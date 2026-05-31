@@ -1,0 +1,21 @@
+target/
+node_modules/
+dist/
+.vite/
+.env
+.env.*
+!.env.example
+
+# Tauri/build output
+apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/gen/
+
+# Local RepoMemo workspace data
+.repomemo/
+workspace-data/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

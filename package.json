@@ -1,0 +1,20 @@
+{
+  "name": "repomemo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local-first technical memory workspace for teams.",
+  "workspaces": [
+    "apps/desktop",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm --workspace @repomemo/desktop run tauri:dev",
+    "web:dev": "npm --workspace @repomemo/desktop run dev",
+    "build": "npm --workspace @repomemo/desktop run build",
+    "typecheck": "npm --workspace @repomemo/desktop run typecheck"
+  },
+  "engines": {
+    "node": ">=22",
+    "npm": ">=10"
+  }
+}
