@@ -36,6 +36,14 @@ Why: starts the React UI in browser-preview mode. This does not launch the nativ
 
 ## Verify The Rust Workspace
 
+If this is a fresh checkout, create the local Tauri icon first:
+
+```powershell
+npm run icons
+```
+
+Why: Tauri's Windows resource build requires `apps/desktop/src-tauri/icons/icon.ico`.
+
 ```powershell
 cargo check
 ```
@@ -43,6 +51,7 @@ cargo check
 Why: verifies Rust crates, Tauri command wiring, SQLx migrations, and compile-time Rust dependencies.
 
 This requires Rust/Cargo to be installed and available on `PATH`.
+See `docs/WINDOWS_SETUP.md` if PowerShell reports `cargo` as not recognized.
 
 ## Run The Desktop App
 

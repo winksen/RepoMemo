@@ -23,6 +23,7 @@ Track implementation progress in [docs/IMPLEMENTATION_TRACKER.md](docs/IMPLEMENT
 - Platform prerequisites for Tauri 2
 
 Rust/Cargo must be available on `PATH` before the desktop app can compile.
+For Windows setup details, see [docs/WINDOWS_SETUP.md](docs/WINDOWS_SETUP.md).
 
 ## Development
 

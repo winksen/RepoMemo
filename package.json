@@ -11,6 +11,7 @@
     "dev": "npm --workspace @repomemo/desktop run tauri:dev",
     "web:dev": "npm --workspace @repomemo/desktop run dev",
     "build": "npm --workspace @repomemo/desktop run build",
+    "icons": "node scripts/create-tauri-icon.mjs",
     "typecheck": "npm --workspace @repomemo/desktop run typecheck"
   },
   "engines": {

@@ -16,8 +16,16 @@ Status: implemented, pending Rust toolchain verification
 | Tauri command bridge | Done | Desktop app can call Rust commands to list/create workspaces and read storage location. |
 | React UI shell | Done | Initial workbench, workspace creation, workspace list, and settings panel. |
 | Tauri capabilities | Done | Default Tauri v2 capability file added for the main window. |
+| Tauri icon generator | Done | `npm run icons` creates the required Windows `icon.ico` asset. |
 | Development command reference | Done | See `docs/DEVELOPMENT_COMMANDS.md`. |
-| Local verification | Partial | Frontend typecheck/build passed. Rust verification requires Cargo on PATH. |
+| Local verification | Partial | Frontend typecheck/build passed from user terminal. Rust/Tauri verification is blocked until Cargo is installed and on PATH. |
+
+Latest verification:
+
+- `npm run typecheck`: passed
+- `npm run build`: passed
+- `cargo check`: passed the MSVC linker step, now needs generated Tauri icon asset
+- `npm run dev`: pending Rust native toolchain completion
 
 ## Phase 1B: Upload And Store
 
