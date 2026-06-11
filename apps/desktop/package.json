@@ -11,8 +11,10 @@
     "tauri:build": "tauri build"
   },
   "dependencies": {
+    "@fontsource/outfit": "^5.2.8",
+    "@tabler/icons-react": "^3.44.0",
     "@tauri-apps/api": "^2.0.0",
-    "lucide-react": "^0.468.0",
+    "@tauri-apps/plugin-dialog": "^2.0.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

@@ -15,6 +15,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 repomemo-api.workspace = true
 repomemo-domain.workspace = true
 tauri.workspace = true
+tauri-plugin-dialog.workspace = true
 tokio.workspace = true
 
 [build-dependencies]

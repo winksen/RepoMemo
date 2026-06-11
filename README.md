@@ -1,19 +1,32 @@
 # RepoMemo
 
-RepoMemo is a local-first technical memory workspace. The first phase focuses on a Tauri desktop shell, a Rust core, SQLite-backed workspace metadata, and the project structure needed for ingestion and retrieval.
+RepoMemo is a local-first technical memory workspace. It starts as a Tauri desktop app with a React UI, Rust core, SQLite metadata storage, and local filesystem blob storage.
 
-## Current Phase
+## Current Capabilities
 
-Phase 1A is being built first:
+Phase 1A is implemented and running locally:
 
-- Rust workspace and core crate boundaries
-- Tauri + React desktop app
-- SQLite database setup and migrations
-- Local app data folder
-- Basic workspace create/list flow
-- Basic settings surface
+- Create and list local workspaces.
+- Persist workspace metadata in SQLite.
+- Show the local app data/storage root.
+- Prove the React UI can call Rust through Tauri commands.
+- Prepare the schema and blob folder for sources, artifacts, chunks, search, AI, and memory cards.
+- Import supported files/folders into local blob storage.
+- List imported artifacts and preview stored text content.
+
+Not implemented yet:
+
+- Chunking/indexing
+- Search
+- AI answers/summaries
+- Memory cards
+
+## Roadmap
 
 Track implementation progress in [docs/IMPLEMENTATION_TRACKER.md](docs/IMPLEMENTATION_TRACKER.md).
+The next-phase roadmap lives in [docs/ROADMAP.md](docs/ROADMAP.md).
+
+UI work should follow the visual system in [docs/design/RepoMemo_UI_DESIGN_SYSTEM.md](docs/design/RepoMemo_UI_DESIGN_SYSTEM.md).
 
 ## Prerequisites
 
@@ -32,6 +45,8 @@ Install JavaScript dependencies:
 ```powershell
 npm.cmd install
 ```
+
+Run this after dependency changes too, such as adding the Tauri dialog plugin.
 
 Run the desktop app:
 

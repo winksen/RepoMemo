@@ -9,6 +9,7 @@ npm.cmd install
 ```
 
 Why: downloads the React, Vite, Tauri CLI, and UI icon dependencies declared in `package.json`.
+Run this again whenever `package.json` changes, such as after adding a Tauri plugin.
 
 ## Typecheck The Frontend
 
@@ -52,6 +53,14 @@ Why: verifies Rust crates, Tauri command wiring, SQLx migrations, and compile-ti
 
 This requires Rust/Cargo to be installed and available on `PATH`.
 See `docs/WINDOWS_SETUP.md` if PowerShell reports `cargo` as not recognized.
+
+## Run Rust Tests
+
+```powershell
+cargo test
+```
+
+Why: runs unit tests for ingestion rules, content hashing, and future Rust core behavior.
 
 ## Run The Desktop App
 

@@ -4,7 +4,7 @@ This tracker records what has been added, what is partially wired, and what rema
 
 ## Phase 1A: Skeleton
 
-Status: implemented, pending Rust toolchain verification
+Status: implemented and running locally
 
 | Area | Status | Notes |
 | --- | --- | --- |
@@ -15,35 +15,43 @@ Status: implemented, pending Rust toolchain verification
 | Storage core | Done | Opens local SQLite DB, creates app data folders, runs migrations, and manages workspaces. |
 | Tauri command bridge | Done | Desktop app can call Rust commands to list/create workspaces and read storage location. |
 | React UI shell | Done | Initial workbench, workspace creation, workspace list, and settings panel. |
+| UI design system | Done | Grey-first Spotify-like block layout, blue highlight rules, light/dark tokens, and compact UX guidance documented in `docs/design/RepoMemo_UI_DESIGN_SYSTEM.md`. |
 | Tauri capabilities | Done | Default Tauri v2 capability file added for the main window. |
 | Tauri icon generator | Done | `npm run icons` creates the required Windows `icon.ico` asset. |
 | Development command reference | Done | See `docs/DEVELOPMENT_COMMANDS.md`. |
-| Local verification | Partial | Frontend typecheck/build passed from user terminal. Rust/Tauri verification is blocked until Cargo is installed and on PATH. |
+| Local verification | Done | Frontend typecheck/build passed from user terminal; desktop app opens locally and can create workspaces. |
+| Next-phase roadmap | Done | See `docs/ROADMAP.md` and `docs/phases/`. |
 
 Latest verification:
 
 - `npm run typecheck`: passed
 - `npm run build`: passed
-- `cargo check`: passed the MSVC linker step, now needs generated Tauri icon asset
-- `npm run dev`: pending Rust native toolchain completion
+- `cargo check`: native toolchain reached after installing Rust/MSVC dependencies
+- `npm run dev`: desktop app opens locally
 
-## Phase 1B: Upload And Store
+## Phase 1B: Import And Store
 
-Status: not started
+Status: implemented, pending local validation
 
-Planned:
+Spec: `docs/phases/PHASE_1B_IMPORT_AND_STORE.md`
 
-- File and folder import commands
-- Accepted extensions for Markdown, text, and common code files
-- Content hashing and content-addressed blob storage
-- Artifact/source records
-- Import status UI
+| Area | Status | Notes |
+| --- | --- | --- |
+| Ingestion crate | Done | `crates/ingestion` discovers selected files/folders, skips ignored directories, filters by extension/size, and detects binary files. |
+| Accepted extensions | Done | `md`, `mdx`, `txt`, `rs`, `ts`, `tsx`, `js`, `jsx`, `py`, `json`, `toml`, `yaml`, `yml`, `sql`, `html`, `css`, `sh`, `ps1`. |
+| Blob storage | Done | Imported file bytes are written to content-addressed blob paths under the app data folder. |
+| Source/artifact records | Done | Imports create or reuse sources and upsert artifact records in SQLite. |
+| Tauri commands | Done | Added `import_paths`, `list_artifacts`, `get_artifact`, and `get_workspace_overview`. |
+| Dialog support | Done | Added Tauri dialog plugin dependency and default permission. |
+| Artifacts UI | Done | Enabled import/artifact workbench, import report, artifact rows, workspace counts, and stored-content preview. |
+| Visual rework | Done | Existing shell now uses separate rounded grey blocks, blue-only highlights, no selected-row left stripe, and a functional light/dark toggle. |
+| Validation | Pending | Run `npm install`, `npm run typecheck`, `npm run build`, `cargo test`, `cargo check`, and `npm run dev`. |
 
 ## Phase 1C: Text Extraction And Chunking
 
 Status: not started
 
-Planned:
+Spec: `docs/phases/PHASE_1C_TEXT_EXTRACTION_AND_CHUNKING.md`
 
 - Text extraction for Markdown, text, and code
 - Markdown heading path extraction
@@ -54,15 +62,61 @@ Planned:
 
 Status: not started
 
-Planned:
+Spec: `docs/phases/PHASE_1D_FULL_TEXT_SEARCH.md`
 
 - SQLite FTS5 search endpoint
 - Search UI
 - Type/language/source filters
 - Result snippets and artifact navigation
 
-## Phase 1E And Later
+## Phase 1E: Code Symbol Index
+
+Status: not started
+
+Spec: `docs/phases/PHASE_1E_CODE_SYMBOL_INDEX.md`
+
+- Tree-sitter parser integration for TypeScript, Python, and Rust
+- Symbol extraction into the existing symbols table
+- File outline view
+- Symbol-aware search results
+
+## Phase 1F: AI Provider Layer
+
+Status: not started
+
+Spec: `docs/phases/PHASE_1F_AI_PROVIDER_LAYER.md`
+
+- Provider abstraction
+- Ollama-compatible local provider first
+- Explicit opt-in cloud provider path later
+- Summary command with citations
+
+## Phase 1G: Semantic Search And Ask
+
+Status: not started
+
+Spec: `docs/phases/PHASE_1G_SEMANTIC_SEARCH_AND_ASK.md`
+
+- Local embedding storage in SQLite for MVP
+- Hybrid retrieval
+- Ask UI with citations
+- Insufficient-context behavior
+
+## Phase 1H: Memory Cards
+
+Status: not started
+
+Spec: `docs/phases/PHASE_1H_MEMORY_CARDS.md`
+
+- Manual memory card creation
+- Save cited answers/summaries as durable memory
+- Link memory cards to artifacts/chunks
+- Memory card search/export
+
+## Phase 2 And Later
 
 Status: deferred
 
-Code symbols, AI providers, semantic search, ask-with-citations, and memory cards are represented in the schema and domain model, but implementation starts after the local import/search loop is working.
+Strategic roadmap: `docs/ROADMAP.md`
+
+Git-aware indexing, issue/PR connectors, team server mode, and enterprise/hosted capabilities remain deferred until Phase 1 proves the local memory loop.

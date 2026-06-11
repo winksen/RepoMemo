@@ -1,7 +1,10 @@
 use std::path::PathBuf;
 
 use repomemo_api::RepoMemoCore;
-use repomemo_domain::{AppSettings, Workspace};
+use repomemo_domain::{
+    AppSettings, ArtifactDetail, ArtifactSummary, ImportReport, ImportRequest, Workspace,
+    WorkspaceOverview,
+};
 use tauri::{Manager, State};
 
 #[derive(Clone)]
@@ -35,8 +38,61 @@ fn get_app_settings(state: State<'_, AppState>) -> AppSettings {
     state.core.app_settings()
 }
 
+#[tauri::command]
+async fn import_paths(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    paths: Vec<String>,
+) -> Result<ImportReport, String> {
+    state
+        .core
+        .import_paths(ImportRequest {
+            workspace_id,
+            paths,
+        })
+        .await
+        .map_err(to_command_error)
+}
+
+#[tauri::command]
+async fn list_artifacts(
+    state: State<'_, AppState>,
+    workspace_id: String,
+) -> Result<Vec<ArtifactSummary>, String> {
+    state
+        .core
+        .list_artifacts(workspace_id)
+        .await
+        .map_err(to_command_error)
+}
+
+#[tauri::command]
+async fn get_artifact(
+    state: State<'_, AppState>,
+    artifact_id: String,
+) -> Result<ArtifactDetail, String> {
+    state
+        .core
+        .get_artifact(artifact_id)
+        .await
+        .map_err(to_command_error)
+}
+
+#[tauri::command]
+async fn get_workspace_overview(
+    state: State<'_, AppState>,
+    workspace_id: String,
+) -> Result<WorkspaceOverview, String> {
+    state
+        .core
+        .workspace_overview(workspace_id)
+        .await
+        .map_err(to_command_error)
+}
+
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let data_dir = resolve_data_dir(app);
             let core = tauri::async_runtime::block_on(RepoMemoCore::boot(data_dir))
@@ -49,7 +105,11 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             list_workspaces,
             create_workspace,
-            get_app_settings
+            get_app_settings,
+            import_paths,
+            list_artifacts,
+            get_artifact,
+            get_workspace_overview
         ])
         .run(tauri::generate_context!())
         .expect("error while running RepoMemo");
