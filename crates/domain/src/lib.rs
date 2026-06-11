@@ -101,6 +101,7 @@ pub struct ArtifactDetail {
     pub metadata: Value,
     pub content_preview: Option<String>,
     pub content_truncated: bool,
+    pub chunks: Vec<Chunk>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -141,6 +142,20 @@ pub struct Chunk {
     pub content_hash: String,
     pub embedding_status: String,
     pub metadata: Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IndexingJobStatus {
+    pub id: String,
+    pub workspace_id: String,
+    pub source_id: Option<String>,
+    pub status: String,
+    pub stage: String,
+    pub progress_current: i64,
+    pub progress_total: Option<i64>,
+    pub error_message: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

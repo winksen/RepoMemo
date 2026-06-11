@@ -28,6 +28,8 @@ import {
   getAppSettings,
   getArtifact,
   getWorkspaceOverview,
+  indexArtifact,
+  indexWorkspace,
   importPaths,
   listArtifacts,
   listWorkspaces,
@@ -36,6 +38,7 @@ import type {
   AppSettings,
   ArtifactDetail,
   ArtifactSummary,
+  IndexingJobStatus,
   ImportReport,
   Workspace,
   WorkspaceOverview,
@@ -69,6 +72,8 @@ export function App() {
   const [artifactDetail, setArtifactDetail] = useState<ArtifactDetail | null>(null);
   const [overview, setOverview] = useState<WorkspaceOverview | null>(null);
   const [importReport, setImportReport] = useState<ImportReport | null>(null);
+  const [indexingJob, setIndexingJob] = useState<IndexingJobStatus | null>(null);
+  const [isIndexing, setIsIndexing] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [manualPath, setManualPath] = useState("");
   const [theme, setTheme] = useState<ThemeMode>(() => {
@@ -252,6 +257,50 @@ export function App() {
     }
   }
 
+  async function handleIndexArtifact(artifactId = selectedArtifactId) {
+    if (!artifactId) {
+      return;
+    }
+
+    setIsIndexing(true);
+    setErrorMessage(null);
+
+    try {
+      const job = await indexArtifact(artifactId);
+      setIndexingJob(job);
+      await refreshWorkspaceData(selectedWorkspaceId);
+      const detail = await getArtifact(artifactId);
+      setArtifactDetail(detail);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsIndexing(false);
+    }
+  }
+
+  async function handleIndexWorkspace() {
+    if (!selectedWorkspaceId) {
+      return;
+    }
+
+    setIsIndexing(true);
+    setErrorMessage(null);
+
+    try {
+      const job = await indexWorkspace(selectedWorkspaceId);
+      setIndexingJob(job);
+      await refreshWorkspaceData(selectedWorkspaceId);
+      if (selectedArtifactId) {
+        const detail = await getArtifact(selectedArtifactId);
+        setArtifactDetail(detail);
+      }
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsIndexing(false);
+    }
+  }
+
   return (
     <main className="app-shell">
       <aside className="sidebar">
@@ -356,6 +405,10 @@ export function App() {
           <ArtifactsView
             artifactDetail={artifactDetail}
             artifacts={artifacts}
+            indexingJob={indexingJob}
+            isIndexing={isIndexing}
+            onIndexArtifact={handleIndexArtifact}
+            onIndexWorkspace={handleIndexWorkspace}
             onRefresh={() => refreshWorkspaceData()}
             onSelectArtifact={setSelectedArtifactId}
             overview={currentOverview}
@@ -555,6 +608,10 @@ function ImportView({
 function ArtifactsView({
   artifactDetail,
   artifacts,
+  indexingJob,
+  isIndexing,
+  onIndexArtifact,
+  onIndexWorkspace,
   onRefresh,
   onSelectArtifact,
   overview,
@@ -563,6 +620,10 @@ function ArtifactsView({
 }: {
   artifactDetail: ArtifactDetail | null;
   artifacts: ArtifactSummary[];
+  indexingJob: IndexingJobStatus | null;
+  isIndexing: boolean;
+  onIndexArtifact: (artifactId?: string | null) => void;
+  onIndexWorkspace: () => void;
   onRefresh: () => void;
   onSelectArtifact: (id: string) => void;
   overview: WorkspaceOverview;
@@ -585,6 +646,15 @@ function ArtifactsView({
     <div className="artifact-layout">
       <section className="panel artifact-main">
         <PanelHeader icon={Archive} label="Artifacts" title="Stored files">
+          <button
+            className="button primary"
+            disabled={isIndexing || artifacts.length === 0}
+            type="button"
+            onClick={onIndexWorkspace}
+          >
+            {isIndexing ? <Loader2 className="spin" size={16} /> : <Database size={16} />}
+            Index all
+          </button>
           <button className="button secondary" type="button" onClick={onRefresh}>
             <RefreshCw size={16} />
             Refresh
@@ -592,6 +662,8 @@ function ArtifactsView({
         </PanelHeader>
 
         <MetricGrid overview={overview} compact />
+
+        {indexingJob ? <IndexingJobPanel job={indexingJob} /> : null}
 
         <div className="artifact-list">
           {artifacts.length === 0 ? (
@@ -630,7 +702,17 @@ function ArtifactsView({
       </section>
 
       <aside className="panel detail-panel">
-        <PanelHeader icon={BookOpen} label="Preview" title="Artifact detail" />
+        <PanelHeader icon={BookOpen} label="Preview" title="Artifact detail">
+          <button
+            className="button secondary"
+            disabled={!artifactDetail || isIndexing}
+            type="button"
+            onClick={() => onIndexArtifact(artifactDetail?.summary.id)}
+          >
+            {isIndexing ? <Loader2 className="spin" size={16} /> : <Database size={16} />}
+            {artifactDetail?.summary.indexed_at ? "Reindex" : "Index"}
+          </button>
+        </PanelHeader>
         {artifactDetail ? (
           <div className="artifact-detail">
             <h3>{artifactDetail.summary.title}</h3>
@@ -645,6 +727,12 @@ function ArtifactsView({
               <StatusBadge tone="neutral">
                 {artifactDetail.summary.source_name}
               </StatusBadge>
+              <StatusBadge tone={artifactDetail.summary.indexed_at ? "success" : "warning"}>
+                {artifactDetail.summary.indexed_at ? "Ready" : "Stored"}
+              </StatusBadge>
+              <StatusBadge tone="neutral">
+                {artifactDetail.chunks.length} chunks
+              </StatusBadge>
             </div>
             <pre className="content-preview">
               {artifactDetail.content_preview ?? "Preview unavailable."}
@@ -652,6 +740,7 @@ function ArtifactsView({
             {artifactDetail.content_truncated ? (
               <p className="truncated-note">Preview truncated to keep the workbench responsive.</p>
             ) : null}
+            <ChunkList detail={artifactDetail} />
           </div>
         ) : (
           <EmptyState
@@ -776,6 +865,64 @@ function ImportReportPanel({ report }: { report: ImportReport }) {
   );
 }
 
+function IndexingJobPanel({ job }: { job: IndexingJobStatus }) {
+  const total = job.progress_total ?? job.progress_current;
+  const progressText =
+    total > 0 ? `${job.progress_current}/${total}` : `${job.progress_current}`;
+
+  return (
+    <section className="report-panel">
+      <div className="report-counts">
+        <StatusBadge tone={job.status === "completed" ? "success" : "warning"}>
+          {job.status === "completed" ? "Ready" : "Indexing"}
+        </StatusBadge>
+        <StatusBadge tone="neutral">{job.stage.replace(/_/g, " ")}</StatusBadge>
+        <StatusBadge tone="neutral">{progressText}</StatusBadge>
+      </div>
+      {job.error_message ? <p className="job-error">{job.error_message}</p> : null}
+    </section>
+  );
+}
+
+function ChunkList({ detail }: { detail: ArtifactDetail }) {
+  if (detail.chunks.length === 0) {
+    return (
+      <section className="chunk-panel">
+        <div className="chunk-panel-header">
+          <strong>Chunks</strong>
+          <StatusBadge tone="warning">Not indexed</StatusBadge>
+        </div>
+        <p className="chunk-empty">
+          Run Index to generate line-based chunks for search and citations.
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="chunk-panel">
+      <div className="chunk-panel-header">
+        <strong>Chunks</strong>
+        <StatusBadge tone="success">{detail.chunks.length} ready</StatusBadge>
+      </div>
+      <div className="chunk-list">
+        {detail.chunks.map((chunk) => (
+          <article className="chunk-row" key={chunk.id || chunk.chunk_index}>
+            <div className="chunk-row-header">
+              <strong>Chunk {chunk.chunk_index + 1}</strong>
+              <span>{formatLineRange(chunk.start_line, chunk.end_line)}</span>
+            </div>
+            {chunk.heading_path ? (
+              <p className="chunk-heading">{chunk.heading_path}</p>
+            ) : null}
+            <p className="chunk-preview">{chunk.text}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function StatusBadge({
   children,
   tone = "neutral",
@@ -816,6 +963,14 @@ function formatBytes(bytes: number) {
     return `${(bytes / 1024).toFixed(1)} KB`;
   }
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatLineRange(start: number | null, end: number | null) {
+  if (start && end) {
+    return start === end ? `line ${start}` : `lines ${start}-${end}`;
+  }
+
+  return "lines unknown";
 }
 
 function formatDate(value: string) {

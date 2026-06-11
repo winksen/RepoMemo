@@ -296,6 +296,14 @@ Recommended widths:
 - inter-block gap: `8px` to `12px`
 - major block radius: `10px` to `12px`
 
+Scrolling contract:
+
+- the app shell is viewport-bound; do not allow `body`, `#root`, or the top-level app grid to become the primary scroll container
+- the sidebar is a fixed/sticky block and should not scroll with main content
+- the top header/status region is its own rounded block, separated from the content blocks by the same inter-block gap
+- each main section is its own rounded block and owns overflow when its content exceeds the available height
+- lists, previews, reports, and detail panes may scroll internally; avoid nested page-level scrolling
+
 The current two-column skeleton can evolve into this model without visual churn.
 
 ### Navigation

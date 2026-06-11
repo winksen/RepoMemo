@@ -10,8 +10,8 @@ const DEFAULT_MAX_FILE_BYTES: u64 = 5 * 1024 * 1024;
 const BINARY_SAMPLE_BYTES: usize = 8192;
 
 const ACCEPTED_EXTENSIONS: &[&str] = &[
-    "md", "mdx", "txt", "rs", "ts", "tsx", "js", "jsx", "py", "json", "toml", "yaml", "yml",
-    "sql", "html", "css", "sh", "ps1",
+    "md", "mdx", "txt", "rs", "ts", "tsx", "js", "jsx", "py", "json", "toml", "yaml", "yml", "sql",
+    "html", "css", "sh", "ps1",
 ];
 
 const IGNORED_DIRECTORIES: &[&str] = &[

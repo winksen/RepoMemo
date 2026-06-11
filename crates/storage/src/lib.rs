@@ -3,8 +3,8 @@ use std::path::{Path, PathBuf};
 use anyhow::{bail, Context, Result};
 use chrono::Utc;
 use repomemo_domain::{
-    ArtifactDetail, ArtifactSummary, ArtifactType, Source, SourceType, Workspace,
-    WorkspaceOverview,
+    ArtifactDetail, ArtifactSummary, ArtifactType, Chunk, IndexingJobStatus, Source, SourceType,
+    Workspace, WorkspaceOverview,
 };
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -82,6 +82,36 @@ struct ArtifactDetailRow {
     updated_at: String,
     indexed_at: Option<String>,
     metadata_json: String,
+}
+
+#[derive(Debug, sqlx::FromRow)]
+struct ChunkRow {
+    id: String,
+    artifact_id: String,
+    workspace_id: String,
+    chunk_index: i64,
+    text: String,
+    token_count: Option<i64>,
+    start_line: Option<i64>,
+    end_line: Option<i64>,
+    heading_path: Option<String>,
+    content_hash: String,
+    embedding_status: String,
+    metadata_json: String,
+}
+
+#[derive(Debug, sqlx::FromRow)]
+struct IndexingJobRow {
+    id: String,
+    workspace_id: String,
+    source_id: Option<String>,
+    status: String,
+    stage: String,
+    progress_current: i64,
+    progress_total: Option<i64>,
+    error_message: Option<String>,
+    created_at: String,
+    updated_at: String,
 }
 
 #[derive(Debug, Clone)]
@@ -292,9 +322,9 @@ impl StorageEngine {
         }
 
         if tokio::fs::metadata(&blob_path).await.is_err() {
-            tokio::fs::write(&blob_path, bytes).await.with_context(|| {
-                format!("failed to write blob {}", blob_path.display())
-            })?;
+            tokio::fs::write(&blob_path, bytes)
+                .await
+                .with_context(|| format!("failed to write blob {}", blob_path.display()))?;
         }
 
         let storage_uri = self.blob_storage_uri(content_hash);
@@ -447,13 +477,206 @@ impl StorageEngine {
             &bytes
         };
         let content_preview = String::from_utf8(preview_bytes.to_vec()).ok();
+        let chunks = self.list_chunks_for_artifact(artifact_id).await?;
 
         Ok(ArtifactDetail {
             summary,
             metadata,
             content_preview,
             content_truncated,
+            chunks,
         })
+    }
+
+    pub async fn get_artifact_summary(&self, artifact_id: &str) -> Result<ArtifactSummary> {
+        let row = sqlx::query_as::<_, ArtifactSummaryRow>(
+            r#"
+            SELECT
+              artifacts.id,
+              artifacts.workspace_id,
+              artifacts.source_id,
+              sources.name AS source_name,
+              artifacts.type AS artifact_type,
+              artifacts.title,
+              artifacts.path,
+              artifacts.content_hash,
+              artifacts.mime_type,
+              artifacts.language,
+              artifacts.size_bytes,
+              artifacts.created_at,
+              artifacts.updated_at,
+              artifacts.indexed_at
+            FROM artifacts
+            JOIN sources ON sources.id = artifacts.source_id
+            WHERE artifacts.id = ?1
+            "#,
+        )
+        .bind(artifact_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(ArtifactSummary::from(row))
+    }
+
+    pub async fn read_artifact_blob(&self, artifact_id: &str) -> Result<Vec<u8>> {
+        let content_hash = sqlx::query_scalar::<_, String>(
+            r#"
+            SELECT content_hash
+            FROM artifacts
+            WHERE id = ?1
+            "#,
+        )
+        .bind(artifact_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        tokio::fs::read(self.blob_path(&content_hash))
+            .await
+            .with_context(|| format!("failed to read blob for artifact {artifact_id}"))
+    }
+
+    pub async fn replace_artifact_chunks(
+        &self,
+        artifact_id: &str,
+        chunks: Vec<Chunk>,
+    ) -> Result<()> {
+        let now = Utc::now().to_rfc3339();
+        let mut tx = self.pool.begin().await?;
+
+        sqlx::query("DELETE FROM chunks WHERE artifact_id = ?1")
+            .bind(artifact_id)
+            .execute(&mut *tx)
+            .await?;
+
+        for mut chunk in chunks {
+            if chunk.id.is_empty() {
+                chunk.id = Uuid::new_v4().to_string();
+            }
+            let metadata_json = serde_json::to_string(&chunk.metadata)?;
+
+            sqlx::query(
+                r#"
+                INSERT INTO chunks (
+                  id,
+                  artifact_id,
+                  workspace_id,
+                  chunk_index,
+                  text,
+                  token_count,
+                  start_line,
+                  end_line,
+                  heading_path,
+                  content_hash,
+                  embedding_status,
+                  metadata_json
+                )
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+                "#,
+            )
+            .bind(&chunk.id)
+            .bind(&chunk.artifact_id)
+            .bind(&chunk.workspace_id)
+            .bind(chunk.chunk_index)
+            .bind(&chunk.text)
+            .bind(chunk.token_count)
+            .bind(chunk.start_line)
+            .bind(chunk.end_line)
+            .bind(&chunk.heading_path)
+            .bind(&chunk.content_hash)
+            .bind(&chunk.embedding_status)
+            .bind(&metadata_json)
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        sqlx::query(
+            r#"
+            UPDATE artifacts
+            SET indexed_at = ?1,
+                updated_at = ?1
+            WHERE id = ?2
+            "#,
+        )
+        .bind(&now)
+        .bind(artifact_id)
+        .execute(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+
+        Ok(())
+    }
+
+    pub async fn create_indexing_job(
+        &self,
+        workspace_id: &str,
+        source_id: Option<&str>,
+        stage: &str,
+        progress_total: Option<i64>,
+    ) -> Result<IndexingJobStatus> {
+        let id = Uuid::new_v4().to_string();
+        let now = Utc::now().to_rfc3339();
+
+        sqlx::query(
+            r#"
+            INSERT INTO indexing_jobs (
+              id,
+              workspace_id,
+              source_id,
+              status,
+              stage,
+              progress_current,
+              progress_total,
+              created_at,
+              updated_at
+            )
+            VALUES (?1, ?2, ?3, 'running', ?4, 0, ?5, ?6, ?7)
+            "#,
+        )
+        .bind(&id)
+        .bind(workspace_id)
+        .bind(source_id)
+        .bind(stage)
+        .bind(progress_total)
+        .bind(&now)
+        .bind(&now)
+        .execute(&self.pool)
+        .await?;
+
+        self.get_indexing_job(&id).await
+    }
+
+    pub async fn update_indexing_job(
+        &self,
+        job_id: &str,
+        status: &str,
+        stage: &str,
+        progress_current: i64,
+        error_message: Option<&str>,
+    ) -> Result<IndexingJobStatus> {
+        let now = Utc::now().to_rfc3339();
+
+        sqlx::query(
+            r#"
+            UPDATE indexing_jobs
+            SET status = ?1,
+                stage = ?2,
+                progress_current = ?3,
+                error_message = ?4,
+                updated_at = ?5
+            WHERE id = ?6
+            "#,
+        )
+        .bind(status)
+        .bind(stage)
+        .bind(progress_current)
+        .bind(error_message)
+        .bind(&now)
+        .bind(job_id)
+        .execute(&self.pool)
+        .await?;
+
+        self.get_indexing_job(job_id).await
     }
 
     pub async fn workspace_overview(&self, workspace_id: &str) -> Result<WorkspaceOverview> {
@@ -521,6 +744,59 @@ impl StorageEngine {
         Ok(ArtifactSummary::from(row))
     }
 
+    async fn list_chunks_for_artifact(&self, artifact_id: &str) -> Result<Vec<Chunk>> {
+        let rows = sqlx::query_as::<_, ChunkRow>(
+            r#"
+            SELECT
+              id,
+              artifact_id,
+              workspace_id,
+              chunk_index,
+              text,
+              token_count,
+              start_line,
+              end_line,
+              heading_path,
+              content_hash,
+              embedding_status,
+              metadata_json
+            FROM chunks
+            WHERE artifact_id = ?1
+            ORDER BY chunk_index ASC
+            "#,
+        )
+        .bind(artifact_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows.into_iter().map(Chunk::from).collect())
+    }
+
+    async fn get_indexing_job(&self, job_id: &str) -> Result<IndexingJobStatus> {
+        let row = sqlx::query_as::<_, IndexingJobRow>(
+            r#"
+            SELECT
+              id,
+              workspace_id,
+              source_id,
+              status,
+              stage,
+              progress_current,
+              progress_total,
+              error_message,
+              created_at,
+              updated_at
+            FROM indexing_jobs
+            WHERE id = ?1
+            "#,
+        )
+        .bind(job_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(IndexingJobStatus::from(row))
+    }
+
     async fn count_for_workspace(&self, table: &str, workspace_id: &str) -> Result<i64> {
         let sql = format!("SELECT COUNT(*) FROM {table} WHERE workspace_id = ?1");
         let count = sqlx::query_scalar::<_, i64>(&sql)
@@ -550,9 +826,8 @@ impl StorageEngine {
 
 impl From<WorkspaceRow> for Workspace {
     fn from(row: WorkspaceRow) -> Self {
-        let settings = serde_json::from_str(&row.settings_json).unwrap_or_else(|_| {
-            Value::Object(Default::default())
-        });
+        let settings = serde_json::from_str(&row.settings_json)
+            .unwrap_or_else(|_| Value::Object(Default::default()));
 
         Self {
             id: row.id,
@@ -622,6 +897,45 @@ impl ArtifactDetailRow {
             created_at: self.created_at.clone(),
             updated_at: self.updated_at.clone(),
             indexed_at: self.indexed_at.clone(),
+        }
+    }
+}
+
+impl From<ChunkRow> for Chunk {
+    fn from(row: ChunkRow) -> Self {
+        let metadata = serde_json::from_str(&row.metadata_json)
+            .unwrap_or_else(|_| Value::Object(Default::default()));
+
+        Self {
+            id: row.id,
+            artifact_id: row.artifact_id,
+            workspace_id: row.workspace_id,
+            chunk_index: row.chunk_index,
+            text: row.text,
+            token_count: row.token_count,
+            start_line: row.start_line,
+            end_line: row.end_line,
+            heading_path: row.heading_path,
+            content_hash: row.content_hash,
+            embedding_status: row.embedding_status,
+            metadata,
+        }
+    }
+}
+
+impl From<IndexingJobRow> for IndexingJobStatus {
+    fn from(row: IndexingJobRow) -> Self {
+        Self {
+            id: row.id,
+            workspace_id: row.workspace_id,
+            source_id: row.source_id,
+            status: row.status,
+            stage: row.stage,
+            progress_current: row.progress_current,
+            progress_total: row.progress_total,
+            error_message: row.error_message,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
         }
     }
 }

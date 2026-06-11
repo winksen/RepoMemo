@@ -26,6 +26,7 @@ Latest verification:
 
 - `npm run typecheck`: passed
 - `npm run build`: passed
+- `cargo test`: passed
 - `cargo check`: native toolchain reached after installing Rust/MSVC dependencies
 - `npm run dev`: desktop app opens locally
 
@@ -49,14 +50,21 @@ Spec: `docs/phases/PHASE_1B_IMPORT_AND_STORE.md`
 
 ## Phase 1C: Text Extraction And Chunking
 
-Status: not started
+Status: implemented, pending local validation
 
 Spec: `docs/phases/PHASE_1C_TEXT_EXTRACTION_AND_CHUNKING.md`
 
-- Text extraction for Markdown, text, and code
-- Markdown heading path extraction
-- Chunk records with line ranges
-- Artifact detail view
+| Area | Status | Notes |
+| --- | --- | --- |
+| Indexer crate | Done | `crates/indexer` extracts UTF-8/lossy text and generates deterministic chunks. |
+| Markdown chunking | Done | Markdown/MDX split by heading path first, then size-limited windows. |
+| Code/text chunking | Done | Text, code, and config files split by stable 100-line windows. |
+| Chunk metadata | Done | Chunks preserve artifact/workspace IDs, index, line range, heading path, token estimate, content hash, and `not_configured` embedding status. |
+| Storage integration | Done | Reindexing replaces old chunks transactionally and updates `artifacts.indexed_at`. |
+| Indexing jobs | Done | `indexing_jobs` rows track artifact/workspace indexing status and progress. |
+| Tauri commands | Done | Added `index_artifact` and `index_workspace`. |
+| Artifact detail UI | Done | Detail panel shows indexed status, chunk count, and generated chunk previews with line ranges. |
+| Validation | Done | `cargo test`, `cargo check`, `npm run typecheck`, and `npm run build` pass. |
 
 ## Phase 1D: Full-Text Search
 

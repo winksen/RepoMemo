@@ -57,6 +57,35 @@ export interface ArtifactDetail {
   metadata: Record<string, unknown>;
   content_preview: string | null;
   content_truncated: boolean;
+  chunks: Chunk[];
+}
+
+export interface Chunk {
+  id: string;
+  artifact_id: string;
+  workspace_id: string;
+  chunk_index: number;
+  text: string;
+  token_count: number | null;
+  start_line: number | null;
+  end_line: number | null;
+  heading_path: string | null;
+  content_hash: string;
+  embedding_status: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface IndexingJobStatus {
+  id: string;
+  workspace_id: string;
+  source_id: string | null;
+  status: string;
+  stage: string;
+  progress_current: number;
+  progress_total: number | null;
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ImportSkippedItem {

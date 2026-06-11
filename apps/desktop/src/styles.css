@@ -72,10 +72,18 @@
   box-sizing: border-box;
 }
 
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
 body {
   margin: 0;
   min-width: 960px;
-  min-height: 100vh;
+  height: 100vh;
   color: var(--color-text);
   background: var(--color-bg);
   font-family: var(--font-ui);
@@ -105,16 +113,24 @@ textarea:focus-visible {
   display: grid;
   grid-template-columns: 288px 1fr;
   gap: 10px;
-  min-height: 100vh;
+  width: 100%;
+  height: 100vh;
+  min-height: 0;
   padding: 10px;
+  overflow: hidden;
   background: var(--color-bg);
 }
 
 .sidebar {
+  position: sticky;
+  top: 10px;
   display: flex;
   flex-direction: column;
   gap: 20px;
+  height: calc(100vh - 20px);
+  min-height: 0;
   padding: 20px;
+  overflow: hidden;
   color: var(--color-text);
   background: var(--color-surface);
   border-radius: 10px;
@@ -182,6 +198,9 @@ textarea:focus-visible {
 .nav-list {
   display: grid;
   gap: 4px;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-width: thin;
 }
 
 .nav-item {
@@ -235,10 +254,14 @@ textarea:focus-visible {
 }
 
 .workbench {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
   min-width: 0;
+  min-height: 0;
   padding: 0;
-  background: var(--color-canvas);
-  border-radius: 10px;
+  background: transparent;
+  border-radius: 0;
   overflow: hidden;
 }
 
@@ -251,6 +274,7 @@ textarea:focus-visible {
   margin: 0;
   padding: 16px 18px;
   background: var(--color-surface);
+  border-radius: 10px;
   box-shadow: var(--shadow-raised);
 }
 
@@ -272,7 +296,8 @@ textarea:focus-visible {
   display: grid;
   grid-template-columns: minmax(360px, 0.75fr) minmax(440px, 1.25fr);
   gap: 10px;
-  padding: 10px;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .artifact-layout {
@@ -280,20 +305,26 @@ textarea:focus-visible {
   grid-template-columns: minmax(560px, 1fr) minmax(340px, 420px);
   gap: 10px;
   align-items: start;
-  padding: 10px;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .panel {
   min-width: 0;
+  min-height: 0;
+  max-height: 100%;
   padding: 16px;
+  overflow: auto;
   background: var(--color-surface);
   border-radius: 10px;
   box-shadow: var(--shadow-raised);
+  scrollbar-width: thin;
 }
 
 .artifact-main,
 .detail-panel {
-  min-height: calc(100vh - 112px);
+  height: 100%;
+  min-height: 0;
 }
 
 .panel-header {
@@ -433,6 +464,7 @@ textarea {
 .artifact-list {
   display: grid;
   gap: 6px;
+  min-height: 0;
 }
 
 .workspace-row,
@@ -608,6 +640,76 @@ textarea {
   font-size: 12px;
 }
 
+.job-error,
+.chunk-empty {
+  margin: 10px 0 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.chunk-panel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  background: var(--color-surface-2);
+  border-radius: 8px;
+}
+
+.chunk-panel-header,
+.chunk-row-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.chunk-panel-header strong,
+.chunk-row-header strong {
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.chunk-list {
+  display: grid;
+  gap: 8px;
+  max-height: 360px;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+
+.chunk-row {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  background: var(--color-surface);
+  border-radius: 8px;
+}
+
+.chunk-row-header span,
+.chunk-heading {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.chunk-heading,
+.chunk-preview {
+  margin: 0;
+}
+
+.chunk-preview {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 18px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+  white-space: pre-wrap;
+}
+
 .status-badge {
   display: inline-flex;
   align-items: center;
@@ -651,7 +753,7 @@ textarea {
 
 .content-preview {
   overflow: auto;
-  max-height: calc(100vh - 330px);
+  max-height: min(48vh, 520px);
   margin: 0;
   padding: 12px;
   color: var(--color-text);
@@ -727,9 +829,16 @@ textarea {
     gap: 8px;
   }
 
+  .workbench-grid,
+  .artifact-layout {
+    overflow: auto;
+    scrollbar-width: thin;
+  }
+
   .artifact-main,
   .detail-panel {
-    min-height: auto;
+    height: auto;
+    min-height: 0;
   }
 
   .metric-grid {

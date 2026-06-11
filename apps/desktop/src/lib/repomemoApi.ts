@@ -4,6 +4,8 @@ import type {
   AppSettings,
   ArtifactDetail,
   ArtifactSummary,
+  Chunk,
+  IndexingJobStatus,
   ImportReport,
   Workspace,
   WorkspaceOverview,
@@ -22,12 +24,16 @@ const mockWorkspaces: Workspace[] = [
 ];
 
 const mockArtifacts: ArtifactSummary[] = [];
+const mockChunks = new Map<string, Chunk[]>();
 
 const emptyOverview = (workspaceId: string): WorkspaceOverview => ({
   workspace_id: workspaceId,
   source_count: 0,
   artifact_count: mockArtifacts.length,
-  chunk_count: 0,
+  chunk_count: Array.from(mockChunks.values()).reduce(
+    (total, chunks) => total + chunks.length,
+    0,
+  ),
   symbol_count: 0,
   memory_card_count: 0,
 });
@@ -160,10 +166,66 @@ export async function getArtifact(
       content_preview:
         "# Preview artifact\n\nThis browser preview does not read local files. Run the Tauri app to import real content.",
       content_truncated: false,
+      chunks: mockChunks.get(artifactId) ?? [],
     };
   }
 
   return invoke<ArtifactDetail>("get_artifact", { artifactId });
+}
+
+export async function indexArtifact(
+  artifactId: string,
+): Promise<IndexingJobStatus> {
+  if (!isTauriRuntime) {
+    const artifact = mockArtifacts.find((item) => item.id === artifactId);
+    if (!artifact) {
+      throw new Error("Artifact was not found.");
+    }
+
+    artifact.indexed_at = new Date().toISOString();
+    mockChunks.set(artifactId, [
+      {
+        id: crypto.randomUUID(),
+        artifact_id: artifactId,
+        workspace_id: artifact.workspace_id,
+        chunk_index: 0,
+        text: "# Preview artifact\n\nThis browser preview renders mock chunks.",
+        token_count: 8,
+        start_line: 1,
+        end_line: 3,
+        heading_path: "Preview artifact",
+        content_hash: crypto.randomUUID().replace(/-/g, ""),
+        embedding_status: "not_configured",
+        metadata: {},
+      },
+    ]);
+
+    return mockIndexingJob(artifact.workspace_id, 1, 1, "completed");
+  }
+
+  return invoke<IndexingJobStatus>("index_artifact", { artifactId });
+}
+
+export async function indexWorkspace(
+  workspaceId: string,
+): Promise<IndexingJobStatus> {
+  if (!isTauriRuntime) {
+    const artifacts = mockArtifacts.filter(
+      (artifact) => artifact.workspace_id === workspaceId,
+    );
+    for (const artifact of artifacts) {
+      await indexArtifact(artifact.id);
+    }
+
+    return mockIndexingJob(
+      workspaceId,
+      artifacts.length,
+      artifacts.length,
+      "completed",
+    );
+  }
+
+  return invoke<IndexingJobStatus>("index_workspace", { workspaceId });
 }
 
 export async function getWorkspaceOverview(
@@ -182,4 +244,26 @@ function normalizeDialogSelection(selection: string | string[] | null): string[]
   }
 
   return Array.isArray(selection) ? selection : [selection];
+}
+
+function mockIndexingJob(
+  workspaceId: string,
+  progressCurrent: number,
+  progressTotal: number,
+  status: string,
+): IndexingJobStatus {
+  const now = new Date().toISOString();
+
+  return {
+    id: crypto.randomUUID(),
+    workspace_id: workspaceId,
+    source_id: null,
+    status,
+    stage: status === "completed" ? "chunked" : "chunking",
+    progress_current: progressCurrent,
+    progress_total: progressTotal,
+    error_message: null,
+    created_at: now,
+    updated_at: now,
+  };
 }

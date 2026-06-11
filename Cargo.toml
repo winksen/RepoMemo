@@ -2,6 +2,7 @@
 members = [
   "crates/domain",
   "crates/ingestion",
+  "crates/indexer",
   "crates/storage",
   "crates/api",
   "apps/desktop/src-tauri"
@@ -32,4 +33,5 @@ uuid = { version = "1", features = ["v4", "serde"] }
 repomemo-api = { path = "crates/api" }
 repomemo-domain = { path = "crates/domain" }
 repomemo-ingestion = { path = "crates/ingestion" }
+repomemo-indexer = { path = "crates/indexer" }
 repomemo-storage = { path = "crates/storage" }

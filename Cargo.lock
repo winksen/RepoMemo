@@ -2749,6 +2749,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "repomemo-domain",
+ "repomemo-indexer",
  "repomemo-ingestion",
  "repomemo-storage",
  "serde_json",
@@ -2773,6 +2774,17 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "repomemo-indexer"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "hex",
+ "repomemo-domain",
+ "serde_json",
+ "sha2",
 ]
 
 [[package]]

@@ -2,8 +2,8 @@ use std::path::PathBuf;
 
 use repomemo_api::RepoMemoCore;
 use repomemo_domain::{
-    AppSettings, ArtifactDetail, ArtifactSummary, ImportReport, ImportRequest, Workspace,
-    WorkspaceOverview,
+    AppSettings, ArtifactDetail, ArtifactSummary, ImportReport, ImportRequest, IndexingJobStatus,
+    Workspace, WorkspaceOverview,
 };
 use tauri::{Manager, State};
 
@@ -18,10 +18,7 @@ async fn list_workspaces(state: State<'_, AppState>) -> Result<Vec<Workspace>, S
 }
 
 #[tauri::command]
-async fn create_workspace(
-    state: State<'_, AppState>,
-    name: String,
-) -> Result<Workspace, String> {
+async fn create_workspace(state: State<'_, AppState>, name: String) -> Result<Workspace, String> {
     if name.trim().is_empty() {
         return Err("Workspace name is required.".to_owned());
     }
@@ -79,6 +76,30 @@ async fn get_artifact(
 }
 
 #[tauri::command]
+async fn index_artifact(
+    state: State<'_, AppState>,
+    artifact_id: String,
+) -> Result<IndexingJobStatus, String> {
+    state
+        .core
+        .index_artifact(artifact_id)
+        .await
+        .map_err(to_command_error)
+}
+
+#[tauri::command]
+async fn index_workspace(
+    state: State<'_, AppState>,
+    workspace_id: String,
+) -> Result<IndexingJobStatus, String> {
+    state
+        .core
+        .index_workspace(workspace_id)
+        .await
+        .map_err(to_command_error)
+}
+
+#[tauri::command]
 async fn get_workspace_overview(
     state: State<'_, AppState>,
     workspace_id: String,
@@ -109,6 +130,8 @@ pub fn run() {
             import_paths,
             list_artifacts,
             get_artifact,
+            index_artifact,
+            index_workspace,
             get_workspace_overview
         ])
         .run(tauri::generate_context!())

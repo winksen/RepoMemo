@@ -2,9 +2,10 @@ use std::path::PathBuf;
 
 use anyhow::{bail, Context, Result};
 use repomemo_domain::{
-    AppSettings, ArtifactDetail, ArtifactSummary, ImportReport, ImportRequest, Workspace,
-    WorkspaceOverview,
+    AppSettings, ArtifactDetail, ArtifactSummary, ImportReport, ImportRequest, IndexingJobStatus,
+    Workspace, WorkspaceOverview,
 };
+use repomemo_indexer::index_artifact;
 use repomemo_ingestion::{discover_import_candidates, ImportCandidate, ImportOptions};
 use repomemo_storage::{NewArtifact, StorageConfig, StorageEngine};
 use serde_json::json;
@@ -55,7 +56,10 @@ impl RepoMemoCore {
         };
 
         for candidate in discovery.candidates {
-            match self.import_candidate(&request.workspace_id, candidate).await {
+            match self
+                .import_candidate(&request.workspace_id, candidate)
+                .await
+            {
                 Ok(stored) if stored.created => {
                     report.imported += 1;
                     report.imported_artifacts.push(stored.artifact);
@@ -66,10 +70,12 @@ impl RepoMemoCore {
                 }
                 Err(error) => {
                     report.failed += 1;
-                    report.skipped_items.push(repomemo_domain::ImportSkippedItem {
-                        path: error.path,
-                        reason: error.reason,
-                    });
+                    report
+                        .skipped_items
+                        .push(repomemo_domain::ImportSkippedItem {
+                            path: error.path,
+                            reason: error.reason,
+                        });
                 }
             }
         }
@@ -85,6 +91,88 @@ impl RepoMemoCore {
 
     pub async fn get_artifact(&self, artifact_id: String) -> Result<ArtifactDetail> {
         self.storage.get_artifact(&artifact_id).await
+    }
+
+    pub async fn index_artifact(&self, artifact_id: String) -> Result<IndexingJobStatus> {
+        if artifact_id.trim().is_empty() {
+            bail!("Artifact id is required.");
+        }
+
+        let summary = self.storage.get_artifact_summary(&artifact_id).await?;
+        let job = self
+            .storage
+            .create_indexing_job(
+                &summary.workspace_id,
+                Some(&summary.source_id),
+                "extracting_text",
+                Some(1),
+            )
+            .await?;
+
+        match self.index_artifact_inner(&summary).await {
+            Ok(chunk_count) => {
+                self.storage
+                    .update_indexing_job(
+                        &job.id,
+                        "completed",
+                        &format!("chunked_{chunk_count}_chunks"),
+                        1,
+                        None,
+                    )
+                    .await
+            }
+            Err(error) => {
+                let _ = self
+                    .storage
+                    .update_indexing_job(&job.id, "failed", "failed", 0, Some(&error.to_string()))
+                    .await;
+                Err(error)
+            }
+        }
+    }
+
+    pub async fn index_workspace(&self, workspace_id: String) -> Result<IndexingJobStatus> {
+        if workspace_id.trim().is_empty() {
+            bail!("Workspace id is required.");
+        }
+
+        if !self.storage.workspace_exists(&workspace_id).await? {
+            bail!("Workspace was not found.");
+        }
+
+        let artifacts = self.storage.list_artifacts(&workspace_id).await?;
+        let total = artifacts.len() as i64;
+        let job = self
+            .storage
+            .create_indexing_job(&workspace_id, None, "chunking_workspace", Some(total))
+            .await?;
+
+        let mut indexed = 0_i64;
+        for artifact in artifacts {
+            if let Err(error) = self.index_artifact_inner(&artifact).await {
+                let _ = self
+                    .storage
+                    .update_indexing_job(
+                        &job.id,
+                        "failed",
+                        "failed",
+                        indexed,
+                        Some(&format!("{}: {error}", artifact.path)),
+                    )
+                    .await;
+                return Err(error);
+            }
+
+            indexed += 1;
+            let _ = self
+                .storage
+                .update_indexing_job(&job.id, "running", "chunking_workspace", indexed, None)
+                .await?;
+        }
+
+        self.storage
+            .update_indexing_job(&job.id, "completed", "chunked_workspace", indexed, None)
+            .await
     }
 
     pub async fn workspace_overview(&self, workspace_id: String) -> Result<WorkspaceOverview> {
@@ -160,6 +248,18 @@ impl RepoMemoCore {
             })
             .await
             .map_err(|error| ImportCandidateError::new(&path_display, error))
+    }
+
+    async fn index_artifact_inner(&self, summary: &ArtifactSummary) -> Result<usize> {
+        let bytes = self.storage.read_artifact_blob(&summary.id).await?;
+        let output = index_artifact(summary, &bytes)?;
+        let chunk_count = output.chunks.len();
+
+        self.storage
+            .replace_artifact_chunks(&summary.id, output.chunks)
+            .await?;
+
+        Ok(chunk_count)
     }
 }
 
