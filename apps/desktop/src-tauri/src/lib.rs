@@ -5,6 +5,7 @@ use repomemo_domain::{
     AppSettings, ArtifactDetail, ArtifactSummary, ImportReport, ImportRequest, IndexingJobStatus,
     SearchRequest, SearchResult, Workspace, WorkspaceOverview,
 };
+use serde::Deserialize;
 use tauri::{Manager, State};
 
 #[derive(Clone)]
@@ -47,6 +48,31 @@ async fn import_paths(
             workspace_id,
             paths,
         })
+        .await
+        .map_err(to_command_error)
+}
+
+#[derive(Debug, Deserialize)]
+struct ImportTextRequest {
+    workspace_id: String,
+    title: String,
+    content: String,
+    language: Option<String>,
+}
+
+#[tauri::command]
+async fn import_text(
+    state: State<'_, AppState>,
+    request: ImportTextRequest,
+) -> Result<ArtifactSummary, String> {
+    state
+        .core
+        .import_text(
+            request.workspace_id,
+            request.title,
+            request.content,
+            request.language,
+        )
         .await
         .map_err(to_command_error)
 }
@@ -140,6 +166,7 @@ pub fn run() {
             create_workspace,
             get_app_settings,
             import_paths,
+            import_text,
             list_artifacts,
             get_artifact,
             index_artifact,

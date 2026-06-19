@@ -26,7 +26,9 @@ Not implemented yet:
 Track implementation progress in [docs/IMPLEMENTATION_TRACKER.md](docs/IMPLEMENTATION_TRACKER.md).
 The next-phase roadmap lives in [docs/ROADMAP.md](docs/ROADMAP.md).
 
-UI work should follow the visual system in [docs/design/RepoMemo_UI_DESIGN_SYSTEM.md](docs/design/RepoMemo_UI_DESIGN_SYSTEM.md).
+UI work should follow the visual system in [docs/design/RepoMemo_UI_DESIGN_SYSTEM.md](docs/design/RepoMemo_UI_DESIGN_SYSTEM.md),
+the per-screen specs in [docs/design/RepoMemo_PAGE_BLUEPRINTS.md](docs/design/RepoMemo_PAGE_BLUEPRINTS.md),
+and the reference mockups in [docs/design/mockups/](docs/design/mockups/).
 
 ## Prerequisites
 

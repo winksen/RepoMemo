@@ -24,6 +24,8 @@ import {
   IconX as X,
 } from "@tabler/icons-react";
 import {
+  ACCEPTED_IMAGE_EXTENSIONS,
+  ACCEPTED_TEXT_EXTENSIONS,
   chooseImportFiles,
   chooseImportFolder,
   createWorkspace,
@@ -33,9 +35,12 @@ import {
   indexArtifact,
   indexWorkspace,
   importPaths,
+  importText,
   listArtifacts,
   listWorkspaces,
+  PASTE_LANGUAGES,
   searchWorkspace,
+  type PasteLanguage,
 } from "./lib/repomemoApi";
 import type {
   AppSettings,
@@ -79,7 +84,9 @@ export function App() {
   const [indexingJob, setIndexingJob] = useState<IndexingJobStatus | null>(null);
   const [isIndexing, setIsIndexing] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
-  const [manualPath, setManualPath] = useState("");
+  const [pasteTitle, setPasteTitle] = useState("");
+  const [pasteContent, setPasteContent] = useState("");
+  const [pasteLanguage, setPasteLanguage] = useState<PasteLanguage>("Text");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [selectedSearchResult, setSelectedSearchResult] = useState<SearchResult | null>(null);
@@ -240,14 +247,40 @@ export function App() {
     await runImport(paths);
   }
 
-  async function handleManualImport(event: FormEvent<HTMLFormElement>) {
+  async function handlePasteImport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const paths = manualPath
-      .split(/\r?\n/)
-      .map((path) => path.trim())
-      .filter(Boolean);
-    await runImport(paths);
-    setManualPath("");
+    if (!selectedWorkspaceId || !pasteContent.trim()) {
+      return;
+    }
+
+    setIsImporting(true);
+    setErrorMessage(null);
+
+    try {
+      const artifact = await importText(
+        selectedWorkspaceId,
+        pasteTitle.trim(),
+        pasteContent,
+        pasteLanguage,
+      );
+      setImportReport({
+        workspace_id: selectedWorkspaceId,
+        scanned: 1,
+        imported: 1,
+        duplicates: 0,
+        skipped: 0,
+        failed: 0,
+        imported_artifacts: [artifact],
+        skipped_items: [],
+      });
+      await refreshWorkspaceData(selectedWorkspaceId);
+      setPasteTitle("");
+      setPasteContent("");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsImporting(false);
+    }
   }
 
   async function runImport(paths: string[]) {
@@ -362,36 +395,46 @@ export function App() {
         </div>
 
         <nav className="nav-list" aria-label="Primary">
-          <NavButton
-            active={activeView === "workspaces"}
-            icon={Library}
-            label="Workspaces"
-            onClick={() => setActiveView("workspaces")}
-          />
-          <NavButton
-            active={activeView === "import"}
-            icon={FolderDown}
-            label="Import"
-            onClick={() => setActiveView("import")}
-            disabled={!selectedWorkspace}
-          />
-          <NavButton
-            active={activeView === "artifacts"}
-            icon={Archive}
-            label="Artifacts"
-            onClick={() => setActiveView("artifacts")}
-            disabled={!selectedWorkspace}
-          />
-          <NavButton
-            active={activeView === "search"}
-            disabled={!selectedWorkspace}
-            icon={Search}
-            label="Search"
-            onClick={() => setActiveView("search")}
-          />
-          <NavButton disabled icon={Brain} label="Ask" />
-          <NavButton disabled icon={Sparkles} label="Memory cards" />
-          <NavButton disabled icon={Settings2} label="Settings" />
+          <div className="nav-group">
+            <p className="nav-cluster-label">Library</p>
+            <NavButton
+              active={activeView === "workspaces"}
+              icon={Library}
+              label="Workspaces"
+              onClick={() => setActiveView("workspaces")}
+            />
+            <NavButton
+              active={activeView === "import"}
+              icon={FolderDown}
+              label="Import"
+              onClick={() => setActiveView("import")}
+              disabled={!selectedWorkspace}
+            />
+            <NavButton
+              active={activeView === "artifacts"}
+              icon={Archive}
+              label="Artifacts"
+              onClick={() => setActiveView("artifacts")}
+              disabled={!selectedWorkspace}
+            />
+          </div>
+          <div className="nav-divider" aria-hidden="true" />
+          <div className="nav-group">
+            <p className="nav-cluster-label">Intelligence</p>
+            <NavButton
+              active={activeView === "search"}
+              disabled={!selectedWorkspace}
+              icon={Search}
+              label="Search"
+              onClick={() => setActiveView("search")}
+            />
+            <NavButton disabled icon={Brain} label="Ask" />
+            <NavButton disabled icon={Sparkles} label="Memory cards" />
+          </div>
+          <div className="nav-divider" aria-hidden="true" />
+          <div className="nav-group">
+            <NavButton disabled icon={Settings2} label="Settings" />
+          </div>
         </nav>
 
         <section className="storage-panel" aria-label="Storage settings">
@@ -446,13 +489,17 @@ export function App() {
             artifacts={artifacts}
             importReport={importReport}
             isImporting={isImporting}
-            manualPath={manualPath}
             onImportFiles={handleImportFiles}
             onImportFolder={handleImportFolder}
-            onManualImport={handleManualImport}
+            onPasteImport={handlePasteImport}
             overview={currentOverview}
+            pasteContent={pasteContent}
+            pasteLanguage={pasteLanguage}
+            pasteTitle={pasteTitle}
             selectedWorkspace={selectedWorkspace}
-            setManualPath={setManualPath}
+            setPasteContent={setPasteContent}
+            setPasteLanguage={setPasteLanguage}
+            setPasteTitle={setPasteTitle}
           />
         ) : activeView === "artifacts" ? (
           <ArtifactsView
@@ -584,24 +631,32 @@ function ImportView({
   artifacts,
   importReport,
   isImporting,
-  manualPath,
   onImportFiles,
   onImportFolder,
-  onManualImport,
+  onPasteImport,
   overview,
+  pasteContent,
+  pasteLanguage,
+  pasteTitle,
   selectedWorkspace,
-  setManualPath,
+  setPasteContent,
+  setPasteLanguage,
+  setPasteTitle,
 }: {
   artifacts: ArtifactSummary[];
   importReport: ImportReport | null;
   isImporting: boolean;
-  manualPath: string;
   onImportFiles: () => void;
   onImportFolder: () => void;
-  onManualImport: (event: FormEvent<HTMLFormElement>) => void;
+  onPasteImport: (event: FormEvent<HTMLFormElement>) => void;
   overview: WorkspaceOverview;
+  pasteContent: string;
+  pasteLanguage: PasteLanguage;
+  pasteTitle: string;
   selectedWorkspace: Workspace | undefined;
-  setManualPath: (value: string) => void;
+  setPasteContent: (value: string) => void;
+  setPasteLanguage: (value: PasteLanguage) => void;
+  setPasteTitle: (value: string) => void;
 }) {
   if (!selectedWorkspace) {
     return (
@@ -620,38 +675,94 @@ function ImportView({
       <section className="panel">
         <PanelHeader icon={FolderDown} label="Import" title="Add local sources" />
 
-        <div className="import-toolbar">
+        <div className="import-actions">
           <button
-            className="button primary"
+            className="import-card"
             type="button"
             onClick={onImportFolder}
             disabled={isImporting}
           >
-            {isImporting ? <Loader2 className="spin" size={16} /> : <FolderDown size={16} />}
-            Import folder
+            <span className="import-card-icon">
+              {isImporting ? <Loader2 className="spin" size={22} /> : <FolderDown size={22} />}
+            </span>
+            <span className="import-card-body">
+              <span className="import-card-title">Import folder</span>
+              <span className="import-card-sub">Recursively scan a folder for supported files.</span>
+            </span>
           </button>
           <button
-            className="button secondary"
+            className="import-card"
             type="button"
             onClick={onImportFiles}
             disabled={isImporting}
           >
-            <Upload size={16} />
-            Import files
+            <span className="import-card-icon">
+              <Upload size={22} />
+            </span>
+            <span className="import-card-body">
+              <span className="import-card-title">Import file</span>
+              <span className="import-card-sub">Pick individual files from disk.</span>
+            </span>
           </button>
         </div>
 
-        <form className="manual-import" onSubmit={onManualImport}>
-          <label htmlFor="manual-path">Manual path import</label>
-          <div className="manual-row">
-            <textarea
-              id="manual-path"
-              value={manualPath}
-              onChange={(event) => setManualPath(event.target.value)}
-              placeholder="Paste one file or folder path per line"
-            />
-            <button className="button secondary" type="submit" disabled={isImporting}>
-              Import
+        <p className="import-accepted">
+          <strong>Accepted file types:</strong>{" "}
+          <span>
+            {ACCEPTED_TEXT_EXTENSIONS.map((ext) => `.${ext}`).join(", ")}
+          </span>
+          <br />
+          <strong>Images:</strong>{" "}
+          <span>
+            {ACCEPTED_IMAGE_EXTENSIONS.map((ext) => `.${ext}`).join(", ")}
+          </span>
+        </p>
+
+        <form className="paste-import" onSubmit={onPasteImport}>
+          <div className="paste-header">
+            <label htmlFor="paste-content">Paste text</label>
+            <div className="paste-language">
+              <label htmlFor="paste-language">Language</label>
+              <select
+                id="paste-language"
+                value={pasteLanguage}
+                onChange={(event) => setPasteLanguage(event.target.value as PasteLanguage)}
+                disabled={isImporting}
+              >
+                {PASTE_LANGUAGES.map((lang) => (
+                  <option key={lang} value={lang}>
+                    {lang}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <input
+            id="paste-title"
+            className="paste-title"
+            type="text"
+            value={pasteTitle}
+            onChange={(event) => setPasteTitle(event.target.value)}
+            placeholder="Title (optional)"
+            disabled={isImporting}
+          />
+          <textarea
+            id="paste-content"
+            className="paste-content"
+            value={pasteContent}
+            onChange={(event) => setPasteContent(event.target.value)}
+            placeholder="Paste text, code, or notes here. Stored as a local artifact in this workspace."
+            rows={8}
+            disabled={isImporting}
+          />
+          <div className="paste-actions">
+            <button
+              className="button primary"
+              type="submit"
+              disabled={isImporting || !pasteContent.trim()}
+            >
+              {isImporting ? <Loader2 className="spin" size={16} /> : <Upload size={16} />}
+              Save pasted text
             </button>
           </div>
         </form>
@@ -874,6 +985,8 @@ function SearchView({
     new Map(artifacts.map((artifact) => [artifact.source_id, artifact.source_name])).entries(),
   ).map(([value, label]) => ({ value, label }));
   const activeFilterCount = languages.length + types.length + sources.length;
+  const indexedCount = artifacts.filter((artifact) => artifact.indexed_at).length;
+  const coveragePct = artifacts.length === 0 ? 0 : Math.round((indexedCount / artifacts.length) * 100);
 
   if (!workspace) {
     return (
@@ -933,7 +1046,19 @@ function SearchView({
 
         <div className="search-results">
           {!hasSearched ? (
-            <EmptyState icon={Search} title="Search local evidence" body="Results come from indexed chunks and work without AI or cloud access." />
+            <div className="prequery">
+              <div className="prequery-hint">
+                <Search size={16} />
+                <span>Ready to search. Results come from local chunks — no AI, no cloud.</span>
+              </div>
+              <div className="coverage-strip">
+                <span>Index coverage</span>
+                <div className="coverage-bar" aria-hidden="true">
+                  <i style={{ width: `${coveragePct}%` }} />
+                </div>
+                <span>{indexedCount}/{artifacts.length} indexed</span>
+              </div>
+            </div>
           ) : results.length === 0 ? (
             <EmptyState icon={Search} title="No indexed chunks matched" body="Try fewer terms, clear a filter, or index more artifacts." />
           ) : results.map((result, index) => (

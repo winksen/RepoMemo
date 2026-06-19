@@ -1086,6 +1086,7 @@ fn artifact_type_to_db(artifact_type: &ArtifactType) -> &'static str {
         ArtifactType::Runbook => "runbook",
         ArtifactType::ApiSpec => "api_spec",
         ArtifactType::Note => "note",
+        ArtifactType::Image => "image",
     }
 }
 
@@ -1100,6 +1101,7 @@ fn artifact_type_from_db(value: &str) -> ArtifactType {
         "runbook" => ArtifactType::Runbook,
         "api_spec" => ArtifactType::ApiSpec,
         "note" => ArtifactType::Note,
+        "image" => ArtifactType::Image,
         _ => ArtifactType::File,
     }
 }

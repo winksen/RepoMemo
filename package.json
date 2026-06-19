@@ -17,5 +17,8 @@
   "engines": {
     "node": ">=22",
     "npm": ">=10"
+  },
+  "dependencies": {
+    "@fontsource/jetbrains-mono": "^5.2.8"
   }
 }

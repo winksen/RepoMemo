@@ -19,3 +19,4 @@ workspace-data/
 Thumbs.db
 .idea/
 .vscode/
+/docs/design

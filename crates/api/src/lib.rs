@@ -2,8 +2,8 @@ use std::path::PathBuf;
 
 use anyhow::{bail, Context, Result};
 use repomemo_domain::{
-    AppSettings, ArtifactDetail, ArtifactSummary, ImportReport, ImportRequest, IndexingJobStatus,
-    SearchRequest, SearchResult, Workspace, WorkspaceOverview,
+    AppSettings, ArtifactDetail, ArtifactSummary, ArtifactType, ImportReport, ImportRequest,
+    IndexingJobStatus, SearchRequest, SearchResult, SourceType, Workspace, WorkspaceOverview,
 };
 use repomemo_indexer::index_artifact;
 use repomemo_ingestion::{discover_import_candidates, ImportCandidate, ImportOptions};
@@ -86,6 +86,77 @@ impl RepoMemoCore {
         report.skipped = report.skipped_items.len();
 
         Ok(report)
+    }
+
+    pub async fn import_text(
+        &self,
+        workspace_id: String,
+        title: String,
+        content: String,
+        language: Option<String>,
+    ) -> Result<ArtifactSummary> {
+        if workspace_id.trim().is_empty() {
+            bail!("Workspace id is required.");
+        }
+        if content.trim().is_empty() {
+            bail!("Pasted content cannot be empty.");
+        }
+        if !self.storage.workspace_exists(&workspace_id).await? {
+            bail!("Workspace was not found.");
+        }
+
+        let language = language
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_owned);
+
+        let (artifact_type, mime_type, extension) = match language.as_deref() {
+            Some("Markdown") => (ArtifactType::MarkdownDoc, "text/markdown", "md"),
+            Some("Text") | None => (ArtifactType::File, "text/plain", "txt"),
+            Some(_) => (ArtifactType::CodeFile, "text/plain", "txt"),
+        };
+
+        let safe_title = title.trim();
+        let safe_title = if safe_title.is_empty() {
+            format!(
+                "Pasted note {}",
+                chrono_like_now_iso().split('T').next().unwrap_or("note")
+            )
+        } else {
+            safe_title.to_owned()
+        };
+        let filename = sanitize_filename(&safe_title, extension);
+
+        let source = self
+            .storage
+            .create_or_get_source(&workspace_id, SourceType::Manual, "Pasted notes", None)
+            .await
+            .with_context(|| "failed to create pasted-notes source")?;
+
+        let bytes = content.into_bytes();
+        let content_hash = StorageEngine::content_hash(&bytes);
+        let size_bytes = bytes.len() as i64;
+
+        self.storage
+            .store_blob(&content_hash, &bytes, Some(mime_type))
+            .await?;
+
+        self.storage
+            .store_artifact(NewArtifact {
+                workspace_id: workspace_id.clone(),
+                source_id: source.id,
+                artifact_type,
+                title: safe_title,
+                path: filename,
+                content_hash,
+                mime_type: Some(mime_type.to_owned()),
+                language,
+                size_bytes,
+                metadata: json!({ "origin": "paste" }),
+            })
+            .await
+            .map(|stored| stored.artifact)
     }
 
     pub async fn list_artifacts(&self, workspace_id: String) -> Result<Vec<ArtifactSummary>> {
@@ -282,4 +353,35 @@ impl ImportCandidateError {
             reason: error.to_string(),
         }
     }
+}
+
+fn chrono_like_now_iso() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    format!("{secs}T0")
+}
+
+fn sanitize_filename(title: &str, extension: &str) -> String {
+    let slug: String = title
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else if c.is_whitespace() {
+                '-'
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    let slug = slug.trim_matches(|c: char| c == '-' || c == '_').to_string();
+    let slug = if slug.is_empty() {
+        "pasted-note".to_owned()
+    } else {
+        slug.to_ascii_lowercase()
+    };
+    format!("{slug}.{extension}")
 }

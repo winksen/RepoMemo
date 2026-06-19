@@ -50,6 +50,7 @@ pub enum ArtifactType {
     File,
     MarkdownDoc,
     CodeFile,
+    Image,
     Issue,
     Pr,
     Decision,

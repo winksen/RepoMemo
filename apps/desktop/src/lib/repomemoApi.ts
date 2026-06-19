@@ -76,6 +76,40 @@ export async function getAppSettings(): Promise<AppSettings> {
   return invoke<AppSettings>("get_app_settings");
 }
 
+export const ACCEPTED_TEXT_EXTENSIONS = [
+  "md",
+  "mdx",
+  "txt",
+  "rs",
+  "ts",
+  "tsx",
+  "js",
+  "jsx",
+  "py",
+  "json",
+  "toml",
+  "yaml",
+  "yml",
+  "sql",
+  "html",
+  "css",
+  "sh",
+  "ps1",
+];
+export const ACCEPTED_IMAGE_EXTENSIONS = [
+  "png",
+  "jpg",
+  "jpeg",
+  "gif",
+  "webp",
+  "svg",
+  "bmp",
+];
+export const ACCEPTED_EXTENSIONS = [
+  ...ACCEPTED_TEXT_EXTENSIONS,
+  ...ACCEPTED_IMAGE_EXTENSIONS,
+];
+
 export async function chooseImportFiles(): Promise<string[]> {
   if (!isTauriRuntime) {
     return ["preview://architecture.md"];
@@ -85,6 +119,11 @@ export async function chooseImportFiles(): Promise<string[]> {
     multiple: true,
     directory: false,
     title: "Import files into RepoMemo",
+    filters: [
+      { name: "Text & code", extensions: ACCEPTED_TEXT_EXTENSIONS },
+      { name: "Images", extensions: ACCEPTED_IMAGE_EXTENSIONS },
+      { name: "All supported", extensions: ACCEPTED_EXTENSIONS },
+    ],
   });
 
   return normalizeDialogSelection(selected);
@@ -141,6 +180,56 @@ export async function importPaths(
   return invoke<ImportReport>("import_paths", {
     workspaceId,
     paths,
+  });
+}
+
+export const PASTE_LANGUAGES = [
+  "Text",
+  "Markdown",
+  "Rust",
+  "TypeScript",
+  "JavaScript",
+  "Python",
+  "JSON",
+  "TOML",
+  "YAML",
+  "SQL",
+  "HTML",
+  "CSS",
+  "Shell",
+  "PowerShell",
+] as const;
+export type PasteLanguage = (typeof PASTE_LANGUAGES)[number];
+
+export async function importText(
+  workspaceId: string,
+  title: string,
+  content: string,
+  language: PasteLanguage,
+): Promise<ArtifactSummary> {
+  if (!isTauriRuntime) {
+    const artifact: ArtifactSummary = {
+      id: crypto.randomUUID(),
+      workspace_id: workspaceId,
+      source_id: "preview-paste",
+      source_name: "Pasted notes",
+      artifact_type: language === "Markdown" ? "markdown_doc" : "file",
+      title: title || "Pasted note",
+      path: (title || "pasted-note").toLowerCase() + ".txt",
+      content_hash: crypto.randomUUID().replace(/-/g, ""),
+      mime_type: language === "Markdown" ? "text/markdown" : "text/plain",
+      language,
+      size_bytes: content.length,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      indexed_at: null,
+    };
+    mockArtifacts.unshift(artifact);
+    return artifact;
+  }
+
+  return invoke<ArtifactSummary>("import_text", {
+    request: { workspaceId, title, content, language },
   });
 }
 

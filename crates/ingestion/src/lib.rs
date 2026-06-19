@@ -11,8 +11,14 @@ const BINARY_SAMPLE_BYTES: usize = 8192;
 
 const ACCEPTED_EXTENSIONS: &[&str] = &[
     "md", "mdx", "txt", "rs", "ts", "tsx", "js", "jsx", "py", "json", "toml", "yaml", "yml", "sql",
-    "html", "css", "sh", "ps1",
+    "html", "css", "sh", "ps1", "png", "jpg", "jpeg", "gif", "webp", "svg", "bmp",
 ];
+
+const IMAGE_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp"];
+
+pub fn is_image_extension(ext: &str) -> bool {
+    IMAGE_EXTENSIONS.contains(&ext)
+}
 
 const IGNORED_DIRECTORIES: &[&str] = &[
     ".git",
@@ -107,6 +113,7 @@ pub fn detect_artifact_type(path: &Path) -> Option<ArtifactType> {
     match extension.as_str() {
         "md" | "mdx" => Some(ArtifactType::MarkdownDoc),
         "txt" => Some(ArtifactType::File),
+        value if IMAGE_EXTENSIONS.contains(&value) => Some(ArtifactType::Image),
         value if ACCEPTED_EXTENSIONS.contains(&value) => Some(ArtifactType::CodeFile),
         _ => None,
     }
@@ -217,7 +224,9 @@ fn inspect_file(
         return;
     };
 
-    if is_probably_binary(path) {
+    let is_image = matches!(artifact_type, ArtifactType::Image);
+
+    if !is_image && is_probably_binary(path) {
         push_skip(discovery, path, "binary file");
         return;
     }
@@ -258,6 +267,12 @@ fn detect_mime(path: &Path) -> Option<String> {
         "json" => "application/json",
         "html" => "text/html",
         "css" => "text/css",
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        "svg" => "image/svg+xml",
+        "bmp" => "image/bmp",
         _ => "text/plain",
     };
 
@@ -308,7 +323,11 @@ mod tests {
             detect_artifact_type(Path::new("notes.txt")),
             Some(ArtifactType::File)
         ));
-        assert!(detect_artifact_type(Path::new("photo.png")).is_none());
+        assert!(matches!(
+            detect_artifact_type(Path::new("photo.png")),
+            Some(ArtifactType::Image)
+        ));
+        assert!(detect_artifact_type(Path::new("blob.bin")).is_none());
     }
 
     #[test]
