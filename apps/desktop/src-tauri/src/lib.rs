@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use repomemo_api::RepoMemoCore;
 use repomemo_domain::{
     AppSettings, ArtifactDetail, ArtifactSummary, ImportReport, ImportRequest, IndexingJobStatus,
-    Workspace, WorkspaceOverview,
+    SearchRequest, SearchResult, Workspace, WorkspaceOverview,
 };
 use tauri::{Manager, State};
 
@@ -111,6 +111,18 @@ async fn get_workspace_overview(
         .map_err(to_command_error)
 }
 
+#[tauri::command]
+async fn search_workspace(
+    state: State<'_, AppState>,
+    request: SearchRequest,
+) -> Result<Vec<SearchResult>, String> {
+    state
+        .core
+        .search_workspace(request)
+        .await
+        .map_err(to_command_error)
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -132,7 +144,8 @@ pub fn run() {
             get_artifact,
             index_artifact,
             index_workspace,
-            get_workspace_overview
+            get_workspace_overview,
+            search_workspace
         ])
         .run(tauri::generate_context!())
         .expect("error while running RepoMemo");

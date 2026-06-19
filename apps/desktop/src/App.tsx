@@ -9,6 +9,7 @@ import {
   IconFileCode as FileCode2,
   IconFolderDown as FolderDown,
   IconFolderPlus as FolderPlus,
+  IconFilter as Filter,
   IconDeviceSdCard as HardDrive,
   IconStack2 as Layers3,
   IconLibrary as Library,
@@ -20,6 +21,7 @@ import {
   IconSparkles as Sparkles,
   IconSun as Sun,
   IconUpload as Upload,
+  IconX as X,
 } from "@tabler/icons-react";
 import {
   chooseImportFiles,
@@ -33,6 +35,7 @@ import {
   importPaths,
   listArtifacts,
   listWorkspaces,
+  searchWorkspace,
 } from "./lib/repomemoApi";
 import type {
   AppSettings,
@@ -40,12 +43,13 @@ import type {
   ArtifactSummary,
   IndexingJobStatus,
   ImportReport,
+  SearchResult,
   Workspace,
   WorkspaceOverview,
 } from "./types";
 
 type LoadState = "idle" | "loading" | "ready" | "error";
-type View = "workspaces" | "import" | "artifacts";
+type View = "workspaces" | "import" | "artifacts" | "search";
 type ThemeMode = "light" | "dark";
 
 const emptyOverview = (workspaceId: string): WorkspaceOverview => ({
@@ -76,6 +80,14 @@ export function App() {
   const [isIndexing, setIsIndexing] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [manualPath, setManualPath] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [selectedSearchResult, setSelectedSearchResult] = useState<SearchResult | null>(null);
+  const [searchLanguages, setSearchLanguages] = useState<string[]>([]);
+  const [searchTypes, setSearchTypes] = useState<ArtifactSummary["artifact_type"][]>([]);
+  const [searchSources, setSearchSources] = useState<string[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
   const [theme, setTheme] = useState<ThemeMode>(() => {
     const saved = localStorage.getItem("repomemo-theme");
     if (saved === "light" || saved === "dark") {
@@ -301,6 +313,41 @@ export function App() {
     }
   }
 
+  async function handleSearch(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
+    if (!selectedWorkspaceId || !searchQuery.trim()) {
+      setSearchResults([]);
+      setSelectedSearchResult(null);
+      setHasSearched(false);
+      return;
+    }
+
+    setIsSearching(true);
+    setErrorMessage(null);
+    try {
+      const results = await searchWorkspace({
+        workspace_id: selectedWorkspaceId,
+        query: searchQuery.trim(),
+        artifact_types: searchTypes,
+        languages: searchLanguages,
+        source_ids: searchSources,
+        limit: 40,
+      });
+      setSearchResults(results);
+      setSelectedSearchResult(results[0] ?? null);
+      setHasSearched(true);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsSearching(false);
+    }
+  }
+
+  function openSearchArtifact(result: SearchResult) {
+    setSelectedArtifactId(result.artifact_id);
+    setActiveView("artifacts");
+  }
+
   return (
     <main className="app-shell">
       <aside className="sidebar">
@@ -335,7 +382,13 @@ export function App() {
             onClick={() => setActiveView("artifacts")}
             disabled={!selectedWorkspace}
           />
-          <NavButton disabled icon={Search} label="Search" />
+          <NavButton
+            active={activeView === "search"}
+            disabled={!selectedWorkspace}
+            icon={Search}
+            label="Search"
+            onClick={() => setActiveView("search")}
+          />
           <NavButton disabled icon={Brain} label="Ask" />
           <NavButton disabled icon={Sparkles} label="Memory cards" />
           <NavButton disabled icon={Settings2} label="Settings" />
@@ -355,7 +408,7 @@ export function App() {
       <section className="workbench">
         <header className="workbench-header">
           <div>
-            <p className="meta-label">Phase 1B</p>
+            <p className="meta-label">Phase 1D</p>
             <h2>{selectedWorkspace?.name ?? "Workspace foundation"}</h2>
           </div>
           <div className="header-actions">
@@ -401,7 +454,7 @@ export function App() {
             selectedWorkspace={selectedWorkspace}
             setManualPath={setManualPath}
           />
-        ) : (
+        ) : activeView === "artifacts" ? (
           <ArtifactsView
             artifactDetail={artifactDetail}
             artifacts={artifacts}
@@ -414,6 +467,26 @@ export function App() {
             overview={currentOverview}
             selectedArtifactId={selectedArtifactId}
             selectedWorkspace={selectedWorkspace}
+          />
+        ) : (
+          <SearchView
+            artifacts={artifacts}
+            hasSearched={hasSearched}
+            isSearching={isSearching}
+            languages={searchLanguages}
+            onOpenArtifact={openSearchArtifact}
+            onSearch={handleSearch}
+            onSelectResult={setSelectedSearchResult}
+            query={searchQuery}
+            results={searchResults}
+            selectedResult={selectedSearchResult}
+            setLanguages={setSearchLanguages}
+            setQuery={setSearchQuery}
+            setSources={setSearchSources}
+            setTypes={setSearchTypes}
+            sources={searchSources}
+            types={searchTypes}
+            workspace={selectedWorkspace}
           />
         )}
       </section>
@@ -754,6 +827,176 @@ function ArtifactsView({
   );
 }
 
+function SearchView({
+  artifacts,
+  hasSearched,
+  isSearching,
+  languages,
+  onOpenArtifact,
+  onSearch,
+  onSelectResult,
+  query,
+  results,
+  selectedResult,
+  setLanguages,
+  setQuery,
+  setSources,
+  setTypes,
+  sources,
+  types,
+  workspace,
+}: {
+  artifacts: ArtifactSummary[];
+  hasSearched: boolean;
+  isSearching: boolean;
+  languages: string[];
+  onOpenArtifact: (result: SearchResult) => void;
+  onSearch: (event?: FormEvent<HTMLFormElement>) => void;
+  onSelectResult: (result: SearchResult) => void;
+  query: string;
+  results: SearchResult[];
+  selectedResult: SearchResult | null;
+  setLanguages: (values: string[]) => void;
+  setQuery: (value: string) => void;
+  setSources: (values: string[]) => void;
+  setTypes: (values: ArtifactSummary["artifact_type"][]) => void;
+  sources: string[];
+  types: ArtifactSummary["artifact_type"][];
+  workspace: Workspace | undefined;
+}) {
+  const languageOptions = Array.from(
+    new Set(artifacts.flatMap((artifact) => artifact.language ?? [])),
+  ).sort();
+  const typeOptions = Array.from(
+    new Set(artifacts.map((artifact) => artifact.artifact_type)),
+  ).sort();
+  const sourceOptions = Array.from(
+    new Map(artifacts.map((artifact) => [artifact.source_id, artifact.source_name])).entries(),
+  ).map(([value, label]) => ({ value, label }));
+  const activeFilterCount = languages.length + types.length + sources.length;
+
+  if (!workspace) {
+    return (
+      <section className="panel">
+        <EmptyState icon={Search} title="No workspace selected" body="Select a workspace before searching indexed context." />
+      </section>
+    );
+  }
+
+  return (
+    <div className="search-layout">
+      <section className="panel search-main">
+        <PanelHeader icon={Search} label="Local retrieval" title="Search indexed context">
+          <StatusBadge tone={artifacts.some((artifact) => artifact.indexed_at) ? "success" : "warning"}>
+            {artifacts.filter((artifact) => artifact.indexed_at).length} indexed
+          </StatusBadge>
+        </PanelHeader>
+
+        <form className="search-form" onSubmit={onSearch}>
+          <div className="search-input-wrap">
+            <Search size={20} />
+            <input
+              aria-label="Search workspace"
+              autoFocus
+              placeholder="Search files, concepts, functions, decisions..."
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+            {query ? (
+              <button className="clear-search" type="button" aria-label="Clear search" onClick={() => setQuery("")}>
+                <X size={16} />
+              </button>
+            ) : null}
+          </div>
+          <button className="button primary" disabled={isSearching || !query.trim()} type="submit">
+            {isSearching ? <Loader2 className="spin" size={16} /> : <Search size={16} />}
+            Search
+          </button>
+        </form>
+
+        <div className="filter-bar">
+          <Filter size={16} />
+          <FilterMenu label="Type" options={typeOptions.map((value) => ({ value, label: formatArtifactType(value) }))} selected={types} onChange={(values) => setTypes(values as ArtifactSummary["artifact_type"][])} />
+          <FilterMenu label="Language" options={languageOptions.map((value) => ({ value, label: value }))} selected={languages} onChange={setLanguages} />
+          <FilterMenu label="Source" options={sourceOptions} selected={sources} onChange={setSources} />
+          {activeFilterCount > 0 ? (
+            <button className="filter-reset" type="button" onClick={() => { setTypes([]); setLanguages([]); setSources([]); }}>
+              Clear {activeFilterCount}
+            </button>
+          ) : null}
+        </div>
+
+        <div className="search-result-summary">
+          <span>{hasSearched ? `${results.length} results` : "Ready to search"}</span>
+          <span>{workspace.name}</span>
+        </div>
+
+        <div className="search-results">
+          {!hasSearched ? (
+            <EmptyState icon={Search} title="Search local evidence" body="Results come from indexed chunks and work without AI or cloud access." />
+          ) : results.length === 0 ? (
+            <EmptyState icon={Search} title="No indexed chunks matched" body="Try fewer terms, clear a filter, or index more artifacts." />
+          ) : results.map((result, index) => (
+            <button
+              className={selectedResult?.chunk_id === result.chunk_id ? "search-result selected" : "search-result"}
+              key={result.chunk_id}
+              type="button"
+              onClick={() => onSelectResult(result)}
+            >
+              <span className="result-rank">{index + 1}</span>
+              <span className="result-content">
+                <span className="result-title-row"><strong>{result.title}</strong><span>{formatLineRange(result.start_line, result.end_line)}</span></span>
+                <span className="result-path">{result.path}</span>
+                <span className="result-snippet">{renderHighlightedSnippet(result.snippet)}</span>
+                <span className="result-meta"><span>{result.language ?? formatArtifactType(result.artifact_type)}</span><span>{result.source_name}</span></span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <aside className="panel search-preview">
+        <PanelHeader icon={BookOpen} label="Matched context" title="Evidence preview">
+          <button className="button secondary" disabled={!selectedResult} type="button" onClick={() => selectedResult && onOpenArtifact(selectedResult)}>
+            <BookOpen size={16} /> Open artifact
+          </button>
+        </PanelHeader>
+        {selectedResult ? (
+          <div className="search-evidence">
+            <h3>{selectedResult.title}</h3>
+            <p className="path-text">{selectedResult.path}</p>
+            <div className="detail-meta">
+              <StatusBadge tone="neutral">{formatLineRange(selectedResult.start_line, selectedResult.end_line)}</StatusBadge>
+              <StatusBadge tone="neutral">{selectedResult.language ?? formatArtifactType(selectedResult.artifact_type)}</StatusBadge>
+              <StatusBadge tone="neutral">{selectedResult.source_name}</StatusBadge>
+            </div>
+            <div className="evidence-snippet">{renderHighlightedSnippet(selectedResult.snippet)}</div>
+            <p className="evidence-note">This result is retrieved directly from local SQLite FTS. AI is not involved.</p>
+          </div>
+        ) : (
+          <EmptyState icon={BookOpen} title="No result selected" body="Select a search result to inspect its matched source context." />
+        )}
+      </aside>
+    </div>
+  );
+}
+
+function FilterMenu({ label, onChange, options, selected }: { label: string; onChange: (values: string[]) => void; options: { value: string; label: string }[]; selected: string[] }) {
+  return (
+    <details className="filter-menu">
+      <summary>{label}{selected.length > 0 ? ` ${selected.length}` : ""}</summary>
+      <div className="filter-options">
+        {options.length === 0 ? <span>No options</span> : options.map((option) => (
+          <label key={option.value}>
+            <input type="checkbox" checked={selected.includes(option.value)} onChange={() => onChange(selected.includes(option.value) ? selected.filter((value) => value !== option.value) : [...selected, option.value])} />
+            <span>{option.label}</span>
+          </label>
+        ))}
+      </div>
+    </details>
+  );
+}
+
 function NavButton({
   active = false,
   disabled = false,
@@ -971,6 +1214,15 @@ function formatLineRange(start: number | null, end: number | null) {
   }
 
   return "lines unknown";
+}
+
+function renderHighlightedSnippet(snippet: string): ReactNode {
+  return snippet.split(/(<mark>|<\/mark>)/).map((part, index, parts) => {
+    if (part === "<mark>" || part === "</mark>") return null;
+    const highlighted = parts.slice(0, index).filter((item) => item === "<mark>").length >
+      parts.slice(0, index).filter((item) => item === "</mark>").length;
+    return highlighted ? <mark key={`${index}-${part}`}>{part}</mark> : part;
+  });
 }
 
 function formatDate(value: string) {

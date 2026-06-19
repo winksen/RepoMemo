@@ -2751,6 +2751,7 @@ dependencies = [
  "repomemo-domain",
  "repomemo-indexer",
  "repomemo-ingestion",
+ "repomemo-retrieval",
  "repomemo-storage",
  "serde_json",
  "tokio",
@@ -2793,6 +2794,15 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "repomemo-domain",
+]
+
+[[package]]
+name = "repomemo-retrieval"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "repomemo-domain",
+ "repomemo-storage",
 ]
 
 [[package]]

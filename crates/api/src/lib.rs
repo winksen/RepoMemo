@@ -3,22 +3,25 @@ use std::path::PathBuf;
 use anyhow::{bail, Context, Result};
 use repomemo_domain::{
     AppSettings, ArtifactDetail, ArtifactSummary, ImportReport, ImportRequest, IndexingJobStatus,
-    Workspace, WorkspaceOverview,
+    SearchRequest, SearchResult, Workspace, WorkspaceOverview,
 };
 use repomemo_indexer::index_artifact;
 use repomemo_ingestion::{discover_import_candidates, ImportCandidate, ImportOptions};
+use repomemo_retrieval::RetrievalService;
 use repomemo_storage::{NewArtifact, StorageConfig, StorageEngine};
 use serde_json::json;
 
 #[derive(Debug, Clone)]
 pub struct RepoMemoCore {
     storage: StorageEngine,
+    retrieval: RetrievalService,
 }
 
 impl RepoMemoCore {
     pub async fn boot(data_dir: PathBuf) -> Result<Self> {
         let storage = StorageEngine::open(StorageConfig { data_dir }).await?;
-        Ok(Self { storage })
+        let retrieval = RetrievalService::new(storage.clone());
+        Ok(Self { storage, retrieval })
     }
 
     pub async fn create_workspace(&self, name: String) -> Result<Workspace> {
@@ -177,6 +180,10 @@ impl RepoMemoCore {
 
     pub async fn workspace_overview(&self, workspace_id: String) -> Result<WorkspaceOverview> {
         self.storage.workspace_overview(&workspace_id).await
+    }
+
+    pub async fn search_workspace(&self, request: SearchRequest) -> Result<Vec<SearchResult>> {
+        self.retrieval.search(request).await
     }
 
     pub fn app_settings(&self) -> AppSettings {

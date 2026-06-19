@@ -3,6 +3,7 @@ members = [
   "crates/domain",
   "crates/ingestion",
   "crates/indexer",
+  "crates/retrieval",
   "crates/storage",
   "crates/api",
   "apps/desktop/src-tauri"
@@ -34,4 +35,5 @@ repomemo-api = { path = "crates/api" }
 repomemo-domain = { path = "crates/domain" }
 repomemo-ingestion = { path = "crates/ingestion" }
 repomemo-indexer = { path = "crates/indexer" }
+repomemo-retrieval = { path = "crates/retrieval" }
 repomemo-storage = { path = "crates/storage" }

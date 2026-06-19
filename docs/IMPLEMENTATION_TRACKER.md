@@ -32,7 +32,7 @@ Latest verification:
 
 ## Phase 1B: Import And Store
 
-Status: implemented, pending local validation
+Status: implemented and validated
 
 Spec: `docs/phases/PHASE_1B_IMPORT_AND_STORE.md`
 
@@ -46,11 +46,11 @@ Spec: `docs/phases/PHASE_1B_IMPORT_AND_STORE.md`
 | Dialog support | Done | Added Tauri dialog plugin dependency and default permission. |
 | Artifacts UI | Done | Enabled import/artifact workbench, import report, artifact rows, workspace counts, and stored-content preview. |
 | Visual rework | Done | Existing shell now uses separate rounded grey blocks, blue-only highlights, no selected-row left stripe, and a functional light/dark toggle. |
-| Validation | Pending | Run `npm install`, `npm run typecheck`, `npm run build`, `cargo test`, `cargo check`, and `npm run dev`. |
+| Validation | Done | Dependency install, frontend checks, Rust checks, and local desktop launch have been completed across the implementation sessions. |
 
 ## Phase 1C: Text Extraction And Chunking
 
-Status: implemented, pending local validation
+Status: implemented and validated
 
 Spec: `docs/phases/PHASE_1C_TEXT_EXTRACTION_AND_CHUNKING.md`
 
@@ -68,14 +68,24 @@ Spec: `docs/phases/PHASE_1C_TEXT_EXTRACTION_AND_CHUNKING.md`
 
 ## Phase 1D: Full-Text Search
 
-Status: not started
+Status: implemented and validated
 
 Spec: `docs/phases/PHASE_1D_FULL_TEXT_SEARCH.md`
 
-- SQLite FTS5 search endpoint
-- Search UI
-- Type/language/source filters
-- Result snippets and artifact navigation
+| Area | Status | Notes |
+| --- | --- | --- |
+| Retrieval crate | Done | Added `crates/retrieval` with safe FTS query preparation and a reusable retrieval service. |
+| SQLite FTS5 search | Done | Ranked search joins `chunks_fts`, chunks, artifacts, and sources through parameterized SQL. |
+| Query safety | Done | User input is tokenized into bounded quoted prefix terms; empty and punctuation-only queries do not execute FTS. |
+| Search filters | Done | Artifact type, language, and source filters are supported by the Rust API and desktop UI. |
+| Search result DTO | Done | Results include artifact/chunk IDs, title, path, type, language, highlighted snippet, line range, score, and source. |
+| Tauri command | Done | Added stable `search_workspace(request)` command. |
+| Search navigation | Done | Enabled Search in the primary navigation for selected workspaces. |
+| Search workbench | Done | Added query field, compact filter menus, ranked result list, empty/loading states, and independent internal scrolling. |
+| Evidence preview | Done | Selecting a result shows matched local context and can open the underlying artifact detail. |
+| Local-only behavior | Done | Search operates directly on SQLite FTS and remains available with AI/cloud disabled. |
+| Tests | Done | Added query-safety unit tests and a SQLite integration test covering FTS triggers, snippets, line ranges, and filters. |
+| Validation | Done | `cargo test`, `cargo check`, `npm run typecheck`, and `npm run build` pass. |
 
 ## Phase 1E: Code Symbol Index
 

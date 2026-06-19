@@ -103,3 +103,26 @@ export interface ImportReport {
   imported_artifacts: ArtifactSummary[];
   skipped_items: ImportSkippedItem[];
 }
+
+export interface SearchRequest {
+  workspace_id: string;
+  query: string;
+  artifact_types: ArtifactType[];
+  languages: string[];
+  source_ids: string[];
+  limit: number | null;
+}
+
+export interface SearchResult {
+  artifact_id: string;
+  chunk_id: string;
+  title: string;
+  path: string;
+  artifact_type: ArtifactType;
+  language: string | null;
+  snippet: string;
+  start_line: number | null;
+  end_line: number | null;
+  score: number;
+  source_name: string;
+}

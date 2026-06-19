@@ -7,6 +7,8 @@ import type {
   Chunk,
   IndexingJobStatus,
   ImportReport,
+  SearchRequest,
+  SearchResult,
   Workspace,
   WorkspaceOverview,
 } from "../types";
@@ -236,6 +238,55 @@ export async function getWorkspaceOverview(
   }
 
   return invoke<WorkspaceOverview>("get_workspace_overview", { workspaceId });
+}
+
+export async function searchWorkspace(
+  request: SearchRequest,
+): Promise<SearchResult[]> {
+  if (!isTauriRuntime) {
+    const terms = request.query
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(Boolean);
+
+    return mockArtifacts
+      .flatMap((artifact) =>
+        (mockChunks.get(artifact.id) ?? []).map((chunk) => ({ artifact, chunk })),
+      )
+      .filter(({ artifact, chunk }) => {
+        if (artifact.workspace_id !== request.workspace_id) return false;
+        if (
+          request.artifact_types.length > 0 &&
+          !request.artifact_types.includes(artifact.artifact_type)
+        ) return false;
+        if (
+          request.languages.length > 0 &&
+          (!artifact.language || !request.languages.includes(artifact.language))
+        ) return false;
+        if (
+          request.source_ids.length > 0 &&
+          !request.source_ids.includes(artifact.source_id)
+        ) return false;
+        const searchable = `${artifact.title} ${artifact.path} ${chunk.text}`.toLowerCase();
+        return terms.every((term) => searchable.includes(term));
+      })
+      .slice(0, request.limit ?? 40)
+      .map(({ artifact, chunk }) => ({
+        artifact_id: artifact.id,
+        chunk_id: chunk.id,
+        title: artifact.title,
+        path: artifact.path,
+        artifact_type: artifact.artifact_type,
+        language: artifact.language,
+        snippet: chunk.text,
+        start_line: chunk.start_line,
+        end_line: chunk.end_line,
+        score: 1,
+        source_name: artifact.source_name,
+      }));
+  }
+
+  return invoke<SearchResult[]>("search_workspace", { request });
 }
 
 function normalizeDialogSelection(selection: string | string[] | null): string[] {

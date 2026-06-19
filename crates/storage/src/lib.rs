@@ -3,13 +3,13 @@ use std::path::{Path, PathBuf};
 use anyhow::{bail, Context, Result};
 use chrono::Utc;
 use repomemo_domain::{
-    ArtifactDetail, ArtifactSummary, ArtifactType, Chunk, IndexingJobStatus, Source, SourceType,
-    Workspace, WorkspaceOverview,
+    ArtifactDetail, ArtifactSummary, ArtifactType, Chunk, IndexingJobStatus, SearchRequest,
+    SearchResult, Source, SourceType, Workspace, WorkspaceOverview,
 };
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions};
-use sqlx::SqlitePool;
+use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteRow};
+use sqlx::{QueryBuilder, Row, Sqlite, SqlitePool};
 use uuid::Uuid;
 
 #[derive(Debug, Clone)]
@@ -112,6 +112,21 @@ struct IndexingJobRow {
     error_message: Option<String>,
     created_at: String,
     updated_at: String,
+}
+
+#[derive(Debug)]
+struct SearchResultRow {
+    artifact_id: String,
+    chunk_id: String,
+    title: String,
+    path: String,
+    artifact_type: String,
+    language: Option<String>,
+    snippet: String,
+    start_line: Option<i64>,
+    end_line: Option<i64>,
+    score: f64,
+    source_name: String,
 }
 
 #[derive(Debug, Clone)]
@@ -692,6 +707,87 @@ impl StorageEngine {
         })
     }
 
+    pub async fn search_chunks(
+        &self,
+        request: &SearchRequest,
+        fts_query: &str,
+    ) -> Result<Vec<SearchResult>> {
+        let mut query = QueryBuilder::<Sqlite>::new(
+            r#"
+            SELECT
+              artifacts.id AS artifact_id,
+              chunks.id AS chunk_id,
+              artifacts.title,
+              artifacts.path,
+              artifacts.type AS artifact_type,
+              artifacts.language,
+              snippet(chunks_fts, 0, '<mark>', '</mark>', ' ... ', 24) AS snippet,
+              chunks.start_line,
+              chunks.end_line,
+              -bm25(chunks_fts) AS score,
+              sources.name AS source_name
+            FROM chunks_fts
+            JOIN chunks ON chunks.rowid = chunks_fts.rowid
+            JOIN artifacts ON artifacts.id = chunks.artifact_id
+            JOIN sources ON sources.id = artifacts.source_id
+            WHERE chunks_fts MATCH
+            "#,
+        );
+        query.push_bind(fts_query);
+        query.push(" AND chunks.workspace_id = ");
+        query.push_bind(&request.workspace_id);
+
+        if !request.artifact_types.is_empty() {
+            query.push(" AND artifacts.type IN (");
+            let mut separated = query.separated(", ");
+            for artifact_type in &request.artifact_types {
+                separated.push_bind(artifact_type_to_db(artifact_type));
+            }
+            separated.push_unseparated(")");
+        }
+
+        if !request.languages.is_empty() {
+            query.push(" AND artifacts.language IN (");
+            let mut separated = query.separated(", ");
+            for language in &request.languages {
+                separated.push_bind(language);
+            }
+            separated.push_unseparated(")");
+        }
+
+        if !request.source_ids.is_empty() {
+            query.push(" AND artifacts.source_id IN (");
+            let mut separated = query.separated(", ");
+            for source_id in &request.source_ids {
+                separated.push_bind(source_id);
+            }
+            separated.push_unseparated(")");
+        }
+
+        query.push(" ORDER BY bm25(chunks_fts) ASC, artifacts.path ASC LIMIT ");
+        query.push_bind(request.limit.unwrap_or(40).clamp(1, 100));
+
+        let rows = query
+            .build()
+            .map(|row: SqliteRow| SearchResultRow {
+                artifact_id: row.get("artifact_id"),
+                chunk_id: row.get("chunk_id"),
+                title: row.get("title"),
+                path: row.get("path"),
+                artifact_type: row.get("artifact_type"),
+                language: row.get("language"),
+                snippet: row.get("snippet"),
+                start_line: row.get("start_line"),
+                end_line: row.get("end_line"),
+                score: row.get("score"),
+                source_name: row.get("source_name"),
+            })
+            .fetch_all(&self.pool)
+            .await?;
+
+        Ok(rows.into_iter().map(SearchResult::from).collect())
+    }
+
     pub fn content_hash(bytes: &[u8]) -> String {
         let digest = Sha256::digest(bytes);
         hex::encode(digest)
@@ -940,6 +1036,24 @@ impl From<IndexingJobRow> for IndexingJobStatus {
     }
 }
 
+impl From<SearchResultRow> for SearchResult {
+    fn from(row: SearchResultRow) -> Self {
+        Self {
+            artifact_id: row.artifact_id,
+            chunk_id: row.chunk_id,
+            title: row.title,
+            path: row.path,
+            artifact_type: artifact_type_from_db(&row.artifact_type),
+            language: row.language,
+            snippet: row.snippet,
+            start_line: row.start_line,
+            end_line: row.end_line,
+            score: row.score,
+            source_name: row.source_name,
+        }
+    }
+}
+
 fn source_type_to_db(source_type: &SourceType) -> &'static str {
     match source_type {
         SourceType::Upload => "upload",
@@ -992,7 +1106,10 @@ fn artifact_type_from_db(value: &str) -> ArtifactType {
 
 #[cfg(test)]
 mod tests {
-    use super::StorageEngine;
+    use super::{NewArtifact, StorageConfig, StorageEngine};
+    use repomemo_domain::{ArtifactType, Chunk, SearchRequest, SourceType};
+    use serde_json::json;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
     fn content_hash_is_stable_sha256_hex() {
@@ -1001,5 +1118,94 @@ mod tests {
         assert_eq!(hash.len(), 64);
         assert_eq!(hash, StorageEngine::content_hash(b"repomemo"));
         assert_ne!(hash, StorageEngine::content_hash(b"RepoMemo"));
+    }
+
+    #[tokio::test]
+    async fn fts_search_returns_snippet_and_respects_language_filter() {
+        let data_dir = std::env::temp_dir().join(format!(
+            "repomemo-search-test-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let storage = StorageEngine::open(StorageConfig {
+            data_dir: data_dir.clone(),
+        })
+        .await
+        .unwrap();
+        let workspace = storage.create_workspace("Search test").await.unwrap();
+        let source = storage
+            .create_or_get_source(
+                &workspace.id,
+                SourceType::Folder,
+                "fixture",
+                Some("fixture"),
+            )
+            .await
+            .unwrap();
+        let bytes = b"RepoMemo provides local artifact retrieval.";
+        let content_hash = StorageEngine::content_hash(bytes);
+        storage
+            .store_blob(&content_hash, bytes, Some("text/markdown"))
+            .await
+            .unwrap();
+        let stored = storage
+            .store_artifact(NewArtifact {
+                workspace_id: workspace.id.clone(),
+                source_id: source.id.clone(),
+                artifact_type: ArtifactType::MarkdownDoc,
+                title: "README.md".to_owned(),
+                path: "README.md".to_owned(),
+                content_hash: content_hash.clone(),
+                mime_type: Some("text/markdown".to_owned()),
+                language: Some("Markdown".to_owned()),
+                size_bytes: bytes.len() as i64,
+                metadata: json!({}),
+            })
+            .await
+            .unwrap();
+        storage
+            .replace_artifact_chunks(
+                &stored.artifact.id,
+                vec![Chunk {
+                    id: String::new(),
+                    artifact_id: stored.artifact.id.clone(),
+                    workspace_id: workspace.id.clone(),
+                    chunk_index: 0,
+                    text: String::from_utf8(bytes.to_vec()).unwrap(),
+                    token_count: Some(5),
+                    start_line: Some(1),
+                    end_line: Some(1),
+                    heading_path: Some("Overview".to_owned()),
+                    content_hash,
+                    embedding_status: "not_configured".to_owned(),
+                    metadata: json!({}),
+                }],
+            )
+            .await
+            .unwrap();
+
+        let request = SearchRequest {
+            workspace_id: workspace.id,
+            query: "artifact retrieval".to_owned(),
+            artifact_types: vec![ArtifactType::MarkdownDoc],
+            languages: vec!["Markdown".to_owned()],
+            source_ids: vec![source.id],
+            limit: Some(10),
+        };
+        let results = storage
+            .search_chunks(&request, "\"artifact\"* AND \"retrieval\"*")
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].artifact_id, stored.artifact.id);
+        assert_eq!(results[0].start_line, Some(1));
+        assert!(results[0].snippet.contains("<mark>artifact</mark>"));
+
+        storage.pool.close().await;
+        drop(storage);
+        std::fs::remove_dir_all(data_dir).unwrap();
     }
 }
