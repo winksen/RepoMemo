@@ -810,7 +810,15 @@ impl StorageEngine {
             settings.id
         };
         let now = Utc::now().to_rfc3339();
-        let metadata_json = serde_json::to_string(&settings.metadata)?;
+        let mut metadata = settings.metadata;
+        if let Some(api_key) = settings.api_key.filter(|value| !value.trim().is_empty()) {
+            metadata["api_key"] = Value::String(api_key);
+        } else if let Ok(existing) = self.get_provider_settings(&id).await {
+            if let Some(api_key) = existing.api_key {
+                metadata["api_key"] = Value::String(api_key);
+            }
+        }
+        let metadata_json = serde_json::to_string(&metadata)?;
         sqlx::query(
             r#"
             INSERT INTO provider_settings (
@@ -1268,6 +1276,15 @@ impl From<SymbolRow> for Symbol {
 
 impl From<ProviderSettingsRow> for ProviderSettings {
     fn from(row: ProviderSettingsRow) -> Self {
+        let mut metadata = serde_json::from_str::<Value>(&row.metadata_json)
+            .unwrap_or_else(|_| Value::Object(Default::default()));
+        let api_key = metadata
+            .get("api_key")
+            .and_then(Value::as_str)
+            .map(str::to_owned);
+        if let Some(object) = metadata.as_object_mut() {
+            object.remove("api_key");
+        }
         Self {
             id: row.id,
             workspace_id: row.workspace_id,
@@ -1277,8 +1294,8 @@ impl From<ProviderSettingsRow> for ProviderSettings {
             model: row.model,
             embedding_model: row.embedding_model,
             enabled: row.enabled,
-            metadata: serde_json::from_str(&row.metadata_json)
-                .unwrap_or_else(|_| Value::Object(Default::default())),
+            metadata,
+            api_key,
         }
     }
 }

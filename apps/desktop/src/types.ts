@@ -168,6 +168,7 @@ export interface ProviderSettings {
   embedding_model: string | null;
   enabled: boolean;
   metadata: Record<string, unknown>;
+  api_key?: string | null;
 }
 
 export interface ProviderTestResult {

@@ -108,6 +108,11 @@ export async function summarizeArtifact(artifactId: string, providerId: string):
   return invoke<SummaryResult>("summarize_artifact", { artifactId, providerId });
 }
 
+export async function summarizeWorkspace(workspaceId: string, providerId: string): Promise<SummaryResult> {
+  if (!isTauriRuntime) return { summary_markdown: "Preview workspace summary. Configure a provider in Settings to generate a real one.", citations: [], warnings: [] };
+  return invoke<SummaryResult>("summarize_workspace", { workspaceId, providerId });
+}
+
 export const ACCEPTED_TEXT_EXTENSIONS = [
   "md",
   "mdx",

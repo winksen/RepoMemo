@@ -224,6 +224,19 @@ async fn summarize_artifact(
         .map_err(to_command_error)
 }
 
+#[tauri::command]
+async fn summarize_workspace(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    provider_id: String,
+) -> Result<SummaryResult, String> {
+    state
+        .core
+        .summarize_workspace(workspace_id, provider_id)
+        .await
+        .map_err(to_command_error)
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -253,7 +266,8 @@ pub fn run() {
             list_provider_settings,
             save_provider_settings,
             test_provider,
-            summarize_artifact
+            summarize_artifact,
+            summarize_workspace
         ])
         .run(tauri::generate_context!())
         .expect("error while running RepoMemo");

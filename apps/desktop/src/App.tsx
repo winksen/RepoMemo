@@ -45,6 +45,7 @@ import {
   searchSymbols,
   saveProviderSettings,
   summarizeArtifact,
+  summarizeWorkspace,
   testProvider,
   type PasteLanguage,
 } from "./lib/repomemoApi";
@@ -65,7 +66,7 @@ import type {
 } from "./types";
 
 type LoadState = "idle" | "loading" | "ready" | "error";
-type View = "workspaces" | "import" | "artifacts" | "search" | "settings";
+type View = "workspaces" | "import" | "artifacts" | "search" | "summary" | "settings";
 type ThemeMode = "light" | "dark";
 
 const emptyOverview = (workspaceId: string): WorkspaceOverview => ({
@@ -96,6 +97,7 @@ export function App() {
   const [isSavingProvider, setIsSavingProvider] = useState(false);
   const [isTestingProvider, setIsTestingProvider] = useState(false);
   const [summary, setSummary] = useState<SummaryResult | null>(null);
+  const [workspaceSummary, setWorkspaceSummary] = useState<SummaryResult | null>(null);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [overview, setOverview] = useState<WorkspaceOverview | null>(null);
   const [importReport, setImportReport] = useState<ImportReport | null>(null);
@@ -463,13 +465,31 @@ export function App() {
     const provider = providers.find((item) => item.enabled);
     if (!provider) {
       setActiveView("settings");
-      setErrorMessage("Enable a local provider before requesting a summary. No content was sent.");
+      setErrorMessage("Enable a provider before requesting a summary. No content was sent.");
       return;
     }
     setIsSummarizing(true);
     setErrorMessage(null);
     try {
       setSummary(await summarizeArtifact(artifactId, provider.id));
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsSummarizing(false);
+    }
+  }
+
+  async function handleWorkspaceSummary() {
+    const provider = providers.find((item) => item.enabled);
+    if (!provider || !selectedWorkspaceId) {
+      setActiveView("settings");
+      setErrorMessage("Enable a provider before requesting a workspace summary. No content was sent.");
+      return;
+    }
+    setIsSummarizing(true);
+    setErrorMessage(null);
+    try {
+      setWorkspaceSummary(await summarizeWorkspace(selectedWorkspaceId, provider.id));
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : String(error));
     } finally {
@@ -524,6 +544,13 @@ export function App() {
               label="Search"
               onClick={() => setActiveView("search")}
             />
+            <NavButton
+              active={activeView === "summary"}
+              disabled={!selectedWorkspace}
+              icon={Sparkles}
+              label="Summary"
+              onClick={() => setActiveView("summary")}
+            />
             <NavButton disabled icon={Brain} label="Ask" />
             <NavButton disabled icon={Sparkles} label="Memory cards" />
           </div>
@@ -562,9 +589,11 @@ export function App() {
               {loadState === "loading" ? "Booting core" : "Local core ready"}
             </StatusBadge>
             <StatusBadge tone={settings?.ai_enabled ? "success" : "neutral"}>
-              {settings?.ai_enabled ? `Local · ${settings.active_provider}` : "No AI"}
+              {settings?.ai_enabled ? `${providers.find((item) => item.enabled)?.provider_type === "openrouter" ? "Cloud" : "Local"} · ${settings.active_provider}` : "No AI"}
             </StatusBadge>
-            <StatusBadge tone="neutral">Cloud off</StatusBadge>
+            <StatusBadge tone={providers.find((item) => item.enabled)?.provider_type === "openrouter" ? "success" : "neutral"}>
+              {providers.find((item) => item.enabled)?.provider_type === "openrouter" ? "Cloud enabled" : "Cloud off"}
+            </StatusBadge>
             <button
               aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
               className="icon-button"
@@ -646,6 +675,13 @@ export function App() {
             sources={searchSources}
             symbolResults={symbolSearchResults}
             types={searchTypes}
+            workspace={selectedWorkspace}
+          />
+        ) : activeView === "summary" ? (
+          <WorkspaceSummaryView
+            isSummarizing={isSummarizing}
+            onSummarize={handleWorkspaceSummary}
+            summary={workspaceSummary}
             workspace={selectedWorkspace}
           />
         ) : (
@@ -1451,16 +1487,22 @@ function ProviderSettingsView({
 
   return (
     <section className="provider-workbench panel">
-      <PanelHeader icon={Brain} label="Local AI" title="Provider control">
-        <StatusBadge tone={draft.enabled ? "success" : "neutral"}>{draft.enabled ? "Local" : "No AI"}</StatusBadge>
+      <PanelHeader icon={Brain} label="AI provider" title="Provider control">
+        <StatusBadge tone={draft.enabled ? "success" : "neutral"}>{draft.enabled ? (draft.provider_type === "openrouter" ? "Cloud" : "Local") : "No AI"}</StatusBadge>
       </PanelHeader>
       <div className="provider-intro">
-        <p>RepoMemo only sends content after you explicitly enable this local provider. Cloud providers remain off in this phase.</p>
+        <p>RepoMemo only sends content after you explicitly enable a provider. Local Ollama stays on-device; OpenRouter sends selected excerpts to its cloud API.</p>
       </div>
       <form className="provider-form" onSubmit={(event) => { event.preventDefault(); onSave({ ...draft, workspace_id: workspace.id }); }}>
         <label>
           <span>Provider</span>
-          <input value="Ollama-compatible local endpoint" disabled />
+          <select value={draft.provider_type} onChange={(event) => {
+            const cloud = event.target.value === "openrouter";
+            setDraft({ ...draft, provider_type: event.target.value, name: cloud ? "OpenRouter" : "Local Ollama", base_url: cloud ? "https://openrouter.ai/api/v1" : "http://127.0.0.1:11434", model: cloud ? "openai/gpt-4o-mini" : "llama3.2", embedding_model: cloud ? null : draft.embedding_model });
+          }}>
+            <option value="ollama">Ollama-compatible (local)</option>
+            <option value="openrouter">OpenRouter (cloud)</option>
+          </select>
         </label>
         <label>
           <span>Base URL</span>
@@ -1472,8 +1514,18 @@ function ProviderSettingsView({
         </label>
         <label>
           <span>Embedding model <em>optional</em></span>
-          <input value={draft.embedding_model ?? ""} onChange={(event) => setDraft({ ...draft, embedding_model: event.target.value || null })} placeholder="nomic-embed-text" />
+          <input disabled={draft.provider_type === "openrouter"} value={draft.embedding_model ?? ""} onChange={(event) => setDraft({ ...draft, embedding_model: event.target.value || null })} placeholder="nomic-embed-text" />
         </label>
+        {draft.provider_type === "openrouter" ? <>
+          <label>
+            <span>OpenRouter API key</span>
+            <input type="password" value={draft.api_key ?? ""} onChange={(event) => setDraft({ ...draft, api_key: event.target.value })} placeholder="sk-or-v1-..." autoComplete="off" />
+          </label>
+          <label className="provider-toggle cloud-consent">
+            <input checked={draft.metadata.cloud_content_acknowledged === true} type="checkbox" onChange={(event) => setDraft({ ...draft, metadata: { ...draft.metadata, cloud_content_acknowledged: event.target.checked } })} />
+            <span><strong>I understand excerpts leave this device</strong><small>RepoMemo sends only the cited excerpts needed for a requested summary to OpenRouter.</small></span>
+          </label>
+        </> : null}
         <label className="provider-toggle">
           <input checked={draft.enabled} type="checkbox" onChange={(event) => setDraft({ ...draft, enabled: event.target.checked })} />
           <span><strong>Enable local AI</strong><small>Only this configured endpoint may receive summary context.</small></span>
@@ -1493,7 +1545,7 @@ function ProviderSettingsView({
 }
 
 function providerDraft(workspaceId: string | undefined): ProviderSettings {
-  return { id: "", workspace_id: workspaceId ?? null, provider_type: "ollama", name: "Local Ollama", base_url: "http://127.0.0.1:11434", model: "llama3.2", embedding_model: null, enabled: false, metadata: {} };
+  return { id: "", workspace_id: workspaceId ?? null, provider_type: "ollama", name: "Local Ollama", base_url: "http://127.0.0.1:11434", model: "llama3.2", embedding_model: null, enabled: false, metadata: {}, api_key: null };
 }
 
 function SummaryPanel({ summary }: { summary: SummaryResult }) {
@@ -1505,6 +1557,33 @@ function SummaryPanel({ summary }: { summary: SummaryResult }) {
         {summary.citations.map((citation) => <span key={citation.chunk_id ?? citation.artifact_id}>{formatLineRange(citation.start_line, citation.end_line)}</span>)}
       </div>
       {summary.warnings.map((warning) => <p className="evidence-note" key={warning}>{warning}</p>)}
+    </section>
+  );
+}
+
+function WorkspaceSummaryView({
+  isSummarizing,
+  onSummarize,
+  summary,
+  workspace,
+}: {
+  isSummarizing: boolean;
+  onSummarize: () => void;
+  summary: SummaryResult | null;
+  workspace: Workspace | undefined;
+}) {
+  if (!workspace) {
+    return <EmptyState icon={Sparkles} title="Choose a workspace" body="Summaries are generated from that workspace’s indexed artifacts." />;
+  }
+  return (
+    <section className="workspace-summary panel">
+      <PanelHeader icon={Sparkles} label="Workspace intelligence" title="Project briefing">
+        <button className="button primary" disabled={isSummarizing} type="button" onClick={onSummarize}>
+          {isSummarizing ? <Loader2 className="spin" size={16} /> : <Sparkles size={16} />} Summarize workspace
+        </button>
+      </PanelHeader>
+      <p className="workspace-summary-intro">Create a concise briefing from indexed excerpts across <strong>{workspace.name}</strong>. Every generated result includes the local chunks it used.</p>
+      {summary ? <SummaryPanel summary={summary} /> : <EmptyState icon={Brain} title="No workspace summary yet" body="Index artifacts, configure a provider, then generate a cited project briefing." />}
     </section>
   );
 }

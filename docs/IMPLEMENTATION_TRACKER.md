@@ -114,9 +114,9 @@ Spec: `docs/phases/PHASE_1F_AI_PROVIDER_LAYER.md`
 | Provider abstraction | Done | Added `crates/ai` with generate, embed, summarize, rerank, and connection-test operations. |
 | Local provider | Done | Ollama-compatible local endpoints support `/api/tags`, `/api/generate`, and `/api/embed`. |
 | Explicit enablement | Done | Provider settings persist per workspace; disabled providers cannot receive summary content. |
-| Cloud posture | Done | Cloud providers are unavailable in this phase and the UI always displays `Cloud off`. |
+| Cloud posture | Done | OpenRouter is available only through an explicit cloud option, API-key entry, and a required acknowledgement that selected excerpts leave the device. |
 | Tauri commands | Done | Added settings list/save, provider test, and cited artifact summary commands. |
-| Summary UI | Done | Artifact details can request a local summary and display the artifact/chunk line citations used. |
+| Summary UI | Done | Artifact and workspace Summary views generate cited briefings; the workspace menu appears before the future Ask mode. |
 | Validation | Done | Provider validation tests, workspace checks, frontend typecheck/build, and Rust workspace checks pass. |
 
 ## Phase 1G: Semantic Search And Ask

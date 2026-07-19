@@ -251,6 +251,8 @@ pub struct ProviderSettings {
     pub embedding_model: Option<String>,
     pub enabled: bool,
     pub metadata: Value,
+    #[serde(skip_serializing, default)]
+    pub api_key: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
