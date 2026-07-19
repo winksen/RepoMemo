@@ -9,6 +9,11 @@ import type {
   ImportReport,
   SearchRequest,
   SearchResult,
+  ProviderSettings,
+  ProviderTestResult,
+  SummaryResult,
+  Symbol,
+  SymbolSearchResult,
   Workspace,
   WorkspaceOverview,
 } from "../types";
@@ -27,6 +32,8 @@ const mockWorkspaces: Workspace[] = [
 
 const mockArtifacts: ArtifactSummary[] = [];
 const mockChunks = new Map<string, Chunk[]>();
+const mockSymbols = new Map<string, Symbol[]>();
+const mockProviders = new Map<string, ProviderSettings[]>();
 
 const emptyOverview = (workspaceId: string): WorkspaceOverview => ({
   workspace_id: workspaceId,
@@ -74,6 +81,31 @@ export async function getAppSettings(): Promise<AppSettings> {
   }
 
   return invoke<AppSettings>("get_app_settings");
+}
+
+export async function listProviderSettings(workspaceId: string): Promise<ProviderSettings[]> {
+  if (!isTauriRuntime) return mockProviders.get(workspaceId) ?? [];
+  return invoke<ProviderSettings[]>("list_provider_settings", { workspaceId });
+}
+
+export async function saveProviderSettings(settings: ProviderSettings): Promise<ProviderSettings> {
+  if (!isTauriRuntime) {
+    const saved = { ...settings, id: settings.id || crypto.randomUUID() };
+    const existing = mockProviders.get(saved.workspace_id ?? "") ?? [];
+    mockProviders.set(saved.workspace_id ?? "", [...existing.filter((item) => item.id !== saved.id), saved]);
+    return saved;
+  }
+  return invoke<ProviderSettings>("save_provider_settings", { settings });
+}
+
+export async function testProvider(providerId: string): Promise<ProviderTestResult> {
+  if (!isTauriRuntime) return { provider_id: providerId, success: true, message: "Preview provider is ready." };
+  return invoke<ProviderTestResult>("test_provider", { providerId });
+}
+
+export async function summarizeArtifact(artifactId: string, providerId: string): Promise<SummaryResult> {
+  if (!isTauriRuntime) return { summary_markdown: "Preview summary. Configure a local provider in the desktop app to generate a real one.", citations: [], warnings: [] };
+  return invoke<SummaryResult>("summarize_artifact", { artifactId, providerId });
 }
 
 export const ACCEPTED_TEXT_EXTENSIONS = [
@@ -290,6 +322,21 @@ export async function indexArtifact(
         metadata: {},
       },
     ]);
+    if (artifact.language === "TypeScript" || artifact.language === "JavaScript") {
+      mockSymbols.set(artifactId, [
+        {
+          id: crypto.randomUUID(),
+          artifact_id: artifactId,
+          workspace_id: artifact.workspace_id,
+          kind: "function",
+          name: "previewSymbol",
+          signature: "function previewSymbol()",
+          start_line: 1,
+          end_line: 3,
+          metadata: {},
+        },
+      ]);
+    }
 
     return mockIndexingJob(artifact.workspace_id, 1, 1, "completed");
   }
@@ -376,6 +423,39 @@ export async function searchWorkspace(
   }
 
   return invoke<SearchResult[]>("search_workspace", { request });
+}
+
+export async function listSymbols(artifactId: string): Promise<Symbol[]> {
+  if (!isTauriRuntime) {
+    return mockSymbols.get(artifactId) ?? [];
+  }
+  return invoke<Symbol[]>("list_symbols", { artifactId });
+}
+
+export async function searchSymbols(
+  workspaceId: string,
+  query: string,
+): Promise<SymbolSearchResult[]> {
+  if (!isTauriRuntime) {
+    const term = query.trim().toLowerCase();
+    return mockArtifacts
+      .flatMap((artifact) =>
+        (mockSymbols.get(artifact.id) ?? []).map((symbol) => ({ artifact, symbol })),
+      )
+      .filter(
+        ({ artifact, symbol }) =>
+          artifact.workspace_id === workspaceId &&
+          symbol.name.toLowerCase().includes(term),
+      )
+      .map(({ artifact, symbol }) => ({
+        symbol,
+        title: artifact.title,
+        path: artifact.path,
+        language: artifact.language,
+        source_name: artifact.source_name,
+      }));
+  }
+  return invoke<SymbolSearchResult[]>("search_symbols", { workspaceId, query });
 }
 
 function normalizeDialogSelection(selection: string | string[] | null): string[] {

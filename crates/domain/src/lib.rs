@@ -187,6 +187,15 @@ pub struct Symbol {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SymbolSearchResult {
+    pub symbol: Symbol,
+    pub title: String,
+    pub path: String,
+    pub language: Option<String>,
+    pub source_name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoryCard {
     pub id: String,
     pub workspace_id: String,
@@ -242,6 +251,13 @@ pub struct ProviderSettings {
     pub embedding_model: Option<String>,
     pub enabled: bool,
     pub metadata: Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProviderTestResult {
+    pub provider_id: String,
+    pub success: bool,
+    pub message: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -1,7 +1,8 @@
 use anyhow::Result;
-use repomemo_domain::{ArtifactSummary, ArtifactType, Chunk};
+use repomemo_domain::{ArtifactSummary, ArtifactType, Chunk, Symbol, SymbolKind};
 use serde_json::json;
 use sha2::{Digest, Sha256};
+use tree_sitter::{Language, Node, Parser};
 
 const MARKDOWN_TARGET_CHARS: usize = 1_600;
 const TEXT_WINDOW_LINES: usize = 100;
@@ -9,6 +10,7 @@ const TEXT_WINDOW_LINES: usize = 100;
 #[derive(Debug, Clone)]
 pub struct IndexArtifactOutput {
     pub chunks: Vec<Chunk>,
+    pub symbols: Vec<Symbol>,
     pub warnings: Vec<String>,
 }
 
@@ -39,6 +41,7 @@ pub fn index_artifact(summary: &ArtifactSummary, bytes: &[u8]) -> Result<IndexAr
     if text.trim().is_empty() {
         return Ok(IndexArtifactOutput {
             chunks: Vec::new(),
+            symbols: Vec::new(),
             warnings,
         });
     }
@@ -53,7 +56,127 @@ pub fn index_artifact(summary: &ArtifactSummary, bytes: &[u8]) -> Result<IndexAr
         chunk_by_line_windows(summary, &text)
     };
 
-    Ok(IndexArtifactOutput { chunks, warnings })
+    let symbols = match extract_symbols(summary, &text) {
+        Ok(symbols) => symbols,
+        Err(error) => {
+            warnings.push(format!("Symbol indexing was skipped: {error}"));
+            Vec::new()
+        }
+    };
+
+    Ok(IndexArtifactOutput {
+        chunks,
+        symbols,
+        warnings,
+    })
+}
+
+fn extract_symbols(summary: &ArtifactSummary, text: &str) -> Result<Vec<Symbol>> {
+    let language = match summary.language.as_deref() {
+        Some("TypeScript") if summary.path.to_ascii_lowercase().ends_with(".tsx") => {
+            tree_sitter_typescript::LANGUAGE_TSX.into()
+        }
+        Some("TypeScript") | Some("JavaScript") => {
+            tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into()
+        }
+        Some("Python") => tree_sitter_python::LANGUAGE.into(),
+        Some("Rust") => tree_sitter_rust::LANGUAGE.into(),
+        _ => return Ok(Vec::new()),
+    };
+
+    parse_symbols(summary, text, language)
+}
+
+fn parse_symbols(summary: &ArtifactSummary, text: &str, language: Language) -> Result<Vec<Symbol>> {
+    let mut parser = Parser::new();
+    parser.set_language(&language)?;
+    let tree = parser
+        .parse(text, None)
+        .ok_or_else(|| anyhow::anyhow!("parser returned no syntax tree"))?;
+    let mut symbols = Vec::new();
+    collect_symbols(tree.root_node(), summary, text, &mut symbols);
+    symbols.sort_by_key(|symbol| (symbol.start_line.unwrap_or(i64::MAX), symbol.name.clone()));
+    Ok(symbols)
+}
+
+fn collect_symbols(
+    node: Node<'_>,
+    summary: &ArtifactSummary,
+    text: &str,
+    output: &mut Vec<Symbol>,
+) {
+    if let Some((kind, name_node)) = symbol_descriptor(node, summary.language.as_deref()) {
+        if let Ok(name) = name_node.utf8_text(text.as_bytes()) {
+            let name = name.trim();
+            if !name.is_empty() {
+                let start_line = node.start_position().row as i64 + 1;
+                let end_line = node.end_position().row as i64 + 1;
+                output.push(Symbol {
+                    id: String::new(),
+                    artifact_id: summary.id.clone(),
+                    workspace_id: summary.workspace_id.clone(),
+                    kind,
+                    name: name.to_owned(),
+                    signature: symbol_signature(node, text),
+                    start_line: Some(start_line),
+                    end_line: Some(end_line),
+                    metadata: json!({ "language": summary.language, "source_path": summary.path }),
+                });
+            }
+        }
+    }
+
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        collect_symbols(child, summary, text, output);
+    }
+}
+
+fn symbol_descriptor<'a>(node: Node<'a>, language: Option<&str>) -> Option<(SymbolKind, Node<'a>)> {
+    let name = node.child_by_field_name("name")?;
+    let kind = match (language, node.kind()) {
+        (Some("TypeScript") | Some("JavaScript"), "function_declaration") => SymbolKind::Function,
+        (Some("TypeScript") | Some("JavaScript"), "class_declaration") => SymbolKind::Class,
+        (Some("TypeScript") | Some("JavaScript"), "interface_declaration") => SymbolKind::Interface,
+        (Some("TypeScript") | Some("JavaScript"), "enum_declaration") => SymbolKind::Enum,
+        (Some("TypeScript") | Some("JavaScript"), "method_definition") => SymbolKind::Method,
+        (Some("Python"), "function_definition") if has_ancestor_kind(node, "class_definition") => {
+            SymbolKind::Method
+        }
+        (Some("Python"), "function_definition") => SymbolKind::Function,
+        (Some("Python"), "class_definition") => SymbolKind::Class,
+        (Some("Rust"), "function_item") if has_ancestor_kind(node, "impl_item") => {
+            SymbolKind::Method
+        }
+        (Some("Rust"), "function_item") => SymbolKind::Function,
+        (Some("Rust"), "enum_item") => SymbolKind::Enum,
+        (Some("Rust"), "struct_item") => SymbolKind::Class,
+        (Some("Rust"), "trait_item") => SymbolKind::Interface,
+        _ => return None,
+    };
+    Some((kind, name))
+}
+
+fn has_ancestor_kind(mut node: Node<'_>, kind: &str) -> bool {
+    while let Some(parent) = node.parent() {
+        if parent.kind() == kind {
+            return true;
+        }
+        node = parent;
+    }
+    false
+}
+
+fn symbol_signature(node: Node<'_>, text: &str) -> Option<String> {
+    let bytes = text.as_bytes();
+    let end = node
+        .child_by_field_name("body")
+        .map(|body| body.start_byte())
+        .unwrap_or_else(|| node.end_byte())
+        .min(node.start_byte().saturating_add(400));
+    let signature = std::str::from_utf8(bytes.get(node.start_byte()..end)?).ok()?;
+    let signature = signature.split_whitespace().collect::<Vec<_>>().join(" ");
+    (!signature.is_empty()).then_some(signature)
 }
 
 fn chunk_markdown(summary: &ArtifactSummary, text: &str) -> Vec<Chunk> {
@@ -286,6 +409,59 @@ mod tests {
         let output = index_artifact(&summary, b"  \n\n").unwrap();
 
         assert!(output.chunks.is_empty());
+    }
+
+    #[test]
+    fn typescript_symbols_include_functions_classes_interfaces_and_methods() {
+        let summary = artifact_summary(ArtifactType::CodeFile, Some("TypeScript"));
+        let text = "interface Store { read(): string }\nclass MemoryStore { read(): string { return 'ok' } }\nfunction createStore(): Store { return new MemoryStore() }";
+        let output = index_artifact(&summary, text.as_bytes()).unwrap();
+
+        assert!(has_symbol(&output, "Store", SymbolKind::Interface, 1));
+        assert!(has_symbol(&output, "MemoryStore", SymbolKind::Class, 2));
+        assert!(has_symbol(&output, "read", SymbolKind::Method, 2));
+        assert!(has_symbol(&output, "createStore", SymbolKind::Function, 3));
+    }
+
+    #[test]
+    fn python_symbols_distinguish_methods() {
+        let summary = artifact_summary(ArtifactType::CodeFile, Some("Python"));
+        let text = "class Index:\n    def search(self, query):\n        return query\n\ndef build_index():\n    return Index()\n";
+        let output = index_artifact(&summary, text.as_bytes()).unwrap();
+
+        assert!(has_symbol(&output, "Index", SymbolKind::Class, 1));
+        assert!(has_symbol(&output, "search", SymbolKind::Method, 2));
+        assert!(has_symbol(&output, "build_index", SymbolKind::Function, 5));
+    }
+
+    #[test]
+    fn rust_symbols_include_enums_functions_and_impl_methods() {
+        let summary = artifact_summary(ArtifactType::CodeFile, Some("Rust"));
+        let text = "enum State { Ready }\nstruct Index;\nimpl Index { fn search(&self) {} }\nfn build() -> Index { Index }\n";
+        let output = index_artifact(&summary, text.as_bytes()).unwrap();
+
+        assert!(has_symbol(&output, "State", SymbolKind::Enum, 1));
+        assert!(has_symbol(&output, "Index", SymbolKind::Class, 2));
+        assert!(has_symbol(&output, "search", SymbolKind::Method, 3));
+        assert!(has_symbol(&output, "build", SymbolKind::Function, 4));
+    }
+
+    #[test]
+    fn malformed_code_still_produces_text_chunks() {
+        let summary = artifact_summary(ArtifactType::CodeFile, Some("TypeScript"));
+        let text = "function incomplete( {\n  return value\n";
+        let output = index_artifact(&summary, text.as_bytes()).unwrap();
+
+        assert_eq!(output.chunks.len(), 1);
+        assert_eq!(output.chunks[0].start_line, Some(1));
+    }
+
+    fn has_symbol(output: &IndexArtifactOutput, name: &str, kind: SymbolKind, line: i64) -> bool {
+        output.symbols.iter().any(|symbol| {
+            symbol.name == name
+                && std::mem::discriminant(&symbol.kind) == std::mem::discriminant(&kind)
+                && symbol.start_line == Some(line)
+        })
     }
 
     fn artifact_summary(artifact_type: ArtifactType, language: Option<&str>) -> ArtifactSummary {

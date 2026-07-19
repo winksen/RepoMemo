@@ -37,9 +37,15 @@ import {
   importPaths,
   importText,
   listArtifacts,
+  listProviderSettings,
+  listSymbols,
   listWorkspaces,
   PASTE_LANGUAGES,
   searchWorkspace,
+  searchSymbols,
+  saveProviderSettings,
+  summarizeArtifact,
+  testProvider,
   type PasteLanguage,
 } from "./lib/repomemoApi";
 import type {
@@ -49,12 +55,17 @@ import type {
   IndexingJobStatus,
   ImportReport,
   SearchResult,
+  ProviderSettings,
+  ProviderTestResult,
+  SummaryResult,
+  Symbol,
+  SymbolSearchResult,
   Workspace,
   WorkspaceOverview,
 } from "./types";
 
 type LoadState = "idle" | "loading" | "ready" | "error";
-type View = "workspaces" | "import" | "artifacts" | "search";
+type View = "workspaces" | "import" | "artifacts" | "search" | "settings";
 type ThemeMode = "light" | "dark";
 
 const emptyOverview = (workspaceId: string): WorkspaceOverview => ({
@@ -79,6 +90,13 @@ export function App() {
   const [artifacts, setArtifacts] = useState<ArtifactSummary[]>([]);
   const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
   const [artifactDetail, setArtifactDetail] = useState<ArtifactDetail | null>(null);
+  const [symbols, setSymbols] = useState<Symbol[]>([]);
+  const [providers, setProviders] = useState<ProviderSettings[]>([]);
+  const [providerTest, setProviderTest] = useState<ProviderTestResult | null>(null);
+  const [isSavingProvider, setIsSavingProvider] = useState(false);
+  const [isTestingProvider, setIsTestingProvider] = useState(false);
+  const [summary, setSummary] = useState<SummaryResult | null>(null);
+  const [isSummarizing, setIsSummarizing] = useState(false);
   const [overview, setOverview] = useState<WorkspaceOverview | null>(null);
   const [importReport, setImportReport] = useState<ImportReport | null>(null);
   const [indexingJob, setIndexingJob] = useState<IndexingJobStatus | null>(null);
@@ -90,6 +108,8 @@ export function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [selectedSearchResult, setSelectedSearchResult] = useState<SearchResult | null>(null);
+  const [symbolSearchResults, setSymbolSearchResults] = useState<SymbolSearchResult[]>([]);
+  const [selectedSymbolResult, setSelectedSymbolResult] = useState<SymbolSearchResult | null>(null);
   const [searchLanguages, setSearchLanguages] = useState<string[]>([]);
   const [searchTypes, setSearchTypes] = useState<ArtifactSummary["artifact_type"][]>([]);
   const [searchSources, setSearchSources] = useState<string[]>([]);
@@ -153,10 +173,14 @@ export function App() {
       setArtifacts([]);
       setOverview(null);
       setSelectedArtifactId(null);
+      setProviders([]);
       return;
     }
 
     refreshWorkspaceData(selectedWorkspaceId);
+    listProviderSettings(selectedWorkspaceId).then(setProviders).catch((error) => {
+      setErrorMessage(error instanceof Error ? error.message : String(error));
+    });
   }, [selectedWorkspaceId]);
 
   useEffect(() => {
@@ -165,13 +189,18 @@ export function App() {
     async function loadArtifact() {
       if (!selectedArtifactId) {
         setArtifactDetail(null);
+        setSymbols([]);
         return;
       }
 
       try {
-        const detail = await getArtifact(selectedArtifactId);
+        const [detail, artifactSymbols] = await Promise.all([
+          getArtifact(selectedArtifactId),
+          listSymbols(selectedArtifactId),
+        ]);
         if (!cancelled) {
           setArtifactDetail(detail);
+          setSymbols(artifactSymbols);
         }
       } catch (error) {
         if (!cancelled) {
@@ -316,6 +345,7 @@ export function App() {
       await refreshWorkspaceData(selectedWorkspaceId);
       const detail = await getArtifact(artifactId);
       setArtifactDetail(detail);
+      setSymbols(await listSymbols(artifactId));
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : String(error));
     } finally {
@@ -338,6 +368,7 @@ export function App() {
       if (selectedArtifactId) {
         const detail = await getArtifact(selectedArtifactId);
         setArtifactDetail(detail);
+        setSymbols(await listSymbols(selectedArtifactId));
       }
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : String(error));
@@ -350,7 +381,9 @@ export function App() {
     event?.preventDefault();
     if (!selectedWorkspaceId || !searchQuery.trim()) {
       setSearchResults([]);
+      setSymbolSearchResults([]);
       setSelectedSearchResult(null);
+      setSelectedSymbolResult(null);
       setHasSearched(false);
       return;
     }
@@ -358,16 +391,29 @@ export function App() {
     setIsSearching(true);
     setErrorMessage(null);
     try {
-      const results = await searchWorkspace({
-        workspace_id: selectedWorkspaceId,
-        query: searchQuery.trim(),
-        artifact_types: searchTypes,
-        languages: searchLanguages,
-        source_ids: searchSources,
-        limit: 40,
+      const [results, symbolResults] = await Promise.all([
+        searchWorkspace({
+          workspace_id: selectedWorkspaceId,
+          query: searchQuery.trim(),
+          artifact_types: searchTypes,
+          languages: searchLanguages,
+          source_ids: searchSources,
+          limit: 40,
+        }),
+        searchSymbols(selectedWorkspaceId, searchQuery.trim()),
+      ]);
+      const filteredSymbolResults = symbolResults.filter((result) => {
+        const artifact = artifacts.find((item) => item.id === result.symbol.artifact_id);
+        if (!artifact) return false;
+        if (searchTypes.length > 0 && !searchTypes.includes(artifact.artifact_type)) return false;
+        if (searchLanguages.length > 0 && (!artifact.language || !searchLanguages.includes(artifact.language))) return false;
+        if (searchSources.length > 0 && !searchSources.includes(artifact.source_id)) return false;
+        return true;
       });
       setSearchResults(results);
-      setSelectedSearchResult(results[0] ?? null);
+      setSymbolSearchResults(filteredSymbolResults);
+      setSelectedSymbolResult(filteredSymbolResults[0] ?? null);
+      setSelectedSearchResult(filteredSymbolResults.length === 0 ? (results[0] ?? null) : null);
       setHasSearched(true);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : String(error));
@@ -379,6 +425,56 @@ export function App() {
   function openSearchArtifact(result: SearchResult) {
     setSelectedArtifactId(result.artifact_id);
     setActiveView("artifacts");
+  }
+
+  function openSymbolArtifact(result: SymbolSearchResult) {
+    setSelectedArtifactId(result.symbol.artifact_id);
+    setActiveView("artifacts");
+  }
+
+  async function handleSaveProvider(settingsToSave: ProviderSettings) {
+    setIsSavingProvider(true);
+    setErrorMessage(null);
+    try {
+      const saved = await saveProviderSettings(settingsToSave);
+      setProviders(await listProviderSettings(saved.workspace_id ?? selectedWorkspaceId ?? ""));
+      setSettings(await getAppSettings());
+      setProviderTest(null);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsSavingProvider(false);
+    }
+  }
+
+  async function handleTestProvider(providerId: string) {
+    setIsTestingProvider(true);
+    setErrorMessage(null);
+    try {
+      setProviderTest(await testProvider(providerId));
+    } catch (error) {
+      setProviderTest({ provider_id: providerId, success: false, message: error instanceof Error ? error.message : String(error) });
+    } finally {
+      setIsTestingProvider(false);
+    }
+  }
+
+  async function handleSummarize(artifactId: string) {
+    const provider = providers.find((item) => item.enabled);
+    if (!provider) {
+      setActiveView("settings");
+      setErrorMessage("Enable a local provider before requesting a summary. No content was sent.");
+      return;
+    }
+    setIsSummarizing(true);
+    setErrorMessage(null);
+    try {
+      setSummary(await summarizeArtifact(artifactId, provider.id));
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsSummarizing(false);
+    }
   }
 
   return (
@@ -433,7 +529,13 @@ export function App() {
           </div>
           <div className="nav-divider" aria-hidden="true" />
           <div className="nav-group">
-            <NavButton disabled icon={Settings2} label="Settings" />
+            <NavButton
+              active={activeView === "settings"}
+              disabled={!selectedWorkspace}
+              icon={Settings2}
+              label="Settings"
+              onClick={() => setActiveView("settings")}
+            />
           </div>
         </nav>
 
@@ -451,13 +553,16 @@ export function App() {
       <section className="workbench">
         <header className="workbench-header">
           <div>
-            <p className="meta-label">Phase 1D</p>
+            <p className="meta-label">Phase 1F</p>
             <h2>{selectedWorkspace?.name ?? "Workspace foundation"}</h2>
           </div>
           <div className="header-actions">
             <StatusBadge tone={loadState === "error" ? "danger" : "success"}>
               <CheckCircle2 size={15} />
               {loadState === "loading" ? "Booting core" : "Local core ready"}
+            </StatusBadge>
+            <StatusBadge tone={settings?.ai_enabled ? "success" : "neutral"}>
+              {settings?.ai_enabled ? `Local · ${settings.active_provider}` : "No AI"}
             </StatusBadge>
             <StatusBadge tone="neutral">Cloud off</StatusBadge>
             <button
@@ -514,25 +619,43 @@ export function App() {
             overview={currentOverview}
             selectedArtifactId={selectedArtifactId}
             selectedWorkspace={selectedWorkspace}
+            symbols={symbols}
+            summary={summary}
+            isSummarizing={isSummarizing}
+            onSummarize={handleSummarize}
           />
-        ) : (
+        ) : activeView === "search" ? (
           <SearchView
             artifacts={artifacts}
             hasSearched={hasSearched}
             isSearching={isSearching}
             languages={searchLanguages}
             onOpenArtifact={openSearchArtifact}
+            onOpenSymbol={openSymbolArtifact}
             onSearch={handleSearch}
-            onSelectResult={setSelectedSearchResult}
+            onSelectResult={(result) => { setSelectedSearchResult(result); setSelectedSymbolResult(null); }}
+            onSelectSymbol={(result) => { setSelectedSymbolResult(result); setSelectedSearchResult(null); }}
             query={searchQuery}
             results={searchResults}
             selectedResult={selectedSearchResult}
+            selectedSymbol={selectedSymbolResult}
             setLanguages={setSearchLanguages}
             setQuery={setSearchQuery}
             setSources={setSearchSources}
             setTypes={setSearchTypes}
             sources={searchSources}
+            symbolResults={symbolSearchResults}
             types={searchTypes}
+            workspace={selectedWorkspace}
+          />
+        ) : (
+          <ProviderSettingsView
+            isSaving={isSavingProvider}
+            isTesting={isTestingProvider}
+            onSave={handleSaveProvider}
+            onTest={handleTestProvider}
+            provider={providers[0] ?? null}
+            testResult={providerTest}
             workspace={selectedWorkspace}
           />
         )}
@@ -801,6 +924,10 @@ function ArtifactsView({
   overview,
   selectedArtifactId,
   selectedWorkspace,
+  symbols,
+  summary,
+  isSummarizing,
+  onSummarize,
 }: {
   artifactDetail: ArtifactDetail | null;
   artifacts: ArtifactSummary[];
@@ -813,6 +940,10 @@ function ArtifactsView({
   overview: WorkspaceOverview;
   selectedArtifactId: string | null;
   selectedWorkspace: Workspace | undefined;
+  symbols: Symbol[];
+  summary: SummaryResult | null;
+  isSummarizing: boolean;
+  onSummarize: (artifactId: string) => void;
 }) {
   if (!selectedWorkspace) {
     return (
@@ -887,15 +1018,26 @@ function ArtifactsView({
 
       <aside className="panel detail-panel">
         <PanelHeader icon={BookOpen} label="Preview" title="Artifact detail">
-          <button
-            className="button secondary"
-            disabled={!artifactDetail || isIndexing}
-            type="button"
-            onClick={() => onIndexArtifact(artifactDetail?.summary.id)}
-          >
-            {isIndexing ? <Loader2 className="spin" size={16} /> : <Database size={16} />}
-            {artifactDetail?.summary.indexed_at ? "Reindex" : "Index"}
-          </button>
+          <div className="detail-actions">
+            <button
+              className="button secondary"
+              disabled={!artifactDetail || isSummarizing}
+              type="button"
+              onClick={() => artifactDetail && onSummarize(artifactDetail.summary.id)}
+            >
+              {isSummarizing ? <Loader2 className="spin" size={16} /> : <Sparkles size={16} />}
+              Summarize
+            </button>
+            <button
+              className="button secondary"
+              disabled={!artifactDetail || isIndexing}
+              type="button"
+              onClick={() => onIndexArtifact(artifactDetail?.summary.id)}
+            >
+              {isIndexing ? <Loader2 className="spin" size={16} /> : <Database size={16} />}
+              {artifactDetail?.summary.indexed_at ? "Reindex" : "Index"}
+            </button>
+          </div>
         </PanelHeader>
         {artifactDetail ? (
           <div className="artifact-detail">
@@ -917,7 +1059,10 @@ function ArtifactsView({
               <StatusBadge tone="neutral">
                 {artifactDetail.chunks.length} chunks
               </StatusBadge>
+              <StatusBadge tone="neutral">{symbols.length} symbols</StatusBadge>
             </div>
+            <SymbolOutline detail={artifactDetail} symbols={symbols} />
+            {summary ? <SummaryPanel summary={summary} /> : null}
             <pre className="content-preview">
               {artifactDetail.content_preview ?? "Preview unavailable."}
             </pre>
@@ -944,16 +1089,20 @@ function SearchView({
   isSearching,
   languages,
   onOpenArtifact,
+  onOpenSymbol,
   onSearch,
   onSelectResult,
+  onSelectSymbol,
   query,
   results,
   selectedResult,
+  selectedSymbol,
   setLanguages,
   setQuery,
   setSources,
   setTypes,
   sources,
+  symbolResults,
   types,
   workspace,
 }: {
@@ -962,16 +1111,20 @@ function SearchView({
   isSearching: boolean;
   languages: string[];
   onOpenArtifact: (result: SearchResult) => void;
+  onOpenSymbol: (result: SymbolSearchResult) => void;
   onSearch: (event?: FormEvent<HTMLFormElement>) => void;
   onSelectResult: (result: SearchResult) => void;
+  onSelectSymbol: (result: SymbolSearchResult) => void;
   query: string;
   results: SearchResult[];
   selectedResult: SearchResult | null;
+  selectedSymbol: SymbolSearchResult | null;
   setLanguages: (values: string[]) => void;
   setQuery: (value: string) => void;
   setSources: (values: string[]) => void;
   setTypes: (values: ArtifactSummary["artifact_type"][]) => void;
   sources: string[];
+  symbolResults: SymbolSearchResult[];
   types: ArtifactSummary["artifact_type"][];
   workspace: Workspace | undefined;
 }) {
@@ -1040,7 +1193,7 @@ function SearchView({
         </div>
 
         <div className="search-result-summary">
-          <span>{hasSearched ? `${results.length} results` : "Ready to search"}</span>
+          <span>{hasSearched ? `${symbolResults.length} symbols · ${results.length} contexts` : "Ready to search"}</span>
           <span>{workspace.name}</span>
         </div>
 
@@ -1059,9 +1212,31 @@ function SearchView({
                 <span>{indexedCount}/{artifacts.length} indexed</span>
               </div>
             </div>
-          ) : results.length === 0 ? (
+          ) : results.length === 0 && symbolResults.length === 0 ? (
             <EmptyState icon={Search} title="No indexed chunks matched" body="Try fewer terms, clear a filter, or index more artifacts." />
-          ) : results.map((result, index) => (
+          ) : <>
+            {symbolResults.length > 0 ? (
+              <div className="symbol-results-group">
+                <p className="result-group-label">Definitions</p>
+                {symbolResults.map((result) => (
+                  <button
+                    className={selectedSymbol?.symbol.id === result.symbol.id ? "search-result symbol-result selected" : "search-result symbol-result"}
+                    key={result.symbol.id}
+                    type="button"
+                    onClick={() => onSelectSymbol(result)}
+                  >
+                    <span className="symbol-kind-mark">{symbolKindMark(result.symbol.kind)}</span>
+                    <span className="result-content">
+                      <span className="result-title-row"><strong>{result.symbol.name}</strong><span>{formatLineRange(result.symbol.start_line, result.symbol.end_line)}</span></span>
+                      <code className="symbol-signature">{result.symbol.signature ?? `${result.symbol.kind} ${result.symbol.name}`}</code>
+                      <span className="result-meta"><span>{result.path}</span><span>{result.symbol.kind}</span></span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            {results.length > 0 ? <p className="result-group-label">Matched context</p> : null}
+            {results.map((result, index) => (
             <button
               className={selectedResult?.chunk_id === result.chunk_id ? "search-result selected" : "search-result"}
               key={result.chunk_id}
@@ -1076,17 +1251,31 @@ function SearchView({
                 <span className="result-meta"><span>{result.language ?? formatArtifactType(result.artifact_type)}</span><span>{result.source_name}</span></span>
               </span>
             </button>
-          ))}
+            ))}
+          </>}
         </div>
       </section>
 
       <aside className="panel search-preview">
         <PanelHeader icon={BookOpen} label="Matched context" title="Evidence preview">
-          <button className="button secondary" disabled={!selectedResult} type="button" onClick={() => selectedResult && onOpenArtifact(selectedResult)}>
+          <button className="button secondary" disabled={!selectedResult && !selectedSymbol} type="button" onClick={() => selectedSymbol ? onOpenSymbol(selectedSymbol) : selectedResult && onOpenArtifact(selectedResult)}>
             <BookOpen size={16} /> Open artifact
           </button>
         </PanelHeader>
-        {selectedResult ? (
+        {selectedSymbol ? (
+          <div className="search-evidence symbol-evidence">
+            <p className="meta-label">{selectedSymbol.symbol.kind}</p>
+            <h3>{selectedSymbol.symbol.name}</h3>
+            <p className="path-text">{selectedSymbol.path}</p>
+            <div className="detail-meta">
+              <StatusBadge tone="neutral">{formatLineRange(selectedSymbol.symbol.start_line, selectedSymbol.symbol.end_line)}</StatusBadge>
+              <StatusBadge tone="neutral">{selectedSymbol.language ?? "Code"}</StatusBadge>
+              <StatusBadge tone="neutral">{selectedSymbol.source_name}</StatusBadge>
+            </div>
+            <pre className="symbol-preview">{selectedSymbol.symbol.signature ?? selectedSymbol.symbol.name}</pre>
+            <p className="evidence-note">Direct symbol match from the local structural index.</p>
+          </div>
+        ) : selectedResult ? (
           <div className="search-evidence">
             <h3>{selectedResult.title}</h3>
             <p className="path-text">{selectedResult.path}</p>
@@ -1233,6 +1422,93 @@ function ImportReportPanel({ report }: { report: ImportReport }) {
   );
 }
 
+function ProviderSettingsView({
+  isSaving,
+  isTesting,
+  onSave,
+  onTest,
+  provider,
+  testResult,
+  workspace,
+}: {
+  isSaving: boolean;
+  isTesting: boolean;
+  onSave: (settings: ProviderSettings) => void;
+  onTest: (providerId: string) => void;
+  provider: ProviderSettings | null;
+  testResult: ProviderTestResult | null;
+  workspace: Workspace | undefined;
+}) {
+  const [draft, setDraft] = useState<ProviderSettings>(() => provider ?? providerDraft(workspace?.id));
+
+  useEffect(() => {
+    setDraft(provider ?? providerDraft(workspace?.id));
+  }, [provider, workspace?.id]);
+
+  if (!workspace) {
+    return <EmptyState icon={Settings2} title="Choose a workspace" body="Provider settings are saved per workspace." />;
+  }
+
+  return (
+    <section className="provider-workbench panel">
+      <PanelHeader icon={Brain} label="Local AI" title="Provider control">
+        <StatusBadge tone={draft.enabled ? "success" : "neutral"}>{draft.enabled ? "Local" : "No AI"}</StatusBadge>
+      </PanelHeader>
+      <div className="provider-intro">
+        <p>RepoMemo only sends content after you explicitly enable this local provider. Cloud providers remain off in this phase.</p>
+      </div>
+      <form className="provider-form" onSubmit={(event) => { event.preventDefault(); onSave({ ...draft, workspace_id: workspace.id }); }}>
+        <label>
+          <span>Provider</span>
+          <input value="Ollama-compatible local endpoint" disabled />
+        </label>
+        <label>
+          <span>Base URL</span>
+          <input value={draft.base_url ?? ""} onChange={(event) => setDraft({ ...draft, base_url: event.target.value })} placeholder="http://127.0.0.1:11434" />
+        </label>
+        <label>
+          <span>Chat model</span>
+          <input value={draft.model ?? ""} onChange={(event) => setDraft({ ...draft, model: event.target.value })} placeholder="llama3.2" />
+        </label>
+        <label>
+          <span>Embedding model <em>optional</em></span>
+          <input value={draft.embedding_model ?? ""} onChange={(event) => setDraft({ ...draft, embedding_model: event.target.value || null })} placeholder="nomic-embed-text" />
+        </label>
+        <label className="provider-toggle">
+          <input checked={draft.enabled} type="checkbox" onChange={(event) => setDraft({ ...draft, enabled: event.target.checked })} />
+          <span><strong>Enable local AI</strong><small>Only this configured endpoint may receive summary context.</small></span>
+        </label>
+        <div className="provider-actions">
+          <button className="button primary" disabled={isSaving} type="submit">
+            {isSaving ? <Loader2 className="spin" size={16} /> : <Settings2 size={16} />} Save provider
+          </button>
+          <button className="button secondary" disabled={!draft.id || isTesting} type="button" onClick={() => onTest(draft.id)}>
+            {isTesting ? <Loader2 className="spin" size={16} /> : <RefreshCw size={16} />} Test connection
+          </button>
+        </div>
+      </form>
+      {testResult ? <div className={testResult.success ? "provider-test ready" : "provider-test failed"}>{testResult.success ? <CheckCircle2 size={17} /> : <X size={17} />} {testResult.message}</div> : null}
+    </section>
+  );
+}
+
+function providerDraft(workspaceId: string | undefined): ProviderSettings {
+  return { id: "", workspace_id: workspaceId ?? null, provider_type: "ollama", name: "Local Ollama", base_url: "http://127.0.0.1:11434", model: "llama3.2", embedding_model: null, enabled: false, metadata: {} };
+}
+
+function SummaryPanel({ summary }: { summary: SummaryResult }) {
+  return (
+    <section className="summary-panel">
+      <div className="chunk-panel-header"><strong>Local AI summary</strong><StatusBadge tone="neutral">Cited</StatusBadge></div>
+      <p className="summary-body">{summary.summary_markdown}</p>
+      <div className="citation-list">
+        {summary.citations.map((citation) => <span key={citation.chunk_id ?? citation.artifact_id}>{formatLineRange(citation.start_line, citation.end_line)}</span>)}
+      </div>
+      {summary.warnings.map((warning) => <p className="evidence-note" key={warning}>{warning}</p>)}
+    </section>
+  );
+}
+
 function IndexingJobPanel({ job }: { job: IndexingJobStatus }) {
   const total = job.progress_total ?? job.progress_current;
   const progressText =
@@ -1248,6 +1524,43 @@ function IndexingJobPanel({ job }: { job: IndexingJobStatus }) {
         <StatusBadge tone="neutral">{progressText}</StatusBadge>
       </div>
       {job.error_message ? <p className="job-error">{job.error_message}</p> : null}
+    </section>
+  );
+}
+
+function SymbolOutline({ detail, symbols }: { detail: ArtifactDetail; symbols: Symbol[] }) {
+  const supported = ["TypeScript", "JavaScript", "Python", "Rust"].includes(
+    detail.summary.language ?? "",
+  );
+
+  return (
+    <section className="symbol-panel">
+      <div className="chunk-panel-header">
+        <strong>File outline</strong>
+        <StatusBadge tone={symbols.length > 0 ? "success" : "neutral"}>
+          {symbols.length} definitions
+        </StatusBadge>
+      </div>
+      {symbols.length > 0 ? (
+        <div className="symbol-list">
+          {symbols.map((symbol) => (
+            <div className="symbol-row" key={symbol.id} tabIndex={0}>
+              <span className="symbol-kind-mark">{symbolKindMark(symbol.kind)}</span>
+              <span className="symbol-row-main">
+                <strong>{symbol.name}</strong>
+                <code>{symbol.signature ?? symbol.kind}</code>
+              </span>
+              <span className="symbol-line">{formatLineRange(symbol.start_line, symbol.end_line)}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="chunk-empty">
+          {supported
+            ? "No definitions were found in this file."
+            : "No symbol index for this language yet."}
+        </p>
+      )}
     </section>
   );
 }
@@ -1289,6 +1602,21 @@ function ChunkList({ detail }: { detail: ArtifactDetail }) {
       </div>
     </section>
   );
+}
+
+function symbolKindMark(kind: Symbol["kind"]): string {
+  const marks: Record<Symbol["kind"], string> = {
+    function: "ƒ",
+    class: "C",
+    method: "m",
+    interface: "I",
+    enum: "E",
+    route: "R",
+    endpoint: "↗",
+    config: "⚙",
+    test: "T",
+  };
+  return marks[kind];
 }
 
 function StatusBadge({

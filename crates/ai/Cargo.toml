@@ -1,0 +1,12 @@
+[package]
+name = "repomemo-ai"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+repomemo-domain.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true

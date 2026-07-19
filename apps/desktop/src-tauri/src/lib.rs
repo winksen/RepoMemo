@@ -3,7 +3,8 @@ use std::path::PathBuf;
 use repomemo_api::RepoMemoCore;
 use repomemo_domain::{
     AppSettings, ArtifactDetail, ArtifactSummary, ImportReport, ImportRequest, IndexingJobStatus,
-    SearchRequest, SearchResult, Workspace, WorkspaceOverview,
+    ProviderSettings, ProviderTestResult, SearchRequest, SearchResult, SummaryResult, Symbol,
+    SymbolSearchResult, Workspace, WorkspaceOverview,
 };
 use serde::Deserialize;
 use tauri::{Manager, State};
@@ -32,8 +33,8 @@ async fn create_workspace(state: State<'_, AppState>, name: String) -> Result<Wo
 }
 
 #[tauri::command]
-fn get_app_settings(state: State<'_, AppState>) -> AppSettings {
-    state.core.app_settings()
+async fn get_app_settings(state: State<'_, AppState>) -> Result<AppSettings, String> {
+    state.core.app_settings().await.map_err(to_command_error)
 }
 
 #[tauri::command]
@@ -149,6 +150,80 @@ async fn search_workspace(
         .map_err(to_command_error)
 }
 
+#[tauri::command]
+async fn list_symbols(
+    state: State<'_, AppState>,
+    artifact_id: String,
+) -> Result<Vec<Symbol>, String> {
+    state
+        .core
+        .list_symbols(artifact_id)
+        .await
+        .map_err(to_command_error)
+}
+
+#[tauri::command]
+async fn search_symbols(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    query: String,
+) -> Result<Vec<SymbolSearchResult>, String> {
+    state
+        .core
+        .search_symbols(workspace_id, query)
+        .await
+        .map_err(to_command_error)
+}
+
+#[tauri::command]
+async fn list_provider_settings(
+    state: State<'_, AppState>,
+    workspace_id: String,
+) -> Result<Vec<ProviderSettings>, String> {
+    state
+        .core
+        .list_provider_settings(workspace_id)
+        .await
+        .map_err(to_command_error)
+}
+
+#[tauri::command]
+async fn save_provider_settings(
+    state: State<'_, AppState>,
+    settings: ProviderSettings,
+) -> Result<ProviderSettings, String> {
+    state
+        .core
+        .save_provider_settings(settings)
+        .await
+        .map_err(to_command_error)
+}
+
+#[tauri::command]
+async fn test_provider(
+    state: State<'_, AppState>,
+    provider_id: String,
+) -> Result<ProviderTestResult, String> {
+    state
+        .core
+        .test_provider(provider_id)
+        .await
+        .map_err(to_command_error)
+}
+
+#[tauri::command]
+async fn summarize_artifact(
+    state: State<'_, AppState>,
+    artifact_id: String,
+    provider_id: String,
+) -> Result<SummaryResult, String> {
+    state
+        .core
+        .summarize_artifact(artifact_id, provider_id)
+        .await
+        .map_err(to_command_error)
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -172,7 +247,13 @@ pub fn run() {
             index_artifact,
             index_workspace,
             get_workspace_overview,
-            search_workspace
+            search_workspace,
+            list_symbols,
+            search_symbols,
+            list_provider_settings,
+            save_provider_settings,
+            test_provider,
+            summarize_artifact
         ])
         .run(tauri::generate_context!())
         .expect("error while running RepoMemo");

@@ -1,9 +1,11 @@
 use std::path::PathBuf;
 
 use anyhow::{bail, Context, Result};
+use repomemo_ai::{validate_settings, AiProvider, GenerateRequest, OllamaProvider};
 use repomemo_domain::{
     AppSettings, ArtifactDetail, ArtifactSummary, ArtifactType, ImportReport, ImportRequest,
-    IndexingJobStatus, SearchRequest, SearchResult, SourceType, Workspace, WorkspaceOverview,
+    IndexingJobStatus, ProviderSettings, ProviderTestResult, SearchRequest, SearchResult,
+    SourceType, SummaryResult, Symbol, SymbolSearchResult, Workspace, WorkspaceOverview,
 };
 use repomemo_indexer::index_artifact;
 use repomemo_ingestion::{discover_import_candidates, ImportCandidate, ImportOptions};
@@ -257,12 +259,125 @@ impl RepoMemoCore {
         self.retrieval.search(request).await
     }
 
-    pub fn app_settings(&self) -> AppSettings {
-        AppSettings {
-            data_dir: self.storage.data_dir().display().to_string(),
-            ai_enabled: false,
-            active_provider: None,
+    pub async fn list_symbols(&self, artifact_id: String) -> Result<Vec<Symbol>> {
+        if artifact_id.trim().is_empty() {
+            bail!("Artifact id is required.");
         }
+        self.storage.list_symbols(&artifact_id).await
+    }
+
+    pub async fn search_symbols(
+        &self,
+        workspace_id: String,
+        query: String,
+    ) -> Result<Vec<SymbolSearchResult>> {
+        if workspace_id.trim().is_empty() {
+            bail!("Workspace id is required.");
+        }
+        self.storage.search_symbols(&workspace_id, &query, 30).await
+    }
+
+    pub async fn list_provider_settings(
+        &self,
+        workspace_id: String,
+    ) -> Result<Vec<ProviderSettings>> {
+        if workspace_id.trim().is_empty() {
+            bail!("Workspace id is required.");
+        }
+        self.storage.list_provider_settings(&workspace_id).await
+    }
+
+    pub async fn save_provider_settings(
+        &self,
+        settings: ProviderSettings,
+    ) -> Result<ProviderSettings> {
+        let workspace_id = settings
+            .workspace_id
+            .as_deref()
+            .context("Provider settings must belong to a workspace.")?;
+        if !self.storage.workspace_exists(workspace_id).await? {
+            bail!("Workspace was not found.");
+        }
+        validate_settings(&settings)?;
+        self.storage.save_provider_settings(settings).await
+    }
+
+    pub async fn test_provider(&self, provider_id: String) -> Result<ProviderTestResult> {
+        let settings = self.storage.get_provider_settings(&provider_id).await?;
+        let provider = OllamaProvider::from_settings(settings)?;
+        provider.test_connection().await
+    }
+
+    pub async fn summarize_artifact(
+        &self,
+        artifact_id: String,
+        provider_id: String,
+    ) -> Result<SummaryResult> {
+        let detail = self.storage.get_artifact(&artifact_id).await?;
+        if detail.chunks.is_empty() {
+            bail!(
+                "Index this artifact before requesting a summary so RepoMemo can cite its content."
+            );
+        }
+        let settings = self.storage.get_provider_settings(&provider_id).await?;
+        if !settings.enabled {
+            bail!("Enable this local provider before using AI. No content was sent.");
+        }
+        if settings.workspace_id.as_deref() != Some(detail.summary.workspace_id.as_str()) {
+            bail!("The selected provider belongs to a different workspace.");
+        }
+        let provider = OllamaProvider::from_settings(settings)?;
+        let selected_chunks = detail.chunks.iter().take(8).collect::<Vec<_>>();
+        let context = selected_chunks
+            .iter()
+            .scan(0_usize, |total, chunk| {
+                if *total >= 12_000 {
+                    return None;
+                }
+                let text = chunk.text.chars().take(2_000).collect::<String>();
+                *total += text.len();
+                Some(format!(
+                    "[{}] {}\n{}",
+                    chunk.id,
+                    chunk.heading_path.as_deref().unwrap_or("Artifact content"),
+                    text
+                ))
+            })
+            .collect::<Vec<_>>()
+            .join("\n\n");
+        let summary_markdown = provider
+            .generate(GenerateRequest {
+                prompt: format!("Summarize the artifact '{}'. Be concise, factual, and use only the supplied local context. Do not claim to have read content outside this context.", detail.summary.title),
+                context,
+                options: json!({ "temperature": 0.2 }),
+            })
+            .await?;
+        let citations = selected_chunks
+            .into_iter()
+            .map(|chunk| repomemo_domain::Citation {
+                artifact_id: detail.summary.id.clone(),
+                chunk_id: Some(chunk.id.clone()),
+                title: detail.summary.title.clone(),
+                path: detail.summary.path.clone(),
+                start_line: chunk.start_line,
+                end_line: chunk.end_line,
+                confidence: None,
+            })
+            .collect();
+        Ok(SummaryResult {
+            summary_markdown,
+            citations,
+            warnings: vec!["Generated by the configured local provider. Verify cited source text before relying on the summary.".to_owned()],
+        })
+    }
+
+    pub async fn app_settings(&self) -> Result<AppSettings> {
+        let (ai_enabled, active_provider) = self.storage.app_ai_status().await?;
+        Ok(AppSettings {
+            data_dir: self.storage.data_dir().display().to_string(),
+            ai_enabled,
+            active_provider,
+        })
     }
 
     async fn import_candidate(
@@ -334,7 +449,7 @@ impl RepoMemoCore {
         let chunk_count = output.chunks.len();
 
         self.storage
-            .replace_artifact_chunks(&summary.id, output.chunks)
+            .replace_artifact_index(&summary.id, output.chunks, output.symbols)
             .await?;
 
         Ok(chunk_count)
@@ -377,7 +492,9 @@ fn sanitize_filename(title: &str, extension: &str) -> String {
             }
         })
         .collect();
-    let slug = slug.trim_matches(|c: char| c == '-' || c == '_').to_string();
+    let slug = slug
+        .trim_matches(|c: char| c == '-' || c == '_')
+        .to_string();
     let slug = if slug.is_empty() {
         "pasted-note".to_owned()
     } else {

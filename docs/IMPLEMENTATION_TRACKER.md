@@ -89,25 +89,35 @@ Spec: `docs/phases/PHASE_1D_FULL_TEXT_SEARCH.md`
 
 ## Phase 1E: Code Symbol Index
 
-Status: not started
+Status: implemented and validated
 
 Spec: `docs/phases/PHASE_1E_CODE_SYMBOL_INDEX.md`
 
-- Tree-sitter parser integration for TypeScript, Python, and Rust
-- Symbol extraction into the existing symbols table
-- File outline view
-- Symbol-aware search results
+| Area | Status | Notes |
+| --- | --- | --- |
+| Tree-sitter parser integration | Done | TypeScript/TSX, JavaScript, Python, and Rust are parsed locally during artifact indexing. |
+| Symbol extraction and storage | Done | Functions, classes/structs, methods, interfaces/traits, and enums are persisted transactionally alongside chunks. |
+| Parser resilience | Done | Malformed code retains its text chunks; symbol parsing never blocks indexing. |
+| Tauri commands | Done | Added `list_symbols(artifact_id)` and `search_symbols(workspace_id, query)`. |
+| File outline | Done | Indexed code artifacts show a compact structural outline with signatures and line ranges. |
+| Symbol-aware search | Done | Direct definition matches appear before regular full-text context results and respect active workspace filters. |
+| Validation | Done | `cargo test --workspace`, `npm run typecheck`, and `npm run build` pass. |
 
 ## Phase 1F: AI Provider Layer
 
-Status: not started
+Status: implemented and validated
 
 Spec: `docs/phases/PHASE_1F_AI_PROVIDER_LAYER.md`
 
-- Provider abstraction
-- Ollama-compatible local provider first
-- Explicit opt-in cloud provider path later
-- Summary command with citations
+| Area | Status | Notes |
+| --- | --- | --- |
+| Provider abstraction | Done | Added `crates/ai` with generate, embed, summarize, rerank, and connection-test operations. |
+| Local provider | Done | Ollama-compatible local endpoints support `/api/tags`, `/api/generate`, and `/api/embed`. |
+| Explicit enablement | Done | Provider settings persist per workspace; disabled providers cannot receive summary content. |
+| Cloud posture | Done | Cloud providers are unavailable in this phase and the UI always displays `Cloud off`. |
+| Tauri commands | Done | Added settings list/save, provider test, and cited artifact summary commands. |
+| Summary UI | Done | Artifact details can request a local summary and display the artifact/chunk line citations used. |
+| Validation | Done | Provider validation tests, workspace checks, frontend typecheck/build, and Rust workspace checks pass. |
 
 ## Phase 1G: Semantic Search And Ask
 

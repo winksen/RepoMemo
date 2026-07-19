@@ -8,6 +8,7 @@ rust-version.workspace = true
 
 [dependencies]
 anyhow.workspace = true
+repomemo-ai.workspace = true
 repomemo-domain.workspace = true
 repomemo-ingestion.workspace = true
 repomemo-indexer.workspace = true

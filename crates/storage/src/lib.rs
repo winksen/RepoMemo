@@ -3,8 +3,9 @@ use std::path::{Path, PathBuf};
 use anyhow::{bail, Context, Result};
 use chrono::Utc;
 use repomemo_domain::{
-    ArtifactDetail, ArtifactSummary, ArtifactType, Chunk, IndexingJobStatus, SearchRequest,
-    SearchResult, Source, SourceType, Workspace, WorkspaceOverview,
+    ArtifactDetail, ArtifactSummary, ArtifactType, Chunk, IndexingJobStatus, ProviderSettings,
+    SearchRequest, SearchResult, Source, SourceType, Symbol, SymbolKind, SymbolSearchResult,
+    Workspace, WorkspaceOverview,
 };
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -97,6 +98,32 @@ struct ChunkRow {
     heading_path: Option<String>,
     content_hash: String,
     embedding_status: String,
+    metadata_json: String,
+}
+
+#[derive(Debug, sqlx::FromRow)]
+struct SymbolRow {
+    id: String,
+    artifact_id: String,
+    workspace_id: String,
+    kind: String,
+    name: String,
+    signature: Option<String>,
+    start_line: Option<i64>,
+    end_line: Option<i64>,
+    metadata_json: String,
+}
+
+#[derive(Debug, sqlx::FromRow)]
+struct ProviderSettingsRow {
+    id: String,
+    workspace_id: Option<String>,
+    provider_type: String,
+    name: String,
+    base_url: Option<String>,
+    model: Option<String>,
+    embedding_model: Option<String>,
+    enabled: bool,
     metadata_json: String,
 }
 
@@ -555,6 +582,16 @@ impl StorageEngine {
         artifact_id: &str,
         chunks: Vec<Chunk>,
     ) -> Result<()> {
+        self.replace_artifact_index(artifact_id, chunks, Vec::new())
+            .await
+    }
+
+    pub async fn replace_artifact_index(
+        &self,
+        artifact_id: &str,
+        chunks: Vec<Chunk>,
+        symbols: Vec<Symbol>,
+    ) -> Result<()> {
         let now = Utc::now().to_rfc3339();
         let mut tx = self.pool.begin().await?;
 
@@ -604,6 +641,38 @@ impl StorageEngine {
             .await?;
         }
 
+        sqlx::query("DELETE FROM symbols WHERE artifact_id = ?1")
+            .bind(artifact_id)
+            .execute(&mut *tx)
+            .await?;
+
+        for mut symbol in symbols {
+            if symbol.id.is_empty() {
+                symbol.id = Uuid::new_v4().to_string();
+            }
+            let metadata_json = serde_json::to_string(&symbol.metadata)?;
+            sqlx::query(
+                r#"
+                INSERT INTO symbols (
+                  id, artifact_id, workspace_id, kind, name, signature,
+                  start_line, end_line, metadata_json
+                )
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+                "#,
+            )
+            .bind(&symbol.id)
+            .bind(&symbol.artifact_id)
+            .bind(&symbol.workspace_id)
+            .bind(symbol_kind_to_db(&symbol.kind))
+            .bind(&symbol.name)
+            .bind(&symbol.signature)
+            .bind(symbol.start_line)
+            .bind(symbol.end_line)
+            .bind(&metadata_json)
+            .execute(&mut *tx)
+            .await?;
+        }
+
         sqlx::query(
             r#"
             UPDATE artifacts
@@ -620,6 +689,166 @@ impl StorageEngine {
         tx.commit().await?;
 
         Ok(())
+    }
+
+    pub async fn list_symbols(&self, artifact_id: &str) -> Result<Vec<Symbol>> {
+        let rows = sqlx::query_as::<_, SymbolRow>(
+            r#"
+            SELECT id, artifact_id, workspace_id, kind, name, signature,
+                   start_line, end_line, metadata_json
+            FROM symbols
+            WHERE artifact_id = ?1
+            ORDER BY COALESCE(start_line, 2147483647), name
+            "#,
+        )
+        .bind(artifact_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows.into_iter().map(Symbol::from).collect())
+    }
+
+    pub async fn search_symbols(
+        &self,
+        workspace_id: &str,
+        query: &str,
+        limit: i64,
+    ) -> Result<Vec<SymbolSearchResult>> {
+        let query = query.trim();
+        if query.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let rows = sqlx::query(
+            r#"
+            SELECT symbols.id, symbols.artifact_id, symbols.workspace_id,
+                   symbols.kind, symbols.name, symbols.signature,
+                   symbols.start_line, symbols.end_line, symbols.metadata_json,
+                   artifacts.title, artifacts.path, artifacts.language,
+                   sources.name AS source_name
+            FROM symbols
+            JOIN artifacts ON artifacts.id = symbols.artifact_id
+            JOIN sources ON sources.id = artifacts.source_id
+            WHERE symbols.workspace_id = ?1
+              AND instr(lower(symbols.name), lower(?2)) > 0
+            ORDER BY
+              CASE WHEN lower(symbols.name) = lower(?2) THEN 0 ELSE 1 END,
+              length(symbols.name), symbols.name, artifacts.path
+            LIMIT ?3
+            "#,
+        )
+        .bind(workspace_id)
+        .bind(query)
+        .bind(limit.clamp(1, 100))
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|row| SymbolSearchResult {
+                symbol: Symbol::from(SymbolRow {
+                    id: row.get("id"),
+                    artifact_id: row.get("artifact_id"),
+                    workspace_id: row.get("workspace_id"),
+                    kind: row.get("kind"),
+                    name: row.get("name"),
+                    signature: row.get("signature"),
+                    start_line: row.get("start_line"),
+                    end_line: row.get("end_line"),
+                    metadata_json: row.get("metadata_json"),
+                }),
+                title: row.get("title"),
+                path: row.get("path"),
+                language: row.get("language"),
+                source_name: row.get("source_name"),
+            })
+            .collect())
+    }
+
+    pub async fn list_provider_settings(
+        &self,
+        workspace_id: &str,
+    ) -> Result<Vec<ProviderSettings>> {
+        let rows = sqlx::query_as::<_, ProviderSettingsRow>(
+            r#"
+            SELECT id, workspace_id, provider_type, name, base_url, model,
+                   embedding_model, enabled, metadata_json
+            FROM provider_settings
+            WHERE workspace_id = ?1
+            ORDER BY enabled DESC, updated_at DESC, name
+            "#,
+        )
+        .bind(workspace_id)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows.into_iter().map(ProviderSettings::from).collect())
+    }
+
+    pub async fn get_provider_settings(&self, provider_id: &str) -> Result<ProviderSettings> {
+        let row = sqlx::query_as::<_, ProviderSettingsRow>(
+            r#"
+            SELECT id, workspace_id, provider_type, name, base_url, model,
+                   embedding_model, enabled, metadata_json
+            FROM provider_settings
+            WHERE id = ?1
+            "#,
+        )
+        .bind(provider_id)
+        .fetch_optional(&self.pool)
+        .await?
+        .context("provider settings were not found")?;
+        Ok(row.into())
+    }
+
+    pub async fn save_provider_settings(
+        &self,
+        settings: ProviderSettings,
+    ) -> Result<ProviderSettings> {
+        let id = if settings.id.trim().is_empty() {
+            Uuid::new_v4().to_string()
+        } else {
+            settings.id
+        };
+        let now = Utc::now().to_rfc3339();
+        let metadata_json = serde_json::to_string(&settings.metadata)?;
+        sqlx::query(
+            r#"
+            INSERT INTO provider_settings (
+              id, workspace_id, provider_type, name, base_url, model, embedding_model,
+              enabled, metadata_json, created_at, updated_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10)
+            ON CONFLICT(id) DO UPDATE SET
+              workspace_id = excluded.workspace_id, provider_type = excluded.provider_type,
+              name = excluded.name, base_url = excluded.base_url, model = excluded.model,
+              embedding_model = excluded.embedding_model, enabled = excluded.enabled,
+              metadata_json = excluded.metadata_json, updated_at = excluded.updated_at
+            "#,
+        )
+        .bind(&id)
+        .bind(&settings.workspace_id)
+        .bind(&settings.provider_type)
+        .bind(&settings.name)
+        .bind(&settings.base_url)
+        .bind(&settings.model)
+        .bind(&settings.embedding_model)
+        .bind(settings.enabled)
+        .bind(metadata_json)
+        .bind(now)
+        .execute(&self.pool)
+        .await?;
+        self.get_provider_settings(&id).await
+    }
+
+    pub async fn app_ai_status(&self) -> Result<(bool, Option<String>)> {
+        let row = sqlx::query(
+            "SELECT name FROM provider_settings WHERE enabled = 1 ORDER BY updated_at DESC LIMIT 1",
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(match row {
+            Some(row) => (true, Some(row.get("name"))),
+            None => (false, None),
+        })
     }
 
     pub async fn create_indexing_job(
@@ -1019,6 +1248,41 @@ impl From<ChunkRow> for Chunk {
     }
 }
 
+impl From<SymbolRow> for Symbol {
+    fn from(row: SymbolRow) -> Self {
+        let metadata = serde_json::from_str(&row.metadata_json)
+            .unwrap_or_else(|_| Value::Object(Default::default()));
+        Self {
+            id: row.id,
+            artifact_id: row.artifact_id,
+            workspace_id: row.workspace_id,
+            kind: symbol_kind_from_db(&row.kind),
+            name: row.name,
+            signature: row.signature,
+            start_line: row.start_line,
+            end_line: row.end_line,
+            metadata,
+        }
+    }
+}
+
+impl From<ProviderSettingsRow> for ProviderSettings {
+    fn from(row: ProviderSettingsRow) -> Self {
+        Self {
+            id: row.id,
+            workspace_id: row.workspace_id,
+            provider_type: row.provider_type,
+            name: row.name,
+            base_url: row.base_url,
+            model: row.model,
+            embedding_model: row.embedding_model,
+            enabled: row.enabled,
+            metadata: serde_json::from_str(&row.metadata_json)
+                .unwrap_or_else(|_| Value::Object(Default::default())),
+        }
+    }
+}
+
 impl From<IndexingJobRow> for IndexingJobStatus {
     fn from(row: IndexingJobRow) -> Self {
         Self {
@@ -1106,10 +1370,38 @@ fn artifact_type_from_db(value: &str) -> ArtifactType {
     }
 }
 
+fn symbol_kind_to_db(kind: &SymbolKind) -> &'static str {
+    match kind {
+        SymbolKind::Function => "function",
+        SymbolKind::Class => "class",
+        SymbolKind::Method => "method",
+        SymbolKind::Interface => "interface",
+        SymbolKind::Enum => "enum",
+        SymbolKind::Route => "route",
+        SymbolKind::Endpoint => "endpoint",
+        SymbolKind::Config => "config",
+        SymbolKind::Test => "test",
+    }
+}
+
+fn symbol_kind_from_db(value: &str) -> SymbolKind {
+    match value {
+        "class" => SymbolKind::Class,
+        "method" => SymbolKind::Method,
+        "interface" => SymbolKind::Interface,
+        "enum" => SymbolKind::Enum,
+        "route" => SymbolKind::Route,
+        "endpoint" => SymbolKind::Endpoint,
+        "config" => SymbolKind::Config,
+        "test" => SymbolKind::Test,
+        _ => SymbolKind::Function,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{NewArtifact, StorageConfig, StorageEngine};
-    use repomemo_domain::{ArtifactType, Chunk, SearchRequest, SourceType};
+    use repomemo_domain::{ArtifactType, Chunk, SearchRequest, SourceType, Symbol, SymbolKind};
     use serde_json::json;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -1168,7 +1460,7 @@ mod tests {
             .await
             .unwrap();
         storage
-            .replace_artifact_chunks(
+            .replace_artifact_index(
                 &stored.artifact.id,
                 vec![Chunk {
                     id: String::new(),
@@ -1182,6 +1474,17 @@ mod tests {
                     heading_path: Some("Overview".to_owned()),
                     content_hash,
                     embedding_status: "not_configured".to_owned(),
+                    metadata: json!({}),
+                }],
+                vec![Symbol {
+                    id: String::new(),
+                    artifact_id: stored.artifact.id.clone(),
+                    workspace_id: workspace.id.clone(),
+                    kind: SymbolKind::Function,
+                    name: "retrieve_artifact".to_owned(),
+                    signature: Some("fn retrieve_artifact()".to_owned()),
+                    start_line: Some(7),
+                    end_line: Some(9),
                     metadata: json!({}),
                 }],
             )
@@ -1205,6 +1508,14 @@ mod tests {
         assert_eq!(results[0].artifact_id, stored.artifact.id);
         assert_eq!(results[0].start_line, Some(1));
         assert!(results[0].snippet.contains("<mark>artifact</mark>"));
+
+        let symbol_results = storage
+            .search_symbols(&request.workspace_id, "retrieve", 10)
+            .await
+            .unwrap();
+        assert_eq!(symbol_results.len(), 1);
+        assert_eq!(symbol_results[0].symbol.name, "retrieve_artifact");
+        assert_eq!(symbol_results[0].symbol.start_line, Some(7));
 
         storage.pool.close().await;
         drop(storage);

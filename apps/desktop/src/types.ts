@@ -126,3 +126,68 @@ export interface SearchResult {
   score: number;
   source_name: string;
 }
+
+export type SymbolKind =
+  | "function"
+  | "class"
+  | "method"
+  | "interface"
+  | "enum"
+  | "route"
+  | "endpoint"
+  | "config"
+  | "test";
+
+export interface Symbol {
+  id: string;
+  artifact_id: string;
+  workspace_id: string;
+  kind: SymbolKind;
+  name: string;
+  signature: string | null;
+  start_line: number | null;
+  end_line: number | null;
+  metadata: Record<string, unknown>;
+}
+
+export interface SymbolSearchResult {
+  symbol: Symbol;
+  title: string;
+  path: string;
+  language: string | null;
+  source_name: string;
+}
+
+export interface ProviderSettings {
+  id: string;
+  workspace_id: string | null;
+  provider_type: string;
+  name: string;
+  base_url: string | null;
+  model: string | null;
+  embedding_model: string | null;
+  enabled: boolean;
+  metadata: Record<string, unknown>;
+}
+
+export interface ProviderTestResult {
+  provider_id: string;
+  success: boolean;
+  message: string;
+}
+
+export interface Citation {
+  artifact_id: string;
+  chunk_id: string | null;
+  title: string;
+  path: string;
+  start_line: number | null;
+  end_line: number | null;
+  confidence: number | null;
+}
+
+export interface SummaryResult {
+  summary_markdown: string;
+  citations: Citation[];
+  warnings: string[];
+}
