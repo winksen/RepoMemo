@@ -27,6 +27,17 @@ struct MarkdownSection {
 }
 
 pub fn index_artifact(summary: &ArtifactSummary, bytes: &[u8]) -> Result<IndexArtifactOutput> {
+    if matches!(summary.artifact_type, ArtifactType::Image) {
+        return Ok(IndexArtifactOutput {
+            chunks: Vec::new(),
+            symbols: Vec::new(),
+            warnings: vec![
+                "Images are not decoded as text. Run visual analysis with a vision-capable AI provider to make their content searchable."
+                    .to_owned(),
+            ],
+        });
+    }
+
     let mut warnings = Vec::new();
     let text = match String::from_utf8(bytes.to_vec()) {
         Ok(text) => text,
@@ -69,6 +80,49 @@ pub fn index_artifact(summary: &ArtifactSummary, bytes: &[u8]) -> Result<IndexAr
         symbols,
         warnings,
     })
+}
+
+/// Turns a vision model's faithful description into the single searchable representation
+/// for an image. Images deliberately have no line chunks or symbol index.
+pub fn index_image_description(
+    summary: &ArtifactSummary,
+    description: &str,
+) -> IndexArtifactOutput {
+    let text = description.trim();
+    if text.is_empty() {
+        return IndexArtifactOutput {
+            chunks: Vec::new(),
+            symbols: Vec::new(),
+            warnings: vec!["The vision provider returned no usable image description.".to_owned()],
+        };
+    }
+
+    let chunk = Chunk {
+        id: String::new(),
+        artifact_id: summary.id.clone(),
+        workspace_id: summary.workspace_id.clone(),
+        chunk_index: 0,
+        token_count: Some(estimate_tokens(text)),
+        start_line: None,
+        end_line: None,
+        heading_path: Some("Visual description".to_owned()),
+        content_hash: content_hash(text.as_bytes()),
+        embedding_status: "not_configured".to_owned(),
+        metadata: json!({
+            "source_path": summary.path,
+            "mime_type": summary.mime_type,
+            "artifact_type": "image",
+            "representation": "visual_description",
+            "derived_from": "image"
+        }),
+        text: text.to_owned(),
+    };
+
+    IndexArtifactOutput {
+        chunks: vec![chunk],
+        symbols: Vec::new(),
+        warnings: Vec::new(),
+    }
 }
 
 fn extract_symbols(summary: &ArtifactSummary, text: &str) -> Result<Vec<Symbol>> {
@@ -409,6 +463,32 @@ mod tests {
         let output = index_artifact(&summary, b"  \n\n").unwrap();
 
         assert!(output.chunks.is_empty());
+    }
+
+    #[test]
+    fn images_are_not_lossily_decoded_into_line_chunks() {
+        let summary = artifact_summary(ArtifactType::Image, None);
+        let output = index_artifact(&summary, &[0x89, b'P', b'N', b'G', 0, 1]).unwrap();
+
+        assert!(output.chunks.is_empty());
+        assert_eq!(output.warnings.len(), 1);
+    }
+
+    #[test]
+    fn visual_description_is_a_single_non_line_chunk() {
+        let summary = artifact_summary(ArtifactType::Image, None);
+        let output = index_image_description(&summary, "A login screen with an email field.");
+
+        assert_eq!(output.chunks.len(), 1);
+        assert_eq!(
+            output.chunks[0].heading_path.as_deref(),
+            Some("Visual description")
+        );
+        assert_eq!(output.chunks[0].start_line, None);
+        assert_eq!(
+            output.chunks[0].metadata["representation"],
+            "visual_description"
+        );
     }
 
     #[test]

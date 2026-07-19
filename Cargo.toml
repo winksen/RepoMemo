@@ -19,6 +19,7 @@ rust-version = "1.78"
 
 [workspace.dependencies]
 anyhow = "1"
+base64 = "0.22"
 chrono = { version = "0.4", features = ["serde"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 hex = "0.4"

@@ -18,6 +18,7 @@ export type ArtifactType =
   | "file"
   | "markdown_doc"
   | "code_file"
+  | "image"
   | "issue"
   | "pr"
   | "decision"

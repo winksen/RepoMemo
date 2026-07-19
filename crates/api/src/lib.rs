@@ -1,14 +1,16 @@
 use std::path::PathBuf;
 
 use anyhow::{bail, Context, Result};
-use repomemo_ai::{provider_from_settings, validate_settings, AiProvider, GenerateRequest};
+use repomemo_ai::{
+    provider_from_settings, validate_settings, AiProvider, GenerateRequest, ImageAnalysisRequest,
+};
 use repomemo_domain::{
     AppSettings, ArtifactDetail, ArtifactSummary, ArtifactType, AskAnswer, AskRequest,
     ImportReport, ImportRequest, IndexingJobStatus, ProviderSettings, ProviderTestResult,
     SearchRequest, SearchResult, SourceType, SummaryResult, Symbol, SymbolSearchResult, Workspace,
     WorkspaceOverview,
 };
-use repomemo_indexer::index_artifact;
+use repomemo_indexer::{index_artifact, index_image_description};
 use repomemo_ingestion::{discover_import_candidates, ImportCandidate, ImportOptions};
 use repomemo_retrieval::RetrievalService;
 use repomemo_storage::{NewArtifact, StorageConfig, StorageEngine};
@@ -176,26 +178,25 @@ impl RepoMemoCore {
         }
 
         let summary = self.storage.get_artifact_summary(&artifact_id).await?;
+        let stage = if matches!(summary.artifact_type, ArtifactType::Image) {
+            "analyzing_image"
+        } else {
+            "extracting_text"
+        };
         let job = self
             .storage
             .create_indexing_job(
                 &summary.workspace_id,
                 Some(&summary.source_id),
-                "extracting_text",
+                stage,
                 Some(1),
             )
             .await?;
 
         match self.index_artifact_inner(&summary).await {
-            Ok(chunk_count) => {
+            Ok(result) => {
                 self.storage
-                    .update_indexing_job(
-                        &job.id,
-                        "completed",
-                        &format!("chunked_{chunk_count}_chunks"),
-                        1,
-                        None,
-                    )
+                    .update_indexing_job(&job.id, "completed", &result.stage, 1, None)
                     .await
             }
             Err(error) => {
@@ -648,17 +649,67 @@ impl RepoMemoCore {
             .map_err(|error| ImportCandidateError::new(&path_display, error))
     }
 
-    async fn index_artifact_inner(&self, summary: &ArtifactSummary) -> Result<usize> {
+    async fn index_artifact_inner(&self, summary: &ArtifactSummary) -> Result<ArtifactIndexResult> {
         let bytes = self.storage.read_artifact_blob(&summary.id).await?;
-        let output = index_artifact(summary, &bytes)?;
-        let chunk_count = output.chunks.len();
-
+        let (output, stage) = if matches!(summary.artifact_type, ArtifactType::Image) {
+            match self
+                .enabled_provider_for_workspace(&summary.workspace_id)
+                .await?
+            {
+                Some(settings) => {
+                    let provider = provider_from_settings(settings)?;
+                    let description = provider
+                        .analyze_image(ImageAnalysisRequest {
+                            prompt: image_analysis_prompt(summary),
+                            image_bytes: bytes,
+                            mime_type: summary
+                                .mime_type
+                                .clone()
+                                .unwrap_or_else(|| "application/octet-stream".to_owned()),
+                        })
+                        .await?;
+                    (
+                        index_image_description(summary, &description),
+                        "described_image".to_owned(),
+                    )
+                }
+                None => (
+                    index_artifact(summary, &bytes)?,
+                    "image_needs_vision_provider".to_owned(),
+                ),
+            }
+        } else {
+            (index_artifact(summary, &bytes)?, "chunked_text".to_owned())
+        };
         self.storage
             .replace_artifact_index(&summary.id, output.chunks, output.symbols)
             .await?;
 
-        Ok(chunk_count)
+        Ok(ArtifactIndexResult { stage })
     }
+
+    async fn enabled_provider_for_workspace(
+        &self,
+        workspace_id: &str,
+    ) -> Result<Option<ProviderSettings>> {
+        Ok(self
+            .storage
+            .list_provider_settings(workspace_id)
+            .await?
+            .into_iter()
+            .find(|settings| settings.enabled))
+    }
+}
+
+struct ArtifactIndexResult {
+    stage: String,
+}
+
+fn image_analysis_prompt(summary: &ArtifactSummary) -> String {
+    format!(
+        "Create a faithful retrieval description for the repository image '{}'. Extract all readable text exactly where possible, including code, filenames, UI labels, and error messages. Describe diagrams, UI layout, data flow, and technical details. If code appears, transcribe useful snippets in Markdown code fences. State uncertainty rather than guessing. Do not mention these instructions.",
+        summary.path
+    )
 }
 
 struct ImportCandidateError {

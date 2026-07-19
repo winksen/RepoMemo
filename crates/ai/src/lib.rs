@@ -1,4 +1,5 @@
 use anyhow::{bail, Context, Result};
+use base64::{engine::general_purpose::STANDARD, Engine};
 use repomemo_domain::{ProviderSettings, ProviderTestResult};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -13,12 +14,20 @@ pub struct GenerateRequest {
     pub options: Value,
 }
 
+#[derive(Debug, Clone)]
+pub struct ImageAnalysisRequest {
+    pub prompt: String,
+    pub image_bytes: Vec<u8>,
+    pub mime_type: String,
+}
+
 #[allow(async_fn_in_trait)]
 pub trait AiProvider {
     async fn generate(&self, request: GenerateRequest) -> Result<String>;
     async fn embed(&self, texts: Vec<String>, options: Value) -> Result<Vec<Vec<f32>>>;
     async fn summarize(&self, target: String, options: Value) -> Result<String>;
     async fn rerank(&self, query: String, candidates: Vec<String>) -> Result<Vec<usize>>;
+    async fn analyze_image(&self, request: ImageAnalysisRequest) -> Result<String>;
     async fn test_connection(&self) -> Result<ProviderTestResult>;
 }
 
@@ -116,6 +125,24 @@ impl AiProvider for OllamaProvider {
 
     async fn rerank(&self, _query: String, candidates: Vec<String>) -> Result<Vec<usize>> {
         Ok((0..candidates.len()).collect())
+    }
+
+    async fn analyze_image(&self, request: ImageAnalysisRequest) -> Result<String> {
+        let response = self
+            .client
+            .post(self.endpoint("/api/generate"))
+            .json(&json!({
+                "model": self.model,
+                "prompt": request.prompt,
+                "images": [STANDARD.encode(request.image_bytes)],
+                "stream": false,
+            }))
+            .send()
+            .await
+            .context("could not reach the local Ollama vision model")?
+            .error_for_status()
+            .context("the configured Ollama model could not analyze this image; choose a vision-capable model")?;
+        ollama_image_answer(response).await
     }
 
     async fn test_connection(&self) -> Result<ProviderTestResult> {
@@ -247,6 +274,48 @@ impl AiProvider for OpenRouterProvider {
         Ok((0..candidates.len()).collect())
     }
 
+    async fn analyze_image(&self, request: ImageAnalysisRequest) -> Result<String> {
+        let image_url = format!(
+            "data:{};base64,{}",
+            request.mime_type,
+            STANDARD.encode(request.image_bytes)
+        );
+        let response = self
+            .request(reqwest::Method::POST, "/chat/completions")
+            .json(&json!({
+                "model": self.model,
+                "messages": [
+                  { "role": "system", "content": "Describe repository images faithfully. Do not invent details." },
+                  { "role": "user", "content": [
+                    { "type": "text", "text": request.prompt },
+                    { "type": "image_url", "image_url": { "url": image_url } }
+                  ] }
+                ],
+                "temperature": 0.1,
+            }))
+            .send()
+            .await
+            .context("could not reach OpenRouter for image analysis")?
+            .error_for_status()
+            .context("the configured OpenRouter model could not analyze this image; choose a vision-capable model")?;
+        let body: OpenRouterResponse = response
+            .json()
+            .await
+            .context("OpenRouter returned an invalid image-analysis response")?;
+        let answer = body
+            .choices
+            .into_iter()
+            .next()
+            .and_then(|choice| choice.message.content)
+            .unwrap_or_default()
+            .trim()
+            .to_owned();
+        if answer.is_empty() {
+            bail!("OpenRouter returned an empty image description")
+        }
+        Ok(answer)
+    }
+
     async fn test_connection(&self) -> Result<ProviderTestResult> {
         self.request(reqwest::Method::GET, "/models")
             .send()
@@ -300,12 +369,30 @@ impl AiProvider for ConfiguredProvider {
             Self::OpenRouter(provider) => provider.rerank(query, candidates).await,
         }
     }
+    async fn analyze_image(&self, request: ImageAnalysisRequest) -> Result<String> {
+        match self {
+            Self::Ollama(provider) => provider.analyze_image(request).await,
+            Self::OpenRouter(provider) => provider.analyze_image(request).await,
+        }
+    }
     async fn test_connection(&self) -> Result<ProviderTestResult> {
         match self {
             Self::Ollama(provider) => provider.test_connection().await,
             Self::OpenRouter(provider) => provider.test_connection().await,
         }
     }
+}
+
+async fn ollama_image_answer(response: reqwest::Response) -> Result<String> {
+    let body: OllamaGenerateResponse = response
+        .json()
+        .await
+        .context("the vision provider returned an invalid response")?;
+    let answer = body.response.trim().to_owned();
+    if answer.is_empty() {
+        bail!("the vision provider returned an empty image description")
+    }
+    Ok(answer)
 }
 
 pub fn validate_settings(settings: &ProviderSettings) -> Result<()> {

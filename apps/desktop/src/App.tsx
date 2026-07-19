@@ -2,11 +2,15 @@ import type { FormEvent, ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import {
   IconArchive as Archive,
+  IconArrowRight as ArrowRight,
   IconBook as BookOpen,
   IconBrain as Brain,
+  IconChevronRight as ChevronRight,
   IconCircleCheck as CheckCircle2,
+  IconClock as Clock,
   IconDatabase as Database,
   IconFileCode as FileCode2,
+  IconPhoto as Photo,
   IconFolderDown as FolderDown,
   IconFolderPlus as FolderPlus,
   IconFilter as Filter,
@@ -15,9 +19,11 @@ import {
   IconLibrary as Library,
   IconLoader2 as Loader2,
   IconMoon as Moon,
+  IconPlus as Plus,
   IconRefresh as RefreshCw,
   IconSearch as Search,
   IconSettings as Settings2,
+  IconShieldLock as ShieldLock,
   IconSparkles as Sparkles,
   IconSun as Sun,
   IconUpload as Upload,
@@ -609,8 +615,45 @@ export function App() {
       </aside>
 
       <section className="workbench">
-        <header className="workbench-header">
-          <div>
+        <header className={activeView === "workspaces" ? "workbench-header workspace-header-v3" : "workbench-header"}>
+          {activeView === "workspaces" ? (
+            <>
+              <div className="workspace-header-copy">
+                <p className="workspace-breadcrumb"><span>Library</span><ChevronRight size={13} /> Workspaces</p>
+                <div className="workspace-heading-line">
+                  <h2>Workspaces</h2>
+                  <span>{workspaces.length}</span>
+                </div>
+              </div>
+              <div className="workspace-header-actions">
+                <div className="workspace-runtime-status" aria-live="polite">
+                  <span className={loadState === "error" ? "workspace-runtime-dot error" : "workspace-runtime-dot"} aria-hidden="true" />
+                  <span>
+                    <strong>{loadState === "loading" ? "Starting local core" : loadState === "error" ? "Local core unavailable" : "Local database ready"}</strong>
+                    <small>Private on this device</small>
+                  </span>
+                </div>
+                <button
+                  className="workspace-new-button"
+                  type="button"
+                  onClick={() => document.getElementById("workspace-name")?.focus()}
+                >
+                  <Plus size={16} /> New workspace
+                </button>
+                <button
+                  aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+                  className="icon-button workspace-theme-button"
+                  type="button"
+                  onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
+                  title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+                >
+                  {theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
             <p className="meta-label">Phase 1F</p>
             <h2>{selectedWorkspace?.name ?? "Workspace foundation"}</h2>
           </div>
@@ -634,7 +677,9 @@ export function App() {
             >
               {theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
             </button>
-          </div>
+              </div>
+            </>
+          )}
         </header>
 
         {errorMessage ? <div className="error-banner">{errorMessage}</div> : null}
@@ -643,6 +688,7 @@ export function App() {
           <WorkspaceView
             currentOverview={currentOverview}
             onCreateWorkspace={handleCreateWorkspace}
+            onNavigate={(view) => setActiveView(view)}
             onSelectWorkspace={setSelectedWorkspaceId}
             selectedWorkspaceId={selectedWorkspaceId}
             workspaceName={workspaceName}
@@ -736,6 +782,7 @@ export function App() {
 function WorkspaceView({
   currentOverview,
   onCreateWorkspace,
+  onNavigate,
   onSelectWorkspace,
   selectedWorkspaceId,
   setWorkspaceName,
@@ -744,77 +791,168 @@ function WorkspaceView({
 }: {
   currentOverview: WorkspaceOverview;
   onCreateWorkspace: (event: FormEvent<HTMLFormElement>) => void;
+  onNavigate: (view: "import" | "artifacts" | "search") => void;
   onSelectWorkspace: (id: string) => void;
   selectedWorkspaceId: string | null;
   setWorkspaceName: (value: string) => void;
   workspaceName: string;
   workspaces: Workspace[];
 }) {
-  return (
-    <div className="workbench-grid">
-      <section className="panel">
-        <PanelHeader
-          icon={FolderPlus}
-          label="Workspace"
-          title="Create or select"
-        />
-        <form className="workspace-form" onSubmit={onCreateWorkspace}>
-          <label htmlFor="workspace-name">Workspace name</label>
-          <div className="input-row">
-            <input
-              id="workspace-name"
-              value={workspaceName}
-              onChange={(event) => setWorkspaceName(event.target.value)}
-              placeholder="Engineering memory"
-            />
-            <button className="button primary" type="submit">
-              Create
-            </button>
-          </div>
-        </form>
+  const selectedWorkspace = workspaces.find((workspace) => workspace.id === selectedWorkspaceId);
+  const hasArtifacts = currentOverview.artifact_count > 0;
+  const canSearch = currentOverview.chunk_count > 0;
+  const pipeline = [
+    { complete: currentOverview.source_count > 0, count: currentOverview.source_count, label: "Sources" },
+    { complete: currentOverview.chunk_count > 0, count: currentOverview.chunk_count, label: "Indexed" },
+    { complete: currentOverview.memory_card_count > 0, count: currentOverview.memory_card_count, label: "Memory" },
+  ];
 
-        <div className="workspace-list" aria-live="polite">
+  return (
+    <div className="workspace-page-v3">
+      <section className="workspace-directory" aria-labelledby="workspace-directory-title">
+        <header className="workspace-directory-header">
+          <div>
+            <p className="workspace-kicker">Local library</p>
+            <h3 id="workspace-directory-title">Your workspaces</h3>
+            <p>Select a workspace to inspect its local knowledge map and continue working.</p>
+          </div>
+          <span className="workspace-count">{workspaces.length} total</span>
+        </header>
+
+        <div className="workspace-list-v3" aria-live="polite">
           {workspaces.length === 0 ? (
-            <EmptyState
-              icon={Library}
-              title="No workspaces yet"
-              body="Create a local workspace to start importing technical memory."
-            />
+            <div className="workspace-empty-v3">
+              <Library size={22} />
+              <strong>No workspaces yet</strong>
+              <p>Create a private workspace below, then add a repository or a set of project documents.</p>
+            </div>
           ) : (
             workspaces.map((workspace) => (
               <button
-                className={
-                  workspace.id === selectedWorkspaceId
-                    ? "workspace-row selected"
-                    : "workspace-row"
-                }
+                className={workspace.id === selectedWorkspaceId ? "workspace-row-v3 selected" : "workspace-row-v3"}
+                aria-pressed={workspace.id === selectedWorkspaceId}
                 key={workspace.id}
                 type="button"
                 onClick={() => onSelectWorkspace(workspace.id)}
               >
-                <span>
+                <span className="workspace-row-mark" aria-hidden="true"><Layers3 size={18} /></span>
+                <span className="workspace-row-copy">
                   <strong>{workspace.name}</strong>
-                  <small>{formatDate(workspace.updated_at)}</small>
+                  <small><ShieldLock size={12} /> Local workspace</small>
                 </span>
-                <span className="row-dot" aria-hidden="true" />
+                <span className="workspace-row-time" title={formatDate(workspace.updated_at)}>
+                  <Clock size={13} /> {formatRelativeDate(workspace.updated_at)}
+                  <ChevronRight size={16} aria-hidden="true" />
+                </span>
               </button>
             ))
           )}
         </div>
+
+        <form className="workspace-create-v3" onSubmit={onCreateWorkspace}>
+          <div className="workspace-create-heading">
+            <span aria-hidden="true"><Plus size={16} /></span>
+            <label htmlFor="workspace-name">
+              <strong>Create a workspace</strong>
+              <small>Everything starts local and stays under your control.</small>
+            </label>
+          </div>
+          <div className="workspace-create-controls">
+            <input
+              id="workspace-name"
+              value={workspaceName}
+              onChange={(event) => setWorkspaceName(event.target.value)}
+              placeholder="e.g. Payments platform"
+              autoComplete="off"
+            />
+            <button className="workspace-create-button" disabled={!workspaceName.trim()} type="submit">
+              Create <ArrowRight size={15} />
+            </button>
+          </div>
+        </form>
       </section>
 
-      <section className="panel">
-        <PanelHeader
-          icon={Database}
-          label="Selected workspace"
-          title="Local memory state"
-        />
-        <MetricGrid overview={currentOverview} />
-        <div className="notice">
-          Phase 1A is running. Phase 1B adds import and artifact storage before
-          indexing, search, AI, or memory cards.
-        </div>
-      </section>
+      <aside className="workspace-inspector-v3" aria-label="Selected workspace details">
+        {selectedWorkspace ? (
+          <>
+            <header className="workspace-inspector-header">
+              <div className="workspace-local-badge"><ShieldLock size={14} /> Stored locally</div>
+              <p className="workspace-selection-meta">Selected workspace <span aria-hidden="true">/</span> Updated {formatRelativeDate(selectedWorkspace.updated_at)}</p>
+              <h3>{selectedWorkspace.name}</h3>
+              <p>Project artifacts, searchable context, and durable memory in one private knowledge boundary.</p>
+            </header>
+
+            <dl className="workspace-metrics-v3" aria-label="Workspace totals">
+              <div><dt>Sources</dt><dd>{currentOverview.source_count}</dd></div>
+              <div><dt>Artifacts</dt><dd>{currentOverview.artifact_count}</dd></div>
+              <div><dt>Chunks</dt><dd>{currentOverview.chunk_count}</dd></div>
+              <div><dt>Symbols</dt><dd>{currentOverview.symbol_count}</dd></div>
+              <div><dt>Memory</dt><dd>{currentOverview.memory_card_count}</dd></div>
+            </dl>
+
+            <section className="workspace-pipeline" aria-labelledby="workspace-pipeline-title">
+              <div className="workspace-section-heading">
+                <div>
+                  <p className="workspace-kicker">Knowledge pipeline</p>
+                  <h4 id="workspace-pipeline-title">Workspace readiness</h4>
+                </div>
+                <span>{pipeline.filter((step) => step.complete).length} of {pipeline.length}</span>
+              </div>
+              <ol>
+                {pipeline.map((step, index) => (
+                  <li className={step.complete ? "complete" : ""} key={step.label}>
+                    <span className="workspace-pipeline-mark" aria-hidden="true">
+                      {step.complete ? <CheckCircle2 size={16} /> : index + 1}
+                    </span>
+                    <strong>{step.label}</strong>
+                    <small>{step.count}</small>
+                  </li>
+                ))}
+              </ol>
+            </section>
+
+            <section className="workspace-continue">
+              <div className="workspace-section-heading">
+                <div>
+                  <p className="workspace-kicker">Next action</p>
+                  <h4>Continue working</h4>
+                </div>
+              </div>
+              <p>{hasArtifacts ? canSearch ? "Your local index is ready. Browse the archive or search across retrieved context." : "Artifacts are stored. Open the archive to inspect and index them for retrieval." : "Bring in a repository, folder, file, or pasted note to establish this workspace."}</p>
+              <div className="workspace-action-row">
+                <button className="workspace-primary-action" type="button" onClick={() => onNavigate(hasArtifacts ? "artifacts" : "import")}>
+                  {hasArtifacts ? <Archive size={17} /> : <FolderDown size={17} />}
+                  {hasArtifacts ? "Open artifacts" : "Import first source"}
+                  <ArrowRight size={16} />
+                </button>
+                {hasArtifacts ? (
+                  <button className="workspace-secondary-action" type="button" onClick={() => onNavigate(canSearch ? "search" : "import")}>
+                    {canSearch ? <Search size={16} /> : <FolderPlus size={16} />}
+                    {canSearch ? "Search workspace" : "Add sources"}
+                  </button>
+                ) : null}
+              </div>
+            </section>
+
+            <footer className="workspace-trust-note">
+              <Database size={18} aria-hidden="true" />
+              <span><strong>Private by default</strong><small>Workspace data is stored in RepoMemo's local application directory.</small></span>
+            </footer>
+          </>
+        ) : (
+          <div className="workspace-onboarding-v3">
+            <span className="workspace-onboarding-icon"><ShieldLock size={24} /></span>
+            <p className="workspace-kicker">Private by design</p>
+            <h3>A home for project knowledge</h3>
+            <p>Create your first workspace to collect code, documents, decisions, and cited AI output without losing source context.</p>
+            <ul>
+              <li><CheckCircle2 size={16} /> Stored on this device</li>
+              <li><CheckCircle2 size={16} /> Search works without AI</li>
+              <li><CheckCircle2 size={16} /> Cloud access stays explicit</li>
+            </ul>
+          </div>
+        )}
+      </aside>
     </div>
   );
 }
@@ -1068,7 +1206,7 @@ function ArtifactsView({
                 type="button"
                 onClick={() => onSelectArtifact(artifact.id)}
               >
-                <FileCode2 size={18} />
+                {artifact.artifact_type === "image" ? <Photo size={18} /> : <FileCode2 size={18} />}
                 <span className="artifact-row-main">
                   <strong>{artifact.title}</strong>
                   <small>{artifact.path}</small>
@@ -1104,7 +1242,9 @@ function ArtifactsView({
               onClick={() => onIndexArtifact(artifactDetail?.summary.id)}
             >
               {isIndexing ? <Loader2 className="spin" size={16} /> : <Database size={16} />}
-              {artifactDetail?.summary.indexed_at ? "Reindex" : "Index"}
+              {artifactDetail?.summary.artifact_type === "image"
+                ? artifactDetail.summary.indexed_at ? "Reanalyze image" : "Analyze image"
+                : artifactDetail?.summary.indexed_at ? "Reindex" : "Index"}
             </button>
           </div>
         </PanelHeader>
@@ -1126,15 +1266,23 @@ function ArtifactsView({
                 {artifactDetail.summary.indexed_at ? "Ready" : "Stored"}
               </StatusBadge>
               <StatusBadge tone="neutral">
-                {artifactDetail.chunks.length} chunks
+                {artifactDetail.summary.artifact_type === "image"
+                  ? `${artifactDetail.chunks.length} visual description${artifactDetail.chunks.length === 1 ? "" : "s"}`
+                  : `${artifactDetail.chunks.length} chunks`}
               </StatusBadge>
               <StatusBadge tone="neutral">{symbols.length} symbols</StatusBadge>
             </div>
-            <SymbolOutline detail={artifactDetail} symbols={symbols} />
+            {artifactDetail.summary.artifact_type !== "image" ? <SymbolOutline detail={artifactDetail} symbols={symbols} /> : null}
             {summary ? <SummaryPanel summary={summary} /> : null}
-            <pre className="content-preview">
-              {artifactDetail.content_preview ?? "Preview unavailable."}
-            </pre>
+            {artifactDetail.summary.artifact_type === "image" ? (
+              <p className="image-preview-note">
+                The original image stays stored locally. Its searchable representation is the visual description below.
+              </p>
+            ) : (
+              <pre className="content-preview">
+                {artifactDetail.content_preview ?? "Preview unavailable."}
+              </pre>
+            )}
             {artifactDetail.content_truncated ? (
               <p className="truncated-note">Preview truncated to keep the workbench responsive.</p>
             ) : null}
@@ -1525,6 +1673,7 @@ function ProviderSettingsView({
       </PanelHeader>
       <div className="provider-intro">
         <p>RepoMemo only sends content after you explicitly enable a provider. Local Ollama stays on-device; OpenRouter sends selected excerpts to its cloud API.</p>
+        <p>Image analysis sends the selected original image to this provider and requires a vision-capable model. Its generated description, not raw pixels, is used for local search.</p>
       </div>
       <form className="provider-form" onSubmit={(event) => { event.preventDefault(); onSave({ ...draft, workspace_id: workspace.id }); }}>
         <label>
@@ -1556,12 +1705,12 @@ function ProviderSettingsView({
           </label>
           <label className="provider-toggle cloud-consent">
             <input checked={draft.metadata.cloud_content_acknowledged === true} type="checkbox" onChange={(event) => setDraft({ ...draft, metadata: { ...draft.metadata, cloud_content_acknowledged: event.target.checked } })} />
-            <span><strong>I understand excerpts leave this device</strong><small>RepoMemo sends only the cited excerpts needed for a requested summary to OpenRouter.</small></span>
+            <span><strong>I understand content leaves this device</strong><small>RepoMemo sends selected excerpts for AI requests and the original image when you request image analysis.</small></span>
           </label>
         </> : null}
         <label className="provider-toggle">
           <input checked={draft.enabled} type="checkbox" onChange={(event) => setDraft({ ...draft, enabled: event.target.checked })} />
-          <span><strong>Enable local AI</strong><small>Only this configured endpoint may receive summary context.</small></span>
+          <span><strong>Enable local AI</strong><small>Only this configured endpoint may receive summary context or images you choose to analyze.</small></span>
         </label>
         <div className="provider-actions">
           <button className="button primary" disabled={isSaving} type="submit">
@@ -1719,15 +1868,19 @@ function SymbolOutline({ detail, symbols }: { detail: ArtifactDetail; symbols: S
 }
 
 function ChunkList({ detail }: { detail: ArtifactDetail }) {
+  const isImage = detail.summary.artifact_type === "image";
+  const label = isImage ? "Visual description" : "Chunks";
   if (detail.chunks.length === 0) {
     return (
       <section className="chunk-panel">
         <div className="chunk-panel-header">
-          <strong>Chunks</strong>
-          <StatusBadge tone="warning">Not indexed</StatusBadge>
+          <strong>{label}</strong>
+          <StatusBadge tone="warning">{isImage ? "Needs vision model" : "Not indexed"}</StatusBadge>
         </div>
         <p className="chunk-empty">
-          Run Index to generate line-based chunks for search and citations.
+          {isImage
+            ? "Enable a vision-capable provider, then choose Analyze image. RepoMemo will extract visible text, code, and visual structure into one searchable description."
+            : "Run Index to generate line-based chunks for search and citations."}
         </p>
       </section>
     );
@@ -1736,15 +1889,15 @@ function ChunkList({ detail }: { detail: ArtifactDetail }) {
   return (
     <section className="chunk-panel">
       <div className="chunk-panel-header">
-        <strong>Chunks</strong>
+        <strong>{label}</strong>
         <StatusBadge tone="success">{detail.chunks.length} ready</StatusBadge>
       </div>
       <div className="chunk-list">
         {detail.chunks.map((chunk) => (
           <article className="chunk-row" key={chunk.id || chunk.chunk_index}>
             <div className="chunk-row-header">
-              <strong>Chunk {chunk.chunk_index + 1}</strong>
-              <span>{formatLineRange(chunk.start_line, chunk.end_line)}</span>
+              <strong>{isImage ? "Generated description" : `Chunk ${chunk.chunk_index + 1}`}</strong>
+              {!isImage ? <span>{formatLineRange(chunk.start_line, chunk.end_line)}</span> : null}
             </div>
             {chunk.heading_path ? (
               <p className="chunk-heading">{chunk.heading_path}</p>
@@ -1833,4 +1986,25 @@ function renderHighlightedSnippet(snippet: string): ReactNode {
 
 function formatDate(value: string) {
   return new Date(value).toLocaleString();
+}
+
+function formatRelativeDate(value: string) {
+  const timestamp = new Date(value).getTime();
+  const elapsed = Date.now() - timestamp;
+
+  if (!Number.isFinite(timestamp) || elapsed < 0) {
+    return formatDate(value);
+  }
+
+  const minutes = Math.floor(elapsed / 60_000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+
+  return new Date(value).toLocaleDateString(undefined, { day: "numeric", month: "short" });
 }
