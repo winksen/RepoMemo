@@ -192,3 +192,18 @@ export interface SummaryResult {
   citations: Citation[];
   warnings: string[];
 }
+
+export interface AskRequest {
+  workspace_id: string;
+  question: string;
+  provider_id: string | null;
+  limit: number | null;
+}
+
+export interface AskAnswer {
+  answer_markdown: string;
+  citations: Citation[];
+  retrieved_context: SearchResult[];
+  confidence: number | null;
+  warnings: string[];
+}

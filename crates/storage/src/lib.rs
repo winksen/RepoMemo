@@ -128,6 +128,21 @@ struct ProviderSettingsRow {
 }
 
 #[derive(Debug, sqlx::FromRow)]
+struct EmbeddingSearchRow {
+    chunk_id: String,
+    artifact_id: String,
+    title: String,
+    path: String,
+    artifact_type: String,
+    language: Option<String>,
+    text: String,
+    start_line: Option<i64>,
+    end_line: Option<i64>,
+    source_name: String,
+    vector_blob: Vec<u8>,
+}
+
+#[derive(Debug, sqlx::FromRow)]
 struct IndexingJobRow {
     id: String,
     workspace_id: String,
@@ -763,6 +778,100 @@ impl StorageEngine {
                 source_name: row.get("source_name"),
             })
             .collect())
+    }
+
+    pub async fn list_workspace_chunks(&self, workspace_id: &str) -> Result<Vec<Chunk>> {
+        let rows = sqlx::query_as::<_, ChunkRow>(
+            r#"SELECT id, artifact_id, workspace_id, chunk_index, text, token_count,
+               start_line, end_line, heading_path, content_hash, embedding_status, metadata_json
+               FROM chunks WHERE workspace_id = ?1 ORDER BY artifact_id, chunk_index"#,
+        )
+        .bind(workspace_id)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows.into_iter().map(Chunk::from).collect())
+    }
+
+    pub async fn upsert_embeddings(
+        &self,
+        workspace_id: &str,
+        model: &str,
+        embeddings: Vec<(String, Vec<f32>)>,
+    ) -> Result<()> {
+        let now = Utc::now().to_rfc3339();
+        let mut tx = self.pool.begin().await?;
+        for (chunk_id, vector) in embeddings {
+            if vector.is_empty() {
+                continue;
+            }
+            let dimensions = vector.len() as i64;
+            let bytes = encode_embedding(&vector);
+            sqlx::query(
+                r#"INSERT INTO chunk_embeddings (chunk_id, workspace_id, model, dimensions, vector_blob, created_at, updated_at)
+                   VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6)
+                   ON CONFLICT(chunk_id) DO UPDATE SET model = excluded.model, dimensions = excluded.dimensions,
+                     vector_blob = excluded.vector_blob, updated_at = excluded.updated_at"#,
+            )
+            .bind(&chunk_id).bind(workspace_id).bind(model).bind(dimensions).bind(bytes).bind(&now)
+            .execute(&mut *tx).await?;
+            sqlx::query("UPDATE chunks SET embedding_status = 'ready' WHERE id = ?1")
+                .bind(&chunk_id)
+                .execute(&mut *tx)
+                .await?;
+        }
+        tx.commit().await?;
+        Ok(())
+    }
+
+    pub async fn search_chunks_by_embedding(
+        &self,
+        workspace_id: &str,
+        query: &[f32],
+        limit: i64,
+    ) -> Result<Vec<SearchResult>> {
+        if query.is_empty() {
+            return Ok(Vec::new());
+        }
+        let rows = sqlx::query_as::<_, EmbeddingSearchRow>(
+            r#"SELECT chunks.id AS chunk_id, chunks.artifact_id, artifacts.title, artifacts.path,
+                 artifacts.type AS artifact_type, artifacts.language, chunks.text, chunks.start_line,
+                 chunks.end_line, sources.name AS source_name, chunk_embeddings.vector_blob
+               FROM chunk_embeddings JOIN chunks ON chunks.id = chunk_embeddings.chunk_id
+               JOIN artifacts ON artifacts.id = chunks.artifact_id JOIN sources ON sources.id = artifacts.source_id
+               WHERE chunk_embeddings.workspace_id = ?1"#,
+        ).bind(workspace_id).fetch_all(&self.pool).await?;
+        let mut results = rows
+            .into_iter()
+            .filter_map(|row| {
+                let vector = decode_embedding(&row.vector_blob)?;
+                let score = cosine_similarity(query, &vector)?;
+                Some(SearchResult {
+                    artifact_id: row.artifact_id,
+                    chunk_id: row.chunk_id,
+                    title: row.title,
+                    path: row.path,
+                    artifact_type: artifact_type_from_db(&row.artifact_type),
+                    language: row.language,
+                    snippet: row.text.chars().take(360).collect(),
+                    start_line: row.start_line,
+                    end_line: row.end_line,
+                    score,
+                    source_name: row.source_name,
+                })
+            })
+            .collect::<Vec<_>>();
+        results.sort_by(|left, right| right.score.total_cmp(&left.score));
+        results.truncate(limit.clamp(1, 100) as usize);
+        Ok(results)
+    }
+
+    pub async fn embedding_count(&self, workspace_id: &str) -> Result<i64> {
+        let row =
+            sqlx::query("SELECT COUNT(*) AS count FROM chunk_embeddings WHERE workspace_id = ?1")
+                .bind(workspace_id)
+                .fetch_one(&self.pool)
+                .await?;
+        Ok(row.get("count"))
     }
 
     pub async fn list_provider_settings(
@@ -1415,12 +1524,53 @@ fn symbol_kind_from_db(value: &str) -> SymbolKind {
     }
 }
 
+pub fn encode_embedding(values: &[f32]) -> Vec<u8> {
+    values
+        .iter()
+        .flat_map(|value| value.to_le_bytes())
+        .collect()
+}
+
+pub fn decode_embedding(bytes: &[u8]) -> Option<Vec<f32>> {
+    if bytes.len() % 4 != 0 {
+        return None;
+    }
+    Some(
+        bytes
+            .chunks_exact(4)
+            .map(|chunk| f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
+            .collect(),
+    )
+}
+
+fn cosine_similarity(left: &[f32], right: &[f32]) -> Option<f64> {
+    if left.len() != right.len() || left.is_empty() {
+        return None;
+    }
+    let (dot, left_norm, right_norm) = left.iter().zip(right).fold(
+        (0.0_f64, 0.0_f64, 0.0_f64),
+        |(dot, left_norm, right_norm), (a, b)| {
+            let a = f64::from(*a);
+            let b = f64::from(*b);
+            (dot + a * b, left_norm + a * a, right_norm + b * b)
+        },
+    );
+    (left_norm > 0.0 && right_norm > 0.0).then_some(dot / (left_norm.sqrt() * right_norm.sqrt()))
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{NewArtifact, StorageConfig, StorageEngine};
+    use super::{decode_embedding, encode_embedding, NewArtifact, StorageConfig, StorageEngine};
     use repomemo_domain::{ArtifactType, Chunk, SearchRequest, SourceType, Symbol, SymbolKind};
     use serde_json::json;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn embedding_serialization_round_trips() {
+        let values = vec![0.25_f32, -1.0, 3.5];
+        assert_eq!(decode_embedding(&encode_embedding(&values)), Some(values));
+        assert_eq!(decode_embedding(&[0, 1]), None);
+    }
 
     #[test]
     fn content_hash_is_stable_sha256_hex() {

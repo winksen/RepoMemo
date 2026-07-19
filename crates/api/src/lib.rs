@@ -3,9 +3,10 @@ use std::path::PathBuf;
 use anyhow::{bail, Context, Result};
 use repomemo_ai::{provider_from_settings, validate_settings, AiProvider, GenerateRequest};
 use repomemo_domain::{
-    AppSettings, ArtifactDetail, ArtifactSummary, ArtifactType, ImportReport, ImportRequest,
-    IndexingJobStatus, ProviderSettings, ProviderTestResult, SearchRequest, SearchResult,
-    SourceType, SummaryResult, Symbol, SymbolSearchResult, Workspace, WorkspaceOverview,
+    AppSettings, ArtifactDetail, ArtifactSummary, ArtifactType, AskAnswer, AskRequest,
+    ImportReport, ImportRequest, IndexingJobStatus, ProviderSettings, ProviderTestResult,
+    SearchRequest, SearchResult, SourceType, SummaryResult, Symbol, SymbolSearchResult, Workspace,
+    WorkspaceOverview,
 };
 use repomemo_indexer::index_artifact;
 use repomemo_ingestion::{discover_import_candidates, ImportCandidate, ImportOptions};
@@ -431,6 +432,156 @@ impl RepoMemoCore {
             data_dir: self.storage.data_dir().display().to_string(),
             ai_enabled,
             active_provider,
+        })
+    }
+
+    pub async fn embed_workspace(
+        &self,
+        workspace_id: String,
+        provider_id: String,
+    ) -> Result<IndexingJobStatus> {
+        let settings = self.storage.get_provider_settings(&provider_id).await?;
+        if !settings.enabled {
+            bail!("Enable this provider before building embeddings.");
+        }
+        if settings.workspace_id.as_deref() != Some(workspace_id.as_str()) {
+            bail!("The selected provider belongs to a different workspace.");
+        }
+        let chunks = self.storage.list_workspace_chunks(&workspace_id).await?;
+        if chunks.is_empty() {
+            bail!("Index artifacts before building embeddings.");
+        }
+        let job = self
+            .storage
+            .create_indexing_job(
+                &workspace_id,
+                None,
+                "embedding_workspace",
+                Some(chunks.len() as i64),
+            )
+            .await?;
+        let provider = provider_from_settings(settings.clone())?;
+        let mut completed = 0_i64;
+        for batch in chunks.chunks(16) {
+            let vectors = provider
+                .embed(
+                    batch.iter().map(|chunk| chunk.text.clone()).collect(),
+                    json!({}),
+                )
+                .await?;
+            if vectors.len() != batch.len() {
+                bail!("Provider returned an unexpected embedding count.");
+            }
+            self.storage
+                .upsert_embeddings(
+                    &workspace_id,
+                    settings
+                        .embedding_model
+                        .as_deref()
+                        .or(settings.model.as_deref())
+                        .unwrap_or("unknown"),
+                    batch
+                        .iter()
+                        .zip(vectors)
+                        .map(|(chunk, vector)| (chunk.id.clone(), vector))
+                        .collect(),
+                )
+                .await?;
+            completed += batch.len() as i64;
+            self.storage
+                .update_indexing_job(&job.id, "running", "embedding_workspace", completed, None)
+                .await?;
+        }
+        self.storage
+            .update_indexing_job(&job.id, "completed", "embedded_workspace", completed, None)
+            .await
+    }
+
+    pub async fn ask_workspace(&self, request: AskRequest) -> Result<AskAnswer> {
+        if request.workspace_id.trim().is_empty() || request.question.trim().is_empty() {
+            bail!("A workspace and question are required.");
+        }
+        let provider_id = request
+            .provider_id
+            .as_deref()
+            .context("Enable a provider before using Ask.")?;
+        let settings = self.storage.get_provider_settings(provider_id).await?;
+        if !settings.enabled {
+            bail!("Enable this provider before using Ask. No content was sent.");
+        }
+        if settings.workspace_id.as_deref() != Some(request.workspace_id.as_str()) {
+            bail!("The selected provider belongs to a different workspace.");
+        }
+        let provider = provider_from_settings(settings)?;
+        let query_embedding = provider
+            .embed(vec![request.question.clone()], json!({}))
+            .await
+            .ok()
+            .and_then(|vectors| vectors.into_iter().next());
+        let (retrieved_context, used_embeddings) = self
+            .retrieval
+            .hybrid_search(
+                SearchRequest {
+                    workspace_id: request.workspace_id.clone(),
+                    query: request.question.clone(),
+                    artifact_types: Vec::new(),
+                    languages: Vec::new(),
+                    source_ids: Vec::new(),
+                    limit: request.limit.or(Some(10)),
+                },
+                query_embedding.as_deref(),
+            )
+            .await?;
+        if retrieved_context.is_empty() {
+            return Ok(AskAnswer {
+                answer_markdown: "Indexed context is insufficient for a reliable answer."
+                    .to_owned(),
+                citations: Vec::new(),
+                retrieved_context,
+                confidence: Some(0.0),
+                warnings: vec![
+                    "No matching indexed context was found; no provider generation was requested."
+                        .to_owned(),
+                ],
+            });
+        }
+        let citations = retrieved_context
+            .iter()
+            .map(|result| repomemo_domain::Citation {
+                artifact_id: result.artifact_id.clone(),
+                chunk_id: Some(result.chunk_id.clone()),
+                title: result.title.clone(),
+                path: result.path.clone(),
+                start_line: result.start_line,
+                end_line: result.end_line,
+                confidence: Some(result.score),
+            })
+            .collect::<Vec<_>>();
+        let context = retrieved_context
+            .iter()
+            .take(8)
+            .map(|result| {
+                format!(
+                    "[{}] {} ({})\n{}",
+                    result.chunk_id, result.title, result.path, result.snippet
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n\n");
+        let answer_markdown = provider.generate(GenerateRequest { prompt: format!("Answer the question: {}. Use only the supplied cited context. If it does not support a conclusion, say the indexed context is insufficient.", request.question), context, options: json!({ "temperature": 0.1 }) }).await?;
+        let confidence = retrieved_context
+            .first()
+            .map(|result| result.score.clamp(0.0, 1.0));
+        let mut warnings = Vec::new();
+        if !used_embeddings {
+            warnings.push("Answer used full-text retrieval because local embeddings are not available for this provider or workspace.".to_owned());
+        }
+        Ok(AskAnswer {
+            answer_markdown,
+            citations,
+            retrieved_context,
+            confidence,
+            warnings,
         })
     }
 

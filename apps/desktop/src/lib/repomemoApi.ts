@@ -2,6 +2,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import type {
   AppSettings,
+  AskAnswer,
+  AskRequest,
   ArtifactDetail,
   ArtifactSummary,
   Chunk,
@@ -111,6 +113,16 @@ export async function summarizeArtifact(artifactId: string, providerId: string):
 export async function summarizeWorkspace(workspaceId: string, providerId: string): Promise<SummaryResult> {
   if (!isTauriRuntime) return { summary_markdown: "Preview workspace summary. Configure a provider in Settings to generate a real one.", citations: [], warnings: [] };
   return invoke<SummaryResult>("summarize_workspace", { workspaceId, providerId });
+}
+
+export async function embedWorkspace(workspaceId: string, providerId: string): Promise<IndexingJobStatus> {
+  if (!isTauriRuntime) return mockIndexingJob(workspaceId, 0, 0, "completed");
+  return invoke<IndexingJobStatus>("embed_workspace", { workspaceId, providerId });
+}
+
+export async function askWorkspace(request: AskRequest): Promise<AskAnswer> {
+  if (!isTauriRuntime) return { answer_markdown: "Indexed context is insufficient for a reliable answer.", citations: [], retrieved_context: [], confidence: 0, warnings: ["Preview mode does not call an AI provider."] };
+  return invoke<AskAnswer>("ask_workspace", { request });
 }
 
 export const ACCEPTED_TEXT_EXTENSIONS = [

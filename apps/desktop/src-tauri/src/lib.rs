@@ -2,9 +2,9 @@ use std::path::PathBuf;
 
 use repomemo_api::RepoMemoCore;
 use repomemo_domain::{
-    AppSettings, ArtifactDetail, ArtifactSummary, ImportReport, ImportRequest, IndexingJobStatus,
-    ProviderSettings, ProviderTestResult, SearchRequest, SearchResult, SummaryResult, Symbol,
-    SymbolSearchResult, Workspace, WorkspaceOverview,
+    AppSettings, ArtifactDetail, ArtifactSummary, AskAnswer, AskRequest, ImportReport,
+    ImportRequest, IndexingJobStatus, ProviderSettings, ProviderTestResult, SearchRequest,
+    SearchResult, SummaryResult, Symbol, SymbolSearchResult, Workspace, WorkspaceOverview,
 };
 use serde::Deserialize;
 use tauri::{Manager, State};
@@ -237,6 +237,31 @@ async fn summarize_workspace(
         .map_err(to_command_error)
 }
 
+#[tauri::command]
+async fn embed_workspace(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    provider_id: String,
+) -> Result<IndexingJobStatus, String> {
+    state
+        .core
+        .embed_workspace(workspace_id, provider_id)
+        .await
+        .map_err(to_command_error)
+}
+
+#[tauri::command]
+async fn ask_workspace(
+    state: State<'_, AppState>,
+    request: AskRequest,
+) -> Result<AskAnswer, String> {
+    state
+        .core
+        .ask_workspace(request)
+        .await
+        .map_err(to_command_error)
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -267,7 +292,9 @@ pub fn run() {
             save_provider_settings,
             test_provider,
             summarize_artifact,
-            summarize_workspace
+            summarize_workspace,
+            embed_workspace,
+            ask_workspace
         ])
         .run(tauri::generate_context!())
         .expect("error while running RepoMemo");

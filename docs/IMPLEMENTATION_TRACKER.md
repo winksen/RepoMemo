@@ -121,14 +121,20 @@ Spec: `docs/phases/PHASE_1F_AI_PROVIDER_LAYER.md`
 
 ## Phase 1G: Semantic Search And Ask
 
-Status: not started
+Status: implemented and validated
 
 Spec: `docs/phases/PHASE_1G_SEMANTIC_SEARCH_AND_ASK.md`
 
-- Local embedding storage in SQLite for MVP
-- Hybrid retrieval
-- Ask UI with citations
-- Insufficient-context behavior
+| Area | Status | Notes |
+| --- | --- | --- |
+| Local embedding storage | Done | Float32 vectors are serialized into SQLite `chunk_embeddings` blobs and remain local to the workspace. |
+| Embedding jobs | Done | `embed_workspace` batches indexed chunks through a configured embedding-capable provider and tracks progress with indexing jobs. |
+| Hybrid retrieval | Done | Ask merges safe FTS candidates with cosine-ranked local embeddings when available. |
+| Ask orchestration | Done | Retrieval prepares inspectable context before provider generation, with citations for each selected chunk. |
+| FTS-only fallback | Done | Providers without embeddings, including OpenRouter in this phase, use FTS evidence and a visible warning. |
+| Insufficient context | Done | Empty retrieval returns `Indexed context is insufficient for a reliable answer.` without a generation call. |
+| Ask workbench | Done | Enabled Ask navigation includes prompt input, cited answer, retrieved evidence, and a local-embedding build action. |
+| Validation | Done | Embedding serialization coverage, workspace Rust tests, frontend typecheck, and production build pass. |
 
 ## Phase 1H: Memory Cards
 

@@ -29,6 +29,8 @@ import {
   chooseImportFiles,
   chooseImportFolder,
   createWorkspace,
+  askWorkspace,
+  embedWorkspace,
   getAppSettings,
   getArtifact,
   getWorkspaceOverview,
@@ -51,6 +53,7 @@ import {
 } from "./lib/repomemoApi";
 import type {
   AppSettings,
+  AskAnswer,
   ArtifactDetail,
   ArtifactSummary,
   IndexingJobStatus,
@@ -66,7 +69,7 @@ import type {
 } from "./types";
 
 type LoadState = "idle" | "loading" | "ready" | "error";
-type View = "workspaces" | "import" | "artifacts" | "search" | "summary" | "settings";
+type View = "workspaces" | "import" | "artifacts" | "search" | "summary" | "ask" | "settings";
 type ThemeMode = "light" | "dark";
 
 const emptyOverview = (workspaceId: string): WorkspaceOverview => ({
@@ -99,6 +102,10 @@ export function App() {
   const [summary, setSummary] = useState<SummaryResult | null>(null);
   const [workspaceSummary, setWorkspaceSummary] = useState<SummaryResult | null>(null);
   const [isSummarizing, setIsSummarizing] = useState(false);
+  const [askQuestion, setAskQuestion] = useState("");
+  const [askAnswer, setAskAnswer] = useState<AskAnswer | null>(null);
+  const [isAsking, setIsAsking] = useState(false);
+  const [isEmbedding, setIsEmbedding] = useState(false);
   const [overview, setOverview] = useState<WorkspaceOverview | null>(null);
   const [importReport, setImportReport] = useState<ImportReport | null>(null);
   const [indexingJob, setIndexingJob] = useState<IndexingJobStatus | null>(null);
@@ -497,6 +504,30 @@ export function App() {
     }
   }
 
+  async function handleAsk() {
+    const provider = providers.find((item) => item.enabled);
+    if (!provider || !selectedWorkspaceId || !askQuestion.trim()) {
+      if (!provider) { setActiveView("settings"); setErrorMessage("Enable a provider before using Ask. No content was sent."); }
+      return;
+    }
+    setIsAsking(true);
+    setErrorMessage(null);
+    try {
+      setAskAnswer(await askWorkspace({ workspace_id: selectedWorkspaceId, question: askQuestion.trim(), provider_id: provider.id, limit: 10 }));
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : String(error));
+    } finally { setIsAsking(false); }
+  }
+
+  async function handleEmbedWorkspace() {
+    const provider = providers.find((item) => item.enabled);
+    if (!provider || !selectedWorkspaceId) { setActiveView("settings"); setErrorMessage("Enable a local embedding provider first."); return; }
+    setIsEmbedding(true); setErrorMessage(null);
+    try { setIndexingJob(await embedWorkspace(selectedWorkspaceId, provider.id)); await refreshWorkspaceData(selectedWorkspaceId); }
+    catch (error) { setErrorMessage(error instanceof Error ? error.message : String(error)); }
+    finally { setIsEmbedding(false); }
+  }
+
   return (
     <main className="app-shell">
       <aside className="sidebar">
@@ -551,7 +582,7 @@ export function App() {
               label="Summary"
               onClick={() => setActiveView("summary")}
             />
-            <NavButton disabled icon={Brain} label="Ask" />
+            <NavButton active={activeView === "ask"} disabled={!selectedWorkspace} icon={Brain} label="Ask" onClick={() => setActiveView("ask")} />
             <NavButton disabled icon={Sparkles} label="Memory cards" />
           </div>
           <div className="nav-divider" aria-hidden="true" />
@@ -684,6 +715,8 @@ export function App() {
             summary={workspaceSummary}
             workspace={selectedWorkspace}
           />
+        ) : activeView === "ask" ? (
+          <AskView askAnswer={askAnswer} isAsking={isAsking} isEmbedding={isEmbedding} onAsk={handleAsk} onEmbed={handleEmbedWorkspace} question={askQuestion} setQuestion={setAskQuestion} workspace={selectedWorkspace} />
         ) : (
           <ProviderSettingsView
             isSaving={isSavingProvider}
@@ -1584,6 +1617,47 @@ function WorkspaceSummaryView({
       </PanelHeader>
       <p className="workspace-summary-intro">Create a concise briefing from indexed excerpts across <strong>{workspace.name}</strong>. Every generated result includes the local chunks it used.</p>
       {summary ? <SummaryPanel summary={summary} /> : <EmptyState icon={Brain} title="No workspace summary yet" body="Index artifacts, configure a provider, then generate a cited project briefing." />}
+    </section>
+  );
+}
+
+function AskView({
+  askAnswer,
+  isAsking,
+  isEmbedding,
+  onAsk,
+  onEmbed,
+  question,
+  setQuestion,
+  workspace,
+}: {
+  askAnswer: AskAnswer | null;
+  isAsking: boolean;
+  isEmbedding: boolean;
+  onAsk: () => void;
+  onEmbed: () => void;
+  question: string;
+  setQuestion: (value: string) => void;
+  workspace: Workspace | undefined;
+}) {
+  if (!workspace) return <EmptyState icon={Brain} title="Choose a workspace" body="Ask uses the indexed context in one workspace." />;
+  return (
+    <section className="ask-workbench panel">
+      <PanelHeader icon={Brain} label="Evidence first" title="Ask the workspace">
+        <button className="button secondary" disabled={isEmbedding} type="button" onClick={onEmbed}>{isEmbedding ? <Loader2 className="spin" size={16} /> : <Database size={16} />} Build local embeddings</button>
+      </PanelHeader>
+      <p className="workspace-summary-intro">Answers are generated only after RepoMemo retrieves inspectable local evidence. Without embeddings, Ask falls back to full-text retrieval.</p>
+      <div className="ask-composer">
+        <textarea value={question} onChange={(event) => setQuestion(event.target.value)} placeholder={`What do you want to know about ${workspace.name}?`} rows={3} />
+        <button className="button primary" disabled={isAsking || !question.trim()} type="button" onClick={onAsk}>{isAsking ? <Loader2 className="spin" size={16} /> : <Brain size={16} />} Ask</button>
+      </div>
+      {askAnswer ? <div className="ask-answer">
+        <div className="chunk-panel-header"><strong>Answer</strong><StatusBadge tone={askAnswer.confidence && askAnswer.confidence > 0.15 ? "success" : "warning"}>{askAnswer.confidence && askAnswer.confidence > 0.15 ? "Evidence found" : "Low confidence"}</StatusBadge></div>
+        <p className="summary-body">{askAnswer.answer_markdown}</p>
+        <div className="citation-list">{askAnswer.citations.map((citation) => <span key={citation.chunk_id ?? citation.artifact_id}>{citation.title} · {formatLineRange(citation.start_line, citation.end_line)}</span>)}</div>
+        {askAnswer.warnings.map((warning) => <p className="evidence-note" key={warning}>{warning}</p>)}
+        <div className="retrieved-evidence"><p className="result-group-label">Retrieved context</p>{askAnswer.retrieved_context.map((result) => <div key={result.chunk_id}><strong>{result.title}</strong><span>{formatLineRange(result.start_line, result.end_line)}</span><p>{result.snippet}</p></div>)}</div>
+      </div> : <EmptyState icon={Brain} title="Ask with evidence" body="Enter a question to retrieve local context before generation." />}
     </section>
   );
 }
