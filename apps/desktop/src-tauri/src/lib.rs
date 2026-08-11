@@ -2,9 +2,11 @@ use std::path::PathBuf;
 
 use repomemo_api::RepoMemoCore;
 use repomemo_domain::{
-    AppSettings, ArtifactDetail, ArtifactSummary, AskAnswer, AskRequest, ImportReport,
-    ImportRequest, IndexingJobStatus, ProviderSettings, ProviderTestResult, SearchRequest,
-    SearchResult, SummaryResult, Symbol, SymbolSearchResult, Workspace, WorkspaceOverview,
+    AppSettings, ArtifactDetail, ArtifactSummary, AskAnswer, AskRequest, CreateMemoryCardRequest,
+    ImportReport, ImportRequest, IndexingJobStatus, MemoryCard, MemoryCardDetail,
+    MemoryCardSummary, ProviderSettings, ProviderTestResult, SearchRequest, SearchResult,
+    SummaryResult, Symbol, SymbolSearchResult, UpdateMemoryCardRequest, Workspace,
+    WorkspaceOverview,
 };
 use serde::Deserialize;
 use tauri::{Manager, State};
@@ -134,6 +136,76 @@ async fn get_workspace_overview(
     state
         .core
         .workspace_overview(workspace_id)
+        .await
+        .map_err(to_command_error)
+}
+
+#[tauri::command]
+async fn create_memory_card(
+    state: State<'_, AppState>,
+    request: CreateMemoryCardRequest,
+) -> Result<MemoryCard, String> {
+    state
+        .core
+        .create_memory_card(request)
+        .await
+        .map_err(to_command_error)
+}
+
+#[tauri::command]
+async fn update_memory_card(
+    state: State<'_, AppState>,
+    request: UpdateMemoryCardRequest,
+) -> Result<MemoryCard, String> {
+    state
+        .core
+        .update_memory_card(request)
+        .await
+        .map_err(to_command_error)
+}
+
+#[tauri::command]
+async fn list_memory_cards(
+    state: State<'_, AppState>,
+    workspace_id: String,
+) -> Result<Vec<MemoryCardSummary>, String> {
+    state
+        .core
+        .list_memory_cards(workspace_id)
+        .await
+        .map_err(to_command_error)
+}
+
+#[tauri::command]
+async fn search_memory_cards(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    query: String,
+) -> Result<Vec<MemoryCardSummary>, String> {
+    state
+        .core
+        .search_memory_cards(workspace_id, query)
+        .await
+        .map_err(to_command_error)
+}
+
+#[tauri::command]
+async fn get_memory_card(
+    state: State<'_, AppState>,
+    card_id: String,
+) -> Result<MemoryCardDetail, String> {
+    state
+        .core
+        .get_memory_card(card_id)
+        .await
+        .map_err(to_command_error)
+}
+
+#[tauri::command]
+async fn export_memory_card(state: State<'_, AppState>, card_id: String) -> Result<String, String> {
+    state
+        .core
+        .export_memory_card(card_id)
         .await
         .map_err(to_command_error)
 }
@@ -285,6 +357,12 @@ pub fn run() {
             index_artifact,
             index_workspace,
             get_workspace_overview,
+            create_memory_card,
+            update_memory_card,
+            list_memory_cards,
+            search_memory_cards,
+            get_memory_card,
+            export_memory_card,
             search_workspace,
             list_symbols,
             search_symbols,

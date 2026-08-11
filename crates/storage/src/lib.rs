@@ -3,9 +3,10 @@ use std::path::{Path, PathBuf};
 use anyhow::{bail, Context, Result};
 use chrono::Utc;
 use repomemo_domain::{
-    ArtifactDetail, ArtifactSummary, ArtifactType, Chunk, IndexingJobStatus, ProviderSettings,
-    SearchRequest, SearchResult, Source, SourceType, Symbol, SymbolKind, SymbolSearchResult,
-    Workspace, WorkspaceOverview,
+    ArtifactDetail, ArtifactSummary, ArtifactType, Chunk, Citation, IndexingJobStatus, MemoryCard,
+    MemoryCardDetail, MemoryCardSummary, MemoryEvidence, ProviderSettings, SearchRequest,
+    SearchResult, Source, SourceType, Symbol, SymbolKind, SymbolSearchResult, Workspace,
+    WorkspaceOverview,
 };
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -154,6 +155,44 @@ struct IndexingJobRow {
     error_message: Option<String>,
     created_at: String,
     updated_at: String,
+}
+
+#[derive(Debug, sqlx::FromRow)]
+struct MemoryCardRow {
+    id: String,
+    workspace_id: String,
+    title: String,
+    body_markdown: String,
+    source: String,
+    confidence: Option<f64>,
+    created_at: String,
+    updated_at: String,
+    metadata_json: String,
+}
+
+#[derive(Debug, sqlx::FromRow)]
+struct MemoryCardSummaryRow {
+    id: String,
+    workspace_id: String,
+    title: String,
+    body_excerpt: String,
+    source: String,
+    evidence_count: i64,
+    created_at: String,
+    updated_at: String,
+}
+
+#[derive(Debug, sqlx::FromRow)]
+struct MemoryEvidenceRow {
+    link_id: String,
+    target_id: String,
+    target_type: String,
+    artifact_id: Option<String>,
+    chunk_id: Option<String>,
+    title: Option<String>,
+    path: Option<String>,
+    start_line: Option<i64>,
+    end_line: Option<i64>,
 }
 
 #[derive(Debug)]
@@ -1053,6 +1092,232 @@ impl StorageEngine {
         })
     }
 
+    pub async fn create_memory_card(
+        &self,
+        workspace_id: &str,
+        title: &str,
+        body_markdown: &str,
+        source: &str,
+        confidence: Option<f64>,
+        citations: &[Citation],
+    ) -> Result<MemoryCard> {
+        for citation in citations {
+            self.validate_memory_evidence(workspace_id, citation)
+                .await?;
+        }
+
+        let id = Uuid::new_v4().to_string();
+        let now = Utc::now().to_rfc3339();
+        sqlx::query(
+            r#"
+            INSERT INTO memory_cards (
+              id, workspace_id, title, body_markdown, source, confidence,
+              created_at, updated_at, metadata_json
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, '{}')
+            "#,
+        )
+        .bind(&id)
+        .bind(workspace_id)
+        .bind(title.trim())
+        .bind(body_markdown.trim())
+        .bind(source.trim())
+        .bind(confidence)
+        .bind(&now)
+        .bind(&now)
+        .execute(&self.pool)
+        .await?;
+
+        for citation in citations {
+            let (target_id, target_type) = citation
+                .chunk_id
+                .as_ref()
+                .map(|chunk_id| (chunk_id.as_str(), "chunk"))
+                .unwrap_or((citation.artifact_id.as_str(), "artifact"));
+            sqlx::query(
+                r#"
+                INSERT INTO links (
+                  id, workspace_id, from_id, from_type, to_id, to_type,
+                  relation_type, confidence, created_by, metadata_json, created_at
+                ) VALUES (?1, ?2, ?3, 'memory_card', ?4, ?5, 'cites', ?6, 'user', '{}', ?7)
+                "#,
+            )
+            .bind(Uuid::new_v4().to_string())
+            .bind(workspace_id)
+            .bind(&id)
+            .bind(target_id)
+            .bind(target_type)
+            .bind(citation.confidence)
+            .bind(&now)
+            .execute(&self.pool)
+            .await?;
+        }
+
+        self.get_memory_card(&id).await.map(|detail| detail.card)
+    }
+
+    pub async fn update_memory_card(
+        &self,
+        card_id: &str,
+        title: &str,
+        body_markdown: &str,
+        source: &str,
+        confidence: Option<f64>,
+    ) -> Result<MemoryCard> {
+        let now = Utc::now().to_rfc3339();
+        let changed = sqlx::query(
+            r#"
+            UPDATE memory_cards
+            SET title = ?1, body_markdown = ?2, source = ?3, confidence = ?4, updated_at = ?5
+            WHERE id = ?6
+            "#,
+        )
+        .bind(title.trim())
+        .bind(body_markdown.trim())
+        .bind(source.trim())
+        .bind(confidence)
+        .bind(&now)
+        .bind(card_id)
+        .execute(&self.pool)
+        .await?;
+        if changed.rows_affected() == 0 {
+            bail!("Memory card was not found.");
+        }
+        self.get_memory_card(card_id)
+            .await
+            .map(|detail| detail.card)
+    }
+
+    pub async fn list_memory_cards(&self, workspace_id: &str) -> Result<Vec<MemoryCardSummary>> {
+        self.query_memory_cards(workspace_id, None).await
+    }
+
+    pub async fn search_memory_cards(
+        &self,
+        workspace_id: &str,
+        query: &str,
+    ) -> Result<Vec<MemoryCardSummary>> {
+        self.query_memory_cards(workspace_id, Some(query.trim()))
+            .await
+    }
+
+    pub async fn get_memory_card(&self, card_id: &str) -> Result<MemoryCardDetail> {
+        let row = sqlx::query_as::<_, MemoryCardRow>(
+            r#"
+            SELECT id, workspace_id, title, body_markdown, source, confidence,
+                   created_at, updated_at, metadata_json
+            FROM memory_cards WHERE id = ?1
+            "#,
+        )
+        .bind(card_id)
+        .fetch_one(&self.pool)
+        .await?;
+        let evidence_rows = sqlx::query_as::<_, MemoryEvidenceRow>(
+            r#"
+            SELECT
+              links.id AS link_id,
+              links.to_id AS target_id,
+              links.to_type AS target_type,
+              artifacts.id AS artifact_id,
+              chunks.id AS chunk_id,
+              artifacts.title AS title,
+              artifacts.path AS path,
+              chunks.start_line AS start_line,
+              chunks.end_line AS end_line
+            FROM links
+            LEFT JOIN chunks ON links.to_type = 'chunk' AND chunks.id = links.to_id
+            LEFT JOIN artifacts ON artifacts.id = CASE
+              WHEN links.to_type = 'artifact' THEN links.to_id
+              ELSE chunks.artifact_id
+            END
+            WHERE links.from_type = 'memory_card' AND links.from_id = ?1
+            ORDER BY links.created_at ASC
+            "#,
+        )
+        .bind(card_id)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(MemoryCardDetail {
+            card: MemoryCard::from(row),
+            evidence: evidence_rows
+                .into_iter()
+                .map(MemoryEvidence::from)
+                .collect(),
+        })
+    }
+
+    async fn query_memory_cards(
+        &self,
+        workspace_id: &str,
+        search: Option<&str>,
+    ) -> Result<Vec<MemoryCardSummary>> {
+        let rows = if let Some(search) = search.filter(|value| !value.is_empty()) {
+            sqlx::query_as::<_, MemoryCardSummaryRow>(
+                r#"
+                SELECT memory_cards.id, memory_cards.workspace_id, memory_cards.title,
+                       substr(memory_cards.body_markdown, 1, 220) AS body_excerpt,
+                       memory_cards.source, COUNT(links.id) AS evidence_count,
+                       memory_cards.created_at, memory_cards.updated_at
+                FROM memory_cards
+                LEFT JOIN links ON links.from_type = 'memory_card' AND links.from_id = memory_cards.id
+                WHERE memory_cards.workspace_id = ?1
+                  AND lower(memory_cards.title || ' ' || memory_cards.body_markdown) LIKE '%' || lower(?2) || '%'
+                GROUP BY memory_cards.id
+                ORDER BY memory_cards.updated_at DESC, memory_cards.title ASC
+                "#,
+            )
+            .bind(workspace_id)
+            .bind(search)
+            .fetch_all(&self.pool)
+            .await?
+        } else {
+            sqlx::query_as::<_, MemoryCardSummaryRow>(
+                r#"
+                SELECT memory_cards.id, memory_cards.workspace_id, memory_cards.title,
+                       substr(memory_cards.body_markdown, 1, 220) AS body_excerpt,
+                       memory_cards.source, COUNT(links.id) AS evidence_count,
+                       memory_cards.created_at, memory_cards.updated_at
+                FROM memory_cards
+                LEFT JOIN links ON links.from_type = 'memory_card' AND links.from_id = memory_cards.id
+                WHERE memory_cards.workspace_id = ?1
+                GROUP BY memory_cards.id
+                ORDER BY memory_cards.updated_at DESC, memory_cards.title ASC
+                "#,
+            )
+            .bind(workspace_id)
+            .fetch_all(&self.pool)
+            .await?
+        };
+        Ok(rows.into_iter().map(MemoryCardSummary::from).collect())
+    }
+
+    async fn validate_memory_evidence(
+        &self,
+        workspace_id: &str,
+        citation: &Citation,
+    ) -> Result<()> {
+        let exists = if let Some(chunk_id) = &citation.chunk_id {
+            sqlx::query_scalar::<_, i64>(
+                "SELECT COUNT(*) FROM chunks WHERE id = ?1 AND workspace_id = ?2",
+            )
+            .bind(chunk_id)
+            .bind(workspace_id)
+            .fetch_one(&self.pool)
+            .await?
+        } else {
+            sqlx::query_scalar::<_, i64>(
+                "SELECT COUNT(*) FROM artifacts WHERE id = ?1 AND workspace_id = ?2",
+            )
+            .bind(&citation.artifact_id)
+            .bind(workspace_id)
+            .fetch_one(&self.pool)
+            .await?
+        };
+        if exists == 0 {
+            bail!("A cited evidence record is missing from this workspace.");
+        }
+        Ok(())
+    }
+
     pub async fn search_chunks(
         &self,
         request: &SearchRequest,
@@ -1444,6 +1709,57 @@ impl From<SearchResultRow> for SearchResult {
     }
 }
 
+impl From<MemoryCardRow> for MemoryCard {
+    fn from(row: MemoryCardRow) -> Self {
+        let metadata = serde_json::from_str(&row.metadata_json)
+            .unwrap_or_else(|_| Value::Object(Default::default()));
+        Self {
+            id: row.id,
+            workspace_id: row.workspace_id,
+            title: row.title,
+            body_markdown: row.body_markdown,
+            source: row.source,
+            confidence: row.confidence,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+            metadata,
+        }
+    }
+}
+
+impl From<MemoryCardSummaryRow> for MemoryCardSummary {
+    fn from(row: MemoryCardSummaryRow) -> Self {
+        Self {
+            id: row.id,
+            workspace_id: row.workspace_id,
+            title: row.title,
+            body_excerpt: row.body_excerpt,
+            source: row.source,
+            evidence_count: row.evidence_count,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+        }
+    }
+}
+
+impl From<MemoryEvidenceRow> for MemoryEvidence {
+    fn from(row: MemoryEvidenceRow) -> Self {
+        let exists = row.artifact_id.is_some();
+        Self {
+            link_id: row.link_id,
+            target_id: row.target_id,
+            target_type: row.target_type,
+            artifact_id: row.artifact_id,
+            chunk_id: row.chunk_id,
+            title: row.title,
+            path: row.path,
+            start_line: row.start_line,
+            end_line: row.end_line,
+            exists,
+        }
+    }
+}
+
 fn source_type_to_db(source_type: &SourceType) -> &'static str {
     match source_type {
         SourceType::Upload => "upload",
@@ -1561,7 +1877,9 @@ fn cosine_similarity(left: &[f32], right: &[f32]) -> Option<f64> {
 #[cfg(test)]
 mod tests {
     use super::{decode_embedding, encode_embedding, NewArtifact, StorageConfig, StorageEngine};
-    use repomemo_domain::{ArtifactType, Chunk, SearchRequest, SourceType, Symbol, SymbolKind};
+    use repomemo_domain::{
+        ArtifactType, Chunk, Citation, SearchRequest, SourceType, Symbol, SymbolKind,
+    };
     use serde_json::json;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -1686,6 +2004,92 @@ mod tests {
 
         storage.pool.close().await;
         drop(storage);
-        std::fs::remove_dir_all(data_dir).unwrap();
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn memory_cards_link_evidence_and_are_searchable() {
+        let data_dir = std::env::temp_dir().join(format!(
+            "repomemo-memory-test-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let storage = StorageEngine::open(StorageConfig {
+            data_dir: data_dir.clone(),
+        })
+        .await
+        .unwrap();
+        let workspace = storage.create_workspace("Memory test").await.unwrap();
+        let source = storage
+            .create_or_get_source(&workspace.id, SourceType::Manual, "Notes", None)
+            .await
+            .unwrap();
+        let bytes = b"Local evidence for a durable memory card.";
+        let content_hash = StorageEngine::content_hash(bytes);
+        storage
+            .store_blob(&content_hash, bytes, Some("text/plain"))
+            .await
+            .unwrap();
+        let artifact = storage
+            .store_artifact(NewArtifact {
+                workspace_id: workspace.id.clone(),
+                source_id: source.id,
+                artifact_type: ArtifactType::Note,
+                title: "Evidence note".to_owned(),
+                path: "evidence.txt".to_owned(),
+                content_hash,
+                mime_type: Some("text/plain".to_owned()),
+                language: Some("Text".to_owned()),
+                size_bytes: bytes.len() as i64,
+                metadata: json!({}),
+            })
+            .await
+            .unwrap()
+            .artifact;
+        let card = storage
+            .create_memory_card(
+                &workspace.id,
+                "Keep local evidence",
+                "Evidence remains inspectable.",
+                "manual",
+                None,
+                &[Citation {
+                    artifact_id: artifact.id.clone(),
+                    chunk_id: None,
+                    title: artifact.title.clone(),
+                    path: artifact.path.clone(),
+                    start_line: None,
+                    end_line: None,
+                    confidence: None,
+                }],
+            )
+            .await
+            .unwrap();
+        let matches = storage
+            .search_memory_cards(&workspace.id, "inspectable")
+            .await
+            .unwrap();
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].evidence_count, 1);
+        let detail = storage.get_memory_card(&card.id).await.unwrap();
+        assert_eq!(detail.evidence.len(), 1);
+        assert!(detail.evidence[0].exists);
+        let updated = storage
+            .update_memory_card(
+                &card.id,
+                "Keep verified evidence",
+                "Evidence remains local and inspectable.",
+                "manual",
+                None,
+            )
+            .await
+            .unwrap();
+        assert_eq!(updated.title, "Keep verified evidence");
+
+        storage.pool.close().await;
+        drop(storage);
+        let _ = std::fs::remove_dir_all(data_dir);
     }
 }

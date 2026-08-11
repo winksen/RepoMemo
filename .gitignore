@@ -20,3 +20,6 @@ Thumbs.db
 .idea/
 .vscode/
 /docs/design
+/.agents/skills/impeccable
+.codex/hooks.json
+/.impeccable

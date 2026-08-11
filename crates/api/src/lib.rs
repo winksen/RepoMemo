@@ -6,9 +6,10 @@ use repomemo_ai::{
 };
 use repomemo_domain::{
     AppSettings, ArtifactDetail, ArtifactSummary, ArtifactType, AskAnswer, AskRequest,
-    ImportReport, ImportRequest, IndexingJobStatus, ProviderSettings, ProviderTestResult,
-    SearchRequest, SearchResult, SourceType, SummaryResult, Symbol, SymbolSearchResult, Workspace,
-    WorkspaceOverview,
+    CreateMemoryCardRequest, ImportReport, ImportRequest, IndexingJobStatus, MemoryCard,
+    MemoryCardDetail, MemoryCardSummary, ProviderSettings, ProviderTestResult, SearchRequest,
+    SearchResult, SourceType, SummaryResult, Symbol, SymbolSearchResult, UpdateMemoryCardRequest,
+    Workspace, WorkspaceOverview,
 };
 use repomemo_indexer::{index_artifact, index_image_description};
 use repomemo_ingestion::{discover_import_candidates, ImportCandidate, ImportOptions};
@@ -255,6 +256,98 @@ impl RepoMemoCore {
 
     pub async fn workspace_overview(&self, workspace_id: String) -> Result<WorkspaceOverview> {
         self.storage.workspace_overview(&workspace_id).await
+    }
+
+    pub async fn create_memory_card(&self, request: CreateMemoryCardRequest) -> Result<MemoryCard> {
+        validate_memory_card_fields(&request.title, &request.body_markdown, &request.source)?;
+        if !self.storage.workspace_exists(&request.workspace_id).await? {
+            bail!("Workspace was not found.");
+        }
+        self.storage
+            .create_memory_card(
+                &request.workspace_id,
+                &request.title,
+                &request.body_markdown,
+                &request.source,
+                request.confidence,
+                &request.citations,
+            )
+            .await
+    }
+
+    pub async fn update_memory_card(&self, request: UpdateMemoryCardRequest) -> Result<MemoryCard> {
+        validate_memory_card_fields(&request.title, &request.body_markdown, &request.source)?;
+        self.storage
+            .update_memory_card(
+                &request.card_id,
+                &request.title,
+                &request.body_markdown,
+                &request.source,
+                request.confidence,
+            )
+            .await
+    }
+
+    pub async fn list_memory_cards(&self, workspace_id: String) -> Result<Vec<MemoryCardSummary>> {
+        if workspace_id.trim().is_empty() {
+            bail!("Workspace id is required.");
+        }
+        self.storage.list_memory_cards(&workspace_id).await
+    }
+
+    pub async fn search_memory_cards(
+        &self,
+        workspace_id: String,
+        query: String,
+    ) -> Result<Vec<MemoryCardSummary>> {
+        if workspace_id.trim().is_empty() {
+            bail!("Workspace id is required.");
+        }
+        self.storage
+            .search_memory_cards(&workspace_id, &query)
+            .await
+    }
+
+    pub async fn get_memory_card(&self, card_id: String) -> Result<MemoryCardDetail> {
+        if card_id.trim().is_empty() {
+            bail!("Memory card id is required.");
+        }
+        self.storage.get_memory_card(&card_id).await
+    }
+
+    pub async fn export_memory_card(&self, card_id: String) -> Result<String> {
+        let detail = self.get_memory_card(card_id).await?;
+        let mut markdown = format!(
+            "# {}\n\n{}\n\n## Record\n\n- Source: {}\n- Updated: {}\n\n## Evidence\n",
+            detail.card.title,
+            detail.card.body_markdown.trim(),
+            detail.card.source,
+            detail.card.updated_at,
+        );
+        if detail.evidence.is_empty() {
+            markdown.push_str("\n_No linked evidence._\n");
+        } else {
+            for evidence in detail.evidence {
+                if evidence.exists {
+                    let location = match (evidence.start_line, evidence.end_line) {
+                        (Some(start), Some(end)) if start != end => format!(" lines {start}-{end}"),
+                        (Some(line), _) => format!(" line {line}"),
+                        _ => String::new(),
+                    };
+                    markdown.push_str(&format!(
+                        "\n- [{}]({}){}\n",
+                        evidence
+                            .title
+                            .unwrap_or_else(|| "Untitled evidence".to_owned()),
+                        evidence.path.unwrap_or_else(|| evidence.target_id.clone()),
+                        location,
+                    ));
+                } else {
+                    markdown.push_str(&format!("\n- Missing evidence ({})\n", evidence.target_id));
+                }
+            }
+        }
+        Ok(markdown)
     }
 
     pub async fn search_workspace(&self, request: SearchRequest) -> Result<Vec<SearchResult>> {
@@ -712,6 +805,19 @@ fn image_analysis_prompt(summary: &ArtifactSummary) -> String {
     )
 }
 
+fn validate_memory_card_fields(title: &str, body_markdown: &str, source: &str) -> Result<()> {
+    if title.trim().is_empty() {
+        bail!("Memory card title is required.");
+    }
+    if body_markdown.trim().is_empty() {
+        bail!("Memory card body is required.");
+    }
+    if source.trim().is_empty() {
+        bail!("Memory card source is required.");
+    }
+    Ok(())
+}
+
 struct ImportCandidateError {
     path: String,
     reason: String,
@@ -757,4 +863,62 @@ fn sanitize_filename(title: &str, extension: &str) -> String {
         slug.to_ascii_lowercase()
     };
     format!("{slug}.{extension}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::RepoMemoCore;
+    use repomemo_domain::{Citation, CreateMemoryCardRequest};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[tokio::test]
+    async fn memory_card_export_includes_the_linked_evidence() {
+        let data_dir = std::env::temp_dir().join(format!(
+            "repomemo-memory-export-test-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let core = RepoMemoCore::boot(data_dir.clone()).await.unwrap();
+        let workspace = core
+            .create_workspace("Memory export".to_owned())
+            .await
+            .unwrap();
+        let artifact = core
+            .import_text(
+                workspace.id.clone(),
+                "Decision note".to_owned(),
+                "Keep the evidence local.".to_owned(),
+                Some("Markdown".to_owned()),
+            )
+            .await
+            .unwrap();
+        let card = core
+            .create_memory_card(CreateMemoryCardRequest {
+                workspace_id: workspace.id,
+                title: "Local-first decision".to_owned(),
+                body_markdown: "The source of truth remains local.".to_owned(),
+                source: "manual".to_owned(),
+                confidence: None,
+                citations: vec![Citation {
+                    artifact_id: artifact.id,
+                    chunk_id: None,
+                    title: artifact.title,
+                    path: artifact.path.clone(),
+                    start_line: None,
+                    end_line: None,
+                    confidence: None,
+                }],
+            })
+            .await
+            .unwrap();
+        let exported = core.export_memory_card(card.id).await.unwrap();
+        assert!(exported.contains("# Local-first decision"));
+        assert!(exported.contains("## Evidence"));
+        assert!(exported.contains(&artifact.path));
+
+        drop(core);
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
 }

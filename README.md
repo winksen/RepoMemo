@@ -19,7 +19,7 @@ Not implemented yet:
 - Chunking/indexing
 - Search
 - AI answers/summaries
-- Memory cards
+- Memory-card editing beyond the initial create/save workflow
 
 ## Roadmap
 

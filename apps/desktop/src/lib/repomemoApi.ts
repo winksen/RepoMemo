@@ -7,8 +7,12 @@ import type {
   ArtifactDetail,
   ArtifactSummary,
   Chunk,
+  CreateMemoryCardRequest,
   IndexingJobStatus,
   ImportReport,
+  MemoryCard,
+  MemoryCardDetail,
+  MemoryCardSummary,
   SearchRequest,
   SearchResult,
   ProviderSettings,
@@ -16,6 +20,7 @@ import type {
   SummaryResult,
   Symbol,
   SymbolSearchResult,
+  UpdateMemoryCardRequest,
   Workspace,
   WorkspaceOverview,
 } from "../types";
@@ -36,6 +41,8 @@ const mockArtifacts: ArtifactSummary[] = [];
 const mockChunks = new Map<string, Chunk[]>();
 const mockSymbols = new Map<string, Symbol[]>();
 const mockProviders = new Map<string, ProviderSettings[]>();
+const mockMemoryCards = new Map<string, MemoryCard[]>();
+const mockMemoryEvidence = new Map<string, MemoryCardDetail["evidence"]>();
 
 const emptyOverview = (workspaceId: string): WorkspaceOverview => ({
   workspace_id: workspaceId,
@@ -46,7 +53,7 @@ const emptyOverview = (workspaceId: string): WorkspaceOverview => ({
     0,
   ),
   symbol_count: 0,
-  memory_card_count: 0,
+  memory_card_count: mockMemoryCards.get(workspaceId)?.length ?? 0,
 });
 
 export async function listWorkspaces(): Promise<Workspace[]> {
@@ -83,6 +90,78 @@ export async function getAppSettings(): Promise<AppSettings> {
   }
 
   return invoke<AppSettings>("get_app_settings");
+}
+
+function toMemorySummary(card: MemoryCard): MemoryCardSummary {
+  return {
+    id: card.id,
+    workspace_id: card.workspace_id,
+    title: card.title,
+    body_excerpt: card.body_markdown.slice(0, 220),
+    source: card.source,
+    evidence_count: mockMemoryEvidence.get(card.id)?.length ?? 0,
+    created_at: card.created_at,
+    updated_at: card.updated_at,
+  };
+}
+
+export async function createMemoryCard(request: CreateMemoryCardRequest): Promise<MemoryCard> {
+  if (!isTauriRuntime) {
+    const now = new Date().toISOString();
+    const card: MemoryCard = { ...request, id: crypto.randomUUID(), created_at: now, updated_at: now, metadata: {} };
+    const cards = mockMemoryCards.get(request.workspace_id) ?? [];
+    mockMemoryCards.set(request.workspace_id, [card, ...cards]);
+    mockMemoryEvidence.set(card.id, request.citations.map((citation) => ({
+      link_id: crypto.randomUUID(), target_id: citation.chunk_id ?? citation.artifact_id,
+      target_type: citation.chunk_id ? "chunk" : "artifact", artifact_id: citation.artifact_id,
+      chunk_id: citation.chunk_id, title: citation.title, path: citation.path,
+      start_line: citation.start_line, end_line: citation.end_line, exists: true,
+    })));
+    return card;
+  }
+  return invoke<MemoryCard>("create_memory_card", { request });
+}
+
+export async function listMemoryCards(workspaceId: string): Promise<MemoryCardSummary[]> {
+  if (!isTauriRuntime) return (mockMemoryCards.get(workspaceId) ?? []).map(toMemorySummary);
+  return invoke<MemoryCardSummary[]>("list_memory_cards", { workspaceId });
+}
+
+export async function updateMemoryCard(request: UpdateMemoryCardRequest): Promise<MemoryCard> {
+  if (!isTauriRuntime) {
+    const card = Array.from(mockMemoryCards.values()).flat().find((item) => item.id === request.card_id);
+    if (!card) throw new Error("Memory card was not found.");
+    Object.assign(card, { ...request, id: card.id, workspace_id: card.workspace_id, created_at: card.created_at, updated_at: new Date().toISOString(), metadata: card.metadata });
+    return card;
+  }
+  return invoke<MemoryCard>("update_memory_card", { request });
+}
+
+export async function searchMemoryCards(workspaceId: string, query: string): Promise<MemoryCardSummary[]> {
+  if (!isTauriRuntime) {
+    const term = query.trim().toLowerCase();
+    return (mockMemoryCards.get(workspaceId) ?? [])
+      .filter((card) => `${card.title} ${card.body_markdown}`.toLowerCase().includes(term))
+      .map(toMemorySummary);
+  }
+  return invoke<MemoryCardSummary[]>("search_memory_cards", { workspaceId, query });
+}
+
+export async function getMemoryCard(cardId: string): Promise<MemoryCardDetail> {
+  if (!isTauriRuntime) {
+    const card = Array.from(mockMemoryCards.values()).flat().find((item) => item.id === cardId);
+    if (!card) throw new Error("Memory card was not found.");
+    return { card, evidence: mockMemoryEvidence.get(cardId) ?? [] };
+  }
+  return invoke<MemoryCardDetail>("get_memory_card", { cardId });
+}
+
+export async function exportMemoryCard(cardId: string): Promise<string> {
+  if (!isTauriRuntime) {
+    const detail = await getMemoryCard(cardId);
+    return `# ${detail.card.title}\n\n${detail.card.body_markdown}\n\n## Record\n\n- Source: ${detail.card.source}\n\n## Evidence\n${detail.evidence.map((evidence) => `- [${evidence.title ?? "Untitled evidence"}](${evidence.path ?? evidence.target_id})`).join("\n") || "\n_No linked evidence._"}\n`;
+  }
+  return invoke<string>("export_memory_card", { cardId });
 }
 
 export async function listProviderSettings(workspaceId: string): Promise<ProviderSettings[]> {

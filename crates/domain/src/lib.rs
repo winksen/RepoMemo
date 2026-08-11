@@ -209,6 +209,57 @@ pub struct MemoryCard {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryCardSummary {
+    pub id: String,
+    pub workspace_id: String,
+    pub title: String,
+    pub body_excerpt: String,
+    pub source: String,
+    pub evidence_count: i64,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryEvidence {
+    pub link_id: String,
+    pub target_id: String,
+    pub target_type: String,
+    pub artifact_id: Option<String>,
+    pub chunk_id: Option<String>,
+    pub title: Option<String>,
+    pub path: Option<String>,
+    pub start_line: Option<i64>,
+    pub end_line: Option<i64>,
+    pub exists: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryCardDetail {
+    pub card: MemoryCard,
+    pub evidence: Vec<MemoryEvidence>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateMemoryCardRequest {
+    pub workspace_id: String,
+    pub title: String,
+    pub body_markdown: String,
+    pub source: String,
+    pub confidence: Option<f64>,
+    pub citations: Vec<Citation>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateMemoryCardRequest {
+    pub card_id: String,
+    pub title: String,
+    pub body_markdown: String,
+    pub source: String,
+    pub confidence: Option<f64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
     pub data_dir: String,
     pub ai_enabled: bool,

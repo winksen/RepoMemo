@@ -138,14 +138,18 @@ Spec: `docs/phases/PHASE_1G_SEMANTIC_SEARCH_AND_ASK.md`
 
 ## Phase 1H: Memory Cards
 
-Status: not started
+Status: implemented and validated
 
 Spec: `docs/phases/PHASE_1H_MEMORY_CARDS.md`
 
-- Manual memory card creation
-- Save cited answers/summaries as durable memory
-- Link memory cards to artifacts/chunks
-- Memory card search/export
+| Area | Status | Notes |
+| --- | --- | --- |
+| Durable card storage | Done | Cards persist locally in the existing `memory_cards` table with title, Markdown body, source, confidence, and timestamps. |
+| Evidence links | Done | Saved answers and summaries create explicit links back to cited chunks or artifacts; missing records are surfaced as stale evidence. |
+| Memory commands | Done | Create, update, list, get, search, and Markdown export commands are available through the desktop bridge. |
+| Memory workbench | Done | Enabled Memory cards navigation provides a searchable ledger, a manual local-note flow, evidence detail, and Markdown export. |
+| AI handoff | Done | Artifact summaries, workspace briefings, and Ask answers have an explicit Save memory action; nothing is saved automatically. |
+| Validation | Done | Storage lifecycle/search tests, export coverage, frontend typecheck, production build, and a browser pass completed. |
 
 ## Phase 2 And Later
 

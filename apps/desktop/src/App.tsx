@@ -1,8 +1,19 @@
-import type { FormEvent, ReactNode } from "react";
+/*
+THESIS: RepoMemo is an evidence instrument, not a card dashboard; provenance is the layout.
+OWN-WORLD: Lab-paper and anodized-aluminum planes, graphite rules, circuit-green state, amber attention, registered channels, and compact instrument labels.
+STORY: Choose a local workspace, follow its sources through indexing, inspect the evidence, then take the next safe action.
+FIRST VIEWPORT: A narrow channel rail, a dominant evidence workbench, and a persistent status spine; workspace selection sits left of the evidence trace and Import source remains primary.
+FORM: Evidence-first asymmetrical stack, fifth grounded direction, fused with registered three-zone navigation and a compact pipeline; seed 5ab99c22.
+*/
+
+import type { CSSProperties, FormEvent, ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   IconArchive as Archive,
   IconArrowRight as ArrowRight,
+  IconBookmark as Bookmark,
   IconBook as BookOpen,
   IconBrain as Brain,
   IconChevronRight as ChevronRight,
@@ -35,26 +46,31 @@ import {
   chooseImportFiles,
   chooseImportFolder,
   createWorkspace,
+  createMemoryCard,
   askWorkspace,
   embedWorkspace,
   getAppSettings,
   getArtifact,
+  getMemoryCard,
   getWorkspaceOverview,
   indexArtifact,
   indexWorkspace,
   importPaths,
   importText,
   listArtifacts,
+  listMemoryCards,
   listProviderSettings,
   listSymbols,
   listWorkspaces,
   PASTE_LANGUAGES,
   searchWorkspace,
+  searchMemoryCards,
   searchSymbols,
   saveProviderSettings,
   summarizeArtifact,
   summarizeWorkspace,
   testProvider,
+  exportMemoryCard,
   type PasteLanguage,
 } from "./lib/repomemoApi";
 import type {
@@ -64,6 +80,8 @@ import type {
   ArtifactSummary,
   IndexingJobStatus,
   ImportReport,
+  MemoryCardDetail,
+  MemoryCardSummary,
   SearchResult,
   ProviderSettings,
   ProviderTestResult,
@@ -75,8 +93,19 @@ import type {
 } from "./types";
 
 type LoadState = "idle" | "loading" | "ready" | "error";
-type View = "workspaces" | "import" | "artifacts" | "search" | "summary" | "ask" | "settings";
+type View = "workspaces" | "import" | "artifacts" | "search" | "summary" | "ask" | "memory" | "settings";
 type ThemeMode = "light" | "dark";
+
+const viewMeta: Record<View, { section: string; title: string }> = {
+  workspaces: { section: "Library", title: "Workspaces" },
+  import: { section: "Library", title: "Import sources" },
+  artifacts: { section: "Library", title: "Artifacts" },
+  search: { section: "Intelligence", title: "Search" },
+  summary: { section: "Intelligence", title: "Project briefing" },
+  ask: { section: "Intelligence", title: "Ask RepoMemo" },
+  memory: { section: "Intelligence", title: "Memory cards" },
+  settings: { section: "Preferences", title: "Provider settings" },
+};
 
 const emptyOverview = (workspaceId: string): WorkspaceOverview => ({
   workspace_id: workspaceId,
@@ -110,6 +139,13 @@ export function App() {
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [askQuestion, setAskQuestion] = useState("");
   const [askAnswer, setAskAnswer] = useState<AskAnswer | null>(null);
+  const [memoryCards, setMemoryCards] = useState<MemoryCardSummary[]>([]);
+  const [memorySearch, setMemorySearch] = useState("");
+  const [selectedMemoryCardId, setSelectedMemoryCardId] = useState<string | null>(null);
+  const [memoryCardDetail, setMemoryCardDetail] = useState<MemoryCardDetail | null>(null);
+  const [memoryTitle, setMemoryTitle] = useState("");
+  const [memoryBody, setMemoryBody] = useState("");
+  const [isSavingMemory, setIsSavingMemory] = useState(false);
   const [isAsking, setIsAsking] = useState(false);
   const [isEmbedding, setIsEmbedding] = useState(false);
   const [overview, setOverview] = useState<WorkspaceOverview | null>(null);
@@ -189,10 +225,14 @@ export function App() {
       setOverview(null);
       setSelectedArtifactId(null);
       setProviders([]);
+      setMemoryCards([]);
+      setSelectedMemoryCardId(null);
+      setMemoryCardDetail(null);
       return;
     }
 
     refreshWorkspaceData(selectedWorkspaceId);
+    refreshMemoryCards(selectedWorkspaceId);
     listProviderSettings(selectedWorkspaceId).then(setProviders).catch((error) => {
       setErrorMessage(error instanceof Error ? error.message : String(error));
     });
@@ -231,12 +271,63 @@ export function App() {
     };
   }, [selectedArtifactId]);
 
+  useEffect(() => {
+    let cancelled = false;
+    if (!selectedMemoryCardId) {
+      setMemoryCardDetail(null);
+      return;
+    }
+    getMemoryCard(selectedMemoryCardId)
+      .then((detail) => { if (!cancelled) setMemoryCardDetail(detail); })
+      .catch((error) => { if (!cancelled) setErrorMessage(error instanceof Error ? error.message : String(error)); });
+    return () => { cancelled = true; };
+  }, [selectedMemoryCardId]);
+
   const selectedWorkspace = useMemo(
     () => workspaces.find((workspace) => workspace.id === selectedWorkspaceId),
     [selectedWorkspaceId, workspaces],
   );
 
   const currentOverview = overview ?? emptyOverview(selectedWorkspaceId ?? "");
+  const activeProvider = providers.find((provider) => provider.enabled);
+  const indexedArtifactCount = artifacts.filter((artifact) => Boolean(artifact.indexed_at)).length;
+  const artifactCoverage = artifacts.length > 0
+    ? Math.round((indexedArtifactCount / artifacts.length) * 100)
+    : 0;
+  const indexingProgress = indexingJob?.progress_total
+    ? Math.min(100, Math.round((indexingJob.progress_current / indexingJob.progress_total) * 100))
+    : null;
+  const normalizedIndexingStatus = indexingJob?.status.toLowerCase() ?? "";
+  const indexingFailed = normalizedIndexingStatus === "failed" || normalizedIndexingStatus === "error";
+  const indexingActive = isIndexing || Boolean(
+    indexingJob
+    && !["completed", "failed", "error", "cancelled"].includes(normalizedIndexingStatus),
+  );
+  const indexingTone = indexingFailed
+    ? "error"
+    : indexingActive
+      ? "attention"
+      : artifacts.length === 0
+        ? "waiting"
+        : indexedArtifactCount === artifacts.length
+          ? "ready"
+          : indexedArtifactCount > 0
+            ? "partial"
+            : "waiting";
+  const displayedIndexingProgress = indexingActive && indexingProgress !== null
+    ? indexingProgress
+    : artifactCoverage;
+  const indexingLabel = indexingFailed
+    ? "Failed"
+    : indexingActive
+      ? indexingJob?.stage || "Indexing"
+      : artifacts.length === 0
+        ? "Waiting"
+        : indexedArtifactCount === artifacts.length
+          ? "Complete"
+          : indexedArtifactCount > 0
+            ? "Partial"
+            : "Waiting";
 
   async function refreshWorkspaceData(workspaceId = selectedWorkspaceId) {
     if (!workspaceId) {
@@ -255,6 +346,70 @@ export function App() {
           ? current
           : artifactList[0]?.id ?? null,
       );
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  async function refreshMemoryCards(workspaceId = selectedWorkspaceId, query = memorySearch) {
+    if (!workspaceId) return;
+    try {
+      const cards = query.trim()
+        ? await searchMemoryCards(workspaceId, query)
+        : await listMemoryCards(workspaceId);
+      setMemoryCards(cards);
+      setSelectedMemoryCardId((current) => cards.some((card) => card.id === current) ? current : cards[0]?.id ?? null);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  async function handleSaveMemory(
+    title: string,
+    bodyMarkdown: string,
+    source: string,
+    citations: SummaryResult["citations"] = [],
+    confidence: number | null = null,
+  ) {
+    if (!selectedWorkspaceId || !title.trim() || !bodyMarkdown.trim()) return;
+    setIsSavingMemory(true);
+    setErrorMessage(null);
+    try {
+      const card = await createMemoryCard({
+        workspace_id: selectedWorkspaceId,
+        title: title.trim(),
+        body_markdown: bodyMarkdown.trim(),
+        source,
+        confidence,
+        citations,
+      });
+      setMemoryTitle("");
+      setMemoryBody("");
+      setMemorySearch("");
+      await Promise.all([refreshMemoryCards(selectedWorkspaceId, ""), refreshWorkspaceData(selectedWorkspaceId)]);
+      setSelectedMemoryCardId(card.id);
+      setActiveView("memory");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsSavingMemory(false);
+    }
+  }
+
+  async function handleMemorySearch(query: string) {
+    setMemorySearch(query);
+    await refreshMemoryCards(selectedWorkspaceId, query);
+  }
+
+  async function handleExportMemory(cardId: string) {
+    try {
+      const markdown = await exportMemoryCard(cardId);
+      const href = URL.createObjectURL(new Blob([markdown], { type: "text/markdown" }));
+      const anchor = document.createElement("a");
+      anchor.href = href;
+      anchor.download = `${memoryCardDetail?.card.title ?? "repomemo-memory"}.md`.replace(/[\\/:*?"<>|]/g, "-");
+      anchor.click();
+      URL.revokeObjectURL(href);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : String(error));
     }
@@ -534,6 +689,26 @@ export function App() {
     finally { setIsEmbedding(false); }
   }
 
+  function openNextSafeAction() {
+    if (!selectedWorkspace) {
+      setActiveView("workspaces");
+      requestAnimationFrame(() => document.getElementById("workspace-name")?.focus());
+      return;
+    }
+
+    if (currentOverview.source_count === 0) {
+      setActiveView("import");
+      return;
+    }
+
+    if (artifacts.length === 0 || indexedArtifactCount < artifacts.length) {
+      setActiveView("artifacts");
+      return;
+    }
+
+    setActiveView("search");
+  }
+
   return (
     <main className="app-shell">
       <aside className="sidebar">
@@ -589,7 +764,7 @@ export function App() {
               onClick={() => setActiveView("summary")}
             />
             <NavButton active={activeView === "ask"} disabled={!selectedWorkspace} icon={Brain} label="Ask" onClick={() => setActiveView("ask")} />
-            <NavButton disabled icon={Sparkles} label="Memory cards" />
+            <NavButton active={activeView === "memory"} disabled={!selectedWorkspace} icon={Bookmark} label="Memory cards" onClick={() => setActiveView("memory")} />
           </div>
           <div className="nav-divider" aria-hidden="true" />
           <div className="nav-group">
@@ -615,7 +790,7 @@ export function App() {
       </aside>
 
       <section className="workbench">
-        <header className={activeView === "workspaces" ? "workbench-header workspace-header-v3" : "workbench-header"}>
+        <header className="workbench-header workspace-header-v3 graphite-header">
           {activeView === "workspaces" ? (
             <>
               <div className="workspace-header-copy">
@@ -627,14 +802,14 @@ export function App() {
               </div>
               <div className="workspace-header-actions">
                 <div className="workspace-runtime-status" aria-live="polite">
-                  <span className={loadState === "error" ? "workspace-runtime-dot error" : "workspace-runtime-dot"} aria-hidden="true" />
+                  <span className={`workspace-runtime-dot ${loadState === "error" ? "error" : loadState === "ready" ? "ready" : "busy"}`} aria-hidden="true" />
                   <span>
-                    <strong>{loadState === "loading" ? "Starting local core" : loadState === "error" ? "Local core unavailable" : "Local database ready"}</strong>
+                    <strong>{loadState === "error" ? "Local core unavailable" : loadState === "ready" ? "Local database ready" : "Starting local core"}</strong>
                     <small>Private on this device</small>
                   </span>
                 </div>
                 <button
-                  className="workspace-new-button"
+                  className={`workspace-new-button ${selectedWorkspace ? "secondary" : "primary"}`}
                   type="button"
                   onClick={() => document.getElementById("workspace-name")?.focus()}
                 >
@@ -653,14 +828,15 @@ export function App() {
             </>
           ) : (
             <>
-              <div>
-            <p className="meta-label">Phase 1F</p>
-            <h2>{selectedWorkspace?.name ?? "Workspace foundation"}</h2>
+              <div className="workspace-header-copy">
+            <p className="workspace-breadcrumb"><span>{viewMeta[activeView].section}</span><ChevronRight size={13} /> {viewMeta[activeView].title}</p>
+            <h2>{viewMeta[activeView].title}</h2>
           </div>
-          <div className="header-actions">
-            <StatusBadge tone={loadState === "error" ? "danger" : "success"}>
-              <CheckCircle2 size={15} />
-              {loadState === "loading" ? "Booting core" : "Local core ready"}
+          <div className="header-actions workspace-header-actions">
+            {selectedWorkspace ? <div className="workspace-context-chip"><Layers3 size={14} /><span>{selectedWorkspace.name}</span></div> : null}
+            <StatusBadge tone={loadState === "error" ? "danger" : loadState === "ready" ? "success" : "warning"}>
+              {loadState === "error" ? <X size={15} /> : loadState === "ready" ? <CheckCircle2 size={15} /> : <Loader2 className="spin" size={15} />}
+              {loadState === "error" ? "Local core unavailable" : loadState === "ready" ? "Local core ready" : "Booting core"}
             </StatusBadge>
             <StatusBadge tone={settings?.ai_enabled ? "success" : "neutral"}>
               {settings?.ai_enabled ? `${providers.find((item) => item.enabled)?.provider_type === "openrouter" ? "Cloud" : "Local"} · ${settings.active_provider}` : "No AI"}
@@ -670,7 +846,7 @@ export function App() {
             </StatusBadge>
             <button
               aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
-              className="icon-button"
+              className="icon-button workspace-theme-button"
               type="button"
               onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
               title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
@@ -687,6 +863,7 @@ export function App() {
         {activeView === "workspaces" ? (
           <WorkspaceView
             currentOverview={currentOverview}
+            indexedArtifactCount={indexedArtifactCount}
             onCreateWorkspace={handleCreateWorkspace}
             onNavigate={(view) => setActiveView(view)}
             onSelectWorkspace={setSelectedWorkspaceId}
@@ -729,6 +906,7 @@ export function App() {
             summary={summary}
             isSummarizing={isSummarizing}
             onSummarize={handleSummarize}
+            onSaveMemory={handleSaveMemory}
           />
         ) : activeView === "search" ? (
           <SearchView
@@ -758,11 +936,29 @@ export function App() {
           <WorkspaceSummaryView
             isSummarizing={isSummarizing}
             onSummarize={handleWorkspaceSummary}
+            onSaveMemory={handleSaveMemory}
             summary={workspaceSummary}
             workspace={selectedWorkspace}
           />
         ) : activeView === "ask" ? (
-          <AskView askAnswer={askAnswer} isAsking={isAsking} isEmbedding={isEmbedding} onAsk={handleAsk} onEmbed={handleEmbedWorkspace} question={askQuestion} setQuestion={setAskQuestion} workspace={selectedWorkspace} />
+          <AskView askAnswer={askAnswer} isAsking={isAsking} isEmbedding={isEmbedding} onAsk={handleAsk} onEmbed={handleEmbedWorkspace} onSaveMemory={handleSaveMemory} question={askQuestion} setQuestion={setAskQuestion} workspace={selectedWorkspace} />
+        ) : activeView === "memory" ? (
+          <MemoryCardsView
+            cards={memoryCards}
+            detail={memoryCardDetail}
+            isSaving={isSavingMemory}
+            onCreate={() => handleSaveMemory(memoryTitle, memoryBody, "manual")}
+            onExport={handleExportMemory}
+            onSearch={handleMemorySearch}
+            onSelect={setSelectedMemoryCardId}
+            searchQuery={memorySearch}
+            selectedCardId={selectedMemoryCardId}
+            setBody={setMemoryBody}
+            setTitle={setMemoryTitle}
+            title={memoryTitle}
+            body={memoryBody}
+            workspace={selectedWorkspace}
+          />
         ) : (
           <ProviderSettingsView
             isSaving={isSavingProvider}
@@ -775,12 +971,140 @@ export function App() {
           />
         )}
       </section>
+
+      <aside className="status-spine" aria-label="System status and next action">
+        <header className="status-spine-header">
+          <div>
+            <span className="instrument-index">SYS</span>
+            <strong>Local boundary</strong>
+          </div>
+          <span
+            className={`state-lamp ${loadState === "error" ? "error" : loadState === "ready" ? "ready" : "busy"}`}
+            aria-label={loadState === "error" ? "Local core unavailable" : loadState === "ready" ? "Local core ready" : "Local core starting"}
+          />
+        </header>
+
+        <section className="status-module">
+          <div className="status-module-title">
+            <Database size={15} aria-hidden="true" />
+            <span>Local database</span>
+            <strong>{loadState === "error" ? "Unavailable" : loadState === "ready" ? "Ready" : "Starting"}</strong>
+          </div>
+          <dl>
+            <div><dt>Scope</dt><dd>{selectedWorkspace ? selectedWorkspace.name : "No workspace"}</dd></div>
+            <div><dt>Sources</dt><dd>{currentOverview.source_count}</dd></div>
+            <div><dt>Artifacts</dt><dd>{currentOverview.artifact_count}</dd></div>
+          </dl>
+        </section>
+
+        <section className="status-module">
+          <div className="status-module-title">
+            <HardDrive size={15} aria-hidden="true" />
+            <span>Storage root</span>
+            <strong>Local</strong>
+          </div>
+          <p className="status-path" title={settings?.data_dir}>{settings?.data_dir ?? "Resolving local path…"}</p>
+          <dl>
+            <div><dt>Chunks</dt><dd>{currentOverview.chunk_count}</dd></div>
+            <div><dt>Symbols</dt><dd>{currentOverview.symbol_count}</dd></div>
+          </dl>
+        </section>
+
+        <section className={`status-module ${indexingTone}`}>
+          <div className="status-module-title">
+            <RefreshCw size={15} aria-hidden="true" />
+            <span>Indexing</span>
+            <strong>{indexingLabel}</strong>
+          </div>
+          <div
+            className="instrument-progress"
+            role="progressbar"
+            aria-label="Indexing progress"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={displayedIndexingProgress}
+            aria-valuetext={indexingFailed
+              ? "Indexing failed"
+              : `${indexedArtifactCount} of ${artifacts.length} artifacts indexed`}
+          >
+            <span style={{ "--progress": `${displayedIndexingProgress}%` } as CSSProperties} />
+          </div>
+          <dl>
+            <div>
+              <dt>Coverage</dt>
+              <dd>
+                {indexingFailed
+                  ? "Failed"
+                  : indexingActive && indexingProgress !== null
+                    ? `${indexingProgress}%`
+                    : artifacts.length === 0
+                      ? "Not started"
+                      : `${indexedArtifactCount}/${artifacts.length} artifacts`}
+              </dd>
+            </div>
+            <div><dt>Memory</dt><dd>{currentOverview.memory_card_count}</dd></div>
+          </dl>
+          {indexingFailed && indexingJob?.error_message
+            ? <p className="status-module-copy status-error-copy">{indexingJob.error_message}</p>
+            : null}
+        </section>
+
+        <section className="status-module">
+          <div className="status-module-title">
+            <Brain size={15} aria-hidden="true" />
+            <span>AI boundary</span>
+            <strong>{activeProvider ? (activeProvider.provider_type === "openrouter" ? "Cloud" : "Local") : "Off"}</strong>
+          </div>
+          <p className="status-module-copy">
+            {activeProvider ? `${activeProvider.name}${activeProvider.model ? ` · ${activeProvider.model}` : ""}` : "Search and artifact inspection remain available without AI."}
+          </p>
+          <button
+            className="status-text-action"
+            disabled={!selectedWorkspace}
+            onClick={() => setActiveView("settings")}
+            type="button"
+          >
+            Configure provider <ArrowRight size={13} />
+          </button>
+        </section>
+
+        <section className="status-module next-safe-action">
+          <span className="instrument-index">NEXT SAFE ACTION</span>
+          <strong>
+            {!selectedWorkspace
+              ? "Create a workspace"
+              : currentOverview.source_count === 0
+                ? "Import first source"
+                : artifacts.length === 0 || indexedArtifactCount < artifacts.length
+                  ? "Inspect and index"
+                  : "Search local evidence"}
+          </strong>
+          <button className="spine-primary-action" onClick={openNextSafeAction} type="button">
+            {!selectedWorkspace
+              ? <Plus size={15} />
+              : currentOverview.source_count === 0
+                ? <FolderDown size={15} />
+                : artifacts.length === 0 || indexedArtifactCount < artifacts.length
+                  ? <Archive size={15} />
+                  : <Search size={15} />}
+            Continue
+            <ArrowRight size={14} />
+          </button>
+        </section>
+
+        <footer className="status-spine-footer">
+          <span className="state-lamp" aria-hidden="true" />
+          Local-first
+          <span>v0.1</span>
+        </footer>
+      </aside>
     </main>
   );
 }
 
 function WorkspaceView({
   currentOverview,
+  indexedArtifactCount,
   onCreateWorkspace,
   onNavigate,
   onSelectWorkspace,
@@ -790,6 +1114,7 @@ function WorkspaceView({
   workspaces,
 }: {
   currentOverview: WorkspaceOverview;
+  indexedArtifactCount: number;
   onCreateWorkspace: (event: FormEvent<HTMLFormElement>) => void;
   onNavigate: (view: "import" | "artifacts" | "search") => void;
   onSelectWorkspace: (id: string) => void;
@@ -800,10 +1125,12 @@ function WorkspaceView({
 }) {
   const selectedWorkspace = workspaces.find((workspace) => workspace.id === selectedWorkspaceId);
   const hasArtifacts = currentOverview.artifact_count > 0;
-  const canSearch = currentOverview.chunk_count > 0;
+  const hasIndexedArtifacts = indexedArtifactCount > 0;
+  const allArtifactsIndexed = hasArtifacts
+    && indexedArtifactCount === currentOverview.artifact_count;
   const pipeline = [
     { complete: currentOverview.source_count > 0, count: currentOverview.source_count, label: "Sources" },
-    { complete: currentOverview.chunk_count > 0, count: currentOverview.chunk_count, label: "Indexed" },
+    { complete: allArtifactsIndexed, count: indexedArtifactCount, label: "Indexed" },
     { complete: currentOverview.memory_card_count > 0, count: currentOverview.memory_card_count, label: "Memory" },
   ];
 
@@ -882,6 +1209,57 @@ function WorkspaceView({
               <p>Project artifacts, searchable context, and durable memory in one private knowledge boundary.</p>
             </header>
 
+            <section className="workspace-evidence-path" aria-labelledby="workspace-evidence-title">
+              <div className="workspace-section-heading">
+                <div>
+                  <p className="workspace-kicker">Evidence path</p>
+                  <h4 id="workspace-evidence-title">Local knowledge flow</h4>
+                </div>
+                <span>Live totals</span>
+              </div>
+              <div className="workspace-trace-canvas">
+                <div className="workspace-trace-stack input">
+                  <div className={currentOverview.source_count > 0 ? "workspace-trace-node ready" : "workspace-trace-node"}>
+                    <span><FolderDown size={15} /></span>
+                    <strong>Sources</strong>
+                    <small>{currentOverview.source_count}</small>
+                  </div>
+                  <div className={currentOverview.artifact_count > 0 ? "workspace-trace-node ready" : "workspace-trace-node"}>
+                    <span><Archive size={15} /></span>
+                    <strong>Artifacts</strong>
+                    <small>{currentOverview.artifact_count}</small>
+                  </div>
+                </div>
+                <div className="workspace-trace-bridge input" aria-hidden="true">
+                  <i /><i /><b />
+                </div>
+                <div className={hasIndexedArtifacts ? "workspace-trace-node core ready" : "workspace-trace-node core"}>
+                  <span><Database size={17} /></span>
+                  <strong>Indexed evidence</strong>
+                  <small>{indexedArtifactCount}/{currentOverview.artifact_count} artifacts · {currentOverview.chunk_count} chunks</small>
+                </div>
+                <div className="workspace-trace-bridge output" aria-hidden="true">
+                  <b /><i /><i />
+                </div>
+                <div className="workspace-trace-stack output">
+                  <div className={currentOverview.symbol_count > 0 ? "workspace-trace-node ready" : "workspace-trace-node"}>
+                    <span><FileCode2 size={15} /></span>
+                    <strong>Symbols</strong>
+                    <small>{currentOverview.symbol_count}</small>
+                  </div>
+                  <div className={currentOverview.memory_card_count > 0 ? "workspace-trace-node ready" : "workspace-trace-node"}>
+                    <span><Brain size={15} /></span>
+                    <strong>Memory</strong>
+                    <small>{currentOverview.memory_card_count}</small>
+                  </div>
+                </div>
+              </div>
+              <p className="workspace-trace-caption">
+                <span className="state-lamp ready" aria-hidden="true" />
+                Every derived result stays registered to local source material.
+              </p>
+            </section>
+
             <dl className="workspace-metrics-v3" aria-label="Workspace totals">
               <div><dt>Sources</dt><dd>{currentOverview.source_count}</dd></div>
               <div><dt>Artifacts</dt><dd>{currentOverview.artifact_count}</dd></div>
@@ -918,7 +1296,15 @@ function WorkspaceView({
                   <h4>Continue working</h4>
                 </div>
               </div>
-              <p>{hasArtifacts ? canSearch ? "Your local index is ready. Browse the archive or search across retrieved context." : "Artifacts are stored. Open the archive to inspect and index them for retrieval." : "Bring in a repository, folder, file, or pasted note to establish this workspace."}</p>
+              <p>
+                {hasArtifacts
+                  ? allArtifactsIndexed
+                    ? "Every stored artifact is indexed. Browse the archive or search across retrieved context."
+                    : hasIndexedArtifacts
+                      ? "Some artifacts are searchable. Open the archive to finish indexing the remaining evidence."
+                      : "Artifacts are stored. Open the archive to inspect and index them for retrieval."
+                  : "Bring in a repository, folder, file, or pasted note to establish this workspace."}
+              </p>
               <div className="workspace-action-row">
                 <button className="workspace-primary-action" type="button" onClick={() => onNavigate(hasArtifacts ? "artifacts" : "import")}>
                   {hasArtifacts ? <Archive size={17} /> : <FolderDown size={17} />}
@@ -926,9 +1312,9 @@ function WorkspaceView({
                   <ArrowRight size={16} />
                 </button>
                 {hasArtifacts ? (
-                  <button className="workspace-secondary-action" type="button" onClick={() => onNavigate(canSearch ? "search" : "import")}>
-                    {canSearch ? <Search size={16} /> : <FolderPlus size={16} />}
-                    {canSearch ? "Search workspace" : "Add sources"}
+                  <button className="workspace-secondary-action" type="button" onClick={() => onNavigate(hasIndexedArtifacts ? "search" : "import")}>
+                    {hasIndexedArtifacts ? <Search size={16} /> : <FolderPlus size={16} />}
+                    {hasIndexedArtifacts ? "Search workspace" : "Add sources"}
                   </button>
                 ) : null}
               </div>
@@ -1001,8 +1387,8 @@ function ImportView({
   }
 
   return (
-    <div className="workbench-grid">
-      <section className="panel">
+    <div className="workbench-grid import-layout graphite-page">
+      <section className="panel import-main">
         <PanelHeader icon={FolderDown} label="Import" title="Add local sources" />
 
         <div className="import-actions">
@@ -1097,24 +1483,29 @@ function ImportView({
           </div>
         </form>
 
-        <MetricGrid overview={overview} compact />
-
-        {importReport ? <ImportReportPanel report={importReport} /> : null}
       </section>
 
-      <section className="panel">
-        <PanelHeader icon={Database} label="Workspace" title="Import readiness" />
+      <aside className="panel import-rail evidence-rail">
+        <PanelHeader icon={Database} label="Workspace state" title="Import activity" />
         <MetricGrid overview={overview} />
         <div className="notice">
-          Stored artifacts are browseable now. Chunking and full-text search are
-          next, so imported content stays local and inspectable before AI enters
-          the workflow.
+          Files are copied into this workspace before indexing. You can inspect what was stored before any AI workflow runs.
         </div>
-        <div className="recent-strip">
-          <strong>Recent artifacts</strong>
-          <span>{artifacts.length} stored</span>
+        {importReport ? <ImportReportPanel report={importReport} /> : null}
+        <div className="rail-section-heading">
+          <div><strong>Recent artifacts</strong><span>Latest local additions</span></div>
+          <small>{artifacts.length} stored</small>
         </div>
-      </section>
+        <div className="recent-artifact-list">
+          {artifacts.length > 0 ? artifacts.slice(0, 6).map((artifact) => (
+            <div className="recent-artifact-row" key={artifact.id}>
+              <span aria-hidden="true">{artifact.artifact_type === "image" ? <Photo size={15} /> : <FileCode2 size={15} />}</span>
+              <div><strong>{artifact.title}</strong><small>{formatArtifactType(artifact.artifact_type)} · {formatRelativeDate(artifact.updated_at)}</small></div>
+              <span className={artifact.indexed_at ? "state-dot ready" : "state-dot"} title={artifact.indexed_at ? "Indexed" : "Stored"} />
+            </div>
+          )) : <p className="rail-empty">Imported files will appear here.</p>}
+        </div>
+      </aside>
     </div>
   );
 }
@@ -1134,6 +1525,7 @@ function ArtifactsView({
   symbols,
   summary,
   isSummarizing,
+  onSaveMemory,
   onSummarize,
 }: {
   artifactDetail: ArtifactDetail | null;
@@ -1150,6 +1542,7 @@ function ArtifactsView({
   symbols: Symbol[];
   summary: SummaryResult | null;
   isSummarizing: boolean;
+  onSaveMemory: (title: string, body: string, source: string, citations: SummaryResult["citations"]) => void;
   onSummarize: (artifactId: string) => void;
 }) {
   if (!selectedWorkspace) {
@@ -1165,7 +1558,7 @@ function ArtifactsView({
   }
 
   return (
-    <div className="artifact-layout">
+    <div className="artifact-layout graphite-page">
       <section className="panel artifact-main">
         <PanelHeader icon={Archive} label="Artifacts" title="Stored files">
           <button
@@ -1192,7 +1585,7 @@ function ArtifactsView({
             <EmptyState
               icon={Archive}
               title="No artifacts indexed yet"
-              body="Import a folder to make this workspace inspectable. Search starts after chunking in Phase 1C/1D."
+              body="Import a folder, then index it to make its local content searchable and inspectable."
             />
           ) : (
             artifacts.map((artifact) => (
@@ -1223,7 +1616,7 @@ function ArtifactsView({
         </div>
       </section>
 
-      <aside className="panel detail-panel">
+      <aside className="panel detail-panel evidence-rail">
         <PanelHeader icon={BookOpen} label="Preview" title="Artifact detail">
           <div className="detail-actions">
             <button
@@ -1273,7 +1666,7 @@ function ArtifactsView({
               <StatusBadge tone="neutral">{symbols.length} symbols</StatusBadge>
             </div>
             {artifactDetail.summary.artifact_type !== "image" ? <SymbolOutline detail={artifactDetail} symbols={symbols} /> : null}
-            {summary ? <SummaryPanel summary={summary} /> : null}
+            {summary ? <SummaryPanel summary={summary} onSave={() => onSaveMemory(`Artifact summary: ${artifactDetail.summary.title}`, summary.summary_markdown, "artifact_summary", summary.citations)} /> : null}
             {artifactDetail.summary.artifact_type === "image" ? (
               <p className="image-preview-note">
                 The original image stays stored locally. Its searchable representation is the visual description below.
@@ -1367,7 +1760,7 @@ function SearchView({
   }
 
   return (
-    <div className="search-layout">
+    <div className="search-layout graphite-page">
       <section className="panel search-main">
         <PanelHeader icon={Search} label="Local retrieval" title="Search indexed context">
           <StatusBadge tone={artifacts.some((artifact) => artifact.indexed_at) ? "success" : "warning"}>
@@ -1473,7 +1866,7 @@ function SearchView({
         </div>
       </section>
 
-      <aside className="panel search-preview">
+      <aside className="panel search-preview evidence-rail">
         <PanelHeader icon={BookOpen} label="Matched context" title="Evidence preview">
           <button className="button secondary" disabled={!selectedResult && !selectedSymbol} type="button" onClick={() => selectedSymbol ? onOpenSymbol(selectedSymbol) : selectedResult && onOpenArtifact(selectedResult)}>
             <BookOpen size={16} /> Open artifact
@@ -1639,6 +2032,87 @@ function ImportReportPanel({ report }: { report: ImportReport }) {
   );
 }
 
+function MemoryCardsView({
+  body,
+  cards,
+  detail,
+  isSaving,
+  onCreate,
+  onExport,
+  onSearch,
+  onSelect,
+  searchQuery,
+  selectedCardId,
+  setBody,
+  setTitle,
+  title,
+  workspace,
+}: {
+  body: string;
+  cards: MemoryCardSummary[];
+  detail: MemoryCardDetail | null;
+  isSaving: boolean;
+  onCreate: () => void;
+  onExport: (cardId: string) => void;
+  onSearch: (query: string) => void;
+  onSelect: (id: string) => void;
+  searchQuery: string;
+  selectedCardId: string | null;
+  setBody: (value: string) => void;
+  setTitle: (value: string) => void;
+  title: string;
+  workspace: Workspace | undefined;
+}) {
+  if (!workspace) return <EmptyState icon={Bookmark} title="Choose a workspace" body="Memory cards are stored locally in one workspace." />;
+
+  return (
+    <div className="memory-layout graphite-page">
+      <section className="panel memory-ledger">
+        <PanelHeader icon={Bookmark} label="Durable knowledge" title="Memory cards" />
+        <label className="memory-search-label" htmlFor="memory-search">Find local memory</label>
+        <div className="search-input-wrap memory-search">
+          <Search size={17} aria-hidden="true" />
+          <input id="memory-search" value={searchQuery} onChange={(event) => onSearch(event.target.value)} placeholder="Search saved knowledge" />
+        </div>
+        <div className="memory-card-list" aria-label="Saved memory cards">
+          {cards.length > 0 ? cards.map((card) => (
+            <button className={card.id === selectedCardId ? "memory-card-row selected" : "memory-card-row"} key={card.id} onClick={() => onSelect(card.id)} type="button">
+              <span className="memory-row-mark"><Bookmark size={15} /></span>
+              <span className="memory-row-main"><strong>{card.title}</strong><small>{card.body_excerpt || "No body text"}</small></span>
+              <span className="memory-row-meta"><small>{card.evidence_count} evidence</small><small>{formatRelativeDate(card.updated_at)}</small></span>
+            </button>
+          )) : <EmptyState icon={Bookmark} title={searchQuery ? "No matching memory" : "No memory saved yet"} body={searchQuery ? "Try a different title or phrase." : "Create a note here, or save a cited briefing or answer."} />}
+        </div>
+      </section>
+
+      <section className="panel memory-reading-pane">
+        <PanelHeader icon={BookOpen} label="Card detail" title={detail?.card.title ?? "Create memory"}>
+          {detail ? <button className="button secondary" type="button" onClick={() => onExport(detail.card.id)}><Upload size={16} /> Export Markdown</button> : null}
+        </PanelHeader>
+        {detail ? <>
+          <div className="memory-card-meta"><StatusBadge tone="neutral">{formatMemorySource(detail.card.source)}</StatusBadge><span>Updated {formatRelativeDate(detail.card.updated_at)}</span></div>
+          <div className="markdown-content memory-markdown"><ReactMarkdown remarkPlugins={[remarkGfm]}>{detail.card.body_markdown}</ReactMarkdown></div>
+          <section className="memory-evidence-list">
+            <div className="chunk-panel-header"><strong>Linked evidence</strong><StatusBadge tone={detail.evidence.every((item) => item.exists) ? "success" : "warning"}>{detail.evidence.length} link{detail.evidence.length === 1 ? "" : "s"}</StatusBadge></div>
+            {detail.evidence.length > 0 ? detail.evidence.map((evidence) => <div className={evidence.exists ? "memory-evidence-row" : "memory-evidence-row missing"} key={evidence.link_id}><span className={evidence.exists ? "state-dot ready" : "state-dot"} /><div><strong>{evidence.title ?? "Missing evidence"}</strong><code>{evidence.path ?? evidence.target_id}{evidence.start_line ? ` · ${formatLineRange(evidence.start_line, evidence.end_line)}` : ""}</code></div></div>) : <p className="rail-empty">This manual card has no linked source evidence.</p>}
+          </section>
+        </> : <form className="memory-create-form" onSubmit={(event) => { event.preventDefault(); onCreate(); }}>
+          <p className="workspace-summary-intro">Record a durable local note without enabling AI. Add source context in the body when evidence is unavailable.</p>
+          <label><span>Title</span><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Decision, pattern, or operational note" autoFocus /></label>
+          <label><span>Memory</span><textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder="Write the knowledge worth keeping…" rows={12} /></label>
+          <button className="button primary" disabled={isSaving || !title.trim() || !body.trim()} type="submit">{isSaving ? <Loader2 className="spin" size={16} /> : <Bookmark size={16} />} Save local memory</button>
+        </form>}
+      </section>
+
+      <aside className="panel evidence-rail memory-rail">
+        <PanelHeader icon={ShieldLock} label="Durability" title="Evidence boundary" />
+        <div className="trust-callout"><ShieldLock size={18} /><div><strong>Explicit, local, inspectable</strong><p>Nothing is saved automatically. AI-generated cards retain their cited source links; manual cards stay clearly marked.</p></div></div>
+        <dl className="settings-facts"><div><dt>Workspace</dt><dd>{workspace.name}</dd></div><div><dt>Saved cards</dt><dd>{cards.length}</dd></div><div><dt>Selected links</dt><dd>{detail?.evidence.length ?? 0}</dd></div></dl>
+      </aside>
+    </div>
+  );
+}
+
 function ProviderSettingsView({
   isSaving,
   isTesting,
@@ -1667,7 +2141,8 @@ function ProviderSettingsView({
   }
 
   return (
-    <section className="provider-workbench panel">
+    <div className="provider-layout graphite-page">
+    <section className="provider-workbench panel settings-main">
       <PanelHeader icon={Brain} label="AI provider" title="Provider control">
         <StatusBadge tone={draft.enabled ? "success" : "neutral"}>{draft.enabled ? (draft.provider_type === "openrouter" ? "Cloud" : "Local") : "No AI"}</StatusBadge>
       </PanelHeader>
@@ -1723,6 +2198,21 @@ function ProviderSettingsView({
       </form>
       {testResult ? <div className={testResult.success ? "provider-test ready" : "provider-test failed"}>{testResult.success ? <CheckCircle2 size={17} /> : <X size={17} />} {testResult.message}</div> : null}
     </section>
+    <aside className="panel evidence-rail settings-rail">
+      <PanelHeader icon={ShieldLock} label="Privacy boundary" title="Connection scope" />
+      <div className="provider-state-card">
+        <span className={draft.enabled ? "state-dot ready" : "state-dot"} />
+        <div><strong>{draft.enabled ? `${draft.name} enabled` : "AI disabled"}</strong><p>{draft.provider_type === "openrouter" ? "Selected excerpts and requested images may leave this device." : "Requests are sent only to the configured local endpoint."}</p></div>
+      </div>
+      <dl className="settings-facts">
+        <div><dt>Workspace</dt><dd>{workspace.name}</dd></div>
+        <div><dt>Provider type</dt><dd>{draft.provider_type === "openrouter" ? "Cloud" : "Local"}</dd></div>
+        <div><dt>Chat model</dt><dd>{draft.model || "Not set"}</dd></div>
+        <div><dt>Embeddings</dt><dd>{draft.embedding_model || "Full-text fallback"}</dd></div>
+      </dl>
+      <div className="trust-callout"><ShieldLock size={18} /><div><strong>Explicit by default</strong><p>Provider access is stored per workspace and remains off until you enable it here.</p></div></div>
+    </aside>
+    </div>
   );
 }
 
@@ -1730,11 +2220,13 @@ function providerDraft(workspaceId: string | undefined): ProviderSettings {
   return { id: "", workspace_id: workspaceId ?? null, provider_type: "ollama", name: "Local Ollama", base_url: "http://127.0.0.1:11434", model: "llama3.2", embedding_model: null, enabled: false, metadata: {}, api_key: null };
 }
 
-function SummaryPanel({ summary }: { summary: SummaryResult }) {
+function SummaryPanel({ summary, onSave }: { summary: SummaryResult; onSave?: () => void }) {
   return (
     <section className="summary-panel">
-      <div className="chunk-panel-header"><strong>Local AI summary</strong><StatusBadge tone="neutral">Cited</StatusBadge></div>
-      <p className="summary-body">{summary.summary_markdown}</p>
+      <div className="chunk-panel-header"><strong>Local AI summary</strong><div>{onSave ? <button className="button secondary compact" type="button" onClick={onSave}><Bookmark size={15} /> Save memory</button> : null}<StatusBadge tone="neutral">Cited</StatusBadge></div></div>
+      <div className="markdown-content">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{summary.summary_markdown}</ReactMarkdown>
+      </div>
       <div className="citation-list">
         {summary.citations.map((citation) => <span key={citation.chunk_id ?? citation.artifact_id}>{formatLineRange(citation.start_line, citation.end_line)}</span>)}
       </div>
@@ -1745,11 +2237,13 @@ function SummaryPanel({ summary }: { summary: SummaryResult }) {
 
 function WorkspaceSummaryView({
   isSummarizing,
+  onSaveMemory,
   onSummarize,
   summary,
   workspace,
 }: {
   isSummarizing: boolean;
+  onSaveMemory: (title: string, body: string, source: string, citations: SummaryResult["citations"]) => void;
   onSummarize: () => void;
   summary: SummaryResult | null;
   workspace: Workspace | undefined;
@@ -1758,15 +2252,25 @@ function WorkspaceSummaryView({
     return <EmptyState icon={Sparkles} title="Choose a workspace" body="Summaries are generated from that workspace’s indexed artifacts." />;
   }
   return (
-    <section className="workspace-summary panel">
-      <PanelHeader icon={Sparkles} label="Workspace intelligence" title="Project briefing">
-        <button className="button primary" disabled={isSummarizing} type="button" onClick={onSummarize}>
-          {isSummarizing ? <Loader2 className="spin" size={16} /> : <Sparkles size={16} />} Summarize workspace
-        </button>
-      </PanelHeader>
-      <p className="workspace-summary-intro">Create a concise briefing from indexed excerpts across <strong>{workspace.name}</strong>. Every generated result includes the local chunks it used.</p>
-      {summary ? <SummaryPanel summary={summary} /> : <EmptyState icon={Brain} title="No workspace summary yet" body="Index artifacts, configure a provider, then generate a cited project briefing." />}
-    </section>
+    <div className="intelligence-layout graphite-page">
+      <section className="workspace-summary panel reading-pane">
+        <PanelHeader icon={Sparkles} label="Workspace intelligence" title="Project briefing">
+          <button className="button primary" disabled={isSummarizing} type="button" onClick={onSummarize}>
+            {isSummarizing ? <Loader2 className="spin" size={16} /> : <Sparkles size={16} />} Generate briefing
+          </button>
+        </PanelHeader>
+        <p className="workspace-summary-intro">A concise, cited orientation to <strong>{workspace.name}</strong>, generated only from indexed excerpts in this workspace.</p>
+        {summary ? <SummaryPanel summary={summary} onSave={() => onSaveMemory(`Project briefing: ${workspace.name}`, summary.summary_markdown, "workspace_summary", summary.citations)} /> : <EmptyState icon={Brain} title="No briefing generated" body="Index artifacts, configure a provider, then generate a cited project briefing." />}
+      </section>
+      <aside className="panel evidence-rail summary-rail">
+        <PanelHeader icon={ShieldLock} label="Provenance" title="Source grounding" />
+        <div className="trust-callout"><ShieldLock size={18} /><div><strong>Evidence stays inspectable</strong><p>The briefing is assembled from local chunks. Citations remain available beside the generated result.</p></div></div>
+        <div className="rail-section-heading"><div><strong>Citations</strong><span>Source locations used</span></div><small>{summary?.citations.length ?? 0}</small></div>
+        {summary && summary.citations.length > 0 ? (
+          <div className="rail-citation-list">{summary.citations.map((citation, index) => <div key={citation.chunk_id ?? citation.artifact_id}><span>{String(index + 1).padStart(2, "0")}</span><code>{formatLineRange(citation.start_line, citation.end_line)}</code></div>)}</div>
+        ) : <p className="rail-empty">Generate a briefing to see its source map.</p>}
+      </aside>
+    </div>
   );
 }
 
@@ -1776,6 +2280,7 @@ function AskView({
   isEmbedding,
   onAsk,
   onEmbed,
+  onSaveMemory,
   question,
   setQuestion,
   workspace,
@@ -1785,13 +2290,15 @@ function AskView({
   isEmbedding: boolean;
   onAsk: () => void;
   onEmbed: () => void;
+  onSaveMemory: (title: string, body: string, source: string, citations: SummaryResult["citations"], confidence?: number | null) => void;
   question: string;
   setQuestion: (value: string) => void;
   workspace: Workspace | undefined;
 }) {
   if (!workspace) return <EmptyState icon={Brain} title="Choose a workspace" body="Ask uses the indexed context in one workspace." />;
   return (
-    <section className="ask-workbench panel">
+    <div className="intelligence-layout ask-layout graphite-page">
+    <section className="ask-workbench panel reading-pane">
       <PanelHeader icon={Brain} label="Evidence first" title="Ask the workspace">
         <button className="button secondary" disabled={isEmbedding} type="button" onClick={onEmbed}>{isEmbedding ? <Loader2 className="spin" size={16} /> : <Database size={16} />} Build local embeddings</button>
       </PanelHeader>
@@ -1801,13 +2308,23 @@ function AskView({
         <button className="button primary" disabled={isAsking || !question.trim()} type="button" onClick={onAsk}>{isAsking ? <Loader2 className="spin" size={16} /> : <Brain size={16} />} Ask</button>
       </div>
       {askAnswer ? <div className="ask-answer">
-        <div className="chunk-panel-header"><strong>Answer</strong><StatusBadge tone={askAnswer.confidence && askAnswer.confidence > 0.15 ? "success" : "warning"}>{askAnswer.confidence && askAnswer.confidence > 0.15 ? "Evidence found" : "Low confidence"}</StatusBadge></div>
-        <p className="summary-body">{askAnswer.answer_markdown}</p>
+        <div className="chunk-panel-header"><strong>Answer</strong><div><button className="button secondary compact" type="button" onClick={() => onSaveMemory(`Answer: ${question.trim().slice(0, 72)}`, askAnswer.answer_markdown, "answer", askAnswer.citations, askAnswer.confidence)}><Bookmark size={15} /> Save memory</button><StatusBadge tone={askAnswer.confidence && askAnswer.confidence > 0.15 ? "success" : "warning"}>{askAnswer.confidence && askAnswer.confidence > 0.15 ? "Evidence found" : "Low confidence"}</StatusBadge></div></div>
+        <div className="markdown-content"><ReactMarkdown remarkPlugins={[remarkGfm]}>{askAnswer.answer_markdown}</ReactMarkdown></div>
         <div className="citation-list">{askAnswer.citations.map((citation) => <span key={citation.chunk_id ?? citation.artifact_id}>{citation.title} · {formatLineRange(citation.start_line, citation.end_line)}</span>)}</div>
         {askAnswer.warnings.map((warning) => <p className="evidence-note" key={warning}>{warning}</p>)}
-        <div className="retrieved-evidence"><p className="result-group-label">Retrieved context</p>{askAnswer.retrieved_context.map((result) => <div key={result.chunk_id}><strong>{result.title}</strong><span>{formatLineRange(result.start_line, result.end_line)}</span><p>{result.snippet}</p></div>)}</div>
+        <div className="retrieved-evidence answer-evidence"><p className="result-group-label">Retrieved context</p>{askAnswer.retrieved_context.map((result) => <div key={result.chunk_id}><strong>{result.title}</strong><span>{formatLineRange(result.start_line, result.end_line)}</span><p>{result.snippet}</p></div>)}</div>
       </div> : <EmptyState icon={Brain} title="Ask with evidence" body="Enter a question to retrieve local context before generation." />}
     </section>
+    <aside className="panel evidence-rail ask-evidence-rail">
+      <PanelHeader icon={BookOpen} label="Retrieved context" title="Evidence rail" />
+      {askAnswer ? <>
+        <div className="rail-section-heading"><div><strong>Sources used</strong><span>Inspectable local matches</span></div><small>{askAnswer.retrieved_context.length}</small></div>
+        <div className="retrieved-evidence">{askAnswer.retrieved_context.map((result) => <div key={result.chunk_id}><div><strong>{result.title}</strong><span>{formatLineRange(result.start_line, result.end_line)}</span></div><p>{result.snippet}</p></div>)}</div>
+        <div className="rail-section-heading"><div><strong>Citations</strong><span>Linked answer references</span></div><small>{askAnswer.citations.length}</small></div>
+        <div className="citation-list">{askAnswer.citations.map((citation) => <span key={citation.chunk_id ?? citation.artifact_id}>{citation.title} · {formatLineRange(citation.start_line, citation.end_line)}</span>)}</div>
+      </> : <EmptyState icon={BookOpen} title="No evidence retrieved" body="Ask a question to populate the evidence rail." />}
+    </aside>
+    </div>
   );
 }
 
@@ -1815,12 +2332,18 @@ function IndexingJobPanel({ job }: { job: IndexingJobStatus }) {
   const total = job.progress_total ?? job.progress_current;
   const progressText =
     total > 0 ? `${job.progress_current}/${total}` : `${job.progress_current}`;
+  const normalizedStatus = job.status.toLowerCase();
+  const failed = normalizedStatus === "failed" || normalizedStatus === "error";
+  const completed = normalizedStatus === "completed";
+  const active = ["running", "indexing", "processing", "active"].includes(normalizedStatus);
+  const statusTone = failed ? "danger" : completed ? "success" : active ? "warning" : "neutral";
+  const statusLabel = failed ? "Failed" : completed ? "Ready" : active ? "Indexing" : "Queued";
 
   return (
     <section className="report-panel">
       <div className="report-counts">
-        <StatusBadge tone={job.status === "completed" ? "success" : "warning"}>
-          {job.status === "completed" ? "Ready" : "Indexing"}
+        <StatusBadge tone={statusTone}>
+          {statusLabel}
         </StatusBadge>
         <StatusBadge tone="neutral">{job.stage.replace(/_/g, " ")}</StatusBadge>
         <StatusBadge tone="neutral">{progressText}</StatusBadge>
@@ -1955,6 +2478,16 @@ function EmptyState({
 
 function formatArtifactType(value: string) {
   return value.replace(/_/g, " ");
+}
+
+function formatMemorySource(source: string) {
+  const labels: Record<string, string> = {
+    manual: "Manual note",
+    artifact_summary: "Artifact summary",
+    workspace_summary: "Project briefing",
+    answer: "Cited answer",
+  };
+  return labels[source] ?? source.replace(/_/g, " ");
 }
 
 function formatBytes(bytes: number) {

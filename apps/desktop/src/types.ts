@@ -188,6 +188,64 @@ export interface Citation {
   confidence: number | null;
 }
 
+export interface MemoryCard {
+  id: string;
+  workspace_id: string;
+  title: string;
+  body_markdown: string;
+  source: string;
+  confidence: number | null;
+  created_at: string;
+  updated_at: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface MemoryCardSummary {
+  id: string;
+  workspace_id: string;
+  title: string;
+  body_excerpt: string;
+  source: string;
+  evidence_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MemoryEvidence {
+  link_id: string;
+  target_id: string;
+  target_type: string;
+  artifact_id: string | null;
+  chunk_id: string | null;
+  title: string | null;
+  path: string | null;
+  start_line: number | null;
+  end_line: number | null;
+  exists: boolean;
+}
+
+export interface MemoryCardDetail {
+  card: MemoryCard;
+  evidence: MemoryEvidence[];
+}
+
+export interface CreateMemoryCardRequest {
+  workspace_id: string;
+  title: string;
+  body_markdown: string;
+  source: string;
+  confidence: number | null;
+  citations: Citation[];
+}
+
+export interface UpdateMemoryCardRequest {
+  card_id: string;
+  title: string;
+  body_markdown: string;
+  source: string;
+  confidence: number | null;
+}
+
 export interface SummaryResult {
   summary_markdown: string;
   citations: Citation[];
