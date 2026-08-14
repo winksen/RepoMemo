@@ -1,9 +1,9 @@
 /*
-THESIS: RepoMemo is an evidence instrument, not a card dashboard; provenance is the layout.
-OWN-WORLD: Lab-paper and anodized-aluminum planes, graphite rules, circuit-green state, amber attention, registered channels, and compact instrument labels.
-STORY: Choose a local workspace, follow its sources through indexing, inspect the evidence, then take the next safe action.
-FIRST VIEWPORT: A narrow channel rail, a dominant evidence workbench, and a persistent status spine; workspace selection sits left of the evidence trace and Import source remains primary.
-FORM: Evidence-first asymmetrical stack, fifth grounded direction, fused with registered three-zone navigation and a compact pipeline; seed 5ab99c22.
+THESIS: RepoMemo is a neutral research canvas, not an instrument panel; the working document and its evidence note share a quiet frame.
+OWN-WORLD: White paper, near-black type, faint cool-gray seams, system type, 12px curves, and a single reserved blue for direct action or current selection.
+STORY: Select a workspace, work in one broad primary canvas, and keep local context in a calm right-side note without scanning dashboards.
+FIRST VIEWPORT: A 64px icon rail, a light title bar, a generous main task plane, and a 400px contextual note pane divided only by hairlines.
+FORM: The user-pinned Rox productivity composition, translated to local project evidence with direct source facts and no decorative telemetry.
 */
 
 import type { CSSProperties, FormEvent, ReactNode } from "react";
@@ -29,14 +29,12 @@ import {
   IconStack2 as Layers3,
   IconLibrary as Library,
   IconLoader2 as Loader2,
-  IconMoon as Moon,
   IconPlus as Plus,
   IconRefresh as RefreshCw,
   IconSearch as Search,
   IconSettings as Settings2,
   IconShieldLock as ShieldLock,
   IconSparkles as Sparkles,
-  IconSun as Sun,
   IconUpload as Upload,
   IconX as X,
 } from "@tabler/icons-react";
@@ -94,7 +92,6 @@ import type {
 
 type LoadState = "idle" | "loading" | "ready" | "error";
 type View = "workspaces" | "import" | "artifacts" | "search" | "summary" | "ask" | "memory" | "settings";
-type ThemeMode = "light" | "dark";
 
 const viewMeta: Record<View, { section: string; title: string }> = {
   workspaces: { section: "Library", title: "Workspaces" },
@@ -166,21 +163,6 @@ export function App() {
   const [searchSources, setSearchSources] = useState<string[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
-  const [theme, setTheme] = useState<ThemeMode>(() => {
-    const saved = localStorage.getItem("repomemo-theme");
-    if (saved === "light" || saved === "dark") {
-      return saved;
-    }
-    return window.matchMedia("(prefers-color-scheme: dark)").matches
-      ? "dark"
-      : "light";
-  });
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    localStorage.setItem("repomemo-theme", theme);
-  }, [theme]);
-
   useEffect(() => {
     let cancelled = false;
 
@@ -815,15 +797,6 @@ export function App() {
                 >
                   <Plus size={16} /> New workspace
                 </button>
-                <button
-                  aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
-                  className="icon-button workspace-theme-button"
-                  type="button"
-                  onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
-                  title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
-                >
-                  {theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
-                </button>
               </div>
             </>
           ) : (
@@ -838,21 +811,16 @@ export function App() {
               {loadState === "error" ? <X size={15} /> : loadState === "ready" ? <CheckCircle2 size={15} /> : <Loader2 className="spin" size={15} />}
               {loadState === "error" ? "Local core unavailable" : loadState === "ready" ? "Local core ready" : "Booting core"}
             </StatusBadge>
+            <StatusBadge tone={indexingTone === "error" ? "danger" : indexingTone === "attention" ? "warning" : indexingTone === "ready" ? "success" : "neutral"}>
+              <RefreshCw className={indexingActive ? "spin" : undefined} size={14} />
+              Index {indexingLabel}
+            </StatusBadge>
             <StatusBadge tone={settings?.ai_enabled ? "success" : "neutral"}>
               {settings?.ai_enabled ? `${providers.find((item) => item.enabled)?.provider_type === "openrouter" ? "Cloud" : "Local"} · ${settings.active_provider}` : "No AI"}
             </StatusBadge>
-            <StatusBadge tone={providers.find((item) => item.enabled)?.provider_type === "openrouter" ? "success" : "neutral"}>
-              {providers.find((item) => item.enabled)?.provider_type === "openrouter" ? "Cloud enabled" : "Cloud off"}
+            <StatusBadge tone={activeProvider ? "success" : "neutral"}>
+              {activeProvider ? `${activeProvider.provider_type === "openrouter" ? "Cloud" : "Local"} AI` : "AI off"}
             </StatusBadge>
-            <button
-              aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
-              className="icon-button workspace-theme-button"
-              type="button"
-              onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
-              title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
-            >
-              {theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
-            </button>
               </div>
             </>
           )}
@@ -1128,12 +1096,6 @@ function WorkspaceView({
   const hasIndexedArtifacts = indexedArtifactCount > 0;
   const allArtifactsIndexed = hasArtifacts
     && indexedArtifactCount === currentOverview.artifact_count;
-  const pipeline = [
-    { complete: currentOverview.source_count > 0, count: currentOverview.source_count, label: "Sources" },
-    { complete: allArtifactsIndexed, count: indexedArtifactCount, label: "Indexed" },
-    { complete: currentOverview.memory_card_count > 0, count: currentOverview.memory_card_count, label: "Memory" },
-  ];
-
   return (
     <div className="workspace-page-v3">
       <section className="workspace-directory" aria-labelledby="workspace-directory-title">
@@ -1209,7 +1171,7 @@ function WorkspaceView({
               <p>Project artifacts, searchable context, and durable memory in one private knowledge boundary.</p>
             </header>
 
-            <section className="workspace-evidence-path" aria-labelledby="workspace-evidence-title">
+            {false ? <section className="workspace-evidence-path" aria-labelledby="workspace-evidence-title">
               <div className="workspace-section-heading">
                 <div>
                   <p className="workspace-kicker">Evidence path</p>
@@ -1258,35 +1220,37 @@ function WorkspaceView({
                 <span className="state-lamp ready" aria-hidden="true" />
                 Every derived result stays registered to local source material.
               </p>
-            </section>
+            </section> : null}
 
-            <dl className="workspace-metrics-v3" aria-label="Workspace totals">
+            {false ? <dl className="workspace-metrics-v3" aria-label="Workspace totals">
               <div><dt>Sources</dt><dd>{currentOverview.source_count}</dd></div>
               <div><dt>Artifacts</dt><dd>{currentOverview.artifact_count}</dd></div>
               <div><dt>Chunks</dt><dd>{currentOverview.chunk_count}</dd></div>
               <div><dt>Symbols</dt><dd>{currentOverview.symbol_count}</dd></div>
               <div><dt>Memory</dt><dd>{currentOverview.memory_card_count}</dd></div>
-            </dl>
+            </dl> : null}
 
-            <section className="workspace-pipeline" aria-labelledby="workspace-pipeline-title">
+            {false ? <section className="workspace-pipeline" aria-labelledby="workspace-pipeline-title">
               <div className="workspace-section-heading">
                 <div>
                   <p className="workspace-kicker">Knowledge pipeline</p>
                   <h4 id="workspace-pipeline-title">Workspace readiness</h4>
                 </div>
-                <span>{pipeline.filter((step) => step.complete).length} of {pipeline.length}</span>
+                <span>0 of 0</span>
               </div>
-              <ol>
-                {pipeline.map((step, index) => (
-                  <li className={step.complete ? "complete" : ""} key={step.label}>
-                    <span className="workspace-pipeline-mark" aria-hidden="true">
-                      {step.complete ? <CheckCircle2 size={16} /> : index + 1}
-                    </span>
-                    <strong>{step.label}</strong>
-                    <small>{step.count}</small>
-                  </li>
-                ))}
-              </ol>
+              <ol />
+            </section> : null}
+
+            <section className="workspace-note-summary" aria-labelledby="workspace-note-title">
+              <p className="workspace-kicker">Workspace note</p>
+              <h4 id="workspace-note-title">Local context</h4>
+              <p>Everything here remains in this workspace and can be inspected at the source when you need it.</p>
+              <dl aria-label="Workspace totals">
+                <div><dt>Sources</dt><dd>{currentOverview.source_count}</dd></div>
+                <div><dt>Artifacts</dt><dd>{currentOverview.artifact_count}</dd></div>
+                <div><dt>Indexed excerpts</dt><dd>{currentOverview.chunk_count}</dd></div>
+                <div><dt>Memory cards</dt><dd>{currentOverview.memory_card_count}</dd></div>
+              </dl>
             </section>
 
             <section className="workspace-continue">
@@ -1545,6 +1509,17 @@ function ArtifactsView({
   onSaveMemory: (title: string, body: string, source: string, citations: SummaryResult["citations"]) => void;
   onSummarize: (artifactId: string) => void;
 }) {
+  const [artifactQuery, setArtifactQuery] = useState("");
+  const normalizedArtifactQuery = artifactQuery.trim().toLocaleLowerCase();
+  const filteredArtifacts = normalizedArtifactQuery
+    ? artifacts.filter((artifact) => [
+      artifact.title,
+      artifact.path,
+      artifact.language ?? "",
+      formatArtifactType(artifact.artifact_type),
+    ].some((value) => value.toLocaleLowerCase().includes(normalizedArtifactQuery)))
+    : artifacts;
+
   if (!selectedWorkspace) {
     return (
       <section className="panel">
@@ -1580,6 +1555,22 @@ function ArtifactsView({
 
         {indexingJob ? <IndexingJobPanel job={indexingJob} /> : null}
 
+        <div className="artifact-library-tools">
+          <label className="artifact-search" htmlFor="artifact-search">
+            <Search size={17} aria-hidden="true" />
+            <span className="sr-only">Search stored artifacts</span>
+            <input
+              id="artifact-search"
+              value={artifactQuery}
+              onChange={(event) => setArtifactQuery(event.target.value)}
+              placeholder="Search files, paths, or languages"
+              type="search"
+            />
+            {artifactQuery ? <button aria-label="Clear artifact search" className="artifact-search-clear" type="button" onClick={() => setArtifactQuery("")}><X size={15} /></button> : null}
+          </label>
+          <span className="artifact-result-count" aria-live="polite">{filteredArtifacts.length} of {artifacts.length} files</span>
+        </div>
+
         <div className="artifact-list">
           {artifacts.length === 0 ? (
             <EmptyState
@@ -1587,8 +1578,14 @@ function ArtifactsView({
               title="No artifacts indexed yet"
               body="Import a folder, then index it to make its local content searchable and inspectable."
             />
+          ) : filteredArtifacts.length === 0 ? (
+            <EmptyState
+              icon={Search}
+              title="No matching artifacts"
+              body={`No local files match “${artifactQuery}”. Try a file name, folder, or language.`}
+            />
           ) : (
-            artifacts.map((artifact) => (
+            filteredArtifacts.map((artifact) => (
               <button
                 className={
                   artifact.id === selectedArtifactId
@@ -1599,17 +1596,19 @@ function ArtifactsView({
                 type="button"
                 onClick={() => onSelectArtifact(artifact.id)}
               >
-                {artifact.artifact_type === "image" ? <Photo size={18} /> : <FileCode2 size={18} />}
+                <span className="artifact-block-icon" aria-hidden="true">
+                  {artifact.artifact_type === "image" ? <Photo size={19} /> : <FileCode2 size={19} />}
+                </span>
                 <span className="artifact-row-main">
                   <strong>{artifact.title}</strong>
                   <small>{artifact.path}</small>
                 </span>
-                <span className="artifact-meta">
-                  {artifact.language ?? formatArtifactType(artifact.artifact_type)}
+                <span className="artifact-block-footer">
+                  <span className="artifact-meta">{artifact.language ?? formatArtifactType(artifact.artifact_type)}</span>
+                  <StatusBadge tone={artifact.indexed_at ? "success" : "warning"}>
+                    {artifact.indexed_at ? "Indexed" : "Stored"}
+                  </StatusBadge>
                 </span>
-                <StatusBadge tone={artifact.indexed_at ? "success" : "warning"}>
-                  {artifact.indexed_at ? "Indexed" : "Stored"}
-                </StatusBadge>
               </button>
             ))
           )}
