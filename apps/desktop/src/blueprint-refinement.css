@@ -1,0 +1,421 @@
+/*
+ * Blueprint refinement
+ *
+ * This file intentionally sits after the earlier implementation passes. It
+ * standardizes the visual grammar without changing RepoMemo's workflows or
+ * its research-canvas layout.
+ */
+
+:root {
+  color-scheme: light;
+
+  --color-bg: hsl(220 16% 98%);
+  --color-canvas: hsl(220 14% 95%);
+  --color-surface: #ffffff;
+  --color-surface-2: hsl(220 16% 98%);
+  --color-surface-3: hsl(220 14% 95%);
+  --color-surface-hover: hsl(220 14% 93%);
+  --color-code-surface: hsl(220 16% 98%);
+
+  --color-text: hsl(220 15% 15%);
+  --color-text-muted: hsl(220 10% 42%);
+  --color-text-subtle: hsl(220 10% 55%);
+  --color-border: hsl(220 12% 90%);
+  --color-border-strong: hsl(220 10% 80%);
+
+  --color-accent: hsl(233 84% 44%);
+  --color-accent-hover: hsl(233 78% 36%);
+  --color-accent-soft: hsl(228 100% 97%);
+  --color-accent-text: hsl(233 78% 36%);
+  --color-on-accent: #ffffff;
+  --color-focus: hsl(233 84% 44%);
+
+  --color-info: hsl(215 78% 43%);
+  --color-info-soft: hsl(214 95% 93%);
+  --color-success: hsl(152 58% 35%);
+  --color-success-soft: hsl(149 55% 93%);
+  --color-warning: hsl(38 91% 36%);
+  --color-warning-soft: hsl(45 93% 91%);
+  --color-danger: hsl(0 70% 45%);
+  --color-danger-soft: hsl(0 86% 95%);
+  --color-discovery: hsl(233 84% 44%);
+  --color-discovery-soft: hsl(228 100% 97%);
+
+  --shadow-block: none;
+  --shadow-floating: 0 18px 44px rgb(20 27 43 / 18%);
+  --font-ui: "Recursive Variable", "Segoe UI", system-ui, sans-serif;
+  --font-display: var(--font-ui);
+  --ease-standard: cubic-bezier(.2, 0, 0, 1);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --color-bg: hsl(220 16% 8%);
+  --color-canvas: hsl(220 16% 10%);
+  --color-surface: hsl(220 14% 11%);
+  --color-surface-2: hsl(220 10% 16%);
+  --color-surface-3: hsl(220 10% 20%);
+  --color-surface-hover: hsl(220 10% 18%);
+  --color-code-surface: hsl(220 16% 8%);
+
+  --color-text: hsl(220 18% 92%);
+  --color-text-muted: hsl(220 8% 66%);
+  --color-text-subtle: hsl(220 8% 54%);
+  --color-border: hsl(220 10% 20%);
+  --color-border-strong: hsl(220 10% 29%);
+
+  --color-accent: hsl(230 82% 62%);
+  --color-accent-hover: hsl(230 88% 74%);
+  --color-accent-soft: hsl(233 62% 17%);
+  --color-accent-text: hsl(230 88% 74%);
+  --color-on-accent: #ffffff;
+  --color-focus: hsl(230 82% 62%);
+
+  --color-info: hsl(210 88% 70%);
+  --color-info-soft: hsl(214 52% 18%);
+  --color-success: hsl(152 57% 58%);
+  --color-success-soft: hsl(152 36% 17%);
+  --color-warning: hsl(45 88% 65%);
+  --color-warning-soft: hsl(42 48% 18%);
+  --color-danger: hsl(0 82% 70%);
+  --color-danger-soft: hsl(0 42% 19%);
+  --color-discovery: hsl(230 82% 62%);
+  --color-discovery-soft: hsl(233 45% 18%);
+}
+
+::selection {
+  color: inherit;
+  background: hsl(232 82% 52% / 35%);
+}
+
+*,
+*::before,
+*::after {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(220 10% 42% / 40%) transparent;
+}
+
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track,
+*::-webkit-scrollbar-corner { background: transparent; }
+*::-webkit-scrollbar-thumb { background: hsl(220 10% 42% / 35%); border-radius: 999px; }
+*::-webkit-scrollbar-thumb:hover { background: hsl(220 10% 42% / 55%); }
+*::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+
+button,
+input,
+textarea,
+select {
+  font-family: var(--font-ui);
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+.symbol-row:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* Navigation stays compact for this desktop workbench, but gets one decisive
+ * active state instead of an outlined, low-contrast selection. */
+.brand-glyph,
+.panel-icon,
+.workspace-row-mark,
+.import-card-icon,
+.artifact-block-icon,
+.memory-row-mark,
+.recent-artifact-row > span:first-child {
+  color: var(--color-text-muted);
+  background: var(--color-surface-3);
+  border: 0;
+}
+
+.nav-item {
+  border-radius: 999px;
+  transition: color 180ms var(--ease-standard), background 180ms var(--ease-standard), transform 180ms var(--ease-standard);
+}
+
+.nav-item:hover:not(:disabled) {
+  color: var(--color-text);
+  background: var(--color-surface-3);
+  transform: none;
+}
+
+.nav-item.active,
+.nav-item.active:hover:not(:disabled) {
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.nav-item.active::before { display: none; }
+
+/* One action language: quiet ghost pills, cobalt primary pills, and outlined
+ * card actions. The class names are retained to avoid behavior changes. */
+.button,
+.workspace-new-button,
+.workspace-create-button,
+.workspace-primary-action,
+.workspace-secondary-action {
+  min-height: 36px;
+  padding: 0 16px;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  transition: color 180ms var(--ease-standard), background 180ms var(--ease-standard), border-color 180ms var(--ease-standard), box-shadow 180ms var(--ease-standard);
+}
+
+.button.primary,
+.workspace-new-button.primary,
+.workspace-primary-action {
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  box-shadow: 0 2px 5px hsl(233 84% 44% / 20%);
+}
+
+.button.primary:hover:not(:disabled),
+.workspace-new-button.primary:hover:not(:disabled),
+.workspace-primary-action:hover:not(:disabled) {
+  color: var(--color-on-accent);
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+  box-shadow: 0 3px 8px hsl(233 84% 44% / 24%);
+}
+
+.button.secondary,
+.workspace-create-button,
+.workspace-secondary-action {
+  color: var(--color-text-muted);
+  background: transparent;
+  border-color: var(--color-border);
+}
+
+.button.secondary:hover:not(:disabled),
+.workspace-create-button:hover:not(:disabled),
+.workspace-secondary-action:hover:not(:disabled) {
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.workspace-new-button.secondary {
+  color: var(--color-text-muted);
+  background: var(--color-surface-2);
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.workspace-new-button.secondary:hover:not(:disabled) {
+  color: var(--color-text);
+  background: var(--color-surface-2);
+  border-color: var(--color-accent);
+}
+
+.button:disabled,
+.workspace-new-button:disabled,
+.workspace-create-button:disabled,
+.workspace-primary-action:disabled,
+.workspace-secondary-action:disabled {
+  color: var(--color-text-subtle);
+  background: var(--color-surface-3);
+  border-color: transparent;
+  box-shadow: none;
+  opacity: .62;
+}
+
+.icon-button {
+  width: 36px;
+  height: 36px;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  transition: color 180ms var(--ease-standard), background 180ms var(--ease-standard), border-color 180ms var(--ease-standard);
+}
+
+.icon-button:hover {
+  color: var(--color-accent);
+  background: var(--color-surface-2);
+  border-color: var(--color-accent);
+}
+
+/* Keep status information available, but stop treating every header state as
+ * a second row of equally-weighted buttons. */
+.graphite-header .header-actions > .status-badge:nth-of-type(n + 2) { display: none; }
+
+.workspace-context-chip,
+.status-badge {
+  min-height: 26px;
+  padding: 0 9px;
+  color: var(--color-text-muted);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border) !important;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.status-badge.success { color: var(--color-success); background: var(--color-success-soft); border-color: transparent !important; }
+.status-badge.warning { color: var(--color-warning); background: var(--color-warning-soft); border-color: transparent !important; }
+.status-badge.danger { color: var(--color-danger); background: var(--color-danger-soft); border-color: transparent !important; }
+.status-badge.info,
+.status-badge.discovery { color: var(--color-info); background: var(--color-info-soft); border-color: transparent !important; }
+
+/* Cards and working regions use neutral surfaces, generous corners, and
+ * borders rather than a stack of slightly different shadows. */
+.import-card,
+.notice,
+.report-panel,
+.image-preview-note,
+.provider-intro,
+.provider-state-card,
+.trust-callout,
+.ask-composer,
+.empty-state {
+  background: var(--color-surface-2);
+  border: 2px solid transparent;
+  border-radius: 16px;
+  box-shadow: none;
+}
+
+.import-card:hover:not(:disabled) {
+  background: var(--color-surface-2);
+  border-color: var(--color-accent);
+  box-shadow: none;
+  transform: none;
+}
+
+.artifact-row,
+.search-result,
+.memory-card-row,
+.workspace-row-v3 {
+  border: 2px solid transparent;
+  border-radius: 12px;
+  box-shadow: none;
+  transition: background 180ms var(--ease-standard), border-color 180ms var(--ease-standard);
+}
+
+.artifact-row:hover,
+.search-result:hover,
+.memory-card-row:hover,
+.workspace-row-v3:hover {
+  background: var(--color-surface-2);
+  border-color: var(--color-accent);
+  box-shadow: none;
+  transform: none;
+}
+
+.artifact-row.selected,
+.search-result.selected,
+.memory-card-row.selected,
+.workspace-row-v3.selected {
+  background: var(--color-accent-soft);
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.artifact-row.selected .artifact-block-icon,
+.workspace-row-v3.selected .workspace-row-mark {
+  color: var(--color-accent);
+  background: var(--color-surface);
+}
+
+.citation-list span {
+  color: var(--color-accent-text);
+  background: var(--color-accent-soft);
+  border-radius: 8px;
+}
+
+/* Interface labels remain readable UI copy, not terminal-style decoration. */
+.provider-form label:not(.provider-toggle),
+.paste-language label,
+.result-group-label,
+.memory-search-label,
+.memory-create-form label > span {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+input,
+textarea,
+select,
+.paste-language select,
+.workspace-create-controls input {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  box-shadow: none;
+  transition: border-color 180ms var(--ease-standard), background 180ms var(--ease-standard);
+}
+
+input:hover:not(:disabled),
+textarea:hover:not(:disabled),
+select:hover:not(:disabled) { border-color: var(--color-border-strong); }
+
+input:focus,
+textarea:focus,
+select:focus,
+.workspace-create-controls input:focus {
+  background: var(--color-surface);
+  border-color: var(--color-accent);
+  outline: 2px solid hsl(233 84% 44% / 16%);
+}
+
+.search-input-wrap {
+  background: var(--color-surface-2);
+  border: 2px solid transparent;
+  border-radius: 999px;
+  box-shadow: none;
+}
+
+.search-input-wrap:hover,
+.search-input-wrap:focus-within {
+  border-color: var(--color-accent);
+  box-shadow: none;
+}
+
+.search-input-wrap input,
+.search-input-wrap input:focus {
+  background: transparent;
+  border: 0;
+  outline: 0;
+}
+
+/* The right pane is contextual evidence, not a dashboard. */
+.workspace-inspector-v3,
+.evidence-rail,
+.detail-panel,
+.search-preview,
+.memory-rail {
+  background: var(--color-surface);
+}
+
+.workspace-metrics-v3,
+.workspace-pipeline,
+.workspace-evidence-path { display: none !important; }
+
+@media (max-width: 900px) {
+  .graphite-header .header-actions > .status-badge { display: none; }
+  .workspace-context-chip { max-width: min(42vw, 260px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}

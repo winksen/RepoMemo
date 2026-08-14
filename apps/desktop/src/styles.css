@@ -23,7 +23,7 @@
   --color-accent-text: #075a4b;
   --color-on-accent: #ffffff;
 
-  /* Semantic colors collapsed to a single blue family — accent for primary,
+  /* Semantic colors collapsed to a single blue family: accent for primary,
      accent-text (darker) for "danger/strong" tone. No green, violet, amber. */
   --color-info: #326fa8;
   --color-info-soft: #e7f0f8;
@@ -470,7 +470,7 @@ textarea:focus-visible {
   flex-wrap: wrap;
 }
 
-/* ===== Workspaces v3 — Graphite Workbench pilot ===== */
+/* ===== Workspaces v3: Graphite Workbench pilot ===== */
 .workspace-header-v3,
 .workspace-page-v3 {
   --workspace-accent: #147d72;
@@ -2149,7 +2149,7 @@ mark {
   border-radius: 2px;
 }
 
-/* Pre-query state (compact, working — not a full-panel empty state) */
+/* Pre-query state (compact, working, not a full-panel empty state) */
 .prequery {
   display: flex;
   flex-direction: column;
@@ -2487,7 +2487,7 @@ mark {
   white-space: pre-wrap;
 }
 
-/* ===== Empty states (compact — never blank a whole panel) ===== */
+/* ===== Empty states (compact, never blank a whole panel) ===== */
 .empty-state {
   display: flex;
   flex-direction: column;

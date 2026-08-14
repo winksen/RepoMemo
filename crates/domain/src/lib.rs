@@ -1,6 +1,37 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+/// Temporary server-side identity shape. Production authentication replaces
+/// the dummy session issuer, not this client-facing session contract.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SharedUser {
+    pub id: String,
+    pub display_name: String,
+    pub email: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkspaceRole {
+    Owner,
+    Admin,
+    Member,
+    Viewer,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkspaceMembership {
+    pub workspace_id: String,
+    pub role: WorkspaceRole,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SharedSession {
+    pub user: SharedUser,
+    pub authentication: String,
+    pub memberships: Vec<WorkspaceMembership>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Workspace {
     pub id: String,

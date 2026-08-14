@@ -34,7 +34,7 @@ import {
   IconSearch as Search,
   IconSettings as Settings2,
   IconShieldLock as ShieldLock,
-  IconSparkles as Sparkles,
+  IconWand as Wand2,
   IconUpload as Upload,
   IconX as X,
 } from "@tabler/icons-react";
@@ -741,7 +741,7 @@ export function App() {
             <NavButton
               active={activeView === "summary"}
               disabled={!selectedWorkspace}
-              icon={Sparkles}
+              icon={Wand2}
               label="Summary"
               onClick={() => setActiveView("summary")}
             />
@@ -1624,7 +1624,7 @@ function ArtifactsView({
               type="button"
               onClick={() => artifactDetail && onSummarize(artifactDetail.summary.id)}
             >
-              {isSummarizing ? <Loader2 className="spin" size={16} /> : <Sparkles size={16} />}
+              {isSummarizing ? <Loader2 className="spin" size={16} /> : <Wand2 size={16} />}
               Summarize
             </button>
             <button
@@ -1811,7 +1811,7 @@ function SearchView({
             <div className="prequery">
               <div className="prequery-hint">
                 <Search size={16} />
-                <span>Ready to search. Results come from local chunks — no AI, no cloud.</span>
+                <span>Ready to search. Results come from local chunks. No AI, no cloud.</span>
               </div>
               <div className="coverage-strip">
                 <span>Index coverage</span>
@@ -2248,14 +2248,14 @@ function WorkspaceSummaryView({
   workspace: Workspace | undefined;
 }) {
   if (!workspace) {
-    return <EmptyState icon={Sparkles} title="Choose a workspace" body="Summaries are generated from that workspace’s indexed artifacts." />;
+    return <EmptyState icon={Wand2} title="Choose a workspace" body="Summaries are generated from that workspace’s indexed artifacts." />;
   }
   return (
     <div className="intelligence-layout graphite-page">
       <section className="workspace-summary panel reading-pane">
-        <PanelHeader icon={Sparkles} label="Workspace intelligence" title="Project briefing">
+        <PanelHeader icon={Wand2} label="Workspace intelligence" title="Project briefing">
           <button className="button primary" disabled={isSummarizing} type="button" onClick={onSummarize}>
-            {isSummarizing ? <Loader2 className="spin" size={16} /> : <Sparkles size={16} />} Generate briefing
+            {isSummarizing ? <Loader2 className="spin" size={16} /> : <Wand2 size={16} />} Generate briefing
           </button>
         </PanelHeader>
         <p className="workspace-summary-intro">A concise, cited orientation to <strong>{workspace.name}</strong>, generated only from indexed excerpts in this workspace.</p>
