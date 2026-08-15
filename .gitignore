@@ -12,6 +12,7 @@ apps/desktop/src-tauri/gen/
 
 # Local RepoMemo workspace data
 .repomemo/
+.repomemo-server/
 workspace-data/
 
 # OS/editor noise
@@ -24,3 +25,4 @@ Thumbs.db
 .codex/hooks.json
 /.impeccable
 docs/DESIGN_BLUEPRINT.md
+/docs/api

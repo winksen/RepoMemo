@@ -10,6 +10,7 @@ import type { CSSProperties, FormEvent, ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { SharedWebApp } from "./SharedWebApp";
 import {
   IconArchive as Archive,
   IconArrowRight as ArrowRight,
@@ -113,7 +114,13 @@ const emptyOverview = (workspaceId: string): WorkspaceOverview => ({
   memory_card_count: 0,
 });
 
+const isTauriRuntime = "__TAURI_INTERNALS__" in window;
+
 export function App() {
+  return isTauriRuntime ? <LocalDesktopApp /> : <SharedWebApp />;
+}
+
+function LocalDesktopApp() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(

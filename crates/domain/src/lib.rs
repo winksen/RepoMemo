@@ -33,6 +33,21 @@ pub struct SharedSession {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Organization {
+    pub id: String,
+    pub name: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SharedWorkspace {
+    pub workspace: Workspace,
+    pub organization_id: String,
+    pub role: WorkspaceRole,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Workspace {
     pub id: String,
     pub name: String,

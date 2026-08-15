@@ -6,6 +6,38 @@ export interface Workspace {
   settings: Record<string, unknown>;
 }
 
+export interface SharedUser {
+  id: string;
+  display_name: string;
+  email: string | null;
+}
+
+export type WorkspaceRole = "owner" | "admin" | "member" | "viewer";
+
+export interface WorkspaceMembership {
+  workspace_id: string;
+  role: WorkspaceRole;
+}
+
+export interface SharedSession {
+  user: SharedUser;
+  authentication: "jwt";
+  memberships: WorkspaceMembership[];
+}
+
+export interface Organization {
+  id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SharedWorkspace {
+  workspace: Workspace;
+  organization_id: string;
+  role: WorkspaceRole;
+}
+
 export interface AppSettings {
   data_dir: string;
   ai_enabled: boolean;

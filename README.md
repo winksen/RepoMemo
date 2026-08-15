@@ -2,6 +2,11 @@
 
 RepoMemo is a local-first technical memory workspace. It starts as a Tauri desktop app with a React UI, Rust core, SQLite metadata storage, and local filesystem blob storage.
 
+Shared mode now has a separate Rust API with JWT-protected user, organization,
+and workspace routes. It has its own server data directory and does not expose
+the desktop app's local database. Import the [Postman collection](docs/api/RepoMemo_Shared_API_v2.postman_collection.json)
+to exercise the initial shared API.
+
 ## Current Capabilities
 
 Phase 1A is implemented and running locally:

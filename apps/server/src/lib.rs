@@ -1,149 +1,847 @@
-//! HTTP boundary for server-authoritative RepoMemo workspaces.
-//!
-//! This first slice deliberately exposes only service discovery and a dummy
-//! authenticated session. It establishes a stable client/server boundary while
-//! the PostgreSQL, object-storage, and job-store adapters are introduced.
+//! Server-authoritative HTTP API for shared RepoMemo workspaces.
 
+use std::{net::SocketAddr, path::PathBuf, time::Duration};
+
+use anyhow::{bail, Context, Result};
+use argon2::{
+    password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
+    Argon2,
+};
 use axum::{
-    extract::State,
-    http::{header::HeaderName, HeaderMap, StatusCode},
-    response::IntoResponse,
-    routing::get,
+    extract::{FromRequestParts, Path, State},
+    http::{header, request::Parts, HeaderValue, Method, StatusCode},
+    response::{IntoResponse, Response},
+    routing::{get, post},
     Json, Router,
 };
-use repomemo_domain::{SharedSession, SharedUser, WorkspaceMembership, WorkspaceRole};
-use serde::Serialize;
+use chrono::{Duration as ChronoDuration, Utc};
+use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
+use rand_core::OsRng;
+use repomemo_api::RepoMemoCore;
+use repomemo_domain::{
+    ArtifactDetail, ArtifactSummary, Citation, CreateMemoryCardRequest, IndexingJobStatus,
+    MemoryCard, MemoryCardDetail, MemoryCardSummary, Organization, SearchRequest, SearchResult,
+    SharedSession, SharedUser, SharedWorkspace, WorkspaceOverview, WorkspaceRole,
+};
+use repomemo_storage::{StorageConfig, StorageEngine};
+use serde::{Deserialize, Serialize};
+use tower_http::{cors::CorsLayer, trace::TraceLayer};
 
-const USER_ID_HEADER: HeaderName = HeaderName::from_static("x-repomemo-user-id");
-const USER_NAME_HEADER: HeaderName = HeaderName::from_static("x-repomemo-user-name");
+const JWT_ISSUER: &str = "repomemo-server";
+const ACCESS_TOKEN_TTL_MINUTES: i64 = 60;
 
 #[derive(Debug, Clone)]
 pub struct ServerConfig {
     pub service_name: String,
-    pub allow_dummy_sessions: bool,
-}
-
-impl Default for ServerConfig {
-    fn default() -> Self {
-        Self {
-            service_name: "repomemo-server".to_owned(),
-            allow_dummy_sessions: true,
-        }
-    }
+    pub bind_address: SocketAddr,
+    pub data_dir: PathBuf,
+    pub jwt_secret: String,
+    pub allowed_origin: Option<HeaderValue>,
 }
 
 impl ServerConfig {
-    /// Reads the executable's configuration. Dummy sessions require explicit
-    /// opt-in so a public deployment cannot accidentally use demo identity.
-    pub fn from_env() -> Self {
-        Self {
+    pub fn from_env() -> Result<Self> {
+        let jwt_secret = std::env::var("REPOMEMO_JWT_SECRET")
+            .context("REPOMEMO_JWT_SECRET is required; use at least 32 random characters")?;
+        if jwt_secret.len() < 32 {
+            bail!("REPOMEMO_JWT_SECRET must contain at least 32 characters");
+        }
+
+        let bind_address = std::env::var("REPOMEMO_SERVER_ADDR")
+            .unwrap_or_else(|_| "127.0.0.1:8787".to_owned())
+            .parse()
+            .context("REPOMEMO_SERVER_ADDR must be a valid socket address")?;
+        let data_dir = std::env::var("REPOMEMO_SERVER_DATA_DIR")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| PathBuf::from(".repomemo-server"));
+        let allowed_origin = std::env::var("REPOMEMO_ALLOWED_ORIGIN")
+            .unwrap_or_else(|_| "http://127.0.0.1:5173".to_owned())
+            .parse()
+            .context("REPOMEMO_ALLOWED_ORIGIN must be a valid HTTP header value")?;
+
+        Ok(Self {
             service_name: std::env::var("REPOMEMO_SERVICE_NAME")
                 .unwrap_or_else(|_| "repomemo-server".to_owned()),
-            allow_dummy_sessions: std::env::var("REPOMEMO_ALLOW_DUMMY_SESSIONS")
-                .is_ok_and(|value| value.eq_ignore_ascii_case("true")),
+            bind_address,
+            data_dir,
+            jwt_secret,
+            allowed_origin: Some(allowed_origin),
+        })
+    }
+
+    #[cfg(test)]
+    fn for_test(data_dir: PathBuf) -> Self {
+        Self {
+            service_name: "repomemo-server-test".to_owned(),
+            bind_address: "127.0.0.1:0".parse().unwrap(),
+            data_dir,
+            jwt_secret: "test-secret-that-is-long-enough-for-jwt-signing".to_owned(),
+            allowed_origin: None,
         }
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 struct AppState {
-    config: ServerConfig,
+    storage: StorageEngine,
+    core: RepoMemoCore,
+    jwt_secret: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub struct HealthResponse {
     pub service: String,
     pub status: &'static str,
-    pub mode: &'static str,
+    pub authentication: &'static str,
 }
 
-pub fn router(config: ServerConfig) -> Router {
-    Router::new()
+#[derive(Debug, Serialize)]
+struct ErrorBody {
+    error: ErrorDetail,
+}
+
+#[derive(Debug, Serialize)]
+struct ErrorDetail {
+    code: &'static str,
+    message: String,
+}
+
+#[derive(Debug)]
+struct ApiError {
+    status: StatusCode,
+    code: &'static str,
+    message: String,
+}
+
+impl ApiError {
+    fn bad_request(message: impl Into<String>) -> Self {
+        Self {
+            status: StatusCode::BAD_REQUEST,
+            code: "bad_request",
+            message: message.into(),
+        }
+    }
+
+    fn unauthorized() -> Self {
+        Self {
+            status: StatusCode::UNAUTHORIZED,
+            code: "unauthorized",
+            message: "A valid bearer token is required.".to_owned(),
+        }
+    }
+
+    fn conflict(message: impl Into<String>) -> Self {
+        Self {
+            status: StatusCode::CONFLICT,
+            code: "conflict",
+            message: message.into(),
+        }
+    }
+
+    fn forbidden() -> Self {
+        Self {
+            status: StatusCode::FORBIDDEN,
+            code: "forbidden",
+            message: "Your membership does not allow access to this workspace.".to_owned(),
+        }
+    }
+
+    fn internal(error: impl std::fmt::Display) -> Self {
+        tracing::error!(error = %error, "Unhandled API error");
+        Self {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            code: "internal_error",
+            message: "The server could not complete this request.".to_owned(),
+        }
+    }
+}
+
+impl IntoResponse for ApiError {
+    fn into_response(self) -> Response {
+        (
+            self.status,
+            Json(ErrorBody {
+                error: ErrorDetail {
+                    code: self.code,
+                    message: self.message,
+                },
+            }),
+        )
+            .into_response()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct RegisterRequest {
+    email: String,
+    display_name: String,
+    password: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct LoginRequest {
+    email: String,
+    password: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct CreateOrganizationRequest {
+    name: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct CreateWorkspaceRequest {
+    organization_id: String,
+    name: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct CreateTextArtifactRequest {
+    title: String,
+    content: String,
+    language: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct SearchWorkspaceRequest {
+    query: String,
+    #[serde(default)]
+    artifact_types: Vec<repomemo_domain::ArtifactType>,
+    #[serde(default)]
+    languages: Vec<String>,
+    #[serde(default)]
+    source_ids: Vec<String>,
+    limit: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CreateMemoryCardBody {
+    title: String,
+    body_markdown: String,
+    source: String,
+    confidence: Option<f64>,
+    #[serde(default)]
+    citations: Vec<Citation>,
+}
+
+#[derive(Debug, Serialize)]
+struct TokenResponse {
+    access_token: String,
+    token_type: &'static str,
+    expires_in: u64,
+    user: SharedUser,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct JwtClaims {
+    sub: String,
+    email: String,
+    iss: String,
+    iat: usize,
+    exp: usize,
+}
+
+#[derive(Debug, Clone)]
+struct AuthenticatedSubject {
+    user_id: String,
+}
+
+pub async fn router(config: ServerConfig) -> Result<Router> {
+    let storage = StorageEngine::open(StorageConfig {
+        data_dir: config.data_dir.clone(),
+    })
+    .await?;
+    let core = RepoMemoCore::boot(config.data_dir).await?;
+    let state = AppState {
+        storage,
+        core,
+        jwt_secret: config.jwt_secret,
+    };
+    let cors = match config.allowed_origin {
+        Some(origin) => CorsLayer::new()
+            .allow_origin(origin)
+            .allow_methods([Method::GET, Method::POST])
+            .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE]),
+        None => CorsLayer::new(),
+    };
+
+    Ok(Router::new()
         .route("/health", get(health))
+        .route("/v1/auth/register", post(register))
+        .route("/v1/auth/login", post(login))
         .route("/v1/session", get(session))
-        .with_state(AppState { config })
+        .route(
+            "/v1/organizations",
+            get(list_organizations).post(create_organization),
+        )
+        .route(
+            "/v1/workspaces",
+            get(list_workspaces).post(create_workspace),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/overview",
+            get(workspace_overview),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/artifacts",
+            get(list_artifacts),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/artifacts/text",
+            post(create_text_artifact),
+        )
+        .route(
+            "/v1/artifacts/{artifact_id}",
+            get(get_artifact),
+        )
+        .route(
+            "/v1/artifacts/{artifact_id}/index",
+            post(index_artifact),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/index",
+            post(index_workspace),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/search",
+            post(search_workspace),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/memory-cards",
+            get(list_memory_cards).post(create_memory_card),
+        )
+        .route(
+            "/v1/memory-cards/{card_id}",
+            get(get_memory_card),
+        )
+        .route(
+            "/v1/memory-cards/{card_id}/export",
+            get(export_memory_card),
+        )
+        .layer(TraceLayer::new_for_http())
+        .layer(cors)
+        .with_state(state))
 }
 
-async fn health(State(state): State<AppState>) -> impl IntoResponse {
+async fn health() -> Json<HealthResponse> {
     Json(HealthResponse {
-        service: state.config.service_name,
+        service: "repomemo-server".to_owned(),
         status: "ok",
-        mode: "shared-backend-foundation",
+        authentication: "jwt",
     })
 }
 
-async fn session(
+async fn register(
     State(state): State<AppState>,
-    headers: HeaderMap,
-) -> Result<Json<SharedSession>, StatusCode> {
-    if !state.config.allow_dummy_sessions {
-        return Err(StatusCode::UNAUTHORIZED);
+    Json(request): Json<RegisterRequest>,
+) -> Result<(StatusCode, Json<TokenResponse>), ApiError> {
+    validate_registration(&request)?;
+    if state
+        .storage
+        .find_user_for_auth(&request.email)
+        .await
+        .map_err(map_storage_error)?
+        .is_some()
+    {
+        return Err(ApiError::conflict(
+            "An account already exists for this email address.",
+        ));
     }
+    let password_hash = hash_password(&request.password)?;
+    let user = state
+        .storage
+        .create_user(&request.email, &request.display_name, &password_hash)
+        .await
+        .map_err(ApiError::internal)?;
+    let response = issue_token(&state.jwt_secret, user)?;
+    Ok((StatusCode::CREATED, Json(response)))
+}
 
-    let user_id = header_value(&headers, &USER_ID_HEADER).unwrap_or("demo-user");
-    let display_name = header_value(&headers, &USER_NAME_HEADER).unwrap_or("Demo User");
-
-    if user_id.trim().is_empty() || display_name.trim().is_empty() {
-        return Err(StatusCode::BAD_REQUEST);
+async fn login(
+    State(state): State<AppState>,
+    Json(request): Json<LoginRequest>,
+) -> Result<Json<TokenResponse>, ApiError> {
+    let account = state
+        .storage
+        .find_user_for_auth(&request.email)
+        .await
+        .map_err(|_| invalid_credentials())?;
+    let Some(account) = account else {
+        return Err(invalid_credentials());
+    };
+    if !verify_password(&request.password, &account.password_hash) {
+        return Err(invalid_credentials());
     }
+    Ok(Json(issue_token(&state.jwt_secret, account.user)?))
+}
 
+async fn session(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+) -> Result<Json<SharedSession>, ApiError> {
+    let user = state
+        .storage
+        .find_user(&subject.user_id)
+        .await
+        .map_err(ApiError::internal)?
+        .ok_or_else(ApiError::unauthorized)?;
+    let memberships = state
+        .storage
+        .workspace_memberships_for_user(&subject.user_id)
+        .await
+        .map_err(ApiError::internal)?;
     Ok(Json(SharedSession {
-        user: SharedUser {
-            id: user_id.to_owned(),
-            display_name: display_name.to_owned(),
-            email: None,
-        },
-        authentication: "dummy-session".to_owned(),
-        memberships: vec![WorkspaceMembership {
-            workspace_id: "demo-workspace".to_owned(),
-            role: WorkspaceRole::Owner,
-        }],
+        user,
+        authentication: "jwt".to_owned(),
+        memberships,
     }))
 }
 
-fn header_value<'a>(headers: &'a HeaderMap, name: &HeaderName) -> Option<&'a str> {
-    headers.get(name).and_then(|value| value.to_str().ok())
+async fn create_organization(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Json(request): Json<CreateOrganizationRequest>,
+) -> Result<(StatusCode, Json<Organization>), ApiError> {
+    let organization = state
+        .storage
+        .create_organization(&subject.user_id, &request.name)
+        .await
+        .map_err(map_storage_error)?;
+    Ok((StatusCode::CREATED, Json(organization)))
+}
+
+async fn list_organizations(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+) -> Result<Json<Vec<Organization>>, ApiError> {
+    state
+        .storage
+        .list_organizations_for_user(&subject.user_id)
+        .await
+        .map(Json)
+        .map_err(ApiError::internal)
+}
+
+async fn create_workspace(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Json(request): Json<CreateWorkspaceRequest>,
+) -> Result<(StatusCode, Json<SharedWorkspace>), ApiError> {
+    let workspace = state
+        .storage
+        .create_shared_workspace(&subject.user_id, &request.organization_id, &request.name)
+        .await
+        .map_err(map_storage_error)?;
+    Ok((StatusCode::CREATED, Json(workspace)))
+}
+
+async fn list_workspaces(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+) -> Result<Json<Vec<SharedWorkspace>>, ApiError> {
+    state
+        .storage
+        .list_shared_workspaces_for_user(&subject.user_id)
+        .await
+        .map(Json)
+        .map_err(ApiError::internal)
+}
+
+async fn workspace_overview(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+) -> Result<Json<WorkspaceOverview>, ApiError> {
+    require_workspace_read(&state, &subject, &workspace_id).await?;
+    state
+        .core
+        .workspace_overview(workspace_id)
+        .await
+        .map(Json)
+        .map_err(map_core_error)
+}
+
+async fn list_artifacts(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+) -> Result<Json<Vec<ArtifactSummary>>, ApiError> {
+    require_workspace_read(&state, &subject, &workspace_id).await?;
+    state
+        .core
+        .list_artifacts(workspace_id)
+        .await
+        .map(Json)
+        .map_err(map_core_error)
+}
+
+async fn create_text_artifact(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+    Json(request): Json<CreateTextArtifactRequest>,
+) -> Result<(StatusCode, Json<ArtifactSummary>), ApiError> {
+    require_workspace_write(&state, &subject, &workspace_id).await?;
+    let artifact = state
+        .core
+        .import_text(workspace_id, request.title, request.content, request.language)
+        .await
+        .map_err(map_core_error)?;
+    Ok((StatusCode::CREATED, Json(artifact)))
+}
+
+async fn get_artifact(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(artifact_id): Path<String>,
+) -> Result<Json<ArtifactDetail>, ApiError> {
+    let artifact = state
+        .core
+        .get_artifact(artifact_id)
+        .await
+        .map_err(map_core_error)?;
+    require_workspace_read(&state, &subject, &artifact.summary.workspace_id).await?;
+    Ok(Json(artifact))
+}
+
+async fn index_artifact(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(artifact_id): Path<String>,
+) -> Result<Json<IndexingJobStatus>, ApiError> {
+    let artifact = state
+        .core
+        .get_artifact(artifact_id.clone())
+        .await
+        .map_err(map_core_error)?;
+    require_workspace_write(&state, &subject, &artifact.summary.workspace_id).await?;
+    state
+        .core
+        .index_artifact(artifact_id)
+        .await
+        .map(Json)
+        .map_err(map_core_error)
+}
+
+async fn index_workspace(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+) -> Result<Json<IndexingJobStatus>, ApiError> {
+    require_workspace_write(&state, &subject, &workspace_id).await?;
+    state
+        .core
+        .index_workspace(workspace_id)
+        .await
+        .map(Json)
+        .map_err(map_core_error)
+}
+
+async fn search_workspace(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+    Json(request): Json<SearchWorkspaceRequest>,
+) -> Result<Json<Vec<SearchResult>>, ApiError> {
+    require_workspace_read(&state, &subject, &workspace_id).await?;
+    let result = state
+        .core
+        .search_workspace(SearchRequest {
+            workspace_id,
+            query: request.query,
+            artifact_types: request.artifact_types,
+            languages: request.languages,
+            source_ids: request.source_ids,
+            limit: request.limit,
+        })
+        .await
+        .map_err(map_core_error)?;
+    Ok(Json(result))
+}
+
+async fn list_memory_cards(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+) -> Result<Json<Vec<MemoryCardSummary>>, ApiError> {
+    require_workspace_read(&state, &subject, &workspace_id).await?;
+    state
+        .core
+        .list_memory_cards(workspace_id)
+        .await
+        .map(Json)
+        .map_err(map_core_error)
+}
+
+async fn create_memory_card(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+    Json(request): Json<CreateMemoryCardBody>,
+) -> Result<(StatusCode, Json<MemoryCard>), ApiError> {
+    require_workspace_write(&state, &subject, &workspace_id).await?;
+    let card = state
+        .core
+        .create_memory_card(CreateMemoryCardRequest {
+            workspace_id,
+            title: request.title,
+            body_markdown: request.body_markdown,
+            source: request.source,
+            confidence: request.confidence,
+            citations: request.citations,
+        })
+        .await
+        .map_err(map_core_error)?;
+    Ok((StatusCode::CREATED, Json(card)))
+}
+
+async fn get_memory_card(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(card_id): Path<String>,
+) -> Result<Json<MemoryCardDetail>, ApiError> {
+    let card = state
+        .core
+        .get_memory_card(card_id)
+        .await
+        .map_err(map_core_error)?;
+    require_workspace_read(&state, &subject, &card.card.workspace_id).await?;
+    Ok(Json(card))
+}
+
+async fn export_memory_card(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(card_id): Path<String>,
+) -> Result<Response, ApiError> {
+    let card = state
+        .core
+        .get_memory_card(card_id.clone())
+        .await
+        .map_err(map_core_error)?;
+    require_workspace_read(&state, &subject, &card.card.workspace_id).await?;
+    let markdown = state
+        .core
+        .export_memory_card(card_id)
+        .await
+        .map_err(map_core_error)?;
+    Ok(([(header::CONTENT_TYPE, "text/markdown; charset=utf-8")], markdown).into_response())
+}
+
+async fn require_workspace_read(
+    state: &AppState,
+    subject: &AuthenticatedSubject,
+    workspace_id: &str,
+) -> Result<WorkspaceRole, ApiError> {
+    state
+        .storage
+        .workspace_role_for_user(&subject.user_id, workspace_id)
+        .await
+        .map_err(ApiError::internal)?
+        .ok_or_else(ApiError::forbidden)
+}
+
+async fn require_workspace_write(
+    state: &AppState,
+    subject: &AuthenticatedSubject,
+    workspace_id: &str,
+) -> Result<WorkspaceRole, ApiError> {
+    let role = require_workspace_read(state, subject, workspace_id).await?;
+    if matches!(role, WorkspaceRole::Viewer) {
+        return Err(ApiError::forbidden());
+    }
+    Ok(role)
+}
+
+impl FromRequestParts<AppState> for AuthenticatedSubject {
+    type Rejection = ApiError;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
+        let header_value = parts
+            .headers
+            .get(header::AUTHORIZATION)
+            .and_then(|value| value.to_str().ok())
+            .ok_or_else(ApiError::unauthorized)?;
+        let token = header_value
+            .strip_prefix("Bearer ")
+            .ok_or_else(ApiError::unauthorized)?;
+        let mut validation = Validation::new(Algorithm::HS256);
+        validation.set_issuer(&[JWT_ISSUER]);
+        let claims = decode::<JwtClaims>(
+            token,
+            &DecodingKey::from_secret(state.jwt_secret.as_bytes()),
+            &validation,
+        )
+        .map_err(|_| ApiError::unauthorized())?
+        .claims;
+        Ok(Self {
+            user_id: claims.sub,
+        })
+    }
+}
+
+fn validate_registration(request: &RegisterRequest) -> Result<(), ApiError> {
+    if request.display_name.trim().is_empty() || request.display_name.trim().len() > 120 {
+        return Err(ApiError::bad_request(
+            "Display name must be between 1 and 120 characters.",
+        ));
+    }
+    if request.password.len() < 12 || request.password.len() > 1024 {
+        return Err(ApiError::bad_request(
+            "Password must be between 12 and 1024 characters.",
+        ));
+    }
+    Ok(())
+}
+
+fn hash_password(password: &str) -> Result<String, ApiError> {
+    let salt = SaltString::generate(&mut OsRng);
+    Argon2::default()
+        .hash_password(password.as_bytes(), &salt)
+        .map(|hash| hash.to_string())
+        .map_err(ApiError::internal)
+}
+
+fn verify_password(password: &str, stored_hash: &str) -> bool {
+    PasswordHash::new(stored_hash)
+        .ok()
+        .and_then(|hash| {
+            Argon2::default()
+                .verify_password(password.as_bytes(), &hash)
+                .ok()
+        })
+        .is_some()
+}
+
+fn issue_token(secret: &str, user: SharedUser) -> Result<TokenResponse, ApiError> {
+    let now = Utc::now();
+    let expires_at = now + ChronoDuration::minutes(ACCESS_TOKEN_TTL_MINUTES);
+    let claims = JwtClaims {
+        sub: user.id.clone(),
+        email: user.email.clone().unwrap_or_default(),
+        iss: JWT_ISSUER.to_owned(),
+        iat: now.timestamp() as usize,
+        exp: expires_at.timestamp() as usize,
+    };
+    let access_token = encode(
+        &Header::new(Algorithm::HS256),
+        &claims,
+        &EncodingKey::from_secret(secret.as_bytes()),
+    )
+    .map_err(ApiError::internal)?;
+    Ok(TokenResponse {
+        access_token,
+        token_type: "Bearer",
+        expires_in: Duration::from_secs(ACCESS_TOKEN_TTL_MINUTES as u64 * 60).as_secs(),
+        user,
+    })
+}
+
+fn invalid_credentials() -> ApiError {
+    ApiError {
+        status: StatusCode::UNAUTHORIZED,
+        code: "invalid_credentials",
+        message: "Email or password is incorrect.".to_owned(),
+    }
+}
+
+fn map_storage_error(error: anyhow::Error) -> ApiError {
+    let message = error.to_string();
+    if message.contains("UNIQUE constraint failed") {
+        ApiError::conflict("This record already exists.")
+    } else if message.contains("not a member")
+        || message.contains("must be between")
+        || message.contains("valid email")
+    {
+        ApiError::bad_request(message)
+    } else {
+        ApiError::internal(error)
+    }
+}
+
+fn map_core_error(error: anyhow::Error) -> ApiError {
+    let message = error.to_string();
+    if message.contains("was not found")
+        || message.contains("is required")
+        || message.contains("cannot be empty")
+        || message.contains("must be between")
+    {
+        ApiError::bad_request(message)
+    } else {
+        ApiError::internal(error)
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use axum::{body::Body, http::Request};
+    use super::{router, ServerConfig};
+    use axum::{body::{to_bytes, Body}, http::Request};
+    use serde_json::{json, Value};
     use tower::ServiceExt;
 
-    use super::{router, ServerConfig};
-
     #[tokio::test]
-    async fn exposes_a_dummy_session_for_local_development() {
-        let response = router(ServerConfig::default())
-            .oneshot(
-                Request::builder()
-                    .uri("/v1/session")
-                    .header("x-repomemo-user-id", "amina")
-                    .header("x-repomemo-user-name", "Amina")
-                    .body(Body::empty())
-                    .unwrap(),
-            )
+    async fn registers_and_protects_shared_workspace_routes() {
+        let data_dir =
+            std::env::temp_dir().join(format!("repomemo-server-test-{}", uuid::Uuid::new_v4()));
+        let app = router(ServerConfig::for_test(data_dir.clone()))
             .await
             .unwrap();
-
-        assert_eq!(response.status(), 200);
+        let register = Request::builder().method("POST").uri("/v1/auth/register").header("content-type", "application/json")
+            .body(Body::from(r#"{"email":"owner@example.com","display_name":"Owner","password":"not-a-real-password"}"#)).unwrap();
+        let response = app.clone().oneshot(register).await.unwrap();
+        assert_eq!(response.status(), 201);
+        let registration: Value = serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
+        let token = registration["access_token"].as_str().unwrap();
+        let protected = Request::builder()
+            .uri("/v1/workspaces")
+            .body(Body::empty())
+            .unwrap();
+        let response = app.oneshot(protected).await.unwrap();
+        assert_eq!(response.status(), 401);
+        let _ = std::fs::remove_dir_all(data_dir);
     }
 
     #[tokio::test]
-    async fn rejects_dummy_identity_without_explicit_development_configuration() {
-        let response = router(ServerConfig {
-            service_name: "test".to_owned(),
-            allow_dummy_sessions: false,
-        })
-        .oneshot(
-            Request::builder()
-                .uri("/v1/session")
-                .body(Body::empty())
-                .unwrap(),
-        )
-        .await
-        .unwrap();
+    async fn protects_and_serves_shared_evidence_flow() {
+        let data_dir = std::env::temp_dir().join(format!("repomemo-server-flow-{}", uuid::Uuid::new_v4()));
+        let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+        let response = app.clone().oneshot(Request::builder().method("POST").uri("/v1/auth/register").header("content-type", "application/json")
+            .body(Body::from(r#"{"email":"flow@example.com","display_name":"Flow Owner","password":"not-a-real-password"}"#)).unwrap()).await.unwrap();
+        let registration: Value = serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
+        let authorization = format!("Bearer {}", registration["access_token"].as_str().unwrap());
 
-        assert_eq!(response.status(), 401);
+        let organization = app.clone().oneshot(json_request("POST", "/v1/organizations", &authorization, json!({"name":"Flow Team"}))).await.unwrap();
+        assert_eq!(organization.status(), 201);
+        let organization: Value = serde_json::from_slice(&to_bytes(organization.into_body(), usize::MAX).await.unwrap()).unwrap();
+        let workspace = app.clone().oneshot(json_request("POST", "/v1/workspaces", &authorization, json!({"organization_id": organization["id"], "name":"Flow Workspace"}))).await.unwrap();
+        assert_eq!(workspace.status(), 201);
+        let workspace: Value = serde_json::from_slice(&to_bytes(workspace.into_body(), usize::MAX).await.unwrap()).unwrap();
+        let workspace_id = workspace["workspace"]["id"].as_str().unwrap();
+
+        let artifact = app.clone().oneshot(json_request("POST", &format!("/v1/workspaces/{workspace_id}/artifacts/text"), &authorization, json!({"title":"Shared fact", "content":"The API owns shared data.", "language":"Markdown"}))).await.unwrap();
+        assert_eq!(artifact.status(), 201);
+        let artifact: Value = serde_json::from_slice(&to_bytes(artifact.into_body(), usize::MAX).await.unwrap()).unwrap();
+        let artifact_id = artifact["id"].as_str().unwrap();
+
+        let indexed = app.clone().oneshot(auth_request("POST", &format!("/v1/artifacts/{artifact_id}/index"), &authorization)).await.unwrap();
+        assert_eq!(indexed.status(), 200);
+        let search = app.clone().oneshot(json_request("POST", &format!("/v1/workspaces/{workspace_id}/search"), &authorization, json!({"query":"shared data", "artifact_types": [], "languages": [], "source_ids": [], "limit": 20}))).await.unwrap();
+        assert_eq!(search.status(), 200);
+        let memory = app.clone().oneshot(json_request("POST", &format!("/v1/workspaces/{workspace_id}/memory-cards"), &authorization, json!({"title":"Rule", "body_markdown":"Keep shared data on the API.", "source":"Flow", "confidence": null, "citations": []}))).await.unwrap();
+        assert_eq!(memory.status(), 201);
+        let overview = app.clone().oneshot(auth_request("GET", &format!("/v1/workspaces/{workspace_id}/overview"), &authorization)).await.unwrap();
+        assert_eq!(overview.status(), 200);
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    fn auth_request(method: &str, uri: &str, authorization: &str) -> Request<Body> {
+        Request::builder().method(method).uri(uri).header("authorization", authorization).body(Body::empty()).unwrap()
+    }
+
+    fn json_request(method: &str, uri: &str, authorization: &str, body: Value) -> Request<Body> {
+        Request::builder().method(method).uri(uri).header("authorization", authorization).header("content-type", "application/json").body(Body::from(body.to_string())).unwrap()
     }
 }

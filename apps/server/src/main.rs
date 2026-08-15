@@ -1,5 +1,3 @@
-use std::net::SocketAddr;
-
 use repomemo_server::{router, ServerConfig};
 use tokio::net::TcpListener;
 use tracing::info;
@@ -15,16 +13,17 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let address = std::env::var("REPOMEMO_SERVER_ADDR")
-        .unwrap_or_else(|_| "127.0.0.1:8787".to_owned())
-        .parse::<SocketAddr>()
-        .expect("REPOMEMO_SERVER_ADDR must be a valid socket address");
+    let config = ServerConfig::from_env().expect("Invalid RepoMemo server configuration");
+    let address = config.bind_address;
     let listener = TcpListener::bind(address)
         .await
         .expect("failed to bind RepoMemo server address");
 
     info!(%address, "RepoMemo shared-backend foundation is listening");
-    axum::serve(listener, router(ServerConfig::from_env()))
+    let app = router(config)
+        .await
+        .expect("Failed to initialize RepoMemo server storage");
+    axum::serve(listener, app)
         .await
         .expect("RepoMemo server stopped unexpectedly");
 }

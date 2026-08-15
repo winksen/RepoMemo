@@ -4,9 +4,10 @@ use anyhow::{bail, Context, Result};
 use chrono::Utc;
 use repomemo_domain::{
     ArtifactDetail, ArtifactSummary, ArtifactType, Chunk, Citation, IndexingJobStatus, MemoryCard,
-    MemoryCardDetail, MemoryCardSummary, MemoryEvidence, ProviderSettings, SearchRequest,
-    SearchResult, Source, SourceType, Symbol, SymbolKind, SymbolSearchResult, Workspace,
-    WorkspaceOverview,
+    MemoryCardDetail, MemoryCardSummary, MemoryEvidence, Organization, ProviderSettings,
+    SearchRequest, SearchResult, SharedUser, SharedWorkspace, Source, SourceType, Symbol,
+    SymbolKind, SymbolSearchResult, Workspace, WorkspaceMembership, WorkspaceOverview,
+    WorkspaceRole,
 };
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -33,6 +34,33 @@ struct WorkspaceRow {
     created_at: String,
     updated_at: String,
     settings_json: String,
+}
+
+#[derive(Debug, sqlx::FromRow)]
+struct UserRow {
+    id: String,
+    email: String,
+    display_name: String,
+    password_hash: String,
+}
+
+#[derive(Debug, sqlx::FromRow)]
+struct OrganizationRow {
+    id: String,
+    name: String,
+    created_at: String,
+    updated_at: String,
+}
+
+#[derive(Debug, sqlx::FromRow)]
+struct SharedWorkspaceRow {
+    id: String,
+    name: String,
+    created_at: String,
+    updated_at: String,
+    settings_json: String,
+    organization_id: String,
+    role: String,
 }
 
 #[derive(Debug, sqlx::FromRow)]
@@ -230,6 +258,12 @@ pub struct StoredArtifact {
     pub created: bool,
 }
 
+#[derive(Debug, Clone)]
+pub struct StoredUser {
+    pub user: SharedUser,
+    pub password_hash: String,
+}
+
 impl StorageEngine {
     pub async fn open(config: StorageConfig) -> Result<Self> {
         tokio::fs::create_dir_all(&config.data_dir).await?;
@@ -321,6 +355,219 @@ impl StorageEngine {
         .await?;
 
         Ok(rows.into_iter().map(Workspace::from).collect())
+    }
+
+    pub async fn create_user(
+        &self,
+        email: &str,
+        display_name: &str,
+        password_hash: &str,
+    ) -> Result<SharedUser> {
+        let id = Uuid::new_v4().to_string();
+        let now = Utc::now().to_rfc3339();
+        let email = normalize_email(email)?;
+
+        sqlx::query(
+            "INSERT INTO users (id, email, display_name, password_hash, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        )
+        .bind(&id)
+        .bind(&email)
+        .bind(display_name.trim())
+        .bind(password_hash)
+        .bind(&now)
+        .bind(&now)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(SharedUser {
+            id,
+            email: Some(email),
+            display_name: display_name.trim().to_owned(),
+        })
+    }
+
+    pub async fn find_user_for_auth(&self, email: &str) -> Result<Option<StoredUser>> {
+        let email = normalize_email(email)?;
+        let row = sqlx::query_as::<_, UserRow>(
+            "SELECT id, email, display_name, password_hash FROM users WHERE email = ?1",
+        )
+        .bind(email)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(row.map(StoredUser::from))
+    }
+
+    pub async fn find_user(&self, user_id: &str) -> Result<Option<SharedUser>> {
+        let row = sqlx::query_as::<_, UserRow>(
+            "SELECT id, email, display_name, password_hash FROM users WHERE id = ?1",
+        )
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(row.map(|row| StoredUser::from(row).user))
+    }
+
+    pub async fn create_organization(&self, owner_id: &str, name: &str) -> Result<Organization> {
+        let id = Uuid::new_v4().to_string();
+        let now = Utc::now().to_rfc3339();
+        let name = require_name(name, "Organization name")?;
+        let mut tx = self.pool.begin().await?;
+
+        sqlx::query(
+            "INSERT INTO organizations (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)",
+        )
+        .bind(&id)
+        .bind(&name)
+        .bind(&now)
+        .bind(&now)
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query(
+            "INSERT INTO organization_memberships (organization_id, user_id, role, created_at) VALUES (?1, ?2, 'owner', ?3)",
+        )
+        .bind(&id)
+        .bind(owner_id)
+        .bind(&now)
+        .execute(&mut *tx)
+        .await?;
+        tx.commit().await?;
+
+        Ok(Organization {
+            id,
+            name,
+            created_at: now.clone(),
+            updated_at: now,
+        })
+    }
+
+    pub async fn list_organizations_for_user(&self, user_id: &str) -> Result<Vec<Organization>> {
+        let rows = sqlx::query_as::<_, OrganizationRow>(
+            "SELECT o.id, o.name, o.created_at, o.updated_at FROM organizations o INNER JOIN organization_memberships m ON m.organization_id = o.id WHERE m.user_id = ?1 ORDER BY o.name ASC",
+        )
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows.into_iter().map(Organization::from).collect())
+    }
+
+    pub async fn user_belongs_to_organization(
+        &self,
+        user_id: &str,
+        organization_id: &str,
+    ) -> Result<bool> {
+        let count = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM organization_memberships WHERE organization_id = ?1 AND user_id = ?2",
+        )
+        .bind(organization_id)
+        .bind(user_id)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(count > 0)
+    }
+
+    pub async fn create_shared_workspace(
+        &self,
+        owner_id: &str,
+        organization_id: &str,
+        name: &str,
+    ) -> Result<SharedWorkspace> {
+        if !self
+            .user_belongs_to_organization(owner_id, organization_id)
+            .await?
+        {
+            bail!("User is not a member of this organization.");
+        }
+        let id = Uuid::new_v4().to_string();
+        let now = Utc::now().to_rfc3339();
+        let name = require_name(name, "Workspace name")?;
+        let mut tx = self.pool.begin().await?;
+
+        sqlx::query("INSERT INTO workspaces (id, name, created_at, updated_at, settings_json) VALUES (?1, ?2, ?3, ?4, '{}')")
+            .bind(&id)
+            .bind(&name)
+            .bind(&now)
+            .bind(&now)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query(
+            "INSERT INTO workspace_organizations (workspace_id, organization_id) VALUES (?1, ?2)",
+        )
+        .bind(&id)
+        .bind(organization_id)
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query("INSERT INTO workspace_memberships (workspace_id, user_id, role, created_at, updated_at) VALUES (?1, ?2, 'owner', ?3, ?4)")
+            .bind(&id)
+            .bind(owner_id)
+            .bind(&now)
+            .bind(&now)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+
+        Ok(SharedWorkspace {
+            workspace: Workspace {
+                id,
+                name,
+                created_at: now.clone(),
+                updated_at: now,
+                settings: Value::Object(Default::default()),
+            },
+            organization_id: organization_id.to_owned(),
+            role: WorkspaceRole::Owner,
+        })
+    }
+
+    pub async fn list_shared_workspaces_for_user(
+        &self,
+        user_id: &str,
+    ) -> Result<Vec<SharedWorkspace>> {
+        let rows = sqlx::query_as::<_, SharedWorkspaceRow>(
+            "SELECT w.id, w.name, w.created_at, w.updated_at, w.settings_json, wo.organization_id, wm.role FROM workspaces w INNER JOIN workspace_organizations wo ON wo.workspace_id = w.id INNER JOIN workspace_memberships wm ON wm.workspace_id = w.id WHERE wm.user_id = ?1 ORDER BY w.updated_at DESC, w.name ASC",
+        )
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        rows.into_iter().map(SharedWorkspace::try_from).collect()
+    }
+
+    pub async fn workspace_memberships_for_user(
+        &self,
+        user_id: &str,
+    ) -> Result<Vec<WorkspaceMembership>> {
+        let rows = sqlx::query_as::<_, (String, String)>(
+            "SELECT workspace_id, role FROM workspace_memberships WHERE user_id = ?1",
+        )
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await?;
+        rows.into_iter()
+            .map(|(workspace_id, role)| {
+                Ok(WorkspaceMembership {
+                    workspace_id,
+                    role: workspace_role_from_db(&role)?,
+                })
+            })
+            .collect()
+    }
+
+    pub async fn workspace_role_for_user(
+        &self,
+        user_id: &str,
+        workspace_id: &str,
+    ) -> Result<Option<WorkspaceRole>> {
+        let role = sqlx::query_scalar::<_, String>(
+            "SELECT role FROM workspace_memberships WHERE workspace_id = ?1 AND user_id = ?2",
+        )
+        .bind(workspace_id)
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        role.map(|role| workspace_role_from_db(&role)).transpose()
     }
 
     pub async fn create_or_get_source(
@@ -1546,6 +1793,48 @@ impl From<WorkspaceRow> for Workspace {
     }
 }
 
+impl From<UserRow> for StoredUser {
+    fn from(row: UserRow) -> Self {
+        Self {
+            user: SharedUser {
+                id: row.id,
+                display_name: row.display_name,
+                email: Some(row.email),
+            },
+            password_hash: row.password_hash,
+        }
+    }
+}
+
+impl From<OrganizationRow> for Organization {
+    fn from(row: OrganizationRow) -> Self {
+        Self {
+            id: row.id,
+            name: row.name,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+        }
+    }
+}
+
+impl TryFrom<SharedWorkspaceRow> for SharedWorkspace {
+    type Error = anyhow::Error;
+
+    fn try_from(row: SharedWorkspaceRow) -> Result<Self> {
+        Ok(Self {
+            workspace: Workspace {
+                id: row.id,
+                name: row.name,
+                created_at: row.created_at,
+                updated_at: row.updated_at,
+                settings: serde_json::from_str(&row.settings_json).unwrap_or(Value::Null),
+            },
+            organization_id: row.organization_id,
+            role: workspace_role_from_db(&row.role)?,
+        })
+    }
+}
+
 impl From<SourceRow> for Source {
     fn from(row: SourceRow) -> Self {
         let metadata = serde_json::from_str(&row.metadata_json)
@@ -1757,6 +2046,32 @@ impl From<MemoryEvidenceRow> for MemoryEvidence {
             end_line: row.end_line,
             exists,
         }
+    }
+}
+
+fn normalize_email(value: &str) -> Result<String> {
+    let email = value.trim().to_ascii_lowercase();
+    if email.len() > 254 || !email.contains('@') || email.starts_with('@') || email.ends_with('@') {
+        bail!("A valid email address is required.");
+    }
+    Ok(email)
+}
+
+fn require_name(value: &str, field: &str) -> Result<String> {
+    let value = value.trim();
+    if value.is_empty() || value.len() > 120 {
+        bail!("{field} must be between 1 and 120 characters.");
+    }
+    Ok(value.to_owned())
+}
+
+fn workspace_role_from_db(value: &str) -> Result<WorkspaceRole> {
+    match value {
+        "owner" => Ok(WorkspaceRole::Owner),
+        "admin" => Ok(WorkspaceRole::Admin),
+        "member" => Ok(WorkspaceRole::Member),
+        "viewer" => Ok(WorkspaceRole::Viewer),
+        _ => bail!("Unknown workspace role: {value}"),
     }
 }
 

@@ -29,32 +29,34 @@ not a new orchestration backend in another language.
 
 ## Current Foundation
 
-This change introduces a runnable server foundation and worker process:
+This change introduces a runnable server, server-owned identity storage, and a
+worker process:
 
 - `GET /health` identifies an available shared-backend instance.
-- `GET /v1/session` returns a dummy session for local development.
-- `x-repomemo-user-id` and `x-repomemo-user-name` can override the demo user.
+- `POST /v1/auth/register` creates a password-protected user account.
+- `POST /v1/auth/login` exchanges credentials for an expiring JWT access token.
+- `GET /v1/session` requires a bearer token and returns the authenticated user.
+- organization and workspace routes require a bearer token.
 - the worker has an independent lifecycle and is ready to claim durable jobs.
 - shared client identity contracts live in `repomemo-domain`.
 
-This is deliberately not yet a collaboration data plane. The current endpoint
-does not read or write the desktop SQLite database, and the worker does not yet
-claim jobs. That prevents accidentally presenting local single-user storage as
-shared, permission-aware storage.
+The server has a separate, server-owned SQLite data directory for development.
+It does not read or write the desktop SQLite database, and the worker does not
+yet claim jobs. This prevents accidentally presenting local single-user storage
+as shared, permission-aware storage. PostgreSQL remains the production data
+plane milestone.
 
 Run the foundation locally:
 
 ```powershell
-$env:REPOMEMO_ALLOW_DUMMY_SESSIONS = 'true'
+$env:REPOMEMO_JWT_SECRET = 'replace-this-with-a-random-development-secret-of-at-least-32-characters'
 cargo run -p repomemo-server
 cargo run -p repomemo-worker
 Invoke-RestMethod http://127.0.0.1:8787/health
-Invoke-RestMethod http://127.0.0.1:8787/v1/session
 ```
 
-Dummy sessions require `REPOMEMO_ALLOW_DUMMY_SESSIONS=true`. The server rejects
-them by default so an externally bound deployment cannot accidentally use demo
-identity.
+The API requires `REPOMEMO_JWT_SECRET` with at least 32 characters. It uses
+Argon2id password hashes and validates signed, one-hour JWT access tokens.
 
 The desktop application continues to run unchanged with `npm.cmd run dev`.
 
@@ -82,12 +84,13 @@ Exit criteria:
 - every workspace query is scoped to an authenticated member;
 - audit records exist for membership and workspace changes.
 
-### 2. Dummy sessions become a server identity boundary
+### 2. Production identity and authorization hardening
 
-Keep the `SharedSession` response shape. Replace only the identity issuer:
+Keep the `SharedSession` response shape. Replace the local password issuer when
+an external identity provider is required:
 
 ```text
-now:     development headers -> dummy session
+now:     Argon2id password -> signed JWT access token
 later:   OIDC/session token -> validated user and memberships
 ```
 
