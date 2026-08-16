@@ -26,6 +26,14 @@ pub struct WorkspaceMembership {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkspaceMember {
+    pub user: SharedUser,
+    pub role: WorkspaceRole,
+    pub joined_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SharedSession {
     pub user: SharedUser,
     pub authentication: String,

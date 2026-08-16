@@ -12,7 +12,7 @@ use axum::{
     extract::{DefaultBodyLimit, FromRequestParts, Path, State},
     http::{header, request::Parts, HeaderMap, HeaderName, HeaderValue, Method, StatusCode},
     response::{IntoResponse, Response},
-    routing::{get, post},
+    routing::{delete, get, post},
     Json, Router,
 };
 use chrono::{Duration as ChronoDuration, Utc};
@@ -22,7 +22,7 @@ use repomemo_api::RepoMemoCore;
 use repomemo_domain::{
     ArtifactDetail, ArtifactSummary, Citation, CreateMemoryCardRequest, IndexingJobStatus,
     MemoryCard, MemoryCardDetail, MemoryCardSummary, Organization, SearchRequest, SearchResult,
-    SharedSession, SharedUser, SharedWorkspace, WorkspaceOverview, WorkspaceRole,
+    SharedSession, SharedUser, SharedWorkspace, WorkspaceMember, WorkspaceOverview, WorkspaceRole,
 };
 use repomemo_storage::{StorageConfig, StorageEngine};
 use serde::{Deserialize, Serialize};
@@ -226,6 +226,12 @@ struct CreateMemoryCardBody {
     citations: Vec<Citation>,
 }
 
+#[derive(Debug, Deserialize)]
+struct UpsertWorkspaceMemberRequest {
+    email: String,
+    role: WorkspaceRole,
+}
+
 #[derive(Debug, Serialize)]
 struct TokenResponse {
     access_token: String,
@@ -262,7 +268,7 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
     let cors = match config.allowed_origin {
         Some(origin) => CorsLayer::new()
             .allow_origin(origin)
-            .allow_methods([Method::GET, Method::POST])
+            .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
             .allow_headers([
                 header::AUTHORIZATION,
                 header::CONTENT_TYPE,
@@ -287,6 +293,14 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
         .route(
             "/v1/workspaces/{workspace_id}/overview",
             get(workspace_overview),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/members",
+            get(list_workspace_members).put(upsert_workspace_member),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/members/{user_id}",
+            delete(remove_workspace_member),
         )
         .route(
             "/v1/workspaces/{workspace_id}/artifacts",
@@ -470,6 +484,52 @@ async fn workspace_overview(
         .await
         .map(Json)
         .map_err(map_core_error)
+}
+
+async fn list_workspace_members(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+) -> Result<Json<Vec<WorkspaceMember>>, ApiError> {
+    require_workspace_read(&state, &subject, &workspace_id).await?;
+    state
+        .storage
+        .list_workspace_members(&workspace_id)
+        .await
+        .map(Json)
+        .map_err(map_storage_error)
+}
+
+async fn upsert_workspace_member(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+    Json(request): Json<UpsertWorkspaceMemberRequest>,
+) -> Result<Json<WorkspaceMember>, ApiError> {
+    let caller_role = require_workspace_admin(&state, &subject, &workspace_id).await?;
+    if matches!(caller_role, WorkspaceRole::Admin) && matches!(request.role, WorkspaceRole::Admin) {
+        return Err(ApiError::forbidden());
+    }
+    state
+        .storage
+        .upsert_workspace_member(&workspace_id, &request.email, request.role)
+        .await
+        .map(Json)
+        .map_err(map_storage_error)
+}
+
+async fn remove_workspace_member(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path((workspace_id, user_id)): Path<(String, String)>,
+) -> Result<StatusCode, ApiError> {
+    require_workspace_admin(&state, &subject, &workspace_id).await?;
+    state
+        .storage
+        .remove_workspace_member(&workspace_id, &user_id)
+        .await
+        .map_err(map_storage_error)?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 async fn list_artifacts(
@@ -690,6 +750,18 @@ async fn require_workspace_write(
     Ok(role)
 }
 
+async fn require_workspace_admin(
+    state: &AppState,
+    subject: &AuthenticatedSubject,
+    workspace_id: &str,
+) -> Result<WorkspaceRole, ApiError> {
+    let role = require_workspace_read(state, subject, workspace_id).await?;
+    if !matches!(role, WorkspaceRole::Owner | WorkspaceRole::Admin) {
+        return Err(ApiError::forbidden());
+    }
+    Ok(role)
+}
+
 impl FromRequestParts<AppState> for AuthenticatedSubject {
     type Rejection = ApiError;
 
@@ -792,6 +864,10 @@ fn map_storage_error(error: anyhow::Error) -> ApiError {
     } else if message.contains("not a member")
         || message.contains("must be between")
         || message.contains("valid email")
+        || message.contains("No RepoMemo account")
+        || message.contains("owner role")
+        || message.contains("owner cannot be removed")
+        || message.contains("membership was not found")
     {
         ApiError::bad_request(message)
     } else {
@@ -858,6 +934,22 @@ mod tests {
         let workspace: Value = serde_json::from_slice(&to_bytes(workspace.into_body(), usize::MAX).await.unwrap()).unwrap();
         let workspace_id = workspace["workspace"]["id"].as_str().unwrap();
 
+        let collaborator = app.clone().oneshot(Request::builder().method("POST").uri("/v1/auth/register").header("content-type", "application/json")
+            .body(Body::from(r#"{"email":"collaborator@example.com","display_name":"Collaborator","password":"not-a-real-password"}"#)).unwrap()).await.unwrap();
+        assert_eq!(collaborator.status(), 201);
+        let collaborator: Value = serde_json::from_slice(&to_bytes(collaborator.into_body(), usize::MAX).await.unwrap()).unwrap();
+        let collaborator_authorization = format!("Bearer {}", collaborator["access_token"].as_str().unwrap());
+        let member = app.clone().oneshot(json_request("PUT", &format!("/v1/workspaces/{workspace_id}/members"), &authorization, json!({"email":"collaborator@example.com","role":"member"}))).await.unwrap();
+        assert_eq!(member.status(), 200);
+        let member: Value = serde_json::from_slice(&to_bytes(member.into_body(), usize::MAX).await.unwrap()).unwrap();
+        assert_eq!(member["role"], "member");
+        let members = app.clone().oneshot(auth_request("GET", &format!("/v1/workspaces/{workspace_id}/members"), &authorization)).await.unwrap();
+        assert_eq!(members.status(), 200);
+        let members: Value = serde_json::from_slice(&to_bytes(members.into_body(), usize::MAX).await.unwrap()).unwrap();
+        assert_eq!(members.as_array().unwrap().len(), 2);
+        let collaborator_overview = app.clone().oneshot(auth_request("GET", &format!("/v1/workspaces/{workspace_id}/overview"), &collaborator_authorization)).await.unwrap();
+        assert_eq!(collaborator_overview.status(), 200);
+
         let artifact = app.clone().oneshot(json_request("POST", &format!("/v1/workspaces/{workspace_id}/artifacts/text"), &authorization, json!({"title":"Shared fact", "content":"The API owns shared data.", "language":"Markdown"}))).await.unwrap();
         assert_eq!(artifact.status(), 201);
         let artifact: Value = serde_json::from_slice(&to_bytes(artifact.into_body(), usize::MAX).await.unwrap()).unwrap();
@@ -894,6 +986,11 @@ mod tests {
         assert!(exported.contains("Keep shared data on the API."));
         let overview = app.clone().oneshot(auth_request("GET", &format!("/v1/workspaces/{workspace_id}/overview"), &authorization)).await.unwrap();
         assert_eq!(overview.status(), 200);
+        let collaborator_id = collaborator["user"]["id"].as_str().unwrap();
+        let removed = app.clone().oneshot(auth_request("DELETE", &format!("/v1/workspaces/{workspace_id}/members/{collaborator_id}"), &authorization)).await.unwrap();
+        assert_eq!(removed.status(), 204);
+        let collaborator_overview = app.clone().oneshot(auth_request("GET", &format!("/v1/workspaces/{workspace_id}/overview"), &collaborator_authorization)).await.unwrap();
+        assert_eq!(collaborator_overview.status(), 403);
         let _ = std::fs::remove_dir_all(data_dir);
     }
 

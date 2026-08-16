@@ -19,6 +19,13 @@ export interface WorkspaceMembership {
   role: WorkspaceRole;
 }
 
+export interface WorkspaceMember {
+  user: SharedUser;
+  role: WorkspaceRole;
+  joined_at: string;
+  updated_at: string;
+}
+
 export interface SharedSession {
   user: SharedUser;
   authentication: "jwt";

@@ -9,6 +9,8 @@ import type {
   SearchResult,
   SharedSession,
   SharedUser,
+  WorkspaceMember,
+  WorkspaceRole,
   SharedWorkspace,
   WorkspaceOverview,
 } from "../types";
@@ -131,6 +133,25 @@ export function createSharedWorkspace(
 
 export function getSharedWorkspaceOverview(accessToken: string, workspaceId: string): Promise<WorkspaceOverview> {
   return request<WorkspaceOverview>(`/v1/workspaces/${workspaceId}/overview`, {}, accessToken);
+}
+
+export function listSharedWorkspaceMembers(accessToken: string, workspaceId: string): Promise<WorkspaceMember[]> {
+  return request<WorkspaceMember[]>(`/v1/workspaces/${workspaceId}/members`, {}, accessToken);
+}
+
+export function upsertSharedWorkspaceMember(
+  accessToken: string,
+  workspaceId: string,
+  input: { email: string; role: WorkspaceRole },
+): Promise<WorkspaceMember> {
+  return request<WorkspaceMember>(`/v1/workspaces/${workspaceId}/members`, {
+    method: "PUT",
+    body: JSON.stringify(input),
+  }, accessToken);
+}
+
+export function removeSharedWorkspaceMember(accessToken: string, workspaceId: string, userId: string): Promise<void> {
+  return request<void>(`/v1/workspaces/${workspaceId}/members/${userId}`, { method: "DELETE" }, accessToken);
 }
 
 export function listSharedArtifacts(accessToken: string, workspaceId: string): Promise<ArtifactSummary[]> {

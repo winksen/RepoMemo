@@ -14,6 +14,8 @@ import {
   IconBuildingCommunity as Building,
   IconChevronRight as ChevronRight,
   IconFileText as FileText,
+  IconLayoutDashboard as Dashboard,
+  IconBook2 as Book,
   IconKey as Key,
   IconLoader2 as Loader,
   IconLogout as Logout,
@@ -22,6 +24,7 @@ import {
   IconPlus as Plus,
   IconShieldLock as Shield,
   IconStack2 as Layers,
+  IconTimeline as Timeline,
   IconUsers as Users,
   IconUpload as Upload,
 } from "@tabler/icons-react";
@@ -39,13 +42,16 @@ import {
   indexSharedWorkspace,
   indexSharedArtifact,
   listSharedArtifacts,
+  listSharedWorkspaceMembers,
   listSharedMemoryCards,
   listSharedOrganizations,
   listSharedWorkspaces,
   loginSharedUser,
   registerSharedUser,
   searchSharedWorkspace,
+  removeSharedWorkspaceMember,
   sharedApiUrl,
+  upsertSharedWorkspaceMember,
   uploadSharedArtifact,
   type SharedApiError,
 } from "./lib/sharedApi";
@@ -58,8 +64,12 @@ import type {
   SearchResult,
   SharedSession,
   SharedWorkspace,
+  WorkspaceMember,
+  WorkspaceRole,
   WorkspaceOverview,
 } from "./types";
+import { Button } from "./components/ui/button";
+import { Dropdown } from "./components/ui/dropdown";
 
 const SESSION_STORAGE_KEY = "repomemo.shared.access-token";
 
@@ -180,35 +190,42 @@ export function SharedWebApp() {
   const workspace = workspaceId
     ? workspaces.find((entry) => entry.workspace.id === workspaceId)
     : undefined;
+  const workspaceOrganization = workspace
+    ? organizations.find((organization) => organization.id === workspace.organization_id)
+    : undefined;
 
   if (workspace && routeParts[2] === "artifacts" && routeParts[3]) {
-    return <SharedArtifactDetail accessToken={accessToken} artifactId={routeParts[3]} onBack={() => navigate(`/workspaces/${encodeURIComponent(workspaceId!)}`)} workspace={workspace} />;
+    return <SharedArtifactDetail accessToken={accessToken} apiAvailable={apiAvailable} artifactId={routeParts[3]} onBack={() => navigate(`/workspaces/${encodeURIComponent(workspaceId!)}`)} organization={workspaceOrganization} session={session} signOut={signOut} workspace={workspace} />;
   }
 
   if (workspace && routeParts[2] === "memory-cards" && routeParts[3]) {
-    return <SharedMemoryCardDetail accessToken={accessToken} cardId={routeParts[3]} onBack={() => navigate(`/workspaces/${encodeURIComponent(workspaceId!)}`)} />;
+    return <SharedMemoryCardDetail accessToken={accessToken} apiAvailable={apiAvailable} cardId={routeParts[3]} onBack={() => navigate(`/workspaces/${encodeURIComponent(workspaceId!)}`)} organization={workspaceOrganization} session={session} signOut={signOut} workspace={workspace} />;
   }
 
   if (workspaceId && routeParts.length > 2) {
-    return <SharedRouteNotFound onBack={() => navigate(`/workspaces/${encodeURIComponent(workspaceId!)}`)} />;
+    return <SharedRouteNotFound apiAvailable={apiAvailable} onBack={() => navigate(`/workspaces/${encodeURIComponent(workspaceId!)}`)} organization={workspaceOrganization} organizations={organizations} session={session} signOut={signOut} workspace={workspace} />;
   }
 
   if (workspaceId) {
     return workspace ? (
       <SharedWorkspaceDetail
         accessToken={accessToken}
+        apiAvailable={apiAvailable}
         onBack={() => navigate("/workspaces")}
         onOpenArtifact={(artifactId) => navigate(`/workspaces/${encodeURIComponent(workspaceId!)}/artifacts/${encodeURIComponent(artifactId)}`)}
         onOpenMemoryCard={(cardId) => navigate(`/workspaces/${encodeURIComponent(workspaceId!)}/memory-cards/${encodeURIComponent(cardId)}`)}
+        organization={workspaceOrganization}
+        session={session}
+        signOut={signOut}
         workspace={workspace}
       />
     ) : (
-      <SharedRouteNotFound onBack={() => navigate("/workspaces")} />
+      <SharedRouteNotFound apiAvailable={apiAvailable} onBack={() => navigate("/workspaces")} organizations={organizations} session={session} signOut={signOut} />
     );
   }
 
   if (pathname !== "/workspaces" && pathname !== "/") {
-    return <SharedRouteNotFound onBack={() => navigate("/workspaces")} />;
+    return <SharedRouteNotFound apiAvailable={apiAvailable} onBack={() => navigate("/workspaces")} organizations={organizations} session={session} signOut={signOut} />;
   }
 
   return (
@@ -291,8 +308,8 @@ function AuthCanvas({
       <section className="shared-auth-form-region" aria-label="Account access">
         <div className="shared-auth-form-shell">
           <div className="shared-auth-switch" role="tablist" aria-label="Account action">
-            <button className={mode === "sign-in" ? "active" : ""} onClick={() => { navigate("/login"); setMode("sign-in"); setError(null); }} role="tab" type="button">Sign in</button>
-            <button className={mode === "sign-up" ? "active" : ""} onClick={() => { navigate("/register"); setMode("sign-up"); setError(null); }} role="tab" type="button">Create account</button>
+            <Button className={mode === "sign-in" ? "active" : ""} onClick={() => { navigate("/login"); setMode("sign-in"); setError(null); }} role="tab" type="button" variant="secondary">Sign in</Button>
+            <Button className={mode === "sign-up" ? "active" : ""} onClick={() => { navigate("/register"); setMode("sign-up"); setError(null); }} role="tab" type="button" variant="secondary">Create account</Button>
           </div>
           <div className="shared-auth-heading">
             <p className="shared-eyebrow">{mode === "sign-in" ? "Welcome back" : "Start a shared workspace"}</p>
@@ -304,10 +321,10 @@ function AuthCanvas({
             <label>Email<input autoComplete="email" onChange={(event) => setEmail(event.target.value)} placeholder="you@company.com" required type="email" value={email} /></label>
             <label>Password<input autoComplete={mode === "sign-up" ? "new-password" : "current-password"} minLength={12} onChange={(event) => setPassword(event.target.value)} placeholder="At least 12 characters" required type="password" value={password} /></label>
             {error ? <p className="shared-form-error" role="alert">{error}</p> : null}
-            <button className="shared-primary-action" disabled={isSubmitting} type="submit">
+            <Button disabled={isSubmitting} type="submit" variant="main">
               {isSubmitting ? <Loader className="spin" size={17} /> : <ArrowRight size={17} />}
               {mode === "sign-in" ? "Sign in to shared mode" : "Create account and continue"}
-            </button>
+            </Button>
           </form>
           <p className="shared-api-note">API {apiAvailable === true ? "healthy" : apiAvailable === false ? "unreachable" : "checking"} · <code>{sharedApiUrl}</code></p>
         </div>
@@ -377,42 +394,98 @@ function SharedWorkspaceHome({
   }
 
   return (
-    <main className="shared-home">
-      <header className="shared-home-header">
-        <div className="shared-brand"><span className="shared-brand-glyph"><Layers size={19} /></span><strong>RepoMemo</strong><span className="shared-mode-tag">Shared</span></div>
-        <div className="shared-user-menu"><span>{session.user.display_name}</span><button onClick={signOut} type="button"><Logout size={16} /> Sign out</button></div>
-      </header>
-      <div className="shared-home-frame">
-        <aside className="shared-home-rail">
-          <p className="shared-eyebrow">Organization</p>
-          {organizations.length ? <div className="shared-organization-list">{organizations.map((organization) => <button className={organization.id === organizationId ? "selected" : ""} key={organization.id} onClick={() => setOrganizationId(organization.id)} type="button"><Building size={16} /><span>{organization.name}</span></button>)}</div> : <p className="shared-rail-empty">Create an organization to establish your team boundary.</p>}
-          <div className="shared-rail-footer"><Shield size={15} /><span>JWT active · API {apiAvailable === true ? "healthy" : apiAvailable === false ? "offline" : "checking"}</span></div>
-        </aside>
-        <section className="shared-home-content">
+    <SharedAppShell
+      apiAvailable={apiAvailable}
+      session={session}
+      signOut={signOut}
+      sidebar={<OrganizationRail organizations={organizations} organizationId={organizationId} onSelectOrganization={setOrganizationId} />}
+    >
+        <div className="shared-page-content">
           <div className="shared-page-heading"><p className="shared-eyebrow">Shared workspaces</p><h1>{currentOrganization ? currentOrganization.name : "Set up your team"}</h1><p>{currentOrganization ? "Workspaces are server-authoritative and available only to their members." : "First create the organization that will own your team’s shared memory."}</p></div>
-          {organizations.length === 0 ? <form className="shared-setup-form" onSubmit={createOrganization}><label>Organization name<input autoFocus onChange={(event) => setOrganizationName(event.target.value)} placeholder="Engineering" required value={organizationName} /></label><button className="shared-primary-action" disabled={isSubmitting} type="submit">{isSubmitting ? <Loader className="spin" size={17} /> : <Plus size={17} />} Create organization</button></form> : <>
-            <form className="shared-create-workspace" onSubmit={createWorkspace}><div><strong>Create a workspace</strong><span>Start a bounded memory space for a repository, system, or initiative.</span></div><label className="sr-only" htmlFor="shared-workspace-name">Workspace name</label><input id="shared-workspace-name" onChange={(event) => setWorkspaceName(event.target.value)} placeholder="Payments platform" required value={workspaceName} /><button className="shared-primary-action" disabled={isSubmitting} type="submit">{isSubmitting ? <Loader className="spin" size={17} /> : <Plus size={17} />} Create workspace</button></form>
-            <div className="shared-workspace-list">{workspaces.filter((workspace) => workspace.organization_id === organizationId).map((entry) => <article className="shared-workspace-row" key={entry.workspace.id}><span className="shared-workspace-icon"><Layers size={18} /></span><div><h2>{entry.workspace.name}</h2><p>Created {new Date(entry.workspace.created_at).toLocaleDateString()} · Your role: {entry.role}</p></div><button aria-label={`Open ${entry.workspace.name}`} onClick={() => onOpenWorkspace(entry)} type="button"><ChevronRight size={18} /></button></article>)}{workspaces.filter((workspace) => workspace.organization_id === organizationId).length === 0 ? <div className="shared-empty-state"><Layers size={26} /><strong>No workspaces yet</strong><span>Create the first shared workspace for {currentOrganization?.name}.</span></div> : null}</div>
+          {organizations.length === 0 ? <form className="shared-setup-form" onSubmit={createOrganization}><label>Organization name<input autoFocus onChange={(event) => setOrganizationName(event.target.value)} placeholder="Engineering" required value={organizationName} /></label><Button disabled={isSubmitting} type="submit" variant="main">{isSubmitting ? <Loader className="spin" size={17} /> : <Plus size={17} />} Create organization</Button></form> : <>
+            <form className="shared-create-workspace" onSubmit={createWorkspace}><div><strong>Create a workspace</strong><span>Start a bounded memory space for a repository, system, or initiative.</span></div><label className="sr-only" htmlFor="shared-workspace-name">Workspace name</label><input id="shared-workspace-name" onChange={(event) => setWorkspaceName(event.target.value)} placeholder="Payments platform" required value={workspaceName} /><Button disabled={isSubmitting} type="submit" variant="main">{isSubmitting ? <Loader className="spin" size={17} /> : <Plus size={17} />} Create workspace</Button></form>
+            <div className="shared-workspace-list">{workspaces.filter((workspace) => workspace.organization_id === organizationId).map((entry) => <article className="shared-workspace-row" key={entry.workspace.id}><span className="shared-workspace-icon"><Layers size={18} /></span><div><h2>{entry.workspace.name}</h2><p>Created {new Date(entry.workspace.created_at).toLocaleDateString()} · Your role: {entry.role}</p></div><Button aria-label={`Open ${entry.workspace.name}`} className="shared-workspace-open" onClick={() => onOpenWorkspace(entry)} type="button" variant="secondary"><ChevronRight size={18} /></Button></article>)}{workspaces.filter((workspace) => workspace.organization_id === organizationId).length === 0 ? <div className="shared-empty-state"><Layers size={26} /><strong>No workspaces yet</strong><span>Create the first shared workspace for {currentOrganization?.name}.</span></div> : null}</div>
           </>}
           {formError ? <p className="shared-form-error" role="alert">{formError}</p> : null}
           <p className="shared-boundary-note"><Shield size={15} /> Every workspace view is loaded through the JWT-protected API. This browser never falls back to local preview data.</p>
-        </section>
+        </div>
+    </SharedAppShell>
+  );
+}
+
+function SharedAppShell({
+  apiAvailable,
+  children,
+  session,
+  sidebar,
+  signOut,
+}: {
+  apiAvailable: boolean | null;
+  children: ReactNode;
+  session: SharedSession;
+  sidebar: ReactNode;
+  signOut: () => void;
+}) {
+  return (
+    <main className="shared-home">
+      <header className="shared-home-header">
+        <div className="shared-brand"><span className="shared-brand-glyph"><Layers size={19} /></span><strong>RepoMemo</strong><span className="shared-mode-tag">Shared</span></div>
+        <div className="shared-user-menu"><span>{session.user.display_name}</span><Button className="shared-user-signout" onClick={signOut} type="button" variant="secondary"><Logout size={16} /> Sign out</Button></div>
+      </header>
+      <div className="shared-home-frame">
+        <aside className="shared-home-rail">{sidebar}<div className="shared-rail-footer"><Shield size={15} /><span>JWT active · API {apiAvailable === true ? "healthy" : apiAvailable === false ? "offline" : "checking"}</span></div></aside>
+        <section className="shared-home-content">{children}</section>
       </div>
     </main>
   );
 }
 
+function OrganizationRail({
+  organizations,
+  organizationId,
+  onSelectOrganization,
+}: {
+  organizations: Organization[];
+  organizationId?: string;
+  onSelectOrganization?: (organizationId: string) => void;
+}) {
+  return <><p className="shared-eyebrow">Organization</p>{organizations.length ? <div className="shared-organization-list">{organizations.map((organization) => <Button className={organization.id === organizationId ? "selected" : ""} disabled={!onSelectOrganization} key={organization.id} onClick={() => onSelectOrganization?.(organization.id)} type="button" variant="secondary"><Building size={16} /><span>{organization.name}</span></Button>)}</div> : <p className="shared-rail-empty">Create an organization to establish your team boundary.</p>}</>;
+}
+
+function WorkspaceRail({ organization, workspace }: { organization?: Organization; workspace: SharedWorkspace }) {
+  return <>
+    <p className="shared-eyebrow">Organization</p>
+    <div className="shared-rail-current"><Building size={16} /><span>{organization?.name ?? "Shared organization"}</span></div>
+    <div className="shared-workspace-nav">
+      <p className="shared-eyebrow">Workspace</p>
+      <div className="shared-workspace-context"><Layers size={16} /><span>{workspace.workspace.name}</span></div>
+      <nav aria-label="Workspace sections" className="shared-workspace-menu">
+        <span className="active"><Dashboard size={16} /> Overview</span><span><FileText size={16} /> Evidence</span><span><Search size={16} /> Retrieval</span><span><Book size={16} /> Memory</span><span><Users size={16} /> People</span><span><Timeline size={16} /> Activity</span>
+      </nav>
+      <p className="shared-sidebar-note">Navigation is ready for the upcoming workspace views.</p>
+    </div>
+  </>;
+}
+
 function SharedWorkspaceDetail({
   accessToken,
+  apiAvailable,
   onBack,
   onOpenArtifact,
   onOpenMemoryCard,
+  organization,
+  session,
+  signOut,
   workspace,
 }: {
   accessToken: string;
+  apiAvailable: boolean | null;
   onBack: () => void;
   onOpenArtifact: (artifactId: string) => void;
   onOpenMemoryCard: (cardId: string) => void;
+  organization?: Organization;
+  session: SharedSession;
+  signOut: () => void;
   workspace: SharedWorkspace;
 }) {
   const [overview, setOverview] = useState<WorkspaceOverview | null>(null);
@@ -426,23 +499,30 @@ function SharedWorkspaceDetail({
   const [memoryTitle, setMemoryTitle] = useState("");
   const [memoryBody, setMemoryBody] = useState("");
   const [memoryArtifactId, setMemoryArtifactId] = useState("");
+  const [members, setMembers] = useState<WorkspaceMember[]>([]);
+  const [memberEmail, setMemberEmail] = useState("");
+  const [memberRole, setMemberRole] = useState<WorkspaceRole>("member");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const canWrite = workspace.role !== "viewer";
+  const canManageMembers = workspace.role === "owner" || workspace.role === "admin";
+  const canAssignAdmin = workspace.role === "owner";
 
   async function load() {
     setIsLoading(true);
     setError(null);
     try {
-      const [nextOverview, nextArtifacts, nextMemory] = await Promise.all([
+      const [nextOverview, nextArtifacts, nextMemory, nextMembers] = await Promise.all([
         getSharedWorkspaceOverview(accessToken, workspace.workspace.id),
         listSharedArtifacts(accessToken, workspace.workspace.id),
         listSharedMemoryCards(accessToken, workspace.workspace.id),
+        listSharedWorkspaceMembers(accessToken, workspace.workspace.id),
       ]);
       setOverview(nextOverview);
       setArtifacts(nextArtifacts);
       setMemoryCards(nextMemory);
+      setMembers(nextMembers);
     } catch (requestError) {
       setError(apiMessage(requestError));
     } finally {
@@ -510,16 +590,31 @@ function SharedWorkspaceDetail({
     try { await indexSharedWorkspace(accessToken, workspace.workspace.id); await load(); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
   }
 
+  async function saveMember(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsSubmitting(true); setError(null);
+    try {
+      await upsertSharedWorkspaceMember(accessToken, workspace.workspace.id, {
+        email: memberEmail.trim(),
+        role: memberRole,
+      });
+      setMemberEmail("");
+      setMemberRole("member");
+      await load();
+    } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
+  }
+
+  async function removeMember(userId: string) {
+    setIsSubmitting(true); setError(null);
+    try { await removeSharedWorkspaceMember(accessToken, workspace.workspace.id, userId); await load(); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
+  }
+
   return (
-    <main className="shared-home">
-      <header className="shared-home-header">
-        <div className="shared-brand"><span className="shared-brand-glyph"><Layers size={19} /></span><strong>RepoMemo</strong><span className="shared-mode-tag">Shared</span></div>
-        <button className="shared-back-button" onClick={onBack} type="button"><ArrowLeft size={16} /> All workspaces</button>
-      </header>
+    <SharedAppShell apiAvailable={apiAvailable} session={session} signOut={signOut} sidebar={<WorkspaceRail organization={organization} workspace={workspace} />}>
       <section className="shared-detail-shell" aria-busy={isLoading}>
         <div className="shared-detail-heading">
           <div><p className="shared-eyebrow">Server workspace · {workspace.role}</p><h1>{workspace.workspace.name}</h1><p>Artifacts, search results, and durable team memory are all retrieved through the protected shared API.</p></div>
-          <div className="shared-detail-actions"><button className="shared-secondary-action" disabled={isLoading} onClick={() => void load()} type="button"><Refresh size={16} /> Refresh</button>{canWrite ? <button className="shared-primary-action" disabled={isSubmitting || isLoading} onClick={() => void runIndex()} type="button">{isSubmitting ? <Loader className="spin" size={16} /> : <Layers size={16} />} Index workspace</button> : null}</div>
+          <div className="shared-detail-actions"><Button className="shared-back-button" onClick={onBack} type="button" variant="secondary"><ArrowLeft size={16} /> All workspaces</Button><Button disabled={isLoading} onClick={() => void load()} type="button" variant="secondary"><Refresh size={16} /> Refresh</Button>{canWrite ? <Button disabled={isSubmitting || isLoading} onClick={() => void runIndex()} type="button" variant="main">{isSubmitting ? <Loader className="spin" size={16} /> : <Layers size={16} />} Index workspace</Button> : null}</div>
         </div>
         {error ? <p className="shared-form-error" role="alert">{error}</p> : null}
         <div className="shared-evidence-summary">
@@ -528,30 +623,54 @@ function SharedWorkspaceDetail({
         <div className="shared-detail-grid">
           <section className="shared-detail-panel">
             <div className="shared-panel-heading"><div><FileText size={18} /><h2>Evidence ledger</h2></div><span>{artifacts.length} records</span></div>
-            {artifacts.length ? <div className="shared-artifact-list">{artifacts.map((artifact) => <article key={artifact.id}><button className="shared-record-link" onClick={() => onOpenArtifact(artifact.id)} type="button"><div><strong>{artifact.title}</strong><span>{artifact.path} · {artifact.indexed_at ? "Indexed" : "Not indexed"}</span></div><small>{artifact.language ?? artifact.artifact_type}</small></button></article>)}</div> : <div className="shared-empty-state"><FileText size={25} /><strong>No shared evidence yet</strong><span>Add a pasted note below, then index it when you are ready to search.</span></div>}
-            {canWrite ? <><form className="shared-note-form" onSubmit={addNote}><h3>Add shared note</h3><input onChange={(event) => setNoteTitle(event.target.value)} placeholder="Decision or implementation note" required value={noteTitle} /><textarea onChange={(event) => setNoteContent(event.target.value)} placeholder="Paste Markdown, code context, or a meeting note…" required value={noteContent} /><button className="shared-primary-action" disabled={isSubmitting} type="submit"><Plus size={16} /> Store evidence</button></form><form className="shared-upload-form" onSubmit={submitUpload}><div><strong>Upload a file</strong><span>Markdown, text, code, or supported image · up to 10 MiB</span></div><input accept=".md,.mdx,.txt,.rs,.ts,.tsx,.js,.jsx,.py,.json,.toml,.yaml,.yml,.sql,.html,.css,.sh,.ps1,.png,.jpg,.jpeg,.gif,.webp,.svg,.bmp" aria-label="Upload a shared artifact" onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)} required type="file" /><button className="shared-secondary-action" disabled={isSubmitting || !uploadFile} type="submit"><Upload size={16} /> Upload</button></form></> : <p className="shared-readonly-note"><Shield size={15} /> Your viewer membership can inspect shared evidence but cannot change it.</p>}
+            {artifacts.length ? <div className="shared-artifact-list">{artifacts.map((artifact) => <article key={artifact.id}><Button className="shared-record-link" onClick={() => onOpenArtifact(artifact.id)} type="button" variant="secondary"><div><strong>{artifact.title}</strong><span>{artifact.path} · {artifact.indexed_at ? "Indexed" : "Not indexed"}</span></div><small>{artifact.language ?? artifact.artifact_type}</small></Button></article>)}</div> : <div className="shared-empty-state"><FileText size={25} /><strong>No shared evidence yet</strong><span>Add a pasted note below, then index it when you are ready to search.</span></div>}
+            {canWrite ? <><form className="shared-note-form" onSubmit={addNote}><h3>Add shared note</h3><input onChange={(event) => setNoteTitle(event.target.value)} placeholder="Decision or implementation note" required value={noteTitle} /><textarea onChange={(event) => setNoteContent(event.target.value)} placeholder="Paste Markdown, code context, or a meeting note…" required value={noteContent} /><Button disabled={isSubmitting} type="submit" variant="main"><Plus size={16} /> Store evidence</Button></form><form className="shared-upload-form" onSubmit={submitUpload}><div><strong>Upload a file</strong><span>Markdown, text, code, or supported image · up to 10 MiB</span></div><input accept=".md,.mdx,.txt,.rs,.ts,.tsx,.js,.jsx,.py,.json,.toml,.yaml,.yml,.sql,.html,.css,.sh,.ps1,.png,.jpg,.jpeg,.gif,.webp,.svg,.bmp" aria-label="Upload a shared artifact" onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)} required type="file" /><Button disabled={isSubmitting || !uploadFile} type="submit" variant="secondary"><Upload size={16} /> Upload</Button></form></> : <p className="shared-readonly-note"><Shield size={15} /> Your viewer membership can inspect shared evidence but cannot change it.</p>}
           </section>
           <aside className="shared-detail-panel shared-retrieval-panel">
             <div className="shared-panel-heading"><div><Search size={18} /><h2>Retrieve</h2></div></div>
-            <form className="shared-search-form" onSubmit={runSearch}><input onChange={(event) => setQuery(event.target.value)} placeholder="Search indexed evidence" value={query} /><button className="shared-secondary-action" disabled={isSubmitting} type="submit">Search</button></form>
+            <form className="shared-search-form" onSubmit={runSearch}><input onChange={(event) => setQuery(event.target.value)} placeholder="Search indexed evidence" value={query} /><Button disabled={isSubmitting} type="submit" variant="secondary">Search</Button></form>
             {results.length ? <div className="shared-search-results">{results.map((result) => <article key={result.chunk_id}><strong>{result.title}</strong><p>{result.snippet}</p><span>{result.path}{result.start_line ? ` · line ${result.start_line}` : ""}</span></article>)}</div> : <p className="shared-muted-copy">Index one or more artifacts, then search the evidence base from here.</p>}
-            <div className="shared-memory-section"><div className="shared-panel-heading"><div><Shield size={18} /><h2>Team memory</h2></div><span>{memoryCards.length}</span></div>{memoryCards.length ? <div className="shared-memory-list">{memoryCards.map((card) => <article key={card.id}><button className="shared-record-link" onClick={() => onOpenMemoryCard(card.id)} type="button"><strong>{card.title}</strong><span>{card.body_excerpt}</span></button></article>)}</div> : <p className="shared-muted-copy">No durable memory cards yet.</p>}{canWrite ? <form className="shared-memory-form" onSubmit={addMemory}><input onChange={(event) => setMemoryTitle(event.target.value)} placeholder="Memory title" required value={memoryTitle} /><textarea onChange={(event) => setMemoryBody(event.target.value)} placeholder="A concise durable fact…" required value={memoryBody} /><label>Evidence link<select onChange={(event) => setMemoryArtifactId(event.target.value)} value={memoryArtifactId}><option value="">No direct artifact link</option>{artifacts.map((artifact) => <option key={artifact.id} value={artifact.id}>{artifact.title}</option>)}</select></label><button className="shared-secondary-action" disabled={isSubmitting} type="submit">Save memory</button></form> : null}</div>
+            <div className="shared-memory-section"><div className="shared-panel-heading"><div><Shield size={18} /><h2>Team memory</h2></div><span>{memoryCards.length}</span></div>{memoryCards.length ? <div className="shared-memory-list">{memoryCards.map((card) => <article key={card.id}><Button className="shared-record-link" onClick={() => onOpenMemoryCard(card.id)} type="button" variant="secondary"><strong>{card.title}</strong><span>{card.body_excerpt}</span></Button></article>)}</div> : <p className="shared-muted-copy">No durable memory cards yet.</p>}{canWrite ? <form className="shared-memory-form" onSubmit={addMemory}><input onChange={(event) => setMemoryTitle(event.target.value)} placeholder="Memory title" required value={memoryTitle} /><textarea onChange={(event) => setMemoryBody(event.target.value)} placeholder="A concise durable fact…" required value={memoryBody} /><label>Evidence link<Dropdown aria-label="Evidence link" onValueChange={(value) => setMemoryArtifactId(value === "__none__" ? "" : value)} options={[{ label: "No direct artifact link", value: "__none__" }, ...artifacts.map((artifact) => ({ label: artifact.title, value: artifact.id }))]} value={memoryArtifactId || "__none__"} /></label><Button disabled={isSubmitting} type="submit" variant="secondary">Save memory</Button></form> : null}</div>
+            <div className="shared-members-section">
+              <div className="shared-panel-heading"><div><Users size={18} /><h2>Workspace team</h2></div><span>{members.length}</span></div>
+              <p className="shared-muted-copy">{canManageMembers ? "Add people who already have a RepoMemo account, then choose what they can do here." : "Your workspace role does not allow membership changes."}</p>
+              <div className="shared-member-list">
+                {members.map((member) => <article className="shared-member-row" key={member.user.id}>
+                  <div><strong>{member.user.display_name}</strong><span>{member.user.email ?? "No email"}</span></div>
+                  <span className="shared-member-role">{member.role}</span>
+                  {canManageMembers && member.role !== "owner" ? <Button className="shared-member-remove" disabled={isSubmitting} onClick={() => void removeMember(member.user.id)} type="button" variant="secondary">Remove</Button> : null}
+                </article>)}
+              </div>
+              {canManageMembers ? <form className="shared-member-form" onSubmit={saveMember}>
+                <input aria-label="Member email" onChange={(event) => setMemberEmail(event.target.value)} placeholder="person@example.com" required type="email" value={memberEmail} />
+                <Dropdown aria-label="Member role" onValueChange={(value) => setMemberRole(value as WorkspaceRole)} options={[{ label: "Viewer", value: "viewer" }, { label: "Member", value: "member" }, ...(canAssignAdmin ? [{ label: "Admin", value: "admin" }] : [])]} value={memberRole} />
+                <Button disabled={isSubmitting} type="submit" variant="secondary">Add member</Button>
+              </form> : null}
+            </div>
           </aside>
         </div>
       </section>
-    </main>
+    </SharedAppShell>
   );
 }
 
 function SharedArtifactDetail({
   accessToken,
+  apiAvailable,
   artifactId,
   onBack,
+  organization,
+  session,
+  signOut,
   workspace,
 }: {
   accessToken: string;
+  apiAvailable: boolean | null;
   artifactId: string;
   onBack: () => void;
+  organization?: Organization;
+  session: SharedSession;
+  signOut: () => void;
   workspace: SharedWorkspace;
 }) {
   const [artifact, setArtifact] = useState<ArtifactDetail | null>(null);
@@ -573,8 +692,8 @@ function SharedArtifactDetail({
   }
 
   return (
-    <SharedRecordLayout backLabel="Workspace" onBack={onBack} title={artifact?.summary.title ?? "Artifact"} subtitle={artifact?.summary.path ?? "Loading protected evidence…"}>
-      <div className="shared-detail-actions"><button className="shared-secondary-action" disabled={isLoading} onClick={() => void load()} type="button"><Refresh size={16} /> Refresh</button>{canWrite ? <button className="shared-primary-action" disabled={isLoading || isIndexing} onClick={() => void indexArtifact()} type="button">{isIndexing ? <Loader className="spin" size={16} /> : <Layers size={16} />} Index artifact</button> : null}</div>
+    <SharedRecordLayout apiAvailable={apiAvailable} backLabel="Workspace" onBack={onBack} organization={organization} session={session} signOut={signOut} title={artifact?.summary.title ?? "Artifact"} subtitle={artifact?.summary.path ?? "Loading protected evidence…"} workspace={workspace}>
+      <div className="shared-detail-actions"><Button disabled={isLoading} onClick={() => void load()} type="button" variant="secondary"><Refresh size={16} /> Refresh</Button>{canWrite ? <Button disabled={isLoading || isIndexing} onClick={() => void indexArtifact()} type="button" variant="main">{isIndexing ? <Loader className="spin" size={16} /> : <Layers size={16} />} Index artifact</Button> : null}</div>
       {error ? <p className="shared-form-error" role="alert">{error}</p> : null}
       <div className="shared-record-meta"><span>{artifact?.summary.artifact_type ?? "artifact"}</span><span>{artifact?.summary.language ?? "Unspecified language"}</span><span>{artifact?.summary.indexed_at ? "Indexed" : "Not indexed"}</span></div>
       <section className="shared-record-panel"><h2>Stored content</h2>{artifact?.content_preview ? <pre className="shared-content-preview">{artifact.content_preview}</pre> : <p className="shared-muted-copy">This artifact has no text preview available.</p>}</section>
@@ -585,12 +704,22 @@ function SharedArtifactDetail({
 
 function SharedMemoryCardDetail({
   accessToken,
+  apiAvailable,
   cardId,
   onBack,
+  organization,
+  session,
+  signOut,
+  workspace,
 }: {
   accessToken: string;
+  apiAvailable: boolean | null;
   cardId: string;
   onBack: () => void;
+  organization?: Organization;
+  session: SharedSession;
+  signOut: () => void;
+  workspace: SharedWorkspace;
 }) {
   const [card, setCard] = useState<MemoryCardDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -619,8 +748,8 @@ function SharedMemoryCardDetail({
   }
 
   return (
-    <SharedRecordLayout backLabel="Workspace" onBack={onBack} title={card?.card.title ?? "Memory card"} subtitle={card ? `Source: ${card.card.source}` : "Loading durable team memory…"}>
-      <div className="shared-detail-actions"><button className="shared-secondary-action" disabled={isLoading} onClick={() => void load()} type="button"><Refresh size={16} /> Refresh</button><button className="shared-primary-action" disabled={isLoading || isExporting} onClick={() => void exportCard()} type="button">{isExporting ? <Loader className="spin" size={16} /> : <FileText size={16} />} Export Markdown</button></div>
+    <SharedRecordLayout apiAvailable={apiAvailable} backLabel="Workspace" onBack={onBack} organization={organization} session={session} signOut={signOut} title={card?.card.title ?? "Memory card"} subtitle={card ? `Source: ${card.card.source}` : "Loading durable team memory…"} workspace={workspace}>
+      <div className="shared-detail-actions"><Button disabled={isLoading} onClick={() => void load()} type="button" variant="secondary"><Refresh size={16} /> Refresh</Button><Button disabled={isLoading || isExporting} onClick={() => void exportCard()} type="button" variant="main">{isExporting ? <Loader className="spin" size={16} /> : <FileText size={16} />} Export Markdown</Button></div>
       {error ? <p className="shared-form-error" role="alert">{error}</p> : null}
       <section className="shared-record-panel"><h2>Durable statement</h2><div className="shared-memory-body">{card?.card.body_markdown ?? ""}</div></section>
       <section className="shared-record-panel"><h2>Linked evidence</h2>{card?.evidence.length ? <div className="shared-evidence-links">{card.evidence.map((evidence) => <article key={evidence.link_id}><strong>{evidence.title ?? "Untitled evidence"}</strong><span>{evidence.path ?? evidence.target_id}{evidence.start_line ? ` · line ${evidence.start_line}` : ""}</span></article>)}</div> : <p className="shared-muted-copy">This memory card currently has no linked evidence.</p>}</section>
@@ -629,41 +758,64 @@ function SharedMemoryCardDetail({
 }
 
 function SharedRecordLayout({
+  apiAvailable,
   backLabel,
   children,
   onBack,
+  organization,
+  session,
+  signOut,
   subtitle,
   title,
+  workspace,
 }: {
+  apiAvailable: boolean | null;
   backLabel: string;
   children: ReactNode;
   onBack: () => void;
+  organization?: Organization;
+  session: SharedSession;
+  signOut: () => void;
   subtitle: string;
   title: string;
+  workspace: SharedWorkspace;
 }) {
   return (
-    <main className="shared-home">
-      <header className="shared-home-header"><div className="shared-brand"><span className="shared-brand-glyph"><Layers size={19} /></span><strong>RepoMemo</strong><span className="shared-mode-tag">Shared</span></div><button className="shared-back-button" onClick={onBack} type="button"><ArrowLeft size={16} /> {backLabel}</button></header>
+    <SharedAppShell apiAvailable={apiAvailable} session={session} signOut={signOut} sidebar={<WorkspaceRail organization={organization} workspace={workspace} />}>
       <section className="shared-detail-shell">
-        <div className="shared-detail-heading"><div><p className="shared-eyebrow">Protected record</p><h1>{title}</h1><p className="shared-record-subtitle">{subtitle}</p></div></div>
+        <div className="shared-detail-heading"><div><p className="shared-eyebrow">Protected record</p><h1>{title}</h1><p className="shared-record-subtitle">{subtitle}</p></div><Button className="shared-back-button" onClick={onBack} type="button" variant="secondary"><ArrowLeft size={16} /> {backLabel}</Button></div>
         <div className="shared-record-content">{children}</div>
       </section>
-    </main>
+    </SharedAppShell>
   );
 }
 
-function SharedRouteNotFound({ onBack }: { onBack: () => void }) {
+function SharedRouteNotFound({
+  apiAvailable,
+  onBack,
+  organization,
+  organizations,
+  session,
+  signOut,
+  workspace,
+}: {
+  apiAvailable: boolean | null;
+  onBack: () => void;
+  organization?: Organization;
+  organizations: Organization[];
+  session: SharedSession;
+  signOut: () => void;
+  workspace?: SharedWorkspace;
+}) {
   return (
-    <main className="shared-auth-canvas">
-      <section className="shared-auth-intro" aria-label="Unknown shared route">
-        <div className="shared-brand"><span className="shared-brand-glyph"><Layers size={21} /></span><strong>RepoMemo</strong></div>
+    <SharedAppShell apiAvailable={apiAvailable} session={session} signOut={signOut} sidebar={workspace ? <WorkspaceRail organization={organization} workspace={workspace} /> : <OrganizationRail organizations={organizations} />}>
+      <section className="shared-page-content shared-route-page" aria-label="Unknown shared route">
         <p className="shared-eyebrow">Shared workspace</p>
         <h1>This address has no shared view.</h1>
         <p className="shared-intro-copy">The requested route is not available, or the workspace is not in your current signed-in membership.</p>
-        <button className="shared-primary-action shared-route-action" onClick={onBack} type="button"><ArrowLeft size={17} /> Go to workspaces</button>
+        <Button className="shared-route-action" onClick={onBack} type="button" variant="main"><ArrowLeft size={17} /> Go to workspaces</Button>
       </section>
-      <section className="shared-auth-form-region" aria-hidden="true"><div className="shared-route-mark"><Shield size={42} /><span>JWT-protected routes only expose data granted to the current session.</span></div></section>
-    </main>
+    </SharedAppShell>
   );
 }
 

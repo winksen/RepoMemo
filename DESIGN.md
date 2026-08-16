@@ -68,6 +68,16 @@ The Workspace route uses the central canvas to browse and create workspaces. Its
 
 Controls are 36–40px tall, softly rounded at 8px, and communicate through text and icons rather than colored blocks. Surfaces use one faint divider or a very soft offset shadow, never both by default. Selected rows use a pale blue field. Suggested actions can use the reserved warm wash and a small trailing action control. Inputs are white with a subtle border and blue focus outline.
 
+### Shared UI primitives
+
+The web client uses shadcn's source-owned component pattern. Components live in
+`apps/desktop/src/components/ui/`, remain editable in this repository, and use
+Radix only for interaction behavior. `Button` has exactly two variants:
+`main` for the single decisive action in a group and `secondary` for every
+other action. `Dropdown` has one accessible visual treatment for all selects.
+Do not introduce a third button or dropdown treatment without updating this
+system deliberately.
+
 ## Do's and don'ts
 
 - Do make the primary task the largest, brightest surface.

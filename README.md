@@ -20,6 +20,7 @@ With the API running, start the Vite web client and open:
 
 Unauthenticated visits to shared workspace routes are redirected to `/login`.
 Workspace members can paste notes or upload supported Markdown, text, code, and image files up to 10 MiB. Memory cards may cite an artifact selected from that workspace.
+Owners and admins can manage the workspace team from its shared web view. A teammate must create a RepoMemo account before their email can be added; owners may grant `admin`, `member`, or `viewer`, while admins may grant `member` or `viewer`.
 
 ## Current Capabilities
 

@@ -6,7 +6,7 @@ use repomemo_domain::{
     ArtifactDetail, ArtifactSummary, ArtifactType, Chunk, Citation, IndexingJobStatus, MemoryCard,
     MemoryCardDetail, MemoryCardSummary, MemoryEvidence, Organization, ProviderSettings,
     SearchRequest, SearchResult, SharedUser, SharedWorkspace, Source, SourceType, Symbol,
-    SymbolKind, SymbolSearchResult, Workspace, WorkspaceMembership, WorkspaceOverview,
+    SymbolKind, SymbolSearchResult, Workspace, WorkspaceMember, WorkspaceMembership, WorkspaceOverview,
     WorkspaceRole,
 };
 use serde_json::Value;
@@ -61,6 +61,16 @@ struct SharedWorkspaceRow {
     settings_json: String,
     organization_id: String,
     role: String,
+}
+
+#[derive(Debug, sqlx::FromRow)]
+struct WorkspaceMemberRow {
+    id: String,
+    email: String,
+    display_name: String,
+    role: String,
+    created_at: String,
+    updated_at: String,
 }
 
 #[derive(Debug, sqlx::FromRow)]
@@ -409,6 +419,17 @@ impl StorageEngine {
         Ok(row.map(|row| StoredUser::from(row).user))
     }
 
+    pub async fn find_user_by_email(&self, email: &str) -> Result<Option<SharedUser>> {
+        let email = normalize_email(email)?;
+        let row = sqlx::query_as::<_, UserRow>(
+            "SELECT id, email, display_name, password_hash FROM users WHERE email = ?1",
+        )
+        .bind(email)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.map(|row| StoredUser::from(row).user))
+    }
+
     pub async fn create_organization(&self, owner_id: &str, name: &str) -> Result<Organization> {
         let id = Uuid::new_v4().to_string();
         let now = Utc::now().to_rfc3339();
@@ -568,6 +589,76 @@ impl StorageEngine {
         .fetch_optional(&self.pool)
         .await?;
         role.map(|role| workspace_role_from_db(&role)).transpose()
+    }
+
+    pub async fn list_workspace_members(&self, workspace_id: &str) -> Result<Vec<WorkspaceMember>> {
+        let rows = sqlx::query_as::<_, WorkspaceMemberRow>(
+            "SELECT u.id, u.email, u.display_name, wm.role, wm.created_at, wm.updated_at FROM workspace_memberships wm INNER JOIN users u ON u.id = wm.user_id WHERE wm.workspace_id = ?1 ORDER BY CASE wm.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 WHEN 'member' THEN 2 ELSE 3 END, u.display_name ASC",
+        )
+        .bind(workspace_id)
+        .fetch_all(&self.pool)
+        .await?;
+        rows.into_iter().map(WorkspaceMember::try_from).collect()
+    }
+
+    pub async fn upsert_workspace_member(
+        &self,
+        workspace_id: &str,
+        email: &str,
+        role: WorkspaceRole,
+    ) -> Result<WorkspaceMember> {
+        if matches!(role, WorkspaceRole::Owner) {
+            bail!("The owner role cannot be assigned through membership management.");
+        }
+        let user = self
+            .find_user_by_email(email)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("No RepoMemo account exists for this email address."))?;
+        let organization_id = sqlx::query_scalar::<_, String>(
+            "SELECT organization_id FROM workspace_organizations WHERE workspace_id = ?1",
+        )
+        .bind(workspace_id)
+        .fetch_optional(&self.pool)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Workspace was not found."))?;
+        let now = Utc::now().to_rfc3339();
+        let mut tx = self.pool.begin().await?;
+        sqlx::query("INSERT OR IGNORE INTO organization_memberships (organization_id, user_id, role, created_at) VALUES (?1, ?2, 'member', ?3)")
+            .bind(&organization_id)
+            .bind(&user.id)
+            .bind(&now)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("INSERT INTO workspace_memberships (workspace_id, user_id, role, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT(workspace_id, user_id) DO UPDATE SET role = excluded.role, updated_at = excluded.updated_at")
+            .bind(workspace_id)
+            .bind(&user.id)
+            .bind(workspace_role_to_db(&role))
+            .bind(&now)
+            .bind(&now)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        self.list_workspace_members(workspace_id)
+            .await?
+            .into_iter()
+            .find(|member| member.user.id == user.id)
+            .ok_or_else(|| anyhow::anyhow!("Workspace member could not be loaded."))
+    }
+
+    pub async fn remove_workspace_member(&self, workspace_id: &str, user_id: &str) -> Result<()> {
+        let role = self.workspace_role_for_user(user_id, workspace_id).await?;
+        if matches!(role, Some(WorkspaceRole::Owner)) {
+            bail!("The workspace owner cannot be removed.");
+        }
+        let result = sqlx::query("DELETE FROM workspace_memberships WHERE workspace_id = ?1 AND user_id = ?2")
+            .bind(workspace_id)
+            .bind(user_id)
+            .execute(&self.pool)
+            .await?;
+        if result.rows_affected() == 0 {
+            bail!("Workspace membership was not found.");
+        }
+        Ok(())
     }
 
     pub async fn create_or_get_source(
@@ -1835,6 +1926,23 @@ impl TryFrom<SharedWorkspaceRow> for SharedWorkspace {
     }
 }
 
+impl TryFrom<WorkspaceMemberRow> for WorkspaceMember {
+    type Error = anyhow::Error;
+
+    fn try_from(row: WorkspaceMemberRow) -> Result<Self> {
+        Ok(Self {
+            user: SharedUser {
+                id: row.id,
+                display_name: row.display_name,
+                email: Some(row.email),
+            },
+            role: workspace_role_from_db(&row.role)?,
+            joined_at: row.created_at,
+            updated_at: row.updated_at,
+        })
+    }
+}
+
 impl From<SourceRow> for Source {
     fn from(row: SourceRow) -> Self {
         let metadata = serde_json::from_str(&row.metadata_json)
@@ -2072,6 +2180,15 @@ fn workspace_role_from_db(value: &str) -> Result<WorkspaceRole> {
         "member" => Ok(WorkspaceRole::Member),
         "viewer" => Ok(WorkspaceRole::Viewer),
         _ => bail!("Unknown workspace role: {value}"),
+    }
+}
+
+fn workspace_role_to_db(role: &WorkspaceRole) -> &'static str {
+    match role {
+        WorkspaceRole::Owner => "owner",
+        WorkspaceRole::Admin => "admin",
+        WorkspaceRole::Member => "member",
+        WorkspaceRole::Viewer => "viewer",
     }
 }
 

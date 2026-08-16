@@ -83,7 +83,9 @@ The API binds to `127.0.0.1:8787` by default. It stores server-owned
 development data in `.repomemo-server/` and exposes JWT-protected workspace
 routes. Import `docs/api/RepoMemo_Shared_API_v2.postman_collection.json` into
 Postman and run its numbered folders in order to exercise authentication,
-workspace setup, evidence, indexing, retrieval, and team memory.
+workspace setup, evidence, indexing, retrieval, team memory, and workspace
+membership management. For the membership folder, register the teammate first,
+then set its email in the `memberEmail` collection variable.
 
 Run the React web client in a second terminal:
 
