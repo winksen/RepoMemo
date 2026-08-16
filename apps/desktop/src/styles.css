@@ -212,7 +212,7 @@ textarea:focus-visible {
 .shared-api-note code { color: var(--color-text-muted); font-family: var(--font-mono); }
 .shared-loading { justify-content: center; gap: 10px; height: 100vh; color: var(--color-text-muted); }
 
-.shared-home { display: grid; grid-template-rows: 62px 1fr; padding: 12px; }
+.shared-home { display: grid; grid-template-rows: 62px minmax(0, 1fr); height: 100vh; min-height: 0; padding: 12px; overflow: hidden; }
 .shared-home-header { justify-content: space-between; padding: 0 14px; background: var(--color-surface); border-radius: 12px; box-shadow: var(--shadow-block); }
 .shared-user-menu { gap: 14px; color: var(--color-text-muted); font-size: 13px; }
 .shared-user-menu button { display: inline-flex; align-items: center; gap: 6px; color: var(--color-text-muted); background: transparent; cursor: pointer; font-size: 13px; }
@@ -259,7 +259,7 @@ textarea:focus-visible {
 .shared-back-button:hover,
 .shared-secondary-action:hover:not(:disabled) { background: var(--color-surface-hover); }
 .shared-secondary-action:disabled { cursor: wait; opacity: 0.65; }
-.shared-detail-shell { min-height: 0; padding: clamp(28px, 5vw, 64px); overflow: auto; background: var(--color-surface); border-radius: 12px; box-shadow: var(--shadow-block); }
+.shared-detail-shell { min-width: 0; min-height: 0; padding: clamp(28px, 5vw, 64px); overflow: auto; overscroll-behavior: contain; background: var(--color-surface); border-radius: 12px; box-shadow: var(--shadow-block); }
 .shared-detail-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; padding-bottom: 28px; border-bottom: 1px solid var(--color-border); }
 .shared-detail-heading .shared-eyebrow { margin: 0 0 9px; }
 .shared-detail-heading h1 { max-width: 18ch; margin: 0; font-family: var(--font-display); font-size: clamp(34px, 4vw, 52px); font-weight: 400; letter-spacing: -0.025em; line-height: 1; }
@@ -278,6 +278,8 @@ textarea:focus-visible {
 .shared-panel-heading span { color: var(--color-text-subtle); font-size: 12px; }
 .shared-artifact-list { border-top: 1px solid var(--color-border); }
 .shared-artifact-list article { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 13px 0; border-bottom: 1px solid var(--color-border); }
+.shared-record-link { display: flex; align-items: center; justify-content: space-between; gap: 14px; width: 100%; padding: 0; color: inherit; background: transparent; cursor: pointer; text-align: left; }
+.shared-record-link:hover strong { color: var(--color-accent-text); }
 .shared-artifact-list article > div { min-width: 0; }
 .shared-artifact-list strong,
 .shared-artifact-list span { display: block; }
@@ -285,7 +287,8 @@ textarea:focus-visible {
 .shared-artifact-list span { margin-top: 3px; overflow: hidden; color: var(--color-text-muted); font-family: var(--font-mono); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .shared-artifact-list small { flex: 0 0 auto; color: var(--color-text-subtle); font-size: 11px; }
 .shared-note-form,
-.shared-memory-form { display: grid; gap: 10px; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--color-border); }
+.shared-memory-form,
+.shared-upload-form { display: grid; gap: 10px; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--color-border); }
 .shared-note-form h3 { margin: 0 0 2px; font-size: 14px; }
 .shared-note-form input,
 .shared-note-form textarea,
@@ -309,6 +312,29 @@ textarea:focus-visible {
 .shared-memory-list strong { font-size: 13px; }
 .shared-memory-list span { overflow: hidden; color: var(--color-text-muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .shared-memory-form textarea { min-height: 76px; resize: vertical; }
+.shared-upload-form > div { display: grid; gap: 3px; }
+.shared-upload-form strong { font-size: 14px; }
+.shared-upload-form span { color: var(--color-text-muted); font-size: 12px; line-height: 1.45; }
+.shared-upload-form input[type="file"] { width: 100%; color: var(--color-text-muted); font-size: 12px; }
+.shared-memory-form label { display: grid; gap: 6px; color: var(--color-text-muted); font-size: 12px; font-weight: 700; }
+.shared-memory-form select { width: 100%; min-height: 38px; padding: 0 10px; color: var(--color-text); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px; }
+.shared-route-action { width: fit-content; margin-top: 34px; }
+.shared-route-mark { display: grid; gap: 14px; width: min(100%, 300px); place-items: center; color: var(--color-text-muted); text-align: center; font-size: 13px; line-height: 1.55; }
+.shared-route-mark svg { color: var(--color-accent); }
+.shared-record-content { display: grid; gap: 22px; margin-top: 26px; }
+.shared-record-subtitle { overflow-wrap: anywhere; }
+.shared-record-panel { padding-top: 20px; border-top: 1px solid var(--color-border); }
+.shared-record-panel h2 { margin: 0 0 12px; font-size: 15px; }
+.shared-content-preview { max-height: 440px; margin: 0; padding: 16px; overflow: auto; color: var(--color-text); background: var(--color-surface-2); border-radius: 10px; font-family: var(--font-mono); font-size: 12px; line-height: 1.6; white-space: pre-wrap; }
+.shared-chunk-list { display: grid; gap: 14px; }
+.shared-chunk-list article { padding-bottom: 14px; border-bottom: 1px solid var(--color-border); }
+.shared-chunk-list span,
+.shared-evidence-links span { color: var(--color-text-subtle); font-family: var(--font-mono); font-size: 11px; }
+.shared-chunk-list p { margin: 6px 0 0; font-size: 13px; line-height: 1.55; white-space: pre-wrap; }
+.shared-memory-body { max-width: 75ch; font-size: 14px; line-height: 1.65; white-space: pre-wrap; }
+.shared-evidence-links { display: grid; gap: 10px; }
+.shared-evidence-links article { display: grid; gap: 3px; }
+.shared-evidence-links strong { font-size: 13px; }
 
 @media (max-width: 900px) {
   body, .shared-auth-canvas, .shared-home { min-width: 0; }

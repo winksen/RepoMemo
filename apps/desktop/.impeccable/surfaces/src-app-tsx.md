@@ -26,6 +26,14 @@ The browser client stores its JWT only in session storage. It must clearly
 handle invalid credentials, expired sessions, API reachability, an empty
 organization list, and first-workspace setup. It must never use preview data in
 shared mode or present unavailable artifact/retrieval routes as working.
+Browser navigation is route-addressable: `/login`, `/register`, `/workspaces`,
+`/workspaces/:workspaceId`, individual artifact records, and individual memory
+cards; protected workspace addresses must redirect to sign-in without a valid
+session and unknown record IDs must fail safely. Each route calls the matching
+shared API endpoint rather than reconstructing it from summary data.
+The protected workspace shell owns a bounded viewport with an independently
+scrollable content plane, so long artifact, memory, and upload forms remain
+reachable despite the desktop app's globally non-scrolling root.
 
 ## Chosen direction
 

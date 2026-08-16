@@ -8,8 +8,9 @@ use argon2::{
     Argon2,
 };
 use axum::{
-    extract::{FromRequestParts, Path, State},
-    http::{header, request::Parts, HeaderValue, Method, StatusCode},
+    body::Bytes,
+    extract::{DefaultBodyLimit, FromRequestParts, Path, State},
+    http::{header, request::Parts, HeaderMap, HeaderName, HeaderValue, Method, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
@@ -29,6 +30,7 @@ use tower_http::{cors::CorsLayer, trace::TraceLayer};
 
 const JWT_ISSUER: &str = "repomemo-server";
 const ACCESS_TOKEN_TTL_MINUTES: i64 = 60;
+const MAX_SHARED_UPLOAD_BYTES: usize = 10 * 1024 * 1024;
 
 #[derive(Debug, Clone)]
 pub struct ServerConfig {
@@ -261,7 +263,11 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
         Some(origin) => CorsLayer::new()
             .allow_origin(origin)
             .allow_methods([Method::GET, Method::POST])
-            .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE]),
+            .allow_headers([
+                header::AUTHORIZATION,
+                header::CONTENT_TYPE,
+                HeaderName::from_static("x-repomemo-filename"),
+            ]),
         None => CorsLayer::new(),
     };
 
@@ -289,6 +295,10 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
         .route(
             "/v1/workspaces/{workspace_id}/artifacts/text",
             post(create_text_artifact),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/artifacts/upload",
+            post(upload_artifact),
         )
         .route(
             "/v1/artifacts/{artifact_id}",
@@ -319,6 +329,7 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
             get(export_memory_card),
         )
         .layer(TraceLayer::new_for_http())
+        .layer(DefaultBodyLimit::max(MAX_SHARED_UPLOAD_BYTES))
         .layer(cors)
         .with_state(state))
 }
@@ -485,6 +496,32 @@ async fn create_text_artifact(
     let artifact = state
         .core
         .import_text(workspace_id, request.title, request.content, request.language)
+        .await
+        .map_err(map_core_error)?;
+    Ok((StatusCode::CREATED, Json(artifact)))
+}
+
+async fn upload_artifact(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<(StatusCode, Json<ArtifactSummary>), ApiError> {
+    require_workspace_write(&state, &subject, &workspace_id).await?;
+    let filename = headers
+        .get("x-repomemo-filename")
+        .and_then(|value| value.to_str().ok())
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| ApiError::bad_request("X-RepoMemo-Filename is required for uploads."))?
+        .to_owned();
+    let mime_type = headers
+        .get(header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_owned);
+    let artifact = state
+        .core
+        .import_upload(workspace_id, filename, body.to_vec(), mime_type)
         .await
         .map_err(map_core_error)?;
     Ok((StatusCode::CREATED, Json(artifact)))
@@ -794,7 +831,7 @@ mod tests {
         let response = app.clone().oneshot(register).await.unwrap();
         assert_eq!(response.status(), 201);
         let registration: Value = serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
-        let token = registration["access_token"].as_str().unwrap();
+        let _token = registration["access_token"].as_str().unwrap();
         let protected = Request::builder()
             .uri("/v1/workspaces")
             .body(Body::empty())
@@ -826,12 +863,35 @@ mod tests {
         let artifact: Value = serde_json::from_slice(&to_bytes(artifact.into_body(), usize::MAX).await.unwrap()).unwrap();
         let artifact_id = artifact["id"].as_str().unwrap();
 
+        let uploaded = app.clone().oneshot(Request::builder().method("POST").uri(format!("/v1/workspaces/{workspace_id}/artifacts/upload"))
+            .header("authorization", &authorization)
+            .header("content-type", "text/x-rust")
+            .header("x-repomemo-filename", "upload.rs")
+            .body(Body::from("fn shared_upload() {}"))
+            .unwrap()).await.unwrap();
+        assert_eq!(uploaded.status(), 201);
+
         let indexed = app.clone().oneshot(auth_request("POST", &format!("/v1/artifacts/{artifact_id}/index"), &authorization)).await.unwrap();
         assert_eq!(indexed.status(), 200);
         let search = app.clone().oneshot(json_request("POST", &format!("/v1/workspaces/{workspace_id}/search"), &authorization, json!({"query":"shared data", "artifact_types": [], "languages": [], "source_ids": [], "limit": 20}))).await.unwrap();
         assert_eq!(search.status(), 200);
+        let search: Value = serde_json::from_slice(&to_bytes(search.into_body(), usize::MAX).await.unwrap()).unwrap();
+        assert_eq!(search.as_array().unwrap().len(), 1);
+        assert_eq!(search[0]["artifact_id"], artifact_id);
         let memory = app.clone().oneshot(json_request("POST", &format!("/v1/workspaces/{workspace_id}/memory-cards"), &authorization, json!({"title":"Rule", "body_markdown":"Keep shared data on the API.", "source":"Flow", "confidence": null, "citations": []}))).await.unwrap();
         assert_eq!(memory.status(), 201);
+        let memory: Value = serde_json::from_slice(&to_bytes(memory.into_body(), usize::MAX).await.unwrap()).unwrap();
+        let memory_id = memory["id"].as_str().unwrap();
+        let memories = app.clone().oneshot(auth_request("GET", &format!("/v1/workspaces/{workspace_id}/memory-cards"), &authorization)).await.unwrap();
+        assert_eq!(memories.status(), 200);
+        let memories: Value = serde_json::from_slice(&to_bytes(memories.into_body(), usize::MAX).await.unwrap()).unwrap();
+        assert_eq!(memories.as_array().unwrap().len(), 1);
+        let memory_detail = app.clone().oneshot(auth_request("GET", &format!("/v1/memory-cards/{memory_id}"), &authorization)).await.unwrap();
+        assert_eq!(memory_detail.status(), 200);
+        let exported = app.clone().oneshot(auth_request("GET", &format!("/v1/memory-cards/{memory_id}/export"), &authorization)).await.unwrap();
+        assert_eq!(exported.status(), 200);
+        let exported = String::from_utf8(to_bytes(exported.into_body(), usize::MAX).await.unwrap().to_vec()).unwrap();
+        assert!(exported.contains("Keep shared data on the API."));
         let overview = app.clone().oneshot(auth_request("GET", &format!("/v1/workspaces/{workspace_id}/overview"), &authorization)).await.unwrap();
         assert_eq!(overview.status(), 200);
         let _ = std::fs::remove_dir_all(data_dir);

@@ -7,6 +7,20 @@ and workspace routes. It has its own server data directory and does not expose
 the desktop app's local database. Import the [Postman collection](docs/api/RepoMemo_Shared_API_v2.postman_collection.json)
 to exercise the initial shared API.
 
+### Shared web routes
+
+With the API running, start the Vite web client and open:
+
+- `/login` — sign in to the shared server.
+- `/register` — create a shared-server account.
+- `/workspaces` — the protected organization and workspace directory.
+- `/workspaces/:workspaceId` — a protected evidence, retrieval, and memory view.
+- `/workspaces/:workspaceId/artifacts/:artifactId` — protected artifact detail and individual indexing.
+- `/workspaces/:workspaceId/memory-cards/:memoryCardId` — protected memory detail and Markdown export.
+
+Unauthenticated visits to shared workspace routes are redirected to `/login`.
+Workspace members can paste notes or upload supported Markdown, text, code, and image files up to 10 MiB. Memory cards may cite an artifact selected from that workspace.
+
 ## Current Capabilities
 
 Phase 1A is implemented and running locally:

@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context, Result};
 use repomemo_ai::{
@@ -12,7 +12,9 @@ use repomemo_domain::{
     Workspace, WorkspaceOverview,
 };
 use repomemo_indexer::{index_artifact, index_image_description};
-use repomemo_ingestion::{discover_import_candidates, ImportCandidate, ImportOptions};
+use repomemo_ingestion::{
+    detect_artifact_type, detect_language, discover_import_candidates, ImportCandidate, ImportOptions,
+};
 use repomemo_retrieval::RetrievalService;
 use repomemo_storage::{NewArtifact, StorageConfig, StorageEngine};
 use serde_json::json;
@@ -160,6 +162,71 @@ impl RepoMemoCore {
                 language,
                 size_bytes,
                 metadata: json!({ "origin": "paste" }),
+            })
+            .await
+            .map(|stored| stored.artifact)
+    }
+
+    pub async fn import_upload(
+        &self,
+        workspace_id: String,
+        filename: String,
+        bytes: Vec<u8>,
+        mime_type: Option<String>,
+    ) -> Result<ArtifactSummary> {
+        if workspace_id.trim().is_empty() {
+            bail!("Workspace id is required.");
+        }
+        if bytes.is_empty() {
+            bail!("Uploaded files cannot be empty.");
+        }
+        if !self.storage.workspace_exists(&workspace_id).await? {
+            bail!("Workspace was not found.");
+        }
+
+        let path = Path::new(&filename);
+        let safe_filename = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .filter(|name| !name.trim().is_empty())
+            .ok_or_else(|| anyhow::anyhow!("A valid upload filename is required."))?
+            .to_owned();
+        let artifact_type = detect_artifact_type(path)
+            .ok_or_else(|| anyhow::anyhow!("This file type is not supported for shared upload."))?;
+        let language = detect_language(path);
+        let fallback_mime = if matches!(artifact_type, ArtifactType::Image) {
+            "application/octet-stream"
+        } else if matches!(artifact_type, ArtifactType::MarkdownDoc) {
+            "text/markdown"
+        } else {
+            "text/plain"
+        };
+        let mime_type = mime_type
+            .filter(|value| !value.trim().is_empty())
+            .unwrap_or_else(|| fallback_mime.to_owned());
+        let source = self
+            .storage
+            .create_or_get_source(&workspace_id, SourceType::Upload, "Shared uploads", None)
+            .await
+            .with_context(|| "failed to create shared-uploads source")?;
+        let content_hash = StorageEngine::content_hash(&bytes);
+        let size_bytes = bytes.len() as i64;
+
+        self.storage
+            .store_blob(&content_hash, &bytes, Some(&mime_type))
+            .await?;
+        self.storage
+            .store_artifact(NewArtifact {
+                workspace_id,
+                source_id: source.id,
+                artifact_type,
+                title: safe_filename.clone(),
+                path: safe_filename,
+                content_hash,
+                mime_type: Some(mime_type),
+                language,
+                size_bytes,
+                metadata: json!({ "origin": "shared_upload" }),
             })
             .await
             .map(|stored| stored.artifact)

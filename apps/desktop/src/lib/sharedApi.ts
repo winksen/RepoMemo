@@ -3,6 +3,7 @@ import type {
   ArtifactSummary,
   IndexingJobStatus,
   MemoryCard,
+  MemoryCardDetail,
   MemoryCardSummary,
   Organization,
   SearchResult,
@@ -15,6 +16,10 @@ import type {
 const API_URL = (import.meta.env.VITE_REPOMEMO_API_URL ?? "http://127.0.0.1:8787").replace(/\/$/, "");
 
 export const sharedApiUrl = API_URL;
+
+export function getSharedHealth(): Promise<{ service: string; status: string; authentication: string }> {
+  return request<{ service: string; status: string; authentication: string }>("/health");
+}
 
 export class SharedApiError extends Error {
   readonly status: number;
@@ -56,6 +61,17 @@ async function request<T>(
     throw new SharedApiError(response.status, message ?? `The shared API returned ${response.status}.`);
   }
   return payload as T;
+}
+
+async function requestText(path: string, accessToken: string): Promise<string> {
+  const response = await fetch(`${API_URL}${path}`, {
+    headers: { Accept: "text/markdown", Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null) as { error?: { message?: string } } | null;
+    throw new SharedApiError(response.status, payload?.error?.message ?? `The shared API returned ${response.status}.`);
+  }
+  return response.text();
 }
 
 export async function registerSharedUser(input: {
@@ -136,8 +152,33 @@ export function createSharedTextArtifact(accessToken: string, workspaceId: strin
   }, accessToken);
 }
 
+export async function uploadSharedArtifact(accessToken: string, workspaceId: string, file: File): Promise<ArtifactSummary> {
+  const response = await fetch(`${API_URL}/v1/workspaces/${workspaceId}/artifacts/upload`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": file.type || "application/octet-stream",
+      "X-RepoMemo-Filename": file.name,
+    },
+    body: file,
+  });
+  const payload = await response.json().catch(() => null) as { error?: { message?: string } } | ArtifactSummary | null;
+  if (!response.ok) {
+    const message = payload && typeof payload === "object" && "error" in payload
+      ? payload.error?.message
+      : null;
+    throw new SharedApiError(response.status, message ?? `The shared API returned ${response.status}.`);
+  }
+  return payload as ArtifactSummary;
+}
+
 export function indexSharedWorkspace(accessToken: string, workspaceId: string): Promise<IndexingJobStatus> {
   return request<IndexingJobStatus>(`/v1/workspaces/${workspaceId}/index`, { method: "POST" }, accessToken);
+}
+
+export function indexSharedArtifact(accessToken: string, artifactId: string): Promise<IndexingJobStatus> {
+  return request<IndexingJobStatus>(`/v1/artifacts/${artifactId}/index`, { method: "POST" }, accessToken);
 }
 
 export function searchSharedWorkspace(accessToken: string, workspaceId: string, query: string): Promise<SearchResult[]> {
@@ -155,6 +196,15 @@ export function createSharedMemoryCard(accessToken: string, workspaceId: string,
   title: string;
   bodyMarkdown: string;
   source: string;
+  citations?: Array<{
+    artifact_id: string;
+    chunk_id: string | null;
+    title: string;
+    path: string;
+    start_line: number | null;
+    end_line: number | null;
+    confidence: number | null;
+  }>;
 }): Promise<MemoryCard> {
   return request<MemoryCard>(`/v1/workspaces/${workspaceId}/memory-cards`, {
     method: "POST",
@@ -163,7 +213,15 @@ export function createSharedMemoryCard(accessToken: string, workspaceId: string,
       body_markdown: input.bodyMarkdown,
       source: input.source,
       confidence: null,
-      citations: [],
+      citations: input.citations ?? [],
     }),
   }, accessToken);
+}
+
+export function getSharedMemoryCard(accessToken: string, cardId: string): Promise<MemoryCardDetail> {
+  return request<MemoryCardDetail>(`/v1/memory-cards/${cardId}`, {}, accessToken);
+}
+
+export function exportSharedMemoryCard(accessToken: string, cardId: string): Promise<string> {
+  return requestText(`/v1/memory-cards/${cardId}/export`, accessToken);
 }
