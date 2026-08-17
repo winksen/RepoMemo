@@ -8,9 +8,13 @@ import type {
   Organization,
   SearchResult,
   SharedSession,
+  SharedAiProviderSettings,
   SharedUser,
   WorkspaceMember,
   WorkspaceRole,
+  WorkspaceActivityEvent,
+  WorkspaceAiOverview,
+  WorkspaceCapabilities,
   SharedWorkspace,
   WorkspaceOverview,
 } from "../types";
@@ -131,8 +135,60 @@ export function createSharedWorkspace(
   }, accessToken);
 }
 
+export function updateSharedWorkspace(accessToken: string, workspaceId: string, name: string) {
+  return request<SharedWorkspace["workspace"]>(`/v1/workspaces/${workspaceId}`, {
+    method: "PUT",
+    body: JSON.stringify({ name }),
+  }, accessToken);
+}
+
+export function deleteSharedWorkspace(accessToken: string, workspaceId: string): Promise<void> {
+  return request<void>(`/v1/workspaces/${workspaceId}`, { method: "DELETE" }, accessToken);
+}
+
 export function getSharedWorkspaceOverview(accessToken: string, workspaceId: string): Promise<WorkspaceOverview> {
   return request<WorkspaceOverview>(`/v1/workspaces/${workspaceId}/overview`, {}, accessToken);
+}
+
+export function getSharedWorkspaceCapabilities(accessToken: string, workspaceId: string): Promise<WorkspaceCapabilities> {
+  return request<WorkspaceCapabilities>(`/v1/workspaces/${workspaceId}/capabilities`, {}, accessToken);
+}
+
+export function generateSharedWorkspaceAiOverview(accessToken: string, workspaceId: string): Promise<WorkspaceAiOverview> {
+  return request<WorkspaceAiOverview>(`/v1/workspaces/${workspaceId}/ai-overview`, { method: "POST" }, accessToken);
+}
+
+export function listSharedWorkspaceAiProviders(accessToken: string, workspaceId: string): Promise<SharedAiProviderSettings[]> {
+  return request<SharedAiProviderSettings[]>(`/v1/workspaces/${workspaceId}/ai-providers`, {}, accessToken);
+}
+
+export function saveSharedWorkspaceAiProvider(accessToken: string, workspaceId: string, input: {
+  id?: string;
+  providerType: "ollama" | "openrouter";
+  name: string;
+  baseUrl?: string;
+  model: string;
+  apiKey?: string;
+  enabled: boolean;
+  cloudContentAcknowledged: boolean;
+}): Promise<SharedAiProviderSettings> {
+  return request<SharedAiProviderSettings>(`/v1/workspaces/${workspaceId}/ai-providers`, {
+    method: "PUT",
+    body: JSON.stringify({
+      id: input.id ?? null,
+      provider_type: input.providerType,
+      name: input.name,
+      base_url: input.baseUrl || null,
+      model: input.model,
+      api_key: input.apiKey || null,
+      enabled: input.enabled,
+      cloud_content_acknowledged: input.cloudContentAcknowledged,
+    }),
+  }, accessToken);
+}
+
+export function listSharedWorkspaceActivity(accessToken: string, workspaceId: string): Promise<WorkspaceActivityEvent[]> {
+  return request<WorkspaceActivityEvent[]>(`/v1/workspaces/${workspaceId}/activity`, {}, accessToken);
 }
 
 export function listSharedWorkspaceMembers(accessToken: string, workspaceId: string): Promise<WorkspaceMember[]> {
@@ -160,6 +216,17 @@ export function listSharedArtifacts(accessToken: string, workspaceId: string): P
 
 export function getSharedArtifact(accessToken: string, artifactId: string): Promise<ArtifactDetail> {
   return request<ArtifactDetail>(`/v1/artifacts/${artifactId}`, {}, accessToken);
+}
+
+export function updateSharedArtifact(accessToken: string, artifactId: string, title: string): Promise<ArtifactSummary> {
+  return request<ArtifactSummary>(`/v1/artifacts/${artifactId}`, {
+    method: "PUT",
+    body: JSON.stringify({ title }),
+  }, accessToken);
+}
+
+export function deleteSharedArtifact(accessToken: string, artifactId: string): Promise<void> {
+  return request<void>(`/v1/artifacts/${artifactId}`, { method: "DELETE" }, accessToken);
 }
 
 export function createSharedTextArtifact(accessToken: string, workspaceId: string, input: {
@@ -241,6 +308,27 @@ export function createSharedMemoryCard(accessToken: string, workspaceId: string,
 
 export function getSharedMemoryCard(accessToken: string, cardId: string): Promise<MemoryCardDetail> {
   return request<MemoryCardDetail>(`/v1/memory-cards/${cardId}`, {}, accessToken);
+}
+
+export function updateSharedMemoryCard(accessToken: string, cardId: string, input: {
+  title: string;
+  bodyMarkdown: string;
+  source: string;
+  confidence?: number | null;
+}): Promise<MemoryCard> {
+  return request<MemoryCard>(`/v1/memory-cards/${cardId}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      title: input.title,
+      body_markdown: input.bodyMarkdown,
+      source: input.source,
+      confidence: input.confidence ?? null,
+    }),
+  }, accessToken);
+}
+
+export function deleteSharedMemoryCard(accessToken: string, cardId: string): Promise<void> {
+  return request<void>(`/v1/memory-cards/${cardId}`, { method: "DELETE" }, accessToken);
 }
 
 export function exportSharedMemoryCard(accessToken: string, cardId: string): Promise<string> {

@@ -13,7 +13,8 @@ use repomemo_domain::{
 };
 use repomemo_indexer::{index_artifact, index_image_description};
 use repomemo_ingestion::{
-    detect_artifact_type, detect_language, discover_import_candidates, ImportCandidate, ImportOptions,
+    detect_artifact_type, detect_language, discover_import_candidates, ImportCandidate,
+    ImportOptions,
 };
 use repomemo_retrieval::RetrievalService;
 use repomemo_storage::{NewArtifact, StorageConfig, StorageEngine};
@@ -38,6 +39,20 @@ impl RepoMemoCore {
 
     pub async fn list_workspaces(&self) -> Result<Vec<Workspace>> {
         self.storage.list_workspaces().await
+    }
+
+    pub async fn update_workspace_name(
+        &self,
+        workspace_id: String,
+        name: String,
+    ) -> Result<Workspace> {
+        self.storage
+            .update_workspace_name(&workspace_id, &name)
+            .await
+    }
+
+    pub async fn delete_workspace(&self, workspace_id: String) -> Result<()> {
+        self.storage.delete_workspace(&workspace_id).await
     }
 
     pub async fn import_paths(&self, request: ImportRequest) -> Result<ImportReport> {
@@ -240,6 +255,20 @@ impl RepoMemoCore {
         self.storage.get_artifact(&artifact_id).await
     }
 
+    pub async fn update_artifact_title(
+        &self,
+        artifact_id: String,
+        title: String,
+    ) -> Result<ArtifactSummary> {
+        self.storage
+            .update_artifact_title(&artifact_id, &title)
+            .await
+    }
+
+    pub async fn delete_artifact(&self, artifact_id: String) -> Result<()> {
+        self.storage.delete_artifact(&artifact_id).await
+    }
+
     pub async fn index_artifact(&self, artifact_id: String) -> Result<IndexingJobStatus> {
         if artifact_id.trim().is_empty() {
             bail!("Artifact id is required.");
@@ -353,6 +382,13 @@ impl RepoMemoCore {
                 request.confidence,
             )
             .await
+    }
+
+    pub async fn delete_memory_card(&self, card_id: String) -> Result<()> {
+        if card_id.trim().is_empty() {
+            bail!("Memory card id is required.");
+        }
+        self.storage.delete_memory_card(&card_id).await
     }
 
     pub async fn list_memory_cards(&self, workspace_id: String) -> Result<Vec<MemoryCardSummary>> {

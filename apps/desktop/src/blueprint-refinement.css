@@ -352,7 +352,7 @@ select,
 .paste-language select,
 .workspace-create-controls input {
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  border: 2px solid var(--color-border-strong);
   border-radius: 10px;
   box-shadow: none;
   transition: border-color 180ms var(--ease-standard), background 180ms var(--ease-standard);
@@ -360,7 +360,7 @@ select,
 
 input:hover:not(:disabled),
 textarea:hover:not(:disabled),
-select:hover:not(:disabled) { border-color: var(--color-border-strong); }
+select:hover:not(:disabled) { border-color: var(--color-accent); }
 
 input:focus,
 textarea:focus,
@@ -368,7 +368,21 @@ select:focus,
 .workspace-create-controls input:focus {
   background: var(--color-surface);
   border-color: var(--color-accent);
-  outline: 2px solid hsl(233 84% 44% / 16%);
+  outline: none;
+}
+
+/* The shared primitives own form-control geometry and must retain a visible
+ * two-pixel neutral boundary even where a page has more specific field rules. */
+input.rm-input,
+textarea.rm-textarea {
+  border: 2px solid var(--color-border-strong);
+}
+
+input.rm-input:hover:not(:disabled),
+textarea.rm-textarea:hover:not(:disabled),
+input.rm-input:focus,
+textarea.rm-textarea:focus {
+  border-color: var(--color-accent);
 }
 
 .search-input-wrap {

@@ -34,6 +34,18 @@ pub struct WorkspaceMember {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkspaceActivityEvent {
+    pub id: String,
+    pub workspace_id: String,
+    pub actor: Option<SharedUser>,
+    pub action: String,
+    pub subject_type: String,
+    pub subject_id: Option<String>,
+    pub summary: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SharedSession {
     pub user: SharedUser,
     pub authentication: String,
@@ -72,6 +84,45 @@ pub struct WorkspaceOverview {
     pub chunk_count: i64,
     pub symbol_count: i64,
     pub memory_card_count: i64,
+}
+
+/// Server-authoritative permissions for the currently authenticated member.
+/// Clients may use this shape to decide which controls to present, but every
+/// mutation remains enforced by the shared API.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkspaceCapabilities {
+    pub role: WorkspaceRole,
+    pub can_read: bool,
+    pub can_write_content: bool,
+    pub can_delete_content: bool,
+    pub can_manage_members: bool,
+    pub can_assign_admin: bool,
+    pub can_manage_workspace: bool,
+    pub can_generate_ai_overview: bool,
+}
+
+/// A citation-backed workspace briefing generated through an enabled provider.
+/// When no provider is configured, the API returns this shape with no summary
+/// and an actionable warning instead of fabricating an AI result.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkspaceAiOverview {
+    pub provider_configured: bool,
+    pub provider_name: Option<String>,
+    pub summary_markdown: Option<String>,
+    pub citations: Vec<Citation>,
+    pub warnings: Vec<String>,
+}
+
+/// Safe-to-return provider metadata for the shared web client. Credentials
+/// remain server-side and are never serialized in this response.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SharedAiProviderSettings {
+    pub id: String,
+    pub provider_type: String,
+    pub name: String,
+    pub base_url: Option<String>,
+    pub model: Option<String>,
+    pub enabled: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

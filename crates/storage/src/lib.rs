@@ -6,8 +6,8 @@ use repomemo_domain::{
     ArtifactDetail, ArtifactSummary, ArtifactType, Chunk, Citation, IndexingJobStatus, MemoryCard,
     MemoryCardDetail, MemoryCardSummary, MemoryEvidence, Organization, ProviderSettings,
     SearchRequest, SearchResult, SharedUser, SharedWorkspace, Source, SourceType, Symbol,
-    SymbolKind, SymbolSearchResult, Workspace, WorkspaceMember, WorkspaceMembership, WorkspaceOverview,
-    WorkspaceRole,
+    SymbolKind, SymbolSearchResult, Workspace, WorkspaceActivityEvent, WorkspaceMember,
+    WorkspaceMembership, WorkspaceOverview, WorkspaceRole,
 };
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -71,6 +71,20 @@ struct WorkspaceMemberRow {
     role: String,
     created_at: String,
     updated_at: String,
+}
+
+#[derive(Debug, sqlx::FromRow)]
+struct WorkspaceActivityRow {
+    id: String,
+    workspace_id: String,
+    actor_id: Option<String>,
+    actor_email: Option<String>,
+    actor_display_name: Option<String>,
+    action: String,
+    subject_type: String,
+    subject_id: Option<String>,
+    summary: String,
+    created_at: String,
 }
 
 #[derive(Debug, sqlx::FromRow)]
@@ -367,6 +381,38 @@ impl StorageEngine {
         Ok(rows.into_iter().map(Workspace::from).collect())
     }
 
+    pub async fn update_workspace_name(&self, workspace_id: &str, name: &str) -> Result<Workspace> {
+        let name = require_name(name, "Workspace name")?;
+        let now = Utc::now().to_rfc3339();
+        let changed = sqlx::query("UPDATE workspaces SET name = ?1, updated_at = ?2 WHERE id = ?3")
+            .bind(&name)
+            .bind(&now)
+            .bind(workspace_id)
+            .execute(&self.pool)
+            .await?;
+        if changed.rows_affected() == 0 {
+            bail!("Workspace was not found.");
+        }
+        let row = sqlx::query_as::<_, WorkspaceRow>(
+            "SELECT id, name, created_at, updated_at, settings_json FROM workspaces WHERE id = ?1",
+        )
+        .bind(workspace_id)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(Workspace::from(row))
+    }
+
+    pub async fn delete_workspace(&self, workspace_id: &str) -> Result<()> {
+        let changed = sqlx::query("DELETE FROM workspaces WHERE id = ?1")
+            .bind(workspace_id)
+            .execute(&self.pool)
+            .await?;
+        if changed.rows_affected() == 0 {
+            bail!("Workspace was not found.");
+        }
+        Ok(())
+    }
+
     pub async fn create_user(
         &self,
         email: &str,
@@ -527,6 +573,14 @@ impl StorageEngine {
             .bind(&now)
             .execute(&mut *tx)
             .await?;
+        sqlx::query("INSERT INTO workspace_activity (id, workspace_id, actor_user_id, action, subject_type, subject_id, summary, created_at) VALUES (?1, ?2, ?3, 'workspace_created', 'workspace', ?2, ?4, ?5)")
+            .bind(Uuid::new_v4().to_string())
+            .bind(&id)
+            .bind(owner_id)
+            .bind(format!("Created workspace {name}."))
+            .bind(&now)
+            .execute(&mut *tx)
+            .await?;
         tx.commit().await?;
 
         Ok(SharedWorkspace {
@@ -601,6 +655,64 @@ impl StorageEngine {
         rows.into_iter().map(WorkspaceMember::try_from).collect()
     }
 
+    pub async fn record_workspace_activity(
+        &self,
+        workspace_id: &str,
+        actor_user_id: Option<&str>,
+        action: &str,
+        subject_type: &str,
+        subject_id: Option<&str>,
+        summary: &str,
+    ) -> Result<()> {
+        sqlx::query(
+            "INSERT INTO workspace_activity (id, workspace_id, actor_user_id, action, subject_type, subject_id, summary, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        )
+        .bind(Uuid::new_v4().to_string())
+        .bind(workspace_id)
+        .bind(actor_user_id)
+        .bind(action)
+        .bind(subject_type)
+        .bind(subject_id)
+        .bind(summary)
+        .bind(Utc::now().to_rfc3339())
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn list_workspace_activity(
+        &self,
+        workspace_id: &str,
+        limit: i64,
+    ) -> Result<Vec<WorkspaceActivityEvent>> {
+        let rows = sqlx::query_as::<_, WorkspaceActivityRow>(
+            r#"
+            SELECT
+              activity.id,
+              activity.workspace_id,
+              actor.id AS actor_id,
+              actor.email AS actor_email,
+              actor.display_name AS actor_display_name,
+              activity.action,
+              activity.subject_type,
+              activity.subject_id,
+              activity.summary,
+              activity.created_at
+            FROM workspace_activity AS activity
+            LEFT JOIN users AS actor ON actor.id = activity.actor_user_id
+            WHERE activity.workspace_id = ?1
+            ORDER BY activity.created_at DESC, activity.id DESC
+            LIMIT ?2
+            "#,
+        )
+        .bind(workspace_id)
+        .bind(limit.clamp(1, 100))
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows.into_iter().map(WorkspaceActivityEvent::from).collect())
+    }
+
     pub async fn upsert_workspace_member(
         &self,
         workspace_id: &str,
@@ -650,11 +762,13 @@ impl StorageEngine {
         if matches!(role, Some(WorkspaceRole::Owner)) {
             bail!("The workspace owner cannot be removed.");
         }
-        let result = sqlx::query("DELETE FROM workspace_memberships WHERE workspace_id = ?1 AND user_id = ?2")
-            .bind(workspace_id)
-            .bind(user_id)
-            .execute(&self.pool)
-            .await?;
+        let result = sqlx::query(
+            "DELETE FROM workspace_memberships WHERE workspace_id = ?1 AND user_id = ?2",
+        )
+        .bind(workspace_id)
+        .bind(user_id)
+        .execute(&self.pool)
+        .await?;
         if result.rows_affected() == 0 {
             bail!("Workspace membership was not found.");
         }
@@ -950,6 +1064,43 @@ impl StorageEngine {
         .await?;
 
         Ok(ArtifactSummary::from(row))
+    }
+
+    pub async fn update_artifact_title(
+        &self,
+        artifact_id: &str,
+        title: &str,
+    ) -> Result<ArtifactSummary> {
+        let title = require_name(title, "Artifact title")?;
+        let now = Utc::now().to_rfc3339();
+        let changed = sqlx::query("UPDATE artifacts SET title = ?1, updated_at = ?2 WHERE id = ?3")
+            .bind(&title)
+            .bind(&now)
+            .bind(artifact_id)
+            .execute(&self.pool)
+            .await?;
+        if changed.rows_affected() == 0 {
+            bail!("Artifact was not found.");
+        }
+        self.get_artifact_summary(artifact_id).await
+    }
+
+    pub async fn delete_artifact(&self, artifact_id: &str) -> Result<()> {
+        let summary = self.get_artifact_summary(artifact_id).await?;
+        let mut tx = self.pool.begin().await?;
+        sqlx::query(
+            "DELETE FROM links WHERE workspace_id = ?1 AND (to_id = ?2 OR (to_type = 'chunk' AND to_id IN (SELECT id FROM chunks WHERE artifact_id = ?2)))",
+        )
+        .bind(&summary.workspace_id)
+        .bind(artifact_id)
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query("DELETE FROM artifacts WHERE id = ?1")
+            .bind(artifact_id)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        Ok(())
     }
 
     pub async fn read_artifact_blob(&self, artifact_id: &str) -> Result<Vec<u8>> {
@@ -1525,6 +1676,22 @@ impl StorageEngine {
             .map(|detail| detail.card)
     }
 
+    pub async fn delete_memory_card(&self, card_id: &str) -> Result<()> {
+        let detail = self.get_memory_card(card_id).await?;
+        let mut tx = self.pool.begin().await?;
+        sqlx::query("DELETE FROM links WHERE workspace_id = ?1 AND from_type = 'memory_card' AND from_id = ?2")
+            .bind(&detail.card.workspace_id)
+            .bind(card_id)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("DELETE FROM memory_cards WHERE id = ?1")
+            .bind(card_id)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
     pub async fn list_memory_cards(&self, workspace_id: &str) -> Result<Vec<MemoryCardSummary>> {
         self.query_memory_cards(workspace_id, None).await
     }
@@ -1940,6 +2107,27 @@ impl TryFrom<WorkspaceMemberRow> for WorkspaceMember {
             joined_at: row.created_at,
             updated_at: row.updated_at,
         })
+    }
+}
+
+impl From<WorkspaceActivityRow> for WorkspaceActivityEvent {
+    fn from(row: WorkspaceActivityRow) -> Self {
+        Self {
+            id: row.id,
+            workspace_id: row.workspace_id,
+            actor: row.actor_id.map(|id| SharedUser {
+                id,
+                display_name: row
+                    .actor_display_name
+                    .unwrap_or_else(|| "Former member".to_owned()),
+                email: row.actor_email,
+            }),
+            action: row.action,
+            subject_type: row.subject_type,
+            subject_id: row.subject_id,
+            summary: row.summary,
+            created_at: row.created_at,
+        }
     }
 }
 

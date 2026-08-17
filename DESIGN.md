@@ -75,6 +75,9 @@ The web client uses shadcn's source-owned component pattern. Components live in
 Radix only for interaction behavior. `Button` has exactly two variants:
 `main` for the single decisive action in a group and `secondary` for every
 other action. `Dropdown` has one accessible visual treatment for all selects.
+`Input` and `Textarea` own all text-entry fields: a calm neutral boundary at
+rest and a solid blue boundary on hover and focus. Control-state transitions
+use the shared ease-in-out curve; buttons never move position on hover.
 Do not introduce a third button or dropdown treatment without updating this
 system deliberately.
 

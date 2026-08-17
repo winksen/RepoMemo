@@ -12,7 +12,7 @@ use axum::{
     extract::{DefaultBodyLimit, FromRequestParts, Path, State},
     http::{header, request::Parts, HeaderMap, HeaderName, HeaderValue, Method, StatusCode},
     response::{IntoResponse, Response},
-    routing::{delete, get, post},
+    routing::{delete, get, post, put},
     Json, Router,
 };
 use chrono::{Duration as ChronoDuration, Utc};
@@ -21,11 +21,14 @@ use rand_core::OsRng;
 use repomemo_api::RepoMemoCore;
 use repomemo_domain::{
     ArtifactDetail, ArtifactSummary, Citation, CreateMemoryCardRequest, IndexingJobStatus,
-    MemoryCard, MemoryCardDetail, MemoryCardSummary, Organization, SearchRequest, SearchResult,
-    SharedSession, SharedUser, SharedWorkspace, WorkspaceMember, WorkspaceOverview, WorkspaceRole,
+    MemoryCard, MemoryCardDetail, MemoryCardSummary, Organization, ProviderSettings, SearchRequest,
+    SearchResult, SharedAiProviderSettings, SharedSession, SharedUser, SharedWorkspace,
+    UpdateMemoryCardRequest, Workspace, WorkspaceActivityEvent, WorkspaceAiOverview,
+    WorkspaceCapabilities, WorkspaceMember, WorkspaceOverview, WorkspaceRole,
 };
 use repomemo_storage::{StorageConfig, StorageEngine};
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 
 const JWT_ISSUER: &str = "repomemo-server";
@@ -198,10 +201,20 @@ struct CreateWorkspaceRequest {
 }
 
 #[derive(Debug, Deserialize)]
+struct UpdateWorkspaceRequest {
+    name: String,
+}
+
+#[derive(Debug, Deserialize)]
 struct CreateTextArtifactRequest {
     title: String,
     content: String,
     language: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct UpdateArtifactRequest {
+    title: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -224,6 +237,27 @@ struct CreateMemoryCardBody {
     confidence: Option<f64>,
     #[serde(default)]
     citations: Vec<Citation>,
+}
+
+#[derive(Debug, Deserialize)]
+struct UpdateMemoryCardBody {
+    title: String,
+    body_markdown: String,
+    source: String,
+    confidence: Option<f64>,
+}
+
+#[derive(Debug, Deserialize)]
+struct SaveAiProviderRequest {
+    id: Option<String>,
+    provider_type: String,
+    name: String,
+    base_url: Option<String>,
+    model: Option<String>,
+    api_key: Option<String>,
+    enabled: bool,
+    #[serde(default)]
+    cloud_content_acknowledged: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -291,8 +325,28 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
             get(list_workspaces).post(create_workspace),
         )
         .route(
+            "/v1/workspaces/{workspace_id}",
+            put(update_workspace).delete(delete_workspace),
+        )
+        .route(
             "/v1/workspaces/{workspace_id}/overview",
             get(workspace_overview),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/capabilities",
+            get(workspace_capabilities),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/ai-overview",
+            post(generate_workspace_ai_overview),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/ai-providers",
+            get(list_workspace_ai_providers).put(save_workspace_ai_provider),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/activity",
+            get(list_workspace_activity),
         )
         .route(
             "/v1/workspaces/{workspace_id}/members",
@@ -316,16 +370,12 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
         )
         .route(
             "/v1/artifacts/{artifact_id}",
-            get(get_artifact),
+            get(get_artifact)
+                .put(update_artifact)
+                .delete(delete_artifact),
         )
-        .route(
-            "/v1/artifacts/{artifact_id}/index",
-            post(index_artifact),
-        )
-        .route(
-            "/v1/workspaces/{workspace_id}/index",
-            post(index_workspace),
-        )
+        .route("/v1/artifacts/{artifact_id}/index", post(index_artifact))
+        .route("/v1/workspaces/{workspace_id}/index", post(index_workspace))
         .route(
             "/v1/workspaces/{workspace_id}/search",
             post(search_workspace),
@@ -336,12 +386,11 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
         )
         .route(
             "/v1/memory-cards/{card_id}",
-            get(get_memory_card),
+            get(get_memory_card)
+                .put(update_memory_card)
+                .delete(delete_memory_card),
         )
-        .route(
-            "/v1/memory-cards/{card_id}/export",
-            get(export_memory_card),
-        )
+        .route("/v1/memory-cards/{card_id}/export", get(export_memory_card))
         .layer(TraceLayer::new_for_http())
         .layer(DefaultBodyLimit::max(MAX_SHARED_UPLOAD_BYTES))
         .layer(cors)
@@ -472,6 +521,45 @@ async fn list_workspaces(
         .map_err(ApiError::internal)
 }
 
+async fn update_workspace(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+    Json(request): Json<UpdateWorkspaceRequest>,
+) -> Result<Json<Workspace>, ApiError> {
+    require_workspace_owner(&state, &subject, &workspace_id).await?;
+    let workspace = state
+        .core
+        .update_workspace_name(workspace_id.clone(), request.name)
+        .await
+        .map_err(map_core_error)?;
+    record_workspace_activity(
+        &state,
+        &workspace_id,
+        &subject.user_id,
+        "workspace_updated",
+        "workspace",
+        Some(&workspace_id),
+        format!("Renamed the workspace to {}.", workspace.name),
+    )
+    .await;
+    Ok(Json(workspace))
+}
+
+async fn delete_workspace(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    require_workspace_owner(&state, &subject, &workspace_id).await?;
+    state
+        .core
+        .delete_workspace(workspace_id)
+        .await
+        .map_err(map_core_error)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 async fn workspace_overview(
     subject: AuthenticatedSubject,
     State(state): State<AppState>,
@@ -484,6 +572,199 @@ async fn workspace_overview(
         .await
         .map(Json)
         .map_err(map_core_error)
+}
+
+async fn workspace_capabilities(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+) -> Result<Json<WorkspaceCapabilities>, ApiError> {
+    let role = require_workspace_read(&state, &subject, &workspace_id).await?;
+    Ok(Json(capabilities_for_role(role)))
+}
+
+async fn generate_workspace_ai_overview(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+) -> Result<Json<WorkspaceAiOverview>, ApiError> {
+    require_workspace_read(&state, &subject, &workspace_id).await?;
+    let provider = state
+        .storage
+        .list_provider_settings(&workspace_id)
+        .await
+        .map_err(map_storage_error)?
+        .into_iter()
+        .find(|setting| setting.enabled);
+
+    let Some(provider) = provider else {
+        return Ok(Json(WorkspaceAiOverview {
+            provider_configured: false,
+            provider_name: None,
+            summary_markdown: None,
+            citations: Vec::new(),
+            warnings: vec![
+                "No enabled AI provider is configured for this workspace. Evidence remains available locally; configure a workspace provider before generating an AI overview.".to_owned(),
+            ],
+        }));
+    };
+
+    let result = state
+        .core
+        .summarize_workspace(workspace_id.clone(), provider.id.clone())
+        .await
+        .map_err(map_core_error)?;
+    record_workspace_activity(
+        &state,
+        &workspace_id,
+        &subject.user_id,
+        "ai_overview_generated",
+        "workspace",
+        Some(&workspace_id),
+        "Generated a citation-backed AI workspace overview.".to_owned(),
+    )
+    .await;
+    Ok(Json(WorkspaceAiOverview {
+        provider_configured: true,
+        provider_name: Some(provider.name),
+        summary_markdown: Some(result.summary_markdown),
+        citations: result.citations,
+        warnings: result.warnings,
+    }))
+}
+
+async fn list_workspace_ai_providers(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+) -> Result<Json<Vec<SharedAiProviderSettings>>, ApiError> {
+    require_workspace_owner(&state, &subject, &workspace_id).await?;
+    state
+        .storage
+        .list_provider_settings(&workspace_id)
+        .await
+        .map(|providers| {
+            providers
+                .into_iter()
+                .map(shared_provider_settings)
+                .collect()
+        })
+        .map(Json)
+        .map_err(map_storage_error)
+}
+
+async fn save_workspace_ai_provider(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+    Json(request): Json<SaveAiProviderRequest>,
+) -> Result<Json<SharedAiProviderSettings>, ApiError> {
+    require_workspace_owner(&state, &subject, &workspace_id).await?;
+    let provider_id = request.id.unwrap_or_default();
+    let existing = if provider_id.trim().is_empty() {
+        None
+    } else {
+        let settings = state
+            .storage
+            .get_provider_settings(&provider_id)
+            .await
+            .map_err(map_storage_error)?;
+        if settings.workspace_id.as_deref() != Some(workspace_id.as_str()) {
+            return Err(ApiError::forbidden());
+        }
+        Some(settings)
+    };
+    let api_key = request
+        .api_key
+        .filter(|value| !value.trim().is_empty())
+        .or_else(|| {
+            existing
+                .as_ref()
+                .and_then(|settings| settings.api_key.clone())
+        });
+    let cloud_content_acknowledged = request.cloud_content_acknowledged
+        || existing
+            .as_ref()
+            .and_then(|settings| settings.metadata.get("cloud_content_acknowledged"))
+            .and_then(|value| value.as_bool())
+            .unwrap_or(false);
+    let provider = state
+        .core
+        .save_provider_settings(ProviderSettings {
+            id: provider_id,
+            workspace_id: Some(workspace_id.clone()),
+            provider_type: request.provider_type,
+            name: request.name,
+            base_url: request.base_url,
+            model: request.model,
+            embedding_model: None,
+            enabled: request.enabled,
+            metadata: json!({ "cloud_content_acknowledged": cloud_content_acknowledged }),
+            api_key,
+        })
+        .await
+        .map_err(map_core_error)?;
+    record_workspace_activity(
+        &state,
+        &workspace_id,
+        &subject.user_id,
+        "ai_provider_updated",
+        "ai_provider",
+        Some(&provider.id),
+        format!("Updated AI provider: {}.", provider.name),
+    )
+    .await;
+    Ok(Json(shared_provider_settings(provider)))
+}
+
+fn shared_provider_settings(provider: ProviderSettings) -> SharedAiProviderSettings {
+    SharedAiProviderSettings {
+        id: provider.id,
+        provider_type: provider.provider_type,
+        name: provider.name,
+        base_url: provider.base_url,
+        model: provider.model,
+        enabled: provider.enabled,
+    }
+}
+
+async fn list_workspace_activity(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+) -> Result<Json<Vec<WorkspaceActivityEvent>>, ApiError> {
+    require_workspace_read(&state, &subject, &workspace_id).await?;
+    state
+        .storage
+        .list_workspace_activity(&workspace_id, 100)
+        .await
+        .map(Json)
+        .map_err(map_storage_error)
+}
+
+async fn record_workspace_activity(
+    state: &AppState,
+    workspace_id: &str,
+    actor_user_id: &str,
+    action: &str,
+    subject_type: &str,
+    subject_id: Option<&str>,
+    summary: String,
+) {
+    if let Err(error) = state
+        .storage
+        .record_workspace_activity(
+            workspace_id,
+            Some(actor_user_id),
+            action,
+            subject_type,
+            subject_id,
+            &summary,
+        )
+        .await
+    {
+        tracing::error!(error = %error, workspace_id, action, "Failed to record workspace activity");
+    }
 }
 
 async fn list_workspace_members(
@@ -507,15 +788,49 @@ async fn upsert_workspace_member(
     Json(request): Json<UpsertWorkspaceMemberRequest>,
 ) -> Result<Json<WorkspaceMember>, ApiError> {
     let caller_role = require_workspace_admin(&state, &subject, &workspace_id).await?;
-    if matches!(caller_role, WorkspaceRole::Admin) && matches!(request.role, WorkspaceRole::Admin) {
-        return Err(ApiError::forbidden());
+    if matches!(&caller_role, WorkspaceRole::Admin) {
+        if matches!(request.role, WorkspaceRole::Admin) {
+            return Err(ApiError::forbidden());
+        }
+        if let Some(user) = state
+            .storage
+            .find_user_by_email(&request.email)
+            .await
+            .map_err(map_storage_error)?
+        {
+            let target_role = state
+                .storage
+                .workspace_role_for_user(&user.id, &workspace_id)
+                .await
+                .map_err(map_storage_error)?;
+            if matches!(
+                target_role,
+                Some(WorkspaceRole::Owner | WorkspaceRole::Admin)
+            ) {
+                return Err(ApiError::forbidden());
+            }
+        }
     }
-    state
+    let member = state
         .storage
         .upsert_workspace_member(&workspace_id, &request.email, request.role)
         .await
-        .map(Json)
-        .map_err(map_storage_error)
+        .map_err(map_storage_error)?;
+    record_workspace_activity(
+        &state,
+        &workspace_id,
+        &subject.user_id,
+        "member_updated",
+        "user",
+        Some(&member.user.id),
+        format!(
+            "Set {} to {}.",
+            member.user.display_name,
+            workspace_role_label(&member.role)
+        ),
+    )
+    .await;
+    Ok(Json(member))
 }
 
 async fn remove_workspace_member(
@@ -523,12 +838,40 @@ async fn remove_workspace_member(
     State(state): State<AppState>,
     Path((workspace_id, user_id)): Path<(String, String)>,
 ) -> Result<StatusCode, ApiError> {
-    require_workspace_admin(&state, &subject, &workspace_id).await?;
+    let caller_role = require_workspace_admin(&state, &subject, &workspace_id).await?;
+    let member = state
+        .storage
+        .list_workspace_members(&workspace_id)
+        .await
+        .map_err(map_storage_error)?
+        .into_iter()
+        .find(|member| member.user.id == user_id);
+    if matches!(&caller_role, WorkspaceRole::Admin)
+        && matches!(
+            member.as_ref().map(|entry| &entry.role),
+            Some(WorkspaceRole::Owner | WorkspaceRole::Admin)
+        )
+    {
+        return Err(ApiError::forbidden());
+    }
+    let member_name = member
+        .map(|entry| entry.user.display_name)
+        .unwrap_or_else(|| "a workspace member".to_owned());
     state
         .storage
         .remove_workspace_member(&workspace_id, &user_id)
         .await
         .map_err(map_storage_error)?;
+    record_workspace_activity(
+        &state,
+        &workspace_id,
+        &subject.user_id,
+        "member_removed",
+        "user",
+        Some(&user_id),
+        format!("Removed {member_name} from the workspace."),
+    )
+    .await;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -555,9 +898,24 @@ async fn create_text_artifact(
     require_workspace_write(&state, &subject, &workspace_id).await?;
     let artifact = state
         .core
-        .import_text(workspace_id, request.title, request.content, request.language)
+        .import_text(
+            workspace_id.clone(),
+            request.title,
+            request.content,
+            request.language,
+        )
         .await
         .map_err(map_core_error)?;
+    record_workspace_activity(
+        &state,
+        &workspace_id,
+        &subject.user_id,
+        "evidence_stored",
+        "artifact",
+        Some(&artifact.id),
+        format!("Stored evidence: {}.", artifact.title),
+    )
+    .await;
     Ok((StatusCode::CREATED, Json(artifact)))
 }
 
@@ -581,9 +939,19 @@ async fn upload_artifact(
         .map(str::to_owned);
     let artifact = state
         .core
-        .import_upload(workspace_id, filename, body.to_vec(), mime_type)
+        .import_upload(workspace_id.clone(), filename, body.to_vec(), mime_type)
         .await
         .map_err(map_core_error)?;
+    record_workspace_activity(
+        &state,
+        &workspace_id,
+        &subject.user_id,
+        "evidence_uploaded",
+        "artifact",
+        Some(&artifact.id),
+        format!("Uploaded evidence: {}.", artifact.title),
+    )
+    .await;
     Ok((StatusCode::CREATED, Json(artifact)))
 }
 
@@ -601,6 +969,67 @@ async fn get_artifact(
     Ok(Json(artifact))
 }
 
+async fn update_artifact(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(artifact_id): Path<String>,
+    Json(request): Json<UpdateArtifactRequest>,
+) -> Result<Json<ArtifactSummary>, ApiError> {
+    let current = state
+        .core
+        .get_artifact(artifact_id.clone())
+        .await
+        .map_err(map_core_error)?;
+    require_workspace_write(&state, &subject, &current.summary.workspace_id).await?;
+    let artifact = state
+        .core
+        .update_artifact_title(artifact_id, request.title)
+        .await
+        .map_err(map_core_error)?;
+    record_workspace_activity(
+        &state,
+        &artifact.workspace_id,
+        &subject.user_id,
+        "artifact_updated",
+        "artifact",
+        Some(&artifact.id),
+        format!("Renamed evidence to {}.", artifact.title),
+    )
+    .await;
+    Ok(Json(artifact))
+}
+
+async fn delete_artifact(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(artifact_id): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    let current = state
+        .core
+        .get_artifact(artifact_id.clone())
+        .await
+        .map_err(map_core_error)?;
+    require_workspace_write(&state, &subject, &current.summary.workspace_id).await?;
+    let title = current.summary.title;
+    let workspace_id = current.summary.workspace_id;
+    state
+        .core
+        .delete_artifact(artifact_id.clone())
+        .await
+        .map_err(map_core_error)?;
+    record_workspace_activity(
+        &state,
+        &workspace_id,
+        &subject.user_id,
+        "artifact_deleted",
+        "artifact",
+        Some(&artifact_id),
+        format!("Deleted evidence: {title}."),
+    )
+    .await;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 async fn index_artifact(
     subject: AuthenticatedSubject,
     State(state): State<AppState>,
@@ -612,12 +1041,22 @@ async fn index_artifact(
         .await
         .map_err(map_core_error)?;
     require_workspace_write(&state, &subject, &artifact.summary.workspace_id).await?;
-    state
+    let job = state
         .core
         .index_artifact(artifact_id)
         .await
-        .map(Json)
-        .map_err(map_core_error)
+        .map_err(map_core_error)?;
+    record_workspace_activity(
+        &state,
+        &artifact.summary.workspace_id,
+        &subject.user_id,
+        "artifact_indexed",
+        "artifact",
+        Some(&artifact.summary.id),
+        format!("Indexed evidence: {}.", artifact.summary.title),
+    )
+    .await;
+    Ok(Json(job))
 }
 
 async fn index_workspace(
@@ -626,12 +1065,22 @@ async fn index_workspace(
     Path(workspace_id): Path<String>,
 ) -> Result<Json<IndexingJobStatus>, ApiError> {
     require_workspace_write(&state, &subject, &workspace_id).await?;
-    state
+    let job = state
         .core
-        .index_workspace(workspace_id)
+        .index_workspace(workspace_id.clone())
         .await
-        .map(Json)
-        .map_err(map_core_error)
+        .map_err(map_core_error)?;
+    record_workspace_activity(
+        &state,
+        &workspace_id,
+        &subject.user_id,
+        "workspace_indexed",
+        "workspace",
+        Some(&workspace_id),
+        "Indexed the workspace evidence.".to_owned(),
+    )
+    .await;
+    Ok(Json(job))
 }
 
 async fn search_workspace(
@@ -680,7 +1129,7 @@ async fn create_memory_card(
     let card = state
         .core
         .create_memory_card(CreateMemoryCardRequest {
-            workspace_id,
+            workspace_id: workspace_id.clone(),
             title: request.title,
             body_markdown: request.body_markdown,
             source: request.source,
@@ -689,6 +1138,16 @@ async fn create_memory_card(
         })
         .await
         .map_err(map_core_error)?;
+    record_workspace_activity(
+        &state,
+        &workspace_id,
+        &subject.user_id,
+        "memory_created",
+        "memory_card",
+        Some(&card.id),
+        format!("Saved team memory: {}.", card.title),
+    )
+    .await;
     Ok((StatusCode::CREATED, Json(card)))
 }
 
@@ -704,6 +1163,74 @@ async fn get_memory_card(
         .map_err(map_core_error)?;
     require_workspace_read(&state, &subject, &card.card.workspace_id).await?;
     Ok(Json(card))
+}
+
+async fn update_memory_card(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(card_id): Path<String>,
+    Json(request): Json<UpdateMemoryCardBody>,
+) -> Result<Json<MemoryCard>, ApiError> {
+    let current = state
+        .core
+        .get_memory_card(card_id.clone())
+        .await
+        .map_err(map_core_error)?;
+    require_workspace_write(&state, &subject, &current.card.workspace_id).await?;
+    let workspace_id = current.card.workspace_id;
+    let card = state
+        .core
+        .update_memory_card(UpdateMemoryCardRequest {
+            card_id,
+            title: request.title,
+            body_markdown: request.body_markdown,
+            source: request.source,
+            confidence: request.confidence,
+        })
+        .await
+        .map_err(map_core_error)?;
+    record_workspace_activity(
+        &state,
+        &workspace_id,
+        &subject.user_id,
+        "memory_updated",
+        "memory_card",
+        Some(&card.id),
+        format!("Updated team memory: {}.", card.title),
+    )
+    .await;
+    Ok(Json(card))
+}
+
+async fn delete_memory_card(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(card_id): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    let current = state
+        .core
+        .get_memory_card(card_id.clone())
+        .await
+        .map_err(map_core_error)?;
+    require_workspace_write(&state, &subject, &current.card.workspace_id).await?;
+    let workspace_id = current.card.workspace_id;
+    let title = current.card.title;
+    state
+        .core
+        .delete_memory_card(card_id.clone())
+        .await
+        .map_err(map_core_error)?;
+    record_workspace_activity(
+        &state,
+        &workspace_id,
+        &subject.user_id,
+        "memory_deleted",
+        "memory_card",
+        Some(&card_id),
+        format!("Deleted team memory: {title}."),
+    )
+    .await;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 async fn export_memory_card(
@@ -722,7 +1249,11 @@ async fn export_memory_card(
         .export_memory_card(card_id)
         .await
         .map_err(map_core_error)?;
-    Ok(([(header::CONTENT_TYPE, "text/markdown; charset=utf-8")], markdown).into_response())
+    Ok((
+        [(header::CONTENT_TYPE, "text/markdown; charset=utf-8")],
+        markdown,
+    )
+        .into_response())
 }
 
 async fn require_workspace_read(
@@ -760,6 +1291,42 @@ async fn require_workspace_admin(
         return Err(ApiError::forbidden());
     }
     Ok(role)
+}
+
+async fn require_workspace_owner(
+    state: &AppState,
+    subject: &AuthenticatedSubject,
+    workspace_id: &str,
+) -> Result<WorkspaceRole, ApiError> {
+    let role = require_workspace_read(state, subject, workspace_id).await?;
+    if !matches!(role, WorkspaceRole::Owner) {
+        return Err(ApiError::forbidden());
+    }
+    Ok(role)
+}
+
+fn capabilities_for_role(role: WorkspaceRole) -> WorkspaceCapabilities {
+    let can_write_content = !matches!(&role, WorkspaceRole::Viewer);
+    let can_manage_members = matches!(&role, WorkspaceRole::Owner | WorkspaceRole::Admin);
+    WorkspaceCapabilities {
+        can_read: true,
+        can_delete_content: can_write_content,
+        can_write_content,
+        can_assign_admin: matches!(&role, WorkspaceRole::Owner),
+        can_manage_workspace: matches!(&role, WorkspaceRole::Owner),
+        can_generate_ai_overview: true,
+        role,
+        can_manage_members,
+    }
+}
+
+fn workspace_role_label(role: &WorkspaceRole) -> &'static str {
+    match role {
+        WorkspaceRole::Owner => "owner",
+        WorkspaceRole::Admin => "admin",
+        WorkspaceRole::Member => "member",
+        WorkspaceRole::Viewer => "viewer",
+    }
 }
 
 impl FromRequestParts<AppState> for AuthenticatedSubject {
@@ -881,6 +1448,9 @@ fn map_core_error(error: anyhow::Error) -> ApiError {
         || message.contains("is required")
         || message.contains("cannot be empty")
         || message.contains("must be between")
+        || message.contains("Unsupported AI provider")
+        || message.contains("before enabling cloud AI")
+        || message.contains("cloud content acknowledgement")
     {
         ApiError::bad_request(message)
     } else {
@@ -891,7 +1461,10 @@ fn map_core_error(error: anyhow::Error) -> ApiError {
 #[cfg(test)]
 mod tests {
     use super::{router, ServerConfig};
-    use axum::{body::{to_bytes, Body}, http::Request};
+    use axum::{
+        body::{to_bytes, Body},
+        http::Request,
+    };
     use serde_json::{json, Value};
     use tower::ServiceExt;
 
@@ -906,7 +1479,9 @@ mod tests {
             .body(Body::from(r#"{"email":"owner@example.com","display_name":"Owner","password":"not-a-real-password"}"#)).unwrap();
         let response = app.clone().oneshot(register).await.unwrap();
         assert_eq!(response.status(), 201);
-        let registration: Value = serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
+        let registration: Value =
+            serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
         let _token = registration["access_token"].as_str().unwrap();
         let protected = Request::builder()
             .uri("/v1/workspaces")
@@ -919,86 +1494,328 @@ mod tests {
 
     #[tokio::test]
     async fn protects_and_serves_shared_evidence_flow() {
-        let data_dir = std::env::temp_dir().join(format!("repomemo-server-flow-{}", uuid::Uuid::new_v4()));
-        let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+        let data_dir =
+            std::env::temp_dir().join(format!("repomemo-server-flow-{}", uuid::Uuid::new_v4()));
+        let app = router(ServerConfig::for_test(data_dir.clone()))
+            .await
+            .unwrap();
         let response = app.clone().oneshot(Request::builder().method("POST").uri("/v1/auth/register").header("content-type", "application/json")
             .body(Body::from(r#"{"email":"flow@example.com","display_name":"Flow Owner","password":"not-a-real-password"}"#)).unwrap()).await.unwrap();
-        let registration: Value = serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
+        let registration: Value =
+            serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
         let authorization = format!("Bearer {}", registration["access_token"].as_str().unwrap());
 
-        let organization = app.clone().oneshot(json_request("POST", "/v1/organizations", &authorization, json!({"name":"Flow Team"}))).await.unwrap();
+        let organization = app
+            .clone()
+            .oneshot(json_request(
+                "POST",
+                "/v1/organizations",
+                &authorization,
+                json!({"name":"Flow Team"}),
+            ))
+            .await
+            .unwrap();
         assert_eq!(organization.status(), 201);
-        let organization: Value = serde_json::from_slice(&to_bytes(organization.into_body(), usize::MAX).await.unwrap()).unwrap();
-        let workspace = app.clone().oneshot(json_request("POST", "/v1/workspaces", &authorization, json!({"organization_id": organization["id"], "name":"Flow Workspace"}))).await.unwrap();
+        let organization: Value = serde_json::from_slice(
+            &to_bytes(organization.into_body(), usize::MAX)
+                .await
+                .unwrap(),
+        )
+        .unwrap();
+        let workspace = app
+            .clone()
+            .oneshot(json_request(
+                "POST",
+                "/v1/workspaces",
+                &authorization,
+                json!({"organization_id": organization["id"], "name":"Flow Workspace"}),
+            ))
+            .await
+            .unwrap();
         assert_eq!(workspace.status(), 201);
-        let workspace: Value = serde_json::from_slice(&to_bytes(workspace.into_body(), usize::MAX).await.unwrap()).unwrap();
+        let workspace: Value =
+            serde_json::from_slice(&to_bytes(workspace.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
         let workspace_id = workspace["workspace"]["id"].as_str().unwrap();
 
         let collaborator = app.clone().oneshot(Request::builder().method("POST").uri("/v1/auth/register").header("content-type", "application/json")
             .body(Body::from(r#"{"email":"collaborator@example.com","display_name":"Collaborator","password":"not-a-real-password"}"#)).unwrap()).await.unwrap();
         assert_eq!(collaborator.status(), 201);
-        let collaborator: Value = serde_json::from_slice(&to_bytes(collaborator.into_body(), usize::MAX).await.unwrap()).unwrap();
-        let collaborator_authorization = format!("Bearer {}", collaborator["access_token"].as_str().unwrap());
-        let member = app.clone().oneshot(json_request("PUT", &format!("/v1/workspaces/{workspace_id}/members"), &authorization, json!({"email":"collaborator@example.com","role":"member"}))).await.unwrap();
+        let collaborator: Value = serde_json::from_slice(
+            &to_bytes(collaborator.into_body(), usize::MAX)
+                .await
+                .unwrap(),
+        )
+        .unwrap();
+        let collaborator_authorization =
+            format!("Bearer {}", collaborator["access_token"].as_str().unwrap());
+        let member = app
+            .clone()
+            .oneshot(json_request(
+                "PUT",
+                &format!("/v1/workspaces/{workspace_id}/members"),
+                &authorization,
+                json!({"email":"collaborator@example.com","role":"member"}),
+            ))
+            .await
+            .unwrap();
         assert_eq!(member.status(), 200);
-        let member: Value = serde_json::from_slice(&to_bytes(member.into_body(), usize::MAX).await.unwrap()).unwrap();
+        let member: Value =
+            serde_json::from_slice(&to_bytes(member.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
         assert_eq!(member["role"], "member");
-        let members = app.clone().oneshot(auth_request("GET", &format!("/v1/workspaces/{workspace_id}/members"), &authorization)).await.unwrap();
+        let members = app
+            .clone()
+            .oneshot(auth_request(
+                "GET",
+                &format!("/v1/workspaces/{workspace_id}/members"),
+                &authorization,
+            ))
+            .await
+            .unwrap();
         assert_eq!(members.status(), 200);
-        let members: Value = serde_json::from_slice(&to_bytes(members.into_body(), usize::MAX).await.unwrap()).unwrap();
+        let members: Value =
+            serde_json::from_slice(&to_bytes(members.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
         assert_eq!(members.as_array().unwrap().len(), 2);
-        let collaborator_overview = app.clone().oneshot(auth_request("GET", &format!("/v1/workspaces/{workspace_id}/overview"), &collaborator_authorization)).await.unwrap();
+        let collaborator_overview = app
+            .clone()
+            .oneshot(auth_request(
+                "GET",
+                &format!("/v1/workspaces/{workspace_id}/overview"),
+                &collaborator_authorization,
+            ))
+            .await
+            .unwrap();
         assert_eq!(collaborator_overview.status(), 200);
 
         let artifact = app.clone().oneshot(json_request("POST", &format!("/v1/workspaces/{workspace_id}/artifacts/text"), &authorization, json!({"title":"Shared fact", "content":"The API owns shared data.", "language":"Markdown"}))).await.unwrap();
         assert_eq!(artifact.status(), 201);
-        let artifact: Value = serde_json::from_slice(&to_bytes(artifact.into_body(), usize::MAX).await.unwrap()).unwrap();
+        let artifact: Value =
+            serde_json::from_slice(&to_bytes(artifact.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
         let artifact_id = artifact["id"].as_str().unwrap();
 
-        let uploaded = app.clone().oneshot(Request::builder().method("POST").uri(format!("/v1/workspaces/{workspace_id}/artifacts/upload"))
-            .header("authorization", &authorization)
-            .header("content-type", "text/x-rust")
-            .header("x-repomemo-filename", "upload.rs")
-            .body(Body::from("fn shared_upload() {}"))
-            .unwrap()).await.unwrap();
+        let uploaded = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/v1/workspaces/{workspace_id}/artifacts/upload"))
+                    .header("authorization", &authorization)
+                    .header("content-type", "text/x-rust")
+                    .header("x-repomemo-filename", "upload.rs")
+                    .body(Body::from("fn shared_upload() {}"))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         assert_eq!(uploaded.status(), 201);
 
-        let indexed = app.clone().oneshot(auth_request("POST", &format!("/v1/artifacts/{artifact_id}/index"), &authorization)).await.unwrap();
+        let indexed = app
+            .clone()
+            .oneshot(auth_request(
+                "POST",
+                &format!("/v1/artifacts/{artifact_id}/index"),
+                &authorization,
+            ))
+            .await
+            .unwrap();
         assert_eq!(indexed.status(), 200);
         let search = app.clone().oneshot(json_request("POST", &format!("/v1/workspaces/{workspace_id}/search"), &authorization, json!({"query":"shared data", "artifact_types": [], "languages": [], "source_ids": [], "limit": 20}))).await.unwrap();
         assert_eq!(search.status(), 200);
-        let search: Value = serde_json::from_slice(&to_bytes(search.into_body(), usize::MAX).await.unwrap()).unwrap();
+        let search: Value =
+            serde_json::from_slice(&to_bytes(search.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
         assert_eq!(search.as_array().unwrap().len(), 1);
         assert_eq!(search[0]["artifact_id"], artifact_id);
         let memory = app.clone().oneshot(json_request("POST", &format!("/v1/workspaces/{workspace_id}/memory-cards"), &authorization, json!({"title":"Rule", "body_markdown":"Keep shared data on the API.", "source":"Flow", "confidence": null, "citations": []}))).await.unwrap();
         assert_eq!(memory.status(), 201);
-        let memory: Value = serde_json::from_slice(&to_bytes(memory.into_body(), usize::MAX).await.unwrap()).unwrap();
+        let memory: Value =
+            serde_json::from_slice(&to_bytes(memory.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
         let memory_id = memory["id"].as_str().unwrap();
-        let memories = app.clone().oneshot(auth_request("GET", &format!("/v1/workspaces/{workspace_id}/memory-cards"), &authorization)).await.unwrap();
+        let memories = app
+            .clone()
+            .oneshot(auth_request(
+                "GET",
+                &format!("/v1/workspaces/{workspace_id}/memory-cards"),
+                &authorization,
+            ))
+            .await
+            .unwrap();
         assert_eq!(memories.status(), 200);
-        let memories: Value = serde_json::from_slice(&to_bytes(memories.into_body(), usize::MAX).await.unwrap()).unwrap();
+        let memories: Value =
+            serde_json::from_slice(&to_bytes(memories.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
         assert_eq!(memories.as_array().unwrap().len(), 1);
-        let memory_detail = app.clone().oneshot(auth_request("GET", &format!("/v1/memory-cards/{memory_id}"), &authorization)).await.unwrap();
+        let memory_detail = app
+            .clone()
+            .oneshot(auth_request(
+                "GET",
+                &format!("/v1/memory-cards/{memory_id}"),
+                &authorization,
+            ))
+            .await
+            .unwrap();
         assert_eq!(memory_detail.status(), 200);
-        let exported = app.clone().oneshot(auth_request("GET", &format!("/v1/memory-cards/{memory_id}/export"), &authorization)).await.unwrap();
+        let exported = app
+            .clone()
+            .oneshot(auth_request(
+                "GET",
+                &format!("/v1/memory-cards/{memory_id}/export"),
+                &authorization,
+            ))
+            .await
+            .unwrap();
         assert_eq!(exported.status(), 200);
-        let exported = String::from_utf8(to_bytes(exported.into_body(), usize::MAX).await.unwrap().to_vec()).unwrap();
+        let exported = String::from_utf8(
+            to_bytes(exported.into_body(), usize::MAX)
+                .await
+                .unwrap()
+                .to_vec(),
+        )
+        .unwrap();
         assert!(exported.contains("Keep shared data on the API."));
-        let overview = app.clone().oneshot(auth_request("GET", &format!("/v1/workspaces/{workspace_id}/overview"), &authorization)).await.unwrap();
+        let capabilities = app
+            .clone()
+            .oneshot(auth_request(
+                "GET",
+                &format!("/v1/workspaces/{workspace_id}/capabilities"),
+                &authorization,
+            ))
+            .await
+            .unwrap();
+        assert_eq!(capabilities.status(), 200);
+        let capabilities: Value = serde_json::from_slice(
+            &to_bytes(capabilities.into_body(), usize::MAX)
+                .await
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(capabilities["role"], "owner");
+        assert_eq!(capabilities["can_manage_workspace"], true);
+        let ai_overview = app
+            .clone()
+            .oneshot(auth_request(
+                "POST",
+                &format!("/v1/workspaces/{workspace_id}/ai-overview"),
+                &authorization,
+            ))
+            .await
+            .unwrap();
+        assert_eq!(ai_overview.status(), 200);
+        let ai_overview: Value =
+            serde_json::from_slice(&to_bytes(ai_overview.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
+        assert_eq!(ai_overview["provider_configured"], false);
+        let renamed_artifact = app
+            .clone()
+            .oneshot(json_request(
+                "PUT",
+                &format!("/v1/artifacts/{artifact_id}"),
+                &authorization,
+                json!({"title":"Updated shared fact"}),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(renamed_artifact.status(), 200);
+        let updated_memory = app
+            .clone()
+            .oneshot(json_request(
+                "PUT",
+                &format!("/v1/memory-cards/{memory_id}"),
+                &authorization,
+                json!({"title":"Updated rule", "body_markdown":"Keep shared data on the API.", "source":"Flow", "confidence":null}),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(updated_memory.status(), 200);
+        let overview = app
+            .clone()
+            .oneshot(auth_request(
+                "GET",
+                &format!("/v1/workspaces/{workspace_id}/overview"),
+                &authorization,
+            ))
+            .await
+            .unwrap();
         assert_eq!(overview.status(), 200);
+        let activity = app
+            .clone()
+            .oneshot(auth_request(
+                "GET",
+                &format!("/v1/workspaces/{workspace_id}/activity"),
+                &authorization,
+            ))
+            .await
+            .unwrap();
+        assert_eq!(activity.status(), 200);
+        let activity: Value =
+            serde_json::from_slice(&to_bytes(activity.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
+        let activity = activity.as_array().unwrap();
+        assert!(activity
+            .iter()
+            .any(|event| event["action"] == "workspace_created"));
+        assert!(activity
+            .iter()
+            .any(|event| event["action"] == "evidence_stored"));
+        assert!(activity
+            .iter()
+            .any(|event| event["action"] == "memory_created"));
         let collaborator_id = collaborator["user"]["id"].as_str().unwrap();
-        let removed = app.clone().oneshot(auth_request("DELETE", &format!("/v1/workspaces/{workspace_id}/members/{collaborator_id}"), &authorization)).await.unwrap();
+        let removed = app
+            .clone()
+            .oneshot(auth_request(
+                "DELETE",
+                &format!("/v1/workspaces/{workspace_id}/members/{collaborator_id}"),
+                &authorization,
+            ))
+            .await
+            .unwrap();
         assert_eq!(removed.status(), 204);
-        let collaborator_overview = app.clone().oneshot(auth_request("GET", &format!("/v1/workspaces/{workspace_id}/overview"), &collaborator_authorization)).await.unwrap();
+        let collaborator_overview = app
+            .clone()
+            .oneshot(auth_request(
+                "GET",
+                &format!("/v1/workspaces/{workspace_id}/overview"),
+                &collaborator_authorization,
+            ))
+            .await
+            .unwrap();
         assert_eq!(collaborator_overview.status(), 403);
+        let renamed_workspace = app
+            .clone()
+            .oneshot(json_request(
+                "PUT",
+                &format!("/v1/workspaces/{workspace_id}"),
+                &authorization,
+                json!({"name":"Renamed Flow Workspace"}),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(renamed_workspace.status(), 200);
         let _ = std::fs::remove_dir_all(data_dir);
     }
 
     fn auth_request(method: &str, uri: &str, authorization: &str) -> Request<Body> {
-        Request::builder().method(method).uri(uri).header("authorization", authorization).body(Body::empty()).unwrap()
+        Request::builder()
+            .method(method)
+            .uri(uri)
+            .header("authorization", authorization)
+            .body(Body::empty())
+            .unwrap()
     }
 
     fn json_request(method: &str, uri: &str, authorization: &str, body: Value) -> Request<Body> {
-        Request::builder().method(method).uri(uri).header("authorization", authorization).header("content-type", "application/json").body(Body::from(body.to_string())).unwrap()
+        Request::builder()
+            .method(method)
+            .uri(uri)
+            .header("authorization", authorization)
+            .header("content-type", "application/json")
+            .body(Body::from(body.to_string()))
+            .unwrap()
     }
 }

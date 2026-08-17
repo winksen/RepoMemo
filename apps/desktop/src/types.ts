@@ -26,6 +26,17 @@ export interface WorkspaceMember {
   updated_at: string;
 }
 
+export interface WorkspaceActivityEvent {
+  id: string;
+  workspace_id: string;
+  actor: SharedUser | null;
+  action: string;
+  subject_type: string;
+  subject_id: string | null;
+  summary: string;
+  created_at: string;
+}
+
 export interface SharedSession {
   user: SharedUser;
   authentication: "jwt";
@@ -73,6 +84,34 @@ export interface WorkspaceOverview {
   chunk_count: number;
   symbol_count: number;
   memory_card_count: number;
+}
+
+export interface WorkspaceCapabilities {
+  role: WorkspaceRole;
+  can_read: boolean;
+  can_write_content: boolean;
+  can_delete_content: boolean;
+  can_manage_members: boolean;
+  can_assign_admin: boolean;
+  can_manage_workspace: boolean;
+  can_generate_ai_overview: boolean;
+}
+
+export interface WorkspaceAiOverview {
+  provider_configured: boolean;
+  provider_name: string | null;
+  summary_markdown: string | null;
+  citations: Citation[];
+  warnings: string[];
+}
+
+export interface SharedAiProviderSettings {
+  id: string;
+  provider_type: "ollama" | "openrouter";
+  name: string;
+  base_url: string | null;
+  model: string | null;
+  enabled: boolean;
 }
 
 export interface ArtifactSummary {
