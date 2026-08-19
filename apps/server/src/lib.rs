@@ -219,6 +219,19 @@ struct UpdateArtifactRequest {
 }
 
 #[derive(Debug, Deserialize)]
+struct QueryArtifactsRequest {
+    #[serde(default)]
+    query: String,
+    #[serde(default)]
+    artifact_types: Vec<repomemo_domain::ArtifactType>,
+    #[serde(default)]
+    languages: Vec<String>,
+    #[serde(default)]
+    source_ids: Vec<String>,
+    indexed: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
 struct SearchWorkspaceRequest {
     query: String,
     #[serde(default)]
@@ -376,6 +389,10 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
         .route(
             "/v1/workspaces/{workspace_id}/artifacts",
             get(list_artifacts),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/artifacts/query",
+            post(query_artifacts),
         )
         .route(
             "/v1/workspaces/{workspace_id}/artifacts/text",
@@ -982,6 +999,59 @@ async fn list_artifacts(
         .await
         .map(Json)
         .map_err(map_core_error)
+}
+
+async fn query_artifacts(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+    Json(request): Json<QueryArtifactsRequest>,
+) -> Result<Json<Vec<ArtifactSummary>>, ApiError> {
+    require_workspace_read(&state, &subject, &workspace_id).await?;
+    let query = request.query.trim().to_lowercase();
+    let languages = request
+        .languages
+        .into_iter()
+        .map(|language| language.to_lowercase())
+        .collect::<Vec<_>>();
+    let artifacts = state
+        .core
+        .list_artifacts(workspace_id)
+        .await
+        .map_err(map_core_error)?
+        .into_iter()
+        .filter(|artifact| {
+            let query_matches = query.is_empty()
+                || artifact.title.to_lowercase().contains(&query)
+                || artifact.path.to_lowercase().contains(&query);
+            let type_matches = request.artifact_types.is_empty()
+                || request
+                    .artifact_types
+                    .iter()
+                    .any(|artifact_type| artifact_type == &artifact.artifact_type);
+            let language_matches = languages.is_empty()
+                || artifact
+                    .language
+                    .as_deref()
+                    .map(|language| {
+                        languages
+                            .iter()
+                            .any(|candidate| candidate == &language.to_lowercase())
+                    })
+                    .unwrap_or(false);
+            let source_matches = request.source_ids.is_empty()
+                || request
+                    .source_ids
+                    .iter()
+                    .any(|source_id| source_id == &artifact.source_id);
+            let indexing_matches = request
+                .indexed
+                .map(|indexed| artifact.indexed_at.is_some() == indexed)
+                .unwrap_or(true);
+            query_matches && type_matches && language_matches && source_matches && indexing_matches
+        })
+        .collect();
+    Ok(Json(artifacts))
 }
 
 async fn create_text_artifact(
@@ -1722,6 +1792,32 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(uploaded.status(), 201);
+
+        let filtered_artifacts = app
+            .clone()
+            .oneshot(json_request(
+                "POST",
+                &format!("/v1/workspaces/{workspace_id}/artifacts/query"),
+                &authorization,
+                json!({
+                    "query":"shared fact",
+                    "artifact_types":["markdown_doc"],
+                    "languages":["markdown"],
+                    "source_ids":[],
+                    "indexed":false
+                }),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(filtered_artifacts.status(), 200);
+        let filtered_artifacts: Value = serde_json::from_slice(
+            &to_bytes(filtered_artifacts.into_body(), usize::MAX)
+                .await
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(filtered_artifacts.as_array().unwrap().len(), 1);
+        assert_eq!(filtered_artifacts[0]["id"], artifact_id);
 
         let indexed = app
             .clone()

@@ -294,6 +294,31 @@ textarea:focus-visible {
 .shared-artifact-list strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
 .shared-artifact-list span { margin-top: 3px; overflow: hidden; color: var(--color-text-muted); font-family: var(--font-mono); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .shared-artifact-list small { flex: 0 0 auto; color: var(--color-text-subtle); font-size: 11px; }
+.shared-artifact-browser { display: grid; gap: 14px; }
+.shared-artifact-filters { display: grid; grid-template-columns: minmax(180px, 1.5fr) repeat(3, minmax(130px, 0.72fr)) auto auto; gap: 8px; align-items: end; padding: 14px 0; border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); }
+.shared-artifact-filters .rm-dropdown-trigger { width: 100%; }
+.shared-artifact-browser-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--color-text-subtle); font-size: 12px; }
+.shared-artifact-view-switch { display: flex; gap: 5px; }
+.shared-artifact-view-switch .rm-button { display: grid; width: 34px; min-width: 34px; height: 34px; min-height: 34px; padding: 0; place-items: center; }
+.shared-artifact-view-switch .rm-button.active { color: var(--color-accent-text); background: var(--color-accent-soft); border-color: var(--color-accent); }
+.shared-artifact-manager { display: grid; gap: 10px; }
+.shared-artifact-manager.grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+.shared-artifact-manager article { min-width: 0; }
+.rm-button.shared-artifact-entry { display: grid; grid-template-columns: auto minmax(0, 1fr); align-content: start; align-items: start; gap: 12px; width: 100%; min-height: 150px; padding: 14px; color: var(--color-text); background: var(--color-surface); border: 2px solid var(--color-border-strong); border-radius: 12px; cursor: pointer; text-align: left; }
+.rm-button.shared-artifact-entry:hover:not(:disabled) { background: var(--color-surface); border-color: var(--color-accent); }
+.shared-artifact-file-icon { display: grid; width: 38px; height: 38px; place-items: center; color: var(--color-accent-text); background: var(--color-accent-soft); border-radius: 9px; }
+.shared-artifact-entry-copy { display: grid; min-width: 0; gap: 4px; }
+.shared-artifact-entry-copy strong { overflow: hidden; color: var(--color-text); font-size: 13px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.shared-artifact-entry-copy > span { overflow: hidden; color: var(--color-text-muted); font-size: 11px; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
+.shared-artifact-entry-meta { display: flex; grid-column: 1 / -1; flex-wrap: wrap; gap: 5px; align-self: end; margin-top: auto; }
+.shared-artifact-entry-meta > span { padding: 3px 6px; color: var(--color-text-muted); background: var(--color-surface-2); border-radius: 5px; font-size: 10px; line-height: 1.2; }
+.shared-artifact-entry-meta > span.indexed { color: var(--color-success); background: var(--color-success-soft); }
+.shared-artifact-entry-meta > span.pending { color: var(--color-warning); background: var(--color-warning-soft); }
+.shared-artifact-manager.list { gap: 0; border-top: 1px solid var(--color-border); }
+.shared-artifact-manager.list .rm-button.shared-artifact-entry { grid-template-columns: auto minmax(0, 1fr) auto; min-height: 0; padding: 10px 0; border: 0; border-bottom: 1px solid var(--color-border); border-radius: 0; }
+.shared-artifact-manager.list .rm-button.shared-artifact-entry:hover:not(:disabled) { background: var(--color-surface-2); }
+.shared-artifact-manager.list .shared-artifact-file-icon { width: 32px; height: 32px; border-radius: 7px; }
+.shared-artifact-manager.list .shared-artifact-entry-meta { grid-column: auto; justify-content: flex-end; max-width: 310px; margin-top: 0; }
 .shared-note-form,
 .shared-memory-form,
 .shared-upload-form { display: grid; gap: 10px; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--color-border); }
@@ -520,6 +545,10 @@ textarea:focus-visible {
   .shared-member-form { grid-template-columns: 1fr; }
   .shared-ai-provider-form { grid-template-columns: 1fr; }
   .shared-ask-evidence form { grid-template-columns: 1fr; }
+  .shared-artifact-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .shared-artifact-filters .rm-input { grid-column: 1 / -1; }
+  .shared-artifact-manager.list .rm-button.shared-artifact-entry { grid-template-columns: auto minmax(0, 1fr); }
+  .shared-artifact-manager.list .shared-artifact-entry-meta { grid-column: 2; justify-content: flex-start; max-width: none; }
   .shared-workspace-admin form { flex-direction: column; }
   .shared-workspace-rename { flex-direction: column; }
 }

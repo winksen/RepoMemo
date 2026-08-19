@@ -2,6 +2,7 @@ import type {
   AskAnswer,
   ArtifactDetail,
   ArtifactSummary,
+  ArtifactType,
   IndexingJobStatus,
   MemoryCard,
   MemoryCardDetail,
@@ -227,6 +228,25 @@ export function removeSharedWorkspaceMember(accessToken: string, workspaceId: st
 
 export function listSharedArtifacts(accessToken: string, workspaceId: string): Promise<ArtifactSummary[]> {
   return request<ArtifactSummary[]>(`/v1/workspaces/${workspaceId}/artifacts`, {}, accessToken);
+}
+
+export function querySharedArtifacts(accessToken: string, workspaceId: string, input: {
+  query: string;
+  artifactTypes?: ArtifactType[];
+  languages?: string[];
+  sourceIds?: string[];
+  indexed?: boolean;
+}): Promise<ArtifactSummary[]> {
+  return request<ArtifactSummary[]>(`/v1/workspaces/${workspaceId}/artifacts/query`, {
+    method: "POST",
+    body: JSON.stringify({
+      query: input.query,
+      artifact_types: input.artifactTypes ?? [],
+      languages: input.languages ?? [],
+      source_ids: input.sourceIds ?? [],
+      indexed: input.indexed ?? null,
+    }),
+  }, accessToken);
 }
 
 export function getSharedArtifact(accessToken: string, artifactId: string): Promise<ArtifactDetail> {
