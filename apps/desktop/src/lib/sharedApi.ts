@@ -1,4 +1,5 @@
 import type {
+  AskAnswer,
   ArtifactDetail,
   ArtifactSummary,
   IndexingJobStatus,
@@ -6,6 +7,7 @@ import type {
   MemoryCardDetail,
   MemoryCardSummary,
   Organization,
+  ProviderTestResult,
   SearchResult,
   SharedSession,
   SharedAiProviderSettings,
@@ -158,6 +160,13 @@ export function generateSharedWorkspaceAiOverview(accessToken: string, workspace
   return request<WorkspaceAiOverview>(`/v1/workspaces/${workspaceId}/ai-overview`, { method: "POST" }, accessToken);
 }
 
+export function askSharedWorkspace(accessToken: string, workspaceId: string, question: string): Promise<AskAnswer> {
+  return request<AskAnswer>(`/v1/workspaces/${workspaceId}/ask`, {
+    method: "POST",
+    body: JSON.stringify({ question, limit: 8 }),
+  }, accessToken);
+}
+
 export function listSharedWorkspaceAiProviders(accessToken: string, workspaceId: string): Promise<SharedAiProviderSettings[]> {
   return request<SharedAiProviderSettings[]>(`/v1/workspaces/${workspaceId}/ai-providers`, {}, accessToken);
 }
@@ -184,6 +193,12 @@ export function saveSharedWorkspaceAiProvider(accessToken: string, workspaceId: 
       enabled: input.enabled,
       cloud_content_acknowledged: input.cloudContentAcknowledged,
     }),
+  }, accessToken);
+}
+
+export function testSharedWorkspaceAiProvider(accessToken: string, workspaceId: string, providerId: string): Promise<ProviderTestResult> {
+  return request<ProviderTestResult>(`/v1/workspaces/${workspaceId}/ai-providers/${providerId}/test`, {
+    method: "POST",
   }, accessToken);
 }
 
@@ -278,6 +293,13 @@ export function searchSharedWorkspace(accessToken: string, workspaceId: string, 
 
 export function listSharedMemoryCards(accessToken: string, workspaceId: string): Promise<MemoryCardSummary[]> {
   return request<MemoryCardSummary[]>(`/v1/workspaces/${workspaceId}/memory-cards`, {}, accessToken);
+}
+
+export function searchSharedMemoryCards(accessToken: string, workspaceId: string, query: string): Promise<MemoryCardSummary[]> {
+  return request<MemoryCardSummary[]>(`/v1/workspaces/${workspaceId}/memory-cards/search`, {
+    method: "POST",
+    body: JSON.stringify({ query }),
+  }, accessToken);
 }
 
 export function createSharedMemoryCard(accessToken: string, workspaceId: string, input: {

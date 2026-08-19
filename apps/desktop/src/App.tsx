@@ -30,6 +30,7 @@ import {
   IconStack2 as Layers3,
   IconLibrary as Library,
   IconLoader2 as Loader2,
+  IconMoon as Moon,
   IconPlus as Plus,
   IconRefresh as RefreshCw,
   IconSearch as Search,
@@ -37,6 +38,7 @@ import {
   IconShieldLock as ShieldLock,
   IconWand as Wand2,
   IconUpload as Upload,
+  IconSun as Sun,
   IconX as X,
 } from "@tabler/icons-react";
 import {
@@ -93,6 +95,15 @@ import type {
 
 type LoadState = "idle" | "loading" | "ready" | "error";
 type View = "workspaces" | "import" | "artifacts" | "search" | "summary" | "ask" | "memory" | "settings";
+type Theme = "light" | "dark";
+
+const THEME_STORAGE_KEY = "repomemo.theme";
+
+function initialTheme(): Theme {
+  const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+  if (storedTheme === "light" || storedTheme === "dark") return storedTheme;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
 
 const viewMeta: Record<View, { section: string; title: string }> = {
   workspaces: { section: "Library", title: "Workspaces" },
@@ -127,6 +138,7 @@ function LocalDesktopApp() {
     null,
   );
   const [workspaceName, setWorkspaceName] = useState("");
+  const [theme, setTheme] = useState<Theme>(initialTheme);
   const [loadState, setLoadState] = useState<LoadState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<View>("workspaces");
@@ -170,6 +182,12 @@ function LocalDesktopApp() {
   const [searchSources, setSearchSources] = useState<string[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+  }, [theme]);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -797,6 +815,7 @@ function LocalDesktopApp() {
                     <small>Private on this device</small>
                   </span>
                 </div>
+                <button aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} aria-pressed={theme === "dark"} className="icon-button workspace-theme-button" onClick={() => setTheme((current) => current === "dark" ? "light" : "dark")} title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} type="button">{theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}</button>
                 <button
                   className={`workspace-new-button ${selectedWorkspace ? "secondary" : "primary"}`}
                   type="button"
@@ -828,6 +847,7 @@ function LocalDesktopApp() {
             <StatusBadge tone={activeProvider ? "success" : "neutral"}>
               {activeProvider ? `${activeProvider.provider_type === "openrouter" ? "Cloud" : "Local"} AI` : "AI off"}
             </StatusBadge>
+            <button aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} aria-pressed={theme === "dark"} className="icon-button workspace-theme-button" onClick={() => setTheme((current) => current === "dark" ? "light" : "dark")} title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} type="button">{theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}</button>
               </div>
             </>
           )}

@@ -266,6 +266,14 @@ export interface Citation {
   confidence: number | null;
 }
 
+export interface AskAnswer {
+  answer_markdown: string;
+  citations: Citation[];
+  retrieved_context: SearchResult[];
+  confidence: number | null;
+  warnings: string[];
+}
+
 export interface MemoryCard {
   id: string;
   workspace_id: string;

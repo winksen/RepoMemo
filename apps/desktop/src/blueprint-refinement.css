@@ -44,7 +44,8 @@
   --shadow-block: none;
   --shadow-floating: 0 18px 44px rgb(20 27 43 / 18%);
   --font-ui: "Recursive Variable", "Segoe UI", system-ui, sans-serif;
-  --font-display: var(--font-ui);
+  --font-brand: "Fjalla One", "Arial Narrow", sans-serif;
+  --font-display: "Fjalla One", "Arial Narrow", sans-serif;
   --ease-standard: cubic-bezier(.2, 0, 0, 1);
 }
 
@@ -417,6 +418,101 @@ textarea.rm-textarea:focus {
 .workspace-metrics-v3,
 .workspace-pipeline,
 .workspace-evidence-path { display: none !important; }
+
+/* The legacy desktop canvas contains a small set of fixed light surfaces.
+ * Keep them mapped to semantic roles so the same shared preference applies
+ * to both the browser client and the local application. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+:root[data-theme="dark"] body,
+:root[data-theme="dark"] .app-shell,
+:root[data-theme="dark"] .workbench {
+  background: var(--color-canvas);
+}
+
+:root[data-theme="dark"] .sidebar,
+:root[data-theme="dark"] .workbench-header.workspace-header-v3.graphite-header,
+:root[data-theme="dark"] .workspace-page-v3,
+:root[data-theme="dark"] .workspace-directory,
+:root[data-theme="dark"] .workspace-inspector-v3,
+:root[data-theme="dark"] .workbench-grid,
+:root[data-theme="dark"] .artifact-layout,
+:root[data-theme="dark"] .search-layout,
+:root[data-theme="dark"] .intelligence-layout,
+:root[data-theme="dark"] .provider-layout,
+:root[data-theme="dark"] .panel,
+:root[data-theme="dark"] .evidence-rail,
+:root[data-theme="dark"] .detail-panel,
+:root[data-theme="dark"] .search-preview,
+:root[data-theme="dark"] .memory-rail {
+  background: var(--color-surface);
+}
+
+:root[data-theme="dark"] .brand-glyph,
+:root[data-theme="dark"] .workspace-row-mark,
+:root[data-theme="dark"] .panel-icon,
+:root[data-theme="dark"] .workspace-create-heading > span {
+  color: var(--color-text-muted);
+  background: var(--color-surface-3);
+}
+
+:root[data-theme="dark"] .nav-item:hover:not(:disabled),
+:root[data-theme="dark"] .workspace-row-v3:hover {
+  color: var(--color-text);
+  background: var(--color-surface-hover);
+}
+
+:root[data-theme="dark"] .workspace-row-v3.selected .workspace-row-mark,
+:root[data-theme="dark"] .artifact-row.selected .artifact-block-icon {
+  color: var(--color-accent);
+  background: var(--color-surface);
+}
+
+:root[data-theme="dark"] .workspace-new-button.secondary,
+:root[data-theme="dark"] .button.secondary,
+:root[data-theme="dark"] .workspace-secondary-action,
+:root[data-theme="dark"] .workspace-context-chip,
+:root[data-theme="dark"] .status-badge {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+:root[data-theme="dark"] .workspace-create-controls input,
+:root[data-theme="dark"] .paste-language select,
+:root[data-theme="dark"] input,
+:root[data-theme="dark"] textarea,
+:root[data-theme="dark"] select {
+  background: var(--color-surface);
+  border-color: var(--color-border-strong);
+}
+
+:root[data-theme="dark"] .import-card:hover:not(:disabled) {
+  background: var(--color-surface);
+  border-color: var(--color-accent);
+}
+
+:root[data-theme="dark"] .workspace-local-badge,
+:root[data-theme="dark"] .import-card {
+  background: var(--color-surface-2);
+}
+
+:root[data-theme="dark"] .workspace-new-button.secondary:hover:not(:disabled),
+:root[data-theme="dark"] .button.secondary:hover:not(:disabled),
+:root[data-theme="dark"] .workspace-secondary-action:hover:not(:disabled),
+:root[data-theme="dark"] input:hover:not(:disabled),
+:root[data-theme="dark"] textarea:hover:not(:disabled),
+:root[data-theme="dark"] select:hover:not(:disabled),
+:root[data-theme="dark"] input:focus,
+:root[data-theme="dark"] textarea:focus,
+:root[data-theme="dark"] select:focus {
+  border-color: var(--color-accent);
+}
+
+:root[data-theme="dark"] .status-badge.success { color: var(--color-success); }
+:root[data-theme="dark"] .status-badge.warning { color: var(--color-warning); }
+:root[data-theme="dark"] .status-badge.danger { color: var(--color-danger); }
 
 @media (max-width: 900px) {
   .graphite-header .header-actions > .status-badge { display: none; }

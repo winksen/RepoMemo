@@ -20,11 +20,12 @@ use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, 
 use rand_core::OsRng;
 use repomemo_api::RepoMemoCore;
 use repomemo_domain::{
-    ArtifactDetail, ArtifactSummary, Citation, CreateMemoryCardRequest, IndexingJobStatus,
-    MemoryCard, MemoryCardDetail, MemoryCardSummary, Organization, ProviderSettings, SearchRequest,
-    SearchResult, SharedAiProviderSettings, SharedSession, SharedUser, SharedWorkspace,
-    UpdateMemoryCardRequest, Workspace, WorkspaceActivityEvent, WorkspaceAiOverview,
-    WorkspaceCapabilities, WorkspaceMember, WorkspaceOverview, WorkspaceRole,
+    ArtifactDetail, ArtifactSummary, AskAnswer, AskRequest, Citation, CreateMemoryCardRequest,
+    IndexingJobStatus, MemoryCard, MemoryCardDetail, MemoryCardSummary, Organization,
+    ProviderSettings, ProviderTestResult, SearchRequest, SearchResult, SharedAiProviderSettings,
+    SharedSession, SharedUser, SharedWorkspace, UpdateMemoryCardRequest, Workspace,
+    WorkspaceActivityEvent, WorkspaceAiOverview, WorkspaceCapabilities, WorkspaceMember,
+    WorkspaceOverview, WorkspaceRole,
 };
 use repomemo_storage::{StorageConfig, StorageEngine};
 use serde::{Deserialize, Serialize};
@@ -230,6 +231,17 @@ struct SearchWorkspaceRequest {
 }
 
 #[derive(Debug, Deserialize)]
+struct AskWorkspaceRequest {
+    question: String,
+    limit: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
+struct SearchMemoryCardsRequest {
+    query: String,
+}
+
+#[derive(Debug, Deserialize)]
 struct CreateMemoryCardBody {
     title: String,
     body_markdown: String,
@@ -340,9 +352,14 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
             "/v1/workspaces/{workspace_id}/ai-overview",
             post(generate_workspace_ai_overview),
         )
+        .route("/v1/workspaces/{workspace_id}/ask", post(ask_workspace))
         .route(
             "/v1/workspaces/{workspace_id}/ai-providers",
             get(list_workspace_ai_providers).put(save_workspace_ai_provider),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/ai-providers/{provider_id}/test",
+            post(test_workspace_ai_provider),
         )
         .route(
             "/v1/workspaces/{workspace_id}/activity",
@@ -383,6 +400,10 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
         .route(
             "/v1/workspaces/{workspace_id}/memory-cards",
             get(list_memory_cards).post(create_memory_card),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/memory-cards/search",
+            post(search_memory_cards),
         )
         .route(
             "/v1/memory-cards/{card_id}",
@@ -633,12 +654,54 @@ async fn generate_workspace_ai_overview(
     }))
 }
 
+async fn ask_workspace(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+    Json(request): Json<AskWorkspaceRequest>,
+) -> Result<Json<AskAnswer>, ApiError> {
+    require_workspace_read(&state, &subject, &workspace_id).await?;
+    let provider = state
+        .storage
+        .list_provider_settings(&workspace_id)
+        .await
+        .map_err(map_storage_error)?
+        .into_iter()
+        .find(|setting| setting.enabled)
+        .ok_or_else(|| {
+            ApiError::bad_request(
+                "No enabled AI provider is configured for this workspace. An administrator can configure one in Settings.",
+            )
+        })?;
+    let answer = state
+        .core
+        .ask_workspace(AskRequest {
+            workspace_id: workspace_id.clone(),
+            question: request.question,
+            provider_id: Some(provider.id),
+            limit: request.limit,
+        })
+        .await
+        .map_err(map_core_error)?;
+    record_workspace_activity(
+        &state,
+        &workspace_id,
+        &subject.user_id,
+        "ai_question_answered",
+        "workspace",
+        Some(&workspace_id),
+        "Asked a citation-backed question of workspace evidence.".to_owned(),
+    )
+    .await;
+    Ok(Json(answer))
+}
+
 async fn list_workspace_ai_providers(
     subject: AuthenticatedSubject,
     State(state): State<AppState>,
     Path(workspace_id): Path<String>,
 ) -> Result<Json<Vec<SharedAiProviderSettings>>, ApiError> {
-    require_workspace_owner(&state, &subject, &workspace_id).await?;
+    require_workspace_admin(&state, &subject, &workspace_id).await?;
     state
         .storage
         .list_provider_settings(&workspace_id)
@@ -659,7 +722,7 @@ async fn save_workspace_ai_provider(
     Path(workspace_id): Path<String>,
     Json(request): Json<SaveAiProviderRequest>,
 ) -> Result<Json<SharedAiProviderSettings>, ApiError> {
-    require_workspace_owner(&state, &subject, &workspace_id).await?;
+    require_workspace_admin(&state, &subject, &workspace_id).await?;
     let provider_id = request.id.unwrap_or_default();
     let existing = if provider_id.trim().is_empty() {
         None
@@ -715,6 +778,38 @@ async fn save_workspace_ai_provider(
     )
     .await;
     Ok(Json(shared_provider_settings(provider)))
+}
+
+async fn test_workspace_ai_provider(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path((workspace_id, provider_id)): Path<(String, String)>,
+) -> Result<Json<ProviderTestResult>, ApiError> {
+    require_workspace_admin(&state, &subject, &workspace_id).await?;
+    let provider = state
+        .storage
+        .get_provider_settings(&provider_id)
+        .await
+        .map_err(map_storage_error)?;
+    if provider.workspace_id.as_deref() != Some(workspace_id.as_str()) {
+        return Err(ApiError::forbidden());
+    }
+    let result = state
+        .core
+        .test_provider(provider_id.clone())
+        .await
+        .map_err(map_core_error)?;
+    record_workspace_activity(
+        &state,
+        &workspace_id,
+        &subject.user_id,
+        "ai_provider_tested",
+        "ai_provider",
+        Some(&provider_id),
+        format!("Tested AI provider: {}.", provider.name),
+    )
+    .await;
+    Ok(Json(result))
 }
 
 fn shared_provider_settings(provider: ProviderSettings) -> SharedAiProviderSettings {
@@ -1114,6 +1209,21 @@ async fn list_memory_cards(
     state
         .core
         .list_memory_cards(workspace_id)
+        .await
+        .map(Json)
+        .map_err(map_core_error)
+}
+
+async fn search_memory_cards(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+    Json(request): Json<SearchMemoryCardsRequest>,
+) -> Result<Json<Vec<MemoryCardSummary>>, ApiError> {
+    require_workspace_read(&state, &subject, &workspace_id).await?;
+    state
+        .core
+        .search_memory_cards(workspace_id, request.query)
         .await
         .map(Json)
         .map_err(map_core_error)
@@ -1650,6 +1760,24 @@ mod tests {
             serde_json::from_slice(&to_bytes(memories.into_body(), usize::MAX).await.unwrap())
                 .unwrap();
         assert_eq!(memories.as_array().unwrap().len(), 1);
+        let matching_memories = app
+            .clone()
+            .oneshot(json_request(
+                "POST",
+                &format!("/v1/workspaces/{workspace_id}/memory-cards/search"),
+                &authorization,
+                json!({"query":"shared data"}),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(matching_memories.status(), 200);
+        let matching_memories: Value = serde_json::from_slice(
+            &to_bytes(matching_memories.into_body(), usize::MAX)
+                .await
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(matching_memories.as_array().unwrap().len(), 1);
         let memory_detail = app
             .clone()
             .oneshot(auth_request(
@@ -1710,6 +1838,17 @@ mod tests {
             serde_json::from_slice(&to_bytes(ai_overview.into_body(), usize::MAX).await.unwrap())
                 .unwrap();
         assert_eq!(ai_overview["provider_configured"], false);
+        let ask_without_provider = app
+            .clone()
+            .oneshot(json_request(
+                "POST",
+                &format!("/v1/workspaces/{workspace_id}/ask"),
+                &authorization,
+                json!({"question":"What is shared?"}),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(ask_without_provider.status(), 400);
         let renamed_artifact = app
             .clone()
             .oneshot(json_request(

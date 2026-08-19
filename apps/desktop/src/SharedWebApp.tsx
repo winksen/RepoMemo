@@ -20,8 +20,10 @@ import {
   IconKey as Key,
   IconLoader2 as Loader,
   IconLogout as Logout,
+  IconMoon as Moon,
   IconRefresh as Refresh,
   IconSearch as Search,
+  IconSettings as Settings,
   IconPlus as Plus,
   IconPencil as Pencil,
   IconShieldLock as Shield,
@@ -30,8 +32,10 @@ import {
   IconTrash as Trash,
   IconUsers as Users,
   IconUpload as Upload,
+  IconSun as Sun,
 } from "@tabler/icons-react";
 import {
+  askSharedWorkspace,
   createSharedOrganization,
   createSharedMemoryCard,
   createSharedTextArtifact,
@@ -59,7 +63,9 @@ import {
   generateSharedWorkspaceAiOverview,
   registerSharedUser,
   searchSharedWorkspace,
+  searchSharedMemoryCards,
   saveSharedWorkspaceAiProvider,
+  testSharedWorkspaceAiProvider,
   removeSharedWorkspaceMember,
   sharedApiUrl,
   upsertSharedWorkspaceMember,
@@ -70,11 +76,13 @@ import {
   type SharedApiError,
 } from "./lib/sharedApi";
 import type {
+  AskAnswer,
   ArtifactSummary,
   ArtifactDetail,
   MemoryCardDetail,
   MemoryCardSummary,
   Organization,
+  ProviderTestResult,
   SearchResult,
   SharedAiProviderSettings,
   SharedSession,
@@ -92,12 +100,20 @@ import { Input } from "./components/ui/input";
 import { Textarea } from "./components/ui/textarea";
 
 const SESSION_STORAGE_KEY = "repomemo.shared.access-token";
+const THEME_STORAGE_KEY = "repomemo.theme";
 
 type AuthMode = "sign-in" | "sign-up";
 type PageState = "restoring" | "unauthenticated" | "ready" | "error";
-type WorkspaceSection = "overview" | "evidence" | "retrieval" | "memory" | "people" | "activity";
+type WorkspaceSection = "overview" | "evidence" | "retrieval" | "memory" | "people" | "activity" | "settings";
+type Theme = "light" | "dark";
 
-const WORKSPACE_SECTIONS: WorkspaceSection[] = ["overview", "evidence", "retrieval", "memory", "people", "activity"];
+const WORKSPACE_SECTIONS: WorkspaceSection[] = ["overview", "evidence", "retrieval", "memory", "people", "activity", "settings"];
+
+function initialTheme(): Theme {
+  const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+  if (storedTheme === "light" || storedTheme === "dark") return storedTheme;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
 
 function currentPathname() {
   return window.location.pathname.replace(/\/+$/, "") || "/";
@@ -118,6 +134,10 @@ export function SharedWebApp() {
   const [error, setError] = useState<string | null>(null);
   const [pathname, setPathname] = useState(currentPathname);
   const [apiAvailable, setApiAvailable] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = initialTheme();
+  }, []);
 
   useEffect(() => {
     const syncPathname = () => setPathname(currentPathname());
@@ -466,11 +486,18 @@ function SharedAppShell({
   sidebar: ReactNode;
   signOut: () => void;
 }) {
+  const [theme, setTheme] = useState<Theme>(initialTheme);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+  }, [theme]);
+
   return (
     <main className="shared-home">
       <header className="shared-home-header">
         <div className="shared-brand"><span className="shared-brand-glyph"><Layers size={19} /></span><strong>RepoMemo</strong><span className="shared-mode-tag">Shared</span></div>
-        <div className="shared-user-menu"><span>{session.user.display_name}</span><Button className="shared-user-signout" onClick={signOut} type="button" variant="secondary"><Logout size={16} /> Sign out</Button></div>
+        <div className="shared-user-menu"><Button aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} aria-pressed={theme === "dark"} className="shared-theme-toggle" onClick={() => setTheme((current) => current === "dark" ? "light" : "dark")} title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} type="button" variant="secondary">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}<span>{theme === "dark" ? "Light" : "Dark"}</span></Button><span>{session.user.display_name}</span><Button className="shared-user-signout" onClick={signOut} type="button" variant="secondary"><Logout size={16} /> Sign out</Button></div>
       </header>
       <div className="shared-home-frame">
         <aside className="shared-home-rail">{sidebar}<div className="shared-rail-footer"><Shield size={15} /><span>JWT active · API {apiAvailable === true ? "healthy" : apiAvailable === false ? "offline" : "checking"}</span></div></aside>
@@ -516,6 +543,7 @@ function WorkspaceRail({
         <Button aria-current={activeSection === "memory" ? "page" : undefined} className={activeSection === "memory" ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.("memory")} type="button" variant="secondary"><Book size={16} /> Memory</Button>
         <Button aria-current={activeSection === "people" ? "page" : undefined} className={activeSection === "people" ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.("people")} type="button" variant="secondary"><Users size={16} /> People</Button>
         <Button aria-current={activeSection === "activity" ? "page" : undefined} className={activeSection === "activity" ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.("activity")} type="button" variant="secondary"><Timeline size={16} /> Activity</Button>
+        {workspace.role === "owner" || workspace.role === "admin" ? <Button aria-current={activeSection === "settings" ? "page" : undefined} className={activeSection === "settings" ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.("settings")} type="button" variant="secondary"><Settings size={16} /> Settings</Button> : null}
       </nav>
       <p className="shared-sidebar-note">Navigate between the shared workspace views.</p>
     </div>
@@ -556,6 +584,10 @@ function SharedWorkspaceDetail({
   const [memoryCards, setMemoryCards] = useState<MemoryCardSummary[]>([]);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [query, setQuery] = useState("");
+  const [askQuestion, setAskQuestion] = useState("");
+  const [askAnswer, setAskAnswer] = useState<AskAnswer | null>(null);
+  const [memoryQuery, setMemoryQuery] = useState("");
+  const [memoryResults, setMemoryResults] = useState<MemoryCardSummary[] | null>(null);
   const [noteTitle, setNoteTitle] = useState("");
   const [noteContent, setNoteContent] = useState("");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -577,6 +609,7 @@ function SharedWorkspaceDetail({
   const [providerModel, setProviderModel] = useState("llama3.2");
   const [providerApiKey, setProviderApiKey] = useState("");
   const [cloudContentAcknowledged, setCloudContentAcknowledged] = useState(false);
+  const [providerTest, setProviderTest] = useState<ProviderTestResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -589,6 +622,7 @@ function SharedWorkspaceDetail({
   const isMemoryView = section === "memory";
   const isPeopleView = section === "people";
   const isActivityView = section === "activity";
+  const isSettingsView = section === "settings";
 
   async function load() {
     setIsLoading(true);
@@ -606,7 +640,7 @@ function SharedWorkspaceDetail({
       setMemoryCards(nextMemory);
       setMembers(nextMembers);
       setCapabilities(nextCapabilities);
-      if (nextCapabilities.can_manage_workspace) {
+      if (nextCapabilities.can_manage_members) {
         setAiProviders(await listSharedWorkspaceAiProviders(accessToken, workspace.workspace.id));
       } else {
         setAiProviders([]);
@@ -686,6 +720,21 @@ function SharedWorkspaceDetail({
     try { setResults(await searchSharedWorkspace(accessToken, workspace.workspace.id, query)); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
   }
 
+  async function askEvidence(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!askQuestion.trim()) return;
+    setIsSubmitting(true); setError(null);
+    try { setAskAnswer(await askSharedWorkspace(accessToken, workspace.workspace.id, askQuestion)); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
+  }
+
+  async function runMemorySearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const nextQuery = memoryQuery.trim();
+    if (!nextQuery) { setMemoryResults(null); return; }
+    setIsSubmitting(true); setError(null);
+    try { setMemoryResults(await searchSharedMemoryCards(accessToken, workspace.workspace.id, nextQuery)); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
+  }
+
   async function runIndex() {
     setIsSubmitting(true); setError(null);
     try { await indexSharedWorkspace(accessToken, workspace.workspace.id); await load(); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
@@ -731,7 +780,17 @@ function SharedWorkspaceDetail({
       setAiProviders((current) => [saved, ...current.filter((entry) => entry.id !== saved.id)]);
       setProviderId(saved.id);
       setProviderApiKey("");
+      setProviderTest(null);
     } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
+  }
+
+  async function testAiProvider() {
+    if (!providerId) {
+      setError("Save the AI provider before testing its connection.");
+      return;
+    }
+    setIsSubmitting(true); setError(null); setProviderTest(null);
+    try { setProviderTest(await testSharedWorkspaceAiProvider(accessToken, workspace.workspace.id, providerId)); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
   }
 
   function selectProviderType(value: "ollama" | "openrouter") {
@@ -768,7 +827,7 @@ function SharedWorkspaceDetail({
     <SharedAppShell apiAvailable={apiAvailable} session={session} signOut={signOut} sidebar={<WorkspaceRail activeSection={section} onNavigate={onNavigate} organization={organization} workspace={workspace} />}>
       <section className="shared-detail-shell" aria-busy={isLoading}>
         <div className="shared-detail-heading">
-          <div><p className="shared-eyebrow">{isEvidenceView ? "Evidence" : isRetrievalView ? "Retrieval" : isMemoryView ? "Team memory" : isPeopleView ? "Workspace access" : isActivityView ? "Workspace history" : `Server workspace · ${workspace.role}`}</p><h1>{isEvidenceView ? "Evidence ledger" : isRetrievalView ? "Retrieve evidence" : isMemoryView ? "Durable team memory" : isPeopleView ? "People" : isActivityView ? "Activity" : workspace.workspace.name}</h1><p>{isEvidenceView ? "Store notes and files in the workspace, then index them for retrieval." : isRetrievalView ? "Search indexed workspace evidence and inspect the source context behind every result." : isMemoryView ? "Capture concise facts and decisions that should outlive the current investigation." : isPeopleView ? "See who can access this workspace and manage roles when your membership allows it." : isActivityView ? "A durable record of shared workspace changes, including evidence, memory, indexing, and membership updates." : "Artifacts, search results, and durable team memory are all retrieved through the protected shared API."}</p></div>
+          <div><p className="shared-eyebrow">{isEvidenceView ? "Evidence" : isRetrievalView ? "Retrieval" : isMemoryView ? "Team memory" : isPeopleView ? "Workspace access" : isActivityView ? "Workspace history" : isSettingsView ? "Administrative control" : `Server workspace · ${workspace.role}`}</p><h1>{isEvidenceView ? "Evidence ledger" : isRetrievalView ? "Retrieve evidence" : isMemoryView ? "Durable team memory" : isPeopleView ? "People" : isActivityView ? "Activity" : isSettingsView ? "Workspace settings" : workspace.workspace.name}</h1><p>{isEvidenceView ? "Store notes and files in the workspace, then index them for retrieval." : isRetrievalView ? "Search indexed workspace evidence and inspect the source context behind every result." : isMemoryView ? "Capture concise facts and decisions that should outlive the current investigation." : isPeopleView ? "See who can access this workspace and understand each person’s role." : isActivityView ? "A durable record of shared workspace changes, including evidence, memory, indexing, and membership updates." : isSettingsView ? "Administrators control workspace access and AI integrations here. Owner-only actions remain clearly marked." : "Artifacts, search results, and durable team memory are all retrieved through the protected shared API."}</p></div>
           <div className="shared-detail-actions"><Button className="shared-back-button" onClick={onBack} type="button" variant="secondary"><ArrowLeft size={16} /> All workspaces</Button><Button disabled={isLoading} onClick={() => void load()} type="button" variant="secondary"><Refresh size={16} /> Refresh</Button>{canWrite ? <Button disabled={isSubmitting || isLoading} onClick={() => void runIndex()} type="button" variant="main">{isSubmitting ? <Loader className="spin" size={16} /> : <Layers size={16} />} {isEvidenceView ? "Index evidence" : "Index workspace"}</Button> : null}</div>
         </div>
         {error ? <p className="shared-form-error" role="alert">{error}</p> : null}
@@ -782,20 +841,22 @@ function SharedWorkspaceDetail({
           {aiOverview?.citations.length ? <div className="shared-ai-citations"><strong>Evidence used</strong>{aiOverview.citations.map((citation) => <span key={`${citation.artifact_id}-${citation.chunk_id ?? "artifact"}`}>{citation.title} · {citation.path}{citation.start_line ? ` · line ${citation.start_line}` : ""}</span>)}</div> : null}
           <Button disabled={isSubmitting || isLoading || !capabilities?.can_generate_ai_overview} onClick={() => void generateAiOverview()} type="button" variant="secondary">{isSubmitting ? <Loader className="spin" size={16} /> : <Brain size={16} />}{aiOverview?.summary_markdown ? "Refresh AI overview" : "Generate AI overview"}</Button>
         </section> : null}
-        <div className={`shared-detail-grid${isEvidenceView ? " evidence-only" : isRetrievalView ? " retrieval-only" : isMemoryView ? " memory-only" : isPeopleView ? " people-only" : isActivityView ? " activity-only" : ""}`}>
-          <section className="shared-detail-panel" hidden={isRetrievalView || isMemoryView || isPeopleView || isActivityView}>
+        <div className={`shared-detail-grid${isEvidenceView ? " evidence-only" : isRetrievalView ? " retrieval-only" : isMemoryView ? " memory-only" : isPeopleView ? " people-only" : isActivityView ? " activity-only" : isSettingsView ? " settings-only" : ""}`}>
+          <section className="shared-detail-panel" hidden={isRetrievalView || isMemoryView || isPeopleView || isActivityView || isSettingsView}>
             <div className="shared-panel-heading"><div><FileText size={18} /><h2>Evidence ledger</h2></div><span>{artifacts.length} records</span></div>
             {artifacts.length ? <div className="shared-artifact-list">{artifacts.map((artifact) => <article key={artifact.id}><Button className="shared-record-link" onClick={() => onOpenArtifact(artifact.id)} type="button" variant="secondary"><div><strong>{artifact.title}</strong><span>{artifact.path} · {artifact.indexed_at ? "Indexed" : "Not indexed"}</span></div><small>{artifact.language ?? artifact.artifact_type}</small></Button></article>)}</div> : <div className="shared-empty-state"><FileText size={25} /><strong>No shared evidence yet</strong><span>Add a pasted note below, then index it when you are ready to search.</span></div>}
             {canWrite ? <><form className="shared-note-form" onSubmit={addNote}><h3>Add shared note</h3><Input onChange={(event) => setNoteTitle(event.target.value)} placeholder="Decision or implementation note" required value={noteTitle} /><Textarea onChange={(event) => setNoteContent(event.target.value)} placeholder="Paste Markdown, code context, or a meeting note…" required value={noteContent} /><Button disabled={isSubmitting} type="submit" variant="main"><Plus size={16} /> Store evidence</Button></form><form className="shared-upload-form" onSubmit={submitUpload}><div><strong>Upload a file</strong><span>Markdown, text, code, or supported image · up to 10 MiB</span></div><label className="shared-upload-picker"><input accept=".md,.mdx,.txt,.rs,.ts,.tsx,.js,.jsx,.py,.json,.toml,.yaml,.yml,.sql,.html,.css,.sh,.ps1,.png,.jpg,.jpeg,.gif,.webp,.svg,.bmp" aria-label="Upload a shared artifact" className="shared-upload-native-input" onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)} required type="file" /><span className="shared-upload-picker-icon"><Upload size={18} /></span><span className="shared-upload-picker-copy"><strong>{uploadFile?.name ?? "Choose a shared file"}</strong><span>{uploadFile ? `${formatFileSize(uploadFile.size)} · ready to upload` : "Markdown, text, code, or a supported image"}</span></span><span className="shared-upload-picker-action">Browse</span></label><Button disabled={isSubmitting || !uploadFile} type="submit" variant="secondary"><Upload size={16} /> Upload</Button></form></> : <p className="shared-readonly-note"><Shield size={15} /> Your viewer membership can inspect shared evidence but cannot change it.</p>}
           </section>
-          <aside className="shared-detail-panel shared-retrieval-panel" hidden={isEvidenceView}>
+          <aside className="shared-detail-panel shared-retrieval-panel" hidden={isEvidenceView || isSettingsView}>
             <div className="shared-panel-heading" hidden={isMemoryView || isPeopleView || isActivityView}><div><Search size={18} /><h2>Retrieve</h2></div></div>
             <form className="shared-search-form" hidden={isMemoryView || isPeopleView || isActivityView} onSubmit={runSearch}><Input onChange={(event) => setQuery(event.target.value)} placeholder="Search indexed evidence" value={query} /><Button disabled={isSubmitting} type="submit" variant="secondary">Search</Button></form>
-            <div hidden={isMemoryView || isPeopleView || isActivityView}>{results.length ? <div className="shared-search-results">{results.map((result) => <article key={result.chunk_id}><strong>{result.title}</strong><p>{result.snippet}</p><span>{result.path}{result.start_line ? ` · line ${result.start_line}` : ""}</span></article>)}</div> : <p className="shared-muted-copy">Index one or more artifacts, then search the evidence base from here.</p>}</div>
-            <div className="shared-memory-section" hidden={isRetrievalView || isPeopleView || isActivityView}><div className="shared-panel-heading"><div><Shield size={18} /><h2>Team memory</h2></div><span>{memoryCards.length}</span></div>{memoryCards.length ? <div className="shared-memory-list">{memoryCards.map((card) => <article key={card.id}><Button className="shared-record-link" onClick={() => onOpenMemoryCard(card.id)} type="button" variant="secondary"><strong>{card.title}</strong><span>{card.body_excerpt}</span></Button></article>)}</div> : <p className="shared-muted-copy">No durable memory cards yet.</p>}{canWrite ? <form className="shared-memory-form" onSubmit={addMemory}><Input onChange={(event) => setMemoryTitle(event.target.value)} placeholder="Memory title" required value={memoryTitle} /><Textarea onChange={(event) => setMemoryBody(event.target.value)} placeholder="A concise durable fact…" required value={memoryBody} /><label>Evidence link<Dropdown aria-label="Evidence link" onValueChange={(value) => setMemoryArtifactId(value === "__none__" ? "" : value)} options={[{ label: "No direct artifact link", value: "__none__" }, ...artifacts.map((artifact) => ({ label: artifact.title, value: artifact.id }))]} value={memoryArtifactId || "__none__"} /></label><Button disabled={isSubmitting} type="submit" variant="secondary">Save memory</Button></form> : null}</div>
-            <div className="shared-members-section" hidden={isRetrievalView || isMemoryView || isActivityView}>
+            <div hidden={isMemoryView || isPeopleView || isActivityView}>{results.length ? <div className="shared-search-results">{results.map((result) => <article key={result.chunk_id}><strong>{result.title}</strong><p>{result.snippet}</p><span>{result.path}{result.start_line ? ` · line ${result.start_line}` : ""}</span></article>)}</div> : <p className="shared-muted-copy">Index one or more artifacts, then search the evidence base from here.</p>}
+              <section className="shared-ask-evidence" aria-live="polite"><div><Brain size={18} /><h3>Ask your evidence</h3></div><p>Get a citation-backed answer from the indexed workspace context.</p><form onSubmit={askEvidence}><Textarea onChange={(event) => setAskQuestion(event.target.value)} placeholder="What do we know about the current implementation?" required value={askQuestion} /><Button disabled={isSubmitting} type="submit" variant="secondary">{isSubmitting ? <Loader className="spin" size={16} /> : <Brain size={16} />} Ask</Button></form>{askAnswer ? <div className="shared-ask-answer"><div className="shared-ai-overview-body">{askAnswer.answer_markdown}</div>{askAnswer.warnings.length ? <div className="shared-ai-overview-warning">{askAnswer.warnings.map((warning) => <p key={warning}>{warning}</p>)}</div> : null}{askAnswer.citations.length ? <div className="shared-ai-citations"><strong>Evidence used</strong>{askAnswer.citations.map((citation) => <span key={`${citation.artifact_id}-${citation.chunk_id ?? "artifact"}`}>{citation.title} · {citation.path}{citation.start_line ? ` · line ${citation.start_line}` : ""}</span>)}</div> : null}</div> : null}</section>
+            </div>
+            <div className="shared-memory-section" hidden={isRetrievalView || isPeopleView || isActivityView}><div className="shared-panel-heading"><div><Shield size={18} /><h2>Team memory</h2></div><span>{memoryResults?.length ?? memoryCards.length}</span></div><form className="shared-search-form shared-memory-search" onSubmit={runMemorySearch}><Input onChange={(event) => setMemoryQuery(event.target.value)} placeholder="Search team memory" value={memoryQuery} /><Button disabled={isSubmitting} type="submit" variant="secondary">Search</Button></form>{(memoryResults ?? memoryCards).length ? <div className="shared-memory-list">{(memoryResults ?? memoryCards).map((card) => <article key={card.id}><Button className="shared-record-link" onClick={() => onOpenMemoryCard(card.id)} type="button" variant="secondary"><strong>{card.title}</strong><span>{card.body_excerpt}</span></Button></article>)}</div> : <p className="shared-muted-copy">{memoryResults ? "No memory cards match that search." : "No durable memory cards yet."}</p>}{canWrite ? <form className="shared-memory-form" onSubmit={addMemory}><Input onChange={(event) => setMemoryTitle(event.target.value)} placeholder="Memory title" required value={memoryTitle} /><Textarea onChange={(event) => setMemoryBody(event.target.value)} placeholder="A concise durable fact…" required value={memoryBody} /><label>Evidence link<Dropdown aria-label="Evidence link" onValueChange={(value) => setMemoryArtifactId(value === "__none__" ? "" : value)} options={[{ label: "No direct artifact link", value: "__none__" }, ...artifacts.map((artifact) => ({ label: artifact.title, value: artifact.id }))]} value={memoryArtifactId || "__none__"} /></label><Button disabled={isSubmitting} type="submit" variant="secondary">Save memory</Button></form> : null}</div>
+            <div className="shared-members-section" hidden={isRetrievalView || isMemoryView || isActivityView || isSettingsView}>
               <div className="shared-panel-heading"><div><Users size={18} /><h2>Workspace team</h2></div><span>{members.length}</span></div>
-              <p className="shared-muted-copy">{canManageMembers ? "Add people who already have a RepoMemo account, then choose what they can do here." : "Your workspace role does not allow membership changes."}</p>
+              <p className="shared-muted-copy">{canManageMembers ? "Workspace access is administered from Settings." : "Your workspace role does not allow membership changes."}</p>
               <div className="shared-capabilities" aria-label="Your workspace capabilities">
                 <strong>Your {capabilities?.role ?? workspace.role} access</strong>
                 <span>Read evidence, retrieval, memory, exports, and activity.</span>
@@ -807,34 +868,44 @@ function SharedWorkspaceDetail({
                 {members.map((member) => <article className="shared-member-row" key={member.user.id}>
                   <div><strong>{member.user.display_name}</strong><span>{member.user.email ?? "No email"}</span></div>
                   <span className="shared-member-role">{member.role}</span>
-                  {canManageMembers && member.role !== "owner" ? <Button className="shared-member-remove" disabled={isSubmitting} onClick={() => void removeMember(member.user.id)} type="button" variant="secondary">Remove</Button> : null}
                 </article>)}
               </div>
-              {canManageMembers ? <form className="shared-member-form" onSubmit={saveMember}>
-                <Input aria-label="Member email" onChange={(event) => setMemberEmail(event.target.value)} placeholder="person@example.com" required type="email" value={memberEmail} />
-                <Dropdown aria-label="Member role" onValueChange={(value) => setMemberRole(value as WorkspaceRole)} options={[{ label: "Viewer", value: "viewer" }, { label: "Member", value: "member" }, ...(canAssignAdmin ? [{ label: "Admin", value: "admin" }] : [])]} value={memberRole} />
-                <Button disabled={isSubmitting} type="submit" variant="secondary">Add / update</Button>
-              </form> : null}
-              {canManageWorkspace ? <section className="shared-workspace-admin">
-                <div><h3>Workspace controls</h3><p>Only the owner can rename or permanently delete this shared workspace.</p></div>
-                <form onSubmit={renameWorkspace}><Input aria-label="Workspace name" onChange={(event) => setWorkspaceName(event.target.value)} required value={workspaceName} /><Button disabled={isSubmitting} type="submit" variant="secondary"><Pencil size={16} /> Rename</Button></form>
-                <Button className="shared-danger-action" disabled={isSubmitting} onClick={() => void removeWorkspace()} type="button" variant="secondary"><Trash size={16} /> Delete workspace</Button>
-                <form className="shared-ai-provider-form" onSubmit={saveAiProvider}>
-                  <div><h3>AI overview provider</h3><p>Configure one explicit workspace provider. Credentials are sent only to this protected server and are never returned to the browser after saving.</p></div>
-                  <label>Provider<Dropdown aria-label="AI provider" onValueChange={(value) => selectProviderType(value as "ollama" | "openrouter")} options={[{ label: "Ollama (local)", value: "ollama" }, { label: "OpenRouter (cloud)", value: "openrouter" }]} value={providerType} /></label>
-                  <label>Provider name<Input onChange={(event) => setProviderName(event.target.value)} required value={providerName} /></label>
-                  <label>Base URL<Input onChange={(event) => setProviderBaseUrl(event.target.value)} placeholder={providerType === "ollama" ? "http://127.0.0.1:11434" : "https://openrouter.ai/api/v1"} value={providerBaseUrl} /></label>
-                  <label>Chat model<Input onChange={(event) => setProviderModel(event.target.value)} placeholder={providerType === "ollama" ? "llama3.2" : "openai/gpt-4o-mini"} required value={providerModel} /></label>
-                  {providerType === "openrouter" ? <><label>API key<Input autoComplete="off" onChange={(event) => setProviderApiKey(event.target.value)} placeholder={providerId ? "Leave blank to keep the saved key" : "Required to enable cloud AI"} type="password" value={providerApiKey} /></label><label className="shared-ai-provider-toggle"><input checked={cloudContentAcknowledged} onChange={(event) => setCloudContentAcknowledged(event.target.checked)} type="checkbox" /> I understand that generating an overview sends the cited workspace excerpts to this cloud provider.</label></> : null}
-                  <Button disabled={isSubmitting} type="submit" variant="secondary">{isSubmitting ? <Loader className="spin" size={16} /> : <Brain size={16} />} Save AI provider</Button>
-                </form>
-              </section> : null}
             </div>
             <div className="shared-activity-section" hidden={!isActivityView}>
               <div className="shared-panel-heading"><div><Timeline size={18} /><h2>Recent activity</h2></div><span>{activity.length}</span></div>
               {activity.length ? <div className="shared-activity-list">{activity.map((event) => <article key={event.id}><div><strong>{event.summary}</strong><span>{event.actor?.display_name ?? "System"} · {event.action.replace(/_/g, " ")}</span></div><time dateTime={event.created_at}>{formatActivityTime(event.created_at)}</time></article>)}</div> : <div className="shared-empty-state"><Timeline size={25} /><strong>No recorded activity yet</strong><span>New workspace changes will appear here.</span></div>}
             </div>
           </aside>
+          <section className="shared-settings-section" hidden={!isSettingsView}>
+            {canManageMembers ? <>
+              <div className="shared-settings-policy"><Settings size={18} /><div><strong>Administrative workspace controls</strong><span>Changes are enforced by the shared API. Administrators can manage people and integrations; owner-only workspace actions are explicitly marked.</span></div></div>
+              <section className="shared-settings-group">
+                <div className="shared-panel-heading"><div><Users size={18} /><h2>People and access</h2></div><span>{members.length} people</span></div>
+                <p className="shared-muted-copy">Add a registered RepoMemo user or update their role. Administrators cannot create, edit, or remove other administrators; owners retain the final authority.</p>
+                <div className="shared-member-list">{members.map((member) => <article className="shared-member-row" key={member.user.id}><div><strong>{member.user.display_name}</strong><span>{member.user.email ?? "No email"}</span></div><span className="shared-member-role">{member.role}</span>{member.role !== "owner" ? <Button className="shared-member-remove" disabled={isSubmitting} onClick={() => void removeMember(member.user.id)} type="button" variant="secondary">Remove</Button> : null}</article>)}</div>
+                <form className="shared-member-form" onSubmit={saveMember}><Input aria-label="Member email" onChange={(event) => setMemberEmail(event.target.value)} placeholder="person@example.com" required type="email" value={memberEmail} /><Dropdown aria-label="Member role" onValueChange={(value) => setMemberRole(value as WorkspaceRole)} options={[{ label: "Viewer", value: "viewer" }, { label: "Member", value: "member" }, ...(canAssignAdmin ? [{ label: "Admin", value: "admin" }] : [])]} value={memberRole} /><Button disabled={isSubmitting} type="submit" variant="secondary">Add / update</Button></form>
+              </section>
+              <section className="shared-settings-group">
+                <div className="shared-panel-heading"><div><Brain size={18} /><h2>AI integration</h2></div><span>{aiProviders.some((provider) => provider.enabled) ? "configured" : "not configured"}</span></div>
+                <p className="shared-muted-copy">Configure one explicit provider for citation-backed workspace overviews. Credentials are stored on the protected server and are never returned to the browser.</p>
+                <form className="shared-ai-provider-form" onSubmit={saveAiProvider}>
+                  <label>Provider<Dropdown aria-label="AI provider" onValueChange={(value) => selectProviderType(value as "ollama" | "openrouter")} options={[{ label: "Ollama (local)", value: "ollama" }, { label: "OpenRouter (cloud)", value: "openrouter" }]} value={providerType} /></label>
+                  <label>Provider name<Input onChange={(event) => setProviderName(event.target.value)} required value={providerName} /></label>
+                  <label>Base URL<Input onChange={(event) => setProviderBaseUrl(event.target.value)} placeholder={providerType === "ollama" ? "http://127.0.0.1:11434" : "https://openrouter.ai/api/v1"} value={providerBaseUrl} /></label>
+                  <label>Chat model<Input onChange={(event) => setProviderModel(event.target.value)} placeholder={providerType === "ollama" ? "llama3.2" : "openai/gpt-4o-mini"} required value={providerModel} /></label>
+                  {providerType === "openrouter" ? <><label>API key<Input autoComplete="off" onChange={(event) => setProviderApiKey(event.target.value)} placeholder={providerId ? "Leave blank to keep the saved key" : "Required to enable cloud AI"} type="password" value={providerApiKey} /></label><label className="shared-ai-provider-toggle"><input checked={cloudContentAcknowledged} onChange={(event) => setCloudContentAcknowledged(event.target.checked)} type="checkbox" /> I understand that generating an overview sends cited workspace excerpts to this cloud provider.</label></> : null}
+                  <div className="shared-ai-provider-actions"><Button disabled={isSubmitting} type="submit" variant="secondary">{isSubmitting ? <Loader className="spin" size={16} /> : <Brain size={16} />} Save AI provider</Button><Button disabled={isSubmitting || !providerId} onClick={() => void testAiProvider()} type="button" variant="secondary">{isSubmitting ? <Loader className="spin" size={16} /> : <Refresh size={16} />} Test connection</Button></div>
+                  {providerTest ? <p className={`shared-provider-test ${providerTest.success ? "success" : "failure"}`} role="status">{providerTest.message}</p> : null}
+                </form>
+              </section>
+              <section className="shared-settings-group" hidden={!canManageWorkspace}>
+                <div className="shared-panel-heading"><div><Settings size={18} /><h2>Workspace ownership</h2></div><span>owner only</span></div>
+                <p className="shared-muted-copy">Rename this workspace or remove it permanently. Deletion removes its shared evidence, memory, and memberships.</p>
+                <form className="shared-workspace-rename" onSubmit={renameWorkspace}><Input aria-label="Workspace name" onChange={(event) => setWorkspaceName(event.target.value)} required value={workspaceName} /><Button disabled={isSubmitting} type="submit" variant="secondary"><Pencil size={16} /> Rename</Button></form>
+                <Button className="shared-danger-action" disabled={isSubmitting} onClick={() => void removeWorkspace()} type="button" variant="secondary"><Trash size={16} /> Delete workspace</Button>
+              </section>
+            </> : <div className="shared-empty-state"><Settings size={25} /><strong>Administrative access required</strong><span>Only workspace administrators and the owner can open settings. Your current role can still browse shared evidence, memory, and activity.</span></div>}
+          </section>
         </div>
       </section>
     </SharedAppShell>
