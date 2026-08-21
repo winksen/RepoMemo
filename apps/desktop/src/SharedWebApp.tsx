@@ -50,6 +50,7 @@ import {
   getSharedArtifact,
   getSharedHealth,
   getSharedWorkspaceCapabilities,
+  getSharedRetrievalFacets,
   getSharedMemoryCard,
   getSharedSession,
   getSharedWorkspaceOverview,
@@ -88,6 +89,7 @@ import type {
   MemoryCardSummary,
   Organization,
   ProviderTestResult,
+  RetrievalFacets,
   SearchResult,
   SharedAiProviderSettings,
   SharedSession,
@@ -596,6 +598,11 @@ function SharedWorkspaceDetail({
   const [memoryCards, setMemoryCards] = useState<MemoryCardSummary[]>([]);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [query, setQuery] = useState("");
+  const [retrievalFacets, setRetrievalFacets] = useState<RetrievalFacets | null>(null);
+  const [retrievalArtifactType, setRetrievalArtifactType] = useState<ArtifactType | "all">("all");
+  const [retrievalLanguage, setRetrievalLanguage] = useState("all");
+  const [retrievalSourceId, setRetrievalSourceId] = useState("all");
+  const [retrievalLimit, setRetrievalLimit] = useState("20");
   const [askQuestion, setAskQuestion] = useState("");
   const [askAnswer, setAskAnswer] = useState<AskAnswer | null>(null);
   const [memoryQuery, setMemoryQuery] = useState("");
@@ -642,12 +649,13 @@ function SharedWorkspaceDetail({
     setIsLoading(true);
     setError(null);
     try {
-      const [nextOverview, nextArtifacts, nextMemory, nextMembers, nextCapabilities] = await Promise.all([
+      const [nextOverview, nextArtifacts, nextMemory, nextMembers, nextCapabilities, nextRetrievalFacets] = await Promise.all([
         getSharedWorkspaceOverview(accessToken, workspace.workspace.id),
         listSharedArtifacts(accessToken, workspace.workspace.id),
         listSharedMemoryCards(accessToken, workspace.workspace.id),
         listSharedWorkspaceMembers(accessToken, workspace.workspace.id),
         getSharedWorkspaceCapabilities(accessToken, workspace.workspace.id),
+        getSharedRetrievalFacets(accessToken, workspace.workspace.id),
       ]);
       setOverview(nextOverview);
       setArtifacts(nextArtifacts);
@@ -655,6 +663,7 @@ function SharedWorkspaceDetail({
       setMemoryCards(nextMemory);
       setMembers(nextMembers);
       setCapabilities(nextCapabilities);
+      setRetrievalFacets(nextRetrievalFacets);
       if (nextCapabilities.can_manage_members) {
         setAiProviders(await listSharedWorkspaceAiProviders(accessToken, workspace.workspace.id));
       } else {
@@ -732,7 +741,23 @@ function SharedWorkspaceDetail({
     event.preventDefault();
     if (!query.trim()) return;
     setIsSubmitting(true); setError(null);
-    try { setResults(await searchSharedWorkspace(accessToken, workspace.workspace.id, query)); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
+    try {
+      setResults(await searchSharedWorkspace(accessToken, workspace.workspace.id, {
+        query,
+        artifactTypes: retrievalArtifactType === "all" ? [] : [retrievalArtifactType],
+        languages: retrievalLanguage === "all" ? [] : [retrievalLanguage],
+        sourceIds: retrievalSourceId === "all" ? [] : [retrievalSourceId],
+        limit: Number(retrievalLimit),
+      }));
+    } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
+  }
+
+  function clearRetrievalFilters() {
+    setRetrievalArtifactType("all");
+    setRetrievalLanguage("all");
+    setRetrievalSourceId("all");
+    setRetrievalLimit("20");
+    setResults([]);
   }
 
   async function filterArtifacts(event: FormEvent<HTMLFormElement>) {
@@ -878,7 +903,7 @@ function SharedWorkspaceDetail({
           <Button disabled={isSubmitting || isLoading || !capabilities?.can_generate_ai_overview} onClick={() => void generateAiOverview()} type="button" variant="secondary">{isSubmitting ? <Loader className="spin" size={16} /> : <Brain size={16} />}{aiOverview?.summary_markdown ? "Refresh AI overview" : "Generate AI overview"}</Button>
         </section> : null}
         {section !== "overview" ? <div className={`shared-detail-grid${isEvidenceView ? " evidence-only" : isRetrievalView ? " retrieval-only" : isMemoryView ? " memory-only" : isPeopleView ? " people-only" : isActivityView ? " activity-only" : isSettingsView ? " settings-only" : ""}`}>
-          <section className="shared-detail-panel" hidden={isRetrievalView || isMemoryView || isPeopleView || isActivityView || isSettingsView}>
+          {isEvidenceView ? <section className="shared-detail-panel">
             <div className="shared-panel-heading"><div><FileText size={18} /><h2>Evidence ledger</h2></div><span>{displayedArtifacts.length} of {artifacts.length} files</span></div>
             <div className="shared-artifact-browser">
               <form className="shared-artifact-filters" onSubmit={filterArtifacts}>
@@ -893,15 +918,25 @@ function SharedWorkspaceDetail({
               {displayedArtifacts.length ? <div className={`shared-artifact-manager ${artifactViewMode}`}>{displayedArtifacts.map((artifact) => <article key={artifact.id}><Button className="shared-artifact-entry" onClick={() => onOpenArtifact(artifact.id)} type="button" variant="secondary"><span className="shared-artifact-file-icon"><FileText size={20} /></span><span className="shared-artifact-entry-copy"><strong>{artifact.title}</strong><span>{artifact.path}</span></span><span className="shared-artifact-entry-meta"><span>{artifactTypeLabel(artifact.artifact_type)}</span><span>{artifact.language ?? "Unspecified"}</span><span>{formatFileSize(artifact.size_bytes)}</span><span className={artifact.indexed_at ? "indexed" : "pending"}>{artifact.indexed_at ? "Indexed" : "Not indexed"}</span></span></Button></article>)}</div> : <div className="shared-empty-state"><FileText size={25} /><strong>{artifacts.length ? "No files match these filters" : "No shared evidence yet"}</strong><span>{artifacts.length ? "Clear or adjust the filters to see other workspace files." : "Add a pasted note below, then index it when you are ready to search."}</span></div>}
             </div>
             {canWrite ? <><form className="shared-note-form" onSubmit={addNote}><h3>Add shared note</h3><Input onChange={(event) => setNoteTitle(event.target.value)} placeholder="Decision or implementation note" required value={noteTitle} /><Textarea onChange={(event) => setNoteContent(event.target.value)} placeholder="Paste Markdown, code context, or a meeting note…" required value={noteContent} /><Button disabled={isSubmitting} type="submit" variant="main"><Plus size={16} /> Store evidence</Button></form><form className="shared-upload-form" onSubmit={submitUpload}><div><strong>Upload a file</strong><span>Markdown, text, code, or supported image · up to 10 MiB</span></div><label className="shared-upload-picker"><input accept=".md,.mdx,.txt,.rs,.ts,.tsx,.js,.jsx,.py,.json,.toml,.yaml,.yml,.sql,.html,.css,.sh,.ps1,.png,.jpg,.jpeg,.gif,.webp,.svg,.bmp" aria-label="Upload a shared artifact" className="shared-upload-native-input" onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)} required type="file" /><span className="shared-upload-picker-icon"><Upload size={18} /></span><span className="shared-upload-picker-copy"><strong>{uploadFile?.name ?? "Choose a shared file"}</strong><span>{uploadFile ? `${formatFileSize(uploadFile.size)} · ready to upload` : "Markdown, text, code, or a supported image"}</span></span><span className="shared-upload-picker-action">Browse</span></label><Button disabled={isSubmitting || !uploadFile} type="submit" variant="secondary"><Upload size={16} /> Upload</Button></form></> : <p className="shared-readonly-note"><Shield size={15} /> Your viewer membership can inspect shared evidence but cannot change it.</p>}
-          </section>
-          <aside className="shared-detail-panel shared-retrieval-panel" hidden={isEvidenceView || isSettingsView}>
-            <div className="shared-panel-heading" hidden={isMemoryView || isPeopleView || isActivityView}><div><Search size={18} /><h2>Retrieve</h2></div></div>
-            <form className="shared-search-form" hidden={isMemoryView || isPeopleView || isActivityView} onSubmit={runSearch}><Input onChange={(event) => setQuery(event.target.value)} placeholder="Search indexed evidence" value={query} /><Button disabled={isSubmitting} type="submit" variant="secondary">Search</Button></form>
-            <div hidden={isMemoryView || isPeopleView || isActivityView}>{results.length ? <div className="shared-search-results">{results.map((result) => <article key={result.chunk_id}><strong>{result.title}</strong><p>{result.snippet}</p><span>{result.path}{result.start_line ? ` · line ${result.start_line}` : ""}</span></article>)}</div> : <p className="shared-muted-copy">Index one or more artifacts, then search the evidence base from here.</p>}
+          </section> : null}
+          {isRetrievalView || isMemoryView || isPeopleView || isActivityView ? <aside className="shared-detail-panel shared-retrieval-panel">
+            {isRetrievalView ? <><div className="shared-panel-heading"><div><Search size={18} /><h2>Retrieve</h2></div></div>
+            <form className="shared-retrieval-search" onSubmit={runSearch}>
+              <Input onChange={(event) => setQuery(event.target.value)} placeholder="Search indexed evidence" value={query} />
+              <div className="shared-retrieval-filter-row">
+                <Dropdown aria-label="Limit retrieval to a file type" onValueChange={(value) => setRetrievalArtifactType(value as ArtifactType | "all")} options={[{ label: "All file types", value: "all" }, ...(retrievalFacets?.artifact_types ?? []).map((type) => ({ label: artifactTypeLabel(type), value: type }))]} value={retrievalArtifactType} />
+                <Dropdown aria-label="Limit retrieval to a language" onValueChange={setRetrievalLanguage} options={[{ label: "All languages", value: "all" }, ...(retrievalFacets?.languages ?? []).map((language) => ({ label: language, value: language }))]} value={retrievalLanguage} />
+                <Dropdown aria-label="Limit retrieval to a source" onValueChange={setRetrievalSourceId} options={[{ label: "All sources", value: "all" }, ...(retrievalFacets?.sources ?? []).map((source) => ({ label: source.name, value: source.id }))]} value={retrievalSourceId} />
+                <Dropdown aria-label="Number of results" onValueChange={setRetrievalLimit} options={[{ label: "10 results", value: "10" }, { label: "20 results", value: "20" }, { label: "50 results", value: "50" }]} value={retrievalLimit} />
+                <Button disabled={isSubmitting} type="submit" variant="main"><Search size={16} /> Search</Button>
+                {results.length ? <Button disabled={isSubmitting} onClick={clearRetrievalFilters} type="button" variant="secondary">Clear</Button> : null}
+              </div>
+            </form>
+            <div>{results.length ? <div className="shared-search-results"><p className="shared-search-result-count">{results.length} matching evidence {results.length === 1 ? "result" : "results"}</p>{results.map((result) => <article key={result.chunk_id}><Button className="shared-search-result" onClick={() => onOpenArtifact(result.artifact_id)} type="button" variant="secondary"><span className="shared-search-result-heading"><strong>{result.title}</strong><span>{artifactTypeLabel(result.artifact_type)} · {result.language ?? "Unspecified"} · {result.source_name}</span></span><p>{result.snippet}</p><span className="shared-search-result-path">{result.path}{result.start_line ? ` · line ${result.start_line}` : ""}</span></Button></article>)}</div> : <p className="shared-muted-copy">Index one or more artifacts, then search the evidence base from here. Use filters to narrow large workspaces.</p>}
               <section className="shared-ask-evidence" aria-live="polite"><div><Brain size={18} /><h3>Ask your evidence</h3></div><p>Get a citation-backed answer from the indexed workspace context.</p><form onSubmit={askEvidence}><Textarea onChange={(event) => setAskQuestion(event.target.value)} placeholder="What do we know about the current implementation?" required value={askQuestion} /><Button disabled={isSubmitting} type="submit" variant="secondary">{isSubmitting ? <Loader className="spin" size={16} /> : <Brain size={16} />} Ask</Button></form>{askAnswer ? <div className="shared-ask-answer"><div className="shared-ai-overview-body">{askAnswer.answer_markdown}</div>{askAnswer.warnings.length ? <div className="shared-ai-overview-warning">{askAnswer.warnings.map((warning) => <p key={warning}>{warning}</p>)}</div> : null}{askAnswer.citations.length ? <div className="shared-ai-citations"><strong>Evidence used</strong>{askAnswer.citations.map((citation) => <span key={`${citation.artifact_id}-${citation.chunk_id ?? "artifact"}`}>{citation.title} · {citation.path}{citation.start_line ? ` · line ${citation.start_line}` : ""}</span>)}</div> : null}</div> : null}</section>
-            </div>
-            <div className="shared-memory-section" hidden={isRetrievalView || isPeopleView || isActivityView}><div className="shared-panel-heading"><div><Shield size={18} /><h2>Team memory</h2></div><span>{memoryResults?.length ?? memoryCards.length}</span></div><form className="shared-search-form shared-memory-search" onSubmit={runMemorySearch}><Input onChange={(event) => setMemoryQuery(event.target.value)} placeholder="Search team memory" value={memoryQuery} /><Button disabled={isSubmitting} type="submit" variant="secondary">Search</Button></form>{(memoryResults ?? memoryCards).length ? <div className="shared-memory-list">{(memoryResults ?? memoryCards).map((card) => <article key={card.id}><Button className="shared-record-link" onClick={() => onOpenMemoryCard(card.id)} type="button" variant="secondary"><strong>{card.title}</strong><span>{card.body_excerpt}</span></Button></article>)}</div> : <p className="shared-muted-copy">{memoryResults ? "No memory cards match that search." : "No durable memory cards yet."}</p>}{canWrite ? <form className="shared-memory-form" onSubmit={addMemory}><Input onChange={(event) => setMemoryTitle(event.target.value)} placeholder="Memory title" required value={memoryTitle} /><Textarea onChange={(event) => setMemoryBody(event.target.value)} placeholder="A concise durable fact…" required value={memoryBody} /><label>Evidence link<Dropdown aria-label="Evidence link" onValueChange={(value) => setMemoryArtifactId(value === "__none__" ? "" : value)} options={[{ label: "No direct artifact link", value: "__none__" }, ...artifacts.map((artifact) => ({ label: artifact.title, value: artifact.id }))]} value={memoryArtifactId || "__none__"} /></label><Button disabled={isSubmitting} type="submit" variant="secondary">Save memory</Button></form> : null}</div>
-            <div className="shared-members-section" hidden={isRetrievalView || isMemoryView || isActivityView || isSettingsView}>
+            </div></> : null}
+            {isMemoryView ? <div className="shared-memory-section"><div className="shared-panel-heading"><div><Shield size={18} /><h2>Team memory</h2></div><span>{memoryResults?.length ?? memoryCards.length}</span></div><form className="shared-search-form shared-memory-search" onSubmit={runMemorySearch}><Input onChange={(event) => setMemoryQuery(event.target.value)} placeholder="Search team memory" value={memoryQuery} /><Button disabled={isSubmitting} type="submit" variant="secondary">Search</Button></form>{(memoryResults ?? memoryCards).length ? <div className="shared-memory-list">{(memoryResults ?? memoryCards).map((card) => <article key={card.id}><Button className="shared-record-link" onClick={() => onOpenMemoryCard(card.id)} type="button" variant="secondary"><strong>{card.title}</strong><span>{card.body_excerpt}</span></Button></article>)}</div> : <p className="shared-muted-copy">{memoryResults ? "No memory cards match that search." : "No durable memory cards yet."}</p>}{canWrite ? <form className="shared-memory-form" onSubmit={addMemory}><Input onChange={(event) => setMemoryTitle(event.target.value)} placeholder="Memory title" required value={memoryTitle} /><Textarea onChange={(event) => setMemoryBody(event.target.value)} placeholder="A concise durable fact…" required value={memoryBody} /><label>Evidence link<Dropdown aria-label="Evidence link" onValueChange={(value) => setMemoryArtifactId(value === "__none__" ? "" : value)} options={[{ label: "No direct artifact link", value: "__none__" }, ...artifacts.map((artifact) => ({ label: artifact.title, value: artifact.id }))]} value={memoryArtifactId || "__none__"} /></label><Button disabled={isSubmitting} type="submit" variant="secondary">Save memory</Button></form> : null}</div> : null}
+            {isPeopleView ? <div className="shared-members-section">
               <div className="shared-panel-heading"><div><Users size={18} /><h2>Workspace team</h2></div><span>{members.length}</span></div>
               <p className="shared-muted-copy">{canManageMembers ? "Workspace access is administered from Settings." : "Your workspace role does not allow membership changes."}</p>
               <div className="shared-capabilities" aria-label="Your workspace capabilities">
@@ -917,13 +952,13 @@ function SharedWorkspaceDetail({
                   <span className="shared-member-role">{member.role}</span>
                 </article>)}
               </div>
-            </div>
-            <div className="shared-activity-section" hidden={!isActivityView}>
+            </div> : null}
+            {isActivityView ? <div className="shared-activity-section">
               <div className="shared-panel-heading"><div><Timeline size={18} /><h2>Recent activity</h2></div><span>{activity.length}</span></div>
               {activity.length ? <div className="shared-activity-list">{activity.map((event) => <article key={event.id}><div><strong>{event.summary}</strong><span>{event.actor?.display_name ?? "System"} · {event.action.replace(/_/g, " ")}</span></div><time dateTime={event.created_at}>{formatActivityTime(event.created_at)}</time></article>)}</div> : <div className="shared-empty-state"><Timeline size={25} /><strong>No recorded activity yet</strong><span>New workspace changes will appear here.</span></div>}
-            </div>
-          </aside>
-          <section className="shared-settings-section" hidden={!isSettingsView}>
+            </div> : null}
+          </aside> : null}
+          {isSettingsView ? <section className="shared-settings-section">
             {canManageMembers ? <>
               <div className="shared-settings-policy"><Settings size={18} /><div><strong>Administrative workspace controls</strong><span>Changes are enforced by the shared API. Administrators can manage people and integrations; owner-only workspace actions are explicitly marked.</span></div></div>
               <section className="shared-settings-group">
@@ -945,14 +980,14 @@ function SharedWorkspaceDetail({
                   {providerTest ? <p className={`shared-provider-test ${providerTest.success ? "success" : "failure"}`} role="status">{providerTest.message}</p> : null}
                 </form>
               </section>
-              <section className="shared-settings-group" hidden={!canManageWorkspace}>
+              {canManageWorkspace ? <section className="shared-settings-group">
                 <div className="shared-panel-heading"><div><Settings size={18} /><h2>Workspace ownership</h2></div><span>owner only</span></div>
                 <p className="shared-muted-copy">Rename this workspace or remove it permanently. Deletion removes its shared evidence, memory, and memberships.</p>
                 <form className="shared-workspace-rename" onSubmit={renameWorkspace}><Input aria-label="Workspace name" onChange={(event) => setWorkspaceName(event.target.value)} required value={workspaceName} /><Button disabled={isSubmitting} type="submit" variant="secondary"><Pencil size={16} /> Rename</Button></form>
                 <Button className="shared-danger-action" disabled={isSubmitting} onClick={() => void removeWorkspace()} type="button" variant="secondary"><Trash size={16} /> Delete workspace</Button>
-              </section>
+              </section> : null}
             </> : <div className="shared-empty-state"><Settings size={25} /><strong>Administrative access required</strong><span>Only workspace administrators and the owner can open settings. Your current role can still browse shared evidence, memory, and activity.</span></div>}
-          </section>
+          </section> : null}
         </div> : null}
       </section>
     </SharedAppShell>

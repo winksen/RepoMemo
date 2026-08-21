@@ -335,10 +335,17 @@ textarea:focus-visible {
 .shared-search-form { display: flex; gap: 8px; }
 .shared-search-form input { min-width: 0; flex: 1; }
 .shared-search-results { display: grid; gap: 10px; margin-top: 16px; }
-.shared-search-results article { padding-bottom: 12px; border-bottom: 1px solid var(--color-border); }
-.shared-search-results strong { font-size: 13px; }
-.shared-search-results p { margin: 5px 0; color: var(--color-text-muted); font-size: 12px; line-height: 1.5; }
-.shared-search-results span { color: var(--color-text-subtle); font-family: var(--font-mono); font-size: 11px; }
+.shared-retrieval-search { display: grid; gap: 8px; }
+.shared-retrieval-filter-row { display: grid; grid-template-columns: repeat(4, minmax(120px, 1fr)) auto auto; gap: 8px; align-items: center; }
+.shared-retrieval-filter-row .rm-dropdown-trigger { width: 100%; }
+.shared-search-results { margin-top: 20px; }
+.shared-search-result-count { margin: 0; color: var(--color-text-subtle); font-size: 12px; }
+.shared-search-result { display: grid; width: 100%; justify-items: start; gap: 7px; padding: 13px; text-align: left; }
+.shared-search-result-heading { display: flex; align-items: baseline; justify-content: space-between; width: 100%; gap: 12px; }
+.shared-search-result strong { font-size: 13px; }
+.shared-search-result-heading > span,
+.shared-search-result-path { color: var(--color-text-subtle); font-family: var(--font-mono); font-size: 11px; }
+.shared-search-result p { margin: 0; color: var(--color-text-muted); font-size: 12px; line-height: 1.5; }
 .shared-ask-evidence { display: grid; gap: 10px; margin-top: 28px; padding-top: 22px; border-top: 1px solid var(--color-border); }
 .shared-ask-evidence > div { display: flex; align-items: center; gap: 8px; }
 .shared-ask-evidence h3 { margin: 0; font-size: 14px; }
@@ -547,6 +554,7 @@ textarea:focus-visible {
   .shared-ask-evidence form { grid-template-columns: 1fr; }
   .shared-artifact-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .shared-artifact-filters .rm-input { grid-column: 1 / -1; }
+  .shared-retrieval-filter-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .shared-artifact-manager.list .rm-button.shared-artifact-entry { grid-template-columns: auto minmax(0, 1fr); }
   .shared-artifact-manager.list .shared-artifact-entry-meta { grid-column: 2; justify-content: flex-start; max-width: none; }
   .shared-workspace-admin form { flex-direction: column; }

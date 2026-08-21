@@ -206,6 +206,15 @@ export interface SearchResult {
   source_name: string;
 }
 
+export interface RetrievalFacets {
+  artifact_types: ArtifactType[];
+  languages: string[];
+  sources: Array<{
+    id: string;
+    name: string;
+  }>;
+}
+
 export type SymbolKind =
   | "function"
   | "class"

@@ -20,7 +20,7 @@ use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, 
 use rand_core::OsRng;
 use repomemo_api::RepoMemoCore;
 use repomemo_domain::{
-    ArtifactDetail, ArtifactSummary, AskAnswer, AskRequest, Citation, CreateMemoryCardRequest,
+    ArtifactDetail, ArtifactSummary, ArtifactType, AskAnswer, AskRequest, Citation, CreateMemoryCardRequest,
     IndexingJobStatus, MemoryCard, MemoryCardDetail, MemoryCardSummary, Organization,
     ProviderSettings, ProviderTestResult, SearchRequest, SearchResult, SharedAiProviderSettings,
     SharedSession, SharedUser, SharedWorkspace, UpdateMemoryCardRequest, Workspace,
@@ -243,6 +243,19 @@ struct SearchWorkspaceRequest {
     limit: Option<i64>,
 }
 
+#[derive(Debug, Serialize)]
+struct RetrievalSourceFacet {
+    id: String,
+    name: String,
+}
+
+#[derive(Debug, Serialize)]
+struct RetrievalFacetsResponse {
+    artifact_types: Vec<ArtifactType>,
+    languages: Vec<String>,
+    sources: Vec<RetrievalSourceFacet>,
+}
+
 #[derive(Debug, Deserialize)]
 struct AskWorkspaceRequest {
     question: String,
@@ -410,6 +423,10 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
         )
         .route("/v1/artifacts/{artifact_id}/index", post(index_artifact))
         .route("/v1/workspaces/{workspace_id}/index", post(index_workspace))
+        .route(
+            "/v1/workspaces/{workspace_id}/retrieval-facets",
+            get(get_retrieval_facets),
+        )
         .route(
             "/v1/workspaces/{workspace_id}/search",
             post(search_workspace),
@@ -1270,6 +1287,47 @@ async fn search_workspace(
     Ok(Json(result))
 }
 
+async fn get_retrieval_facets(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+) -> Result<Json<RetrievalFacetsResponse>, ApiError> {
+    require_workspace_read(&state, &subject, &workspace_id).await?;
+    let artifacts = state
+        .core
+        .list_artifacts(workspace_id)
+        .await
+        .map_err(map_core_error)?;
+    let mut artifact_types: Vec<ArtifactType> = Vec::new();
+    let mut languages: Vec<String> = Vec::new();
+    let mut sources: Vec<RetrievalSourceFacet> = Vec::new();
+
+    for artifact in artifacts.iter().filter(|artifact| artifact.indexed_at.is_some()) {
+        if !artifact_types.contains(&artifact.artifact_type) {
+            artifact_types.push(artifact.artifact_type.clone());
+        }
+        if let Some(language) = artifact.language.as_ref().filter(|language| !language.trim().is_empty()) {
+            if !languages.iter().any(|candidate| candidate.eq_ignore_ascii_case(language)) {
+                languages.push(language.clone());
+            }
+        }
+        if !sources.iter().any(|source: &RetrievalSourceFacet| source.id == artifact.source_id) {
+            sources.push(RetrievalSourceFacet {
+                id: artifact.source_id.clone(),
+                name: artifact.source_name.clone(),
+            });
+        }
+    }
+
+    languages.sort_by_key(|language| language.to_lowercase());
+    sources.sort_by_key(|source| source.name.to_lowercase());
+    Ok(Json(RetrievalFacetsResponse {
+        artifact_types,
+        languages,
+        sources,
+    }))
+}
+
 async fn list_memory_cards(
     subject: AuthenticatedSubject,
     State(state): State<AppState>,
@@ -1836,6 +1894,24 @@ mod tests {
                 .unwrap();
         assert_eq!(search.as_array().unwrap().len(), 1);
         assert_eq!(search[0]["artifact_id"], artifact_id);
+        let retrieval_facets = app
+            .clone()
+            .oneshot(auth_request(
+                "GET",
+                &format!("/v1/workspaces/{workspace_id}/retrieval-facets"),
+                &authorization,
+            ))
+            .await
+            .unwrap();
+        assert_eq!(retrieval_facets.status(), 200);
+        let retrieval_facets: Value = serde_json::from_slice(
+            &to_bytes(retrieval_facets.into_body(), usize::MAX)
+                .await
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(retrieval_facets["artifact_types"], json!(["markdown_doc"]));
+        assert_eq!(retrieval_facets["languages"], json!(["Markdown"]));
         let memory = app.clone().oneshot(json_request("POST", &format!("/v1/workspaces/{workspace_id}/memory-cards"), &authorization, json!({"title":"Rule", "body_markdown":"Keep shared data on the API.", "source":"Flow", "confidence": null, "citations": []}))).await.unwrap();
         assert_eq!(memory.status(), 201);
         let memory: Value =

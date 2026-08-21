@@ -304,10 +304,26 @@ export function indexSharedArtifact(accessToken: string, artifactId: string): Pr
   return request<IndexingJobStatus>(`/v1/artifacts/${artifactId}/index`, { method: "POST" }, accessToken);
 }
 
-export function searchSharedWorkspace(accessToken: string, workspaceId: string, query: string): Promise<SearchResult[]> {
+export function getSharedRetrievalFacets(accessToken: string, workspaceId: string): Promise<import("../types").RetrievalFacets> {
+  return request<import("../types").RetrievalFacets>(`/v1/workspaces/${workspaceId}/retrieval-facets`, {}, accessToken);
+}
+
+export function searchSharedWorkspace(accessToken: string, workspaceId: string, input: {
+  query: string;
+  artifactTypes?: ArtifactType[];
+  languages?: string[];
+  sourceIds?: string[];
+  limit?: number;
+}): Promise<SearchResult[]> {
   return request<SearchResult[]>(`/v1/workspaces/${workspaceId}/search`, {
     method: "POST",
-    body: JSON.stringify({ query, artifact_types: [], languages: [], source_ids: [], limit: 20 }),
+    body: JSON.stringify({
+      query: input.query,
+      artifact_types: input.artifactTypes ?? [],
+      languages: input.languages ?? [],
+      source_ids: input.sourceIds ?? [],
+      limit: input.limit ?? 20,
+    }),
   }, accessToken);
 }
 
