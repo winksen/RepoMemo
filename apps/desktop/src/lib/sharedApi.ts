@@ -1,6 +1,7 @@
 import type {
   AskAnswer,
   ArtifactDetail,
+  ArtifactComment,
   ArtifactSummary,
   ArtifactType,
   IndexingJobStatus,
@@ -17,6 +18,10 @@ import type {
   WorkspaceMember,
   WorkspaceRole,
   WorkspaceActivityEvent,
+  WorkspaceActivityCalendar,
+  CollaborationTask,
+  CollaborationTaskPriority,
+  CollaborationTaskStatus,
   WorkspaceAiOverview,
   WorkspaceCapabilities,
   SharedWorkspace,
@@ -116,6 +121,10 @@ export function getSharedSession(accessToken: string): Promise<SharedSession> {
 
 export function getSharedProfile(accessToken: string): Promise<UserProfile> {
   return request<UserProfile>("/v1/profile", {}, accessToken);
+}
+
+export function listSharedProfileTasks(accessToken: string): Promise<CollaborationTask[]> {
+  return request<CollaborationTask[]>("/v1/profile/tasks", {}, accessToken);
 }
 
 export function updateSharedProfile(accessToken: string, displayName: string): Promise<SharedUser> {
@@ -231,6 +240,58 @@ export function listSharedWorkspaceActivity(accessToken: string, workspaceId: st
   return request<WorkspaceActivityEvent[]>(`/v1/workspaces/${workspaceId}/activity`, {}, accessToken);
 }
 
+export function getSharedWorkspaceActivityCalendar(accessToken: string, workspaceId: string): Promise<WorkspaceActivityCalendar> {
+  return request<WorkspaceActivityCalendar>(`/v1/workspaces/${workspaceId}/activity/calendar`, {}, accessToken);
+}
+
+export interface CollaborationTaskInput {
+  title: string;
+  description: string;
+  status: CollaborationTaskStatus;
+  priority: CollaborationTaskPriority;
+  assigneeUserId?: string;
+  artifactId?: string;
+  dueAt?: string;
+}
+
+export function listSharedCollaborationTasks(accessToken: string, workspaceId: string): Promise<CollaborationTask[]> {
+  return request<CollaborationTask[]>(`/v1/workspaces/${workspaceId}/tasks`, {}, accessToken);
+}
+
+export function createSharedCollaborationTask(accessToken: string, workspaceId: string, input: CollaborationTaskInput): Promise<CollaborationTask> {
+  return request<CollaborationTask>(`/v1/workspaces/${workspaceId}/tasks`, {
+    method: "POST",
+    body: JSON.stringify({
+      title: input.title,
+      description: input.description,
+      status: input.status,
+      priority: input.priority,
+      assignee_user_id: input.assigneeUserId || null,
+      artifact_id: input.artifactId || null,
+      due_at: input.dueAt || null,
+    }),
+  }, accessToken);
+}
+
+export function updateSharedCollaborationTask(accessToken: string, taskId: string, input: CollaborationTaskInput): Promise<CollaborationTask> {
+  return request<CollaborationTask>(`/v1/tasks/${taskId}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      title: input.title,
+      description: input.description,
+      status: input.status,
+      priority: input.priority,
+      assignee_user_id: input.assigneeUserId || null,
+      artifact_id: input.artifactId || null,
+      due_at: input.dueAt || null,
+    }),
+  }, accessToken);
+}
+
+export function deleteSharedCollaborationTask(accessToken: string, taskId: string): Promise<void> {
+  return request<void>(`/v1/tasks/${taskId}`, { method: "DELETE" }, accessToken);
+}
+
 export function listSharedWorkspaceMembers(accessToken: string, workspaceId: string): Promise<WorkspaceMember[]> {
   return request<WorkspaceMember[]>(`/v1/workspaces/${workspaceId}/members`, {}, accessToken);
 }
@@ -286,6 +347,28 @@ export function updateSharedArtifact(accessToken: string, artifactId: string, ti
 
 export function deleteSharedArtifact(accessToken: string, artifactId: string): Promise<void> {
   return request<void>(`/v1/artifacts/${artifactId}`, { method: "DELETE" }, accessToken);
+}
+
+export function listSharedArtifactComments(accessToken: string, artifactId: string): Promise<ArtifactComment[]> {
+  return request<ArtifactComment[]>(`/v1/artifacts/${artifactId}/comments`, {}, accessToken);
+}
+
+export function createSharedArtifactComment(accessToken: string, artifactId: string, body: string): Promise<ArtifactComment> {
+  return request<ArtifactComment>(`/v1/artifacts/${artifactId}/comments`, {
+    method: "POST",
+    body: JSON.stringify({ body }),
+  }, accessToken);
+}
+
+export function updateSharedArtifactComment(accessToken: string, commentId: string, body: string): Promise<ArtifactComment> {
+  return request<ArtifactComment>(`/v1/comments/${commentId}`, {
+    method: "PUT",
+    body: JSON.stringify({ body }),
+  }, accessToken);
+}
+
+export function deleteSharedArtifactComment(accessToken: string, commentId: string): Promise<void> {
+  return request<void>(`/v1/comments/${commentId}`, { method: "DELETE" }, accessToken);
 }
 
 export function createSharedTextArtifact(accessToken: string, workspaceId: string, input: {

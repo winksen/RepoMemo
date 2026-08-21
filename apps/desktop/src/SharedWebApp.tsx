@@ -20,6 +20,8 @@ import {
   IconLayoutGrid as Grid,
   IconLayoutDashboard as Dashboard,
   IconBook2 as Book,
+  IconChecklist as Checklist,
+  IconMessageCircle as MessageCircle,
   IconKey as Key,
   IconList as List,
   IconLoader2 as Loader,
@@ -42,11 +44,15 @@ import {
 import {
   askSharedWorkspace,
   createSharedOrganization,
+  createSharedArtifactComment,
+  createSharedCollaborationTask,
   changeSharedPassword,
   createSharedMemoryCard,
   createSharedTextArtifact,
   createSharedWorkspace,
   deleteSharedArtifact,
+  deleteSharedArtifactComment,
+  deleteSharedCollaborationTask,
   deleteSharedMemoryCard,
   deleteSharedWorkspace,
   exportSharedMemoryCard,
@@ -54,6 +60,7 @@ import {
   getSharedHealth,
   getSharedProfile,
   getSharedWorkspaceCapabilities,
+  getSharedWorkspaceActivityCalendar,
   getSharedWorkspaceMetrics,
   getSharedRetrievalFacets,
   getSharedMemoryCard,
@@ -62,11 +69,14 @@ import {
   indexSharedWorkspace,
   indexSharedArtifact,
   listSharedArtifacts,
+  listSharedArtifactComments,
+  listSharedCollaborationTasks,
   listSharedWorkspaceAiProviders,
   listSharedWorkspaceActivity,
   listSharedWorkspaceMembers,
   listSharedMemoryCards,
   listSharedOrganizations,
+  listSharedProfileTasks,
   listSharedWorkspaces,
   loginSharedUser,
   generateSharedWorkspaceAiOverview,
@@ -81,6 +91,8 @@ import {
   upsertSharedWorkspaceMember,
   uploadSharedArtifact,
   updateSharedArtifact,
+  updateSharedArtifactComment,
+  updateSharedCollaborationTask,
   updateSharedProfile,
   updateSharedMemoryCard,
   updateSharedWorkspace,
@@ -90,6 +102,7 @@ import type {
   AskAnswer,
   ArtifactSummary,
   ArtifactDetail,
+  ArtifactComment,
   ArtifactType,
   MemoryCardDetail,
   MemoryCardSummary,
@@ -102,7 +115,11 @@ import type {
   SharedUser,
   SharedWorkspace,
   WorkspaceMember,
+  CollaborationTask,
+  CollaborationTaskPriority,
+  CollaborationTaskStatus,
   WorkspaceActivityEvent,
+  WorkspaceActivityCalendar,
   WorkspaceAiOverview,
   WorkspaceCapabilities,
   WorkspaceRole,
@@ -121,11 +138,17 @@ const THEME_STORAGE_KEY = "repomemo.theme";
 
 type AuthMode = "sign-in" | "sign-up";
 type PageState = "restoring" | "unauthenticated" | "ready" | "error";
-type WorkspaceSection = "overview" | "evidence" | "retrieval" | "memory" | "people" | "activity" | "settings";
+type WorkspaceSection = "overview" | "evidence" | "retrieval" | "memory" | "tasks" | "people" | "activity" | "settings";
 type Theme = "light" | "dark";
 type ArtifactViewMode = "grid" | "list";
 
-const WORKSPACE_SECTIONS: WorkspaceSection[] = ["overview", "evidence", "retrieval", "memory", "people", "activity", "settings"];
+const WORKSPACE_SECTIONS: WorkspaceSection[] = ["overview", "evidence", "retrieval", "memory", "tasks", "people", "activity", "settings"];
+const TASK_COLUMNS: Array<{ status: CollaborationTaskStatus; label: string }> = [
+  { status: "open", label: "Open" },
+  { status: "in_progress", label: "In progress" },
+  { status: "blocked", label: "Blocked" },
+  { status: "done", label: "Done" },
+];
 
 function initialTheme(): Theme {
   const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
@@ -431,6 +454,7 @@ function SharedProfile({
   signOut: () => void;
 }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [assignedTasks, setAssignedTasks] = useState<CollaborationTask[]>([]);
   const [displayName, setDisplayName] = useState(session.user.display_name);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -443,8 +467,12 @@ function SharedProfile({
   async function load() {
     setIsLoading(true); setError(null);
     try {
-      const nextProfile = await getSharedProfile(accessToken);
+      const [nextProfile, nextAssignedTasks] = await Promise.all([
+        getSharedProfile(accessToken),
+        listSharedProfileTasks(accessToken),
+      ]);
       setProfile(nextProfile);
+      setAssignedTasks(nextAssignedTasks);
       setDisplayName(nextProfile.user.display_name);
     } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsLoading(false); }
   }
@@ -482,7 +510,8 @@ function SharedProfile({
       {notice ? <p className="shared-profile-notice" role="status">{notice}</p> : null}
       <div className="shared-profile-layout">
         <section className="shared-profile-identity"><div className="shared-profile-avatar" aria-hidden="true">{initials}</div><div><h2>{profile?.user.display_name ?? session.user.display_name}</h2><p>{profile?.user.email ?? session.user.email ?? "No email address"}</p></div><dl><div><dt>Last connected</dt><dd>{formatProfileTime(profile?.last_connected_at)}</dd></div><div><dt>Member since</dt><dd>{formatProfileTime(profile?.created_at)}</dd></div><div><dt>Shared workspaces</dt><dd>{profile?.workspace_count ?? "—"}</dd></div><div><dt>Recorded actions</dt><dd>{profile?.recent_activity_count ?? "—"}</dd></div></dl></section>
-        <MetricTimeline items={profile?.activity_by_day ?? []} title="Your activity, last 14 days" />
+        <ContributionCalendar items={profile?.activity_by_day ?? []} title="Your activity" total={profile?.recent_activity_count} />
+        <section className="shared-profile-assigned"><div className="shared-panel-heading"><div><Checklist size={18} /><h2>Assigned to you</h2></div><span>{assignedTasks.length} active</span></div>{assignedTasks.length ? <div className="shared-profile-task-list">{assignedTasks.map((task) => <Button key={task.id} onClick={() => navigate(`/workspaces/${encodeURIComponent(task.workspace_id)}/tasks`)} type="button" variant="secondary"><span><strong>{task.title}</strong><small>{task.status.replace(/_/g, " ")} · {task.priority} priority{task.due_at ? ` · due ${formatTaskDueDate(task.due_at)}` : ""}</small></span><ChevronRight size={16} /></Button>)}</div> : <p className="shared-muted-copy">No active tasks are assigned to you.</p>}</section>
         <section className="shared-profile-panel"><div className="shared-panel-heading"><div><UserCircle size={18} /><h2>Personal details</h2></div></div><form onSubmit={saveProfile}><label>Display name<Input autoComplete="name" onChange={(event) => setDisplayName(event.target.value)} required value={displayName} /></label><label>Email<Input disabled value={profile?.user.email ?? session.user.email ?? ""} /></label><Button disabled={isSubmitting} type="submit" variant="main">{isSubmitting ? <Loader className="spin" size={16} /> : <Pencil size={16} />} Save details</Button></form></section>
         <section className="shared-profile-panel"><div className="shared-panel-heading"><div><Key size={18} /><h2>Password</h2></div></div><form onSubmit={changePassword}><label>Current password<Input autoComplete="current-password" minLength={12} onChange={(event) => setCurrentPassword(event.target.value)} required type="password" value={currentPassword} /></label><label>New password<Input autoComplete="new-password" minLength={12} onChange={(event) => setNewPassword(event.target.value)} placeholder="At least 12 characters" required type="password" value={newPassword} /></label><label>Confirm new password<Input autoComplete="new-password" minLength={12} onChange={(event) => setConfirmPassword(event.target.value)} required type="password" value={confirmPassword} /></label><Button disabled={isSubmitting} type="submit" variant="secondary">{isSubmitting ? <Loader className="spin" size={16} /> : <Key size={16} />} Change password</Button></form></section>
       </div>
@@ -638,6 +667,7 @@ function WorkspaceRail({
         <Button aria-current={activeSection === "evidence" ? "page" : undefined} className={activeSection === "evidence" ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.("evidence")} type="button" variant="secondary"><FileText size={16} /> Evidence</Button>
         <Button aria-current={activeSection === "retrieval" ? "page" : undefined} className={activeSection === "retrieval" ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.("retrieval")} type="button" variant="secondary"><Search size={16} /> Retrieval</Button>
         <Button aria-current={activeSection === "memory" ? "page" : undefined} className={activeSection === "memory" ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.("memory")} type="button" variant="secondary"><Book size={16} /> Memory</Button>
+        <Button aria-current={activeSection === "tasks" ? "page" : undefined} className={activeSection === "tasks" ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.("tasks")} type="button" variant="secondary"><Checklist size={16} /> Tasks</Button>
         <Button aria-current={activeSection === "people" ? "page" : undefined} className={activeSection === "people" ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.("people")} type="button" variant="secondary"><Users size={16} /> People</Button>
         <Button aria-current={activeSection === "activity" ? "page" : undefined} className={activeSection === "activity" ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.("activity")} type="button" variant="secondary"><Timeline size={16} /> Activity</Button>
         {workspace.role === "owner" || workspace.role === "admin" ? <Button aria-current={activeSection === "settings" ? "page" : undefined} className={activeSection === "settings" ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.("settings")} type="button" variant="secondary"><Settings size={16} /> Settings</Button> : null}
@@ -705,6 +735,16 @@ function SharedWorkspaceDetail({
   const [memoryArtifactId, setMemoryArtifactId] = useState("");
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
   const [activity, setActivity] = useState<WorkspaceActivityEvent[]>([]);
+  const [activityCalendar, setActivityCalendar] = useState<WorkspaceActivityCalendar | null>(null);
+  const [tasks, setTasks] = useState<CollaborationTask[]>([]);
+  const [taskQuery, setTaskQuery] = useState("");
+  const [taskAssigneeFilter, setTaskAssigneeFilter] = useState("all");
+  const [taskTitle, setTaskTitle] = useState("");
+  const [taskDescription, setTaskDescription] = useState("");
+  const [taskPriority, setTaskPriority] = useState<CollaborationTaskPriority>("medium");
+  const [taskAssigneeId, setTaskAssigneeId] = useState("");
+  const [taskArtifactId, setTaskArtifactId] = useState("");
+  const [taskDueDate, setTaskDueDate] = useState("");
   const [capabilities, setCapabilities] = useState<WorkspaceCapabilities | null>(null);
   const [aiOverview, setAiOverview] = useState<WorkspaceAiOverview | null>(null);
   const [aiProviders, setAiProviders] = useState<SharedAiProviderSettings[]>([]);
@@ -729,11 +769,19 @@ function SharedWorkspaceDetail({
   const isEvidenceView = section === "evidence";
   const isRetrievalView = section === "retrieval";
   const isMemoryView = section === "memory";
+  const isTasksView = section === "tasks";
   const isPeopleView = section === "people";
   const isActivityView = section === "activity";
   const isSettingsView = section === "settings";
   const displayedArtifacts = artifactResults ?? artifacts;
   const artifactSources = Array.from(new Map(artifacts.map((artifact) => [artifact.source_id, artifact.source_name])).entries());
+  const visibleTasks = tasks.filter((task) => {
+    const normalizedQuery = taskQuery.trim().toLowerCase();
+    const matchesQuery = !normalizedQuery || `${task.title} ${task.description}`.toLowerCase().includes(normalizedQuery);
+    const matchesAssignee = taskAssigneeFilter === "all"
+      || (taskAssigneeFilter === "unassigned" ? !task.assignee : task.assignee?.id === taskAssigneeFilter);
+    return matchesQuery && matchesAssignee;
+  });
 
   async function load() {
     setIsLoading(true);
@@ -762,7 +810,15 @@ function SharedWorkspaceDetail({
         setAiProviders([]);
       }
       if (isActivityView) {
-        setActivity(await listSharedWorkspaceActivity(accessToken, workspace.workspace.id));
+        const [nextActivity, nextActivityCalendar] = await Promise.all([
+          listSharedWorkspaceActivity(accessToken, workspace.workspace.id),
+          getSharedWorkspaceActivityCalendar(accessToken, workspace.workspace.id),
+        ]);
+        setActivity(nextActivity);
+        setActivityCalendar(nextActivityCalendar);
+      }
+      if (isTasksView) {
+        setTasks(await listSharedCollaborationTasks(accessToken, workspace.workspace.id));
       }
     } catch (requestError) {
       setError(apiMessage(requestError));
@@ -771,7 +827,7 @@ function SharedWorkspaceDetail({
     }
   }
 
-  useEffect(() => { void load(); }, [accessToken, isActivityView, workspace.workspace.id]);
+  useEffect(() => { void load(); }, [accessToken, isActivityView, isTasksView, workspace.workspace.id]);
   useEffect(() => { setWorkspaceName(workspace.workspace.name); }, [workspace.workspace.name]);
   useEffect(() => {
     const provider = aiProviders.find((entry) => entry.enabled) ?? aiProviders[0];
@@ -809,6 +865,52 @@ function SharedWorkspaceDetail({
       });
       setMemoryTitle(""); setMemoryBody(""); setMemoryArtifactId("");
       await load();
+    } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
+  }
+
+  async function addTask(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsSubmitting(true); setError(null);
+    try {
+      await createSharedCollaborationTask(accessToken, workspace.workspace.id, {
+        title: taskTitle,
+        description: taskDescription,
+        status: "open",
+        priority: taskPriority,
+        assigneeUserId: taskAssigneeId || undefined,
+        artifactId: taskArtifactId || undefined,
+        dueAt: taskDueDate ? `${taskDueDate}T23:59:59Z` : undefined,
+      });
+      setTaskTitle(""); setTaskDescription(""); setTaskPriority("medium"); setTaskAssigneeId(""); setTaskArtifactId(""); setTaskDueDate("");
+      setTasks(await listSharedCollaborationTasks(accessToken, workspace.workspace.id));
+      setWorkspaceMetrics(await getSharedWorkspaceMetrics(accessToken, workspace.workspace.id));
+    } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
+  }
+
+  async function reviseTask(task: CollaborationTask, changes: { status?: CollaborationTaskStatus; priority?: CollaborationTaskPriority; assigneeUserId?: string | null }) {
+    setIsSubmitting(true); setError(null);
+    try {
+      const updated = await updateSharedCollaborationTask(accessToken, task.id, {
+        title: task.title,
+        description: task.description,
+        status: changes.status ?? task.status,
+        priority: changes.priority ?? task.priority,
+        assigneeUserId: changes.assigneeUserId === null ? undefined : changes.assigneeUserId ?? task.assignee?.id,
+        artifactId: task.artifact_id ?? undefined,
+        dueAt: task.due_at ?? undefined,
+      });
+      setTasks((current) => current.map((entry) => entry.id === updated.id ? updated : entry));
+      setWorkspaceMetrics(await getSharedWorkspaceMetrics(accessToken, workspace.workspace.id));
+    } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
+  }
+
+  async function removeTask(task: CollaborationTask) {
+    if (!window.confirm(`Delete “${task.title}”?`)) return;
+    setIsSubmitting(true); setError(null);
+    try {
+      await deleteSharedCollaborationTask(accessToken, task.id);
+      setTasks((current) => current.filter((entry) => entry.id !== task.id));
+      setWorkspaceMetrics(await getSharedWorkspaceMetrics(accessToken, workspace.workspace.id));
     } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
   }
 
@@ -980,7 +1082,7 @@ function SharedWorkspaceDetail({
     <SharedAppShell apiAvailable={apiAvailable} session={session} signOut={signOut} sidebar={<WorkspaceRail activeSection={section} onNavigate={onNavigate} organization={organization} workspace={workspace} />}>
       <section className="shared-detail-shell" aria-busy={isLoading}>
         <div className="shared-detail-heading">
-          <div><p className="shared-eyebrow">{isEvidenceView ? "Evidence" : isRetrievalView ? "Retrieval" : isMemoryView ? "Team memory" : isPeopleView ? "Workspace access" : isActivityView ? "Workspace history" : isSettingsView ? "Administrative control" : `Server workspace · ${workspace.role}`}</p><h1>{isEvidenceView ? "Evidence ledger" : isRetrievalView ? "Retrieve evidence" : isMemoryView ? "Durable team memory" : isPeopleView ? "People" : isActivityView ? "Activity" : isSettingsView ? "Workspace settings" : workspace.workspace.name}</h1><p>{isEvidenceView ? "Store notes and files in the workspace, then index them for retrieval." : isRetrievalView ? "Search indexed workspace evidence and inspect the source context behind every result." : isMemoryView ? "Capture concise facts and decisions that should outlive the current investigation." : isPeopleView ? "See who can access this workspace and understand each person’s role." : isActivityView ? "A durable record of shared workspace changes, including evidence, memory, indexing, and membership updates." : isSettingsView ? "Administrators control workspace access and AI integrations here. Owner-only actions remain clearly marked." : "Artifacts, search results, and durable team memory are all retrieved through the protected shared API."}</p></div>
+          <div><p className="shared-eyebrow">{isEvidenceView ? "Evidence" : isRetrievalView ? "Retrieval" : isMemoryView ? "Team memory" : isTasksView ? "Team follow-up" : isPeopleView ? "Workspace access" : isActivityView ? "Workspace history" : isSettingsView ? "Administrative control" : `Server workspace · ${workspace.role}`}</p><h1>{isEvidenceView ? "Evidence ledger" : isRetrievalView ? "Retrieve evidence" : isMemoryView ? "Durable team memory" : isTasksView ? "Tasks" : isPeopleView ? "People" : isActivityView ? "Activity" : isSettingsView ? "Workspace settings" : workspace.workspace.name}</h1><p>{isEvidenceView ? "Store notes and files in the workspace, then index them for retrieval." : isRetrievalView ? "Search indexed workspace evidence and inspect the source context behind every result." : isMemoryView ? "Capture concise facts and decisions that should outlive the current investigation." : isTasksView ? "Turn evidence and decisions into assigned, trackable action items for the team." : isPeopleView ? "See who can access this workspace and understand each person’s role." : isActivityView ? "A durable record of shared workspace changes, including evidence, memory, indexing, and membership updates." : isSettingsView ? "Administrators control workspace access and AI integrations here. Owner-only actions remain clearly marked." : "Artifacts, search results, and durable team memory are all retrieved through the protected shared API."}</p></div>
           <div className="shared-detail-actions"><Button className="shared-back-button" onClick={onBack} type="button" variant="secondary"><ArrowLeft size={16} /> All workspaces</Button><Button disabled={isLoading} onClick={() => void load()} type="button" variant="secondary"><Refresh size={16} /> Refresh</Button>{canWrite && isEvidenceView ? <Button disabled={isSubmitting || isLoading} onClick={() => void runIndex()} type="button" variant="main">{isSubmitting ? <Loader className="spin" size={16} /> : <Layers size={16} />} Index evidence</Button> : null}</div>
         </div>
         {error ? <p className="shared-form-error" role="alert">{error}</p> : null}
@@ -996,6 +1098,9 @@ function SharedWorkspaceDetail({
             <div><span>Knowledge density</span><strong>{workspaceMetrics ? `${workspaceMetrics.indexed_artifact_count ? Math.round(workspaceMetrics.chunk_count / workspaceMetrics.indexed_artifact_count) : 0}` : "—"}</strong><small>retrieval chunks per indexed file</small></div>
             <div><span>Code symbols</span><strong>{workspaceMetrics?.symbol_count ?? "—"}</strong><small>extracted from evidence</small></div>
             <div><span>Team access</span><strong>{workspaceMetrics?.member_count ?? "—"}</strong><small>people with workspace access</small></div>
+            <div><span>Active tasks</span><strong>{workspaceMetrics ? workspaceMetrics.open_task_count + workspaceMetrics.in_progress_task_count : "—"}</strong><small>{workspaceMetrics?.in_progress_task_count ?? 0} currently in progress</small></div>
+            <div><span>At risk</span><strong>{workspaceMetrics?.blocked_task_count ?? "—"}</strong><small>{workspaceMetrics?.overdue_task_count ?? 0} overdue action items</small></div>
+            <div><span>Team discussion</span><strong>{workspaceMetrics?.comment_count ?? "—"}</strong><small>{workspaceMetrics?.completed_task_count ?? 0} tasks completed</small></div>
           </div>
           <div className="shared-metric-visuals">
             <section className="shared-metric-panel shared-metric-coverage"><div><h3>Indexing coverage</h3><span>{workspaceMetrics ? `${workspaceMetrics.pending_artifact_count} waiting to be indexed` : "Loading…"}</span></div><div className="shared-coverage-track" aria-label="Artifact indexing coverage"><span style={{ width: `${workspaceMetrics?.artifact_count ? (workspaceMetrics.indexed_artifact_count / workspaceMetrics.artifact_count) * 100 : 0}%` }} /></div><div className="shared-coverage-legend"><span>Indexed {workspaceMetrics?.indexed_artifact_count ?? 0}</span><span>Pending {workspaceMetrics?.pending_artifact_count ?? 0}</span></div></section>
@@ -1014,7 +1119,7 @@ function SharedWorkspaceDetail({
           {aiOverview?.citations.length ? <div className="shared-ai-citations"><strong>Evidence used</strong>{aiOverview.citations.map((citation) => <span key={`${citation.artifact_id}-${citation.chunk_id ?? "artifact"}`}>{citation.title} · {citation.path}{citation.start_line ? ` · line ${citation.start_line}` : ""}</span>)}</div> : null}
           <Button disabled={isSubmitting || isLoading || !capabilities?.can_generate_ai_overview} onClick={() => void generateAiOverview()} type="button" variant="secondary">{isSubmitting ? <Loader className="spin" size={16} /> : <Brain size={16} />}{aiOverview?.summary_markdown ? "Refresh AI overview" : "Generate AI overview"}</Button>
         </section> : null}
-        {section !== "overview" ? <div className={`shared-detail-grid${isEvidenceView ? " evidence-only" : isRetrievalView ? " retrieval-only" : isMemoryView ? " memory-only" : isPeopleView ? " people-only" : isActivityView ? " activity-only" : isSettingsView ? " settings-only" : ""}`}>
+        {section !== "overview" ? <div className={`shared-detail-grid${isEvidenceView ? " evidence-only" : isRetrievalView ? " retrieval-only" : isMemoryView ? " memory-only" : isTasksView ? " tasks-only" : isPeopleView ? " people-only" : isActivityView ? " activity-only" : isSettingsView ? " settings-only" : ""}`}>
           {isEvidenceView ? <section className="shared-detail-panel">
             <div className="shared-panel-heading"><div><FileText size={18} /><h2>Evidence ledger</h2></div><span>{displayedArtifacts.length} of {artifacts.length} files</span></div>
             <div className="shared-artifact-browser">
@@ -1031,7 +1136,7 @@ function SharedWorkspaceDetail({
             </div>
             {canWrite ? <><form className="shared-note-form" onSubmit={addNote}><h3>Add shared note</h3><Input onChange={(event) => setNoteTitle(event.target.value)} placeholder="Decision or implementation note" required value={noteTitle} /><Textarea onChange={(event) => setNoteContent(event.target.value)} placeholder="Paste Markdown, code context, or a meeting note…" required value={noteContent} /><Button disabled={isSubmitting} type="submit" variant="main"><Plus size={16} /> Store evidence</Button></form><form className="shared-upload-form" onSubmit={submitUpload}><div><strong>Upload a file</strong><span>Markdown, text, code, or supported image · up to 10 MiB</span></div><label className="shared-upload-picker"><input accept=".md,.mdx,.txt,.rs,.ts,.tsx,.js,.jsx,.py,.json,.toml,.yaml,.yml,.sql,.html,.css,.sh,.ps1,.png,.jpg,.jpeg,.gif,.webp,.svg,.bmp" aria-label="Upload a shared artifact" className="shared-upload-native-input" onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)} required type="file" /><span className="shared-upload-picker-icon"><Upload size={18} /></span><span className="shared-upload-picker-copy"><strong>{uploadFile?.name ?? "Choose a shared file"}</strong><span>{uploadFile ? `${formatFileSize(uploadFile.size)} · ready to upload` : "Markdown, text, code, or a supported image"}</span></span><span className="shared-upload-picker-action">Browse</span></label><Button disabled={isSubmitting || !uploadFile} type="submit" variant="secondary"><Upload size={16} /> Upload</Button></form></> : <p className="shared-readonly-note"><Shield size={15} /> Your viewer membership can inspect shared evidence but cannot change it.</p>}
           </section> : null}
-          {isRetrievalView || isMemoryView || isPeopleView || isActivityView ? <aside className="shared-detail-panel shared-retrieval-panel">
+          {isRetrievalView || isMemoryView || isTasksView || isPeopleView || isActivityView ? <aside className="shared-detail-panel shared-retrieval-panel">
             {isRetrievalView ? <><div className="shared-panel-heading"><div><Search size={18} /><h2>Retrieve</h2></div></div>
             <form className="shared-retrieval-search" onSubmit={runSearch}>
               <Input onChange={(event) => setQuery(event.target.value)} placeholder="Search indexed evidence" value={query} />
@@ -1048,6 +1153,12 @@ function SharedWorkspaceDetail({
               <section className="shared-ask-evidence" aria-live="polite"><div><Brain size={18} /><h3>Ask your evidence</h3></div><p>Get a citation-backed answer from the indexed workspace context.</p><form onSubmit={askEvidence}><Textarea onChange={(event) => setAskQuestion(event.target.value)} placeholder="What do we know about the current implementation?" required value={askQuestion} /><Button disabled={isSubmitting} type="submit" variant="secondary">{isSubmitting ? <Loader className="spin" size={16} /> : <Brain size={16} />} Ask</Button></form>{askAnswer ? <div className="shared-ask-answer"><div className="shared-ai-overview-body">{askAnswer.answer_markdown}</div>{askAnswer.warnings.length ? <div className="shared-ai-overview-warning">{askAnswer.warnings.map((warning) => <p key={warning}>{warning}</p>)}</div> : null}{askAnswer.citations.length ? <div className="shared-ai-citations"><strong>Evidence used</strong>{askAnswer.citations.map((citation) => <span key={`${citation.artifact_id}-${citation.chunk_id ?? "artifact"}`}>{citation.title} · {citation.path}{citation.start_line ? ` · line ${citation.start_line}` : ""}</span>)}</div> : null}</div> : null}</section>
             </div></> : null}
             {isMemoryView ? <div className="shared-memory-section"><div className="shared-panel-heading"><div><Shield size={18} /><h2>Team memory</h2></div><span>{memoryResults?.length ?? memoryCards.length}</span></div><form className="shared-search-form shared-memory-search" onSubmit={runMemorySearch}><Input onChange={(event) => setMemoryQuery(event.target.value)} placeholder="Search team memory" value={memoryQuery} /><Button disabled={isSubmitting} type="submit" variant="secondary">Search</Button></form>{(memoryResults ?? memoryCards).length ? <div className="shared-memory-list">{(memoryResults ?? memoryCards).map((card) => <article key={card.id}><Button className="shared-record-link" onClick={() => onOpenMemoryCard(card.id)} type="button" variant="secondary"><strong>{card.title}</strong><span>{card.body_excerpt}</span></Button></article>)}</div> : <p className="shared-muted-copy">{memoryResults ? "No memory cards match that search." : "No durable memory cards yet."}</p>}{canWrite ? <form className="shared-memory-form" onSubmit={addMemory}><Input onChange={(event) => setMemoryTitle(event.target.value)} placeholder="Memory title" required value={memoryTitle} /><Textarea onChange={(event) => setMemoryBody(event.target.value)} placeholder="A concise durable fact…" required value={memoryBody} /><label>Evidence link<Dropdown aria-label="Evidence link" onValueChange={(value) => setMemoryArtifactId(value === "__none__" ? "" : value)} options={[{ label: "No direct artifact link", value: "__none__" }, ...artifacts.map((artifact) => ({ label: artifact.title, value: artifact.id }))]} value={memoryArtifactId || "__none__"} /></label><Button disabled={isSubmitting} type="submit" variant="secondary">Save memory</Button></form> : null}</div> : null}
+            {isTasksView ? <div className="shared-task-workspace">
+              <div className="shared-panel-heading"><div><Checklist size={18} /><h2>Team action board</h2></div><span>{tasks.length} tasks</span></div>
+              <div className="shared-task-toolbar"><Input aria-label="Search tasks" onChange={(event) => setTaskQuery(event.target.value)} placeholder="Search action items" value={taskQuery} /><Dropdown aria-label="Filter tasks by assignee" onValueChange={setTaskAssigneeFilter} options={[{ label: "Everyone", value: "all" }, { label: "Unassigned", value: "unassigned" }, ...members.map((member) => ({ label: member.user.display_name, value: member.user.id }))]} value={taskAssigneeFilter} /></div>
+              {canWrite ? <form className="shared-task-create" onSubmit={addTask}><div className="shared-task-create-heading"><div><Plus size={17} /><div><strong>Create an action item</strong><span>Assign work and tie it back to the evidence that prompted it.</span></div></div></div><Input aria-label="Task title" onChange={(event) => setTaskTitle(event.target.value)} placeholder="What needs to happen?" required value={taskTitle} /><Textarea aria-label="Task description" onChange={(event) => setTaskDescription(event.target.value)} placeholder="Context, acceptance criteria, or next steps" value={taskDescription} /><div className="shared-task-create-fields"><Dropdown aria-label="Task priority" onValueChange={(value) => setTaskPriority(value as CollaborationTaskPriority)} options={[{ label: "Low priority", value: "low" }, { label: "Medium priority", value: "medium" }, { label: "High priority", value: "high" }, { label: "Urgent", value: "urgent" }]} value={taskPriority} /><Dropdown aria-label="Task assignee" onValueChange={(value) => setTaskAssigneeId(value === "__unassigned__" ? "" : value)} options={[{ label: "Unassigned", value: "__unassigned__" }, ...members.map((member) => ({ label: member.user.display_name, value: member.user.id }))]} value={taskAssigneeId || "__unassigned__"} /><Dropdown aria-label="Related evidence" onValueChange={(value) => setTaskArtifactId(value === "__none__" ? "" : value)} options={[{ label: "No evidence link", value: "__none__" }, ...artifacts.map((artifact) => ({ label: artifact.title, value: artifact.id }))]} value={taskArtifactId || "__none__"} /><Input aria-label="Task due date" onChange={(event) => setTaskDueDate(event.target.value)} type="date" value={taskDueDate} /></div><Button disabled={isSubmitting} type="submit" variant="main">Create task</Button></form> : null}
+              {visibleTasks.length ? <div className="shared-task-board">{TASK_COLUMNS.map((column) => { const columnTasks = visibleTasks.filter((task) => task.status === column.status); return <section className="shared-task-column" key={column.status}><div className="shared-task-column-heading"><h3>{column.label}</h3><span>{columnTasks.length}</span></div><div className="shared-task-column-list">{columnTasks.length ? columnTasks.map((task) => <article className={`shared-task-card priority-${task.priority}${isTaskOverdue(task) ? " overdue" : ""}`} key={task.id}><div className="shared-task-card-heading"><span>{task.priority}</span>{task.due_at ? <time dateTime={task.due_at}>{formatTaskDueDate(task.due_at)}</time> : null}</div><h4>{task.title}</h4>{task.description ? <p>{task.description}</p> : null}<div className="shared-task-context"><span>{task.assignee?.display_name ?? "Unassigned"}</span>{task.artifact_id ? <Button onClick={() => onOpenArtifact(task.artifact_id!)} type="button" variant="secondary"><FileText size={14} /> Evidence</Button> : null}</div>{canWrite ? <div className="shared-task-controls"><Dropdown aria-label={`Status for ${task.title}`} onValueChange={(value) => void reviseTask(task, { status: value as CollaborationTaskStatus })} options={TASK_COLUMNS.map((option) => ({ label: option.label, value: option.status }))} value={task.status} /><Dropdown aria-label={`Assignee for ${task.title}`} onValueChange={(value) => void reviseTask(task, { assigneeUserId: value === "__unassigned__" ? null : value })} options={[{ label: "Unassigned", value: "__unassigned__" }, ...members.map((member) => ({ label: member.user.display_name, value: member.user.id }))]} value={task.assignee?.id ?? "__unassigned__"} /><Dropdown aria-label={`Priority for ${task.title}`} onValueChange={(value) => void reviseTask(task, { priority: value as CollaborationTaskPriority })} options={[{ label: "Low", value: "low" }, { label: "Medium", value: "medium" }, { label: "High", value: "high" }, { label: "Urgent", value: "urgent" }]} value={task.priority} />{task.created_by.id === session.user.id || workspace.role === "owner" || workspace.role === "admin" ? <Button aria-label={`Delete ${task.title}`} disabled={isSubmitting} onClick={() => void removeTask(task)} type="button" variant="secondary"><Trash size={15} /></Button> : null}</div> : null}</article>) : <p>No tasks here.</p>}</div></section>; })}</div> : <div className="shared-empty-state"><Checklist size={25} /><strong>No action items match</strong><span>Create a task or adjust the current filters.</span></div>}
+            </div> : null}
             {isPeopleView ? <div className="shared-members-section">
               <div className="shared-panel-heading"><div><Users size={18} /><h2>Workspace team</h2></div><span>{members.length}</span></div>
               <p className="shared-muted-copy">{canManageMembers ? "Workspace access is administered from Settings." : "Your workspace role does not allow membership changes."}</p>
@@ -1066,6 +1177,7 @@ function SharedWorkspaceDetail({
               </div>
             </div> : null}
             {isActivityView ? <div className="shared-activity-section">
+              <ContributionCalendar items={activityCalendar?.activity_by_day ?? []} title="Workspace activity" total={activityCalendar?.total_activity_count} />
               <div className="shared-panel-heading"><div><Timeline size={18} /><h2>Recent activity</h2></div><span>{activity.length}</span></div>
               {activity.length ? <div className="shared-activity-list">{activity.map((event) => <article key={event.id}><div><strong>{event.summary}</strong><span>{event.actor?.display_name ?? "System"} · {event.action.replace(/_/g, " ")}</span></div><time dateTime={event.created_at}>{formatActivityTime(event.created_at)}</time></article>)}</div> : <div className="shared-empty-state"><Timeline size={25} /><strong>No recorded activity yet</strong><span>New workspace changes will appear here.</span></div>}
             </div> : null}
@@ -1126,6 +1238,10 @@ function SharedArtifactDetail({
   workspace: SharedWorkspace;
 }) {
   const [artifact, setArtifact] = useState<ArtifactDetail | null>(null);
+  const [comments, setComments] = useState<ArtifactComment[]>([]);
+  const [commentBody, setCommentBody] = useState("");
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingCommentBody, setEditingCommentBody] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isIndexing, setIsIndexing] = useState(false);
@@ -1133,10 +1249,17 @@ function SharedArtifactDetail({
   const [isMutating, setIsMutating] = useState(false);
   const [title, setTitle] = useState("");
   const canWrite = workspace.role !== "viewer";
+  const canModerateComments = workspace.role === "owner" || workspace.role === "admin";
 
   async function load() {
     setIsLoading(true); setError(null);
-    try { setArtifact(await getSharedArtifact(accessToken, artifactId)); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsLoading(false); }
+    try {
+      const [nextArtifact, nextComments] = await Promise.all([
+        getSharedArtifact(accessToken, artifactId),
+        listSharedArtifactComments(accessToken, artifactId),
+      ]);
+      setArtifact(nextArtifact); setComments(nextComments);
+    } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsLoading(false); }
   }
 
   useEffect(() => { void load(); }, [accessToken, artifactId]);
@@ -1159,6 +1282,36 @@ function SharedArtifactDetail({
     try { await deleteSharedArtifact(accessToken, artifactId); onBack(); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsMutating(false); }
   }
 
+  async function addComment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsMutating(true); setError(null);
+    try {
+      const comment = await createSharedArtifactComment(accessToken, artifactId, commentBody);
+      setComments((current) => [...current, comment]);
+      setCommentBody("");
+    } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsMutating(false); }
+  }
+
+  async function saveComment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editingCommentId) return;
+    setIsMutating(true); setError(null);
+    try {
+      const updated = await updateSharedArtifactComment(accessToken, editingCommentId, editingCommentBody);
+      setComments((current) => current.map((comment) => comment.id === updated.id ? updated : comment));
+      setEditingCommentId(null); setEditingCommentBody("");
+    } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsMutating(false); }
+  }
+
+  async function removeComment(comment: ArtifactComment) {
+    if (!window.confirm("Delete this evidence comment?")) return;
+    setIsMutating(true); setError(null);
+    try {
+      await deleteSharedArtifactComment(accessToken, comment.id);
+      setComments((current) => current.filter((entry) => entry.id !== comment.id));
+    } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsMutating(false); }
+  }
+
   return (
     <SharedRecordLayout activeSection="evidence" apiAvailable={apiAvailable} backLabel="Workspace" onBack={onBack} organization={organization} session={session} signOut={signOut} title={artifact?.summary.title ?? "Artifact"} subtitle={artifact?.summary.path ?? "Loading protected evidence…"} workspace={workspace}>
       <div className="shared-detail-actions"><Button disabled={isLoading} onClick={() => void load()} type="button" variant="secondary"><Refresh size={16} /> Refresh</Button>{canWrite ? <><Button disabled={isLoading || isMutating} onClick={() => setIsEditing((value) => !value)} type="button" variant="secondary"><Pencil size={16} /> {isEditing ? "Cancel edit" : "Edit"}</Button><Button className="shared-danger-action" disabled={isLoading || isMutating} onClick={() => void removeArtifact()} type="button" variant="secondary"><Trash size={16} /> Delete</Button><Button disabled={isLoading || isIndexing || isMutating} onClick={() => void indexArtifact()} type="button" variant="main">{isIndexing ? <Loader className="spin" size={16} /> : <Layers size={16} />} Index artifact</Button></> : null}</div>
@@ -1167,6 +1320,7 @@ function SharedArtifactDetail({
       {isEditing ? <form className="shared-record-edit-form" onSubmit={saveArtifact}><label>Evidence title<Input onChange={(event) => setTitle(event.target.value)} required value={title} /></label><Button disabled={isMutating} type="submit" variant="main">{isMutating ? <Loader className="spin" size={16} /> : <Pencil size={16} />} Save evidence</Button></form> : null}
       <section className="shared-record-panel"><h2>Stored content</h2>{artifact?.content_preview ? <pre className="shared-content-preview">{artifact.content_preview}</pre> : <p className="shared-muted-copy">This artifact has no text preview available.</p>}</section>
       <section className="shared-record-panel"><h2>Indexed evidence</h2>{artifact?.chunks.length ? <div className="shared-chunk-list">{artifact.chunks.map((chunk) => <article key={chunk.id}><span>{chunk.start_line ? `Lines ${chunk.start_line}${chunk.end_line && chunk.end_line !== chunk.start_line ? `–${chunk.end_line}` : ""}` : "Stored chunk"}</span><p>{chunk.text}</p></article>)}</div> : <p className="shared-muted-copy">Index this artifact to create retrievable evidence chunks.</p>}</section>
+      <section className="shared-record-panel shared-discussion-panel"><div className="shared-panel-heading"><div><MessageCircle size={18} /><h2>Evidence discussion</h2></div><span>{comments.length} comments</span></div>{comments.length ? <div className="shared-comment-list">{comments.map((comment) => <article key={comment.id}><div className="shared-comment-author"><span aria-hidden="true">{comment.author.display_name.slice(0, 1).toUpperCase()}</span><div><strong>{comment.author.display_name}</strong><time dateTime={comment.created_at}>{formatActivityTime(comment.created_at)}{comment.updated_at !== comment.created_at ? " · edited" : ""}</time></div></div>{editingCommentId === comment.id ? <form onSubmit={saveComment}><Textarea aria-label="Edit comment" onChange={(event) => setEditingCommentBody(event.target.value)} required value={editingCommentBody} /><div><Button disabled={isMutating} type="submit" variant="main">Save comment</Button><Button onClick={() => setEditingCommentId(null)} type="button" variant="secondary">Cancel</Button></div></form> : <><p>{comment.body}</p>{comment.author.id === session.user.id || canModerateComments ? <div className="shared-comment-actions">{comment.author.id === session.user.id ? <Button onClick={() => { setEditingCommentId(comment.id); setEditingCommentBody(comment.body); }} type="button" variant="secondary"><Pencil size={14} /> Edit</Button> : null}<Button disabled={isMutating} onClick={() => void removeComment(comment)} type="button" variant="secondary"><Trash size={14} /> Delete</Button></div> : null}</>}</article>)}</div> : <p className="shared-muted-copy">No discussion yet. Add context, ask for a review, or record a decision beside the evidence.</p>}{canWrite ? <form className="shared-comment-form" onSubmit={addComment}><Textarea aria-label="New evidence comment" onChange={(event) => setCommentBody(event.target.value)} placeholder="Add context or ask the team a question…" required value={commentBody} /><Button disabled={isMutating} type="submit" variant="main"><MessageCircle size={16} /> Add comment</Button></form> : null}</section>
     </SharedRecordLayout>
   );
 }
@@ -1279,7 +1433,7 @@ function SharedRecordLayout({
   workspace: SharedWorkspace;
 }) {
   return (
-    <SharedAppShell apiAvailable={apiAvailable} session={session} signOut={signOut} sidebar={<WorkspaceRail activeSection={activeSection} organization={organization} workspace={workspace} />}>
+    <SharedAppShell apiAvailable={apiAvailable} session={session} signOut={signOut} sidebar={<WorkspaceRail activeSection={activeSection} onNavigate={(section) => navigate(`/workspaces/${encodeURIComponent(workspace.workspace.id)}/${section}`)} organization={organization} workspace={workspace} />}>
       <section className="shared-detail-shell">
         <div className="shared-detail-heading"><div><p className="shared-eyebrow">Protected record</p><h1>{title}</h1><p className="shared-record-subtitle">{subtitle}</p></div><Button className="shared-back-button" onClick={onBack} type="button" variant="secondary"><ArrowLeft size={16} /> {backLabel}</Button></div>
         <div className="shared-record-content">{children}</div>
@@ -1335,6 +1489,24 @@ function MetricTimeline({ items, title = "Activity, last 14 days" }: { items: Wo
   return <section className="shared-metric-panel shared-metric-timeline"><div><h3>{title}</h3><span>{items.reduce((total, item) => total + item.value, 0)} changes</span></div><div className="shared-timeline-bars" aria-label={`${title} activity graph`}>{items.map((item) => <div key={item.label}><span title={`${formatMetricDay(item.label)}: ${item.value} changes`} style={{ height: `${Math.max((item.value / maximum) * 100, item.value ? 8 : 2)}%` }} /><small>{formatMetricDay(item.label)}</small></div>)}</div></section>;
 }
 
+function ContributionCalendar({ items, title, total }: { items: WorkspaceMetricBreakdown[]; title: string; total?: number }) {
+  const calendarDays = items.map((item) => ({ ...item, date: new Date(`${item.label}T12:00:00`) })).filter((item) => !Number.isNaN(item.date.getTime()));
+  const maximum = Math.max(...calendarDays.map((item) => item.value), 1);
+  const startOffset = calendarDays[0]?.date.getDay() ?? 0;
+  const contributionTotal = total ?? calendarDays.reduce((sum, item) => sum + item.value, 0);
+  const monthMarkers = calendarDays.filter((item, index) => index === 0 || item.date.getDate() === 1);
+  const gridPosition = (index: number) => ({ gridColumnStart: Math.floor((startOffset + index) / 7) + 1, gridRowStart: ((startOffset + index) % 7) + 1 });
+  const levelFor = (value: number) => value === 0 ? 0 : Math.max(1, Math.min(4, Math.ceil((value / maximum) * 4)));
+  return <section className="shared-contribution-calendar">
+    <div className="shared-contribution-heading"><div><h3>{contributionTotal.toLocaleString()} contributions in the last year</h3><span>{title}</span></div></div>
+    <div className="shared-contribution-scroll">
+      <div className="shared-contribution-months" aria-hidden="true">{monthMarkers.map((item) => { const index = calendarDays.indexOf(item); return <span key={item.label} style={{ gridColumnStart: gridPosition(index).gridColumnStart }}>{item.date.toLocaleDateString(undefined, { month: "short" })}</span>; })}</div>
+      <div className="shared-contribution-body"><div className="shared-contribution-weekdays" aria-hidden="true"><span>Sun</span><span></span><span>Tue</span><span></span><span>Thu</span><span></span><span>Sat</span></div><div aria-label={`${title}: ${contributionTotal} contributions in the last year`} className="shared-contribution-grid" role="img">{calendarDays.map((item, index) => <span aria-label={`${formatMetricDay(item.label)}: ${item.value} contributions`} data-level={levelFor(item.value)} key={item.label} style={gridPosition(index)} title={`${formatMetricDay(item.label)}: ${item.value} contributions`} />)}</div></div>
+      <div className="shared-contribution-footer"><span>Contribution activity is based on saved evidence, memory, indexing, and workspace changes.</span><div aria-hidden="true" className="shared-contribution-legend"><span>Less</span>{[0, 1, 2, 3, 4].map((level) => <i data-level={level} key={level} />)}<span>More</span></div></div>
+    </div>
+  </section>;
+}
+
 function formatMetricDay(value: string) {
   const date = new Date(`${value}T00:00:00`);
   if (Number.isNaN(date.getTime())) return value;
@@ -1349,6 +1521,18 @@ function formatActivityTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+}
+
+function isTaskOverdue(task: CollaborationTask) {
+  if (!task.due_at || task.status === "done") return false;
+  const dueAt = new Date(task.due_at);
+  return !Number.isNaN(dueAt.getTime()) && dueAt.getTime() < Date.now();
+}
+
+function formatTaskDueDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 function formatProfileTime(value: string | null | undefined) {

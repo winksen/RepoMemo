@@ -20,14 +20,14 @@ use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, 
 use rand_core::OsRng;
 use repomemo_api::RepoMemoCore;
 use repomemo_domain::{
-    ArtifactDetail, ArtifactSummary, ArtifactType, AskAnswer, AskRequest, Citation, CreateMemoryCardRequest,
-    IndexingJobStatus, MemoryCard, MemoryCardDetail, MemoryCardSummary, Organization,
-    ProviderSettings, ProviderTestResult, SearchRequest, SearchResult, SharedAiProviderSettings,
-    SharedSession, SharedUser, SharedWorkspace, UpdateMemoryCardRequest, Workspace,
-    WorkspaceActivityEvent, WorkspaceAiOverview, WorkspaceCapabilities, WorkspaceMember,
-    WorkspaceOverview, WorkspaceRole,
+    ArtifactComment, ArtifactDetail, ArtifactSummary, ArtifactType, AskAnswer, AskRequest, Citation,
+    CollaborationTask, CreateMemoryCardRequest, IndexingJobStatus, MemoryCard, MemoryCardDetail,
+    MemoryCardSummary, Organization, ProviderSettings, ProviderTestResult, SearchRequest,
+    SearchResult, SharedAiProviderSettings, SharedSession, SharedUser, SharedWorkspace,
+    UpdateMemoryCardRequest, Workspace, WorkspaceActivityEvent, WorkspaceAiOverview,
+    WorkspaceCapabilities, WorkspaceMember, WorkspaceOverview, WorkspaceRole,
 };
-use repomemo_storage::{StorageConfig, StorageEngine};
+use repomemo_storage::{NewCollaborationTask, StorageConfig, StorageEngine};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
@@ -285,6 +285,12 @@ struct UserProfileResponse {
 }
 
 #[derive(Debug, Serialize)]
+struct WorkspaceActivityCalendarResponse {
+    total_activity_count: i64,
+    activity_by_day: Vec<WorkspaceMetricBreakdown>,
+}
+
+#[derive(Debug, Serialize)]
 struct WorkspaceMetricsResponse {
     workspace_id: String,
     generated_at: String,
@@ -299,6 +305,12 @@ struct WorkspaceMetricsResponse {
     chunk_count: i64,
     symbol_count: i64,
     memory_card_count: i64,
+    open_task_count: i64,
+    in_progress_task_count: i64,
+    blocked_task_count: i64,
+    completed_task_count: i64,
+    overdue_task_count: i64,
+    comment_count: i64,
     recent_activity_count: i64,
     artifacts_created_last_7_days: i64,
     artifacts_updated_last_7_days: i64,
@@ -358,6 +370,23 @@ struct UpsertWorkspaceMemberRequest {
     role: WorkspaceRole,
 }
 
+#[derive(Debug, Deserialize)]
+struct SaveCollaborationTaskRequest {
+    title: String,
+    #[serde(default)]
+    description: String,
+    status: String,
+    priority: String,
+    assignee_user_id: Option<String>,
+    artifact_id: Option<String>,
+    due_at: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct SaveArtifactCommentRequest {
+    body: String,
+}
+
 #[derive(Debug, Serialize)]
 struct TokenResponse {
     access_token: String,
@@ -413,6 +442,7 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
             get(get_profile).put(update_profile),
         )
         .route("/v1/profile/password", post(change_profile_password))
+        .route("/v1/profile/tasks", get(list_profile_tasks))
         .route(
             "/v1/organizations",
             get(list_organizations).post(create_organization),
@@ -455,6 +485,20 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
             get(list_workspace_activity),
         )
         .route(
+            "/v1/workspaces/{workspace_id}/activity/calendar",
+            get(workspace_activity_calendar),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/tasks",
+            get(list_collaboration_tasks).post(create_collaboration_task),
+        )
+        .route(
+            "/v1/tasks/{task_id}",
+            get(get_collaboration_task)
+                .put(update_collaboration_task)
+                .delete(delete_collaboration_task),
+        )
+        .route(
             "/v1/workspaces/{workspace_id}/members",
             get(list_workspace_members).put(upsert_workspace_member),
         )
@@ -483,6 +527,14 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
             get(get_artifact)
                 .put(update_artifact)
                 .delete(delete_artifact),
+        )
+        .route(
+            "/v1/artifacts/{artifact_id}/comments",
+            get(list_artifact_comments).post(create_artifact_comment),
+        )
+        .route(
+            "/v1/comments/{comment_id}",
+            put(update_artifact_comment).delete(delete_artifact_comment),
         )
         .route("/v1/artifacts/{artifact_id}/index", post(index_artifact))
         .route("/v1/workspaces/{workspace_id}/index", post(index_workspace))
@@ -616,30 +668,44 @@ async fn get_profile(
         .map_err(ApiError::internal)?;
     let activity = state
         .storage
-        .list_user_activity(&subject.user_id, 100)
+        .user_activity_by_day(
+            &subject.user_id,
+            &(Utc::now() - ChronoDuration::days(364)).to_rfc3339(),
+        )
         .await
         .map_err(map_storage_error)?;
     let today = Utc::now().date_naive();
-    let mut activity_by_day = (0..14)
+    let mut activity_by_day = (0..365)
         .rev()
         .map(|offset| ((today - ChronoDuration::days(offset)).to_string(), 0))
         .collect::<BTreeMap<_, _>>();
-    for event in &activity {
-        if let Some(day) = event.created_at.get(..10) {
-            if let Some(count) = activity_by_day.get_mut(day) {
-                *count += 1;
-            }
+    for (day, count) in activity {
+        if let Some(value) = activity_by_day.get_mut(&day) {
+            *value = count;
         }
     }
+    let recent_activity_count = activity_by_day.values().sum();
     Ok(Json(UserProfileResponse {
         user: profile.user,
         created_at: profile.created_at,
         updated_at: profile.updated_at,
         last_connected_at: profile.last_connected_at,
         workspace_count: memberships.len() as i64,
-        recent_activity_count: activity.len() as i64,
+        recent_activity_count,
         activity_by_day: metric_timeline(activity_by_day),
     }))
+}
+
+async fn list_profile_tasks(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+) -> Result<Json<Vec<CollaborationTask>>, ApiError> {
+    state
+        .storage
+        .list_assigned_collaboration_tasks(&subject.user_id)
+        .await
+        .map(Json)
+        .map_err(map_storage_error)
 }
 
 async fn update_profile(
@@ -819,6 +885,11 @@ async fn workspace_metrics(
         .list_workspace_members(&workspace_id)
         .await
         .map_err(map_storage_error)?;
+    let collaboration = state
+        .storage
+        .workspace_collaboration_counts(&workspace_id)
+        .await
+        .map_err(map_storage_error)?;
     let mut artifact_types = BTreeMap::<String, i64>::new();
     let mut artifact_bytes_by_type = BTreeMap::<String, i64>::new();
     let mut languages = BTreeMap::<String, i64>::new();
@@ -883,6 +954,12 @@ async fn workspace_metrics(
         chunk_count: overview.chunk_count,
         symbol_count: overview.symbol_count,
         memory_card_count: overview.memory_card_count,
+        open_task_count: collaboration.open_tasks,
+        in_progress_task_count: collaboration.in_progress_tasks,
+        blocked_task_count: collaboration.blocked_tasks,
+        completed_task_count: collaboration.completed_tasks,
+        overdue_task_count: collaboration.overdue_tasks,
+        comment_count: collaboration.comments,
         recent_activity_count: activity.len() as i64,
         artifacts_created_last_7_days,
         artifacts_updated_last_7_days,
@@ -1167,6 +1244,344 @@ async fn list_workspace_activity(
         .await
         .map(Json)
         .map_err(map_storage_error)
+}
+
+async fn workspace_activity_calendar(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+) -> Result<Json<WorkspaceActivityCalendarResponse>, ApiError> {
+    require_workspace_read(&state, &subject, &workspace_id).await?;
+    let today = Utc::now().date_naive();
+    let mut activity_by_day = (0..365)
+        .rev()
+        .map(|offset| ((today - ChronoDuration::days(offset)).to_string(), 0))
+        .collect::<BTreeMap<_, _>>();
+    let rows = state
+        .storage
+        .workspace_activity_by_day(
+            &workspace_id,
+            &(Utc::now() - ChronoDuration::days(364)).to_rfc3339(),
+        )
+        .await
+        .map_err(map_storage_error)?;
+    for (day, count) in rows {
+        if let Some(value) = activity_by_day.get_mut(&day) {
+            *value = count;
+        }
+    }
+    let total_activity_count = activity_by_day.values().sum();
+    Ok(Json(WorkspaceActivityCalendarResponse {
+        total_activity_count,
+        activity_by_day: metric_timeline(activity_by_day),
+    }))
+}
+
+async fn list_collaboration_tasks(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+) -> Result<Json<Vec<CollaborationTask>>, ApiError> {
+    require_workspace_read(&state, &subject, &workspace_id).await?;
+    state
+        .storage
+        .list_collaboration_tasks(&workspace_id)
+        .await
+        .map(Json)
+        .map_err(map_storage_error)
+}
+
+async fn get_collaboration_task(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(task_id): Path<String>,
+) -> Result<Json<CollaborationTask>, ApiError> {
+    let task = state
+        .storage
+        .get_collaboration_task(&task_id)
+        .await
+        .map_err(map_storage_error)?;
+    require_workspace_read(&state, &subject, &task.workspace_id).await?;
+    Ok(Json(task))
+}
+
+async fn create_collaboration_task(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+    Json(request): Json<SaveCollaborationTaskRequest>,
+) -> Result<(StatusCode, Json<CollaborationTask>), ApiError> {
+    require_workspace_write(&state, &subject, &workspace_id).await?;
+    let payload = normalize_collaboration_task(&state, &workspace_id, request).await?;
+    let task = state
+        .storage
+        .create_collaboration_task(&workspace_id, &subject.user_id, payload)
+        .await
+        .map_err(map_storage_error)?;
+    record_workspace_activity(
+        &state,
+        &workspace_id,
+        &subject.user_id,
+        "task_created",
+        "task",
+        Some(&task.id),
+        format!("Created task: {}.", task.title),
+    )
+    .await;
+    Ok((StatusCode::CREATED, Json(task)))
+}
+
+async fn update_collaboration_task(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(task_id): Path<String>,
+    Json(request): Json<SaveCollaborationTaskRequest>,
+) -> Result<Json<CollaborationTask>, ApiError> {
+    let current = state
+        .storage
+        .get_collaboration_task(&task_id)
+        .await
+        .map_err(map_storage_error)?;
+    require_workspace_write(&state, &subject, &current.workspace_id).await?;
+    let payload = normalize_collaboration_task(&state, &current.workspace_id, request).await?;
+    let task = state
+        .storage
+        .update_collaboration_task(&task_id, payload)
+        .await
+        .map_err(map_storage_error)?;
+    record_workspace_activity(
+        &state,
+        &task.workspace_id,
+        &subject.user_id,
+        "task_updated",
+        "task",
+        Some(&task.id),
+        format!("Updated task: {} ({}).", task.title, task.status.replace('_', " ")),
+    )
+    .await;
+    Ok(Json(task))
+}
+
+async fn delete_collaboration_task(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(task_id): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    let task = state
+        .storage
+        .get_collaboration_task(&task_id)
+        .await
+        .map_err(map_storage_error)?;
+    let role = require_workspace_read(&state, &subject, &task.workspace_id).await?;
+    if task.created_by.id != subject.user_id
+        && !matches!(role, WorkspaceRole::Owner | WorkspaceRole::Admin)
+    {
+        return Err(ApiError::forbidden());
+    }
+    state
+        .storage
+        .delete_collaboration_task(&task_id)
+        .await
+        .map_err(map_storage_error)?;
+    record_workspace_activity(
+        &state,
+        &task.workspace_id,
+        &subject.user_id,
+        "task_deleted",
+        "task",
+        Some(&task.id),
+        format!("Deleted task: {}.", task.title),
+    )
+    .await;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn normalize_collaboration_task(
+    state: &AppState,
+    workspace_id: &str,
+    request: SaveCollaborationTaskRequest,
+) -> Result<NewCollaborationTask, ApiError> {
+    let title = request.title.trim().to_owned();
+    let description = request.description.trim().to_owned();
+    if title.is_empty() || title.len() > 180 {
+        return Err(ApiError::bad_request("Task title must be between 1 and 180 characters."));
+    }
+    if description.len() > 5_000 {
+        return Err(ApiError::bad_request("Task description cannot exceed 5,000 characters."));
+    }
+    if !matches!(request.status.as_str(), "open" | "in_progress" | "blocked" | "done") {
+        return Err(ApiError::bad_request("Task status must be open, in_progress, blocked, or done."));
+    }
+    if !matches!(request.priority.as_str(), "low" | "medium" | "high" | "urgent") {
+        return Err(ApiError::bad_request("Task priority must be low, medium, high, or urgent."));
+    }
+    if let Some(user_id) = request.assignee_user_id.as_deref() {
+        if state
+            .storage
+            .workspace_role_for_user(user_id, workspace_id)
+            .await
+            .map_err(map_storage_error)?
+            .is_none()
+        {
+            return Err(ApiError::bad_request("Task assignee must be a workspace member."));
+        }
+    }
+    if let Some(artifact_id) = request.artifact_id.as_deref() {
+        let artifact = state
+            .storage
+            .get_artifact(artifact_id)
+            .await
+            .map_err(map_storage_error)?;
+        if artifact.summary.workspace_id != workspace_id {
+            return Err(ApiError::bad_request("Task evidence must belong to this workspace."));
+        }
+    }
+    let due_at = request.due_at.filter(|value| !value.trim().is_empty());
+    if due_at.as_ref().is_some_and(|value| value.len() > 64) {
+        return Err(ApiError::bad_request("Task due date is invalid."));
+    }
+    Ok(NewCollaborationTask {
+        title,
+        description,
+        status: request.status,
+        priority: request.priority,
+        assignee_user_id: request.assignee_user_id,
+        artifact_id: request.artifact_id,
+        due_at,
+    })
+}
+
+async fn list_artifact_comments(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(artifact_id): Path<String>,
+) -> Result<Json<Vec<ArtifactComment>>, ApiError> {
+    let artifact = state
+        .storage
+        .get_artifact(&artifact_id)
+        .await
+        .map_err(map_storage_error)?;
+    require_workspace_read(&state, &subject, &artifact.summary.workspace_id).await?;
+    state
+        .storage
+        .list_artifact_comments(&artifact_id)
+        .await
+        .map(Json)
+        .map_err(map_storage_error)
+}
+
+async fn create_artifact_comment(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(artifact_id): Path<String>,
+    Json(request): Json<SaveArtifactCommentRequest>,
+) -> Result<(StatusCode, Json<ArtifactComment>), ApiError> {
+    let artifact = state
+        .storage
+        .get_artifact(&artifact_id)
+        .await
+        .map_err(map_storage_error)?;
+    require_workspace_write(&state, &subject, &artifact.summary.workspace_id).await?;
+    let body = validate_comment_body(&request.body)?;
+    let comment = state
+        .storage
+        .create_artifact_comment(
+            &artifact.summary.workspace_id,
+            &artifact_id,
+            &subject.user_id,
+            &body,
+        )
+        .await
+        .map_err(map_storage_error)?;
+    record_workspace_activity(
+        &state,
+        &comment.workspace_id,
+        &subject.user_id,
+        "comment_added",
+        "artifact",
+        Some(&artifact_id),
+        format!("Commented on evidence: {}.", artifact.summary.title),
+    )
+    .await;
+    Ok((StatusCode::CREATED, Json(comment)))
+}
+
+async fn update_artifact_comment(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(comment_id): Path<String>,
+    Json(request): Json<SaveArtifactCommentRequest>,
+) -> Result<Json<ArtifactComment>, ApiError> {
+    let current = state
+        .storage
+        .get_artifact_comment(&comment_id)
+        .await
+        .map_err(map_storage_error)?;
+    let role = require_workspace_read(&state, &subject, &current.workspace_id).await?;
+    if current.author.id != subject.user_id
+        && !matches!(role, WorkspaceRole::Owner | WorkspaceRole::Admin)
+    {
+        return Err(ApiError::forbidden());
+    }
+    let body = validate_comment_body(&request.body)?;
+    let updated = state
+        .storage
+        .update_artifact_comment(&comment_id, &body)
+        .await
+        .map_err(map_storage_error)?;
+    record_workspace_activity(
+        &state,
+        &updated.workspace_id,
+        &subject.user_id,
+        "comment_updated",
+        "artifact",
+        Some(&updated.artifact_id),
+        "Updated an evidence comment.".to_owned(),
+    )
+    .await;
+    Ok(Json(updated))
+}
+
+async fn delete_artifact_comment(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(comment_id): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    let comment = state
+        .storage
+        .get_artifact_comment(&comment_id)
+        .await
+        .map_err(map_storage_error)?;
+    let role = require_workspace_read(&state, &subject, &comment.workspace_id).await?;
+    if comment.author.id != subject.user_id
+        && !matches!(role, WorkspaceRole::Owner | WorkspaceRole::Admin)
+    {
+        return Err(ApiError::forbidden());
+    }
+    state
+        .storage
+        .delete_artifact_comment(&comment_id)
+        .await
+        .map_err(map_storage_error)?;
+    record_workspace_activity(
+        &state,
+        &comment.workspace_id,
+        &subject.user_id,
+        "comment_deleted",
+        "artifact",
+        Some(&comment.artifact_id),
+        "Removed an evidence comment.".to_owned(),
+    )
+    .await;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+fn validate_comment_body(body: &str) -> Result<String, ApiError> {
+    let body = body.trim().to_owned();
+    if body.is_empty() || body.len() > 5_000 {
+        return Err(ApiError::bad_request("Comment must be between 1 and 5,000 characters."));
+    }
+    Ok(body)
 }
 
 async fn record_workspace_activity(
@@ -1851,6 +2266,9 @@ fn capabilities_for_role(role: WorkspaceRole) -> WorkspaceCapabilities {
         can_assign_admin: matches!(&role, WorkspaceRole::Owner),
         can_manage_workspace: matches!(&role, WorkspaceRole::Owner),
         can_generate_ai_overview: true,
+        can_create_tasks: can_write_content,
+        can_comment: can_write_content,
+        can_moderate_comments: matches!(&role, WorkspaceRole::Owner | WorkspaceRole::Admin),
         role,
         can_manage_members,
     }
@@ -2057,7 +2475,7 @@ mod tests {
                 .unwrap();
         assert_eq!(profile["user"]["display_name"], "Flow Owner");
         assert!(profile["last_connected_at"].is_string());
-        assert_eq!(profile["activity_by_day"].as_array().unwrap().len(), 14);
+        assert_eq!(profile["activity_by_day"].as_array().unwrap().len(), 365);
 
         let renamed_profile = app
             .clone()
@@ -2174,6 +2592,130 @@ mod tests {
                 .unwrap();
         let artifact_id = artifact["id"].as_str().unwrap();
 
+        let task = app
+            .clone()
+            .oneshot(json_request(
+                "POST",
+                &format!("/v1/workspaces/{workspace_id}/tasks"),
+                &authorization,
+                json!({
+                    "title":"Review shared API decision",
+                    "description":"Confirm the evidence and capture follow-up work.",
+                    "status":"open",
+                    "priority":"high",
+                    "assignee_user_id":member["user"]["id"],
+                    "artifact_id":artifact_id,
+                    "due_at":null
+                }),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(task.status(), 201);
+        let task: Value =
+            serde_json::from_slice(&to_bytes(task.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
+        let task_id = task["id"].as_str().unwrap();
+        assert_eq!(task["assignee"]["display_name"], "Collaborator");
+        let assigned_tasks = app
+            .clone()
+            .oneshot(auth_request(
+                "GET",
+                "/v1/profile/tasks",
+                &collaborator_authorization,
+            ))
+            .await
+            .unwrap();
+        assert_eq!(assigned_tasks.status(), 200);
+        let assigned_tasks: Value = serde_json::from_slice(
+            &to_bytes(assigned_tasks.into_body(), usize::MAX)
+                .await
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(assigned_tasks.as_array().unwrap().len(), 1);
+        let updated_task = app
+            .clone()
+            .oneshot(json_request(
+                "PUT",
+                &format!("/v1/tasks/{task_id}"),
+                &collaborator_authorization,
+                json!({
+                    "title":"Review shared API decision",
+                    "description":"Confirmed and documented.",
+                    "status":"done",
+                    "priority":"high",
+                    "assignee_user_id":member["user"]["id"],
+                    "artifact_id":artifact_id,
+                    "due_at":null
+                }),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(updated_task.status(), 200);
+        let updated_task: Value = serde_json::from_slice(
+            &to_bytes(updated_task.into_body(), usize::MAX)
+                .await
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(updated_task["status"], "done");
+        assert!(updated_task["completed_at"].is_string());
+        let tasks = app
+            .clone()
+            .oneshot(auth_request(
+                "GET",
+                &format!("/v1/workspaces/{workspace_id}/tasks"),
+                &authorization,
+            ))
+            .await
+            .unwrap();
+        assert_eq!(tasks.status(), 200);
+        let tasks: Value =
+            serde_json::from_slice(&to_bytes(tasks.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
+        assert_eq!(tasks.as_array().unwrap().len(), 1);
+
+        let comment = app
+            .clone()
+            .oneshot(json_request(
+                "POST",
+                &format!("/v1/artifacts/{artifact_id}/comments"),
+                &collaborator_authorization,
+                json!({"body":"This confirms the server-authoritative decision."}),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(comment.status(), 201);
+        let comment: Value =
+            serde_json::from_slice(&to_bytes(comment.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
+        let comment_id = comment["id"].as_str().unwrap();
+        let updated_comment = app
+            .clone()
+            .oneshot(json_request(
+                "PUT",
+                &format!("/v1/comments/{comment_id}"),
+                &collaborator_authorization,
+                json!({"body":"Confirmed: the API remains authoritative for shared data."}),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(updated_comment.status(), 200);
+        let comments = app
+            .clone()
+            .oneshot(auth_request(
+                "GET",
+                &format!("/v1/artifacts/{artifact_id}/comments"),
+                &authorization,
+            ))
+            .await
+            .unwrap();
+        assert_eq!(comments.status(), 200);
+        let comments: Value =
+            serde_json::from_slice(&to_bytes(comments.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
+        assert_eq!(comments.as_array().unwrap().len(), 1);
+
         let uploaded = app
             .clone()
             .oneshot(
@@ -2243,10 +2785,27 @@ mod tests {
         assert_eq!(metrics["indexed_artifact_count"], 1);
         assert_eq!(metrics["pending_artifact_count"], 1);
         assert_eq!(metrics["member_count"], 2);
+        assert_eq!(metrics["completed_task_count"], 1);
+        assert_eq!(metrics["comment_count"], 1);
         assert!(metrics["total_artifact_bytes"].as_i64().unwrap() > 0);
         assert!(metrics["indexed_artifact_bytes"].as_i64().unwrap() > 0);
         assert_eq!(metrics["activity_by_day"].as_array().unwrap().len(), 14);
         assert!(!metrics["artifact_bytes_by_type"].as_array().unwrap().is_empty());
+        let calendar = app
+            .clone()
+            .oneshot(auth_request(
+                "GET",
+                &format!("/v1/workspaces/{workspace_id}/activity/calendar"),
+                &authorization,
+            ))
+            .await
+            .unwrap();
+        assert_eq!(calendar.status(), 200);
+        let calendar: Value =
+            serde_json::from_slice(&to_bytes(calendar.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
+        assert_eq!(calendar["activity_by_day"].as_array().unwrap().len(), 365);
+        assert!(calendar["total_activity_count"].as_i64().unwrap() > 0);
         let search = app.clone().oneshot(json_request("POST", &format!("/v1/workspaces/{workspace_id}/search"), &authorization, json!({"query":"shared data", "artifact_types": [], "languages": [], "source_ids": [], "limit": 20}))).await.unwrap();
         assert_eq!(search.status(), 200);
         let search: Value =

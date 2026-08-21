@@ -46,6 +46,34 @@ pub struct WorkspaceActivityEvent {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CollaborationTask {
+    pub id: String,
+    pub workspace_id: String,
+    pub title: String,
+    pub description: String,
+    pub status: String,
+    pub priority: String,
+    pub assignee: Option<SharedUser>,
+    pub created_by: SharedUser,
+    pub artifact_id: Option<String>,
+    pub due_at: Option<String>,
+    pub completed_at: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArtifactComment {
+    pub id: String,
+    pub workspace_id: String,
+    pub artifact_id: String,
+    pub author: SharedUser,
+    pub body: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SharedSession {
     pub user: SharedUser,
     pub authentication: String,
@@ -99,6 +127,9 @@ pub struct WorkspaceCapabilities {
     pub can_assign_admin: bool,
     pub can_manage_workspace: bool,
     pub can_generate_ai_overview: bool,
+    pub can_create_tasks: bool,
+    pub can_comment: bool,
+    pub can_moderate_comments: bool,
 }
 
 /// A citation-backed workspace briefing generated through an enabled provider.

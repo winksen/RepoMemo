@@ -37,6 +37,40 @@ export interface WorkspaceActivityEvent {
   created_at: string;
 }
 
+export interface WorkspaceActivityCalendar {
+  total_activity_count: number;
+  activity_by_day: WorkspaceMetricBreakdown[];
+}
+
+export type CollaborationTaskStatus = "open" | "in_progress" | "blocked" | "done";
+export type CollaborationTaskPriority = "low" | "medium" | "high" | "urgent";
+
+export interface CollaborationTask {
+  id: string;
+  workspace_id: string;
+  title: string;
+  description: string;
+  status: CollaborationTaskStatus;
+  priority: CollaborationTaskPriority;
+  assignee: SharedUser | null;
+  created_by: SharedUser;
+  artifact_id: string | null;
+  due_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ArtifactComment {
+  id: string;
+  workspace_id: string;
+  artifact_id: string;
+  author: SharedUser;
+  body: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface SharedSession {
   user: SharedUser;
   authentication: "jwt";
@@ -115,6 +149,12 @@ export interface WorkspaceMetrics {
   chunk_count: number;
   symbol_count: number;
   memory_card_count: number;
+  open_task_count: number;
+  in_progress_task_count: number;
+  blocked_task_count: number;
+  completed_task_count: number;
+  overdue_task_count: number;
+  comment_count: number;
   recent_activity_count: number;
   artifacts_created_last_7_days: number;
   artifacts_updated_last_7_days: number;
@@ -135,6 +175,9 @@ export interface WorkspaceCapabilities {
   can_assign_admin: boolean;
   can_manage_workspace: boolean;
   can_generate_ai_overview: boolean;
+  can_create_tasks: boolean;
+  can_comment: boolean;
+  can_moderate_comments: boolean;
 }
 
 export interface WorkspaceAiOverview {

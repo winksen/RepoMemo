@@ -3,11 +3,11 @@ use std::path::{Path, PathBuf};
 use anyhow::{bail, Context, Result};
 use chrono::Utc;
 use repomemo_domain::{
-    ArtifactDetail, ArtifactSummary, ArtifactType, Chunk, Citation, IndexingJobStatus, MemoryCard,
-    MemoryCardDetail, MemoryCardSummary, MemoryEvidence, Organization, ProviderSettings,
-    SearchRequest, SearchResult, SharedUser, SharedWorkspace, Source, SourceType, Symbol,
-    SymbolKind, SymbolSearchResult, Workspace, WorkspaceActivityEvent, WorkspaceMember,
-    WorkspaceMembership, WorkspaceOverview, WorkspaceRole,
+    ArtifactComment, ArtifactDetail, ArtifactSummary, ArtifactType, Chunk, Citation,
+    CollaborationTask, IndexingJobStatus, MemoryCard, MemoryCardDetail, MemoryCardSummary,
+    MemoryEvidence, Organization, ProviderSettings, SearchRequest, SearchResult, SharedUser,
+    SharedWorkspace, Source, SourceType, Symbol, SymbolKind, SymbolSearchResult, Workspace,
+    WorkspaceActivityEvent, WorkspaceMember, WorkspaceMembership, WorkspaceOverview, WorkspaceRole,
 };
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -95,6 +95,61 @@ struct WorkspaceActivityRow {
     subject_id: Option<String>,
     summary: String,
     created_at: String,
+}
+
+#[derive(Debug, sqlx::FromRow)]
+struct CollaborationTaskRow {
+    id: String,
+    workspace_id: String,
+    title: String,
+    description: String,
+    status: String,
+    priority: String,
+    assignee_id: Option<String>,
+    assignee_email: Option<String>,
+    assignee_display_name: Option<String>,
+    creator_id: String,
+    creator_email: String,
+    creator_display_name: String,
+    artifact_id: Option<String>,
+    due_at: Option<String>,
+    completed_at: Option<String>,
+    created_at: String,
+    updated_at: String,
+}
+
+#[derive(Debug, sqlx::FromRow)]
+struct ArtifactCommentRow {
+    id: String,
+    workspace_id: String,
+    artifact_id: String,
+    author_id: String,
+    author_email: String,
+    author_display_name: String,
+    body: String,
+    created_at: String,
+    updated_at: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct NewCollaborationTask {
+    pub title: String,
+    pub description: String,
+    pub status: String,
+    pub priority: String,
+    pub assignee_user_id: Option<String>,
+    pub artifact_id: Option<String>,
+    pub due_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct WorkspaceCollaborationCounts {
+    pub open_tasks: i64,
+    pub in_progress_tasks: i64,
+    pub blocked_tasks: i64,
+    pub completed_tasks: i64,
+    pub overdue_tasks: i64,
+    pub comments: i64,
 }
 
 #[derive(Debug, sqlx::FromRow)]
@@ -806,6 +861,388 @@ impl StorageEngine {
         .fetch_all(&self.pool)
         .await?;
         Ok(rows.into_iter().map(WorkspaceActivityEvent::from).collect())
+    }
+
+    pub async fn workspace_activity_by_day(
+        &self,
+        workspace_id: &str,
+        since: &str,
+    ) -> Result<Vec<(String, i64)>> {
+        Ok(sqlx::query_as::<_, (String, i64)>(
+            r#"
+            SELECT substr(created_at, 1, 10) AS day, COUNT(*) AS count
+            FROM workspace_activity
+            WHERE workspace_id = ?1 AND created_at >= ?2
+            GROUP BY day
+            ORDER BY day ASC
+            "#,
+        )
+        .bind(workspace_id)
+        .bind(since)
+        .fetch_all(&self.pool)
+        .await?)
+    }
+
+    pub async fn user_activity_by_day(
+        &self,
+        user_id: &str,
+        since: &str,
+    ) -> Result<Vec<(String, i64)>> {
+        Ok(sqlx::query_as::<_, (String, i64)>(
+            r#"
+            SELECT substr(created_at, 1, 10) AS day, COUNT(*) AS count
+            FROM workspace_activity
+            WHERE actor_user_id = ?1 AND created_at >= ?2
+            GROUP BY day
+            ORDER BY day ASC
+            "#,
+        )
+        .bind(user_id)
+        .bind(since)
+        .fetch_all(&self.pool)
+        .await?)
+    }
+
+    pub async fn list_collaboration_tasks(
+        &self,
+        workspace_id: &str,
+    ) -> Result<Vec<CollaborationTask>> {
+        let rows = sqlx::query_as::<_, CollaborationTaskRow>(
+            r#"
+            SELECT
+              task.id,
+              task.workspace_id,
+              task.title,
+              task.description,
+              task.status,
+              task.priority,
+              assignee.id AS assignee_id,
+              assignee.email AS assignee_email,
+              assignee.display_name AS assignee_display_name,
+              creator.id AS creator_id,
+              creator.email AS creator_email,
+              creator.display_name AS creator_display_name,
+              task.artifact_id,
+              task.due_at,
+              task.completed_at,
+              task.created_at,
+              task.updated_at
+            FROM workspace_tasks AS task
+            JOIN users AS creator ON creator.id = task.created_by_user_id
+            LEFT JOIN users AS assignee ON assignee.id = task.assignee_user_id
+            WHERE task.workspace_id = ?1
+            ORDER BY
+              CASE task.status WHEN 'in_progress' THEN 0 WHEN 'blocked' THEN 1 WHEN 'open' THEN 2 ELSE 3 END,
+              CASE task.priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END,
+              task.due_at IS NULL,
+              task.due_at ASC,
+              task.updated_at DESC
+            "#,
+        )
+        .bind(workspace_id)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows.into_iter().map(CollaborationTask::from).collect())
+    }
+
+    pub async fn list_assigned_collaboration_tasks(
+        &self,
+        user_id: &str,
+    ) -> Result<Vec<CollaborationTask>> {
+        let rows = sqlx::query_as::<_, CollaborationTaskRow>(
+            r#"
+            SELECT
+              task.id,
+              task.workspace_id,
+              task.title,
+              task.description,
+              task.status,
+              task.priority,
+              assignee.id AS assignee_id,
+              assignee.email AS assignee_email,
+              assignee.display_name AS assignee_display_name,
+              creator.id AS creator_id,
+              creator.email AS creator_email,
+              creator.display_name AS creator_display_name,
+              task.artifact_id,
+              task.due_at,
+              task.completed_at,
+              task.created_at,
+              task.updated_at
+            FROM workspace_tasks AS task
+            JOIN users AS creator ON creator.id = task.created_by_user_id
+            JOIN users AS assignee ON assignee.id = task.assignee_user_id
+            JOIN workspace_memberships AS membership
+              ON membership.workspace_id = task.workspace_id AND membership.user_id = ?1
+            WHERE task.assignee_user_id = ?1 AND task.status != 'done'
+            ORDER BY
+              CASE task.priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END,
+              task.due_at IS NULL,
+              task.due_at ASC,
+              task.updated_at DESC
+            "#,
+        )
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows.into_iter().map(CollaborationTask::from).collect())
+    }
+
+    pub async fn get_collaboration_task(&self, task_id: &str) -> Result<CollaborationTask> {
+        let row = sqlx::query_as::<_, CollaborationTaskRow>(
+            r#"
+            SELECT
+              task.id,
+              task.workspace_id,
+              task.title,
+              task.description,
+              task.status,
+              task.priority,
+              assignee.id AS assignee_id,
+              assignee.email AS assignee_email,
+              assignee.display_name AS assignee_display_name,
+              creator.id AS creator_id,
+              creator.email AS creator_email,
+              creator.display_name AS creator_display_name,
+              task.artifact_id,
+              task.due_at,
+              task.completed_at,
+              task.created_at,
+              task.updated_at
+            FROM workspace_tasks AS task
+            JOIN users AS creator ON creator.id = task.created_by_user_id
+            LEFT JOIN users AS assignee ON assignee.id = task.assignee_user_id
+            WHERE task.id = ?1
+            "#,
+        )
+        .bind(task_id)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(CollaborationTask::from(row))
+    }
+
+    pub async fn create_collaboration_task(
+        &self,
+        workspace_id: &str,
+        created_by_user_id: &str,
+        task: NewCollaborationTask,
+    ) -> Result<CollaborationTask> {
+        let id = Uuid::new_v4().to_string();
+        let now = Utc::now().to_rfc3339();
+        let completed_at = (task.status == "done").then(|| now.clone());
+        sqlx::query(
+            r#"
+            INSERT INTO workspace_tasks (
+              id, workspace_id, title, description, status, priority,
+              assignee_user_id, created_by_user_id, artifact_id, due_at,
+              completed_at, created_at, updated_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
+            "#,
+        )
+        .bind(&id)
+        .bind(workspace_id)
+        .bind(task.title)
+        .bind(task.description)
+        .bind(task.status)
+        .bind(task.priority)
+        .bind(task.assignee_user_id)
+        .bind(created_by_user_id)
+        .bind(task.artifact_id)
+        .bind(task.due_at)
+        .bind(completed_at)
+        .bind(&now)
+        .bind(&now)
+        .execute(&self.pool)
+        .await?;
+        self.get_collaboration_task(&id).await
+    }
+
+    pub async fn update_collaboration_task(
+        &self,
+        task_id: &str,
+        task: NewCollaborationTask,
+    ) -> Result<CollaborationTask> {
+        let current = self.get_collaboration_task(task_id).await?;
+        let now = Utc::now().to_rfc3339();
+        let completed_at = if task.status == "done" {
+            current.completed_at.or_else(|| Some(now.clone()))
+        } else {
+            None
+        };
+        sqlx::query(
+            r#"
+            UPDATE workspace_tasks
+            SET title = ?1, description = ?2, status = ?3, priority = ?4,
+                assignee_user_id = ?5, artifact_id = ?6, due_at = ?7,
+                completed_at = ?8, updated_at = ?9
+            WHERE id = ?10
+            "#,
+        )
+        .bind(task.title)
+        .bind(task.description)
+        .bind(task.status)
+        .bind(task.priority)
+        .bind(task.assignee_user_id)
+        .bind(task.artifact_id)
+        .bind(task.due_at)
+        .bind(completed_at)
+        .bind(now)
+        .bind(task_id)
+        .execute(&self.pool)
+        .await?;
+        self.get_collaboration_task(task_id).await
+    }
+
+    pub async fn delete_collaboration_task(&self, task_id: &str) -> Result<()> {
+        let result = sqlx::query("DELETE FROM workspace_tasks WHERE id = ?1")
+            .bind(task_id)
+            .execute(&self.pool)
+            .await?;
+        if result.rows_affected() == 0 {
+            bail!("Collaboration task was not found.");
+        }
+        Ok(())
+    }
+
+    pub async fn list_artifact_comments(&self, artifact_id: &str) -> Result<Vec<ArtifactComment>> {
+        let rows = sqlx::query_as::<_, ArtifactCommentRow>(
+            r#"
+            SELECT
+              comment.id,
+              comment.workspace_id,
+              comment.artifact_id,
+              author.id AS author_id,
+              author.email AS author_email,
+              author.display_name AS author_display_name,
+              comment.body,
+              comment.created_at,
+              comment.updated_at
+            FROM artifact_comments AS comment
+            JOIN users AS author ON author.id = comment.author_user_id
+            WHERE comment.artifact_id = ?1
+            ORDER BY comment.created_at ASC, comment.id ASC
+            "#,
+        )
+        .bind(artifact_id)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows.into_iter().map(ArtifactComment::from).collect())
+    }
+
+    pub async fn get_artifact_comment(&self, comment_id: &str) -> Result<ArtifactComment> {
+        let row = sqlx::query_as::<_, ArtifactCommentRow>(
+            r#"
+            SELECT
+              comment.id,
+              comment.workspace_id,
+              comment.artifact_id,
+              author.id AS author_id,
+              author.email AS author_email,
+              author.display_name AS author_display_name,
+              comment.body,
+              comment.created_at,
+              comment.updated_at
+            FROM artifact_comments AS comment
+            JOIN users AS author ON author.id = comment.author_user_id
+            WHERE comment.id = ?1
+            "#,
+        )
+        .bind(comment_id)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(ArtifactComment::from(row))
+    }
+
+    pub async fn create_artifact_comment(
+        &self,
+        workspace_id: &str,
+        artifact_id: &str,
+        author_user_id: &str,
+        body: &str,
+    ) -> Result<ArtifactComment> {
+        let id = Uuid::new_v4().to_string();
+        let now = Utc::now().to_rfc3339();
+        sqlx::query(
+            r#"
+            INSERT INTO artifact_comments (
+              id, workspace_id, artifact_id, author_user_id, body, created_at, updated_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+            "#,
+        )
+        .bind(&id)
+        .bind(workspace_id)
+        .bind(artifact_id)
+        .bind(author_user_id)
+        .bind(body)
+        .bind(&now)
+        .bind(&now)
+        .execute(&self.pool)
+        .await?;
+        self.get_artifact_comment(&id).await
+    }
+
+    pub async fn update_artifact_comment(
+        &self,
+        comment_id: &str,
+        body: &str,
+    ) -> Result<ArtifactComment> {
+        sqlx::query("UPDATE artifact_comments SET body = ?1, updated_at = ?2 WHERE id = ?3")
+            .bind(body)
+            .bind(Utc::now().to_rfc3339())
+            .bind(comment_id)
+            .execute(&self.pool)
+            .await?;
+        self.get_artifact_comment(comment_id).await
+    }
+
+    pub async fn delete_artifact_comment(&self, comment_id: &str) -> Result<()> {
+        let result = sqlx::query("DELETE FROM artifact_comments WHERE id = ?1")
+            .bind(comment_id)
+            .execute(&self.pool)
+            .await?;
+        if result.rows_affected() == 0 {
+            bail!("Artifact comment was not found.");
+        }
+        Ok(())
+    }
+
+    pub async fn workspace_collaboration_counts(
+        &self,
+        workspace_id: &str,
+    ) -> Result<WorkspaceCollaborationCounts> {
+        let rows = sqlx::query_as::<_, (String, i64)>(
+            "SELECT status, COUNT(*) FROM workspace_tasks WHERE workspace_id = ?1 GROUP BY status",
+        )
+        .bind(workspace_id)
+        .fetch_all(&self.pool)
+        .await?;
+        let mut counts = WorkspaceCollaborationCounts::default();
+        for (status, count) in rows {
+            match status.as_str() {
+                "open" => counts.open_tasks = count,
+                "in_progress" => counts.in_progress_tasks = count,
+                "blocked" => counts.blocked_tasks = count,
+                "done" => counts.completed_tasks = count,
+                _ => {}
+            }
+        }
+        counts.overdue_tasks = sqlx::query_scalar::<_, i64>(
+            r#"
+            SELECT COUNT(*) FROM workspace_tasks
+            WHERE workspace_id = ?1 AND status != 'done' AND due_at IS NOT NULL AND due_at < ?2
+            "#,
+        )
+        .bind(workspace_id)
+        .bind(Utc::now().to_rfc3339())
+        .fetch_one(&self.pool)
+        .await?;
+        counts.comments = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM artifact_comments WHERE workspace_id = ?1",
+        )
+        .bind(workspace_id)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(counts)
     }
 
     pub async fn upsert_workspace_member(
@@ -2237,6 +2674,52 @@ impl From<WorkspaceActivityRow> for WorkspaceActivityEvent {
             subject_id: row.subject_id,
             summary: row.summary,
             created_at: row.created_at,
+        }
+    }
+}
+
+impl From<CollaborationTaskRow> for CollaborationTask {
+    fn from(row: CollaborationTaskRow) -> Self {
+        Self {
+            id: row.id,
+            workspace_id: row.workspace_id,
+            title: row.title,
+            description: row.description,
+            status: row.status,
+            priority: row.priority,
+            assignee: row.assignee_id.map(|id| SharedUser {
+                id,
+                display_name: row.assignee_display_name.unwrap_or_else(|| "Member".to_owned()),
+                email: row.assignee_email,
+            }),
+            created_by: SharedUser {
+                id: row.creator_id,
+                display_name: row.creator_display_name,
+                email: Some(row.creator_email),
+            },
+            artifact_id: row.artifact_id,
+            due_at: row.due_at,
+            completed_at: row.completed_at,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+        }
+    }
+}
+
+impl From<ArtifactCommentRow> for ArtifactComment {
+    fn from(row: ArtifactCommentRow) -> Self {
+        Self {
+            id: row.id,
+            workspace_id: row.workspace_id,
+            artifact_id: row.artifact_id,
+            author: SharedUser {
+                id: row.author_id,
+                display_name: row.author_display_name,
+                email: Some(row.author_email),
+            },
+            body: row.body,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
         }
     }
 }
