@@ -1,6 +1,6 @@
 //! Server-authoritative HTTP API for shared RepoMemo workspaces.
 
-use std::{net::SocketAddr, path::PathBuf, time::Duration};
+use std::{collections::BTreeMap, net::SocketAddr, path::PathBuf, time::Duration};
 
 use anyhow::{bail, Context, Result};
 use argon2::{
@@ -191,6 +191,17 @@ struct LoginRequest {
 }
 
 #[derive(Debug, Deserialize)]
+struct UpdateProfileRequest {
+    display_name: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct ChangePasswordRequest {
+    current_password: String,
+    new_password: String,
+}
+
+#[derive(Debug, Deserialize)]
 struct CreateOrganizationRequest {
     name: String,
 }
@@ -254,6 +265,49 @@ struct RetrievalFacetsResponse {
     artifact_types: Vec<ArtifactType>,
     languages: Vec<String>,
     sources: Vec<RetrievalSourceFacet>,
+}
+
+#[derive(Debug, Serialize)]
+struct WorkspaceMetricBreakdown {
+    label: String,
+    value: i64,
+}
+
+#[derive(Debug, Serialize)]
+struct UserProfileResponse {
+    user: SharedUser,
+    created_at: String,
+    updated_at: String,
+    last_connected_at: Option<String>,
+    workspace_count: i64,
+    recent_activity_count: i64,
+    activity_by_day: Vec<WorkspaceMetricBreakdown>,
+}
+
+#[derive(Debug, Serialize)]
+struct WorkspaceMetricsResponse {
+    workspace_id: String,
+    generated_at: String,
+    source_count: i64,
+    member_count: i64,
+    artifact_count: i64,
+    indexed_artifact_count: i64,
+    pending_artifact_count: i64,
+    total_artifact_bytes: i64,
+    indexed_artifact_bytes: i64,
+    pending_artifact_bytes: i64,
+    chunk_count: i64,
+    symbol_count: i64,
+    memory_card_count: i64,
+    recent_activity_count: i64,
+    artifacts_created_last_7_days: i64,
+    artifacts_updated_last_7_days: i64,
+    activity_actions: Vec<WorkspaceMetricBreakdown>,
+    activity_by_day: Vec<WorkspaceMetricBreakdown>,
+    member_roles: Vec<WorkspaceMetricBreakdown>,
+    artifact_types: Vec<WorkspaceMetricBreakdown>,
+    artifact_bytes_by_type: Vec<WorkspaceMetricBreakdown>,
+    languages: Vec<WorkspaceMetricBreakdown>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -355,6 +409,11 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
         .route("/v1/auth/login", post(login))
         .route("/v1/session", get(session))
         .route(
+            "/v1/profile",
+            get(get_profile).put(update_profile),
+        )
+        .route("/v1/profile/password", post(change_profile_password))
+        .route(
             "/v1/organizations",
             get(list_organizations).post(create_organization),
         )
@@ -369,6 +428,10 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
         .route(
             "/v1/workspaces/{workspace_id}/overview",
             get(workspace_overview),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/metrics",
+            get(workspace_metrics),
         )
         .route(
             "/v1/workspaces/{workspace_id}/capabilities",
@@ -482,6 +545,11 @@ async fn register(
         .create_user(&request.email, &request.display_name, &password_hash)
         .await
         .map_err(ApiError::internal)?;
+    state
+        .storage
+        .touch_user_connection(&user.id)
+        .await
+        .map_err(ApiError::internal)?;
     let response = issue_token(&state.jwt_secret, user)?;
     Ok((StatusCode::CREATED, Json(response)))
 }
@@ -501,6 +569,11 @@ async fn login(
     if !verify_password(&request.password, &account.password_hash) {
         return Err(invalid_credentials());
     }
+    state
+        .storage
+        .touch_user_connection(&account.user.id)
+        .await
+        .map_err(ApiError::internal)?;
     Ok(Json(issue_token(&state.jwt_secret, account.user)?))
 }
 
@@ -524,6 +597,97 @@ async fn session(
         authentication: "jwt".to_owned(),
         memberships,
     }))
+}
+
+async fn get_profile(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+) -> Result<Json<UserProfileResponse>, ApiError> {
+    let profile = state
+        .storage
+        .get_user_profile(&subject.user_id)
+        .await
+        .map_err(ApiError::internal)?
+        .ok_or_else(ApiError::unauthorized)?;
+    let memberships = state
+        .storage
+        .workspace_memberships_for_user(&subject.user_id)
+        .await
+        .map_err(ApiError::internal)?;
+    let activity = state
+        .storage
+        .list_user_activity(&subject.user_id, 100)
+        .await
+        .map_err(map_storage_error)?;
+    let today = Utc::now().date_naive();
+    let mut activity_by_day = (0..14)
+        .rev()
+        .map(|offset| ((today - ChronoDuration::days(offset)).to_string(), 0))
+        .collect::<BTreeMap<_, _>>();
+    for event in &activity {
+        if let Some(day) = event.created_at.get(..10) {
+            if let Some(count) = activity_by_day.get_mut(day) {
+                *count += 1;
+            }
+        }
+    }
+    Ok(Json(UserProfileResponse {
+        user: profile.user,
+        created_at: profile.created_at,
+        updated_at: profile.updated_at,
+        last_connected_at: profile.last_connected_at,
+        workspace_count: memberships.len() as i64,
+        recent_activity_count: activity.len() as i64,
+        activity_by_day: metric_timeline(activity_by_day),
+    }))
+}
+
+async fn update_profile(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Json(request): Json<UpdateProfileRequest>,
+) -> Result<Json<SharedUser>, ApiError> {
+    if request.display_name.trim().is_empty() || request.display_name.trim().len() > 120 {
+        return Err(ApiError::bad_request(
+            "Display name must be between 1 and 120 characters.",
+        ));
+    }
+    state
+        .storage
+        .update_user_display_name(&subject.user_id, &request.display_name)
+        .await
+        .map(Json)
+        .map_err(map_storage_error)
+}
+
+async fn change_profile_password(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Json(request): Json<ChangePasswordRequest>,
+) -> Result<StatusCode, ApiError> {
+    validate_password(&request.new_password)?;
+    let account = state
+        .storage
+        .find_user(&subject.user_id)
+        .await
+        .map_err(ApiError::internal)?
+        .ok_or_else(ApiError::unauthorized)?;
+    let stored_account = state
+        .storage
+        .find_user_for_auth(account.email.as_deref().unwrap_or_default())
+        .await
+        .map_err(ApiError::internal)?
+        .ok_or_else(ApiError::unauthorized)?;
+    if !verify_password(&request.current_password, &stored_account.password_hash) {
+        return Err(ApiError::bad_request("Current password is incorrect."));
+    }
+    let password_hash = hash_password(&request.new_password)?;
+    state
+        .storage
+        .update_user_password(&subject.user_id, &password_hash)
+        .await
+        .map_err(map_storage_error)?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 async fn create_organization(
@@ -627,6 +791,140 @@ async fn workspace_overview(
         .await
         .map(Json)
         .map_err(map_core_error)
+}
+
+async fn workspace_metrics(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+) -> Result<Json<WorkspaceMetricsResponse>, ApiError> {
+    require_workspace_read(&state, &subject, &workspace_id).await?;
+    let overview = state
+        .core
+        .workspace_overview(workspace_id.clone())
+        .await
+        .map_err(map_core_error)?;
+    let artifacts = state
+        .core
+        .list_artifacts(workspace_id.clone())
+        .await
+        .map_err(map_core_error)?;
+    let activity = state
+        .storage
+        .list_workspace_activity(&workspace_id, 100)
+        .await
+        .map_err(map_storage_error)?;
+    let members = state
+        .storage
+        .list_workspace_members(&workspace_id)
+        .await
+        .map_err(map_storage_error)?;
+    let mut artifact_types = BTreeMap::<String, i64>::new();
+    let mut artifact_bytes_by_type = BTreeMap::<String, i64>::new();
+    let mut languages = BTreeMap::<String, i64>::new();
+    let mut activity_actions = BTreeMap::<String, i64>::new();
+    let mut member_roles = BTreeMap::<String, i64>::new();
+    let today = Utc::now().date_naive();
+    let mut activity_by_day = (0..14)
+        .rev()
+        .map(|offset| ((today - ChronoDuration::days(offset)).to_string(), 0))
+        .collect::<BTreeMap<_, _>>();
+    let freshness_threshold = (Utc::now() - ChronoDuration::days(7)).to_rfc3339();
+    let mut indexed_artifact_count = 0;
+    let mut total_artifact_bytes = 0;
+    let mut indexed_artifact_bytes = 0;
+    let mut artifacts_created_last_7_days = 0;
+    let mut artifacts_updated_last_7_days = 0;
+
+    for artifact in &artifacts {
+        if artifact.indexed_at.is_some() {
+            indexed_artifact_count += 1;
+            indexed_artifact_bytes += artifact.size_bytes;
+        }
+        total_artifact_bytes += artifact.size_bytes;
+        let artifact_type = artifact_type_label(&artifact.artifact_type).to_owned();
+        *artifact_types
+            .entry(artifact_type.clone())
+            .or_default() += 1;
+        *artifact_bytes_by_type.entry(artifact_type).or_default() += artifact.size_bytes;
+        artifacts_created_last_7_days += i64::from(artifact.created_at >= freshness_threshold);
+        artifacts_updated_last_7_days += i64::from(artifact.updated_at >= freshness_threshold);
+        if let Some(language) = artifact.language.as_ref().filter(|language| !language.trim().is_empty()) {
+            *languages.entry(language.clone()).or_default() += 1;
+        }
+    }
+    for event in &activity {
+        *activity_actions
+            .entry(event.action.replace('_', " "))
+            .or_default() += 1;
+        if let Some(day) = event.created_at.get(..10) {
+            if let Some(count) = activity_by_day.get_mut(day) {
+                *count += 1;
+            }
+        }
+    }
+    for member in &members {
+        *member_roles
+            .entry(workspace_role_label(&member.role).to_owned())
+            .or_default() += 1;
+    }
+
+    Ok(Json(WorkspaceMetricsResponse {
+        workspace_id,
+        generated_at: Utc::now().to_rfc3339(),
+        source_count: overview.source_count,
+        member_count: members.len() as i64,
+        artifact_count: overview.artifact_count,
+        indexed_artifact_count,
+        pending_artifact_count: overview.artifact_count - indexed_artifact_count,
+        total_artifact_bytes,
+        indexed_artifact_bytes,
+        pending_artifact_bytes: total_artifact_bytes - indexed_artifact_bytes,
+        chunk_count: overview.chunk_count,
+        symbol_count: overview.symbol_count,
+        memory_card_count: overview.memory_card_count,
+        recent_activity_count: activity.len() as i64,
+        artifacts_created_last_7_days,
+        artifacts_updated_last_7_days,
+        activity_actions: metric_breakdown(activity_actions),
+        activity_by_day: metric_timeline(activity_by_day),
+        member_roles: metric_breakdown(member_roles),
+        artifact_types: metric_breakdown(artifact_types),
+        artifact_bytes_by_type: metric_breakdown(artifact_bytes_by_type),
+        languages: metric_breakdown(languages),
+    }))
+}
+
+fn artifact_type_label(artifact_type: &ArtifactType) -> &'static str {
+    match artifact_type {
+        ArtifactType::File => "File",
+        ArtifactType::MarkdownDoc => "Markdown",
+        ArtifactType::CodeFile => "Code",
+        ArtifactType::Image => "Image",
+        ArtifactType::Issue => "Issue",
+        ArtifactType::Pr => "Pull request",
+        ArtifactType::Decision => "Decision",
+        ArtifactType::Incident => "Incident",
+        ArtifactType::Runbook => "Runbook",
+        ArtifactType::ApiSpec => "API specification",
+        ArtifactType::Note => "Note",
+    }
+}
+
+fn metric_breakdown(values: BTreeMap<String, i64>) -> Vec<WorkspaceMetricBreakdown> {
+    let mut values = values
+        .into_iter()
+        .map(|(label, value)| WorkspaceMetricBreakdown { label, value })
+        .collect::<Vec<_>>();
+    values.sort_by(|left, right| right.value.cmp(&left.value).then_with(|| left.label.cmp(&right.label)));
+    values
+}
+
+fn metric_timeline(values: BTreeMap<String, i64>) -> Vec<WorkspaceMetricBreakdown> {
+    values
+        .into_iter()
+        .map(|(label, value)| WorkspaceMetricBreakdown { label, value })
+        .collect()
 }
 
 async fn workspace_capabilities(
@@ -1603,7 +1901,11 @@ fn validate_registration(request: &RegisterRequest) -> Result<(), ApiError> {
             "Display name must be between 1 and 120 characters.",
         ));
     }
-    if request.password.len() < 12 || request.password.len() > 1024 {
+    validate_password(&request.password)
+}
+
+fn validate_password(password: &str) -> Result<(), ApiError> {
+    if password.len() < 12 || password.len() > 1024 {
         return Err(ApiError::bad_request(
             "Password must be between 12 and 1024 characters.",
         ));
@@ -1743,6 +2045,43 @@ mod tests {
             serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap())
                 .unwrap();
         let authorization = format!("Bearer {}", registration["access_token"].as_str().unwrap());
+
+        let profile = app
+            .clone()
+            .oneshot(auth_request("GET", "/v1/profile", &authorization))
+            .await
+            .unwrap();
+        assert_eq!(profile.status(), 200);
+        let profile: Value =
+            serde_json::from_slice(&to_bytes(profile.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
+        assert_eq!(profile["user"]["display_name"], "Flow Owner");
+        assert!(profile["last_connected_at"].is_string());
+        assert_eq!(profile["activity_by_day"].as_array().unwrap().len(), 14);
+
+        let renamed_profile = app
+            .clone()
+            .oneshot(json_request(
+                "PUT",
+                "/v1/profile",
+                &authorization,
+                json!({"display_name":"Flow Owner Updated"}),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(renamed_profile.status(), 200);
+
+        let changed_password = app
+            .clone()
+            .oneshot(json_request(
+                "POST",
+                "/v1/profile/password",
+                &authorization,
+                json!({"current_password":"not-a-real-password","new_password":"changed-password-123"}),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(changed_password.status(), 204);
 
         let organization = app
             .clone()
@@ -1887,6 +2226,27 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(indexed.status(), 200);
+        let metrics = app
+            .clone()
+            .oneshot(auth_request(
+                "GET",
+                &format!("/v1/workspaces/{workspace_id}/metrics"),
+                &authorization,
+            ))
+            .await
+            .unwrap();
+        assert_eq!(metrics.status(), 200);
+        let metrics: Value =
+            serde_json::from_slice(&to_bytes(metrics.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
+        assert_eq!(metrics["artifact_count"], 2);
+        assert_eq!(metrics["indexed_artifact_count"], 1);
+        assert_eq!(metrics["pending_artifact_count"], 1);
+        assert_eq!(metrics["member_count"], 2);
+        assert!(metrics["total_artifact_bytes"].as_i64().unwrap() > 0);
+        assert!(metrics["indexed_artifact_bytes"].as_i64().unwrap() > 0);
+        assert_eq!(metrics["activity_by_day"].as_array().unwrap().len(), 14);
+        assert!(!metrics["artifact_bytes_by_type"].as_array().unwrap().is_empty());
         let search = app.clone().oneshot(json_request("POST", &format!("/v1/workspaces/{workspace_id}/search"), &authorization, json!({"query":"shared data", "artifact_types": [], "languages": [], "source_ids": [], "limit": 20}))).await.unwrap();
         assert_eq!(search.status(), 200);
         let search: Value =

@@ -43,6 +43,16 @@ export interface SharedSession {
   memberships: WorkspaceMembership[];
 }
 
+export interface UserProfile {
+  user: SharedUser;
+  created_at: string;
+  updated_at: string;
+  last_connected_at: string | null;
+  workspace_count: number;
+  recent_activity_count: number;
+  activity_by_day: WorkspaceMetricBreakdown[];
+}
+
 export interface Organization {
   id: string;
   name: string;
@@ -84,6 +94,36 @@ export interface WorkspaceOverview {
   chunk_count: number;
   symbol_count: number;
   memory_card_count: number;
+}
+
+export interface WorkspaceMetricBreakdown {
+  label: string;
+  value: number;
+}
+
+export interface WorkspaceMetrics {
+  workspace_id: string;
+  generated_at: string;
+  source_count: number;
+  member_count: number;
+  artifact_count: number;
+  indexed_artifact_count: number;
+  pending_artifact_count: number;
+  total_artifact_bytes: number;
+  indexed_artifact_bytes: number;
+  pending_artifact_bytes: number;
+  chunk_count: number;
+  symbol_count: number;
+  memory_card_count: number;
+  recent_activity_count: number;
+  artifacts_created_last_7_days: number;
+  artifacts_updated_last_7_days: number;
+  activity_actions: WorkspaceMetricBreakdown[];
+  activity_by_day: WorkspaceMetricBreakdown[];
+  member_roles: WorkspaceMetricBreakdown[];
+  artifact_types: WorkspaceMetricBreakdown[];
+  artifact_bytes_by_type: WorkspaceMetricBreakdown[];
+  languages: WorkspaceMetricBreakdown[];
 }
 
 export interface WorkspaceCapabilities {

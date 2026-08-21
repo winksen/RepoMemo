@@ -13,6 +13,7 @@ import type {
   SharedSession,
   SharedAiProviderSettings,
   SharedUser,
+  UserProfile,
   WorkspaceMember,
   WorkspaceRole,
   WorkspaceActivityEvent,
@@ -20,6 +21,7 @@ import type {
   WorkspaceCapabilities,
   SharedWorkspace,
   WorkspaceOverview,
+  WorkspaceMetrics,
 } from "../types";
 
 const API_URL = (import.meta.env.VITE_REPOMEMO_API_URL ?? "http://127.0.0.1:8787").replace(/\/$/, "");
@@ -112,6 +114,24 @@ export function getSharedSession(accessToken: string): Promise<SharedSession> {
   return request<SharedSession>("/v1/session", {}, accessToken);
 }
 
+export function getSharedProfile(accessToken: string): Promise<UserProfile> {
+  return request<UserProfile>("/v1/profile", {}, accessToken);
+}
+
+export function updateSharedProfile(accessToken: string, displayName: string): Promise<SharedUser> {
+  return request<SharedUser>("/v1/profile", {
+    method: "PUT",
+    body: JSON.stringify({ display_name: displayName }),
+  }, accessToken);
+}
+
+export function changeSharedPassword(accessToken: string, input: { currentPassword: string; newPassword: string }): Promise<void> {
+  return request<void>("/v1/profile/password", {
+    method: "POST",
+    body: JSON.stringify({ current_password: input.currentPassword, new_password: input.newPassword }),
+  }, accessToken);
+}
+
 export function listSharedOrganizations(accessToken: string): Promise<Organization[]> {
   return request<Organization[]>("/v1/organizations", {}, accessToken);
 }
@@ -151,6 +171,10 @@ export function deleteSharedWorkspace(accessToken: string, workspaceId: string):
 
 export function getSharedWorkspaceOverview(accessToken: string, workspaceId: string): Promise<WorkspaceOverview> {
   return request<WorkspaceOverview>(`/v1/workspaces/${workspaceId}/overview`, {}, accessToken);
+}
+
+export function getSharedWorkspaceMetrics(accessToken: string, workspaceId: string): Promise<WorkspaceMetrics> {
+  return request<WorkspaceMetrics>(`/v1/workspaces/${workspaceId}/metrics`, {}, accessToken);
 }
 
 export function getSharedWorkspaceCapabilities(accessToken: string, workspaceId: string): Promise<WorkspaceCapabilities> {

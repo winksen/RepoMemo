@@ -45,6 +45,16 @@ struct UserRow {
 }
 
 #[derive(Debug, sqlx::FromRow)]
+struct UserProfileRow {
+    id: String,
+    email: String,
+    display_name: String,
+    created_at: String,
+    updated_at: String,
+    last_connected_at: Option<String>,
+}
+
+#[derive(Debug, sqlx::FromRow)]
 struct OrganizationRow {
     id: String,
     name: String,
@@ -288,6 +298,14 @@ pub struct StoredUser {
     pub password_hash: String,
 }
 
+#[derive(Debug, Clone)]
+pub struct UserProfile {
+    pub user: SharedUser,
+    pub created_at: String,
+    pub updated_at: String,
+    pub last_connected_at: Option<String>,
+}
+
 impl StorageEngine {
     pub async fn open(config: StorageConfig) -> Result<Self> {
         tokio::fs::create_dir_all(&config.data_dir).await?;
@@ -474,6 +492,55 @@ impl StorageEngine {
         .fetch_optional(&self.pool)
         .await?;
         Ok(row.map(|row| StoredUser::from(row).user))
+    }
+
+    pub async fn get_user_profile(&self, user_id: &str) -> Result<Option<UserProfile>> {
+        let row = sqlx::query_as::<_, UserProfileRow>(
+            "SELECT id, email, display_name, created_at, updated_at, last_connected_at FROM users WHERE id = ?1",
+        )
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.map(UserProfile::from))
+    }
+
+    pub async fn update_user_display_name(&self, user_id: &str, display_name: &str) -> Result<SharedUser> {
+        let display_name = require_name(display_name, "Display name")?;
+        let now = Utc::now().to_rfc3339();
+        let changed = sqlx::query("UPDATE users SET display_name = ?1, updated_at = ?2 WHERE id = ?3")
+            .bind(&display_name)
+            .bind(now)
+            .bind(user_id)
+            .execute(&self.pool)
+            .await?;
+        if changed.rows_affected() == 0 {
+            bail!("User was not found.");
+        }
+        self.find_user(user_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("User was not found."))
+    }
+
+    pub async fn update_user_password(&self, user_id: &str, password_hash: &str) -> Result<()> {
+        let changed = sqlx::query("UPDATE users SET password_hash = ?1, updated_at = ?2 WHERE id = ?3")
+            .bind(password_hash)
+            .bind(Utc::now().to_rfc3339())
+            .bind(user_id)
+            .execute(&self.pool)
+            .await?;
+        if changed.rows_affected() == 0 {
+            bail!("User was not found.");
+        }
+        Ok(())
+    }
+
+    pub async fn touch_user_connection(&self, user_id: &str) -> Result<()> {
+        sqlx::query("UPDATE users SET last_connected_at = ?1 WHERE id = ?2")
+            .bind(Utc::now().to_rfc3339())
+            .bind(user_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
     }
 
     pub async fn create_organization(&self, owner_id: &str, name: &str) -> Result<Organization> {
@@ -710,6 +777,34 @@ impl StorageEngine {
         .fetch_all(&self.pool)
         .await?;
 
+        Ok(rows.into_iter().map(WorkspaceActivityEvent::from).collect())
+    }
+
+    pub async fn list_user_activity(&self, user_id: &str, limit: i64) -> Result<Vec<WorkspaceActivityEvent>> {
+        let rows = sqlx::query_as::<_, WorkspaceActivityRow>(
+            r#"
+            SELECT
+              activity.id,
+              activity.workspace_id,
+              actor.id AS actor_id,
+              actor.email AS actor_email,
+              actor.display_name AS actor_display_name,
+              activity.action,
+              activity.subject_type,
+              activity.subject_id,
+              activity.summary,
+              activity.created_at
+            FROM workspace_activity AS activity
+            LEFT JOIN users AS actor ON actor.id = activity.actor_user_id
+            WHERE activity.actor_user_id = ?1
+            ORDER BY activity.created_at DESC, activity.id DESC
+            LIMIT ?2
+            "#,
+        )
+        .bind(user_id)
+        .bind(limit.clamp(1, 100))
+        .fetch_all(&self.pool)
+        .await?;
         Ok(rows.into_iter().map(WorkspaceActivityEvent::from).collect())
     }
 
@@ -2060,6 +2155,21 @@ impl From<UserRow> for StoredUser {
                 email: Some(row.email),
             },
             password_hash: row.password_hash,
+        }
+    }
+}
+
+impl From<UserProfileRow> for UserProfile {
+    fn from(row: UserProfileRow) -> Self {
+        Self {
+            user: SharedUser {
+                id: row.id,
+                display_name: row.display_name,
+                email: Some(row.email),
+            },
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+            last_connected_at: row.last_connected_at,
         }
     }
 }

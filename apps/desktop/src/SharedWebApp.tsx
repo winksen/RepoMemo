@@ -14,6 +14,7 @@ import {
   IconBuildingCommunity as Building,
   IconBrain as Brain,
   IconChevronRight as ChevronRight,
+  IconChartBar as Chart,
   IconFileText as FileText,
   IconFilter as Filter,
   IconLayoutGrid as Grid,
@@ -35,11 +36,13 @@ import {
   IconTrash as Trash,
   IconUsers as Users,
   IconUpload as Upload,
+  IconUserCircle as UserCircle,
   IconSun as Sun,
 } from "@tabler/icons-react";
 import {
   askSharedWorkspace,
   createSharedOrganization,
+  changeSharedPassword,
   createSharedMemoryCard,
   createSharedTextArtifact,
   createSharedWorkspace,
@@ -49,7 +52,9 @@ import {
   exportSharedMemoryCard,
   getSharedArtifact,
   getSharedHealth,
+  getSharedProfile,
   getSharedWorkspaceCapabilities,
+  getSharedWorkspaceMetrics,
   getSharedRetrievalFacets,
   getSharedMemoryCard,
   getSharedSession,
@@ -76,6 +81,7 @@ import {
   upsertSharedWorkspaceMember,
   uploadSharedArtifact,
   updateSharedArtifact,
+  updateSharedProfile,
   updateSharedMemoryCard,
   updateSharedWorkspace,
   type SharedApiError,
@@ -93,6 +99,7 @@ import type {
   SearchResult,
   SharedAiProviderSettings,
   SharedSession,
+  SharedUser,
   SharedWorkspace,
   WorkspaceMember,
   WorkspaceActivityEvent,
@@ -100,6 +107,9 @@ import type {
   WorkspaceCapabilities,
   WorkspaceRole,
   WorkspaceOverview,
+  WorkspaceMetrics,
+  WorkspaceMetricBreakdown,
+  UserProfile,
 } from "./types";
 import { Button } from "./components/ui/button";
 import { Dropdown } from "./components/ui/dropdown";
@@ -248,6 +258,10 @@ export function SharedWebApp() {
   const workspaceOrganization = workspace
     ? organizations.find((organization) => organization.id === workspace.organization_id)
     : undefined;
+
+  if (pathname === "/profile") {
+    return <SharedProfile accessToken={accessToken} apiAvailable={apiAvailable} organizations={organizations} onSessionUserUpdated={(user) => setSession((current) => current ? { ...current, user } : current)} session={session} signOut={signOut} />;
+  }
 
   if (workspace && routeParts[2] === "artifacts" && routeParts[3]) {
     return <SharedArtifactDetail accessToken={accessToken} apiAvailable={apiAvailable} artifactId={routeParts[3]} onBack={() => navigate(`/workspaces/${encodeURIComponent(workspaceId!)}/overview`)} organization={workspaceOrganization} session={session} signOut={signOut} workspace={workspace} />;
@@ -401,6 +415,81 @@ function AuthCanvas({
   );
 }
 
+function SharedProfile({
+  accessToken,
+  apiAvailable,
+  organizations,
+  onSessionUserUpdated,
+  session,
+  signOut,
+}: {
+  accessToken: string;
+  apiAvailable: boolean | null;
+  organizations: Organization[];
+  onSessionUserUpdated: (user: SharedUser) => void;
+  session: SharedSession;
+  signOut: () => void;
+}) {
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [displayName, setDisplayName] = useState(session.user.display_name);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function load() {
+    setIsLoading(true); setError(null);
+    try {
+      const nextProfile = await getSharedProfile(accessToken);
+      setProfile(nextProfile);
+      setDisplayName(nextProfile.user.display_name);
+    } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsLoading(false); }
+  }
+
+  useEffect(() => { void load(); }, [accessToken]);
+
+  async function saveProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsSubmitting(true); setError(null); setNotice(null);
+    try {
+      const user = await updateSharedProfile(accessToken, displayName);
+      onSessionUserUpdated(user);
+      setProfile((current) => current ? { ...current, user, updated_at: new Date().toISOString() } : current);
+      setNotice("Profile name updated.");
+    } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
+  }
+
+  async function changePassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (newPassword !== confirmPassword) { setError("New password confirmation does not match."); return; }
+    setIsSubmitting(true); setError(null); setNotice(null);
+    try {
+      await changeSharedPassword(accessToken, { currentPassword, newPassword });
+      setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
+      setNotice("Password changed. Your current session remains active.");
+    } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
+  }
+
+  const initials = (profile?.user.display_name ?? session.user.display_name).split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "U";
+
+  return <SharedAppShell apiAvailable={apiAvailable} session={session} signOut={signOut} sidebar={<OrganizationRail organizations={organizations} />}>
+    <section className="shared-page-content shared-profile-page" aria-busy={isLoading}>
+      <div className="shared-detail-heading"><div><p className="shared-eyebrow">Account</p><h1>Your profile</h1><p>Manage your identity and review your activity across shared workspaces.</p></div><Button onClick={() => navigate("/workspaces")} type="button" variant="secondary"><ArrowLeft size={16} /> All workspaces</Button></div>
+      {error ? <p className="shared-form-error" role="alert">{error}</p> : null}
+      {notice ? <p className="shared-profile-notice" role="status">{notice}</p> : null}
+      <div className="shared-profile-layout">
+        <section className="shared-profile-identity"><div className="shared-profile-avatar" aria-hidden="true">{initials}</div><div><h2>{profile?.user.display_name ?? session.user.display_name}</h2><p>{profile?.user.email ?? session.user.email ?? "No email address"}</p></div><dl><div><dt>Last connected</dt><dd>{formatProfileTime(profile?.last_connected_at)}</dd></div><div><dt>Member since</dt><dd>{formatProfileTime(profile?.created_at)}</dd></div><div><dt>Shared workspaces</dt><dd>{profile?.workspace_count ?? "—"}</dd></div><div><dt>Recorded actions</dt><dd>{profile?.recent_activity_count ?? "—"}</dd></div></dl></section>
+        <MetricTimeline items={profile?.activity_by_day ?? []} title="Your activity, last 14 days" />
+        <section className="shared-profile-panel"><div className="shared-panel-heading"><div><UserCircle size={18} /><h2>Personal details</h2></div></div><form onSubmit={saveProfile}><label>Display name<Input autoComplete="name" onChange={(event) => setDisplayName(event.target.value)} required value={displayName} /></label><label>Email<Input disabled value={profile?.user.email ?? session.user.email ?? ""} /></label><Button disabled={isSubmitting} type="submit" variant="main">{isSubmitting ? <Loader className="spin" size={16} /> : <Pencil size={16} />} Save details</Button></form></section>
+        <section className="shared-profile-panel"><div className="shared-panel-heading"><div><Key size={18} /><h2>Password</h2></div></div><form onSubmit={changePassword}><label>Current password<Input autoComplete="current-password" minLength={12} onChange={(event) => setCurrentPassword(event.target.value)} required type="password" value={currentPassword} /></label><label>New password<Input autoComplete="new-password" minLength={12} onChange={(event) => setNewPassword(event.target.value)} placeholder="At least 12 characters" required type="password" value={newPassword} /></label><label>Confirm new password<Input autoComplete="new-password" minLength={12} onChange={(event) => setConfirmPassword(event.target.value)} required type="password" value={confirmPassword} /></label><Button disabled={isSubmitting} type="submit" variant="secondary">{isSubmitting ? <Loader className="spin" size={16} /> : <Key size={16} />} Change password</Button></form></section>
+      </div>
+    </section>
+  </SharedAppShell>;
+}
+
 function SharedWorkspaceHome({
   accessToken,
   apiAvailable,
@@ -505,7 +594,7 @@ function SharedAppShell({
     <main className="shared-home">
       <header className="shared-home-header">
         <div className="shared-brand"><span className="shared-brand-glyph"><Layers size={19} /></span><strong>RepoMemo</strong><span className="shared-mode-tag">Shared</span></div>
-        <div className="shared-user-menu"><Button aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} aria-pressed={theme === "dark"} className="shared-theme-toggle" onClick={() => setTheme((current) => current === "dark" ? "light" : "dark")} title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} type="button" variant="secondary">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}<span>{theme === "dark" ? "Light" : "Dark"}</span></Button><span>{session.user.display_name}</span><Button className="shared-user-signout" onClick={signOut} type="button" variant="secondary"><Logout size={16} /> Sign out</Button></div>
+        <div className="shared-user-menu"><Button aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} aria-pressed={theme === "dark"} className="shared-theme-toggle" onClick={() => setTheme((current) => current === "dark" ? "light" : "dark")} title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} type="button" variant="secondary">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}<span>{theme === "dark" ? "Light" : "Dark"}</span></Button><Button className="shared-profile-link" onClick={() => navigate("/profile")} type="button" variant="secondary"><UserCircle size={16} /> {session.user.display_name}</Button><Button className="shared-user-signout" onClick={signOut} type="button" variant="secondary"><Logout size={16} /> Sign out</Button></div>
       </header>
       <div className="shared-home-frame">
         <aside className="shared-home-rail">{sidebar}<div className="shared-rail-footer"><Shield size={15} /><span>JWT active · API {apiAvailable === true ? "healthy" : apiAvailable === false ? "offline" : "checking"}</span></div></aside>
@@ -588,6 +677,7 @@ function SharedWorkspaceDetail({
   workspace: SharedWorkspace;
 }) {
   const [overview, setOverview] = useState<WorkspaceOverview | null>(null);
+  const [workspaceMetrics, setWorkspaceMetrics] = useState<WorkspaceMetrics | null>(null);
   const [artifacts, setArtifacts] = useState<ArtifactSummary[]>([]);
   const [artifactResults, setArtifactResults] = useState<ArtifactSummary[] | null>(null);
   const [artifactQuery, setArtifactQuery] = useState("");
@@ -649,8 +739,9 @@ function SharedWorkspaceDetail({
     setIsLoading(true);
     setError(null);
     try {
-      const [nextOverview, nextArtifacts, nextMemory, nextMembers, nextCapabilities, nextRetrievalFacets] = await Promise.all([
+      const [nextOverview, nextWorkspaceMetrics, nextArtifacts, nextMemory, nextMembers, nextCapabilities, nextRetrievalFacets] = await Promise.all([
         getSharedWorkspaceOverview(accessToken, workspace.workspace.id),
+        getSharedWorkspaceMetrics(accessToken, workspace.workspace.id),
         listSharedArtifacts(accessToken, workspace.workspace.id),
         listSharedMemoryCards(accessToken, workspace.workspace.id),
         listSharedWorkspaceMembers(accessToken, workspace.workspace.id),
@@ -658,6 +749,7 @@ function SharedWorkspaceDetail({
         getSharedRetrievalFacets(accessToken, workspace.workspace.id),
       ]);
       setOverview(nextOverview);
+      setWorkspaceMetrics(nextWorkspaceMetrics);
       setArtifacts(nextArtifacts);
       setArtifactResults(null);
       setMemoryCards(nextMemory);
@@ -892,9 +984,29 @@ function SharedWorkspaceDetail({
           <div className="shared-detail-actions"><Button className="shared-back-button" onClick={onBack} type="button" variant="secondary"><ArrowLeft size={16} /> All workspaces</Button><Button disabled={isLoading} onClick={() => void load()} type="button" variant="secondary"><Refresh size={16} /> Refresh</Button>{canWrite && isEvidenceView ? <Button disabled={isSubmitting || isLoading} onClick={() => void runIndex()} type="button" variant="main">{isSubmitting ? <Loader className="spin" size={16} /> : <Layers size={16} />} Index evidence</Button> : null}</div>
         </div>
         {error ? <p className="shared-form-error" role="alert">{error}</p> : null}
-        {section === "overview" ? <div className="shared-evidence-summary">
+        {section === "overview" ? <><div className="shared-evidence-summary">
           <span><strong>{overview?.artifact_count ?? "—"}</strong> artifacts</span><span><strong>{overview?.chunk_count ?? "—"}</strong> indexed chunks</span><span><strong>{overview?.memory_card_count ?? "—"}</strong> memory cards</span>
-        </div> : null}
+        </div>
+        <section className="shared-metrics-dashboard" aria-labelledby="workspace-metrics-heading">
+          <div className="shared-panel-heading"><div><Chart size={18} /><h2 id="workspace-metrics-heading">Workspace pulse</h2></div><span>{workspaceMetrics ? "Live API snapshot" : "Loading metrics…"}</span></div>
+          <div className="shared-metric-highlights">
+            <div><span>Index coverage</span><strong>{workspaceMetrics ? `${workspaceMetrics.artifact_count ? Math.round((workspaceMetrics.indexed_artifact_count / workspaceMetrics.artifact_count) * 100) : 0}%` : "—"}</strong><small>{workspaceMetrics ? `${workspaceMetrics.indexed_artifact_count} of ${workspaceMetrics.artifact_count} artifacts` : "Waiting for server data"}</small></div>
+            <div><span>Indexed storage</span><strong>{workspaceMetrics ? formatFileSize(workspaceMetrics.indexed_artifact_bytes) : "—"}</strong><small>{workspaceMetrics ? `${formatFileSize(workspaceMetrics.pending_artifact_bytes)} pending` : "Waiting for server data"}</small></div>
+            <div><span>Fresh evidence</span><strong>{workspaceMetrics?.artifacts_updated_last_7_days ?? "—"}</strong><small>{workspaceMetrics ? `${workspaceMetrics.artifacts_created_last_7_days} added in 7 days` : "Waiting for server data"}</small></div>
+            <div><span>Knowledge density</span><strong>{workspaceMetrics ? `${workspaceMetrics.indexed_artifact_count ? Math.round(workspaceMetrics.chunk_count / workspaceMetrics.indexed_artifact_count) : 0}` : "—"}</strong><small>retrieval chunks per indexed file</small></div>
+            <div><span>Code symbols</span><strong>{workspaceMetrics?.symbol_count ?? "—"}</strong><small>extracted from evidence</small></div>
+            <div><span>Team access</span><strong>{workspaceMetrics?.member_count ?? "—"}</strong><small>people with workspace access</small></div>
+          </div>
+          <div className="shared-metric-visuals">
+            <section className="shared-metric-panel shared-metric-coverage"><div><h3>Indexing coverage</h3><span>{workspaceMetrics ? `${workspaceMetrics.pending_artifact_count} waiting to be indexed` : "Loading…"}</span></div><div className="shared-coverage-track" aria-label="Artifact indexing coverage"><span style={{ width: `${workspaceMetrics?.artifact_count ? (workspaceMetrics.indexed_artifact_count / workspaceMetrics.artifact_count) * 100 : 0}%` }} /></div><div className="shared-coverage-legend"><span>Indexed {workspaceMetrics?.indexed_artifact_count ?? 0}</span><span>Pending {workspaceMetrics?.pending_artifact_count ?? 0}</span></div></section>
+            <MetricBars emptyLabel="Evidence types appear after you add files." items={workspaceMetrics?.artifact_types ?? []} title="Evidence by type" />
+            <MetricBars emptyLabel="Storage distribution appears after you add files." formatValue={formatFileSize} items={workspaceMetrics?.artifact_bytes_by_type ?? []} title="Storage by evidence type" />
+            <MetricBars emptyLabel="Languages appear after indexed files are detected." items={workspaceMetrics?.languages ?? []} title="Languages in evidence" />
+            <MetricTimeline items={workspaceMetrics?.activity_by_day ?? []} />
+            <MetricBars emptyLabel="Workspace changes will be summarized here." items={workspaceMetrics?.activity_actions ?? []} title="Recent activity" />
+            <MetricBars emptyLabel="Team roles appear when members join this workspace." items={workspaceMetrics?.member_roles ?? []} summary={workspaceMetrics ? `${workspaceMetrics.member_count} people` : undefined} title="Team access" />
+          </div>
+        </section></> : null}
         {section === "overview" ? <section className="shared-ai-overview" aria-live="polite">
           <div className="shared-panel-heading"><div><Brain size={18} /><h2>AI workspace overview</h2></div>{aiOverview?.provider_name ? <span>{aiOverview.provider_name}</span> : null}</div>
           {aiOverview?.summary_markdown ? <div className="shared-ai-overview-body">{aiOverview.summary_markdown}</div> : <p className="shared-muted-copy">Generate a concise project briefing from indexed evidence. RepoMemo only uses an enabled provider configured for this workspace and returns the source citations with the result.</p>}
@@ -1208,7 +1320,25 @@ function SharedRouteNotFound({
 function formatFileSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
+
+function MetricBars({ emptyLabel, formatValue = (value: number) => value.toLocaleString(), items, summary, title }: { emptyLabel: string; formatValue?: (value: number) => string; items: WorkspaceMetricBreakdown[]; summary?: string; title: string }) {
+  const visibleItems = items.slice(0, 5);
+  const maximum = Math.max(...visibleItems.map((item) => item.value), 1);
+  return <section className="shared-metric-panel"><div><h3>{title}</h3><span>{summary ?? (visibleItems.length ? `${visibleItems.length} categories` : "No data yet")}</span></div>{visibleItems.length ? <div className="shared-metric-bars">{visibleItems.map((item) => <div className="shared-metric-bar" key={item.label}><span>{item.label}</span><div aria-label={`${item.label}: ${formatValue(item.value)}`} className="shared-metric-bar-track"><i style={{ width: `${(item.value / maximum) * 100}%` }} /></div><strong>{formatValue(item.value)}</strong></div>)}</div> : <p className="shared-metric-empty">{emptyLabel}</p>}</section>;
+}
+
+function MetricTimeline({ items, title = "Activity, last 14 days" }: { items: WorkspaceMetricBreakdown[]; title?: string }) {
+  const maximum = Math.max(...items.map((item) => item.value), 1);
+  return <section className="shared-metric-panel shared-metric-timeline"><div><h3>{title}</h3><span>{items.reduce((total, item) => total + item.value, 0)} changes</span></div><div className="shared-timeline-bars" aria-label={`${title} activity graph`}>{items.map((item) => <div key={item.label}><span title={`${formatMetricDay(item.label)}: ${item.value} changes`} style={{ height: `${Math.max((item.value / maximum) * 100, item.value ? 8 : 2)}%` }} /><small>{formatMetricDay(item.label)}</small></div>)}</div></section>;
+}
+
+function formatMetricDay(value: string) {
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 function artifactTypeLabel(type: ArtifactType) {
@@ -1219,6 +1349,11 @@ function formatActivityTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+}
+
+function formatProfileTime(value: string | null | undefined) {
+  if (!value) return "Not recorded yet";
+  return formatActivityTime(value);
 }
 
 function artifactCitation(artifacts: ArtifactSummary[], artifactId: string) {
