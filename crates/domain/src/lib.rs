@@ -63,6 +63,35 @@ pub struct CollaborationTask {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SavedSearch {
+    pub id: String,
+    pub workspace_id: String,
+    pub name: String,
+    pub query: String,
+    pub artifact_types: Vec<ArtifactType>,
+    pub languages: Vec<String>,
+    pub source_ids: Vec<String>,
+    pub result_limit: i64,
+    pub created_by: SharedUser,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskChecklistItem {
+    pub id: String,
+    pub task_id: String,
+    pub workspace_id: String,
+    pub body: String,
+    pub position: i64,
+    pub completed_at: Option<String>,
+    pub completed_by: Option<SharedUser>,
+    pub created_by: SharedUser,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ArtifactComment {
     pub id: String,
     pub workspace_id: String,

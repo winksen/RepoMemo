@@ -5,8 +5,8 @@ use chrono::Utc;
 use repomemo_domain::{
     ArtifactComment, ArtifactDetail, ArtifactLifecycle, ArtifactLifecycleEvent, ArtifactSummary, ArtifactType, Chunk, Citation,
     CollaborationTask, IndexingJobStatus, MemoryCard, MemoryCardDetail, MemoryCardSummary,
-    MemoryEvidence, Organization, ProviderSettings, SearchRequest, SearchResult, SharedNotification, SharedUser,
-    SharedWorkspace, Source, SourceType, Symbol, SymbolKind, SymbolSearchResult, Workspace,
+    MemoryEvidence, Organization, ProviderSettings, SavedSearch, SearchRequest, SearchResult, SharedNotification, SharedUser,
+    SharedWorkspace, Source, SourceType, Symbol, SymbolKind, SymbolSearchResult, TaskChecklistItem, Workspace,
     WorkspaceActivityEvent, WorkspaceMember, WorkspaceMembership, WorkspaceOverview, WorkspaceRole,
 };
 use serde_json::Value;
@@ -119,6 +119,20 @@ struct CollaborationTaskRow {
 }
 
 #[derive(Debug, sqlx::FromRow)]
+struct SavedSearchRow {
+    id: String, workspace_id: String, name: String, query: String, artifact_types_json: String,
+    languages_json: String, source_ids_json: String, result_limit: i64,
+    creator_id: String, creator_email: String, creator_display_name: String, created_at: String, updated_at: String,
+}
+
+#[derive(Debug, sqlx::FromRow)]
+struct TaskChecklistItemRow {
+    id: String, task_id: String, workspace_id: String, body: String, position: i64,
+    completed_at: Option<String>, completed_by_id: Option<String>, completed_by_email: Option<String>, completed_by_display_name: Option<String>,
+    creator_id: String, creator_email: String, creator_display_name: String, created_at: String, updated_at: String,
+}
+
+#[derive(Debug, sqlx::FromRow)]
 struct ArtifactCommentRow {
     id: String,
     workspace_id: String,
@@ -183,6 +197,12 @@ pub struct NewCollaborationTask {
     pub artifact_id: Option<String>,
     pub due_at: Option<String>,
 }
+
+#[derive(Debug, Clone)]
+pub struct NewSavedSearch { pub name: String, pub query: String, pub artifact_types: Vec<ArtifactType>, pub languages: Vec<String>, pub source_ids: Vec<String>, pub result_limit: i64 }
+
+#[derive(Debug, Clone)]
+pub struct NewTaskChecklistItem { pub body: String }
 
 #[derive(Debug, Clone, Default)]
 pub struct WorkspaceCollaborationCounts {
@@ -1163,6 +1183,58 @@ impl StorageEngine {
         }
         Ok(())
     }
+
+    pub async fn list_saved_searches(&self, workspace_id: &str) -> Result<Vec<SavedSearch>> {
+        let rows = sqlx::query_as::<_, SavedSearchRow>("SELECT search.id, search.workspace_id, search.name, search.query, search.artifact_types_json, search.languages_json, search.source_ids_json, search.result_limit, creator.id AS creator_id, creator.email AS creator_email, creator.display_name AS creator_display_name, search.created_at, search.updated_at FROM workspace_saved_searches search JOIN users creator ON creator.id = search.created_by_user_id WHERE search.workspace_id = ?1 ORDER BY search.updated_at DESC, search.name ASC")
+            .bind(workspace_id).fetch_all(&self.pool).await?;
+        Ok(rows.into_iter().map(SavedSearch::from).collect())
+    }
+
+    pub async fn create_saved_search(&self, workspace_id: &str, user_id: &str, search: NewSavedSearch) -> Result<SavedSearch> {
+        let id = Uuid::new_v4().to_string(); let now = Utc::now().to_rfc3339();
+        sqlx::query("INSERT INTO workspace_saved_searches (id, workspace_id, created_by_user_id, name, query, artifact_types_json, languages_json, source_ids_json, result_limit, created_at, updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?10)")
+            .bind(&id).bind(workspace_id).bind(user_id).bind(search.name).bind(search.query)
+            .bind(serde_json::to_string(&search.artifact_types)?).bind(serde_json::to_string(&search.languages)?).bind(serde_json::to_string(&search.source_ids)?).bind(search.result_limit).bind(now).execute(&self.pool).await?;
+        self.get_saved_search(&id).await
+    }
+
+    pub async fn get_saved_search(&self, search_id: &str) -> Result<SavedSearch> {
+        let row = sqlx::query_as::<_, SavedSearchRow>("SELECT search.id, search.workspace_id, search.name, search.query, search.artifact_types_json, search.languages_json, search.source_ids_json, search.result_limit, creator.id AS creator_id, creator.email AS creator_email, creator.display_name AS creator_display_name, search.created_at, search.updated_at FROM workspace_saved_searches search JOIN users creator ON creator.id = search.created_by_user_id WHERE search.id = ?1")
+            .bind(search_id).fetch_one(&self.pool).await?;
+        Ok(SavedSearch::from(row))
+    }
+
+    pub async fn delete_saved_search(&self, search_id: &str) -> Result<()> {
+        let changed = sqlx::query("DELETE FROM workspace_saved_searches WHERE id = ?1").bind(search_id).execute(&self.pool).await?;
+        if changed.rows_affected() == 0 { bail!("Saved search was not found."); }
+        Ok(())
+    }
+
+    pub async fn list_task_checklist_items(&self, task_id: &str) -> Result<Vec<TaskChecklistItem>> {
+        let rows = sqlx::query_as::<_, TaskChecklistItemRow>("SELECT item.id,item.task_id,item.workspace_id,item.body,item.position,item.completed_at,completed.id AS completed_by_id,completed.email AS completed_by_email,completed.display_name AS completed_by_display_name,creator.id AS creator_id,creator.email AS creator_email,creator.display_name AS creator_display_name,item.created_at,item.updated_at FROM workspace_task_checklist_items item JOIN users creator ON creator.id=item.created_by_user_id LEFT JOIN users completed ON completed.id=item.completed_by_user_id WHERE item.task_id=?1 ORDER BY item.position,item.created_at")
+            .bind(task_id).fetch_all(&self.pool).await?;
+        Ok(rows.into_iter().map(TaskChecklistItem::from).collect())
+    }
+
+    pub async fn create_task_checklist_item(&self, task_id: &str, workspace_id: &str, user_id: &str, item: NewTaskChecklistItem) -> Result<TaskChecklistItem> {
+        let id=Uuid::new_v4().to_string(); let now=Utc::now().to_rfc3339();
+        let position: i64=sqlx::query_scalar("SELECT COALESCE(MAX(position), -1) + 1 FROM workspace_task_checklist_items WHERE task_id=?1").bind(task_id).fetch_one(&self.pool).await?;
+        sqlx::query("INSERT INTO workspace_task_checklist_items (id,task_id,workspace_id,created_by_user_id,body,position,created_at,updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?7)").bind(&id).bind(task_id).bind(workspace_id).bind(user_id).bind(item.body).bind(position).bind(now).execute(&self.pool).await?;
+        self.get_task_checklist_item(&id).await
+    }
+
+    pub async fn get_task_checklist_item(&self, item_id: &str) -> Result<TaskChecklistItem> {
+        let row=sqlx::query_as::<_,TaskChecklistItemRow>("SELECT item.id,item.task_id,item.workspace_id,item.body,item.position,item.completed_at,completed.id AS completed_by_id,completed.email AS completed_by_email,completed.display_name AS completed_by_display_name,creator.id AS creator_id,creator.email AS creator_email,creator.display_name AS creator_display_name,item.created_at,item.updated_at FROM workspace_task_checklist_items item JOIN users creator ON creator.id=item.created_by_user_id LEFT JOIN users completed ON completed.id=item.completed_by_user_id WHERE item.id=?1").bind(item_id).fetch_one(&self.pool).await?;
+        Ok(TaskChecklistItem::from(row))
+    }
+
+    pub async fn toggle_task_checklist_item(&self, item_id: &str, user_id: &str, completed: bool) -> Result<TaskChecklistItem> {
+        let now=Utc::now().to_rfc3339();
+        sqlx::query("UPDATE workspace_task_checklist_items SET completed_at=?1, completed_by_user_id=?2, updated_at=?3 WHERE id=?4").bind(if completed { Some(now.clone()) } else { None }).bind(if completed { Some(user_id) } else { None }).bind(now).bind(item_id).execute(&self.pool).await?;
+        self.get_task_checklist_item(item_id).await
+    }
+
+    pub async fn delete_task_checklist_item(&self, item_id: &str) -> Result<()> { let changed=sqlx::query("DELETE FROM workspace_task_checklist_items WHERE id=?1").bind(item_id).execute(&self.pool).await?; if changed.rows_affected()==0 { bail!("Checklist item was not found."); } Ok(()) }
 
     pub async fn list_artifact_comments(&self, artifact_id: &str) -> Result<Vec<ArtifactComment>> {
         let rows = sqlx::query_as::<_, ArtifactCommentRow>(
@@ -2975,6 +3047,22 @@ impl From<ArtifactCommentRow> for ArtifactComment {
             created_at: row.created_at,
             updated_at: row.updated_at,
         }
+    }
+}
+
+impl From<SavedSearchRow> for SavedSearch {
+    fn from(row: SavedSearchRow) -> Self {
+        Self { id: row.id, workspace_id: row.workspace_id, name: row.name, query: row.query,
+            artifact_types: serde_json::from_str(&row.artifact_types_json).unwrap_or_default(), languages: serde_json::from_str(&row.languages_json).unwrap_or_default(), source_ids: serde_json::from_str(&row.source_ids_json).unwrap_or_default(), result_limit: row.result_limit,
+            created_by: SharedUser { id: row.creator_id, display_name: row.creator_display_name, email: Some(row.creator_email) }, created_at: row.created_at, updated_at: row.updated_at }
+    }
+}
+
+impl From<TaskChecklistItemRow> for TaskChecklistItem {
+    fn from(row: TaskChecklistItemRow) -> Self {
+        Self { id: row.id, task_id: row.task_id, workspace_id: row.workspace_id, body: row.body, position: row.position, completed_at: row.completed_at,
+            completed_by: row.completed_by_id.map(|id| SharedUser { id, display_name: row.completed_by_display_name.unwrap_or_else(|| "Member".to_owned()), email: row.completed_by_email }),
+            created_by: SharedUser { id: row.creator_id, display_name: row.creator_display_name, email: Some(row.creator_email) }, created_at: row.created_at, updated_at: row.updated_at }
     }
 }
 

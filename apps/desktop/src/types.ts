@@ -61,6 +61,14 @@ export interface CollaborationTask {
   updated_at: string;
 }
 
+export interface SavedSearch {
+  id: string; workspace_id: string; name: string; query: string; artifact_types: ArtifactType[]; languages: string[]; source_ids: string[]; result_limit: number; created_by: SharedUser; created_at: string; updated_at: string;
+}
+
+export interface TaskChecklistItem {
+  id: string; task_id: string; workspace_id: string; body: string; position: number; completed_at: string | null; completed_by: SharedUser | null; created_by: SharedUser; created_at: string; updated_at: string;
+}
+
 export interface ArtifactComment {
   id: string;
   workspace_id: string;

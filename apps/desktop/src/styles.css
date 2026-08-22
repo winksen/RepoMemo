@@ -482,6 +482,20 @@ textarea:focus-visible {
 .shared-task-controls { align-items: stretch; flex-wrap: wrap; padding-top: 8px; border-top: 1px solid var(--color-border); }
 .shared-task-controls > * { flex: 1 1 92px; min-width: 0; }
 .shared-task-controls > button { flex: 0 0 34px; min-height: 34px; padding: 0; }
+.shared-saved-searches { display: grid; gap: 9px; margin: 16px 0; padding: 14px 0; border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); }
+.shared-saved-search-list { display: grid; gap: 6px; }
+.shared-saved-search-list article { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; }
+.shared-saved-search-list article > button:first-child { justify-content: flex-start; min-height: 42px; text-align: left; }
+.shared-saved-search-list strong, .shared-saved-search-list small { display: block; }
+.shared-saved-search-list small { margin-top: 2px; color: var(--color-text-muted); font-size: 10px; }
+.shared-save-search-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px; }
+.shared-task-checklist-select { margin-top: 12px; }
+.shared-task-checklist-panel { display: grid; gap: 10px; margin-top: 16px; padding: 14px; background: var(--color-surface-2); border-radius: 10px; }
+.shared-task-checklist-list { display: grid; gap: 7px; }
+.shared-task-checklist-list label { display: flex; align-items: flex-start; gap: 8px; color: var(--color-text-muted); font-size: 12px; line-height: 1.45; }
+.shared-task-checklist-list input { width: 15px; height: 15px; margin: 1px 0 0; accent-color: var(--color-accent); }
+.shared-task-checklist-list input:checked + span { color: var(--color-text-subtle); text-decoration: line-through; }
+.shared-task-checklist-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px; padding-top: 9px; border-top: 1px solid var(--color-border); }
 .shared-members-section { margin-top: 30px; padding-top: 22px; border-top: 1px solid var(--color-border); }
 .shared-activity-list { border-top: 1px solid var(--color-border); }
 .shared-activity-list article { position: relative; display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 14px 0 14px 21px; border-bottom: 1px solid var(--color-border); }

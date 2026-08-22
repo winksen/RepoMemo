@@ -25,6 +25,8 @@ import type {
   CollaborationTask,
   CollaborationTaskPriority,
   CollaborationTaskStatus,
+  SavedSearch,
+  TaskChecklistItem,
   WorkspaceAiOverview,
   WorkspaceCapabilities,
   SharedWorkspace,
@@ -306,6 +308,14 @@ export function updateSharedCollaborationTask(accessToken: string, taskId: strin
 export function deleteSharedCollaborationTask(accessToken: string, taskId: string): Promise<void> {
   return request<void>(`/v1/tasks/${taskId}`, { method: "DELETE" }, accessToken);
 }
+
+export function listSharedSavedSearches(accessToken: string, workspaceId: string): Promise<SavedSearch[]> { return request<SavedSearch[]>(`/v1/workspaces/${workspaceId}/saved-searches`, {}, accessToken); }
+export function createSharedSavedSearch(accessToken: string, workspaceId: string, input: { name: string; query: string; artifactTypes: ArtifactType[]; languages: string[]; sourceIds: string[]; resultLimit: number }): Promise<SavedSearch> { return request<SavedSearch>(`/v1/workspaces/${workspaceId}/saved-searches`, { method: "POST", body: JSON.stringify({ name: input.name, query: input.query, artifact_types: input.artifactTypes, languages: input.languages, source_ids: input.sourceIds, result_limit: input.resultLimit }) }, accessToken); }
+export function deleteSharedSavedSearch(accessToken: string, searchId: string): Promise<void> { return request<void>(`/v1/saved-searches/${searchId}`, { method: "DELETE" }, accessToken); }
+export function listSharedTaskChecklist(accessToken: string, taskId: string): Promise<TaskChecklistItem[]> { return request<TaskChecklistItem[]>(`/v1/tasks/${taskId}/checklist`, {}, accessToken); }
+export function createSharedTaskChecklistItem(accessToken: string, taskId: string, body: string): Promise<TaskChecklistItem> { return request<TaskChecklistItem>(`/v1/tasks/${taskId}/checklist`, { method: "POST", body: JSON.stringify({ body }) }, accessToken); }
+export function toggleSharedTaskChecklistItem(accessToken: string, itemId: string, completed: boolean): Promise<TaskChecklistItem> { return request<TaskChecklistItem>(`/v1/task-checklist/${itemId}`, { method: "PUT", body: JSON.stringify({ completed }) }, accessToken); }
+export function deleteSharedTaskChecklistItem(accessToken: string, itemId: string): Promise<void> { return request<void>(`/v1/task-checklist/${itemId}`, { method: "DELETE" }, accessToken); }
 
 export function listSharedWorkspaceMembers(accessToken: string, workspaceId: string): Promise<WorkspaceMember[]> {
   return request<WorkspaceMember[]>(`/v1/workspaces/${workspaceId}/members`, {}, accessToken);

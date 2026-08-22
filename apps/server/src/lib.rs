@@ -22,13 +22,13 @@ use repomemo_api::RepoMemoCore;
 use repomemo_domain::{
     ArtifactComment, ArtifactDetail, ArtifactLifecycle, ArtifactLifecycleEvent, ArtifactSummary, ArtifactType, AskAnswer, AskRequest, Citation,
     CollaborationTask, CreateMemoryCardRequest, IndexingJobStatus, MemoryCard, MemoryCardDetail,
-    MemoryCardSummary, Organization, ProviderSettings, ProviderTestResult, SearchRequest,
+    MemoryCardSummary, Organization, ProviderSettings, ProviderTestResult, SavedSearch, SearchRequest,
     SearchResult, SharedAiProviderSettings, SharedSession, SharedUser, SharedWorkspace,
-    SharedNotification,
+    SharedNotification, TaskChecklistItem,
     UpdateMemoryCardRequest, Workspace, WorkspaceActivityEvent, WorkspaceAiOverview,
     WorkspaceCapabilities, WorkspaceMember, WorkspaceOverview, WorkspaceRole,
 };
-use repomemo_storage::{NewCollaborationTask, NewSharedNotification, SaveArtifactLifecycle, StorageConfig, StorageEngine};
+use repomemo_storage::{NewCollaborationTask, NewSavedSearch, NewSharedNotification, NewTaskChecklistItem, SaveArtifactLifecycle, StorageConfig, StorageEngine};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
@@ -238,6 +238,15 @@ struct SaveArtifactLifecycleRequest {
     review_note: String,
     superseded_by_artifact_id: Option<String>,
 }
+
+#[derive(Debug, Deserialize)]
+struct SaveSearchRequest { name: String, query: String, #[serde(default)] artifact_types: Vec<ArtifactType>, #[serde(default)] languages: Vec<String>, #[serde(default)] source_ids: Vec<String>, result_limit: Option<i64> }
+
+#[derive(Debug, Deserialize)]
+struct CreateChecklistItemRequest { body: String }
+
+#[derive(Debug, Deserialize)]
+struct ToggleChecklistItemRequest { completed: bool }
 
 #[derive(Debug, Deserialize)]
 struct QueryArtifactsRequest {
@@ -508,12 +517,16 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
             "/v1/workspaces/{workspace_id}/tasks",
             get(list_collaboration_tasks).post(create_collaboration_task),
         )
+        .route("/v1/workspaces/{workspace_id}/saved-searches", get(list_saved_searches).post(create_saved_search))
         .route(
             "/v1/tasks/{task_id}",
             get(get_collaboration_task)
                 .put(update_collaboration_task)
                 .delete(delete_collaboration_task),
         )
+        .route("/v1/tasks/{task_id}/checklist", get(list_task_checklist).post(create_task_checklist_item))
+        .route("/v1/task-checklist/{item_id}", put(toggle_task_checklist_item).delete(delete_task_checklist_item))
+        .route("/v1/saved-searches/{search_id}", delete(delete_saved_search))
         .route(
             "/v1/workspaces/{workspace_id}/members",
             get(list_workspace_members).put(upsert_workspace_member),
@@ -1461,6 +1474,40 @@ async fn delete_collaboration_task(
     )
     .await;
     Ok(StatusCode::NO_CONTENT)
+}
+
+async fn list_saved_searches(subject: AuthenticatedSubject, State(state): State<AppState>, Path(workspace_id): Path<String>) -> Result<Json<Vec<SavedSearch>>, ApiError> {
+    require_workspace_read(&state, &subject, &workspace_id).await?;
+    state.storage.list_saved_searches(&workspace_id).await.map(Json).map_err(map_storage_error)
+}
+async fn create_saved_search(subject: AuthenticatedSubject, State(state): State<AppState>, Path(workspace_id): Path<String>, Json(request): Json<SaveSearchRequest>) -> Result<(StatusCode, Json<SavedSearch>), ApiError> {
+    require_workspace_write(&state, &subject, &workspace_id).await?;
+    let name=request.name.trim().to_owned(); let query=request.query.trim().to_owned(); let result_limit=request.result_limit.unwrap_or(20);
+    if name.is_empty() || name.len()>120 || query.is_empty() || query.len()>500 || !(1..=100).contains(&result_limit) { return Err(ApiError::bad_request("Saved search needs a name, query, and a result limit between 1 and 100.")); }
+    let saved=state.storage.create_saved_search(&workspace_id,&subject.user_id,NewSavedSearch{name,query,artifact_types:request.artifact_types,languages:request.languages,source_ids:request.source_ids,result_limit}).await.map_err(map_storage_error)?;
+    record_workspace_activity(&state,&workspace_id,&subject.user_id,"saved_search_created","saved_search",Some(&saved.id),format!("Saved retrieval workflow: {}.",saved.name)).await;
+    Ok((StatusCode::CREATED,Json(saved)))
+}
+async fn delete_saved_search(subject: AuthenticatedSubject, State(state): State<AppState>, Path(search_id): Path<String>) -> Result<StatusCode, ApiError> {
+    let saved=state.storage.get_saved_search(&search_id).await.map_err(map_storage_error)?; require_workspace_write(&state,&subject,&saved.workspace_id).await?;
+    state.storage.delete_saved_search(&search_id).await.map_err(map_storage_error)?; Ok(StatusCode::NO_CONTENT)
+}
+async fn list_task_checklist(subject: AuthenticatedSubject, State(state): State<AppState>, Path(task_id): Path<String>) -> Result<Json<Vec<TaskChecklistItem>>, ApiError> {
+    let task=state.storage.get_collaboration_task(&task_id).await.map_err(map_storage_error)?; require_workspace_read(&state,&subject,&task.workspace_id).await?;
+    state.storage.list_task_checklist_items(&task_id).await.map(Json).map_err(map_storage_error)
+}
+async fn create_task_checklist_item(subject: AuthenticatedSubject, State(state): State<AppState>, Path(task_id): Path<String>, Json(request): Json<CreateChecklistItemRequest>) -> Result<(StatusCode, Json<TaskChecklistItem>), ApiError> {
+    let task=state.storage.get_collaboration_task(&task_id).await.map_err(map_storage_error)?; require_workspace_write(&state,&subject,&task.workspace_id).await?; let body=request.body.trim().to_owned();
+    if body.is_empty() || body.len()>500 { return Err(ApiError::bad_request("Checklist item must be between 1 and 500 characters.")); }
+    let item=state.storage.create_task_checklist_item(&task_id,&task.workspace_id,&subject.user_id,NewTaskChecklistItem{body}).await.map_err(map_storage_error)?; Ok((StatusCode::CREATED,Json(item)))
+}
+async fn toggle_task_checklist_item(subject: AuthenticatedSubject, State(state): State<AppState>, Path(item_id): Path<String>, Json(request): Json<ToggleChecklistItemRequest>) -> Result<Json<TaskChecklistItem>, ApiError> {
+    let current=state.storage.get_task_checklist_item(&item_id).await.map_err(map_storage_error)?; require_workspace_write(&state,&subject,&current.workspace_id).await?;
+    state.storage.toggle_task_checklist_item(&item_id,&subject.user_id,request.completed).await.map(Json).map_err(map_storage_error)
+}
+async fn delete_task_checklist_item(subject: AuthenticatedSubject, State(state): State<AppState>, Path(item_id): Path<String>) -> Result<StatusCode, ApiError> {
+    let current=state.storage.get_task_checklist_item(&item_id).await.map_err(map_storage_error)?; require_workspace_write(&state,&subject,&current.workspace_id).await?;
+    state.storage.delete_task_checklist_item(&item_id).await.map_err(map_storage_error)?; Ok(StatusCode::NO_CONTENT)
 }
 
 async fn normalize_collaboration_task(
@@ -2897,6 +2944,13 @@ mod tests {
         .unwrap();
         assert_eq!(lifecycle_history.as_array().unwrap().len(), 1);
 
+        let saved_search = app.clone().oneshot(json_request("POST", &format!("/v1/workspaces/{workspace_id}/saved-searches"), &authorization, json!({"name":"Architecture review","query":"shared","artifact_types":["markdown_doc"],"languages":[],"source_ids":[],"result_limit":20}))).await.unwrap();
+        assert_eq!(saved_search.status(), 201);
+        let saved_search: Value = serde_json::from_slice(&to_bytes(saved_search.into_body(), usize::MAX).await.unwrap()).unwrap();
+        let saved_search_id = saved_search["id"].as_str().unwrap();
+        let saved_searches = app.clone().oneshot(auth_request("GET", &format!("/v1/workspaces/{workspace_id}/saved-searches"), &authorization)).await.unwrap();
+        assert_eq!(saved_searches.status(), 200);
+
         let task = app
             .clone()
             .oneshot(json_request(
@@ -2920,6 +2974,14 @@ mod tests {
             serde_json::from_slice(&to_bytes(task.into_body(), usize::MAX).await.unwrap())
                 .unwrap();
         let task_id = task["id"].as_str().unwrap();
+        let checklist_item = app.clone().oneshot(json_request("POST", &format!("/v1/tasks/{task_id}/checklist"), &authorization, json!({"body":"Confirm the shared evidence"}))).await.unwrap();
+        assert_eq!(checklist_item.status(), 201);
+        let checklist_item: Value = serde_json::from_slice(&to_bytes(checklist_item.into_body(), usize::MAX).await.unwrap()).unwrap();
+        let checklist_item_id = checklist_item["id"].as_str().unwrap();
+        let completed_item = app.clone().oneshot(json_request("PUT", &format!("/v1/task-checklist/{checklist_item_id}"), &authorization, json!({"completed":true}))).await.unwrap();
+        assert_eq!(completed_item.status(), 200);
+        let delete_search = app.clone().oneshot(auth_request("DELETE", &format!("/v1/saved-searches/{saved_search_id}"), &authorization)).await.unwrap();
+        assert_eq!(delete_search.status(), 204);
         assert_eq!(task["assignee"]["display_name"], "Collaborator");
         let task_notifications = app
             .clone()
