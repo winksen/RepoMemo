@@ -13,6 +13,7 @@ import {
   IconArrowLeft as ArrowLeft,
   IconBuildingCommunity as Building,
   IconBrain as Brain,
+  IconBell as Bell,
   IconChevronRight as ChevronRight,
   IconChartBar as Chart,
   IconFileText as FileText,
@@ -57,6 +58,7 @@ import {
   deleteSharedWorkspace,
   exportSharedMemoryCard,
   getSharedArtifact,
+  getSharedArtifactLifecycle,
   getSharedHealth,
   getSharedProfile,
   getSharedWorkspaceCapabilities,
@@ -70,6 +72,7 @@ import {
   indexSharedArtifact,
   listSharedArtifacts,
   listSharedArtifactComments,
+  listSharedArtifactLifecycleEvents,
   listSharedCollaborationTasks,
   listSharedWorkspaceAiProviders,
   listSharedWorkspaceActivity,
@@ -77,6 +80,7 @@ import {
   listSharedMemoryCards,
   listSharedOrganizations,
   listSharedProfileTasks,
+  listSharedNotifications,
   listSharedWorkspaces,
   loginSharedUser,
   generateSharedWorkspaceAiOverview,
@@ -91,6 +95,9 @@ import {
   upsertSharedWorkspaceMember,
   uploadSharedArtifact,
   updateSharedArtifact,
+  updateSharedArtifactLifecycle,
+  markAllSharedNotificationsRead,
+  markSharedNotificationRead,
   updateSharedArtifactComment,
   updateSharedCollaborationTask,
   updateSharedProfile,
@@ -103,6 +110,9 @@ import type {
   ArtifactSummary,
   ArtifactDetail,
   ArtifactComment,
+  ArtifactLifecycle,
+  ArtifactLifecycleEvent,
+  ArtifactLifecycleStatus,
   ArtifactType,
   MemoryCardDetail,
   MemoryCardSummary,
@@ -127,6 +137,7 @@ import type {
   WorkspaceMetrics,
   WorkspaceMetricBreakdown,
   UserProfile,
+  SharedNotification,
 } from "./types";
 import { Button } from "./components/ui/button";
 import { Dropdown } from "./components/ui/dropdown";
@@ -284,6 +295,10 @@ export function SharedWebApp() {
 
   if (pathname === "/profile") {
     return <SharedProfile accessToken={accessToken} apiAvailable={apiAvailable} organizations={organizations} onSessionUserUpdated={(user) => setSession((current) => current ? { ...current, user } : current)} session={session} signOut={signOut} />;
+  }
+
+  if (pathname === "/notifications") {
+    return <SharedNotifications accessToken={accessToken} apiAvailable={apiAvailable} organizations={organizations} session={session} signOut={signOut} />;
   }
 
   if (workspace && routeParts[2] === "artifacts" && routeParts[3]) {
@@ -519,6 +534,60 @@ function SharedProfile({
   </SharedAppShell>;
 }
 
+function SharedNotifications({
+  accessToken,
+  apiAvailable,
+  organizations,
+  session,
+  signOut,
+}: {
+  accessToken: string;
+  apiAvailable: boolean | null;
+  organizations: Organization[];
+  session: SharedSession;
+  signOut: () => void;
+}) {
+  const [notifications, setNotifications] = useState<SharedNotification[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isMutating, setIsMutating] = useState(false);
+
+  async function load() {
+    setIsLoading(true); setError(null);
+    try { setNotifications(await listSharedNotifications(accessToken)); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsLoading(false); }
+  }
+
+  useEffect(() => { void load(); }, [accessToken]);
+
+  async function openNotification(notification: SharedNotification) {
+    setError(null);
+    try {
+      if (!notification.read_at) {
+        const updated = await markSharedNotificationRead(accessToken, notification.id);
+        setNotifications((current) => current.map((entry) => entry.id === updated.id ? updated : entry));
+      }
+      navigate(notification.href);
+    } catch (requestError) { setError(apiMessage(requestError)); }
+  }
+
+  async function markAllRead() {
+    setIsMutating(true); setError(null);
+    try {
+      await markAllSharedNotificationsRead(accessToken);
+      setNotifications((current) => current.map((entry) => entry.read_at ? entry : { ...entry, read_at: new Date().toISOString() }));
+    } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsMutating(false); }
+  }
+
+  const unreadCount = notifications.filter((notification) => !notification.read_at).length;
+  return <SharedAppShell apiAvailable={apiAvailable} session={session} signOut={signOut} sidebar={<OrganizationRail organizations={organizations} />}>
+    <section className="shared-page-content shared-notifications-page" aria-busy={isLoading}>
+      <div className="shared-detail-heading"><div><p className="shared-eyebrow">Inbox</p><h1>Notifications</h1><p>Task assignments and direct evidence mentions appear here. Mention a teammate with their email, for example <code>@person@example.com</code>.</p></div><div className="shared-detail-actions"><Button disabled={isLoading} onClick={() => void load()} type="button" variant="secondary"><Refresh size={16} /> Refresh</Button><Button disabled={isMutating || unreadCount === 0} onClick={() => void markAllRead()} type="button" variant="secondary">Mark all read</Button></div></div>
+      {error ? <p className="shared-form-error" role="alert">{error}</p> : null}
+      <section className="shared-notification-list" aria-label="Notifications">{notifications.length ? notifications.map((notification) => <article className={notification.read_at ? "" : "is-unread"} key={notification.id}><Button onClick={() => void openNotification(notification)} type="button" variant="secondary"><span className="shared-notification-icon"><Bell size={17} /></span><span><strong>{notification.title}</strong><small>{notification.body}</small><time dateTime={notification.created_at}>{formatActivityTime(notification.created_at)}</time></span><ChevronRight size={17} /></Button></article>) : <div className="shared-empty-state"><Bell size={25} /><strong>Nothing new</strong><span>Assignments and evidence mentions will appear here when your team needs your attention.</span></div>}</section>
+    </section>
+  </SharedAppShell>;
+}
+
 function SharedWorkspaceHome({
   accessToken,
   apiAvailable,
@@ -623,7 +692,7 @@ function SharedAppShell({
     <main className="shared-home">
       <header className="shared-home-header">
         <div className="shared-brand"><span className="shared-brand-glyph"><Layers size={19} /></span><strong>RepoMemo</strong><span className="shared-mode-tag">Shared</span></div>
-        <div className="shared-user-menu"><Button aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} aria-pressed={theme === "dark"} className="shared-theme-toggle" onClick={() => setTheme((current) => current === "dark" ? "light" : "dark")} title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} type="button" variant="secondary">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}<span>{theme === "dark" ? "Light" : "Dark"}</span></Button><Button className="shared-profile-link" onClick={() => navigate("/profile")} type="button" variant="secondary"><UserCircle size={16} /> {session.user.display_name}</Button><Button className="shared-user-signout" onClick={signOut} type="button" variant="secondary"><Logout size={16} /> Sign out</Button></div>
+        <div className="shared-user-menu"><Button aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} aria-pressed={theme === "dark"} className="shared-theme-toggle" onClick={() => setTheme((current) => current === "dark" ? "light" : "dark")} title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} type="button" variant="secondary">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}<span>{theme === "dark" ? "Light" : "Dark"}</span></Button><Button className="shared-notifications-link" onClick={() => navigate("/notifications")} type="button" variant="secondary"><Bell size={16} /> Notifications</Button><Button className="shared-profile-link" onClick={() => navigate("/profile")} type="button" variant="secondary"><UserCircle size={16} /> {session.user.display_name}</Button><Button className="shared-user-signout" onClick={signOut} type="button" variant="secondary"><Logout size={16} /> Sign out</Button></div>
       </header>
       <div className="shared-home-frame">
         <aside className="shared-home-rail">{sidebar}<div className="shared-rail-footer"><Shield size={15} /><span>JWT active · API {apiAvailable === true ? "healthy" : apiAvailable === false ? "offline" : "checking"}</span></div></aside>
@@ -1239,6 +1308,10 @@ function SharedArtifactDetail({
 }) {
   const [artifact, setArtifact] = useState<ArtifactDetail | null>(null);
   const [comments, setComments] = useState<ArtifactComment[]>([]);
+  const [lifecycle, setLifecycle] = useState<ArtifactLifecycle | null>(null);
+  const [lifecycleEvents, setLifecycleEvents] = useState<ArtifactLifecycleEvent[]>([]);
+  const [workspaceMembers, setWorkspaceMembers] = useState<WorkspaceMember[]>([]);
+  const [workspaceArtifacts, setWorkspaceArtifacts] = useState<ArtifactSummary[]>([]);
   const [commentBody, setCommentBody] = useState("");
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editingCommentBody, setEditingCommentBody] = useState("");
@@ -1246,24 +1319,39 @@ function SharedArtifactDetail({
   const [isLoading, setIsLoading] = useState(true);
   const [isIndexing, setIsIndexing] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [isEditingLifecycle, setIsEditingLifecycle] = useState(false);
   const [isMutating, setIsMutating] = useState(false);
   const [title, setTitle] = useState("");
+  const [lifecycleStatus, setLifecycleStatus] = useState<ArtifactLifecycleStatus>("active");
+  const [lifecycleOwnerId, setLifecycleOwnerId] = useState("");
+  const [lifecycleNote, setLifecycleNote] = useState("");
+  const [supersededByArtifactId, setSupersededByArtifactId] = useState("");
   const canWrite = workspace.role !== "viewer";
   const canModerateComments = workspace.role === "owner" || workspace.role === "admin";
 
   async function load() {
     setIsLoading(true); setError(null);
     try {
-      const [nextArtifact, nextComments] = await Promise.all([
+      const [nextArtifact, nextComments, nextLifecycle, nextLifecycleEvents, nextMembers, nextArtifacts] = await Promise.all([
         getSharedArtifact(accessToken, artifactId),
         listSharedArtifactComments(accessToken, artifactId),
+        getSharedArtifactLifecycle(accessToken, artifactId),
+        listSharedArtifactLifecycleEvents(accessToken, artifactId),
+        listSharedWorkspaceMembers(accessToken, workspace.workspace.id),
+        listSharedArtifacts(accessToken, workspace.workspace.id),
       ]);
-      setArtifact(nextArtifact); setComments(nextComments);
+      setArtifact(nextArtifact); setComments(nextComments); setLifecycle(nextLifecycle); setLifecycleEvents(nextLifecycleEvents); setWorkspaceMembers(nextMembers); setWorkspaceArtifacts(nextArtifacts);
     } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsLoading(false); }
   }
 
   useEffect(() => { void load(); }, [accessToken, artifactId]);
   useEffect(() => { setTitle(artifact?.summary.title ?? ""); }, [artifact?.summary.title]);
+  useEffect(() => {
+    setLifecycleStatus(lifecycle?.status ?? "active");
+    setLifecycleOwnerId(lifecycle?.owner?.id ?? "");
+    setLifecycleNote(lifecycle?.review_note ?? "");
+    setSupersededByArtifactId(lifecycle?.superseded_by_artifact_id ?? "");
+  }, [lifecycle]);
 
   async function indexArtifact() {
     setIsIndexing(true); setError(null);
@@ -1280,6 +1368,21 @@ function SharedArtifactDetail({
     if (!window.confirm(`Delete ${artifact?.summary.title ?? "this evidence"}? Linked memory citations will be removed.`)) return;
     setIsMutating(true); setError(null);
     try { await deleteSharedArtifact(accessToken, artifactId); onBack(); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsMutating(false); }
+  }
+
+  async function saveLifecycle(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsMutating(true); setError(null);
+    try {
+      await updateSharedArtifactLifecycle(accessToken, artifactId, {
+        status: lifecycleStatus,
+        ownerUserId: lifecycleOwnerId || null,
+        reviewNote: lifecycleNote,
+        supersededByArtifactId: supersededByArtifactId || null,
+      });
+      setIsEditingLifecycle(false);
+      await load();
+    } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsMutating(false); }
   }
 
   async function addComment(event: FormEvent<HTMLFormElement>) {
@@ -1318,9 +1421,10 @@ function SharedArtifactDetail({
       {error ? <p className="shared-form-error" role="alert">{error}</p> : null}
       <div className="shared-record-meta"><span>{artifact?.summary.artifact_type ?? "artifact"}</span><span>{artifact?.summary.language ?? "Unspecified language"}</span><span>{artifact?.summary.indexed_at ? "Indexed" : "Not indexed"}</span></div>
       {isEditing ? <form className="shared-record-edit-form" onSubmit={saveArtifact}><label>Evidence title<Input onChange={(event) => setTitle(event.target.value)} required value={title} /></label><Button disabled={isMutating} type="submit" variant="main">{isMutating ? <Loader className="spin" size={16} /> : <Pencil size={16} />} Save evidence</Button></form> : null}
+      <section className="shared-record-panel shared-lifecycle-panel"><div className="shared-panel-heading"><div><Shield size={18} /><h2>Evidence lifecycle</h2></div><span className={`shared-lifecycle-status status-${lifecycle?.status ?? "active"}`}>{lifecycle?.status?.replace(/_/g, " ") ?? "Active"}</span></div>{isEditingLifecycle ? <form className="shared-lifecycle-form" onSubmit={saveLifecycle}><label>Status<Dropdown aria-label="Evidence lifecycle status" onValueChange={(value) => setLifecycleStatus(value as ArtifactLifecycleStatus)} options={[{ label: "Active", value: "active" }, { label: "Needs review", value: "needs_review" }, { label: "Verified", value: "verified" }, { label: "Outdated", value: "outdated" }, { label: "Superseded", value: "superseded" }]} value={lifecycleStatus} /></label><label>Review owner<Dropdown aria-label="Evidence review owner" onValueChange={(value) => setLifecycleOwnerId(value === "__unassigned__" ? "" : value)} options={[{ label: "Unassigned", value: "__unassigned__" }, ...workspaceMembers.map((member) => ({ label: member.user.display_name, value: member.user.id }))]} value={lifecycleOwnerId || "__unassigned__"} /></label>{lifecycleStatus === "superseded" ? <label>Replacement evidence<Dropdown aria-label="Replacement evidence" onValueChange={(value) => setSupersededByArtifactId(value === "__none__" ? "" : value)} options={[{ label: "Choose replacement evidence", value: "__none__" }, ...workspaceArtifacts.filter((entry) => entry.id !== artifactId).map((entry) => ({ label: entry.title, value: entry.id }))]} value={supersededByArtifactId || "__none__"} /></label> : null}<label className="shared-lifecycle-note">Review note<Textarea onChange={(event) => setLifecycleNote(event.target.value)} placeholder="What should the team know about this evidence?" value={lifecycleNote} /></label><div><Button disabled={isMutating} type="submit" variant="main">{isMutating ? <Loader className="spin" size={16} /> : <Shield size={16} />} Save lifecycle</Button><Button disabled={isMutating} onClick={() => setIsEditingLifecycle(false)} type="button" variant="secondary">Cancel</Button></div></form> : <div className="shared-lifecycle-summary"><div><strong>{lifecycle?.owner ? `Owned by ${lifecycle.owner.display_name}` : "No review owner"}</strong><span>{lifecycle?.reviewed_at ? `Last updated ${formatActivityTime(lifecycle.reviewed_at)} by ${lifecycle.reviewed_by?.display_name ?? "a member"}` : "No lifecycle review recorded yet."}</span></div>{lifecycle?.review_note ? <p>{lifecycle.review_note}</p> : <p className="shared-muted-copy">Add a review note so the evidence can be trusted in context.</p>}{lifecycle?.superseded_by_artifact_id ? <span className="shared-lifecycle-replacement">Replaced by evidence {lifecycle.superseded_by_artifact_id.slice(0, 8)}</span> : null}{canWrite ? <Button onClick={() => setIsEditingLifecycle(true)} type="button" variant="secondary"><Pencil size={15} /> Update lifecycle</Button> : null}</div>}<div className="shared-lifecycle-history"><strong>History</strong>{lifecycleEvents.length ? lifecycleEvents.map((event) => <p key={event.id}><span>{event.detail}</span><time dateTime={event.created_at}>{event.actor?.display_name ?? "System"} · {formatActivityTime(event.created_at)}</time></p>) : <p className="shared-muted-copy">Lifecycle changes will be recorded here.</p>}</div></section>
       <section className="shared-record-panel"><h2>Stored content</h2>{artifact?.content_preview ? <pre className="shared-content-preview">{artifact.content_preview}</pre> : <p className="shared-muted-copy">This artifact has no text preview available.</p>}</section>
       <section className="shared-record-panel"><h2>Indexed evidence</h2>{artifact?.chunks.length ? <div className="shared-chunk-list">{artifact.chunks.map((chunk) => <article key={chunk.id}><span>{chunk.start_line ? `Lines ${chunk.start_line}${chunk.end_line && chunk.end_line !== chunk.start_line ? `–${chunk.end_line}` : ""}` : "Stored chunk"}</span><p>{chunk.text}</p></article>)}</div> : <p className="shared-muted-copy">Index this artifact to create retrievable evidence chunks.</p>}</section>
-      <section className="shared-record-panel shared-discussion-panel"><div className="shared-panel-heading"><div><MessageCircle size={18} /><h2>Evidence discussion</h2></div><span>{comments.length} comments</span></div>{comments.length ? <div className="shared-comment-list">{comments.map((comment) => <article key={comment.id}><div className="shared-comment-author"><span aria-hidden="true">{comment.author.display_name.slice(0, 1).toUpperCase()}</span><div><strong>{comment.author.display_name}</strong><time dateTime={comment.created_at}>{formatActivityTime(comment.created_at)}{comment.updated_at !== comment.created_at ? " · edited" : ""}</time></div></div>{editingCommentId === comment.id ? <form onSubmit={saveComment}><Textarea aria-label="Edit comment" onChange={(event) => setEditingCommentBody(event.target.value)} required value={editingCommentBody} /><div><Button disabled={isMutating} type="submit" variant="main">Save comment</Button><Button onClick={() => setEditingCommentId(null)} type="button" variant="secondary">Cancel</Button></div></form> : <><p>{comment.body}</p>{comment.author.id === session.user.id || canModerateComments ? <div className="shared-comment-actions">{comment.author.id === session.user.id ? <Button onClick={() => { setEditingCommentId(comment.id); setEditingCommentBody(comment.body); }} type="button" variant="secondary"><Pencil size={14} /> Edit</Button> : null}<Button disabled={isMutating} onClick={() => void removeComment(comment)} type="button" variant="secondary"><Trash size={14} /> Delete</Button></div> : null}</>}</article>)}</div> : <p className="shared-muted-copy">No discussion yet. Add context, ask for a review, or record a decision beside the evidence.</p>}{canWrite ? <form className="shared-comment-form" onSubmit={addComment}><Textarea aria-label="New evidence comment" onChange={(event) => setCommentBody(event.target.value)} placeholder="Add context or ask the team a question…" required value={commentBody} /><Button disabled={isMutating} type="submit" variant="main"><MessageCircle size={16} /> Add comment</Button></form> : null}</section>
+      <section className="shared-record-panel shared-discussion-panel"><div className="shared-panel-heading"><div><MessageCircle size={18} /><h2>Evidence discussion</h2></div><span>{comments.length} comments</span></div>{comments.length ? <div className="shared-comment-list">{comments.map((comment) => <article key={comment.id}><div className="shared-comment-author"><span aria-hidden="true">{comment.author.display_name.slice(0, 1).toUpperCase()}</span><div><strong>{comment.author.display_name}</strong><time dateTime={comment.created_at}>{formatActivityTime(comment.created_at)}{comment.updated_at !== comment.created_at ? " · edited" : ""}</time></div></div>{editingCommentId === comment.id ? <form onSubmit={saveComment}><Textarea aria-label="Edit comment" onChange={(event) => setEditingCommentBody(event.target.value)} required value={editingCommentBody} /><div><Button disabled={isMutating} type="submit" variant="main">Save comment</Button><Button onClick={() => setEditingCommentId(null)} type="button" variant="secondary">Cancel</Button></div></form> : <><p>{comment.body}</p>{comment.author.id === session.user.id || canModerateComments ? <div className="shared-comment-actions">{comment.author.id === session.user.id ? <Button onClick={() => { setEditingCommentId(comment.id); setEditingCommentBody(comment.body); }} type="button" variant="secondary"><Pencil size={14} /> Edit</Button> : null}<Button disabled={isMutating} onClick={() => void removeComment(comment)} type="button" variant="secondary"><Trash size={14} /> Delete</Button></div> : null}</>}</article>)}</div> : <p className="shared-muted-copy">No discussion yet. Add context, ask for a review, or record a decision beside the evidence.</p>}{canWrite ? <form className="shared-comment-form" onSubmit={addComment}><Textarea aria-label="New evidence comment" onChange={(event) => setCommentBody(event.target.value)} placeholder="Add context or mention @teammate@example.com…" required value={commentBody} /><Button disabled={isMutating} type="submit" variant="main"><MessageCircle size={16} /> Add comment</Button></form> : null}</section>
     </SharedRecordLayout>
   );
 }

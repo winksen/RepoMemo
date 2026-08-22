@@ -71,6 +71,41 @@ export interface ArtifactComment {
   updated_at: string;
 }
 
+export type ArtifactLifecycleStatus = "active" | "needs_review" | "verified" | "outdated" | "superseded";
+
+export interface ArtifactLifecycle {
+  artifact_id: string;
+  workspace_id: string;
+  status: ArtifactLifecycleStatus;
+  owner: SharedUser | null;
+  review_note: string;
+  reviewed_by: SharedUser | null;
+  reviewed_at: string | null;
+  superseded_by_artifact_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ArtifactLifecycleEvent {
+  id: string;
+  artifact_id: string;
+  actor: SharedUser | null;
+  action: string;
+  detail: string;
+  created_at: string;
+}
+
+export interface SharedNotification {
+  id: string;
+  workspace_id: string | null;
+  notification_type: "task_assigned" | "evidence_mention" | string;
+  title: string;
+  body: string;
+  href: string;
+  read_at: string | null;
+  created_at: string;
+}
+
 export interface SharedSession {
   user: SharedUser;
   authentication: "jwt";

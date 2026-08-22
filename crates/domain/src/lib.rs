@@ -74,6 +74,42 @@ pub struct ArtifactComment {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArtifactLifecycle {
+    pub artifact_id: String,
+    pub workspace_id: String,
+    pub status: String,
+    pub owner: Option<SharedUser>,
+    pub review_note: String,
+    pub reviewed_by: Option<SharedUser>,
+    pub reviewed_at: Option<String>,
+    pub superseded_by_artifact_id: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArtifactLifecycleEvent {
+    pub id: String,
+    pub artifact_id: String,
+    pub actor: Option<SharedUser>,
+    pub action: String,
+    pub detail: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SharedNotification {
+    pub id: String,
+    pub workspace_id: Option<String>,
+    pub notification_type: String,
+    pub title: String,
+    pub body: String,
+    pub href: String,
+    pub read_at: Option<String>,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SharedSession {
     pub user: SharedUser,
     pub authentication: String,

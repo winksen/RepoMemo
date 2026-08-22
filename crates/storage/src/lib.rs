@@ -3,9 +3,9 @@ use std::path::{Path, PathBuf};
 use anyhow::{bail, Context, Result};
 use chrono::Utc;
 use repomemo_domain::{
-    ArtifactComment, ArtifactDetail, ArtifactSummary, ArtifactType, Chunk, Citation,
+    ArtifactComment, ArtifactDetail, ArtifactLifecycle, ArtifactLifecycleEvent, ArtifactSummary, ArtifactType, Chunk, Citation,
     CollaborationTask, IndexingJobStatus, MemoryCard, MemoryCardDetail, MemoryCardSummary,
-    MemoryEvidence, Organization, ProviderSettings, SearchRequest, SearchResult, SharedUser,
+    MemoryEvidence, Organization, ProviderSettings, SearchRequest, SearchResult, SharedNotification, SharedUser,
     SharedWorkspace, Source, SourceType, Symbol, SymbolKind, SymbolSearchResult, Workspace,
     WorkspaceActivityEvent, WorkspaceMember, WorkspaceMembership, WorkspaceOverview, WorkspaceRole,
 };
@@ -131,6 +131,48 @@ struct ArtifactCommentRow {
     updated_at: String,
 }
 
+#[derive(Debug, sqlx::FromRow)]
+struct ArtifactLifecycleRow {
+    artifact_id: String,
+    workspace_id: String,
+    status: String,
+    owner_id: Option<String>,
+    owner_email: Option<String>,
+    owner_display_name: Option<String>,
+    review_note: String,
+    reviewer_id: Option<String>,
+    reviewer_email: Option<String>,
+    reviewer_display_name: Option<String>,
+    reviewed_at: Option<String>,
+    superseded_by_artifact_id: Option<String>,
+    created_at: String,
+    updated_at: String,
+}
+
+#[derive(Debug, sqlx::FromRow)]
+struct ArtifactLifecycleEventRow {
+    id: String,
+    artifact_id: String,
+    actor_id: Option<String>,
+    actor_email: Option<String>,
+    actor_display_name: Option<String>,
+    action: String,
+    detail: String,
+    created_at: String,
+}
+
+#[derive(Debug, sqlx::FromRow)]
+struct SharedNotificationRow {
+    id: String,
+    workspace_id: Option<String>,
+    notification_type: String,
+    title: String,
+    body: String,
+    href: String,
+    read_at: Option<String>,
+    created_at: String,
+}
+
 #[derive(Debug, Clone)]
 pub struct NewCollaborationTask {
     pub title: String,
@@ -150,6 +192,24 @@ pub struct WorkspaceCollaborationCounts {
     pub completed_tasks: i64,
     pub overdue_tasks: i64,
     pub comments: i64,
+}
+
+#[derive(Debug, Clone)]
+pub struct SaveArtifactLifecycle {
+    pub status: String,
+    pub owner_user_id: Option<String>,
+    pub review_note: String,
+    pub superseded_by_artifact_id: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct NewSharedNotification {
+    pub user_id: String,
+    pub workspace_id: Option<String>,
+    pub notification_type: String,
+    pub title: String,
+    pub body: String,
+    pub href: String,
 }
 
 #[derive(Debug, sqlx::FromRow)]
@@ -1204,6 +1264,200 @@ impl StorageEngine {
             bail!("Artifact comment was not found.");
         }
         Ok(())
+    }
+
+    pub async fn get_artifact_lifecycle(&self, artifact_id: &str) -> Result<ArtifactLifecycle> {
+        let artifact = self.get_artifact_summary(artifact_id).await?;
+        let now = Utc::now().to_rfc3339();
+        sqlx::query(
+            r#"
+            INSERT OR IGNORE INTO artifact_lifecycle (
+              artifact_id, workspace_id, status, owner_user_id, review_note,
+              reviewed_by_user_id, reviewed_at, superseded_by_artifact_id, created_at, updated_at
+            ) VALUES (?1, ?2, 'active', NULL, '', NULL, NULL, NULL, ?3, ?3)
+            "#,
+        )
+        .bind(artifact_id)
+        .bind(&artifact.workspace_id)
+        .bind(now)
+        .execute(&self.pool)
+        .await?;
+
+        let row = sqlx::query_as::<_, ArtifactLifecycleRow>(
+            r#"
+            SELECT
+              lifecycle.artifact_id,
+              lifecycle.workspace_id,
+              lifecycle.status,
+              owner.id AS owner_id,
+              owner.email AS owner_email,
+              owner.display_name AS owner_display_name,
+              lifecycle.review_note,
+              reviewer.id AS reviewer_id,
+              reviewer.email AS reviewer_email,
+              reviewer.display_name AS reviewer_display_name,
+              lifecycle.reviewed_at,
+              lifecycle.superseded_by_artifact_id,
+              lifecycle.created_at,
+              lifecycle.updated_at
+            FROM artifact_lifecycle AS lifecycle
+            LEFT JOIN users AS owner ON owner.id = lifecycle.owner_user_id
+            LEFT JOIN users AS reviewer ON reviewer.id = lifecycle.reviewed_by_user_id
+            WHERE lifecycle.artifact_id = ?1
+            "#,
+        )
+        .bind(artifact_id)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(ArtifactLifecycle::from(row))
+    }
+
+    pub async fn save_artifact_lifecycle(
+        &self,
+        artifact_id: &str,
+        actor_user_id: &str,
+        lifecycle: SaveArtifactLifecycle,
+    ) -> Result<ArtifactLifecycle> {
+        let artifact = self.get_artifact_summary(artifact_id).await?;
+        let now = Utc::now().to_rfc3339();
+        sqlx::query(
+            r#"
+            INSERT INTO artifact_lifecycle (
+              artifact_id, workspace_id, status, owner_user_id, review_note,
+              reviewed_by_user_id, reviewed_at, superseded_by_artifact_id, created_at, updated_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?7, ?7)
+            ON CONFLICT(artifact_id) DO UPDATE SET
+              status = excluded.status,
+              owner_user_id = excluded.owner_user_id,
+              review_note = excluded.review_note,
+              reviewed_by_user_id = excluded.reviewed_by_user_id,
+              reviewed_at = excluded.reviewed_at,
+              superseded_by_artifact_id = excluded.superseded_by_artifact_id,
+              updated_at = excluded.updated_at
+            "#,
+        )
+        .bind(artifact_id)
+        .bind(&artifact.workspace_id)
+        .bind(&lifecycle.status)
+        .bind(&lifecycle.owner_user_id)
+        .bind(&lifecycle.review_note)
+        .bind(actor_user_id)
+        .bind(&now)
+        .bind(&lifecycle.superseded_by_artifact_id)
+        .execute(&self.pool)
+        .await?;
+
+        let action = if lifecycle.status == "superseded" { "artifact_superseded" } else { "lifecycle_updated" };
+        let detail = format!("Evidence lifecycle changed to {}.", lifecycle.status);
+        sqlx::query("INSERT INTO artifact_lifecycle_events (id, artifact_id, actor_user_id, action, detail, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)")
+            .bind(Uuid::new_v4().to_string())
+            .bind(artifact_id)
+            .bind(actor_user_id)
+            .bind(action)
+            .bind(detail)
+            .bind(now)
+            .execute(&self.pool)
+            .await?;
+        self.get_artifact_lifecycle(artifact_id).await
+    }
+
+    pub async fn list_artifact_lifecycle_events(&self, artifact_id: &str) -> Result<Vec<ArtifactLifecycleEvent>> {
+        let rows = sqlx::query_as::<_, ArtifactLifecycleEventRow>(
+            r#"
+            SELECT event.id, event.artifact_id,
+              actor.id AS actor_id, actor.email AS actor_email, actor.display_name AS actor_display_name,
+              event.action, event.detail, event.created_at
+            FROM artifact_lifecycle_events AS event
+            LEFT JOIN users AS actor ON actor.id = event.actor_user_id
+            WHERE event.artifact_id = ?1
+            ORDER BY event.created_at DESC, event.id DESC
+            "#,
+        )
+        .bind(artifact_id)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows.into_iter().map(ArtifactLifecycleEvent::from).collect())
+    }
+
+    pub async fn create_shared_notification(
+        &self,
+        notification: NewSharedNotification,
+    ) -> Result<SharedNotification> {
+        let id = Uuid::new_v4().to_string();
+        let now = Utc::now().to_rfc3339();
+        sqlx::query(
+            r#"
+            INSERT INTO workspace_notifications (
+              id, user_id, workspace_id, notification_type, title, body, href, read_at, created_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULL, ?8)
+            "#,
+        )
+        .bind(&id)
+        .bind(notification.user_id)
+        .bind(notification.workspace_id)
+        .bind(notification.notification_type)
+        .bind(notification.title)
+        .bind(notification.body)
+        .bind(notification.href)
+        .bind(now)
+        .execute(&self.pool)
+        .await?;
+        self.get_shared_notification(&id).await
+    }
+
+    pub async fn list_shared_notifications(&self, user_id: &str) -> Result<Vec<SharedNotification>> {
+        let rows = sqlx::query_as::<_, SharedNotificationRow>(
+            r#"
+            SELECT id, workspace_id, notification_type, title, body, href, read_at, created_at
+            FROM workspace_notifications
+            WHERE user_id = ?1
+            ORDER BY CASE WHEN read_at IS NULL THEN 0 ELSE 1 END, created_at DESC, id DESC
+            LIMIT 100
+            "#,
+        )
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows.into_iter().map(SharedNotification::from).collect())
+    }
+
+    pub async fn mark_shared_notification_read(
+        &self,
+        notification_id: &str,
+        user_id: &str,
+    ) -> Result<SharedNotification> {
+        let now = Utc::now().to_rfc3339();
+        let result = sqlx::query(
+            "UPDATE workspace_notifications SET read_at = COALESCE(read_at, ?1) WHERE id = ?2 AND user_id = ?3",
+        )
+        .bind(now)
+        .bind(notification_id)
+        .bind(user_id)
+        .execute(&self.pool)
+        .await?;
+        if result.rows_affected() == 0 {
+            bail!("Notification was not found.");
+        }
+        self.get_shared_notification(notification_id).await
+    }
+
+    pub async fn mark_all_shared_notifications_read(&self, user_id: &str) -> Result<()> {
+        sqlx::query("UPDATE workspace_notifications SET read_at = ?1 WHERE user_id = ?2 AND read_at IS NULL")
+            .bind(Utc::now().to_rfc3339())
+            .bind(user_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    async fn get_shared_notification(&self, notification_id: &str) -> Result<SharedNotification> {
+        let row = sqlx::query_as::<_, SharedNotificationRow>(
+            "SELECT id, workspace_id, notification_type, title, body, href, read_at, created_at FROM workspace_notifications WHERE id = ?1",
+        )
+        .bind(notification_id)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(SharedNotification::from(row))
     }
 
     pub async fn workspace_collaboration_counts(
@@ -2720,6 +2974,51 @@ impl From<ArtifactCommentRow> for ArtifactComment {
             body: row.body,
             created_at: row.created_at,
             updated_at: row.updated_at,
+        }
+    }
+}
+
+impl From<ArtifactLifecycleRow> for ArtifactLifecycle {
+    fn from(row: ArtifactLifecycleRow) -> Self {
+        Self {
+            artifact_id: row.artifact_id,
+            workspace_id: row.workspace_id,
+            status: row.status,
+            owner: row.owner_id.map(|id| SharedUser { id, display_name: row.owner_display_name.unwrap_or_else(|| "Member".to_owned()), email: row.owner_email }),
+            review_note: row.review_note,
+            reviewed_by: row.reviewer_id.map(|id| SharedUser { id, display_name: row.reviewer_display_name.unwrap_or_else(|| "Member".to_owned()), email: row.reviewer_email }),
+            reviewed_at: row.reviewed_at,
+            superseded_by_artifact_id: row.superseded_by_artifact_id,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+        }
+    }
+}
+
+impl From<ArtifactLifecycleEventRow> for ArtifactLifecycleEvent {
+    fn from(row: ArtifactLifecycleEventRow) -> Self {
+        Self {
+            id: row.id,
+            artifact_id: row.artifact_id,
+            actor: row.actor_id.map(|id| SharedUser { id, display_name: row.actor_display_name.unwrap_or_else(|| "Member".to_owned()), email: row.actor_email }),
+            action: row.action,
+            detail: row.detail,
+            created_at: row.created_at,
+        }
+    }
+}
+
+impl From<SharedNotificationRow> for SharedNotification {
+    fn from(row: SharedNotificationRow) -> Self {
+        Self {
+            id: row.id,
+            workspace_id: row.workspace_id,
+            notification_type: row.notification_type,
+            title: row.title,
+            body: row.body,
+            href: row.href,
+            read_at: row.read_at,
+            created_at: row.created_at,
         }
     }
 }

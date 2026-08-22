@@ -1,6 +1,6 @@
 //! Server-authoritative HTTP API for shared RepoMemo workspaces.
 
-use std::{collections::BTreeMap, net::SocketAddr, path::PathBuf, time::Duration};
+use std::{collections::{BTreeMap, BTreeSet}, net::SocketAddr, path::PathBuf, time::Duration};
 
 use anyhow::{bail, Context, Result};
 use argon2::{
@@ -20,14 +20,15 @@ use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, 
 use rand_core::OsRng;
 use repomemo_api::RepoMemoCore;
 use repomemo_domain::{
-    ArtifactComment, ArtifactDetail, ArtifactSummary, ArtifactType, AskAnswer, AskRequest, Citation,
+    ArtifactComment, ArtifactDetail, ArtifactLifecycle, ArtifactLifecycleEvent, ArtifactSummary, ArtifactType, AskAnswer, AskRequest, Citation,
     CollaborationTask, CreateMemoryCardRequest, IndexingJobStatus, MemoryCard, MemoryCardDetail,
     MemoryCardSummary, Organization, ProviderSettings, ProviderTestResult, SearchRequest,
     SearchResult, SharedAiProviderSettings, SharedSession, SharedUser, SharedWorkspace,
+    SharedNotification,
     UpdateMemoryCardRequest, Workspace, WorkspaceActivityEvent, WorkspaceAiOverview,
     WorkspaceCapabilities, WorkspaceMember, WorkspaceOverview, WorkspaceRole,
 };
-use repomemo_storage::{NewCollaborationTask, StorageConfig, StorageEngine};
+use repomemo_storage::{NewCollaborationTask, NewSharedNotification, SaveArtifactLifecycle, StorageConfig, StorageEngine};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
@@ -227,6 +228,15 @@ struct CreateTextArtifactRequest {
 #[derive(Debug, Deserialize)]
 struct UpdateArtifactRequest {
     title: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct SaveArtifactLifecycleRequest {
+    status: String,
+    owner_user_id: Option<String>,
+    #[serde(default)]
+    review_note: String,
+    superseded_by_artifact_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -443,6 +453,12 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
         )
         .route("/v1/profile/password", post(change_profile_password))
         .route("/v1/profile/tasks", get(list_profile_tasks))
+        .route("/v1/notifications", get(list_notifications))
+        .route("/v1/notifications/read-all", post(mark_all_notifications_read))
+        .route(
+            "/v1/notifications/{notification_id}/read",
+            post(mark_notification_read),
+        )
         .route(
             "/v1/organizations",
             get(list_organizations).post(create_organization),
@@ -531,6 +547,14 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
         .route(
             "/v1/artifacts/{artifact_id}/comments",
             get(list_artifact_comments).post(create_artifact_comment),
+        )
+        .route(
+            "/v1/artifacts/{artifact_id}/lifecycle",
+            get(get_artifact_lifecycle).put(update_artifact_lifecycle),
+        )
+        .route(
+            "/v1/artifacts/{artifact_id}/lifecycle/history",
+            get(list_artifact_lifecycle_events),
         )
         .route(
             "/v1/comments/{comment_id}",
@@ -706,6 +730,43 @@ async fn list_profile_tasks(
         .await
         .map(Json)
         .map_err(map_storage_error)
+}
+
+async fn list_notifications(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+) -> Result<Json<Vec<SharedNotification>>, ApiError> {
+    state
+        .storage
+        .list_shared_notifications(&subject.user_id)
+        .await
+        .map(Json)
+        .map_err(map_storage_error)
+}
+
+async fn mark_notification_read(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(notification_id): Path<String>,
+) -> Result<Json<SharedNotification>, ApiError> {
+    state
+        .storage
+        .mark_shared_notification_read(&notification_id, &subject.user_id)
+        .await
+        .map(Json)
+        .map_err(map_storage_error)
+}
+
+async fn mark_all_notifications_read(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+) -> Result<StatusCode, ApiError> {
+    state
+        .storage
+        .mark_all_shared_notifications_read(&subject.user_id)
+        .await
+        .map_err(map_storage_error)?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 async fn update_profile(
@@ -1318,6 +1379,7 @@ async fn create_collaboration_task(
         .create_collaboration_task(&workspace_id, &subject.user_id, payload)
         .await
         .map_err(map_storage_error)?;
+    notify_task_assignee(&state, &subject.user_id, &task).await;
     record_workspace_activity(
         &state,
         &workspace_id,
@@ -1349,6 +1411,11 @@ async fn update_collaboration_task(
         .update_collaboration_task(&task_id, payload)
         .await
         .map_err(map_storage_error)?;
+    if current.assignee.as_ref().map(|member| member.id.as_str())
+        != task.assignee.as_ref().map(|member| member.id.as_str())
+    {
+        notify_task_assignee(&state, &subject.user_id, &task).await;
+    }
     record_workspace_activity(
         &state,
         &task.workspace_id,
@@ -1493,6 +1560,15 @@ async fn create_artifact_comment(
         )
         .await
         .map_err(map_storage_error)?;
+    notify_artifact_mentions(
+        &state,
+        &subject.user_id,
+        &artifact.summary.workspace_id,
+        &artifact_id,
+        &artifact.summary.title,
+        &body,
+    )
+    .await;
     record_workspace_activity(
         &state,
         &comment.workspace_id,
@@ -1606,6 +1682,79 @@ async fn record_workspace_activity(
         .await
     {
         tracing::error!(error = %error, workspace_id, action, "Failed to record workspace activity");
+    }
+}
+
+async fn notify_task_assignee(state: &AppState, actor_user_id: &str, task: &CollaborationTask) {
+    let Some(assignee) = task.assignee.as_ref() else {
+        return;
+    };
+    if assignee.id == actor_user_id {
+        return;
+    }
+    create_notification(
+        state,
+        NewSharedNotification {
+            user_id: assignee.id.clone(),
+            workspace_id: Some(task.workspace_id.clone()),
+            notification_type: "task_assigned".to_owned(),
+            title: "Task assigned to you".to_owned(),
+            body: format!("{} was assigned to you.", task.title),
+            href: format!("/workspaces/{}/tasks", task.workspace_id),
+        },
+    )
+    .await;
+}
+
+async fn notify_artifact_mentions(
+    state: &AppState,
+    actor_user_id: &str,
+    workspace_id: &str,
+    artifact_id: &str,
+    artifact_title: &str,
+    body: &str,
+) {
+    let members = match state.storage.list_workspace_members(workspace_id).await {
+        Ok(members) => members,
+        Err(error) => {
+            tracing::error!(error = %error, workspace_id, "Failed to resolve evidence comment mentions");
+            return;
+        }
+    };
+    let mentioned_emails = body
+        .split_whitespace()
+        .filter_map(|token| {
+            token
+                .trim_matches(|character: char| matches!(character, ',' | '.' | ':' | ';' | '!' | '?' | ')' | ']' | '}' | '"' | '\''))
+                .strip_prefix('@')
+                .map(|email| email.to_ascii_lowercase())
+        })
+        .collect::<BTreeSet<_>>();
+    for member in members {
+        let Some(email) = member.user.email.as_deref() else {
+            continue;
+        };
+        if member.user.id == actor_user_id || !mentioned_emails.contains(&email.to_ascii_lowercase()) {
+            continue;
+        }
+        create_notification(
+            state,
+            NewSharedNotification {
+                user_id: member.user.id,
+                workspace_id: Some(workspace_id.to_owned()),
+                notification_type: "evidence_mention".to_owned(),
+                title: "You were mentioned in evidence discussion".to_owned(),
+                body: format!("You were mentioned on {}.", artifact_title),
+                href: format!("/workspaces/{workspace_id}/artifacts/{artifact_id}"),
+            },
+        )
+        .await;
+    }
+}
+
+async fn create_notification(state: &AppState, notification: NewSharedNotification) {
+    if let Err(error) = state.storage.create_shared_notification(notification).await {
+        tracing::error!(error = %error, "Failed to create shared notification");
     }
 }
 
@@ -1923,6 +2072,122 @@ async fn delete_artifact(
     )
     .await;
     Ok(StatusCode::NO_CONTENT)
+}
+
+async fn get_artifact_lifecycle(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(artifact_id): Path<String>,
+) -> Result<Json<ArtifactLifecycle>, ApiError> {
+    let artifact = state
+        .core
+        .get_artifact(artifact_id.clone())
+        .await
+        .map_err(map_core_error)?;
+    require_workspace_read(&state, &subject, &artifact.summary.workspace_id).await?;
+    state
+        .storage
+        .get_artifact_lifecycle(&artifact_id)
+        .await
+        .map(Json)
+        .map_err(map_storage_error)
+}
+
+async fn update_artifact_lifecycle(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(artifact_id): Path<String>,
+    Json(request): Json<SaveArtifactLifecycleRequest>,
+) -> Result<Json<ArtifactLifecycle>, ApiError> {
+    let artifact = state
+        .core
+        .get_artifact(artifact_id.clone())
+        .await
+        .map_err(map_core_error)?;
+    require_workspace_write(&state, &subject, &artifact.summary.workspace_id).await?;
+    let status = request.status.trim().to_ascii_lowercase();
+    if !matches!(status.as_str(), "active" | "needs_review" | "verified" | "outdated" | "superseded") {
+        return Err(ApiError::bad_request("Evidence lifecycle status is invalid."));
+    }
+    let review_note = request.review_note.trim().to_owned();
+    if review_note.len() > 5_000 {
+        return Err(ApiError::bad_request("Evidence lifecycle note is too long."));
+    }
+    let owner_user_id = request.owner_user_id.filter(|value| !value.trim().is_empty());
+    if let Some(owner_user_id) = owner_user_id.as_deref() {
+        if state
+            .storage
+            .workspace_role_for_user(owner_user_id, &artifact.summary.workspace_id)
+            .await
+            .map_err(map_storage_error)?
+            .is_none()
+        {
+            return Err(ApiError::bad_request("Evidence owner must be a workspace member."));
+        }
+    }
+    let superseded_by_artifact_id = request
+        .superseded_by_artifact_id
+        .filter(|value| !value.trim().is_empty());
+    if status == "superseded" && superseded_by_artifact_id.is_none() {
+        return Err(ApiError::bad_request("Choose the replacement evidence before marking this item superseded."));
+    }
+    if let Some(replacement_id) = superseded_by_artifact_id.as_deref() {
+        if replacement_id == artifact_id {
+            return Err(ApiError::bad_request("Evidence cannot supersede itself."));
+        }
+        let replacement = state
+            .core
+            .get_artifact(replacement_id.to_owned())
+            .await
+            .map_err(map_core_error)?;
+        if replacement.summary.workspace_id != artifact.summary.workspace_id {
+            return Err(ApiError::bad_request("Replacement evidence must belong to this workspace."));
+        }
+    }
+    let lifecycle = state
+        .storage
+        .save_artifact_lifecycle(
+            &artifact_id,
+            &subject.user_id,
+            SaveArtifactLifecycle {
+                status: status.clone(),
+                owner_user_id,
+                review_note,
+                superseded_by_artifact_id,
+            },
+        )
+        .await
+        .map_err(map_storage_error)?;
+    record_workspace_activity(
+        &state,
+        &artifact.summary.workspace_id,
+        &subject.user_id,
+        "evidence_lifecycle_updated",
+        "artifact",
+        Some(&artifact_id),
+        format!("Updated evidence lifecycle for {} to {}.", artifact.summary.title, status),
+    )
+    .await;
+    Ok(Json(lifecycle))
+}
+
+async fn list_artifact_lifecycle_events(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(artifact_id): Path<String>,
+) -> Result<Json<Vec<ArtifactLifecycleEvent>>, ApiError> {
+    let artifact = state
+        .core
+        .get_artifact(artifact_id.clone())
+        .await
+        .map_err(map_core_error)?;
+    require_workspace_read(&state, &subject, &artifact.summary.workspace_id).await?;
+    state
+        .storage
+        .list_artifact_lifecycle_events(&artifact_id)
+        .await
+        .map(Json)
+        .map_err(map_storage_error)
 }
 
 async fn index_artifact(
@@ -2592,6 +2857,46 @@ mod tests {
                 .unwrap();
         let artifact_id = artifact["id"].as_str().unwrap();
 
+        let lifecycle = app
+            .clone()
+            .oneshot(json_request(
+                "PUT",
+                &format!("/v1/artifacts/{artifact_id}/lifecycle"),
+                &authorization,
+                json!({
+                    "status":"needs_review",
+                    "owner_user_id":member["user"]["id"],
+                    "review_note":"Needs a second reviewer before this decision is relied on.",
+                    "superseded_by_artifact_id":null
+                }),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(lifecycle.status(), 200);
+        let lifecycle: Value = serde_json::from_slice(
+            &to_bytes(lifecycle.into_body(), usize::MAX).await.unwrap(),
+        )
+        .unwrap();
+        assert_eq!(lifecycle["status"], "needs_review");
+        assert_eq!(lifecycle["owner"]["id"], member["user"]["id"]);
+        let lifecycle_history = app
+            .clone()
+            .oneshot(auth_request(
+                "GET",
+                &format!("/v1/artifacts/{artifact_id}/lifecycle/history"),
+                &authorization,
+            ))
+            .await
+            .unwrap();
+        assert_eq!(lifecycle_history.status(), 200);
+        let lifecycle_history: Value = serde_json::from_slice(
+            &to_bytes(lifecycle_history.into_body(), usize::MAX)
+                .await
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(lifecycle_history.as_array().unwrap().len(), 1);
+
         let task = app
             .clone()
             .oneshot(json_request(
@@ -2616,6 +2921,19 @@ mod tests {
                 .unwrap();
         let task_id = task["id"].as_str().unwrap();
         assert_eq!(task["assignee"]["display_name"], "Collaborator");
+        let task_notifications = app
+            .clone()
+            .oneshot(auth_request("GET", "/v1/notifications", &collaborator_authorization))
+            .await
+            .unwrap();
+        assert_eq!(task_notifications.status(), 200);
+        let task_notifications: Value = serde_json::from_slice(
+            &to_bytes(task_notifications.into_body(), usize::MAX)
+                .await
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(task_notifications[0]["notification_type"], "task_assigned");
         let assigned_tasks = app
             .clone()
             .oneshot(auth_request(
@@ -2681,7 +2999,7 @@ mod tests {
                 "POST",
                 &format!("/v1/artifacts/{artifact_id}/comments"),
                 &collaborator_authorization,
-                json!({"body":"This confirms the server-authoritative decision."}),
+                json!({"body":"@flow@example.com This confirms the server-authoritative decision."}),
             ))
             .await
             .unwrap();
@@ -2690,6 +3008,30 @@ mod tests {
             serde_json::from_slice(&to_bytes(comment.into_body(), usize::MAX).await.unwrap())
                 .unwrap();
         let comment_id = comment["id"].as_str().unwrap();
+        let mention_notifications = app
+            .clone()
+            .oneshot(auth_request("GET", "/v1/notifications", &authorization))
+            .await
+            .unwrap();
+        assert_eq!(mention_notifications.status(), 200);
+        let mention_notifications: Value = serde_json::from_slice(
+            &to_bytes(mention_notifications.into_body(), usize::MAX)
+                .await
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(mention_notifications[0]["notification_type"], "evidence_mention");
+        let mention_notification_id = mention_notifications[0]["id"].as_str().unwrap();
+        let marked_notification = app
+            .clone()
+            .oneshot(auth_request(
+                "POST",
+                &format!("/v1/notifications/{mention_notification_id}/read"),
+                &authorization,
+            ))
+            .await
+            .unwrap();
+        assert_eq!(marked_notification.status(), 200);
         let updated_comment = app
             .clone()
             .oneshot(json_request(

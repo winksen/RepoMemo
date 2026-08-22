@@ -2,6 +2,8 @@ import type {
   AskAnswer,
   ArtifactDetail,
   ArtifactComment,
+  ArtifactLifecycle,
+  ArtifactLifecycleEvent,
   ArtifactSummary,
   ArtifactType,
   IndexingJobStatus,
@@ -12,6 +14,7 @@ import type {
   ProviderTestResult,
   SearchResult,
   SharedSession,
+  SharedNotification,
   SharedAiProviderSettings,
   SharedUser,
   UserProfile,
@@ -125,6 +128,18 @@ export function getSharedProfile(accessToken: string): Promise<UserProfile> {
 
 export function listSharedProfileTasks(accessToken: string): Promise<CollaborationTask[]> {
   return request<CollaborationTask[]>("/v1/profile/tasks", {}, accessToken);
+}
+
+export function listSharedNotifications(accessToken: string): Promise<SharedNotification[]> {
+  return request<SharedNotification[]>("/v1/notifications", {}, accessToken);
+}
+
+export function markSharedNotificationRead(accessToken: string, notificationId: string): Promise<SharedNotification> {
+  return request<SharedNotification>(`/v1/notifications/${notificationId}/read`, { method: "POST" }, accessToken);
+}
+
+export function markAllSharedNotificationsRead(accessToken: string): Promise<void> {
+  return request<void>("/v1/notifications/read-all", { method: "POST" }, accessToken);
 }
 
 export function updateSharedProfile(accessToken: string, displayName: string): Promise<SharedUser> {
@@ -347,6 +362,31 @@ export function updateSharedArtifact(accessToken: string, artifactId: string, ti
 
 export function deleteSharedArtifact(accessToken: string, artifactId: string): Promise<void> {
   return request<void>(`/v1/artifacts/${artifactId}`, { method: "DELETE" }, accessToken);
+}
+
+export function getSharedArtifactLifecycle(accessToken: string, artifactId: string): Promise<ArtifactLifecycle> {
+  return request<ArtifactLifecycle>(`/v1/artifacts/${artifactId}/lifecycle`, {}, accessToken);
+}
+
+export function updateSharedArtifactLifecycle(accessToken: string, artifactId: string, input: {
+  status: ArtifactLifecycle["status"];
+  ownerUserId: string | null;
+  reviewNote: string;
+  supersededByArtifactId: string | null;
+}): Promise<ArtifactLifecycle> {
+  return request<ArtifactLifecycle>(`/v1/artifacts/${artifactId}/lifecycle`, {
+    method: "PUT",
+    body: JSON.stringify({
+      status: input.status,
+      owner_user_id: input.ownerUserId,
+      review_note: input.reviewNote,
+      superseded_by_artifact_id: input.supersededByArtifactId,
+    }),
+  }, accessToken);
+}
+
+export function listSharedArtifactLifecycleEvents(accessToken: string, artifactId: string): Promise<ArtifactLifecycleEvent[]> {
+  return request<ArtifactLifecycleEvent[]>(`/v1/artifacts/${artifactId}/lifecycle/history`, {}, accessToken);
 }
 
 export function listSharedArtifactComments(accessToken: string, artifactId: string): Promise<ArtifactComment[]> {
