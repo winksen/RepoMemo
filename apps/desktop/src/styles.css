@@ -210,12 +210,16 @@ textarea:focus-visible {
 .shared-api-note code { color: var(--color-text-muted); font-family: var(--font-mono); }
 .shared-loading { justify-content: center; gap: 10px; height: 100vh; color: var(--color-text-muted); }
 
-.shared-home { display: grid; grid-template-rows: 62px minmax(0, 1fr); height: 100dvh; min-height: 0; padding: 12px; overflow: hidden; }
-.shared-home-header { position: relative; z-index: 1; justify-content: space-between; padding: 0 14px; background: var(--color-surface); border-radius: 12px; box-shadow: var(--shadow-block); }
-.shared-user-menu { gap: 14px; color: var(--color-text-muted); font-size: 13px; }
-.shared-user-menu button { display: inline-flex; align-items: center; gap: 6px; color: var(--color-text-muted); background: transparent; cursor: pointer; font-size: 13px; }
-.shared-user-menu button:hover { color: var(--color-text); }
-.shared-theme-toggle { min-width: 76px; justify-content: center; }
+.shared-home { display: grid; grid-template-rows: 52px minmax(0, 1fr); height: 100dvh; min-height: 0; padding: 8px; overflow: hidden; }
+.shared-home-header { position: relative; z-index: 1; justify-content: space-between; padding: 0 12px; background: var(--color-surface); border-radius: 12px; box-shadow: var(--shadow-block); }
+.shared-user-menu { gap: 8px; color: var(--color-text-muted); font-size: 13px; }
+.shared-account-controls { display: inline-flex; overflow: hidden; background: var(--color-surface); border: 2px solid var(--color-border); border-radius: 8px; transition: border-color 110ms var(--ease-control); }
+.shared-account-controls button { display: inline-flex; align-items: center; gap: 6px; min-width: 36px; min-height: 36px; padding: 0 10px; color: var(--color-text); background: transparent; border: 0; border-radius: 0; cursor: pointer; font-size: 12px; font-weight: 700; }
+.shared-account-controls button + button { border-left: 1px solid var(--color-border); }
+.shared-account-controls:hover { border-color: var(--color-accent); }
+.shared-account-controls button:focus-visible { position: relative; z-index: 1; outline-offset: -2px; }
+.shared-theme-toggle,
+.shared-notifications-link { justify-content: center; padding: 0 9px !important; }
 .shared-home-frame { display: grid; grid-template-columns: 216px minmax(0, 1fr); gap: 10px; min-height: 0; padding-top: 10px; }
 .shared-home-rail,
 .shared-home-content { background: var(--color-surface); border-radius: 12px; box-shadow: var(--shadow-block); }

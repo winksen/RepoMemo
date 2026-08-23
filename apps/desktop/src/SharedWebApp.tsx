@@ -701,7 +701,22 @@ function SharedAppShell({
     <main className="shared-home">
       <header className="shared-home-header">
         <div className="shared-brand"><span className="shared-brand-glyph"><Layers size={19} /></span><strong>RepoMemo</strong><span className="shared-mode-tag">Shared</span></div>
-        <div className="shared-user-menu"><Button aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} aria-pressed={theme === "dark"} className="shared-theme-toggle" onClick={() => setTheme((current) => current === "dark" ? "light" : "dark")} title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} type="button" variant="secondary">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}<span>{theme === "dark" ? "Light" : "Dark"}</span></Button><Button className="shared-notifications-link" onClick={() => navigate("/notifications")} type="button" variant="secondary"><Bell size={16} /> Notifications</Button><Button className="shared-profile-link" onClick={() => navigate("/profile")} type="button" variant="secondary"><UserCircle size={16} /> {session.user.display_name}</Button><Button className="shared-user-signout" onClick={signOut} type="button" variant="secondary"><Logout size={16} /> Sign out</Button></div>
+        <div className="shared-user-menu" aria-label="Account controls">
+          <div className="shared-account-controls">
+            <Button aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} aria-pressed={theme === "dark"} className="shared-theme-toggle" onClick={() => setTheme((current) => current === "dark" ? "light" : "dark")} title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} type="button" variant="secondary">
+              {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+            </Button>
+            <Button aria-label="Open notifications" className="shared-notifications-link" onClick={() => navigate("/notifications")} title="Notifications" type="button" variant="secondary">
+              <Bell size={16} />
+            </Button>
+            <Button className="shared-profile-link" onClick={() => navigate("/profile")} type="button" variant="secondary">
+              <UserCircle size={16} /> Profile
+            </Button>
+          </div>
+          <Button className="shared-user-signout" onClick={signOut} type="button" variant="secondary">
+            <Logout size={16} /> Sign out
+          </Button>
+        </div>
       </header>
       <div className="shared-home-frame">
         <aside className="shared-home-rail">{sidebar}<div className="shared-rail-footer"><Shield size={15} /><span>JWT active · API {apiAvailable === true ? "healthy" : apiAvailable === false ? "offline" : "checking"}</span></div></aside>
