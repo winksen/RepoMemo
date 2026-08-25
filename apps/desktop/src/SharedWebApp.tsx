@@ -339,11 +339,11 @@ function SharedWebAppContent() {
     : undefined;
 
   if (pathname === "/profile") {
-    return <SharedProfile accessToken={accessToken} apiAvailable={apiAvailable} organizations={organizations} onSessionUserUpdated={(user) => setSession((current) => current ? { ...current, user } : current)} session={session} signOut={signOut} />;
+    return <SharedProfile accessToken={accessToken} apiAvailable={apiAvailable} organizations={organizations} onSessionUserUpdated={(user) => setSession((current) => current ? { ...current, user } : current)} session={session} signOut={signOut} workspaces={workspaces} />;
   }
 
   if (pathname === "/notifications") {
-    return <SharedNotifications accessToken={accessToken} apiAvailable={apiAvailable} organizations={organizations} session={session} signOut={signOut} />;
+    return <SharedNotifications accessToken={accessToken} apiAvailable={apiAvailable} organizations={organizations} session={session} signOut={signOut} workspaces={workspaces} />;
   }
 
   if (pathname === "/dashboard") {
@@ -351,17 +351,17 @@ function SharedWebAppContent() {
   }
 
   if (workspace && routeParts[2] === "artifacts" && routeParts[3]) {
-    return <SharedArtifactDetail accessToken={accessToken} apiAvailable={apiAvailable} artifactId={routeParts[3]} onBack={() => navigate(`/workspaces/${encodeURIComponent(workspaceId!)}/overview`)} organization={workspaceOrganization} organizations={organizations} session={session} signOut={signOut} workspace={workspace} />;
+    return <SharedArtifactDetail accessToken={accessToken} apiAvailable={apiAvailable} artifactId={routeParts[3]} onBack={() => navigate(`/workspaces/${encodeURIComponent(workspaceId!)}/overview`)} organization={workspaceOrganization} organizations={organizations} session={session} signOut={signOut} workspace={workspace} workspaces={workspaces} />;
   }
 
   if (workspace && routeParts[2] === "memory-cards" && routeParts[3]) {
-    return <SharedMemoryCardDetail accessToken={accessToken} apiAvailable={apiAvailable} cardId={routeParts[3]} onBack={() => navigate(`/workspaces/${encodeURIComponent(workspaceId!)}/overview`)} organization={workspaceOrganization} organizations={organizations} session={session} signOut={signOut} workspace={workspace} />;
+    return <SharedMemoryCardDetail accessToken={accessToken} apiAvailable={apiAvailable} cardId={routeParts[3]} onBack={() => navigate(`/workspaces/${encodeURIComponent(workspaceId!)}/overview`)} organization={workspaceOrganization} organizations={organizations} session={session} signOut={signOut} workspace={workspace} workspaces={workspaces} />;
   }
 
   const isWorkspaceSectionRoute = routeParts.length === 2 || (Boolean(activeWorkspaceSection) && routeParts.length === 3);
 
   if (workspaceId && !isWorkspaceSectionRoute) {
-    return <SharedRouteNotFound apiAvailable={apiAvailable} onBack={() => navigate(`/workspaces/${encodeURIComponent(workspaceId!)}/overview`)} organization={workspaceOrganization} organizations={organizations} session={session} signOut={signOut} workspace={workspace} />;
+    return <SharedRouteNotFound apiAvailable={apiAvailable} onBack={() => navigate(`/workspaces/${encodeURIComponent(workspaceId!)}/overview`)} organization={workspaceOrganization} organizations={organizations} session={session} signOut={signOut} workspace={workspace} workspaces={workspaces} />;
   }
 
   if (workspaceId) {
@@ -388,14 +388,15 @@ function SharedWebAppContent() {
         session={session}
         signOut={signOut}
         workspace={workspace}
+        workspaces={workspaces}
       />
     ) : (
-      <SharedRouteNotFound apiAvailable={apiAvailable} onBack={() => navigate("/workspaces")} organizations={organizations} session={session} signOut={signOut} />
+      <SharedRouteNotFound apiAvailable={apiAvailable} onBack={() => navigate("/workspaces")} organizations={organizations} session={session} signOut={signOut} workspaces={workspaces} />
     );
   }
 
   if (pathname !== "/workspaces" && pathname !== "/") {
-    return <SharedRouteNotFound apiAvailable={apiAvailable} onBack={() => navigate("/workspaces")} organizations={organizations} session={session} signOut={signOut} />;
+    return <SharedRouteNotFound apiAvailable={apiAvailable} onBack={() => navigate("/workspaces")} organizations={organizations} session={session} signOut={signOut} workspaces={workspaces} />;
   }
 
   return (
@@ -510,6 +511,7 @@ function SharedProfile({
   onSessionUserUpdated,
   session,
   signOut,
+  workspaces,
 }: {
   accessToken: string;
   apiAvailable: boolean | null;
@@ -517,6 +519,7 @@ function SharedProfile({
   onSessionUserUpdated: (user: SharedUser) => void;
   session: SharedSession;
   signOut: () => void;
+  workspaces: SharedWorkspace[];
 }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [assignedTasks, setAssignedTasks] = useState<CollaborationTask[]>([]);
@@ -568,7 +571,7 @@ function SharedProfile({
 
   const initials = (profile?.user.display_name ?? session.user.display_name).split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "U";
 
-  return <SharedLayout apiAvailable={apiAvailable} onNavigate={navigate} session={session} signOut={signOut} sidebar={<OrganizationRail organizations={organizations} />}>
+  return <SharedLayout apiAvailable={apiAvailable} onNavigate={navigate} session={session} signOut={signOut} sidebar={<OrganizationRail organizations={organizations} workspaces={workspaces} />}>
     <section className="shared-page-content shared-profile-page" aria-busy={isLoading}>
       <div className="shared-detail-heading"><div><p className="shared-eyebrow">Account</p><h1>Your profile</h1><p>Manage your identity and review your activity across shared workspaces.</p></div><Button onClick={() => navigate("/workspaces")} type="button" variant="secondary"><ArrowLeft size={16} /> All workspaces</Button></div>
       {error ? <p className="shared-form-error" role="alert">{error}</p> : null}
@@ -590,12 +593,14 @@ function SharedNotifications({
   organizations,
   session,
   signOut,
+  workspaces,
 }: {
   accessToken: string;
   apiAvailable: boolean | null;
   organizations: Organization[];
   session: SharedSession;
   signOut: () => void;
+  workspaces: SharedWorkspace[];
 }) {
   const [notifications, setNotifications] = useState<SharedNotification[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -629,7 +634,7 @@ function SharedNotifications({
   }
 
   const unreadCount = notifications.filter((notification) => !notification.read_at).length;
-  return <SharedLayout apiAvailable={apiAvailable} onNavigate={navigate} session={session} signOut={signOut} sidebar={<OrganizationRail organizations={organizations} />}>
+  return <SharedLayout apiAvailable={apiAvailable} onNavigate={navigate} session={session} signOut={signOut} sidebar={<OrganizationRail organizations={organizations} workspaces={workspaces} />}>
     <section className="shared-page-content shared-notifications-page" aria-busy={isLoading}>
       <div className="shared-detail-heading"><div><p className="shared-eyebrow">Inbox</p><h1>Notifications</h1><p>Task assignments and direct evidence mentions appear here. Mention a teammate with their email, for example <code>@person@example.com</code>.</p></div><div className="shared-detail-actions"><Button disabled={isLoading} onClick={() => void load()} type="button" variant="secondary"><Refresh size={16} /> Refresh</Button><Button disabled={isMutating || unreadCount === 0} onClick={() => void markAllRead()} type="button" variant="secondary">Mark all read</Button></div></div>
       {error ? <p className="shared-form-error" role="alert">{error}</p> : null}
@@ -682,7 +687,7 @@ function SharedDashboard({
     memory: total.memory + metrics.memory_card_count,
   }), { artifacts: 0, tasks: 0, memory: 0 }), [metricsByWorkspace]);
 
-  return <SharedLayout apiAvailable={apiAvailable} onNavigate={navigate} session={session} signOut={signOut} sidebar={<OrganizationRail organizations={organizations} />}>
+  return <SharedLayout apiAvailable={apiAvailable} onNavigate={navigate} session={session} signOut={signOut} sidebar={<OrganizationRail organizations={organizations} workspaces={workspaces} />}>
     <section className="shared-page-content shared-dashboard-page" aria-busy={isLoading}>
       <div className="shared-page-heading"><div><p className="shared-eyebrow">Shared overview</p><h1>Dashboard</h1><p>Accessible organizations, workspaces, and the evidence your teams are building.</p></div><div className="shared-detail-actions"><Button onClick={() => navigate("/workspaces")} type="button" variant="secondary"><Layers size={16} /> All workspaces</Button><Button disabled={isLoading} onClick={() => void load()} type="button" variant="secondary"><Refresh size={16} /> Refresh</Button></div></div>
       {error ? <p className="shared-form-error" role="alert">{error}</p> : null}
@@ -779,7 +784,7 @@ function SharedWorkspaceHome({
       onNavigate={navigate}
       session={session}
       signOut={signOut}
-      sidebar={<OrganizationRail organizations={organizations} organizationId={organizationId} />}
+      sidebar={<OrganizationRail organizations={organizations} organizationId={organizationId} workspaces={workspaces} />}
     >
         <div className="shared-page-content">
           <div className="shared-page-heading"><div><p className="shared-eyebrow">Shared workspaces</p><h1>{showOrganizationForm ? "Create an organization" : currentOrganization ? currentOrganization.name : "Set up your team"}</h1><p>{showOrganizationForm ? "Create a separate team boundary for its own shared workspaces and members." : "Workspaces are server-authoritative and available only to their members."}</p></div>{organizations.length ? <Button onClick={organizationNavigation.startCreatingOrganization} type="button" variant="secondary"><Plus size={16} /> New organization</Button> : null}</div>
@@ -797,46 +802,58 @@ function SharedWorkspaceHome({
 function OrganizationRail({
   organizations,
   organizationId,
+  workspaceId,
+  workspaces,
 }: {
   organizations: Organization[];
   organizationId?: string;
+  workspaceId?: string;
+  workspaces?: SharedWorkspace[];
 }) {
   const organizationNavigation = useOrganizationNavigation();
   const selectedOrganizationId = organizationId ?? organizationNavigation.activeOrganizationId ?? organizations[0]?.id;
-  return <><p className="shared-eyebrow">Organization</p>{organizations.length ? <><Dropdown aria-label="Switch organization" className="shared-organization-select" onValueChange={organizationNavigation.selectOrganization} options={organizations.map((organization) => ({ label: organization.name, value: organization.id }))} value={selectedOrganizationId} /><Button className="shared-organization-create" onClick={organizationNavigation.startCreatingOrganization} type="button" variant="secondary"><Plus size={16} /> New organization</Button></> : <><p className="shared-rail-empty">No organization is available to this account yet.</p><Button className="shared-organization-create" onClick={organizationNavigation.startCreatingOrganization} type="button" variant="secondary"><Plus size={16} /> Create organization</Button></>}</>;
+  const canManageOrganizations = !organizations.length || (workspaces?.some((workspace) => workspace.role === "owner") ?? false);
+
+  return <div className="shared-rail-navigation">
+    {workspaces ? <section className="shared-rail-workspaces" aria-label="Workspaces">
+      <p className="shared-eyebrow">Workspaces</p>
+      {workspaces.length ? <div className="shared-rail-list">{workspaces.map((workspace) => {
+        const organization = organizations.find((entry) => entry.id === workspace.organization_id);
+        const label = organizations.length > 1 ? `${organization?.name ?? "Organization"} / ${workspace.workspace.name}` : workspace.workspace.name;
+        const isCurrent = workspace.workspace.id === workspaceId;
+        return <Button aria-current={isCurrent ? "page" : undefined} className={`shared-rail-workspace${isCurrent ? " active" : ""}`} key={workspace.workspace.id} onClick={() => navigate(`/workspaces/${encodeURIComponent(workspace.workspace.id)}/overview`)} type="button" variant="secondary"><Layers size={16} /><span>{label}</span></Button>;
+      })}</div> : <p className="shared-rail-empty">No accessible workspaces yet.</p>}
+    </section> : null}
+    {canManageOrganizations ? <section className="shared-rail-organizations" aria-label="Organization management">
+      <p className="shared-eyebrow">Organizations</p>
+      {organizations.length ? <div className="shared-rail-list">{organizations.map((organization) => <Button aria-current={organization.id === selectedOrganizationId ? "page" : undefined} className={`shared-rail-organization${organization.id === selectedOrganizationId ? " active" : ""}`} key={organization.id} onClick={() => organizationNavigation.selectOrganization(organization.id)} type="button" variant="secondary"><Building size={16} /><span>{organization.name}</span></Button>)}</div> : <p className="shared-rail-empty">Create an organization to begin.</p>}
+      <Button className="shared-organization-create" onClick={organizationNavigation.startCreatingOrganization} type="button" variant="secondary"><Plus size={16} /> New organization</Button>
+    </section> : null}
+  </div>;
 }
 
-function WorkspaceRail({
+function WorkspaceTopbar({
   activeSection = "overview",
   onNavigate,
-  organization,
-  organizations,
   workspace,
 }: {
   activeSection?: WorkspaceSection;
   onNavigate?: (section: WorkspaceSection) => void;
-  organization?: Organization;
-  organizations: Organization[];
   workspace: SharedWorkspace;
 }) {
-  return <>
-    <OrganizationRail organizationId={organization?.id} organizations={organizations} />
-    <div className="shared-workspace-nav">
-      <p className="shared-eyebrow">Workspace</p>
-      <div className="shared-workspace-context"><Layers size={16} /><span>{workspace.workspace.name}</span></div>
-      <nav aria-label="Workspace sections" className="shared-workspace-menu">
-        <Button aria-current={activeSection === "overview" ? "page" : undefined} className={activeSection === "overview" ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.("overview")} type="button" variant="secondary"><Dashboard size={16} /> Overview</Button>
-        <Button aria-current={activeSection === "evidence" ? "page" : undefined} className={activeSection === "evidence" ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.("evidence")} type="button" variant="secondary"><FileText size={16} /> Evidence</Button>
-        <Button aria-current={activeSection === "retrieval" ? "page" : undefined} className={activeSection === "retrieval" ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.("retrieval")} type="button" variant="secondary"><Search size={16} /> Retrieval</Button>
-        <Button aria-current={activeSection === "memory" ? "page" : undefined} className={activeSection === "memory" ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.("memory")} type="button" variant="secondary"><Book size={16} /> Memory</Button>
-        <Button aria-current={activeSection === "tasks" ? "page" : undefined} className={activeSection === "tasks" ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.("tasks")} type="button" variant="secondary"><Checklist size={16} /> Tasks</Button>
-        <Button aria-current={activeSection === "people" ? "page" : undefined} className={activeSection === "people" ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.("people")} type="button" variant="secondary"><Users size={16} /> People</Button>
-        <Button aria-current={activeSection === "activity" ? "page" : undefined} className={activeSection === "activity" ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.("activity")} type="button" variant="secondary"><Timeline size={16} /> Activity</Button>
-        {workspace.role === "owner" || workspace.role === "admin" ? <Button aria-current={activeSection === "settings" ? "page" : undefined} className={activeSection === "settings" ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.("settings")} type="button" variant="secondary"><Settings size={16} /> Settings</Button> : null}
-      </nav>
-      <p className="shared-sidebar-note">Navigate between the shared workspace views.</p>
+  return <nav aria-label={`${workspace.workspace.name} sections`} className="shared-workspace-topbar">
+    <div className="shared-workspace-topbar-identity"><Layers size={16} /><span>{workspace.workspace.name}</span></div>
+    <div className="shared-workspace-tabs">
+      <Button aria-current={activeSection === "overview" ? "page" : undefined} className={activeSection === "overview" ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.("overview")} type="button" variant="secondary"><Dashboard size={16} /> Overview</Button>
+      <Button aria-current={activeSection === "evidence" ? "page" : undefined} className={activeSection === "evidence" ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.("evidence")} type="button" variant="secondary"><FileText size={16} /> Evidence</Button>
+      <Button aria-current={activeSection === "retrieval" ? "page" : undefined} className={activeSection === "retrieval" ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.("retrieval")} type="button" variant="secondary"><Search size={16} /> Retrieval</Button>
+      <Button aria-current={activeSection === "memory" ? "page" : undefined} className={activeSection === "memory" ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.("memory")} type="button" variant="secondary"><Book size={16} /> Memory</Button>
+      <Button aria-current={activeSection === "tasks" ? "page" : undefined} className={activeSection === "tasks" ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.("tasks")} type="button" variant="secondary"><Checklist size={16} /> Tasks</Button>
+      <Button aria-current={activeSection === "people" ? "page" : undefined} className={activeSection === "people" ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.("people")} type="button" variant="secondary"><Users size={16} /> People</Button>
+      <Button aria-current={activeSection === "activity" ? "page" : undefined} className={activeSection === "activity" ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.("activity")} type="button" variant="secondary"><Timeline size={16} /> Activity</Button>
+      {workspace.role === "owner" || workspace.role === "admin" ? <Button aria-current={activeSection === "settings" ? "page" : undefined} className={activeSection === "settings" ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.("settings")} type="button" variant="secondary"><Settings size={16} /> Settings</Button> : null}
     </div>
-  </>;
+  </nav>;
 }
 
 function SharedWorkspaceDetail({
@@ -854,6 +871,7 @@ function SharedWorkspaceDetail({
   session,
   signOut,
   workspace,
+  workspaces,
 }: {
   accessToken: string;
   apiAvailable: boolean | null;
@@ -869,6 +887,7 @@ function SharedWorkspaceDetail({
   session: SharedSession;
   signOut: () => void;
   workspace: SharedWorkspace;
+  workspaces: SharedWorkspace[];
 }) {
   const [overview, setOverview] = useState<WorkspaceOverview | null>(null);
   const [workspaceMetrics, setWorkspaceMetrics] = useState<WorkspaceMetrics | null>(null);
@@ -1283,7 +1302,7 @@ function SharedWorkspaceDetail({
   }
 
   return (
-    <SharedLayout apiAvailable={apiAvailable} onNavigate={navigate} session={session} signOut={signOut} sidebar={<WorkspaceRail activeSection={section} onNavigate={onNavigate} organization={organization} organizations={organizations} workspace={workspace} />}>
+    <SharedLayout apiAvailable={apiAvailable} onNavigate={navigate} session={session} signOut={signOut} sidebar={<OrganizationRail organizationId={organization?.id} organizations={organizations} workspaceId={workspace.workspace.id} workspaces={workspaces} />} workspaceNavigation={<WorkspaceTopbar activeSection={section} onNavigate={onNavigate} workspace={workspace} />}>
       <section className="shared-detail-shell" aria-busy={isLoading}>
         <div className="shared-detail-heading">
           <div><p className="shared-eyebrow">{isEvidenceView ? "Evidence" : isRetrievalView ? "Retrieval" : isMemoryView ? "Team memory" : isTasksView ? "Team follow-up" : isPeopleView ? "Workspace access" : isActivityView ? "Workspace history" : isSettingsView ? "Administrative control" : `Server workspace · ${workspace.role}`}</p><h1>{isEvidenceView ? "Evidence ledger" : isRetrievalView ? "Retrieve evidence" : isMemoryView ? "Durable team memory" : isTasksView ? "Tasks" : isPeopleView ? "People" : isActivityView ? "Activity" : isSettingsView ? "Workspace settings" : workspace.workspace.name}</h1><p>{isEvidenceView ? "Store notes and files in the workspace, then index them for retrieval." : isRetrievalView ? "Search indexed workspace evidence and inspect the source context behind every result." : isMemoryView ? "Capture concise facts and decisions that should outlive the current investigation." : isTasksView ? "Turn evidence and decisions into assigned, trackable action items for the team." : isPeopleView ? "See who can access this workspace and understand each person’s role." : isActivityView ? "A durable record of shared workspace changes, including evidence, memory, indexing, and membership updates." : isSettingsView ? "Administrators control workspace access and AI integrations here. Owner-only actions remain clearly marked." : "Artifacts, search results, and durable team memory are all retrieved through the protected shared API."}</p></div>
@@ -1435,6 +1454,7 @@ function SharedArtifactDetail({
   session,
   signOut,
   workspace,
+  workspaces,
 }: {
   accessToken: string;
   apiAvailable: boolean | null;
@@ -1445,6 +1465,7 @@ function SharedArtifactDetail({
   session: SharedSession;
   signOut: () => void;
   workspace: SharedWorkspace;
+  workspaces: SharedWorkspace[];
 }) {
   const [artifact, setArtifact] = useState<ArtifactDetail | null>(null);
   const [comments, setComments] = useState<ArtifactComment[]>([]);
@@ -1556,7 +1577,7 @@ function SharedArtifactDetail({
   }
 
   return (
-    <SharedRecordLayout activeSection="evidence" apiAvailable={apiAvailable} backLabel="Workspace" onBack={onBack} organization={organization} organizations={organizations} session={session} signOut={signOut} title={artifact?.summary.title ?? "Artifact"} subtitle={artifact?.summary.path ?? "Loading protected evidence…"} workspace={workspace}>
+    <SharedRecordLayout activeSection="evidence" apiAvailable={apiAvailable} backLabel="Workspace" onBack={onBack} organization={organization} organizations={organizations} session={session} signOut={signOut} title={artifact?.summary.title ?? "Artifact"} subtitle={artifact?.summary.path ?? "Loading protected evidence…"} workspace={workspace} workspaces={workspaces}>
       <div className="shared-detail-actions"><Button disabled={isLoading} onClick={() => void load()} type="button" variant="secondary"><Refresh size={16} /> Refresh</Button>{canWrite ? <><Button disabled={isLoading || isMutating} onClick={() => setIsEditing((value) => !value)} type="button" variant="secondary"><Pencil size={16} /> {isEditing ? "Cancel edit" : "Edit"}</Button><Button className="shared-danger-action" disabled={isLoading || isMutating} onClick={() => void removeArtifact()} type="button" variant="secondary"><Trash size={16} /> Delete</Button><Button disabled={isLoading || isIndexing || isMutating} onClick={() => void indexArtifact()} type="button" variant="main">{isIndexing ? <Loader className="spin" size={16} /> : <Layers size={16} />} Index artifact</Button></> : null}</div>
       {error ? <p className="shared-form-error" role="alert">{error}</p> : null}
       <div className="shared-record-meta"><span>{artifact?.summary.artifact_type ?? "artifact"}</span><span>{artifact?.summary.language ?? "Unspecified language"}</span><span>{artifact?.summary.indexed_at ? "Indexed" : "Not indexed"}</span></div>
@@ -1579,6 +1600,7 @@ function SharedMemoryCardDetail({
   session,
   signOut,
   workspace,
+  workspaces,
 }: {
   accessToken: string;
   apiAvailable: boolean | null;
@@ -1589,6 +1611,7 @@ function SharedMemoryCardDetail({
   session: SharedSession;
   signOut: () => void;
   workspace: SharedWorkspace;
+  workspaces: SharedWorkspace[];
 }) {
   const [card, setCard] = useState<MemoryCardDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -1644,7 +1667,7 @@ function SharedMemoryCardDetail({
   }
 
   return (
-    <SharedRecordLayout activeSection="memory" apiAvailable={apiAvailable} backLabel="Workspace" onBack={onBack} organization={organization} organizations={organizations} session={session} signOut={signOut} title={card?.card.title ?? "Memory card"} subtitle={card ? `Source: ${card.card.source}` : "Loading durable team memory…"} workspace={workspace}>
+    <SharedRecordLayout activeSection="memory" apiAvailable={apiAvailable} backLabel="Workspace" onBack={onBack} organization={organization} organizations={organizations} session={session} signOut={signOut} title={card?.card.title ?? "Memory card"} subtitle={card ? `Source: ${card.card.source}` : "Loading durable team memory…"} workspace={workspace} workspaces={workspaces}>
       <div className="shared-detail-actions"><Button disabled={isLoading} onClick={() => void load()} type="button" variant="secondary"><Refresh size={16} /> Refresh</Button>{canWrite ? <><Button disabled={isLoading || isMutating} onClick={() => setIsEditing((value) => !value)} type="button" variant="secondary"><Pencil size={16} /> {isEditing ? "Cancel edit" : "Edit"}</Button><Button className="shared-danger-action" disabled={isLoading || isMutating} onClick={() => void removeCard()} type="button" variant="secondary"><Trash size={16} /> Delete</Button></> : null}<Button disabled={isLoading || isExporting || isMutating} onClick={() => void exportCard()} type="button" variant="main">{isExporting ? <Loader className="spin" size={16} /> : <FileText size={16} />} Export Markdown</Button></div>
       {error ? <p className="shared-form-error" role="alert">{error}</p> : null}
       <section className="shared-record-panel"><h2>Durable statement</h2>{isEditing ? <form className="shared-record-edit-form" onSubmit={saveCard}><label>Title<Input onChange={(event) => setTitle(event.target.value)} required value={title} /></label><label>Source<Input onChange={(event) => setSource(event.target.value)} required value={source} /></label><label>Statement<Textarea onChange={(event) => setBodyMarkdown(event.target.value)} required value={bodyMarkdown} /></label><Button disabled={isMutating} type="submit" variant="main">{isMutating ? <Loader className="spin" size={16} /> : <Pencil size={16} />} Save memory</Button></form> : <div className="shared-memory-body">{card?.card.body_markdown ?? ""}</div>}</section>
@@ -1666,6 +1689,7 @@ function SharedRecordLayout({
   subtitle,
   title,
   workspace,
+  workspaces,
 }: {
   activeSection: WorkspaceSection;
   apiAvailable: boolean | null;
@@ -1679,9 +1703,10 @@ function SharedRecordLayout({
   subtitle: string;
   title: string;
   workspace: SharedWorkspace;
+  workspaces: SharedWorkspace[];
 }) {
   return (
-    <SharedLayout apiAvailable={apiAvailable} onNavigate={navigate} session={session} signOut={signOut} sidebar={<WorkspaceRail activeSection={activeSection} onNavigate={(section) => navigate(`/workspaces/${encodeURIComponent(workspace.workspace.id)}/${section}`)} organization={organization} organizations={organizations} workspace={workspace} />}>
+    <SharedLayout apiAvailable={apiAvailable} onNavigate={navigate} session={session} signOut={signOut} sidebar={<OrganizationRail organizationId={organization?.id} organizations={organizations} workspaceId={workspace.workspace.id} workspaces={workspaces} />} workspaceNavigation={<WorkspaceTopbar activeSection={activeSection} onNavigate={(section) => navigate(`/workspaces/${encodeURIComponent(workspace.workspace.id)}/${section}`)} workspace={workspace} />}>
       <section className="shared-detail-shell">
         <div className="shared-detail-heading"><div><p className="shared-eyebrow">Protected record</p><h1>{title}</h1><p className="shared-record-subtitle">{subtitle}</p></div><Button className="shared-back-button" onClick={onBack} type="button" variant="secondary"><ArrowLeft size={16} /> {backLabel}</Button></div>
         <div className="shared-record-content">{children}</div>
@@ -1698,6 +1723,7 @@ function SharedRouteNotFound({
   session,
   signOut,
   workspace,
+  workspaces,
 }: {
   apiAvailable: boolean | null;
   onBack: () => void;
@@ -1706,9 +1732,10 @@ function SharedRouteNotFound({
   session: SharedSession;
   signOut: () => void;
   workspace?: SharedWorkspace;
+  workspaces?: SharedWorkspace[];
 }) {
   return (
-    <SharedLayout apiAvailable={apiAvailable} onNavigate={navigate} session={session} signOut={signOut} sidebar={workspace ? <WorkspaceRail organization={organization} organizations={organizations} workspace={workspace} /> : <OrganizationRail organizations={organizations} />}>
+    <SharedLayout apiAvailable={apiAvailable} onNavigate={navigate} session={session} signOut={signOut} sidebar={<OrganizationRail organizationId={organization?.id} organizations={organizations} workspaceId={workspace?.workspace.id} workspaces={workspaces} />} workspaceNavigation={workspace ? <WorkspaceTopbar workspace={workspace} /> : undefined}>
       <section className="shared-page-content shared-route-page" aria-label="Unknown shared route">
         <p className="shared-eyebrow">Shared workspace</p>
         <h1>This address has no shared view.</h1>

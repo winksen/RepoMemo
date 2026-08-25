@@ -47,7 +47,7 @@ The reader should be able to select a workspace, search or ask a question, and i
 
 Light mode is the product's default. The physical scene is a developer working through a project on a normal desktop display, with enough contrast for long reading and no themed ambient field. White is the working surface; a very cool gray establishes gutters and inactive controls; thin cool-gray dividers define regions.
 
-Blue is the only expressive color. It denotes the current selection, keyboard focus, a direct primary action, and an active tab. Green, amber, and red remain semantic exception colors only; they never brand broad regions. A warm suggestion wash may appear only behind actionable assistant recommendations, never as general decoration.
+Blue is the only expressive color. It denotes keyboard focus, a direct primary action, and an active tab. Green, amber, and red remain semantic exception colors only; they never brand broad regions. A warm suggestion wash may appear only behind actionable assistant recommendations, never as general decoration.
 
 ## Typography
 
@@ -66,7 +66,7 @@ The Workspace route uses the central canvas to browse and create workspaces. Its
 
 ## Components
 
-Controls are 36–40px tall, softly rounded at 8px, and communicate through text and icons rather than colored blocks. Surfaces use one faint divider or a very soft offset shadow, never both by default. Selected rows use a pale blue field. Suggested actions can use the reserved warm wash and a small trailing action control. Inputs are white with a subtle border and blue focus outline.
+Controls are 36–40px tall, softly rounded at 8px, and communicate through text and icons rather than colored blocks. Surfaces use one faint divider or a very soft offset shadow, never both by default. Selected rows use neutral surfaces with stronger ink or a neutral boundary. Never pair accent-colored text or icons with an accent-tint background on a component or button—at rest, selected, or hovered. Reserve accent backgrounds for solid primary actions and accent color for focus and restrained status signals. User-supplied logo artwork remains black and white; do not recolor it with the accent. Suggested actions can use the reserved warm wash and a small trailing action control. Inputs are white with a subtle border and blue focus outline.
 
 ### Shared UI primitives
 

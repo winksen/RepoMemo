@@ -6,7 +6,6 @@ import {
   IconLogout as Logout,
   IconMoon as Moon,
   IconShieldLock as Shield,
-  IconStack2 as Layers,
   IconSun as Sun,
   IconUserCircle as UserCircle,
 } from "@tabler/icons-react";
@@ -29,6 +28,7 @@ export function SharedLayout({
   sidebar,
   signOut,
   onNavigate,
+  workspaceNavigation,
 }: {
   apiAvailable: boolean | null;
   children: ReactNode;
@@ -36,6 +36,7 @@ export function SharedLayout({
   sidebar: ReactNode;
   signOut: () => void;
   onNavigate: (to: string) => void;
+  workspaceNavigation?: ReactNode;
 }) {
   const [theme, setTheme] = useState<Theme>(initialSharedTheme);
 
@@ -46,7 +47,7 @@ export function SharedLayout({
 
   return <main className="shared-home">
     <header className="shared-home-header">
-      <div className="shared-brand"><span className="shared-brand-glyph"><Layers size={19} /></span><strong>RepoMemo</strong><span className="shared-mode-tag">Shared</span></div>
+      <Button aria-label="Go to dashboard" className="shared-brand" onClick={() => onNavigate("/dashboard")} type="button" variant="secondary"><img alt="" className="shared-brand-mark" src="/RM-logofull.svg" /></Button>
       <div className="shared-header-actions">
         <Button aria-current={window.location.pathname === "/dashboard" ? "page" : undefined} className="shared-dashboard-link" onClick={() => onNavigate("/dashboard")} type="button" variant="secondary"><Dashboard size={16} /> Dashboard</Button>
         <div className="shared-user-menu" aria-label="Account controls">
@@ -63,7 +64,10 @@ export function SharedLayout({
     </header>
     <div className="shared-home-frame">
       <aside className="shared-home-rail">{sidebar}<div className="shared-rail-footer"><Shield size={15} /><span>JWT active · API {apiAvailable === true ? "healthy" : apiAvailable === false ? "offline" : "checking"}</span></div></aside>
-      <section className="shared-home-content">{children}</section>
+      <section className="shared-home-content">
+        {workspaceNavigation}
+        <div className="shared-layout-content">{children}</div>
+      </section>
     </div>
   </main>;
 }

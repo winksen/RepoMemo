@@ -317,7 +317,7 @@ select:focus-visible,
 .search-result.selected,
 .memory-card-row.selected,
 .workspace-row-v3.selected {
-  background: var(--color-accent-soft);
+  background: var(--color-surface-2);
   border-color: transparent;
   box-shadow: none;
 }
@@ -329,8 +329,8 @@ select:focus-visible,
 }
 
 .citation-list span {
-  color: var(--color-accent-text);
-  background: var(--color-accent-soft);
+  color: var(--color-text-muted);
+  background: var(--color-surface-3);
   border-radius: 8px;
 }
 
