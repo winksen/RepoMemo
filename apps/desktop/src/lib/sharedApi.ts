@@ -11,6 +11,8 @@ import type {
   MemoryCardDetail,
   MemoryCardSummary,
   Organization,
+  OrganizationMember,
+  OrganizationRole,
   ProviderTestResult,
   SearchResult,
   SharedSession,
@@ -167,6 +169,28 @@ export function createSharedOrganization(accessToken: string, name: string): Pro
     method: "POST",
     body: JSON.stringify({ name }),
   }, accessToken);
+}
+
+export function updateSharedOrganization(accessToken: string, organizationId: string, name: string): Promise<Organization> {
+  return request<Organization>(`/v1/organizations/${organizationId}`, {
+    method: "PUT",
+    body: JSON.stringify({ name }),
+  }, accessToken);
+}
+
+export function listSharedOrganizationMembers(accessToken: string, organizationId: string): Promise<OrganizationMember[]> {
+  return request<OrganizationMember[]>(`/v1/organizations/${organizationId}/members`, {}, accessToken);
+}
+
+export function upsertSharedOrganizationMember(accessToken: string, organizationId: string, input: { email: string; role: OrganizationRole }): Promise<OrganizationMember> {
+  return request<OrganizationMember>(`/v1/organizations/${organizationId}/members`, {
+    method: "PUT",
+    body: JSON.stringify({ email: input.email, role: input.role }),
+  }, accessToken);
+}
+
+export function removeSharedOrganizationMember(accessToken: string, organizationId: string, userId: string): Promise<void> {
+  return request<void>(`/v1/organizations/${organizationId}/members/${userId}`, { method: "DELETE" }, accessToken);
 }
 
 export function listSharedWorkspaces(accessToken: string): Promise<SharedWorkspace[]> {

@@ -13,6 +13,7 @@ export interface SharedUser {
 }
 
 export type WorkspaceRole = "owner" | "admin" | "member" | "viewer";
+export type OrganizationRole = "owner" | "admin" | "member";
 
 export interface WorkspaceMembership {
   workspace_id: string;
@@ -133,8 +134,15 @@ export interface UserProfile {
 export interface Organization {
   id: string;
   name: string;
+  role: OrganizationRole;
   created_at: string;
   updated_at: string;
+}
+
+export interface OrganizationMember {
+  user: SharedUser;
+  role: OrganizationRole;
+  joined_at: string;
 }
 
 export interface SharedWorkspace {

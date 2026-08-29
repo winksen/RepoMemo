@@ -81,6 +81,7 @@ import {
   listSharedWorkspaceActivity,
   listSharedWorkspaceMembers,
   listSharedMemoryCards,
+  listSharedOrganizationMembers,
   listSharedOrganizations,
   listSharedProfileTasks,
   listSharedNotifications,
@@ -94,10 +95,13 @@ import {
   saveSharedWorkspaceAiProvider,
   testSharedWorkspaceAiProvider,
   removeSharedWorkspaceMember,
+  removeSharedOrganizationMember,
   sharedApiUrl,
   upsertSharedWorkspaceMember,
+  upsertSharedOrganizationMember,
   uploadSharedArtifact,
   updateSharedArtifact,
+  updateSharedOrganization,
   updateSharedArtifactLifecycle,
   markAllSharedNotificationsRead,
   markSharedNotificationRead,
@@ -121,6 +125,8 @@ import type {
   MemoryCardDetail,
   MemoryCardSummary,
   Organization,
+  OrganizationMember,
+  OrganizationRole,
   ProviderTestResult,
   RetrievalFacets,
   SearchResult,
@@ -166,6 +172,7 @@ type OrganizationNavigation = {
 };
 
 const WORKSPACE_SECTIONS: WorkspaceSection[] = ["overview", "evidence", "retrieval", "memory", "tasks", "people", "activity", "settings"];
+const ADMIN_WORKSPACE_SECTIONS = new Set<WorkspaceSection>(["people", "activity", "settings"]);
 const TASK_COLUMNS: Array<{ status: CollaborationTaskStatus; label: string }> = [
   { status: "open", label: "Open" },
   { status: "in_progress", label: "In progress" },
@@ -755,6 +762,7 @@ function SharedWorkspaceHome({
     () => organizations.find((organization) => organization.id === organizationId),
     [organizationId, organizations],
   );
+  const canManageOrganization = currentOrganization?.role === "owner" || currentOrganization?.role === "admin";
 
   async function createOrganization(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -789,14 +797,76 @@ function SharedWorkspaceHome({
         <div className="shared-page-content">
           <div className="shared-page-heading"><div><p className="shared-eyebrow">Shared workspaces</p><h1>{showOrganizationForm ? "Create an organization" : currentOrganization ? currentOrganization.name : "Set up your team"}</h1><p>{showOrganizationForm ? "Create a separate team boundary for its own shared workspaces and members." : "Workspaces are server-authoritative and available only to their members."}</p></div>{organizations.length ? <Button onClick={organizationNavigation.startCreatingOrganization} type="button" variant="secondary"><Plus size={16} /> New organization</Button> : null}</div>
           {showOrganizationForm ? <form className="shared-setup-form" onSubmit={createOrganization}><label>Organization name<Input autoFocus onChange={(event) => setOrganizationName(event.target.value)} placeholder="Engineering" required value={organizationName} /></label><div className="shared-setup-actions"><Button disabled={isSubmitting} type="submit" variant="main">{isSubmitting ? <Loader className="spin" size={17} /> : <Plus size={17} />} Create organization</Button>{organizations.length ? <Button disabled={isSubmitting} onClick={organizationNavigation.cancelOrganizationCreation} type="button" variant="secondary">Cancel</Button> : null}</div></form> : <>
-            <form className="shared-create-workspace" onSubmit={createWorkspace}><div><strong>Create a workspace</strong><span>Start a bounded memory space for a repository, system, or initiative.</span></div><label className="sr-only" htmlFor="shared-workspace-name">Workspace name</label><Input id="shared-workspace-name" onChange={(event) => setWorkspaceName(event.target.value)} placeholder="Payments platform" required value={workspaceName} /><Button disabled={isSubmitting} type="submit" variant="main">{isSubmitting ? <Loader className="spin" size={17} /> : <Plus size={17} />} Create workspace</Button></form>
+            {canManageOrganization ? <form className="shared-create-workspace" onSubmit={createWorkspace}><div><strong>Create a workspace</strong><span>Start a bounded memory space for a repository, system, or initiative.</span></div><label className="sr-only" htmlFor="shared-workspace-name">Workspace name</label><Input id="shared-workspace-name" onChange={(event) => setWorkspaceName(event.target.value)} placeholder="Payments platform" required value={workspaceName} /><Button disabled={isSubmitting} type="submit" variant="main">{isSubmitting ? <Loader className="spin" size={17} /> : <Plus size={17} />} Create workspace</Button></form> : <p className="shared-muted-copy">Your organization role grants access to its workspaces but not workspace creation.</p>}
             <div className="shared-workspace-list">{workspaces.filter((workspace) => workspace.organization_id === organizationId).map((entry) => <article className="shared-workspace-row" key={entry.workspace.id}><span className="shared-workspace-icon"><Layers size={18} /></span><div><h2>{entry.workspace.name}</h2><p>Created {new Date(entry.workspace.created_at).toLocaleDateString()} · Your role: {entry.role}</p></div><Button aria-label={`Open ${entry.workspace.name}`} className="shared-workspace-open" onClick={() => onOpenWorkspace(entry)} type="button" variant="secondary"><ChevronRight size={18} /></Button></article>)}{workspaces.filter((workspace) => workspace.organization_id === organizationId).length === 0 ? <div className="shared-empty-state"><Layers size={26} /><strong>No workspaces yet</strong><span>Create the first shared workspace for {currentOrganization?.name}.</span></div> : null}</div>
+            {currentOrganization && canManageOrganization ? <OrganizationAdministration accessToken={accessToken} onOrganizationUpdated={(updated) => setOrganizations((current) => current.map((organization) => organization.id === updated.id ? updated : organization))} organization={currentOrganization} /> : null}
           </>}
           {formError ? <p className="shared-form-error" role="alert">{formError}</p> : null}
           <p className="shared-boundary-note"><Shield size={15} /> Every workspace view is loaded through the JWT-protected API. This browser never falls back to local preview data.</p>
         </div>
     </SharedLayout>
   );
+}
+
+function OrganizationAdministration({
+  accessToken,
+  onOrganizationUpdated,
+  organization,
+}: {
+  accessToken: string;
+  onOrganizationUpdated: (organization: Organization) => void;
+  organization: Organization;
+}) {
+  const [members, setMembers] = useState<OrganizationMember[]>([]);
+  const [organizationName, setOrganizationName] = useState(organization.name);
+  const [memberEmail, setMemberEmail] = useState("");
+  const [memberRole, setMemberRole] = useState<OrganizationRole>("member");
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const canRename = organization.role === "owner";
+  const canAssignAdmin = organization.role === "owner";
+
+  async function load() {
+    setIsLoading(true); setError(null);
+    try { setMembers(await listSharedOrganizationMembers(accessToken, organization.id)); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsLoading(false); }
+  }
+
+  useEffect(() => { setOrganizationName(organization.name); void load(); }, [accessToken, organization.id, organization.name]);
+
+  async function saveOrganization(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsSaving(true); setError(null);
+    try { onOrganizationUpdated(await updateSharedOrganization(accessToken, organization.id, organizationName)); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSaving(false); }
+  }
+
+  async function saveMember(email: string, role: OrganizationRole) {
+    setIsSaving(true); setError(null);
+    try {
+      const member = await upsertSharedOrganizationMember(accessToken, organization.id, { email, role });
+      setMembers((current) => current.some((entry) => entry.user.id === member.user.id) ? current.map((entry) => entry.user.id === member.user.id ? member : entry) : [...current, member]);
+      setMemberEmail("");
+    } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSaving(false); }
+  }
+
+  async function removeMember(member: OrganizationMember) {
+    setIsSaving(true); setError(null);
+    try { await removeSharedOrganizationMember(accessToken, organization.id, member.user.id); setMembers((current) => current.filter((entry) => entry.user.id !== member.user.id)); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSaving(false); }
+  }
+
+  return <section className="shared-organization-admin" aria-labelledby="organization-admin-title">
+    <div className="shared-panel-heading"><div><Building size={18} /><h2 id="organization-admin-title">Organization administration</h2></div><span>{organization.role}</span></div>
+    <p className="shared-muted-copy">Organization members inherit access to every workspace. Their organization role controls the level of that access.</p>
+    {canRename ? <form className="shared-organization-rename" onSubmit={saveOrganization}><label>Organization name<Input onChange={(event) => setOrganizationName(event.target.value)} required value={organizationName} /></label><Button disabled={isSaving || organizationName.trim() === organization.name} type="submit" variant="secondary">Save name</Button></form> : null}
+    <form className="shared-organization-member-form" onSubmit={(event) => { event.preventDefault(); void saveMember(memberEmail, memberRole); }}><label>Member email<Input onChange={(event) => setMemberEmail(event.target.value)} placeholder="person@example.com" required type="email" value={memberEmail} /></label><label>Organization role<Dropdown aria-label="Organization role" onValueChange={(value) => setMemberRole(value as OrganizationRole)} options={[{ label: "Member", value: "member" }, ...(canAssignAdmin ? [{ label: "Admin", value: "admin" }] : [])]} value={memberRole} /></label><Button disabled={isSaving} type="submit" variant="secondary"><Users size={16} /> Add member</Button></form>
+    {error ? <p className="shared-form-error" role="alert">{error}</p> : null}
+    <div className="shared-organization-member-list" aria-busy={isLoading}>{isLoading ? <p className="shared-muted-copy">Loading organization members…</p> : members.map((member) => {
+      const isOwner = member.role === "owner";
+      const protectedMember = isOwner || (organization.role === "admin" && member.role === "admin");
+      const email = member.user.email ?? "";
+      return <article key={member.user.id}><div><strong>{member.user.display_name}</strong><span>{email}</span></div><div className="shared-organization-member-actions">{isOwner ? <span className="shared-member-role">Owner</span> : <Dropdown aria-label={`Role for ${member.user.display_name}`} disabled={protectedMember || isSaving} onValueChange={(value) => void saveMember(email, value as OrganizationRole)} options={[{ label: "Member", value: "member" }, ...(canAssignAdmin ? [{ label: "Admin", value: "admin" }] : [])]} value={member.role} />}{!protectedMember ? <Button aria-label={`Remove ${member.user.display_name} from ${organization.name}`} disabled={isSaving} onClick={() => void removeMember(member)} type="button" variant="secondary"><Trash size={15} /></Button> : null}</div></article>;
+    })}</div>
+  </section>;
 }
 
 function OrganizationRail({
@@ -812,7 +882,7 @@ function OrganizationRail({
 }) {
   const organizationNavigation = useOrganizationNavigation();
   const selectedOrganizationId = organizationId ?? organizationNavigation.activeOrganizationId ?? organizations[0]?.id;
-  const canManageOrganizations = !organizations.length || (workspaces?.some((workspace) => workspace.role === "owner") ?? false);
+  const canManageOrganizations = !organizations.length || organizations.some((organization) => organization.role === "owner" || organization.role === "admin");
 
   return <div className="shared-rail-navigation">
     {workspaces ? <section className="shared-rail-workspaces" aria-label="Workspaces">
@@ -841,17 +911,25 @@ function WorkspaceTopbar({
   onNavigate?: (section: WorkspaceSection) => void;
   workspace: SharedWorkspace;
 }) {
+  const isWorkspaceAdmin = workspace.role === "owner" || workspace.role === "admin";
+  const workspaceTab = (section: WorkspaceSection, label: string, icon: ReactNode) => {
+    const isAdminOnly = ADMIN_WORKSPACE_SECTIONS.has(section);
+    if (isAdminOnly && !isWorkspaceAdmin) return null;
+    const isActive = activeSection === section;
+    return <Button aria-current={isActive ? "page" : undefined} className={isActive ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.(section)} type="button" variant="secondary">{icon}<span className="shared-workspace-tab-label">{label}{isAdminOnly ? <span className="shared-workspace-tab-restricted">Admin</span> : null}</span></Button>;
+  };
+
   return <nav aria-label={`${workspace.workspace.name} sections`} className="shared-workspace-topbar">
     <div className="shared-workspace-topbar-identity"><Layers size={16} /><span>{workspace.workspace.name}</span></div>
     <div className="shared-workspace-tabs">
-      <Button aria-current={activeSection === "overview" ? "page" : undefined} className={activeSection === "overview" ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.("overview")} type="button" variant="secondary"><Dashboard size={16} /> Overview</Button>
-      <Button aria-current={activeSection === "evidence" ? "page" : undefined} className={activeSection === "evidence" ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.("evidence")} type="button" variant="secondary"><FileText size={16} /> Evidence</Button>
-      <Button aria-current={activeSection === "retrieval" ? "page" : undefined} className={activeSection === "retrieval" ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.("retrieval")} type="button" variant="secondary"><Search size={16} /> Retrieval</Button>
-      <Button aria-current={activeSection === "memory" ? "page" : undefined} className={activeSection === "memory" ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.("memory")} type="button" variant="secondary"><Book size={16} /> Memory</Button>
-      <Button aria-current={activeSection === "tasks" ? "page" : undefined} className={activeSection === "tasks" ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.("tasks")} type="button" variant="secondary"><Checklist size={16} /> Tasks</Button>
-      <Button aria-current={activeSection === "people" ? "page" : undefined} className={activeSection === "people" ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.("people")} type="button" variant="secondary"><Users size={16} /> People</Button>
-      <Button aria-current={activeSection === "activity" ? "page" : undefined} className={activeSection === "activity" ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.("activity")} type="button" variant="secondary"><Timeline size={16} /> Activity</Button>
-      {workspace.role === "owner" || workspace.role === "admin" ? <Button aria-current={activeSection === "settings" ? "page" : undefined} className={activeSection === "settings" ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.("settings")} type="button" variant="secondary"><Settings size={16} /> Settings</Button> : null}
+      {workspaceTab("overview", "Overview", <Dashboard size={16} />)}
+      {workspaceTab("evidence", "Evidence", <FileText size={16} />)}
+      {workspaceTab("retrieval", "Retrieval", <Search size={16} />)}
+      {workspaceTab("memory", "Memory", <Book size={16} />)}
+      {workspaceTab("tasks", "Tasks", <Checklist size={16} />)}
+      {workspaceTab("people", "People", <Users size={16} />)}
+      {workspaceTab("activity", "Activity", <Timeline size={16} />)}
+      {workspaceTab("settings", "Settings", <Settings size={16} />)}
     </div>
   </nav>;
 }
@@ -961,6 +1039,8 @@ function SharedWorkspaceDetail({
   const isPeopleView = section === "people";
   const isActivityView = section === "activity";
   const isSettingsView = section === "settings";
+  const isWorkspaceAdmin = workspace.role === "owner" || workspace.role === "admin";
+  const isRestrictedView = ADMIN_WORKSPACE_SECTIONS.has(section) && !isWorkspaceAdmin;
   const displayedArtifacts = artifactResults ?? artifacts;
   const artifactSources = Array.from(new Map(artifacts.map((artifact) => [artifact.source_id, artifact.source_name])).entries());
   const visibleTasks = tasks.filter((task) => {
@@ -975,13 +1055,12 @@ function SharedWorkspaceDetail({
     setIsLoading(true);
     setError(null);
     try {
-      const [nextOverview, nextWorkspaceMetrics, nextArtifacts, nextMemory, nextMembers, nextCapabilities, nextRetrievalFacets] = await Promise.all([
+      const nextCapabilities = await getSharedWorkspaceCapabilities(accessToken, workspace.workspace.id);
+      const [nextOverview, nextWorkspaceMetrics, nextArtifacts, nextMemory, nextRetrievalFacets] = await Promise.all([
         getSharedWorkspaceOverview(accessToken, workspace.workspace.id),
         getSharedWorkspaceMetrics(accessToken, workspace.workspace.id),
         listSharedArtifacts(accessToken, workspace.workspace.id),
         listSharedMemoryCards(accessToken, workspace.workspace.id),
-        listSharedWorkspaceMembers(accessToken, workspace.workspace.id),
-        getSharedWorkspaceCapabilities(accessToken, workspace.workspace.id),
         getSharedRetrievalFacets(accessToken, workspace.workspace.id),
       ]);
       setOverview(nextOverview);
@@ -989,21 +1068,29 @@ function SharedWorkspaceDetail({
       setArtifacts(nextArtifacts);
       setArtifactResults(null);
       setMemoryCards(nextMemory);
-      setMembers(nextMembers);
       setCapabilities(nextCapabilities);
       setRetrievalFacets(nextRetrievalFacets);
       if (nextCapabilities.can_manage_members) {
-        setAiProviders(await listSharedWorkspaceAiProviders(accessToken, workspace.workspace.id));
+        const [nextMembers, nextAiProviders] = await Promise.all([
+          listSharedWorkspaceMembers(accessToken, workspace.workspace.id),
+          listSharedWorkspaceAiProviders(accessToken, workspace.workspace.id),
+        ]);
+        setMembers(nextMembers);
+        setAiProviders(nextAiProviders);
       } else {
+        setMembers([]);
         setAiProviders([]);
       }
-      if (isActivityView) {
+      if (isActivityView && nextCapabilities.can_manage_members) {
         const [nextActivity, nextActivityCalendar] = await Promise.all([
           listSharedWorkspaceActivity(accessToken, workspace.workspace.id),
           getSharedWorkspaceActivityCalendar(accessToken, workspace.workspace.id),
         ]);
         setActivity(nextActivity);
         setActivityCalendar(nextActivityCalendar);
+      } else {
+        setActivity([]);
+        setActivityCalendar(null);
       }
       if (isTasksView) {
         setTasks(await listSharedCollaborationTasks(accessToken, workspace.workspace.id));
@@ -1309,6 +1396,7 @@ function SharedWorkspaceDetail({
           <div className="shared-detail-actions"><Button className="shared-back-button" onClick={onBack} type="button" variant="secondary"><ArrowLeft size={16} /> All workspaces</Button><Button disabled={isLoading} onClick={() => void load()} type="button" variant="secondary"><Refresh size={16} /> Refresh</Button>{canWrite && isEvidenceView ? <Button disabled={isSubmitting || isLoading} onClick={() => void runIndex()} type="button" variant="main">{isSubmitting ? <Loader className="spin" size={16} /> : <Layers size={16} />} Index evidence</Button> : null}</div>
         </div>
         {error ? <p className="shared-form-error" role="alert">{error}</p> : null}
+        {isRestrictedView ? <div className="shared-empty-state shared-admin-restricted-state"><Shield size={25} /><strong>Workspace administrator access required</strong><span>People, Activity, and Settings are reserved for workspace owners and administrators.</span><Button onClick={() => onNavigate("overview")} type="button" variant="secondary">Go to overview</Button></div> : <>
         {section === "overview" ? <><div className="shared-evidence-summary">
           <span><strong>{overview?.artifact_count ?? "—"}</strong> artifacts</span><span><strong>{overview?.chunk_count ?? "—"}</strong> indexed chunks</span><span><strong>{overview?.memory_card_count ?? "—"}</strong> memory cards</span>
         </div>
@@ -1436,9 +1524,10 @@ function SharedWorkspaceDetail({
                 <form className="shared-workspace-rename" onSubmit={renameWorkspace}><Input aria-label="Workspace name" onChange={(event) => setWorkspaceName(event.target.value)} required value={workspaceName} /><Button disabled={isSubmitting} type="submit" variant="secondary"><Pencil size={16} /> Rename</Button></form>
                 <Button className="shared-danger-action" disabled={isSubmitting} onClick={() => void removeWorkspace()} type="button" variant="secondary"><Trash size={16} /> Delete workspace</Button>
               </section> : null}
-            </> : <div className="shared-empty-state"><Settings size={25} /><strong>Administrative access required</strong><span>Only workspace administrators and the owner can open settings. Your current role can still browse shared evidence, memory, and activity.</span></div>}
+            </> : <div className="shared-empty-state"><Settings size={25} /><strong>Administrative access required</strong><span>Only workspace administrators and the owner can open settings. Your current role can still browse shared evidence, memory, and tasks.</span></div>}
           </section> : null}
         </div> : null}
+        </>}
       </section>
     </SharedLayout>
   );

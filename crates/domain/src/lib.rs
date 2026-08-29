@@ -19,6 +19,21 @@ pub enum WorkspaceRole {
     Viewer,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum OrganizationRole {
+    Owner,
+    Admin,
+    Member,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OrganizationMember {
+    pub user: SharedUser,
+    pub role: OrganizationRole,
+    pub joined_at: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkspaceMembership {
     pub workspace_id: String,
@@ -149,6 +164,7 @@ pub struct SharedSession {
 pub struct Organization {
     pub id: String,
     pub name: String,
+    pub role: OrganizationRole,
     pub created_at: String,
     pub updated_at: String,
 }

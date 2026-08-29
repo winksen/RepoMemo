@@ -22,7 +22,7 @@ use repomemo_api::RepoMemoCore;
 use repomemo_domain::{
     ArtifactComment, ArtifactDetail, ArtifactLifecycle, ArtifactLifecycleEvent, ArtifactSummary, ArtifactType, AskAnswer, AskRequest, Citation,
     CollaborationTask, CreateMemoryCardRequest, IndexingJobStatus, MemoryCard, MemoryCardDetail,
-    MemoryCardSummary, Organization, ProviderSettings, ProviderTestResult, SavedSearch, SearchRequest,
+    MemoryCardSummary, Organization, OrganizationMember, OrganizationRole, ProviderSettings, ProviderTestResult, SavedSearch, SearchRequest,
     SearchResult, SharedAiProviderSettings, SharedSession, SharedUser, SharedWorkspace,
     SharedNotification, TaskChecklistItem,
     UpdateMemoryCardRequest, Workspace, WorkspaceActivityEvent, WorkspaceAiOverview,
@@ -205,6 +205,17 @@ struct ChangePasswordRequest {
 #[derive(Debug, Deserialize)]
 struct CreateOrganizationRequest {
     name: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct UpdateOrganizationRequest {
+    name: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct UpsertOrganizationMemberRequest {
+    email: String,
+    role: OrganizationRole,
 }
 
 #[derive(Debug, Deserialize)]
@@ -471,6 +482,18 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
         .route(
             "/v1/organizations",
             get(list_organizations).post(create_organization),
+        )
+        .route(
+            "/v1/organizations/{organization_id}",
+            put(update_organization),
+        )
+        .route(
+            "/v1/organizations/{organization_id}/members",
+            get(list_organization_members).put(upsert_organization_member),
+        )
+        .route(
+            "/v1/organizations/{organization_id}/members/{user_id}",
+            delete(remove_organization_member),
         )
         .route(
             "/v1/workspaces",
@@ -853,6 +876,96 @@ async fn list_organizations(
         .await
         .map(Json)
         .map_err(ApiError::internal)
+}
+
+async fn update_organization(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(organization_id): Path<String>,
+    Json(request): Json<UpdateOrganizationRequest>,
+) -> Result<Json<Organization>, ApiError> {
+    require_organization_owner(&state, &subject, &organization_id).await?;
+    state
+        .storage
+        .update_organization(&organization_id, &subject.user_id, &request.name)
+        .await
+        .map(Json)
+        .map_err(map_storage_error)
+}
+
+async fn list_organization_members(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(organization_id): Path<String>,
+) -> Result<Json<Vec<OrganizationMember>>, ApiError> {
+    require_organization_read(&state, &subject, &organization_id).await?;
+    state
+        .storage
+        .list_organization_members(&organization_id)
+        .await
+        .map(Json)
+        .map_err(ApiError::internal)
+}
+
+async fn upsert_organization_member(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(organization_id): Path<String>,
+    Json(request): Json<UpsertOrganizationMemberRequest>,
+) -> Result<Json<OrganizationMember>, ApiError> {
+    let caller_role = require_organization_admin(&state, &subject, &organization_id).await?;
+    if matches!(request.role, OrganizationRole::Owner)
+        || (matches!(caller_role, OrganizationRole::Admin) && matches!(request.role, OrganizationRole::Admin))
+    {
+        return Err(ApiError::forbidden());
+    }
+    if matches!(caller_role, OrganizationRole::Admin) {
+        if let Some(target) = state
+            .storage
+            .find_user_by_email(&request.email)
+            .await
+            .map_err(ApiError::internal)?
+        {
+            let target_role = state
+                .storage
+                .organization_role_for_user(&target.id, &organization_id)
+                .await
+                .map_err(ApiError::internal)?;
+            if matches!(target_role, Some(OrganizationRole::Owner | OrganizationRole::Admin)) {
+                return Err(ApiError::forbidden());
+            }
+        }
+    }
+    state
+        .storage
+        .upsert_organization_member(&organization_id, &request.email, request.role)
+        .await
+        .map(Json)
+        .map_err(map_storage_error)
+}
+
+async fn remove_organization_member(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path((organization_id, user_id)): Path<(String, String)>,
+) -> Result<StatusCode, ApiError> {
+    let caller_role = require_organization_admin(&state, &subject, &organization_id).await?;
+    let target_role = state
+        .storage
+        .organization_role_for_user(&user_id, &organization_id)
+        .await
+        .map_err(ApiError::internal)?;
+    if matches!(target_role, Some(OrganizationRole::Owner))
+        || (matches!(caller_role, OrganizationRole::Admin) && matches!(target_role, Some(OrganizationRole::Admin)))
+    {
+        return Err(ApiError::forbidden());
+    }
+    state
+        .storage
+        .remove_organization_member(&organization_id, &user_id)
+        .await
+        .map_err(map_storage_error)?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 async fn create_workspace(
@@ -1311,7 +1424,7 @@ async fn list_workspace_activity(
     State(state): State<AppState>,
     Path(workspace_id): Path<String>,
 ) -> Result<Json<Vec<WorkspaceActivityEvent>>, ApiError> {
-    require_workspace_read(&state, &subject, &workspace_id).await?;
+    require_workspace_admin(&state, &subject, &workspace_id).await?;
     state
         .storage
         .list_workspace_activity(&workspace_id, 100)
@@ -1325,7 +1438,7 @@ async fn workspace_activity_calendar(
     State(state): State<AppState>,
     Path(workspace_id): Path<String>,
 ) -> Result<Json<WorkspaceActivityCalendarResponse>, ApiError> {
-    require_workspace_read(&state, &subject, &workspace_id).await?;
+    require_workspace_admin(&state, &subject, &workspace_id).await?;
     let today = Utc::now().date_naive();
     let mut activity_by_day = (0..365)
         .rev()
@@ -1810,7 +1923,7 @@ async fn list_workspace_members(
     State(state): State<AppState>,
     Path(workspace_id): Path<String>,
 ) -> Result<Json<Vec<WorkspaceMember>>, ApiError> {
-    require_workspace_read(&state, &subject, &workspace_id).await?;
+    require_workspace_admin(&state, &subject, &workspace_id).await?;
     state
         .storage
         .list_workspace_members(&workspace_id)
@@ -2532,6 +2645,43 @@ async fn require_workspace_read(
         .ok_or_else(ApiError::forbidden)
 }
 
+async fn require_organization_read(
+    state: &AppState,
+    subject: &AuthenticatedSubject,
+    organization_id: &str,
+) -> Result<OrganizationRole, ApiError> {
+    state
+        .storage
+        .organization_role_for_user(&subject.user_id, organization_id)
+        .await
+        .map_err(ApiError::internal)?
+        .ok_or_else(ApiError::forbidden)
+}
+
+async fn require_organization_admin(
+    state: &AppState,
+    subject: &AuthenticatedSubject,
+    organization_id: &str,
+) -> Result<OrganizationRole, ApiError> {
+    let role = require_organization_read(state, subject, organization_id).await?;
+    if !matches!(role, OrganizationRole::Owner | OrganizationRole::Admin) {
+        return Err(ApiError::forbidden());
+    }
+    Ok(role)
+}
+
+async fn require_organization_owner(
+    state: &AppState,
+    subject: &AuthenticatedSubject,
+    organization_id: &str,
+) -> Result<OrganizationRole, ApiError> {
+    let role = require_organization_read(state, subject, organization_id).await?;
+    if !matches!(role, OrganizationRole::Owner) {
+        return Err(ApiError::forbidden());
+    }
+    Ok(role)
+}
+
 async fn require_workspace_write(
     state: &AppState,
     subject: &AuthenticatedSubject,
@@ -2886,6 +3036,18 @@ mod tests {
             serde_json::from_slice(&to_bytes(members.into_body(), usize::MAX).await.unwrap())
                 .unwrap();
         assert_eq!(members.as_array().unwrap().len(), 2);
+        for endpoint in [
+            format!("/v1/workspaces/{workspace_id}/members"),
+            format!("/v1/workspaces/{workspace_id}/activity"),
+            format!("/v1/workspaces/{workspace_id}/activity/calendar"),
+        ] {
+            let response = app
+                .clone()
+                .oneshot(auth_request("GET", &endpoint, &collaborator_authorization))
+                .await
+                .unwrap();
+            assert_eq!(response.status(), 403, "{endpoint} should require workspace admin access");
+        }
         let collaborator_overview = app
             .clone()
             .oneshot(auth_request(
@@ -3431,6 +3593,45 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(renamed_workspace.status(), 200);
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn organization_members_inherit_workspace_access_and_roles() {
+        let data_dir = std::env::temp_dir().join(format!("repomemo-organization-test-{}", uuid::Uuid::new_v4()));
+        let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+        let owner = app.clone().oneshot(Request::builder().method("POST").uri("/v1/auth/register").header("content-type", "application/json").body(Body::from(r#"{"email":"org-owner@example.com","display_name":"Org Owner","password":"not-a-real-password"}"#)).unwrap()).await.unwrap();
+        let owner: Value = serde_json::from_slice(&to_bytes(owner.into_body(), usize::MAX).await.unwrap()).unwrap();
+        let owner_authorization = format!("Bearer {}", owner["access_token"].as_str().unwrap());
+        let member = app.clone().oneshot(Request::builder().method("POST").uri("/v1/auth/register").header("content-type", "application/json").body(Body::from(r#"{"email":"org-member@example.com","display_name":"Org Member","password":"not-a-real-password"}"#)).unwrap()).await.unwrap();
+        let member: Value = serde_json::from_slice(&to_bytes(member.into_body(), usize::MAX).await.unwrap()).unwrap();
+        let member_authorization = format!("Bearer {}", member["access_token"].as_str().unwrap());
+
+        let organization = app.clone().oneshot(json_request("POST", "/v1/organizations", &owner_authorization, json!({"name":"Platform"}))).await.unwrap();
+        let organization: Value = serde_json::from_slice(&to_bytes(organization.into_body(), usize::MAX).await.unwrap()).unwrap();
+        let organization_id = organization["id"].as_str().unwrap();
+        assert_eq!(organization["role"], "owner");
+        for workspace_name in ["Core", "Docs"] {
+            let workspace = app.clone().oneshot(json_request("POST", "/v1/workspaces", &owner_authorization, json!({"organization_id": organization_id, "name": workspace_name}))).await.unwrap();
+            assert_eq!(workspace.status(), 201);
+        }
+
+        let added = app.clone().oneshot(json_request("PUT", &format!("/v1/organizations/{organization_id}/members"), &owner_authorization, json!({"email":"org-member@example.com","role":"admin"}))).await.unwrap();
+        assert_eq!(added.status(), 200);
+        let member_workspaces = app.clone().oneshot(auth_request("GET", "/v1/workspaces", &member_authorization)).await.unwrap();
+        assert_eq!(member_workspaces.status(), 200);
+        let member_workspaces: Value = serde_json::from_slice(&to_bytes(member_workspaces.into_body(), usize::MAX).await.unwrap()).unwrap();
+        assert_eq!(member_workspaces.as_array().unwrap().len(), 2);
+        assert!(member_workspaces.as_array().unwrap().iter().all(|workspace| workspace["role"] == "admin"));
+
+        let renamed = app.clone().oneshot(json_request("PUT", &format!("/v1/organizations/{organization_id}"), &owner_authorization, json!({"name":"Platform Engineering"}))).await.unwrap();
+        assert_eq!(renamed.status(), 200);
+        let member_id = member["user"]["id"].as_str().unwrap();
+        let removed = app.clone().oneshot(auth_request("DELETE", &format!("/v1/organizations/{organization_id}/members/{member_id}"), &owner_authorization)).await.unwrap();
+        assert_eq!(removed.status(), 204);
+        let member_workspaces = app.clone().oneshot(auth_request("GET", "/v1/workspaces", &member_authorization)).await.unwrap();
+        let member_workspaces: Value = serde_json::from_slice(&to_bytes(member_workspaces.into_body(), usize::MAX).await.unwrap()).unwrap();
+        assert!(member_workspaces.as_array().unwrap().is_empty());
         let _ = std::fs::remove_dir_all(data_dir);
     }
 

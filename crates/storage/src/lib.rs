@@ -5,7 +5,7 @@ use chrono::Utc;
 use repomemo_domain::{
     ArtifactComment, ArtifactDetail, ArtifactLifecycle, ArtifactLifecycleEvent, ArtifactSummary, ArtifactType, Chunk, Citation,
     CollaborationTask, IndexingJobStatus, MemoryCard, MemoryCardDetail, MemoryCardSummary,
-    MemoryEvidence, Organization, ProviderSettings, SavedSearch, SearchRequest, SearchResult, SharedNotification, SharedUser,
+    MemoryEvidence, Organization, OrganizationMember, OrganizationRole, ProviderSettings, SavedSearch, SearchRequest, SearchResult, SharedNotification, SharedUser,
     SharedWorkspace, Source, SourceType, Symbol, SymbolKind, SymbolSearchResult, TaskChecklistItem, Workspace,
     WorkspaceActivityEvent, WorkspaceMember, WorkspaceMembership, WorkspaceOverview, WorkspaceRole,
 };
@@ -58,8 +58,18 @@ struct UserProfileRow {
 struct OrganizationRow {
     id: String,
     name: String,
+    role: String,
     created_at: String,
     updated_at: String,
+}
+
+#[derive(Debug, sqlx::FromRow)]
+struct OrganizationMemberRow {
+    id: String,
+    email: String,
+    display_name: String,
+    role: String,
+    created_at: String,
 }
 
 #[derive(Debug, sqlx::FromRow)]
@@ -706,6 +716,7 @@ impl StorageEngine {
         Ok(Organization {
             id,
             name,
+            role: OrganizationRole::Owner,
             created_at: now.clone(),
             updated_at: now,
         })
@@ -713,13 +724,132 @@ impl StorageEngine {
 
     pub async fn list_organizations_for_user(&self, user_id: &str) -> Result<Vec<Organization>> {
         let rows = sqlx::query_as::<_, OrganizationRow>(
-            "SELECT o.id, o.name, o.created_at, o.updated_at FROM organizations o INNER JOIN organization_memberships m ON m.organization_id = o.id WHERE m.user_id = ?1 ORDER BY o.name ASC",
+            "SELECT o.id, o.name, m.role, o.created_at, o.updated_at FROM organizations o INNER JOIN organization_memberships m ON m.organization_id = o.id WHERE m.user_id = ?1 ORDER BY o.name ASC",
         )
         .bind(user_id)
         .fetch_all(&self.pool)
         .await?;
 
         Ok(rows.into_iter().map(Organization::from).collect())
+    }
+
+    pub async fn organization_role_for_user(
+        &self,
+        user_id: &str,
+        organization_id: &str,
+    ) -> Result<Option<OrganizationRole>> {
+        let role = sqlx::query_scalar::<_, String>(
+            "SELECT role FROM organization_memberships WHERE organization_id = ?1 AND user_id = ?2",
+        )
+        .bind(organization_id)
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        role.map(|role| organization_role_from_db(&role)).transpose()
+    }
+
+    pub async fn update_organization(
+        &self,
+        organization_id: &str,
+        user_id: &str,
+        name: &str,
+    ) -> Result<Organization> {
+        let name = require_name(name, "Organization name")?;
+        let now = Utc::now().to_rfc3339();
+        let updated = sqlx::query("UPDATE organizations SET name = ?1, updated_at = ?2 WHERE id = ?3")
+            .bind(&name)
+            .bind(&now)
+            .bind(organization_id)
+            .execute(&self.pool)
+            .await?;
+        if updated.rows_affected() == 0 {
+            bail!("Organization was not found.");
+        }
+        let row = sqlx::query_as::<_, OrganizationRow>(
+            "SELECT o.id, o.name, m.role, o.created_at, o.updated_at FROM organizations o INNER JOIN organization_memberships m ON m.organization_id = o.id WHERE o.id = ?1 AND m.user_id = ?2",
+        )
+        .bind(organization_id)
+        .bind(user_id)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(row.into())
+    }
+
+    pub async fn list_organization_members(&self, organization_id: &str) -> Result<Vec<OrganizationMember>> {
+        let rows = sqlx::query_as::<_, OrganizationMemberRow>(
+            "SELECT u.id, u.email, u.display_name, m.role, m.created_at FROM organization_memberships m INNER JOIN users u ON u.id = m.user_id WHERE m.organization_id = ?1 ORDER BY CASE m.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END, u.display_name ASC",
+        )
+        .bind(organization_id)
+        .fetch_all(&self.pool)
+        .await?;
+        rows.into_iter().map(OrganizationMember::try_from).collect()
+    }
+
+    pub async fn upsert_organization_member(
+        &self,
+        organization_id: &str,
+        email: &str,
+        role: OrganizationRole,
+    ) -> Result<OrganizationMember> {
+        if matches!(role, OrganizationRole::Owner) {
+            bail!("The owner role cannot be assigned through organization membership management.");
+        }
+        let user = self
+            .find_user_by_email(email)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("No RepoMemo account exists for this email address."))?;
+        let now = Utc::now().to_rfc3339();
+        let mut tx = self.pool.begin().await?;
+        let organization_exists = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM organizations WHERE id = ?1")
+            .bind(organization_id)
+            .fetch_one(&mut *tx)
+            .await?;
+        if organization_exists == 0 {
+            bail!("Organization was not found.");
+        }
+        sqlx::query("INSERT INTO organization_memberships (organization_id, user_id, role, created_at) VALUES (?1, ?2, ?3, ?4) ON CONFLICT(organization_id, user_id) DO UPDATE SET role = excluded.role")
+            .bind(organization_id)
+            .bind(&user.id)
+            .bind(organization_role_to_db(&role))
+            .bind(&now)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("INSERT INTO workspace_memberships (workspace_id, user_id, role, created_at, updated_at) SELECT wo.workspace_id, ?1, CASE ?2 WHEN 'admin' THEN 'admin' ELSE 'member' END, ?3, ?3 FROM workspace_organizations wo WHERE wo.organization_id = ?4 ON CONFLICT(workspace_id, user_id) DO UPDATE SET role = excluded.role, updated_at = excluded.updated_at")
+            .bind(&user.id)
+            .bind(organization_role_to_db(&role))
+            .bind(&now)
+            .bind(organization_id)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        self.list_organization_members(organization_id)
+            .await?
+            .into_iter()
+            .find(|member| member.user.id == user.id)
+            .ok_or_else(|| anyhow::anyhow!("Organization member could not be loaded."))
+    }
+
+    pub async fn remove_organization_member(&self, organization_id: &str, user_id: &str) -> Result<()> {
+        let role = self.organization_role_for_user(user_id, organization_id).await?;
+        if matches!(role, Some(OrganizationRole::Owner)) {
+            bail!("The organization owner cannot be removed.");
+        }
+        let mut tx = self.pool.begin().await?;
+        let deleted = sqlx::query("DELETE FROM organization_memberships WHERE organization_id = ?1 AND user_id = ?2")
+            .bind(organization_id)
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await?;
+        if deleted.rows_affected() == 0 {
+            bail!("Organization membership was not found.");
+        }
+        sqlx::query("DELETE FROM workspace_memberships WHERE user_id = ?1 AND workspace_id IN (SELECT workspace_id FROM workspace_organizations WHERE organization_id = ?2)")
+            .bind(user_id)
+            .bind(organization_id)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        Ok(())
     }
 
     pub async fn user_belongs_to_organization(
@@ -739,15 +869,16 @@ impl StorageEngine {
 
     pub async fn create_shared_workspace(
         &self,
-        owner_id: &str,
+        creator_id: &str,
         organization_id: &str,
         name: &str,
     ) -> Result<SharedWorkspace> {
-        if !self
-            .user_belongs_to_organization(owner_id, organization_id)
+        let creator_role = self
+            .organization_role_for_user(creator_id, organization_id)
             .await?
-        {
-            bail!("User is not a member of this organization.");
+            .ok_or_else(|| anyhow::anyhow!("User is not a member of this organization."))?;
+        if matches!(creator_role, OrganizationRole::Member) {
+            bail!("Only organization owners and admins can create workspaces.");
         }
         let id = Uuid::new_v4().to_string();
         let now = Utc::now().to_rfc3339();
@@ -768,17 +899,16 @@ impl StorageEngine {
         .bind(organization_id)
         .execute(&mut *tx)
         .await?;
-        sqlx::query("INSERT INTO workspace_memberships (workspace_id, user_id, role, created_at, updated_at) VALUES (?1, ?2, 'owner', ?3, ?4)")
+        sqlx::query("INSERT INTO workspace_memberships (workspace_id, user_id, role, created_at, updated_at) SELECT ?1, om.user_id, CASE om.role WHEN 'owner' THEN 'owner' WHEN 'admin' THEN 'admin' ELSE 'member' END, ?2, ?2 FROM organization_memberships om WHERE om.organization_id = ?3")
             .bind(&id)
-            .bind(owner_id)
             .bind(&now)
-            .bind(&now)
+            .bind(organization_id)
             .execute(&mut *tx)
             .await?;
         sqlx::query("INSERT INTO workspace_activity (id, workspace_id, actor_user_id, action, subject_type, subject_id, summary, created_at) VALUES (?1, ?2, ?3, 'workspace_created', 'workspace', ?2, ?4, ?5)")
             .bind(Uuid::new_v4().to_string())
             .bind(&id)
-            .bind(owner_id)
+            .bind(creator_id)
             .bind(format!("Created workspace {name}."))
             .bind(&now)
             .execute(&mut *tx)
@@ -794,7 +924,7 @@ impl StorageEngine {
                 settings: Value::Object(Default::default()),
             },
             organization_id: organization_id.to_owned(),
-            role: WorkspaceRole::Owner,
+            role: organization_role_to_workspace_role(&creator_role),
         })
     }
 
@@ -1597,6 +1727,12 @@ impl StorageEngine {
             .bind(&organization_id)
             .bind(&user.id)
             .bind(&now)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("INSERT OR IGNORE INTO workspace_memberships (workspace_id, user_id, role, created_at, updated_at) SELECT wo.workspace_id, ?1, 'member', ?2, ?2 FROM workspace_organizations wo WHERE wo.organization_id = ?3")
+            .bind(&user.id)
+            .bind(&now)
+            .bind(&organization_id)
             .execute(&mut *tx)
             .await?;
         sqlx::query("INSERT INTO workspace_memberships (workspace_id, user_id, role, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT(workspace_id, user_id) DO UPDATE SET role = excluded.role, updated_at = excluded.updated_at")
@@ -2942,9 +3078,26 @@ impl From<OrganizationRow> for Organization {
         Self {
             id: row.id,
             name: row.name,
+            role: organization_role_from_db(&row.role).unwrap_or(OrganizationRole::Member),
             created_at: row.created_at,
             updated_at: row.updated_at,
         }
+    }
+}
+
+impl TryFrom<OrganizationMemberRow> for OrganizationMember {
+    type Error = anyhow::Error;
+
+    fn try_from(row: OrganizationMemberRow) -> Result<Self> {
+        Ok(Self {
+            user: SharedUser {
+                id: row.id,
+                display_name: row.display_name,
+                email: Some(row.email),
+            },
+            role: organization_role_from_db(&row.role)?,
+            joined_at: row.created_at,
+        })
     }
 }
 
@@ -3357,6 +3510,31 @@ fn workspace_role_to_db(role: &WorkspaceRole) -> &'static str {
         WorkspaceRole::Admin => "admin",
         WorkspaceRole::Member => "member",
         WorkspaceRole::Viewer => "viewer",
+    }
+}
+
+fn organization_role_from_db(value: &str) -> Result<OrganizationRole> {
+    match value {
+        "owner" => Ok(OrganizationRole::Owner),
+        "admin" => Ok(OrganizationRole::Admin),
+        "member" => Ok(OrganizationRole::Member),
+        _ => bail!("Unknown organization role: {value}"),
+    }
+}
+
+fn organization_role_to_db(role: &OrganizationRole) -> &'static str {
+    match role {
+        OrganizationRole::Owner => "owner",
+        OrganizationRole::Admin => "admin",
+        OrganizationRole::Member => "member",
+    }
+}
+
+fn organization_role_to_workspace_role(role: &OrganizationRole) -> WorkspaceRole {
+    match role {
+        OrganizationRole::Owner => WorkspaceRole::Owner,
+        OrganizationRole::Admin => WorkspaceRole::Admin,
+        OrganizationRole::Member => WorkspaceRole::Member,
     }
 }
 
