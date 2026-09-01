@@ -249,8 +249,7 @@ textarea:focus-visible {
 .shared-rail-footer { gap: 7px; margin-top: auto; padding-top: 16px; color: var(--color-text-subtle); border-top: 1px solid var(--color-border); font-size: 12px; }
 .shared-home-content { --shared-content-inset: clamp(24px, 2vw, 36px); display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 0; overflow: hidden; }
 .shared-layout-content { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
-.shared-workspace-topbar { display: flex; align-items: stretch; gap: 16px; min-height: 48px; padding: 0 var(--shared-content-inset); overflow: hidden; border-bottom: 1px solid var(--color-border); }
-.shared-workspace-topbar-identity { display: inline-flex; align-items: center; flex: 0 0 auto; gap: 8px; color: var(--color-text); font-size: 13px; font-weight: 700; white-space: nowrap; }
+.shared-workspace-topbar { display: flex; align-items: stretch; min-height: 48px; padding: 0 var(--shared-content-inset); overflow: hidden; border-bottom: 1px solid var(--color-border); }
 .shared-workspace-tabs { display: flex; min-width: 0; overflow-x: auto; scrollbar-width: none; }
 .shared-workspace-tabs::-webkit-scrollbar { display: none; }
 .shared-workspace-tabs .rm-button { position: relative; flex: 0 0 auto; min-height: 48px; padding: 0 11px; color: var(--color-text-muted); background: transparent; border: 0; border-bottom: 2px solid transparent; border-radius: 0; font-size: 12px; }
@@ -312,11 +311,17 @@ textarea:focus-visible {
 .shared-profile-panel label { display: grid; gap: 6px; color: var(--color-text-muted); font-size: 12px; }
 .shared-profile-panel .rm-input { width: 100%; }
 .shared-profile-notice { margin: 0 0 16px; padding: 11px 13px; color: var(--color-success); background: var(--color-success-soft); border-radius: 8px; font-size: 13px; }
-.shared-page-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-.shared-page-heading > div { min-width: 0; }
-.shared-page-heading .shared-eyebrow { margin: 0 0 10px; }
-.shared-page-heading h1 { max-width: none; font-size: clamp(34px, 4vw, 52px); }
-.shared-page-heading > div > p:not(.shared-eyebrow) { max-width: 60ch; margin: 14px 0 0; color: var(--color-text-muted); line-height: 1.6; }
+.shared-page-heading,
+.shared-detail-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding-bottom: 28px; border-bottom: 1px solid var(--color-border); }
+.shared-page-heading > div,
+.shared-detail-heading > div { min-width: 0; }
+.shared-page-heading h1,
+.shared-detail-heading h1 { max-width: 18ch; margin: 0; font-family: var(--font-display); font-size: clamp(34px, 4vw, 52px); font-weight: 400; letter-spacing: -0.025em; line-height: 1; }
+.shared-page-heading > div > p,
+.shared-detail-heading > div > p { max-width: 62ch; margin: 12px 0 0; color: var(--color-text-muted); font-size: 14px; line-height: 1.55; }
+.shared-page-content > .shared-page-heading,
+.shared-page-content > .shared-detail-heading,
+.shared-detail-shell > .shared-detail-heading { margin-bottom: 32px; }
 .shared-setup-form { width: min(100%, 440px); margin-top: 48px; }
 .shared-setup-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .shared-create-workspace { gap: 12px; margin-top: 42px; padding: 16px 0; border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); }
@@ -360,11 +365,7 @@ textarea:focus-visible {
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 .shared-detail-shell { min-width: 0; min-height: 100%; overflow: visible; }
-.shared-detail-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; padding-bottom: 28px; border-bottom: 1px solid var(--color-border); }
-.shared-detail-heading .shared-eyebrow { margin: 0 0 9px; }
-.shared-detail-heading h1 { max-width: 18ch; margin: 0; font-family: var(--font-display); font-size: clamp(34px, 4vw, 52px); font-weight: 400; letter-spacing: -0.025em; line-height: 1; }
-.shared-detail-heading p:not(.shared-eyebrow) { max-width: 62ch; margin: 12px 0 0; color: var(--color-text-muted); font-size: 14px; line-height: 1.55; }
-.shared-detail-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.shared-detail-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .shared-evidence-summary { display: flex; gap: 0; margin: 24px 0; border: 1px solid var(--color-border); border-radius: 10px; }
 .shared-evidence-summary span { flex: 1; padding: 13px 16px; color: var(--color-text-muted); border-right: 1px solid var(--color-border); font-size: 12px; }
 .shared-evidence-summary span:last-child { border-right: 0; }
@@ -775,9 +776,9 @@ textarea:focus-visible {
   .shared-rail-footer { display: none; }
   .shared-home-content { overflow: visible; }
   .shared-layout-content { overflow: visible; }
-  .shared-workspace-topbar { gap: 10px; padding: 0 var(--shared-content-inset); overflow-x: auto; }
-  .shared-workspace-topbar-identity { max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
-  .shared-page-heading { align-items: stretch; flex-direction: column; }
+  .shared-workspace-topbar { padding: 0 var(--shared-content-inset); overflow-x: auto; }
+  .shared-page-heading,
+  .shared-detail-heading { align-items: flex-start; flex-direction: column; }
   .shared-dashboard-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .shared-dashboard-summary > div { padding: 14px 12px; border-right: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); }
   .shared-dashboard-summary > div:first-child { padding-left: 0; }
@@ -791,7 +792,6 @@ textarea:focus-visible {
   .shared-organization-member-form { align-items: stretch; flex-direction: column; }
   .shared-organization-member-actions .rm-dropdown-trigger { min-width: 0; }
   .shared-detail-shell { margin-top: 10px; }
-  .shared-detail-heading { align-items: flex-start; flex-direction: column; }
   .shared-evidence-summary { flex-direction: column; }
   .shared-evidence-summary span { border-right: 0; border-bottom: 1px solid var(--color-border); }
   .shared-evidence-summary span:last-child { border-bottom: 0; }

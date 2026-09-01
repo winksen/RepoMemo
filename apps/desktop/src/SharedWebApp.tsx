@@ -376,7 +376,6 @@ function SharedWebAppContent() {
       <SharedWorkspaceDetail
         accessToken={accessToken}
         apiAvailable={apiAvailable}
-        onBack={() => navigate(`/workspaces?organization=${encodeURIComponent(workspace.organization_id)}`)}
         onWorkspaceDeleted={(deletedWorkspaceId) => {
           setWorkspaces((current) => current.filter((entry) => entry.workspace.id !== deletedWorkspaceId));
           navigate(`/workspaces?organization=${encodeURIComponent(workspace.organization_id)}`);
@@ -580,7 +579,7 @@ function SharedProfile({
 
   return <SharedLayout apiAvailable={apiAvailable} onNavigate={navigate} session={session} signOut={signOut} sidebar={<OrganizationRail organizations={organizations} workspaces={workspaces} />}>
     <section className="shared-page-content shared-profile-page" aria-busy={isLoading}>
-      <div className="shared-detail-heading"><div><p className="shared-eyebrow">Account</p><h1>Your profile</h1><p>Manage your identity and review your activity across shared workspaces.</p></div><Button onClick={() => navigate("/workspaces")} type="button" variant="secondary"><ArrowLeft size={16} /> All workspaces</Button></div>
+      <div className="shared-detail-heading"><div><h1>Your profile</h1><p>Manage your identity and review your activity across shared workspaces.</p></div></div>
       {error ? <p className="shared-form-error" role="alert">{error}</p> : null}
       {notice ? <p className="shared-profile-notice" role="status">{notice}</p> : null}
       <div className="shared-profile-layout">
@@ -643,7 +642,7 @@ function SharedNotifications({
   const unreadCount = notifications.filter((notification) => !notification.read_at).length;
   return <SharedLayout apiAvailable={apiAvailable} onNavigate={navigate} session={session} signOut={signOut} sidebar={<OrganizationRail organizations={organizations} workspaces={workspaces} />}>
     <section className="shared-page-content shared-notifications-page" aria-busy={isLoading}>
-      <div className="shared-detail-heading"><div><p className="shared-eyebrow">Inbox</p><h1>Notifications</h1><p>Task assignments and direct evidence mentions appear here. Mention a teammate with their email, for example <code>@person@example.com</code>.</p></div><div className="shared-detail-actions"><Button disabled={isLoading} onClick={() => void load()} type="button" variant="secondary"><Refresh size={16} /> Refresh</Button><Button disabled={isMutating || unreadCount === 0} onClick={() => void markAllRead()} type="button" variant="secondary">Mark all read</Button></div></div>
+      <div className="shared-detail-heading"><div><h1>Notifications</h1><p>Task assignments and direct evidence mentions appear here. Mention a teammate with their email, for example <code>@person@example.com</code>.</p></div><div className="shared-detail-actions"><Button disabled={isMutating || unreadCount === 0} onClick={() => void markAllRead()} type="button" variant="secondary">Mark all read</Button></div></div>
       {error ? <p className="shared-form-error" role="alert">{error}</p> : null}
       <section className="shared-notification-list" aria-label="Notifications">{notifications.length ? notifications.map((notification) => <article className={notification.read_at ? "" : "is-unread"} key={notification.id}><Button onClick={() => void openNotification(notification)} type="button" variant="secondary"><span className="shared-notification-icon"><Bell size={17} /></span><span><strong>{notification.title}</strong><small>{notification.body}</small><time dateTime={notification.created_at}>{formatActivityTime(notification.created_at)}</time></span><ChevronRight size={17} /></Button></article>) : <div className="shared-empty-state"><Bell size={25} /><strong>Nothing new</strong><span>Assignments and evidence mentions will appear here when your team needs your attention.</span></div>}</section>
     </section>
@@ -696,7 +695,7 @@ function SharedDashboard({
 
   return <SharedLayout apiAvailable={apiAvailable} onNavigate={navigate} session={session} signOut={signOut} sidebar={<OrganizationRail organizations={organizations} workspaces={workspaces} />}>
     <section className="shared-page-content shared-dashboard-page" aria-busy={isLoading}>
-      <div className="shared-page-heading"><div><p className="shared-eyebrow">Shared overview</p><h1>Dashboard</h1><p>Accessible organizations, workspaces, and the evidence your teams are building.</p></div><div className="shared-detail-actions"><Button onClick={() => navigate("/workspaces")} type="button" variant="secondary"><Layers size={16} /> All workspaces</Button><Button disabled={isLoading} onClick={() => void load()} type="button" variant="secondary"><Refresh size={16} /> Refresh</Button></div></div>
+      <div className="shared-page-heading"><div><h1>Dashboard</h1><p>Accessible organizations, workspaces, and the evidence your teams are building.</p></div></div>
       {error ? <p className="shared-form-error" role="alert">{error}</p> : null}
       <dl className="shared-dashboard-summary">
         <div><dt>Organizations</dt><dd>{organizations.length}</dd><span>available to your account</span></div>
@@ -795,7 +794,7 @@ function SharedWorkspaceHome({
       sidebar={<OrganizationRail organizations={organizations} organizationId={organizationId} workspaces={workspaces} />}
     >
         <div className="shared-page-content">
-          <div className="shared-page-heading"><div><p className="shared-eyebrow">Shared workspaces</p><h1>{showOrganizationForm ? "Create an organization" : currentOrganization ? currentOrganization.name : "Set up your team"}</h1><p>{showOrganizationForm ? "Create a separate team boundary for its own shared workspaces and members." : "Workspaces are server-authoritative and available only to their members."}</p></div>{organizations.length ? <Button onClick={organizationNavigation.startCreatingOrganization} type="button" variant="secondary"><Plus size={16} /> New organization</Button> : null}</div>
+          <div className="shared-page-heading"><div><h1>{showOrganizationForm ? "Create an organization" : currentOrganization ? currentOrganization.name : "Set up your team"}</h1><p>{showOrganizationForm ? "Create a separate team boundary for its own shared workspaces and members." : "Workspaces are server-authoritative and available only to their members."}</p></div>{organizations.length ? <Button onClick={organizationNavigation.startCreatingOrganization} type="button" variant="secondary"><Plus size={16} /> New organization</Button> : null}</div>
           {showOrganizationForm ? <form className="shared-setup-form" onSubmit={createOrganization}><label>Organization name<Input autoFocus onChange={(event) => setOrganizationName(event.target.value)} placeholder="Engineering" required value={organizationName} /></label><div className="shared-setup-actions"><Button disabled={isSubmitting} type="submit" variant="main">{isSubmitting ? <Loader className="spin" size={17} /> : <Plus size={17} />} Create organization</Button>{organizations.length ? <Button disabled={isSubmitting} onClick={organizationNavigation.cancelOrganizationCreation} type="button" variant="secondary">Cancel</Button> : null}</div></form> : <>
             {canManageOrganization ? <form className="shared-create-workspace" onSubmit={createWorkspace}><div><strong>Create a workspace</strong><span>Start a bounded memory space for a repository, system, or initiative.</span></div><label className="sr-only" htmlFor="shared-workspace-name">Workspace name</label><Input id="shared-workspace-name" onChange={(event) => setWorkspaceName(event.target.value)} placeholder="Payments platform" required value={workspaceName} /><Button disabled={isSubmitting} type="submit" variant="main">{isSubmitting ? <Loader className="spin" size={17} /> : <Plus size={17} />} Create workspace</Button></form> : <p className="shared-muted-copy">Your organization role grants access to its workspaces but not workspace creation.</p>}
             <div className="shared-workspace-list">{workspaces.filter((workspace) => workspace.organization_id === organizationId).map((entry) => <article className="shared-workspace-row" key={entry.workspace.id}><span className="shared-workspace-icon"><Layers size={18} /></span><div><h2>{entry.workspace.name}</h2><p>Created {new Date(entry.workspace.created_at).toLocaleDateString()} · Your role: {entry.role}</p></div><Button aria-label={`Open ${entry.workspace.name}`} className="shared-workspace-open" onClick={() => onOpenWorkspace(entry)} type="button" variant="secondary"><ChevronRight size={18} /></Button></article>)}{workspaces.filter((workspace) => workspace.organization_id === organizationId).length === 0 ? <div className="shared-empty-state"><Layers size={26} /><strong>No workspaces yet</strong><span>Create the first shared workspace for {currentOrganization?.name}.</span></div> : null}</div>
@@ -919,8 +918,7 @@ function WorkspaceTopbar({
     return <Button aria-current={isActive ? "page" : undefined} className={isActive ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.(section)} type="button" variant="secondary">{icon}<span className="shared-workspace-tab-label">{label}{isAdminOnly ? <span className="shared-workspace-tab-restricted">Admin</span> : null}</span></Button>;
   };
 
-  return <nav aria-label={`${workspace.workspace.name} sections`} className="shared-workspace-topbar">
-    <div className="shared-workspace-topbar-identity"><Layers size={16} /><span>{workspace.workspace.name}</span></div>
+  return <nav aria-label="Workspace sections" className="shared-workspace-topbar">
     <div className="shared-workspace-tabs">
       {workspaceTab("overview", "Overview", <Dashboard size={16} />)}
       {workspaceTab("evidence", "Evidence", <FileText size={16} />)}
@@ -937,7 +935,6 @@ function WorkspaceTopbar({
 function SharedWorkspaceDetail({
   accessToken,
   apiAvailable,
-  onBack,
   onWorkspaceDeleted,
   onWorkspaceUpdated,
   onOpenArtifact,
@@ -953,7 +950,6 @@ function SharedWorkspaceDetail({
 }: {
   accessToken: string;
   apiAvailable: boolean | null;
-  onBack: () => void;
   onWorkspaceDeleted: (workspaceId: string) => void;
   onWorkspaceUpdated: (workspace: SharedWorkspace["workspace"]) => void;
   onOpenArtifact: (artifactId: string) => void;
@@ -1392,8 +1388,8 @@ function SharedWorkspaceDetail({
     <SharedLayout apiAvailable={apiAvailable} onNavigate={navigate} session={session} signOut={signOut} sidebar={<OrganizationRail organizationId={organization?.id} organizations={organizations} workspaceId={workspace.workspace.id} workspaces={workspaces} />} workspaceNavigation={<WorkspaceTopbar activeSection={section} onNavigate={onNavigate} workspace={workspace} />}>
       <section className="shared-detail-shell" aria-busy={isLoading}>
         <div className="shared-detail-heading">
-          <div><p className="shared-eyebrow">{isEvidenceView ? "Evidence" : isRetrievalView ? "Retrieval" : isMemoryView ? "Team memory" : isTasksView ? "Team follow-up" : isPeopleView ? "Workspace access" : isActivityView ? "Workspace history" : isSettingsView ? "Administrative control" : `Server workspace · ${workspace.role}`}</p><h1>{isEvidenceView ? "Evidence ledger" : isRetrievalView ? "Retrieve evidence" : isMemoryView ? "Durable team memory" : isTasksView ? "Tasks" : isPeopleView ? "People" : isActivityView ? "Activity" : isSettingsView ? "Workspace settings" : workspace.workspace.name}</h1><p>{isEvidenceView ? "Store notes and files in the workspace, then index them for retrieval." : isRetrievalView ? "Search indexed workspace evidence and inspect the source context behind every result." : isMemoryView ? "Capture concise facts and decisions that should outlive the current investigation." : isTasksView ? "Turn evidence and decisions into assigned, trackable action items for the team." : isPeopleView ? "See who can access this workspace and understand each person’s role." : isActivityView ? "A durable record of shared workspace changes, including evidence, memory, indexing, and membership updates." : isSettingsView ? "Administrators control workspace access and AI integrations here. Owner-only actions remain clearly marked." : "Artifacts, search results, and durable team memory are all retrieved through the protected shared API."}</p></div>
-          <div className="shared-detail-actions"><Button className="shared-back-button" onClick={onBack} type="button" variant="secondary"><ArrowLeft size={16} /> All workspaces</Button><Button disabled={isLoading} onClick={() => void load()} type="button" variant="secondary"><Refresh size={16} /> Refresh</Button>{canWrite && isEvidenceView ? <Button disabled={isSubmitting || isLoading} onClick={() => void runIndex()} type="button" variant="main">{isSubmitting ? <Loader className="spin" size={16} /> : <Layers size={16} />} Index evidence</Button> : null}</div>
+          <div><h1>{isEvidenceView ? "Evidence ledger" : isRetrievalView ? "Retrieve evidence" : isMemoryView ? "Durable team memory" : isTasksView ? "Tasks" : isPeopleView ? "People" : isActivityView ? "Activity" : isSettingsView ? "Workspace settings" : workspace.workspace.name}</h1><p>{isEvidenceView ? "Store notes and files in the workspace, then index them for retrieval." : isRetrievalView ? "Search indexed workspace evidence and inspect the source context behind every result." : isMemoryView ? "Capture concise facts and decisions that should outlive the current investigation." : isTasksView ? "Turn evidence and decisions into assigned, trackable action items for the team." : isPeopleView ? "See who can access this workspace and understand each person’s role." : isActivityView ? "A durable record of shared workspace changes, including evidence, memory, indexing, and membership updates." : isSettingsView ? "Administrators control workspace access and AI integrations here. Owner-only actions remain clearly marked." : "Artifacts, search results, and durable team memory are all retrieved through the protected shared API."}</p></div>
+          {canWrite && isEvidenceView ? <div className="shared-detail-actions"><Button disabled={isSubmitting || isLoading} onClick={() => void runIndex()} type="button" variant="main">{isSubmitting ? <Loader className="spin" size={16} /> : <Layers size={16} />} Index evidence</Button></div> : null}
         </div>
         {error ? <p className="shared-form-error" role="alert">{error}</p> : null}
         {isRestrictedView ? <div className="shared-empty-state shared-admin-restricted-state"><Shield size={25} /><strong>Workspace administrator access required</strong><span>People, Activity, and Settings are reserved for workspace owners and administrators.</span><Button onClick={() => onNavigate("overview")} type="button" variant="secondary">Go to overview</Button></div> : <>
@@ -1666,8 +1662,8 @@ function SharedArtifactDetail({
   }
 
   return (
-    <SharedRecordLayout activeSection="evidence" apiAvailable={apiAvailable} backLabel="Workspace" onBack={onBack} organization={organization} organizations={organizations} session={session} signOut={signOut} title={artifact?.summary.title ?? "Artifact"} subtitle={artifact?.summary.path ?? "Loading protected evidence…"} workspace={workspace} workspaces={workspaces}>
-      <div className="shared-detail-actions"><Button disabled={isLoading} onClick={() => void load()} type="button" variant="secondary"><Refresh size={16} /> Refresh</Button>{canWrite ? <><Button disabled={isLoading || isMutating} onClick={() => setIsEditing((value) => !value)} type="button" variant="secondary"><Pencil size={16} /> {isEditing ? "Cancel edit" : "Edit"}</Button><Button className="shared-danger-action" disabled={isLoading || isMutating} onClick={() => void removeArtifact()} type="button" variant="secondary"><Trash size={16} /> Delete</Button><Button disabled={isLoading || isIndexing || isMutating} onClick={() => void indexArtifact()} type="button" variant="main">{isIndexing ? <Loader className="spin" size={16} /> : <Layers size={16} />} Index artifact</Button></> : null}</div>
+    <SharedRecordLayout activeSection="evidence" apiAvailable={apiAvailable} organization={organization} organizations={organizations} session={session} signOut={signOut} title={artifact?.summary.title ?? "Artifact"} subtitle={artifact?.summary.path ?? "Loading protected evidence…"} workspace={workspace} workspaces={workspaces}>
+      <div className="shared-detail-actions">{canWrite ? <><Button disabled={isLoading || isMutating} onClick={() => setIsEditing((value) => !value)} type="button" variant="secondary"><Pencil size={16} /> {isEditing ? "Cancel edit" : "Edit"}</Button><Button className="shared-danger-action" disabled={isLoading || isMutating} onClick={() => void removeArtifact()} type="button" variant="secondary"><Trash size={16} /> Delete</Button><Button disabled={isLoading || isIndexing || isMutating} onClick={() => void indexArtifact()} type="button" variant="main">{isIndexing ? <Loader className="spin" size={16} /> : <Layers size={16} />} Index artifact</Button></> : null}</div>
       {error ? <p className="shared-form-error" role="alert">{error}</p> : null}
       <div className="shared-record-meta"><span>{artifact?.summary.artifact_type ?? "artifact"}</span><span>{artifact?.summary.language ?? "Unspecified language"}</span><span>{artifact?.summary.indexed_at ? "Indexed" : "Not indexed"}</span></div>
       {isEditing ? <form className="shared-record-edit-form" onSubmit={saveArtifact}><label>Evidence title<Input onChange={(event) => setTitle(event.target.value)} required value={title} /></label><Button disabled={isMutating} type="submit" variant="main">{isMutating ? <Loader className="spin" size={16} /> : <Pencil size={16} />} Save evidence</Button></form> : null}
@@ -1756,8 +1752,8 @@ function SharedMemoryCardDetail({
   }
 
   return (
-    <SharedRecordLayout activeSection="memory" apiAvailable={apiAvailable} backLabel="Workspace" onBack={onBack} organization={organization} organizations={organizations} session={session} signOut={signOut} title={card?.card.title ?? "Memory card"} subtitle={card ? `Source: ${card.card.source}` : "Loading durable team memory…"} workspace={workspace} workspaces={workspaces}>
-      <div className="shared-detail-actions"><Button disabled={isLoading} onClick={() => void load()} type="button" variant="secondary"><Refresh size={16} /> Refresh</Button>{canWrite ? <><Button disabled={isLoading || isMutating} onClick={() => setIsEditing((value) => !value)} type="button" variant="secondary"><Pencil size={16} /> {isEditing ? "Cancel edit" : "Edit"}</Button><Button className="shared-danger-action" disabled={isLoading || isMutating} onClick={() => void removeCard()} type="button" variant="secondary"><Trash size={16} /> Delete</Button></> : null}<Button disabled={isLoading || isExporting || isMutating} onClick={() => void exportCard()} type="button" variant="main">{isExporting ? <Loader className="spin" size={16} /> : <FileText size={16} />} Export Markdown</Button></div>
+    <SharedRecordLayout activeSection="memory" apiAvailable={apiAvailable} organization={organization} organizations={organizations} session={session} signOut={signOut} title={card?.card.title ?? "Memory card"} subtitle={card ? `Source: ${card.card.source}` : "Loading durable team memory…"} workspace={workspace} workspaces={workspaces}>
+      <div className="shared-detail-actions">{canWrite ? <><Button disabled={isLoading || isMutating} onClick={() => setIsEditing((value) => !value)} type="button" variant="secondary"><Pencil size={16} /> {isEditing ? "Cancel edit" : "Edit"}</Button><Button className="shared-danger-action" disabled={isLoading || isMutating} onClick={() => void removeCard()} type="button" variant="secondary"><Trash size={16} /> Delete</Button></> : null}<Button disabled={isLoading || isExporting || isMutating} onClick={() => void exportCard()} type="button" variant="main">{isExporting ? <Loader className="spin" size={16} /> : <FileText size={16} />} Export Markdown</Button></div>
       {error ? <p className="shared-form-error" role="alert">{error}</p> : null}
       <section className="shared-record-panel"><h2>Durable statement</h2>{isEditing ? <form className="shared-record-edit-form" onSubmit={saveCard}><label>Title<Input onChange={(event) => setTitle(event.target.value)} required value={title} /></label><label>Source<Input onChange={(event) => setSource(event.target.value)} required value={source} /></label><label>Statement<Textarea onChange={(event) => setBodyMarkdown(event.target.value)} required value={bodyMarkdown} /></label><Button disabled={isMutating} type="submit" variant="main">{isMutating ? <Loader className="spin" size={16} /> : <Pencil size={16} />} Save memory</Button></form> : <div className="shared-memory-body">{card?.card.body_markdown ?? ""}</div>}</section>
       <section className="shared-record-panel"><h2>Linked evidence</h2>{card?.evidence.length ? <div className="shared-evidence-links">{card.evidence.map((evidence) => <article key={evidence.link_id}><strong>{evidence.title ?? "Untitled evidence"}</strong><span>{evidence.path ?? evidence.target_id}{evidence.start_line ? ` · line ${evidence.start_line}` : ""}</span></article>)}</div> : <p className="shared-muted-copy">This memory card currently has no linked evidence.</p>}</section>
@@ -1768,9 +1764,7 @@ function SharedMemoryCardDetail({
 function SharedRecordLayout({
   activeSection,
   apiAvailable,
-  backLabel,
   children,
-  onBack,
   organization,
   organizations,
   session,
@@ -1782,9 +1776,7 @@ function SharedRecordLayout({
 }: {
   activeSection: WorkspaceSection;
   apiAvailable: boolean | null;
-  backLabel: string;
   children: ReactNode;
-  onBack: () => void;
   organization?: Organization;
   organizations: Organization[];
   session: SharedSession;
@@ -1797,7 +1789,7 @@ function SharedRecordLayout({
   return (
     <SharedLayout apiAvailable={apiAvailable} onNavigate={navigate} session={session} signOut={signOut} sidebar={<OrganizationRail organizationId={organization?.id} organizations={organizations} workspaceId={workspace.workspace.id} workspaces={workspaces} />} workspaceNavigation={<WorkspaceTopbar activeSection={activeSection} onNavigate={(section) => navigate(`/workspaces/${encodeURIComponent(workspace.workspace.id)}/${section}`)} workspace={workspace} />}>
       <section className="shared-detail-shell">
-        <div className="shared-detail-heading"><div><p className="shared-eyebrow">Protected record</p><h1>{title}</h1><p className="shared-record-subtitle">{subtitle}</p></div><Button className="shared-back-button" onClick={onBack} type="button" variant="secondary"><ArrowLeft size={16} /> {backLabel}</Button></div>
+        <div className="shared-detail-heading"><div><h1>{title}</h1><p className="shared-record-subtitle">{subtitle}</p></div></div>
         <div className="shared-record-content">{children}</div>
       </section>
     </SharedLayout>
