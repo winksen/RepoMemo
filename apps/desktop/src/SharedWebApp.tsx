@@ -14,8 +14,10 @@ import {
   IconBuildingCommunity as Building,
   IconBrain as Brain,
   IconBell as Bell,
+  IconChevronDown as ChevronDown,
   IconChevronRight as ChevronRight,
   IconChartBar as Chart,
+  IconCode as Code,
   IconFileText as FileText,
   IconFilter as Filter,
   IconLayoutGrid as Grid,
@@ -26,6 +28,8 @@ import {
   IconKey as Key,
   IconList as List,
   IconLoader2 as Loader,
+  IconMarkdown as Markdown,
+  IconNote as Note,
   IconRefresh as Refresh,
   IconSearch as Search,
   IconSettings as Settings,
@@ -89,7 +93,6 @@ import {
   loginSharedUser,
   generateSharedWorkspaceAiOverview,
   registerSharedUser,
-  querySharedArtifacts,
   searchSharedWorkspace,
   searchSharedMemoryCards,
   saveSharedWorkspaceAiProvider,
@@ -173,6 +176,19 @@ type OrganizationNavigation = {
 
 const WORKSPACE_SECTIONS: WorkspaceSection[] = ["overview", "evidence", "retrieval", "memory", "tasks", "people", "activity", "settings"];
 const ADMIN_WORKSPACE_SECTIONS = new Set<WorkspaceSection>(["people", "activity", "settings"]);
+const EVIDENCE_ARTIFACT_TYPES: Array<{ label: string; value: ArtifactType }> = [
+  { label: "Markdown", value: "markdown_doc" },
+  { label: "Code", value: "code_file" },
+  { label: "Shared note", value: "note" },
+  { label: "File", value: "file" },
+  { label: "Image", value: "image" },
+  { label: "Issue", value: "issue" },
+  { label: "Pull request", value: "pr" },
+  { label: "Decision", value: "decision" },
+  { label: "Incident", value: "incident" },
+  { label: "Runbook", value: "runbook" },
+  { label: "API spec", value: "api_spec" },
+];
 const TASK_COLUMNS: Array<{ status: CollaborationTaskStatus; label: string }> = [
   { status: "open", label: "Open" },
   { status: "in_progress", label: "In progress" },
@@ -966,11 +982,8 @@ function SharedWorkspaceDetail({
   const [overview, setOverview] = useState<WorkspaceOverview | null>(null);
   const [workspaceMetrics, setWorkspaceMetrics] = useState<WorkspaceMetrics | null>(null);
   const [artifacts, setArtifacts] = useState<ArtifactSummary[]>([]);
-  const [artifactResults, setArtifactResults] = useState<ArtifactSummary[] | null>(null);
   const [artifactQuery, setArtifactQuery] = useState("");
-  const [artifactType, setArtifactType] = useState<ArtifactType | "all">("all");
-  const [artifactSourceId, setArtifactSourceId] = useState("all");
-  const [artifactIndexStatus, setArtifactIndexStatus] = useState<"all" | "indexed" | "not_indexed">("all");
+  const [artifactTypes, setArtifactTypes] = useState<ArtifactType[]>([]);
   const [artifactViewMode, setArtifactViewMode] = useState<ArtifactViewMode>("grid");
   const [memoryCards, setMemoryCards] = useState<MemoryCardSummary[]>([]);
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -1037,8 +1050,15 @@ function SharedWorkspaceDetail({
   const isSettingsView = section === "settings";
   const isWorkspaceAdmin = workspace.role === "owner" || workspace.role === "admin";
   const isRestrictedView = ADMIN_WORKSPACE_SECTIONS.has(section) && !isWorkspaceAdmin;
-  const displayedArtifacts = artifactResults ?? artifacts;
-  const artifactSources = Array.from(new Map(artifacts.map((artifact) => [artifact.source_id, artifact.source_name])).entries());
+  const displayedArtifacts = useMemo(() => {
+    const normalizedQuery = artifactQuery.trim().toLowerCase();
+    return artifacts.filter((artifact) => {
+      const matchesQuery = !normalizedQuery || `${artifact.title} ${artifact.path}`.toLowerCase().includes(normalizedQuery);
+      const matchesType = artifactTypes.length === 0 || artifactTypes.includes(artifact.artifact_type);
+      return matchesQuery && matchesType;
+    });
+  }, [artifactQuery, artifactTypes, artifacts]);
+  const hasArtifactFilters = Boolean(artifactQuery.trim() || artifactTypes.length);
   const visibleTasks = tasks.filter((task) => {
     const normalizedQuery = taskQuery.trim().toLowerCase();
     const matchesQuery = !normalizedQuery || `${task.title} ${task.description}`.toLowerCase().includes(normalizedQuery);
@@ -1062,7 +1082,6 @@ function SharedWorkspaceDetail({
       setOverview(nextOverview);
       setWorkspaceMetrics(nextWorkspaceMetrics);
       setArtifacts(nextArtifacts);
-      setArtifactResults(null);
       setMemoryCards(nextMemory);
       setCapabilities(nextCapabilities);
       setRetrievalFacets(nextRetrievalFacets);
@@ -1260,25 +1279,10 @@ function SharedWorkspaceDetail({
     try { const updated = await toggleSharedTaskChecklistItem(accessToken, item.id, !item.completed_at); setTaskChecklists((current) => ({ ...current, [item.task_id]: (current[item.task_id] ?? []).map((entry) => entry.id === updated.id ? updated : entry) })); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
   }
 
-  async function filterArtifacts(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setIsSubmitting(true); setError(null);
-    try {
-      setArtifactResults(await querySharedArtifacts(accessToken, workspace.workspace.id, {
-        query: artifactQuery,
-        artifactTypes: artifactType === "all" ? [] : [artifactType],
-        sourceIds: artifactSourceId === "all" ? [] : [artifactSourceId],
-        indexed: artifactIndexStatus === "all" ? undefined : artifactIndexStatus === "indexed",
-      }));
-    } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
-  }
-
-  function clearArtifactFilters() {
-    setArtifactQuery("");
-    setArtifactType("all");
-    setArtifactSourceId("all");
-    setArtifactIndexStatus("all");
-    setArtifactResults(null);
+  function toggleArtifactType(type: ArtifactType) {
+    setArtifactTypes((current) => current.includes(type)
+      ? current.filter((currentType) => currentType !== type)
+      : [...current, type]);
   }
 
   async function askEvidence(event: FormEvent<HTMLFormElement>) {
@@ -1428,20 +1432,24 @@ function SharedWorkspaceDetail({
         </section> : null}
         {section !== "overview" ? <div className={`shared-detail-grid${isEvidenceView ? " evidence-only" : isRetrievalView ? " retrieval-only" : isMemoryView ? " memory-only" : isTasksView ? " tasks-only" : isPeopleView ? " people-only" : isActivityView ? " activity-only" : isSettingsView ? " settings-only" : ""}`}>
           {isEvidenceView ? <section className="shared-detail-panel">
-            <div className="shared-panel-heading"><div><FileText size={18} /><h2>Evidence ledger</h2></div><span>{displayedArtifacts.length} of {artifacts.length} files</span></div>
             <div className="shared-artifact-browser">
-              <form className="shared-artifact-filters" onSubmit={filterArtifacts}>
+              <div className="shared-artifact-filters">
                 <Input aria-label="Search evidence files" onChange={(event) => setArtifactQuery(event.target.value)} placeholder="Search file name or path" value={artifactQuery} />
-                <Dropdown aria-label="Filter evidence by file type" onValueChange={(value) => setArtifactType(value as ArtifactType | "all")} options={[{ label: "All file types", value: "all" }, ...Array.from(new Set(artifacts.map((artifact) => artifact.artifact_type))).map((type) => ({ label: artifactTypeLabel(type), value: type }))]} value={artifactType} />
-                <Dropdown aria-label="Filter evidence by source" onValueChange={setArtifactSourceId} options={[{ label: "All sources", value: "all" }, ...artifactSources.map(([id, name]) => ({ label: name, value: id }))]} value={artifactSourceId} />
-                <Dropdown aria-label="Filter evidence by indexing status" onValueChange={(value) => setArtifactIndexStatus(value as "all" | "indexed" | "not_indexed")} options={[{ label: "Any indexing status", value: "all" }, { label: "Indexed", value: "indexed" }, { label: "Not indexed", value: "not_indexed" }]} value={artifactIndexStatus} />
-                <Button disabled={isSubmitting} type="submit" variant="secondary"><Filter size={16} /> Apply</Button>
-                {artifactResults ? <Button disabled={isSubmitting} onClick={clearArtifactFilters} type="button" variant="secondary">Clear</Button> : null}
-              </form>
-              <div className="shared-artifact-browser-meta"><span>{artifactResults ? "Filtered server results" : "All workspace files"}</span><div className="shared-artifact-view-switch" role="group" aria-label="Evidence view"><Button aria-label="Grid view" aria-pressed={artifactViewMode === "grid"} className={artifactViewMode === "grid" ? "active" : ""} onClick={() => setArtifactViewMode("grid")} type="button" variant="secondary"><Grid size={16} /></Button><Button aria-label="List view" aria-pressed={artifactViewMode === "list"} className={artifactViewMode === "list" ? "active" : ""} onClick={() => setArtifactViewMode("list")} type="button" variant="secondary"><List size={16} /></Button></div></div>
-              {displayedArtifacts.length ? <div className={`shared-artifact-manager ${artifactViewMode}`}>{displayedArtifacts.map((artifact) => <article key={artifact.id}><Button className="shared-artifact-entry" onClick={() => onOpenArtifact(artifact.id)} type="button" variant="secondary"><span className="shared-artifact-file-icon"><FileText size={20} /></span><span className="shared-artifact-entry-copy"><strong>{artifact.title}</strong><span>{artifact.path}</span></span><span className="shared-artifact-entry-meta"><span>{artifactTypeLabel(artifact.artifact_type)}</span><span>{artifact.language ?? "Unspecified"}</span><span>{formatFileSize(artifact.size_bytes)}</span><span className={artifact.indexed_at ? "indexed" : "pending"}>{artifact.indexed_at ? "Indexed" : "Not indexed"}</span></span></Button></article>)}</div> : <div className="shared-empty-state"><FileText size={25} /><strong>{artifacts.length ? "No files match these filters" : "No shared evidence yet"}</strong><span>{artifacts.length ? "Clear or adjust the filters to see other workspace files." : "Add a pasted note below, then index it when you are ready to search."}</span></div>}
+                <details className="shared-artifact-type-menu">
+                  <summary><Filter size={16} /><span>{artifactTypes.length ? `${artifactTypes.length} types` : "File types"}</span><ChevronDown size={16} /></summary>
+                  <div className="shared-artifact-type-menu-panel">
+                    <label><input checked={artifactTypes.length === 0} onChange={() => setArtifactTypes([])} type="checkbox" /><span>All types</span></label>
+                    {EVIDENCE_ARTIFACT_TYPES.map((option) => {
+                      const isSelected = artifactTypes.includes(option.value);
+                      return <label key={option.value}><input checked={isSelected} onChange={() => toggleArtifactType(option.value)} type="checkbox" />{artifactTypeIcon(option.value, 15)}<span>{option.label}</span></label>;
+                    })}
+                  </div>
+                </details>
+              </div>
+              <div className="shared-artifact-browser-meta"><span>{displayedArtifacts.length} of {artifacts.length} files{hasArtifactFilters ? " matching filters" : ""}</span><div className="shared-artifact-view-switch" role="group" aria-label="Evidence view"><Button aria-label="Grid view" aria-pressed={artifactViewMode === "grid"} className={artifactViewMode === "grid" ? "active" : ""} onClick={() => setArtifactViewMode("grid")} type="button" variant="secondary"><Grid size={16} /></Button><Button aria-label="List view" aria-pressed={artifactViewMode === "list"} className={artifactViewMode === "list" ? "active" : ""} onClick={() => setArtifactViewMode("list")} type="button" variant="secondary"><List size={16} /></Button></div></div>
+              {displayedArtifacts.length ? <div className={`shared-artifact-manager ${artifactViewMode}`}>{displayedArtifacts.map((artifact) => <article key={artifact.id}><Button className="shared-artifact-entry" onClick={() => onOpenArtifact(artifact.id)} type="button" variant="secondary"><span className={`shared-artifact-file-icon type-${artifact.artifact_type}`}>{artifactTypeIcon(artifact.artifact_type, 20)}</span><span className="shared-artifact-entry-copy"><strong>{artifact.title}</strong><span>{artifact.path}</span></span><span className="shared-artifact-entry-meta"><span>{artifactTypeLabel(artifact.artifact_type)}</span><span>{artifact.language ?? "Unspecified"}</span><span>{formatFileSize(artifact.size_bytes)}</span><span className={artifact.indexed_at ? "indexed" : "pending"}>{artifact.indexed_at ? "Indexed" : "Not indexed"}</span></span></Button></article>)}</div> : <div className="shared-empty-state"><FileText size={25} /><strong>{artifacts.length ? "No files match these filters" : "No shared evidence yet"}</strong><span>{artifacts.length ? "Adjust the search or selected types to see other workspace files." : "Add a pasted note below, then index it when you are ready to search."}</span></div>}
             </div>
-            {canWrite ? <><form className="shared-note-form" onSubmit={addNote}><h3>Add shared note</h3><Input onChange={(event) => setNoteTitle(event.target.value)} placeholder="Decision or implementation note" required value={noteTitle} /><Textarea onChange={(event) => setNoteContent(event.target.value)} placeholder="Paste Markdown, code context, or a meeting note…" required value={noteContent} /><Button disabled={isSubmitting} type="submit" variant="main"><Plus size={16} /> Store evidence</Button></form><form className="shared-upload-form" onSubmit={submitUpload}><div><strong>Upload a file</strong><span>Markdown, text, code, or supported image · up to 10 MiB</span></div><label className="shared-upload-picker"><input accept=".md,.mdx,.txt,.rs,.ts,.tsx,.js,.jsx,.py,.json,.toml,.yaml,.yml,.sql,.html,.css,.sh,.ps1,.png,.jpg,.jpeg,.gif,.webp,.svg,.bmp" aria-label="Upload a shared artifact" className="shared-upload-native-input" onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)} required type="file" /><span className="shared-upload-picker-icon"><Upload size={18} /></span><span className="shared-upload-picker-copy"><strong>{uploadFile?.name ?? "Choose a shared file"}</strong><span>{uploadFile ? `${formatFileSize(uploadFile.size)} · ready to upload` : "Markdown, text, code, or a supported image"}</span></span><span className="shared-upload-picker-action">Browse</span></label><Button disabled={isSubmitting || !uploadFile} type="submit" variant="secondary"><Upload size={16} /> Upload</Button></form></> : <p className="shared-readonly-note"><Shield size={15} /> Your viewer membership can inspect shared evidence but cannot change it.</p>}
+            {canWrite ? <div className="shared-evidence-additions"><form className="shared-note-form" onSubmit={addNote}><h3>Add shared note</h3><Input onChange={(event) => setNoteTitle(event.target.value)} placeholder="Decision or implementation note" required value={noteTitle} /><Textarea onChange={(event) => setNoteContent(event.target.value)} placeholder="Paste Markdown, code context, or a meeting note…" required value={noteContent} /><Button disabled={isSubmitting} type="submit" variant="main"><Plus size={16} /> Store evidence</Button></form><form className="shared-upload-form" onSubmit={submitUpload}><div><strong>Upload a file</strong><span>Markdown, text, code, or supported image · up to 10 MiB</span></div><label className="shared-upload-picker"><input accept=".md,.mdx,.txt,.rs,.ts,.tsx,.js,.jsx,.py,.json,.toml,.yaml,.yml,.sql,.html,.css,.sh,.ps1,.png,.jpg,.jpeg,.gif,.webp,.svg,.bmp" aria-label="Upload a shared artifact" className="shared-upload-native-input" onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)} required type="file" /><span className="shared-upload-picker-icon"><Upload size={18} /></span><span className="shared-upload-picker-copy"><strong>{uploadFile?.name ?? "Choose a shared file"}</strong><span>{uploadFile ? `${formatFileSize(uploadFile.size)} · ready to upload` : "Markdown, text, code, or a supported image"}</span></span><span className="shared-upload-picker-action">Browse</span></label><Button disabled={isSubmitting || !uploadFile} type="submit" variant="secondary"><Upload size={16} /> Upload</Button></form></div> : <p className="shared-readonly-note"><Shield size={15} /> Your viewer membership can inspect shared evidence but cannot change it.</p>}
           </section> : null}
           {isRetrievalView || isMemoryView || isTasksView || isPeopleView || isActivityView ? <aside className="shared-detail-panel shared-retrieval-panel">
             {isRetrievalView ? <><div className="shared-panel-heading"><div><Search size={18} /><h2>Retrieve</h2></div></div>
@@ -1870,7 +1878,17 @@ function formatMetricDay(value: string) {
 }
 
 function artifactTypeLabel(type: ArtifactType) {
+  if (type === "markdown_doc") return "Markdown";
+  if (type === "code_file") return "Code";
+  if (type === "note") return "Shared note";
   return type.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function artifactTypeIcon(type: ArtifactType, size: number) {
+  if (type === "markdown_doc") return <Markdown size={size} />;
+  if (type === "code_file") return <Code size={size} />;
+  if (type === "note") return <Note size={size} />;
+  return <FileText size={size} />;
 }
 
 function formatActivityTime(value: string) {
