@@ -233,8 +233,10 @@ export const ACCEPTED_IMAGE_EXTENSIONS = [
   "svg",
   "bmp",
 ];
+export const ACCEPTED_DOCUMENT_EXTENSIONS = ["doc", "docx"];
 export const ACCEPTED_EXTENSIONS = [
   ...ACCEPTED_TEXT_EXTENSIONS,
+  ...ACCEPTED_DOCUMENT_EXTENSIONS,
   ...ACCEPTED_IMAGE_EXTENSIONS,
 ];
 
@@ -249,11 +251,23 @@ export async function chooseImportFiles(): Promise<string[]> {
     title: "Import files into RepoMemo",
     filters: [
       { name: "Text & code", extensions: ACCEPTED_TEXT_EXTENSIONS },
+      { name: "Word documents", extensions: ACCEPTED_DOCUMENT_EXTENSIONS },
       { name: "Images", extensions: ACCEPTED_IMAGE_EXTENSIONS },
       { name: "All supported", extensions: ACCEPTED_EXTENSIONS },
     ],
   });
 
+  return normalizeDialogSelection(selected);
+}
+
+export async function chooseImportDocuments(): Promise<string[]> {
+  if (!isTauriRuntime) return ["preview://project-brief.docx"];
+  const selected = await open({
+    multiple: true,
+    directory: false,
+    title: "Import Word documents into RepoMemo",
+    filters: [{ name: "Word documents", extensions: ACCEPTED_DOCUMENT_EXTENSIONS }],
+  });
   return normalizeDialogSelection(selected);
 }
 

@@ -13,8 +13,8 @@ use repomemo_domain::{
 };
 use repomemo_indexer::{index_artifact, index_image_description};
 use repomemo_ingestion::{
-    detect_artifact_type, detect_language, discover_import_candidates, ImportCandidate,
-    ImportOptions,
+    detect_artifact_type, detect_language, discover_import_candidates, extract_word_text,
+    is_word_document, ImportCandidate, ImportOptions,
 };
 use repomemo_retrieval::RetrievalService;
 use repomemo_storage::{NewArtifact, StorageConfig, StorageEngine};
@@ -209,7 +209,13 @@ impl RepoMemoCore {
         let artifact_type = detect_artifact_type(path)
             .ok_or_else(|| anyhow::anyhow!("This file type is not supported for shared upload."))?;
         let language = detect_language(path);
-        let fallback_mime = if matches!(artifact_type, ArtifactType::Image) {
+        let fallback_mime = if is_word_document(path) {
+            if path.extension().and_then(|extension| extension.to_str()).is_some_and(|extension| extension.eq_ignore_ascii_case("docx")) {
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            } else {
+                "application/msword"
+            }
+        } else if matches!(artifact_type, ArtifactType::Image) {
             "application/octet-stream"
         } else if matches!(artifact_type, ArtifactType::MarkdownDoc) {
             "text/markdown"
@@ -252,7 +258,14 @@ impl RepoMemoCore {
     }
 
     pub async fn get_artifact(&self, artifact_id: String) -> Result<ArtifactDetail> {
-        self.storage.get_artifact(&artifact_id).await
+        let mut detail = self.storage.get_artifact(&artifact_id).await?;
+        if is_word_document(Path::new(&detail.summary.path)) {
+            let bytes = self.storage.read_artifact_blob(&detail.summary.id).await?;
+            let text = extract_word_text(Path::new(&detail.summary.path), &bytes)?;
+            detail.content_truncated = text.as_ref().is_some_and(|value| value.len() > 120_000);
+            detail.content_preview = text.map(|value| value.chars().take(120_000).collect());
+        }
+        Ok(detail)
     }
 
     pub async fn update_artifact_title(

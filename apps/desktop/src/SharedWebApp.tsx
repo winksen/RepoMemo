@@ -164,7 +164,7 @@ const SESSION_STORAGE_KEY = "repomemo.shared.access-token";
 
 type AuthMode = "sign-in" | "sign-up";
 type PageState = "restoring" | "unauthenticated" | "ready" | "error";
-type WorkspaceSection = "overview" | "evidence" | "retrieval" | "memory" | "tasks" | "people" | "activity" | "settings";
+type WorkspaceSection = "overview" | "evidence" | "documents" | "retrieval" | "memory" | "tasks" | "people" | "activity" | "settings";
 type ArtifactViewMode = "grid" | "list";
 type OrganizationNavigation = {
   activeOrganizationId: string | null;
@@ -174,7 +174,7 @@ type OrganizationNavigation = {
   cancelOrganizationCreation: () => void;
 };
 
-const WORKSPACE_SECTIONS: WorkspaceSection[] = ["overview", "evidence", "retrieval", "memory", "tasks", "people", "activity", "settings"];
+const WORKSPACE_SECTIONS: WorkspaceSection[] = ["overview", "evidence", "documents", "retrieval", "memory", "tasks", "people", "activity", "settings"];
 const ADMIN_WORKSPACE_SECTIONS = new Set<WorkspaceSection>(["people", "activity", "settings"]);
 const EVIDENCE_ARTIFACT_TYPES: Array<{ label: string; value: ArtifactType }> = [
   { label: "Markdown", value: "markdown_doc" },
@@ -938,6 +938,7 @@ function WorkspaceTopbar({
     <div className="shared-workspace-tabs">
       {workspaceTab("overview", "Overview", <Dashboard size={16} />)}
       {workspaceTab("evidence", "Evidence", <FileText size={16} />)}
+      {workspaceTab("documents", "Documents", <FileText size={16} />)}
       {workspaceTab("retrieval", "Retrieval", <Search size={16} />)}
       {workspaceTab("memory", "Memory", <Book size={16} />)}
       {workspaceTab("tasks", "Tasks", <Checklist size={16} />)}
@@ -1042,6 +1043,7 @@ function SharedWorkspaceDetail({
   const canAssignAdmin = capabilities?.can_assign_admin ?? false;
   const canManageWorkspace = capabilities?.can_manage_workspace ?? false;
   const isEvidenceView = section === "evidence";
+  const isDocumentsView = section === "documents";
   const isRetrievalView = section === "retrieval";
   const isMemoryView = section === "memory";
   const isTasksView = section === "tasks";
@@ -1055,9 +1057,10 @@ function SharedWorkspaceDetail({
     return artifacts.filter((artifact) => {
       const matchesQuery = !normalizedQuery || `${artifact.title} ${artifact.path}`.toLowerCase().includes(normalizedQuery);
       const matchesType = artifactTypes.length === 0 || artifactTypes.includes(artifact.artifact_type);
-      return matchesQuery && matchesType;
+      const isWordDocument = artifact.language === "Word" || /\.docx?$/i.test(artifact.path);
+      return matchesQuery && matchesType && (!isDocumentsView || isWordDocument);
     });
-  }, [artifactQuery, artifactTypes, artifacts]);
+  }, [artifactQuery, artifactTypes, artifacts, isDocumentsView]);
   const hasArtifactFilters = Boolean(artifactQuery.trim() || artifactTypes.length);
   const visibleTasks = tasks.filter((task) => {
     const normalizedQuery = taskQuery.trim().toLowerCase();
@@ -1392,8 +1395,8 @@ function SharedWorkspaceDetail({
     <SharedLayout apiAvailable={apiAvailable} onNavigate={navigate} session={session} signOut={signOut} sidebar={<OrganizationRail organizationId={organization?.id} organizations={organizations} workspaceId={workspace.workspace.id} workspaces={workspaces} />} workspaceNavigation={<WorkspaceTopbar activeSection={section} onNavigate={onNavigate} workspace={workspace} />}>
       <section className="shared-detail-shell" aria-busy={isLoading}>
         <div className="shared-detail-heading">
-          <div><h1>{isEvidenceView ? "Evidence ledger" : isRetrievalView ? "Retrieve evidence" : isMemoryView ? "Durable team memory" : isTasksView ? "Tasks" : isPeopleView ? "People" : isActivityView ? "Activity" : isSettingsView ? "Workspace settings" : workspace.workspace.name}</h1><p>{isEvidenceView ? "Store notes and files in the workspace, then index them for retrieval." : isRetrievalView ? "Search indexed workspace evidence and inspect the source context behind every result." : isMemoryView ? "Capture concise facts and decisions that should outlive the current investigation." : isTasksView ? "Turn evidence and decisions into assigned, trackable action items for the team." : isPeopleView ? "See who can access this workspace and understand each person’s role." : isActivityView ? "A durable record of shared workspace changes, including evidence, memory, indexing, and membership updates." : isSettingsView ? "Administrators control workspace access and AI integrations here. Owner-only actions remain clearly marked." : "Artifacts, search results, and durable team memory are all retrieved through the protected shared API."}</p></div>
-          {canWrite && isEvidenceView ? <div className="shared-detail-actions"><Button disabled={isSubmitting || isLoading} onClick={() => void runIndex()} type="button" variant="main">{isSubmitting ? <Loader className="spin" size={16} /> : <Layers size={16} />} Index evidence</Button></div> : null}
+          <div><h1>{isEvidenceView ? "Evidence ledger" : isDocumentsView ? "Documents" : isRetrievalView ? "Retrieve evidence" : isMemoryView ? "Durable team memory" : isTasksView ? "Tasks" : isPeopleView ? "People" : isActivityView ? "Activity" : isSettingsView ? "Workspace settings" : workspace.workspace.name}</h1><p>{isEvidenceView ? "Store notes and files in the workspace, then index them for retrieval." : isDocumentsView ? "Upload Word documents, inspect their extracted text, and keep them alongside the workspace evidence ledger." : isRetrievalView ? "Search indexed workspace evidence and inspect the source context behind every result." : isMemoryView ? "Capture concise facts and decisions that should outlive the current investigation." : isTasksView ? "Turn evidence and decisions into assigned, trackable action items for the team." : isPeopleView ? "See who can access this workspace and understand each person’s role." : isActivityView ? "A durable record of shared workspace changes, including evidence, memory, indexing, and membership updates." : isSettingsView ? "Administrators control workspace access and AI integrations here. Owner-only actions remain clearly marked." : "Artifacts, search results, and durable team memory are all retrieved through the protected shared API."}</p></div>
+          {canWrite && (isEvidenceView || isDocumentsView) ? <div className="shared-detail-actions"><Button disabled={isSubmitting || isLoading} onClick={() => void runIndex()} type="button" variant="main">{isSubmitting ? <Loader className="spin" size={16} /> : <Layers size={16} />} Index evidence</Button></div> : null}
         </div>
         {error ? <p className="shared-form-error" role="alert">{error}</p> : null}
         {isRestrictedView ? <div className="shared-empty-state shared-admin-restricted-state"><Shield size={25} /><strong>Workspace administrator access required</strong><span>People, Activity, and Settings are reserved for workspace owners and administrators.</span><Button onClick={() => onNavigate("overview")} type="button" variant="secondary">Go to overview</Button></div> : <>
@@ -1430,8 +1433,8 @@ function SharedWorkspaceDetail({
           {aiOverview?.citations.length ? <div className="shared-ai-citations"><strong>Evidence used</strong>{aiOverview.citations.map((citation) => <span key={`${citation.artifact_id}-${citation.chunk_id ?? "artifact"}`}>{citation.title} · {citation.path}{citation.start_line ? ` · line ${citation.start_line}` : ""}</span>)}</div> : null}
           <Button disabled={isSubmitting || isLoading || !capabilities?.can_generate_ai_overview} onClick={() => void generateAiOverview()} type="button" variant="secondary">{isSubmitting ? <Loader className="spin" size={16} /> : <Brain size={16} />}{aiOverview?.summary_markdown ? "Refresh AI overview" : "Generate AI overview"}</Button>
         </section> : null}
-        {section !== "overview" ? <div className={`shared-detail-grid${isEvidenceView ? " evidence-only" : isRetrievalView ? " retrieval-only" : isMemoryView ? " memory-only" : isTasksView ? " tasks-only" : isPeopleView ? " people-only" : isActivityView ? " activity-only" : isSettingsView ? " settings-only" : ""}`}>
-          {isEvidenceView ? <section className="shared-detail-panel">
+        {section !== "overview" ? <div className={`shared-detail-grid${isEvidenceView || isDocumentsView ? " evidence-only" : isRetrievalView ? " retrieval-only" : isMemoryView ? " memory-only" : isTasksView ? " tasks-only" : isPeopleView ? " people-only" : isActivityView ? " activity-only" : isSettingsView ? " settings-only" : ""}`}>
+          {isEvidenceView || isDocumentsView ? <section className="shared-detail-panel">
             <div className="shared-artifact-browser">
               <div className="shared-artifact-filters">
                 <Input aria-label="Search evidence files" onChange={(event) => setArtifactQuery(event.target.value)} placeholder="Search file name or path" value={artifactQuery} />
@@ -1449,7 +1452,7 @@ function SharedWorkspaceDetail({
               <div className="shared-artifact-browser-meta"><span>{displayedArtifacts.length} of {artifacts.length} files{hasArtifactFilters ? " matching filters" : ""}</span><div className="shared-artifact-view-switch" role="group" aria-label="Evidence view"><Button aria-label="Grid view" aria-pressed={artifactViewMode === "grid"} className={artifactViewMode === "grid" ? "active" : ""} onClick={() => setArtifactViewMode("grid")} type="button" variant="secondary"><Grid size={16} /></Button><Button aria-label="List view" aria-pressed={artifactViewMode === "list"} className={artifactViewMode === "list" ? "active" : ""} onClick={() => setArtifactViewMode("list")} type="button" variant="secondary"><List size={16} /></Button></div></div>
               {displayedArtifacts.length ? <div className={`shared-artifact-manager ${artifactViewMode}`}>{displayedArtifacts.map((artifact) => <article key={artifact.id}><Button className="shared-artifact-entry" onClick={() => onOpenArtifact(artifact.id)} type="button" variant="secondary"><span className={`shared-artifact-file-icon type-${artifact.artifact_type}`}>{artifactTypeIcon(artifact.artifact_type, 20)}</span><span className="shared-artifact-entry-copy"><strong>{artifact.title}</strong><span>{artifact.path}</span></span><span className="shared-artifact-entry-meta"><span>{artifactTypeLabel(artifact.artifact_type)}</span><span>{artifact.language ?? "Unspecified"}</span><span>{formatFileSize(artifact.size_bytes)}</span><span className={artifact.indexed_at ? "indexed" : "pending"}>{artifact.indexed_at ? "Indexed" : "Not indexed"}</span></span></Button></article>)}</div> : <div className="shared-empty-state"><FileText size={25} /><strong>{artifacts.length ? "No files match these filters" : "No shared evidence yet"}</strong><span>{artifacts.length ? "Adjust the search or selected types to see other workspace files." : "Add a pasted note below, then index it when you are ready to search."}</span></div>}
             </div>
-            {canWrite ? <div className="shared-evidence-additions"><form className="shared-note-form" onSubmit={addNote}><h3>Add shared note</h3><Input onChange={(event) => setNoteTitle(event.target.value)} placeholder="Decision or implementation note" required value={noteTitle} /><Textarea onChange={(event) => setNoteContent(event.target.value)} placeholder="Paste Markdown, code context, or a meeting note…" required value={noteContent} /><Button disabled={isSubmitting} type="submit" variant="main"><Plus size={16} /> Store evidence</Button></form><form className="shared-upload-form" onSubmit={submitUpload}><div><strong>Upload a file</strong><span>Markdown, text, code, or supported image · up to 10 MiB</span></div><label className="shared-upload-picker"><input accept=".md,.mdx,.txt,.rs,.ts,.tsx,.js,.jsx,.py,.json,.toml,.yaml,.yml,.sql,.html,.css,.sh,.ps1,.png,.jpg,.jpeg,.gif,.webp,.svg,.bmp" aria-label="Upload a shared artifact" className="shared-upload-native-input" onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)} required type="file" /><span className="shared-upload-picker-icon"><Upload size={18} /></span><span className="shared-upload-picker-copy"><strong>{uploadFile?.name ?? "Choose a shared file"}</strong><span>{uploadFile ? `${formatFileSize(uploadFile.size)} · ready to upload` : "Markdown, text, code, or a supported image"}</span></span><span className="shared-upload-picker-action">Browse</span></label><Button disabled={isSubmitting || !uploadFile} type="submit" variant="secondary"><Upload size={16} /> Upload</Button></form></div> : <p className="shared-readonly-note"><Shield size={15} /> Your viewer membership can inspect shared evidence but cannot change it.</p>}
+            {canWrite ? <div className="shared-evidence-additions">{isEvidenceView ? <form className="shared-note-form" onSubmit={addNote}><h3>Add shared note</h3><Input onChange={(event) => setNoteTitle(event.target.value)} placeholder="Decision or implementation note" required value={noteTitle} /><Textarea onChange={(event) => setNoteContent(event.target.value)} placeholder="Paste Markdown, code context, or a meeting note…" required value={noteContent} /><Button disabled={isSubmitting} type="submit" variant="main"><Plus size={16} /> Store evidence</Button></form> : null}<form className="shared-upload-form" onSubmit={submitUpload}><div><strong>{isDocumentsView ? "Upload a Word document" : "Upload a file"}</strong><span>{isDocumentsView ? "DOC and DOCX · up to 10 MiB · extracted locally when indexed" : "Markdown, text, code, image, or Word document · up to 10 MiB"}</span></div><label className="shared-upload-picker"><input accept={isDocumentsView ? ".doc,.docx" : ".md,.mdx,.txt,.rs,.ts,.tsx,.js,.jsx,.py,.json,.toml,.yaml,.yml,.sql,.html,.css,.sh,.ps1,.doc,.docx,.png,.jpg,.jpeg,.gif,.webp,.svg,.bmp"} aria-label={isDocumentsView ? "Upload a Word document" : "Upload a shared artifact"} className="shared-upload-native-input" onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)} required type="file" /><span className="shared-upload-picker-icon"><Upload size={18} /></span><span className="shared-upload-picker-copy"><strong>{uploadFile?.name ?? (isDocumentsView ? "Choose a Word file" : "Choose a shared file")}</strong><span>{uploadFile ? `${formatFileSize(uploadFile.size)} · ready to upload` : isDocumentsView ? "DOC or DOCX" : "Markdown, text, code, image, or Word document"}</span></span><span className="shared-upload-picker-action">Browse</span></label><Button disabled={isSubmitting || !uploadFile} type="submit" variant="secondary"><Upload size={16} /> Upload</Button></form></div> : <p className="shared-readonly-note"><Shield size={15} /> Your viewer membership can inspect shared evidence but cannot change it.</p>}
           </section> : null}
           {isRetrievalView || isMemoryView || isTasksView || isPeopleView || isActivityView ? <aside className="shared-detail-panel shared-retrieval-panel">
             {isRetrievalView ? <><div className="shared-panel-heading"><div><Search size={18} /><h2>Retrieve</h2></div></div>

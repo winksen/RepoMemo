@@ -1,5 +1,6 @@
 use anyhow::Result;
 use repomemo_domain::{ArtifactSummary, ArtifactType, Chunk, Symbol, SymbolKind};
+use repomemo_ingestion::extract_word_text;
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use tree_sitter::{Language, Node, Parser};
@@ -39,14 +40,20 @@ pub fn index_artifact(summary: &ArtifactSummary, bytes: &[u8]) -> Result<IndexAr
     }
 
     let mut warnings = Vec::new();
-    let text = match String::from_utf8(bytes.to_vec()) {
-        Ok(text) => text,
-        Err(error) => {
-            warnings.push(format!(
-                "Artifact contained invalid UTF-8; decoded lossily for indexing: {error}"
-            ));
-            String::from_utf8_lossy(bytes).to_string()
+    let text = match extract_word_text(std::path::Path::new(&summary.path), bytes)? {
+        Some(text) => {
+            warnings.push("Word document text was extracted locally for indexing.".to_owned());
+            text
         }
+        None => match String::from_utf8(bytes.to_vec()) {
+            Ok(text) => text,
+            Err(error) => {
+                warnings.push(format!(
+                    "Artifact contained invalid UTF-8; decoded lossily for indexing: {error}"
+                ));
+                String::from_utf8_lossy(bytes).to_string()
+            }
+        },
     };
 
     if text.trim().is_empty() {

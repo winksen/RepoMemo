@@ -22,6 +22,7 @@ import {
   IconClock as Clock,
   IconDatabase as Database,
   IconFileCode as FileCode2,
+  IconFileText as FileText,
   IconPhoto as Photo,
   IconFolderDown as FolderDown,
   IconFolderPlus as FolderPlus,
@@ -43,7 +44,9 @@ import {
 } from "@tabler/icons-react";
 import {
   ACCEPTED_IMAGE_EXTENSIONS,
+  ACCEPTED_DOCUMENT_EXTENSIONS,
   ACCEPTED_TEXT_EXTENSIONS,
+  chooseImportDocuments,
   chooseImportFiles,
   chooseImportFolder,
   createWorkspace,
@@ -94,7 +97,7 @@ import type {
 } from "./types";
 
 type LoadState = "idle" | "loading" | "ready" | "error";
-type View = "workspaces" | "import" | "artifacts" | "search" | "summary" | "ask" | "memory" | "settings";
+type View = "workspaces" | "import" | "documents" | "artifacts" | "search" | "summary" | "ask" | "memory" | "settings";
 type Theme = "light" | "dark";
 
 const THEME_STORAGE_KEY = "repomemo.theme";
@@ -108,6 +111,7 @@ function initialTheme(): Theme {
 const viewMeta: Record<View, { section: string; title: string }> = {
   workspaces: { section: "Library", title: "Workspaces" },
   import: { section: "Library", title: "Import sources" },
+  documents: { section: "Library", title: "Documents" },
   artifacts: { section: "Library", title: "Artifacts" },
   search: { section: "Intelligence", title: "Search" },
   summary: { section: "Intelligence", title: "Project briefing" },
@@ -453,6 +457,11 @@ function LocalDesktopApp() {
     await runImport(paths);
   }
 
+  async function handleImportDocuments() {
+    const paths = await chooseImportDocuments();
+    await runImport(paths, true);
+  }
+
   async function handlePasteImport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedWorkspaceId || !pasteContent.trim()) {
@@ -489,7 +498,7 @@ function LocalDesktopApp() {
     }
   }
 
-  async function runImport(paths: string[]) {
+  async function runImport(paths: string[], indexAfterImport = false) {
     if (!selectedWorkspaceId || paths.length === 0) {
       return;
     }
@@ -500,6 +509,16 @@ function LocalDesktopApp() {
     try {
       const report = await importPaths(selectedWorkspaceId, paths);
       setImportReport(report);
+      if (indexAfterImport && report.imported_artifacts.length > 0) {
+        setIsIndexing(true);
+        try {
+          for (const artifact of report.imported_artifacts) {
+            setIndexingJob(await indexArtifact(artifact.id));
+          }
+        } finally {
+          setIsIndexing(false);
+        }
+      }
       await refreshWorkspaceData(selectedWorkspaceId);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : String(error));
@@ -746,6 +765,13 @@ function LocalDesktopApp() {
               disabled={!selectedWorkspace}
             />
             <NavButton
+              active={activeView === "documents"}
+              icon={FileText}
+              label="Documents"
+              onClick={() => setActiveView("documents")}
+              disabled={!selectedWorkspace}
+            />
+            <NavButton
               active={activeView === "artifacts"}
               icon={Archive}
               label="Artifacts"
@@ -883,6 +909,14 @@ function LocalDesktopApp() {
             setPasteContent={setPasteContent}
             setPasteLanguage={setPasteLanguage}
             setPasteTitle={setPasteTitle}
+          />
+        ) : activeView === "documents" ? (
+          <DocumentsView
+            artifacts={artifacts}
+            isImporting={isImporting}
+            isIndexing={isIndexing}
+            onImportDocuments={handleImportDocuments}
+            onOpenLedger={() => setActiveView("artifacts")}
           />
         ) : activeView === "artifacts" ? (
           <ArtifactsView
@@ -1329,6 +1363,62 @@ function WorkspaceView({
             </ul>
           </div>
         )}
+      </aside>
+    </div>
+  );
+}
+
+function DocumentsView({
+  artifacts,
+  isImporting,
+  isIndexing,
+  onImportDocuments,
+  onOpenLedger,
+}: {
+  artifacts: ArtifactSummary[];
+  isImporting: boolean;
+  isIndexing: boolean;
+  onImportDocuments: () => void;
+  onOpenLedger: () => void;
+}) {
+  const documents = artifacts.filter((artifact) => artifact.language === "Word" || /\.docx?$/i.test(artifact.path));
+
+  return (
+    <div className="workbench-grid import-layout graphite-page documents-layout">
+      <section className="panel import-main">
+        <PanelHeader icon={FileText} label="Documents" title="Add Word evidence" />
+        <div className="document-intake">
+          <div className="document-intake-copy">
+            <span className="document-intake-icon" aria-hidden="true"><FileText size={24} /></span>
+            <div>
+              <h3>Upload a Word document</h3>
+              <p>RepoMemo stores the original file locally, extracts its body text, and indexes it for retrieval.</p>
+            </div>
+          </div>
+          <button className="button primary" disabled={isImporting || isIndexing} onClick={onImportDocuments} type="button">
+            {isImporting || isIndexing ? <Loader2 className="spin" size={16} /> : <Upload size={16} />}
+            {isIndexing ? "Indexing documents" : "Choose Word files"}
+          </button>
+        </div>
+        <p className="import-accepted"><strong>Supported:</strong> <span>{ACCEPTED_DOCUMENT_EXTENSIONS.map((extension) => `.${extension}`).join(", ")}</span></p>
+        <div className="document-workflow-note">
+          <CheckCircle2 size={17} aria-hidden="true" />
+          <span><strong>Evidence-ready by default.</strong> New documents are indexed after upload and remain available in the artifact ledger with their extracted preview.</span>
+        </div>
+      </section>
+      <aside className="panel import-rail evidence-rail">
+        <PanelHeader icon={Archive} label="Evidence ledger" title="Stored documents">
+          <button className="button secondary" onClick={onOpenLedger} type="button">Open all evidence</button>
+        </PanelHeader>
+        <div className="recent-artifact-list document-artifact-list">
+          {documents.length ? documents.map((artifact) => (
+            <div className="recent-artifact-row" key={artifact.id}>
+              <span aria-hidden="true"><FileText size={15} /></span>
+              <div><strong>{artifact.title}</strong><small>{artifact.indexed_at ? "Indexed" : "Stored"} · {formatRelativeDate(artifact.updated_at)}</small></div>
+              <span className={artifact.indexed_at ? "state-dot ready" : "state-dot"} title={artifact.indexed_at ? "Indexed" : "Stored"} />
+            </div>
+          )) : <p className="rail-empty">Word files you upload will appear in the evidence ledger.</p>}
+        </div>
       </aside>
     </div>
   );

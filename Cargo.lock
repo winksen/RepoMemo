@@ -3245,6 +3245,7 @@ dependencies = [
  "anyhow",
  "hex",
  "repomemo-domain",
+ "repomemo-ingestion",
  "serde_json",
  "sha2",
  "tree-sitter",
@@ -3258,6 +3259,9 @@ name = "repomemo-ingestion"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "cfb",
+ "flate2",
+ "quick-xml",
  "repomemo-domain",
 ]
 
