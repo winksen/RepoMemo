@@ -479,6 +479,7 @@ textarea:focus-visible {
 .shared-artifact-manager article { min-width: 0; }
 .rm-button.shared-artifact-entry { display: grid; grid-template-columns: auto minmax(0, 1fr); align-content: start; align-items: start; gap: 12px; width: 100%; min-height: 150px; padding: 14px; color: var(--color-text); background: var(--color-surface); border: 2px solid var(--color-border-strong); border-radius: 12px; cursor: pointer; text-align: left; }
 .rm-button.shared-artifact-entry:hover:not(:disabled) { background: var(--color-surface); border-color: var(--color-accent); }
+.rm-button.shared-artifact-entry.selected { background: var(--color-surface-2); border-color: var(--color-accent); }
 .shared-artifact-file-icon { display: grid; width: 38px; height: 38px; place-items: center; color: var(--color-text-muted); background: var(--color-surface-3); border-radius: 9px; }
 .shared-artifact-entry-copy { display: grid; min-width: 0; gap: 4px; }
 .shared-artifact-entry-copy strong { overflow: hidden; color: var(--color-text); font-size: 13px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
@@ -498,6 +499,12 @@ textarea:focus-visible {
 .shared-evidence-additions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; margin-top: 24px; }
 .shared-evidence-additions .shared-note-form,
 .shared-evidence-additions .shared-upload-form { margin-top: 0; }
+.shared-document-preview { display: grid; gap: 12px; margin-top: 24px; padding-top: 22px; border-top: 1px solid var(--color-border); }
+.shared-document-preview .shared-panel-heading { margin-bottom: 0; }
+.shared-document-preview-meta { display: flex; flex-wrap: wrap; gap: 6px; }
+.shared-document-preview-meta span { max-width: 100%; overflow: hidden; padding: 4px 7px; color: var(--color-text-muted); background: var(--color-surface-2); border-radius: 6px; font-size: 11px; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+.shared-document-preview-meta span:first-child { flex: 1 1 220px; color: var(--color-text); }
+.shared-word-preview-body { max-height: min(48vh, 560px); }
 .shared-note-form h3 { margin: 0 0 2px; font-size: 14px; }
 .shared-note-form input,
 .shared-note-form textarea,
@@ -1056,6 +1063,90 @@ textarea:focus-visible {
 
 .document-artifact-list {
   margin-top: 2px;
+}
+
+.document-artifact-row {
+  width: 100%;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.document-artifact-row.selected,
+.document-artifact-row:hover {
+  background: var(--color-surface-2);
+}
+
+.document-preview-section {
+  display: grid;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 22px;
+  border-top: 1px solid var(--color-border);
+}
+
+.document-preview-header,
+.document-preview-title,
+.document-preview-meta {
+  display: flex;
+  align-items: center;
+}
+
+.document-preview-header {
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.document-preview-title {
+  gap: 9px;
+  min-width: 0;
+}
+
+.document-preview-title svg {
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
+}
+
+.document-preview-title h3 {
+  margin: 0;
+  font-size: 15px;
+  line-height: 21px;
+}
+
+.document-preview-title p {
+  margin: 2px 0 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 17px;
+}
+
+.document-preview-meta {
+  flex-wrap: wrap;
+  gap: 7px;
+  color: var(--color-text-subtle);
+  font-size: 11px;
+}
+
+.document-preview-body,
+.document-preview-empty {
+  margin: 0;
+  padding: 14px;
+  color: var(--color-text);
+  background: var(--color-code-surface);
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.document-preview-body {
+  max-height: min(48vh, 560px);
+  overflow: auto;
+  font-family: var(--font-ui);
+  white-space: pre-wrap;
+}
+
+.document-preview-empty {
+  color: var(--color-text-muted);
 }
 
 .detail-actions,

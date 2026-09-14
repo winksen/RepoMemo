@@ -3,11 +3,13 @@ use std::path::{Path, PathBuf};
 use anyhow::{bail, Context, Result};
 use chrono::Utc;
 use repomemo_domain::{
-    ArtifactComment, ArtifactDetail, ArtifactLifecycle, ArtifactLifecycleEvent, ArtifactSummary, ArtifactType, Chunk, Citation,
-    CollaborationTask, IndexingJobStatus, MemoryCard, MemoryCardDetail, MemoryCardSummary,
-    MemoryEvidence, Organization, OrganizationMember, OrganizationRole, ProviderSettings, SavedSearch, SearchRequest, SearchResult, SharedNotification, SharedUser,
-    SharedWorkspace, Source, SourceType, Symbol, SymbolKind, SymbolSearchResult, TaskChecklistItem, Workspace,
-    WorkspaceActivityEvent, WorkspaceMember, WorkspaceMembership, WorkspaceOverview, WorkspaceRole,
+    ArtifactComment, ArtifactDetail, ArtifactLifecycle, ArtifactLifecycleEvent, ArtifactSummary,
+    ArtifactType, Chunk, Citation, CollaborationTask, IndexingJobStatus, MemoryCard,
+    MemoryCardDetail, MemoryCardSummary, MemoryEvidence, Organization, OrganizationMember,
+    OrganizationRole, ProviderSettings, SavedSearch, SearchRequest, SearchResult,
+    SharedNotification, SharedUser, SharedWorkspace, Source, SourceType, Symbol, SymbolKind,
+    SymbolSearchResult, TaskChecklistItem, Workspace, WorkspaceActivityEvent, WorkspaceMember,
+    WorkspaceMembership, WorkspaceOverview, WorkspaceRole,
 };
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -130,16 +132,37 @@ struct CollaborationTaskRow {
 
 #[derive(Debug, sqlx::FromRow)]
 struct SavedSearchRow {
-    id: String, workspace_id: String, name: String, query: String, artifact_types_json: String,
-    languages_json: String, source_ids_json: String, result_limit: i64,
-    creator_id: String, creator_email: String, creator_display_name: String, created_at: String, updated_at: String,
+    id: String,
+    workspace_id: String,
+    name: String,
+    query: String,
+    artifact_types_json: String,
+    languages_json: String,
+    source_ids_json: String,
+    result_limit: i64,
+    creator_id: String,
+    creator_email: String,
+    creator_display_name: String,
+    created_at: String,
+    updated_at: String,
 }
 
 #[derive(Debug, sqlx::FromRow)]
 struct TaskChecklistItemRow {
-    id: String, task_id: String, workspace_id: String, body: String, position: i64,
-    completed_at: Option<String>, completed_by_id: Option<String>, completed_by_email: Option<String>, completed_by_display_name: Option<String>,
-    creator_id: String, creator_email: String, creator_display_name: String, created_at: String, updated_at: String,
+    id: String,
+    task_id: String,
+    workspace_id: String,
+    body: String,
+    position: i64,
+    completed_at: Option<String>,
+    completed_by_id: Option<String>,
+    completed_by_email: Option<String>,
+    completed_by_display_name: Option<String>,
+    creator_id: String,
+    creator_email: String,
+    creator_display_name: String,
+    created_at: String,
+    updated_at: String,
 }
 
 #[derive(Debug, sqlx::FromRow)]
@@ -209,10 +232,19 @@ pub struct NewCollaborationTask {
 }
 
 #[derive(Debug, Clone)]
-pub struct NewSavedSearch { pub name: String, pub query: String, pub artifact_types: Vec<ArtifactType>, pub languages: Vec<String>, pub source_ids: Vec<String>, pub result_limit: i64 }
+pub struct NewSavedSearch {
+    pub name: String,
+    pub query: String,
+    pub artifact_types: Vec<ArtifactType>,
+    pub languages: Vec<String>,
+    pub source_ids: Vec<String>,
+    pub result_limit: i64,
+}
 
 #[derive(Debug, Clone)]
-pub struct NewTaskChecklistItem { pub body: String }
+pub struct NewTaskChecklistItem {
+    pub body: String,
+}
 
 #[derive(Debug, Clone, Default)]
 pub struct WorkspaceCollaborationCounts {
@@ -649,15 +681,20 @@ impl StorageEngine {
         Ok(row.map(UserProfile::from))
     }
 
-    pub async fn update_user_display_name(&self, user_id: &str, display_name: &str) -> Result<SharedUser> {
+    pub async fn update_user_display_name(
+        &self,
+        user_id: &str,
+        display_name: &str,
+    ) -> Result<SharedUser> {
         let display_name = require_name(display_name, "Display name")?;
         let now = Utc::now().to_rfc3339();
-        let changed = sqlx::query("UPDATE users SET display_name = ?1, updated_at = ?2 WHERE id = ?3")
-            .bind(&display_name)
-            .bind(now)
-            .bind(user_id)
-            .execute(&self.pool)
-            .await?;
+        let changed =
+            sqlx::query("UPDATE users SET display_name = ?1, updated_at = ?2 WHERE id = ?3")
+                .bind(&display_name)
+                .bind(now)
+                .bind(user_id)
+                .execute(&self.pool)
+                .await?;
         if changed.rows_affected() == 0 {
             bail!("User was not found.");
         }
@@ -667,12 +704,13 @@ impl StorageEngine {
     }
 
     pub async fn update_user_password(&self, user_id: &str, password_hash: &str) -> Result<()> {
-        let changed = sqlx::query("UPDATE users SET password_hash = ?1, updated_at = ?2 WHERE id = ?3")
-            .bind(password_hash)
-            .bind(Utc::now().to_rfc3339())
-            .bind(user_id)
-            .execute(&self.pool)
-            .await?;
+        let changed =
+            sqlx::query("UPDATE users SET password_hash = ?1, updated_at = ?2 WHERE id = ?3")
+                .bind(password_hash)
+                .bind(Utc::now().to_rfc3339())
+                .bind(user_id)
+                .execute(&self.pool)
+                .await?;
         if changed.rows_affected() == 0 {
             bail!("User was not found.");
         }
@@ -745,7 +783,8 @@ impl StorageEngine {
         .bind(user_id)
         .fetch_optional(&self.pool)
         .await?;
-        role.map(|role| organization_role_from_db(&role)).transpose()
+        role.map(|role| organization_role_from_db(&role))
+            .transpose()
     }
 
     pub async fn update_organization(
@@ -756,12 +795,13 @@ impl StorageEngine {
     ) -> Result<Organization> {
         let name = require_name(name, "Organization name")?;
         let now = Utc::now().to_rfc3339();
-        let updated = sqlx::query("UPDATE organizations SET name = ?1, updated_at = ?2 WHERE id = ?3")
-            .bind(&name)
-            .bind(&now)
-            .bind(organization_id)
-            .execute(&self.pool)
-            .await?;
+        let updated =
+            sqlx::query("UPDATE organizations SET name = ?1, updated_at = ?2 WHERE id = ?3")
+                .bind(&name)
+                .bind(&now)
+                .bind(organization_id)
+                .execute(&self.pool)
+                .await?;
         if updated.rows_affected() == 0 {
             bail!("Organization was not found.");
         }
@@ -775,7 +815,10 @@ impl StorageEngine {
         Ok(row.into())
     }
 
-    pub async fn list_organization_members(&self, organization_id: &str) -> Result<Vec<OrganizationMember>> {
+    pub async fn list_organization_members(
+        &self,
+        organization_id: &str,
+    ) -> Result<Vec<OrganizationMember>> {
         let rows = sqlx::query_as::<_, OrganizationMemberRow>(
             "SELECT u.id, u.email, u.display_name, m.role, m.created_at FROM organization_memberships m INNER JOIN users u ON u.id = m.user_id WHERE m.organization_id = ?1 ORDER BY CASE m.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END, u.display_name ASC",
         )
@@ -800,10 +843,11 @@ impl StorageEngine {
             .ok_or_else(|| anyhow::anyhow!("No RepoMemo account exists for this email address."))?;
         let now = Utc::now().to_rfc3339();
         let mut tx = self.pool.begin().await?;
-        let organization_exists = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM organizations WHERE id = ?1")
-            .bind(organization_id)
-            .fetch_one(&mut *tx)
-            .await?;
+        let organization_exists =
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM organizations WHERE id = ?1")
+                .bind(organization_id)
+                .fetch_one(&mut *tx)
+                .await?;
         if organization_exists == 0 {
             bail!("Organization was not found.");
         }
@@ -829,17 +873,25 @@ impl StorageEngine {
             .ok_or_else(|| anyhow::anyhow!("Organization member could not be loaded."))
     }
 
-    pub async fn remove_organization_member(&self, organization_id: &str, user_id: &str) -> Result<()> {
-        let role = self.organization_role_for_user(user_id, organization_id).await?;
+    pub async fn remove_organization_member(
+        &self,
+        organization_id: &str,
+        user_id: &str,
+    ) -> Result<()> {
+        let role = self
+            .organization_role_for_user(user_id, organization_id)
+            .await?;
         if matches!(role, Some(OrganizationRole::Owner)) {
             bail!("The organization owner cannot be removed.");
         }
         let mut tx = self.pool.begin().await?;
-        let deleted = sqlx::query("DELETE FROM organization_memberships WHERE organization_id = ?1 AND user_id = ?2")
-            .bind(organization_id)
-            .bind(user_id)
-            .execute(&mut *tx)
-            .await?;
+        let deleted = sqlx::query(
+            "DELETE FROM organization_memberships WHERE organization_id = ?1 AND user_id = ?2",
+        )
+        .bind(organization_id)
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await?;
         if deleted.rows_affected() == 0 {
             bail!("Organization membership was not found.");
         }
@@ -1045,7 +1097,11 @@ impl StorageEngine {
         Ok(rows.into_iter().map(WorkspaceActivityEvent::from).collect())
     }
 
-    pub async fn list_user_activity(&self, user_id: &str, limit: i64) -> Result<Vec<WorkspaceActivityEvent>> {
+    pub async fn list_user_activity(
+        &self,
+        user_id: &str,
+        limit: i64,
+    ) -> Result<Vec<WorkspaceActivityEvent>> {
         let rows = sqlx::query_as::<_, WorkspaceActivityRow>(
             r#"
             SELECT
@@ -1320,8 +1376,14 @@ impl StorageEngine {
         Ok(rows.into_iter().map(SavedSearch::from).collect())
     }
 
-    pub async fn create_saved_search(&self, workspace_id: &str, user_id: &str, search: NewSavedSearch) -> Result<SavedSearch> {
-        let id = Uuid::new_v4().to_string(); let now = Utc::now().to_rfc3339();
+    pub async fn create_saved_search(
+        &self,
+        workspace_id: &str,
+        user_id: &str,
+        search: NewSavedSearch,
+    ) -> Result<SavedSearch> {
+        let id = Uuid::new_v4().to_string();
+        let now = Utc::now().to_rfc3339();
         sqlx::query("INSERT INTO workspace_saved_searches (id, workspace_id, created_by_user_id, name, query, artifact_types_json, languages_json, source_ids_json, result_limit, created_at, updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?10)")
             .bind(&id).bind(workspace_id).bind(user_id).bind(search.name).bind(search.query)
             .bind(serde_json::to_string(&search.artifact_types)?).bind(serde_json::to_string(&search.languages)?).bind(serde_json::to_string(&search.source_ids)?).bind(search.result_limit).bind(now).execute(&self.pool).await?;
@@ -1335,8 +1397,13 @@ impl StorageEngine {
     }
 
     pub async fn delete_saved_search(&self, search_id: &str) -> Result<()> {
-        let changed = sqlx::query("DELETE FROM workspace_saved_searches WHERE id = ?1").bind(search_id).execute(&self.pool).await?;
-        if changed.rows_affected() == 0 { bail!("Saved search was not found."); }
+        let changed = sqlx::query("DELETE FROM workspace_saved_searches WHERE id = ?1")
+            .bind(search_id)
+            .execute(&self.pool)
+            .await?;
+        if changed.rows_affected() == 0 {
+            bail!("Saved search was not found.");
+        }
         Ok(())
     }
 
@@ -1346,8 +1413,15 @@ impl StorageEngine {
         Ok(rows.into_iter().map(TaskChecklistItem::from).collect())
     }
 
-    pub async fn create_task_checklist_item(&self, task_id: &str, workspace_id: &str, user_id: &str, item: NewTaskChecklistItem) -> Result<TaskChecklistItem> {
-        let id=Uuid::new_v4().to_string(); let now=Utc::now().to_rfc3339();
+    pub async fn create_task_checklist_item(
+        &self,
+        task_id: &str,
+        workspace_id: &str,
+        user_id: &str,
+        item: NewTaskChecklistItem,
+    ) -> Result<TaskChecklistItem> {
+        let id = Uuid::new_v4().to_string();
+        let now = Utc::now().to_rfc3339();
         let position: i64=sqlx::query_scalar("SELECT COALESCE(MAX(position), -1) + 1 FROM workspace_task_checklist_items WHERE task_id=?1").bind(task_id).fetch_one(&self.pool).await?;
         sqlx::query("INSERT INTO workspace_task_checklist_items (id,task_id,workspace_id,created_by_user_id,body,position,created_at,updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?7)").bind(&id).bind(task_id).bind(workspace_id).bind(user_id).bind(item.body).bind(position).bind(now).execute(&self.pool).await?;
         self.get_task_checklist_item(&id).await
@@ -1358,13 +1432,27 @@ impl StorageEngine {
         Ok(TaskChecklistItem::from(row))
     }
 
-    pub async fn toggle_task_checklist_item(&self, item_id: &str, user_id: &str, completed: bool) -> Result<TaskChecklistItem> {
-        let now=Utc::now().to_rfc3339();
+    pub async fn toggle_task_checklist_item(
+        &self,
+        item_id: &str,
+        user_id: &str,
+        completed: bool,
+    ) -> Result<TaskChecklistItem> {
+        let now = Utc::now().to_rfc3339();
         sqlx::query("UPDATE workspace_task_checklist_items SET completed_at=?1, completed_by_user_id=?2, updated_at=?3 WHERE id=?4").bind(if completed { Some(now.clone()) } else { None }).bind(if completed { Some(user_id) } else { None }).bind(now).bind(item_id).execute(&self.pool).await?;
         self.get_task_checklist_item(item_id).await
     }
 
-    pub async fn delete_task_checklist_item(&self, item_id: &str) -> Result<()> { let changed=sqlx::query("DELETE FROM workspace_task_checklist_items WHERE id=?1").bind(item_id).execute(&self.pool).await?; if changed.rows_affected()==0 { bail!("Checklist item was not found."); } Ok(()) }
+    pub async fn delete_task_checklist_item(&self, item_id: &str) -> Result<()> {
+        let changed = sqlx::query("DELETE FROM workspace_task_checklist_items WHERE id=?1")
+            .bind(item_id)
+            .execute(&self.pool)
+            .await?;
+        if changed.rows_affected() == 0 {
+            bail!("Checklist item was not found.");
+        }
+        Ok(())
+    }
 
     pub async fn list_artifact_comments(&self, artifact_id: &str) -> Result<Vec<ArtifactComment>> {
         let rows = sqlx::query_as::<_, ArtifactCommentRow>(
@@ -1549,7 +1637,11 @@ impl StorageEngine {
         .execute(&self.pool)
         .await?;
 
-        let action = if lifecycle.status == "superseded" { "artifact_superseded" } else { "lifecycle_updated" };
+        let action = if lifecycle.status == "superseded" {
+            "artifact_superseded"
+        } else {
+            "lifecycle_updated"
+        };
         let detail = format!("Evidence lifecycle changed to {}.", lifecycle.status);
         sqlx::query("INSERT INTO artifact_lifecycle_events (id, artifact_id, actor_user_id, action, detail, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)")
             .bind(Uuid::new_v4().to_string())
@@ -1563,7 +1655,10 @@ impl StorageEngine {
         self.get_artifact_lifecycle(artifact_id).await
     }
 
-    pub async fn list_artifact_lifecycle_events(&self, artifact_id: &str) -> Result<Vec<ArtifactLifecycleEvent>> {
+    pub async fn list_artifact_lifecycle_events(
+        &self,
+        artifact_id: &str,
+    ) -> Result<Vec<ArtifactLifecycleEvent>> {
         let rows = sqlx::query_as::<_, ArtifactLifecycleEventRow>(
             r#"
             SELECT event.id, event.artifact_id,
@@ -1607,7 +1702,10 @@ impl StorageEngine {
         self.get_shared_notification(&id).await
     }
 
-    pub async fn list_shared_notifications(&self, user_id: &str) -> Result<Vec<SharedNotification>> {
+    pub async fn list_shared_notifications(
+        &self,
+        user_id: &str,
+    ) -> Result<Vec<SharedNotification>> {
         let rows = sqlx::query_as::<_, SharedNotificationRow>(
             r#"
             SELECT id, workspace_id, notification_type, title, body, href, read_at, created_at
@@ -3168,7 +3266,9 @@ impl From<CollaborationTaskRow> for CollaborationTask {
             priority: row.priority,
             assignee: row.assignee_id.map(|id| SharedUser {
                 id,
-                display_name: row.assignee_display_name.unwrap_or_else(|| "Member".to_owned()),
+                display_name: row
+                    .assignee_display_name
+                    .unwrap_or_else(|| "Member".to_owned()),
                 email: row.assignee_email,
             }),
             created_by: SharedUser {
@@ -3205,17 +3305,50 @@ impl From<ArtifactCommentRow> for ArtifactComment {
 
 impl From<SavedSearchRow> for SavedSearch {
     fn from(row: SavedSearchRow) -> Self {
-        Self { id: row.id, workspace_id: row.workspace_id, name: row.name, query: row.query,
-            artifact_types: serde_json::from_str(&row.artifact_types_json).unwrap_or_default(), languages: serde_json::from_str(&row.languages_json).unwrap_or_default(), source_ids: serde_json::from_str(&row.source_ids_json).unwrap_or_default(), result_limit: row.result_limit,
-            created_by: SharedUser { id: row.creator_id, display_name: row.creator_display_name, email: Some(row.creator_email) }, created_at: row.created_at, updated_at: row.updated_at }
+        Self {
+            id: row.id,
+            workspace_id: row.workspace_id,
+            name: row.name,
+            query: row.query,
+            artifact_types: serde_json::from_str(&row.artifact_types_json).unwrap_or_default(),
+            languages: serde_json::from_str(&row.languages_json).unwrap_or_default(),
+            source_ids: serde_json::from_str(&row.source_ids_json).unwrap_or_default(),
+            result_limit: row.result_limit,
+            created_by: SharedUser {
+                id: row.creator_id,
+                display_name: row.creator_display_name,
+                email: Some(row.creator_email),
+            },
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+        }
     }
 }
 
 impl From<TaskChecklistItemRow> for TaskChecklistItem {
     fn from(row: TaskChecklistItemRow) -> Self {
-        Self { id: row.id, task_id: row.task_id, workspace_id: row.workspace_id, body: row.body, position: row.position, completed_at: row.completed_at,
-            completed_by: row.completed_by_id.map(|id| SharedUser { id, display_name: row.completed_by_display_name.unwrap_or_else(|| "Member".to_owned()), email: row.completed_by_email }),
-            created_by: SharedUser { id: row.creator_id, display_name: row.creator_display_name, email: Some(row.creator_email) }, created_at: row.created_at, updated_at: row.updated_at }
+        Self {
+            id: row.id,
+            task_id: row.task_id,
+            workspace_id: row.workspace_id,
+            body: row.body,
+            position: row.position,
+            completed_at: row.completed_at,
+            completed_by: row.completed_by_id.map(|id| SharedUser {
+                id,
+                display_name: row
+                    .completed_by_display_name
+                    .unwrap_or_else(|| "Member".to_owned()),
+                email: row.completed_by_email,
+            }),
+            created_by: SharedUser {
+                id: row.creator_id,
+                display_name: row.creator_display_name,
+                email: Some(row.creator_email),
+            },
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+        }
     }
 }
 
@@ -3225,9 +3358,21 @@ impl From<ArtifactLifecycleRow> for ArtifactLifecycle {
             artifact_id: row.artifact_id,
             workspace_id: row.workspace_id,
             status: row.status,
-            owner: row.owner_id.map(|id| SharedUser { id, display_name: row.owner_display_name.unwrap_or_else(|| "Member".to_owned()), email: row.owner_email }),
+            owner: row.owner_id.map(|id| SharedUser {
+                id,
+                display_name: row
+                    .owner_display_name
+                    .unwrap_or_else(|| "Member".to_owned()),
+                email: row.owner_email,
+            }),
             review_note: row.review_note,
-            reviewed_by: row.reviewer_id.map(|id| SharedUser { id, display_name: row.reviewer_display_name.unwrap_or_else(|| "Member".to_owned()), email: row.reviewer_email }),
+            reviewed_by: row.reviewer_id.map(|id| SharedUser {
+                id,
+                display_name: row
+                    .reviewer_display_name
+                    .unwrap_or_else(|| "Member".to_owned()),
+                email: row.reviewer_email,
+            }),
             reviewed_at: row.reviewed_at,
             superseded_by_artifact_id: row.superseded_by_artifact_id,
             created_at: row.created_at,
@@ -3241,7 +3386,13 @@ impl From<ArtifactLifecycleEventRow> for ArtifactLifecycleEvent {
         Self {
             id: row.id,
             artifact_id: row.artifact_id,
-            actor: row.actor_id.map(|id| SharedUser { id, display_name: row.actor_display_name.unwrap_or_else(|| "Member".to_owned()), email: row.actor_email }),
+            actor: row.actor_id.map(|id| SharedUser {
+                id,
+                display_name: row
+                    .actor_display_name
+                    .unwrap_or_else(|| "Member".to_owned()),
+                email: row.actor_email,
+            }),
             action: row.action,
             detail: row.detail,
             created_at: row.created_at,

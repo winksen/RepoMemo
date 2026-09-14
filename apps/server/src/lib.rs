@@ -1,6 +1,11 @@
 //! Server-authoritative HTTP API for shared RepoMemo workspaces.
 
-use std::{collections::{BTreeMap, BTreeSet}, net::SocketAddr, path::PathBuf, time::Duration};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    net::SocketAddr,
+    path::PathBuf,
+    time::Duration,
+};
 
 use anyhow::{bail, Context, Result};
 use argon2::{
@@ -20,15 +25,19 @@ use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, 
 use rand_core::OsRng;
 use repomemo_api::RepoMemoCore;
 use repomemo_domain::{
-    ArtifactComment, ArtifactDetail, ArtifactLifecycle, ArtifactLifecycleEvent, ArtifactSummary, ArtifactType, AskAnswer, AskRequest, Citation,
-    CollaborationTask, CreateMemoryCardRequest, IndexingJobStatus, MemoryCard, MemoryCardDetail,
-    MemoryCardSummary, Organization, OrganizationMember, OrganizationRole, ProviderSettings, ProviderTestResult, SavedSearch, SearchRequest,
-    SearchResult, SharedAiProviderSettings, SharedSession, SharedUser, SharedWorkspace,
-    SharedNotification, TaskChecklistItem,
-    UpdateMemoryCardRequest, Workspace, WorkspaceActivityEvent, WorkspaceAiOverview,
-    WorkspaceCapabilities, WorkspaceMember, WorkspaceOverview, WorkspaceRole,
+    ArtifactComment, ArtifactDetail, ArtifactLifecycle, ArtifactLifecycleEvent, ArtifactSummary,
+    ArtifactType, AskAnswer, AskRequest, Citation, CollaborationTask, CreateMemoryCardRequest,
+    IndexingJobStatus, MemoryCard, MemoryCardDetail, MemoryCardSummary, Organization,
+    OrganizationMember, OrganizationRole, ProviderSettings, ProviderTestResult, SavedSearch,
+    SearchRequest, SearchResult, SharedAiProviderSettings, SharedNotification, SharedSession,
+    SharedUser, SharedWorkspace, TaskChecklistItem, UpdateMemoryCardRequest, Workspace,
+    WorkspaceActivityEvent, WorkspaceAiOverview, WorkspaceCapabilities, WorkspaceMember,
+    WorkspaceOverview, WorkspaceRole,
 };
-use repomemo_storage::{NewCollaborationTask, NewSavedSearch, NewSharedNotification, NewTaskChecklistItem, SaveArtifactLifecycle, StorageConfig, StorageEngine};
+use repomemo_storage::{
+    NewCollaborationTask, NewSavedSearch, NewSharedNotification, NewTaskChecklistItem,
+    SaveArtifactLifecycle, StorageConfig, StorageEngine,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
@@ -251,13 +260,27 @@ struct SaveArtifactLifecycleRequest {
 }
 
 #[derive(Debug, Deserialize)]
-struct SaveSearchRequest { name: String, query: String, #[serde(default)] artifact_types: Vec<ArtifactType>, #[serde(default)] languages: Vec<String>, #[serde(default)] source_ids: Vec<String>, result_limit: Option<i64> }
+struct SaveSearchRequest {
+    name: String,
+    query: String,
+    #[serde(default)]
+    artifact_types: Vec<ArtifactType>,
+    #[serde(default)]
+    languages: Vec<String>,
+    #[serde(default)]
+    source_ids: Vec<String>,
+    result_limit: Option<i64>,
+}
 
 #[derive(Debug, Deserialize)]
-struct CreateChecklistItemRequest { body: String }
+struct CreateChecklistItemRequest {
+    body: String,
+}
 
 #[derive(Debug, Deserialize)]
-struct ToggleChecklistItemRequest { completed: bool }
+struct ToggleChecklistItemRequest {
+    completed: bool,
+}
 
 #[derive(Debug, Deserialize)]
 struct QueryArtifactsRequest {
@@ -467,14 +490,14 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
         .route("/v1/auth/register", post(register))
         .route("/v1/auth/login", post(login))
         .route("/v1/session", get(session))
-        .route(
-            "/v1/profile",
-            get(get_profile).put(update_profile),
-        )
+        .route("/v1/profile", get(get_profile).put(update_profile))
         .route("/v1/profile/password", post(change_profile_password))
         .route("/v1/profile/tasks", get(list_profile_tasks))
         .route("/v1/notifications", get(list_notifications))
-        .route("/v1/notifications/read-all", post(mark_all_notifications_read))
+        .route(
+            "/v1/notifications/read-all",
+            post(mark_all_notifications_read),
+        )
         .route(
             "/v1/notifications/{notification_id}/read",
             post(mark_notification_read),
@@ -540,16 +563,28 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
             "/v1/workspaces/{workspace_id}/tasks",
             get(list_collaboration_tasks).post(create_collaboration_task),
         )
-        .route("/v1/workspaces/{workspace_id}/saved-searches", get(list_saved_searches).post(create_saved_search))
+        .route(
+            "/v1/workspaces/{workspace_id}/saved-searches",
+            get(list_saved_searches).post(create_saved_search),
+        )
         .route(
             "/v1/tasks/{task_id}",
             get(get_collaboration_task)
                 .put(update_collaboration_task)
                 .delete(delete_collaboration_task),
         )
-        .route("/v1/tasks/{task_id}/checklist", get(list_task_checklist).post(create_task_checklist_item))
-        .route("/v1/task-checklist/{item_id}", put(toggle_task_checklist_item).delete(delete_task_checklist_item))
-        .route("/v1/saved-searches/{search_id}", delete(delete_saved_search))
+        .route(
+            "/v1/tasks/{task_id}/checklist",
+            get(list_task_checklist).post(create_task_checklist_item),
+        )
+        .route(
+            "/v1/task-checklist/{item_id}",
+            put(toggle_task_checklist_item).delete(delete_task_checklist_item),
+        )
+        .route(
+            "/v1/saved-searches/{search_id}",
+            delete(delete_saved_search),
+        )
         .route(
             "/v1/workspaces/{workspace_id}/members",
             get(list_workspace_members).put(upsert_workspace_member),
@@ -915,7 +950,8 @@ async fn upsert_organization_member(
 ) -> Result<Json<OrganizationMember>, ApiError> {
     let caller_role = require_organization_admin(&state, &subject, &organization_id).await?;
     if matches!(request.role, OrganizationRole::Owner)
-        || (matches!(caller_role, OrganizationRole::Admin) && matches!(request.role, OrganizationRole::Admin))
+        || (matches!(caller_role, OrganizationRole::Admin)
+            && matches!(request.role, OrganizationRole::Admin))
     {
         return Err(ApiError::forbidden());
     }
@@ -931,7 +967,10 @@ async fn upsert_organization_member(
                 .organization_role_for_user(&target.id, &organization_id)
                 .await
                 .map_err(ApiError::internal)?;
-            if matches!(target_role, Some(OrganizationRole::Owner | OrganizationRole::Admin)) {
+            if matches!(
+                target_role,
+                Some(OrganizationRole::Owner | OrganizationRole::Admin)
+            ) {
                 return Err(ApiError::forbidden());
             }
         }
@@ -956,7 +995,8 @@ async fn remove_organization_member(
         .await
         .map_err(ApiError::internal)?;
     if matches!(target_role, Some(OrganizationRole::Owner))
-        || (matches!(caller_role, OrganizationRole::Admin) && matches!(target_role, Some(OrganizationRole::Admin)))
+        || (matches!(caller_role, OrganizationRole::Admin)
+            && matches!(target_role, Some(OrganizationRole::Admin)))
     {
         return Err(ApiError::forbidden());
     }
@@ -1101,13 +1141,15 @@ async fn workspace_metrics(
         }
         total_artifact_bytes += artifact.size_bytes;
         let artifact_type = artifact_type_label(&artifact.artifact_type).to_owned();
-        *artifact_types
-            .entry(artifact_type.clone())
-            .or_default() += 1;
+        *artifact_types.entry(artifact_type.clone()).or_default() += 1;
         *artifact_bytes_by_type.entry(artifact_type).or_default() += artifact.size_bytes;
         artifacts_created_last_7_days += i64::from(artifact.created_at >= freshness_threshold);
         artifacts_updated_last_7_days += i64::from(artifact.updated_at >= freshness_threshold);
-        if let Some(language) = artifact.language.as_ref().filter(|language| !language.trim().is_empty()) {
+        if let Some(language) = artifact
+            .language
+            .as_ref()
+            .filter(|language| !language.trim().is_empty())
+        {
             *languages.entry(language.clone()).or_default() += 1;
         }
     }
@@ -1180,7 +1222,12 @@ fn metric_breakdown(values: BTreeMap<String, i64>) -> Vec<WorkspaceMetricBreakdo
         .into_iter()
         .map(|(label, value)| WorkspaceMetricBreakdown { label, value })
         .collect::<Vec<_>>();
-    values.sort_by(|left, right| right.value.cmp(&left.value).then_with(|| left.label.cmp(&right.label)));
+    values.sort_by(|left, right| {
+        right
+            .value
+            .cmp(&left.value)
+            .then_with(|| left.label.cmp(&right.label))
+    });
     values
 }
 
@@ -1549,7 +1596,11 @@ async fn update_collaboration_task(
         "task_updated",
         "task",
         Some(&task.id),
-        format!("Updated task: {} ({}).", task.title, task.status.replace('_', " ")),
+        format!(
+            "Updated task: {} ({}).",
+            task.title,
+            task.status.replace('_', " ")
+        ),
     )
     .await;
     Ok(Json(task))
@@ -1589,38 +1640,169 @@ async fn delete_collaboration_task(
     Ok(StatusCode::NO_CONTENT)
 }
 
-async fn list_saved_searches(subject: AuthenticatedSubject, State(state): State<AppState>, Path(workspace_id): Path<String>) -> Result<Json<Vec<SavedSearch>>, ApiError> {
+async fn list_saved_searches(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+) -> Result<Json<Vec<SavedSearch>>, ApiError> {
     require_workspace_read(&state, &subject, &workspace_id).await?;
-    state.storage.list_saved_searches(&workspace_id).await.map(Json).map_err(map_storage_error)
+    state
+        .storage
+        .list_saved_searches(&workspace_id)
+        .await
+        .map(Json)
+        .map_err(map_storage_error)
 }
-async fn create_saved_search(subject: AuthenticatedSubject, State(state): State<AppState>, Path(workspace_id): Path<String>, Json(request): Json<SaveSearchRequest>) -> Result<(StatusCode, Json<SavedSearch>), ApiError> {
+async fn create_saved_search(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+    Json(request): Json<SaveSearchRequest>,
+) -> Result<(StatusCode, Json<SavedSearch>), ApiError> {
     require_workspace_write(&state, &subject, &workspace_id).await?;
-    let name=request.name.trim().to_owned(); let query=request.query.trim().to_owned(); let result_limit=request.result_limit.unwrap_or(20);
-    if name.is_empty() || name.len()>120 || query.is_empty() || query.len()>500 || !(1..=100).contains(&result_limit) { return Err(ApiError::bad_request("Saved search needs a name, query, and a result limit between 1 and 100.")); }
-    let saved=state.storage.create_saved_search(&workspace_id,&subject.user_id,NewSavedSearch{name,query,artifact_types:request.artifact_types,languages:request.languages,source_ids:request.source_ids,result_limit}).await.map_err(map_storage_error)?;
-    record_workspace_activity(&state,&workspace_id,&subject.user_id,"saved_search_created","saved_search",Some(&saved.id),format!("Saved retrieval workflow: {}.",saved.name)).await;
-    Ok((StatusCode::CREATED,Json(saved)))
+    let name = request.name.trim().to_owned();
+    let query = request.query.trim().to_owned();
+    let result_limit = request.result_limit.unwrap_or(20);
+    if name.is_empty()
+        || name.len() > 120
+        || query.is_empty()
+        || query.len() > 500
+        || !(1..=100).contains(&result_limit)
+    {
+        return Err(ApiError::bad_request(
+            "Saved search needs a name, query, and a result limit between 1 and 100.",
+        ));
+    }
+    let saved = state
+        .storage
+        .create_saved_search(
+            &workspace_id,
+            &subject.user_id,
+            NewSavedSearch {
+                name,
+                query,
+                artifact_types: request.artifact_types,
+                languages: request.languages,
+                source_ids: request.source_ids,
+                result_limit,
+            },
+        )
+        .await
+        .map_err(map_storage_error)?;
+    record_workspace_activity(
+        &state,
+        &workspace_id,
+        &subject.user_id,
+        "saved_search_created",
+        "saved_search",
+        Some(&saved.id),
+        format!("Saved retrieval workflow: {}.", saved.name),
+    )
+    .await;
+    Ok((StatusCode::CREATED, Json(saved)))
 }
-async fn delete_saved_search(subject: AuthenticatedSubject, State(state): State<AppState>, Path(search_id): Path<String>) -> Result<StatusCode, ApiError> {
-    let saved=state.storage.get_saved_search(&search_id).await.map_err(map_storage_error)?; require_workspace_write(&state,&subject,&saved.workspace_id).await?;
-    state.storage.delete_saved_search(&search_id).await.map_err(map_storage_error)?; Ok(StatusCode::NO_CONTENT)
+async fn delete_saved_search(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(search_id): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    let saved = state
+        .storage
+        .get_saved_search(&search_id)
+        .await
+        .map_err(map_storage_error)?;
+    require_workspace_write(&state, &subject, &saved.workspace_id).await?;
+    state
+        .storage
+        .delete_saved_search(&search_id)
+        .await
+        .map_err(map_storage_error)?;
+    Ok(StatusCode::NO_CONTENT)
 }
-async fn list_task_checklist(subject: AuthenticatedSubject, State(state): State<AppState>, Path(task_id): Path<String>) -> Result<Json<Vec<TaskChecklistItem>>, ApiError> {
-    let task=state.storage.get_collaboration_task(&task_id).await.map_err(map_storage_error)?; require_workspace_read(&state,&subject,&task.workspace_id).await?;
-    state.storage.list_task_checklist_items(&task_id).await.map(Json).map_err(map_storage_error)
+async fn list_task_checklist(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(task_id): Path<String>,
+) -> Result<Json<Vec<TaskChecklistItem>>, ApiError> {
+    let task = state
+        .storage
+        .get_collaboration_task(&task_id)
+        .await
+        .map_err(map_storage_error)?;
+    require_workspace_read(&state, &subject, &task.workspace_id).await?;
+    state
+        .storage
+        .list_task_checklist_items(&task_id)
+        .await
+        .map(Json)
+        .map_err(map_storage_error)
 }
-async fn create_task_checklist_item(subject: AuthenticatedSubject, State(state): State<AppState>, Path(task_id): Path<String>, Json(request): Json<CreateChecklistItemRequest>) -> Result<(StatusCode, Json<TaskChecklistItem>), ApiError> {
-    let task=state.storage.get_collaboration_task(&task_id).await.map_err(map_storage_error)?; require_workspace_write(&state,&subject,&task.workspace_id).await?; let body=request.body.trim().to_owned();
-    if body.is_empty() || body.len()>500 { return Err(ApiError::bad_request("Checklist item must be between 1 and 500 characters.")); }
-    let item=state.storage.create_task_checklist_item(&task_id,&task.workspace_id,&subject.user_id,NewTaskChecklistItem{body}).await.map_err(map_storage_error)?; Ok((StatusCode::CREATED,Json(item)))
+async fn create_task_checklist_item(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(task_id): Path<String>,
+    Json(request): Json<CreateChecklistItemRequest>,
+) -> Result<(StatusCode, Json<TaskChecklistItem>), ApiError> {
+    let task = state
+        .storage
+        .get_collaboration_task(&task_id)
+        .await
+        .map_err(map_storage_error)?;
+    require_workspace_write(&state, &subject, &task.workspace_id).await?;
+    let body = request.body.trim().to_owned();
+    if body.is_empty() || body.len() > 500 {
+        return Err(ApiError::bad_request(
+            "Checklist item must be between 1 and 500 characters.",
+        ));
+    }
+    let item = state
+        .storage
+        .create_task_checklist_item(
+            &task_id,
+            &task.workspace_id,
+            &subject.user_id,
+            NewTaskChecklistItem { body },
+        )
+        .await
+        .map_err(map_storage_error)?;
+    Ok((StatusCode::CREATED, Json(item)))
 }
-async fn toggle_task_checklist_item(subject: AuthenticatedSubject, State(state): State<AppState>, Path(item_id): Path<String>, Json(request): Json<ToggleChecklistItemRequest>) -> Result<Json<TaskChecklistItem>, ApiError> {
-    let current=state.storage.get_task_checklist_item(&item_id).await.map_err(map_storage_error)?; require_workspace_write(&state,&subject,&current.workspace_id).await?;
-    state.storage.toggle_task_checklist_item(&item_id,&subject.user_id,request.completed).await.map(Json).map_err(map_storage_error)
+async fn toggle_task_checklist_item(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(item_id): Path<String>,
+    Json(request): Json<ToggleChecklistItemRequest>,
+) -> Result<Json<TaskChecklistItem>, ApiError> {
+    let current = state
+        .storage
+        .get_task_checklist_item(&item_id)
+        .await
+        .map_err(map_storage_error)?;
+    require_workspace_write(&state, &subject, &current.workspace_id).await?;
+    state
+        .storage
+        .toggle_task_checklist_item(&item_id, &subject.user_id, request.completed)
+        .await
+        .map(Json)
+        .map_err(map_storage_error)
 }
-async fn delete_task_checklist_item(subject: AuthenticatedSubject, State(state): State<AppState>, Path(item_id): Path<String>) -> Result<StatusCode, ApiError> {
-    let current=state.storage.get_task_checklist_item(&item_id).await.map_err(map_storage_error)?; require_workspace_write(&state,&subject,&current.workspace_id).await?;
-    state.storage.delete_task_checklist_item(&item_id).await.map_err(map_storage_error)?; Ok(StatusCode::NO_CONTENT)
+async fn delete_task_checklist_item(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(item_id): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    let current = state
+        .storage
+        .get_task_checklist_item(&item_id)
+        .await
+        .map_err(map_storage_error)?;
+    require_workspace_write(&state, &subject, &current.workspace_id).await?;
+    state
+        .storage
+        .delete_task_checklist_item(&item_id)
+        .await
+        .map_err(map_storage_error)?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 async fn normalize_collaboration_task(
@@ -1631,16 +1813,30 @@ async fn normalize_collaboration_task(
     let title = request.title.trim().to_owned();
     let description = request.description.trim().to_owned();
     if title.is_empty() || title.len() > 180 {
-        return Err(ApiError::bad_request("Task title must be between 1 and 180 characters."));
+        return Err(ApiError::bad_request(
+            "Task title must be between 1 and 180 characters.",
+        ));
     }
     if description.len() > 5_000 {
-        return Err(ApiError::bad_request("Task description cannot exceed 5,000 characters."));
+        return Err(ApiError::bad_request(
+            "Task description cannot exceed 5,000 characters.",
+        ));
     }
-    if !matches!(request.status.as_str(), "open" | "in_progress" | "blocked" | "done") {
-        return Err(ApiError::bad_request("Task status must be open, in_progress, blocked, or done."));
+    if !matches!(
+        request.status.as_str(),
+        "open" | "in_progress" | "blocked" | "done"
+    ) {
+        return Err(ApiError::bad_request(
+            "Task status must be open, in_progress, blocked, or done.",
+        ));
     }
-    if !matches!(request.priority.as_str(), "low" | "medium" | "high" | "urgent") {
-        return Err(ApiError::bad_request("Task priority must be low, medium, high, or urgent."));
+    if !matches!(
+        request.priority.as_str(),
+        "low" | "medium" | "high" | "urgent"
+    ) {
+        return Err(ApiError::bad_request(
+            "Task priority must be low, medium, high, or urgent.",
+        ));
     }
     if let Some(user_id) = request.assignee_user_id.as_deref() {
         if state
@@ -1650,7 +1846,9 @@ async fn normalize_collaboration_task(
             .map_err(map_storage_error)?
             .is_none()
         {
-            return Err(ApiError::bad_request("Task assignee must be a workspace member."));
+            return Err(ApiError::bad_request(
+                "Task assignee must be a workspace member.",
+            ));
         }
     }
     if let Some(artifact_id) = request.artifact_id.as_deref() {
@@ -1660,7 +1858,9 @@ async fn normalize_collaboration_task(
             .await
             .map_err(map_storage_error)?;
         if artifact.summary.workspace_id != workspace_id {
-            return Err(ApiError::bad_request("Task evidence must belong to this workspace."));
+            return Err(ApiError::bad_request(
+                "Task evidence must belong to this workspace.",
+            ));
         }
     }
     let due_at = request.due_at.filter(|value| !value.trim().is_empty());
@@ -1815,7 +2015,9 @@ async fn delete_artifact_comment(
 fn validate_comment_body(body: &str) -> Result<String, ApiError> {
     let body = body.trim().to_owned();
     if body.is_empty() || body.len() > 5_000 {
-        return Err(ApiError::bad_request("Comment must be between 1 and 5,000 characters."));
+        return Err(ApiError::bad_request(
+            "Comment must be between 1 and 5,000 characters.",
+        ));
     }
     Ok(body)
 }
@@ -1885,7 +2087,12 @@ async fn notify_artifact_mentions(
         .split_whitespace()
         .filter_map(|token| {
             token
-                .trim_matches(|character: char| matches!(character, ',' | '.' | ':' | ';' | '!' | '?' | ')' | ']' | '}' | '"' | '\''))
+                .trim_matches(|character: char| {
+                    matches!(
+                        character,
+                        ',' | '.' | ':' | ';' | '!' | '?' | ')' | ']' | '}' | '"' | '\''
+                    )
+                })
                 .strip_prefix('@')
                 .map(|email| email.to_ascii_lowercase())
         })
@@ -1894,7 +2101,9 @@ async fn notify_artifact_mentions(
         let Some(email) = member.user.email.as_deref() else {
             continue;
         };
-        if member.user.id == actor_user_id || !mentioned_emails.contains(&email.to_ascii_lowercase()) {
+        if member.user.id == actor_user_id
+            || !mentioned_emails.contains(&email.to_ascii_lowercase())
+        {
             continue;
         }
         create_notification(
@@ -2266,14 +2475,23 @@ async fn update_artifact_lifecycle(
         .map_err(map_core_error)?;
     require_workspace_write(&state, &subject, &artifact.summary.workspace_id).await?;
     let status = request.status.trim().to_ascii_lowercase();
-    if !matches!(status.as_str(), "active" | "needs_review" | "verified" | "outdated" | "superseded") {
-        return Err(ApiError::bad_request("Evidence lifecycle status is invalid."));
+    if !matches!(
+        status.as_str(),
+        "active" | "needs_review" | "verified" | "outdated" | "superseded"
+    ) {
+        return Err(ApiError::bad_request(
+            "Evidence lifecycle status is invalid.",
+        ));
     }
     let review_note = request.review_note.trim().to_owned();
     if review_note.len() > 5_000 {
-        return Err(ApiError::bad_request("Evidence lifecycle note is too long."));
+        return Err(ApiError::bad_request(
+            "Evidence lifecycle note is too long.",
+        ));
     }
-    let owner_user_id = request.owner_user_id.filter(|value| !value.trim().is_empty());
+    let owner_user_id = request
+        .owner_user_id
+        .filter(|value| !value.trim().is_empty());
     if let Some(owner_user_id) = owner_user_id.as_deref() {
         if state
             .storage
@@ -2282,14 +2500,18 @@ async fn update_artifact_lifecycle(
             .map_err(map_storage_error)?
             .is_none()
         {
-            return Err(ApiError::bad_request("Evidence owner must be a workspace member."));
+            return Err(ApiError::bad_request(
+                "Evidence owner must be a workspace member.",
+            ));
         }
     }
     let superseded_by_artifact_id = request
         .superseded_by_artifact_id
         .filter(|value| !value.trim().is_empty());
     if status == "superseded" && superseded_by_artifact_id.is_none() {
-        return Err(ApiError::bad_request("Choose the replacement evidence before marking this item superseded."));
+        return Err(ApiError::bad_request(
+            "Choose the replacement evidence before marking this item superseded.",
+        ));
     }
     if let Some(replacement_id) = superseded_by_artifact_id.as_deref() {
         if replacement_id == artifact_id {
@@ -2301,7 +2523,9 @@ async fn update_artifact_lifecycle(
             .await
             .map_err(map_core_error)?;
         if replacement.summary.workspace_id != artifact.summary.workspace_id {
-            return Err(ApiError::bad_request("Replacement evidence must belong to this workspace."));
+            return Err(ApiError::bad_request(
+                "Replacement evidence must belong to this workspace.",
+            ));
         }
     }
     let lifecycle = state
@@ -2325,7 +2549,10 @@ async fn update_artifact_lifecycle(
         "evidence_lifecycle_updated",
         "artifact",
         Some(&artifact_id),
-        format!("Updated evidence lifecycle for {} to {}.", artifact.summary.title, status),
+        format!(
+            "Updated evidence lifecycle for {} to {}.",
+            artifact.summary.title, status
+        ),
     )
     .await;
     Ok(Json(lifecycle))
@@ -2440,16 +2667,29 @@ async fn get_retrieval_facets(
     let mut languages: Vec<String> = Vec::new();
     let mut sources: Vec<RetrievalSourceFacet> = Vec::new();
 
-    for artifact in artifacts.iter().filter(|artifact| artifact.indexed_at.is_some()) {
+    for artifact in artifacts
+        .iter()
+        .filter(|artifact| artifact.indexed_at.is_some())
+    {
         if !artifact_types.contains(&artifact.artifact_type) {
             artifact_types.push(artifact.artifact_type.clone());
         }
-        if let Some(language) = artifact.language.as_ref().filter(|language| !language.trim().is_empty()) {
-            if !languages.iter().any(|candidate| candidate.eq_ignore_ascii_case(language)) {
+        if let Some(language) = artifact
+            .language
+            .as_ref()
+            .filter(|language| !language.trim().is_empty())
+        {
+            if !languages
+                .iter()
+                .any(|candidate| candidate.eq_ignore_ascii_case(language))
+            {
                 languages.push(language.clone());
             }
         }
-        if !sources.iter().any(|source: &RetrievalSourceFacet| source.id == artifact.source_id) {
+        if !sources
+            .iter()
+            .any(|source: &RetrievalSourceFacet| source.id == artifact.source_id)
+        {
             sources.push(RetrievalSourceFacet {
                 id: artifact.source_id.clone(),
                 name: artifact.source_name.clone(),
@@ -3046,7 +3286,11 @@ mod tests {
                 .oneshot(auth_request("GET", &endpoint, &collaborator_authorization))
                 .await
                 .unwrap();
-            assert_eq!(response.status(), 403, "{endpoint} should require workspace admin access");
+            assert_eq!(
+                response.status(),
+                403,
+                "{endpoint} should require workspace admin access"
+            );
         }
         let collaborator_overview = app
             .clone()
@@ -3082,10 +3326,9 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(lifecycle.status(), 200);
-        let lifecycle: Value = serde_json::from_slice(
-            &to_bytes(lifecycle.into_body(), usize::MAX).await.unwrap(),
-        )
-        .unwrap();
+        let lifecycle: Value =
+            serde_json::from_slice(&to_bytes(lifecycle.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
         assert_eq!(lifecycle["status"], "needs_review");
         assert_eq!(lifecycle["owner"]["id"], member["user"]["id"]);
         let lifecycle_history = app
@@ -3108,9 +3351,22 @@ mod tests {
 
         let saved_search = app.clone().oneshot(json_request("POST", &format!("/v1/workspaces/{workspace_id}/saved-searches"), &authorization, json!({"name":"Architecture review","query":"shared","artifact_types":["markdown_doc"],"languages":[],"source_ids":[],"result_limit":20}))).await.unwrap();
         assert_eq!(saved_search.status(), 201);
-        let saved_search: Value = serde_json::from_slice(&to_bytes(saved_search.into_body(), usize::MAX).await.unwrap()).unwrap();
+        let saved_search: Value = serde_json::from_slice(
+            &to_bytes(saved_search.into_body(), usize::MAX)
+                .await
+                .unwrap(),
+        )
+        .unwrap();
         let saved_search_id = saved_search["id"].as_str().unwrap();
-        let saved_searches = app.clone().oneshot(auth_request("GET", &format!("/v1/workspaces/{workspace_id}/saved-searches"), &authorization)).await.unwrap();
+        let saved_searches = app
+            .clone()
+            .oneshot(auth_request(
+                "GET",
+                &format!("/v1/workspaces/{workspace_id}/saved-searches"),
+                &authorization,
+            ))
+            .await
+            .unwrap();
         assert_eq!(saved_searches.status(), 200);
 
         let task = app
@@ -3133,21 +3389,55 @@ mod tests {
             .unwrap();
         assert_eq!(task.status(), 201);
         let task: Value =
-            serde_json::from_slice(&to_bytes(task.into_body(), usize::MAX).await.unwrap())
-                .unwrap();
+            serde_json::from_slice(&to_bytes(task.into_body(), usize::MAX).await.unwrap()).unwrap();
         let task_id = task["id"].as_str().unwrap();
-        let checklist_item = app.clone().oneshot(json_request("POST", &format!("/v1/tasks/{task_id}/checklist"), &authorization, json!({"body":"Confirm the shared evidence"}))).await.unwrap();
+        let checklist_item = app
+            .clone()
+            .oneshot(json_request(
+                "POST",
+                &format!("/v1/tasks/{task_id}/checklist"),
+                &authorization,
+                json!({"body":"Confirm the shared evidence"}),
+            ))
+            .await
+            .unwrap();
         assert_eq!(checklist_item.status(), 201);
-        let checklist_item: Value = serde_json::from_slice(&to_bytes(checklist_item.into_body(), usize::MAX).await.unwrap()).unwrap();
+        let checklist_item: Value = serde_json::from_slice(
+            &to_bytes(checklist_item.into_body(), usize::MAX)
+                .await
+                .unwrap(),
+        )
+        .unwrap();
         let checklist_item_id = checklist_item["id"].as_str().unwrap();
-        let completed_item = app.clone().oneshot(json_request("PUT", &format!("/v1/task-checklist/{checklist_item_id}"), &authorization, json!({"completed":true}))).await.unwrap();
+        let completed_item = app
+            .clone()
+            .oneshot(json_request(
+                "PUT",
+                &format!("/v1/task-checklist/{checklist_item_id}"),
+                &authorization,
+                json!({"completed":true}),
+            ))
+            .await
+            .unwrap();
         assert_eq!(completed_item.status(), 200);
-        let delete_search = app.clone().oneshot(auth_request("DELETE", &format!("/v1/saved-searches/{saved_search_id}"), &authorization)).await.unwrap();
+        let delete_search = app
+            .clone()
+            .oneshot(auth_request(
+                "DELETE",
+                &format!("/v1/saved-searches/{saved_search_id}"),
+                &authorization,
+            ))
+            .await
+            .unwrap();
         assert_eq!(delete_search.status(), 204);
         assert_eq!(task["assignee"]["display_name"], "Collaborator");
         let task_notifications = app
             .clone()
-            .oneshot(auth_request("GET", "/v1/notifications", &collaborator_authorization))
+            .oneshot(auth_request(
+                "GET",
+                "/v1/notifications",
+                &collaborator_authorization,
+            ))
             .await
             .unwrap();
         assert_eq!(task_notifications.status(), 200);
@@ -3244,7 +3534,10 @@ mod tests {
                 .unwrap(),
         )
         .unwrap();
-        assert_eq!(mention_notifications[0]["notification_type"], "evidence_mention");
+        assert_eq!(
+            mention_notifications[0]["notification_type"],
+            "evidence_mention"
+        );
         let mention_notification_id = mention_notifications[0]["id"].as_str().unwrap();
         let marked_notification = app
             .clone()
@@ -3356,7 +3649,10 @@ mod tests {
         assert!(metrics["total_artifact_bytes"].as_i64().unwrap() > 0);
         assert!(metrics["indexed_artifact_bytes"].as_i64().unwrap() > 0);
         assert_eq!(metrics["activity_by_day"].as_array().unwrap().len(), 14);
-        assert!(!metrics["artifact_bytes_by_type"].as_array().unwrap().is_empty());
+        assert!(!metrics["artifact_bytes_by_type"]
+            .as_array()
+            .unwrap()
+            .is_empty());
         let calendar = app
             .clone()
             .oneshot(auth_request(
@@ -3598,39 +3894,119 @@ mod tests {
 
     #[tokio::test]
     async fn organization_members_inherit_workspace_access_and_roles() {
-        let data_dir = std::env::temp_dir().join(format!("repomemo-organization-test-{}", uuid::Uuid::new_v4()));
-        let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+        let data_dir = std::env::temp_dir().join(format!(
+            "repomemo-organization-test-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let app = router(ServerConfig::for_test(data_dir.clone()))
+            .await
+            .unwrap();
         let owner = app.clone().oneshot(Request::builder().method("POST").uri("/v1/auth/register").header("content-type", "application/json").body(Body::from(r#"{"email":"org-owner@example.com","display_name":"Org Owner","password":"not-a-real-password"}"#)).unwrap()).await.unwrap();
-        let owner: Value = serde_json::from_slice(&to_bytes(owner.into_body(), usize::MAX).await.unwrap()).unwrap();
+        let owner: Value =
+            serde_json::from_slice(&to_bytes(owner.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
         let owner_authorization = format!("Bearer {}", owner["access_token"].as_str().unwrap());
         let member = app.clone().oneshot(Request::builder().method("POST").uri("/v1/auth/register").header("content-type", "application/json").body(Body::from(r#"{"email":"org-member@example.com","display_name":"Org Member","password":"not-a-real-password"}"#)).unwrap()).await.unwrap();
-        let member: Value = serde_json::from_slice(&to_bytes(member.into_body(), usize::MAX).await.unwrap()).unwrap();
+        let member: Value =
+            serde_json::from_slice(&to_bytes(member.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
         let member_authorization = format!("Bearer {}", member["access_token"].as_str().unwrap());
 
-        let organization = app.clone().oneshot(json_request("POST", "/v1/organizations", &owner_authorization, json!({"name":"Platform"}))).await.unwrap();
-        let organization: Value = serde_json::from_slice(&to_bytes(organization.into_body(), usize::MAX).await.unwrap()).unwrap();
+        let organization = app
+            .clone()
+            .oneshot(json_request(
+                "POST",
+                "/v1/organizations",
+                &owner_authorization,
+                json!({"name":"Platform"}),
+            ))
+            .await
+            .unwrap();
+        let organization: Value = serde_json::from_slice(
+            &to_bytes(organization.into_body(), usize::MAX)
+                .await
+                .unwrap(),
+        )
+        .unwrap();
         let organization_id = organization["id"].as_str().unwrap();
         assert_eq!(organization["role"], "owner");
         for workspace_name in ["Core", "Docs"] {
-            let workspace = app.clone().oneshot(json_request("POST", "/v1/workspaces", &owner_authorization, json!({"organization_id": organization_id, "name": workspace_name}))).await.unwrap();
+            let workspace = app
+                .clone()
+                .oneshot(json_request(
+                    "POST",
+                    "/v1/workspaces",
+                    &owner_authorization,
+                    json!({"organization_id": organization_id, "name": workspace_name}),
+                ))
+                .await
+                .unwrap();
             assert_eq!(workspace.status(), 201);
         }
 
-        let added = app.clone().oneshot(json_request("PUT", &format!("/v1/organizations/{organization_id}/members"), &owner_authorization, json!({"email":"org-member@example.com","role":"admin"}))).await.unwrap();
+        let added = app
+            .clone()
+            .oneshot(json_request(
+                "PUT",
+                &format!("/v1/organizations/{organization_id}/members"),
+                &owner_authorization,
+                json!({"email":"org-member@example.com","role":"admin"}),
+            ))
+            .await
+            .unwrap();
         assert_eq!(added.status(), 200);
-        let member_workspaces = app.clone().oneshot(auth_request("GET", "/v1/workspaces", &member_authorization)).await.unwrap();
+        let member_workspaces = app
+            .clone()
+            .oneshot(auth_request("GET", "/v1/workspaces", &member_authorization))
+            .await
+            .unwrap();
         assert_eq!(member_workspaces.status(), 200);
-        let member_workspaces: Value = serde_json::from_slice(&to_bytes(member_workspaces.into_body(), usize::MAX).await.unwrap()).unwrap();
+        let member_workspaces: Value = serde_json::from_slice(
+            &to_bytes(member_workspaces.into_body(), usize::MAX)
+                .await
+                .unwrap(),
+        )
+        .unwrap();
         assert_eq!(member_workspaces.as_array().unwrap().len(), 2);
-        assert!(member_workspaces.as_array().unwrap().iter().all(|workspace| workspace["role"] == "admin"));
+        assert!(member_workspaces
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|workspace| workspace["role"] == "admin"));
 
-        let renamed = app.clone().oneshot(json_request("PUT", &format!("/v1/organizations/{organization_id}"), &owner_authorization, json!({"name":"Platform Engineering"}))).await.unwrap();
+        let renamed = app
+            .clone()
+            .oneshot(json_request(
+                "PUT",
+                &format!("/v1/organizations/{organization_id}"),
+                &owner_authorization,
+                json!({"name":"Platform Engineering"}),
+            ))
+            .await
+            .unwrap();
         assert_eq!(renamed.status(), 200);
         let member_id = member["user"]["id"].as_str().unwrap();
-        let removed = app.clone().oneshot(auth_request("DELETE", &format!("/v1/organizations/{organization_id}/members/{member_id}"), &owner_authorization)).await.unwrap();
+        let removed = app
+            .clone()
+            .oneshot(auth_request(
+                "DELETE",
+                &format!("/v1/organizations/{organization_id}/members/{member_id}"),
+                &owner_authorization,
+            ))
+            .await
+            .unwrap();
         assert_eq!(removed.status(), 204);
-        let member_workspaces = app.clone().oneshot(auth_request("GET", "/v1/workspaces", &member_authorization)).await.unwrap();
-        let member_workspaces: Value = serde_json::from_slice(&to_bytes(member_workspaces.into_body(), usize::MAX).await.unwrap()).unwrap();
+        let member_workspaces = app
+            .clone()
+            .oneshot(auth_request("GET", "/v1/workspaces", &member_authorization))
+            .await
+            .unwrap();
+        let member_workspaces: Value = serde_json::from_slice(
+            &to_bytes(member_workspaces.into_body(), usize::MAX)
+                .await
+                .unwrap(),
+        )
+        .unwrap();
         assert!(member_workspaces.as_array().unwrap().is_empty());
         let _ = std::fs::remove_dir_all(data_dir);
     }

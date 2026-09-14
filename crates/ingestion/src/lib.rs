@@ -322,8 +322,15 @@ fn extract_docx_text(bytes: &[u8]) -> Result<String> {
                 }
             }
             Ok(Event::Empty(event)) if word_tag(event.name().as_ref(), b"tab") => text.push('\t'),
-            Ok(Event::Empty(event)) if word_tag(event.name().as_ref(), b"br") || word_tag(event.name().as_ref(), b"cr") => text.push('\n'),
-            Ok(Event::Text(event)) => text.push_str(&event.decode().context("invalid XML text in DOCX")?),
+            Ok(Event::Empty(event))
+                if word_tag(event.name().as_ref(), b"br")
+                    || word_tag(event.name().as_ref(), b"cr") =>
+            {
+                text.push('\n')
+            }
+            Ok(Event::Text(event)) => {
+                text.push_str(&event.decode().context("invalid XML text in DOCX")?)
+            }
             Ok(Event::Eof) => break,
             Err(error) => return Err(anyhow::anyhow!("invalid WordprocessingML: {error}")),
             _ => {}
@@ -365,20 +372,28 @@ fn read_zip_member(bytes: &[u8], member_name: &str) -> Result<Vec<u8>> {
         let local_header_offset = le_u32(bytes, cursor + 42)? as usize;
         let filename_start = cursor + 46;
         let filename_end = filename_start + filename_length;
-        let filename = std::str::from_utf8(bytes.get(filename_start..filename_end).ok_or_else(|| anyhow::anyhow!("DOCX ZIP filename is truncated"))?)?;
+        let filename = std::str::from_utf8(
+            bytes
+                .get(filename_start..filename_end)
+                .ok_or_else(|| anyhow::anyhow!("DOCX ZIP filename is truncated"))?,
+        )?;
         cursor = filename_end + extra_length + comment_length;
 
         if filename != member_name {
             continue;
         }
-        if bytes.get(local_header_offset..local_header_offset + 4) != Some(&[0x50, 0x4b, 0x03, 0x04]) {
+        if bytes.get(local_header_offset..local_header_offset + 4)
+            != Some(&[0x50, 0x4b, 0x03, 0x04])
+        {
             bail!("DOCX ZIP local entry is malformed");
         }
         let local_name_length = le_u16(bytes, local_header_offset + 26)? as usize;
         let local_extra_length = le_u16(bytes, local_header_offset + 28)? as usize;
         let data_start = local_header_offset + 30 + local_name_length + local_extra_length;
         let data_end = data_start + compressed_size;
-        let compressed = bytes.get(data_start..data_end).ok_or_else(|| anyhow::anyhow!("DOCX ZIP entry is truncated"))?;
+        let compressed = bytes
+            .get(data_start..data_end)
+            .ok_or_else(|| anyhow::anyhow!("DOCX ZIP entry is truncated"))?;
         let mut output = Vec::new();
         match compression {
             0 => output.extend_from_slice(compressed),
@@ -398,22 +413,29 @@ fn read_zip_member(bytes: &[u8], member_name: &str) -> Result<Vec<u8>> {
 }
 
 fn le_u16(bytes: &[u8], offset: usize) -> Result<u16> {
-    let value = bytes.get(offset..offset + 2).ok_or_else(|| anyhow::anyhow!("DOCX ZIP metadata is truncated"))?;
+    let value = bytes
+        .get(offset..offset + 2)
+        .ok_or_else(|| anyhow::anyhow!("DOCX ZIP metadata is truncated"))?;
     Ok(u16::from_le_bytes([value[0], value[1]]))
 }
 
 fn le_u32(bytes: &[u8], offset: usize) -> Result<u32> {
-    let value = bytes.get(offset..offset + 4).ok_or_else(|| anyhow::anyhow!("DOCX ZIP metadata is truncated"))?;
+    let value = bytes
+        .get(offset..offset + 4)
+        .ok_or_else(|| anyhow::anyhow!("DOCX ZIP metadata is truncated"))?;
     Ok(u32::from_le_bytes([value[0], value[1], value[2], value[3]]))
 }
 
 fn extract_legacy_doc_text(bytes: &[u8]) -> Result<String> {
     let mut compound = cfb::CompoundFile::open(Cursor::new(bytes))
         .context("legacy .doc files must use the Microsoft Compound File format")?;
-    let stream = compound.open_stream("/WordDocument")
+    let stream = compound
+        .open_stream("/WordDocument")
         .context("legacy .doc is missing its WordDocument stream")?;
     let mut word_document = Vec::new();
-    stream.take(MAX_WORD_XML_BYTES + 1).read_to_end(&mut word_document)?;
+    stream
+        .take(MAX_WORD_XML_BYTES + 1)
+        .read_to_end(&mut word_document)?;
     if word_document.len() as u64 > MAX_WORD_XML_BYTES {
         bail!("legacy .doc body exceeds the 16 MiB extraction limit");
     }
@@ -421,9 +443,17 @@ fn extract_legacy_doc_text(bytes: &[u8]) -> Result<String> {
     let fc_min = le_u32(&word_document, 24).unwrap_or(0) as usize;
     let fc_mac = le_u32(&word_document, 28).unwrap_or(word_document.len() as u32) as usize;
     let body = word_document.get(fc_min..fc_mac).unwrap_or(&word_document);
-    let likely_utf16 = body.chunks(2).take(128).filter(|pair| pair.len() == 2 && pair[1] == 0).count() > 12;
+    let likely_utf16 = body
+        .chunks(2)
+        .take(128)
+        .filter(|pair| pair.len() == 2 && pair[1] == 0)
+        .count()
+        > 12;
     let text = if likely_utf16 {
-        let units = body.chunks_exact(2).map(|pair| u16::from_le_bytes([pair[0], pair[1]])).collect::<Vec<_>>();
+        let units = body
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>();
         String::from_utf16_lossy(&units)
     } else {
         body.iter().map(|byte| *byte as char).collect()

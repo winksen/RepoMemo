@@ -131,6 +131,10 @@ const emptyOverview = (workspaceId: string): WorkspaceOverview => ({
 
 const isTauriRuntime = "__TAURI_INTERNALS__" in window;
 
+function isWordArtifact(artifact: Pick<ArtifactSummary, "language" | "path">) {
+  return artifact.language === "Word" || /\.docx?$/i.test(artifact.path);
+}
+
 export function App() {
   return isTauriRuntime ? <LocalDesktopApp /> : <SharedWebApp />;
 }
@@ -248,6 +252,23 @@ function LocalDesktopApp() {
       setErrorMessage(error instanceof Error ? error.message : String(error));
     });
   }, [selectedWorkspaceId]);
+
+  useEffect(() => {
+    if (activeView !== "documents") {
+      return;
+    }
+
+    const documents = artifacts.filter(isWordArtifact);
+    if (documents.length === 0) {
+      return;
+    }
+
+    setSelectedArtifactId((current) =>
+      documents.some((artifact) => artifact.id === current)
+        ? current
+        : documents[0].id,
+    );
+  }, [activeView, artifacts]);
 
   useEffect(() => {
     let cancelled = false;
@@ -912,11 +933,15 @@ function LocalDesktopApp() {
           />
         ) : activeView === "documents" ? (
           <DocumentsView
+            artifactDetail={artifactDetail}
             artifacts={artifacts}
             isImporting={isImporting}
             isIndexing={isIndexing}
             onImportDocuments={handleImportDocuments}
+            onIndexDocument={handleIndexArtifact}
             onOpenLedger={() => setActiveView("artifacts")}
+            onSelectDocument={setSelectedArtifactId}
+            selectedArtifactId={selectedArtifactId}
           />
         ) : activeView === "artifacts" ? (
           <ArtifactsView
@@ -1369,19 +1394,30 @@ function WorkspaceView({
 }
 
 function DocumentsView({
+  artifactDetail,
   artifacts,
   isImporting,
   isIndexing,
   onImportDocuments,
+  onIndexDocument,
   onOpenLedger,
+  onSelectDocument,
+  selectedArtifactId,
 }: {
+  artifactDetail: ArtifactDetail | null;
   artifacts: ArtifactSummary[];
   isImporting: boolean;
   isIndexing: boolean;
   onImportDocuments: () => void;
+  onIndexDocument: (artifactId?: string | null) => void;
   onOpenLedger: () => void;
+  onSelectDocument: (artifactId: string) => void;
+  selectedArtifactId: string | null;
 }) {
-  const documents = artifacts.filter((artifact) => artifact.language === "Word" || /\.docx?$/i.test(artifact.path));
+  const documents = artifacts.filter(isWordArtifact);
+  const selectedDocument = documents.find((artifact) => artifact.id === selectedArtifactId) ?? null;
+  const previewDetail = artifactDetail?.summary.id === selectedDocument?.id ? artifactDetail : null;
+  const previewText = previewDetail?.content_preview?.trim();
 
   return (
     <div className="workbench-grid import-layout graphite-page documents-layout">
@@ -1405,6 +1441,55 @@ function DocumentsView({
           <CheckCircle2 size={17} aria-hidden="true" />
           <span><strong>Evidence-ready by default.</strong> New documents are indexed after upload and remain available in the artifact ledger with their extracted preview.</span>
         </div>
+        <section className="document-preview-section" aria-live="polite">
+          <div className="document-preview-header">
+            <div className="document-preview-title">
+              <BookOpen size={18} aria-hidden="true" />
+              <div>
+                <h3>Word preview</h3>
+                <p>The extracted body text RepoMemo will search and cite.</p>
+              </div>
+            </div>
+            {selectedDocument ? (
+              <button
+                className="button secondary"
+                disabled={isIndexing}
+                onClick={() => onIndexDocument(selectedDocument.id)}
+                type="button"
+              >
+                {isIndexing ? <Loader2 className="spin" size={16} /> : <Database size={16} />}
+                {selectedDocument.indexed_at ? "Reindex" : "Index"}
+              </button>
+            ) : null}
+          </div>
+          {selectedDocument ? (
+            <>
+              <div className="document-preview-meta">
+                <StatusBadge tone={selectedDocument.indexed_at ? "success" : "warning"}>
+                  {selectedDocument.indexed_at ? "Indexed" : "Stored"}
+                </StatusBadge>
+                <span>{formatBytes(selectedDocument.size_bytes)}</span>
+                <span>{formatRelativeDate(selectedDocument.updated_at)}</span>
+              </div>
+              {previewDetail ? (
+                previewText ? (
+                  <pre className="document-preview-body">{previewText}</pre>
+                ) : (
+                  <p className="document-preview-empty">No extractable text was found in this Word document.</p>
+                )
+              ) : (
+                <p className="document-preview-empty">Loading extracted text preview...</p>
+              )}
+              {previewDetail?.content_truncated ? <p className="truncated-note">Preview truncated to keep the workbench responsive.</p> : null}
+            </>
+          ) : (
+            <EmptyState
+              icon={FileText}
+              title={documents.length ? "Choose a document" : "No Word documents yet"}
+              body={documents.length ? "Select a stored Word file to inspect its extracted text." : "Upload a DOC or DOCX file to preview its searchable content here."}
+            />
+          )}
+        </section>
       </section>
       <aside className="panel import-rail evidence-rail">
         <PanelHeader icon={Archive} label="Evidence ledger" title="Stored documents">
@@ -1412,11 +1497,16 @@ function DocumentsView({
         </PanelHeader>
         <div className="recent-artifact-list document-artifact-list">
           {documents.length ? documents.map((artifact) => (
-            <div className="recent-artifact-row" key={artifact.id}>
+            <button
+              className={artifact.id === selectedDocument?.id ? "recent-artifact-row document-artifact-row selected" : "recent-artifact-row document-artifact-row"}
+              key={artifact.id}
+              onClick={() => onSelectDocument(artifact.id)}
+              type="button"
+            >
               <span aria-hidden="true"><FileText size={15} /></span>
               <div><strong>{artifact.title}</strong><small>{artifact.indexed_at ? "Indexed" : "Stored"} · {formatRelativeDate(artifact.updated_at)}</small></div>
               <span className={artifact.indexed_at ? "state-dot ready" : "state-dot"} title={artifact.indexed_at ? "Indexed" : "Stored"} />
-            </div>
+            </button>
           )) : <p className="rail-empty">Word files you upload will appear in the evidence ledger.</p>}
         </div>
       </aside>

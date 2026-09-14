@@ -210,7 +210,11 @@ impl RepoMemoCore {
             .ok_or_else(|| anyhow::anyhow!("This file type is not supported for shared upload."))?;
         let language = detect_language(path);
         let fallback_mime = if is_word_document(path) {
-            if path.extension().and_then(|extension| extension.to_str()).is_some_and(|extension| extension.eq_ignore_ascii_case("docx")) {
+            if path
+                .extension()
+                .and_then(|extension| extension.to_str())
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("docx"))
+            {
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             } else {
                 "application/msword"
