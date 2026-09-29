@@ -171,7 +171,7 @@ textarea:focus-visible {
 
 .rm-button.shared-brand { min-height: 32px; padding: 0 4px; color: var(--color-text); background: transparent; border: 0; border-radius: 7px; }
 .rm-button.shared-brand:hover:not(:disabled) { color: var(--color-text); background: transparent; border-color: transparent; }
-.shared-brand-mark { display: block; width: 154px; height: 28px; flex: 0 0 auto; object-fit: contain; }
+.shared-brand-mark { display: block; width: 28px; height: 28px; flex: 0 0 auto; object-fit: contain; }
 :root[data-theme="dark"] .shared-brand-mark { filter: invert(1); }
 .shared-workspace-icon {
   display: grid;
