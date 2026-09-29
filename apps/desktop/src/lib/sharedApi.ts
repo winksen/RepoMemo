@@ -36,7 +36,7 @@ import type {
   WorkspaceMetrics,
 } from "../types";
 
-const API_URL = (import.meta.env.VITE_REPOMEMO_API_URL ?? "http://127.0.0.1:8787").replace(/\/$/, "");
+const API_URL = (import.meta.env.VITE_REPOMEMO_API_URL ?? "http://127.0.0.1:3020").replace(/\/$/, "");
 
 export const sharedApiUrl = API_URL;
 

@@ -1,9 +1,13 @@
 //! Server-authoritative HTTP API for shared RepoMemo workspaces.
 
+mod events;
+
 use std::{
     collections::{BTreeMap, BTreeSet},
+    convert::Infallible,
     net::SocketAddr,
     path::PathBuf,
+    sync::Arc,
     time::Duration,
 };
 
@@ -14,12 +18,16 @@ use argon2::{
 };
 use axum::{
     body::Bytes,
-    extract::{DefaultBodyLimit, FromRequestParts, Path, State},
+    extract::{DefaultBodyLimit, FromRequestParts, Path, Query, State},
     http::{header, request::Parts, HeaderMap, HeaderName, HeaderValue, Method, StatusCode},
-    response::{IntoResponse, Response},
+    response::{
+        sse::{Event as SseEvent, KeepAlive, Sse},
+        IntoResponse, Response,
+    },
     routing::{delete, get, post, put},
     Json, Router,
 };
+use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
 use chrono::{Duration as ChronoDuration, Utc};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use rand_core::OsRng;
@@ -38,6 +46,8 @@ use repomemo_storage::{
     NewCollaborationTask, NewSavedSearch, NewSharedNotification, NewTaskChecklistItem,
     SaveArtifactLifecycle, StorageConfig, StorageEngine,
 };
+
+use crate::events::{BusActivityObserver, BusJobObserver, WorkspaceEventBus};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
@@ -64,14 +74,14 @@ impl ServerConfig {
         }
 
         let bind_address = std::env::var("REPOMEMO_SERVER_ADDR")
-            .unwrap_or_else(|_| "127.0.0.1:8787".to_owned())
+            .unwrap_or_else(|_| "127.0.0.1:3020".to_owned())
             .parse()
             .context("REPOMEMO_SERVER_ADDR must be a valid socket address")?;
         let data_dir = std::env::var("REPOMEMO_SERVER_DATA_DIR")
             .map(PathBuf::from)
             .unwrap_or_else(|_| PathBuf::from(".repomemo-server"));
         let allowed_origin = std::env::var("REPOMEMO_ALLOWED_ORIGIN")
-            .unwrap_or_else(|_| "http://127.0.0.1:5173".to_owned())
+            .unwrap_or_else(|_| "http://127.0.0.1:3021".to_owned())
             .parse()
             .context("REPOMEMO_ALLOWED_ORIGIN must be a valid HTTP header value")?;
 
@@ -102,6 +112,7 @@ struct AppState {
     storage: StorageEngine,
     core: RepoMemoCore,
     jwt_secret: String,
+    event_bus: WorkspaceEventBus,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -467,11 +478,22 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
         data_dir: config.data_dir.clone(),
     })
     .await?;
-    let core = RepoMemoCore::boot(config.data_dir).await?;
+
+    // Share the same storage handle with the API core so job and activity
+    // observers registered here also fire for writes that happen inside
+    // `RepoMemoCore`. Without this the two halves would each hold their own
+    // pool and SSE would only see writes the server layer performed directly.
+    let core = RepoMemoCore::from_storage(storage.clone());
+
+    let event_bus = WorkspaceEventBus::new();
+    storage.set_job_observer(Arc::new(BusJobObserver::new(event_bus.clone())));
+    storage.set_activity_observer(Arc::new(BusActivityObserver::new(event_bus.clone())));
+
     let state = AppState {
         storage,
         core,
         jwt_secret: config.jwt_secret,
+        event_bus,
     };
     let cors = match config.allowed_origin {
         Some(origin) => CorsLayer::new()
@@ -633,6 +655,10 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
         )
         .route("/v1/artifacts/{artifact_id}/index", post(index_artifact))
         .route("/v1/workspaces/{workspace_id}/index", post(index_workspace))
+        .route("/v1/workspaces/{workspace_id}/jobs", get(list_workspace_jobs))
+        .route("/v1/workspaces/{workspace_id}/events", get(workspace_events))
+        .route("/v1/jobs/{job_id}", get(get_job))
+        .route("/v1/jobs/{job_id}/cancel", post(cancel_job))
         .route(
             "/v1/workspaces/{workspace_id}/retrieval-facets",
             get(get_retrieval_facets),
@@ -2630,6 +2656,88 @@ async fn index_workspace(
     Ok(Json(job))
 }
 
+#[derive(Debug, Deserialize)]
+struct JobsQuery {
+    kind: Option<String>,
+    status: Option<String>,
+    limit: Option<i64>,
+}
+
+async fn list_workspace_jobs(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+    Query(query): Query<JobsQuery>,
+) -> Result<Json<Vec<IndexingJobStatus>>, ApiError> {
+    require_workspace_read(&state, &subject, &workspace_id).await?;
+    let limit = query.limit.unwrap_or(50);
+    state
+        .storage
+        .list_workspace_jobs(
+            &workspace_id,
+            query.kind.as_deref(),
+            query.status.as_deref(),
+            limit,
+        )
+        .await
+        .map(Json)
+        .map_err(map_storage_error)
+}
+
+async fn get_job(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(job_id): Path<String>,
+) -> Result<Json<IndexingJobStatus>, ApiError> {
+    let job = state
+        .storage
+        .get_job(&job_id)
+        .await
+        .map_err(map_storage_error)?
+        .ok_or_else(|| ApiError::bad_request("The job was not found."))?;
+    require_workspace_read(&state, &subject, &job.workspace_id).await?;
+    Ok(Json(job))
+}
+
+async fn cancel_job(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(job_id): Path<String>,
+) -> Result<Json<IndexingJobStatus>, ApiError> {
+    let job = state
+        .storage
+        .get_job(&job_id)
+        .await
+        .map_err(map_storage_error)?
+        .ok_or_else(|| ApiError::bad_request("The job was not found."))?;
+    require_workspace_write(&state, &subject, &job.workspace_id).await?;
+    let updated = state
+        .storage
+        .request_job_cancel(&job_id)
+        .await
+        .map_err(map_storage_error)?;
+    Ok(Json(updated))
+}
+
+/// Server-sent-events stream of job progress and activity for a workspace.
+/// Emits `job` and `activity` events; `KeepAlive` comments keep proxies from
+/// closing the connection during quiet stretches.
+async fn workspace_events(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+) -> Result<Sse<impl Stream<Item = Result<SseEvent, Infallible>>>, ApiError> {
+    require_workspace_read(&state, &subject, &workspace_id).await?;
+    let receiver = state.event_bus.subscribe(&workspace_id);
+    let stream = BroadcastStream::new(receiver).filter_map(|item| {
+        let event = item.ok()?;
+        let name = event.event_name();
+        let payload = serde_json::to_string(&event).ok()?;
+        Some(Ok(SseEvent::default().event(name).data(payload)))
+    });
+    Ok(Sse::new(stream).keep_alive(KeepAlive::new().interval(Duration::from_secs(15))))
+}
+
 async fn search_workspace(
     subject: AuthenticatedSubject,
     State(state): State<AppState>,
@@ -4008,6 +4116,184 @@ mod tests {
         )
         .unwrap();
         assert!(member_workspaces.as_array().unwrap().is_empty());
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn indexing_publishes_jobs_that_can_be_listed_and_cancelled() {
+        let data_dir =
+            std::env::temp_dir().join(format!("repomemo-server-jobs-{}", uuid::Uuid::new_v4()));
+        let app = router(ServerConfig::for_test(data_dir.clone()))
+            .await
+            .unwrap();
+
+        let register = Request::builder()
+            .method("POST")
+            .uri("/v1/auth/register")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                r#"{"email":"jobs@example.com","display_name":"Jobs Owner","password":"not-a-real-password"}"#,
+            ))
+            .unwrap();
+        let registration: Value = serde_json::from_slice(
+            &to_bytes(
+                app.clone().oneshot(register).await.unwrap().into_body(),
+                usize::MAX,
+            )
+            .await
+            .unwrap(),
+        )
+        .unwrap();
+        let authorization = format!("Bearer {}", registration["access_token"].as_str().unwrap());
+
+        let organization = app
+            .clone()
+            .oneshot(json_request(
+                "POST",
+                "/v1/organizations",
+                &authorization,
+                json!({"name":"Jobs Org"}),
+            ))
+            .await
+            .unwrap();
+        let organization: Value = serde_json::from_slice(
+            &to_bytes(organization.into_body(), usize::MAX)
+                .await
+                .unwrap(),
+        )
+        .unwrap();
+        let workspace = app
+            .clone()
+            .oneshot(json_request(
+                "POST",
+                "/v1/workspaces",
+                &authorization,
+                json!({"organization_id": organization["id"], "name":"Jobs Workspace"}),
+            ))
+            .await
+            .unwrap();
+        let workspace: Value = serde_json::from_slice(
+            &to_bytes(workspace.into_body(), usize::MAX).await.unwrap(),
+        )
+        .unwrap();
+        let workspace_id = workspace["workspace"]["id"].as_str().unwrap().to_owned();
+
+        let empty_jobs = app
+            .clone()
+            .oneshot(auth_request(
+                "GET",
+                &format!("/v1/workspaces/{workspace_id}/jobs"),
+                &authorization,
+            ))
+            .await
+            .unwrap();
+        assert_eq!(empty_jobs.status(), 200);
+        let empty_jobs: Value = serde_json::from_slice(
+            &to_bytes(empty_jobs.into_body(), usize::MAX).await.unwrap(),
+        )
+        .unwrap();
+        assert!(empty_jobs.as_array().unwrap().is_empty());
+
+        let artifact = app
+            .clone()
+            .oneshot(json_request(
+                "POST",
+                &format!("/v1/workspaces/{workspace_id}/artifacts/text"),
+                &authorization,
+                json!({"title":"Job source","content":"Line one\nLine two\nLine three","language":"Markdown"}),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(artifact.status(), 201);
+        let artifact: Value =
+            serde_json::from_slice(&to_bytes(artifact.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
+        let artifact_id = artifact["id"].as_str().unwrap().to_owned();
+
+        let indexed = app
+            .clone()
+            .oneshot(json_request(
+                "POST",
+                &format!("/v1/artifacts/{artifact_id}/index"),
+                &authorization,
+                json!({}),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(indexed.status(), 200);
+        let indexed_job: Value =
+            serde_json::from_slice(&to_bytes(indexed.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
+        let job_id = indexed_job["id"].as_str().unwrap().to_owned();
+        assert_eq!(indexed_job["kind"], "indexing");
+        assert_eq!(indexed_job["status"], "completed");
+        assert_eq!(indexed_job["cancel_requested"], false);
+
+        let listed = app
+            .clone()
+            .oneshot(auth_request(
+                "GET",
+                &format!("/v1/workspaces/{workspace_id}/jobs?kind=indexing"),
+                &authorization,
+            ))
+            .await
+            .unwrap();
+        assert_eq!(listed.status(), 200);
+        let listed: Value =
+            serde_json::from_slice(&to_bytes(listed.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
+        let jobs = listed.as_array().unwrap();
+        assert!(!jobs.is_empty(), "indexing should have produced a job");
+        assert!(jobs.iter().any(|job| job["id"] == job_id));
+        for job in jobs {
+            assert_eq!(job["kind"], "indexing");
+        }
+
+        let single = app
+            .clone()
+            .oneshot(auth_request(
+                "GET",
+                &format!("/v1/jobs/{job_id}"),
+                &authorization,
+            ))
+            .await
+            .unwrap();
+        assert_eq!(single.status(), 200);
+        let single: Value =
+            serde_json::from_slice(&to_bytes(single.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
+        assert_eq!(single["id"], job_id);
+
+        // Cancelling a job that already finished is a no-op that returns the
+        // current state; only running/pending jobs flip the cancel flag.
+        let cancelled = app
+            .clone()
+            .oneshot(json_request(
+                "POST",
+                &format!("/v1/jobs/{job_id}/cancel"),
+                &authorization,
+                json!({}),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(cancelled.status(), 200);
+        let cancelled: Value = serde_json::from_slice(
+            &to_bytes(cancelled.into_body(), usize::MAX).await.unwrap(),
+        )
+        .unwrap();
+        assert_eq!(cancelled["status"], "completed");
+        assert_eq!(cancelled["cancel_requested"], false);
+
+        let missing = app
+            .clone()
+            .oneshot(auth_request(
+                "GET",
+                "/v1/jobs/does-not-exist",
+                &authorization,
+            ))
+            .await
+            .unwrap();
+        assert_eq!(missing.status(), 400);
         let _ = std::fs::remove_dir_all(data_dir);
     }
 

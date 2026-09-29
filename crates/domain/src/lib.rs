@@ -367,11 +367,13 @@ pub struct IndexingJobStatus {
     pub id: String,
     pub workspace_id: String,
     pub source_id: Option<String>,
+    pub kind: String,
     pub status: String,
     pub stage: String,
     pub progress_current: i64,
     pub progress_total: Option<i64>,
     pub error_message: Option<String>,
+    pub cancel_requested: bool,
     pub created_at: String,
     pub updated_at: String,
 }

@@ -79,7 +79,7 @@ $env:REPOMEMO_JWT_SECRET = 'replace-this-with-a-random-development-secret-of-at-
 cargo run -p repomemo-server
 ```
 
-The API binds to `127.0.0.1:8787` by default. It stores server-owned
+The API binds to `127.0.0.1:3020` by default. It stores server-owned
 development data in `.repomemo-server/` and exposes JWT-protected workspace
 routes. Import `docs/api/RepoMemo_Shared_API_v2.postman_collection.json` into
 Postman and run its numbered folders in order to exercise authentication,
@@ -93,8 +93,8 @@ Run the React web client in a second terminal:
 npm.cmd run web:dev
 ```
 
-Open `http://127.0.0.1:5173`. The web client reads `VITE_REPOMEMO_API_URL`,
-which defaults to `http://127.0.0.1:8787`; copy `apps/desktop/.env.example` to
+Open `http://127.0.0.1:3021`. The web client reads `VITE_REPOMEMO_API_URL`,
+which defaults to `http://127.0.0.1:3020`; copy `apps/desktop/.env.example` to
 `apps/desktop/.env.local` to override it.
 
 Run the background worker foundation separately:

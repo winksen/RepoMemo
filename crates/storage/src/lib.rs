@@ -1,4 +1,5 @@
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, RwLock};
 
 use anyhow::{bail, Context, Result};
 use chrono::Utc;
@@ -17,16 +18,40 @@ use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, S
 use sqlx::{QueryBuilder, Row, Sqlite, SqlitePool};
 use uuid::Uuid;
 
+/// Observer invoked whenever a job row is created or updated. The shared
+/// server registers one to fan events into its SSE bus; local desktop use
+/// keeps the default no-op observer and pays no per-write cost.
+pub trait JobObserver: Send + Sync {
+    fn on_job_changed(&self, job: &IndexingJobStatus);
+}
+
+/// Observer invoked after each workspace activity insert. The server uses
+/// it to push live-updates to SSE subscribers.
+pub trait ActivityObserver: Send + Sync {
+    fn on_activity_recorded(&self, event: &WorkspaceActivityEvent);
+}
+
 #[derive(Debug, Clone)]
 pub struct StorageConfig {
     pub data_dir: PathBuf,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct StorageEngine {
     pool: SqlitePool,
     data_dir: PathBuf,
     blob_dir: PathBuf,
+    job_observer: Arc<RwLock<Option<Arc<dyn JobObserver>>>>,
+    activity_observer: Arc<RwLock<Option<Arc<dyn ActivityObserver>>>>,
+}
+
+impl std::fmt::Debug for StorageEngine {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("StorageEngine")
+            .field("data_dir", &self.data_dir)
+            .field("blob_dir", &self.blob_dir)
+            .finish_non_exhaustive()
+    }
 }
 
 #[derive(Debug, sqlx::FromRow)]
@@ -387,11 +412,13 @@ struct IndexingJobRow {
     id: String,
     workspace_id: String,
     source_id: Option<String>,
+    kind: String,
     status: String,
     stage: String,
     progress_current: i64,
     progress_total: Option<i64>,
     error_message: Option<String>,
+    cancel_requested: i64,
     created_at: String,
     updated_at: String,
 }
@@ -508,6 +535,8 @@ impl StorageEngine {
             pool,
             data_dir: config.data_dir,
             blob_dir,
+            job_observer: Arc::new(RwLock::new(None)),
+            activity_observer: Arc::new(RwLock::new(None)),
         })
     }
 
@@ -517,6 +546,38 @@ impl StorageEngine {
 
     pub fn blob_dir(&self) -> &Path {
         &self.blob_dir
+    }
+
+    /// Install a job observer that receives every job insert/update. Replaces
+    /// any previously registered observer. The default is unset (no-op).
+    pub fn set_job_observer(&self, observer: Arc<dyn JobObserver>) {
+        if let Ok(mut guard) = self.job_observer.write() {
+            *guard = Some(observer);
+        }
+    }
+
+    /// Install an activity observer that receives every workspace activity
+    /// insert. Replaces any previously registered observer.
+    pub fn set_activity_observer(&self, observer: Arc<dyn ActivityObserver>) {
+        if let Ok(mut guard) = self.activity_observer.write() {
+            *guard = Some(observer);
+        }
+    }
+
+    fn emit_job(&self, job: &IndexingJobStatus) {
+        if let Ok(guard) = self.job_observer.read() {
+            if let Some(observer) = guard.as_ref() {
+                observer.on_job_changed(job);
+            }
+        }
+    }
+
+    fn emit_activity(&self, event: &WorkspaceActivityEvent) {
+        if let Ok(guard) = self.activity_observer.read() {
+            if let Some(observer) = guard.as_ref() {
+                observer.on_activity_recorded(event);
+            }
+        }
     }
 
     pub async fn workspace_exists(&self, workspace_id: &str) -> Result<bool> {
@@ -1048,20 +1109,64 @@ impl StorageEngine {
         subject_id: Option<&str>,
         summary: &str,
     ) -> Result<()> {
+        let event_id = Uuid::new_v4().to_string();
+        let created_at = Utc::now().to_rfc3339();
         sqlx::query(
             "INSERT INTO workspace_activity (id, workspace_id, actor_user_id, action, subject_type, subject_id, summary, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
         )
-        .bind(Uuid::new_v4().to_string())
+        .bind(&event_id)
         .bind(workspace_id)
         .bind(actor_user_id)
         .bind(action)
         .bind(subject_type)
         .bind(subject_id)
         .bind(summary)
-        .bind(Utc::now().to_rfc3339())
+        .bind(&created_at)
         .execute(&self.pool)
         .await?;
+
+        // Emit only if someone is listening. Fetching the joined actor row
+        // is cheap and keeps SSE payloads identical to the REST list view.
+        if self
+            .activity_observer
+            .read()
+            .ok()
+            .and_then(|guard| guard.as_ref().map(|_| ()))
+            .is_some()
+        {
+            if let Ok(Some(event)) = self.get_workspace_activity_event(&event_id).await {
+                self.emit_activity(&event);
+            }
+        }
         Ok(())
+    }
+
+    async fn get_workspace_activity_event(
+        &self,
+        event_id: &str,
+    ) -> Result<Option<WorkspaceActivityEvent>> {
+        let row = sqlx::query_as::<_, WorkspaceActivityRow>(
+            r#"
+            SELECT
+              activity.id,
+              activity.workspace_id,
+              actor.id AS actor_id,
+              actor.email AS actor_email,
+              actor.display_name AS actor_display_name,
+              activity.action,
+              activity.subject_type,
+              activity.subject_id,
+              activity.summary,
+              activity.created_at
+            FROM workspace_activity AS activity
+            LEFT JOIN users AS actor ON actor.id = activity.actor_user_id
+            WHERE activity.id = ?1
+            "#,
+        )
+        .bind(event_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.map(WorkspaceActivityEvent::from))
     }
 
     pub async fn list_workspace_activity(
@@ -2595,6 +2700,18 @@ impl StorageEngine {
         stage: &str,
         progress_total: Option<i64>,
     ) -> Result<IndexingJobStatus> {
+        self.create_job(workspace_id, source_id, "indexing", stage, progress_total)
+            .await
+    }
+
+    pub async fn create_job(
+        &self,
+        workspace_id: &str,
+        source_id: Option<&str>,
+        kind: &str,
+        stage: &str,
+        progress_total: Option<i64>,
+    ) -> Result<IndexingJobStatus> {
         let id = Uuid::new_v4().to_string();
         let now = Utc::now().to_rfc3339();
 
@@ -2604,19 +2721,22 @@ impl StorageEngine {
               id,
               workspace_id,
               source_id,
+              kind,
               status,
               stage,
               progress_current,
               progress_total,
+              cancel_requested,
               created_at,
               updated_at
             )
-            VALUES (?1, ?2, ?3, 'running', ?4, 0, ?5, ?6, ?7)
+            VALUES (?1, ?2, ?3, ?4, 'running', ?5, 0, ?6, 0, ?7, ?8)
             "#,
         )
         .bind(&id)
         .bind(workspace_id)
         .bind(source_id)
+        .bind(kind)
         .bind(stage)
         .bind(progress_total)
         .bind(&now)
@@ -2624,7 +2744,9 @@ impl StorageEngine {
         .execute(&self.pool)
         .await?;
 
-        self.get_indexing_job(&id).await
+        let job = self.get_indexing_job(&id).await?;
+        self.emit_job(&job);
+        Ok(job)
     }
 
     pub async fn update_indexing_job(
@@ -2657,7 +2779,119 @@ impl StorageEngine {
         .execute(&self.pool)
         .await?;
 
-        self.get_indexing_job(job_id).await
+        let job = self.get_indexing_job(job_id).await?;
+        self.emit_job(&job);
+        Ok(job)
+    }
+
+    /// Mark a job as cancellation-requested. Long-running loops poll
+    /// `is_job_cancel_requested` between units of work and stop cooperatively.
+    /// Returns the refreshed job. Emits a job event so SSE subscribers see
+    /// the flag flip immediately.
+    pub async fn request_job_cancel(&self, job_id: &str) -> Result<IndexingJobStatus> {
+        let now = Utc::now().to_rfc3339();
+        let affected = sqlx::query(
+            r#"
+            UPDATE indexing_jobs
+            SET cancel_requested = 1,
+                updated_at = ?1
+            WHERE id = ?2
+              AND status IN ('running', 'pending')
+            "#,
+        )
+        .bind(&now)
+        .bind(job_id)
+        .execute(&self.pool)
+        .await?
+        .rows_affected();
+
+        let job = self.get_indexing_job(job_id).await?;
+        if affected > 0 {
+            self.emit_job(&job);
+        }
+        Ok(job)
+    }
+
+    pub async fn is_job_cancel_requested(&self, job_id: &str) -> Result<bool> {
+        let value = sqlx::query_scalar::<_, i64>(
+            "SELECT cancel_requested FROM indexing_jobs WHERE id = ?1",
+        )
+        .bind(job_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(value.unwrap_or(0) != 0)
+    }
+
+    pub async fn get_job(&self, job_id: &str) -> Result<Option<IndexingJobStatus>> {
+        let row = sqlx::query_as::<_, IndexingJobRow>(
+            r#"
+            SELECT
+              id,
+              workspace_id,
+              source_id,
+              kind,
+              status,
+              stage,
+              progress_current,
+              progress_total,
+              error_message,
+              cancel_requested,
+              created_at,
+              updated_at
+            FROM indexing_jobs
+            WHERE id = ?1
+            "#,
+        )
+        .bind(job_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.map(IndexingJobStatus::from))
+    }
+
+    /// Lists jobs for a workspace, newest first. Optional filters narrow by
+    /// job kind or status; pass `None`/empty to skip a filter. `limit` is
+    /// clamped to a sensible upper bound.
+    pub async fn list_workspace_jobs(
+        &self,
+        workspace_id: &str,
+        kind: Option<&str>,
+        status: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<IndexingJobStatus>> {
+        let mut builder = QueryBuilder::<Sqlite>::new(
+            r#"
+            SELECT
+              id,
+              workspace_id,
+              source_id,
+              kind,
+              status,
+              stage,
+              progress_current,
+              progress_total,
+              error_message,
+              cancel_requested,
+              created_at,
+              updated_at
+            FROM indexing_jobs
+            WHERE workspace_id =
+            "#,
+        );
+        builder.push_bind(workspace_id.to_owned());
+        if let Some(kind) = kind {
+            builder.push(" AND kind = ").push_bind(kind.to_owned());
+        }
+        if let Some(status) = status {
+            builder.push(" AND status = ").push_bind(status.to_owned());
+        }
+        builder.push(" ORDER BY created_at DESC, id DESC LIMIT ");
+        builder.push_bind(limit.clamp(1, 200));
+
+        let rows = builder
+            .build_query_as::<IndexingJobRow>()
+            .fetch_all(&self.pool)
+            .await?;
+        Ok(rows.into_iter().map(IndexingJobStatus::from).collect())
     }
 
     pub async fn workspace_overview(&self, workspace_id: &str) -> Result<WorkspaceOverview> {
@@ -3083,11 +3317,13 @@ impl StorageEngine {
               id,
               workspace_id,
               source_id,
+              kind,
               status,
               stage,
               progress_current,
               progress_total,
               error_message,
+              cancel_requested,
               created_at,
               updated_at
             FROM indexing_jobs
@@ -3549,11 +3785,13 @@ impl From<IndexingJobRow> for IndexingJobStatus {
             id: row.id,
             workspace_id: row.workspace_id,
             source_id: row.source_id,
+            kind: row.kind,
             status: row.status,
             stage: row.stage,
             progress_current: row.progress_current,
             progress_total: row.progress_total,
             error_message: row.error_message,
+            cancel_requested: row.cancel_requested != 0,
             created_at: row.created_at,
             updated_at: row.updated_at,
         }

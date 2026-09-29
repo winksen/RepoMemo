@@ -29,8 +29,19 @@ pub struct RepoMemoCore {
 impl RepoMemoCore {
     pub async fn boot(data_dir: PathBuf) -> Result<Self> {
         let storage = StorageEngine::open(StorageConfig { data_dir }).await?;
+        Ok(Self::from_storage(storage))
+    }
+
+    /// Build a core over an already-open storage engine. The shared server
+    /// uses this so that its own `StorageEngine` handle and the core's handle
+    /// point at the same pool and share observers (job events, activity feed).
+    pub fn from_storage(storage: StorageEngine) -> Self {
         let retrieval = RetrievalService::new(storage.clone());
-        Ok(Self { storage, retrieval })
+        Self { storage, retrieval }
+    }
+
+    pub fn storage(&self) -> &StorageEngine {
+        &self.storage
     }
 
     pub async fn create_workspace(&self, name: String) -> Result<Workspace> {
@@ -336,11 +347,24 @@ impl RepoMemoCore {
         let total = artifacts.len() as i64;
         let job = self
             .storage
-            .create_indexing_job(&workspace_id, None, "chunking_workspace", Some(total))
+            .create_job(
+                &workspace_id,
+                None,
+                "indexing",
+                "chunking_workspace",
+                Some(total),
+            )
             .await?;
 
         let mut indexed = 0_i64;
         for artifact in artifacts {
+            if self.storage.is_job_cancel_requested(&job.id).await? {
+                return self
+                    .storage
+                    .update_indexing_job(&job.id, "cancelled", "cancelled", indexed, None)
+                    .await;
+            }
+
             if let Err(error) = self.index_artifact_inner(&artifact).await {
                 let _ = self
                     .storage
@@ -667,9 +691,10 @@ impl RepoMemoCore {
         }
         let job = self
             .storage
-            .create_indexing_job(
+            .create_job(
                 &workspace_id,
                 None,
+                "embedding",
                 "embedding_workspace",
                 Some(chunks.len() as i64),
             )
@@ -677,6 +702,12 @@ impl RepoMemoCore {
         let provider = provider_from_settings(settings.clone())?;
         let mut completed = 0_i64;
         for batch in chunks.chunks(16) {
+            if self.storage.is_job_cancel_requested(&job.id).await? {
+                return self
+                    .storage
+                    .update_indexing_job(&job.id, "cancelled", "cancelled", completed, None)
+                    .await;
+            }
             let vectors = provider
                 .embed(
                     batch.iter().map(|chunk| chunk.text.clone()).collect(),

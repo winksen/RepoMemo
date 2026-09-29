@@ -5,7 +5,7 @@
   "identifier": "com.repomemo.desktop",
   "build": {
     "beforeDevCommand": "npm.cmd run dev",
-    "devUrl": "http://127.0.0.1:5173",
+    "devUrl": "http://127.0.0.1:3021",
     "beforeBuildCommand": "npm.cmd run build",
     "frontendDist": "../dist"
   },

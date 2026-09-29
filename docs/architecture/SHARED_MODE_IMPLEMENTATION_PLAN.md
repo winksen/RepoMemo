@@ -52,7 +52,7 @@ Run the foundation locally:
 $env:REPOMEMO_JWT_SECRET = 'replace-this-with-a-random-development-secret-of-at-least-32-characters'
 cargo run -p repomemo-server
 cargo run -p repomemo-worker
-Invoke-RestMethod http://127.0.0.1:8787/health
+Invoke-RestMethod http://127.0.0.1:3020/health
 ```
 
 The API requires `REPOMEMO_JWT_SECRET` with at least 32 characters. It uses
