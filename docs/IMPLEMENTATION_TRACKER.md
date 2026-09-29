@@ -20,7 +20,7 @@ Status: implemented and running locally
 | Tauri icon generator | Done | `npm run icons` creates the required Windows `icon.ico` asset. |
 | Development command reference | Done | See `docs/DEVELOPMENT_COMMANDS.md`. |
 | Local verification | Done | Frontend typecheck/build passed from user terminal; desktop app opens locally and can create workspaces. |
-| Next-phase roadmap | Done | See `docs/ROADMAP.md` and `docs/phases/`. |
+| Next-phase roadmap | Done | See `mindmap/ROADMAP.md` and `docs/phases/`. |
 
 Latest verification:
 
@@ -155,6 +155,6 @@ Spec: `docs/phases/PHASE_1H_MEMORY_CARDS.md`
 
 Status: deferred
 
-Strategic roadmap: `docs/ROADMAP.md`
+Strategic roadmap: `mindmap/ROADMAP.md`
 
 Git-aware indexing, issue/PR connectors, team server mode, and enterprise/hosted capabilities remain deferred until Phase 1 proves the local memory loop.

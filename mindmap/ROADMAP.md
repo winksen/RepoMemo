@@ -1,0 +1,126 @@
+# RepoMemo Roadmap
+
+> **Current version:** `V0.1.32` (2026-09-29)
+> **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · [Implementation tracker](../docs/IMPLEMENTATION_TRACKER.md)
+
+RepoMemo started as a local-first desktop workbench. It has since grown into a **self-hosted team product**: a shared API server with a web client, organizations and roles, collaboration, and optional AI grounded in cited evidence. The original local memory loop (Phase 1) is complete. A large part of the originally "later" team-server phase has also shipped, in a lighter form than first planned: SQLite instead of PostgreSQL, and in-process work instead of a job queue.
+
+The current focus is **moving heavy work off the request path** (background jobs and live progress), then **hardening** and **parity** before growing connectors.
+
+---
+
+## At a glance
+
+```mermaid
+timeline
+  title RepoMemo delivery
+  section Local memory loop
+    May 2026 : V0.1.0 Desktop skeleton
+    Jun 2026 : V0.1.2 Import and store : V0.1.3 Chunking and symbols : V0.1.4 Full-text search
+    Jul 2026 : V0.1.6 AI providers : V0.1.8 Embeddings and Ask : V0.1.9 Image understanding
+    Aug 2026 : V0.1.10 Memory cards
+  section Shared team mode
+    Aug 2026 : V0.1.12 Server foundation : V0.1.13 Accounts and shared evidence : V0.1.15 to V0.1.19 Team admin, AI and retrieval
+    Aug 2026 : V0.1.20 to V0.1.23 Profiles, collaboration, review, workflows
+    Sep 2026 : V0.1.27 Organization admin : V0.1.30 Word documents : V0.1.32 Jobs API and live events
+```
+
+| Stage | Status |
+|---|---|
+| Phase 1: Local memory loop (1A–1H) | ✅ Complete |
+| Phase S: Shared team mode | ✅ Core complete · 🔄 background jobs in progress |
+| Next: Jobs, hardening, parity | 🔜 Planned |
+| Later: Git awareness, connectors, scale, enterprise | 💭 Direction |
+
+---
+
+## ✅ Delivered
+
+### Phase 1: Local memory loop (desktop)
+
+The goal was to run the whole local loop with AI kept optional: *create workspace → import → inspect → search → ask with citations → save memory*.
+
+| Phase | Version | Delivered |
+|---|---|---|
+| 1A Skeleton | V0.1.0 | Tauri + React shell, Rust workspace, SQLite schema, workspaces |
+| 1B Import and store | V0.1.2 | File and folder import, content-addressed blob store, artifacts view, ADRs 0002–0004 |
+| 1C Chunking | V0.1.3 | Markdown chunking by heading, 100-line windows for code and text, indexing jobs |
+| 1E Code symbols | V0.1.3 | tree-sitter symbols for TS/TSX/JS, Python and Rust, file outlines |
+| 1D Full-text search | V0.1.4 | SQLite FTS5, safe query building, filters, highlighted snippets |
+| 1F AI provider layer | V0.1.6–0.1.7 | Ollama (local) and OpenRouter (cloud, with explicit acknowledgement), cited summaries |
+| 1G Semantic search and Ask | V0.1.8 | Local embeddings, hybrid retrieval, cited answers, "insufficient context" guard |
+| Image understanding | V0.1.9 | Vision-provider descriptions make images searchable |
+| 1H Memory cards | V0.1.10 | Durable cards with evidence links, search and Markdown export |
+
+The detailed specs are in [docs/phases/](../docs/phases) and the status of each area is in the [implementation tracker](../docs/IMPLEMENTATION_TRACKER.md).
+
+### Phase S: Shared team mode (server + web)
+
+This phase took the original "Phase 4: Team Server" and delivered it incrementally on the existing Rust core and SQLite.
+
+| Milestone | Version | Delivered |
+|---|---|---|
+| Server foundation | V0.1.12 | `repomemo-server` (Axum), health and session routes, worker process boundary |
+| Accounts and shared evidence | V0.1.13 | Registration and login (Argon2 + JWT), organizations, workspaces, text evidence, indexing, search, memory, and the **web client** |
+| File uploads | V0.1.14 | Upload of evidence files up to 10 MiB |
+| Workspace membership | V0.1.15 | Add, change and remove members, with role rules |
+| Workspace admin and AI | V0.1.16 | Rename and delete, capabilities, per-workspace AI providers, AI overview, activity log |
+| Ask in shared mode | V0.1.17 | Cited Q&A, provider test, memory search |
+| Retrieval depth | V0.1.18–0.1.19 | Artifact query filters, retrieval facets (type, language, source) |
+| Profiles and metrics | V0.1.20 | User profile, password change, "workspace pulse" metrics |
+| Collaboration | V0.1.21 | Task board, evidence comments, assigned tasks, activity calendar |
+| Review and notifications | V0.1.22 | Evidence lifecycle (verified, outdated, superseded) with history, notifications, @mentions |
+| Workflow depth | V0.1.23 | Saved searches, task checklists |
+| Web experience | V0.1.24–0.1.29 | Dashboard, organization switcher, notifications page, profile page, workspace sections, grid and list evidence views |
+| Organization administration | V0.1.27 | Organization rename and member management, with access flowing to all org workspaces |
+| Word documents | V0.1.30–0.1.31 | `.doc`/`.docx` text extraction, indexing, Documents section with preview |
+| Jobs API and live events | V0.1.32 | Job kinds, cooperative cancel, job listing, **SSE event stream** for job and activity events |
+
+---
+
+## 🔄 In progress: background jobs and live progress
+
+V0.1.32 laid the groundwork: a jobs table with a kind and a cancel flag, the jobs endpoints, and a per-workspace SSE stream. The remaining steps are:
+
+- [ ] **Worker claims jobs.** `repomemo-worker` polls or claims queued jobs so indexing no longer runs inside the HTTP request.
+- [ ] **Async index endpoints.** `POST …/index` returns a queued job immediately.
+- [ ] **Live progress in the web client.** Consume the SSE stream with a fetch-based reader, because a native `EventSource` cannot send the auth header. Show progress bars and a cancel button.
+- [ ] **Incremental re-index.** Skip artifacts whose content hash has not changed.
+
+---
+
+## 🔜 Next (proposed priorities)
+
+These items come from the gaps and risks recorded in the mindmaps. The order is a proposal and is open for discussion.
+
+| # | Theme | Items | Why |
+|---|---|---|---|
+| 1 | **Security hardening** | Encrypt provider API keys at rest · refresh tokens and revocation (invalidate on password change) · an AI-usage capability and rate limits (viewers can currently trigger cloud calls) | Keys are stored in plaintext today, and sessions end hard after 60 minutes |
+| 2 | **Semantic search in shared mode** | Expose embedding builds as a job · embedding model setting · an embedding-capable cloud option | Ask in shared mode is keyword-only today |
+| 3 | **Web UX correctness** | Render AI answers as Markdown · render search highlights · handle session expiry gracefully · multi-citation memory cards · multi-file and folder upload | Visible rough edges in daily use |
+| 4 | **Onboarding** | Email invitations for people without an account · password reset | People can only be added after they register |
+| 5 | **Code health** | Split `SharedWebApp.tsx` by route · adopt a router and a data-fetching cache · frontend tests · typed API errors (404 instead of 400) | The web client is about 2k lines in one file and has no tests |
+| 6 | **Data hygiene and performance** | Blob garbage collection · SQL-side metrics · batched dashboard metrics · indexed vector search | Orphan blobs build up, and several endpoints scan everything in memory |
+| 7 | **Docs** | Grow the mindmap branch pages · refresh `PRODUCT.md` · single up-to-date API collection | Keep the documentation trustworthy |
+
+---
+
+## 💭 Later: strategic direction
+
+These carry over from the original roadmap and are still valid:
+
+| Direction | Scope |
+|---|---|
+| **Git-aware indexing** | Import repositories directly, with branch and commit metadata, changed files, ownership hints and commit/PR relationships |
+| **Issue and PR connectors** | GitHub/GitLab first, then Linear/Jira. Link issues and PRs to artifacts and symbols |
+| **Scale-out team server** | PostgreSQL, object storage, a durable job queue, and Qdrant when vector search needs a service (see [ADR-0004](../docs/decisions/0004-embedded-vector-storage-before-qdrant.md)) |
+| **Enterprise / hosted** | SSO, permission-aware retrieval, audit export, policy controls and redaction, hosted and self-hosted deployment |
+
+---
+
+## Guiding rules (unchanged)
+
+- **Storage first, AI second.** Every AI feature operates on indexed, inspectable evidence and returns citations.
+- **Useful without AI.** Storing, browsing, indexing and search must keep working with no provider configured.
+- **Cloud is explicit.** No content leaves the server until an admin enables a cloud provider and acknowledges it.
+- **Show state.** Storage, indexing progress, provider status and errors are always visible.

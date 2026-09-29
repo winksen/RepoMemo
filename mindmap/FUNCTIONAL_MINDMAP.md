@@ -1,0 +1,398 @@
+# RepoMemo: Functional Mindmap
+
+> **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
+> **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
+> **Scope:** reflects the code at `V0.1.32` (2026-09-29). The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
+
+---
+
+## The product in one paragraph
+
+RepoMemo is a **team memory workspace for technical knowledge**. A team stores its evidence (notes, code files, Markdown docs, Word documents, screenshots and diagrams) in a shared workspace. RepoMemo **indexes** that evidence so it can be **searched** by keyword, and can optionally **ask an AI** questions that are answered **only from the stored evidence, with citations**. Knowledge worth keeping is saved as **memory cards**. Around that core, the team can **review** evidence (lifecycle status), **discuss** it (comments with @mentions), and **track work** (a task board with checklists). The core stays useful without AI: storing, browsing, indexing and searching all work with no AI provider configured.
+
+---
+
+## Who it's for and what it stands for
+
+### Users
+
+RepoMemo serves **developers and technical teams working inside an active codebase**. They reach for it when they need to:
+
+- investigate implementation details
+- recall **why** a decision was made
+- onboard onto an unfamiliar system
+- recover reliable context from code, documents, runbooks, incidents and architecture records
+
+**Success** means a user moves from an uncertain technical question to **trustworthy source context** quickly, understands **where the answer came from**, and **preserves** useful knowledge for later.
+
+### Positioning
+
+RepoMemo is **structured memory first and an AI interface second**. Its source of truth is durable storage plus explicit metadata: indexes, symbols, links and citations. It is **not** a chat transcript or an opaque embedding store. Cloud AI is optional and is always an explicit choice.
+
+### Product principles
+
+1. **Evidence before inference.** Show sources, paths, line ranges, status and provenance.
+2. **Value without AI.** Browsing, indexing and retrieval stay useful with AI switched off.
+3. **Dense but legible.** Optimize for technical scanning without turning the workspace into visual noise.
+4. **State is obvious.** Storage, indexing progress, provider state and errors are visible and actionable.
+5. **Preserve trust.** Never blur durable stored facts with generated interpretation.
+
+### Constraints the product must respect
+
+- AI providers are optional. Sending content to a cloud provider requires explicit configuration and acknowledgement.
+- Answers and summaries must stay tied to inspectable evidence and citations.
+- Product copy must never invent customers, testimonials, usage metrics, benchmarks, pricing, or capabilities that are not built. The repository contains no approved marketing claims.
+
+### Voice
+
+The voice is **calm, precise, technical, private by default, and evidence-oriented**. The product states system facts directly, avoids hype, and always distinguishes trustworthy stored facts from optional AI interpretation.
+
+### Experience and accessibility
+
+- The product is used as a **focused technical workbench**. It must support dense scanning, keyboard-friendly operation, long paths and identifiers, code-oriented content, large result sets, and both light and dark themes.
+- It must be **fully usable by keyboard** with visible focus states, respect **reduced-motion** preferences, keep **readable contrast** in both themes, and accommodate long technical identifiers without hiding critical context.
+
+> The visual system (colors, type, components) is defined separately in [DESIGN.md](../DESIGN.md).
+
+---
+
+## The mindmap
+
+```mermaid
+mindmap
+  root((RepoMemo))
+    Principles
+      Evidence before inference
+      Useful without AI
+      Private by default
+    Account
+      Register and sign in
+      Profile and password
+      Activity calendar
+      Notifications
+    Organizations
+      Create and rename
+      Members and roles
+      Access flows to all org workspaces
+    Workspaces
+      Dashboard with metrics
+      Overview pulse
+      Rename and delete
+    Evidence
+      Paste a note
+      Upload a file
+      Browse and filter
+      Word document preview
+      Lifecycle review
+      Discussion and mentions
+    Indexing
+      Split into passages
+      Extract code symbols
+      Describe images with AI
+    Retrieval
+      Keyword search with filters
+      Saved searches
+      Ask with citations
+    AI
+      Local Ollama
+      Cloud OpenRouter
+      Workspace overview
+    Memory
+      Durable cards
+      Linked evidence
+      Markdown export
+    Collaboration
+      Task board
+      Checklists
+      People
+      Activity feed
+```
+
+Each branch below maps to one section of this document. Deeper branch documents will live next to this file (see [Branch documents](#branch-documents-planned)).
+
+---
+
+## 1. Who uses it: roles and permissions
+
+RepoMemo has two levels of membership.
+
+**Organization**: the team or company boundary. Roles: `owner`, `admin`, `member`.
+**Workspace**: one body of knowledge inside an organization, such as a project or service. Roles: `owner`, `admin`, `member`, `viewer`.
+
+Joining an organization **automatically grants access to every workspace in it**: an org owner becomes a workspace owner, an org admin becomes an admin, and an org member becomes a member. A workspace can also add a registered user directly. That user then joins the organization as a `member`.
+
+### What each workspace role can do
+
+| Capability | Owner | Admin | Member | Viewer |
+|---|:-:|:-:|:-:|:-:|
+| Read evidence, search, memory, tasks | ✅ | ✅ | ✅ | ✅ |
+| Ask AI / generate AI overview¹ | ✅ | ✅ | ✅ | ✅ |
+| Add, rename, delete, index evidence | ✅ | ✅ | ✅ | — |
+| Create and edit memory cards | ✅ | ✅ | ✅ | — |
+| Create and edit tasks, comment, change lifecycle | ✅ | ✅ | ✅ | — |
+| Edit or delete *other people's* comments and tasks | ✅ | ✅ | — | — |
+| Open People / Activity / Settings sections | ✅ | ✅ | — | — |
+| Add or remove members | ✅ | ✅² | — | — |
+| Configure the AI provider | ✅ | ✅ | — | — |
+| Rename or delete the workspace | ✅ | — | — | — |
+
+¹ The AI features need an enabled provider. A viewer can trigger them, so a viewer can also cause calls to a paid cloud provider.
+² Admins can grant only `member` or `viewer`, and cannot change or remove other admins or the owner. Nobody can assign `owner` through the UI.
+
+### Organization permissions
+
+| Action | Org owner | Org admin | Org member |
+|---|:-:|:-:|:-:|
+| Create a workspace in the org | ✅ | ✅ | — |
+| Add members / change roles | ✅ | ✅ (not admins) | — |
+| Rename the organization | ✅ | — | — |
+
+Any signed-in user can create a new organization and becomes its owner.
+
+---
+
+## 2. Account and session
+
+| Feature | What the user experiences |
+|---|---|
+| **Register** (`/register`) | Email, display name (1–120 characters), password (12+ characters). The user is signed in immediately. |
+| **Sign in** (`/login`) | Email and password. A wrong email and a wrong password produce the same message. |
+| **Session** | Lasts **60 minutes** and there is no silent renewal. The session is tied to the browser tab, so closing the tab signs the user out. |
+| **Profile** (`/profile`) | Rename yourself, change your password (the current password is required), see last connection time, workspace count, a **365-day contribution calendar**, and **tasks assigned to you**. |
+| **Notifications** (`/notifications`) | "Task assigned to you" and "You were mentioned in evidence discussion". Mark one or all as read. Clicking a notification opens the related page. |
+| **Theme** | Light and dark toggle, remembered per browser. |
+| **Sign out** | Always visible in the header. |
+
+**Not available yet:** password reset, email invitations for people without an account, SSO.
+
+---
+
+## 3. Organizations and the dashboard
+
+- **Dashboard** (`/dashboard`): every organization you belong to, its workspaces, and aggregate totals (artifacts, active tasks, memory cards).
+- **Workspace directory** (`/workspaces`): pick an organization, create workspaces (owner or admin), and create a new organization.
+- **Organization administration**: list members, add a registered user by email with a role, and remove members, subject to the rules in §1.
+
+---
+
+## 4. Workspaces
+
+A workspace is opened at `/workspaces/:id/<section>` and has **nine sections**:
+
+| Section | Purpose | Who sees it |
+|---|---|---|
+| **Overview** | "Workspace pulse" metrics and the AI overview | Everyone |
+| **Evidence** | The evidence ledger: browse, add notes, upload files, index | Everyone (only writers can add) |
+| **Documents** | The same ledger filtered to Word files, with an inline text preview | Everyone |
+| **Retrieval** | Keyword search, saved searches, "Ask your evidence" | Everyone |
+| **Memory** | Team memory cards: search and create | Everyone |
+| **Tasks** | Team action board | Everyone |
+| **People** | Member list and a summary of *your* capabilities | Owner and admin |
+| **Activity** | Recent activity feed and a 365-day calendar | Owner and admin |
+| **Settings** | Members, AI provider, rename or delete | Owner and admin (rename and delete are owner only) |
+
+### Workspace pulse (Overview)
+
+This is a live snapshot computed on each visit:
+
+- **Index coverage**: the percentage of artifacts that are indexed. Pending artifacts are counted and their size is shown.
+- **Fresh evidence**: artifacts added or updated in the last 7 days.
+- **Knowledge density**: searchable passages per indexed file.
+- **Code symbols**: functions and classes extracted from code.
+- **Team**: member count, active tasks, blocked and overdue tasks ("at risk"), comment count.
+- **Charts**: evidence by type, storage by type, languages, 14-day activity, activity by action, and members by role.
+
+Deleting a workspace **permanently removes** all of its evidence, memory, tasks and memberships.
+
+---
+
+## 5. Evidence (artifacts)
+
+Evidence is anything the team stores. Each item is called an **artifact**.
+
+### Adding evidence
+
+| Method | Details |
+|---|---|
+| **Paste a shared note** | A title and some text. You can pick a language: Markdown, Text, or a code language. Pasted notes are grouped under the source "Pasted notes". |
+| **Upload a file** | Up to **10 MiB**. Uploads are grouped under the source "Shared uploads". |
+
+**Supported file types:** Markdown (`md`, `mdx`), text (`txt`), Word (`doc`, `docx`), code and config (`rs`, `ts`, `tsx`, `js`, `jsx`, `py`, `json`, `toml`, `yaml`, `yml`, `sql`, `html`, `css`, `sh`, `ps1`), and images (`png`, `jpg`, `jpeg`, `gif`, `webp`, `svg`, `bmp`).
+
+If the same file with the same content is uploaded twice, it is stored only once.
+
+### Working with evidence
+
+- **Browse**: filter by name or path and by type, and switch between grid and list views.
+- **Artifact page** (`/workspaces/:id/artifacts/:artifactId`) shows:
+  - metadata: type, language, and whether it is indexed
+  - **stored content** as a text preview; Word files are converted to text
+  - **indexed evidence**: the searchable passages, with line ranges
+  - **rename** and **delete**, for writers
+- **Lifecycle review**: every artifact has a status:
+  `active` → `needs_review` → `verified` / `outdated` / `superseded`
+  Each artifact can also have an **owner** (a workspace member) and a **review note**. `superseded` requires choosing the replacement artifact. Every change is kept in a **lifecycle history**.
+- **Discussion**: threaded comments of up to 5,000 characters. Typing `@someone@example.com` **notifies that workspace member**. Authors edit or delete their own comments, and admins and owners can moderate any comment.
+
+---
+
+## 6. Indexing: making evidence searchable
+
+Evidence must be **indexed** before search, Ask, or the AI overview can use it. Writers press **"Index evidence"**, which indexes the whole workspace. Indexing can also be triggered for a single artifact.
+
+In plain terms, indexing does the following:
+
+1. **Reads the text.** Word documents are converted locally.
+2. **Splits it into passages.** Markdown is split by heading; code and text are split into windows of about 100 lines. Each passage keeps its line range so every citation can point to exact lines.
+3. **Extracts code symbols** from TypeScript, JavaScript, Python and Rust: functions, classes, methods, interfaces and enums.
+4. **Handles images differently.** If the workspace has an AI provider enabled, the image is sent to it and a **text description** is stored and made searchable, including any text visible in the image. Without a provider, images stay stored but cannot be searched.
+
+Re-indexing replaces the previous passages for each artifact.
+
+**Current behavior to be aware of:** indexing runs while the user waits. On large workspaces the button spins until everything is done, and no progress bar is shown yet. If one file fails, indexing stops at that file.
+
+---
+
+## 7. Retrieval: finding evidence
+
+### Keyword search
+
+- Searches the **indexed passages** of the workspace.
+- Every word must match, and words match as prefixes: `auth tok` finds "authentication token".
+- Filters: **file type**, **language**, **source**, and **10 / 20 / 50 results**. Filter options are built from what has actually been indexed.
+- Each result shows the title, type, language, source, a snippet, the path, and the line range. Clicking a result opens the artifact.
+- Search does **not** use AI and works offline.
+
+### Saved searches
+
+Writers can save a named search that includes its filters. Anyone can re-run it with one click. Saved searches are shared with the whole workspace.
+
+### Ask your evidence (AI)
+
+- The user asks a question in plain language.
+- RepoMemo **first retrieves** matching passages. If nothing matches, it answers *"Indexed context is insufficient"* **without calling the AI**.
+- Otherwise it sends the best passages to the workspace's AI provider. The provider is told to use only that context.
+- The response contains the **answer**, the **citations** (artifact, path, lines), a **confidence** figure, and **warnings**. For example, a warning appears when only keyword retrieval could be used.
+
+---
+
+## 8. AI integration
+
+AI is **optional and explicit**. Nothing is sent to any AI service until an owner or admin configures and enables a provider in **Settings → AI integration**.
+
+| Provider | Where content goes | Requirements |
+|---|---|---|
+| **Ollama (local)** | A local or self-hosted Ollama server | A base URL (default `http://127.0.0.1:11434`) and a chat model |
+| **OpenRouter (cloud)** | The OpenRouter cloud API | An API key, a chat model, and an **explicit acknowledgement** that workspace excerpts leave the device |
+
+- **Test connection** checks the provider before relying on it.
+- The API key is kept on the server and **is never sent back to the browser**.
+- AI powers three features: **Ask your evidence**, the **AI workspace overview** (a briefing for someone joining the project, built from indexed excerpts, with citations), and **image descriptions** during indexing.
+
+---
+
+## 9. Memory cards: durable team knowledge
+
+A memory card is a **short, durable statement the team wants to keep**. Examples are "We chose SQLite over Postgres because…" and "Deploys must go through X".
+
+- **Create**: a title and a Markdown body. You can **link one evidence item** as its citation.
+- **Search**: a text match on the title and body.
+- **Card page** (`/workspaces/:id/memory-cards/:cardId`): the statement, its source, and **linked evidence**. If the linked artifact has been deleted, the evidence is shown as missing.
+- **Edit / delete**: writers only.
+- **Export** a card as a Markdown file that includes its evidence links and line ranges, for use in a wiki, an ADR or a PR description.
+
+---
+
+## 10. Collaboration
+
+### Task board
+
+- Four columns: **Open**, **In progress**, **Blocked**, **Done**.
+- Each task has a title, a description, a **priority** (low / medium / high / urgent), an optional **assignee** who must be a workspace member, optional **linked evidence**, and an optional **due date**. Overdue tasks are flagged.
+- **Checklists** inside a task, where each item can be ticked.
+- Search tasks, and filter by assignee or show unassigned tasks.
+- Assigning a task to someone **notifies them**. The task also appears on their profile.
+- A task can be deleted by its creator, or by an admin or owner.
+
+### People and Activity
+
+- **People** lists the members and explains what your role lets you do.
+- **Activity** shows the last 100 workspace actions and a 365-day calendar. Recorded actions include evidence stored or uploaded, indexing, lifecycle changes, comments, tasks, memory, member changes, AI use and provider changes.
+
+---
+
+## 11. Typical team journey
+
+```
+Create organization ─► Create workspace ─► Invite teammates (they register first)
+      │
+      ▼
+Paste notes / upload files ─► Index evidence ─► Search / save searches
+      │                                              │
+      ▼                                              ▼
+Review lifecycle, discuss with @mentions     (optional) configure AI ─► Ask with citations
+      │                                              │
+      ▼                                              ▼
+Create tasks from findings  ◄──────────────  Save conclusions as memory cards ─► Export
+```
+
+---
+
+## 12. Local desktop mode
+
+The same application also ships as a **Windows desktop app** built with Tauri. It is fully local: no accounts, no organizations and no collaboration features. It adds capabilities the web app does not have yet:
+
+- importing **whole folders** from disk, which skips `.git`, `node_modules`, `target`, `dist`, `build`, `.next` and `.vite`
+- symbol search
+- per-artifact AI summaries
+- building **embeddings** for semantic search
+
+The desktop app and the shared server keep **separate data**.
+
+---
+
+## 13. Known functional gaps (as of V0.1.32)
+
+These are observed in the code and are useful for prioritizing:
+
+| Gap | Impact |
+|---|---|
+| No live indexing progress in the web app | Users wait on a spinner, and large workspaces can time out. |
+| No semantic (embedding) search in shared mode | Ask always uses keyword retrieval and shows a warning saying so. |
+| AI answers and the overview are shown as raw Markdown text | Headings and lists are not formatted. |
+| Search snippets show literal `<mark>` tags | The highlight markup is shown as text instead of being rendered. |
+| Sessions expire after 60 minutes with no renewal | Users are signed out mid-work and requests start failing. |
+| People need a RepoMemo account before they can be added | There is no invitation-by-email flow. |
+| No password reset | Users who are locked out need an administrator's help. |
+| Folder import exists only on desktop | Web users upload one file at a time. |
+| A memory card created from the web cites at most one artifact | The API supports several citations, but the UI offers only one. |
+
+---
+
+## Branch documents (planned)
+
+This gateway is the root of the functional mindmap. Each branch can grow into its own page under `mindmap/functional/`:
+
+| Branch | Planned page |
+|---|---|
+| Roles and permissions | `functional/roles-and-permissions.md` |
+| Account, profile, notifications | `functional/account-and-notifications.md` |
+| Organizations and workspaces | `functional/organizations-and-workspaces.md` |
+| Evidence and lifecycle | `functional/evidence-and-lifecycle.md` |
+| Indexing, retrieval, Ask | `functional/indexing-and-retrieval.md` |
+| AI providers and privacy | `functional/ai-and-privacy.md` |
+| Memory cards | `functional/memory-cards.md` |
+| Tasks and collaboration | `functional/tasks-and-collaboration.md` |
+
+## Glossary
+
+| Term | Meaning |
+|---|---|
+| **Artifact / evidence** | A stored item: a note, file or image. |
+| **Source** | Where artifacts came from: "Pasted notes", "Shared uploads", or an imported folder on desktop. |
+| **Chunk / passage** | A searchable slice of an artifact that keeps its line range. |
+| **Symbol** | A named code construct such as a function or class, extracted during indexing. |
+| **Citation** | A pointer from an AI answer or memory card to the exact artifact and lines that support it. |
+| **Memory card** | A durable, human-curated statement linked to evidence. |
+| **Lifecycle** | The review status of an artifact: active, needs review, verified, outdated or superseded. |
+| **Provider** | The AI backend, Ollama or OpenRouter, configured for a workspace. |

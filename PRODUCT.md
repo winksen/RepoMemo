@@ -45,7 +45,8 @@ The product name is RepoMemo. Its voice is calm, precise, technical, private by 
 
 - Product overview and development constraints: `README.md`
 - Product position, domain model, and architecture: `docs/architecture/RepoMemo_ARCHITECTURE.md`
-- Delivery sequence and acceptance criteria: `docs/ROADMAP.md`
+- Delivery sequence and acceptance criteria: `mindmap/ROADMAP.md`
+- Functional and technical overview: `mindmap/FUNCTIONAL_MINDMAP.md`, `mindmap/TECHNICAL_MINDMAP.md`
 - Implemented desktop interface and workflows: `apps/desktop/src/App.tsx`
 - Existing visual implementation: `apps/desktop/src/styles.css`
 

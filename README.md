@@ -1,89 +1,116 @@
-# RepoMemo
+<p align="center">
+  <img src="apps/desktop/public/RM-logofull.svg" alt="RepoMemo" width="260" />
+</p>
 
-RepoMemo is a local-first technical memory workspace. It starts as a Tauri desktop app with a React UI, Rust core, SQLite metadata storage, and local filesystem blob storage.
+<p align="center">
+  <strong>A team memory workspace for technical knowledge.</strong><br />
+  Store your evidence, index it, search it, and ask questions that are answered with citations.
+</p>
 
-Shared mode now has a separate Rust API with JWT-protected user, organization,
-and workspace routes. It has its own server data directory and does not expose
-the desktop app's local database. Import the [Postman collection](docs/api/RepoMemo_Shared_API_v2.postman_collection.json)
-to exercise the initial shared API.
+---
 
-### Shared web routes
+## What is RepoMemo?
 
-With the API running, start the Vite web client and open:
+Engineering knowledge is scattered across code, Markdown docs, Word files, screenshots, runbooks and people's heads. RepoMemo gives a team one place to keep that **evidence**. It makes the evidence **searchable** and turns what the team learns into **durable, cited memory**.
 
-- `/login` — sign in to the shared server.
-- `/register` — create a shared-server account.
-- `/workspaces` — the protected organization and workspace directory.
-- `/workspaces/:workspaceId` — a protected evidence, retrieval, and memory view.
-- `/workspaces/:workspaceId/artifacts/:artifactId` — protected artifact detail and individual indexing.
-- `/workspaces/:workspaceId/memory-cards/:memoryCardId` — protected memory detail and Markdown export.
+It is **evidence-first**. Storing, browsing, indexing and searching all work without AI. AI is an optional layer, and it is only allowed to answer from your indexed evidence, with a citation to the exact file and lines it used.
 
-Unauthenticated visits to shared workspace routes are redirected to `/login`.
-Workspace members can paste notes or upload supported Markdown, text, code, and image files up to 10 MiB. Memory cards may cite an artifact selected from that workspace.
-Owners and admins can manage the workspace team from its shared web view. A teammate must create a RepoMemo account before their email can be added; owners may grant `admin`, `member`, or `viewer`, while admins may grant `member` or `viewer`.
+## Features
 
-## Current Capabilities
+| | |
+|---|---|
+| 🗂️ **Evidence workspaces** | Organizations and workspaces with owner, admin, member and viewer roles |
+| 📥 **Capture** | Paste notes, or upload code, Markdown, Word documents and images of up to 10 MiB |
+| 🔎 **Index & search** | Heading-aware chunking, code symbols for TS/JS/Python/Rust, ranked full-text search with filters, and saved searches |
+| 🤖 **Ask with citations** | Optional AI through local **Ollama** or cloud **OpenRouter**. Answers and workspace overviews are grounded in retrieved evidence |
+| 🧠 **Memory cards** | Keep conclusions as durable, evidence-linked cards, with Markdown export |
+| ✅ **Review & collaborate** | Evidence lifecycle (verified, outdated, superseded), comments with @mentions, a task board with checklists, notifications, an activity feed and metrics |
+| 🔒 **Private by default** | Self-hosted server, and nothing is sent to an AI provider until an admin enables one explicitly |
 
-Phase 1A is implemented and running locally:
+## How it works
 
-- Create and list local workspaces.
-- Persist workspace metadata in SQLite.
-- Show the local app data/storage root.
-- Prove the React UI can call Rust through Tauri commands.
-- Prepare the schema and blob folder for sources, artifacts, chunks, search, AI, and memory cards.
-- Import supported files/folders into local blob storage.
-- List imported artifacts and preview stored text content.
-
-Not implemented yet:
-
-- Chunking/indexing
-- Search
-- AI answers/summaries
-- Memory-card editing beyond the initial create/save workflow
-
-## Roadmap
-
-Track implementation progress in [docs/IMPLEMENTATION_TRACKER.md](docs/IMPLEMENTATION_TRACKER.md).
-The next-phase roadmap lives in [docs/ROADMAP.md](docs/ROADMAP.md).
-
-UI work should follow the visual system in [docs/design/RepoMemo_UI_DESIGN_SYSTEM.md](docs/design/RepoMemo_UI_DESIGN_SYSTEM.md),
-the per-screen specs in [docs/design/RepoMemo_PAGE_BLUEPRINTS.md](docs/design/RepoMemo_PAGE_BLUEPRINTS.md),
-and the reference mockups in [docs/design/mockups/](docs/design/mockups/).
-
-## Prerequisites
-
-- Node.js 22+
-- npm 10+
-- Rust stable toolchain with Cargo
-- Platform prerequisites for Tauri 2
-
-Rust/Cargo must be available on `PATH` before the desktop app can compile.
-For Windows setup details, see [docs/WINDOWS_SETUP.md](docs/WINDOWS_SETUP.md).
-
-## Development
-
-Install JavaScript dependencies:
-
-```powershell
-npm.cmd install
+```
+ Browser (React SPA)  ──JWT──►  RepoMemo API (Rust · Axum)  ──►  SQLite + content-addressed file store
+                                        │
+                                        └──► optional AI provider (Ollama / OpenRouter)
 ```
 
-Run this after dependency changes too, such as adding the Tauri dialog plugin.
+RepoMemo can be run two ways:
 
-Run the desktop app:
+- **Shared mode (primary).** A self-hosted API server and a web client for teams.
+- **Desktop mode.** A local-only Tauri app for Windows that uses the same React UI and Rust core.
 
-```powershell
-npm.cmd run dev
+## Quick start (shared mode)
+
+**Prerequisites:** Node.js 22+, npm 10+, and the stable Rust toolchain. For Windows specifics, see [docs/WINDOWS_SETUP.md](docs/WINDOWS_SETUP.md).
+
+```bash
+npm install
 ```
 
-Run only the Vite web shell:
+Start the API on `127.0.0.1:3020`. It needs a JWT secret of at least 32 characters.
 
-```powershell
-npm.cmd run web:dev
+```bash
+REPOMEMO_JWT_SECRET="replace-with-a-random-secret-of-32+-chars" cargo run -p repomemo-server
 ```
 
-Build the frontend:
+In PowerShell, set the secret with `$env:REPOMEMO_JWT_SECRET = '...'` before running `cargo run -p repomemo-server`.
 
-```powershell
-npm.cmd run build
+Start the web client on `127.0.0.1:3021` from a second terminal:
+
+```bash
+npm run web:dev
 ```
+
+Open <http://127.0.0.1:3021>, create an account, create an organization and a workspace, and add some evidence.
+
+**Desktop mode:**
+
+```bash
+npm run dev
+```
+
+More commands, including tests, builds and the worker, are in [docs/DEVELOPMENT_COMMANDS.md](docs/DEVELOPMENT_COMMANDS.md).
+
+## Documentation
+
+The documentation starts in the **[`mindmap/`](mindmap/)** folder:
+
+| Document | For | What it covers |
+|---|---|---|
+| 🧭 **[Functional mindmap](mindmap/FUNCTIONAL_MINDMAP.md)** | Everyone | What RepoMemo does: roles, features, workflows, product principles, known gaps |
+| 🛠️ **[Technical mindmap](mindmap/TECHNICAL_MINDMAP.md)** | Engineers | Architecture, the full API reference, pipelines, data model, risks |
+| 🗺️ **[Roadmap](mindmap/ROADMAP.md)** | Everyone | What has shipped, what is next, and the longer-term direction |
+
+Other references:
+
+- [Architecture decisions (ADRs)](docs/decisions/)
+- [Development commands](docs/DEVELOPMENT_COMMANDS.md)
+- [Implementation tracker](docs/IMPLEMENTATION_TRACKER.md)
+
+## Repository layout
+
+```
+apps/
+  server/      Shared-mode HTTP API (Axum)
+  desktop/     React web client + Tauri desktop shell
+  worker/      Background worker (placeholder)
+crates/
+  api/         RepoMemoCore: import, index, search, ask, memory
+  storage/     SQLite (sqlx) + blob store + migrations
+  ingestion/   File detection and Word text extraction
+  indexer/     Chunking and tree-sitter symbol extraction
+  retrieval/   Full-text and hybrid retrieval
+  ai/          Ollama and OpenRouter providers
+  domain/      Shared data types
+mindmap/       Functional and technical documentation, roadmap
+docs/          Setup guides, ADRs, historical phase specs
+```
+
+## Status
+
+RepoMemo is in **early development** (`v0.1.x`). APIs and storage formats may change between versions. See the [roadmap](mindmap/ROADMAP.md) for the current focus.
+
+## License
+
+MIT, as declared in the workspace [`Cargo.toml`](Cargo.toml).
