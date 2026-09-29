@@ -82,6 +82,7 @@ This phase took the original "Phase 4: Team Server" and delivered it incremental
 
 V0.1.32 laid the groundwork: a jobs table with a kind and a cancel flag, the jobs endpoints, and a per-workspace SSE stream. The remaining steps are:
 
+- [x] **Automatic indexing after save.** Notes and uploads are queued and indexed in the background by the server, with restart recovery. Stored chunks are visible to owners and admins only, in a dialog. The queue is in-process, so the items below still apply for a durable, scalable version.
 - [ ] **Worker claims jobs.** `repomemo-worker` polls or claims queued jobs so indexing no longer runs inside the HTTP request.
 - [ ] **Async index endpoints.** `POST …/index` returns a queued job immediately.
 - [ ] **Live progress in the web client.** Consume the SSE stream with a fetch-based reader, because a native `EventSource` cannot send the auth header. Show progress bars and a cancel button.

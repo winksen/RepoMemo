@@ -211,6 +211,8 @@ pub struct WorkspaceCapabilities {
     pub can_create_tasks: bool,
     pub can_comment: bool,
     pub can_moderate_comments: bool,
+    /// Whether the member may inspect the stored index chunks of an artifact.
+    pub can_inspect_index: bool,
 }
 
 /// A citation-backed workspace briefing generated through an enabled provider.

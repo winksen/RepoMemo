@@ -6,6 +6,7 @@ import type {
   ArtifactLifecycleEvent,
   ArtifactSummary,
   ArtifactType,
+  Chunk,
   IndexingJobStatus,
   MemoryCard,
   MemoryCardDetail,
@@ -483,6 +484,11 @@ export function indexSharedWorkspace(accessToken: string, workspaceId: string): 
 
 export function indexSharedArtifact(accessToken: string, artifactId: string): Promise<IndexingJobStatus> {
   return request<IndexingJobStatus>(`/v1/artifacts/${artifactId}/index`, { method: "POST" }, accessToken);
+}
+
+/** Administrator-only view of the stored index chunks of one artifact. */
+export function listSharedArtifactChunks(accessToken: string, artifactId: string): Promise<Chunk[]> {
+  return request<Chunk[]>(`/v1/artifacts/${artifactId}/chunks`, {}, accessToken);
 }
 
 export function getSharedRetrievalFacets(accessToken: string, workspaceId: string): Promise<import("../types").RetrievalFacets> {

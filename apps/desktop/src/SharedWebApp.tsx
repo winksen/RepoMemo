@@ -7,7 +7,7 @@ FORM: The established RepoMemo operate composition, adapted into a protected bro
 */
 
 import type { FormEvent, ReactNode } from "react";
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   IconArrowRight as ArrowRight,
   IconArrowLeft as ArrowLeft,
@@ -73,8 +73,8 @@ import {
   getSharedMemoryCard,
   getSharedSession,
   getSharedWorkspaceOverview,
-  indexSharedWorkspace,
   indexSharedArtifact,
+  listSharedArtifactChunks,
   listSharedArtifacts,
   listSharedArtifactComments,
   listSharedArtifactLifecycleEvents,
@@ -125,6 +125,7 @@ import type {
   ArtifactLifecycleEvent,
   ArtifactLifecycleStatus,
   ArtifactType,
+  Chunk,
   MemoryCardDetail,
   MemoryCardSummary,
   Organization,
@@ -161,6 +162,8 @@ import { Textarea } from "./components/ui/textarea";
 import { initialSharedTheme, SharedLayout } from "./components/SharedLayout";
 
 const SESSION_STORAGE_KEY = "repomemo.shared.access-token";
+const INDEX_POLL_INTERVAL_MS = 3000;
+const INDEX_POLL_ATTEMPTS = 40;
 
 type AuthMode = "sign-in" | "sign-up";
 type PageState = "restoring" | "unauthenticated" | "ready" | "error";
@@ -1049,6 +1052,9 @@ function SharedWorkspaceDetail({
   const canManageMembers = capabilities?.can_manage_members ?? false;
   const canAssignAdmin = capabilities?.can_assign_admin ?? false;
   const canManageWorkspace = capabilities?.can_manage_workspace ?? false;
+  const canInspectIndex = capabilities?.can_inspect_index ?? false;
+  const [indexingStalled, setIndexingStalled] = useState(false);
+  const pendingIndexKey = useMemo(() => artifacts.filter((artifact) => !artifact.indexed_at).map((artifact) => artifact.id).join(","), [artifacts]);
   const isEvidenceView = section === "evidence";
   const isDocumentsView = section === "documents";
   const isRetrievalView = section === "retrieval";
@@ -1132,6 +1138,36 @@ function SharedWorkspaceDetail({
   }
 
   useEffect(() => { void load(); }, [accessToken, isActivityView, isRetrievalView, isTasksView, workspace.workspace.id]);
+  // New evidence is indexed by the server in the background. While anything is
+  // still waiting, refresh the ledger until it is done, then give up quietly so
+  // an artifact that failed to index does not keep the page polling forever.
+  useEffect(() => {
+    setIndexingStalled(false);
+    if (!pendingIndexKey) return;
+    let attempts = 0;
+    const timer = window.setInterval(async () => {
+      attempts += 1;
+      try {
+        const nextArtifacts = await listSharedArtifacts(accessToken, workspace.workspace.id);
+        setArtifacts(nextArtifacts);
+        if (nextArtifacts.every((artifact) => artifact.indexed_at)) {
+          window.clearInterval(timer);
+          const [nextOverview, nextMetrics, nextFacets] = await Promise.all([
+            getSharedWorkspaceOverview(accessToken, workspace.workspace.id),
+            getSharedWorkspaceMetrics(accessToken, workspace.workspace.id),
+            getSharedRetrievalFacets(accessToken, workspace.workspace.id),
+          ]);
+          setOverview(nextOverview); setWorkspaceMetrics(nextMetrics); setRetrievalFacets(nextFacets);
+          return;
+        }
+      } catch { /* keep the last known state and try again */ }
+      if (attempts >= INDEX_POLL_ATTEMPTS) {
+        window.clearInterval(timer);
+        setIndexingStalled(true);
+      }
+    }, INDEX_POLL_INTERVAL_MS);
+    return () => window.clearInterval(timer);
+  }, [accessToken, pendingIndexKey, workspace.workspace.id]);
   useEffect(() => { setWorkspaceName(workspace.workspace.name); }, [workspace.workspace.name]);
   useEffect(() => {
     const provider = aiProviders.find((entry) => entry.enabled) ?? aiProviders[0];
@@ -1358,11 +1394,6 @@ function SharedWorkspaceDetail({
     try { setMemoryResults(await searchSharedMemoryCards(accessToken, workspace.workspace.id, nextQuery)); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
   }
 
-  async function runIndex() {
-    setIsSubmitting(true); setError(null);
-    try { await indexSharedWorkspace(accessToken, workspace.workspace.id); await load(); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
-  }
-
   async function generateAiOverview() {
     setIsSubmitting(true); setError(null);
     try { setAiOverview(await generateSharedWorkspaceAiOverview(accessToken, workspace.workspace.id)); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
@@ -1450,13 +1481,12 @@ function SharedWorkspaceDetail({
     <SharedLayout apiAvailable={apiAvailable} onNavigate={navigate} session={session} signOut={signOut} sidebar={<OrganizationRail organizationId={organization?.id} organizations={organizations} workspaceId={workspace.workspace.id} workspaces={workspaces} />} workspaceNavigation={<WorkspaceTopbar activeSection={section} onNavigate={onNavigate} workspace={workspace} />}>
       <section className="shared-detail-shell" aria-busy={isLoading}>
         <div className="shared-detail-heading">
-          <div><h1>{isEvidenceView ? "Evidence ledger" : isDocumentsView ? "Documents" : isRetrievalView ? "Retrieve evidence" : isMemoryView ? "Durable team memory" : isTasksView ? "Tasks" : isPeopleView ? "People" : isActivityView ? "Activity" : isSettingsView ? "Workspace settings" : workspace.workspace.name}</h1><p>{isEvidenceView ? "Store notes and files in the workspace, then index them for retrieval." : isDocumentsView ? "Upload Word documents, inspect their extracted text, and keep them alongside the workspace evidence ledger." : isRetrievalView ? "Search indexed workspace evidence and inspect the source context behind every result." : isMemoryView ? "Capture concise facts and decisions that should outlive the current investigation." : isTasksView ? "Turn evidence and decisions into assigned, trackable action items for the team." : isPeopleView ? "See who can access this workspace and understand each person’s role." : isActivityView ? "A durable record of shared workspace changes, including evidence, memory, indexing, and membership updates." : isSettingsView ? "Administrators control workspace access and AI integrations here. Owner-only actions remain clearly marked." : "Artifacts, search results, and durable team memory are all retrieved through the protected shared API."}</p></div>
-          {canWrite && (isEvidenceView || isDocumentsView) ? <div className="shared-detail-actions"><Button disabled={isSubmitting || isLoading} onClick={() => void runIndex()} type="button" variant="main">{isSubmitting ? <Loader className="spin" size={16} /> : <Layers size={16} />} Index evidence</Button></div> : null}
+          <div><h1>{isEvidenceView ? "Evidence ledger" : isDocumentsView ? "Documents" : isRetrievalView ? "Retrieve evidence" : isMemoryView ? "Durable team memory" : isTasksView ? "Tasks" : isPeopleView ? "People" : isActivityView ? "Activity" : isSettingsView ? "Workspace settings" : workspace.workspace.name}</h1><p>{isEvidenceView ? "Store notes and files in the workspace. New evidence is indexed automatically, so it is ready for retrieval shortly after it is saved." : isDocumentsView ? "Upload Word documents, inspect their extracted text, and keep them alongside the workspace evidence ledger." : isRetrievalView ? "Search indexed workspace evidence and inspect the source context behind every result." : isMemoryView ? "Capture concise facts and decisions that should outlive the current investigation." : isTasksView ? "Turn evidence and decisions into assigned, trackable action items for the team." : isPeopleView ? "See who can access this workspace and understand each person’s role." : isActivityView ? "A durable record of shared workspace changes, including evidence, memory, indexing, and membership updates." : isSettingsView ? "Administrators control workspace access and AI integrations here. Owner-only actions remain clearly marked." : "Artifacts, search results, and durable team memory are all retrieved through the protected shared API."}</p></div>
         </div>
         {error ? <p className="shared-form-error" role="alert">{error}</p> : null}
         {isRestrictedView ? <div className="shared-empty-state shared-admin-restricted-state"><Shield size={25} /><strong>Workspace administrator access required</strong><span>People, Activity, and Settings are reserved for workspace owners and administrators.</span><Button onClick={() => onNavigate("overview")} type="button" variant="secondary">Go to overview</Button></div> : <>
         {section === "overview" ? <><div className="shared-evidence-summary">
-          <span><strong>{overview?.artifact_count ?? "—"}</strong> artifacts</span><span><strong>{overview?.chunk_count ?? "—"}</strong> indexed chunks</span><span><strong>{overview?.memory_card_count ?? "—"}</strong> memory cards</span>
+          <span><strong>{overview?.artifact_count ?? "—"}</strong> artifacts</span>{canInspectIndex ? <span><strong>{overview?.chunk_count ?? "—"}</strong> indexed chunks</span> : null}<span><strong>{overview?.memory_card_count ?? "—"}</strong> memory cards</span>
         </div>
         <section className="shared-metrics-dashboard" aria-labelledby="workspace-metrics-heading">
           <div className="shared-panel-heading"><div><Chart size={18} /><h2 id="workspace-metrics-heading">Workspace pulse</h2></div><span>{workspaceMetrics ? "Live API snapshot" : "Loading metrics…"}</span></div>
@@ -1505,9 +1535,9 @@ function SharedWorkspaceDetail({
                 </details>
               </div>
               <div className="shared-artifact-browser-meta"><span>{displayedArtifacts.length} of {isDocumentsView ? documentArtifacts.length : artifacts.length} files{hasArtifactFilters ? " matching filters" : ""}</span><div className="shared-artifact-view-switch" role="group" aria-label="Evidence view"><Button aria-label="Grid view" aria-pressed={artifactViewMode === "grid"} className={artifactViewMode === "grid" ? "active" : ""} onClick={() => setArtifactViewMode("grid")} type="button" variant="secondary"><Grid size={16} /></Button><Button aria-label="List view" aria-pressed={artifactViewMode === "list"} className={artifactViewMode === "list" ? "active" : ""} onClick={() => setArtifactViewMode("list")} type="button" variant="secondary"><List size={16} /></Button></div></div>
-              {displayedArtifacts.length ? <div className={`shared-artifact-manager ${artifactViewMode}`}>{displayedArtifacts.map((artifact) => <article key={artifact.id}><Button className={isDocumentsView && artifact.id === selectedDocument?.id ? "shared-artifact-entry selected" : "shared-artifact-entry"} onClick={() => isDocumentsView ? setSelectedDocumentId(artifact.id) : onOpenArtifact(artifact.id)} type="button" variant="secondary"><span className={`shared-artifact-file-icon type-${artifact.artifact_type}`}>{artifactTypeIcon(artifact.artifact_type, 20)}</span><span className="shared-artifact-entry-copy"><strong>{artifact.title}</strong><span>{artifact.path}</span></span><span className="shared-artifact-entry-meta"><span>{artifactTypeLabel(artifact.artifact_type)}</span><span>{artifact.language ?? "Unspecified"}</span><span>{formatFileSize(artifact.size_bytes)}</span><span className={artifact.indexed_at ? "indexed" : "pending"}>{artifact.indexed_at ? "Indexed" : "Not indexed"}</span></span></Button></article>)}</div> : <div className="shared-empty-state"><FileText size={25} /><strong>{artifacts.length ? "No files match these filters" : isDocumentsView ? "No Word documents yet" : "No shared evidence yet"}</strong><span>{artifacts.length ? "Adjust the search or selected types to see other workspace files." : isDocumentsView ? "Upload a DOC or DOCX file to preview its extracted text here." : "Add a pasted note below, then index it when you are ready to search."}</span></div>}
+              {displayedArtifacts.length ? <div className={`shared-artifact-manager ${artifactViewMode}`}>{displayedArtifacts.map((artifact) => <article key={artifact.id}><Button className={isDocumentsView && artifact.id === selectedDocument?.id ? "shared-artifact-entry selected" : "shared-artifact-entry"} onClick={() => isDocumentsView ? setSelectedDocumentId(artifact.id) : onOpenArtifact(artifact.id)} type="button" variant="secondary"><span className={`shared-artifact-file-icon type-${artifact.artifact_type}`}>{artifactTypeIcon(artifact.artifact_type, 20)}</span><span className="shared-artifact-entry-copy"><strong>{artifact.title}</strong><span>{artifact.path}</span></span><span className="shared-artifact-entry-meta"><span>{artifactTypeLabel(artifact.artifact_type)}</span><span>{artifact.language ?? "Unspecified"}</span><span>{formatFileSize(artifact.size_bytes)}</span><span className={artifact.indexed_at ? "indexed" : "pending"}>{artifact.indexed_at ? "Indexed" : indexingStalled ? "Not indexed" : "Indexing…"}</span></span></Button></article>)}</div> : <div className="shared-empty-state"><FileText size={25} /><strong>{artifacts.length ? "No files match these filters" : isDocumentsView ? "No Word documents yet" : "No shared evidence yet"}</strong><span>{artifacts.length ? "Adjust the search or selected types to see other workspace files." : isDocumentsView ? "Upload a DOC or DOCX file to preview its extracted text here." : "Add a pasted note below, then index it when you are ready to search."}</span></div>}
             </div>
-            {isDocumentsView ? <section className="shared-document-preview" aria-live="polite"><div className="shared-panel-heading"><div><Book size={18} /><h2>Word preview</h2></div><span>{selectedDocument ? selectedDocument.indexed_at ? "Indexed" : "Stored" : `${documentArtifacts.length} documents`}</span></div>{selectedDocument ? <><div className="shared-document-preview-meta"><span>{selectedDocument.title}</span><span>{formatFileSize(selectedDocument.size_bytes)}</span><span>{selectedDocument.language ?? "Word"}</span></div>{isDocumentPreviewLoading ? <p className="shared-muted-copy">Loading extracted text preview...</p> : documentPreviewText ? <pre className="shared-content-preview shared-word-preview-body">{documentPreviewText}</pre> : <p className="shared-muted-copy">No extractable text was found in this Word document.</p>}{previewDocument?.content_truncated ? <p className="shared-muted-copy">Preview truncated to keep the workspace responsive.</p> : null}</> : <div className="shared-empty-state"><FileText size={25} /><strong>No document selected</strong><span>Choose a Word file above to inspect the extracted text.</span></div>}</section> : null}
+            {isDocumentsView ? <section className="shared-document-preview" aria-live="polite"><div className="shared-panel-heading"><div><Book size={18} /><h2>Word preview</h2></div><span>{selectedDocument ? selectedDocument.indexed_at ? "Indexed" : indexingStalled ? "Stored" : "Indexing…" :`${documentArtifacts.length} documents`}</span></div>{selectedDocument ? <><div className="shared-document-preview-meta"><span>{selectedDocument.title}</span><span>{formatFileSize(selectedDocument.size_bytes)}</span><span>{selectedDocument.language ?? "Word"}</span></div>{isDocumentPreviewLoading ? <p className="shared-muted-copy">Loading extracted text preview...</p> : documentPreviewText ? <pre className="shared-content-preview shared-word-preview-body">{documentPreviewText}</pre> : <p className="shared-muted-copy">No extractable text was found in this Word document.</p>}{previewDocument?.content_truncated ? <p className="shared-muted-copy">Preview truncated to keep the workspace responsive.</p> : null}</> : <div className="shared-empty-state"><FileText size={25} /><strong>No document selected</strong><span>Choose a Word file above to inspect the extracted text.</span></div>}</section> : null}
             {canWrite ? <div className="shared-evidence-additions">{isEvidenceView ? <form className="shared-note-form" onSubmit={addNote}><h3>Add shared note</h3><Input onChange={(event) => setNoteTitle(event.target.value)} placeholder="Decision or implementation note" required value={noteTitle} /><Textarea onChange={(event) => setNoteContent(event.target.value)} placeholder="Paste Markdown, code context, or a meeting note…" required value={noteContent} /><Button disabled={isSubmitting} type="submit" variant="main"><Plus size={16} /> Store evidence</Button></form> : null}<form className="shared-upload-form" onSubmit={submitUpload}><div><strong>{isDocumentsView ? "Upload a Word document" : "Upload a file"}</strong><span>{isDocumentsView ? "DOC and DOCX · up to 10 MiB · extracted locally when indexed" : "Markdown, text, code, image, or Word document · up to 10 MiB"}</span></div><label className="shared-upload-picker"><input accept={isDocumentsView ? ".doc,.docx" : ".md,.mdx,.txt,.rs,.ts,.tsx,.js,.jsx,.py,.json,.toml,.yaml,.yml,.sql,.html,.css,.sh,.ps1,.doc,.docx,.png,.jpg,.jpeg,.gif,.webp,.svg,.bmp"} aria-label={isDocumentsView ? "Upload a Word document" : "Upload a shared artifact"} className="shared-upload-native-input" onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)} required type="file" /><span className="shared-upload-picker-icon"><Upload size={18} /></span><span className="shared-upload-picker-copy"><strong>{uploadFile?.name ?? (isDocumentsView ? "Choose a Word file" : "Choose a shared file")}</strong><span>{uploadFile ? `${formatFileSize(uploadFile.size)} · ready to upload` : isDocumentsView ? "DOC or DOCX" : "Markdown, text, code, image, or Word document"}</span></span><span className="shared-upload-picker-action">Browse</span></label><Button disabled={isSubmitting || !uploadFile} type="submit" variant="secondary"><Upload size={16} /> Upload</Button></form></div> : <p className="shared-readonly-note"><Shield size={15} /> Your viewer membership can inspect shared evidence but cannot change it.</p>}
           </section> : null}
           {isRetrievalView || isMemoryView || isTasksView || isPeopleView || isActivityView ? <aside className="shared-detail-panel shared-retrieval-panel">
@@ -1630,7 +1660,8 @@ function SharedArtifactDetail({
   const [editingCommentBody, setEditingCommentBody] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isIndexing, setIsIndexing] = useState(false);
+  const [showChunks, setShowChunks] = useState(false);
+  const [indexingStalled, setIndexingStalled] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingLifecycle, setIsEditingLifecycle] = useState(false);
   const [isMutating, setIsMutating] = useState(false);
@@ -1641,6 +1672,8 @@ function SharedArtifactDetail({
   const [supersededByArtifactId, setSupersededByArtifactId] = useState("");
   const canWrite = workspace.role !== "viewer";
   const canModerateComments = workspace.role === "owner" || workspace.role === "admin";
+  const canInspectIndex = workspace.role === "owner" || workspace.role === "admin";
+  const isAwaitingIndex = Boolean(artifact) && !artifact?.summary.indexed_at;
 
   async function load() {
     setIsLoading(true); setError(null);
@@ -1666,10 +1699,25 @@ function SharedArtifactDetail({
     setSupersededByArtifactId(lifecycle?.superseded_by_artifact_id ?? "");
   }, [lifecycle]);
 
-  async function indexArtifact() {
-    setIsIndexing(true); setError(null);
-    try { await indexSharedArtifact(accessToken, artifactId); await load(); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsIndexing(false); }
-  }
+  // Indexing happens in the background right after the evidence is stored.
+  useEffect(() => {
+    setIndexingStalled(false);
+    if (!isAwaitingIndex) return;
+    let attempts = 0;
+    const timer = window.setInterval(async () => {
+      attempts += 1;
+      try {
+        const nextArtifact = await getSharedArtifact(accessToken, artifactId);
+        setArtifact(nextArtifact);
+        if (nextArtifact.summary.indexed_at) { window.clearInterval(timer); return; }
+      } catch { /* keep the last known state and try again */ }
+      if (attempts >= INDEX_POLL_ATTEMPTS) {
+        window.clearInterval(timer);
+        setIndexingStalled(true);
+      }
+    }, INDEX_POLL_INTERVAL_MS);
+    return () => window.clearInterval(timer);
+  }, [accessToken, artifactId, isAwaitingIndex]);
 
   async function saveArtifact(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1730,15 +1778,68 @@ function SharedArtifactDetail({
 
   return (
     <SharedRecordLayout activeSection="evidence" apiAvailable={apiAvailable} organization={organization} organizations={organizations} session={session} signOut={signOut} title={artifact?.summary.title ?? "Artifact"} subtitle={artifact?.summary.path ?? "Loading protected evidence…"} workspace={workspace} workspaces={workspaces}>
-      <div className="shared-detail-actions">{canWrite ? <><Button disabled={isLoading || isMutating} onClick={() => setIsEditing((value) => !value)} type="button" variant="secondary"><Pencil size={16} /> {isEditing ? "Cancel edit" : "Edit"}</Button><Button className="shared-danger-action" disabled={isLoading || isMutating} onClick={() => void removeArtifact()} type="button" variant="secondary"><Trash size={16} /> Delete</Button><Button disabled={isLoading || isIndexing || isMutating} onClick={() => void indexArtifact()} type="button" variant="main">{isIndexing ? <Loader className="spin" size={16} /> : <Layers size={16} />} Index artifact</Button></> : null}</div>
+      <div className="shared-detail-actions">{canWrite ? <><Button disabled={isLoading || isMutating} onClick={() => setIsEditing((value) => !value)} type="button" variant="secondary"><Pencil size={16} /> {isEditing ? "Cancel edit" : "Edit"}</Button><Button className="shared-danger-action" disabled={isLoading || isMutating} onClick={() => void removeArtifact()} type="button" variant="secondary"><Trash size={16} /> Delete</Button></> : null}{canInspectIndex ? <Button disabled={isLoading || !artifact} onClick={() => setShowChunks(true)} type="button" variant="secondary"><Layers size={16} /> Indexed chunks</Button> : null}</div>
       {error ? <p className="shared-form-error" role="alert">{error}</p> : null}
-      <div className="shared-record-meta"><span>{artifact?.summary.artifact_type ?? "artifact"}</span><span>{artifact?.summary.language ?? "Unspecified language"}</span><span>{artifact?.summary.indexed_at ? "Indexed" : "Not indexed"}</span></div>
+      <div className="shared-record-meta"><span>{artifact?.summary.artifact_type ?? "artifact"}</span><span>{artifact?.summary.language ?? "Unspecified language"}</span><span>{artifact?.summary.indexed_at ? "Indexed" : indexingStalled ? "Not indexed" : "Indexing…"}</span></div>
       {isEditing ? <form className="shared-record-edit-form" onSubmit={saveArtifact}><label>Evidence title<Input onChange={(event) => setTitle(event.target.value)} required value={title} /></label><Button disabled={isMutating} type="submit" variant="main">{isMutating ? <Loader className="spin" size={16} /> : <Pencil size={16} />} Save evidence</Button></form> : null}
       <section className="shared-record-panel shared-lifecycle-panel"><div className="shared-panel-heading"><div><Shield size={18} /><h2>Evidence lifecycle</h2></div><span className={`shared-lifecycle-status status-${lifecycle?.status ?? "active"}`}>{lifecycle?.status?.replace(/_/g, " ") ?? "Active"}</span></div>{isEditingLifecycle ? <form className="shared-lifecycle-form" onSubmit={saveLifecycle}><label>Status<Dropdown aria-label="Evidence lifecycle status" onValueChange={(value) => setLifecycleStatus(value as ArtifactLifecycleStatus)} options={[{ label: "Active", value: "active" }, { label: "Needs review", value: "needs_review" }, { label: "Verified", value: "verified" }, { label: "Outdated", value: "outdated" }, { label: "Superseded", value: "superseded" }]} value={lifecycleStatus} /></label><label>Review owner<Dropdown aria-label="Evidence review owner" onValueChange={(value) => setLifecycleOwnerId(value === "__unassigned__" ? "" : value)} options={[{ label: "Unassigned", value: "__unassigned__" }, ...workspaceMembers.map((member) => ({ label: member.user.display_name, value: member.user.id }))]} value={lifecycleOwnerId || "__unassigned__"} /></label>{lifecycleStatus === "superseded" ? <label>Replacement evidence<Dropdown aria-label="Replacement evidence" onValueChange={(value) => setSupersededByArtifactId(value === "__none__" ? "" : value)} options={[{ label: "Choose replacement evidence", value: "__none__" }, ...workspaceArtifacts.filter((entry) => entry.id !== artifactId).map((entry) => ({ label: entry.title, value: entry.id }))]} value={supersededByArtifactId || "__none__"} /></label> : null}<label className="shared-lifecycle-note">Review note<Textarea onChange={(event) => setLifecycleNote(event.target.value)} placeholder="What should the team know about this evidence?" value={lifecycleNote} /></label><div><Button disabled={isMutating} type="submit" variant="main">{isMutating ? <Loader className="spin" size={16} /> : <Shield size={16} />} Save lifecycle</Button><Button disabled={isMutating} onClick={() => setIsEditingLifecycle(false)} type="button" variant="secondary">Cancel</Button></div></form> : <div className="shared-lifecycle-summary"><div><strong>{lifecycle?.owner ? `Owned by ${lifecycle.owner.display_name}` : "No review owner"}</strong><span>{lifecycle?.reviewed_at ? `Last updated ${formatActivityTime(lifecycle.reviewed_at)} by ${lifecycle.reviewed_by?.display_name ?? "a member"}` : "No lifecycle review recorded yet."}</span></div>{lifecycle?.review_note ? <p>{lifecycle.review_note}</p> : <p className="shared-muted-copy">Add a review note so the evidence can be trusted in context.</p>}{lifecycle?.superseded_by_artifact_id ? <span className="shared-lifecycle-replacement">Replaced by evidence {lifecycle.superseded_by_artifact_id.slice(0, 8)}</span> : null}{canWrite ? <Button onClick={() => setIsEditingLifecycle(true)} type="button" variant="secondary"><Pencil size={15} /> Update lifecycle</Button> : null}</div>}<div className="shared-lifecycle-history"><strong>History</strong>{lifecycleEvents.length ? lifecycleEvents.map((event) => <p key={event.id}><span>{event.detail}</span><time dateTime={event.created_at}>{event.actor?.display_name ?? "System"} · {formatActivityTime(event.created_at)}</time></p>) : <p className="shared-muted-copy">Lifecycle changes will be recorded here.</p>}</div></section>
       <section className="shared-record-panel"><h2>Stored content</h2>{artifact?.content_preview ? <pre className="shared-content-preview">{artifact.content_preview}</pre> : <p className="shared-muted-copy">This artifact has no text preview available.</p>}</section>
-      <section className="shared-record-panel"><h2>Indexed evidence</h2>{artifact?.chunks.length ? <div className="shared-chunk-list">{artifact.chunks.map((chunk) => <article key={chunk.id}><span>{chunk.start_line ? `Lines ${chunk.start_line}${chunk.end_line && chunk.end_line !== chunk.start_line ? `–${chunk.end_line}` : ""}` : "Stored chunk"}</span><p>{chunk.text}</p></article>)}</div> : <p className="shared-muted-copy">Index this artifact to create retrievable evidence chunks.</p>}</section>
       <section className="shared-record-panel shared-discussion-panel"><div className="shared-panel-heading"><div><MessageCircle size={18} /><h2>Evidence discussion</h2></div><span>{comments.length} comments</span></div>{comments.length ? <div className="shared-comment-list">{comments.map((comment) => <article key={comment.id}><div className="shared-comment-author"><span aria-hidden="true">{comment.author.display_name.slice(0, 1).toUpperCase()}</span><div><strong>{comment.author.display_name}</strong><time dateTime={comment.created_at}>{formatActivityTime(comment.created_at)}{comment.updated_at !== comment.created_at ? " · edited" : ""}</time></div></div>{editingCommentId === comment.id ? <form onSubmit={saveComment}><Textarea aria-label="Edit comment" onChange={(event) => setEditingCommentBody(event.target.value)} required value={editingCommentBody} /><div><Button disabled={isMutating} type="submit" variant="main">Save comment</Button><Button onClick={() => setEditingCommentId(null)} type="button" variant="secondary">Cancel</Button></div></form> : <><p>{comment.body}</p>{comment.author.id === session.user.id || canModerateComments ? <div className="shared-comment-actions">{comment.author.id === session.user.id ? <Button onClick={() => { setEditingCommentId(comment.id); setEditingCommentBody(comment.body); }} type="button" variant="secondary"><Pencil size={14} /> Edit</Button> : null}<Button disabled={isMutating} onClick={() => void removeComment(comment)} type="button" variant="secondary"><Trash size={14} /> Delete</Button></div> : null}</>}</article>)}</div> : <p className="shared-muted-copy">No discussion yet. Add context, ask for a review, or record a decision beside the evidence.</p>}{canWrite ? <form className="shared-comment-form" onSubmit={addComment}><Textarea aria-label="New evidence comment" onChange={(event) => setCommentBody(event.target.value)} placeholder="Add context or mention @teammate@example.com…" required value={commentBody} /><Button disabled={isMutating} type="submit" variant="main"><MessageCircle size={16} /> Add comment</Button></form> : null}</section>
+      {showChunks && artifact ? <IndexedChunksDialog accessToken={accessToken} artifact={artifact.summary} onClose={() => setShowChunks(false)} onReindexed={() => void load()} /> : null}
     </SharedRecordLayout>
+  );
+}
+
+/** Administrator-only inspection of the chunks stored for one artifact. */
+function IndexedChunksDialog({
+  accessToken,
+  artifact,
+  onClose,
+  onReindexed,
+}: {
+  accessToken: string;
+  artifact: ArtifactSummary;
+  onClose: () => void;
+  onReindexed: () => void;
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const [chunks, setChunks] = useState<Chunk[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isReindexing, setIsReindexing] = useState(false);
+
+  async function loadChunks() {
+    setError(null);
+    try { setChunks(await listSharedArtifactChunks(accessToken, artifact.id)); } catch (requestError) { setError(apiMessage(requestError)); }
+  }
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (dialog && !dialog.open) dialog.showModal();
+    void loadChunks();
+  }, [artifact.id]);
+
+  async function reindex() {
+    setIsReindexing(true); setError(null);
+    try { await indexSharedArtifact(accessToken, artifact.id); await loadChunks(); onReindexed(); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsReindexing(false); }
+  }
+
+  return (
+    <dialog aria-labelledby="indexed-chunks-title" className="shared-dialog" onClick={(event) => { if (event.target === event.currentTarget) dialogRef.current?.close(); }} onClose={onClose} ref={dialogRef}>
+      <header className="shared-dialog-header">
+        <div><h2 id="indexed-chunks-title">Indexed chunks</h2><p>{artifact.path}{chunks ? ` · ${chunks.length} ${chunks.length === 1 ? "chunk" : "chunks"}` : ""}</p></div>
+        <Button aria-label="Close indexed chunks" onClick={() => dialogRef.current?.close()} type="button" variant="secondary">Close</Button>
+      </header>
+      <div className="shared-dialog-body">
+        {error ? <p className="shared-form-error" role="alert">{error}</p> : null}
+        {chunks === null && !error ? <p className="shared-muted-copy"><Loader className="spin" size={14} /> Loading chunks…</p> : null}
+        {chunks && chunks.length === 0 ? <p className="shared-muted-copy">No chunks are stored for this artifact. It may still be indexing, or it has no extractable text.</p> : null}
+        {chunks && chunks.length ? <div className="shared-chunk-list">{chunks.map((chunk) => <article key={chunk.id}><span>{`#${chunk.chunk_index + 1}`}{chunk.start_line ? ` · Lines ${chunk.start_line}${chunk.end_line && chunk.end_line !== chunk.start_line ? `–${chunk.end_line}` : ""}` : ""}{chunk.heading_path ? ` · ${chunk.heading_path}` : ""}{chunk.token_count ? ` · ${chunk.token_count} tokens` : ""}</span><p>{chunk.text}</p></article>)}</div> : null}
+      </div>
+      <footer className="shared-dialog-footer">
+        <span>Only workspace owners and administrators can see stored chunks.</span>
+        <Button disabled={isReindexing} onClick={() => void reindex()} type="button" variant="main">{isReindexing ? <Loader className="spin" size={16} /> : <Layers size={16} />} Re-index</Button>
+      </footer>
+    </dialog>
   );
 }
 

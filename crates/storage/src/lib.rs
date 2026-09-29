@@ -2180,6 +2180,39 @@ impl StorageEngine {
         Ok(rows.into_iter().map(ArtifactSummary::from).collect())
     }
 
+    /// Artifacts that have never been indexed, oldest first, across all
+    /// workspaces. The shared server uses this to resume automatic indexing
+    /// after a restart.
+    pub async fn list_unindexed_artifacts(&self) -> Result<Vec<ArtifactSummary>> {
+        let rows = sqlx::query_as::<_, ArtifactSummaryRow>(
+            r#"
+            SELECT
+              artifacts.id,
+              artifacts.workspace_id,
+              artifacts.source_id,
+              sources.name AS source_name,
+              artifacts.type AS artifact_type,
+              artifacts.title,
+              artifacts.path,
+              artifacts.content_hash,
+              artifacts.mime_type,
+              artifacts.language,
+              artifacts.size_bytes,
+              artifacts.created_at,
+              artifacts.updated_at,
+              artifacts.indexed_at
+            FROM artifacts
+            JOIN sources ON sources.id = artifacts.source_id
+            WHERE artifacts.indexed_at IS NULL
+            ORDER BY artifacts.created_at ASC
+            "#,
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows.into_iter().map(ArtifactSummary::from).collect())
+    }
+
     pub async fn get_artifact(&self, artifact_id: &str) -> Result<ArtifactDetail> {
         let row = sqlx::query_as::<_, ArtifactDetailRow>(
             r#"
@@ -3282,7 +3315,7 @@ impl StorageEngine {
         Ok(ArtifactSummary::from(row))
     }
 
-    async fn list_chunks_for_artifact(&self, artifact_id: &str) -> Result<Vec<Chunk>> {
+    pub async fn list_chunks_for_artifact(&self, artifact_id: &str) -> Result<Vec<Chunk>> {
         let rows = sqlx::query_as::<_, ChunkRow>(
             r#"
             SELECT

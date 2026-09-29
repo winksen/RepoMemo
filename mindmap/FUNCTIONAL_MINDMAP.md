@@ -86,6 +86,7 @@ mindmap
       Lifecycle review
       Discussion and mentions
     Indexing
+      Automatic after save
       Split into passages
       Extract code symbols
       Describe images with AI
@@ -127,7 +128,8 @@ Joining an organization **automatically grants access to every workspace in it**
 |---|:-:|:-:|:-:|:-:|
 | Read evidence, search, memory, tasks | ✅ | ✅ | ✅ | ✅ |
 | Ask AI / generate AI overview¹ | ✅ | ✅ | ✅ | ✅ |
-| Add, rename, delete, index evidence | ✅ | ✅ | ✅ | — |
+| Add, rename, delete evidence (indexing is automatic) | ✅ | ✅ | ✅ | — |
+| Inspect stored index chunks and re-index one artifact | ✅ | ✅ | — | — |
 | Create and edit memory cards | ✅ | ✅ | ✅ | — |
 | Create and edit tasks, comment, change lifecycle | ✅ | ✅ | ✅ | — |
 | Edit or delete *other people's* comments and tasks | ✅ | ✅ | — | — |
@@ -182,7 +184,7 @@ A workspace is opened at `/workspaces/:id/<section>` and has **nine sections**:
 | Section | Purpose | Who sees it |
 |---|---|---|
 | **Overview** | "Workspace pulse" metrics and the AI overview | Everyone |
-| **Evidence** | The evidence ledger: browse, add notes, upload files, index | Everyone (only writers can add) |
+| **Evidence** | The evidence ledger: browse, add notes, upload files. New evidence is indexed automatically | Everyone (only writers can add) |
 | **Documents** | The same ledger filtered to Word files, with an inline text preview | Everyone |
 | **Retrieval** | Keyword search, saved searches, "Ask your evidence" | Everyone |
 | **Memory** | Team memory cards: search and create | Everyone |
@@ -227,7 +229,8 @@ If the same file with the same content is uploaded twice, it is stored only once
 - **Artifact page** (`/workspaces/:id/artifacts/:artifactId`) shows:
   - metadata: type, language, and whether it is indexed
   - **stored content** as a text preview; Word files are converted to text
-  - **indexed evidence**: the searchable passages, with line ranges
+  - **indexing status**: *Indexing…* right after saving, then *Indexed*
+  - for owners and admins only, an **Indexed chunks** button that opens a dialog with the stored passages, their line ranges, and a **Re-index** action
   - **rename** and **delete**, for writers
 - **Lifecycle review**: every artifact has a status:
   `active` → `needs_review` → `verified` / `outdated` / `superseded`
@@ -238,7 +241,9 @@ If the same file with the same content is uploaded twice, it is stored only once
 
 ## 6. Indexing: making evidence searchable
 
-Evidence must be **indexed** before search, Ask, or the AI overview can use it. Writers press **"Index evidence"**, which indexes the whole workspace. Indexing can also be triggered for a single artifact.
+Evidence must be **indexed** before search, Ask, or the AI overview can use it. Indexing is **automatic**: as soon as a note is pasted or a file is uploaded, the server queues it and indexes it in the background. Nobody presses an index button, and the ledger shows *Indexing…* until the artifact is ready. Artifacts that were stored but never indexed (for example when the server restarted mid-queue) are picked up again at startup.
+
+The stored passages are an administrative detail. Regular members see search results, snippets and citations, but not the raw chunk list. Owners and admins can open it from the artifact page, and can re-index a single artifact from there (useful after an AI provider is configured for images).
 
 In plain terms, indexing does the following:
 
@@ -249,7 +254,7 @@ In plain terms, indexing does the following:
 
 Re-indexing replaces the previous passages for each artifact.
 
-**Current behavior to be aware of:** indexing runs while the user waits. On large workspaces the button spins until everything is done, and no progress bar is shown yet. If one file fails, indexing stops at that file.
+**Current behavior to be aware of:** the background queue processes up to two artifacts at a time, and the ledger polls for status rather than receiving live events. If an artifact fails to index it stays *Not indexed* and is retried at the next server start. Images stored before an AI provider was configured are indexed with no description and need a manual re-index by an admin.
 
 ---
 
@@ -357,7 +362,7 @@ These are observed in the code and are useful for prioritizing:
 
 | Gap | Impact |
 |---|---|
-| No live indexing progress in the web app | Users wait on a spinner, and large workspaces can time out. |
+| Indexing status is polled, not streamed | The ledger refreshes every few seconds while artifacts are pending. There is no per-file progress bar and no visible failure reason. |
 | No semantic (embedding) search in shared mode | Ask always uses keyword retrieval and shows a warning saying so. |
 | AI answers and the overview are shown as raw Markdown text | Headings and lists are not formatted. |
 | Search snippets show literal `<mark>` tags | The highlight markup is shown as text instead of being rendered. |

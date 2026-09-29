@@ -18,7 +18,7 @@ mindmap
       JWT in sessionStorage
     HTTP API
       Axum 0.8 server
-      75 operations under v1
+      76 operations under v1
       JWT HS256 extractor
       Role guards per request
       SSE event stream
@@ -192,7 +192,7 @@ The server resolves the caller's role **per request** from `workspace_membership
 |---|---|
 | `require_workspace_read` | any workspace role |
 | `require_workspace_write` | owner, admin, member |
-| `require_workspace_admin` | owner, admin |
+| `require_workspace_admin` | owner, admin. Also gates `GET /v1/artifacts/{a}/chunks` |
 | `require_workspace_owner` | owner |
 | `require_organization_read/admin/owner` | the equivalent roles at org level |
 
@@ -205,6 +205,7 @@ Other rules:
   - `create_shared_workspace` copies all org members into the workspace.
   - `upsert_organization_member` adds the user to every workspace of the org.
   - `upsert_workspace_member` adds the user to the org as a `member` if needed.
+- `can_inspect_index` (owner, admin) controls who receives chunks from `GET /v1/artifacts/{a}`. The server strips them for everyone else; the SPA only hides the button and the overview chunk count.
 - `GET …/capabilities` returns `capabilities_for_role(role)`. The SPA uses it **only to hide UI**. The server remains the authority.
 
 ### Error envelope
@@ -217,7 +218,7 @@ Other rules:
 
 ---
 
-## 5. HTTP API reference (75 operations)
+## 5. HTTP API reference (76 operations)
 
 Guard legend: **pub** = no auth, **auth** = any valid JWT, **R/W/A/O** = workspace read / write / admin / owner, **oR/oA/oO** = organization read / admin / owner. "→ activity" means the call records a `workspace_activity` row and so emits an SSE `activity` event.
 
@@ -271,15 +272,16 @@ Guard legend: **pub** = no auth, **auth** = any valid JWT, **R/W/A/O** = workspa
 |---|---|---|---|
 | GET | `/v1/workspaces/{ws}/artifacts` | R | |
 | POST | `/v1/workspaces/{ws}/artifacts/query` | R | filters by title/path, types, languages, sources and indexed, **in memory** |
-| POST | `/v1/workspaces/{ws}/artifacts/text` | W | `{title,content,language?}` → activity |
-| POST | `/v1/workspaces/{ws}/artifacts/upload` | W | **raw body**, with the name in the `X-RepoMemo-Filename` header and the MIME type in `Content-Type` → activity |
-| GET, PUT, DELETE | `/v1/artifacts/{a}` | R / W / W | GET returns detail with chunks and preview. Word files are extracted at read time, capped at 120k chars |
+| POST | `/v1/workspaces/{ws}/artifacts/text` | W | `{title,content,language?}` → activity. Queues background indexing |
+| POST | `/v1/workspaces/{ws}/artifacts/upload` | W | **raw body**, with the name in the `X-RepoMemo-Filename` header and the MIME type in `Content-Type` → activity. Queues background indexing |
+| GET, PUT, DELETE | `/v1/artifacts/{a}` | R / W / W | GET returns detail and preview; `chunks` is **empty unless the caller is owner/admin**. Word files are extracted at read time, capped at 120k chars |
+| GET | `/v1/artifacts/{a}/chunks` | A | stored chunks of one artifact, for the admin dialog. Members get 403 |
 | GET, PUT | `/v1/artifacts/{a}/lifecycle` | R / W | validates status, owner membership and the supersede target → activity |
 | GET | `/v1/artifacts/{a}/lifecycle/history` | R | |
 | GET, POST | `/v1/artifacts/{a}/comments` | R / W | `@email` mentions → notifications → activity |
 | PUT, DELETE | `/v1/comments/{c}` | author or A | → activity |
-| POST | `/v1/artifacts/{a}/index` | W | **synchronous**. Returns the finished job |
-| POST | `/v1/workspaces/{ws}/index` | W | **synchronous**, loops over all artifacts and fails fast |
+| POST | `/v1/artifacts/{a}/index` | W | **synchronous** manual re-index. Returns the finished job. The web client only exposes it to admins, in the chunks dialog |
+| POST | `/v1/workspaces/{ws}/index` | W | **synchronous**, loops over all artifacts and fails fast. No longer used by the web client |
 | GET | `/v1/workspaces/{ws}/jobs?kind&status&limit` | R | default limit 50 |
 | GET | `/v1/jobs/{j}` | R | |
 | POST | `/v1/jobs/{j}/cancel` | W | sets `cancel_requested`. Cooperative, checked between artifacts or batches |
@@ -346,8 +348,10 @@ flowchart TD
   RP --> FTS[(chunks_fts updated by triggers)]
 ```
 
-- The work runs **inside the HTTP request**. The job row exists for observability only and nothing picks it up asynchronously.
-- `index_workspace` re-indexes **every** artifact each time, with no content-hash skip. It checks `cancel_requested` between artifacts and stops at the first failure with status `failed`.
+- **Automatic path.** `create_text_artifact` and `upload_artifact` call `IndexQueue::enqueue` ([indexing.rs](../apps/server/src/indexing.rs)) after storing. The queue is an in-process `mpsc` channel with a de-dup set and a semaphore of 2, so at most two artifacts are indexed at once. Each run goes through `RepoMemoCore::index_artifact`, so it still creates a job row (and SSE event) and records an `artifact_indexed` activity. Already-indexed artifacts (duplicate uploads) are skipped.
+- **Restart recovery.** `router()` calls `resume_pending()`, which enqueues every artifact with `indexed_at IS NULL`. A failed run leaves the artifact unindexed, so it is retried at the next start. The queue is not durable on its own: it is rebuilt from the database.
+- The manual `POST …/index` endpoints still run **inside the HTTP request**. The worker crate remains a stub.
+- `index_workspace` (manual, now unused by the SPA) re-indexes **every** artifact each time, with no content-hash skip. It checks `cancel_requested` between artifacts and stops at the first failure with status `failed`.
 
 ### 6.3 Keyword search (`RetrievalService::search` → `StorageEngine::search_chunks`)
 
@@ -486,7 +490,7 @@ Run the Rust tests with `cargo test`. See [DEVELOPMENT_COMMANDS.md](../docs/DEVE
 | # | Area | Issue | Suggested direction |
 |---|---|---|---|
 | 1 | Security | Provider API keys are stored in plaintext in SQLite | Encrypt at rest with a server key, or use an OS or secret store |
-| 2 | Scalability | Indexing runs synchronously inside HTTP handlers, and the worker is a stub | Enqueue jobs, have the worker claim them, and have the SPA follow SSE |
+| 2 | Scalability | Automatic indexing uses an in-process queue with 2 workers, no durable jobs, no retry policy, and the worker crate is a stub. The SPA polls instead of following SSE | Durable job queue claimed by the worker, retries with backoff, SSE progress |
 | 3 | Auth | No refresh or revocation, and a password change leaves old tokens valid | Short access token plus refresh, and a token version per user |
 | 4 | Cost / abuse | Viewers can trigger Ask and the AI overview, including on cloud providers | A capability flag for AI use, and rate limits |
 | 5 | Correctness | Error classification by substring matching, and not-found returns 400 | Typed errors from storage and core |

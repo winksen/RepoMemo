@@ -229,6 +229,7 @@ export interface WorkspaceCapabilities {
   can_create_tasks: boolean;
   can_comment: boolean;
   can_moderate_comments: boolean;
+  can_inspect_index: boolean;
 }
 
 export interface WorkspaceAiOverview {

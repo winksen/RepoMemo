@@ -721,6 +721,18 @@ textarea:focus-visible {
 .shared-chunk-list span,
 .shared-evidence-links span { color: var(--color-text-subtle); font-family: var(--font-mono); font-size: 11px; }
 .shared-chunk-list p { margin: 6px 0 0; font-size: 13px; line-height: 1.55; white-space: pre-wrap; }
+.shared-dialog { inset: 0; width: min(760px, calc(100vw - 32px)); max-height: min(80vh, 720px); margin: auto; padding: 0; overflow: hidden; color: var(--color-text); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px; box-shadow: var(--shadow-floating); }
+.shared-dialog[open] { display: flex; flex-direction: column; }
+.shared-dialog::backdrop { background: rgba(20, 27, 43, 0.4); }
+.shared-dialog-header,
+.shared-dialog-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 18px; }
+.shared-dialog-header { border-bottom: 1px solid var(--color-border); }
+.shared-dialog-footer { border-top: 1px solid var(--color-border); }
+.shared-dialog-header h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.shared-dialog-header p { margin: 3px 0 0; overflow-wrap: anywhere; color: var(--color-text-subtle); font-family: var(--font-mono); font-size: 12px; }
+.shared-dialog-footer > span { color: var(--color-text-subtle); font-size: 12px; }
+.shared-dialog-body { flex: 1; min-height: 0; padding: 16px 18px; overflow: auto; }
+.shared-dialog-body .shared-chunk-list article:last-child { padding-bottom: 0; border-bottom: 0; }
 .shared-memory-body { max-width: 75ch; font-size: 14px; line-height: 1.65; white-space: pre-wrap; }
 .shared-evidence-links { display: grid; gap: 10px; }
 .shared-evidence-links article { display: grid; gap: 3px; }

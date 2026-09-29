@@ -1,6 +1,7 @@
 //! Server-authoritative HTTP API for shared RepoMemo workspaces.
 
 mod events;
+mod indexing;
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -34,7 +35,8 @@ use rand_core::OsRng;
 use repomemo_api::RepoMemoCore;
 use repomemo_domain::{
     ArtifactComment, ArtifactDetail, ArtifactLifecycle, ArtifactLifecycleEvent, ArtifactSummary,
-    ArtifactType, AskAnswer, AskRequest, Citation, CollaborationTask, CreateMemoryCardRequest,
+    ArtifactType, AskAnswer, AskRequest, Chunk, Citation, CollaborationTask,
+    CreateMemoryCardRequest,
     IndexingJobStatus, MemoryCard, MemoryCardDetail, MemoryCardSummary, Organization,
     OrganizationMember, OrganizationRole, ProviderSettings, ProviderTestResult, SavedSearch,
     SearchRequest, SearchResult, SharedAiProviderSettings, SharedNotification, SharedSession,
@@ -48,6 +50,7 @@ use repomemo_storage::{
 };
 
 use crate::events::{BusActivityObserver, BusJobObserver, WorkspaceEventBus};
+use crate::indexing::IndexQueue;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
@@ -113,6 +116,7 @@ struct AppState {
     core: RepoMemoCore,
     jwt_secret: String,
     event_bus: WorkspaceEventBus,
+    index_queue: IndexQueue,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -489,11 +493,15 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
     storage.set_job_observer(Arc::new(BusJobObserver::new(event_bus.clone())));
     storage.set_activity_observer(Arc::new(BusActivityObserver::new(event_bus.clone())));
 
+    let index_queue = IndexQueue::start(core.clone());
+    index_queue.resume_pending().await;
+
     let state = AppState {
         storage,
         core,
         jwt_secret: config.jwt_secret,
         event_bus,
+        index_queue,
     };
     let cors = match config.allowed_origin {
         Some(origin) => CorsLayer::new()
@@ -636,6 +644,10 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
             get(get_artifact)
                 .put(update_artifact)
                 .delete(delete_artifact),
+        )
+        .route(
+            "/v1/artifacts/{artifact_id}/chunks",
+            get(list_artifact_chunks),
         )
         .route(
             "/v1/artifacts/{artifact_id}/comments",
@@ -2355,6 +2367,7 @@ async fn create_text_artifact(
         format!("Stored evidence: {}.", artifact.title),
     )
     .await;
+    state.index_queue.enqueue(&artifact, Some(&subject.user_id));
     Ok((StatusCode::CREATED, Json(artifact)))
 }
 
@@ -2391,6 +2404,7 @@ async fn upload_artifact(
         format!("Uploaded evidence: {}.", artifact.title),
     )
     .await;
+    state.index_queue.enqueue(&artifact, Some(&subject.user_id));
     Ok((StatusCode::CREATED, Json(artifact)))
 }
 
@@ -2399,13 +2413,37 @@ async fn get_artifact(
     State(state): State<AppState>,
     Path(artifact_id): Path<String>,
 ) -> Result<Json<ArtifactDetail>, ApiError> {
-    let artifact = state
+    let mut artifact = state
         .core
         .get_artifact(artifact_id)
         .await
         .map_err(map_core_error)?;
-    require_workspace_read(&state, &subject, &artifact.summary.workspace_id).await?;
+    let role = require_workspace_read(&state, &subject, &artifact.summary.workspace_id).await?;
+    // Stored chunks are an administrative view of the index. Everyone else
+    // works with the artifact content and search results.
+    if !capabilities_for_role(role).can_inspect_index {
+        artifact.chunks.clear();
+    }
     Ok(Json(artifact))
+}
+
+async fn list_artifact_chunks(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(artifact_id): Path<String>,
+) -> Result<Json<Vec<Chunk>>, ApiError> {
+    let summary = state
+        .storage
+        .get_artifact_summary(&artifact_id)
+        .await
+        .map_err(map_storage_error)?;
+    require_workspace_admin(&state, &subject, &summary.workspace_id).await?;
+    state
+        .storage
+        .list_chunks_for_artifact(&artifact_id)
+        .await
+        .map(Json)
+        .map_err(map_storage_error)
 }
 
 async fn update_artifact(
@@ -3079,6 +3117,7 @@ fn capabilities_for_role(role: WorkspaceRole) -> WorkspaceCapabilities {
         can_create_tasks: can_write_content,
         can_comment: can_write_content,
         can_moderate_comments: matches!(&role, WorkspaceRole::Owner | WorkspaceRole::Admin),
+        can_inspect_index: can_manage_members,
         role,
         can_manage_members,
     }
@@ -3709,8 +3748,7 @@ mod tests {
                     "query":"shared fact",
                     "artifact_types":["markdown_doc"],
                     "languages":["markdown"],
-                    "source_ids":[],
-                    "indexed":false
+                    "source_ids":[]
                 }),
             ))
             .await
@@ -3725,16 +3763,23 @@ mod tests {
         assert_eq!(filtered_artifacts.as_array().unwrap().len(), 1);
         assert_eq!(filtered_artifacts[0]["id"], artifact_id);
 
-        let indexed = app
+        // Notes and uploads are indexed in the background right after storing.
+        wait_for_indexed_artifacts(&app, &authorization, workspace_id, 2).await;
+        let indexed_only = app
             .clone()
-            .oneshot(auth_request(
+            .oneshot(json_request(
                 "POST",
-                &format!("/v1/artifacts/{artifact_id}/index"),
+                &format!("/v1/workspaces/{workspace_id}/artifacts/query"),
                 &authorization,
+                json!({"query":"", "artifact_types":[], "languages":[], "source_ids":[], "indexed":true}),
             ))
             .await
             .unwrap();
-        assert_eq!(indexed.status(), 200);
+        let indexed_only: Value = serde_json::from_slice(
+            &to_bytes(indexed_only.into_body(), usize::MAX).await.unwrap(),
+        )
+        .unwrap();
+        assert_eq!(indexed_only.as_array().unwrap().len(), 2);
         let metrics = app
             .clone()
             .oneshot(auth_request(
@@ -3749,8 +3794,8 @@ mod tests {
             serde_json::from_slice(&to_bytes(metrics.into_body(), usize::MAX).await.unwrap())
                 .unwrap();
         assert_eq!(metrics["artifact_count"], 2);
-        assert_eq!(metrics["indexed_artifact_count"], 1);
-        assert_eq!(metrics["pending_artifact_count"], 1);
+        assert_eq!(metrics["indexed_artifact_count"], 2);
+        assert_eq!(metrics["pending_artifact_count"], 0);
         assert_eq!(metrics["member_count"], 2);
         assert_eq!(metrics["completed_task_count"], 1);
         assert_eq!(metrics["comment_count"], 1);
@@ -3799,8 +3844,12 @@ mod tests {
                 .unwrap(),
         )
         .unwrap();
-        assert_eq!(retrieval_facets["artifact_types"], json!(["markdown_doc"]));
-        assert_eq!(retrieval_facets["languages"], json!(["Markdown"]));
+        // Both the pasted note and the uploaded Rust file were indexed automatically.
+        assert_eq!(
+            retrieval_facets["artifact_types"],
+            json!(["code_file", "markdown_doc"])
+        );
+        assert_eq!(retrieval_facets["languages"], json!(["Markdown", "Rust"]));
         let memory = app.clone().oneshot(json_request("POST", &format!("/v1/workspaces/{workspace_id}/memory-cards"), &authorization, json!({"title":"Rule", "body_markdown":"Keep shared data on the API.", "source":"Flow", "confidence": null, "citations": []}))).await.unwrap();
         assert_eq!(memory.status(), 201);
         let memory: Value =
@@ -4294,6 +4343,193 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(missing.status(), 400);
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    /// Polls the artifact list until `expected` artifacts report an index
+    /// timestamp, since indexing runs on a background queue.
+    async fn wait_for_indexed_artifacts(
+        app: &axum::Router,
+        authorization: &str,
+        workspace_id: &str,
+        expected: usize,
+    ) {
+        for _ in 0..100 {
+            let response = app
+                .clone()
+                .oneshot(auth_request(
+                    "GET",
+                    &format!("/v1/workspaces/{workspace_id}/artifacts"),
+                    authorization,
+                ))
+                .await
+                .unwrap();
+            let artifacts: Value =
+                serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap())
+                    .unwrap();
+            let indexed = artifacts
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|artifact| artifact["indexed_at"].is_string())
+                .count();
+            if indexed >= expected {
+                return;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+        panic!("artifacts were not indexed in the background in time");
+    }
+
+    #[tokio::test]
+    async fn indexes_new_evidence_automatically_and_limits_chunks_to_admins() {
+        let data_dir =
+            std::env::temp_dir().join(format!("repomemo-server-auto-index-{}", uuid::Uuid::new_v4()));
+        let app = router(ServerConfig::for_test(data_dir.clone()))
+            .await
+            .unwrap();
+
+        let mut tokens = Vec::new();
+        for email in ["auto-owner@example.com", "auto-member@example.com"] {
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .method("POST")
+                        .uri("/v1/auth/register")
+                        .header("content-type", "application/json")
+                        .body(Body::from(
+                            json!({"email": email, "display_name": email, "password": "not-a-real-password"})
+                                .to_string(),
+                        ))
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), 201);
+            let body: Value =
+                serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap())
+                    .unwrap();
+            tokens.push(format!("Bearer {}", body["access_token"].as_str().unwrap()));
+        }
+        let (owner, member) = (&tokens[0], &tokens[1]);
+
+        let organization = app
+            .clone()
+            .oneshot(json_request("POST", "/v1/organizations", owner, json!({"name":"Auto Team"})))
+            .await
+            .unwrap();
+        let organization: Value = serde_json::from_slice(
+            &to_bytes(organization.into_body(), usize::MAX).await.unwrap(),
+        )
+        .unwrap();
+        let workspace = app
+            .clone()
+            .oneshot(json_request(
+                "POST",
+                "/v1/workspaces",
+                owner,
+                json!({"organization_id": organization["id"], "name":"Auto Workspace"}),
+            ))
+            .await
+            .unwrap();
+        let workspace: Value = serde_json::from_slice(
+            &to_bytes(workspace.into_body(), usize::MAX).await.unwrap(),
+        )
+        .unwrap();
+        let workspace_id = workspace["workspace"]["id"].as_str().unwrap().to_owned();
+        let added = app
+            .clone()
+            .oneshot(json_request(
+                "PUT",
+                &format!("/v1/workspaces/{workspace_id}/members"),
+                owner,
+                json!({"email":"auto-member@example.com","role":"member"}),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(added.status(), 200);
+
+        let artifact = app
+            .clone()
+            .oneshot(json_request(
+                "POST",
+                &format!("/v1/workspaces/{workspace_id}/artifacts/text"),
+                member,
+                json!({"title":"Auto note","content":"# Auto\nIndexed without a button.","language":"Markdown"}),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(artifact.status(), 201);
+        let artifact: Value =
+            serde_json::from_slice(&to_bytes(artifact.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
+        let artifact_id = artifact["id"].as_str().unwrap().to_owned();
+
+        wait_for_indexed_artifacts(&app, owner, &workspace_id, 1).await;
+
+        let capabilities = |authorization: String| {
+            let app = app.clone();
+            let workspace_id = workspace_id.clone();
+            async move {
+                let response = app
+                    .oneshot(auth_request(
+                        "GET",
+                        &format!("/v1/workspaces/{workspace_id}/capabilities"),
+                        &authorization,
+                    ))
+                    .await
+                    .unwrap();
+                serde_json::from_slice::<Value>(
+                    &to_bytes(response.into_body(), usize::MAX).await.unwrap(),
+                )
+                .unwrap()
+            }
+        };
+        assert_eq!(capabilities(owner.clone()).await["can_inspect_index"], true);
+        assert_eq!(capabilities(member.clone()).await["can_inspect_index"], false);
+
+        // A member can read the artifact but never receives its chunks.
+        let detail = app
+            .clone()
+            .oneshot(auth_request("GET", &format!("/v1/artifacts/{artifact_id}"), member))
+            .await
+            .unwrap();
+        assert_eq!(detail.status(), 200);
+        let detail: Value =
+            serde_json::from_slice(&to_bytes(detail.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
+        assert!(detail["chunks"].as_array().unwrap().is_empty());
+        let member_chunks = app
+            .clone()
+            .oneshot(auth_request("GET", &format!("/v1/artifacts/{artifact_id}/chunks"), member))
+            .await
+            .unwrap();
+        assert_eq!(member_chunks.status(), 403);
+
+        // Owners and admins see the stored chunks through both routes.
+        let owner_detail = app
+            .clone()
+            .oneshot(auth_request("GET", &format!("/v1/artifacts/{artifact_id}"), owner))
+            .await
+            .unwrap();
+        let owner_detail: Value = serde_json::from_slice(
+            &to_bytes(owner_detail.into_body(), usize::MAX).await.unwrap(),
+        )
+        .unwrap();
+        assert_eq!(owner_detail["chunks"].as_array().unwrap().len(), 1);
+        let owner_chunks = app
+            .clone()
+            .oneshot(auth_request("GET", &format!("/v1/artifacts/{artifact_id}/chunks"), owner))
+            .await
+            .unwrap();
+        assert_eq!(owner_chunks.status(), 200);
+        let owner_chunks: Value = serde_json::from_slice(
+            &to_bytes(owner_chunks.into_body(), usize::MAX).await.unwrap(),
+        )
+        .unwrap();
+        assert_eq!(owner_chunks[0]["heading_path"], "Auto");
+
         let _ = std::fs::remove_dir_all(data_dir);
     }
 
