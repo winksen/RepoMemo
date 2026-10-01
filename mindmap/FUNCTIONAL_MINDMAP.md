@@ -248,11 +248,11 @@ The stored passages are an administrative detail. Regular members see search res
 In plain terms, indexing does the following:
 
 1. **Reads the text.** Word documents are converted locally.
-2. **Splits it into passages.** Markdown is split by heading; code and text are split into windows of about 100 lines. Each passage keeps its line range so every citation can point to exact lines.
+2. **Splits it into passages.** Markdown is split by heading. TypeScript, JavaScript, Python and Rust are split along their structure, so a function, class or impl block is not cut in half: small neighbours are grouped, and large classes are split by method. Each passage records its scope (for example `impl Store > save`), which is also searchable. Other text and code files are split into windows of about 100 lines. Every passage keeps its line range so citations point to exact lines.
 3. **Extracts code symbols** from TypeScript, JavaScript, Python and Rust: functions, classes, methods, interfaces and enums.
 4. **Handles images differently.** If the workspace has an AI provider enabled, the image is sent to it and a **text description** is stored and made searchable, including any text visible in the image. Without a provider, images stay stored but cannot be searched.
 
-Re-indexing replaces the previous passages for each artifact.
+Re-indexing keeps every passage whose text did not change, so memory cards and any stored embeddings that point at it stay valid. Only passages that actually changed are replaced. When RepoMemo improves how it splits content, existing evidence is refreshed automatically in the background the next time the server starts, and images are never re-analysed by that refresh.
 
 **Current behavior to be aware of:** the background queue processes up to two artifacts at a time, and the ledger polls for status rather than receiving live events. If an artifact fails to index it stays *Not indexed* and is retried at the next server start. Images stored before an AI provider was configured are indexed with no description and need a manual re-index by an admin.
 

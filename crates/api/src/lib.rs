@@ -11,7 +11,7 @@ use repomemo_domain::{
     SearchResult, SourceType, SummaryResult, Symbol, SymbolSearchResult, UpdateMemoryCardRequest,
     Workspace, WorkspaceOverview,
 };
-use repomemo_indexer::{index_artifact, index_image_description};
+use repomemo_indexer::{index_artifact, index_image_description, INDEXER_VERSION};
 use repomemo_ingestion::{
     detect_artifact_type, detect_language, discover_import_candidates, extract_word_text,
     is_word_document, ImportCandidate, ImportOptions,
@@ -343,7 +343,11 @@ impl RepoMemoCore {
             bail!("Workspace was not found.");
         }
 
-        let artifacts = self.storage.list_artifacts(&workspace_id).await?;
+        // Incremental: artifacts already indexed by the current indexer are left alone.
+        let artifacts = self
+            .storage
+            .list_artifacts_needing_index(Some(&workspace_id), INDEXER_VERSION)
+            .await?;
         let total = artifacts.len() as i64;
         let job = self
             .storage
@@ -388,6 +392,15 @@ impl RepoMemoCore {
 
         self.storage
             .update_indexing_job(&job.id, "completed", "chunked_workspace", indexed, None)
+            .await
+    }
+
+    /// Artifacts that were never indexed, or were indexed by an older indexer
+    /// version, across every workspace. Images are only listed until their
+    /// first index, so refreshing never repeats vision analysis.
+    pub async fn artifacts_needing_index(&self) -> Result<Vec<ArtifactSummary>> {
+        self.storage
+            .list_artifacts_needing_index(None, INDEXER_VERSION)
             .await
     }
 
@@ -926,7 +939,7 @@ impl RepoMemoCore {
             (index_artifact(summary, &bytes)?, "chunked_text".to_owned())
         };
         self.storage
-            .replace_artifact_index(&summary.id, output.chunks, output.symbols)
+            .replace_artifact_index(&summary.id, output.chunks, output.symbols, INDEXER_VERSION)
             .await?;
 
         Ok(ArtifactIndexResult { stage })
@@ -1068,6 +1081,62 @@ mod tests {
         assert!(exported.contains("# Local-first decision"));
         assert!(exported.contains("## Evidence"));
         assert!(exported.contains(&artifact.path));
+
+        drop(core);
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn workspace_indexing_skips_artifacts_that_are_already_current() {
+        let data_dir = std::env::temp_dir().join(format!(
+            "repomemo-incremental-index-test-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let core = RepoMemoCore::boot(data_dir.clone()).await.unwrap();
+        let workspace = core
+            .create_workspace("Incremental".to_owned())
+            .await
+            .unwrap();
+        let first = core
+            .import_text(
+                workspace.id.clone(),
+                "First".to_owned(),
+                "# First
+One.".to_owned(),
+                Some("Markdown".to_owned()),
+            )
+            .await
+            .unwrap();
+        assert_eq!(core.artifacts_needing_index().await.unwrap().len(), 1);
+
+        let job = core.index_workspace(workspace.id.clone()).await.unwrap();
+        assert_eq!(job.status, "completed");
+        assert_eq!(job.progress_total, Some(1));
+        let chunk_ids = |detail: repomemo_domain::ArtifactDetail| {
+            detail.chunks.into_iter().map(|chunk| chunk.id).collect::<Vec<_>>()
+        };
+        let indexed_ids = chunk_ids(core.get_artifact(first.id.clone()).await.unwrap());
+        assert_eq!(indexed_ids.len(), 1);
+        assert!(core.artifacts_needing_index().await.unwrap().is_empty());
+
+        // Nothing is stale, so a second pass does no work and keeps every chunk.
+        let job = core.index_workspace(workspace.id.clone()).await.unwrap();
+        assert_eq!(job.status, "completed");
+        assert_eq!(job.progress_total, Some(0));
+        assert_eq!(
+            chunk_ids(core.get_artifact(first.id.clone()).await.unwrap()),
+            indexed_ids
+        );
+
+        // A forced re-index of unchanged content keeps chunk identity too.
+        core.index_artifact(first.id.clone()).await.unwrap();
+        assert_eq!(
+            chunk_ids(core.get_artifact(first.id).await.unwrap()),
+            indexed_ids
+        );
 
         drop(core);
         let _ = std::fs::remove_dir_all(data_dir);

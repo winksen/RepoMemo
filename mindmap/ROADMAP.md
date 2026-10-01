@@ -44,7 +44,7 @@ The goal was to run the whole local loop with AI kept optional: *create workspac
 |---|---|---|
 | 1A Skeleton | V0.1.0 | Tauri + React shell, Rust workspace, SQLite schema, workspaces |
 | 1B Import and store | V0.1.2 | File and folder import, content-addressed blob store, artifacts view, ADRs 0002–0004 |
-| 1C Chunking | V0.1.3 | Markdown chunking by heading, 100-line windows for code and text, indexing jobs |
+| 1C Chunking | V0.1.3 | Markdown chunking by heading, 100-line windows for code and text, indexing jobs. Code chunking became structure-aware (declarations, scope in the heading) afterwards |
 | 1E Code symbols | V0.1.3 | tree-sitter symbols for TS/TSX/JS, Python and Rust, file outlines |
 | 1D Full-text search | V0.1.4 | SQLite FTS5, safe query building, filters, highlighted snippets |
 | 1F AI provider layer | V0.1.6–0.1.7 | Ollama (local) and OpenRouter (cloud, with explicit acknowledgement), cited summaries |
@@ -86,7 +86,7 @@ V0.1.32 laid the groundwork: a jobs table with a kind and a cancel flag, the job
 - [ ] **Worker claims jobs.** `repomemo-worker` polls or claims queued jobs so indexing no longer runs inside the HTTP request.
 - [ ] **Async index endpoints.** `POST …/index` returns a queued job immediately.
 - [ ] **Live progress in the web client.** Consume the SSE stream with a fetch-based reader, because a native `EventSource` cannot send the auth header. Show progress bars and a cancel button.
-- [ ] **Incremental re-index.** Skip artifacts whose content hash has not changed.
+- [x] **Incremental re-index.** Workspace indexing skips artifacts already indexed by the current indexer version, unchanged chunks keep their identity (and embeddings), and a version bump refreshes older indexes in the background.
 
 ---
 

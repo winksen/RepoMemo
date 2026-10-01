@@ -30,7 +30,7 @@ mindmap
       AI providers
     Storage
       SQLite WAL via sqlx
-      10 migrations
+      11 migrations
       Content-addressed blobs
       Job and activity observers
     Runtime
@@ -114,7 +114,7 @@ flowchart TD
 | `crates/domain` | Serde DTOs shared by every layer: `ArtifactSummary`, `Chunk`, `Citation`, `WorkspaceRole`… | [lib.rs](../crates/domain/src/lib.rs) | ~570 LOC |
 | `crates/storage` | `StorageEngine`: the sqlx pool, migrations, blob I/O, **all SQL**, observers | [lib.rs](../crates/storage/src/lib.rs), [migrations/](../crates/storage/migrations) | ~4,260 LOC |
 | `crates/ingestion` | File discovery, type and language detection, binary sniffing, Word (`.docx` zip/XML, `.doc` CFB) text extraction | [lib.rs](../crates/ingestion/src/lib.rs) | ~650 |
-| `crates/indexer` | Chunking (Markdown by heading, 100-line windows) and tree-sitter symbols (TS/TSX/JS, Python, Rust) | [lib.rs](../crates/indexer/src/lib.rs) | ~570 |
+| `crates/indexer` | Chunking (Markdown by heading, structure-aware code chunks for TS/TSX/JS, Python and Rust, 100-line windows as fallback) and tree-sitter symbols. Exports `INDEXER_VERSION` | [lib.rs](../crates/indexer/src/lib.rs) | ~570 |
 | `crates/retrieval` | FTS query sanitising, hybrid FTS + vector merge | [lib.rs](../crates/retrieval/src/lib.rs) | ~100 |
 | `crates/ai` | `AiProvider` trait, with Ollama and OpenRouter implementations over `reqwest` (rustls) | [lib.rs](../crates/ai/src/lib.rs) | ~530 |
 | `crates/api` | `RepoMemoCore` facade: import, index, search, summarize, ask, memory cards | [lib.rs](../crates/api/src/lib.rs) | ~1,075 |
@@ -340,18 +340,24 @@ flowchart TD
   WX --> CH
   U --> CH{Markdown / Decision / Runbook?}
   CH -- yes --> MD[chunk by heading path, ~1600 chars]
-  CH -- no --> LW[100-line windows]
+  CH -- no --> TS{tree-sitter language?}
+  TS -- yes --> CD[chunk by declaration, pack to ~1800 chars, split big classes by member]
+  TS -- no --> LW[100-line windows]
   MD --> SY[tree-sitter symbols: TS/TSX/JS, Python, Rust]
+  CD --> SY
   LW --> SY
-  SY --> RP["replace_artifact_index: delete then insert chunks and symbols"]
+  SY --> RP["replace_artifact_index: reuse rows with unchanged text, insert new, delete gone, stamp index_version"]
   V --> RP
   RP --> FTS[(chunks_fts updated by triggers)]
 ```
 
 - **Automatic path.** `create_text_artifact` and `upload_artifact` call `IndexQueue::enqueue` ([indexing.rs](../apps/server/src/indexing.rs)) after storing. The queue is an in-process `mpsc` channel with a de-dup set and a semaphore of 2, so at most two artifacts are indexed at once. Each run goes through `RepoMemoCore::index_artifact`, so it still creates a job row (and SSE event) and records an `artifact_indexed` activity. Already-indexed artifacts (duplicate uploads) are skipped.
 - **Restart recovery.** `router()` calls `resume_pending()`, which enqueues every artifact with `indexed_at IS NULL`. A failed run leaves the artifact unindexed, so it is retried at the next start. The queue is not durable on its own: it is rebuilt from the database.
+- **Structure-aware code chunks.** For languages with a tree-sitter grammar (TS/TSX/JS, Python, Rust) the file is parsed once and shared with symbol extraction. Top-level declarations become units, comments and attributes stay attached to the declaration below, and units are packed to about 1,800 characters within the same scope. A unit over 3,600 characters is split along its members (class methods, impl items, statements) up to three levels deep, with the enclosing scope stored in `heading_path`, for example `impl Store > save`. Units that cannot be split further are cut by size. Chunks always cover every line exactly once, so citations never point at unowned lines. If there is no grammar or parse tree, the 100-line windows apply.
+- **Stable chunk identity.** `replace_artifact_index` matches new chunks to existing ones by content hash. A match keeps its row, so its id, its `chunk_embeddings` row and any `links` to it survive a re-index. Only chunks whose text changed are inserted or deleted. The transaction takes the write lock first (a no-op update) because SQLite fails a read-then-write transaction instantly with `database is locked` when another indexing task commits in between.
+- **Index versions.** `INDEXER_VERSION` (currently 2) is stamped on each artifact. `list_artifacts_needing_index` returns artifacts that are unindexed or older than the current version, and skips images that were already indexed. Manual `POST /v1/workspaces/{ws}/index` and the startup sweep both use it, so unchanged evidence is not re-processed. Bump the constant whenever chunking or symbol logic changes. Refreshes do not update `updated_at` and do not write activity entries.
 - The manual `POST …/index` endpoints still run **inside the HTTP request**. The worker crate remains a stub.
-- `index_workspace` (manual, now unused by the SPA) re-indexes **every** artifact each time, with no content-hash skip. It checks `cancel_requested` between artifacts and stops at the first failure with status `failed`.
+- `index_workspace` (manual, now unused by the SPA) only processes artifacts that need indexing (see index versions above). It checks `cancel_requested` between artifacts and stops at the first failure with status `failed`.
 
 ### 6.3 Keyword search (`RetrievalService::search` → `StorageEngine::search_chunks`)
 
@@ -405,6 +411,7 @@ The database is SQLite in WAL mode with foreign keys on, a pool of at most 5 con
 | 0008 | notifications | workspace_notifications |
 | 0009 | workflow_depth | workspace_saved_searches, workspace_task_checklist_items |
 | 0010 | jobs_kind_cancel | `indexing_jobs.kind`, `cancel_requested` |
+| 0011 | index_version | `artifacts.index_version`, the indexer version that produced the current chunks |
 
 ```mermaid
 erDiagram

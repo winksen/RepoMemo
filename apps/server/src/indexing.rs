@@ -24,6 +24,9 @@ struct IndexRequest {
     workspace_id: String,
     title: String,
     actor_user_id: Option<String>,
+    /// First-time indexing is worth an activity entry; a background refresh of
+    /// an already indexed artifact is not.
+    record_activity: bool,
 }
 
 #[derive(Clone)]
@@ -47,12 +50,16 @@ impl IndexQueue {
         }
     }
 
-    /// Schedules an artifact for indexing unless it is already indexed or
-    /// already waiting in the queue.
+    /// Schedules a newly stored artifact for indexing unless it is already
+    /// indexed (a duplicate upload) or already waiting in the queue.
     pub fn enqueue(&self, artifact: &ArtifactSummary, actor_user_id: Option<&str>) {
         if artifact.indexed_at.is_some() {
             return;
         }
+        self.push(artifact, actor_user_id);
+    }
+
+    fn push(&self, artifact: &ArtifactSummary, actor_user_id: Option<&str>) {
         let newly_queued = self
             .queued
             .lock()
@@ -66,6 +73,7 @@ impl IndexQueue {
             workspace_id: artifact.workspace_id.clone(),
             title: artifact.title.clone(),
             actor_user_id: actor_user_id.map(str::to_owned),
+            record_activity: artifact.indexed_at.is_none(),
         };
         if self.sender.send(request).is_err() {
             tracing::error!(artifact_id = %artifact.id, "Indexing queue is closed");
@@ -73,16 +81,18 @@ impl IndexQueue {
         }
     }
 
-    /// Queues every artifact that was stored but never indexed, for example
-    /// because the server stopped before the queue drained.
+    /// Queues every artifact that was stored but never indexed (for example
+    /// because the server stopped before the queue drained) and every artifact
+    /// indexed by an older indexer version, so improvements to chunking reach
+    /// existing evidence without anyone re-indexing by hand.
     pub async fn resume_pending(&self) {
-        match self.core.storage().list_unindexed_artifacts().await {
+        match self.core.artifacts_needing_index().await {
             Ok(pending) => {
                 if !pending.is_empty() {
                     tracing::info!(count = pending.len(), "Resuming pending evidence indexing");
                 }
                 for artifact in &pending {
-                    self.enqueue(artifact, None);
+                    self.push(artifact, None);
                 }
             }
             Err(error) => {
@@ -114,6 +124,7 @@ async fn run_worker(
 
 async fn index_one(core: &RepoMemoCore, request: &IndexRequest) {
     match core.index_artifact(request.artifact_id.clone()).await {
+        Ok(_) if !request.record_activity => {}
         Ok(_) => {
             if let Err(error) = core
                 .storage()

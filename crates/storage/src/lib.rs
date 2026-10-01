@@ -1,3 +1,4 @@
+use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 
@@ -2180,10 +2181,15 @@ impl StorageEngine {
         Ok(rows.into_iter().map(ArtifactSummary::from).collect())
     }
 
-    /// Artifacts that have never been indexed, oldest first, across all
-    /// workspaces. The shared server uses this to resume automatic indexing
-    /// after a restart.
-    pub async fn list_unindexed_artifacts(&self) -> Result<Vec<ArtifactSummary>> {
+    /// Artifacts whose index is missing or was produced by an older indexer,
+    /// oldest first. Images are only listed while they have never been
+    /// indexed, so a version bump never re-runs paid vision analysis.
+    /// `workspace_id` limits the scan to one workspace.
+    pub async fn list_artifacts_needing_index(
+        &self,
+        workspace_id: Option<&str>,
+        current_index_version: i64,
+    ) -> Result<Vec<ArtifactSummary>> {
         let rows = sqlx::query_as::<_, ArtifactSummaryRow>(
             r#"
             SELECT
@@ -2203,10 +2209,16 @@ impl StorageEngine {
               artifacts.indexed_at
             FROM artifacts
             JOIN sources ON sources.id = artifacts.source_id
-            WHERE artifacts.indexed_at IS NULL
+            WHERE (?1 IS NULL OR artifacts.workspace_id = ?1)
+              AND (
+                artifacts.indexed_at IS NULL
+                OR (artifacts.type != 'image' AND artifacts.index_version < ?2)
+              )
             ORDER BY artifacts.created_at ASC
             "#,
         )
+        .bind(workspace_id)
+        .bind(current_index_version)
         .fetch_all(&self.pool)
         .await?;
 
@@ -2355,29 +2367,100 @@ impl StorageEngine {
         artifact_id: &str,
         chunks: Vec<Chunk>,
     ) -> Result<()> {
-        self.replace_artifact_index(artifact_id, chunks, Vec::new())
+        self.replace_artifact_index(artifact_id, chunks, Vec::new(), 0)
             .await
     }
 
+    /// Replaces the chunks and symbols of an artifact.
+    ///
+    /// A new chunk whose text matches an existing chunk of the artifact takes
+    /// over that row instead of being re-created. Its id, embedding and any
+    /// memory-card links therefore survive a re-index; only chunks whose text
+    /// actually changed are dropped and inserted.
     pub async fn replace_artifact_index(
         &self,
         artifact_id: &str,
         chunks: Vec<Chunk>,
         symbols: Vec<Symbol>,
+        index_version: i64,
     ) -> Result<()> {
         let now = Utc::now().to_rfc3339();
         let mut tx = self.pool.begin().await?;
 
-        sqlx::query("DELETE FROM chunks WHERE artifact_id = ?1")
+        // Take the write lock before reading. A transaction that starts with a
+        // read and then tries to write fails at once with "database is locked"
+        // when another indexing task commits in between, instead of waiting.
+        sqlx::query("UPDATE artifacts SET index_version = index_version WHERE id = ?1")
             .bind(artifact_id)
             .execute(&mut *tx)
             .await?;
 
-        for mut chunk in chunks {
+        let existing = sqlx::query_as::<_, (String, String)>(
+            "SELECT id, content_hash FROM chunks WHERE artifact_id = ?1 ORDER BY chunk_index",
+        )
+        .bind(artifact_id)
+        .fetch_all(&mut *tx)
+        .await?;
+        let mut reusable: HashMap<String, VecDeque<String>> = HashMap::new();
+        for (id, content_hash) in existing {
+            reusable.entry(content_hash).or_default().push_back(id);
+        }
+        let planned = chunks
+            .into_iter()
+            .map(|chunk| {
+                let reused_id = reusable
+                    .get_mut(&chunk.content_hash)
+                    .and_then(VecDeque::pop_front);
+                (chunk, reused_id)
+            })
+            .collect::<Vec<_>>();
+
+        for id in reusable.into_values().flatten() {
+            sqlx::query("DELETE FROM chunks WHERE id = ?1")
+                .bind(id)
+                .execute(&mut *tx)
+                .await?;
+        }
+        // Park the surviving rows on negative indexes so renumbering cannot
+        // collide with UNIQUE(artifact_id, chunk_index) midway.
+        sqlx::query("UPDATE chunks SET chunk_index = -chunk_index - 1 WHERE artifact_id = ?1")
+            .bind(artifact_id)
+            .execute(&mut *tx)
+            .await?;
+
+        for (mut chunk, reused_id) in planned {
+            let metadata_json = serde_json::to_string(&chunk.metadata)?;
+
+            if let Some(id) = reused_id {
+                sqlx::query(
+                    r#"
+                    UPDATE chunks
+                    SET chunk_index = ?2,
+                        text = ?3,
+                        token_count = ?4,
+                        start_line = ?5,
+                        end_line = ?6,
+                        heading_path = ?7,
+                        metadata_json = ?8
+                    WHERE id = ?1
+                    "#,
+                )
+                .bind(&id)
+                .bind(chunk.chunk_index)
+                .bind(&chunk.text)
+                .bind(chunk.token_count)
+                .bind(chunk.start_line)
+                .bind(chunk.end_line)
+                .bind(&chunk.heading_path)
+                .bind(&metadata_json)
+                .execute(&mut *tx)
+                .await?;
+                continue;
+            }
+
             if chunk.id.is_empty() {
                 chunk.id = Uuid::new_v4().to_string();
             }
-            let metadata_json = serde_json::to_string(&chunk.metadata)?;
 
             sqlx::query(
                 r#"
@@ -2449,13 +2532,15 @@ impl StorageEngine {
         sqlx::query(
             r#"
             UPDATE artifacts
-            SET indexed_at = ?1,
-                updated_at = ?1
+            SET updated_at = CASE WHEN indexed_at IS NULL THEN ?1 ELSE updated_at END,
+                indexed_at = ?1,
+                index_version = ?3
             WHERE id = ?2
             "#,
         )
         .bind(&now)
         .bind(artifact_id)
+        .bind(index_version)
         .execute(&mut *tx)
         .await?;
 
@@ -4172,6 +4257,7 @@ mod tests {
                     end_line: Some(9),
                     metadata: json!({}),
                 }],
+                0,
             )
             .await
             .unwrap();
@@ -4201,6 +4287,259 @@ mod tests {
         assert_eq!(symbol_results.len(), 1);
         assert_eq!(symbol_results[0].symbol.name, "retrieve_artifact");
         assert_eq!(symbol_results[0].symbol.start_line, Some(7));
+
+        storage.pool.close().await;
+        drop(storage);
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn reindexing_keeps_unchanged_chunks_and_their_embeddings() {
+        let data_dir = std::env::temp_dir().join(format!(
+            "repomemo-reindex-test-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let storage = StorageEngine::open(StorageConfig {
+            data_dir: data_dir.clone(),
+        })
+        .await
+        .unwrap();
+        let workspace = storage.create_workspace("Reindex test").await.unwrap();
+        let source = storage
+            .create_or_get_source(&workspace.id, SourceType::Folder, "fixture", Some("fixture"))
+            .await
+            .unwrap();
+        let bytes = b"placeholder";
+        let content_hash = StorageEngine::content_hash(bytes);
+        storage
+            .store_blob(&content_hash, bytes, Some("text/markdown"))
+            .await
+            .unwrap();
+        let artifact = storage
+            .store_artifact(NewArtifact {
+                workspace_id: workspace.id.clone(),
+                source_id: source.id,
+                artifact_type: ArtifactType::MarkdownDoc,
+                title: "Notes".to_owned(),
+                path: "notes.md".to_owned(),
+                content_hash,
+                mime_type: Some("text/markdown".to_owned()),
+                language: Some("Markdown".to_owned()),
+                size_bytes: bytes.len() as i64,
+                metadata: json!({}),
+            })
+            .await
+            .unwrap()
+            .artifact;
+
+        let chunk = |index: i64, text: &str| Chunk {
+            id: String::new(),
+            artifact_id: artifact.id.clone(),
+            workspace_id: workspace.id.clone(),
+            chunk_index: index,
+            text: text.to_owned(),
+            token_count: Some(1),
+            start_line: Some(index + 1),
+            end_line: Some(index + 1),
+            heading_path: None,
+            content_hash: StorageEngine::content_hash(text.as_bytes()),
+            embedding_status: "not_configured".to_owned(),
+            metadata: json!({}),
+        };
+
+        storage
+            .replace_artifact_index(
+                &artifact.id,
+                vec![chunk(0, "alpha stays"), chunk(1, "beta moves"), chunk(2, "gamma goes")],
+                Vec::new(),
+                1,
+            )
+            .await
+            .unwrap();
+        let before = storage.list_chunks_for_artifact(&artifact.id).await.unwrap();
+        let id_of = |chunks: &[Chunk], text: &str| {
+            chunks
+                .iter()
+                .find(|candidate| candidate.text == text)
+                .map(|candidate| candidate.id.clone())
+        };
+        storage
+            .upsert_embeddings(
+                &workspace.id,
+                "test-model",
+                vec![
+                    (id_of(&before, "alpha stays").unwrap(), vec![1.0, 0.0]),
+                    (id_of(&before, "gamma goes").unwrap(), vec![0.0, 1.0]),
+                ],
+            )
+            .await
+            .unwrap();
+        assert_eq!(storage.embedding_count(&workspace.id).await.unwrap(), 2);
+
+        // `beta` moves to a new position, `gamma` is removed, `delta` is new.
+        storage
+            .replace_artifact_index(
+                &artifact.id,
+                vec![chunk(0, "alpha stays"), chunk(1, "delta arrives"), chunk(2, "beta moves")],
+                Vec::new(),
+                2,
+            )
+            .await
+            .unwrap();
+        let after = storage.list_chunks_for_artifact(&artifact.id).await.unwrap();
+
+        assert_eq!(after.len(), 3);
+        assert_eq!(
+            after.iter().map(|chunk| chunk.chunk_index).collect::<Vec<_>>(),
+            vec![0, 1, 2]
+        );
+        assert_eq!(id_of(&after, "alpha stays"), id_of(&before, "alpha stays"));
+        assert_eq!(id_of(&after, "beta moves"), id_of(&before, "beta moves"));
+        assert!(id_of(&after, "gamma goes").is_none());
+        assert!(id_of(&before, "delta arrives").is_none());
+        assert_eq!(
+            after.iter().find(|chunk| chunk.text == "beta moves").unwrap().chunk_index,
+            2
+        );
+        // The embedding of the unchanged chunk survived; the removed chunk's went with it.
+        assert_eq!(storage.embedding_count(&workspace.id).await.unwrap(), 1);
+        assert_eq!(
+            after
+                .iter()
+                .find(|chunk| chunk.text == "alpha stays")
+                .unwrap()
+                .embedding_status,
+            "ready"
+        );
+
+        // Full-text search follows the renumbering and the removal.
+        let search = |query: &str| SearchRequest {
+            workspace_id: workspace.id.clone(),
+            query: query.to_owned(),
+            artifact_types: Vec::new(),
+            languages: Vec::new(),
+            source_ids: Vec::new(),
+            limit: Some(10),
+        };
+        for (word, expected) in [("delta", 1), ("beta", 1), ("gamma", 0)] {
+            let results = storage
+                .search_chunks(&search(word), &format!("\"{word}\"*"))
+                .await
+                .unwrap();
+            assert_eq!(results.len(), expected, "search for {word}");
+        }
+
+        // Only the index version distinguishes fresh from stale artifacts.
+        assert!(storage
+            .list_artifacts_needing_index(Some(&workspace.id), 2)
+            .await
+            .unwrap()
+            .is_empty());
+        assert_eq!(
+            storage
+                .list_artifacts_needing_index(Some(&workspace.id), 3)
+                .await
+                .unwrap()
+                .len(),
+            1
+        );
+
+        storage.pool.close().await;
+        drop(storage);
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    /// The background queue indexes several artifacts at once, so concurrent
+    /// re-indexing must wait for the write lock instead of failing with
+    /// "database is locked".
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn concurrent_reindexing_of_different_artifacts_does_not_lock_the_database() {
+        let data_dir = std::env::temp_dir().join(format!(
+            "repomemo-concurrent-index-test-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let storage = StorageEngine::open(StorageConfig {
+            data_dir: data_dir.clone(),
+        })
+        .await
+        .unwrap();
+        let workspace = storage.create_workspace("Concurrent index").await.unwrap();
+        let source = storage
+            .create_or_get_source(&workspace.id, SourceType::Folder, "fixture", Some("fixture"))
+            .await
+            .unwrap();
+
+        let mut artifact_ids = Vec::new();
+        for number in 0..12 {
+            let bytes = format!("artifact number {number}").into_bytes();
+            let content_hash = StorageEngine::content_hash(&bytes);
+            storage
+                .store_blob(&content_hash, &bytes, Some("text/plain"))
+                .await
+                .unwrap();
+            let artifact = storage
+                .store_artifact(NewArtifact {
+                    workspace_id: workspace.id.clone(),
+                    source_id: source.id.clone(),
+                    artifact_type: ArtifactType::File,
+                    title: format!("File {number}"),
+                    path: format!("file-{number}.txt"),
+                    content_hash,
+                    mime_type: Some("text/plain".to_owned()),
+                    language: Some("Text".to_owned()),
+                    size_bytes: bytes.len() as i64,
+                    metadata: json!({}),
+                })
+                .await
+                .unwrap()
+                .artifact;
+            artifact_ids.push(artifact.id);
+        }
+
+        // Two passes: the second one finds existing chunks to reuse.
+        for pass in 0..2 {
+            let mut tasks = Vec::new();
+            for artifact_id in &artifact_ids {
+                let storage = storage.clone();
+                let workspace_id = workspace.id.clone();
+                let artifact_id = artifact_id.clone();
+                tasks.push(tokio::spawn(async move {
+                    let chunks = (0..3)
+                        .map(|index| {
+                            let text = format!("{artifact_id} chunk {index} pass {}", pass % 1);
+                            Chunk {
+                                id: String::new(),
+                                artifact_id: artifact_id.clone(),
+                                workspace_id: workspace_id.clone(),
+                                chunk_index: index,
+                                content_hash: StorageEngine::content_hash(text.as_bytes()),
+                                text,
+                                token_count: Some(1),
+                                start_line: Some(index + 1),
+                                end_line: Some(index + 1),
+                                heading_path: None,
+                                embedding_status: "not_configured".to_owned(),
+                                metadata: json!({}),
+                            }
+                        })
+                        .collect();
+                    storage
+                        .replace_artifact_index(&artifact_id, chunks, Vec::new(), 1)
+                        .await
+                }));
+            }
+            for task in tasks {
+                task.await.unwrap().unwrap_or_else(|error| {
+                    panic!("re-index failed on pass {pass}: {error}");
+                });
+            }
+        }
 
         storage.pool.close().await;
         drop(storage);
