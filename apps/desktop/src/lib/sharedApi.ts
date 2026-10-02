@@ -1,4 +1,7 @@
 import type {
+  AgentCapabilities,
+  AgentMessage,
+  AgentReply,
   AskAnswer,
   ArtifactDetail,
   ArtifactComment,
@@ -244,6 +247,17 @@ export function askSharedWorkspace(accessToken: string, workspaceId: string, que
   return request<AskAnswer>(`/v1/workspaces/${workspaceId}/ask`, {
     method: "POST",
     body: JSON.stringify({ question, limit: 8 }),
+  }, accessToken);
+}
+
+export function getSharedAgentCapabilities(accessToken: string, workspaceId: string): Promise<AgentCapabilities> {
+  return request<AgentCapabilities>(`/v1/workspaces/${workspaceId}/agent/capabilities`, {}, accessToken);
+}
+
+export function sendSharedAgentMessage(accessToken: string, workspaceId: string, message: AgentMessage): Promise<AgentReply> {
+  return request<AgentReply>(`/v1/workspaces/${workspaceId}/agent/messages`, {
+    method: "POST",
+    body: JSON.stringify(message),
   }, accessToken);
 }
 

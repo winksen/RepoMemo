@@ -1,5 +1,6 @@
 //! Server-authoritative HTTP API for shared RepoMemo workspaces.
 
+mod agent;
 mod conversion;
 mod events;
 mod indexing;
@@ -625,6 +626,14 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
             post(generate_workspace_ai_overview),
         )
         .route("/v1/workspaces/{workspace_id}/ask", post(ask_workspace))
+        .route(
+            "/v1/workspaces/{workspace_id}/agent/capabilities",
+            get(agent::list_agent_capabilities),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/agent/messages",
+            post(agent::send_agent_message),
+        )
         .route(
             "/v1/workspaces/{workspace_id}/ai-providers",
             get(list_workspace_ai_providers).put(save_workspace_ai_provider),
@@ -5637,6 +5646,141 @@ mod tests {
             to_bytes(pdf.into_body(), usize::MAX).await.unwrap(),
             "pretend this is a Word file".as_bytes()
         );
+    }
+
+    #[tokio::test]
+    async fn assistant_routes_messages_and_works_without_ai() {
+        let data_dir =
+            std::env::temp_dir().join(format!("repomemo-server-agent-{}", uuid::Uuid::new_v4()));
+        let app = router(ServerConfig::for_test(data_dir.clone()))
+            .await
+            .unwrap();
+        let read = |response: axum::response::Response| async move {
+            serde_json::from_slice::<Value>(&to_bytes(response.into_body(), usize::MAX).await.unwrap())
+                .unwrap()
+        };
+
+        let registered = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/v1/auth/register")
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        json!({"email": "agent@example.com", "display_name": "Agent", "password": "not-a-real-password"})
+                            .to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let owner = format!("Bearer {}", read(registered).await["access_token"].as_str().unwrap());
+        let organization = read(
+            app.clone()
+                .oneshot(json_request("POST", "/v1/organizations", &owner, json!({"name":"Agent Team"})))
+                .await
+                .unwrap(),
+        )
+        .await;
+        let workspace = read(
+            app.clone()
+                .oneshot(json_request(
+                    "POST",
+                    "/v1/workspaces",
+                    &owner,
+                    json!({"organization_id": organization["id"], "name":"Agent Workspace"}),
+                ))
+                .await
+                .unwrap(),
+        )
+        .await;
+        let workspace_id = workspace["workspace"]["id"].as_str().unwrap().to_owned();
+        for (title, content) in [
+            ("Retry policy", "# Retries\nUploads use an exponential backoff budget."),
+            ("Deploy runbook", "# Deploy\nRun the migration before switching traffic."),
+        ] {
+            let created = app
+                .clone()
+                .oneshot(json_request(
+                    "POST",
+                    &format!("/v1/workspaces/{workspace_id}/artifacts/text"),
+                    &owner,
+                    json!({"title": title, "content": content, "language": "Markdown"}),
+                ))
+                .await
+                .unwrap();
+            assert_eq!(created.status(), 201);
+        }
+        wait_for_indexed_artifacts(&app, &owner, &workspace_id, 2).await;
+
+        let capabilities = read(
+            app.clone()
+                .oneshot(auth_request(
+                    "GET",
+                    &format!("/v1/workspaces/{workspace_id}/agent/capabilities"),
+                    &owner,
+                ))
+                .await
+                .unwrap(),
+        )
+        .await;
+        assert_eq!(capabilities["provider_name"], Value::Null);
+        let available = capabilities["capabilities"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|capability| capability["available"] == true)
+            .map(|capability| capability["id"].as_str().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(available, ["find_files", "search_content"]);
+
+        let send = |body: Value| {
+            let app = app.clone();
+            let uri = format!("/v1/workspaces/{workspace_id}/agent/messages");
+            let owner = owner.clone();
+            async move {
+                let response = app.oneshot(json_request("POST", &uri, &owner, body)).await.unwrap();
+                assert_eq!(response.status(), 200);
+                read(response).await
+            }
+        };
+
+        let found = send(json!({"message": "find the deploy runbook"})).await;
+        assert_eq!(found["capability"], "find_files");
+        assert_eq!(found["routing"], "rules");
+        assert_eq!(found["files"][0]["title"], "Deploy runbook");
+
+        let searched = send(json!({"message": "backoff", "capability": "search_content"})).await;
+        assert_eq!(searched["routing"], "explicit");
+        assert_eq!(searched["matches"][0]["title"], "Retry policy");
+
+        // A file lookup with no matching name falls back to the indexed content.
+        let fallback = send(json!({"message": "find migration"})).await;
+        assert_eq!(fallback["files"].as_array().unwrap().len(), 0);
+        assert_eq!(fallback["matches"][0]["title"], "Deploy runbook");
+
+        let summary = send(json!({"message": "summarize the retry policy"})).await;
+        assert_eq!(summary["capability"], "summarize_file");
+        assert_eq!(summary["generated"], false);
+        assert!(summary["reply_markdown"].as_str().unwrap().contains("needs an AI provider"));
+
+        let unmatched = send(json!({"message": "write me a poem"})).await;
+        assert_eq!(unmatched["capability"], Value::Null);
+        assert_eq!(unmatched["routing"], "unmatched");
+
+        let outsider = app
+            .clone()
+            .oneshot(json_request(
+                "POST",
+                &format!("/v1/workspaces/{workspace_id}/agent/messages"),
+                "Bearer not-a-token",
+                json!({"message": "find runbook"}),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(outsider.status(), 401);
+        let _ = std::fs::remove_dir_all(data_dir);
     }
 
     fn json_request(method: &str, uri: &str, authorization: &str, body: Value) -> Request<Body> {

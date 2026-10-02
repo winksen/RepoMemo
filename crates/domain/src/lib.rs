@@ -662,3 +662,65 @@ pub struct AskAnswer {
     pub confidence: Option<f64>,
     pub warnings: Vec<String>,
 }
+
+/// A job the workspace assistant knows how to do. The assistant only ever runs
+/// one of these; a message that matches none of them gets a plain reply.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentCapability {
+    FindFiles,
+    SearchContent,
+    SummarizeFile,
+    AskQuestion,
+    WorkspaceOverview,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentCapabilityInfo {
+    pub id: AgentCapability,
+    pub label: String,
+    pub description: String,
+    pub placeholder: String,
+    pub requires_ai: bool,
+    /// False when the capability needs AI and no text provider is enabled.
+    pub available: bool,
+}
+
+/// How a message was matched to a capability.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentRouting {
+    /// The user picked the capability.
+    Explicit,
+    /// Keyword rules recognised the request; no AI was involved.
+    Rules,
+    /// The enabled provider classified the request.
+    Model,
+    Unmatched,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentRequest {
+    pub workspace_id: String,
+    pub message: String,
+    pub capability: Option<AgentCapability>,
+    /// Target file for capabilities that work on one artifact.
+    pub artifact_id: Option<String>,
+    pub provider_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentReply {
+    pub capability: Option<AgentCapability>,
+    pub routing: AgentRouting,
+    /// What the capability ran on after routing stripped the instruction.
+    pub subject: String,
+    pub reply_markdown: String,
+    /// True when `reply_markdown` was written by an AI provider rather than
+    /// assembled from stored facts.
+    pub generated: bool,
+    pub files: Vec<ArtifactSummary>,
+    pub matches: Vec<SearchResult>,
+    pub citations: Vec<Citation>,
+    pub warnings: Vec<String>,
+}

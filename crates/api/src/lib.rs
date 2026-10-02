@@ -20,6 +20,10 @@ use repomemo_retrieval::RetrievalService;
 use repomemo_storage::{NewArtifact, StorageConfig, StorageEngine};
 use serde_json::json;
 
+mod agent;
+
+pub use agent::agent_capabilities;
+
 #[derive(Debug, Clone)]
 pub struct RepoMemoCore {
     storage: StorageEngine,

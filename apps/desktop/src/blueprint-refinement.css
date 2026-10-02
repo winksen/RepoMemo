@@ -709,3 +709,42 @@ body,
 .shared-email-attachments span { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; color: var(--color-text-muted); background: var(--color-surface-3); border-radius: 999px; font-size: 12px; }
 .shared-email-body { font-family: var(--font-ui); white-space: pre-wrap; }
 .shared-rendered-frame { height: 720px; }
+
+/* Workspace assistant */
+.shared-assistant { display: grid; gap: 18px; max-width: 880px; }
+.shared-assistant-thread { display: grid; align-content: start; gap: 28px; min-height: 240px; }
+.shared-assistant-intro { display: grid; gap: 7px; place-items: start; padding: 36px 0 12px; color: var(--color-text-muted); }
+.shared-assistant-intro strong { color: var(--color-text); font-size: 15px; }
+.shared-assistant-intro span { max-width: 62ch; font-size: 13px; line-height: 1.55; }
+.shared-assistant-turn { display: grid; gap: 12px; min-width: 0; }
+.shared-assistant-request { display: grid; justify-self: end; justify-items: end; gap: 4px; max-width: min(70ch, 85%); }
+.shared-assistant-request p { margin: 0; padding: 10px 14px; overflow-wrap: anywhere; color: var(--color-text); background: var(--color-surface-3); border-radius: 12px 12px 4px 12px; font-size: 14px; line-height: 1.5; white-space: pre-wrap; }
+.shared-assistant-request span { color: var(--color-text-subtle); font-size: 11px; }
+.shared-assistant-pending { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--color-text-muted); font-size: 13px; }
+.shared-assistant-failed { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; color: var(--color-text-muted); font-size: 13px; }
+.shared-assistant-reply { display: grid; gap: 12px; min-width: 0; }
+.shared-assistant-reply-meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 14px; color: var(--color-text-subtle); font-size: 12px; }
+.shared-assistant-reply-meta span { display: inline-flex; align-items: center; gap: 6px; }
+.shared-assistant-generated { padding: 2px 8px; border: 1px solid var(--color-border-strong); border-radius: 999px; }
+.shared-assistant-files { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.shared-assistant-files li { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.shared-assistant .rm-button.shared-assistant-file { flex: 1; justify-content: flex-start; min-width: 0; padding: 9px 12px; font-weight: 400; text-align: left; }
+.shared-assistant-file > span { display: grid; gap: 3px; min-width: 0; }
+.shared-assistant-file strong { overflow: hidden; font-size: 13px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.shared-assistant-file small { overflow: hidden; color: var(--color-text-subtle); font-family: var(--font-mono); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.shared-assistant .shared-search-results { margin-top: 0; }
+.shared-assistant-citation { overflow: hidden; padding: 0; color: inherit; background: none; border: 0; border-radius: 4px; cursor: pointer; font: inherit; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+.shared-assistant-citation:hover { color: var(--color-text); text-decoration: underline; }
+.shared-assistant-citation:focus-visible, .shared-assistant-footnote button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.shared-assistant-composer { position: sticky; bottom: 0; display: grid; gap: 10px; padding: 14px 0 16px; background: var(--color-surface); border-top: 1px solid var(--color-border); }
+.shared-assistant-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.shared-assistant-actions .rm-button { min-height: 32px; font-weight: 600; }
+.shared-assistant-actions .rm-button.active, .shared-assistant-actions .rm-button.active:hover:not(:disabled) { color: var(--color-text); background: var(--color-surface-3); border-color: var(--color-text); }
+.shared-assistant-actions .rm-button:disabled { cursor: not-allowed; }
+.shared-assistant-input { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 8px; }
+.shared-assistant-input .rm-textarea { min-height: 52px; max-height: 200px; }
+.shared-assistant-input .rm-button { width: 44px; height: 44px; padding: 0; }
+.shared-assistant-footnote { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 14px; color: var(--color-text-subtle); font-size: 12px; }
+.shared-assistant-footnote span { display: inline-flex; align-items: center; gap: 6px; }
+.shared-assistant-footnote button { padding: 0; color: var(--color-text-muted); background: none; border: 0; cursor: pointer; font: inherit; text-decoration: underline; }
+.shared-assistant-footnote button:disabled { cursor: default; opacity: 0.5; }

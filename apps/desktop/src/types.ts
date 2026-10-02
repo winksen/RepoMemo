@@ -478,6 +478,40 @@ export interface AskAnswer {
   warnings: string[];
 }
 
+export type AgentCapability = "find_files" | "search_content" | "summarize_file" | "ask_question" | "workspace_overview";
+
+export interface AgentCapabilityInfo {
+  id: AgentCapability;
+  label: string;
+  description: string;
+  placeholder: string;
+  requires_ai: boolean;
+  available: boolean;
+}
+
+export interface AgentCapabilities {
+  capabilities: AgentCapabilityInfo[];
+  provider_name: string | null;
+}
+
+export interface AgentMessage {
+  message: string;
+  capability?: AgentCapability;
+  artifact_id?: string;
+}
+
+export interface AgentReply {
+  capability: AgentCapability | null;
+  routing: "explicit" | "rules" | "model" | "unmatched";
+  subject: string;
+  reply_markdown: string;
+  generated: boolean;
+  files: ArtifactSummary[];
+  matches: SearchResult[];
+  citations: Citation[];
+  warnings: string[];
+}
+
 export interface MemoryCard {
   id: string;
   workspace_id: string;

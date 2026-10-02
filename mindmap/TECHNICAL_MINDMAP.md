@@ -259,6 +259,8 @@ Guard legend: **pub** = no auth, **auth** = any valid JWT, **R/W/A/O** = workspa
 | GET | `/v1/workspaces/{ws}/capabilities` | R | role → capability flags |
 | POST | `/v1/workspaces/{ws}/ai-overview` | R | returns `provider_configured:false` instead of erroring → activity |
 | POST | `/v1/workspaces/{ws}/ask` | R | 400 when no enabled provider → activity |
+| GET | `/v1/workspaces/{ws}/agent/capabilities` | R | assistant actions, each flagged `available` against the enabled text provider |
+| POST | `/v1/workspaces/{ws}/agent/messages` | R | `{message, capability?, artifact_id?}` → `AgentReply`. Provider failures come back as reply warnings, not errors. AI-generated replies → activity |
 | GET, PUT | `/v1/workspaces/{ws}/ai-providers` | A | the response strips `api_key`. PUT upserts and keeps the stored key if the body omits it |
 | POST | `/v1/workspaces/{ws}/ai-providers/{p}/test` | A | → activity |
 | GET | `/v1/workspaces/{ws}/activity` | A | last 100 |
@@ -395,6 +397,18 @@ The overview takes up to 2 chunks per artifact in artifact-list order, stopping 
 `validate_settings` requires a `name`, an `http(s)` base URL and a model. To **enable** OpenRouter it also requires an `api_key` and `metadata.cloud_content_acknowledged == true`. The HTTP timeout is 45 s.
 
 > ⚠️ **API keys are stored in plaintext** inside `provider_settings.metadata_json.api_key`.
+
+### 6.7 Workspace assistant ([crates/api/src/agent.rs](../crates/api/src/agent.rs))
+
+The assistant is a closed capability router, not a free-running agent. Each message runs exactly one of `find_files`, `search_content`, `summarize_file`, `ask_question` or `workspace_overview`, and each of those wraps an existing core flow.
+
+1. **Routing**, in order. (1) A capability the user picked is used as-is (`routing: explicit`). (2) Keyword rules (`route_by_rules`) recognise common phrasings with no AI (`rules`). (3) If a text provider is enabled, it classifies the message into `{capability, subject}` JSON (`model`). (4) Otherwise the reply lists what the assistant can do (`unmatched`).
+2. **File lookup** matches every word against title or path. Kind words such as "pdfs" or "markdown" also match by extension. Results are ranked exact name, then prefix, then contains. A lookup with no name match falls back to a content search.
+3. **Summarize** takes an `artifact_id`, or resolves the subject to a single file. When several files match it returns them for the user to pick from.
+4. `summarize_file`, `ask_question` and `workspace_overview` need an enabled text provider. Without one they reply that AI is not configured, and nothing is sent.
+5. `generated: true` marks text written by the provider, so the UI can label it apart from stored facts.
+
+Conversations are kept only in the browser's `sessionStorage` (the last 30 turns per workspace). Nothing about a conversation is stored on the server.
 
 ---
 
