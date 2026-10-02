@@ -47,7 +47,7 @@ tauri = { version = "2", features = [] }
 tauri-build = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
 thiserror = "2"
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "fs", "net", "signal", "sync"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "fs", "net", "signal", "sync", "process", "time"] }
 tokio-stream = { version = "0.1", features = ["sync"] }
 tower = { version = "0.5", features = ["util"] }
 tracing = "0.1"
@@ -61,3 +61,12 @@ repomemo-ingestion = { path = "crates/ingestion" }
 repomemo-indexer = { path = "crates/indexer" }
 repomemo-retrieval = { path = "crates/retrieval" }
 repomemo-storage = { path = "crates/storage" }
+
+# The server links many dependencies (SQL, PDF, Office parsing, TLS). Full debug
+# info for all of them overflows the 4 GB MSVC PDB limit (LNK1140), so keep
+# line tables for our own crates and none for third-party code.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false

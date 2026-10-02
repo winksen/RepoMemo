@@ -1,5 +1,6 @@
 //! Server-authoritative HTTP API for shared RepoMemo workspaces.
 
+mod conversion;
 mod events;
 mod indexing;
 
@@ -50,6 +51,7 @@ use repomemo_storage::{
 };
 
 use crate::events::{BusActivityObserver, BusJobObserver, WorkspaceEventBus};
+use crate::conversion::{Converter, RenderState};
 use crate::indexing::IndexQueue;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -66,6 +68,9 @@ pub struct ServerConfig {
     pub data_dir: PathBuf,
     pub jwt_secret: String,
     pub allowed_origin: Option<HeaderValue>,
+    /// LibreOffice executable used for Office previews. When unset the server
+    /// looks for it; without it the extracted previews are used.
+    pub soffice: Option<PathBuf>,
 }
 
 impl ServerConfig {
@@ -95,6 +100,7 @@ impl ServerConfig {
             data_dir,
             jwt_secret,
             allowed_origin: Some(allowed_origin),
+            soffice: std::env::var_os("REPOMEMO_SOFFICE").map(PathBuf::from),
         })
     }
 
@@ -106,6 +112,7 @@ impl ServerConfig {
             data_dir,
             jwt_secret: "test-secret-that-is-long-enough-for-jwt-signing".to_owned(),
             allowed_origin: None,
+            soffice: None,
         }
     }
 }
@@ -117,6 +124,7 @@ struct AppState {
     jwt_secret: String,
     event_bus: WorkspaceEventBus,
     index_queue: IndexQueue,
+    converter: Converter,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -523,12 +531,22 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
     let index_queue = IndexQueue::start(core.clone());
     index_queue.resume_pending().await;
 
+    let converter = match config.soffice.clone() {
+        Some(path) => Converter::with_binary(&config.data_dir, Some(path)),
+        None => Converter::detect(&config.data_dir),
+    };
+    if converter.enabled() {
+        tracing::info!("LibreOffice found: Office files get layout-accurate previews");
+    } else {
+        tracing::info!("LibreOffice not found: Office previews show extracted text and tables");
+    }
     let state = AppState {
         storage,
         core,
         jwt_secret: config.jwt_secret,
         event_bus,
         index_queue,
+        converter,
     };
     let cors = match config.allowed_origin {
         Some(origin) => CorsLayer::new()
@@ -544,6 +562,7 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
                 header::AUTHORIZATION,
                 header::CONTENT_TYPE,
                 HeaderName::from_static("x-repomemo-filename"),
+                HeaderName::from_static("x-repomemo-folder-id"),
             ]),
         None => CorsLayer::new(),
     };
@@ -673,6 +692,14 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
         .route(
             "/v1/artifacts/{artifact_id}/document-preview",
             get(artifact_document_preview),
+        )
+        .route(
+            "/v1/artifacts/{artifact_id}/rendered-preview/status",
+            get(rendered_preview_status),
+        )
+        .route(
+            "/v1/artifacts/{artifact_id}/rendered-preview",
+            get(rendered_preview_pdf),
         )
         .route(
             "/v1/artifacts/{artifact_id}/open-link",
@@ -2544,6 +2571,62 @@ async fn artifact_document_preview(
         .map_err(map_core_error)
 }
 
+#[derive(Debug, Serialize)]
+struct RenderStatusResponse {
+    /// `ready`, `converting`, `failed`, `disabled` or `unsupported`.
+    state: &'static str,
+    message: Option<String>,
+}
+
+async fn rendered_preview_status(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(artifact_id): Path<String>,
+) -> Result<Json<RenderStatusResponse>, ApiError> {
+    let summary = state
+        .storage
+        .get_artifact_summary(&artifact_id)
+        .await
+        .map_err(|_| ApiError::bad_request("Artifact was not found."))?;
+    require_workspace_read(&state, &subject, &summary.workspace_id).await?;
+    let (name, message) = match state.converter.state(&state.storage, &summary) {
+        RenderState::Ready => ("ready", None),
+        RenderState::Converting => ("converting", None),
+        RenderState::Disabled => ("disabled", None),
+        RenderState::Unsupported => ("unsupported", None),
+        RenderState::Failed(message) => ("failed", Some(message)),
+    };
+    Ok(Json(RenderStatusResponse {
+        state: name,
+        message,
+    }))
+}
+
+/// The layout-accurate PDF of an Office file, once its conversion is done.
+async fn rendered_preview_pdf(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(artifact_id): Path<String>,
+) -> Result<Response, ApiError> {
+    let summary = state
+        .storage
+        .get_artifact_summary(&artifact_id)
+        .await
+        .map_err(|_| ApiError::bad_request("Artifact was not found."))?;
+    require_workspace_read(&state, &subject, &summary.workspace_id).await?;
+    let path = state
+        .converter
+        .cached_pdf(&summary.content_hash)
+        .ok_or_else(|| ApiError::bad_request("The rendered preview is not ready yet."))?;
+    let bytes = tokio::fs::read(path)
+        .await
+        .map_err(|error| ApiError::internal(error))?;
+    let mut rendered = summary;
+    rendered.mime_type = Some("application/pdf".to_owned());
+    rendered.path = format!("{}.pdf", rendered.title);
+    Ok(file_response(&rendered, bytes))
+}
+
 /// A short-lived, single-file link that a desktop app (Word, Excel, ...) can
 /// fetch without the user's session. It grants read access to one artifact for
 /// a few minutes and nothing else.
@@ -2869,6 +2952,10 @@ async fn upload_artifact(
         .import_upload(workspace_id.clone(), filename, body.to_vec(), mime_type)
         .await
         .map_err(map_core_error)?;
+    // Start rendering the faithful preview now so it is ready when opened.
+    state
+        .converter
+        .ensure(state.storage.clone(), artifact.clone());
     if folder_id.is_some() {
         state
             .storage
@@ -5380,6 +5467,176 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(misuse.status(), 401);
+    }
+
+    /// A stand-in for LibreOffice that "converts" by copying the input to
+    /// `<outdir>/input.pdf`, so the conversion pipeline can be tested anywhere.
+    #[cfg(windows)]
+    fn fake_soffice(directory: &std::path::Path) -> std::path::PathBuf {
+        std::fs::create_dir_all(directory).unwrap();
+        let path = directory.join("fake-soffice.bat");
+        let script = [
+            "@echo off",
+            ":loop",
+            "if \"%~1\"==\"\" goto done",
+            "if \"%~1\"==\"--outdir\" set OUT=%~2",
+            "set LAST=%~1",
+            "shift",
+            "goto loop",
+            ":done",
+            "copy /Y \"%LAST%\" \"%OUT%\\input.pdf\" >nul",
+        ]
+        .join("\r\n");
+        std::fs::write(&path, script).unwrap();
+        path
+    }
+
+    #[cfg(unix)]
+    fn fake_soffice(directory: &std::path::Path) -> std::path::PathBuf {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::create_dir_all(directory).unwrap();
+        let path = directory.join("fake-soffice.sh");
+        let script = [
+            "#!/bin/sh",
+            "while [ $# -gt 0 ]; do",
+            "  if [ \"$1\" = \"--outdir\" ]; then out=\"$2\"; fi",
+            "  last=\"$1\"; shift",
+            "done",
+            "cp \"$last\" \"$out/input.pdf\"",
+        ]
+        .join("\n");
+        std::fs::write(&path, script).unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+        path
+    }
+
+    #[tokio::test]
+    async fn office_files_are_rendered_to_a_cached_pdf() {
+        let data_dir =
+            std::env::temp_dir().join(format!("repomemo-server-render-{}", uuid::Uuid::new_v4()));
+        let mut config = ServerConfig::for_test(data_dir.clone());
+        config.soffice = Some(fake_soffice(&data_dir.join("bin")));
+        let app = router(config).await.unwrap();
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/v1/auth/register")
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        json!({"email": "render@example.com", "display_name": "Render", "password": "not-a-real-password"})
+                            .to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let body: Value =
+            serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
+        let owner = format!("Bearer {}", body["access_token"].as_str().unwrap());
+        let organization = app
+            .clone()
+            .oneshot(json_request("POST", "/v1/organizations", &owner, json!({"name":"Render Team"})))
+            .await
+            .unwrap();
+        let organization: Value = serde_json::from_slice(
+            &to_bytes(organization.into_body(), usize::MAX).await.unwrap(),
+        )
+        .unwrap();
+        let workspace = app
+            .clone()
+            .oneshot(json_request(
+                "POST",
+                "/v1/workspaces",
+                &owner,
+                json!({"organization_id": organization["id"], "name":"Render Workspace"}),
+            ))
+            .await
+            .unwrap();
+        let workspace: Value = serde_json::from_slice(
+            &to_bytes(workspace.into_body(), usize::MAX).await.unwrap(),
+        )
+        .unwrap();
+        let workspace_id = workspace["workspace"]["id"].as_str().unwrap().to_owned();
+
+        let upload = |name: &'static str, bytes: &'static str| {
+            let app = app.clone();
+            let owner = owner.clone();
+            let workspace_id = workspace_id.clone();
+            async move {
+                let response = app
+                    .oneshot(
+                        Request::builder()
+                            .method("POST")
+                            .uri(format!("/v1/workspaces/{workspace_id}/artifacts/upload"))
+                            .header("authorization", &owner)
+                            .header("x-repomemo-filename", name)
+                            .body(Body::from(bytes))
+                            .unwrap(),
+                    )
+                    .await
+                    .unwrap();
+                assert_eq!(response.status(), 201);
+                let value: Value = serde_json::from_slice(
+                    &to_bytes(response.into_body(), usize::MAX).await.unwrap(),
+                )
+                .unwrap();
+                value["id"].as_str().unwrap().to_owned()
+            }
+        };
+        let docx = upload("report.docx", "pretend this is a Word file").await;
+        let eml = upload("mail.eml", "Subject: Hi\r\n\r\nBody").await;
+
+        let status = |id: String| {
+            let app = app.clone();
+            let owner = owner.clone();
+            async move {
+                let response = app
+                    .oneshot(json_request(
+                        "GET",
+                        &format!("/v1/artifacts/{id}/rendered-preview/status"),
+                        &owner,
+                        json!(null),
+                    ))
+                    .await
+                    .unwrap();
+                assert_eq!(response.status(), 200);
+                let value: Value = serde_json::from_slice(
+                    &to_bytes(response.into_body(), usize::MAX).await.unwrap(),
+                )
+                .unwrap();
+                value["state"].as_str().unwrap().to_owned()
+            }
+        };
+
+        assert_eq!(status(eml).await, "unsupported");
+        let mut state = status(docx.clone()).await;
+        for _ in 0..100 {
+            if state == "ready" {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            state = status(docx.clone()).await;
+        }
+        assert_eq!(state, "ready");
+
+        let pdf = app
+            .clone()
+            .oneshot(json_request(
+                "GET",
+                &format!("/v1/artifacts/{docx}/rendered-preview"),
+                &owner,
+                json!(null),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(pdf.status(), 200);
+        assert_eq!(
+            to_bytes(pdf.into_body(), usize::MAX).await.unwrap(),
+            "pretend this is a Word file".as_bytes()
+        );
     }
 
     fn json_request(method: &str, uri: &str, authorization: &str, body: Value) -> Request<Body> {

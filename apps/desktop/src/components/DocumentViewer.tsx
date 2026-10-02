@@ -8,11 +8,14 @@ import {
 import {
   createSharedFileLink,
   downloadSharedArtifactFile,
+  downloadSharedRenderedPreview,
   getSharedDocumentPreview,
+  getSharedRenderStatus,
   sharedApiUrl,
 } from "../lib/sharedApi";
 import { columnLetters, documentKindOf, OPEN_IN_APP } from "../lib/documents";
 import type { ArtifactSummary, DocumentPreview, SheetPreview } from "../types";
+import type { RenderStatus } from "../lib/sharedApi";
 import { Button } from "./ui/button";
 import { showToast } from "./ui/toast";
 
@@ -45,6 +48,10 @@ export function DocumentViewer({ accessToken, artifact }: { accessToken: string;
   const [isLoading, setIsLoading] = useState(true);
   const [isBusy, setIsBusy] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [renderState, setRenderState] = useState<RenderStatus | null>(null);
+  const [renderedUrl, setRenderedUrl] = useState<string | null>(null);
+  const [showExtracted, setShowExtracted] = useState(false);
+  const rendersLayout = kind === "word" || kind === "excel" || kind === "powerpoint";
 
   useEffect(() => {
     let cancelled = false;
@@ -56,6 +63,42 @@ export function DocumentViewer({ accessToken, artifact }: { accessToken: string;
       .finally(() => { if (!cancelled) setIsLoading(false); });
     return () => { cancelled = true; };
   }, [accessToken, artifact.id]);
+
+  // Office files: LibreOffice renders the real layout to a PDF on the server.
+  // The status call starts that conversion, so poll until it is ready.
+  useEffect(() => {
+    if (!rendersLayout) return;
+    let cancelled = false;
+    let timer: number | undefined;
+    let url: string | null = null;
+    let attempts = 0;
+    setRenderState(null);
+    setRenderedUrl(null);
+    setShowExtracted(false);
+    const check = async () => {
+      try {
+        const status = await getSharedRenderStatus(accessToken, artifact.id);
+        if (cancelled) return;
+        setRenderState(status);
+        if (status.state === "converting" && attempts++ < 80) {
+          timer = window.setTimeout(() => void check(), 1500);
+        } else if (status.state === "ready") {
+          const blob = await downloadSharedRenderedPreview(accessToken, artifact.id);
+          if (cancelled) return;
+          url = URL.createObjectURL(new Blob([blob], { type: "application/pdf" }));
+          setRenderedUrl(url);
+        }
+      } catch (error) {
+        if (!cancelled) setRenderState({ state: "failed", message: errorText(error) });
+      }
+    };
+    void check();
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [accessToken, artifact.id, rendersLayout]);
 
   // The browser's own PDF viewer shows the original file.
   useEffect(() => {
@@ -111,11 +154,17 @@ export function DocumentViewer({ accessToken, artifact }: { accessToken: string;
         <div className="shared-doc-title"><strong>{artifact.title}</strong></div>
         <div className="shared-doc-actions">
           {target ? <Button disabled={isBusy} onClick={() => void openInApp()} type="button" variant="main"><ExternalLink size={16} /> Open in {target.label}</Button> : null}
+          {renderedUrl ? <Button onClick={() => setShowExtracted((value) => !value)} type="button" variant="secondary">{showExtracted ? "Show original layout" : "Show extracted view"}</Button> : null}
           <Button disabled={isBusy} onClick={() => void download()} type="button" variant="secondary"><Download size={16} /> Download</Button>
         </div>
       </div>
-      {isLoading ? <p className="shared-muted-copy"><Loader className="spin" size={14} /> Loading preview…</p> : null}
-      {preview ? <PreviewBody pdfUrl={pdfUrl} preview={preview} /> : null}
+      {rendersLayout && renderState?.state === "converting" ? <p className="shared-doc-note"><Loader className="spin" size={14} /> Rendering the original layout. The extracted view is shown meanwhile.</p> : null}
+      {rendersLayout && renderState?.state === "failed" ? <p className="shared-doc-note">The original layout could not be rendered{renderState.message ? `: ${renderState.message}` : ""}. Showing the extracted view.</p> : null}
+      {rendersLayout && renderState?.state === "disabled" ? <p className="shared-muted-copy">Install LibreOffice on the server to preview the original layout of Office files.</p> : null}
+      {renderedUrl && !showExtracted ? <iframe className="shared-pdf-frame shared-rendered-frame" src={renderedUrl} title="Document preview" /> : <>
+        {isLoading ? <p className="shared-muted-copy"><Loader className="spin" size={14} /> Loading preview…</p> : null}
+        {preview ? <PreviewBody pdfUrl={pdfUrl} preview={preview} /> : null}
+      </>}
     </div>
   );
 }

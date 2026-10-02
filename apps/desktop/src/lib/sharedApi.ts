@@ -460,6 +460,27 @@ export function getSharedDocumentPreview(accessToken: string, artifactId: string
   return request<DocumentPreview>(`/v1/artifacts/${artifactId}/document-preview`, {}, accessToken);
 }
 
+export interface RenderStatus {
+  state: "ready" | "converting" | "failed" | "disabled" | "unsupported";
+  message: string | null;
+}
+
+/** Asks for the layout-accurate preview; the server starts the conversion if needed. */
+export function getSharedRenderStatus(accessToken: string, artifactId: string): Promise<RenderStatus> {
+  return request<RenderStatus>(`/v1/artifacts/${artifactId}/rendered-preview/status`, {}, accessToken);
+}
+
+export async function downloadSharedRenderedPreview(accessToken: string, artifactId: string): Promise<Blob> {
+  const response = await fetch(`${API_URL}/v1/artifacts/${artifactId}/rendered-preview`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null) as { error?: { message?: string } } | null;
+    throw new SharedApiError(response.status, payload?.error?.message ?? `The shared API returned ${response.status}.`);
+  }
+  return response.blob();
+}
+
 export function createSharedFileLink(accessToken: string, artifactId: string): Promise<FileLink> {
   return request<FileLink>(`/v1/artifacts/${artifactId}/open-link`, { method: "POST", body: JSON.stringify({}) }, accessToken);
 }
