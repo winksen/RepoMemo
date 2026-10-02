@@ -496,8 +496,37 @@ export interface AgentCapabilities {
 
 export interface AgentMessage {
   message: string;
-  capability?: AgentCapability;
-  artifact_id?: string;
+  capability?: AgentCapability | null;
+  artifact_id?: string | null;
+}
+
+export interface AgentConversation {
+  id: string;
+  workspace_id: string;
+  title: string;
+  turn_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AgentTurn {
+  id: string;
+  conversation_id: string;
+  position: number;
+  label: string;
+  request: AgentMessage;
+  reply: AgentReply;
+  created_at: string;
+}
+
+export interface AgentConversationDetail {
+  conversation: AgentConversation;
+  turns: AgentTurn[];
+}
+
+export interface AgentTurnResponse {
+  conversation: AgentConversation;
+  turn: AgentTurn;
 }
 
 export interface AgentReply {

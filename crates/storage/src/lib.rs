@@ -5,7 +5,7 @@ use std::sync::{Arc, RwLock};
 use anyhow::{bail, Context, Result};
 use chrono::Utc;
 use repomemo_domain::{
-    ArtifactComment, ArtifactDetail, ArtifactIndexFailure, Folder, MAX_FOLDER_DEPTH, ArtifactLifecycle, ArtifactLifecycleEvent, ArtifactSummary,
+    AgentConversation, AgentMessage, AgentReply, AgentTurn, ArtifactComment, ArtifactDetail, ArtifactIndexFailure, Folder, MAX_FOLDER_DEPTH, ArtifactLifecycle, ArtifactLifecycleEvent, ArtifactSummary,
     ArtifactType, Chunk, Citation, CollaborationTask, IndexingJobStatus, MemoryCard,
     MemoryCardDetail, MemoryCardSummary, MemoryEvidence, Organization, OrganizationMember,
     OrganizationRole, ProviderSettings, SavedSearch, SearchRequest, SearchResult,
@@ -171,6 +171,60 @@ struct SavedSearchRow {
     creator_display_name: String,
     created_at: String,
     updated_at: String,
+}
+
+const AGENT_CONVERSATION_SELECT: &str = "SELECT conversation.id, conversation.workspace_id, conversation.title, (SELECT COUNT(*) FROM assistant_turns turn WHERE turn.conversation_id = conversation.id) AS turn_count, conversation.created_at, conversation.updated_at FROM assistant_conversations conversation";
+
+#[derive(Debug, sqlx::FromRow)]
+struct AgentConversationRow {
+    id: String,
+    workspace_id: String,
+    title: String,
+    turn_count: i64,
+    created_at: String,
+    updated_at: String,
+}
+
+impl From<AgentConversationRow> for AgentConversation {
+    fn from(row: AgentConversationRow) -> Self {
+        Self {
+            id: row.id,
+            workspace_id: row.workspace_id,
+            title: row.title,
+            turn_count: row.turn_count,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+        }
+    }
+}
+
+#[derive(Debug, sqlx::FromRow)]
+struct AgentTurnRow {
+    id: String,
+    conversation_id: String,
+    position: i64,
+    label: String,
+    request_json: String,
+    reply_json: String,
+    created_at: String,
+}
+
+impl TryFrom<AgentTurnRow> for AgentTurn {
+    type Error = anyhow::Error;
+
+    fn try_from(row: AgentTurnRow) -> Result<Self> {
+        Ok(Self {
+            id: row.id,
+            conversation_id: row.conversation_id,
+            position: row.position,
+            label: row.label,
+            request: serde_json::from_str(&row.request_json)
+                .context("stored assistant request is not valid JSON")?,
+            reply: serde_json::from_str(&row.reply_json)
+                .context("stored assistant reply is not valid JSON")?,
+            created_at: row.created_at,
+        })
+    }
 }
 
 #[derive(Debug, sqlx::FromRow)]
@@ -1511,6 +1565,125 @@ impl StorageEngine {
             bail!("Saved search was not found.");
         }
         Ok(())
+    }
+
+    pub async fn list_agent_conversations(
+        &self,
+        workspace_id: &str,
+        user_id: &str,
+    ) -> Result<Vec<AgentConversation>> {
+        let rows = sqlx::query_as::<_, AgentConversationRow>(&format!("{AGENT_CONVERSATION_SELECT} WHERE conversation.workspace_id = ?1 AND conversation.user_id = ?2 ORDER BY conversation.updated_at DESC"))
+            .bind(workspace_id)
+            .bind(user_id)
+            .fetch_all(&self.pool)
+            .await?;
+        Ok(rows.into_iter().map(AgentConversation::from).collect())
+    }
+
+    /// The conversation when `user_id` owns it; anyone else gets "not found".
+    pub async fn get_agent_conversation(
+        &self,
+        conversation_id: &str,
+        user_id: &str,
+    ) -> Result<AgentConversation> {
+        sqlx::query_as::<_, AgentConversationRow>(&format!("{AGENT_CONVERSATION_SELECT} WHERE conversation.id = ?1 AND conversation.user_id = ?2"))
+            .bind(conversation_id)
+            .bind(user_id)
+            .fetch_optional(&self.pool)
+            .await?
+            .map(AgentConversation::from)
+            .context("Assistant conversation was not found.")
+    }
+
+    pub async fn create_agent_conversation(
+        &self,
+        workspace_id: &str,
+        user_id: &str,
+        title: &str,
+    ) -> Result<AgentConversation> {
+        let id = Uuid::new_v4().to_string();
+        let now = Utc::now().to_rfc3339();
+        sqlx::query("INSERT INTO assistant_conversations (id, workspace_id, user_id, title, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?5)")
+            .bind(&id)
+            .bind(workspace_id)
+            .bind(user_id)
+            .bind(title)
+            .bind(now)
+            .execute(&self.pool)
+            .await?;
+        self.get_agent_conversation(&id, user_id).await
+    }
+
+    pub async fn rename_agent_conversation(
+        &self,
+        conversation_id: &str,
+        user_id: &str,
+        title: &str,
+    ) -> Result<AgentConversation> {
+        let changed = sqlx::query("UPDATE assistant_conversations SET title = ?3 WHERE id = ?1 AND user_id = ?2")
+            .bind(conversation_id)
+            .bind(user_id)
+            .bind(title)
+            .execute(&self.pool)
+            .await?;
+        if changed.rows_affected() == 0 {
+            bail!("Assistant conversation was not found.");
+        }
+        self.get_agent_conversation(conversation_id, user_id).await
+    }
+
+    pub async fn delete_agent_conversation(&self, conversation_id: &str, user_id: &str) -> Result<()> {
+        let changed = sqlx::query("DELETE FROM assistant_conversations WHERE id = ?1 AND user_id = ?2")
+            .bind(conversation_id)
+            .bind(user_id)
+            .execute(&self.pool)
+            .await?;
+        if changed.rows_affected() == 0 {
+            bail!("Assistant conversation was not found.");
+        }
+        Ok(())
+    }
+
+    pub async fn list_agent_turns(&self, conversation_id: &str) -> Result<Vec<AgentTurn>> {
+        let rows = sqlx::query_as::<_, AgentTurnRow>("SELECT id, conversation_id, position, label, request_json, reply_json, created_at FROM assistant_turns WHERE conversation_id = ?1 ORDER BY position")
+            .bind(conversation_id)
+            .fetch_all(&self.pool)
+            .await?;
+        rows.into_iter().map(AgentTurn::try_from).collect()
+    }
+
+    /// Stores a finished exchange at the end of the conversation and marks the
+    /// conversation as recently used.
+    pub async fn append_agent_turn(
+        &self,
+        conversation_id: &str,
+        label: &str,
+        request: &AgentMessage,
+        reply: &AgentReply,
+    ) -> Result<AgentTurn> {
+        let id = Uuid::new_v4().to_string();
+        let now = Utc::now().to_rfc3339();
+        let mut transaction = self.pool.begin().await?;
+        sqlx::query("INSERT INTO assistant_turns (id, conversation_id, position, label, request_json, reply_json, created_at) VALUES (?1, ?2, (SELECT COALESCE(MAX(position), 0) + 1 FROM assistant_turns WHERE conversation_id = ?2), ?3, ?4, ?5, ?6)")
+            .bind(&id)
+            .bind(conversation_id)
+            .bind(label)
+            .bind(serde_json::to_string(request)?)
+            .bind(serde_json::to_string(reply)?)
+            .bind(&now)
+            .execute(&mut *transaction)
+            .await?;
+        sqlx::query("UPDATE assistant_conversations SET updated_at = ?2 WHERE id = ?1")
+            .bind(conversation_id)
+            .bind(&now)
+            .execute(&mut *transaction)
+            .await?;
+        transaction.commit().await?;
+        let row = sqlx::query_as::<_, AgentTurnRow>("SELECT id, conversation_id, position, label, request_json, reply_json, created_at FROM assistant_turns WHERE id = ?1")
+            .bind(&id)
+            .fetch_one(&self.pool)
+            .await?;
+        AgentTurn::try_from(row)
     }
 
     pub async fn list_task_checklist_items(&self, task_id: &str) -> Result<Vec<TaskChecklistItem>> {

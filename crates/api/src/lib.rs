@@ -22,7 +22,7 @@ use serde_json::json;
 
 mod agent;
 
-pub use agent::agent_capabilities;
+pub use agent::{agent_capabilities, agent_conversation_title, agent_turn_label};
 
 #[derive(Debug, Clone)]
 pub struct RepoMemoCore {

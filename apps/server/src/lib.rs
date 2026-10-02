@@ -178,6 +178,14 @@ impl ApiError {
         }
     }
 
+    fn not_found(message: impl Into<String>) -> Self {
+        Self {
+            status: StatusCode::NOT_FOUND,
+            code: "not_found",
+            message: message.into(),
+        }
+    }
+
     fn forbidden() -> Self {
         Self {
             status: StatusCode::FORBIDDEN,
@@ -633,6 +641,16 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
         .route(
             "/v1/workspaces/{workspace_id}/agent/messages",
             post(agent::send_agent_message),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/agent/conversations",
+            get(agent::list_agent_conversations),
+        )
+        .route(
+            "/v1/agent/conversations/{conversation_id}",
+            get(agent::get_agent_conversation)
+                .put(agent::rename_agent_conversation)
+                .delete(agent::delete_agent_conversation),
         )
         .route(
             "/v1/workspaces/{workspace_id}/ai-providers",
@@ -5746,28 +5764,108 @@ mod tests {
             }
         };
 
-        let found = send(json!({"message": "find the deploy runbook"})).await;
+        // The first message starts a conversation named after it.
+        let first = send(json!({"message": "find the deploy runbook"})).await;
+        let conversation_id = first["conversation"]["id"].as_str().unwrap().to_owned();
+        assert_eq!(first["conversation"]["title"], "find the deploy runbook");
+        let found = &first["turn"]["reply"];
         assert_eq!(found["capability"], "find_files");
         assert_eq!(found["routing"], "rules");
         assert_eq!(found["files"][0]["title"], "Deploy runbook");
 
-        let searched = send(json!({"message": "backoff", "capability": "search_content"})).await;
-        assert_eq!(searched["routing"], "explicit");
-        assert_eq!(searched["matches"][0]["title"], "Retry policy");
+        let in_chat = |body: Value| {
+            let mut body = body;
+            body["conversation_id"] = json!(conversation_id);
+            send(body)
+        };
+        let searched = in_chat(json!({"message": "backoff", "capability": "search_content"})).await;
+        assert_eq!(searched["turn"]["reply"]["routing"], "explicit");
+        assert_eq!(searched["turn"]["reply"]["matches"][0]["title"], "Retry policy");
 
         // A file lookup with no matching name falls back to the indexed content.
-        let fallback = send(json!({"message": "find migration"})).await;
-        assert_eq!(fallback["files"].as_array().unwrap().len(), 0);
-        assert_eq!(fallback["matches"][0]["title"], "Deploy runbook");
+        let fallback = in_chat(json!({"message": "find migration"})).await;
+        assert_eq!(fallback["turn"]["reply"]["files"].as_array().unwrap().len(), 0);
+        assert_eq!(fallback["turn"]["reply"]["matches"][0]["title"], "Deploy runbook");
 
-        let summary = send(json!({"message": "summarize the retry policy"})).await;
-        assert_eq!(summary["capability"], "summarize_file");
-        assert_eq!(summary["generated"], false);
-        assert!(summary["reply_markdown"].as_str().unwrap().contains("needs an AI provider"));
+        let summary = in_chat(json!({"message": "summarize the retry policy"})).await;
+        assert_eq!(summary["turn"]["reply"]["capability"], "summarize_file");
+        assert_eq!(summary["turn"]["reply"]["generated"], false);
+        assert!(summary["turn"]["reply"]["reply_markdown"].as_str().unwrap().contains("needs an AI provider"));
 
-        let unmatched = send(json!({"message": "write me a poem"})).await;
-        assert_eq!(unmatched["capability"], Value::Null);
-        assert_eq!(unmatched["routing"], "unmatched");
+        let unmatched = in_chat(json!({"message": "write me a poem"})).await;
+        assert_eq!(unmatched["turn"]["reply"]["capability"], Value::Null);
+        assert_eq!(unmatched["turn"]["reply"]["routing"], "unmatched");
+        assert_eq!(unmatched["turn"]["position"], 5);
+        assert_eq!(unmatched["conversation"]["turn_count"], 5);
+
+        // A second chat, then the history of both.
+        let overview = send(json!({"capability": "workspace_overview"})).await;
+        assert_eq!(overview["conversation"]["title"], "Workspace overview");
+        assert_ne!(overview["conversation"]["id"], json!(conversation_id));
+        let get = |uri: String, authorization: String| {
+            let app = app.clone();
+            async move { app.oneshot(auth_request("GET", &uri, &authorization)).await.unwrap() }
+        };
+        let chats = read(get(format!("/v1/workspaces/{workspace_id}/agent/conversations"), owner.clone()).await).await;
+        assert_eq!(chats.as_array().unwrap().len(), 2);
+        assert_eq!(chats[0]["title"], "Workspace overview");
+        let history = read(get(format!("/v1/agent/conversations/{conversation_id}"), owner.clone()).await).await;
+        let labels = history["turns"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|turn| turn["label"].as_str().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(labels, ["find the deploy runbook", "backoff", "find migration", "summarize the retry policy", "write me a poem"]);
+        assert_eq!(history["turns"][1]["reply"]["matches"][0]["title"], "Retry policy");
+
+        let renamed = app
+            .clone()
+            .oneshot(json_request("PUT", &format!("/v1/agent/conversations/{conversation_id}"), &owner, json!({"title": "  Runbook   hunt "})))
+            .await
+            .unwrap();
+        assert_eq!(read(renamed).await["title"], "Runbook hunt");
+
+        // Another member of the workspace cannot see or continue these chats.
+        let registered = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/v1/auth/register")
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        json!({"email": "agent-other@example.com", "display_name": "Other", "password": "not-a-real-password"})
+                            .to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let other = format!("Bearer {}", read(registered).await["access_token"].as_str().unwrap());
+        let added = app
+            .clone()
+            .oneshot(json_request("PUT", &format!("/v1/workspaces/{workspace_id}/members"), &owner, json!({"email": "agent-other@example.com", "role": "member"})))
+            .await
+            .unwrap();
+        assert_eq!(added.status(), 200);
+        let others_chats = read(get(format!("/v1/workspaces/{workspace_id}/agent/conversations"), other.clone()).await).await;
+        assert_eq!(others_chats.as_array().unwrap().len(), 0);
+        assert_eq!(get(format!("/v1/agent/conversations/{conversation_id}"), other.clone()).await.status(), 404);
+        let hijack = app
+            .clone()
+            .oneshot(json_request("POST", &format!("/v1/workspaces/{workspace_id}/agent/messages"), &other, json!({"message": "find runbook", "conversation_id": conversation_id})))
+            .await
+            .unwrap();
+        assert_eq!(hijack.status(), 404);
+
+        let deleted = app
+            .clone()
+            .oneshot(auth_request("DELETE", &format!("/v1/agent/conversations/{conversation_id}"), &owner))
+            .await
+            .unwrap();
+        assert_eq!(deleted.status(), 204);
+        assert_eq!(get(format!("/v1/agent/conversations/{conversation_id}"), owner.clone()).await.status(), 404);
 
         let outsider = app
             .clone()

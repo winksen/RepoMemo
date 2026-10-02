@@ -699,6 +699,44 @@ pub enum AgentRouting {
     Unmatched,
 }
 
+/// What the user sent: typed text, optionally pinned to a capability or file.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AgentMessage {
+    #[serde(default)]
+    pub message: String,
+    pub capability: Option<AgentCapability>,
+    pub artifact_id: Option<String>,
+}
+
+/// A saved assistant chat. Only the user who started it can see it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentConversation {
+    pub id: String,
+    pub workspace_id: String,
+    pub title: String,
+    pub turn_count: i64,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// One exchange: the request as the user saw it and the assistant's reply.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentTurn {
+    pub id: String,
+    pub conversation_id: String,
+    pub position: i64,
+    pub label: String,
+    pub request: AgentMessage,
+    pub reply: AgentReply,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentConversationDetail {
+    pub conversation: AgentConversation,
+    pub turns: Vec<AgentTurn>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentRequest {
     pub workspace_id: String,

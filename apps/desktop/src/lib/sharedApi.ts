@@ -1,7 +1,9 @@
 import type {
   AgentCapabilities,
+  AgentConversation,
+  AgentConversationDetail,
   AgentMessage,
-  AgentReply,
+  AgentTurnResponse,
   AskAnswer,
   ArtifactDetail,
   ArtifactComment,
@@ -254,11 +256,28 @@ export function getSharedAgentCapabilities(accessToken: string, workspaceId: str
   return request<AgentCapabilities>(`/v1/workspaces/${workspaceId}/agent/capabilities`, {}, accessToken);
 }
 
-export function sendSharedAgentMessage(accessToken: string, workspaceId: string, message: AgentMessage): Promise<AgentReply> {
-  return request<AgentReply>(`/v1/workspaces/${workspaceId}/agent/messages`, {
+/** Sends a message; without `conversationId` the server starts a new conversation. */
+export function sendSharedAgentMessage(accessToken: string, workspaceId: string, message: AgentMessage, conversationId?: string): Promise<AgentTurnResponse> {
+  return request<AgentTurnResponse>(`/v1/workspaces/${workspaceId}/agent/messages`, {
     method: "POST",
-    body: JSON.stringify(message),
+    body: JSON.stringify({ ...message, conversation_id: conversationId }),
   }, accessToken);
+}
+
+export function listSharedAgentConversations(accessToken: string, workspaceId: string): Promise<AgentConversation[]> {
+  return request<AgentConversation[]>(`/v1/workspaces/${workspaceId}/agent/conversations`, {}, accessToken);
+}
+
+export function getSharedAgentConversation(accessToken: string, conversationId: string): Promise<AgentConversationDetail> {
+  return request<AgentConversationDetail>(`/v1/agent/conversations/${conversationId}`, {}, accessToken);
+}
+
+export function renameSharedAgentConversation(accessToken: string, conversationId: string, title: string): Promise<AgentConversation> {
+  return request<AgentConversation>(`/v1/agent/conversations/${conversationId}`, { method: "PUT", body: JSON.stringify({ title }) }, accessToken);
+}
+
+export function deleteSharedAgentConversation(accessToken: string, conversationId: string): Promise<void> {
+  return request<void>(`/v1/agent/conversations/${conversationId}`, { method: "DELETE" }, accessToken);
 }
 
 export function listSharedWorkspaceAiProviders(accessToken: string, workspaceId: string): Promise<SharedAiProviderSettings[]> {

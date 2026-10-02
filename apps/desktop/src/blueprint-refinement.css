@@ -711,7 +711,31 @@ body,
 .shared-rendered-frame { height: 720px; }
 
 /* Workspace assistant */
-.shared-assistant { display: grid; gap: 18px; max-width: 880px; }
+.shared-assistant { display: grid; grid-template-columns: 240px minmax(0, 1fr); align-items: start; gap: 28px; max-width: 1160px; }
+.shared-assistant-main { display: grid; gap: 18px; min-width: 0; max-width: 880px; }
+.shared-assistant-chats { position: sticky; top: 0; display: grid; gap: 10px; max-height: calc(100vh - 220px); padding-right: 4px; overflow-y: auto; }
+.shared-assistant-chats .rm-button.shared-assistant-new-chat { justify-content: flex-start; }
+.shared-assistant-chats ul { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.shared-assistant-chats li { position: relative; display: flex; align-items: center; border-radius: 8px; }
+.shared-assistant-chats li:hover, .shared-assistant-chats li.active { background: var(--color-surface-3); }
+.shared-assistant-chats li > button { display: flex; flex: 1; align-items: flex-start; gap: 8px; min-width: 0; padding: 8px 4px 8px 10px; color: var(--color-text-muted); background: none; border: 0; border-radius: 8px; cursor: pointer; font: inherit; text-align: left; }
+.shared-assistant-chats li > button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
+.shared-assistant-chats li > button:disabled { cursor: default; }
+.shared-assistant-chats li > button > svg { flex: none; margin-top: 2px; }
+.shared-assistant-chats li > button > span { display: grid; gap: 2px; min-width: 0; }
+.shared-assistant-chats li strong { overflow: hidden; color: var(--color-text); font-size: 13px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.shared-assistant-chats li.active strong { font-weight: 700; }
+.shared-assistant-chats li small { color: var(--color-text-subtle); font-size: 11px; }
+.shared-assistant-chats li .rm-action-trigger { flex: none; margin-right: 4px; opacity: 0; }
+.shared-assistant-chats li:hover .rm-action-trigger, .shared-assistant-chats li.active .rm-action-trigger, .shared-assistant-chats li .rm-action-trigger:focus-visible, .shared-assistant-chats li .rm-action-trigger[data-state="open"] { opacity: 1; }
+.shared-assistant-chats-empty { margin: 4px 2px; color: var(--color-text-subtle); font-size: 12px; line-height: 1.5; }
+.shared-assistant-thread-title { padding-bottom: 10px; border-bottom: 1px solid var(--color-border); }
+.shared-assistant-thread-title strong { display: block; overflow: hidden; font-size: 15px; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 900px) {
+  .shared-assistant { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .shared-assistant-chats { position: static; max-height: 240px; }
+  .shared-assistant-chats li .rm-action-trigger { opacity: 1; }
+}
 .shared-assistant-thread { display: grid; align-content: start; gap: 28px; min-height: 240px; }
 .shared-assistant-intro { display: grid; gap: 7px; place-items: start; padding: 36px 0 12px; color: var(--color-text-muted); }
 .shared-assistant-intro strong { color: var(--color-text); font-size: 15px; }

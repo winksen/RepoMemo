@@ -260,7 +260,9 @@ Guard legend: **pub** = no auth, **auth** = any valid JWT, **R/W/A/O** = workspa
 | POST | `/v1/workspaces/{ws}/ai-overview` | R | returns `provider_configured:false` instead of erroring → activity |
 | POST | `/v1/workspaces/{ws}/ask` | R | 400 when no enabled provider → activity |
 | GET | `/v1/workspaces/{ws}/agent/capabilities` | R | assistant actions, each flagged `available` against the enabled text provider |
-| POST | `/v1/workspaces/{ws}/agent/messages` | R | `{message, capability?, artifact_id?}` → `AgentReply`. Provider failures come back as reply warnings, not errors. AI-generated replies → activity |
+| POST | `/v1/workspaces/{ws}/agent/messages` | R | `{message, capability?, artifact_id?, conversation_id?}` → `{conversation, turn}`. Without `conversation_id` a new chat is started after the reply succeeds. Provider failures come back as reply warnings, not errors. AI-generated replies → activity |
+| GET | `/v1/workspaces/{ws}/agent/conversations` | R | the caller's own chats, most recent first |
+| GET, PUT, DELETE | `/v1/agent/conversations/{c}` | R + owner | detail with turns / rename `{title}` (1–120) / delete. Another user's chat is a 404 |
 | GET, PUT | `/v1/workspaces/{ws}/ai-providers` | A | the response strips `api_key`. PUT upserts and keeps the stored key if the body omits it |
 | POST | `/v1/workspaces/{ws}/ai-providers/{p}/test` | A | → activity |
 | GET | `/v1/workspaces/{ws}/activity` | A | last 100 |
@@ -408,7 +410,7 @@ The assistant is a closed capability router, not a free-running agent. Each mess
 4. `summarize_file`, `ask_question` and `workspace_overview` need an enabled text provider. Without one they reply that AI is not configured, and nothing is sent.
 5. `generated: true` marks text written by the provider, so the UI can label it apart from stored facts.
 
-Conversations are kept only in the browser's `sessionStorage` (the last 30 turns per workspace). Nothing about a conversation is stored on the server.
+**Conversations** are stored on the server (migration 0014). `assistant_conversations` holds one row per chat, owned by a single user in a single workspace and visible only to that user. `assistant_turns` holds one row per finished exchange: the label, the request and the full `AgentReply` as JSON. A request that fails leaves no row, and the first message creates the chat only after it gets a reply. A chat is titled from its first request until the user renames it. Turns are snapshots: a file that was deleted later still appears in an old reply, and opening it reports that it is missing. The model does not see earlier turns; each message is still routed and answered on its own. The browser remembers only which chat was last open (`localStorage`).
 
 ---
 
@@ -429,6 +431,7 @@ The database is SQLite in WAL mode with foreign keys on, a pool of at most 5 con
 | 0009 | workflow_depth | workspace_saved_searches, workspace_task_checklist_items |
 | 0010 | jobs_kind_cancel | `indexing_jobs.kind`, `cancel_requested` |
 | 0011 | index_version | `artifacts.index_version`, the indexer version that produced the current chunks |
+| 0014 | assistant_conversations | assistant_conversations, assistant_turns (per-user assistant chats, §6.7) |
 
 ```mermaid
 erDiagram
@@ -456,6 +459,9 @@ erDiagram
   users ||--o{ workspace_notifications : receives
   workspaces ||--o{ indexing_jobs : runs
   workspaces ||--o{ provider_settings : configures
+  workspaces ||--o{ assistant_conversations : has
+  users ||--o{ assistant_conversations : owns
+  assistant_conversations ||--o{ assistant_turns : contains
 ```
 
 Notes:

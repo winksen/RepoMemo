@@ -83,9 +83,8 @@ impl AiProvider for OllamaProvider {
             }))
             .send()
             .await
-            .context("could not reach the local Ollama provider")?
-            .error_for_status()
-            .context("local Ollama provider rejected the summary request")?;
+            .context("could not reach the local Ollama provider")?;
+        let response = checked(response, "The local Ollama provider rejected the request").await?;
         let body: OllamaGenerateResponse = response
             .json()
             .await
@@ -139,9 +138,8 @@ impl AiProvider for OllamaProvider {
             }))
             .send()
             .await
-            .context("could not reach the local Ollama vision model")?
-            .error_for_status()
-            .context("the configured Ollama model could not analyze this image; choose a vision-capable model")?;
+            .context("could not reach the local Ollama vision model")?;
+        let response = checked(response, "The configured Ollama model could not analyze this image; choose a vision-capable model").await?;
         ollama_image_answer(response).await
     }
 
@@ -237,24 +235,9 @@ impl AiProvider for OpenRouterProvider {
                 ],
                 "temperature": request.options.get("temperature").and_then(Value::as_f64).unwrap_or(0.2),
             }))
-            .send().await.context("could not reach OpenRouter")?
-            .error_for_status().context("OpenRouter rejected the summary request")?;
-        let body: OpenRouterResponse = response
-            .json()
-            .await
-            .context("OpenRouter returned an invalid response")?;
-        let answer = body
-            .choices
-            .into_iter()
-            .next()
-            .and_then(|choice| choice.message.content)
-            .unwrap_or_default()
-            .trim()
-            .to_owned();
-        if answer.is_empty() {
-            bail!("OpenRouter returned an empty summary")
-        }
-        Ok(answer)
+            .send().await.context("could not reach OpenRouter")?;
+        let response = checked(response, "OpenRouter rejected the request").await?;
+        openrouter_answer(response, "OpenRouter returned an empty answer").await
     }
 
     async fn embed(&self, _texts: Vec<String>, _options: Value) -> Result<Vec<Vec<f32>>> {
@@ -295,36 +278,137 @@ impl AiProvider for OpenRouterProvider {
             }))
             .send()
             .await
-            .context("could not reach OpenRouter for image analysis")?
-            .error_for_status()
-            .context("the configured OpenRouter model could not analyze this image; choose a vision-capable model")?;
-        let body: OpenRouterResponse = response
-            .json()
-            .await
-            .context("OpenRouter returned an invalid image-analysis response")?;
-        let answer = body
-            .choices
-            .into_iter()
-            .next()
-            .and_then(|choice| choice.message.content)
-            .unwrap_or_default()
-            .trim()
-            .to_owned();
-        if answer.is_empty() {
-            bail!("OpenRouter returned an empty image description")
-        }
-        Ok(answer)
+            .context("could not reach OpenRouter for image analysis")?;
+        let response = checked(response, "The configured OpenRouter model could not analyze this image; choose a vision-capable model").await?;
+        openrouter_answer(response, "OpenRouter returned an empty image description").await
     }
 
+    /// Checks the key, the model id and finally a tiny completion, because the
+    /// public model list answers even when the key, credits or privacy settings
+    /// would make every real request fail.
     async fn test_connection(&self) -> Result<ProviderTestResult> {
-        self.request(reqwest::Method::GET, "/models")
+        let result = |success: bool, message: String| ProviderTestResult {
+            provider_id: self.settings.id.clone(),
+            success,
+            message,
+        };
+        let key = self
+            .request(reqwest::Method::GET, "/key")
             .send()
             .await
-            .context("could not reach OpenRouter")?
-            .error_for_status()
-            .context("OpenRouter rejected the API key")?;
-        Ok(ProviderTestResult { provider_id: self.settings.id.clone(), success: true, message: "OpenRouter is ready. Workspace content will leave this device only when you request an AI action.".to_owned() })
+            .context("could not reach OpenRouter")?;
+        if matches!(key.status().as_u16(), 401 | 403) {
+            return Ok(result(false, "OpenRouter rejected the API key. Paste a valid key and save the provider again.".to_owned()));
+        }
+
+        let models = self
+            .request(reqwest::Method::GET, "/models")
+            .send()
+            .await
+            .context("could not reach OpenRouter")?;
+        let models: Value = checked(models, "OpenRouter could not list its models")
+            .await?
+            .json()
+            .await
+            .context("OpenRouter returned an invalid model list")?;
+        let ids = models["data"]
+            .as_array()
+            .map(|entries| entries.iter().filter_map(|entry| entry["id"].as_str()).collect::<Vec<_>>());
+        if let Some(ids) = ids.filter(|ids| !ids.contains(&self.model.as_str())) {
+            // A model that is only served for free is listed as `<id>:free`,
+            // and the plain id then has no endpoints.
+            let base = self.model.split(':').next().unwrap_or_default();
+            let suggestion = ids
+                .iter()
+                .find(|id| id.split(':').next() == Some(base))
+                .map(|id| format!(" Did you mean '{id}'?"))
+                .unwrap_or_else(|| " Copy the exact id from openrouter.ai/models, for example 'openai/gpt-4o-mini'.".to_owned());
+            return Ok(result(false, format!("OpenRouter does not serve a model with the id '{}'.{suggestion}", self.model)));
+        }
+
+        let probe = self
+            .request(reqwest::Method::POST, "/chat/completions")
+            .json(&json!({
+                "model": self.model,
+                "messages": [{ "role": "user", "content": "Reply with OK." }],
+                "max_tokens": 16,
+            }))
+            .send()
+            .await
+            .context("could not reach OpenRouter")?;
+        if let Err(error) = async { openrouter_answer(checked(probe, "OpenRouter rejected a test request").await?, "").await }.await {
+            return Ok(result(false, error.to_string()));
+        }
+        Ok(result(true, format!("OpenRouter is ready with {}. Workspace content will leave this device only when you request an AI action.", self.model)))
     }
+}
+
+/// Passes a successful response through. Otherwise fails with the provider's
+/// own explanation, which both Ollama and OpenRouter put in an `error` field,
+/// plus a hint for the statuses with a known fix.
+async fn checked(response: reqwest::Response, action: &str) -> Result<reqwest::Response> {
+    let status = response.status();
+    if status.is_success() {
+        return Ok(response);
+    }
+    let body = response.text().await.unwrap_or_default();
+    let detail = serde_json::from_str::<Value>(&body)
+        .ok()
+        .and_then(|value| error_message(&value))
+        .unwrap_or_else(|| body.trim().chars().take(300).collect());
+    let hint = match status.as_u16() {
+        401 | 403 => " Check the API key in the workspace AI settings.",
+        402 => " The provider account has run out of credits.",
+        404 => " Check the model id; on OpenRouter also check the privacy settings, which can rule out every provider for a model.",
+        429 => " The provider is rate limiting requests; try again shortly.",
+        _ => "",
+    };
+    if detail.is_empty() {
+        bail!("{action} (HTTP {}).{hint}", status.as_u16())
+    }
+    bail!("{action} (HTTP {}): {detail}.{hint}", status.as_u16())
+}
+
+fn error_message(value: &Value) -> Option<String> {
+    let error = value.get("error")?;
+    let message = error
+        .get("message")
+        .and_then(Value::as_str)
+        .or_else(|| error.as_str())?
+        .trim()
+        .trim_end_matches('.')
+        .to_owned();
+    // OpenRouter nests the upstream provider's reason under metadata.raw.
+    let upstream = error
+        .pointer("/metadata/raw")
+        .and_then(Value::as_str)
+        .map(|raw| raw.chars().take(200).collect::<String>());
+    Some(match upstream {
+        Some(raw) if !raw.is_empty() && !message.contains(&raw) => format!("{message} ({raw})"),
+        _ => message,
+    })
+}
+
+/// The first choice's text. OpenRouter can answer 200 with an `error` object
+/// when the upstream model fails, so that is checked first.
+async fn openrouter_answer(response: reqwest::Response, empty_message: &str) -> Result<String> {
+    let body: Value = response
+        .json()
+        .await
+        .context("OpenRouter returned an invalid response")?;
+    if let Some(message) = error_message(&body) {
+        bail!("OpenRouter could not complete the request: {message}")
+    }
+    let answer = body
+        .pointer("/choices/0/message/content")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .trim()
+        .to_owned();
+    if answer.is_empty() && !empty_message.is_empty() {
+        bail!("{empty_message}")
+    }
+    Ok(answer)
 }
 
 pub enum ConfiguredProvider {
@@ -465,22 +549,9 @@ struct OllamaModel {
     name: String,
 }
 
-#[derive(Debug, Deserialize)]
-struct OpenRouterResponse {
-    choices: Vec<OpenRouterChoice>,
-}
-#[derive(Debug, Deserialize)]
-struct OpenRouterChoice {
-    message: OpenRouterMessage,
-}
-#[derive(Debug, Deserialize)]
-struct OpenRouterMessage {
-    content: Option<String>,
-}
-
 #[cfg(test)]
 mod tests {
-    use super::validate_settings;
+    use super::{error_message, validate_settings};
     use repomemo_domain::ProviderSettings;
     use serde_json::json;
 
@@ -525,6 +596,20 @@ mod tests {
         cloud.api_key = Some("key".to_owned());
         cloud.metadata = json!({ "cloud_content_acknowledged": true });
         assert!(validate_settings(&cloud).is_ok());
+    }
+
+    #[test]
+    fn reads_provider_error_messages() {
+        assert_eq!(
+            error_message(&json!({"error": {"code": 402, "message": "Insufficient credits."}})).as_deref(),
+            Some("Insufficient credits")
+        );
+        assert_eq!(
+            error_message(&json!({"error": {"message": "Provider returned error", "metadata": {"raw": "model overloaded"}}})).as_deref(),
+            Some("Provider returned error (model overloaded)")
+        );
+        assert_eq!(error_message(&json!({"error": "model 'llama9' not found"})).as_deref(), Some("model 'llama9' not found"));
+        assert_eq!(error_message(&json!({"choices": []})), None);
     }
 
     #[test]

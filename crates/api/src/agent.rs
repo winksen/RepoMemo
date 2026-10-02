@@ -6,7 +6,7 @@
 use anyhow::{bail, Result};
 use repomemo_ai::{provider_from_settings, AiProvider, GenerateRequest};
 use repomemo_domain::{
-    AgentCapability, AgentCapabilityInfo, AgentReply, AgentRequest, AgentRouting,
+    AgentCapability, AgentCapabilityInfo, AgentMessage, AgentReply, AgentRequest, AgentRouting,
     ArtifactSummary, AskRequest, SearchRequest,
 };
 use serde_json::{json, Value};
@@ -163,6 +163,35 @@ pub fn agent_capabilities(ai_available: bool) -> Vec<AgentCapabilityInfo> {
     .collect()
 }
 
+const MAX_TITLE_CHARS: usize = 80;
+
+/// How a request reads in the transcript. A picked action often carries no
+/// typed text, and a file summary picked from a list carries only the title.
+pub fn agent_turn_label(request: &AgentMessage) -> String {
+    let message = request.message.trim();
+    match request.capability {
+        Some(AgentCapability::SummarizeFile) if request.artifact_id.is_some() => {
+            format!("Summarize {message}")
+        }
+        Some(capability) if message.is_empty() => agent_capabilities(true)
+            .into_iter()
+            .find(|info| info.id == capability)
+            .map(|info| info.label)
+            .unwrap_or_default(),
+        _ => message.to_owned(),
+    }
+}
+
+/// A conversation is named after its first request until the user renames it.
+pub fn agent_conversation_title(label: &str) -> String {
+    let label = label.split_whitespace().collect::<Vec<_>>().join(" ");
+    if label.chars().count() <= MAX_TITLE_CHARS {
+        return if label.is_empty() { "New chat".to_owned() } else { label };
+    }
+    let cut = label.chars().take(MAX_TITLE_CHARS - 1).collect::<String>();
+    format!("{}…", cut.trim_end())
+}
+
 fn requires_ai(capability: AgentCapability) -> bool {
     matches!(
         capability,
@@ -200,7 +229,7 @@ impl RepoMemoCore {
                 Ok(Some((capability, subject))) => Some((capability, AgentRouting::Model, subject)),
                 Ok(None) => None,
                 Err(error) => {
-                    warnings.push(format!("The AI provider could not interpret this message: {error}"));
+                    warnings.push(format!("The AI provider could not interpret this message: {error:#}"));
                     None
                 }
             }
@@ -229,7 +258,8 @@ impl RepoMemoCore {
         // failed request: the user can fix the cause and ask again.
         let mut answer = outcome.unwrap_or_else(|error| {
             let mut failed = reply("I couldn't complete that.");
-            failed.warnings.push(error.to_string());
+            // `{:#}` keeps the cause, e.g. a timeout behind "could not reach OpenRouter".
+            failed.warnings.push(format!("{error:#}"));
             failed
         });
         answer.capability = Some(capability);
@@ -698,6 +728,22 @@ mod tests {
         );
         assert_eq!(parse_model_route("{\"capability\": \"none\"}", "x"), None);
         assert_eq!(parse_model_route("no json here", "x"), None);
+    }
+
+    #[test]
+    fn labels_and_titles_read_like_the_request() {
+        let picked = |capability, message: &str, artifact: Option<&str>| AgentMessage {
+            message: message.to_owned(),
+            capability,
+            artifact_id: artifact.map(str::to_owned),
+        };
+        assert_eq!(agent_turn_label(&picked(None, "  find readme ", None)), "find readme");
+        assert_eq!(agent_turn_label(&picked(Some(AgentCapability::WorkspaceOverview), "", None)), "Workspace overview");
+        assert_eq!(agent_turn_label(&picked(Some(AgentCapability::SummarizeFile), "README.md", Some("a1"))), "Summarize README.md");
+        assert_eq!(agent_conversation_title("Why do\n uploads   fail?"), "Why do uploads fail?");
+        let long = agent_conversation_title(&"é".repeat(200));
+        assert_eq!(long.chars().count(), MAX_TITLE_CHARS);
+        assert!(long.ends_with('…'));
     }
 
     #[test]
