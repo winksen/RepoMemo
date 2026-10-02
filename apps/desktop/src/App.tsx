@@ -11,6 +11,7 @@ import { useEffect, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { SharedWebApp } from "./SharedWebApp";
+import { Toast } from "./components/ui/toast";
 import {
   IconArchive as Archive,
   IconArrowRight as ArrowRight,
@@ -900,7 +901,7 @@ function LocalDesktopApp() {
           )}
         </header>
 
-        {errorMessage ? <div className="error-banner">{errorMessage}</div> : null}
+        <Toast kind="error" message={errorMessage} />
 
         {activeView === "workspaces" ? (
           <WorkspaceView

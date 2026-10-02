@@ -469,6 +469,7 @@ Notes:
 | Types | [types.ts](../apps/desktop/src/types.ts) mirrors the Rust `domain` DTOs by hand, in snake_case. There is no codegen |
 | Layout | `SharedLayout` provides the header, theme, notifications, profile and sign-out, plus a rail (`OrganizationRail`) and a `WorkspaceTopbar` |
 | UI kit | Local shadcn-style `Button`, `Input`, `Textarea` and `Dropdown` (Radix Select), with `@tabler/icons-react` |
+| Notifications | Errors and success messages are **toasts** (bottom-right, solid status-colored fill with white text, auto-dismissed after ~4.5 s, errors ~7 s), never inline banners. [toast.tsx](../apps/desktop/src/components/ui/toast.tsx) exposes `showToast(kind, message)` and a declarative `<Toast kind message />`; `ToastViewport` is mounted once in `main.tsx` |
 | Styling | [styles.css](../apps/desktop/src/styles.css) (~6.1k LOC) plus [blueprint-refinement.css](../apps/desktop/src/blueprint-refinement.css). Design rules are in [DESIGN.md](../DESIGN.md). `docs/design/` also holds design rules, but it is gitignored and exists only locally |
 | Rendering of AI output | `answer_markdown` and `summary_markdown` are rendered as **plain text**. `react-markdown` is a dependency but `SharedWebApp` does not use it |
 | Fan-out | The dashboard issues **one `/metrics` call per workspace** (`Promise.allSettled`) |

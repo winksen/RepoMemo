@@ -81,6 +81,25 @@ use the shared ease-in-out curve; buttons never move position on hover.
 Do not introduce a third button or dropdown treatment without updating this
 system deliberately.
 
+### Notifications
+
+Errors and success confirmations are toasts, never inline banners. They stack at
+the bottom right, dismiss themselves after a few seconds (errors stay longer),
+pause while hovered, and can be closed manually. Use `showToast` or `<Toast>`
+from `components/ui/toast.tsx`. A toast is a solid fill in its status color
+(red error, green success, amber warning, blue info) with white text and a
+white icon, and no border. This is the one place a colored fill is used for
+status; it still never pairs tinted fills with same-hue text.
+
+### No tinted neutrals
+
+Backgrounds, borders and body text are true neutral greys (saturation 0) in both
+themes. Do not give surfaces and text a shared hue (blue-grey, green-grey and so
+on) and do not pair a color-tinted background with same-hue text; it reads as
+generic AI-generated styling. Color appears only as the single accent and the
+semantic status colors, used sparingly and never as a tinted fill with matching
+text.
+
 ## Do's and don'ts
 
 - Do make the primary task the largest, brightest surface.

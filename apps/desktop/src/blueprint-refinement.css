@@ -43,7 +43,7 @@
 
   --shadow-block: none;
   --shadow-floating: 0 18px 44px rgb(20 27 43 / 18%);
-  --font-ui: "Recursive Variable", "Segoe UI", system-ui, sans-serif;
+  --font-ui: "Plus Jakarta Sans Variable", "Segoe UI", system-ui, sans-serif;
   --font-brand: "Fjalla One", "Arial Narrow", sans-serif;
   --font-display: "Fjalla One", "Arial Narrow", sans-serif;
   --ease-standard: cubic-bezier(.2, 0, 0, 1);
@@ -52,19 +52,19 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --color-bg: hsl(220 16% 8%);
-  --color-canvas: hsl(220 16% 10%);
-  --color-surface: hsl(220 14% 11%);
-  --color-surface-2: hsl(220 10% 16%);
-  --color-surface-3: hsl(220 10% 20%);
-  --color-surface-hover: hsl(220 10% 18%);
-  --color-code-surface: hsl(220 16% 8%);
+  --color-bg: hsl(0 0% 4%);
+  --color-canvas: hsl(0 0% 6%);
+  --color-surface: hsl(0 0% 8%);
+  --color-surface-2: hsl(0 0% 12%);
+  --color-surface-3: hsl(0 0% 16%);
+  --color-surface-hover: hsl(0 0% 14%);
+  --color-code-surface: hsl(0 0% 5%);
 
-  --color-text: hsl(220 18% 92%);
-  --color-text-muted: hsl(220 8% 66%);
-  --color-text-subtle: hsl(220 8% 54%);
-  --color-border: hsl(220 10% 20%);
-  --color-border-strong: hsl(220 10% 29%);
+  --color-text: hsl(0 0% 93%);
+  --color-text-muted: hsl(0 0% 66%);
+  --color-text-subtle: hsl(0 0% 54%);
+  --color-border: hsl(0 0% 17%);
+  --color-border-strong: hsl(0 0% 26%);
 
   --color-accent: hsl(230 82% 62%);
   --color-accent-hover: hsl(230 88% 74%);
@@ -94,7 +94,7 @@
 *::before,
 *::after {
   scrollbar-width: thin;
-  scrollbar-color: hsl(220 10% 42% / 40%) transparent;
+  scrollbar-color: hsl(0 0% 42% / 40%) transparent;
 }
 
 *::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -528,4 +528,68 @@ textarea.rm-textarea:focus {
     animation-iteration-count: 1 !important;
     transition-duration: .01ms !important;
   }
+}
+
+/* Toasts: solid status-colored fill, white text and icon, no border. */
+.rm-toast-viewport {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(380px, calc(100vw - 32px));
+  pointer-events: none;
+}
+.rm-toast {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  padding: 12px 10px 12px 14px;
+  color: #fff;
+  background: var(--toast-bg);
+  border: 0;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 28%);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.45;
+  pointer-events: auto;
+  animation: rm-toast-in 180ms var(--ease-standard, ease-out);
+}
+.rm-toast-error { --toast-bg: #c9372c; }
+.rm-toast-success { --toast-bg: #1d8a57; }
+.rm-toast-warning { --toast-bg: #b7791f; }
+.rm-toast-info { --toast-bg: #2f5fd0; }
+.rm-toast p { margin: 0; padding-top: 1px; overflow-wrap: anywhere; }
+.rm-toast-icon { margin-top: 1px; color: #fff; }
+.rm-toast-close {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  color: #fff;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0.85;
+}
+.rm-toast-close:hover { background: rgb(255 255 255 / 20%); opacity: 1; }
+@keyframes rm-toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) { .rm-toast { animation: none; } }
+
+/* Hidden overflow can still be scrolled by focus or scrollIntoView (for example
+ * after an upload), which shifts the whole shell. Clipped overflow cannot. */
+html,
+body,
+#root,
+.shared-home { overflow: clip; }
+@media (min-width: 901px) {
+  .shared-home-content { overflow: clip; }
 }
