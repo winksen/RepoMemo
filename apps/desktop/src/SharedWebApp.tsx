@@ -27,8 +27,11 @@ import {
   IconMessageCircle as MessageCircle,
   IconKey as Key,
   IconList as List,
+  IconAlertCircle as AlertCircle,
   IconLoader2 as Loader,
   IconMarkdown as Markdown,
+  IconPhoto as Photo,
+  IconFileWord as WordFile,
   IconNote as Note,
   IconRefresh as Refresh,
   IconSearch as Search,
@@ -180,19 +183,31 @@ type OrganizationNavigation = {
 
 const WORKSPACE_SECTIONS: WorkspaceSection[] = ["overview", "evidence", "documents", "retrieval", "memory", "tasks", "people", "activity", "settings"];
 const ADMIN_WORKSPACE_SECTIONS = new Set<WorkspaceSection>(["people", "activity", "settings"]);
-const EVIDENCE_ARTIFACT_TYPES: Array<{ label: string; value: ArtifactType }> = [
-  { label: "Markdown", value: "markdown_doc" },
-  { label: "Code", value: "code_file" },
-  { label: "Shared note", value: "note" },
-  { label: "File", value: "file" },
+type FileCategory = "markdown" | "text" | "code" | "word" | "image";
+const FILE_CATEGORIES: Array<{ label: string; value: FileCategory }> = [
+  { label: "Markdown", value: "markdown" },
+  { label: "Text", value: "text" },
+  { label: "Code", value: "code" },
+  { label: "Word", value: "word" },
   { label: "Image", value: "image" },
-  { label: "Issue", value: "issue" },
-  { label: "Pull request", value: "pr" },
-  { label: "Decision", value: "decision" },
-  { label: "Incident", value: "incident" },
-  { label: "Runbook", value: "runbook" },
-  { label: "API spec", value: "api_spec" },
 ];
+
+/** Maps an artifact to the supported file categories shown in the type filter. */
+function fileCategory(artifact: Pick<ArtifactSummary, "artifact_type" | "language" | "path">): FileCategory {
+  if (isWordArtifact(artifact)) return "word";
+  if (artifact.artifact_type === "image") return "image";
+  if (artifact.artifact_type === "code_file") return "code";
+  if (artifact.artifact_type === "markdown_doc" || artifact.artifact_type === "note") return "markdown";
+  return "text";
+}
+
+function fileCategoryIcon(category: FileCategory, size: number) {
+  if (category === "markdown") return <Markdown size={size} />;
+  if (category === "code") return <Code size={size} />;
+  if (category === "image") return <Photo size={size} />;
+  if (category === "word") return <WordFile size={size} />;
+  return <FileText size={size} />;
+}
 const TASK_COLUMNS: Array<{ status: CollaborationTaskStatus; label: string }> = [
   { status: "open", label: "Open" },
   { status: "in_progress", label: "In progress" },
@@ -993,7 +1008,7 @@ function SharedWorkspaceDetail({
   const [workspaceMetrics, setWorkspaceMetrics] = useState<WorkspaceMetrics | null>(null);
   const [artifacts, setArtifacts] = useState<ArtifactSummary[]>([]);
   const [artifactQuery, setArtifactQuery] = useState("");
-  const [artifactTypes, setArtifactTypes] = useState<ArtifactType[]>([]);
+  const [artifactTypes, setArtifactTypes] = useState<FileCategory[]>([]);
   const [artifactViewMode, setArtifactViewMode] = useState<ArtifactViewMode>("grid");
   const [memoryCards, setMemoryCards] = useState<MemoryCardSummary[]>([]);
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -1071,7 +1086,7 @@ function SharedWorkspaceDetail({
     const normalizedQuery = artifactQuery.trim().toLowerCase();
     return artifacts.filter((artifact) => {
       const matchesQuery = !normalizedQuery || `${artifact.title} ${artifact.path}`.toLowerCase().includes(normalizedQuery);
-      const matchesType = artifactTypes.length === 0 || artifactTypes.includes(artifact.artifact_type);
+      const matchesType = artifactTypes.length === 0 || artifactTypes.includes(fileCategory(artifact));
       return matchesQuery && matchesType && (!isDocumentsView || isWordArtifact(artifact));
     });
   }, [artifactQuery, artifactTypes, artifacts, isDocumentsView]);
@@ -1375,7 +1390,7 @@ function SharedWorkspaceDetail({
     try { const updated = await toggleSharedTaskChecklistItem(accessToken, item.id, !item.completed_at); setTaskChecklists((current) => ({ ...current, [item.task_id]: (current[item.task_id] ?? []).map((entry) => entry.id === updated.id ? updated : entry) })); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
   }
 
-  function toggleArtifactType(type: ArtifactType) {
+  function toggleArtifactType(type: FileCategory) {
     setArtifactTypes((current) => current.includes(type)
       ? current.filter((currentType) => currentType !== type)
       : [...current, type]);
@@ -1529,15 +1544,15 @@ function SharedWorkspaceDetail({
                   <summary><Filter size={16} /><span>{artifactTypes.length ? `${artifactTypes.length} types` : "File types"}</span><ChevronDown size={16} /></summary>
                   <div className="shared-artifact-type-menu-panel">
                     <label><input checked={artifactTypes.length === 0} onChange={() => setArtifactTypes([])} type="checkbox" /><span>All types</span></label>
-                    {EVIDENCE_ARTIFACT_TYPES.map((option) => {
+                    {FILE_CATEGORIES.map((option) => {
                       const isSelected = artifactTypes.includes(option.value);
-                      return <label key={option.value}><input checked={isSelected} onChange={() => toggleArtifactType(option.value)} type="checkbox" />{artifactTypeIcon(option.value, 15)}<span>{option.label}</span></label>;
+                      return <label key={option.value}><input checked={isSelected} onChange={() => toggleArtifactType(option.value)} type="checkbox" />{fileCategoryIcon(option.value, 15)}<span>{option.label}</span></label>;
                     })}
                   </div>
                 </details>
               </div>
               <div className="shared-artifact-browser-meta"><span>{displayedArtifacts.length} of {isDocumentsView ? documentArtifacts.length : artifacts.length} files{hasArtifactFilters ? " matching filters" : ""}</span><div className="shared-artifact-view-switch" role="group" aria-label="Evidence view"><Button aria-label="Grid view" aria-pressed={artifactViewMode === "grid"} className={artifactViewMode === "grid" ? "active" : ""} onClick={() => setArtifactViewMode("grid")} type="button" variant="secondary"><Grid size={16} /></Button><Button aria-label="List view" aria-pressed={artifactViewMode === "list"} className={artifactViewMode === "list" ? "active" : ""} onClick={() => setArtifactViewMode("list")} type="button" variant="secondary"><List size={16} /></Button></div></div>
-              {displayedArtifacts.length ? <div className={`shared-artifact-manager ${artifactViewMode}`}>{displayedArtifacts.map((artifact) => <article key={artifact.id}><Button className={isDocumentsView && artifact.id === selectedDocument?.id ? "shared-artifact-entry selected" : "shared-artifact-entry"} onClick={() => isDocumentsView ? setSelectedDocumentId(artifact.id) : onOpenArtifact(artifact.id)} type="button" variant="secondary"><span className={`shared-artifact-file-icon type-${artifact.artifact_type}`}>{artifactTypeIcon(artifact.artifact_type, 20)}</span><span className="shared-artifact-entry-copy"><strong>{artifact.title}</strong></span><span className="shared-artifact-entry-meta"><span>{artifactKindLabel(artifact)}</span><span>{formatFileSize(artifact.size_bytes)}</span><span className={artifact.indexed_at ? "indexed" : "pending"}>{artifact.indexed_at ? "Indexed" : indexingStalled ? "Not indexed" : "Indexing…"}</span></span></Button></article>)}</div> : <div className="shared-empty-state"><FileText size={25} /><strong>{artifacts.length ? "No files match these filters" : isDocumentsView ? "No Word documents yet" : "No shared evidence yet"}</strong><span>{artifacts.length ? "Adjust the search or selected types to see other workspace files." : isDocumentsView ? "Upload a DOC or DOCX file to preview its extracted text here." : "Add a pasted note below, then index it when you are ready to search."}</span></div>}
+              {displayedArtifacts.length ? <div className={`shared-artifact-manager ${artifactViewMode}`}>{displayedArtifacts.map((artifact) => <article key={artifact.id}><Button className={isDocumentsView && artifact.id === selectedDocument?.id ? "shared-artifact-entry selected" : "shared-artifact-entry"} onClick={() => isDocumentsView ? setSelectedDocumentId(artifact.id) : onOpenArtifact(artifact.id)} type="button" variant="secondary"><span className={`shared-artifact-file-icon category-${fileCategory(artifact)}`}>{fileCategoryIcon(fileCategory(artifact), 20)}</span><span className="shared-artifact-entry-copy"><strong>{artifact.title}</strong></span><span className="shared-artifact-entry-meta"><span>{artifactKindLabel(artifact)}</span><span>{formatFileSize(artifact.size_bytes)}</span></span>{artifact.indexed_at ? null : indexingStalled ? <span aria-label="Not indexed" className="shared-artifact-status failed" role="img" title="Indexing problem: this file is not indexed"><AlertCircle size={16} /></span> : <span aria-label="Indexing" className="shared-artifact-status" role="img" title="Indexing…"><span aria-hidden="true" className="rm-indexing"><i /><i /><i /></span></span>}</Button></article>)}</div> : <div className="shared-empty-state"><FileText size={25} /><strong>{artifacts.length ? "No files match these filters" : isDocumentsView ? "No Word documents yet" : "No shared evidence yet"}</strong><span>{artifacts.length ? "Adjust the search or selected types to see other workspace files." : isDocumentsView ? "Upload a DOC or DOCX file to preview its extracted text here." : "Add a pasted note below, then index it when you are ready to search."}</span></div>}
             </div>
             {isDocumentsView ? <section className="shared-document-preview" aria-live="polite"><div className="shared-panel-heading"><div><Book size={18} /><h2>Word preview</h2></div><span>{selectedDocument ? selectedDocument.indexed_at ? "Indexed" : indexingStalled ? "Stored" : "Indexing…" :`${documentArtifacts.length} documents`}</span></div>{selectedDocument ? <><div className="shared-document-preview-meta"><span>{selectedDocument.title}</span><span>{formatFileSize(selectedDocument.size_bytes)}</span><span>{selectedDocument.language ?? "Word"}</span></div>{isDocumentPreviewLoading ? <p className="shared-muted-copy">Loading extracted text preview...</p> : documentPreviewText ? <pre className="shared-content-preview shared-word-preview-body">{documentPreviewText}</pre> : <p className="shared-muted-copy">No extractable text was found in this Word document.</p>}{previewDocument?.content_truncated ? <p className="shared-muted-copy">Preview truncated to keep the workspace responsive.</p> : null}</> : <div className="shared-empty-state"><FileText size={25} /><strong>No document selected</strong><span>Choose a Word file above to inspect the extracted text.</span></div>}</section> : null}
             {canWrite ? <div className="shared-evidence-additions">{isEvidenceView ? <form className="shared-note-form" onSubmit={addNote}><h3>Add shared note</h3><Input onChange={(event) => setNoteTitle(event.target.value)} placeholder="Decision or implementation note" required value={noteTitle} /><Textarea onChange={(event) => setNoteContent(event.target.value)} placeholder="Paste Markdown, code context, or a meeting note…" required value={noteContent} /><Button disabled={isSubmitting} type="submit" variant="main"><Plus size={16} /> Store evidence</Button></form> : null}<form className="shared-upload-form" onSubmit={submitUpload}><div><strong>{isDocumentsView ? "Upload a Word document" : "Upload a file"}</strong><span>{isDocumentsView ? "DOC and DOCX · up to 10 MiB · extracted locally when indexed" : "Markdown, text, code, image, or Word document · up to 10 MiB"}</span></div><label className="shared-upload-picker"><input accept={isDocumentsView ? ".doc,.docx" : ".md,.mdx,.txt,.rs,.ts,.tsx,.js,.jsx,.py,.json,.toml,.yaml,.yml,.sql,.html,.css,.sh,.ps1,.doc,.docx,.png,.jpg,.jpeg,.gif,.webp,.svg,.bmp"} aria-label={isDocumentsView ? "Upload a Word document" : "Upload a shared artifact"} className="shared-upload-native-input" onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)} required type="file" /><span className="shared-upload-picker-icon"><Upload size={18} /></span><span className="shared-upload-picker-copy"><strong>{uploadFile?.name ?? (isDocumentsView ? "Choose a Word file" : "Choose a shared file")}</strong><span>{uploadFile ? `${formatFileSize(uploadFile.size)} · ready to upload` : isDocumentsView ? "DOC or DOCX" : "Markdown, text, code, image, or Word document"}</span></span><span className="shared-upload-picker-action">Browse</span></label><Button disabled={isSubmitting || !uploadFile} type="submit" variant="secondary"><Upload size={16} /> Upload</Button></form></div> : <p className="shared-readonly-note"><Shield size={15} /> Your viewer membership can inspect shared evidence but cannot change it.</p>}
