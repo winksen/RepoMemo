@@ -34,7 +34,7 @@ use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, 
 use rand_core::OsRng;
 use repomemo_api::RepoMemoCore;
 use repomemo_domain::{
-    ArtifactComment, ArtifactDetail, ArtifactIndexFailure, Folder, ArtifactLifecycle, ArtifactLifecycleEvent, ArtifactSummary,
+    ArtifactComment, ArtifactDetail, ArtifactIndexFailure, DocumentPreview, Folder, ArtifactLifecycle, ArtifactLifecycleEvent, ArtifactSummary,
     ArtifactType, AskAnswer, AskRequest, Chunk, Citation, CollaborationTask,
     CreateMemoryCardRequest,
     IndexingJobStatus, MemoryCard, MemoryCardDetail, MemoryCardSummary, Organization,
@@ -669,6 +669,19 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
             axum::routing::patch(rename_folder).delete(delete_folder),
         )
         .route("/v1/artifacts/{artifact_id}/folder", put(move_artifact))
+        .route("/v1/artifacts/{artifact_id}/file", get(download_artifact_file))
+        .route(
+            "/v1/artifacts/{artifact_id}/document-preview",
+            get(artifact_document_preview),
+        )
+        .route(
+            "/v1/artifacts/{artifact_id}/open-link",
+            post(create_file_link),
+        )
+        .route(
+            "/v1/shared-files/{token}/{filename}",
+            get(shared_file_by_link),
+        )
         .route(
             "/v1/workspaces/{workspace_id}/artifacts/index-failures",
             get(list_artifact_index_failures),
@@ -2420,6 +2433,179 @@ async fn create_folder(
     )
     .await;
     Ok((StatusCode::CREATED, Json(folder)))
+}
+
+const FILE_LINK_ISSUER: &str = "repomemo-file-link";
+const FILE_LINK_TTL_SECONDS: u64 = 300;
+
+#[derive(Debug, Serialize, Deserialize)]
+struct FileLinkClaims {
+    sub: String,
+    iss: String,
+    exp: u64,
+}
+
+#[derive(Debug, Serialize)]
+struct FileLinkResponse {
+    token: String,
+    filename: String,
+    expires_in_seconds: u64,
+}
+
+/// The stored original as a download. Always an attachment, sandboxed and
+/// never sniffed, so an uploaded HTML or SVG file cannot run in the browser.
+fn file_response(summary: &ArtifactSummary, bytes: Vec<u8>) -> Response {
+    let filename = summary
+        .path
+        .rsplit(['/', '\\'])
+        .next()
+        .unwrap_or("download")
+        .to_owned();
+    let ascii: String = filename
+        .chars()
+        .map(|character| {
+            if character.is_ascii_graphic() && !matches!(character, '"' | '\\' | '%') {
+                character
+            } else if character == ' ' {
+                ' '
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    let encoded: String = filename
+        .bytes()
+        .map(|byte| {
+            if byte.is_ascii_alphanumeric() || b"-_.".contains(&byte) {
+                (byte as char).to_string()
+            } else {
+                format!("%{byte:02X}")
+            }
+        })
+        .collect();
+    let mut headers = HeaderMap::new();
+    let content_type = summary
+        .mime_type
+        .as_deref()
+        .and_then(|value| HeaderValue::from_str(value).ok())
+        .unwrap_or_else(|| HeaderValue::from_static("application/octet-stream"));
+    headers.insert(header::CONTENT_TYPE, content_type);
+    if let Ok(value) = HeaderValue::from_str(&format!(
+        "attachment; filename=\"{ascii}\"; filename*=UTF-8''{encoded}"
+    )) {
+        headers.insert(header::CONTENT_DISPOSITION, value);
+    }
+    headers.insert(
+        HeaderName::from_static("x-content-type-options"),
+        HeaderValue::from_static("nosniff"),
+    );
+    headers.insert(
+        header::CONTENT_SECURITY_POLICY,
+        HeaderValue::from_static("sandbox"),
+    );
+    (StatusCode::OK, headers, bytes).into_response()
+}
+
+async fn download_artifact_file(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(artifact_id): Path<String>,
+) -> Result<Response, ApiError> {
+    let summary = state
+        .storage
+        .get_artifact_summary(&artifact_id)
+        .await
+        .map_err(|_| ApiError::bad_request("Artifact was not found."))?;
+    require_workspace_read(&state, &subject, &summary.workspace_id).await?;
+    let bytes = state
+        .storage
+        .read_artifact_blob(&artifact_id)
+        .await
+        .map_err(map_storage_error)?;
+    Ok(file_response(&summary, bytes))
+}
+
+async fn artifact_document_preview(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(artifact_id): Path<String>,
+) -> Result<Json<DocumentPreview>, ApiError> {
+    let summary = state
+        .storage
+        .get_artifact_summary(&artifact_id)
+        .await
+        .map_err(|_| ApiError::bad_request("Artifact was not found."))?;
+    require_workspace_read(&state, &subject, &summary.workspace_id).await?;
+    state
+        .core
+        .document_preview(&artifact_id)
+        .await
+        .map(Json)
+        .map_err(map_core_error)
+}
+
+/// A short-lived, single-file link that a desktop app (Word, Excel, ...) can
+/// fetch without the user's session. It grants read access to one artifact for
+/// a few minutes and nothing else.
+async fn create_file_link(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(artifact_id): Path<String>,
+) -> Result<Json<FileLinkResponse>, ApiError> {
+    let summary = state
+        .storage
+        .get_artifact_summary(&artifact_id)
+        .await
+        .map_err(|_| ApiError::bad_request("Artifact was not found."))?;
+    require_workspace_read(&state, &subject, &summary.workspace_id).await?;
+    let claims = FileLinkClaims {
+        sub: artifact_id,
+        iss: FILE_LINK_ISSUER.to_owned(),
+        exp: jsonwebtoken::get_current_timestamp() + FILE_LINK_TTL_SECONDS,
+    };
+    let token = encode(
+        &Header::new(Algorithm::HS256),
+        &claims,
+        &EncodingKey::from_secret(state.jwt_secret.as_bytes()),
+    )
+    .map_err(|error| ApiError::internal(error))?;
+    let filename = summary
+        .path
+        .rsplit(['/', '\\'])
+        .next()
+        .unwrap_or("download")
+        .to_owned();
+    Ok(Json(FileLinkResponse {
+        token,
+        filename,
+        expires_in_seconds: FILE_LINK_TTL_SECONDS,
+    }))
+}
+
+async fn shared_file_by_link(
+    State(state): State<AppState>,
+    Path((token, _filename)): Path<(String, String)>,
+) -> Result<Response, ApiError> {
+    let mut validation = Validation::new(Algorithm::HS256);
+    validation.set_issuer(&[FILE_LINK_ISSUER]);
+    let claims = decode::<FileLinkClaims>(
+        &token,
+        &DecodingKey::from_secret(state.jwt_secret.as_bytes()),
+        &validation,
+    )
+    .map_err(|_| ApiError::unauthorized())?
+    .claims;
+    let summary = state
+        .storage
+        .get_artifact_summary(&claims.sub)
+        .await
+        .map_err(|_| ApiError::unauthorized())?;
+    let bytes = state
+        .storage
+        .read_artifact_blob(&claims.sub)
+        .await
+        .map_err(map_storage_error)?;
+    Ok(file_response(&summary, bytes))
 }
 
 async fn rename_folder(
@@ -5038,6 +5224,162 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(image.status(), 400);
+    }
+
+    #[tokio::test]
+    async fn business_documents_preview_download_and_open_link() {
+        let data_dir =
+            std::env::temp_dir().join(format!("repomemo-server-docs-{}", uuid::Uuid::new_v4()));
+        let app = router(ServerConfig::for_test(data_dir)).await.unwrap();
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/v1/auth/register")
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        json!({"email": "docs@example.com", "display_name": "Docs", "password": "not-a-real-password"})
+                            .to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let body: Value =
+            serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
+        let owner = format!("Bearer {}", body["access_token"].as_str().unwrap());
+        let organization = app
+            .clone()
+            .oneshot(json_request("POST", "/v1/organizations", &owner, json!({"name":"Docs Team"})))
+            .await
+            .unwrap();
+        let organization: Value = serde_json::from_slice(
+            &to_bytes(organization.into_body(), usize::MAX).await.unwrap(),
+        )
+        .unwrap();
+        let workspace = app
+            .clone()
+            .oneshot(json_request(
+                "POST",
+                "/v1/workspaces",
+                &owner,
+                json!({"organization_id": organization["id"], "name":"Docs Workspace"}),
+            ))
+            .await
+            .unwrap();
+        let workspace: Value = serde_json::from_slice(
+            &to_bytes(workspace.into_body(), usize::MAX).await.unwrap(),
+        )
+        .unwrap();
+        let workspace_id = workspace["workspace"]["id"].as_str().unwrap().to_owned();
+
+        let eml = "From: Ada <ada@example.com>\r\nTo: bob@example.com\r\nSubject: Plan\r\nContent-Type: text/plain\r\n\r\nPlease review.\r\n";
+        let uploaded = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/v1/workspaces/{workspace_id}/artifacts/upload"))
+                    .header("authorization", &owner)
+                    .header("x-repomemo-filename", "plan.eml")
+                    .header("content-type", "message/rfc822")
+                    .body(Body::from(eml))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(uploaded.status(), 201);
+        let uploaded: Value =
+            serde_json::from_slice(&to_bytes(uploaded.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
+        assert_eq!(uploaded["language"], "Email");
+        let artifact_id = uploaded["id"].as_str().unwrap().to_owned();
+
+        let preview = app
+            .clone()
+            .oneshot(json_request(
+                "GET",
+                &format!("/v1/artifacts/{artifact_id}/document-preview"),
+                &owner,
+                json!(null),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(preview.status(), 200);
+        let preview: Value =
+            serde_json::from_slice(&to_bytes(preview.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
+        assert_eq!(preview["kind"], "email");
+        assert_eq!(preview["subject"], "Plan");
+        assert_eq!(preview["body"], "Please review.");
+
+        let file = app
+            .clone()
+            .oneshot(json_request(
+                "GET",
+                &format!("/v1/artifacts/{artifact_id}/file"),
+                &owner,
+                json!(null),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(file.status(), 200);
+        assert!(file.headers()["content-disposition"]
+            .to_str()
+            .unwrap()
+            .starts_with("attachment"));
+        assert_eq!(to_bytes(file.into_body(), usize::MAX).await.unwrap(), eml.as_bytes());
+
+        let link = app
+            .clone()
+            .oneshot(json_request(
+                "POST",
+                &format!("/v1/artifacts/{artifact_id}/open-link"),
+                &owner,
+                json!({}),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(link.status(), 200);
+        let link: Value =
+            serde_json::from_slice(&to_bytes(link.into_body(), usize::MAX).await.unwrap()).unwrap();
+        let token = link["token"].as_str().unwrap();
+        let public = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/v1/shared-files/{token}/plan.eml"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(public.status(), 200);
+        let forged = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/v1/shared-files/{token}x/plan.eml"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(forged.status(), 401);
+        // A file link must not work as a session token.
+        let misuse = app
+            .clone()
+            .oneshot(json_request(
+                "GET",
+                &format!("/v1/workspaces/{workspace_id}/artifacts"),
+                &format!("Bearer {token}"),
+                json!(null),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(misuse.status(), 401);
     }
 
     fn json_request(method: &str, uri: &str, authorization: &str, body: Value) -> Request<Body> {

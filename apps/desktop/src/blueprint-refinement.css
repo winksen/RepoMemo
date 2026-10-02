@@ -680,3 +680,31 @@ body,
 .shared-artifact-manager article:hover .shared-item-actions, .shared-item-actions:focus-within, .shared-item-actions:has([data-state="open"]) { opacity: 1; }
 .shared-artifact-manager.list .shared-item-actions { top: 50%; right: 8px; left: auto; transform: translateY(-50%); }
 .shared-artifact-manager.list .rm-button.shared-artifact-entry { padding-right: 46px; }
+
+/* Document viewer */
+.shared-doc-viewer { display: grid; gap: 12px; }
+.shared-doc-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.shared-doc-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shared-doc-actions { display: flex; gap: 8px; }
+.shared-doc-note { margin: 0; padding: 10px 12px; color: var(--color-text-muted); background: var(--color-surface-2); border-radius: 8px; font-size: 13px; line-height: 1.5; }
+.shared-pdf-frame { width: 100%; height: 620px; background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: 10px; }
+.shared-sheet { display: grid; gap: 10px; }
+.shared-sheet-tabs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.shared-sheet-tabs button { padding: 6px 12px; color: var(--color-text-muted); background: transparent; border: 1px solid var(--color-border); border-radius: 8px; cursor: pointer; font: inherit; font-size: 13px; }
+.shared-sheet-tabs button.active { color: var(--color-text); background: var(--color-surface-3); border-color: var(--color-border-strong); font-weight: 700; }
+.shared-sheet-scroll { max-height: 440px; overflow: auto; border: 1px solid var(--color-border); border-radius: 10px; }
+.shared-sheet table { border-collapse: collapse; width: max-content; min-width: 100%; font-size: 12px; }
+.shared-sheet th, .shared-sheet td { max-width: 260px; padding: 5px 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-right: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); text-align: left; }
+.shared-sheet thead th { position: sticky; top: 0; z-index: 1; color: var(--color-text-muted); background: var(--color-surface-2); font-weight: 600; text-align: center; }
+.shared-sheet tbody th { position: sticky; left: 0; color: var(--color-text-muted); background: var(--color-surface-2); font-weight: 500; text-align: right; }
+.shared-slide-list { display: grid; gap: 10px; max-height: 560px; overflow: auto; }
+.shared-slide { display: flex; gap: 14px; padding: 14px; background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: 10px; }
+.shared-slide-number { display: grid; flex: none; place-items: center; width: 28px; height: 28px; color: var(--color-text-muted); background: var(--color-surface-3); border-radius: 7px; font-size: 12px; font-weight: 700; }
+.shared-slide p { margin: 6px 0 0; font-size: 13px; line-height: 1.5; }
+.shared-slide details { margin-top: 8px; color: var(--color-text-muted); font-size: 12px; }
+.shared-email-headers { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 0; padding: 12px 14px; background: var(--color-surface-2); border-radius: 10px; font-size: 13px; }
+.shared-email-headers dt { color: var(--color-text-muted); }
+.shared-email-headers dd { margin: 0; overflow-wrap: anywhere; }
+.shared-email-attachments { display: flex; flex-wrap: wrap; gap: 6px; }
+.shared-email-attachments span { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; color: var(--color-text-muted); background: var(--color-surface-3); border-radius: 999px; font-size: 12px; }
+.shared-email-body { font-family: var(--font-ui); white-space: pre-wrap; }

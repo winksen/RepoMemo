@@ -9,12 +9,19 @@ use quick_xml::events::Event;
 use quick_xml::Reader;
 use repomemo_domain::{ArtifactType, ImportSkippedItem, SourceType};
 
+mod documents;
+pub use documents::{
+    document_extensions, document_kind, document_preview, extract_document_text, is_document,
+    DocumentKind,
+};
+
 const DEFAULT_MAX_FILE_BYTES: u64 = 5 * 1024 * 1024;
 const BINARY_SAMPLE_BYTES: usize = 8192;
 
 const ACCEPTED_EXTENSIONS: &[&str] = &[
     "md", "mdx", "txt", "rs", "ts", "tsx", "js", "jsx", "py", "json", "toml", "yaml", "yml", "sql",
-    "html", "css", "sh", "ps1", "doc", "docx", "png", "jpg", "jpeg", "gif", "webp", "svg", "bmp",
+    "html", "css", "sh", "ps1", "doc", "docx", "xlsx", "xlsm", "xls", "pptx", "ppt", "pdf", "one",
+    "eml", "msg", "png", "jpg", "jpeg", "gif", "webp", "svg", "bmp",
 ];
 
 const IMAGE_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp"];
@@ -123,7 +130,8 @@ pub fn detect_artifact_type(path: &Path) -> Option<ArtifactType> {
     let extension = extension(path)?;
     match extension.as_str() {
         "md" | "mdx" => Some(ArtifactType::MarkdownDoc),
-        "txt" | "doc" | "docx" => Some(ArtifactType::File),
+        "txt" => Some(ArtifactType::File),
+        value if document_extensions().contains(&value) => Some(ArtifactType::File),
         value if IMAGE_EXTENSIONS.contains(&value) => Some(ArtifactType::Image),
         value if ACCEPTED_EXTENSIONS.contains(&value) => Some(ArtifactType::CodeFile),
         _ => None,
@@ -136,6 +144,11 @@ pub fn detect_language(path: &Path) -> Option<String> {
         "md" | "mdx" => "Markdown",
         "txt" => "Text",
         "doc" | "docx" => "Word",
+        "xlsx" | "xlsm" | "xls" => "Excel",
+        "pptx" | "ppt" => "PowerPoint",
+        "pdf" => "PDF",
+        "one" => "OneNote",
+        "eml" | "msg" => "Email",
         "rs" => "Rust",
         "ts" | "tsx" => "TypeScript",
         "js" | "jsx" => "JavaScript",
@@ -238,7 +251,7 @@ fn inspect_file(
 
     let is_image = matches!(artifact_type, ArtifactType::Image);
 
-    if !is_image && !is_word_document(path) && is_probably_binary(path) {
+    if !is_image && !is_document(path) && is_probably_binary(path) {
         push_skip(discovery, path, "binary file");
         return;
     }
@@ -271,13 +284,22 @@ fn relative_path(path: &Path, source_root: &Path) -> String {
         .replace('\\', "/")
 }
 
-fn detect_mime(path: &Path) -> Option<String> {
+pub fn detect_mime(path: &Path) -> Option<String> {
     let extension = extension(path)?;
     let mime = match extension.as_str() {
         "md" | "mdx" => "text/markdown",
         "txt" => "text/plain",
         "doc" => "application/msword",
         "docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "xlsm" => "application/vnd.ms-excel.sheet.macroEnabled.12",
+        "xls" => "application/vnd.ms-excel",
+        "pptx" => "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "ppt" => "application/vnd.ms-powerpoint",
+        "pdf" => "application/pdf",
+        "one" => "application/onenote",
+        "msg" => "application/vnd.ms-outlook",
+        "eml" => "message/rfc822",
         "json" => "application/json",
         "html" => "text/html",
         "css" => "text/css",
@@ -349,6 +371,35 @@ fn word_tag(name: &[u8], local_name: &[u8]) -> bool {
     name == local_name || name.strip_prefix(b"w:") == Some(local_name)
 }
 
+/// Names of every member in a ZIP archive, from its central directory.
+fn zip_entry_names(bytes: &[u8]) -> Result<Vec<String>> {
+    let eocd_start = bytes.len().saturating_sub(65_557);
+    let eocd = bytes[eocd_start..]
+        .windows(4)
+        .rposition(|window| window == [0x50, 0x4b, 0x05, 0x06])
+        .map(|offset| eocd_start + offset)
+        .ok_or_else(|| anyhow::anyhow!("ZIP end record was not found"))?;
+    let entries = le_u16(bytes, eocd + 10)? as usize;
+    let mut cursor = le_u32(bytes, eocd + 16)? as usize;
+    let mut names = Vec::new();
+    for _ in 0..entries.min(20_000) {
+        if bytes.get(cursor..cursor + 4) != Some(&[0x50, 0x4b, 0x01, 0x02]) {
+            bail!("ZIP central directory is malformed");
+        }
+        let filename_length = le_u16(bytes, cursor + 28)? as usize;
+        let extra_length = le_u16(bytes, cursor + 30)? as usize;
+        let comment_length = le_u16(bytes, cursor + 32)? as usize;
+        let filename_start = cursor + 46;
+        let filename_end = filename_start + filename_length;
+        let filename = bytes
+            .get(filename_start..filename_end)
+            .ok_or_else(|| anyhow::anyhow!("ZIP filename is truncated"))?;
+        names.push(String::from_utf8_lossy(filename).into_owned());
+        cursor = filename_end + extra_length + comment_length;
+    }
+    Ok(names)
+}
+
 fn read_zip_member(bytes: &[u8], member_name: &str) -> Result<Vec<u8>> {
     let eocd_start = bytes.len().saturating_sub(65_557);
     let eocd = bytes[eocd_start..]
@@ -409,7 +460,7 @@ fn read_zip_member(bytes: &[u8], member_name: &str) -> Result<Vec<u8>> {
         }
         return Ok(output);
     }
-    bail!("DOCX file does not contain word/document.xml")
+    bail!("The file does not contain {member_name}")
 }
 
 fn le_u16(bytes: &[u8], offset: usize) -> Result<u16> {

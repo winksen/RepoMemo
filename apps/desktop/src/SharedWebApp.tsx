@@ -35,6 +35,11 @@ import {
   IconMarkdown as Markdown,
   IconPhoto as Photo,
   IconFileWord as WordFile,
+  IconFileSpreadsheet as ExcelFile,
+  IconPresentation as Presentation,
+  IconFileTypePdf as PdfFile,
+  IconNotebook as OneNoteIcon,
+  IconMail as MailIcon,
   IconNote as Note,
   IconRefresh as Refresh,
   IconSearch as Search,
@@ -178,6 +183,8 @@ import { Textarea } from "./components/ui/textarea";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { RichNoteEditor } from "./components/RichNoteEditor";
+import { DocumentViewer } from "./components/DocumentViewer";
+import { DOCUMENT_ACCEPT, DOCUMENT_KIND_LABEL, documentKindOf, isDocumentArtifact } from "./lib/documents";
 import { AiProviderForm } from "./components/AiProviderForm";
 import { showToast, Toast } from "./components/ui/toast";
 import { initialSharedTheme, SharedLayout, ThemeToggle } from "./components/SharedLayout";
@@ -208,19 +215,25 @@ type ItemDialog =
   | { kind: "move-file"; artifact: ArtifactSummary }
   | { kind: "delete-file"; artifact: ArtifactSummary };
 
-type FileCategory = "markdown" | "note" | "text" | "code" | "word" | "image";
+type FileCategory = "markdown" | "note" | "text" | "code" | "word" | "excel" | "powerpoint" | "pdf" | "onenote" | "email" | "image";
 const FILE_CATEGORIES: Array<{ label: string; value: FileCategory }> = [
   { label: "Markdown", value: "markdown" },
   { label: "Note", value: "note" },
   { label: "Text", value: "text" },
   { label: "Code", value: "code" },
   { label: "Word", value: "word" },
+  { label: "Excel", value: "excel" },
+  { label: "PowerPoint", value: "powerpoint" },
+  { label: "PDF", value: "pdf" },
+  { label: "OneNote", value: "onenote" },
+  { label: "Email", value: "email" },
   { label: "Image", value: "image" },
 ];
 
 /** Maps an artifact to the supported file categories shown in the type filter. */
 function fileCategory(artifact: Pick<ArtifactSummary, "artifact_type" | "language" | "path">): FileCategory {
-  if (isWordArtifact(artifact)) return "word";
+  const documentKind = documentKindOf(artifact);
+  if (documentKind) return documentKind;
   if (artifact.artifact_type === "image") return "image";
   if (artifact.artifact_type === "code_file") return "code";
   if (artifact.artifact_type === "note") return "note";
@@ -234,6 +247,11 @@ function fileCategoryIcon(category: FileCategory, size: number) {
   if (category === "code") return <Code size={size} />;
   if (category === "image") return <Photo size={size} />;
   if (category === "word") return <WordFile size={size} />;
+  if (category === "excel") return <ExcelFile size={size} />;
+  if (category === "powerpoint") return <Presentation size={size} />;
+  if (category === "pdf") return <PdfFile size={size} />;
+  if (category === "onenote") return <OneNoteIcon size={size} />;
+  if (category === "email") return <MailIcon size={size} />;
   return <FileText size={size} />;
 }
 const TASK_COLUMNS: Array<{ status: CollaborationTaskStatus; label: string }> = [
@@ -252,8 +270,9 @@ function currentLocation() {
   return `${currentPathname()}${window.location.search}`;
 }
 
-function isWordArtifact(artifact: Pick<ArtifactSummary, "language" | "path">) {
-  return artifact.language === "Word" || /\.docx?$/i.test(artifact.path);
+function documentKindLabel(artifact: Pick<ArtifactSummary, "path">) {
+  const kind = documentKindOf(artifact);
+  return kind ? DOCUMENT_KIND_LABEL[kind] : "Document";
 }
 
 function navigate(to: string, replace = false) {
@@ -1056,8 +1075,6 @@ function SharedWorkspaceDetail({
   const [noteContent, setNoteContent] = useState("");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
-  const [documentPreview, setDocumentPreview] = useState<ArtifactDetail | null>(null);
-  const [isDocumentPreviewLoading, setIsDocumentPreviewLoading] = useState(false);
   const [memoryTitle, setMemoryTitle] = useState("");
   const [memoryBody, setMemoryBody] = useState("");
   const [memoryArtifactId, setMemoryArtifactId] = useState("");
@@ -1116,7 +1133,7 @@ function SharedWorkspaceDetail({
       const matchesQuery = !normalizedQuery || `${artifact.title} ${artifact.path}`.toLowerCase().includes(normalizedQuery);
       const matchesType = artifactTypes.length === 0 || artifactTypes.includes(fileCategory(artifact));
       const inFolder = !isEvidenceView || Boolean(normalizedQuery) || artifactTypes.length > 0 || (artifact.folder_id ?? null) === currentFolderId;
-      return matchesQuery && matchesType && inFolder && (!isDocumentsView || isWordArtifact(artifact));
+      return matchesQuery && matchesType && inFolder && (!isDocumentsView || isDocumentArtifact(artifact));
     });
   }, [artifactQuery, artifactTypes, artifacts, currentFolderId, isDocumentsView, isEvidenceView]);
   const hasFolderFilters = Boolean(artifactQuery.trim() || artifactTypes.length);
@@ -1141,10 +1158,8 @@ function SharedWorkspaceDetail({
     return counts;
   }, [artifacts, folders]);
   const activeFolderId = isEvidenceView ? currentFolderId : null;
-  const documentArtifacts = useMemo(() => artifacts.filter(isWordArtifact), [artifacts]);
+  const documentArtifacts = useMemo(() => artifacts.filter(isDocumentArtifact), [artifacts]);
   const selectedDocument = documentArtifacts.find((artifact) => artifact.id === selectedDocumentId) ?? null;
-  const previewDocument = documentPreview?.summary.id === selectedDocument?.id ? documentPreview : null;
-  const documentPreviewText = previewDocument?.content_preview?.trim();
   const hasArtifactFilters = Boolean(artifactQuery.trim() || artifactTypes.length);
   const visibleTasks = tasks.filter((task) => {
     const normalizedQuery = taskQuery.trim().toLowerCase();
@@ -1258,37 +1273,6 @@ function SharedWorkspaceDetail({
         : documentArtifacts[0]?.id ?? null,
     );
   }, [documentArtifacts, isDocumentsView]);
-  useEffect(() => {
-    let cancelled = false;
-
-    if (!isDocumentsView || !selectedDocumentId) {
-      setDocumentPreview(null);
-      setIsDocumentPreviewLoading(false);
-      return;
-    }
-
-    setIsDocumentPreviewLoading(true);
-    getSharedArtifact(accessToken, selectedDocumentId)
-      .then((detail) => {
-        if (!cancelled) {
-          setDocumentPreview(detail);
-        }
-      })
-      .catch((requestError) => {
-        if (!cancelled) {
-          setError(apiMessage(requestError));
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setIsDocumentPreviewLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [accessToken, isDocumentsView, selectedDocumentId]);
 
   async function addNote(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1378,7 +1362,7 @@ function SharedWorkspaceDetail({
     setIsSubmitting(true); setError(null);
     try {
       const uploadedArtifact = await uploadSharedArtifact(accessToken, workspace.workspace.id, uploadFile, activeFolderId);
-      if (isDocumentsView && isWordArtifact(uploadedArtifact)) {
+      if (isDocumentsView && isDocumentArtifact(uploadedArtifact)) {
         setSelectedDocumentId(uploadedArtifact.id);
       }
       setUploadFile(null);
@@ -1624,7 +1608,7 @@ function SharedWorkspaceDetail({
     <SharedLayout apiAvailable={apiAvailable} onNavigate={navigate} session={session} signOut={signOut} sidebar={<OrganizationRail organizationId={organization?.id} organizations={organizations} workspaceId={workspace.workspace.id} workspaces={workspaces} />} workspaceNavigation={<WorkspaceTopbar activeSection={section} onNavigate={onNavigate} workspace={workspace} />}>
       <section className="shared-detail-shell" aria-busy={isLoading}>
         <div className="shared-detail-heading">
-          <div><h1>{isEvidenceView ? "Evidence ledger" : isDocumentsView ? "Documents" : isRetrievalView ? "Retrieve evidence" : isMemoryView ? "Durable team memory" : isTasksView ? "Tasks" : isPeopleView ? "People" : isActivityView ? "Activity" : isSettingsView ? "Workspace settings" : workspace.workspace.name}</h1><p>{isEvidenceView ? "Store notes and files in the workspace. New evidence is indexed automatically, so it is ready for retrieval shortly after it is saved." : isDocumentsView ? "Upload Word documents, inspect their extracted text, and keep them alongside the workspace evidence ledger." : isRetrievalView ? "Search indexed workspace evidence and inspect the source context behind every result." : isMemoryView ? "Capture concise facts and decisions that should outlive the current investigation." : isTasksView ? "Turn evidence and decisions into assigned, trackable action items for the team." : isPeopleView ? "See who can access this workspace and understand each person’s role." : isActivityView ? "A durable record of shared workspace changes, including evidence, memory, indexing, and membership updates." : isSettingsView ? "Administrators control workspace access and AI integrations here. Owner-only actions remain clearly marked." : "Artifacts, search results, and durable team memory are all retrieved through the protected shared API."}</p></div>
+          <div><h1>{isEvidenceView ? "Evidence ledger" : isDocumentsView ? "Documents" : isRetrievalView ? "Retrieve evidence" : isMemoryView ? "Durable team memory" : isTasksView ? "Tasks" : isPeopleView ? "People" : isActivityView ? "Activity" : isSettingsView ? "Workspace settings" : workspace.workspace.name}</h1><p>{isEvidenceView ? "Store notes and files in the workspace. New evidence is indexed automatically, so it is ready for retrieval shortly after it is saved." : isDocumentsView ? "Upload Word, Excel, PowerPoint, PDF, OneNote and Outlook files, preview them here, and keep them alongside the workspace evidence ledger." : isRetrievalView ? "Search indexed workspace evidence and inspect the source context behind every result." : isMemoryView ? "Capture concise facts and decisions that should outlive the current investigation." : isTasksView ? "Turn evidence and decisions into assigned, trackable action items for the team." : isPeopleView ? "See who can access this workspace and understand each person’s role." : isActivityView ? "A durable record of shared workspace changes, including evidence, memory, indexing, and membership updates." : isSettingsView ? "Administrators control workspace access and AI integrations here. Owner-only actions remain clearly marked." : "Artifacts, search results, and durable team memory are all retrieved through the protected shared API."}</p></div>
         </div>
         <Toast kind="error" message={error} />
         {isRestrictedView ? <div className="shared-empty-state shared-admin-restricted-state"><Shield size={25} /><strong>Workspace administrator access required</strong><span>People, Activity, and Settings are reserved for workspace owners and administrators.</span><Button onClick={() => onNavigate("overview")} type="button" variant="secondary">Go to overview</Button></div> : <>
@@ -1682,10 +1666,10 @@ function SharedWorkspaceDetail({
               {isEvidenceView && newFolderOpen ? <form className="shared-folder-form" onSubmit={addFolder}><Input aria-label="Folder name" autoFocus maxLength={80} onChange={(event) => setNewFolderName(event.target.value)} placeholder={folderPath.length ? `New folder in ${folderPath[folderPath.length - 1].name}` : "New folder name"} required value={newFolderName} /><Button disabled={isSubmitting} type="submit" variant="main">Create</Button><Button onClick={() => { setNewFolderOpen(false); setNewFolderName(""); }} type="button" variant="secondary">Cancel</Button></form> : null}
               {isEvidenceView && !hasFolderFilters && (folders.length || currentFolderId) ? <nav aria-label="Folder path" className="shared-folder-path"><button className={currentFolderId ? "" : "current"} onClick={() => setCurrentFolderId(null)} type="button">All evidence</button>{folderPath.map((folder, index) => <span key={folder.id}><ChevronRight size={14} /><button className={index === folderPath.length - 1 ? "current" : ""} onClick={() => setCurrentFolderId(folder.id)} type="button">{folder.name}</button></span>)}</nav> : null}
               <div className="shared-artifact-browser-meta"><span>{isEvidenceView && !hasFolderFilters ? `${visibleFolders.length} ${visibleFolders.length === 1 ? "folder" : "folders"} · ${displayedArtifacts.length} ${displayedArtifacts.length === 1 ? "file" : "files"}` : `${displayedArtifacts.length} of ${isDocumentsView ? documentArtifacts.length : artifacts.length} files${hasArtifactFilters ? " matching filters" : ""}`}</span><div className="shared-artifact-view-switch" role="group" aria-label="Evidence view"><Button aria-label="Grid view" aria-pressed={artifactViewMode === "grid"} className={artifactViewMode === "grid" ? "active" : ""} onClick={() => setArtifactViewMode("grid")} type="button" variant="secondary"><Grid size={16} /></Button><Button aria-label="List view" aria-pressed={artifactViewMode === "list"} className={artifactViewMode === "list" ? "active" : ""} onClick={() => setArtifactViewMode("list")} type="button" variant="secondary"><List size={16} /></Button></div></div>
-              {displayedArtifacts.length || visibleFolders.length ? <div className={`shared-artifact-manager ${artifactViewMode}`}>{visibleFolders.map((folder) => <article key={folder.id}><Button className="shared-artifact-entry shared-folder-entry" onClick={() => setCurrentFolderId(folder.id)} type="button" variant="secondary"><span className="shared-artifact-file-icon category-folder"><FolderIcon size={20} /></span><span className="shared-artifact-entry-copy"><strong>{folder.name}</strong></span><span className="shared-artifact-entry-meta"><span>{folderItemCounts.get(folder.id) ?? 0} {(folderItemCounts.get(folder.id) ?? 0) === 1 ? "item" : "items"}</span></span></Button>{canWrite ? <div className="shared-item-actions"><ActionMenu items={[{ label: "Rename", icon: <Pencil size={15} />, onSelect: () => openItemDialog({ kind: "rename-folder", folder }) }, { label: "Delete folder", icon: <Trash size={15} />, destructive: true, onSelect: () => openItemDialog({ kind: "delete-folder", folder }) }]} label={`Actions for folder ${folder.name}`} /></div> : null}</article>)}{displayedArtifacts.map((artifact) => <article key={artifact.id}><Button className={isDocumentsView && artifact.id === selectedDocument?.id ? "shared-artifact-entry selected" : "shared-artifact-entry"} onClick={() => isDocumentsView ? setSelectedDocumentId(artifact.id) : onOpenArtifact(artifact.id)} type="button" variant="secondary"><span className={`shared-artifact-file-icon category-${fileCategory(artifact)}`}>{fileCategoryIcon(fileCategory(artifact), 20)}</span><span className="shared-artifact-entry-copy"><strong>{artifact.title}</strong></span><span className="shared-artifact-entry-meta"><span>{artifactKindLabel(artifact)}</span><span>{formatFileSize(artifact.size_bytes)}</span></span>{artifact.indexed_at ? null : indexFailures[artifact.id] || indexingStalled ? <span aria-label="Not indexed" className="shared-artifact-status failed" role="img" title={indexFailures[artifact.id] ? `Indexing failed: ${indexFailures[artifact.id].message}` : "Indexing problem: this file is not indexed"}><AlertCircle size={16} /></span> : <span aria-label="Indexing" className="shared-artifact-status" role="img" title="Indexing…"><span aria-hidden="true" className="rm-indexing"><i /><i /><i /></span></span>}</Button>{canWrite ? <div className="shared-item-actions"><ActionMenu items={[{ label: "Move to folder…", icon: <FolderMove size={15} />, onSelect: () => openItemDialog({ kind: "move-file", artifact }) }, { label: "Delete file", icon: <Trash size={15} />, destructive: true, onSelect: () => openItemDialog({ kind: "delete-file", artifact }) }]} label={`Actions for ${artifact.title}`} /></div> : null}</article>)}</div> : <div className="shared-empty-state"><FileText size={25} /><strong>{isEvidenceView && currentFolderId && !hasFolderFilters ? "This folder is empty" : artifacts.length ? "No files match these filters" : isDocumentsView ? "No Word documents yet" : "No shared evidence yet"}</strong><span>{isEvidenceView && currentFolderId && !hasFolderFilters ? "Add a note or upload a file below, or create a folder inside it." : artifacts.length ? "Adjust the search or selected types to see other workspace files." : isDocumentsView ? "Upload a DOC or DOCX file to preview its extracted text here." : "Add a pasted note below, then index it when you are ready to search."}</span></div>}
+              {displayedArtifacts.length || visibleFolders.length ? <div className={`shared-artifact-manager ${artifactViewMode}`}>{visibleFolders.map((folder) => <article key={folder.id}><Button className="shared-artifact-entry shared-folder-entry" onClick={() => setCurrentFolderId(folder.id)} type="button" variant="secondary"><span className="shared-artifact-file-icon category-folder"><FolderIcon size={20} /></span><span className="shared-artifact-entry-copy"><strong>{folder.name}</strong></span><span className="shared-artifact-entry-meta"><span>{folderItemCounts.get(folder.id) ?? 0} {(folderItemCounts.get(folder.id) ?? 0) === 1 ? "item" : "items"}</span></span></Button>{canWrite ? <div className="shared-item-actions"><ActionMenu items={[{ label: "Rename", icon: <Pencil size={15} />, onSelect: () => openItemDialog({ kind: "rename-folder", folder }) }, { label: "Delete folder", icon: <Trash size={15} />, destructive: true, onSelect: () => openItemDialog({ kind: "delete-folder", folder }) }]} label={`Actions for folder ${folder.name}`} /></div> : null}</article>)}{displayedArtifacts.map((artifact) => <article key={artifact.id}><Button className={isDocumentsView && artifact.id === selectedDocument?.id ? "shared-artifact-entry selected" : "shared-artifact-entry"} onClick={() => isDocumentsView ? setSelectedDocumentId(artifact.id) : onOpenArtifact(artifact.id)} type="button" variant="secondary"><span className={`shared-artifact-file-icon category-${fileCategory(artifact)}`}>{fileCategoryIcon(fileCategory(artifact), 20)}</span><span className="shared-artifact-entry-copy"><strong>{artifact.title}</strong></span><span className="shared-artifact-entry-meta"><span>{artifactKindLabel(artifact)}</span><span>{formatFileSize(artifact.size_bytes)}</span></span>{artifact.indexed_at ? null : indexFailures[artifact.id] || indexingStalled ? <span aria-label="Not indexed" className="shared-artifact-status failed" role="img" title={indexFailures[artifact.id] ? `Indexing failed: ${indexFailures[artifact.id].message}` : "Indexing problem: this file is not indexed"}><AlertCircle size={16} /></span> : <span aria-label="Indexing" className="shared-artifact-status" role="img" title="Indexing…"><span aria-hidden="true" className="rm-indexing"><i /><i /><i /></span></span>}</Button>{canWrite ? <div className="shared-item-actions"><ActionMenu items={[{ label: "Move to folder…", icon: <FolderMove size={15} />, onSelect: () => openItemDialog({ kind: "move-file", artifact }) }, { label: "Delete file", icon: <Trash size={15} />, destructive: true, onSelect: () => openItemDialog({ kind: "delete-file", artifact }) }]} label={`Actions for ${artifact.title}`} /></div> : null}</article>)}</div> : <div className="shared-empty-state"><FileText size={25} /><strong>{isEvidenceView && currentFolderId && !hasFolderFilters ? "This folder is empty" : artifacts.length ? "No files match these filters" : isDocumentsView ? "No documents yet" : "No shared evidence yet"}</strong><span>{isEvidenceView && currentFolderId && !hasFolderFilters ? "Add a note or upload a file below, or create a folder inside it." : artifacts.length ? "Adjust the search or selected types to see other workspace files." : isDocumentsView ? "Upload a Word, Excel, PowerPoint, PDF, OneNote or Outlook file to preview it here." : "Add a pasted note below, then index it when you are ready to search."}</span></div>}
             </div>
-            {isDocumentsView ? <section className="shared-document-preview" aria-live="polite"><div className="shared-panel-heading"><div><Book size={18} /><h2>Word preview</h2></div><span>{selectedDocument ? selectedDocument.indexed_at ? "Indexed" : indexingStalled ? "Stored" : "Indexing…" :`${documentArtifacts.length} documents`}</span></div>{selectedDocument ? <><div className="shared-document-preview-meta"><span>{selectedDocument.title}</span><span>{formatFileSize(selectedDocument.size_bytes)}</span><span>{selectedDocument.language ?? "Word"}</span></div>{isDocumentPreviewLoading ? <p className="shared-muted-copy">Loading extracted text preview...</p> : documentPreviewText ? <pre className="shared-content-preview shared-word-preview-body">{documentPreviewText}</pre> : <p className="shared-muted-copy">No extractable text was found in this Word document.</p>}{previewDocument?.content_truncated ? <p className="shared-muted-copy">Preview truncated to keep the workspace responsive.</p> : null}</> : <div className="shared-empty-state"><FileText size={25} /><strong>No document selected</strong><span>Choose a Word file above to inspect the extracted text.</span></div>}</section> : null}
-            {canWrite ? <div className="shared-evidence-additions">{isEvidenceView ? <form className="shared-note-form" onSubmit={addNote}><h3>Add shared note{activeFolderId ? <small className="shared-folder-hint"> in {folderPath.map((folder) => folder.name).join(" / ")}</small> : null}</h3><Input onChange={(event) => setNoteTitle(event.target.value)} placeholder="Decision or implementation note" required value={noteTitle} /><RichNoteEditor onChange={setNoteContent} placeholder="Write a note. Use the toolbar or Markdown for formatting…" value={noteContent} /><Button disabled={isSubmitting} type="submit" variant="main"><Plus size={16} /> Store evidence</Button></form> : null}<form className="shared-upload-form" onSubmit={submitUpload}><div><strong>{isDocumentsView ? "Upload a Word document" : "Upload a file"}{activeFolderId ? <small className="shared-folder-hint"> to {folderPath.map((folder) => folder.name).join(" / ")}</small> : null}</strong><span>{isDocumentsView ? "DOC and DOCX · up to 10 MiB · extracted locally when indexed" : "Markdown, text, code, image, or Word document · up to 10 MiB"}</span></div><label className="shared-upload-picker"><input accept={isDocumentsView ? ".doc,.docx" : ".md,.mdx,.txt,.rs,.ts,.tsx,.js,.jsx,.py,.json,.toml,.yaml,.yml,.sql,.html,.css,.sh,.ps1,.doc,.docx,.png,.jpg,.jpeg,.gif,.webp,.svg,.bmp"} aria-label={isDocumentsView ? "Upload a Word document" : "Upload a shared artifact"} className="shared-upload-native-input" onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)} required type="file" /><span className="shared-upload-picker-icon"><Upload size={18} /></span><span className="shared-upload-picker-copy"><strong>{uploadFile?.name ?? (isDocumentsView ? "Choose a Word file" : "Choose a shared file")}</strong><span>{uploadFile ? `${formatFileSize(uploadFile.size)} · ready to upload` : isDocumentsView ? "DOC or DOCX" : "Markdown, text, code, image, or Word document"}</span></span><span className="shared-upload-picker-action">Browse</span></label><Button disabled={isSubmitting || !uploadFile} type="submit" variant="secondary"><Upload size={16} /> Upload</Button></form></div> : <p className="shared-readonly-note"><Shield size={15} /> Your viewer membership can inspect shared evidence but cannot change it.</p>}
+            {isDocumentsView ? <section className="shared-document-preview" aria-live="polite"><div className="shared-panel-heading"><div><Book size={18} /><h2>Preview</h2></div><span>{selectedDocument ? documentKindLabel(selectedDocument) : `${documentArtifacts.length} documents`}</span></div>{selectedDocument ? <DocumentViewer accessToken={accessToken} artifact={selectedDocument} key={selectedDocument.id} /> : <div className="shared-empty-state"><FileText size={25} /><strong>No document selected</strong><span>Choose a document above to preview it.</span></div>}</section> : null}
+            {canWrite ? <div className="shared-evidence-additions">{isEvidenceView ? <form className="shared-note-form" onSubmit={addNote}><h3>Add shared note{activeFolderId ? <small className="shared-folder-hint"> in {folderPath.map((folder) => folder.name).join(" / ")}</small> : null}</h3><Input onChange={(event) => setNoteTitle(event.target.value)} placeholder="Decision or implementation note" required value={noteTitle} /><RichNoteEditor onChange={setNoteContent} placeholder="Write a note. Use the toolbar or Markdown for formatting…" value={noteContent} /><Button disabled={isSubmitting} type="submit" variant="main"><Plus size={16} /> Store evidence</Button></form> : null}<form className="shared-upload-form" onSubmit={submitUpload}><div><strong>{isDocumentsView ? "Upload a document" : "Upload a file"}{activeFolderId ? <small className="shared-folder-hint"> to {folderPath.map((folder) => folder.name).join(" / ")}</small> : null}</strong><span>{isDocumentsView ? "Word, Excel, PowerPoint, PDF, OneNote, Outlook · up to 10 MiB · text is extracted locally for search" : "Markdown, text, code, image, or business document · up to 10 MiB"}</span></div><label className="shared-upload-picker"><input accept={isDocumentsView ? DOCUMENT_ACCEPT : `.md,.mdx,.txt,.rs,.ts,.tsx,.js,.jsx,.py,.json,.toml,.yaml,.yml,.sql,.html,.css,.sh,.ps1,${DOCUMENT_ACCEPT},.png,.jpg,.jpeg,.gif,.webp,.svg,.bmp`} aria-label={isDocumentsView ? "Upload a document" : "Upload a shared artifact"} className="shared-upload-native-input" onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)} required type="file" /><span className="shared-upload-picker-icon"><Upload size={18} /></span><span className="shared-upload-picker-copy"><strong>{uploadFile?.name ?? (isDocumentsView ? "Choose a document" : "Choose a shared file")}</strong><span>{uploadFile ? `${formatFileSize(uploadFile.size)} · ready to upload` : isDocumentsView ? "Word, Excel, PowerPoint, PDF, OneNote or Outlook" : "Markdown, text, code, image, or business document"}</span></span><span className="shared-upload-picker-action">Browse</span></label><Button disabled={isSubmitting || !uploadFile} type="submit" variant="secondary"><Upload size={16} /> Upload</Button></form></div> : <p className="shared-readonly-note"><Shield size={15} /> Your viewer membership can inspect shared evidence but cannot change it.</p>}
           </section> : null}
           {isRetrievalView || isMemoryView || isTasksView || isPeopleView || isActivityView ? <aside className="shared-detail-panel shared-retrieval-panel">
             {isRetrievalView ? <><div className="shared-panel-heading"><div><Search size={18} /><h2>Retrieve</h2></div></div>
@@ -1919,7 +1903,7 @@ function SharedArtifactDetail({
       <div className="shared-record-meta"><span>{artifact?.summary.artifact_type ?? "artifact"}</span><span>{artifact?.summary.language ?? "Unspecified language"}</span><span>{artifact?.summary.indexed_at ? "Indexed" : indexingStalled ? "Not indexed" : "Indexing…"}</span></div>
       {isEditing ? <form className="shared-record-edit-form" onSubmit={saveArtifact}><label>Evidence title<Input onChange={(event) => setTitle(event.target.value)} required value={title} /></label><Button disabled={isMutating} type="submit" variant="main">{isMutating ? <Loader className="spin" size={16} /> : <Pencil size={16} />} Save evidence</Button></form> : null}
       <section className="shared-record-panel shared-lifecycle-panel"><div className="shared-panel-heading"><div><Shield size={18} /><h2>Evidence lifecycle</h2></div><span className={`shared-lifecycle-status status-${lifecycle?.status ?? "active"}`}>{lifecycle?.status?.replace(/_/g, " ") ?? "Active"}</span></div>{isEditingLifecycle ? <form className="shared-lifecycle-form" onSubmit={saveLifecycle}><label>Status<Dropdown aria-label="Evidence lifecycle status" onValueChange={(value) => setLifecycleStatus(value as ArtifactLifecycleStatus)} options={[{ label: "Active", value: "active" }, { label: "Needs review", value: "needs_review" }, { label: "Verified", value: "verified" }, { label: "Outdated", value: "outdated" }, { label: "Superseded", value: "superseded" }]} value={lifecycleStatus} /></label><label>Review owner<Dropdown aria-label="Evidence review owner" onValueChange={(value) => setLifecycleOwnerId(value === "__unassigned__" ? "" : value)} options={[{ label: "Unassigned", value: "__unassigned__" }, ...workspaceMembers.map((member) => ({ label: member.user.display_name, value: member.user.id }))]} value={lifecycleOwnerId || "__unassigned__"} /></label>{lifecycleStatus === "superseded" ? <label>Replacement evidence<Dropdown aria-label="Replacement evidence" onValueChange={(value) => setSupersededByArtifactId(value === "__none__" ? "" : value)} options={[{ label: "Choose replacement evidence", value: "__none__" }, ...workspaceArtifacts.filter((entry) => entry.id !== artifactId).map((entry) => ({ label: entry.title, value: entry.id }))]} value={supersededByArtifactId || "__none__"} /></label> : null}<label className="shared-lifecycle-note">Review note<Textarea onChange={(event) => setLifecycleNote(event.target.value)} placeholder="What should the team know about this evidence?" value={lifecycleNote} /></label><div><Button disabled={isMutating} type="submit" variant="main">{isMutating ? <Loader className="spin" size={16} /> : <Shield size={16} />} Save lifecycle</Button><Button disabled={isMutating} onClick={() => setIsEditingLifecycle(false)} type="button" variant="secondary">Cancel</Button></div></form> : <div className="shared-lifecycle-summary"><div><strong>{lifecycle?.owner ? `Owned by ${lifecycle.owner.display_name}` : "No review owner"}</strong><span>{lifecycle?.reviewed_at ? `Last updated ${formatActivityTime(lifecycle.reviewed_at)} by ${lifecycle.reviewed_by?.display_name ?? "a member"}` : "No lifecycle review recorded yet."}</span></div>{lifecycle?.review_note ? <p>{lifecycle.review_note}</p> : <p className="shared-muted-copy">Add a review note so the evidence can be trusted in context.</p>}{lifecycle?.superseded_by_artifact_id ? <span className="shared-lifecycle-replacement">Replaced by evidence {lifecycle.superseded_by_artifact_id.slice(0, 8)}</span> : null}{canWrite ? <Button onClick={() => setIsEditingLifecycle(true)} type="button" variant="secondary"><Pencil size={15} /> Update lifecycle</Button> : null}</div>}<div className="shared-lifecycle-history"><strong>History</strong>{lifecycleEvents.length ? lifecycleEvents.map((event) => <p key={event.id}><span>{event.detail}</span><time dateTime={event.created_at}>{event.actor?.display_name ?? "System"} · {formatActivityTime(event.created_at)}</time></p>) : <p className="shared-muted-copy">Lifecycle changes will be recorded here.</p>}</div></section>
-      <section className="shared-record-panel"><h2>Stored content</h2>{artifact?.content_preview ? artifact.summary.artifact_type === "note" ? <div className="shared-content-preview shared-markdown"><ReactMarkdown remarkPlugins={[remarkGfm]}>{artifact.content_preview}</ReactMarkdown></div> : <pre className="shared-content-preview">{artifact.content_preview}</pre> : <p className="shared-muted-copy">This artifact has no text preview available.</p>}</section>
+      {artifact && isDocumentArtifact(artifact.summary) ? <section className="shared-record-panel"><h2>Document</h2><DocumentViewer accessToken={accessToken} artifact={artifact.summary} key={artifact.summary.id} /></section> : <section className="shared-record-panel"><h2>Stored content</h2>{artifact?.content_preview ? artifact.summary.artifact_type === "note" ? <div className="shared-content-preview shared-markdown"><ReactMarkdown remarkPlugins={[remarkGfm]}>{artifact.content_preview}</ReactMarkdown></div> : <pre className="shared-content-preview">{artifact.content_preview}</pre> : <p className="shared-muted-copy">This artifact has no text preview available.</p>}</section>}
       <section className="shared-record-panel shared-discussion-panel"><div className="shared-panel-heading"><div><MessageCircle size={18} /><h2>Evidence discussion</h2></div><span>{comments.length} comments</span></div>{comments.length ? <div className="shared-comment-list">{comments.map((comment) => <article key={comment.id}><div className="shared-comment-author"><span aria-hidden="true">{comment.author.display_name.slice(0, 1).toUpperCase()}</span><div><strong>{comment.author.display_name}</strong><time dateTime={comment.created_at}>{formatActivityTime(comment.created_at)}{comment.updated_at !== comment.created_at ? " · edited" : ""}</time></div></div>{editingCommentId === comment.id ? <form onSubmit={saveComment}><Textarea aria-label="Edit comment" onChange={(event) => setEditingCommentBody(event.target.value)} required value={editingCommentBody} /><div><Button disabled={isMutating} type="submit" variant="main">Save comment</Button><Button onClick={() => setEditingCommentId(null)} type="button" variant="secondary">Cancel</Button></div></form> : <><p>{comment.body}</p>{comment.author.id === session.user.id || canModerateComments ? <div className="shared-comment-actions">{comment.author.id === session.user.id ? <Button onClick={() => { setEditingCommentId(comment.id); setEditingCommentBody(comment.body); }} type="button" variant="secondary"><Pencil size={14} /> Edit</Button> : null}<Button disabled={isMutating} onClick={() => void removeComment(comment)} type="button" variant="secondary"><Trash size={14} /> Delete</Button></div> : null}</>}</article>)}</div> : <p className="shared-muted-copy">No discussion yet. Add context, ask for a review, or record a decision beside the evidence.</p>}{canWrite ? <form className="shared-comment-form" onSubmit={addComment}><Textarea aria-label="New evidence comment" onChange={(event) => setCommentBody(event.target.value)} placeholder="Add context or mention @teammate@example.com…" required value={commentBody} /><Button disabled={isMutating} type="submit" variant="main"><MessageCircle size={16} /> Add comment</Button></form> : null}</section>
       {showChunks && artifact ? <IndexedChunksDialog accessToken={accessToken} artifact={artifact.summary} onClose={() => setShowChunks(false)} onReindexed={() => void load()} /> : null}
     </SharedRecordLayout>

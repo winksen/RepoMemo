@@ -25,11 +25,14 @@ argon2 = "0.5"
 axum = "0.8"
 base64 = "0.22"
 chrono = { version = "0.4", features = ["serde"] }
+calamine = { version = "0.36", default-features = false }
 cfb = "0.7"
 flate2 = "1.1"
 quick-xml = "0.39"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 hex = "0.4"
+mail-parser = "0.11"
+pdf-extract = "0.12"
 jsonwebtoken = { version = "10.4", default-features = false, features = ["rust_crypto"] }
 rand_core = { version = "0.6", features = ["getrandom"] }
 serde = { version = "1", features = ["derive"] }

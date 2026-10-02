@@ -15,6 +15,8 @@ import type {
   OrganizationMember,
   OrganizationRole,
   ArtifactIndexFailure,
+  DocumentPreview,
+  FileLink,
   Folder,
   ProviderTestResult,
   SearchResult,
@@ -452,6 +454,26 @@ export function updateSharedArtifactComment(accessToken: string, commentId: stri
 
 export function deleteSharedArtifactComment(accessToken: string, commentId: string): Promise<void> {
   return request<void>(`/v1/comments/${commentId}`, { method: "DELETE" }, accessToken);
+}
+
+export function getSharedDocumentPreview(accessToken: string, artifactId: string): Promise<DocumentPreview> {
+  return request<DocumentPreview>(`/v1/artifacts/${artifactId}/document-preview`, {}, accessToken);
+}
+
+export function createSharedFileLink(accessToken: string, artifactId: string): Promise<FileLink> {
+  return request<FileLink>(`/v1/artifacts/${artifactId}/open-link`, { method: "POST", body: JSON.stringify({}) }, accessToken);
+}
+
+/** The stored original file, fetched with the user's session. */
+export async function downloadSharedArtifactFile(accessToken: string, artifactId: string): Promise<Blob> {
+  const response = await fetch(`${API_URL}/v1/artifacts/${artifactId}/file`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null) as { error?: { message?: string } } | null;
+    throw new SharedApiError(response.status, payload?.error?.message ?? `The shared API returned ${response.status}.`);
+  }
+  return response.blob();
 }
 
 export function listSharedFolders(accessToken: string, workspaceId: string): Promise<Folder[]> {

@@ -241,6 +241,62 @@ pub struct SharedAiProviderSettings {
     pub purpose: String,
 }
 
+/// A rendered-for-reading view of an uploaded business document.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum DocumentPreview {
+    /// Extracted text (Word, legacy PowerPoint, OneNote). `approximate` is set
+    /// when the text was recovered heuristically and may be incomplete.
+    Text {
+        text: String,
+        truncated: bool,
+        approximate: bool,
+    },
+    Sheets {
+        sheets: Vec<SheetPreview>,
+        total_sheets: usize,
+    },
+    Slides {
+        slides: Vec<SlidePreview>,
+        total_slides: usize,
+    },
+    Email {
+        subject: Option<String>,
+        from: Option<String>,
+        to: Vec<String>,
+        cc: Vec<String>,
+        date: Option<String>,
+        body: String,
+        truncated: bool,
+        attachments: Vec<EmailAttachmentInfo>,
+    },
+    /// The browser renders the PDF itself; only the page count is needed.
+    Pdf { page_count: Option<usize> },
+    Unavailable { reason: String },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SheetPreview {
+    pub name: String,
+    pub rows: Vec<Vec<String>>,
+    pub total_rows: usize,
+    pub total_columns: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SlidePreview {
+    pub number: usize,
+    pub title: Option<String>,
+    pub text: Vec<String>,
+    pub notes: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmailAttachmentInfo {
+    pub name: String,
+    pub size_bytes: usize,
+}
+
 /// Folders may be nested this many levels deep (a top-level folder is level 1).
 pub const MAX_FOLDER_DEPTH: usize = 5;
 

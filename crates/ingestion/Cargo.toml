@@ -8,7 +8,10 @@ rust-version.workspace = true
 
 [dependencies]
 anyhow.workspace = true
+calamine.workspace = true
 cfb.workspace = true
 flate2.workspace = true
+mail-parser.workspace = true
+pdf-extract.workspace = true
 quick-xml.workspace = true
 repomemo-domain.workspace = true

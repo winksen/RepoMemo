@@ -1,6 +1,6 @@
 use anyhow::Result;
 use repomemo_domain::{ArtifactSummary, ArtifactType, Chunk, Symbol, SymbolKind};
-use repomemo_ingestion::extract_word_text;
+use repomemo_ingestion::extract_document_text;
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use tree_sitter::{Language, Node, Parser, Tree};
@@ -50,9 +50,9 @@ pub fn index_artifact(summary: &ArtifactSummary, bytes: &[u8]) -> Result<IndexAr
     }
 
     let mut warnings = Vec::new();
-    let text = match extract_word_text(std::path::Path::new(&summary.path), bytes)? {
+    let text = match extract_document_text(std::path::Path::new(&summary.path), bytes)? {
         Some(text) => {
-            warnings.push("Word document text was extracted locally for indexing.".to_owned());
+            warnings.push("Document text was extracted locally for indexing.".to_owned());
             text
         }
         None => match String::from_utf8(bytes.to_vec()) {

@@ -250,6 +250,49 @@ export interface SharedAiProviderSettings {
   purpose: "text" | "vision";
 }
 
+export interface SheetPreview {
+  name: string;
+  rows: string[][];
+  total_rows: number;
+  total_columns: number;
+}
+
+export interface SlidePreview {
+  number: number;
+  title: string | null;
+  text: string[];
+  notes: string | null;
+}
+
+export interface EmailAttachmentInfo {
+  name: string;
+  size_bytes: number;
+}
+
+export type DocumentPreview =
+  | { kind: "text"; text: string; truncated: boolean; approximate: boolean }
+  | { kind: "sheets"; sheets: SheetPreview[]; total_sheets: number }
+  | { kind: "slides"; slides: SlidePreview[]; total_slides: number }
+  | {
+      kind: "email";
+      subject: string | null;
+      from: string | null;
+      to: string[];
+      cc: string[];
+      date: string | null;
+      body: string;
+      truncated: boolean;
+      attachments: EmailAttachmentInfo[];
+    }
+  | { kind: "pdf"; page_count: number | null }
+  | { kind: "unavailable"; reason: string };
+
+export interface FileLink {
+  token: string;
+  filename: string;
+  expires_in_seconds: number;
+}
+
 export interface Folder {
   id: string;
   workspace_id: string;

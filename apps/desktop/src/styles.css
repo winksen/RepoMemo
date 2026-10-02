@@ -485,6 +485,11 @@ textarea:focus-visible {
 .shared-artifact-file-icon.category-markdown { color: #e5b53c; }
 .shared-artifact-file-icon.category-note { color: #d98a4e; }
 .shared-artifact-file-icon.category-folder { color: var(--color-text); }
+.shared-artifact-file-icon.category-excel { color: #2fb36d; }
+.shared-artifact-file-icon.category-powerpoint { color: #e8673c; }
+.shared-artifact-file-icon.category-pdf { color: #e5484d; }
+.shared-artifact-file-icon.category-onenote { color: #a77be0; }
+.shared-artifact-file-icon.category-email { color: #4aa3e0; }
 .shared-artifact-file-icon.category-code { color: #4cc27f; }
 .shared-artifact-file-icon.category-word { color: #4f8df0; }
 .shared-artifact-file-icon.category-image { color: #5cc4f2; }

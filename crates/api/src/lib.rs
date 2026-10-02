@@ -5,7 +5,7 @@ use repomemo_ai::{
     provider_from_settings, validate_settings, AiProvider, GenerateRequest, ImageAnalysisRequest,
 };
 use repomemo_domain::{
-    AppSettings, ArtifactDetail, ArtifactSummary, ArtifactType, AskAnswer, AskRequest,
+    AppSettings, ArtifactDetail, ArtifactSummary, ArtifactType, AskAnswer, AskRequest, DocumentPreview,
     CreateMemoryCardRequest, ImportReport, ImportRequest, IndexingJobStatus, MemoryCard,
     MemoryCardDetail, MemoryCardSummary, ProviderSettings, ProviderTestResult, SearchRequest,
     SearchResult, SourceType, SummaryResult, Symbol, SymbolSearchResult, UpdateMemoryCardRequest,
@@ -13,8 +13,8 @@ use repomemo_domain::{
 };
 use repomemo_indexer::{index_artifact, index_image_description, INDEXER_VERSION};
 use repomemo_ingestion::{
-    detect_artifact_type, detect_language, discover_import_candidates, extract_word_text,
-    is_word_document, ImportCandidate, ImportOptions,
+    detect_artifact_type, detect_language, detect_mime, discover_import_candidates,
+    document_preview, extract_document_text, is_document, ImportCandidate, ImportOptions,
 };
 use repomemo_retrieval::RetrievalService;
 use repomemo_storage::{NewArtifact, StorageConfig, StorageEngine};
@@ -229,16 +229,11 @@ impl RepoMemoCore {
         let artifact_type = detect_artifact_type(path)
             .ok_or_else(|| anyhow::anyhow!("This file type is not supported for shared upload."))?;
         let language = detect_language(path);
-        let fallback_mime = if is_word_document(path) {
-            if path
-                .extension()
-                .and_then(|extension| extension.to_str())
-                .is_some_and(|extension| extension.eq_ignore_ascii_case("docx"))
-            {
-                "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            } else {
-                "application/msword"
-            }
+        let detected_mime = detect_mime(path);
+        let fallback_mime = if is_document(path) {
+            detected_mime
+                .as_deref()
+                .unwrap_or("application/octet-stream")
         } else if matches!(artifact_type, ArtifactType::Image) {
             "application/octet-stream"
         } else if matches!(artifact_type, ArtifactType::MarkdownDoc) {
@@ -283,13 +278,34 @@ impl RepoMemoCore {
 
     pub async fn get_artifact(&self, artifact_id: String) -> Result<ArtifactDetail> {
         let mut detail = self.storage.get_artifact(&artifact_id).await?;
-        if is_word_document(Path::new(&detail.summary.path)) {
+        if is_document(Path::new(&detail.summary.path)) {
             let bytes = self.storage.read_artifact_blob(&detail.summary.id).await?;
-            let text = extract_word_text(Path::new(&detail.summary.path), &bytes)?;
+            // An unreadable document still opens; it just has no text preview.
+            let text = extract_document_text(Path::new(&detail.summary.path), &bytes)
+                .ok()
+                .flatten()
+                .filter(|value| !value.trim().is_empty());
             detail.content_truncated = text.as_ref().is_some_and(|value| value.len() > 120_000);
             detail.content_preview = text.map(|value| value.chars().take(120_000).collect());
         }
         Ok(detail)
+    }
+
+    /// The stored original of an artifact, for download or opening in its app.
+    pub async fn read_artifact_file(&self, artifact_id: &str) -> Result<(ArtifactSummary, Vec<u8>)> {
+        let summary = self.storage.get_artifact_summary(artifact_id).await?;
+        let bytes = self.storage.read_artifact_blob(artifact_id).await?;
+        Ok((summary, bytes))
+    }
+
+    /// A reading preview of a business document (Word, Excel, PowerPoint, PDF,
+    /// OneNote or Outlook message).
+    pub async fn document_preview(&self, artifact_id: &str) -> Result<DocumentPreview> {
+        let (summary, bytes) = self.read_artifact_file(artifact_id).await?;
+        let path = summary.path.clone();
+        tokio::task::spawn_blocking(move || document_preview(Path::new(&path), &bytes))
+            .await
+            .context("the document preview task failed")
     }
 
     pub async fn update_artifact_title(
