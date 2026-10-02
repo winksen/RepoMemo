@@ -145,6 +145,7 @@ textarea:focus-visible {
 }
 
 .shared-auth-canvas {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1.08fr) minmax(440px, 0.92fr);
 }
@@ -173,6 +174,8 @@ textarea:focus-visible {
 .rm-button.shared-brand:hover:not(:disabled) { color: var(--color-text); background: transparent; border-color: transparent; }
 .shared-brand-mark { display: block; width: 28px; height: 28px; flex: 0 0 auto; object-fit: contain; }
 :root[data-theme="dark"] .shared-brand-mark { filter: invert(1); }
+.shared-brand-full { display: block; width: auto; height: 36px; flex: 0 0 auto; }
+:root[data-theme="dark"] .shared-brand-full { filter: invert(1); }
 .shared-workspace-icon {
   display: grid;
   place-items: center;
@@ -189,6 +192,7 @@ textarea:focus-visible {
 .shared-trust-list dt { display: flex; gap: 8px; align-items: center; color: var(--color-text); font-weight: 700; }
 .shared-trust-list dd { margin: 0 0 0 24px; color: var(--color-text-muted); font-size: 13px; }
 
+.rm-button.shared-auth-theme-toggle { position: absolute; top: 20px; right: 20px; z-index: 2; min-height: 36px; }
 .shared-auth-form-region { display: grid; place-items: center; padding: 40px; background: var(--color-surface-2); }
 .shared-auth-form-shell { width: min(100%, 410px); }
 .shared-auth-switch { gap: 4px; padding: 4px; background: var(--color-surface-3); border-radius: 10px; }
@@ -214,11 +218,9 @@ textarea:focus-visible {
 .shared-home-header { position: relative; z-index: 1; justify-content: space-between; padding: 0 12px; background: var(--color-surface); border-radius: 12px; box-shadow: var(--shadow-block); }
 .shared-header-actions { display: flex; align-items: center; gap: 8px; }
 .shared-user-menu { gap: 8px; color: var(--color-text-muted); font-size: 13px; }
-.shared-account-controls { display: inline-flex; overflow: hidden; background: var(--color-surface); border: 2px solid var(--color-border); border-radius: 8px; transition: border-color 110ms var(--ease-control); }
-.shared-account-controls button { display: inline-flex; align-items: center; gap: 6px; min-width: 32px; min-height: 32px; padding: 0 9px; color: var(--color-text); background: transparent; border: 0; border-radius: 0; cursor: pointer; font-size: 12px; font-weight: 700; }
-.shared-account-controls button + button { border-left: 1px solid var(--color-border); }
-.shared-account-controls:hover { border-color: var(--color-accent); }
-.shared-account-controls button:focus-visible { position: relative; z-index: 1; outline-offset: -2px; }
+.shared-account-controls { display: inline-flex; gap: 8px; }
+.shared-account-controls button { display: inline-flex; align-items: center; gap: 6px; min-width: 32px; min-height: 32px; padding: 0 9px; color: var(--color-text); background: var(--color-surface); border: 2px solid var(--color-border); border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 700; transition: border-color 110ms var(--ease-control); }
+.shared-account-controls button:hover { border-color: var(--color-accent); }
 .shared-theme-toggle,
 .shared-notifications-link { justify-content: center; padding: 0 9px !important; }
 .shared-home-frame { display: grid; grid-template-columns: 216px minmax(0, 1fr); gap: 10px; min-height: 0; padding-top: 10px; }

@@ -13,12 +13,42 @@ import type { SharedSession } from "../types";
 import { Button } from "./ui/button";
 
 const THEME_STORAGE_KEY = "repomemo.theme";
-type Theme = "light" | "dark";
+const THEME_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
+export type Theme = "light" | "dark";
+
+function readThemeCookie(): Theme | null {
+  const match = document.cookie.split("; ").find((entry) => entry.startsWith(`${THEME_STORAGE_KEY}=`));
+  const value = match?.slice(THEME_STORAGE_KEY.length + 1);
+  return value === "light" || value === "dark" ? value : null;
+}
 
 export function initialSharedTheme(): Theme {
+  const cookieTheme = readThemeCookie();
+  if (cookieTheme) return cookieTheme;
   const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
   if (storedTheme === "light" || storedTheme === "dark") return storedTheme;
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+/** Theme state persisted in a cookie and applied to the document root. */
+export function useSharedTheme(): [Theme, () => void] {
+  const [theme, setTheme] = useState<Theme>(initialSharedTheme);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document.cookie = `${THEME_STORAGE_KEY}=${theme}; path=/; max-age=${THEME_COOKIE_MAX_AGE}; SameSite=Lax`;
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+  }, [theme]);
+
+  return [theme, () => setTheme((current) => current === "dark" ? "light" : "dark")];
+}
+
+export function ThemeToggle({ className = "" }: { className?: string }) {
+  const [theme, toggleTheme] = useSharedTheme();
+  const next = theme === "dark" ? "light" : "dark";
+  return <Button aria-label={`Switch to ${next} mode`} aria-pressed={theme === "dark"} className={`shared-theme-toggle ${className}`.trim()} onClick={toggleTheme} title={`Switch to ${next} mode`} type="button" variant="secondary">
+    {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+  </Button>;
 }
 
 export function SharedLayout({
@@ -38,13 +68,6 @@ export function SharedLayout({
   onNavigate: (to: string) => void;
   workspaceNavigation?: ReactNode;
 }) {
-  const [theme, setTheme] = useState<Theme>(initialSharedTheme);
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
-  }, [theme]);
-
   return <main className="shared-home">
     <header className="shared-home-header">
       <Button aria-label="Go to dashboard" className="shared-brand" onClick={() => onNavigate("/dashboard")} type="button" variant="secondary"><img alt="" className="shared-brand-mark" src="/RM-logo.svg" /></Button>
@@ -52,9 +75,7 @@ export function SharedLayout({
         <Button aria-current={window.location.pathname === "/dashboard" ? "page" : undefined} className="shared-dashboard-link" onClick={() => onNavigate("/dashboard")} type="button" variant="secondary"><Dashboard size={16} /> Dashboard</Button>
         <div className="shared-user-menu" aria-label="Account controls">
           <div className="shared-account-controls">
-            <Button aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} aria-pressed={theme === "dark"} className="shared-theme-toggle" onClick={() => setTheme((current) => current === "dark" ? "light" : "dark")} title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} type="button" variant="secondary">
-              {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
-            </Button>
+            <ThemeToggle />
             <Button aria-label="Open notifications" className="shared-notifications-link" onClick={() => onNavigate("/notifications")} title="Notifications" type="button" variant="secondary"><Bell size={16} /></Button>
             <Button className="shared-profile-link" onClick={() => onNavigate("/profile")} type="button" variant="secondary"><UserCircle size={16} /> Profile</Button>
           </div>

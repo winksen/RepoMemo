@@ -159,7 +159,7 @@ import { Button } from "./components/ui/button";
 import { Dropdown } from "./components/ui/dropdown";
 import { Input } from "./components/ui/input";
 import { Textarea } from "./components/ui/textarea";
-import { initialSharedTheme, SharedLayout } from "./components/SharedLayout";
+import { initialSharedTheme, SharedLayout, ThemeToggle } from "./components/SharedLayout";
 
 const SESSION_STORAGE_KEY = "repomemo.shared.access-token";
 const INDEX_POLL_INTERVAL_MS = 3000;
@@ -493,8 +493,9 @@ function AuthCanvas({
 
   return (
     <main className="shared-auth-canvas">
+      <ThemeToggle className="shared-auth-theme-toggle" />
       <section className="shared-auth-intro" aria-label="RepoMemo shared mode">
-        <div className="shared-brand"><span className="shared-brand-glyph"><Layers size={21} /></span><strong>RepoMemo</strong></div>
+        <div className="shared-brand"><img alt="RepoMemo" className="shared-brand-full" src="/RM-logofull.svg" /></div>
         <p className="shared-eyebrow">Shared workspace</p>
         <h1>One evidence base for the team.</h1>
         <p className="shared-intro-copy">Sign in to the server-authoritative workspace. Your browser only receives data allowed by your signed session.</p>
