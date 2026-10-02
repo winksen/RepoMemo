@@ -8,6 +8,7 @@
 use std::{
     collections::HashSet,
     sync::{Arc, Mutex},
+    time::Duration,
 };
 
 use repomemo_api::RepoMemoCore;
@@ -18,8 +19,23 @@ use tokio::sync::{mpsc, Semaphore};
 /// artifacts are processed at once instead of one task per upload.
 const MAX_CONCURRENT_INDEXING: usize = 2;
 
-#[derive(Debug)]
+/// A failed attempt is retried after each of these delays, then given up on so
+/// an unreachable provider is not hammered forever. Giving up records the
+/// reason for the shared client; the next server start or a provider change
+/// tries again.
+#[cfg(not(test))]
+const RETRY_DELAYS: [Duration; 3] = [
+    Duration::from_secs(30),
+    Duration::from_secs(120),
+    Duration::from_secs(600),
+];
+#[cfg(test)]
+const RETRY_DELAYS: [Duration; 3] = [Duration::from_millis(20); 3];
+
+#[derive(Debug, Clone)]
 struct IndexRequest {
+    /// Zero for the first try; counts retries already used.
+    attempt: usize,
     artifact_id: String,
     workspace_id: String,
     title: String,
@@ -42,7 +58,12 @@ impl IndexQueue {
     pub fn start(core: RepoMemoCore) -> Self {
         let (sender, receiver) = mpsc::unbounded_channel();
         let queued = Arc::new(Mutex::new(HashSet::new()));
-        tokio::spawn(run_worker(core.clone(), queued.clone(), receiver));
+        tokio::spawn(run_worker(
+            core.clone(),
+            queued.clone(),
+            sender.clone(),
+            receiver,
+        ));
         Self {
             sender,
             queued,
@@ -69,6 +90,7 @@ impl IndexQueue {
             return;
         }
         let request = IndexRequest {
+            attempt: 0,
             artifact_id: artifact.id.clone(),
             workspace_id: artifact.workspace_id.clone(),
             title: artifact.title.clone(),
@@ -105,6 +127,7 @@ impl IndexQueue {
 async fn run_worker(
     core: RepoMemoCore,
     queued: Arc<Mutex<HashSet<String>>>,
+    sender: mpsc::UnboundedSender<IndexRequest>,
     mut receiver: mpsc::UnboundedReceiver<IndexRequest>,
 ) {
     let permits = Arc::new(Semaphore::new(MAX_CONCURRENT_INDEXING));
@@ -114,17 +137,27 @@ async fn run_worker(
         };
         let core = core.clone();
         let queued = queued.clone();
+        let sender = sender.clone();
         tokio::spawn(async move {
-            index_one(&core, &request).await;
-            forget(&queued, &request.artifact_id);
+            let retry_pending = index_one(&core, &request, &sender).await;
+            // A request waiting for its retry stays "queued" so duplicates are
+            // not added; the permit is released so other files keep moving.
+            if !retry_pending {
+                forget(&queued, &request.artifact_id);
+            }
             drop(permit);
         });
     }
 }
 
-async fn index_one(core: &RepoMemoCore, request: &IndexRequest) {
+/// Returns true when a retry was scheduled.
+async fn index_one(
+    core: &RepoMemoCore,
+    request: &IndexRequest,
+    sender: &mpsc::UnboundedSender<IndexRequest>,
+) -> bool {
     match core.index_artifact(request.artifact_id.clone()).await {
-        Ok(_) if !request.record_activity => {}
+        Ok(_) if !request.record_activity => false,
         Ok(_) => {
             if let Err(error) = core
                 .storage()
@@ -140,14 +173,43 @@ async fn index_one(core: &RepoMemoCore, request: &IndexRequest) {
             {
                 tracing::error!(error = %error, "Failed to record indexing activity");
             }
+            false
         }
-        // The core has already marked the job as failed. The artifact stays
-        // unindexed and is retried on the next server start.
-        Err(error) => tracing::warn!(
-            error = %error,
-            artifact_id = %request.artifact_id,
-            "Automatic indexing failed"
-        ),
+        Err(error) => {
+            let reason = format!("{error:#}");
+            if let Some(delay) = RETRY_DELAYS.get(request.attempt).copied() {
+                tracing::warn!(
+                    error = %reason,
+                    artifact_id = %request.artifact_id,
+                    retry_in_secs = delay.as_secs_f32(),
+                    "Automatic indexing failed; will retry"
+                );
+                let next = IndexRequest {
+                    attempt: request.attempt + 1,
+                    ..request.clone()
+                };
+                let sender = sender.clone();
+                tokio::spawn(async move {
+                    tokio::time::sleep(delay).await;
+                    let _ = sender.send(next);
+                });
+                return true;
+            }
+            tracing::warn!(
+                error = %reason,
+                artifact_id = %request.artifact_id,
+                attempts = request.attempt + 1,
+                "Automatic indexing failed; giving up until the next restart or provider change"
+            );
+            if let Err(store_error) = core
+                .storage()
+                .record_index_failure(&request.artifact_id, &reason, (request.attempt + 1) as i64)
+                .await
+            {
+                tracing::error!(error = %store_error, "Failed to record indexing failure");
+            }
+            false
+        }
     }
 }
 

@@ -247,9 +247,26 @@ export interface SharedAiProviderSettings {
   base_url: string | null;
   model: string | null;
   enabled: boolean;
+  purpose: "text" | "vision";
+}
+
+export interface Folder {
+  id: string;
+  workspace_id: string;
+  parent_id: string | null;
+  name: string;
+  created_at: string;
+}
+
+export interface ArtifactIndexFailure {
+  artifact_id: string;
+  message: string;
+  attempts: number;
+  failed_at: string;
 }
 
 export interface ArtifactSummary {
+  folder_id?: string | null;
   id: string;
   workspace_id: string;
   source_id: string;

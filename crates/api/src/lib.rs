@@ -147,8 +147,17 @@ impl RepoMemoCore {
 
         let (artifact_type, mime_type, extension) = match language.as_deref() {
             Some("Markdown") => (ArtifactType::MarkdownDoc, "text/markdown", "md"),
+            // Shared notes are written in Markdown but kept as their own type
+            // with their own extension, so they are not mistaken for files.
+            Some("Note") => (ArtifactType::Note, "text/markdown", "note"),
             Some("Text") | None => (ArtifactType::File, "text/plain", "txt"),
             Some(_) => (ArtifactType::CodeFile, "text/plain", "txt"),
+        };
+
+        let language = if matches!(artifact_type, ArtifactType::Note) {
+            Some("Markdown".to_owned())
+        } else {
+            language
         };
 
         let safe_title = title.trim();
@@ -320,6 +329,7 @@ impl RepoMemoCore {
 
         match self.index_artifact_inner(&summary).await {
             Ok(result) => {
+                let _ = self.storage.clear_index_failure(&artifact_id).await;
                 self.storage
                     .update_indexing_job(&job.id, "completed", &result.stage, 1, None)
                     .await
@@ -327,7 +337,7 @@ impl RepoMemoCore {
             Err(error) => {
                 let _ = self
                     .storage
-                    .update_indexing_job(&job.id, "failed", "failed", 0, Some(&error.to_string()))
+                    .update_indexing_job(&job.id, "failed", "failed", 0, Some(&format!("{error:#}")))
                     .await;
                 Err(error)
             }
@@ -910,11 +920,20 @@ impl RepoMemoCore {
         let bytes = self.storage.read_artifact_blob(&summary.id).await?;
         let (output, stage) = if matches!(summary.artifact_type, ArtifactType::Image) {
             match self
-                .enabled_provider_for_workspace(&summary.workspace_id)
+                .vision_provider_for_workspace(&summary.workspace_id)
                 .await?
             {
                 Some(settings) => {
                     let provider = provider_from_settings(settings)?;
+                    // Fail fast with a readable reason (Ollama stopped, model
+                    // missing) instead of waiting on a doomed image request.
+                    let check = provider
+                        .test_connection()
+                        .await
+                        .context("the image AI provider is not reachable")?;
+                    if !check.success {
+                        bail!("{}", check.message);
+                    }
                     let description = provider
                         .analyze_image(ImageAnalysisRequest {
                             prompt: image_analysis_prompt(summary),
@@ -945,16 +964,47 @@ impl RepoMemoCore {
         Ok(ArtifactIndexResult { stage })
     }
 
-    async fn enabled_provider_for_workspace(
+    /// The provider that describes images: an enabled provider set up for
+    /// vision, or else an enabled provider saved before purposes existed (the
+    /// single-provider desktop setup).
+    async fn vision_provider_for_workspace(
         &self,
         workspace_id: &str,
     ) -> Result<Option<ProviderSettings>> {
-        Ok(self
+        let providers = self.storage.list_provider_settings(workspace_id).await?;
+        Ok(providers
+            .iter()
+            .find(|settings| settings.enabled && settings.purpose() == "vision")
+            .or_else(|| {
+                providers
+                    .iter()
+                    .find(|settings| settings.enabled && !settings.has_explicit_purpose())
+            })
+            .cloned())
+    }
+
+    /// Image uploads are only accepted once an image AI provider is enabled, so
+    /// a picture is never stored without a way to make it searchable.
+    pub async fn ensure_upload_allowed(&self, workspace_id: &str, filename: &str) -> Result<()> {
+        let is_image = matches!(
+            detect_artifact_type(Path::new(filename)),
+            Some(ArtifactType::Image)
+        );
+        if !is_image {
+            return Ok(());
+        }
+        let has_vision = self
             .storage
             .list_provider_settings(workspace_id)
             .await?
-            .into_iter()
-            .find(|settings| settings.enabled))
+            .iter()
+            .any(|settings| settings.enabled && settings.purpose() == "vision");
+        if !has_vision {
+            bail!(
+                "An image AI provider is required to upload images. An administrator can set one up in Settings."
+            );
+        }
+        Ok(())
     }
 }
 

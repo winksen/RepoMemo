@@ -5,7 +5,7 @@ use std::sync::{Arc, RwLock};
 use anyhow::{bail, Context, Result};
 use chrono::Utc;
 use repomemo_domain::{
-    ArtifactComment, ArtifactDetail, ArtifactLifecycle, ArtifactLifecycleEvent, ArtifactSummary,
+    ArtifactComment, ArtifactDetail, ArtifactIndexFailure, Folder, MAX_FOLDER_DEPTH, ArtifactLifecycle, ArtifactLifecycleEvent, ArtifactSummary,
     ArtifactType, Chunk, Citation, CollaborationTask, IndexingJobStatus, MemoryCard,
     MemoryCardDetail, MemoryCardSummary, MemoryEvidence, Organization, OrganizationMember,
     OrganizationRole, ProviderSettings, SavedSearch, SearchRequest, SearchResult,
@@ -2799,6 +2799,196 @@ impl StorageEngine {
         self.get_provider_settings(&id).await
     }
 
+    pub async fn get_folder(&self, folder_id: &str) -> Result<Folder> {
+        let row = sqlx::query(
+            "SELECT id, workspace_id, parent_id, name, created_at FROM folders WHERE id = ?1",
+        )
+        .bind(folder_id)
+        .fetch_optional(&self.pool)
+        .await?
+        .context("Folder was not found.")?;
+        Ok(folder_from_row(&row))
+    }
+
+    pub async fn list_folders(&self, workspace_id: &str) -> Result<Vec<Folder>> {
+        let rows = sqlx::query(
+            r#"
+            SELECT id, workspace_id, parent_id, name, created_at
+            FROM folders WHERE workspace_id = ?1
+            ORDER BY name COLLATE NOCASE
+            "#,
+        )
+        .bind(workspace_id)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows.iter().map(folder_from_row).collect())
+    }
+
+    /// Creates a folder, enforcing a non-empty name, a unique name among its
+    /// siblings, and the nesting limit.
+    pub async fn create_folder(
+        &self,
+        workspace_id: &str,
+        parent_id: Option<&str>,
+        name: &str,
+        created_by: Option<&str>,
+    ) -> Result<Folder> {
+        let name = name.trim();
+        if name.is_empty() {
+            bail!("Folder name is required.");
+        }
+        if name.chars().count() > 80 {
+            bail!("Folder names must be 80 characters or fewer.");
+        }
+        if name.contains(['/', '\\']) {
+            bail!("Folder names cannot contain slashes.");
+        }
+
+        let mut depth = 1;
+        if let Some(parent_id) = parent_id {
+            let mut cursor = Some(self.get_folder(parent_id).await?);
+            if cursor.as_ref().map(|folder| folder.workspace_id.as_str()) != Some(workspace_id) {
+                bail!("Folder was not found.");
+            }
+            while let Some(folder) = cursor {
+                depth += 1;
+                if depth > MAX_FOLDER_DEPTH {
+                    bail!("Folders can be nested up to {MAX_FOLDER_DEPTH} levels deep.");
+                }
+                cursor = match folder.parent_id {
+                    Some(parent) => Some(self.get_folder(&parent).await?),
+                    None => None,
+                };
+            }
+        }
+
+        let duplicate: Option<i64> = sqlx::query_scalar(
+            r#"
+            SELECT 1 FROM folders
+            WHERE workspace_id = ?1 AND COALESCE(parent_id, '') = COALESCE(?2, '')
+              AND name = ?3 COLLATE NOCASE
+            "#,
+        )
+        .bind(workspace_id)
+        .bind(parent_id)
+        .bind(name)
+        .fetch_optional(&self.pool)
+        .await?;
+        if duplicate.is_some() {
+            bail!("A folder with this name already exists here.");
+        }
+
+        let id = Uuid::new_v4().to_string();
+        let created_at = Utc::now().to_rfc3339();
+        sqlx::query(
+            r#"
+            INSERT INTO folders (id, workspace_id, parent_id, name, created_by, created_at)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+            "#,
+        )
+        .bind(&id)
+        .bind(workspace_id)
+        .bind(parent_id)
+        .bind(name)
+        .bind(created_by)
+        .bind(&created_at)
+        .execute(&self.pool)
+        .await?;
+        self.get_folder(&id).await
+    }
+
+    /// Places an unfiled artifact in a folder. An artifact that already sits in
+    /// a folder stays where it is: a duplicate upload resolves to the existing
+    /// artifact and must not pull it out of its folder.
+    pub async fn set_artifact_folder(
+        &self,
+        artifact_id: &str,
+        folder_id: Option<&str>,
+    ) -> Result<()> {
+        sqlx::query("UPDATE artifacts SET folder_id = ?2 WHERE id = ?1 AND folder_id IS NULL")
+            .bind(artifact_id)
+            .bind(folder_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// Artifact id to folder id for every artifact in the workspace that sits
+    /// inside a folder.
+    pub async fn artifact_folder_ids(
+        &self,
+        workspace_id: &str,
+    ) -> Result<HashMap<String, String>> {
+        let rows = sqlx::query(
+            "SELECT id, folder_id FROM artifacts WHERE workspace_id = ?1 AND folder_id IS NOT NULL",
+        )
+        .bind(workspace_id)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|row| (row.get("id"), row.get("folder_id")))
+            .collect())
+    }
+
+    pub async fn record_index_failure(
+        &self,
+        artifact_id: &str,
+        message: &str,
+        attempts: i64,
+    ) -> Result<()> {
+        sqlx::query(
+            r#"
+            INSERT INTO artifact_index_failures (artifact_id, message, attempts, failed_at)
+            VALUES (?1, ?2, ?3, ?4)
+            ON CONFLICT(artifact_id) DO UPDATE SET
+              message = excluded.message, attempts = excluded.attempts,
+              failed_at = excluded.failed_at
+            "#,
+        )
+        .bind(artifact_id)
+        .bind(message)
+        .bind(attempts)
+        .bind(Utc::now().to_rfc3339())
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn clear_index_failure(&self, artifact_id: &str) -> Result<()> {
+        sqlx::query("DELETE FROM artifact_index_failures WHERE artifact_id = ?1")
+            .bind(artifact_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn list_index_failures(
+        &self,
+        workspace_id: &str,
+    ) -> Result<Vec<ArtifactIndexFailure>> {
+        let rows = sqlx::query(
+            r#"
+            SELECT failures.artifact_id, failures.message, failures.attempts, failures.failed_at
+            FROM artifact_index_failures failures
+            JOIN artifacts ON artifacts.id = failures.artifact_id
+            WHERE artifacts.workspace_id = ?1 AND artifacts.indexed_at IS NULL
+            "#,
+        )
+        .bind(workspace_id)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|row| ArtifactIndexFailure {
+                artifact_id: row.get("artifact_id"),
+                message: row.get("message"),
+                attempts: row.get("attempts"),
+                failed_at: row.get("failed_at"),
+            })
+            .collect())
+    }
+
     pub async fn app_ai_status(&self) -> Result<(bool, Option<String>)> {
         let row = sqlx::query(
             "SELECT name FROM provider_settings WHERE enabled = 1 ORDER BY updated_at DESC LIMIT 1",
@@ -3786,6 +3976,16 @@ impl From<SourceRow> for Source {
             created_at: row.created_at,
             updated_at: row.updated_at,
         }
+    }
+}
+
+fn folder_from_row(row: &SqliteRow) -> Folder {
+    Folder {
+        id: row.get("id"),
+        workspace_id: row.get("workspace_id"),
+        parent_id: row.get("parent_id"),
+        name: row.get("name"),
+        created_at: row.get("created_at"),
     }
 }
 

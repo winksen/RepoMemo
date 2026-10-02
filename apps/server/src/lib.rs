@@ -34,7 +34,7 @@ use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, 
 use rand_core::OsRng;
 use repomemo_api::RepoMemoCore;
 use repomemo_domain::{
-    ArtifactComment, ArtifactDetail, ArtifactLifecycle, ArtifactLifecycleEvent, ArtifactSummary,
+    ArtifactComment, ArtifactDetail, ArtifactIndexFailure, Folder, ArtifactLifecycle, ArtifactLifecycleEvent, ArtifactSummary,
     ArtifactType, AskAnswer, AskRequest, Chunk, Citation, CollaborationTask,
     CreateMemoryCardRequest,
     IndexingJobStatus, MemoryCard, MemoryCardDetail, MemoryCardSummary, Organization,
@@ -258,6 +258,21 @@ struct CreateTextArtifactRequest {
     title: String,
     content: String,
     language: Option<String>,
+    folder_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CreateFolderRequest {
+    name: String,
+    parent_id: Option<String>,
+}
+
+/// An artifact summary plus the folder it sits in, for the shared client.
+#[derive(Debug, Serialize)]
+struct SharedArtifactSummary {
+    #[serde(flatten)]
+    summary: ArtifactSummary,
+    folder_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -430,6 +445,8 @@ struct SaveAiProviderRequest {
     enabled: bool,
     #[serde(default)]
     cloud_content_acknowledged: bool,
+    /// `text` or `vision`; keeps the saved purpose when omitted.
+    purpose: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -626,6 +643,14 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
         .route(
             "/v1/workspaces/{workspace_id}/artifacts",
             get(list_artifacts),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/folders",
+            get(list_folders).post(create_folder),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/artifacts/index-failures",
+            get(list_artifact_index_failures),
         )
         .route(
             "/v1/workspaces/{workspace_id}/artifacts/query",
@@ -1297,7 +1322,7 @@ async fn generate_workspace_ai_overview(
         .await
         .map_err(map_storage_error)?
         .into_iter()
-        .find(|setting| setting.enabled);
+        .find(|setting| setting.enabled && setting.purpose() == "text");
 
     let Some(provider) = provider else {
         return Ok(Json(WorkspaceAiOverview {
@@ -1348,7 +1373,7 @@ async fn ask_workspace(
         .await
         .map_err(map_storage_error)?
         .into_iter()
-        .find(|setting| setting.enabled)
+        .find(|setting| setting.enabled && setting.purpose() == "text")
         .ok_or_else(|| {
             ApiError::bad_request(
                 "No enabled AI provider is configured for this workspace. An administrator can configure one in Settings.",
@@ -1432,6 +1457,15 @@ async fn save_workspace_ai_provider(
             .and_then(|settings| settings.metadata.get("cloud_content_acknowledged"))
             .and_then(|value| value.as_bool())
             .unwrap_or(false);
+    let purpose = match request.purpose.as_deref() {
+        Some("vision") => "vision",
+        Some("text") => "text",
+        Some(_) => return Err(ApiError::bad_request("Provider purpose must be text or vision.")),
+        None => existing
+            .as_ref()
+            .map(|settings| settings.purpose())
+            .unwrap_or("text"),
+    };
     let provider = state
         .core
         .save_provider_settings(ProviderSettings {
@@ -1443,7 +1477,10 @@ async fn save_workspace_ai_provider(
             model: request.model,
             embedding_model: None,
             enabled: request.enabled,
-            metadata: json!({ "cloud_content_acknowledged": cloud_content_acknowledged }),
+            metadata: json!({
+                "cloud_content_acknowledged": cloud_content_acknowledged,
+                "purpose": purpose,
+            }),
             api_key,
         })
         .await
@@ -1458,7 +1495,25 @@ async fn save_workspace_ai_provider(
         format!("Updated AI provider: {}.", provider.name),
     )
     .await;
+    if provider.enabled && provider.purpose() == "vision" {
+        // Images stuck behind a missing or broken provider are retried now.
+        state.index_queue.resume_pending().await;
+    }
     Ok(Json(shared_provider_settings(provider)))
+}
+
+async fn list_artifact_index_failures(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+) -> Result<Json<Vec<ArtifactIndexFailure>>, ApiError> {
+    require_workspace_read(&state, &subject, &workspace_id).await?;
+    state
+        .storage
+        .list_index_failures(&workspace_id)
+        .await
+        .map(Json)
+        .map_err(map_storage_error)
 }
 
 async fn test_workspace_ai_provider(
@@ -1494,11 +1549,13 @@ async fn test_workspace_ai_provider(
 }
 
 fn shared_provider_settings(provider: ProviderSettings) -> SharedAiProviderSettings {
+    let purpose = provider.purpose().to_owned();
     SharedAiProviderSettings {
         id: provider.id,
         provider_type: provider.provider_type,
         name: provider.name,
         base_url: provider.base_url,
+        purpose,
         model: provider.model,
         enabled: provider.enabled,
     }
@@ -2277,14 +2334,91 @@ async fn list_artifacts(
     subject: AuthenticatedSubject,
     State(state): State<AppState>,
     Path(workspace_id): Path<String>,
-) -> Result<Json<Vec<ArtifactSummary>>, ApiError> {
+) -> Result<Json<Vec<SharedArtifactSummary>>, ApiError> {
     require_workspace_read(&state, &subject, &workspace_id).await?;
-    state
+    let folder_ids = state
+        .storage
+        .artifact_folder_ids(&workspace_id)
+        .await
+        .map_err(map_storage_error)?;
+    let artifacts = state
         .core
         .list_artifacts(workspace_id)
         .await
+        .map_err(map_core_error)?;
+    Ok(Json(
+        artifacts
+            .into_iter()
+            .map(|summary| SharedArtifactSummary {
+                folder_id: folder_ids.get(&summary.id).cloned(),
+                summary,
+            })
+            .collect(),
+    ))
+}
+
+async fn list_folders(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+) -> Result<Json<Vec<Folder>>, ApiError> {
+    require_workspace_read(&state, &subject, &workspace_id).await?;
+    state
+        .storage
+        .list_folders(&workspace_id)
+        .await
         .map(Json)
-        .map_err(map_core_error)
+        .map_err(map_storage_error)
+}
+
+async fn create_folder(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+    Json(request): Json<CreateFolderRequest>,
+) -> Result<(StatusCode, Json<Folder>), ApiError> {
+    require_workspace_write(&state, &subject, &workspace_id).await?;
+    let folder = state
+        .storage
+        .create_folder(
+            &workspace_id,
+            request.parent_id.as_deref().filter(|id| !id.is_empty()),
+            &request.name,
+            Some(&subject.user_id),
+        )
+        .await
+        .map_err(|error| ApiError::bad_request(error.to_string()))?;
+    record_workspace_activity(
+        &state,
+        &workspace_id,
+        &subject.user_id,
+        "folder_created",
+        "folder",
+        Some(&folder.id),
+        format!("Created folder: {}.", folder.name),
+    )
+    .await;
+    Ok((StatusCode::CREATED, Json(folder)))
+}
+
+/// Checks that a folder belongs to the workspace before anything is stored in it.
+async fn validate_folder(
+    state: &AppState,
+    workspace_id: &str,
+    folder_id: Option<&str>,
+) -> Result<Option<String>, ApiError> {
+    let Some(folder_id) = folder_id.filter(|id| !id.is_empty()) else {
+        return Ok(None);
+    };
+    let folder = state
+        .storage
+        .get_folder(folder_id)
+        .await
+        .map_err(|_| ApiError::bad_request("Folder was not found."))?;
+    if folder.workspace_id != workspace_id {
+        return Err(ApiError::bad_request("Folder was not found."));
+    }
+    Ok(Some(folder.id))
 }
 
 async fn query_artifacts(
@@ -2345,8 +2479,9 @@ async fn create_text_artifact(
     State(state): State<AppState>,
     Path(workspace_id): Path<String>,
     Json(request): Json<CreateTextArtifactRequest>,
-) -> Result<(StatusCode, Json<ArtifactSummary>), ApiError> {
+) -> Result<(StatusCode, Json<SharedArtifactSummary>), ApiError> {
     require_workspace_write(&state, &subject, &workspace_id).await?;
+    let folder_id = validate_folder(&state, &workspace_id, request.folder_id.as_deref()).await?;
     let artifact = state
         .core
         .import_text(
@@ -2357,6 +2492,13 @@ async fn create_text_artifact(
         )
         .await
         .map_err(map_core_error)?;
+    if folder_id.is_some() {
+        state
+            .storage
+            .set_artifact_folder(&artifact.id, folder_id.as_deref())
+            .await
+            .map_err(map_storage_error)?;
+    }
     record_workspace_activity(
         &state,
         &workspace_id,
@@ -2368,7 +2510,13 @@ async fn create_text_artifact(
     )
     .await;
     state.index_queue.enqueue(&artifact, Some(&subject.user_id));
-    Ok((StatusCode::CREATED, Json(artifact)))
+    Ok((
+        StatusCode::CREATED,
+        Json(SharedArtifactSummary {
+            summary: artifact,
+            folder_id,
+        }),
+    ))
 }
 
 async fn upload_artifact(
@@ -2377,8 +2525,12 @@ async fn upload_artifact(
     Path(workspace_id): Path<String>,
     headers: HeaderMap,
     body: Bytes,
-) -> Result<(StatusCode, Json<ArtifactSummary>), ApiError> {
+) -> Result<(StatusCode, Json<SharedArtifactSummary>), ApiError> {
     require_workspace_write(&state, &subject, &workspace_id).await?;
+    let requested_folder = headers
+        .get("x-repomemo-folder-id")
+        .and_then(|value| value.to_str().ok());
+    let folder_id = validate_folder(&state, &workspace_id, requested_folder).await?;
     let filename = headers
         .get("x-repomemo-filename")
         .and_then(|value| value.to_str().ok())
@@ -2389,11 +2541,23 @@ async fn upload_artifact(
         .get(header::CONTENT_TYPE)
         .and_then(|value| value.to_str().ok())
         .map(str::to_owned);
+    state
+        .core
+        .ensure_upload_allowed(&workspace_id, &filename)
+        .await
+        .map_err(map_core_error)?;
     let artifact = state
         .core
         .import_upload(workspace_id.clone(), filename, body.to_vec(), mime_type)
         .await
         .map_err(map_core_error)?;
+    if folder_id.is_some() {
+        state
+            .storage
+            .set_artifact_folder(&artifact.id, folder_id.as_deref())
+            .await
+            .map_err(map_storage_error)?;
+    }
     record_workspace_activity(
         &state,
         &workspace_id,
@@ -2405,7 +2569,13 @@ async fn upload_artifact(
     )
     .await;
     state.index_queue.enqueue(&artifact, Some(&subject.user_id));
-    Ok((StatusCode::CREATED, Json(artifact)))
+    Ok((
+        StatusCode::CREATED,
+        Json(SharedArtifactSummary {
+            summary: artifact,
+            folder_id,
+        }),
+    ))
 }
 
 async fn get_artifact(
@@ -4540,6 +4710,125 @@ mod tests {
             .header("authorization", authorization)
             .body(Body::empty())
             .unwrap()
+    }
+
+    #[tokio::test]
+    async fn folders_nest_to_a_limit_hold_notes_and_images_need_a_vision_provider() {
+        let data_dir =
+            std::env::temp_dir().join(format!("repomemo-server-folders-{}", uuid::Uuid::new_v4()));
+        let app = router(ServerConfig::for_test(data_dir)).await.unwrap();
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/v1/auth/register")
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        json!({"email": "folders@example.com", "display_name": "Folders", "password": "not-a-real-password"})
+                            .to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let body: Value =
+            serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
+        let owner = format!("Bearer {}", body["access_token"].as_str().unwrap());
+        let organization = app
+            .clone()
+            .oneshot(json_request("POST", "/v1/organizations", &owner, json!({"name":"Folder Team"})))
+            .await
+            .unwrap();
+        let organization: Value = serde_json::from_slice(
+            &to_bytes(organization.into_body(), usize::MAX).await.unwrap(),
+        )
+        .unwrap();
+        let workspace = app
+            .clone()
+            .oneshot(json_request(
+                "POST",
+                "/v1/workspaces",
+                &owner,
+                json!({"organization_id": organization["id"], "name":"Folder Workspace"}),
+            ))
+            .await
+            .unwrap();
+        let workspace: Value = serde_json::from_slice(
+            &to_bytes(workspace.into_body(), usize::MAX).await.unwrap(),
+        )
+        .unwrap();
+        let workspace_id = workspace["workspace"]["id"].as_str().unwrap().to_owned();
+        let folders_uri = format!("/v1/workspaces/{workspace_id}/folders");
+
+        // Five levels are allowed, the sixth is refused.
+        let mut parent: Option<String> = None;
+        let mut deepest = String::new();
+        for level in 1..=5 {
+            let response = app
+                .clone()
+                .oneshot(json_request(
+                    "POST",
+                    &folders_uri,
+                    &owner,
+                    json!({"name": format!("level {level}"), "parent_id": parent}),
+                ))
+                .await
+                .unwrap();
+            assert_eq!(response.status(), 201, "level {level}");
+            let folder: Value =
+                serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap())
+                    .unwrap();
+            deepest = folder["id"].as_str().unwrap().to_owned();
+            parent = Some(deepest.clone());
+        }
+        let too_deep = app
+            .clone()
+            .oneshot(json_request(
+                "POST",
+                &folders_uri,
+                &owner,
+                json!({"name": "level 6", "parent_id": deepest}),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(too_deep.status(), 400);
+
+        // A note can be filed in a folder and is reported with it.
+        let note = app
+            .clone()
+            .oneshot(json_request(
+                "POST",
+                &format!("/v1/workspaces/{workspace_id}/artifacts/text"),
+                &owner,
+                json!({"title": "Filed note", "content": "# Hello", "language": "Note", "folder_id": deepest}),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(note.status(), 201);
+        let note: Value =
+            serde_json::from_slice(&to_bytes(note.into_body(), usize::MAX).await.unwrap()).unwrap();
+        assert_eq!(note["folder_id"], json!(deepest));
+        assert_eq!(note["artifact_type"], "note");
+        assert!(note["path"].as_str().unwrap().ends_with(".note"));
+
+        // Images are refused until an image AI provider exists.
+        let image = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/v1/workspaces/{workspace_id}/artifacts/upload"))
+                    .header("authorization", &owner)
+                    .header("x-repomemo-filename", "diagram.png")
+                    .header("content-type", "image/png")
+                    .body(Body::from(vec![1_u8, 2, 3]))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(image.status(), 400);
     }
 
     fn json_request(method: &str, uri: &str, authorization: &str, body: Value) -> Request<Body> {

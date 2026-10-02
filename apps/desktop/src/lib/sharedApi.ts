@@ -14,6 +14,8 @@ import type {
   Organization,
   OrganizationMember,
   OrganizationRole,
+  ArtifactIndexFailure,
+  Folder,
   ProviderTestResult,
   SearchResult,
   SharedSession,
@@ -256,6 +258,7 @@ export function saveSharedWorkspaceAiProvider(accessToken: string, workspaceId: 
   apiKey?: string;
   enabled: boolean;
   cloudContentAcknowledged: boolean;
+  purpose: "text" | "vision";
 }): Promise<SharedAiProviderSettings> {
   return request<SharedAiProviderSettings>(`/v1/workspaces/${workspaceId}/ai-providers`, {
     method: "PUT",
@@ -268,6 +271,7 @@ export function saveSharedWorkspaceAiProvider(accessToken: string, workspaceId: 
       api_key: input.apiKey || null,
       enabled: input.enabled,
       cloud_content_acknowledged: input.cloudContentAcknowledged,
+      purpose: input.purpose,
     }),
   }, accessToken);
 }
@@ -361,6 +365,10 @@ export function removeSharedWorkspaceMember(accessToken: string, workspaceId: st
   return request<void>(`/v1/workspaces/${workspaceId}/members/${userId}`, { method: "DELETE" }, accessToken);
 }
 
+export function listSharedIndexFailures(accessToken: string, workspaceId: string): Promise<ArtifactIndexFailure[]> {
+  return request<ArtifactIndexFailure[]>(`/v1/workspaces/${workspaceId}/artifacts/index-failures`, {}, accessToken);
+}
+
 export function listSharedArtifacts(accessToken: string, workspaceId: string): Promise<ArtifactSummary[]> {
   return request<ArtifactSummary[]>(`/v1/workspaces/${workspaceId}/artifacts`, {}, accessToken);
 }
@@ -446,10 +454,25 @@ export function deleteSharedArtifactComment(accessToken: string, commentId: stri
   return request<void>(`/v1/comments/${commentId}`, { method: "DELETE" }, accessToken);
 }
 
+export function listSharedFolders(accessToken: string, workspaceId: string): Promise<Folder[]> {
+  return request<Folder[]>(`/v1/workspaces/${workspaceId}/folders`, {}, accessToken);
+}
+
+export function createSharedFolder(accessToken: string, workspaceId: string, input: {
+  name: string;
+  parentId: string | null;
+}): Promise<Folder> {
+  return request<Folder>(`/v1/workspaces/${workspaceId}/folders`, {
+    method: "POST",
+    body: JSON.stringify({ name: input.name, parent_id: input.parentId }),
+  }, accessToken);
+}
+
 export function createSharedTextArtifact(accessToken: string, workspaceId: string, input: {
   title: string;
   content: string;
   language?: string;
+  folder_id?: string | null;
 }): Promise<ArtifactSummary> {
   return request<ArtifactSummary>(`/v1/workspaces/${workspaceId}/artifacts/text`, {
     method: "POST",
@@ -457,7 +480,7 @@ export function createSharedTextArtifact(accessToken: string, workspaceId: strin
   }, accessToken);
 }
 
-export async function uploadSharedArtifact(accessToken: string, workspaceId: string, file: File): Promise<ArtifactSummary> {
+export async function uploadSharedArtifact(accessToken: string, workspaceId: string, file: File, folderId?: string | null): Promise<ArtifactSummary> {
   const response = await fetch(`${API_URL}/v1/workspaces/${workspaceId}/artifacts/upload`, {
     method: "POST",
     headers: {
@@ -465,6 +488,7 @@ export async function uploadSharedArtifact(accessToken: string, workspaceId: str
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": file.type || "application/octet-stream",
       "X-RepoMemo-Filename": file.name,
+      ...(folderId ? { "X-RepoMemo-Folder-Id": folderId } : {}),
     },
     body: file,
   });

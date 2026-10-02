@@ -237,6 +237,29 @@ pub struct SharedAiProviderSettings {
     pub base_url: Option<String>,
     pub model: Option<String>,
     pub enabled: bool,
+    /// `text` (answers, summaries, embeddings) or `vision` (image to text).
+    pub purpose: String,
+}
+
+/// Folders may be nested this many levels deep (a top-level folder is level 1).
+pub const MAX_FOLDER_DEPTH: usize = 5;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Folder {
+    pub id: String,
+    pub workspace_id: String,
+    pub parent_id: Option<String>,
+    pub name: String,
+    pub created_at: String,
+}
+
+/// Why an artifact could not be indexed, after every retry was used.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArtifactIndexFailure {
+    pub artifact_id: String,
+    pub message: String,
+    pub attempts: i64,
+    pub failed_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -525,6 +548,21 @@ pub struct ProviderSettings {
     pub metadata: Value,
     #[serde(skip_serializing, default)]
     pub api_key: Option<String>,
+}
+
+impl ProviderSettings {
+    /// What this provider is used for. Providers saved before the split have no
+    /// purpose and are text providers.
+    pub fn purpose(&self) -> &str {
+        match self.metadata.get("purpose").and_then(Value::as_str) {
+            Some("vision") => "vision",
+            _ => "text",
+        }
+    }
+
+    pub fn has_explicit_purpose(&self) -> bool {
+        self.metadata.get("purpose").is_some()
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

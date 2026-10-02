@@ -87,7 +87,10 @@ pub fn index_artifact(summary: &ArtifactSummary, bytes: &[u8]) -> Result<IndexAr
 
     let is_markdown = matches!(
         summary.artifact_type,
-        ArtifactType::MarkdownDoc | ArtifactType::Decision | ArtifactType::Runbook
+        ArtifactType::MarkdownDoc
+            | ArtifactType::Note
+            | ArtifactType::Decision
+            | ArtifactType::Runbook
     ) || matches!(summary.language.as_deref(), Some("Markdown"));
     let chunks = if is_markdown {
         chunk_markdown(summary, &text)
