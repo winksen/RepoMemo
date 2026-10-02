@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 
@@ -2833,16 +2833,7 @@ impl StorageEngine {
         name: &str,
         created_by: Option<&str>,
     ) -> Result<Folder> {
-        let name = name.trim();
-        if name.is_empty() {
-            bail!("Folder name is required.");
-        }
-        if name.chars().count() > 80 {
-            bail!("Folder names must be 80 characters or fewer.");
-        }
-        if name.contains(['/', '\\']) {
-            bail!("Folder names cannot contain slashes.");
-        }
+        let name = validate_folder_name(name)?;
 
         let mut depth = 1;
         if let Some(parent_id) = parent_id {
@@ -2895,6 +2886,89 @@ impl StorageEngine {
         .execute(&self.pool)
         .await?;
         self.get_folder(&id).await
+    }
+
+    pub async fn rename_folder(&self, folder_id: &str, name: &str) -> Result<Folder> {
+        let name = validate_folder_name(name)?;
+        let folder = self.get_folder(folder_id).await?;
+        let duplicate: Option<i64> = sqlx::query_scalar(
+            r#"
+            SELECT 1 FROM folders
+            WHERE workspace_id = ?1 AND COALESCE(parent_id, '') = COALESCE(?2, '')
+              AND name = ?3 COLLATE NOCASE AND id <> ?4
+            "#,
+        )
+        .bind(&folder.workspace_id)
+        .bind(&folder.parent_id)
+        .bind(name)
+        .bind(folder_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        if duplicate.is_some() {
+            bail!("A folder with this name already exists here.");
+        }
+        sqlx::query("UPDATE folders SET name = ?2 WHERE id = ?1")
+            .bind(folder_id)
+            .bind(name)
+            .execute(&self.pool)
+            .await?;
+        self.get_folder(folder_id).await
+    }
+
+    /// Ids of a folder, every folder below it, and every artifact inside any of them.
+    pub async fn folder_subtree(&self, folder_id: &str) -> Result<(Vec<String>, Vec<String>)> {
+        let folder = self.get_folder(folder_id).await?;
+        let all = self.list_folders(&folder.workspace_id).await?;
+        let mut folder_ids = vec![folder.id.clone()];
+        let mut index = 0;
+        while index < folder_ids.len() {
+            let parent = folder_ids[index].clone();
+            folder_ids.extend(
+                all.iter()
+                    .filter(|candidate| candidate.parent_id.as_deref() == Some(parent.as_str()))
+                    .map(|candidate| candidate.id.clone()),
+            );
+            index += 1;
+        }
+        let in_folders: HashSet<&str> = folder_ids.iter().map(String::as_str).collect();
+        let rows = sqlx::query(
+            "SELECT id, folder_id FROM artifacts WHERE workspace_id = ?1 AND folder_id IS NOT NULL",
+        )
+        .bind(&folder.workspace_id)
+        .fetch_all(&self.pool)
+        .await?;
+        let artifact_ids = rows
+            .into_iter()
+            .filter(|row| in_folders.contains(row.get::<String, _>("folder_id").as_str()))
+            .map(|row| row.get("id"))
+            .collect();
+        Ok((folder_ids, artifact_ids))
+    }
+
+    pub async fn delete_folders(&self, folder_ids: &[String]) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        for id in folder_ids {
+            sqlx::query("DELETE FROM folders WHERE id = ?1")
+                .bind(id)
+                .execute(&mut *tx)
+                .await?;
+        }
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// Moves an artifact into a folder, or to the top level with `None`.
+    pub async fn move_artifact_to_folder(
+        &self,
+        artifact_id: &str,
+        folder_id: Option<&str>,
+    ) -> Result<()> {
+        sqlx::query("UPDATE artifacts SET folder_id = ?2 WHERE id = ?1")
+            .bind(artifact_id)
+            .bind(folder_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
     }
 
     /// Places an unfiled artifact in a folder. An artifact that already sits in
@@ -3977,6 +4051,20 @@ impl From<SourceRow> for Source {
             updated_at: row.updated_at,
         }
     }
+}
+
+fn validate_folder_name(name: &str) -> Result<&str> {
+    let name = name.trim();
+    if name.is_empty() {
+        bail!("Folder name is required.");
+    }
+    if name.chars().count() > 80 {
+        bail!("Folder names must be 80 characters or fewer.");
+    }
+    if name.contains(['/', '\\']) {
+        bail!("Folder names cannot contain slashes.");
+    }
+    Ok(name)
 }
 
 fn folder_from_row(row: &SqliteRow) -> Folder {

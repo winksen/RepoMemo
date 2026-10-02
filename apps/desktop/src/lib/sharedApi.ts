@@ -468,6 +468,24 @@ export function createSharedFolder(accessToken: string, workspaceId: string, inp
   }, accessToken);
 }
 
+export function renameSharedFolder(accessToken: string, workspaceId: string, folderId: string, name: string): Promise<Folder> {
+  return request<Folder>(`/v1/workspaces/${workspaceId}/folders/${folderId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ name }),
+  }, accessToken);
+}
+
+export function deleteSharedFolder(accessToken: string, workspaceId: string, folderId: string): Promise<void> {
+  return request<void>(`/v1/workspaces/${workspaceId}/folders/${folderId}`, { method: "DELETE" }, accessToken);
+}
+
+export function moveSharedArtifact(accessToken: string, artifactId: string, folderId: string | null): Promise<ArtifactSummary> {
+  return request<ArtifactSummary>(`/v1/artifacts/${artifactId}/folder`, {
+    method: "PUT",
+    body: JSON.stringify({ folder_id: folderId }),
+  }, accessToken);
+}
+
 export function createSharedTextArtifact(accessToken: string, workspaceId: string, input: {
   title: string;
   content: string;

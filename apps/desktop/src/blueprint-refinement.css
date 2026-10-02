@@ -652,3 +652,31 @@ body,
 .shared-folder-path button:hover { color: var(--color-text); background: var(--color-surface-hover); }
 .shared-folder-path button.current { color: var(--color-text); font-weight: 700; }
 .shared-folder-hint { color: var(--color-text-muted); font-size: 12px; font-weight: 500; }
+
+/* Dialog */
+.rm-dialog-overlay { position: fixed; inset: 0; z-index: 900; background: rgb(0 0 0 / 55%); }
+.rm-dialog { position: fixed; top: 50%; left: 50%; z-index: 901; display: grid; gap: 12px; width: min(440px, calc(100vw - 32px)); max-height: calc(100vh - 48px); padding: 20px; overflow: auto; color: var(--color-text); background: var(--color-surface); border: 1px solid var(--color-border-strong); border-radius: 12px; box-shadow: var(--shadow-floating); transform: translate(-50%, -50%); }
+.rm-dialog-title { margin: 0; font-size: 16px; font-weight: 700; }
+.rm-dialog-description { margin: 0; color: var(--color-text-muted); font-size: 13px; line-height: 1.5; }
+.rm-dialog-body { display: grid; gap: 8px; }
+.rm-dialog-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+.rm-dialog-footer .rm-button.rm-button-danger { color: #fff; background: #c9372c; border-color: #c9372c; }
+.rm-dialog-footer .rm-button.rm-button-danger:hover:not(:disabled) { background: #b32f25; border-color: #b32f25; }
+.rm-folder-picker { display: grid; max-height: 280px; overflow: auto; border: 1px solid var(--color-border); border-radius: 8px; }
+.rm-folder-picker button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; color: var(--color-text); background: transparent; border: 0; cursor: pointer; font: inherit; font-size: 13px; text-align: left; }
+.rm-folder-picker button:hover:not(:disabled) { background: var(--color-surface-hover); }
+.rm-folder-picker button[aria-pressed="true"] { background: var(--color-surface-3); font-weight: 700; }
+.rm-folder-picker button:disabled { color: var(--color-text-subtle); cursor: default; }
+
+/* Action menu */
+.rm-action-trigger { display: grid; place-items: center; width: 28px; height: 28px; color: var(--color-text-muted); background: transparent; border: 0; border-radius: 7px; cursor: pointer; }
+.rm-action-trigger:hover, .rm-action-trigger[data-state="open"] { color: var(--color-text); background: var(--color-surface-hover); }
+.rm-action-menu { z-index: 950; min-width: 170px; padding: 4px; color: var(--color-text); background: var(--color-surface); border: 1px solid var(--color-border-strong); border-radius: 10px; box-shadow: var(--shadow-floating); }
+.rm-action-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 7px; cursor: pointer; font-size: 13px; outline: none; }
+.rm-action-item[data-highlighted] { background: var(--color-surface-hover); }
+.rm-action-item.destructive { color: #e5564a; }
+.shared-artifact-manager article { position: relative; }
+.shared-item-actions { position: absolute; top: 8px; left: 8px; z-index: 2; opacity: 0.55; transition: opacity 110ms var(--ease-control); }
+.shared-artifact-manager article:hover .shared-item-actions, .shared-item-actions:focus-within, .shared-item-actions:has([data-state="open"]) { opacity: 1; }
+.shared-artifact-manager.list .shared-item-actions { top: 50%; right: 8px; left: auto; transform: translateY(-50%); }
+.shared-artifact-manager.list .rm-button.shared-artifact-entry { padding-right: 46px; }

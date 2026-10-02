@@ -262,6 +262,16 @@ struct CreateTextArtifactRequest {
 }
 
 #[derive(Debug, Deserialize)]
+struct RenameFolderRequest {
+    name: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct MoveArtifactRequest {
+    folder_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
 struct CreateFolderRequest {
     name: String,
     parent_id: Option<String>,
@@ -523,7 +533,13 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
     let cors = match config.allowed_origin {
         Some(origin) => CorsLayer::new()
             .allow_origin(origin)
-            .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
+            .allow_methods([
+                Method::GET,
+                Method::POST,
+                Method::PUT,
+                Method::PATCH,
+                Method::DELETE,
+            ])
             .allow_headers([
                 header::AUTHORIZATION,
                 header::CONTENT_TYPE,
@@ -648,6 +664,11 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
             "/v1/workspaces/{workspace_id}/folders",
             get(list_folders).post(create_folder),
         )
+        .route(
+            "/v1/workspaces/{workspace_id}/folders/{folder_id}",
+            axum::routing::patch(rename_folder).delete(delete_folder),
+        )
+        .route("/v1/artifacts/{artifact_id}/folder", put(move_artifact))
         .route(
             "/v1/workspaces/{workspace_id}/artifacts/index-failures",
             get(list_artifact_index_failures),
@@ -2399,6 +2420,117 @@ async fn create_folder(
     )
     .await;
     Ok((StatusCode::CREATED, Json(folder)))
+}
+
+async fn rename_folder(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path((workspace_id, folder_id)): Path<(String, String)>,
+    Json(request): Json<RenameFolderRequest>,
+) -> Result<Json<Folder>, ApiError> {
+    require_workspace_write(&state, &subject, &workspace_id).await?;
+    validate_folder(&state, &workspace_id, Some(&folder_id)).await?;
+    let folder = state
+        .storage
+        .rename_folder(&folder_id, &request.name)
+        .await
+        .map_err(|error| ApiError::bad_request(error.to_string()))?;
+    record_workspace_activity(
+        &state,
+        &workspace_id,
+        &subject.user_id,
+        "folder_renamed",
+        "folder",
+        Some(&folder.id),
+        format!("Renamed folder to {}.", folder.name),
+    )
+    .await;
+    Ok(Json(folder))
+}
+
+/// Deletes a folder together with every folder and file inside it.
+async fn delete_folder(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path((workspace_id, folder_id)): Path<(String, String)>,
+) -> Result<StatusCode, ApiError> {
+    require_workspace_write(&state, &subject, &workspace_id).await?;
+    let folder_id = validate_folder(&state, &workspace_id, Some(&folder_id))
+        .await?
+        .ok_or_else(|| ApiError::bad_request("Folder was not found."))?;
+    let folder = state
+        .storage
+        .get_folder(&folder_id)
+        .await
+        .map_err(map_storage_error)?;
+    let (folder_ids, artifact_ids) = state
+        .storage
+        .folder_subtree(&folder_id)
+        .await
+        .map_err(map_storage_error)?;
+    for artifact_id in &artifact_ids {
+        state
+            .core
+            .delete_artifact(artifact_id.clone())
+            .await
+            .map_err(map_core_error)?;
+    }
+    state
+        .storage
+        .delete_folders(&folder_ids)
+        .await
+        .map_err(map_storage_error)?;
+    record_workspace_activity(
+        &state,
+        &workspace_id,
+        &subject.user_id,
+        "folder_deleted",
+        "folder",
+        Some(&folder_id),
+        format!(
+            "Deleted folder {} with {} file(s) and {} subfolder(s).",
+            folder.name,
+            artifact_ids.len(),
+            folder_ids.len() - 1
+        ),
+    )
+    .await;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn move_artifact(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(artifact_id): Path<String>,
+    Json(request): Json<MoveArtifactRequest>,
+) -> Result<Json<SharedArtifactSummary>, ApiError> {
+    let current = state
+        .core
+        .get_artifact(artifact_id.clone())
+        .await
+        .map_err(map_core_error)?;
+    let workspace_id = current.summary.workspace_id.clone();
+    require_workspace_write(&state, &subject, &workspace_id).await?;
+    let folder_id = validate_folder(&state, &workspace_id, request.folder_id.as_deref()).await?;
+    state
+        .storage
+        .move_artifact_to_folder(&artifact_id, folder_id.as_deref())
+        .await
+        .map_err(map_storage_error)?;
+    record_workspace_activity(
+        &state,
+        &workspace_id,
+        &subject.user_id,
+        "evidence_moved",
+        "artifact",
+        Some(&artifact_id),
+        format!("Moved evidence: {}.", current.summary.title),
+    )
+    .await;
+    Ok(Json(SharedArtifactSummary {
+        summary: current.summary,
+        folder_id,
+    }))
 }
 
 /// Checks that a folder belongs to the workspace before anything is stored in it.
@@ -4812,6 +4944,83 @@ mod tests {
         assert_eq!(note["folder_id"], json!(deepest));
         assert_eq!(note["artifact_type"], "note");
         assert!(note["path"].as_str().unwrap().ends_with(".note"));
+
+        // Renaming, moving a file out, and deleting a folder with everything in it.
+        let note_id = note["id"].as_str().unwrap().to_owned();
+        let renamed = app
+            .clone()
+            .oneshot(json_request(
+                "PATCH",
+                &format!("{folders_uri}/{deepest}"),
+                &owner,
+                json!({"name": "Renamed"}),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(renamed.status(), 200);
+        let moved = app
+            .clone()
+            .oneshot(json_request(
+                "PUT",
+                &format!("/v1/artifacts/{note_id}/folder"),
+                &owner,
+                json!({"folder_id": null}),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(moved.status(), 200);
+        let moved: Value =
+            serde_json::from_slice(&to_bytes(moved.into_body(), usize::MAX).await.unwrap()).unwrap();
+        assert!(moved["folder_id"].is_null());
+        let back_in = app
+            .clone()
+            .oneshot(json_request(
+                "PUT",
+                &format!("/v1/artifacts/{note_id}/folder"),
+                &owner,
+                json!({"folder_id": deepest}),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(back_in.status(), 200);
+        let folders = app
+            .clone()
+            .oneshot(json_request("GET", &folders_uri, &owner, json!(null)))
+            .await
+            .unwrap();
+        let folders: Value =
+            serde_json::from_slice(&to_bytes(folders.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
+        let top = folders
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|folder| folder["parent_id"].is_null())
+            .unwrap()["id"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        let deleted = app
+            .clone()
+            .oneshot(json_request("DELETE", &format!("{folders_uri}/{top}"), &owner, json!(null)))
+            .await
+            .unwrap();
+        assert_eq!(deleted.status(), 204);
+        let remaining = app
+            .clone()
+            .oneshot(json_request("GET", &folders_uri, &owner, json!(null)))
+            .await
+            .unwrap();
+        let remaining: Value =
+            serde_json::from_slice(&to_bytes(remaining.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
+        assert!(remaining.as_array().unwrap().is_empty());
+        let note_gone = app
+            .clone()
+            .oneshot(json_request("GET", &format!("/v1/artifacts/{note_id}"), &owner, json!(null)))
+            .await
+            .unwrap();
+        assert_ne!(note_gone.status(), 200);
 
         // Images are refused until an image AI provider exists.
         let image = app
