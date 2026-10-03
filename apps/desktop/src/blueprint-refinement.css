@@ -711,8 +711,8 @@ body,
 .shared-rendered-frame { height: 720px; }
 
 /* Workspace assistant */
-.shared-assistant { display: grid; grid-template-columns: 240px minmax(0, 1fr); align-items: start; gap: 28px; max-width: 1160px; }
-.shared-assistant-main { display: grid; gap: 18px; min-width: 0; max-width: 880px; }
+.shared-assistant { display: grid; grid-template-columns: 240px minmax(0, 1fr); align-items: start; gap: 28px; }
+.shared-assistant-main { display: grid; gap: 18px; min-width: 0; }
 .shared-assistant-chats { position: sticky; top: 0; display: grid; gap: 10px; max-height: calc(100vh - 220px); padding-right: 4px; overflow-y: auto; }
 .shared-assistant-chats .rm-button.shared-assistant-new-chat { justify-content: flex-start; }
 .shared-assistant-chats ul { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
