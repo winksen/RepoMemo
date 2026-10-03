@@ -293,7 +293,7 @@ export function saveSharedWorkspaceAiProvider(accessToken: string, workspaceId: 
   apiKey?: string;
   enabled: boolean;
   cloudContentAcknowledged: boolean;
-  purpose: "text" | "vision";
+  purpose: "text" | "vision" | "embedding";
 }): Promise<SharedAiProviderSettings> {
   return request<SharedAiProviderSettings>(`/v1/workspaces/${workspaceId}/ai-providers`, {
     method: "PUT",

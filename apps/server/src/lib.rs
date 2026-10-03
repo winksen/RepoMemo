@@ -2,6 +2,7 @@
 
 mod agent;
 mod conversion;
+mod embedding;
 mod events;
 mod indexing;
 
@@ -53,6 +54,7 @@ use repomemo_storage::{
 
 use crate::events::{BusActivityObserver, BusJobObserver, WorkspaceEventBus};
 use crate::conversion::{Converter, RenderState};
+use crate::embedding::EmbeddingQueue;
 use crate::indexing::IndexQueue;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -125,6 +127,7 @@ struct AppState {
     jwt_secret: String,
     event_bus: WorkspaceEventBus,
     index_queue: IndexQueue,
+    embedding_queue: EmbeddingQueue,
     converter: Converter,
 }
 
@@ -413,6 +416,9 @@ struct WorkspaceMetricsResponse {
     indexed_artifact_bytes: i64,
     pending_artifact_bytes: i64,
     chunk_count: i64,
+    /// Chunks with a vector from the current embedding model; `None` when the
+    /// workspace has no embedding provider.
+    embedded_chunk_count: Option<i64>,
     symbol_count: i64,
     memory_card_count: i64,
     open_task_count: i64,
@@ -537,8 +543,10 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
     storage.set_job_observer(Arc::new(BusJobObserver::new(event_bus.clone())));
     storage.set_activity_observer(Arc::new(BusActivityObserver::new(event_bus.clone())));
 
-    let index_queue = IndexQueue::start(core.clone());
+    let embedding_queue = EmbeddingQueue::start(core.clone());
+    let index_queue = IndexQueue::start(core.clone(), embedding_queue.clone());
     index_queue.resume_pending().await;
+    embedding_queue.resume_pending().await;
 
     let converter = match config.soffice.clone() {
         Some(path) => Converter::with_binary(&config.data_dir, Some(path)),
@@ -555,6 +563,7 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
         jwt_secret: config.jwt_secret,
         event_bus,
         index_queue,
+        embedding_queue,
         converter,
     };
     let cors = match config.allowed_origin {
@@ -1320,9 +1329,17 @@ async fn workspace_metrics(
             .or_default() += 1;
     }
 
+    let embedded_chunk_count = state
+        .core
+        .embedding_coverage(&workspace_id)
+        .await
+        .map_err(map_core_error)?
+        .map(|(embedded, _)| embedded);
+
     Ok(Json(WorkspaceMetricsResponse {
         workspace_id,
         generated_at: Utc::now().to_rfc3339(),
+        embedded_chunk_count,
         source_count: overview.source_count,
         member_count: members.len() as i64,
         artifact_count: overview.artifact_count,
@@ -1548,7 +1565,8 @@ async fn save_workspace_ai_provider(
     let purpose = match request.purpose.as_deref() {
         Some("vision") => "vision",
         Some("text") => "text",
-        Some(_) => return Err(ApiError::bad_request("Provider purpose must be text or vision.")),
+        Some("embedding") => "embedding",
+        Some(_) => return Err(ApiError::bad_request("Provider purpose must be text, vision or embedding.")),
         None => existing
             .as_ref()
             .map(|settings| settings.purpose())
@@ -1586,6 +1604,10 @@ async fn save_workspace_ai_provider(
     if provider.enabled && provider.purpose() == "vision" {
         // Images stuck behind a missing or broken provider are retried now.
         state.index_queue.resume_pending().await;
+    }
+    if provider.enabled && provider.purpose() == "embedding" {
+        // Existing chunks get vectors from the (possibly new) model.
+        state.embedding_queue.request(&workspace_id);
     }
     Ok(Json(shared_provider_settings(provider)))
 }
@@ -3259,6 +3281,7 @@ async fn index_artifact(
         .index_artifact(artifact_id)
         .await
         .map_err(map_core_error)?;
+    state.embedding_queue.request(&artifact.summary.workspace_id);
     record_workspace_activity(
         &state,
         &artifact.summary.workspace_id,
@@ -3283,6 +3306,7 @@ async fn index_workspace(
         .index_workspace(workspace_id.clone())
         .await
         .map_err(map_core_error)?;
+    state.embedding_queue.request(&workspace_id);
     record_workspace_activity(
         &state,
         &workspace_id,
@@ -5878,6 +5902,120 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(outsider.status(), 401);
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    /// A stand-in for Ollama. Embeddings are 3-dimensional "topic" vectors
+    /// (shipping, resilience, constant) so meaning can match without shared
+    /// words; every generate prompt is recorded.
+    async fn start_fake_ollama() -> (String, std::sync::Arc<std::sync::Mutex<Vec<String>>>) {
+        use axum::routing::{get, post};
+        let prompts = std::sync::Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+        let topic = |text: &str| {
+            let text = text.to_lowercase();
+            let has = |words: &[&str]| if words.iter().any(|word| text.contains(word)) { 1.0 } else { 0.0 };
+            json!([has(&["deploy", "ship", "release"]), has(&["retry", "backoff", "resilien"]), 0.1])
+        };
+        let recorded = prompts.clone();
+        let app = axum::Router::new()
+            .route("/api/tags", get(|| async { axum::Json(json!({"models": [{"name": "mock-chat"}, {"name": "mock-embed"}]})) }))
+            .route(
+                "/api/embed",
+                post(move |axum::Json(body): axum::Json<Value>| async move {
+                    let vectors = body["input"].as_array().unwrap().iter().map(|text| topic(text.as_str().unwrap())).collect::<Vec<_>>();
+                    axum::Json(json!({ "embeddings": vectors }))
+                }),
+            )
+            .route(
+                "/api/generate",
+                post(move |axum::Json(body): axum::Json<Value>| {
+                    let recorded = recorded.clone();
+                    async move {
+                        let prompt = body["prompt"].as_str().unwrap_or_default().to_owned();
+                        recorded.lock().unwrap().push(prompt);
+                        axum::Json(json!({ "response": "Run the migration first, then switch traffic [1]." }))
+                    }
+                }),
+            );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        (format!("http://{address}"), prompts)
+    }
+
+    #[tokio::test]
+    async fn embeddings_power_semantic_search_and_ask_gets_full_passages() {
+        let data_dir =
+            std::env::temp_dir().join(format!("repomemo-server-embeddings-{}", uuid::Uuid::new_v4()));
+        let app = router(ServerConfig::for_test(data_dir.clone()))
+            .await
+            .unwrap();
+        let (ollama_url, prompts) = start_fake_ollama().await;
+        let read = |response: axum::response::Response| async move {
+            let status = response.status();
+            let body = serde_json::from_slice::<Value>(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
+            assert!(status.is_success(), "{status}: {body}");
+            body
+        };
+        let registered = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/v1/auth/register")
+                    .header("content-type", "application/json")
+                    .body(Body::from(json!({"email": "vectors@example.com", "display_name": "Vectors", "password": "not-a-real-password"}).to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let owner = format!("Bearer {}", read(registered).await["access_token"].as_str().unwrap());
+        let call = |method: &'static str, uri: String, body: Value| {
+            let app = app.clone();
+            let owner = owner.clone();
+            async move { app.oneshot(json_request(method, &uri, &owner, body)).await.unwrap() }
+        };
+        let organization = read(call("POST", "/v1/organizations".to_owned(), json!({"name": "Vector Team"})).await).await;
+        let workspace = read(call("POST", "/v1/workspaces".to_owned(), json!({"organization_id": organization["id"], "name": "Vector Workspace"})).await).await;
+        let workspace_id = workspace["workspace"]["id"].as_str().unwrap().to_owned();
+        for (title, content) in [
+            ("Deploy runbook", "# Deploy\nRun the migration before switching traffic."),
+            ("Retry policy", "# Retries\nUploads use an exponential backoff budget."),
+        ] {
+            read(call("POST", format!("/v1/workspaces/{workspace_id}/artifacts/text"), json!({"title": title, "content": content, "language": "Markdown"})).await).await;
+        }
+        wait_for_indexed_artifacts(&app, &owner, &workspace_id, 2).await;
+
+        let provider = |purpose: &str, model: &str| json!({"provider_type": "ollama", "name": format!("Mock {purpose}"), "base_url": ollama_url, "model": model, "enabled": true, "purpose": purpose});
+        let embedder = read(call("PUT", format!("/v1/workspaces/{workspace_id}/ai-providers"), provider("embedding", "mock-embed")).await).await;
+        assert_eq!(embedder["purpose"], "embedding");
+
+        // Existing chunks are embedded in the background once the provider is saved.
+        let mut embedded = false;
+        for _ in 0..100 {
+            let metrics = read(app.clone().oneshot(auth_request("GET", &format!("/v1/workspaces/{workspace_id}/metrics"), &owner)).await.unwrap()).await;
+            if metrics["embedded_chunk_count"].as_i64().is_some_and(|count| count > 0 && count == metrics["chunk_count"].as_i64().unwrap()) {
+                embedded = true;
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+        assert!(embedded, "chunks were not embedded in time");
+
+        let tested = read(call("POST", format!("/v1/workspaces/{workspace_id}/ai-providers/{}/test", embedder["id"].as_str().unwrap()), json!({})).await).await;
+        assert_eq!(tested["success"], true);
+        assert!(tested["message"].as_str().unwrap().contains("3 dimensions"));
+
+        // "shipping" appears in no file, but means the same as "deploy".
+        let results = read(call("POST", format!("/v1/workspaces/{workspace_id}/search"), json!({"query": "shipping", "limit": 5})).await).await;
+        assert_eq!(results[0]["title"], "Deploy runbook");
+
+        read(call("PUT", format!("/v1/workspaces/{workspace_id}/ai-providers"), provider("text", "mock-chat")).await).await;
+        let answer = read(call("POST", format!("/v1/workspaces/{workspace_id}/ask"), json!({"question": "How do we ship safely?"})).await).await;
+        assert_eq!(answer["citations"][0]["title"], "Deploy runbook");
+        assert!(answer["warnings"].as_array().unwrap().iter().all(|warning| !warning.as_str().unwrap().contains("keyword search only")));
+        let last_prompt = prompts.lock().unwrap().last().cloned().unwrap();
+        assert!(last_prompt.contains("Run the migration before switching traffic."), "the model should see the full passage: {last_prompt}");
         let _ = std::fs::remove_dir_all(data_dir);
     }
 

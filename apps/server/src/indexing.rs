@@ -15,6 +15,8 @@ use repomemo_api::RepoMemoCore;
 use repomemo_domain::ArtifactSummary;
 use tokio::sync::{mpsc, Semaphore};
 
+use crate::embedding::EmbeddingQueue;
+
 /// Indexing can call a vision provider, so keep a small ceiling on how many
 /// artifacts are processed at once instead of one task per upload.
 const MAX_CONCURRENT_INDEXING: usize = 2;
@@ -54,12 +56,14 @@ pub struct IndexQueue {
 
 impl IndexQueue {
     /// Starts the queue worker on the current Tokio runtime. The worker stops
-    /// once every clone of the queue has been dropped.
-    pub fn start(core: RepoMemoCore) -> Self {
+    /// once every clone of the queue has been dropped. Each indexed artifact
+    /// asks `embeddings` to embed its workspace's new chunks.
+    pub fn start(core: RepoMemoCore, embeddings: EmbeddingQueue) -> Self {
         let (sender, receiver) = mpsc::unbounded_channel();
         let queued = Arc::new(Mutex::new(HashSet::new()));
         tokio::spawn(run_worker(
             core.clone(),
+            embeddings,
             queued.clone(),
             sender.clone(),
             receiver,
@@ -126,6 +130,7 @@ impl IndexQueue {
 
 async fn run_worker(
     core: RepoMemoCore,
+    embeddings: EmbeddingQueue,
     queued: Arc<Mutex<HashSet<String>>>,
     sender: mpsc::UnboundedSender<IndexRequest>,
     mut receiver: mpsc::UnboundedReceiver<IndexRequest>,
@@ -136,10 +141,11 @@ async fn run_worker(
             break;
         };
         let core = core.clone();
+        let embeddings = embeddings.clone();
         let queued = queued.clone();
         let sender = sender.clone();
         tokio::spawn(async move {
-            let retry_pending = index_one(&core, &request, &sender).await;
+            let retry_pending = index_one(&core, &embeddings, &request, &sender).await;
             // A request waiting for its retry stays "queued" so duplicates are
             // not added; the permit is released so other files keep moving.
             if !retry_pending {
@@ -153,10 +159,15 @@ async fn run_worker(
 /// Returns true when a retry was scheduled.
 async fn index_one(
     core: &RepoMemoCore,
+    embeddings: &EmbeddingQueue,
     request: &IndexRequest,
     sender: &mpsc::UnboundedSender<IndexRequest>,
 ) -> bool {
-    match core.index_artifact(request.artifact_id.clone()).await {
+    let result = core.index_artifact(request.artifact_id.clone()).await;
+    if result.is_ok() {
+        embeddings.request(&request.workspace_id);
+    }
+    match result {
         Ok(_) if !request.record_activity => false,
         Ok(_) => {
             if let Err(error) = core

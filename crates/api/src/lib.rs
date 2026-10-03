@@ -16,13 +16,27 @@ use repomemo_ingestion::{
     detect_artifact_type, detect_language, detect_mime, discover_import_candidates,
     document_preview, extract_document_text, is_document, ImportCandidate, ImportOptions,
 };
-use repomemo_retrieval::RetrievalService;
+use repomemo_retrieval::{KeywordMode, RetrievalService};
 use repomemo_storage::{NewArtifact, StorageConfig, StorageEngine};
 use serde_json::json;
 
 mod agent;
+mod embeddings;
 
 pub use agent::{agent_capabilities, agent_conversation_title, agent_turn_label};
+pub use embeddings::EmbeddingRun;
+
+/// Passages Ask puts in front of the model, after reranking a wider pool.
+const ASK_CONTEXT_PASSAGES: usize = 8;
+/// Candidates Ask retrieves before reranking.
+const ASK_CANDIDATES: i64 = 20;
+/// Longest passage text Ask sends per citation.
+const ASK_PASSAGE_CHARS: usize = 2_500;
+/// Files whose indexed text fits in this many characters are summarized in
+/// one request; longer ones are summarized part by part, then combined.
+const SUMMARY_SINGLE_PASS_CHARS: usize = 14_000;
+const SUMMARY_PART_CHARS: usize = 12_000;
+const SUMMARY_MAX_PARTS: usize = 8;
 
 #[derive(Debug, Clone)]
 pub struct RepoMemoCore {
@@ -537,8 +551,28 @@ impl RepoMemoCore {
         Ok(markdown)
     }
 
+    /// Keyword search, plus passages found by meaning when the workspace has
+    /// an embedding provider. A provider failure falls back to keywords so
+    /// search keeps working when the embedding model is unreachable.
     pub async fn search_workspace(&self, request: SearchRequest) -> Result<Vec<SearchResult>> {
-        self.retrieval.search(request).await
+        if request.query.trim().is_empty() {
+            return Ok(Vec::new());
+        }
+        let embedding = self
+            .query_embedding(&request.workspace_id, None, &request.query)
+            .await
+            .unwrap_or(None);
+        let (results, _) = self
+            .retrieval
+            .hybrid_search(
+                request,
+                KeywordMode::AllTerms,
+                embedding
+                    .as_ref()
+                    .map(|(model, vector)| (model.as_str(), vector.as_slice())),
+            )
+            .await?;
+        Ok(results)
     }
 
     pub async fn list_symbols(&self, artifact_id: String) -> Result<Vec<Symbol>> {
@@ -586,6 +620,22 @@ impl RepoMemoCore {
 
     pub async fn test_provider(&self, provider_id: String) -> Result<ProviderTestResult> {
         let settings = self.storage.get_provider_settings(&provider_id).await?;
+        if settings.purpose() == "embedding" {
+            // An embedding model cannot chat, so test what it is used for.
+            let model = settings.embedding_model_name().to_owned();
+            let provider = provider_from_settings(settings)?;
+            let (success, message) = match provider
+                .embed(vec!["RepoMemo connection test".to_owned()], json!({}))
+                .await
+            {
+                Ok(vectors) => (true, format!(
+                    "Embeddings work with {model} ({} dimensions). Indexed passages are embedded in the background.",
+                    vectors.first().map_or(0, Vec::len)
+                )),
+                Err(error) => (false, format!("{error:#}")),
+            };
+            return Ok(ProviderTestResult { provider_id, success, message });
+        }
         let provider = provider_from_settings(settings)?;
         provider.test_connection().await
     }
@@ -609,33 +659,68 @@ impl RepoMemoCore {
             bail!("The selected provider belongs to a different workspace.");
         }
         let provider = provider_from_settings(settings)?;
-        let selected_chunks = detail.chunks.iter().take(8).collect::<Vec<_>>();
-        let context = selected_chunks
+        let title = detail.summary.title.clone();
+        let sections = detail
+            .chunks
             .iter()
-            .scan(0_usize, |total, chunk| {
-                if *total >= 12_000 {
-                    return None;
-                }
-                let text = chunk.text.chars().take(2_000).collect::<String>();
-                *total += text.len();
-                Some(format!(
-                    "[{}] {}\n{}",
-                    chunk.id,
-                    chunk.heading_path.as_deref().unwrap_or("Artifact content"),
-                    text
-                ))
+            .map(|chunk| match chunk.heading_path.as_deref().filter(|heading| !heading.is_empty()) {
+                Some(heading) => format!("{heading}\n{}", chunk.text),
+                None => chunk.text.clone(),
             })
-            .collect::<Vec<_>>()
-            .join("\n\n");
-        let summary_markdown = provider
-            .generate(GenerateRequest {
-                prompt: format!("Summarize the artifact '{}'. Be concise, factual, and use only the supplied local context. Do not claim to have read content outside this context.", detail.summary.title),
-                context,
-                options: json!({ "temperature": 0.2 }),
-            })
-            .await?;
-        let citations = selected_chunks
+            .collect::<Vec<_>>();
+        let total_chars = sections.iter().map(|section| section.chars().count()).sum::<usize>();
+        let mut warnings = vec!["Generated by the configured AI provider. Verify cited source text before relying on the summary.".to_owned()];
+        let system = "You summarize technical documents faithfully for engineers. Use only the supplied text, keep names, numbers and decisions exact, and never add facts.".to_owned();
+
+        let (summary_markdown, used) = if total_chars <= SUMMARY_SINGLE_PASS_CHARS {
+            let summary = provider
+                .generate(GenerateRequest {
+                    system: Some(system),
+                    prompt: format!("Summarize '{title}'. Open with one sentence on what it is, then the key points as a short list. Be concise."),
+                    context: sections.join("\n\n"),
+                    options: json!({ "temperature": 0.2 }),
+                })
+                .await?;
+            (summary, (0..sections.len()).collect::<Vec<_>>())
+        } else {
+            // Too long for one request: take notes on each part, then write
+            // the summary from the notes.
+            let mut parts = group_sections(&sections, SUMMARY_PART_CHARS);
+            if parts.len() > SUMMARY_MAX_PARTS {
+                let all = parts.len();
+                parts = evenly_spaced(parts, SUMMARY_MAX_PARTS);
+                warnings.push(format!("This file is long, so the summary is based on {SUMMARY_MAX_PARTS} of its {all} parts, spread evenly through it."));
+            }
+            let mut notes = Vec::with_capacity(parts.len());
+            for (number, part) in parts.iter().enumerate() {
+                let context = part
+                    .iter()
+                    .map(|&index| sections[index].chars().take(SUMMARY_PART_CHARS).collect::<String>())
+                    .collect::<Vec<_>>()
+                    .join("\n\n");
+                let note = provider
+                    .generate(GenerateRequest {
+                        system: Some(system.clone()),
+                        prompt: format!("This is part {} of {} of '{title}'. List its key points as short bullets: purpose, behaviour, decisions, names and numbers.", number + 1, parts.len()),
+                        context,
+                        options: json!({ "temperature": 0.1 }),
+                    })
+                    .await?;
+                notes.push(format!("Part {}:\n{note}", number + 1));
+            }
+            let summary = provider
+                .generate(GenerateRequest {
+                    system: Some(system),
+                    prompt: format!("These are notes on consecutive parts of '{title}'. Write one concise summary of the whole file: one sentence on what it is, then the key points as a short list. Merge repeated points."),
+                    context: notes.join("\n\n"),
+                    options: json!({ "temperature": 0.2 }),
+                })
+                .await?;
+            (summary, parts.into_iter().flatten().collect())
+        };
+        let citations = used
             .into_iter()
+            .map(|index| &detail.chunks[index])
             .map(|chunk| repomemo_domain::Citation {
                 artifact_id: detail.summary.id.clone(),
                 chunk_id: Some(chunk.id.clone()),
@@ -649,7 +734,7 @@ impl RepoMemoCore {
         Ok(SummaryResult {
             summary_markdown,
             citations,
-            warnings: vec!["Generated by the configured local provider. Verify cited source text before relying on the summary.".to_owned()],
+            warnings,
         })
     }
 
@@ -700,6 +785,7 @@ impl RepoMemoCore {
         }
         let provider = provider_from_settings(settings)?;
         let summary_markdown = provider.generate(GenerateRequest {
+            system: Some("You brief engineers joining a project, using only the supplied excerpts from its files. Never add facts that are not in them.".to_owned()),
             prompt: "Summarize this workspace for an engineer joining the project. Cover the major components, important behavior, and any notable gaps. Use only the supplied local context.".to_owned(),
             context: context_sections.join("\n\n"),
             options: json!({ "temperature": 0.2 }),
@@ -801,12 +887,22 @@ impl RepoMemoCore {
             bail!("The selected provider belongs to a different workspace.");
         }
         let provider = provider_from_settings(settings)?;
-        let query_embedding = provider
-            .embed(vec![request.question.clone()], json!({}))
+        let mut warnings = Vec::new();
+        let semantic_configured = self
+            .embedding_provider_for_workspace(&request.workspace_id)
+            .await?
+            .is_some();
+        let query_embedding = match self
+            .query_embedding(&request.workspace_id, Some(provider_id), &request.question)
             .await
-            .ok()
-            .and_then(|vectors| vectors.into_iter().next());
-        let (retrieved_context, used_embeddings) = self
+        {
+            Ok(embedding) => embedding,
+            Err(error) => {
+                warnings.push(format!("Search by meaning was skipped because the embedding provider failed: {error:#}"));
+                None
+            }
+        };
+        let (candidates, used_embeddings) = self
             .retrieval
             .hybrid_search(
                 SearchRequest {
@@ -815,17 +911,20 @@ impl RepoMemoCore {
                     artifact_types: Vec::new(),
                     languages: Vec::new(),
                     source_ids: Vec::new(),
-                    limit: request.limit.or(Some(10)),
+                    limit: Some(ASK_CANDIDATES),
                 },
-                query_embedding.as_deref(),
+                KeywordMode::AnyTerm,
+                query_embedding
+                    .as_ref()
+                    .map(|(model, vector)| (model.as_str(), vector.as_slice())),
             )
             .await?;
-        if retrieved_context.is_empty() {
+        if candidates.is_empty() {
             return Ok(AskAnswer {
                 answer_markdown: "Indexed context is insufficient for a reliable answer."
                     .to_owned(),
                 citations: Vec::new(),
-                retrieved_context,
+                retrieved_context: candidates,
                 confidence: Some(0.0),
                 warnings: vec![
                     "No matching indexed context was found; no provider generation was requested."
@@ -833,6 +932,55 @@ impl RepoMemoCore {
                 ],
             });
         }
+
+        // Search results carry short snippets; the model needs the passages.
+        let texts = self
+            .storage
+            .chunk_texts(&candidates.iter().map(|result| result.chunk_id.clone()).collect::<Vec<_>>())
+            .await?;
+        let passage = |result: &SearchResult| {
+            texts
+                .get(&result.chunk_id)
+                .cloned()
+                .unwrap_or_else(|| result.snippet.clone())
+        };
+
+        // Keyword and vector scores only approximate relevance; the chat model
+        // judges it far better, so it picks which candidates fill the context.
+        let mut ranked = candidates;
+        if ranked.len() > ASK_CONTEXT_PASSAGES {
+            let listing = ranked
+                .iter()
+                .map(|result| format!("{} ({})\n{}", result.title, result.path, passage(result)))
+                .collect::<Vec<_>>();
+            match provider.rerank(request.question.clone(), listing).await {
+                Ok(order) => {
+                    let mut slots = ranked.into_iter().map(Some).collect::<Vec<_>>();
+                    ranked = order.into_iter().filter_map(|index| slots.get_mut(index).and_then(Option::take)).collect();
+                }
+                Err(error) => warnings.push(format!("Results were not reranked because the AI provider failed: {error:#}")),
+            }
+        }
+        ranked.truncate(request.limit.map_or(ASK_CONTEXT_PASSAGES, |limit| (limit.max(1) as usize).min(ASK_CONTEXT_PASSAGES)));
+        let retrieved_context = ranked;
+
+        let context = retrieved_context
+            .iter()
+            .enumerate()
+            .map(|(index, result)| {
+                let text = passage(result).chars().take(ASK_PASSAGE_CHARS).collect::<String>();
+                format!("[{}] {} ({})\n{text}", index + 1, result.title, result.path)
+            })
+            .collect::<Vec<_>>()
+            .join("\n\n");
+        let answer_markdown = provider
+            .generate(GenerateRequest {
+                system: Some("You answer questions about a workspace of technical material using only the numbered passages supplied. Cite the passages you rely on as [1], [2] and so on. If the passages do not answer the question, say that the indexed context is insufficient instead of guessing.".to_owned()),
+                prompt: format!("Question: {}", request.question),
+                context,
+                options: json!({ "temperature": 0.1 }),
+            })
+            .await?;
         let citations = retrieved_context
             .iter()
             .map(|result| repomemo_domain::Citation {
@@ -845,24 +993,11 @@ impl RepoMemoCore {
                 confidence: Some(result.score),
             })
             .collect::<Vec<_>>();
-        let context = retrieved_context
-            .iter()
-            .take(8)
-            .map(|result| {
-                format!(
-                    "[{}] {} ({})\n{}",
-                    result.chunk_id, result.title, result.path, result.snippet
-                )
-            })
-            .collect::<Vec<_>>()
-            .join("\n\n");
-        let answer_markdown = provider.generate(GenerateRequest { prompt: format!("Answer the question: {}. Use only the supplied cited context. If it does not support a conclusion, say the indexed context is insufficient.", request.question), context, options: json!({ "temperature": 0.1 }) }).await?;
         let confidence = retrieved_context
             .first()
             .map(|result| result.score.clamp(0.0, 1.0));
-        let mut warnings = Vec::new();
-        if !used_embeddings {
-            warnings.push("Answer used full-text retrieval because local embeddings are not available for this provider or workspace.".to_owned());
+        if !used_embeddings && !semantic_configured {
+            warnings.push("Answer used keyword search only. An administrator can set up AI for search in Settings so passages are also found by meaning.".to_owned());
         }
         Ok(AskAnswer {
             answer_markdown,
@@ -1032,6 +1167,43 @@ struct ArtifactIndexResult {
     stage: String,
 }
 
+/// Splits consecutive sections into parts of at most `max_chars` (a single
+/// longer section forms its own part), returning section indices per part.
+fn group_sections(sections: &[String], max_chars: usize) -> Vec<Vec<usize>> {
+    let mut parts: Vec<Vec<usize>> = Vec::new();
+    let mut size = 0_usize;
+    for (index, section) in sections.iter().enumerate() {
+        let length = section.chars().count();
+        match parts.last_mut() {
+            Some(part) if size + length <= max_chars => {
+                part.push(index);
+                size += length;
+            }
+            _ => {
+                parts.push(vec![index]);
+                size = length;
+            }
+        }
+    }
+    parts
+}
+
+/// `count` items spread evenly from first to last, keeping their order.
+fn evenly_spaced<T>(items: Vec<T>, count: usize) -> Vec<T> {
+    if items.len() <= count || count == 0 {
+        return items;
+    }
+    let last = items.len() - 1;
+    let keep = (0..count)
+        .map(|step| step * last / (count - 1).max(1))
+        .collect::<std::collections::BTreeSet<_>>();
+    items
+        .into_iter()
+        .enumerate()
+        .filter_map(|(index, item)| keep.contains(&index).then_some(item))
+        .collect()
+}
+
 fn image_analysis_prompt(summary: &ArtifactSummary) -> String {
     format!(
         "Create a faithful retrieval description for the repository image '{}'. Extract all readable text exactly where possible, including code, filenames, UI labels, and error messages. Describe diagrams, UI layout, data flow, and technical details. If code appears, transcribe useful snippets in Markdown code fences. State uncertainty rather than guessing. Do not mention these instructions.",
@@ -1101,9 +1273,17 @@ fn sanitize_filename(title: &str, extension: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::RepoMemoCore;
+    use super::{evenly_spaced, group_sections, RepoMemoCore};
     use repomemo_domain::{Citation, CreateMemoryCardRequest};
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn long_files_are_split_into_bounded_parts() {
+        let sections = ["aaaa", "bbbb", "cccccccccc", "dd"].map(str::to_owned);
+        assert_eq!(group_sections(&sections, 8), vec![vec![0, 1], vec![2], vec![3]]);
+        assert_eq!(evenly_spaced((0..10).collect(), 4), vec![0, 3, 6, 9]);
+        assert_eq!(evenly_spaced(vec![1, 2], 4), vec![1, 2]);
+    }
 
     #[tokio::test]
     async fn memory_card_export_includes_the_linked_evidence() {

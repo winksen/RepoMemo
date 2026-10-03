@@ -607,13 +607,24 @@ pub struct ProviderSettings {
 }
 
 impl ProviderSettings {
-    /// What this provider is used for. Providers saved before the split have no
-    /// purpose and are text providers.
+    /// What this provider is used for: `text` (answers and summaries),
+    /// `vision` (image descriptions) or `embedding` (semantic search vectors).
+    /// Providers saved before the split have no purpose and are text providers.
     pub fn purpose(&self) -> &str {
         match self.metadata.get("purpose").and_then(Value::as_str) {
             Some("vision") => "vision",
+            Some("embedding") => "embedding",
             _ => "text",
         }
+    }
+
+    /// The model whose vectors this provider produces; stored with each
+    /// embedding so vectors from different models are never compared.
+    pub fn embedding_model_name(&self) -> &str {
+        self.embedding_model
+            .as_deref()
+            .or(self.model.as_deref())
+            .unwrap_or("unknown")
     }
 
     pub fn has_explicit_purpose(&self) -> bool {

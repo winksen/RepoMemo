@@ -198,6 +198,8 @@ export interface WorkspaceMetrics {
   indexed_artifact_bytes: number;
   pending_artifact_bytes: number;
   chunk_count: number;
+  /** Passages with a search vector; null when no embedding provider is set up. */
+  embedded_chunk_count: number | null;
   symbol_count: number;
   memory_card_count: number;
   open_task_count: number;
@@ -247,7 +249,7 @@ export interface SharedAiProviderSettings {
   base_url: string | null;
   model: string | null;
   enabled: boolean;
-  purpose: "text" | "vision";
+  purpose: "text" | "vision" | "embedding";
 }
 
 export interface SheetPreview {

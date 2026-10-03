@@ -173,6 +173,16 @@ struct SavedSearchRow {
     updated_at: String,
 }
 
+/// A chunk waiting for an embedding, with the context that makes its vector
+/// more specific than the bare text.
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct EmbeddingCandidate {
+    pub chunk_id: String,
+    pub title: String,
+    pub heading_path: Option<String>,
+    pub text: String,
+}
+
 const AGENT_CONVERSATION_SELECT: &str = "SELECT conversation.id, conversation.workspace_id, conversation.title, (SELECT COUNT(*) FROM assistant_turns turn WHERE turn.conversation_id = conversation.id) AS turn_count, conversation.created_at, conversation.updated_at FROM assistant_conversations conversation";
 
 #[derive(Debug, sqlx::FromRow)]
@@ -2839,23 +2849,35 @@ impl StorageEngine {
         Ok(())
     }
 
+    /// Nearest chunks to `query` among those embedded with `model`, honouring
+    /// the same type, language and source filters as keyword search. Vectors
+    /// from another model are skipped: their dimensions and meaning differ.
     pub async fn search_chunks_by_embedding(
         &self,
-        workspace_id: &str,
+        request: &SearchRequest,
+        model: &str,
         query: &[f32],
-        limit: i64,
     ) -> Result<Vec<SearchResult>> {
         if query.is_empty() {
             return Ok(Vec::new());
         }
-        let rows = sqlx::query_as::<_, EmbeddingSearchRow>(
+        let mut builder = QueryBuilder::<Sqlite>::new(
             r#"SELECT chunks.id AS chunk_id, chunks.artifact_id, artifacts.title, artifacts.path,
                  artifacts.type AS artifact_type, artifacts.language, chunks.text, chunks.start_line,
                  chunks.end_line, sources.name AS source_name, chunk_embeddings.vector_blob
                FROM chunk_embeddings JOIN chunks ON chunks.id = chunk_embeddings.chunk_id
                JOIN artifacts ON artifacts.id = chunks.artifact_id JOIN sources ON sources.id = artifacts.source_id
-               WHERE chunk_embeddings.workspace_id = ?1"#,
-        ).bind(workspace_id).fetch_all(&self.pool).await?;
+               WHERE chunk_embeddings.workspace_id = "#,
+        );
+        builder.push_bind(&request.workspace_id);
+        builder.push(" AND chunk_embeddings.model = ");
+        builder.push_bind(model);
+        push_search_filters(&mut builder, request);
+        let rows = builder
+            .build_query_as::<EmbeddingSearchRow>()
+            .fetch_all(&self.pool)
+            .await?;
+        let limit = request.limit.unwrap_or(12);
         let mut results = rows
             .into_iter()
             .filter_map(|row| {
@@ -2879,6 +2901,64 @@ impl StorageEngine {
         results.sort_by(|left, right| right.score.total_cmp(&left.score));
         results.truncate(limit.clamp(1, 100) as usize);
         Ok(results)
+    }
+
+    /// Full text of the given chunks, keyed by chunk id. Search results carry
+    /// short snippets; answers need the whole passage.
+    pub async fn chunk_texts(&self, chunk_ids: &[String]) -> Result<HashMap<String, String>> {
+        if chunk_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        let mut builder = QueryBuilder::<Sqlite>::new("SELECT id, text FROM chunks WHERE id IN (");
+        let mut separated = builder.separated(", ");
+        for chunk_id in chunk_ids {
+            separated.push_bind(chunk_id);
+        }
+        separated.push_unseparated(")");
+        let rows = builder.build().fetch_all(&self.pool).await?;
+        Ok(rows
+            .into_iter()
+            .map(|row| (row.get::<String, _>("id"), row.get::<String, _>("text")))
+            .collect())
+    }
+
+    /// The next chunks that have no embedding from `model`, either because
+    /// they are new or because the workspace switched embedding models.
+    pub async fn chunks_missing_embeddings(
+        &self,
+        workspace_id: &str,
+        model: &str,
+        limit: i64,
+    ) -> Result<Vec<EmbeddingCandidate>> {
+        let rows = sqlx::query_as::<_, EmbeddingCandidate>(
+            r#"SELECT chunks.id AS chunk_id, artifacts.title, chunks.heading_path, chunks.text
+               FROM chunks JOIN artifacts ON artifacts.id = chunks.artifact_id
+               LEFT JOIN chunk_embeddings ON chunk_embeddings.chunk_id = chunks.id
+               WHERE chunks.workspace_id = ?1
+                 AND (chunk_embeddings.chunk_id IS NULL OR chunk_embeddings.model != ?2)
+               ORDER BY chunks.artifact_id, chunks.chunk_index
+               LIMIT ?3"#,
+        )
+        .bind(workspace_id)
+        .bind(model)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+
+    /// `(embedded with model, all chunks)` for a workspace.
+    pub async fn embedding_coverage(&self, workspace_id: &str, model: &str) -> Result<(i64, i64)> {
+        let row = sqlx::query(
+            r#"SELECT
+                 (SELECT COUNT(*) FROM chunk_embeddings WHERE workspace_id = ?1 AND model = ?2) AS embedded,
+                 (SELECT COUNT(*) FROM chunks WHERE workspace_id = ?1) AS total"#,
+        )
+        .bind(workspace_id)
+        .bind(model)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok((row.get("embedded"), row.get("total")))
     }
 
     pub async fn embedding_count(&self, workspace_id: &str) -> Result<i64> {
@@ -3733,33 +3813,7 @@ impl StorageEngine {
         query.push_bind(fts_query);
         query.push(" AND chunks.workspace_id = ");
         query.push_bind(&request.workspace_id);
-
-        if !request.artifact_types.is_empty() {
-            query.push(" AND artifacts.type IN (");
-            let mut separated = query.separated(", ");
-            for artifact_type in &request.artifact_types {
-                separated.push_bind(artifact_type_to_db(artifact_type));
-            }
-            separated.push_unseparated(")");
-        }
-
-        if !request.languages.is_empty() {
-            query.push(" AND artifacts.language IN (");
-            let mut separated = query.separated(", ");
-            for language in &request.languages {
-                separated.push_bind(language);
-            }
-            separated.push_unseparated(")");
-        }
-
-        if !request.source_ids.is_empty() {
-            query.push(" AND artifacts.source_id IN (");
-            let mut separated = query.separated(", ");
-            for source_id in &request.source_ids {
-                separated.push_bind(source_id);
-            }
-            separated.push_unseparated(")");
-        }
+        push_search_filters(&mut query, request);
 
         query.push(" ORDER BY bm25(chunks_fts) ASC, artifacts.path ASC LIMIT ");
         query.push_bind(request.limit.unwrap_or(40).clamp(1, 100));
@@ -4591,6 +4645,35 @@ pub fn encode_embedding(values: &[f32]) -> Vec<u8> {
         .iter()
         .flat_map(|value| value.to_le_bytes())
         .collect()
+}
+
+/// Appends the optional type, language and source filters of a search, for
+/// queries that join `artifacts`.
+fn push_search_filters<'a>(query: &mut QueryBuilder<'a, Sqlite>, request: &'a SearchRequest) {
+    if !request.artifact_types.is_empty() {
+        query.push(" AND artifacts.type IN (");
+        let mut separated = query.separated(", ");
+        for artifact_type in &request.artifact_types {
+            separated.push_bind(artifact_type_to_db(artifact_type));
+        }
+        separated.push_unseparated(")");
+    }
+    if !request.languages.is_empty() {
+        query.push(" AND artifacts.language IN (");
+        let mut separated = query.separated(", ");
+        for language in &request.languages {
+            separated.push_bind(language);
+        }
+        separated.push_unseparated(")");
+    }
+    if !request.source_ids.is_empty() {
+        query.push(" AND artifacts.source_id IN (");
+        let mut separated = query.separated(", ");
+        for source_id in &request.source_ids {
+            separated.push_bind(source_id);
+        }
+        separated.push_unseparated(")");
+    }
 }
 
 pub fn decode_embedding(bytes: &[u8]) -> Option<Vec<f32>> {

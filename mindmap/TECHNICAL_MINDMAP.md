@@ -370,15 +370,28 @@ flowchart TD
 - The SQL does `chunks_fts MATCH ?` with the workspace, type, language and source filters, ranks by `bm25`, and builds snippets with `snippet(…,'<mark>','</mark>',…,24)`. The limit defaults to 40 and is clamped to 1–100.
 - The SPA renders `result.snippet` as **plain text**, so the `<mark>` tags appear literally (see §9).
 
-### 6.4 Ask (`RepoMemoCore::ask_workspace`)
+### 6.4 Semantic search ([crates/api/src/embeddings.rs](../crates/api/src/embeddings.rs), [apps/server/src/embedding.rs](../apps/server/src/embedding.rs))
 
-1. Picks the **first enabled** provider for the workspace, ordered `enabled DESC, updated_at DESC`.
-2. `provider.embed([question])`. OpenRouter always errors here, and the error is swallowed, which leaves no embedding.
-3. `hybrid_search`: FTS results are merged with `search_chunks_by_embedding`. That function is a **full scan** of the workspace's `chunk_embeddings`, decodes every vector and computes cosine similarity in Rust. Fusion adds `1/(rank+1)`; a result found only semantically gets `0.5 + 1/(rank+1)`. The list is then truncated to the limit, clamped to 1–40.
-4. If the list is empty, the method returns an "insufficient" answer **without calling the provider**.
-5. Otherwise it takes the top 8 as context and calls `generate` at temperature 0.1. Confidence is the top score clamped to [0,1].
+- A workspace may have an **embedding provider** (`metadata.purpose = "embedding"`): Ollama `/api/embed` or OpenRouter `/embeddings`. The suggested model is `bge-m3`, which is multilingual.
+- **When chunks are embedded.** The server's `EmbeddingQueue` queues a workspace after each successful indexing, after the embedding provider is saved, and for every workspace at startup. It coalesces requests per workspace and embeds one workspace at a time.
+- **What a pass does.** `embed_missing_chunks` embeds every chunk without a vector from the current model, in batches of 32, as an `embedding` job. Unchanged chunks keep their vectors across re-indexing. Changing the model re-embeds everything. Each chunk is embedded as `title > heading` plus its text, cut at 6,000 chars.
+- **Search.** `search_workspace` (the Retrieval page and the assistant's Search content) and Ask run `hybrid_search`. It merges keyword (FTS) results and nearest-neighbour results by **reciprocal rank fusion** (k = 60, scores scaled to 0–1). Each list is fetched three times deeper than the limit. Vector search applies the same type, language and source filters and reads only vectors from the current model. If the embedding provider fails, search falls back to keywords only.
+- **Desktop.** With no embedding provider, a provider saved without a purpose (the desktop setup) embeds queries instead.
+- `GET …/metrics` reports `embedded_chunk_count`, shown as progress in Settings → AI for search.
+- ⚠️ Vector search is still a **full scan**: it decodes every vector of the workspace for each query. That is fine for thousands of chunks; beyond that it needs an ANN index (sqlite-vec) or an in-memory cache.
 
-> **Shared mode has no embedding builder.** `embed_workspace` is exposed only as a Tauri command, so server workspaces never have `chunk_embeddings`. Ask is therefore always FTS-only and always carries the "full-text retrieval" warning.
+### 6.4b Ask (`RepoMemoCore::ask_workspace`)
+
+1. Uses the workspace's enabled text provider. The query embedding comes from the embedding provider (§6.4).
+2. `hybrid_search` in **any-word** keyword mode, retrieving 20 candidates. English and French stopwords are removed and the remaining terms are OR'ed, so a natural question still matches; bm25 ranks passages with more and rarer terms first.
+3. If nothing is found, it answers "insufficient" **without calling the provider**.
+4. It loads the **full chunk text** of the candidates; search results only carry short snippets.
+5. If there are more than 8 candidates, the text provider **reranks** them (`llm_rerank`: listwise, JSON array of indices; indices it leaves out keep their order). A rerank failure becomes a warning.
+6. The top 8 passages (each cut at 2,500 chars) go to `generate` as numbered `[1]…[8]`, with a Q&A system prompt that asks the model to cite them. Citations are returned in the same order.
+
+**Summaries.** `summarize_artifact` reads the whole file when its indexed text is at most 14,000 chars. Longer files are summarized part by part: notes on each part of up to 12,000 chars, then one summary written from the notes. At most 8 parts are used, spread evenly, with a warning when parts are skipped.
+
+**Prompts.** `GenerateRequest.system` sets a task-specific system prompt (sent as Ollama `system` or the OpenRouter system message). Ollama requests ask for `num_ctx = 8192` so retrieved context is not cut off silently.
 
 ### 6.5 AI overview (`summarize_workspace`)
 
@@ -528,7 +541,7 @@ Run the Rust tests with `cargo test`. See [DEVELOPMENT_COMMANDS.md](../docs/DEVE
 | 4 | Cost / abuse | Viewers can trigger Ask and the AI overview, including on cloud providers | A capability flag for AI use, and rate limits |
 | 5 | Correctness | Error classification by substring matching, and not-found returns 400 | Typed errors from storage and core |
 | 6 | Performance | Vector search scans the whole table in Rust. Metrics and `artifacts/query` load everything into memory. The dashboard makes N+1 metrics calls | ANN or an index (Qdrant is per [ADR-0004](../docs/decisions/0004-embedded-vector-storage-before-qdrant.md)), SQL aggregation, and a batched metrics endpoint |
-| 7 | Feature parity | No embedding build route in shared mode, so Ask never uses semantic retrieval | Expose `embed_workspace` as a job |
+| 7 | Scale | Vector search scans every embedding of the workspace per query (§6.4) | An ANN index (sqlite-vec) or a per-workspace in-memory vector cache |
 | 8 | Storage | Orphan blobs are never garbage-collected | Reference-counted GC job |
 | 9 | Frontend maintainability | `SharedWebApp.tsx` ~2k LOC, `App.tsx` ~2.7k, `styles.css` ~6.1k, a hand-rolled router, no tests | Split per route and section, add a router and a query cache, add component tests |
 | 10 | UX correctness | Literal `<mark>` in snippets, and Markdown shown as raw text | Render the snippet safely and use `react-markdown` |

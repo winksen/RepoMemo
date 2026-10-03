@@ -283,6 +283,7 @@ impl RepoMemoCore {
         let provider = provider_from_settings(settings)?;
         let raw = provider
             .generate(GenerateRequest {
+                system: Some("You classify requests. You reply with JSON only.".to_owned()),
                 prompt: "You route requests for RepoMemo, a workspace of technical files. Choose the one capability that fits the user's message:\n- find_files: locate files by name, path or type\n- search_content: find passages inside files that mention some words\n- summarize_file: summarize one named file\n- ask_question: answer a question using the workspace content\n- workspace_overview: describe the whole workspace\n- none: anything else, such as chit-chat, writing or editing code, or actions on files\nReply with JSON only, no prose: {\"capability\": \"<id>\", \"subject\": \"<the file name, search words or question, without the instruction>\"}. The user's message is the context below.".to_owned(),
                 context: message.to_owned(),
                 options: json!({ "temperature": 0.0 }),
@@ -427,16 +428,15 @@ impl RepoMemoCore {
         workspace_id: &str,
         query: &str,
     ) -> Result<Vec<repomemo_domain::SearchResult>> {
-        self.retrieval
-            .search(SearchRequest {
-                workspace_id: workspace_id.to_owned(),
-                query: query.to_owned(),
-                artifact_types: Vec::new(),
-                languages: Vec::new(),
-                source_ids: Vec::new(),
-                limit: Some(SEARCH_RESULT_LIMIT),
-            })
-            .await
+        self.search_workspace(SearchRequest {
+            workspace_id: workspace_id.to_owned(),
+            query: query.to_owned(),
+            artifact_types: Vec::new(),
+            languages: Vec::new(),
+            source_ids: Vec::new(),
+            limit: Some(SEARCH_RESULT_LIMIT),
+        })
+        .await
     }
 
     /// Files whose title or path contains every word of `subject`, best first:

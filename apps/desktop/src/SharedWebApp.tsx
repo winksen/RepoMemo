@@ -1264,6 +1264,28 @@ function SharedWorkspaceDetail({
     }, INDEX_POLL_INTERVAL_MS);
     return () => window.clearInterval(timer);
   }, [accessToken, pendingIndexKey, workspace.workspace.id]);
+  const embeddedChunks = workspaceMetrics?.embedded_chunk_count ?? null;
+  const totalChunks = workspaceMetrics?.chunk_count ?? 0;
+  const embeddingPending = embeddedChunks !== null && embeddedChunks < totalChunks;
+  const embeddingStatus = embeddedChunks === null
+    ? null
+    : totalChunks === 0
+      ? "No indexed passages yet. They are embedded as soon as files are indexed."
+      : embeddingPending
+        ? `${embeddedChunks.toLocaleString()} of ${totalChunks.toLocaleString()} passages embedded so far…`
+        : `All ${totalChunks.toLocaleString()} indexed passages are searchable by meaning.`;
+  // Embedding runs in the background on the server; keep the settings
+  // progress current while it does, and stop after a while if it stalls.
+  useEffect(() => {
+    if (!isSettingsView || !embeddingPending) return;
+    let attempts = 0;
+    const timer = window.setInterval(async () => {
+      attempts += 1;
+      try { setWorkspaceMetrics(await getSharedWorkspaceMetrics(accessToken, workspace.workspace.id)); } catch { /* try again */ }
+      if (attempts >= INDEX_POLL_ATTEMPTS) window.clearInterval(timer);
+    }, INDEX_POLL_INTERVAL_MS);
+    return () => window.clearInterval(timer);
+  }, [accessToken, embeddingPending, isSettingsView, workspace.workspace.id]);
   useEffect(() => { setCurrentFolderId(null); setNewFolderOpen(false); }, [workspace.workspace.id]);
   useEffect(() => { setWorkspaceName(workspace.workspace.name); }, [workspace.workspace.name]);
   useEffect(() => {
@@ -1736,6 +1758,7 @@ function SharedWorkspaceDetail({
               </section>
               <AiProviderForm accessToken={accessToken} onSaved={onProviderSaved} providers={aiProviders} purpose="text" workspaceId={workspace.workspace.id} />
               <AiProviderForm accessToken={accessToken} onSaved={onProviderSaved} providers={aiProviders} purpose="vision" workspaceId={workspace.workspace.id} />
+              <AiProviderForm accessToken={accessToken} onSaved={onProviderSaved} providers={aiProviders} purpose="embedding" status={embeddingStatus} workspaceId={workspace.workspace.id} />
               {canManageWorkspace ? <section className="shared-settings-group">
                 <div className="shared-panel-heading"><div><Settings size={18} /><h2>Workspace ownership</h2></div><span>owner only</span></div>
                 <p className="shared-muted-copy">Rename this workspace or remove it permanently. Deletion removes its shared evidence, memory, and memberships.</p>

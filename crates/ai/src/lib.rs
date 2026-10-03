@@ -7,11 +7,25 @@ use serde_json::{json, Value};
 const DEFAULT_BASE_URL: &str = "http://127.0.0.1:11434";
 const OPENROUTER_BASE_URL: &str = "https://openrouter.ai/api/v1";
 
+/// Context window requested from Ollama. Its default is small enough that
+/// retrieved context is cut off silently, so ask for room explicitly.
+const OLLAMA_NUM_CTX: u64 = 8_192;
+const DEFAULT_SYSTEM_PROMPT: &str = "You are RepoMemo's assistant for a workspace of technical material. Use only the supplied context, never invent details, and say so when the context is not enough.";
+
 #[derive(Debug, Clone)]
 pub struct GenerateRequest {
+    /// Instructions for the role the model plays in this task; a generic
+    /// grounded-assistant prompt is used when omitted.
+    pub system: Option<String>,
     pub prompt: String,
     pub context: String,
     pub options: Value,
+}
+
+impl GenerateRequest {
+    fn system_prompt(&self) -> &str {
+        self.system.as_deref().unwrap_or(DEFAULT_SYSTEM_PROMPT)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -72,14 +86,19 @@ impl OllamaProvider {
 
 impl AiProvider for OllamaProvider {
     async fn generate(&self, request: GenerateRequest) -> Result<String> {
+        let mut options = request.options.clone();
+        if let Some(options) = options.as_object_mut() {
+            options.entry("num_ctx").or_insert(json!(OLLAMA_NUM_CTX));
+        }
         let response = self
             .client
             .post(self.endpoint("/api/generate"))
             .json(&json!({
                 "model": self.model,
+                "system": request.system_prompt(),
                 "prompt": format!("{}\n\nContext:\n{}", request.prompt, request.context),
                 "stream": false,
-                "options": request.options,
+                "options": options,
             }))
             .send()
             .await
@@ -102,19 +121,25 @@ impl AiProvider for OllamaProvider {
             .embedding_model
             .as_deref()
             .unwrap_or(&self.model);
+        let count = texts.len();
         let response = self
             .client
             .post(self.endpoint("/api/embed"))
             .json(&json!({ "model": model, "input": texts }))
             .send()
-            .await?
-            .error_for_status()?;
-        let body: OllamaEmbedResponse = response.json().await?;
-        Ok(body.embeddings)
+            .await
+            .context("could not reach the local Ollama provider")?;
+        let response = checked(response, "The local Ollama provider could not build embeddings").await?;
+        let body: OllamaEmbedResponse = response
+            .json()
+            .await
+            .context("local Ollama provider returned invalid embeddings")?;
+        ensure_embeddings(body.embeddings, count)
     }
 
     async fn summarize(&self, target: String, options: Value) -> Result<String> {
         self.generate(GenerateRequest {
+            system: None,
             prompt: "Write a concise factual summary. Use only the supplied content and do not invent details.".to_owned(),
             context: target,
             options,
@@ -122,8 +147,8 @@ impl AiProvider for OllamaProvider {
         .await
     }
 
-    async fn rerank(&self, _query: String, candidates: Vec<String>) -> Result<Vec<usize>> {
-        Ok((0..candidates.len()).collect())
+    async fn rerank(&self, query: String, candidates: Vec<String>) -> Result<Vec<usize>> {
+        llm_rerank(self, &query, &candidates).await
     }
 
     async fn analyze_image(&self, request: ImageAnalysisRequest) -> Result<String> {
@@ -230,7 +255,7 @@ impl AiProvider for OpenRouterProvider {
             .json(&json!({
                 "model": self.model,
                 "messages": [
-                  { "role": "system", "content": "You summarize local repository material faithfully. Do not invent details." },
+                  { "role": "system", "content": request.system_prompt() },
                   { "role": "user", "content": format!("{}\n\nContext:\n{}", request.prompt, request.context) }
                 ],
                 "temperature": request.options.get("temperature").and_then(Value::as_f64).unwrap_or(0.2),
@@ -240,12 +265,48 @@ impl AiProvider for OpenRouterProvider {
         openrouter_answer(response, "OpenRouter returned an empty answer").await
     }
 
-    async fn embed(&self, _texts: Vec<String>, _options: Value) -> Result<Vec<Vec<f32>>> {
-        bail!("OpenRouter embeddings are not configured in Phase 1F.")
+    /// OpenRouter's OpenAI-compatible embeddings endpoint.
+    async fn embed(&self, texts: Vec<String>, _options: Value) -> Result<Vec<Vec<f32>>> {
+        let model = self
+            .settings
+            .embedding_model
+            .as_deref()
+            .unwrap_or(&self.model);
+        let count = texts.len();
+        let response = self
+            .request(reqwest::Method::POST, "/embeddings")
+            .json(&json!({ "model": model, "input": texts }))
+            .send()
+            .await
+            .context("could not reach OpenRouter")?;
+        let body: Value = checked(response, "OpenRouter could not build embeddings")
+            .await?
+            .json()
+            .await
+            .context("OpenRouter returned invalid embeddings")?;
+        if let Some(message) = error_message(&body) {
+            bail!("OpenRouter could not build embeddings: {message}")
+        }
+        let mut rows = body["data"]
+            .as_array()
+            .context("OpenRouter returned no embeddings")?
+            .iter()
+            .map(|row| {
+                let index = row["index"].as_u64().unwrap_or(0) as usize;
+                let vector = row["embedding"]
+                    .as_array()
+                    .map(|values| values.iter().filter_map(Value::as_f64).map(|value| value as f32).collect())
+                    .unwrap_or_default();
+                (index, vector)
+            })
+            .collect::<Vec<(usize, Vec<f32>)>>();
+        rows.sort_by_key(|(index, _)| *index);
+        ensure_embeddings(rows.into_iter().map(|(_, vector)| vector).collect(), count)
     }
 
     async fn summarize(&self, target: String, options: Value) -> Result<String> {
         self.generate(GenerateRequest {
+            system: None,
             prompt: "Write a concise factual summary using only the supplied content.".to_owned(),
             context: target,
             options,
@@ -253,8 +314,8 @@ impl AiProvider for OpenRouterProvider {
         .await
     }
 
-    async fn rerank(&self, _query: String, candidates: Vec<String>) -> Result<Vec<usize>> {
-        Ok((0..candidates.len()).collect())
+    async fn rerank(&self, query: String, candidates: Vec<String>) -> Result<Vec<usize>> {
+        llm_rerank(self, &query, &candidates).await
     }
 
     async fn analyze_image(&self, request: ImageAnalysisRequest) -> Result<String> {
@@ -341,6 +402,81 @@ impl AiProvider for OpenRouterProvider {
         }
         Ok(result(true, format!("OpenRouter is ready with {}. Workspace content will leave this device only when you request an AI action.", self.model)))
     }
+}
+
+/// One vector per input, none empty, so a caller can never store a partial
+/// batch or loop on chunks that silently got no embedding.
+fn ensure_embeddings(vectors: Vec<Vec<f32>>, expected: usize) -> Result<Vec<Vec<f32>>> {
+    if vectors.len() != expected {
+        bail!("The provider returned {} embeddings for {expected} inputs.", vectors.len())
+    }
+    if vectors.iter().any(Vec::is_empty) {
+        bail!("The provider returned an empty embedding; check that the model is an embedding model.")
+    }
+    Ok(vectors)
+}
+
+/// Longest excerpt of each candidate shown to the model when reranking.
+const RERANK_EXCERPT_CHARS: usize = 700;
+
+/// Orders `candidates` by relevance to `query` by asking the chat model,
+/// which judges relevance far better than keyword or vector scores alone.
+/// Returns every index exactly once: indices the model leaves out keep their
+/// original order after the ones it ranked.
+pub async fn llm_rerank<P: AiProvider + ?Sized>(
+    provider: &P,
+    query: &str,
+    candidates: &[String],
+) -> Result<Vec<usize>> {
+    if candidates.len() < 2 {
+        return Ok((0..candidates.len()).collect());
+    }
+    let listing = candidates
+        .iter()
+        .enumerate()
+        .map(|(index, text)| {
+            let excerpt = text.chars().take(RERANK_EXCERPT_CHARS).collect::<String>();
+            format!("[{index}] {}", excerpt.replace('\n', " "))
+        })
+        .collect::<Vec<_>>()
+        .join("\n\n");
+    let raw = provider
+        .generate(GenerateRequest {
+            system: Some("You rank search results for relevance. You reply with JSON only.".to_owned()),
+            prompt: format!(
+                "Query: {query}\n\nRank the passages in the context by how well they help answer the query, most useful first. Leave out passages that are irrelevant. Reply with only a JSON array of passage numbers, for example [3, 0, 5]."
+            ),
+            context: listing,
+            options: json!({ "temperature": 0.0 }),
+        })
+        .await?;
+    Ok(parse_ranking(&raw, candidates.len()))
+}
+
+fn parse_ranking(raw: &str, count: usize) -> Vec<usize> {
+    let ranked = raw
+        .find('[')
+        .zip(raw.rfind(']'))
+        .and_then(|(start, end)| (start < end).then(|| &raw[start..=end]))
+        .and_then(|array| serde_json::from_str::<Vec<Value>>(array).ok())
+        .unwrap_or_default();
+    let mut order = Vec::with_capacity(count);
+    for value in ranked {
+        let index = value
+            .as_u64()
+            .or_else(|| value.as_str().and_then(|text| text.trim().parse().ok()));
+        if let Some(index) = index.map(|index| index as usize) {
+            if index < count && !order.contains(&index) {
+                order.push(index);
+            }
+        }
+    }
+    for index in 0..count {
+        if !order.contains(&index) {
+            order.push(index);
+        }
+    }
+    order
 }
 
 /// Passes a successful response through. Otherwise fails with the provider's
@@ -551,7 +687,20 @@ struct OllamaModel {
 
 #[cfg(test)]
 mod tests {
-    use super::{error_message, validate_settings};
+    use super::{ensure_embeddings, error_message, parse_ranking, validate_settings};
+
+    #[test]
+    fn rankings_cover_every_candidate_once() {
+        assert_eq!(parse_ranking("Here you go: [2, 0, 2, 9, \"1\"]", 4), vec![2, 0, 1, 3]);
+        assert_eq!(parse_ranking("no idea", 3), vec![0, 1, 2]);
+    }
+
+    #[test]
+    fn embeddings_must_match_inputs() {
+        assert!(ensure_embeddings(vec![vec![0.1], vec![0.2]], 2).is_ok());
+        assert!(ensure_embeddings(vec![vec![0.1]], 2).is_err());
+        assert!(ensure_embeddings(vec![vec![0.1], Vec::new()], 2).is_err());
+    }
     use repomemo_domain::ProviderSettings;
     use serde_json::json;
 
