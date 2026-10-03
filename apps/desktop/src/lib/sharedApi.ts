@@ -5,6 +5,7 @@ import type {
   AgentMessage,
   AgentTurnResponse,
   AskAnswer,
+  KnowledgeMap,
   ArtifactDetail,
   ArtifactComment,
   ArtifactLifecycle,
@@ -250,6 +251,10 @@ export function askSharedWorkspace(accessToken: string, workspaceId: string, que
     method: "POST",
     body: JSON.stringify({ question, limit: 8 }),
   }, accessToken);
+}
+
+export function getSharedKnowledgeMap(accessToken: string, workspaceId: string): Promise<KnowledgeMap> {
+  return request<KnowledgeMap>(`/v1/workspaces/${workspaceId}/knowledge-map`, {}, accessToken);
 }
 
 export function getSharedAgentCapabilities(accessToken: string, workspaceId: string): Promise<AgentCapabilities> {

@@ -259,6 +259,7 @@ Guard legend: **pub** = no auth, **auth** = any valid JWT, **R/W/A/O** = workspa
 | GET | `/v1/workspaces/{ws}/capabilities` | R | role → capability flags |
 | POST | `/v1/workspaces/{ws}/ai-overview` | R | returns `provider_configured:false` instead of erroring → activity |
 | POST | `/v1/workspaces/{ws}/ask` | R | 400 when no enabled provider → activity |
+| GET | `/v1/workspaces/{ws}/knowledge-map` | R | indexing and embedding pipeline counts, coverage per kind of file, and the relation graph (files, memory cards, similar and cites links); see §6.8 |
 | GET | `/v1/workspaces/{ws}/agent/capabilities` | R | assistant actions, each flagged `available` against the enabled text provider |
 | POST | `/v1/workspaces/{ws}/agent/messages` | R | `{message, capability?, artifact_id?, conversation_id?}` → `{conversation, turn}`. Without `conversation_id` a new chat is started after the reply succeeds. Provider failures come back as reply warnings, not errors. AI-generated replies → activity |
 | GET | `/v1/workspaces/{ws}/agent/conversations` | R | the caller's own chats, most recent first |
@@ -422,6 +423,18 @@ The assistant is a closed capability router, not a free-running agent. Each mess
 3. **Summarize** takes an `artifact_id`, or resolves the subject to a single file. When several files match it returns them for the user to pick from.
 4. `summarize_file`, `ask_question` and `workspace_overview` need an enabled text provider. Without one they reply that AI is not configured, and nothing is sent.
 5. `generated: true` marks text written by the provider, so the UI can label it apart from stored facts.
+
+### 6.8 Knowledge map ([crates/api/src/knowledge_map.rs](../crates/api/src/knowledge_map.rs), Map tab)
+
+`RepoMemoCore::knowledge_map` computes everything per request from existing data; there are no new tables.
+
+- **Pipeline.** Files stored → indexed (or pending, or failed per `artifact_index_failures`) → passages → passages embedded with the current model.
+- **Coverage.** The same counts grouped by a readable kind: the artifact type, or the extension for uploaded `file`s (PDF, Word, Excel…).
+- **Graph nodes.** The 250 files with the most passages; the rest are counted in `hidden_file_count`. Memory cards that cite a visible file are added too.
+- **Similar links.** Each file's centroid is the unit mean of its passage vectors. The pairwise cosine of centroids gives up to 3 neighbours per file, kept only above an adaptive bar: the mean plus a quarter standard deviation of all pairs, never above the 75th percentile. With fewer than 10 pairs a fixed cosine of 0.5 is used instead.
+- **Cites links.** Memory card → file, resolving citations of a passage to its file.
+
+The page (`KnowledgeMapPanel`) lays the graph out in the browser with a deterministic force layout (`lib/forceLayout.ts`, about 0.7 s at 280 nodes). Nodes are coloured by 3 file groups from the dataviz reference palette, validated for colour-blind readers in both themes. A table view lists every link.
 
 **Conversations** are stored on the server (migration 0014). `assistant_conversations` holds one row per chat, owned by a single user in a single workspace and visible only to that user. `assistant_turns` holds one row per finished exchange: the label, the request and the full `AgentReply` as JSON. A request that fails leaves no row, and the first message creates the chat only after it gets a reply. A chat is titled from its first request until the user renames it. Turns are snapshots: a file that was deleted later still appears in an old reply, and opening it reports that it is missing. The model does not see earlier turns; each message is still routed and answered on its own. The browser remembers only which chat was last open (`localStorage`).
 

@@ -40,7 +40,7 @@ use repomemo_domain::{
     ArtifactComment, ArtifactDetail, ArtifactIndexFailure, DocumentPreview, Folder, ArtifactLifecycle, ArtifactLifecycleEvent, ArtifactSummary,
     ArtifactType, AskAnswer, AskRequest, Chunk, Citation, CollaborationTask,
     CreateMemoryCardRequest,
-    IndexingJobStatus, MemoryCard, MemoryCardDetail, MemoryCardSummary, Organization,
+    IndexingJobStatus, KnowledgeMap, MemoryCard, MemoryCardDetail, MemoryCardSummary, Organization,
     OrganizationMember, OrganizationRole, ProviderSettings, ProviderTestResult, SavedSearch,
     SearchRequest, SearchResult, SharedAiProviderSettings, SharedNotification, SharedSession,
     SharedUser, SharedWorkspace, TaskChecklistItem, UpdateMemoryCardRequest, Workspace,
@@ -643,6 +643,10 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
             post(generate_workspace_ai_overview),
         )
         .route("/v1/workspaces/{workspace_id}/ask", post(ask_workspace))
+        .route(
+            "/v1/workspaces/{workspace_id}/knowledge-map",
+            get(workspace_knowledge_map),
+        )
         .route(
             "/v1/workspaces/{workspace_id}/agent/capabilities",
             get(agent::list_agent_capabilities),
@@ -1413,6 +1417,20 @@ async fn workspace_capabilities(
 ) -> Result<Json<WorkspaceCapabilities>, ApiError> {
     let role = require_workspace_read(&state, &subject, &workspace_id).await?;
     Ok(Json(capabilities_for_role(role)))
+}
+
+async fn workspace_knowledge_map(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+) -> Result<Json<KnowledgeMap>, ApiError> {
+    require_workspace_read(&state, &subject, &workspace_id).await?;
+    state
+        .core
+        .knowledge_map(&workspace_id)
+        .await
+        .map(Json)
+        .map_err(map_core_error)
 }
 
 async fn generate_workspace_ai_overview(
@@ -5978,13 +5996,33 @@ mod tests {
         let organization = read(call("POST", "/v1/organizations".to_owned(), json!({"name": "Vector Team"})).await).await;
         let workspace = read(call("POST", "/v1/workspaces".to_owned(), json!({"organization_id": organization["id"], "name": "Vector Workspace"})).await).await;
         let workspace_id = workspace["workspace"]["id"].as_str().unwrap().to_owned();
+        let mut artifact_ids = Vec::new();
         for (title, content) in [
             ("Deploy runbook", "# Deploy\nRun the migration before switching traffic."),
             ("Retry policy", "# Retries\nUploads use an exponential backoff budget."),
+            ("Release checklist", "# Release\nTag the build and announce the window."),
         ] {
-            read(call("POST", format!("/v1/workspaces/{workspace_id}/artifacts/text"), json!({"title": title, "content": content, "language": "Markdown"})).await).await;
+            let created = read(call("POST", format!("/v1/workspaces/{workspace_id}/artifacts/text"), json!({"title": title, "content": content, "language": "Markdown"})).await).await;
+            artifact_ids.push(created["id"].as_str().unwrap().to_owned());
         }
-        wait_for_indexed_artifacts(&app, &owner, &workspace_id, 2).await;
+        wait_for_indexed_artifacts(&app, &owner, &workspace_id, 3).await;
+        read(call("POST", format!("/v1/workspaces/{workspace_id}/memory-cards"), json!({
+            "title": "Uploads retry with backoff",
+            "body_markdown": "Decided in the retry review.",
+            "source": "manual",
+            "citations": [{"artifact_id": artifact_ids[1], "chunk_id": null, "title": "Retry policy", "path": "Retry policy", "start_line": null, "end_line": null, "confidence": null}]
+        })).await).await;
+
+        // Without an embedding provider the map still shows indexing and memory links.
+        let map = read(call("GET", format!("/v1/workspaces/{workspace_id}/knowledge-map"), json!({})).await).await;
+        assert_eq!(map["pipeline"]["file_count"], 3);
+        assert_eq!(map["pipeline"]["indexed_count"], 3);
+        assert_eq!(map["pipeline"]["embedded_count"], Value::Null);
+        assert_eq!(map["similarity_available"], false);
+        let kinds = |map: &Value, kind: &str| map["edges"].as_array().unwrap().iter().filter(|edge| edge["kind"] == kind).cloned().collect::<Vec<_>>();
+        let cites = kinds(&map, "cites");
+        assert_eq!(cites.len(), 1);
+        assert_eq!(cites[0]["target"], json!(artifact_ids[1]));
 
         let provider = |purpose: &str, model: &str| json!({"provider_type": "ollama", "name": format!("Mock {purpose}"), "base_url": ollama_url, "model": model, "enabled": true, "purpose": purpose});
         let embedder = read(call("PUT", format!("/v1/workspaces/{workspace_id}/ai-providers"), provider("embedding", "mock-embed")).await).await;
@@ -6006,13 +6044,24 @@ mod tests {
         assert_eq!(tested["success"], true);
         assert!(tested["message"].as_str().unwrap().contains("3 dimensions"));
 
+        // Embedded, the map links the two shipping documents and only those.
+        let map = read(call("GET", format!("/v1/workspaces/{workspace_id}/knowledge-map"), json!({})).await).await;
+        assert_eq!(map["similarity_available"], true);
+        assert_eq!(map["pipeline"]["embedded_count"], map["pipeline"]["passage_count"]);
+        let similar = kinds(&map, "similar");
+        assert_eq!(similar.len(), 1, "{similar:?}");
+        let pair = [similar[0]["source"].as_str().unwrap(), similar[0]["target"].as_str().unwrap()];
+        assert!(pair.contains(&artifact_ids[0].as_str()) && pair.contains(&artifact_ids[2].as_str()));
+
         // "shipping" appears in no file, but means the same as "deploy".
         let results = read(call("POST", format!("/v1/workspaces/{workspace_id}/search"), json!({"query": "shipping", "limit": 5})).await).await;
-        assert_eq!(results[0]["title"], "Deploy runbook");
+        let top_two = [results[0]["title"].as_str().unwrap(), results[1]["title"].as_str().unwrap()];
+        assert!(top_two.contains(&"Deploy runbook") && top_two.contains(&"Release checklist"), "{results}");
 
         read(call("PUT", format!("/v1/workspaces/{workspace_id}/ai-providers"), provider("text", "mock-chat")).await).await;
         let answer = read(call("POST", format!("/v1/workspaces/{workspace_id}/ask"), json!({"question": "How do we ship safely?"})).await).await;
-        assert_eq!(answer["citations"][0]["title"], "Deploy runbook");
+        // Both shipping documents are equally relevant, so either may lead.
+        assert!(["Deploy runbook", "Release checklist"].contains(&answer["citations"][0]["title"].as_str().unwrap()), "{answer}");
         assert!(answer["warnings"].as_array().unwrap().iter().all(|warning| !warning.as_str().unwrap().contains("keyword search only")));
         let last_prompt = prompts.lock().unwrap().last().cloned().unwrap();
         assert!(last_prompt.contains("Run the migration before switching traffic."), "the model should see the full passage: {last_prompt}");

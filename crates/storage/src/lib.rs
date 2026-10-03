@@ -2947,6 +2947,106 @@ impl StorageEngine {
         Ok(rows)
     }
 
+    /// Passage count per artifact, and how many of those have a vector from
+    /// `model` (zero for every artifact when `model` is `None`).
+    pub async fn chunk_counts_by_artifact(
+        &self,
+        workspace_id: &str,
+        model: Option<&str>,
+    ) -> Result<HashMap<String, (i64, i64)>> {
+        let rows = sqlx::query(
+            r#"SELECT chunks.artifact_id,
+                 COUNT(*) AS passages,
+                 COUNT(chunk_embeddings.chunk_id) AS embedded
+               FROM chunks
+               LEFT JOIN chunk_embeddings
+                 ON chunk_embeddings.chunk_id = chunks.id AND chunk_embeddings.model = ?2
+               WHERE chunks.workspace_id = ?1
+               GROUP BY chunks.artifact_id"#,
+        )
+        .bind(workspace_id)
+        .bind(model.unwrap_or(""))
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|row| {
+                (
+                    row.get::<String, _>("artifact_id"),
+                    (row.get::<i64, _>("passages"), row.get::<i64, _>("embedded")),
+                )
+            })
+            .collect())
+    }
+
+    /// The average direction of each artifact's passage vectors from `model`
+    /// (unit-normalised), which places a whole file in meaning space.
+    pub async fn artifact_embedding_centroids(
+        &self,
+        workspace_id: &str,
+        model: &str,
+    ) -> Result<HashMap<String, Vec<f32>>> {
+        let rows = sqlx::query(
+            r#"SELECT chunks.artifact_id, chunk_embeddings.vector_blob
+               FROM chunk_embeddings JOIN chunks ON chunks.id = chunk_embeddings.chunk_id
+               WHERE chunk_embeddings.workspace_id = ?1 AND chunk_embeddings.model = ?2"#,
+        )
+        .bind(workspace_id)
+        .bind(model)
+        .fetch_all(&self.pool)
+        .await?;
+        let mut sums: HashMap<String, Vec<f32>> = HashMap::new();
+        for row in rows {
+            let Some(vector) = decode_embedding(&row.get::<Vec<u8>, _>("vector_blob")) else {
+                continue;
+            };
+            let norm = vector.iter().map(|value| value * value).sum::<f32>().sqrt();
+            if norm == 0.0 {
+                continue;
+            }
+            let sum = sums
+                .entry(row.get::<String, _>("artifact_id"))
+                .or_insert_with(|| vec![0.0; vector.len()]);
+            if sum.len() != vector.len() {
+                continue;
+            }
+            for (total, value) in sum.iter_mut().zip(&vector) {
+                *total += value / norm;
+            }
+        }
+        for sum in sums.values_mut() {
+            let norm = sum.iter().map(|value| value * value).sum::<f32>().sqrt();
+            if norm > 0.0 {
+                sum.iter_mut().for_each(|value| *value /= norm);
+            }
+        }
+        Ok(sums)
+    }
+
+    /// `(card id, card title, artifact id)` for every file a memory card
+    /// cites, directly or through one of the file's passages.
+    pub async fn memory_card_artifact_links(
+        &self,
+        workspace_id: &str,
+    ) -> Result<Vec<(String, String, String)>> {
+        let rows = sqlx::query(
+            r#"SELECT DISTINCT memory_cards.id AS card_id, memory_cards.title,
+                 COALESCE(chunks.artifact_id, links.to_id) AS artifact_id
+               FROM links
+               JOIN memory_cards ON memory_cards.id = links.from_id
+               LEFT JOIN chunks ON links.to_type = 'chunk' AND chunks.id = links.to_id
+               WHERE links.workspace_id = ?1 AND links.from_type = 'memory_card'
+                 AND (links.to_type = 'artifact' OR chunks.id IS NOT NULL)"#,
+        )
+        .bind(workspace_id)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|row| (row.get("card_id"), row.get("title"), row.get("artifact_id")))
+            .collect())
+    }
+
     /// `(embedded with model, all chunks)` for a workspace.
     pub async fn embedding_coverage(&self, workspace_id: &str, model: &str) -> Result<(i64, i64)> {
         let row = sqlx::query(

@@ -674,6 +674,93 @@ pub struct AskAnswer {
     pub warnings: Vec<String>,
 }
 
+/// Everything the knowledge map page draws: how far evidence has moved
+/// through indexing and embedding, and how files relate to each other.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KnowledgeMap {
+    pub pipeline: KnowledgePipeline,
+    pub coverage: Vec<KnowledgeCoverage>,
+    pub nodes: Vec<KnowledgeNode>,
+    pub edges: Vec<KnowledgeEdge>,
+    /// Files left out of the graph to keep it readable (the smallest ones).
+    pub hidden_file_count: i64,
+    /// False when there is no embedding provider or nothing is embedded
+    /// yet, so the graph can only show memory links.
+    pub similarity_available: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KnowledgePipeline {
+    pub file_count: i64,
+    pub indexed_count: i64,
+    pub pending_count: i64,
+    pub failed_count: i64,
+    pub passage_count: i64,
+    /// `None` when the workspace has no embedding provider.
+    pub embedded_count: Option<i64>,
+    pub embedding_model: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KnowledgeCoverage {
+    /// A readable kind such as "PDF", "Markdown" or "Code", from the
+    /// artifact type and, for uploaded documents, the file extension.
+    pub label: String,
+    pub file_count: i64,
+    pub indexed_count: i64,
+    pub pending_count: i64,
+    pub failed_count: i64,
+    pub passage_count: i64,
+    pub embedded_count: i64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum KnowledgeNodeKind {
+    File,
+    Memory,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum IndexState {
+    Indexed,
+    Pending,
+    Failed,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KnowledgeNode {
+    /// The artifact id for files, the memory card id for memory.
+    pub id: String,
+    pub kind: KnowledgeNodeKind,
+    pub title: String,
+    pub path: Option<String>,
+    pub artifact_type: Option<ArtifactType>,
+    pub state: Option<IndexState>,
+    pub passage_count: i64,
+    pub embedded_count: i64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum KnowledgeEdgeKind {
+    /// Two files whose content means similar things (cosine of their
+    /// average passage embeddings).
+    Similar,
+    /// A memory card citing a file or one of its passages.
+    Cites,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KnowledgeEdge {
+    pub source: String,
+    pub target: String,
+    pub kind: KnowledgeEdgeKind,
+    /// Cosine similarity for `similar`; 1 for `cites`.
+    pub weight: f64,
+}
+
 /// A job the workspace assistant knows how to do. The assistant only ever runs
 /// one of these; a message that matches none of them gets a plain reply.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

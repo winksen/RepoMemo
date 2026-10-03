@@ -480,6 +480,57 @@ export interface AskAnswer {
   warnings: string[];
 }
 
+export type IndexState = "indexed" | "pending" | "failed";
+
+export interface KnowledgePipeline {
+  file_count: number;
+  indexed_count: number;
+  pending_count: number;
+  failed_count: number;
+  passage_count: number;
+  /** null when no embedding provider is set up. */
+  embedded_count: number | null;
+  embedding_model: string | null;
+}
+
+export interface KnowledgeCoverage {
+  /** A readable kind such as "PDF", "Markdown" or "Code". */
+  label: string;
+  file_count: number;
+  indexed_count: number;
+  pending_count: number;
+  failed_count: number;
+  passage_count: number;
+  embedded_count: number;
+}
+
+export interface KnowledgeNode {
+  id: string;
+  kind: "file" | "memory";
+  title: string;
+  path: string | null;
+  artifact_type: ArtifactType | null;
+  state: IndexState | null;
+  passage_count: number;
+  embedded_count: number;
+}
+
+export interface KnowledgeEdge {
+  source: string;
+  target: string;
+  kind: "similar" | "cites";
+  weight: number;
+}
+
+export interface KnowledgeMap {
+  pipeline: KnowledgePipeline;
+  coverage: KnowledgeCoverage[];
+  nodes: KnowledgeNode[];
+  edges: KnowledgeEdge[];
+  hidden_file_count: number;
+  similarity_available: boolean;
+}
+
 export type AgentCapability = "find_files" | "search_content" | "summarize_file" | "ask_question" | "workspace_overview";
 
 export interface AgentCapabilityInfo {

@@ -312,7 +312,7 @@ textarea:focus-visible {
 .shared-profile-panel label { display: grid; gap: 6px; color: var(--color-text-muted); font-size: 12px; }
 .shared-profile-panel .rm-input { width: 100%; }
 .shared-page-heading,
-.shared-detail-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding-bottom: 28px; border-bottom: 1px solid var(--color-border); }
+.shared-detail-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding-bottom: 14px; border-bottom: 1px solid var(--color-border); }
 .shared-page-heading > div,
 .shared-detail-heading > div { min-width: 0; }
 .shared-page-heading h1,
