@@ -51,7 +51,7 @@ export function DocumentViewer({ accessToken, artifact }: { accessToken: string;
   const [renderState, setRenderState] = useState<RenderStatus | null>(null);
   const [renderedUrl, setRenderedUrl] = useState<string | null>(null);
   const [showExtracted, setShowExtracted] = useState(false);
-  const rendersLayout = kind === "word" || kind === "excel" || kind === "powerpoint";
+  const rendersLayout = kind === "word" || kind === "powerpoint";
 
   useEffect(() => {
     let cancelled = false;

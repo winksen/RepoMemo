@@ -829,8 +829,17 @@ body,
 .rm-map-diamond { display: inline-block; width: 8px; height: 8px; margin: 0 1px; background: var(--color-text); transform: rotate(45deg); }
 .rm-map-graph { display: grid; grid-template-columns: minmax(0, 1fr) 280px; align-items: start; gap: 16px; }
 .rm-map-canvas { position: relative; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px; }
-.rm-map-canvas svg { display: block; width: 100%; height: auto; }
-.rm-map-edge { stroke: var(--color-text-subtle); stroke-width: 1.5; }
+.rm-map-canvas { overflow: hidden; }
+.rm-map-canvas svg { display: block; width: 100%; height: auto; aspect-ratio: 900 / 520; cursor: grab; touch-action: none; user-select: none; }
+.rm-map-canvas svg.panning { cursor: grabbing; }
+.rm-map-zoom { position: absolute; top: 10px; right: 10px; z-index: 2; display: flex; flex-direction: column; gap: 4px; }
+.rm-map-zoom .rm-button { width: 30px; height: 30px; min-height: 0; padding: 0; }
+.rm-map-edge { stroke: var(--color-text-subtle); stroke-width: 1; vector-effect: non-scaling-stroke; stroke-linecap: round; }
+.rm-map-halo { opacity: 0.16; pointer-events: none; }
+.rm-map-halo.documents { fill: var(--viz-documents); }
+.rm-map-halo.notes { fill: var(--viz-notes); }
+.rm-map-halo.code { fill: var(--viz-code); }
+.rm-map-node:hover .rm-map-halo, .rm-map-node.selected .rm-map-halo { opacity: 0.32; }
 .rm-map-edge.cites { stroke: var(--color-text-muted); }
 .rm-map-node { cursor: pointer; outline: none; transition: opacity 120ms var(--ease-standard); }
 .rm-map-node.dimmed { opacity: 0.2; }

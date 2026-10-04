@@ -1,4 +1,4 @@
-import type { MouseEvent as ReactMouseEvent, ReactNode } from "react";
+import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   IconAlertTriangle as AlertTriangle,
@@ -9,6 +9,9 @@ import {
   IconFileText as FileText,
   IconHourglass as Hourglass,
   IconList as List,
+  IconMinus as Minus,
+  IconPlus as Plus,
+  IconFocusCentered as Recenter,
   IconRefresh as Refresh,
   IconSearch as Search,
   IconStack2 as Layers,
@@ -225,6 +228,10 @@ function RelationGraph({ canConfigure, map, onOpenArtifact, onOpenMemoryCard, on
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tooltip, setTooltip] = useState<Tooltip | null>(null);
   const canvas = useRef<HTMLDivElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const drag = useRef<{ x: number; y: number; moved: boolean; active: boolean } | null>(null);
+  const [vp, setViewport] = useState({ k: 1, x: 0, y: 0 });
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   const nodeById = useMemo(() => new Map(map.nodes.map((node) => [node.id, node])), [map.nodes]);
   const maxPassages = useMemo(() => Math.max(1, ...map.nodes.map((node) => node.passage_count)), [map.nodes]);
@@ -254,6 +261,97 @@ function RelationGraph({ canConfigure, map, onOpenArtifact, onOpenMemoryCard, on
   const fileCount = map.nodes.filter((node) => node.kind === "file").length;
 
   useEffect(() => { if (selectedId && !nodeById.has(selectedId)) setSelectedId(null); }, [nodeById, selectedId]);
+
+  const vpRef = useRef(vp);
+  vpRef.current = vp;
+  const frame = useRef<number | null>(null);
+  const stopAnimation = () => { if (frame.current !== null) { cancelAnimationFrame(frame.current); frame.current = null; } };
+  useEffect(() => stopAnimation, []);
+
+  /** Glide the viewport to a target: ease-out, interpolating the centre and
+   *  the zoom on a log scale so zooming feels even. Instant for reduced motion. */
+  function animateTo(target: { k: number; x: number; y: number }, instant = false) {
+    stopAnimation();
+    if (instant || window.matchMedia("(prefers-reduced-motion: reduce)").matches) { setViewport(target); return; }
+    const from = vpRef.current;
+    const fromCx = from.x + CANVAS_WIDTH / from.k / 2, fromCy = from.y + CANVAS_HEIGHT / from.k / 2;
+    const toCx = target.x + CANVAS_WIDTH / target.k / 2, toCy = target.y + CANVAS_HEIGHT / target.k / 2;
+    const start = performance.now();
+    const duration = 550;
+    const step = (now: number) => {
+      const t = Math.min(1, (now - start) / duration);
+      const e = 1 - Math.pow(1 - t, 3);
+      const k = from.k * Math.pow(target.k / from.k, e);
+      const cx = fromCx + (toCx - fromCx) * e, cy = fromCy + (toCy - fromCy) * e;
+      setViewport({ k, x: cx - CANVAS_WIDTH / k / 2, y: cy - CANVAS_HEIGHT / k / 2 });
+      frame.current = t < 1 ? requestAnimationFrame(step) : null;
+    };
+    frame.current = requestAnimationFrame(step);
+  }
+
+  /** Frame every dot with a little breathing room. */
+  function fitView(instant = false) {
+    const points = [...positions.values()];
+    if (!points.length) { animateTo({ k: 1, x: 0, y: 0 }, instant); return; }
+    const pad = 60;
+    const minX = Math.min(...points.map((p) => p.x)) - pad, maxX = Math.max(...points.map((p) => p.x)) + pad;
+    const minY = Math.min(...points.map((p) => p.y)) - pad, maxY = Math.max(...points.map((p) => p.y)) + pad;
+    const k = Math.min(CANVAS_WIDTH / (maxX - minX), CANVAS_HEIGHT / (maxY - minY), 3);
+    const w = CANVAS_WIDTH / k, h = CANVAS_HEIGHT / k;
+    animateTo({ k, x: (minX + maxX) / 2 - w / 2, y: (minY + maxY) / 2 - h / 2 }, instant);
+  }
+  useEffect(() => { fitView(true); }, [positions]);
+
+  // Selecting a dot, from the canvas, the side panel or the table, glides to it.
+  useEffect(() => {
+    const point = selectedId ? positions.get(selectedId) : null;
+    if (!point) return;
+    const k = Math.min(Math.max(vpRef.current.k, 2.2), 4);
+    animateTo({ k, x: point.x - CANVAS_WIDTH / k / 2, y: point.y - CANVAS_HEIGHT / k / 2 });
+  }, [selectedId]);
+
+  /** Zoom by a factor, keeping the point under (fx, fy) (0–1 of the canvas) still. */
+  function zoomBy(factor: number, fx = 0.5, fy = 0.5) {
+    stopAnimation();
+    setViewport((current) => {
+      const k = Math.min(Math.max(current.k * factor, 0.4), 8);
+      const px = current.x + (CANVAS_WIDTH / current.k) * fx;
+      const py = current.y + (CANVAS_HEIGHT / current.k) * fy;
+      return { k, x: px - (CANVAS_WIDTH / k) * fx, y: py - (CANVAS_HEIGHT / k) * fy };
+    });
+  }
+
+  // React attaches wheel listeners as passive; zooming needs preventDefault so
+  // the page does not scroll underneath the map.
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      const box = svg.getBoundingClientRect();
+      zoomBy(Math.exp(-event.deltaY * 0.0015), (event.clientX - box.left) / box.width, (event.clientY - box.top) / box.height);
+    };
+    svg.addEventListener("wheel", onWheel, { passive: false });
+    return () => svg.removeEventListener("wheel", onWheel);
+  }, [view, map.nodes.length]);
+
+  function onPointerDown(event: ReactPointerEvent<SVGSVGElement>) {
+    drag.current = { x: event.clientX, y: event.clientY, moved: false, active: true };
+  }
+  function onPointerMove(event: ReactPointerEvent<SVGSVGElement>) {
+    const state = drag.current;
+    if (!state?.active) return;
+    const box = event.currentTarget.getBoundingClientRect();
+    const dx = event.clientX - state.x, dy = event.clientY - state.y;
+    if (!state.moved && Math.hypot(dx, dy) < 4) return;
+    if (!state.moved) { state.moved = true; stopAnimation(); setTooltip(null); event.currentTarget.setPointerCapture(event.pointerId); }
+    state.x = event.clientX; state.y = event.clientY;
+    setViewport((current) => ({ ...current, x: current.x - (dx / box.width) * (CANVAS_WIDTH / current.k), y: current.y - (dy / box.height) * (CANVAS_HEIGHT / current.k) }));
+  }
+  function onPointerUp() {
+    if (drag.current) drag.current.active = false;
+  }
+  const wasDragged = () => Boolean(drag.current?.moved);
 
   function hover(event: ReactMouseEvent, node: KnowledgeNode) {
     const box = canvas.current?.getBoundingClientRect();
@@ -295,7 +393,23 @@ function RelationGraph({ canConfigure, map, onOpenArtifact, onOpenMemoryCard, on
       : view === "table" ? <EdgeTable edges={edges} nodeById={nodeById} onSelect={(id) => { setSelectedId(id); setView("graph"); }} />
       : <div className="rm-map-graph">
         <div className="rm-map-canvas" ref={canvas} onMouseLeave={() => setTooltip(null)}>
-          <svg aria-label={`Graph of ${fileCount} files and ${edges.length} links. Use the table view for a text version.`} role="img" viewBox={`0 0 ${CANVAS_WIDTH} ${CANVAS_HEIGHT}`} onClick={() => setSelectedId(null)}>
+          <div className="rm-map-zoom" role="group" aria-label="Zoom">
+            <Button aria-label="Zoom in" onClick={() => zoomBy(1.4)} type="button" variant="secondary"><Plus size={15} /></Button>
+            <Button aria-label="Zoom out" onClick={() => zoomBy(1 / 1.4)} type="button" variant="secondary"><Minus size={15} /></Button>
+            <Button aria-label="Fit all dots" onClick={() => fitView()} type="button" variant="secondary"><Recenter size={15} /></Button>
+          </div>
+          <svg
+            aria-label={`Graph of ${fileCount} files and ${edges.length} links. Scroll to zoom, drag to move. Use the table view for a text version.`}
+            className={drag.current?.moved && drag.current.active ? "panning" : ""}
+            onClick={() => { if (!wasDragged()) setSelectedId(null); }}
+            onPointerCancel={onPointerUp}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            ref={svgRef}
+            role="img"
+            viewBox={`${vp.x} ${vp.y} ${CANVAS_WIDTH / vp.k} ${CANVAS_HEIGHT / vp.k}`}
+          >
             <g>{edges.map((edge) => {
               const from = positions.get(edge.source)!;
               const to = positions.get(edge.target)!;
@@ -307,8 +421,8 @@ function RelationGraph({ canConfigure, map, onOpenArtifact, onOpenMemoryCard, on
               if (!point) return null;
               const size = radius(node);
               const dimmed = neighbours !== null && !neighbours.has(node.id);
-              const showLabel = node.id === selectedId || (!selectedId && labelled.has(node.id)) || (neighbours?.has(node.id) ?? false);
-              const select = () => setSelectedId(node.id === selectedId ? null : node.id);
+              const showLabel = node.id === selectedId || node.id === hoveredId || (!selectedId && labelled.has(node.id)) || (neighbours?.has(node.id) ?? false) || (vp.k >= 2.2 && !dimmed);
+              const select = () => { if (!wasDragged()) setSelectedId(node.id === selectedId ? null : node.id); };
               return <g
                 aria-label={`${node.kind === "memory" ? "Memory card" : "File"} ${node.title}`}
                 aria-pressed={node.id === selectedId}
@@ -316,7 +430,8 @@ function RelationGraph({ canConfigure, map, onOpenArtifact, onOpenMemoryCard, on
                 key={node.id}
                 onClick={(event) => { event.stopPropagation(); select(); }}
                 onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); select(); } }}
-                onMouseMove={(event) => hover(event, node)}
+                onMouseLeave={() => setHoveredId(null)}
+                onMouseMove={(event) => { setHoveredId(node.id); hover(event, node); }}
                 role="button"
                 tabIndex={0}
                 transform={`translate(${point.x} ${point.y})`}
@@ -325,8 +440,11 @@ function RelationGraph({ canConfigure, map, onOpenArtifact, onOpenMemoryCard, on
                 <circle className="rm-map-hit" r={Math.max(size + 4, 12)} />
                 {node.kind === "memory"
                   ? <rect className="rm-map-memory" height={size * 1.6} transform="rotate(45)" width={size * 1.6} x={-size * 0.8} y={-size * 0.8} />
-                  : <circle className={`rm-map-file ${fileGroup(node)}${node.state !== "indexed" ? " hollow" : ""}`} r={size} />}
-                {showLabel ? <text className="rm-map-label" x={size + 5} y={4}>{shorten(node.title)}</text> : null}
+                  : <>
+                    <circle className={`rm-map-halo ${fileGroup(node)}`} r={size + 5} />
+                    <circle className={`rm-map-file ${fileGroup(node)}${node.state !== "indexed" ? " hollow" : ""}`} r={size} />
+                  </>}
+                {showLabel ? <text className="rm-map-label" fontSize={11 / vp.k} strokeWidth={3 / vp.k} x={size + 5 / vp.k} y={4 / vp.k}>{shorten(node.title)}</text> : null}
               </g>;
             })}</g>
           </svg>

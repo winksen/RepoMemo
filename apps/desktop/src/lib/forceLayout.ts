@@ -57,8 +57,8 @@ export function layoutGraph(nodes: LayoutNode[], links: LayoutLink[], width: num
     }
     for (let i = 0; i < count; i += 1) {
       // Gravity keeps unlinked nodes from drifting off the canvas.
-      dx[i] -= xs[i] * 0.05;
-      dy[i] -= ys[i] * 0.05;
+      dx[i] -= xs[i] * 0.12;
+      dy[i] -= ys[i] * 0.12;
       const length = Math.hypot(dx[i], dy[i]);
       if (length > 0) {
         const move = Math.min(length, temperature);
@@ -67,6 +67,22 @@ export function layoutGraph(nodes: LayoutNode[], links: LayoutLink[], width: num
       }
     }
     temperature = Math.max(temperature - cooling, 0.5);
+  }
+
+  // Pull strays back toward the crowd: a lone unlinked file should sit near
+  // the rest, not shrink the whole picture to make room for itself.
+  if (count > 3) {
+    const cx = xs.reduce((sum, value) => sum + value, 0) / count;
+    const cy = ys.reduce((sum, value) => sum + value, 0) / count;
+    const distances = Array.from(xs, (value, i) => Math.hypot(value - cx, ys[i] - cy)).sort((a, b) => a - b);
+    const limit = Math.max(distances[Math.floor(count / 2)] * 2.2, ideal * 2);
+    for (let i = 0; i < count; i += 1) {
+      const distance = Math.hypot(xs[i] - cx, ys[i] - cy);
+      if (distance > limit) {
+        xs[i] = cx + ((xs[i] - cx) / distance) * limit;
+        ys[i] = cy + ((ys[i] - cy) / distance) * limit;
+      }
+    }
   }
 
   // Fit the result into the canvas, keeping room for the largest node.

@@ -480,7 +480,7 @@ textarea:focus-visible {
 .rm-button.shared-artifact-entry { transition-property: background-color, border-color; }
 .rm-button.shared-artifact-entry { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; align-content: start; align-items: start; gap: 10px; width: 100%; min-height: 0; height: 100%; padding: 16px 14px; color: var(--color-text); background: var(--color-surface); border: 2px solid var(--color-border-strong); border-radius: 12px; cursor: pointer; text-align: center; }
 .rm-button.shared-artifact-entry:hover:not(:disabled) { background: var(--color-surface); border-color: var(--color-accent); }
-.rm-button.shared-artifact-entry.selected { background: var(--color-surface-2); border-color: var(--color-accent); }
+.rm-button.shared-artifact-entry.selected { border-color: var(--color-accent); }
 .shared-artifact-file-icon { display: grid; width: 48px; height: 48px; place-items: center; color: var(--color-text-muted); background: var(--color-surface-3); border-radius: 9px; }
 .shared-artifact-file-icon.category-markdown { color: #e5b53c; }
 .shared-artifact-file-icon.category-note { color: #d98a4e; }
