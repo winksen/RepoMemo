@@ -132,6 +132,34 @@ impl GitRepo {
         })
     }
 
+    /// The latest `limit` commits reachable from `commit`, newest first.
+    pub async fn recent_commits(&self, commit: &str, limit: usize) -> Result<Vec<CommitInfo>> {
+        let output = self
+            .run(&[
+                "log",
+                &format!("--max-count={limit}"),
+                "--format=%H%x00%s%x00%an%x00%cI%x1e",
+                commit,
+                "--",
+            ])
+            .await?;
+        Ok(output
+            .split('\u{1e}')
+            .map(|record| record.trim_matches('\n'))
+            .filter(|record| !record.is_empty())
+            .map(|record| {
+                let mut parts = record.split('\0');
+                let mut next = || parts.next().unwrap_or_default().to_owned();
+                CommitInfo {
+                    sha: next(),
+                    summary: next(),
+                    author_name: next(),
+                    committed_at: next(),
+                }
+            })
+            .collect())
+    }
+
     /// Every regular file in the commit's tree. Symbolic links and submodules
     /// are left out because they have no content of their own to index.
     pub async fn list_files(&self, commit: &str) -> Result<Vec<TreeFile>> {
@@ -352,6 +380,7 @@ mod tests {
         let info = repo.commit_info(&head).await.unwrap();
         assert_eq!(info.sha, head);
         assert_eq!(info.summary, "Initial commit");
+        assert_eq!(repo.recent_commits(&head, 5).await.unwrap(), vec![info]);
 
         let files = repo.list_files(&head).await.unwrap();
         let paths = files.iter().map(|file| file.path.as_str()).collect::<Vec<_>>();

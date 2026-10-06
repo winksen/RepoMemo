@@ -85,6 +85,29 @@ A repository artifact's own `metadata_json` records `origin: "git_repo"`, the re
 
 ---
 
+## The repository as one evidence item
+
+Besides one artifact per file, each repository has **one artifact that stands for the whole repository** (`type = 'repository'`, path = the repository root, source = the repository source). It is what the Evidence ledger shows for the repository: its files are listed only in the Repositories section, but the repository itself sits next to notes and uploads, with its own lifecycle, comments and memory links.
+
+At the end of every complete sync, [`repo_overview.rs`](../../crates/api/src/repo_overview.rs) computes a **`RepoOverview`** from the stored files, with no AI:
+
+| Part | How it is computed |
+|---|---|
+| At a glance | Files indexed and total size |
+| Languages | Files and bytes per language, by size; the eighth and later are merged into "Other" |
+| Structure | Files per top-level folder (root files as "Repository root"), the 12 largest |
+| Key files | Root README, manifests (`Cargo.toml`, `package.json`, `pyproject.toml`, `go.mod`, `Dockerfile`, …), entry points (`main.rs`, `index.ts`, `App.tsx`, `main.go`, …) and root or `docs/` Markdown. At most 2 READMEs, 5 manifests, 6 entry points and 4 docs, shallowest first |
+| From the README | The opening (~1,800 characters) of the root README, cut at a paragraph, with HTML tags and images removed |
+| Recent commits | The last 10 commits of the branch (`git log`) |
+
+The overview is kept in the source's `metadata_json` (`overview`, `overview_artifact_id`) and rendered as **Markdown** into the artifact's content, which is indexed with the files, so questions about the repository as a whole ("what is this repository?") find it. The Markdown carries no timestamp of its own, so its content hash, and therefore its index, only change when the repository does. The artifact is created on the first sync and updated **in place** afterwards; renaming the repository renames it, and removing the repository deletes it.
+
+**Summary (optional AI).** On the repository page, a member who can write can generate a summary when the workspace has an enabled text provider. The prompt gets the overview Markdown plus the first passages of up to 8 key files (about 16,000 characters in total, 4,000 per file), and asks for what the repository is, its main parts, technologies, how to build or run it (only if stated) and where to start reading. The result is kept in the source's metadata with the provider name, the commit it describes and its citations, until someone regenerates it; the page says when the repository has moved on since. Nothing is sent to a provider unless someone asks.
+
+**The page** (`RepositoryDetailView`, shown on the artifact page of a `repository` item): sync state with Sync now / Stop and a file browser, the summary, and the content overview (language and structure tables, key files that open their evidence, the README opening, recent commits), followed by the usual lifecycle and discussion panels. Renaming or deleting the item through the artifact routes is refused like for repository files.
+
+---
+
 ## Which files are indexed
 
 Implemented in [`crates/ingestion/src/repo.rs`](../../crates/ingestion/src/repo.rs). Rules are decided from the path and the size git reports, before any content is read.
@@ -124,6 +147,8 @@ Syncs change an artifact's lifecycle only from statuses a person would expect, s
 | DELETE | `/v1/repositories/{id}` | A | Deletes the source, its artifacts, chunks and memory links. 409 while syncing. The repository on disk is not touched |
 | POST | `/v1/repositories/{id}/sync` | W | Queues a sync. 409 if one is running |
 | GET | `/v1/repositories/{id}/files` | R | Files currently in the tree, with index state |
+| GET | `/v1/repositories/{id}/detail` | R | `RepoDetail` for the repository page: `repository` (including `overview_artifact_id`), `overview`, `summary`, and `ai_available` (an enabled text provider exists) |
+| POST | `/v1/repositories/{id}/summary` | W | Generates and keeps the AI summary. 400 when no text provider is enabled ("No content was sent") or the repository was never synced |
 
 Progress uses the existing jobs API (`kind = repo_sync`, stages `queued → reading_repository → storing_files → indexing`) and `POST /v1/jobs/{id}/cancel`. Repository artifacts appear in `GET /v1/workspaces/{ws}/artifacts` with a `repository_id`. Renaming or deleting one through the artifact routes is refused with 400, because the next sync would undo it.
 
@@ -139,11 +164,12 @@ Syncs run in the background, one at a time across the server and never two for t
 | File rules and patterns | [crates/ingestion/src/repo.rs](../../crates/ingestion/src/repo.rs) |
 | `repo_files` storage, lifecycle changes | [crates/storage/src/repo.rs](../../crates/storage/src/repo.rs), [0017_repo_files.sql](../../crates/storage/migrations/0017_repo_files.sql) |
 | Sync engine (`connect_local_repo`, `run_repo_sync`, …) | [crates/api/src/repo_sync.rs](../../crates/api/src/repo_sync.rs) |
+| Overview and summary (`compute_overview`, `overview_markdown`, `summarize_repo`) | [crates/api/src/repo_overview.rs](../../crates/api/src/repo_overview.rs) |
 | Domain types (`RepoSource`, `RepoSyncReport`, `RepoFile`) | [crates/domain/src/lib.rs](../../crates/domain/src/lib.rs) |
 | HTTP routes and background runner | [apps/server/src/repositories.rs](../../apps/server/src/repositories.rs) |
-| Web UI: Repositories section (`RepositoriesPanel`) and Settings › Repositories (`RepositorySettings`) | [RepositoriesPanel.tsx](../../apps/desktop/src/components/RepositoriesPanel.tsx) |
+| Web UI: Repositories section (`RepositoriesPanel`), Settings › Repositories (`RepositorySettings`) and the repository page (`RepositoryDetailView`) | [RepositoriesPanel.tsx](../../apps/desktop/src/components/RepositoriesPanel.tsx) |
 
-Tests: `repomemo-git` (tree parsing, reading a real repository), `repomemo-ingestion` (patterns and classification), `repomemo-api` (`syncs_follow_commits_and_keep_artifact_identity`: add, edit, rename, delete, search, remove) and `repomemo-server` (`workspace_repository_links_are_checked_then_synced_in_the_background`: roles, link checks for URLs, missing folders and non-repositories, background sync, refused edits).
+Tests: `repomemo-git` (tree parsing, reading a real repository), `repomemo-ingestion` (patterns and classification), `repomemo-api` (`syncs_follow_commits_and_keep_artifact_identity`: add, edit, rename, delete, search, the repository item and its overview, remove; plus overview and README-excerpt unit tests) and `repomemo-server` (`workspace_repository_links_are_checked_then_synced_in_the_background`: roles, link checks for URLs, missing folders and non-repositories, background sync, refused edits, the repository item, its detail and a cited AI summary through a fake Ollama).
 
 ---
 

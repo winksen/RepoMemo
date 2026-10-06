@@ -356,6 +356,8 @@ pub enum ArtifactType {
     Runbook,
     ApiSpec,
     Note,
+    /// A whole git repository: its generated overview, kept current by syncs.
+    Repository,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -517,7 +519,68 @@ pub struct RepoSource {
     pub file_count: i64,
     pub indexed_file_count: i64,
     pub active_job: Option<IndexingJobStatus>,
+    /// The evidence item that stands for the whole repository.
+    pub overview_artifact_id: Option<String>,
     pub created_at: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RepoLanguageShare {
+    pub language: String,
+    pub files: usize,
+    pub bytes: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RepoFolderShare {
+    /// A top-level folder, or "" for files at the repository root.
+    pub path: String,
+    pub files: usize,
+}
+
+/// A file worth opening first: a README, a manifest or an entry point.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RepoKeyFile {
+    pub path: String,
+    pub artifact_id: String,
+    /// `readme`, `manifest`, `entry_point` or `docs`.
+    pub role: String,
+}
+
+/// What a repository holds, computed from its indexed files at each sync.
+/// Deterministic: no AI is involved.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RepoOverview {
+    pub commit: RepoCommit,
+    pub generated_at: String,
+    pub file_count: usize,
+    pub total_bytes: i64,
+    pub languages: Vec<RepoLanguageShare>,
+    pub folders: Vec<RepoFolderShare>,
+    pub key_files: Vec<RepoKeyFile>,
+    /// The opening of the root README, when there is one.
+    pub readme_excerpt: Option<String>,
+    pub recent_commits: Vec<RepoCommit>,
+}
+
+/// An AI summary of a repository, kept until someone regenerates it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RepoSummary {
+    pub summary_markdown: String,
+    pub citations: Vec<Citation>,
+    pub warnings: Vec<String>,
+    pub provider_name: String,
+    /// The commit the summary describes.
+    pub commit_sha: String,
+    pub generated_at: String,
+}
+
+/// Everything the repository page shows.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RepoDetail {
+    pub repository: RepoSource,
+    pub overview: Option<RepoOverview>,
+    pub summary: Option<RepoSummary>,
 }
 
 /// What the server found at a repository link, before it is connected.

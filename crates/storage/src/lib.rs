@@ -4892,6 +4892,7 @@ fn artifact_type_to_db(artifact_type: &ArtifactType) -> &'static str {
         ArtifactType::ApiSpec => "api_spec",
         ArtifactType::Note => "note",
         ArtifactType::Image => "image",
+        ArtifactType::Repository => "repository",
     }
 }
 
@@ -4907,6 +4908,7 @@ fn artifact_type_from_db(value: &str) -> ArtifactType {
         "api_spec" => ArtifactType::ApiSpec,
         "note" => ArtifactType::Note,
         "image" => ArtifactType::Image,
+        "repository" => ArtifactType::Repository,
         _ => ArtifactType::File,
     }
 }

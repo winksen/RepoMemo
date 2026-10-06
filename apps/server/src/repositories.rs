@@ -18,8 +18,8 @@ use axum::{
 };
 use repomemo_api::RepoMemoCore;
 use repomemo_domain::{
-    IndexingJobStatus, RepoAccessCheck, RepoFile, RepoSettings, RepoSource, RepoSyncReport,
-    REPO_SYNC_JOB_KIND,
+    IndexingJobStatus, ProviderSettings, RepoAccessCheck, RepoDetail, RepoFile, RepoSettings,
+    RepoSource, RepoSummary, RepoSyncReport, REPO_SYNC_JOB_KIND,
 };
 use serde::{Deserialize, Serialize};
 use tokio::sync::Semaphore;
@@ -375,6 +375,74 @@ pub(crate) async fn sync_repository(
         repository,
         job: Some(job),
     }))
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct RepositoryDetailResponse {
+    #[serde(flatten)]
+    detail: RepoDetail,
+    /// The workspace has an enabled text AI provider, so a summary can be
+    /// generated.
+    ai_available: bool,
+}
+
+/// The repository page: its sync state, the overview of what it holds, and
+/// the last AI summary.
+pub(crate) async fn get_repository_detail(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(source_id): Path<String>,
+) -> Result<Json<RepositoryDetailResponse>, ApiError> {
+    let detail = state.core.repo_detail(&source_id).await.map_err(map_repo_error)?;
+    require_workspace_read(&state, &subject, &detail.repository.workspace_id).await?;
+    let ai_available = text_provider(&state, &detail.repository.workspace_id)
+        .await?
+        .is_some();
+    Ok(Json(RepositoryDetailResponse { detail, ai_available }))
+}
+
+/// Generates and keeps an AI summary of the repository. Only the overview
+/// and the opening of its key files are sent to the provider.
+pub(crate) async fn summarize_repository(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(source_id): Path<String>,
+) -> Result<Json<RepoSummary>, ApiError> {
+    let repository = load_repository(&state, &source_id).await?;
+    require_workspace_write(&state, &subject, &repository.workspace_id).await?;
+    let provider = text_provider(&state, &repository.workspace_id)
+        .await?
+        .ok_or_else(|| {
+            ApiError::bad_request(
+                "No text AI provider is enabled for this workspace. An administrator can set one up in Settings. No content was sent.",
+            )
+        })?;
+    let summary = state
+        .core
+        .summarize_repo(&source_id, &provider.id)
+        .await
+        .map_err(map_repo_error)?;
+    record_workspace_activity(
+        &state,
+        &repository.workspace_id,
+        &subject.user_id,
+        "repository_summarized",
+        "repository",
+        Some(&source_id),
+        format!("Generated an AI summary of repository {}.", repository.name),
+    )
+    .await;
+    Ok(Json(summary))
+}
+
+async fn text_provider(state: &AppState, workspace_id: &str) -> Result<Option<ProviderSettings>, ApiError> {
+    Ok(state
+        .storage
+        .list_provider_settings(workspace_id)
+        .await
+        .map_err(ApiError::internal)?
+        .into_iter()
+        .find(|settings| settings.enabled && settings.purpose() == "text"))
 }
 
 pub(crate) async fn list_repository_files(

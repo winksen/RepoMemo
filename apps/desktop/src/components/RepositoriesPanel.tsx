@@ -9,19 +9,24 @@ import {
   IconPlus as Plus,
   IconRefresh as Refresh,
   IconSettings as Settings,
+  IconSparkles as Sparkles,
   IconTrash as Trash,
 } from "@tabler/icons-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   cancelSharedJob,
   checkSharedRepository,
   connectSharedRepository,
   deleteSharedRepository,
+  getSharedRepositoryDetail,
   listSharedRepositories,
   listSharedRepositoryFiles,
+  summarizeSharedRepository,
   syncSharedRepository,
   updateSharedRepository,
 } from "../lib/sharedApi";
-import type { RepoAccessCheck, RepoFile, RepoSource, RepoSyncReport } from "../types";
+import type { RepoAccessCheck, RepoFile, RepoSource, RepoSyncReport, RepositoryDetailResponse } from "../types";
 import { Button } from "./ui/button";
 import { Dialog, DialogCancel } from "./ui/dialog";
 import { Input } from "./ui/input";
@@ -466,6 +471,7 @@ function RepositoryCard({
     <div className="rm-health-actions">
       {job ? (canSync ? <Button disabled={job.cancel_requested} onClick={onStop} type="button" variant="secondary">{job.cancel_requested ? "Stopping…" : "Stop sync"}</Button> : null)
         : canSync ? <Button onClick={onSync} type="button" variant="secondary"><Refresh size={15} /> Sync now</Button> : null}
+      {repository.overview_artifact_id ? <Button onClick={() => onOpenArtifact(repository.overview_artifact_id!)} type="button" variant="secondary"><FolderCode size={15} /> Open overview</Button> : null}
       <Button aria-expanded={filesOpen} disabled={!repository.file_count} onClick={onToggleFiles} type="button" variant="secondary">{filesOpen ? "Hide files" : "Browse files"}</Button>
     </div>
 
@@ -511,4 +517,170 @@ function RepositoryFiles({
     </ul>
     <span className="rm-map-muted">{matching.length > FILE_LIST_LIMIT ? `Showing ${FILE_LIST_LIMIT} of ${matching.length.toLocaleString()} files. Filter to narrow the list.` : `${matching.length.toLocaleString()} ${matching.length === 1 ? "file" : "files"}`}</span>
   </div>;
+}
+
+function formatBytes(bytes: number) {
+  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${bytes} bytes`;
+}
+
+const KEY_FILE_ROLE: Record<string, string> = {
+  readme: "README",
+  manifest: "Manifest",
+  entry_point: "Entry point",
+  docs: "Docs",
+};
+
+/** The page of the evidence item that stands for a whole repository: its
+ *  sync state, an AI summary on request, and the overview of what it holds. */
+export function RepositoryDetailView({
+  accessToken,
+  canSync,
+  onOpenArtifact,
+  repositoryId,
+}: {
+  accessToken: string;
+  canSync: boolean;
+  onOpenArtifact: (artifactId: string) => void;
+  repositoryId: string;
+}) {
+  const [detail, setDetail] = useState<RepositoryDetailResponse | null>(null);
+  const [summarizing, setSummarizing] = useState(false);
+  const [filesOpen, setFilesOpen] = useState(false);
+  const runningJob = useRef<string | null>(null);
+
+  async function load() {
+    try {
+      const next = await getSharedRepositoryDetail(accessToken, repositoryId);
+      const job = next.repository.active_job;
+      if (job) runningJob.current = job.id;
+      else if (runningJob.current) {
+        runningJob.current = null;
+        if (next.repository.status === "error") showToast("error", `${next.repository.name}: ${next.repository.last_error ?? "the sync failed."}`);
+        else if (next.repository.last_report) showToast("success", `${next.repository.name} synced. ${reportSummary(next.repository.last_report)}.`);
+      }
+      setDetail(next);
+    } catch (error) {
+      showToast("error", errorMessage(error, "The repository could not be loaded."));
+    }
+  }
+
+  useEffect(() => { setDetail(null); runningJob.current = null; void load(); }, [accessToken, repositoryId]);
+  const syncing = Boolean(detail?.repository.active_job);
+  useEffect(() => {
+    if (!syncing) return;
+    const timer = window.setInterval(() => void load(), POLL_INTERVAL_MS);
+    return () => window.clearInterval(timer);
+  }, [syncing, accessToken, repositoryId]);
+
+  async function sync() {
+    try {
+      const { job } = await syncSharedRepository(accessToken, repositoryId);
+      if (job) runningJob.current = job.id;
+      await load();
+    } catch (error) {
+      showToast("error", errorMessage(error, "The sync could not be started."));
+    }
+  }
+
+  async function stop() {
+    const job = detail?.repository.active_job;
+    if (!job) return;
+    try {
+      await cancelSharedJob(accessToken, job.id);
+      await load();
+    } catch (error) {
+      showToast("error", errorMessage(error, "The sync could not be stopped."));
+    }
+  }
+
+  async function summarize() {
+    setSummarizing(true);
+    try {
+      const summary = await summarizeSharedRepository(accessToken, repositoryId);
+      setDetail((current) => current ? { ...current, summary } : current);
+      showToast("success", "Summary generated.");
+    } catch (error) {
+      showToast("error", errorMessage(error, "The summary could not be generated."));
+    } finally {
+      setSummarizing(false);
+    }
+  }
+
+  if (!detail) return <section className="shared-record-panel" aria-busy="true"><p className="shared-muted-copy">Loading the repository…</p></section>;
+
+  const { repository, overview, summary } = detail;
+  const job = repository.active_job;
+  const status = job ? "syncing" : repository.status;
+  const commit = repository.last_synced_commit;
+  const summaryIsStale = Boolean(summary && commit && summary.commit_sha !== commit.sha);
+  const citedFiles = summary ? Array.from(new Map(summary.citations.map((citation) => [citation.artifact_id, citation.path])).entries()) : [];
+  const progress = job?.progress_total ? Math.min(100, Math.round((job.progress_current / job.progress_total) * 100)) : null;
+
+  return <>
+    <section className="shared-record-panel rm-repo-page">
+      <div className="shared-panel-heading"><div><GitBranch size={18} /><h2>Repository</h2></div><span className={`rm-repo-status status-${status}`}>{STATUS_LABEL[status]}</span></div>
+      <dl className="rm-repo-facts">
+        <div><dt>Location</dt><dd><code className="rm-repo-path">{repository.root_path}</code></dd></div>
+        <div><dt><GitBranch size={14} /> Branch</dt><dd>{commit?.branch ?? repository.settings.branch ?? "Checked-out branch"}</dd></div>
+        <div><dt><GitCommit size={14} /> Commit</dt><dd>{commit ? <><code>{commit.sha.slice(0, 7)}</code> {commit.summary} <span className="rm-map-muted">· {commit.author_name} · {formatDate(commit.committed_at)}</span></> : <span className="rm-map-muted">Not synced yet</span>}</dd></div>
+        <div><dt>Files</dt><dd>{repository.file_count.toLocaleString()} indexed{repository.last_synced_at ? <span className="rm-map-muted"> · synced {formatDate(repository.last_synced_at)}</span> : null}</dd></div>
+        {!job && repository.status === "error" && repository.last_error ? <div><dt>Last error</dt><dd>{repository.last_error}</dd></div> : null}
+      </dl>
+      {job ? <div className="rm-repo-progress" role="status">
+        <div><span>{STAGE_LABEL[job.stage] ?? job.stage}</span><span>{job.progress_total ? `${job.progress_current.toLocaleString()} / ${job.progress_total.toLocaleString()}` : ""}</span></div>
+        <progress aria-label={`Sync progress for ${repository.name}`} max={100} value={progress ?? undefined} />
+      </div> : null}
+      <div className="rm-health-actions">
+        {canSync ? job
+          ? <Button disabled={job.cancel_requested} onClick={() => void stop()} type="button" variant="secondary">{job.cancel_requested ? "Stopping…" : "Stop sync"}</Button>
+          : <Button onClick={() => void sync()} type="button" variant="secondary"><Refresh size={15} /> Sync now</Button> : null}
+        <Button aria-expanded={filesOpen} disabled={!repository.file_count} onClick={() => setFilesOpen((open) => !open)} type="button" variant="secondary">{filesOpen ? "Hide files" : "Browse files"}</Button>
+      </div>
+      {filesOpen ? <RepositoryFiles accessToken={accessToken} onOpenArtifact={onOpenArtifact} repository={repository} /> : null}
+    </section>
+
+    <section className="shared-record-panel rm-repo-page">
+      <div className="shared-panel-heading"><div><Sparkles size={18} /><h2>Summary</h2></div>{summary ? <span>{summary.provider_name}</span> : null}</div>
+      {summary ? <>
+        <div className="shared-markdown rm-repo-summary"><ReactMarkdown remarkPlugins={[remarkGfm]}>{summary.summary_markdown}</ReactMarkdown></div>
+        <p className="rm-map-muted">Written for commit <code>{summary.commit_sha.slice(0, 7)}</code> on {formatDate(summary.generated_at)}.{summaryIsStale ? " The repository has changed since; regenerate it to describe the current commit." : ""} {summary.warnings.join(" ")}</p>
+        {citedFiles.length ? <div className="rm-repo-cited"><span className="rm-map-muted">Based on</span>{citedFiles.map(([artifactId, path]) => <button className="rm-map-link" key={artifactId} onClick={() => onOpenArtifact(artifactId)} type="button">{path}</button>)}</div> : null}
+      </> : <p className="shared-muted-copy">{detail.ai_available ? "No summary yet. A summary describes what the repository is, its main parts and where to start reading, from the overview below and the opening of its key files." : "A summary needs a text AI provider, which an administrator can set up in Settings. The overview below needs no AI."}</p>}
+      {canSync && detail.ai_available && overview ? <div className="rm-health-actions"><Button disabled={summarizing} onClick={() => void summarize()} type="button" variant={summary && !summaryIsStale ? "secondary" : "main"}><Sparkles size={15} /> {summarizing ? "Summarizing…" : summary ? "Regenerate summary" : "Generate summary"}</Button></div> : null}
+    </section>
+
+    <section className="shared-record-panel rm-repo-page">
+      <div className="shared-panel-heading"><div><FolderCode size={18} /><h2>Content overview</h2></div>{overview ? <span>{overview.file_count.toLocaleString()} files · {formatBytes(overview.total_bytes)}</span> : null}</div>
+      {overview ? <div className="rm-repo-overview">
+        <div className="rm-map-coverage">
+          <table>
+            <caption className="rm-repo-caption">Languages</caption>
+            <thead><tr><th scope="col">Language</th><th scope="col">Files</th><th scope="col">Size</th><th scope="col">Share</th></tr></thead>
+            <tbody>{overview.languages.map((share) => <tr key={share.language}><th scope="row">{share.language}</th><td>{share.files.toLocaleString()}</td><td>{formatBytes(share.bytes)}</td><td>{overview.total_bytes ? `${Math.round((share.bytes / overview.total_bytes) * 100)}%` : "—"}</td></tr>)}</tbody>
+          </table>
+        </div>
+        <div className="rm-map-coverage">
+          <table>
+            <caption className="rm-repo-caption">Structure</caption>
+            <thead><tr><th scope="col">Folder</th><th scope="col">Files</th></tr></thead>
+            <tbody>{overview.folders.map((folder) => <tr key={folder.path}><th scope="row">{folder.path ? <code>{folder.path}/</code> : "Repository root"}</th><td>{folder.files.toLocaleString()}</td></tr>)}</tbody>
+          </table>
+        </div>
+        {overview.key_files.length ? <div className="rm-repo-block">
+          <h3>Key files</h3>
+          <ul className="rm-repo-keyfiles">{overview.key_files.map((file) => <li key={file.artifact_id}><button className="rm-map-link" onClick={() => onOpenArtifact(file.artifact_id)} type="button">{file.path}</button><span className="rm-health-fate">{KEY_FILE_ROLE[file.role] ?? file.role}</span></li>)}</ul>
+        </div> : null}
+        {overview.readme_excerpt ? <div className="rm-repo-block">
+          <h3>From the README</h3>
+          <div className="shared-markdown rm-repo-readme"><ReactMarkdown remarkPlugins={[remarkGfm]}>{overview.readme_excerpt}</ReactMarkdown></div>
+        </div> : null}
+        {overview.recent_commits.length ? <div className="rm-repo-block">
+          <h3>Recent commits</h3>
+          <ul className="rm-repo-commits">{overview.recent_commits.map((entry) => <li key={entry.sha}><code>{entry.sha.slice(0, 7)}</code><span>{entry.summary}</span><span className="rm-map-muted">{entry.author_name} · {formatDate(entry.committed_at)}</span></li>)}</ul>
+        </div> : null}
+      </div> : <p className="shared-muted-copy">The overview appears after the first complete sync.</p>}
+    </section>
+  </>;
 }

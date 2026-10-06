@@ -91,6 +91,7 @@ mindmap
       Sync committed files
       Edits and renames keep history
       Include and exclude rules
+      One evidence item with overview and summary
     Indexing
       Automatic after save
       Split into passages
@@ -267,7 +268,13 @@ A team's code usually already lives in a git repository, with many files and a h
 
 **Skipped automatically:** dependency and build folders (`node_modules/`, `vendor/`, `dist/`, `build/`, `target/`…), lock files, minified files, images, files over 1 MB and binary files. Each sync reports how many files were skipped and why.
 
-Repository files are searchable and citable like any evidence, but they are listed in the Repositories section rather than the Evidence ledger, and they cannot be renamed or deleted one by one: change them in the repository, or exclude their path.
+**The repository as one evidence item.** Each linked repository appears in the **Evidence ledger as a single item**, next to notes and uploads, and can be reviewed, discussed, cited by memory cards and moved into a folder like any evidence. Opening it shows the **repository page**:
+
+- **Sync state**: location, branch, commit, files, with *Sync now* and a file browser.
+- **Summary**: what the repository is, its main parts, technologies, how to build or run it and where to start reading, written by the workspace's AI provider **only when someone asks**, with links to the files it is based on. The page says when the repository has changed since the summary was written.
+- **Content overview**, with no AI: languages, folders, key files (README, manifests, entry points, docs), the opening of the README, and recent commits.
+
+The repository's individual files are searchable and citable like any evidence, but they are listed in the Repositories section (and from the repository page) rather than the Evidence ledger, and they cannot be renamed or deleted one by one: change them in the repository, or exclude their path.
 
 **Availability:** repository links are a setting of each workspace; nothing has to be configured on the server. A link must point at a folder the server can read, so for now only repositories on the server's own disk can be linked; remote repositories (by URL) are planned. See the [technical design](technical/repository-sources.md).
 

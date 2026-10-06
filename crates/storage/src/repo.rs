@@ -533,13 +533,79 @@ impl StorageEngine {
         Ok(rows.into_iter().collect())
     }
 
-    /// The name of the repository an artifact belongs to, if it is a
-    /// repository file.
+    /// Writes the artifact that stands for a whole repository: created on
+    /// the first sync, then updated in place so its comments, lifecycle and
+    /// memory links stay attached. New content is queued for indexing. The
+    /// content blob must already be stored. Returns the artifact id.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn write_repo_overview_artifact(
+        &self,
+        workspace_id: &str,
+        source_id: &str,
+        existing_id: Option<&str>,
+        title: &str,
+        path: &str,
+        content_hash: &str,
+        size_bytes: i64,
+        metadata: &Value,
+    ) -> Result<String> {
+        let now = Utc::now().to_rfc3339();
+        let metadata_json = serde_json::to_string(metadata)?;
+        if let Some(id) = existing_id {
+            let updated = sqlx::query(
+                r#"
+                UPDATE artifacts
+                SET title = ?2, path = ?3, metadata_json = ?6, updated_at = ?7, size_bytes = ?5,
+                    indexed_at = CASE WHEN content_hash = ?4 THEN indexed_at ELSE NULL END,
+                    content_hash = ?4
+                WHERE id = ?1 AND source_id = ?8 AND type = 'repository'
+                "#,
+            )
+            .bind(id)
+            .bind(title)
+            .bind(path)
+            .bind(content_hash)
+            .bind(size_bytes)
+            .bind(&metadata_json)
+            .bind(&now)
+            .bind(source_id)
+            .execute(&self.pool)
+            .await?;
+            if updated.rows_affected() > 0 {
+                return Ok(id.to_owned());
+            }
+        }
+        let id = Uuid::new_v4().to_string();
+        sqlx::query(
+            r#"
+            INSERT INTO artifacts (
+              id, workspace_id, source_id, type, title, path, content_hash, mime_type,
+              language, size_bytes, created_at, updated_at, metadata_json
+            )
+            VALUES (?1, ?2, ?3, 'repository', ?4, ?5, ?6, 'text/markdown', 'Markdown', ?7, ?8, ?8, ?9)
+            "#,
+        )
+        .bind(&id)
+        .bind(workspace_id)
+        .bind(source_id)
+        .bind(title)
+        .bind(path)
+        .bind(content_hash)
+        .bind(size_bytes)
+        .bind(&now)
+        .bind(&metadata_json)
+        .execute(&self.pool)
+        .await?;
+        Ok(id)
+    }
+
+    /// The name of the repository an artifact comes from, if it is one of a
+    /// repository's files or the item that stands for the repository.
     pub async fn repo_name_for_artifact(&self, artifact_id: &str) -> Result<Option<String>> {
         Ok(sqlx::query_scalar::<_, String>(
             r#"
-            SELECT sources.name FROM repo_files JOIN sources ON sources.id = repo_files.source_id
-            WHERE repo_files.artifact_id = ?1
+            SELECT sources.name FROM artifacts JOIN sources ON sources.id = artifacts.source_id
+            WHERE artifacts.id = ?1 AND sources.type = 'git_repo'
             "#,
         )
         .bind(artifact_id)

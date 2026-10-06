@@ -189,6 +189,7 @@ fn kind_label(artifact: &repomemo_domain::ArtifactSummary) -> String {
         ArtifactType::MarkdownDoc => "Markdown",
         ArtifactType::CodeFile => "Code",
         ArtifactType::Note => "Notes",
+        ArtifactType::Repository => "Repositories",
         ArtifactType::Image => "Images",
         ArtifactType::ApiSpec => "API specs",
         ArtifactType::Runbook => "Runbooks",

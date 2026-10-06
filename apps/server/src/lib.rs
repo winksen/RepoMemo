@@ -836,6 +836,8 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
         )
         .route("/v1/repositories/{source_id}/sync", post(repositories::sync_repository))
         .route("/v1/repositories/{source_id}/files", get(repositories::list_repository_files))
+        .route("/v1/repositories/{source_id}/detail", get(repositories::get_repository_detail))
+        .route("/v1/repositories/{source_id}/summary", post(repositories::summarize_repository))
         .route("/v1/workspaces/{workspace_id}/index", post(index_workspace))
         .route("/v1/workspaces/{workspace_id}/jobs", get(list_workspace_jobs))
         .route("/v1/workspaces/{workspace_id}/events", get(workspace_events))
@@ -1467,6 +1469,7 @@ fn artifact_type_label(artifact_type: &ArtifactType) -> &'static str {
         ArtifactType::Runbook => "Runbook",
         ArtifactType::ApiSpec => "API specification",
         ArtifactType::Note => "Note",
+        ArtifactType::Repository => "Repository",
     }
 }
 
@@ -5332,6 +5335,54 @@ mod tests {
             .find(|artifact| artifact["path"] == "src/ledger.rs")
             .unwrap();
         assert_eq!(ledger["repository_id"], repository_id.as_str());
+        // The repository itself is one evidence item, protected like its files.
+        let items = artifacts
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|artifact| artifact["artifact_type"] == "repository")
+            .collect::<Vec<_>>();
+        assert_eq!(items.len(), 1);
+        assert!(items[0]["repository_id"].is_null());
+        assert_eq!(items[0]["source_id"], repository_id.as_str());
+        let item_id = items[0]["id"].as_str().unwrap();
+        assert_eq!(
+            app.clone().oneshot(auth_request("DELETE", &format!("/v1/artifacts/{item_id}"), owner)).await.unwrap().status(),
+            400
+        );
+        let detail = read(app.clone().oneshot(auth_request("GET", &format!("/v1/repositories/{repository_id}/detail"), member)).await.unwrap()).await;
+        assert_eq!(detail["repository"]["overview_artifact_id"], item_id);
+        assert_eq!(detail["overview"]["file_count"], 2);
+        assert_eq!(detail["overview"]["key_files"][0]["path"], "README.md");
+        assert_eq!(detail["ai_available"], false);
+        assert!(detail["summary"].is_null());
+        let summary = app.clone().oneshot(auth_request("POST", &format!("/v1/repositories/{repository_id}/summary"), member)).await.unwrap();
+        assert_eq!(summary.status(), 400);
+        assert!(read(summary).await["error"]["message"].as_str().unwrap().contains("No content was sent"));
+
+        // With a text provider, the summary is generated from the overview and
+        // key files, cited, and kept for the repository page.
+        let (ollama_url, prompts) = start_fake_ollama().await;
+        let saved = app
+            .clone()
+            .oneshot(json_request(
+                "PUT",
+                &format!("/v1/workspaces/{workspace_id}/ai-providers"),
+                owner,
+                json!({"provider_type": "ollama", "name": "Mock text", "base_url": ollama_url, "model": "mock-chat", "enabled": true, "purpose": "text"}),
+            ))
+            .await
+            .unwrap();
+        assert!(saved.status().is_success());
+        let summary = app.clone().oneshot(auth_request("POST", &format!("/v1/repositories/{repository_id}/summary"), member)).await.unwrap();
+        assert_eq!(summary.status(), 200);
+        let summary = read(summary).await;
+        assert_eq!(summary["commit_sha"], detail["overview"]["commit"]["sha"]);
+        assert!(summary["citations"].as_array().unwrap().iter().any(|citation| citation["path"] == "README.md"));
+        assert!(prompts.lock().unwrap().iter().any(|prompt| prompt.contains("payments")));
+        let detail = read(app.clone().oneshot(auth_request("GET", &format!("/v1/repositories/{repository_id}/detail"), member)).await.unwrap()).await;
+        assert_eq!(detail["ai_available"], true);
+        assert_eq!(detail["summary"]["summary_markdown"], summary["summary_markdown"]);
         let artifact_id = ledger["id"].as_str().unwrap();
         let refused = app
             .clone()

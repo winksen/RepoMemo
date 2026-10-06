@@ -170,7 +170,8 @@ export type ArtifactType =
   | "incident"
   | "runbook"
   | "api_spec"
-  | "note";
+  | "note"
+  | "repository";
 
 export interface WorkspaceOverview {
   workspace_id: string;
@@ -784,7 +785,54 @@ export interface RepoSource {
   file_count: number;
   indexed_file_count: number;
   active_job: IndexingJobStatus | null;
+  /** The evidence item that stands for the whole repository. */
+  overview_artifact_id: string | null;
   created_at: string;
+}
+
+export interface RepoLanguageShare {
+  language: string;
+  files: number;
+  bytes: number;
+}
+
+export interface RepoFolderShare {
+  path: string;
+  files: number;
+}
+
+export interface RepoKeyFile {
+  path: string;
+  artifact_id: string;
+  role: "readme" | "manifest" | "entry_point" | "docs" | string;
+}
+
+export interface RepoOverview {
+  commit: RepoCommit;
+  generated_at: string;
+  file_count: number;
+  total_bytes: number;
+  languages: RepoLanguageShare[];
+  folders: RepoFolderShare[];
+  key_files: RepoKeyFile[];
+  readme_excerpt: string | null;
+  recent_commits: RepoCommit[];
+}
+
+export interface RepoSummary {
+  summary_markdown: string;
+  citations: Citation[];
+  warnings: string[];
+  provider_name: string;
+  commit_sha: string;
+  generated_at: string;
+}
+
+export interface RepositoryDetailResponse {
+  repository: RepoSource;
+  overview: RepoOverview | null;
+  summary: RepoSummary | null;
+  ai_available: boolean;
 }
 
 export interface RepoFile {

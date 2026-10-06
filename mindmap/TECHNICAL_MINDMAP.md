@@ -18,7 +18,7 @@ mindmap
       JWT in sessionStorage
     HTTP API
       Axum 0.8 server
-      84 operations under v1
+      86 operations under v1
       JWT HS256 extractor
       Role guards per request
       SSE event stream
@@ -221,7 +221,7 @@ Other rules:
 
 ---
 
-## 5. HTTP API reference (84 operations)
+## 5. HTTP API reference (86 operations)
 
 Guard legend: **pub** = no auth, **auth** = any valid JWT, **R/W/A/O** = workspace read / write / admin / owner, **oR/oA/oO** = organization read / admin / owner. "→ activity" means the call records a `workspace_activity` row and so emits an SSE `activity` event.
 
@@ -304,6 +304,8 @@ Guard legend: **pub** = no auth, **auth** = any valid JWT, **R/W/A/O** = workspa
 | GET, PUT, DELETE | `/v1/repositories/{id}` | R / A / A | detail, settings (branch, include, exclude), remove with all its files |
 | POST | `/v1/repositories/{id}/sync` | W | queues a background sync (`kind = repo_sync` job). 409 if one is running |
 | GET | `/v1/repositories/{id}/files` | R | files in the tree, with index state |
+| GET | `/v1/repositories/{id}/detail` | R | the repository page: overview, last AI summary, `ai_available` |
+| POST | `/v1/repositories/{id}/summary` | W | generates and keeps a cited AI summary of the repository |
 
 Details, including what each sync does, are in [technical/repository-sources.md](technical/repository-sources.md).
 
@@ -470,7 +472,7 @@ Mentions are found with an FTS5 phrase query, then confirmed on the passage text
 
 ### 6.10 Repository sync ([crates/api/src/repo_sync.rs](../crates/api/src/repo_sync.rs), Repositories tab)
 
-A git repository is a source of `type = 'git_repo'` that is kept in step with what its branch has committed. A sync lists the commit's tree with `git ls-tree`, applies the file rules, compares the result with the `repo_files` rows by git blob id, and applies the difference: new files become artifacts, edited and renamed files update their artifact **in place** (so comments, memory links and lifecycle survive), and files that left the tree keep their artifact but lose their chunks and become `outdated`. Changed files are indexed inside the same job instead of through the per-artifact queue. Repository links are a per-workspace setting (Settings › Repositories), checked by the server before they are stored. Syncs run in the background one at a time ([apps/server/src/repositories.rs](../apps/server/src/repositories.rs)). Full design: [technical/repository-sources.md](technical/repository-sources.md).
+A git repository is a source of `type = 'git_repo'` that is kept in step with what its branch has committed. A sync lists the commit's tree with `git ls-tree`, applies the file rules, compares the result with the `repo_files` rows by git blob id, and applies the difference: new files become artifacts, edited and renamed files update their artifact **in place** (so comments, memory links and lifecycle survive), and files that left the tree keep their artifact but lose their chunks and become `outdated`. Changed files are indexed inside the same job instead of through the per-artifact queue. Each sync also writes an overview of the repository (languages, structure, key files, README opening, recent commits) as the content of **one `repository` artifact** that stands for the whole repository in the Evidence ledger; an AI summary of it is generated on request ([crates/api/src/repo_overview.rs](../crates/api/src/repo_overview.rs)). Repository links are a per-workspace setting (Settings › Repositories), checked by the server before they are stored. Syncs run in the background one at a time ([apps/server/src/repositories.rs](../apps/server/src/repositories.rs)). Full design: [technical/repository-sources.md](technical/repository-sources.md).
 
 ---
 

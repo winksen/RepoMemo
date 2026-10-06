@@ -13,7 +13,8 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context, Result};
 use repomemo_domain::{
-    IndexingJobStatus, RepoAccessCheck, RepoCommit, RepoFile, RepoSettings, RepoSkipCount, RepoSource,
+    IndexingJobStatus, RepoAccessCheck, RepoCommit, RepoDetail, RepoFile, RepoOverview,
+    RepoSettings, RepoSummary, RepoSkipCount, RepoSource,
     RepoSyncReport, Source, SourceType, REPO_SYNC_JOB_KIND,
 };
 use repomemo_git::{GitRepo, TreeFile};
@@ -23,6 +24,9 @@ use repomemo_storage::{RepoFileRecord, RepoFileWrite, StorageEngine};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
+use crate::repo_overview::{
+    compute_overview, key_file_role, overview_markdown, readme_excerpt, RECENT_COMMITS,
+};
 use crate::RepoMemoCore;
 
 /// Skipped paths kept per reason in a sync report.
@@ -44,6 +48,15 @@ struct RepoSourceMetadata {
     last_error: Option<String>,
     #[serde(default)]
     last_report: Option<RepoSyncReport>,
+    /// What the repository held at the last complete sync.
+    #[serde(default)]
+    overview: Option<RepoOverview>,
+    /// The artifact that stands for the whole repository.
+    #[serde(default)]
+    overview_artifact_id: Option<String>,
+    /// The last AI summary, kept until it is regenerated.
+    #[serde(default)]
+    summary: Option<RepoSummary>,
 }
 
 impl RepoSourceMetadata {
@@ -205,7 +218,37 @@ impl RepoMemoCore {
         self.storage
             .update_source(source_id, &name, &source.status, &metadata.to_value(), false)
             .await?;
+        if let Some(artifact_id) = &metadata.overview_artifact_id {
+            let _ = self.storage.update_artifact_title(artifact_id, &name).await;
+        }
         self.repo_source(source_id).await
+    }
+
+    /// The repository with its overview and last summary, for its page.
+    pub async fn repo_detail(&self, source_id: &str) -> Result<RepoDetail> {
+        let source = self.repo_source_row(source_id).await?;
+        let metadata = RepoSourceMetadata::of(&source);
+        Ok(RepoDetail {
+            repository: self.repo_source(source_id).await?,
+            overview: metadata.overview,
+            summary: metadata.summary,
+        })
+    }
+
+    pub(crate) async fn store_repo_summary(&self, source_id: &str, summary: RepoSummary) -> Result<()> {
+        let source = self.repo_source_row(source_id).await?;
+        let mut metadata = RepoSourceMetadata::of(&source);
+        metadata.summary = Some(summary);
+        self.storage
+            .update_source(source_id, &source.name, &source.status, &metadata.to_value(), false)
+            .await?;
+        Ok(())
+    }
+
+    /// The summary as stored now, so a sync that read the metadata earlier
+    /// does not drop a summary generated while it ran.
+    async fn latest_repo_summary(&self, source_id: &str) -> Result<Option<RepoSummary>> {
+        Ok(RepoSourceMetadata::of(&self.storage.get_source(source_id).await?).summary)
     }
 
     /// Disconnects a repository and deletes every file stored from it.
@@ -435,16 +478,41 @@ impl RepoMemoCore {
         // The tree is stored; remember the commit before the slower indexing,
         // so an interrupted index pass does not repeat the file work.
         if !report.cancelled {
-            metadata.last_synced_commit = Some(RepoCommit {
+            let synced_commit = RepoCommit {
                 sha: info.sha,
                 summary: info.summary,
                 author_name: info.author_name,
                 committed_at: info.committed_at,
                 branch,
-            });
+            };
+            let recent_commits = repo
+                .recent_commits(&commit, RECENT_COMMITS)
+                .await
+                .unwrap_or_default()
+                .into_iter()
+                .map(|commit| RepoCommit {
+                    sha: commit.sha,
+                    summary: commit.summary,
+                    author_name: commit.author_name,
+                    committed_at: commit.committed_at,
+                    branch: None,
+                })
+                .collect();
+            let (overview, overview_artifact_id) = self
+                .write_repo_overview(
+                    &source,
+                    synced_commit.clone(),
+                    recent_commits,
+                    metadata.overview_artifact_id.as_deref(),
+                )
+                .await?;
+            metadata.last_synced_commit = Some(synced_commit);
             metadata.last_synced_at = Some(chrono_now());
+            metadata.overview = Some(overview);
+            metadata.overview_artifact_id = Some(overview_artifact_id);
         }
         metadata.last_report = Some(report.clone());
+        metadata.summary = self.latest_repo_summary(source_id).await?;
         let source = self
             .storage
             .update_source(source_id, &source.name, "syncing", &metadata.to_value(), false)
@@ -485,6 +553,23 @@ impl RepoMemoCore {
                         .await?;
                 }
             }
+            // The item that stands for the repository is indexed last, once
+            // its files are.
+            if let (false, Some(artifact_id)) = (report.cancelled, &metadata.overview_artifact_id) {
+                let artifact = self.storage.get_artifact_summary(artifact_id).await?;
+                if artifact.indexed_at.is_none() {
+                    match self.index_artifact_inner(&artifact).await {
+                        Ok(_) => {
+                            let _ = self.storage.clear_index_failure(artifact_id).await;
+                        }
+                        Err(error) => {
+                            self.storage
+                                .record_index_failure(artifact_id, &format!("{error:#}"), 1)
+                                .await?;
+                        }
+                    }
+                }
+            }
             self.storage
                 .update_indexing_job(job_id, "running", "indexing", progress as i64, None)
                 .await?;
@@ -492,10 +577,59 @@ impl RepoMemoCore {
 
         metadata.last_report = Some(report.clone());
         metadata.last_error = None;
+        metadata.summary = self.latest_repo_summary(source_id).await?;
         self.storage
             .update_source(source_id, &source.name, "ready", &metadata.to_value(), !report.cancelled)
             .await?;
         Ok(report)
+    }
+
+    /// Computes the repository's overview from its stored files and writes
+    /// it as the content of the artifact that stands for the repository.
+    async fn write_repo_overview(
+        &self,
+        source: &Source,
+        commit: RepoCommit,
+        recent_commits: Vec<RepoCommit>,
+        existing_artifact_id: Option<&str>,
+    ) -> Result<(RepoOverview, String)> {
+        let files = self.storage.list_repo_file_entries(&source.id).await?;
+        let readme = files
+            .iter()
+            .filter(|file| key_file_role(&file.path) == Some("readme"))
+            .min_by_key(|file| !file.path.to_ascii_lowercase().ends_with(".md"));
+        let excerpt = match readme {
+            Some(file) => {
+                let bytes = self.storage.read_artifact_blob(&file.artifact_id).await?;
+                readme_excerpt(&String::from_utf8_lossy(&bytes))
+            }
+            None => None,
+        };
+        let overview = compute_overview(commit, &files, excerpt, recent_commits, chrono_now());
+        let root = source.root_uri.clone().unwrap_or_default();
+        let content = overview_markdown(&source.name, &root, &overview).into_bytes();
+        let content_hash = StorageEngine::content_hash(&content);
+        self.storage
+            .store_blob(&content_hash, &content, Some("text/markdown"))
+            .await?;
+        let artifact_id = self
+            .storage
+            .write_repo_overview_artifact(
+                &source.workspace_id,
+                &source.id,
+                existing_artifact_id,
+                &source.name,
+                &root,
+                &content_hash,
+                content.len() as i64,
+                &json!({
+                    "origin": "git_repo_overview",
+                    "repo_root": root,
+                    "commit": overview.commit.sha,
+                }),
+            )
+            .await?;
+        Ok((overview, artifact_id))
     }
 
     async fn store_repo_blob(
@@ -568,6 +702,7 @@ impl RepoMemoCore {
             file_count,
             indexed_file_count,
             active_job,
+            overview_artifact_id: metadata.overview_artifact_id,
             created_at: source.created_at,
         })
     }
@@ -754,6 +889,18 @@ mod tests {
         let refund_id = files[2].artifact_id.clone();
         let renamed_id = files[1].artifact_id.clone();
 
+        // The whole repository is one more evidence item, with its overview.
+        let detail = core.repo_detail(&source.id).await.unwrap();
+        let overview = detail.overview.unwrap();
+        assert_eq!(overview.file_count, 3);
+        assert_eq!(overview.readme_excerpt.as_deref(), Some("# Payments\n\nHow refunds work."));
+        assert_eq!(overview.recent_commits.len(), 1);
+        let overview_id = detail.repository.overview_artifact_id.unwrap();
+        let item = core.get_artifact(overview_id.clone()).await.unwrap();
+        assert_eq!(item.summary.artifact_type, repomemo_domain::ArtifactType::Repository);
+        assert!(item.summary.indexed_at.is_some());
+        assert!(item.content_preview.unwrap().contains("## Structure"));
+
         let hits = core
             .search_workspace(repomemo_domain::SearchRequest {
                 workspace_id: workspace.id.clone(),
@@ -794,6 +941,12 @@ mod tests {
         let commit = source.last_synced_commit.unwrap();
         assert_eq!(commit.summary, "Rework refunds");
         assert_eq!(commit.branch.as_deref(), Some("main"));
+        let detail = core.repo_detail(&source.id).await.unwrap();
+        assert_eq!(detail.repository.overview_artifact_id.as_deref(), Some(overview_id.as_str()));
+        let overview = detail.overview.unwrap();
+        assert_eq!(overview.file_count, 2);
+        assert_eq!(overview.readme_excerpt, None);
+        assert_eq!(overview.recent_commits[0].summary, "Rework refunds");
 
         // The removed README is kept for its links but no longer searchable,
         // and is never queued for indexing again.
@@ -818,6 +971,7 @@ mod tests {
             .all(|artifact| artifact.path != "README.md"));
         assert!(core.artifacts_needing_index().await.unwrap().is_empty());
 
+        assert!(core.summarize_repo(&source.id, "missing-provider").await.is_err());
         core.remove_repo_source(&source.id).await.unwrap();
         assert!(core.list_artifacts(workspace.id.clone()).await.unwrap().is_empty());
 

@@ -50,6 +50,8 @@ import type {
   WorkspaceMetrics,
   RepoAccessCheck,
   RepoFile,
+  RepoSummary,
+  RepositoryDetailResponse,
   RepoSettings,
   RepoSource,
   RepositoryList,
@@ -872,6 +874,14 @@ export function deleteSharedRepository(accessToken: string, repositoryId: string
 
 export function syncSharedRepository(accessToken: string, repositoryId: string): Promise<{ repository: RepoSource; job: IndexingJobStatus | null }> {
   return request(`/v1/repositories/${repositoryId}/sync`, { method: "POST" }, accessToken);
+}
+
+export function getSharedRepositoryDetail(accessToken: string, repositoryId: string): Promise<RepositoryDetailResponse> {
+  return request<RepositoryDetailResponse>(`/v1/repositories/${repositoryId}/detail`, {}, accessToken);
+}
+
+export function summarizeSharedRepository(accessToken: string, repositoryId: string): Promise<RepoSummary> {
+  return request<RepoSummary>(`/v1/repositories/${repositoryId}/summary`, { method: "POST" }, accessToken);
 }
 
 export function listSharedRepositoryFiles(accessToken: string, repositoryId: string): Promise<RepoFile[]> {
