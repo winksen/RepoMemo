@@ -24,6 +24,7 @@ mod agent;
 mod embeddings;
 mod health;
 mod knowledge_map;
+mod repo_sync;
 
 pub use agent::{agent_capabilities, agent_conversation_title, agent_turn_label};
 pub use embeddings::EmbeddingRun;
@@ -392,7 +393,7 @@ impl RepoMemoCore {
         // Incremental: artifacts already indexed by the current indexer are left alone.
         let artifacts = self
             .storage
-            .list_artifacts_needing_index(Some(&workspace_id), INDEXER_VERSION)
+            .list_artifacts_needing_index(Some(&workspace_id), INDEXER_VERSION, true)
             .await?;
         let total = artifacts.len() as i64;
         let job = self
@@ -443,10 +444,11 @@ impl RepoMemoCore {
 
     /// Artifacts that were never indexed, or were indexed by an older indexer
     /// version, across every workspace. Images are only listed until their
-    /// first index, so refreshing never repeats vision analysis.
+    /// first index, so refreshing never repeats vision analysis. Repository
+    /// files are left to their repository's sync.
     pub async fn artifacts_needing_index(&self) -> Result<Vec<ArtifactSummary>> {
         self.storage
-            .list_artifacts_needing_index(None, INDEXER_VERSION)
+            .list_artifacts_needing_index(None, INDEXER_VERSION, false)
             .await
     }
 

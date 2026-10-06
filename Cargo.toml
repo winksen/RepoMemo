@@ -1,6 +1,7 @@
 [workspace]
 members = [
   "crates/domain",
+  "crates/git",
   "crates/ingestion",
   "crates/indexer",
   "crates/retrieval",
@@ -57,6 +58,7 @@ uuid = { version = "1", features = ["v4", "serde"] }
 repomemo-api = { path = "crates/api" }
 repomemo-ai = { path = "crates/ai" }
 repomemo-domain = { path = "crates/domain" }
+repomemo-git = { path = "crates/git" }
 repomemo-ingestion = { path = "crates/ingestion" }
 repomemo-indexer = { path = "crates/indexer" }
 repomemo-retrieval = { path = "crates/retrieval" }

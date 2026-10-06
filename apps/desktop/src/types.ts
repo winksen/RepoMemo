@@ -312,6 +312,8 @@ export interface ArtifactIndexFailure {
 
 export interface ArtifactSummary {
   folder_id?: string | null;
+  /** Set when the file is synced from a connected git repository. */
+  repository_id?: string | null;
   id: string;
   workspace_id: string;
   source_id: string;
@@ -355,6 +357,8 @@ export interface IndexingJobStatus {
   id: string;
   workspace_id: string;
   source_id: string | null;
+  kind?: string;
+  cancel_requested?: boolean;
   status: string;
   stage: string;
   progress_current: number;
@@ -728,4 +732,74 @@ export interface AskAnswer {
   retrieved_context: SearchResult[];
   confidence: number | null;
   warnings: string[];
+}
+
+export interface RepoSettings {
+  branch: string | null;
+  include: string[];
+  exclude: string[];
+}
+
+export interface RepoCommit {
+  sha: string;
+  summary: string;
+  author_name: string;
+  committed_at: string;
+  branch: string | null;
+}
+
+export interface RepoSkipCount {
+  reason: string;
+  count: number;
+  examples: string[];
+}
+
+export interface RepoSyncReport {
+  commit_sha: string;
+  files_in_tree: number;
+  added: number;
+  updated: number;
+  renamed: number;
+  removed: number;
+  restored: number;
+  unchanged: number;
+  skipped: number;
+  skipped_by_reason: RepoSkipCount[];
+  indexed: number;
+  index_failed: number;
+  cancelled: boolean;
+}
+
+export interface RepoSource {
+  id: string;
+  workspace_id: string;
+  name: string;
+  root_path: string;
+  settings: RepoSettings;
+  status: "pending" | "syncing" | "ready" | "error";
+  last_synced_commit: RepoCommit | null;
+  last_synced_at: string | null;
+  last_error: string | null;
+  last_report: RepoSyncReport | null;
+  file_count: number;
+  indexed_file_count: number;
+  active_job: IndexingJobStatus | null;
+  created_at: string;
+}
+
+export interface RepoFile {
+  path: string;
+  artifact_id: string;
+  artifact_type: ArtifactType;
+  language: string | null;
+  size_bytes: number;
+  indexed: boolean;
+  index_failure: string | null;
+  commit_sha: string;
+}
+
+export interface RepositoryList {
+  local_repositories_enabled: boolean;
+  allowed_roots: string[];
+  repositories: RepoSource[];
 }

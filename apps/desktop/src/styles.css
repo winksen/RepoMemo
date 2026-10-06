@@ -238,7 +238,7 @@ textarea:focus-visible {
 .rm-button.shared-rail-workspace,
 .rm-button.shared-rail-organization { gap: 8px; min-height: 34px; padding: 0 8px; color: var(--color-text-muted); background: transparent; border: 0; border-radius: 7px; font-size: 12px; font-weight: 650; text-align: left; }
 .rm-button.shared-rail-workspace span,
-.rm-button.shared-rail-organization span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rm-button.shared-rail-organization span { overflow: hidden; line-height: 1.5; text-overflow: ellipsis; white-space: nowrap; }
 .rm-button.shared-rail-workspace:hover:not(:disabled),
 .rm-button.shared-rail-organization:hover:not(:disabled) { color: var(--color-text); background: var(--color-surface-2); border-color: transparent; }
 .rm-button.shared-rail-workspace.active,
@@ -654,6 +654,16 @@ textarea:focus-visible {
 .shared-member-row span { display: block; }
 .shared-member-row strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .shared-member-row > div span { margin-top: 2px; overflow: hidden; color: var(--color-text-muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.shared-member-list:has(.shared-member-card) { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.shared-member-card { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 4px 12px; padding: 14px 16px; background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: 12px; }
+.shared-member-card > div { min-width: 0; }
+.shared-member-card strong, .shared-member-card > div span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shared-member-card strong { font-size: 14px; line-height: 1.5; }
+.shared-member-card > div span { color: var(--color-text-muted); font-size: 12px; line-height: 1.5; }
+.shared-member-card .shared-member-role { justify-self: start; grid-column: 2; }
+.shared-member-card .shared-member-remove { justify-self: start; grid-column: 2; }
+.shared-member-avatar { grid-row: 1 / span 3; display: grid; width: 40px; height: 40px; place-items: center; color: var(--color-text-muted); background: var(--color-surface-3); border-radius: 50%; }
+.shared-member-card.role-owner .shared-member-avatar, .shared-member-card.role-admin .shared-member-avatar { color: var(--color-text); border: 1px solid var(--color-border-strong); }
 .shared-member-role { padding: 3px 6px; color: var(--color-text-muted); background: var(--color-surface-3); border-radius: 999px; font-size: 10px; font-weight: 700; text-transform: capitalize; }
 .shared-member-remove { padding: 4px 0; color: var(--color-danger); background: transparent; cursor: pointer; font-size: 11px; font-weight: 700; }
 .shared-member-remove:disabled { cursor: wait; opacity: 0.6; }

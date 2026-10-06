@@ -18,7 +18,7 @@ mindmap
       JWT in sessionStorage
     HTTP API
       Axum 0.8 server
-      76 operations under v1
+      83 operations under v1
       JWT HS256 extractor
       Role guards per request
       SSE event stream
@@ -27,10 +27,11 @@ mindmap
       Ingestion
       Indexer and tree-sitter
       Retrieval FTS5 plus vectors
+      Git repository sync
       AI providers
     Storage
       SQLite WAL via sqlx
-      11 migrations
+      17 migrations
       Content-addressed blobs
       Job and activity observers
     Runtime
@@ -101,6 +102,7 @@ flowchart TD
   api --> indexer[crates/indexer]
   api --> retrieval[crates/retrieval]
   api --> storage[crates/storage]
+  api --> git[crates/git]
   indexer --> ingestion
   retrieval --> storage
   storage --> domain[crates/domain]
@@ -117,6 +119,7 @@ flowchart TD
 | `crates/indexer` | Chunking (Markdown by heading, structure-aware code chunks for TS/TSX/JS, Python and Rust, 100-line windows as fallback) and tree-sitter symbols. Exports `INDEXER_VERSION` | [lib.rs](../crates/indexer/src/lib.rs) | ~570 |
 | `crates/retrieval` | FTS query sanitising, hybrid FTS + vector merge | [lib.rs](../crates/retrieval/src/lib.rs) | ~100 |
 | `crates/ai` | `AiProvider` trait, with Ollama and OpenRouter implementations over `reqwest` (rustls) | [lib.rs](../crates/ai/src/lib.rs) | ~530 |
+| `crates/git` | Read-only `git` CLI access: resolve a branch, list a commit's tree, stream blobs through `git cat-file --batch` | [lib.rs](../crates/git/src/lib.rs) | ~360 |
 | `crates/api` | `RepoMemoCore` facade: import, index, search, summarize, ask, memory cards | [lib.rs](../crates/api/src/lib.rs) | ~1,075 |
 | `apps/server` | Axum router, auth, authorization, collaboration handlers, SSE | [lib.rs](../apps/server/src/lib.rs), [events.rs](../apps/server/src/events.rs) | ~4,320 |
 | `apps/worker` | Placeholder process. It logs and waits for Ctrl-C, and has **no job claiming** | [main.rs](../apps/worker/src/main.rs) | 30 |
@@ -137,6 +140,7 @@ flowchart TD
 | `REPOMEMO_SERVER_DATA_DIR` | `.repomemo-server` | Holds `repomemo.sqlite` and `blobs/`. The path is relative to the CWD. |
 | `REPOMEMO_ALLOWED_ORIGIN` | `http://127.0.0.1:3021` | The **only** CORS origin. Allowed methods are GET, POST, PUT and DELETE. Allowed headers are `Authorization`, `Content-Type` and `X-RepoMemo-Filename`. |
 | `REPOMEMO_SERVICE_NAME` | `repomemo-server` | Parsed, but `/health` hardcodes the name, so the value is effectively unused. |
+| `REPOMEMO_REPO_ROOTS` | unset | Folders local git repositories may be connected from, in PATH format (`;` on Windows, `:` elsewhere). **Unset turns repository sources off.** See [repository sources](technical/repository-sources.md). |
 | `RUST_LOG` | `repomemo_server=info,tower_http=info` | Read by the `tracing-subscriber` EnvFilter. |
 
 Tower layers: `TraceLayer`, `DefaultBodyLimit::max(10 MiB)` and `CorsLayer`.
@@ -218,7 +222,7 @@ Other rules:
 
 ---
 
-## 5. HTTP API reference (76 operations)
+## 5. HTTP API reference (83 operations)
 
 Guard legend: **pub** = no auth, **auth** = any valid JWT, **R/W/A/O** = workspace read / write / admin / owner, **oR/oA/oO** = organization read / admin / owner. "→ activity" means the call records a `workspace_activity` row and so emits an SSE `activity` event.
 
@@ -291,6 +295,17 @@ Guard legend: **pub** = no auth, **auth** = any valid JWT, **R/W/A/O** = workspa
 | GET | `/v1/jobs/{j}` | R | |
 | POST | `/v1/jobs/{j}/cancel` | W | sets `cancel_requested`. Cooperative, checked between artifacts or batches |
 | GET | `/v1/workspaces/{ws}/events` | R | **SSE** with `job` and `activity` events and a 15 s keep-alive |
+
+### Repositories
+
+| Method | Path | Guard | Notes |
+|---|---|---|---|
+| GET, POST | `/v1/workspaces/{ws}/repositories` | R / A | list (with `local_repositories_enabled`), connect a local repository and start its first sync |
+| GET, PUT, DELETE | `/v1/repositories/{id}` | R / A / A | detail, settings (branch, include, exclude), remove with all its files |
+| POST | `/v1/repositories/{id}/sync` | W | queues a background sync (`kind = repo_sync` job). 409 if one is running |
+| GET | `/v1/repositories/{id}/files` | R | files in the tree, with index state |
+
+Details, including what each sync does, are in [technical/repository-sources.md](technical/repository-sources.md).
 
 ### Retrieval and memory
 
@@ -453,6 +468,10 @@ The page (`KnowledgeMapPanel`) lays the graph out in the browser with a determin
 
 Mentions are found with an FTS5 phrase query, then confirmed on the passage text; at most 200 queries run per check. Each finding has a fingerprint built from the facts behind it. `POST /v1/workspaces/{id}/health/actions` (owners and admins) re-runs the checks, acts only on the finding as it stands now (409 when it changed), applies the change through the evidence lifecycle or the task list, and records the outcome in `workspace_health_actions`. A finding with a recorded outcome stays hidden until its fingerprint changes. Per detector, the page shows how many findings were acted on and how many were dismissed, to show which checks earn their place.
 
+### 6.10 Repository sync ([crates/api/src/repo_sync.rs](../crates/api/src/repo_sync.rs), Repositories tab)
+
+A git repository is a source of `type = 'git_repo'` that is kept in step with what its branch has committed. A sync lists the commit's tree with `git ls-tree`, applies the file rules, compares the result with the `repo_files` rows by git blob id, and applies the difference: new files become artifacts, edited and renamed files update their artifact **in place** (so comments, memory links and lifecycle survive), and files that left the tree keep their artifact but lose their chunks and become `outdated`. Changed files are indexed inside the same job instead of through the per-artifact queue. Syncs run in the background one at a time ([apps/server/src/repositories.rs](../apps/server/src/repositories.rs)) and only under `REPOMEMO_REPO_ROOTS`. Full design: [technical/repository-sources.md](technical/repository-sources.md).
+
 ---
 
 ## 7. Data model
@@ -474,6 +493,7 @@ The database is SQLite in WAL mode with foreign keys on, a pool of at most 5 con
 | 0011 | index_version | `artifacts.index_version`, the indexer version that produced the current chunks |
 | 0014 | assistant_conversations | assistant_conversations, assistant_turns (per-user assistant chats, §6.7) |
 | 0015 | workspace_health | workspace_health_actions (what administrators did with each health finding, §6.9) |
+| 0017 | repo_files | one row per tracked path of a repository source: its artifact, git blob id, commit and `removed_at` (§6.10) |
 
 ```mermaid
 erDiagram
@@ -504,6 +524,8 @@ erDiagram
   workspaces ||--o{ assistant_conversations : has
   users ||--o{ assistant_conversations : owns
   assistant_conversations ||--o{ assistant_turns : contains
+  sources ||--o{ repo_files : "tracks paths"
+  artifacts ||--o| repo_files : "holds file"
 ```
 
 Notes:
@@ -612,3 +634,4 @@ This file is the root of the technical mindmap. Each branch can grow into its ow
 | Web client architecture | `technical/web-client.md` |
 | Operations: config, deploy, backup | `technical/operations.md` |
 | Risks and tech-debt register | `technical/tech-debt.md` |
+| Repository sources (git) | ✅ [technical/repository-sources.md](technical/repository-sources.md) |

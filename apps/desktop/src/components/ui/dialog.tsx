@@ -5,6 +5,7 @@ import { Button } from "./button";
 /** A centered modal with a title, optional description and a footer of actions. */
 export function Dialog({
   children,
+  className,
   description,
   footer,
   onClose,
@@ -12,6 +13,7 @@ export function Dialog({
   title,
 }: {
   children?: ReactNode;
+  className?: string;
   description?: ReactNode;
   footer: ReactNode;
   onClose: () => void;
@@ -22,7 +24,7 @@ export function Dialog({
     <DialogPrimitive.Root onOpenChange={(next) => { if (!next) onClose(); }} open={open}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="rm-dialog-overlay" />
-        <DialogPrimitive.Content className="rm-dialog">
+        <DialogPrimitive.Content className={className ? `rm-dialog ${className}` : "rm-dialog"}>
           <DialogPrimitive.Title className="rm-dialog-title">{title}</DialogPrimitive.Title>
           {description ? <DialogPrimitive.Description className="rm-dialog-description">{description}</DialogPrimitive.Description> : null}
           {children ? <div className="rm-dialog-body">{children}</div> : null}
@@ -33,6 +35,6 @@ export function Dialog({
   );
 }
 
-export function DialogCancel({ onClick }: { onClick: () => void }) {
-  return <Button onClick={onClick} type="button" variant="secondary">Cancel</Button>;
+export function DialogCancel({ label = "Cancel", onClick }: { label?: string; onClick: () => void }) {
+  return <Button onClick={onClick} type="button" variant="secondary">{label}</Button>;
 }

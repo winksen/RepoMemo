@@ -3466,12 +3466,15 @@ name = "repomemo-api"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "repomemo-ai",
  "repomemo-domain",
+ "repomemo-git",
  "repomemo-indexer",
  "repomemo-ingestion",
  "repomemo-retrieval",
  "repomemo-storage",
+ "serde",
  "serde_json",
  "tokio",
 ]
@@ -3495,6 +3498,14 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "repomemo-git"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "tokio",
 ]
 
 [[package]]

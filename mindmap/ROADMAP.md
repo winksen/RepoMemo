@@ -29,6 +29,7 @@ timeline
 |---|---|
 | Phase 1: Local memory loop (1A–1H) | ✅ Complete |
 | Phase S: Shared team mode | ✅ Core complete · 🔄 background jobs in progress |
+| Repository indexing (git) | 🔄 Phase 1 (local repositories) delivered · phases 2–3 planned |
 | Next: Jobs, hardening, parity | 🔜 Planned |
 | Later: Git awareness, connectors, scale, enterprise | 💭 Direction |
 
@@ -90,6 +91,17 @@ V0.1.32 laid the groundwork: a jobs table with a kind and a cancel flag, the job
 
 ---
 
+## 🔄 In progress: repository indexing
+
+A git repository is connected as a **living source** instead of being uploaded file by file. Each sync reads what the branch has committed and applies only the difference, keeping every file's identity (comments, memory links, lifecycle) across edits and renames. Design and limits: [technical/repository-sources.md](technical/repository-sources.md).
+
+- [x] **Phase 1: local repositories and the sync engine.** `crates/git` (read-only git CLI), file rules with include/exclude patterns, the `repo_files` table (migration 0017), snapshot sync by git blob id with exact-rename detection, removed files kept but dropped from search, lifecycle changes on edit and removal, one `repo_sync` job per sync with progress and cancel, server routes guarded by `REPOMEMO_REPO_ROOTS`, resync at server start, and the **Repositories** section in the web client.
+- [ ] **Phase 1b: polish.** Automatic sync when the branch moves, renames with edits (`git diff -M`), commit shown on search results and citations, Tauri commands so the desktop app gets the same section.
+- [ ] **Phase 2: remote repositories.** Connect by URL with an encrypted token, partial bare clone under the data directory, scheduled fetch, `https`/`ssh` only.
+- [ ] **Phase 3: git awareness.** Last author and date per file, `CODEOWNERS` ownership hints, commit-pinned citations, push webhooks, issue and pull-request links.
+
+---
+
 ## 🔜 Next (proposed priorities)
 
 These items come from the gaps and risks recorded in the mindmaps. The order is a proposal and is open for discussion.
@@ -112,7 +124,7 @@ These carry over from the original roadmap and are still valid:
 
 | Direction | Scope |
 |---|---|
-| **Git-aware indexing** | Import repositories directly, with branch and commit metadata, changed files, ownership hints and commit/PR relationships |
+| **Git-aware indexing** | Started: local repositories sync by commit (see *In progress* above). Still to come: remote repositories, ownership hints and commit/PR relationships |
 | **Issue and PR connectors** | GitHub/GitLab first, then Linear/Jira. Link issues and PRs to artifacts and symbols |
 | **Scale-out team server** | PostgreSQL, object storage, a durable job queue, and Qdrant when vector search needs a service (see [ADR-0004](../docs/decisions/0004-embedded-vector-storage-before-qdrant.md)) |
 | **Enterprise / hosted** | SSO, permission-aware retrieval, audit export, policy controls and redaction, hosted and self-hosted deployment |

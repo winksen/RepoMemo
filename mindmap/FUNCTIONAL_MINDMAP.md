@@ -85,6 +85,11 @@ mindmap
       Word document preview
       Lifecycle review
       Discussion and mentions
+    Repositories
+      Connect a local git repository
+      Sync committed files
+      Edits and renames keep history
+      Include and exclude rules
     Indexing
       Automatic after save
       Split into passages
@@ -136,6 +141,8 @@ Joining an organization **automatically grants access to every workspace in it**
 | Open People / Activity / Settings sections | ✅ | ✅ | — | — |
 | Add or remove members | ✅ | ✅² | — | — |
 | Configure the AI provider | ✅ | ✅ | — | — |
+| Connect, configure or remove a git repository | ✅ | ✅ | — | — |
+| Sync a connected repository | ✅ | ✅ | ✅ | — |
 | Rename or delete the workspace | ✅ | — | — | — |
 
 ¹ The AI features need an enabled provider. A viewer can trigger them, so a viewer can also cause calls to a paid cloud provider.
@@ -236,6 +243,32 @@ If the same file with the same content is uploaded twice, it is stored only once
   `active` → `needs_review` → `verified` / `outdated` / `superseded`
   Each artifact can also have an **owner** (a workspace member) and a **review note**. `superseded` requires choosing the replacement artifact. Every change is kept in a **lifecycle history**.
 - **Discussion**: threaded comments of up to 5,000 characters. Typing `@someone@example.com` **notifies that workspace member**. Authors edit or delete their own comments, and admins and owners can moderate any comment.
+
+---
+
+## 5b. Repositories
+
+A team's code usually already lives in a git repository, with many files and a history. Uploading it file by file would be slow and would go stale at the next commit. The **Repositories** section connects a repository instead and keeps the workspace in step with it.
+
+| What you do | What happens |
+|---|---|
+| **Connect repository** (owners and admins) | Enter the folder of a git checkout on the server. RepoMemo reads what the branch has **committed**: never uncommitted edits, ignored files or build output. The first sync starts at once. |
+| **Sync now** (writers) | RepoMemo compares the branch's latest commit with what it stored. Only new and changed files are read and indexed; unchanged files cost nothing. |
+| **Settings** (owners and admins) | Choose a branch (default: whatever is checked out), and **include** or **exclude** paths with patterns such as `docs/**`, `src/`, `**/*.test.ts`. Applies from the next sync. |
+| **Browse files** | The repository's files, filterable by path. Each opens like any evidence: preview, lifecycle, comments. |
+| **Remove** (owners and admins) | Removes the repository's files, their index and memory links from the workspace. The repository on disk is untouched. |
+
+**How files follow the repository:**
+
+- An **edited** file is updated in place and re-indexed. Its comments, memory links and tasks stay attached. If it was *verified*, it goes back to *needs review*.
+- A **renamed** file (same content) keeps its identity under the new path.
+- A **deleted** file stays readable for the memory cards and comments that cite it, but it leaves search and Ask, and is marked *outdated* with the commit that removed it.
+
+**Skipped automatically:** dependency and build folders (`node_modules/`, `vendor/`, `dist/`, `build/`, `target/`…), lock files, minified files, images, files over 1 MB and binary files. Each sync reports how many files were skipped and why.
+
+Repository files are searchable and citable like any evidence, but they are listed in the Repositories section rather than the Evidence ledger, and they cannot be renamed or deleted one by one: change them in the repository, or exclude their path.
+
+**Availability:** the server operator turns this on by listing the folders repositories may come from (`REPOMEMO_REPO_ROOTS`). For now only repositories on the server's own disk can be connected; remote repositories (by URL) are planned. See the [technical design](technical/repository-sources.md).
 
 ---
 
@@ -369,7 +402,8 @@ These are observed in the code and are useful for prioritizing:
 | Sessions expire after 60 minutes with no renewal | Users are signed out mid-work and requests start failing. |
 | People need a RepoMemo account before they can be added | There is no invitation-by-email flow. |
 | No password reset | Users who are locked out need an administrator's help. |
-| Folder import exists only on desktop | Web users upload one file at a time. |
+| Folder import exists only on desktop | Web users upload one file at a time. Code in a git repository on the server can now be connected as a whole in **Repositories** (§5b). |
+| Repositories must be on the server's disk and are synced by hand | No remote URLs, no automatic sync when the branch moves, and a file renamed *and* edited in one commit loses its history. |
 | A memory card created from the web cites at most one artifact | The API supports several citations, but the UI offers only one. |
 
 ---
@@ -394,7 +428,8 @@ This gateway is the root of the functional mindmap. Each branch can grow into it
 | Term | Meaning |
 |---|---|
 | **Artifact / evidence** | A stored item: a note, file or image. |
-| **Source** | Where artifacts came from: "Pasted notes", "Shared uploads", or an imported folder on desktop. |
+| **Source** | Where artifacts came from: "Pasted notes", "Shared uploads", a connected git repository, or an imported folder on desktop. |
+| **Repository / sync** | A connected git repository, and the action that brings its files in step with the branch's latest commit. |
 | **Chunk / passage** | A searchable slice of an artifact that keeps its line range. |
 | **Symbol** | A named code construct such as a function or class, extracted during indexing. |
 | **Citation** | A pointer from an AI answer or memory card to the exact artifact and lines that support it. |

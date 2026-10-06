@@ -661,6 +661,10 @@ body,
 .rm-dialog { position: fixed; top: 50%; left: 50%; z-index: 901; display: grid; gap: 12px; width: min(440px, calc(100vw - 32px)); max-height: calc(100vh - 48px); padding: 20px; overflow: auto; color: var(--color-text); background: var(--color-surface); border: 1px solid var(--color-border-strong); border-radius: 12px; box-shadow: var(--shadow-floating); transform: translate(-50%, -50%); }
 .rm-dialog-title { margin: 0; font-size: 16px; font-weight: 700; }
 .rm-dialog-description { margin: 0; color: var(--color-text-muted); font-size: 13px; line-height: 1.5; }
+.rm-dialog-wide { width: min(720px, calc(100vw - 32px)); }
+.shared-ai-citations-full { max-width: none; max-height: 60vh; overflow: auto; }
+.shared-assistant-citation-more { justify-self: start; padding: 0; color: var(--color-text); background: none; border: 0; cursor: pointer; font: inherit; font-weight: 600; text-decoration: underline; }
+.shared-assistant-citation-more:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
 .rm-dialog-body { display: grid; gap: 8px; }
 .rm-dialog-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
 .rm-dialog-footer .rm-button.rm-button-danger { color: #fff; background: #c9372c; border-color: #c9372c; }
@@ -923,3 +927,54 @@ body,
 .shared-artifact-browser-summary .shared-folder-path + span::before { margin: 0 8px; color: var(--color-text-subtle); content: "•"; }
 .shared-artifact-type-menu-panel label input[type="checkbox"] { box-sizing: border-box; width: 16px; height: 16px; min-width: 16px; min-height: 16px; max-width: 16px; max-height: 16px; margin: 0; padding: 0; flex: 0 0 16px; align-self: center; }
 .shared-artifact-type-menu-panel label input[type="checkbox"]:checked::after { top: 1px; left: 4px; box-sizing: content-box; }
+
+.rm-button.shared-user-signout:hover:not(:disabled), .rm-button.shared-user-signout:focus-visible { border-color: var(--color-danger); }
+
+/* Repositories: connected git repositories and their sync state. */
+.rm-repos { display: grid; gap: 20px; max-width: 1160px; }
+.rm-repo-list { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.rm-repo-card { display: grid; gap: 14px; padding: 16px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px; min-width: 0; }
+.rm-repo-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; min-width: 0; }
+.rm-repo-head > div { display: grid; gap: 4px; min-width: 0; }
+.rm-repo-head h3 { margin: 0; color: var(--color-text); font-size: 15px; font-weight: 650; line-height: 1.35; overflow-wrap: anywhere; }
+.rm-repo-path { color: var(--color-text-subtle); font-family: var(--font-mono); font-size: 12px; overflow-wrap: anywhere; }
+.rm-repo-status { flex: none; padding: 2px 10px; color: var(--color-text-muted); background: var(--color-surface-3); border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.rm-repo-status.status-ready { color: var(--color-success); background: var(--color-success-soft); }
+.rm-repo-status.status-syncing { color: var(--color-accent-text); background: var(--color-accent-soft); }
+.rm-repo-status.status-error { color: var(--color-danger); background: var(--color-danger-soft); }
+.rm-repo-facts { display: grid; gap: 6px; margin: 0; font-size: 13px; }
+.rm-repo-facts > div { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; align-items: baseline; }
+.rm-repo-facts dt { display: inline-flex; align-items: center; gap: 6px; color: var(--color-text-muted); font-size: 12px; font-weight: 600; }
+.rm-repo-facts dd { margin: 0; color: var(--color-text); line-height: 1.5; overflow-wrap: anywhere; }
+.rm-repo-facts code, .rm-repo-rules code { font-family: var(--font-mono); font-size: 12px; }
+.rm-repo-rules { display: flex; flex-wrap: wrap; gap: 6px; }
+.rm-repo-rules code { padding: 1px 8px; background: var(--color-code-surface); border-radius: 6px; }
+.rm-repo-progress { display: grid; gap: 6px; font-size: 12px; color: var(--color-text-muted); }
+.rm-repo-progress > div { display: flex; justify-content: space-between; gap: 12px; font-variant-numeric: tabular-nums; }
+.rm-repo-progress progress { width: 100%; height: 6px; appearance: none; border: 0; border-radius: 999px; background: var(--color-surface-3); overflow: hidden; accent-color: var(--color-accent); }
+.rm-repo-progress progress::-webkit-progress-bar { background: var(--color-surface-3); border-radius: 999px; }
+.rm-repo-progress progress::-webkit-progress-value { background: var(--color-accent); border-radius: 999px; }
+.rm-repo-progress progress::-moz-progress-bar { background: var(--color-accent); border-radius: 999px; }
+.rm-repo-error { display: flex; align-items: flex-start; gap: 6px; margin: 0; padding: 8px 12px; color: var(--color-danger); background: var(--color-danger-soft); border-radius: 8px; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.rm-repo-error svg { flex: none; margin-top: 2px; }
+.rm-repo-report { display: grid; gap: 6px; color: var(--color-text-muted); font-size: 13px; }
+.rm-repo-report summary { cursor: pointer; width: fit-content; }
+.rm-repo-report summary:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; border-radius: 2px; }
+.rm-repo-report ul { display: grid; gap: 4px; margin: 6px 0 0; padding-left: 18px; font-size: 12px; }
+.rm-repo-report li { overflow-wrap: anywhere; }
+.rm-repo-files { display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid var(--color-border); min-width: 0; }
+.rm-repo-files ul { display: grid; gap: 2px; max-height: 360px; margin: 0; padding: 0; overflow: auto; list-style: none; }
+.rm-repo-files li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 4px 0; min-width: 0; font-size: 13px; }
+.rm-repo-files .rm-map-link { font-family: var(--font-mono); font-size: 12px; overflow-wrap: anywhere; }
+.rm-repo-form { display: grid; gap: 14px; }
+.rm-repo-form label { display: grid; gap: 6px; color: var(--color-text-muted); font-size: 12px; font-weight: 600; }
+.rm-repo-form label .rm-map-muted { font-weight: 400; }
+.rm-repo-form textarea { font-family: var(--font-mono); font-size: 12px; }
+.rm-repo-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 640px) {
+  .rm-repo-card { padding: 12px; }
+  .rm-repo-head { flex-wrap: wrap; }
+  .rm-repo-facts > div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .rm-repo-form-row { grid-template-columns: minmax(0, 1fr); }
+  .rm-repos .rm-health-actions .rm-button { flex: 1 1 100%; }
+}

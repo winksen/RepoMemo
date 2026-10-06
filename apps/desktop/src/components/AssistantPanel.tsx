@@ -313,6 +313,22 @@ function routingNote(reply: AgentReply, capabilities: AgentCapabilities | null) 
   return label;
 }
 
+const EVIDENCE_PREVIEW_LIMIT = 5;
+
+function Evidence({ citations, isQuestion, onOpenArtifact }: { citations: AgentReply["citations"]; isQuestion: boolean; onOpenArtifact: (artifactId: string) => void }) {
+  const [showAll, setShowAll] = useState(false);
+  const hidden = citations.length - EVIDENCE_PREVIEW_LIMIT;
+  const renderCitation = (citation: AgentReply["citations"][number], index: number, onOpen: (artifactId: string) => void) => <button className="shared-assistant-citation" key={`${citation.artifact_id}-${citation.chunk_id ?? "artifact"}`} onClick={() => onOpen(citation.artifact_id)} type="button">{/* Answers cite their passages as [1], [2]… in this order. */}{isQuestion ? `[${index + 1}] ` : ""}{citation.title} · {citation.path}{citation.start_line ? ` · line ${citation.start_line}` : ""}</button>;
+  return <div className="shared-ai-citations">
+    <strong>Evidence used</strong>
+    {citations.slice(0, EVIDENCE_PREVIEW_LIMIT).map((citation, index) => renderCitation(citation, index, onOpenArtifact))}
+    {hidden > 0 ? <button className="shared-assistant-citation-more" onClick={() => setShowAll(true)} type="button">Show all {citations.length} sources</button> : null}
+    {showAll ? <Dialog className="rm-dialog-wide" footer={<DialogCancel label="Close" onClick={() => setShowAll(false)} />} onClose={() => setShowAll(false)} open title={`Evidence used (${citations.length})`}>
+      <div className="shared-ai-citations shared-ai-citations-full">{citations.map((citation, index) => renderCitation(citation, index, (id) => { setShowAll(false); onOpenArtifact(id); }))}</div>
+    </Dialog> : null}
+  </div>;
+}
+
 function Reply({ canSummarize, capabilities, isBusy, onOpenArtifact, onSummarize, reply }: { canSummarize: boolean; capabilities: AgentCapabilities | null; isBusy: boolean; onOpenArtifact: (artifactId: string) => void; onSummarize: (artifactId: string, title: string) => void; reply: AgentReply }) {
   const note = routingNote(reply, capabilities);
   // Found files, or the choices offered when a file name was ambiguous.
@@ -329,6 +345,6 @@ function Reply({ canSummarize, capabilities, isBusy, onOpenArtifact, onSummarize
       {offerSummary ? <Button disabled={isBusy || !file.indexed_at} onClick={() => onSummarize(file.id, file.title)} title={file.indexed_at ? `Summarize ${file.title}` : "This file is not indexed yet"} type="button" variant="secondary">Summarize</Button> : null}
     </li>)}</ul> : null}
     {reply.matches.length ? <div className="shared-search-results">{reply.matches.map((match) => <article key={match.chunk_id}><Button className="shared-search-result" onClick={() => onOpenArtifact(match.artifact_id)} type="button" variant="secondary"><span className="shared-search-result-heading"><strong>{match.title}</strong><span>{match.source_name}</span></span><p>{match.snippet}</p><span className="shared-search-result-path">{match.path}{match.start_line ? ` · line ${match.start_line}` : ""}</span></Button></article>)}</div> : null}
-    {reply.citations.length ? <div className="shared-ai-citations"><strong>Evidence used</strong>{reply.citations.map((citation, index) => <button className="shared-assistant-citation" key={`${citation.artifact_id}-${citation.chunk_id ?? "artifact"}`} onClick={() => onOpenArtifact(citation.artifact_id)} type="button">{/* Answers cite their passages as [1], [2]… in this order. */}{reply.capability === "ask_question" ? `[${index + 1}] ` : ""}{citation.title} · {citation.path}{citation.start_line ? ` · line ${citation.start_line}` : ""}</button>)}</div> : null}
+    {reply.citations.length ? <Evidence isQuestion={reply.capability === "ask_question"} citations={reply.citations} onOpenArtifact={onOpenArtifact} /> : null}
   </div>;
 }

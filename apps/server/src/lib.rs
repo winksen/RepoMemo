@@ -6,6 +6,7 @@ mod embedding;
 mod events;
 mod health;
 mod indexing;
+mod repositories;
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -56,6 +57,7 @@ use repomemo_storage::{
 use crate::events::{BusActivityObserver, BusJobObserver, WorkspaceEventBus};
 use crate::conversion::{Converter, RenderState};
 use crate::embedding::EmbeddingQueue;
+use crate::repositories::RepoSyncRunner;
 use crate::indexing::IndexQueue;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -76,6 +78,9 @@ pub struct ServerConfig {
     /// LibreOffice executable used for Office previews. When unset the server
     /// looks for it; without it the extracted previews are used.
     pub soffice: Option<PathBuf>,
+    /// Folders local git repositories may be connected from
+    /// (`REPOMEMO_REPO_ROOTS`). Empty turns local repositories off.
+    pub repo_roots: Vec<PathBuf>,
 }
 
 impl ServerConfig {
@@ -106,6 +111,7 @@ impl ServerConfig {
             jwt_secret,
             allowed_origin: Some(allowed_origin),
             soffice: std::env::var_os("REPOMEMO_SOFFICE").map(PathBuf::from),
+            repo_roots: repositories::repo_roots_from_env(),
         })
     }
 
@@ -118,6 +124,7 @@ impl ServerConfig {
             jwt_secret: "test-secret-that-is-long-enough-for-jwt-signing".to_owned(),
             allowed_origin: None,
             soffice: None,
+            repo_roots: Vec::new(),
         }
     }
 }
@@ -131,6 +138,7 @@ struct AppState {
     index_queue: IndexQueue,
     embedding_queue: EmbeddingQueue,
     converter: Converter,
+    repo_sync: RepoSyncRunner,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -305,6 +313,9 @@ struct SharedArtifactSummary {
     #[serde(flatten)]
     summary: ArtifactSummary,
     folder_id: Option<String>,
+    /// The repository source the file is synced from, if any.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    repository_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -555,6 +566,11 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
     let index_queue = IndexQueue::start(core.clone(), embedding_queue.clone());
     index_queue.resume_pending().await;
     embedding_queue.resume_pending().await;
+    if !config.repo_roots.is_empty() {
+        tracing::info!(roots = ?config.repo_roots, "Local git repositories can be connected");
+    }
+    let repo_sync = RepoSyncRunner::new(core.clone(), embedding_queue.clone(), config.repo_roots.clone());
+    repo_sync.resume_all().await;
 
     let converter = match config.soffice.clone() {
         Some(path) => Converter::with_binary(&config.data_dir, Some(path)),
@@ -573,6 +589,7 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
         index_queue,
         embedding_queue,
         converter,
+        repo_sync,
     };
     let cors = match config.allowed_origin {
         Some(origin) => CorsLayer::new()
@@ -810,6 +827,18 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
             put(update_artifact_comment).delete(delete_artifact_comment),
         )
         .route("/v1/artifacts/{artifact_id}/index", post(index_artifact))
+        .route(
+            "/v1/workspaces/{workspace_id}/repositories",
+            get(repositories::list_repositories).post(repositories::connect_repository),
+        )
+        .route(
+            "/v1/repositories/{source_id}",
+            get(repositories::get_repository)
+                .put(repositories::update_repository)
+                .delete(repositories::delete_repository),
+        )
+        .route("/v1/repositories/{source_id}/sync", post(repositories::sync_repository))
+        .route("/v1/repositories/{source_id}/files", get(repositories::list_repository_files))
         .route("/v1/workspaces/{workspace_id}/index", post(index_workspace))
         .route("/v1/workspaces/{workspace_id}/jobs", get(list_workspace_jobs))
         .route("/v1/workspaces/{workspace_id}/events", get(workspace_events))
@@ -2528,6 +2557,11 @@ async fn list_artifacts(
         .artifact_folder_ids(&workspace_id)
         .await
         .map_err(map_storage_error)?;
+    let repository_ids = state
+        .storage
+        .repo_artifact_sources(&workspace_id)
+        .await
+        .map_err(map_storage_error)?;
     let artifacts = state
         .core
         .list_artifacts(workspace_id)
@@ -2538,6 +2572,7 @@ async fn list_artifacts(
             .into_iter()
             .map(|summary| SharedArtifactSummary {
                 folder_id: folder_ids.get(&summary.id).cloned(),
+                repository_id: repository_ids.get(&summary.id).cloned(),
                 summary,
             })
             .collect(),
@@ -2925,6 +2960,7 @@ async fn move_artifact(
     Ok(Json(SharedArtifactSummary {
         summary: current.summary,
         folder_id,
+        repository_id: None,
     }))
 }
 
@@ -3042,6 +3078,7 @@ async fn create_text_artifact(
         Json(SharedArtifactSummary {
             summary: artifact,
             folder_id,
+            repository_id: None,
         }),
     ))
 }
@@ -3105,6 +3142,7 @@ async fn upload_artifact(
         Json(SharedArtifactSummary {
             summary: artifact,
             folder_id,
+            repository_id: None,
         }),
     ))
 }
@@ -3159,6 +3197,7 @@ async fn update_artifact(
         .await
         .map_err(map_core_error)?;
     require_workspace_write(&state, &subject, &current.summary.workspace_id).await?;
+    repositories::ensure_not_repository_file(&state, &artifact_id).await?;
     let artifact = state
         .core
         .update_artifact_title(artifact_id, request.title)
@@ -3188,6 +3227,7 @@ async fn delete_artifact(
         .await
         .map_err(map_core_error)?;
     require_workspace_write(&state, &subject, &current.summary.workspace_id).await?;
+    repositories::ensure_not_repository_file(&state, &artifact_id).await?;
     let title = current.summary.title;
     let workspace_id = current.summary.workspace_id;
     state
@@ -5093,6 +5133,195 @@ mod tests {
 
     /// Polls the artifact list until `expected` artifacts report an index
     /// timestamp, since indexing runs on a background queue.
+    #[tokio::test]
+    async fn local_repositories_sync_in_the_background_within_allowed_roots() {
+        let base = std::env::temp_dir().join(format!("repomemo-server-repo-{}", uuid::Uuid::new_v4()));
+        let repo_dir = base.join("repos").join("payments");
+        let data_dir = base.join("data");
+        std::fs::create_dir_all(repo_dir.join("src")).unwrap();
+        let git = |args: &[&str]| {
+            let status = std::process::Command::new("git")
+                .arg("-C")
+                .arg(&repo_dir)
+                .args(["-c", "user.name=Test", "-c", "user.email=test@example.com"])
+                .args(args)
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .status()
+                .unwrap();
+            assert!(status.success());
+        };
+        git(&["init", "--quiet", "--initial-branch=main"]);
+        std::fs::write(repo_dir.join("README.md"), "# Payments\n\nRefunds are issued by the ledger.\n").unwrap();
+        std::fs::write(repo_dir.join("src/ledger.rs"), "pub fn post_refund() {}\n").unwrap();
+        git(&["add", "."]);
+        git(&["commit", "--quiet", "-m", "Initial"]);
+
+        let mut config = ServerConfig::for_test(data_dir.clone());
+        config.repo_roots = vec![base.join("repos")];
+        let app = router(config).await.unwrap();
+        let read = |response: axum::response::Response| async move {
+            serde_json::from_slice::<Value>(&to_bytes(response.into_body(), usize::MAX).await.unwrap())
+                .unwrap_or(Value::Null)
+        };
+        let mut tokens = Vec::new();
+        for email in ["repo-owner@example.com", "repo-member@example.com"] {
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .method("POST")
+                        .uri("/v1/auth/register")
+                        .header("content-type", "application/json")
+                        .body(Body::from(
+                            json!({"email": email, "display_name": email, "password": "not-a-real-password"})
+                                .to_string(),
+                        ))
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            tokens.push(format!("Bearer {}", read(response).await["access_token"].as_str().unwrap()));
+        }
+        let (owner, member) = (&tokens[0], &tokens[1]);
+        let organization = read(
+            app.clone()
+                .oneshot(json_request("POST", "/v1/organizations", owner, json!({"name":"Repo Team"})))
+                .await
+                .unwrap(),
+        )
+        .await;
+        let workspace = read(
+            app.clone()
+                .oneshot(json_request(
+                    "POST",
+                    "/v1/workspaces",
+                    owner,
+                    json!({"organization_id": organization["id"], "name":"Repo Workspace"}),
+                ))
+                .await
+                .unwrap(),
+        )
+        .await;
+        let workspace_id = workspace["workspace"]["id"].as_str().unwrap().to_owned();
+        let added = app
+            .clone()
+            .oneshot(json_request(
+                "PUT",
+                &format!("/v1/workspaces/{workspace_id}/members"),
+                owner,
+                json!({"email":"repo-member@example.com","role":"member"}),
+            ))
+            .await
+            .unwrap();
+        assert!(added.status().is_success());
+        let repositories_uri = format!("/v1/workspaces/{workspace_id}/repositories");
+
+        let listing = read(app.clone().oneshot(auth_request("GET", &repositories_uri, owner)).await.unwrap()).await;
+        assert_eq!(listing["local_repositories_enabled"], true);
+        assert_eq!(listing["allowed_roots"].as_array().unwrap().len(), 1);
+        let listing = read(app.clone().oneshot(auth_request("GET", &repositories_uri, member)).await.unwrap()).await;
+        assert!(listing["allowed_roots"].as_array().unwrap().is_empty());
+
+        let connect = |token: &str, path: &std::path::Path| {
+            json_request("POST", &repositories_uri, token, json!({"path": path.display().to_string()}))
+        };
+        assert_eq!(app.clone().oneshot(connect(member, &repo_dir)).await.unwrap().status(), 403);
+        let outside = app.clone().oneshot(connect(owner, &data_dir)).await.unwrap();
+        assert_eq!(outside.status(), 400);
+        assert!(read(outside).await["error"]["message"].as_str().unwrap().contains("outside"));
+
+        let connected = app.clone().oneshot(connect(owner, &repo_dir.join("src"))).await.unwrap();
+        assert_eq!(connected.status(), 201);
+        let connected = read(connected).await;
+        assert_eq!(connected["repository"]["name"], "payments");
+        assert_eq!(connected["job"]["kind"], "repo_sync");
+        let repository_id = connected["repository"]["id"].as_str().unwrap().to_owned();
+        assert_eq!(app.clone().oneshot(connect(owner, &repo_dir)).await.unwrap().status(), 409);
+
+        let repository_uri = format!("/v1/repositories/{repository_id}");
+        let mut repository = Value::Null;
+        for _ in 0..100 {
+            repository = read(app.clone().oneshot(auth_request("GET", &repository_uri, member)).await.unwrap()).await;
+            if repository["status"] == "ready" && repository["active_job"].is_null() {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+        assert_eq!(repository["status"], "ready", "{repository}");
+        assert_eq!(repository["file_count"], 2);
+        assert_eq!(repository["indexed_file_count"], 2);
+        assert_eq!(repository["last_synced_commit"]["summary"], "Initial");
+        assert_eq!(repository["last_report"]["added"], 2);
+
+        let files = read(app.clone().oneshot(auth_request("GET", &format!("{repository_uri}/files"), member)).await.unwrap()).await;
+        assert_eq!(files.as_array().unwrap().len(), 2);
+        let artifacts = read(
+            app.clone()
+                .oneshot(auth_request("GET", &format!("/v1/workspaces/{workspace_id}/artifacts"), owner))
+                .await
+                .unwrap(),
+        )
+        .await;
+        let ledger = artifacts
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|artifact| artifact["path"] == "src/ledger.rs")
+            .unwrap();
+        assert_eq!(ledger["repository_id"], repository_id.as_str());
+        let artifact_id = ledger["id"].as_str().unwrap();
+        let refused = app
+            .clone()
+            .oneshot(auth_request("DELETE", &format!("/v1/artifacts/{artifact_id}"), owner))
+            .await
+            .unwrap();
+        assert_eq!(refused.status(), 400);
+
+        // Members may sync; only administrators change or remove a repository.
+        let synced = app.clone().oneshot(auth_request("POST", &format!("{repository_uri}/sync"), member)).await.unwrap();
+        assert_eq!(synced.status(), 200);
+        assert_eq!(
+            app.clone()
+                .oneshot(json_request("PUT", &repository_uri, member, json!({"exclude": ["*.md"]})))
+                .await
+                .unwrap()
+                .status(),
+            403
+        );
+        let updated = read(
+            app.clone()
+                .oneshot(json_request("PUT", &repository_uri, owner, json!({"name": "Payments", "exclude": ["*.md"]})))
+                .await
+                .unwrap(),
+        )
+        .await;
+        assert_eq!(updated["name"], "Payments");
+        assert_eq!(updated["settings"]["exclude"], json!(["*.md"]));
+
+        for _ in 0..100 {
+            repository = read(app.clone().oneshot(auth_request("GET", &repository_uri, owner)).await.unwrap()).await;
+            if repository["active_job"].is_null() {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+        assert_eq!(app.clone().oneshot(auth_request("DELETE", &repository_uri, member)).await.unwrap().status(), 403);
+        assert_eq!(app.clone().oneshot(auth_request("DELETE", &repository_uri, owner)).await.unwrap().status(), 204);
+        let artifacts = read(
+            app.clone()
+                .oneshot(auth_request("GET", &format!("/v1/workspaces/{workspace_id}/artifacts"), owner))
+                .await
+                .unwrap(),
+        )
+        .await;
+        assert!(artifacts.as_array().unwrap().is_empty());
+        assert_eq!(app.clone().oneshot(auth_request("GET", &repository_uri, owner)).await.unwrap().status(), 404);
+
+        drop(app);
+        let _ = std::fs::remove_dir_all(base);
+    }
+
     async fn wait_for_indexed_artifacts(
         app: &axum::Router,
         authorization: &str,

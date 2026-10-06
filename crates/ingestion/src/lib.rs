@@ -10,6 +10,7 @@ use quick_xml::Reader;
 use repomemo_domain::{ArtifactType, ImportSkippedItem, SourceType};
 
 mod documents;
+pub mod repo;
 pub use documents::{
     document_extensions, document_kind, document_preview, extract_document_text, is_document,
     DocumentKind,

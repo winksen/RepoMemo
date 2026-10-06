@@ -443,6 +443,96 @@ pub struct Chunk {
     pub metadata: Value,
 }
 
+/// Job kind of a repository sync in the jobs table.
+pub const REPO_SYNC_JOB_KIND: &str = "repo_sync";
+
+/// What a repository source indexes. Stored in the source's metadata.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RepoSettings {
+    /// Local branch to index; `None` follows whatever HEAD points at.
+    #[serde(default)]
+    pub branch: Option<String>,
+    /// When not empty, only paths matching one of these patterns are indexed.
+    #[serde(default)]
+    pub include: Vec<String>,
+    /// Paths matching these patterns are skipped, on top of the defaults.
+    #[serde(default)]
+    pub exclude: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RepoCommit {
+    pub sha: String,
+    pub summary: String,
+    pub author_name: String,
+    pub committed_at: String,
+    /// The branch the commit was read from, when HEAD was on one.
+    pub branch: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RepoSkipCount {
+    pub reason: String,
+    pub count: usize,
+    /// A few of the skipped paths, to explain the reason.
+    pub examples: Vec<String>,
+}
+
+/// What one sync changed.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RepoSyncReport {
+    pub commit_sha: String,
+    /// Regular files in the commit's tree, before any rule is applied.
+    pub files_in_tree: usize,
+    pub added: usize,
+    pub updated: usize,
+    pub renamed: usize,
+    pub removed: usize,
+    pub restored: usize,
+    pub unchanged: usize,
+    pub skipped: usize,
+    pub skipped_by_reason: Vec<RepoSkipCount>,
+    pub indexed: usize,
+    pub index_failed: usize,
+    pub cancelled: bool,
+}
+
+/// A git repository connected to a workspace. Its files are kept in step with
+/// the repository by syncs: one artifact per tracked path, updated in place.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RepoSource {
+    pub id: String,
+    pub workspace_id: String,
+    pub name: String,
+    /// Repository root on the server's disk.
+    pub root_path: String,
+    pub settings: RepoSettings,
+    /// `pending` (never synced), `syncing`, `ready` or `error`.
+    pub status: String,
+    pub last_synced_commit: Option<RepoCommit>,
+    pub last_synced_at: Option<String>,
+    pub last_error: Option<String>,
+    pub last_report: Option<RepoSyncReport>,
+    /// Files currently tracked and indexed from the repository.
+    pub file_count: i64,
+    pub indexed_file_count: i64,
+    pub active_job: Option<IndexingJobStatus>,
+    pub created_at: String,
+}
+
+/// A file of a repository source that is currently in its tree.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RepoFile {
+    pub path: String,
+    pub artifact_id: String,
+    pub artifact_type: ArtifactType,
+    pub language: Option<String>,
+    pub size_bytes: i64,
+    pub indexed: bool,
+    pub index_failure: Option<String>,
+    pub commit_sha: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IndexingJobStatus {
     pub id: String,

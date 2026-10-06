@@ -19,6 +19,9 @@ use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, S
 use sqlx::{QueryBuilder, Row, Sqlite, SqlitePool};
 use uuid::Uuid;
 
+mod repo;
+pub use repo::{RepoFileRecord, RepoFileWrite};
+
 /// Observer invoked whenever a job row is created or updated. The shared
 /// server registers one to fan events into its SSE bus; local desktop use
 /// keeps the default no-op observer and pays no per-write cost.
@@ -2443,10 +2446,14 @@ impl StorageEngine {
     /// oldest first. Images are only listed while they have never been
     /// indexed, so a version bump never re-runs paid vision analysis.
     /// `workspace_id` limits the scan to one workspace.
+    /// Files of a repository that left its tree are never listed. Files still
+    /// in a repository are listed only with `include_repo_files`, because
+    /// repository syncs index their own files in one job.
     pub async fn list_artifacts_needing_index(
         &self,
         workspace_id: Option<&str>,
         current_index_version: i64,
+        include_repo_files: bool,
     ) -> Result<Vec<ArtifactSummary>> {
         let rows = sqlx::query_as::<_, ArtifactSummaryRow>(
             r#"
@@ -2467,16 +2474,19 @@ impl StorageEngine {
               artifacts.indexed_at
             FROM artifacts
             JOIN sources ON sources.id = artifacts.source_id
+            LEFT JOIN repo_files ON repo_files.artifact_id = artifacts.id
             WHERE (?1 IS NULL OR artifacts.workspace_id = ?1)
               AND (
                 artifacts.indexed_at IS NULL
                 OR (artifacts.type != 'image' AND artifacts.index_version < ?2)
               )
+              AND (repo_files.artifact_id IS NULL OR (?3 AND repo_files.removed_at IS NULL))
             ORDER BY artifacts.created_at ASC
             "#,
         )
         .bind(workspace_id)
         .bind(current_index_version)
+        .bind(include_repo_files)
         .fetch_all(&self.pool)
         .await?;
 
@@ -5267,13 +5277,13 @@ mod tests {
 
         // Only the index version distinguishes fresh from stale artifacts.
         assert!(storage
-            .list_artifacts_needing_index(Some(&workspace.id), 2)
+            .list_artifacts_needing_index(Some(&workspace.id), 2, true)
             .await
             .unwrap()
             .is_empty());
         assert_eq!(
             storage
-                .list_artifacts_needing_index(Some(&workspace.id), 3)
+                .list_artifacts_needing_index(Some(&workspace.id), 3, true)
                 .await
                 .unwrap()
                 .len(),

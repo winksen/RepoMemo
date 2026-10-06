@@ -100,6 +100,10 @@ generic AI-generated styling. Color appears only as the single accent and the
 semantic status colors, used sparingly and never as a tinted fill with matching
 text.
 
+This applies to hover and focus states too. When asked to change one property of
+a state (for example a danger hover border), change only that property; never add
+a tinted background or recolor the text to match.
+
 ## Do's and don'ts
 
 - Do make the primary task the largest, brightest surface.

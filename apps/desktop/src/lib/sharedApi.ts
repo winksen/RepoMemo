@@ -48,6 +48,10 @@ import type {
   SharedWorkspace,
   WorkspaceOverview,
   WorkspaceMetrics,
+  RepoFile,
+  RepoSettings,
+  RepoSource,
+  RepositoryList,
 } from "../types";
 
 const API_URL = (import.meta.env.VITE_REPOMEMO_API_URL ?? "http://127.0.0.1:3020").replace(/\/$/, "");
@@ -829,4 +833,32 @@ export function deleteSharedMemoryCard(accessToken: string, cardId: string): Pro
 
 export function exportSharedMemoryCard(accessToken: string, cardId: string): Promise<string> {
   return requestText(`/v1/memory-cards/${cardId}/export`, accessToken);
+}
+
+export function listSharedRepositories(accessToken: string, workspaceId: string): Promise<RepositoryList> {
+  return request<RepositoryList>(`/v1/workspaces/${workspaceId}/repositories`, {}, accessToken);
+}
+
+export function connectSharedRepository(accessToken: string, workspaceId: string, input: { path: string; name?: string } & RepoSettings): Promise<{ repository: RepoSource; job: IndexingJobStatus | null }> {
+  return request(`/v1/workspaces/${workspaceId}/repositories`, { method: "POST", body: JSON.stringify(input) }, accessToken);
+}
+
+export function updateSharedRepository(accessToken: string, repositoryId: string, input: { name?: string } & RepoSettings): Promise<RepoSource> {
+  return request<RepoSource>(`/v1/repositories/${repositoryId}`, { method: "PUT", body: JSON.stringify(input) }, accessToken);
+}
+
+export function deleteSharedRepository(accessToken: string, repositoryId: string): Promise<void> {
+  return request<void>(`/v1/repositories/${repositoryId}`, { method: "DELETE" }, accessToken);
+}
+
+export function syncSharedRepository(accessToken: string, repositoryId: string): Promise<{ repository: RepoSource; job: IndexingJobStatus | null }> {
+  return request(`/v1/repositories/${repositoryId}/sync`, { method: "POST" }, accessToken);
+}
+
+export function listSharedRepositoryFiles(accessToken: string, repositoryId: string): Promise<RepoFile[]> {
+  return request<RepoFile[]>(`/v1/repositories/${repositoryId}/files`, {}, accessToken);
+}
+
+export function cancelSharedJob(accessToken: string, jobId: string): Promise<IndexingJobStatus> {
+  return request<IndexingJobStatus>(`/v1/jobs/${jobId}/cancel`, { method: "POST" }, accessToken);
 }
