@@ -274,6 +274,8 @@ A team's code usually already lives in a git repository, with many files and a h
 - **Summary**: what the repository is, its main parts, technologies, how to build or run it and where to start reading, written by the workspace's AI provider **only when someone asks**, with links to the files it is based on. The page says when the repository has changed since the summary was written.
 - **Content overview**, with no AI: languages, folders, key files (README, manifests, entry points, docs), the opening of the README, and recent commits.
 
+The **knowledge map** draws each repository as one ringed dot, sized by all of its files and linked to similar evidence and to memory cards that cite any of its files, and the **health checks** compare the repository as a whole rather than file by file.
+
 The repository's individual files are searchable and citable like any evidence, but they are listed in the Repositories section (and from the repository page) rather than the Evidence ledger, and they cannot be renamed or deleted one by one: change them in the repository, or exclude their path.
 
 **Availability:** repository links are a setting of each workspace; nothing has to be configured on the server. A link must point at a folder the server can read, so for now only repositories on the server's own disk can be linked; remote repositories (by URL) are planned. See the [technical design](technical/repository-sources.md).

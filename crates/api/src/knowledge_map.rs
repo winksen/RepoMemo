@@ -1,12 +1,18 @@
 //! The knowledge map: indexing and embedding progress, coverage per file
 //! type, and a graph of how files relate. Everything is computed from data
 //! that already exists (chunks, their embeddings, memory card citations).
+//!
+//! A git repository is drawn as one node, the evidence item that stands for
+//! it, not as one node per file: its size is the content of all its files,
+//! its meaning is the average of theirs, and a memory card citing any of its
+//! files links to it. The progress and coverage figures still count every
+//! file, since each one is indexed.
 
 use std::collections::{HashMap, HashSet};
 
 use anyhow::Result;
 use repomemo_domain::{
-    IndexState, KnowledgeCoverage, KnowledgeEdge, KnowledgeEdgeKind, KnowledgeMap, KnowledgeNode,
+    ArtifactType, IndexState, KnowledgeCoverage, KnowledgeEdge, KnowledgeEdgeKind, KnowledgeMap, KnowledgeNode,
     KnowledgeNodeKind, KnowledgePipeline,
 };
 
@@ -52,6 +58,19 @@ impl RepoMemoCore {
         };
         let counts_of = |artifact_id: &str| counts.get(artifact_id).copied().unwrap_or((0, 0));
 
+        let repo_file_sources = self.storage.repo_artifact_sources(workspace_id).await?;
+        let folded_into = folded_repository_files(&artifacts, &repo_file_sources);
+        // Passages and embedded passages of a graph node, its folded files included.
+        let mut node_counts: HashMap<String, (i64, i64)> = HashMap::new();
+        for artifact in &artifacts {
+            let node_id = folded_into.get(&artifact.id).unwrap_or(&artifact.id);
+            let (passages, embedded) = counts_of(&artifact.id);
+            let entry = node_counts.entry(node_id.clone()).or_default();
+            entry.0 += passages;
+            entry.1 += embedded;
+        }
+        let node_counts_of = |artifact_id: &str| node_counts.get(artifact_id).copied().unwrap_or((0, 0));
+
         let mut pipeline = KnowledgePipeline {
             file_count: artifacts.len() as i64,
             indexed_count: 0,
@@ -74,7 +93,11 @@ impl RepoMemoCore {
             if let Some(total) = pipeline.embedded_count.as_mut() {
                 *total += embedded;
             }
-            let label = kind_label(artifact);
+            let label = if repo_file_sources.contains_key(&artifact.id) {
+                "Repository files".to_owned()
+            } else {
+                kind_label(artifact)
+            };
             let row = match coverage.iter_mut().position(|row| row.label == label) {
                 Some(index) => &mut coverage[index],
                 None => {
@@ -101,12 +124,16 @@ impl RepoMemoCore {
         }
         coverage.sort_by(|a, b| b.file_count.cmp(&a.file_count));
 
-        // The graph keeps the files with the most content.
-        let mut ranked = artifacts.iter().collect::<Vec<_>>();
+        // The graph keeps the files with the most content. Files of a
+        // repository are not drawn on their own: their repository is.
+        let mut ranked = artifacts
+            .iter()
+            .filter(|artifact| !folded_into.contains_key(&artifact.id))
+            .collect::<Vec<_>>();
         ranked.sort_by(|a, b| {
-            counts_of(&b.id)
+            node_counts_of(&b.id)
                 .0
-                .cmp(&counts_of(&a.id).0)
+                .cmp(&node_counts_of(&a.id).0)
                 .then_with(|| a.title.cmp(&b.title))
         });
         let hidden_file_count = ranked.len().saturating_sub(MAX_FILE_NODES) as i64;
@@ -114,7 +141,7 @@ impl RepoMemoCore {
         let mut nodes = ranked
             .iter()
             .map(|artifact| {
-                let (passage_count, embedded_count) = counts_of(&artifact.id);
+                let (passage_count, embedded_count) = node_counts_of(&artifact.id);
                 KnowledgeNode {
                     id: artifact.id.clone(),
                     kind: KnowledgeNodeKind::File,
@@ -132,10 +159,11 @@ impl RepoMemoCore {
         let mut edges = Vec::new();
         let mut similarity_available = false;
         if let Some(model) = embedding_model.as_deref() {
-            let centroids = self
+            let mut centroids = self
                 .storage
                 .artifact_embedding_centroids(workspace_id, model)
                 .await?;
+            fold_repository_centroids(&mut centroids, &folded_into);
             let files = nodes
                 .iter()
                 .filter_map(|node| centroids.get(&node.id).map(|vector| (node.id.as_str(), vector.as_slice())))
@@ -145,8 +173,11 @@ impl RepoMemoCore {
         }
 
         let mut cards: HashMap<String, String> = HashMap::new();
+        let mut card_links = HashSet::new();
         for (card_id, title, artifact_id) in self.storage.memory_card_artifact_links(workspace_id).await? {
-            if !visible.contains(&artifact_id) {
+            // A card citing a repository's file links to the repository.
+            let artifact_id = folded_into.get(&artifact_id).cloned().unwrap_or(artifact_id);
+            if !visible.contains(&artifact_id) || !card_links.insert((card_id.clone(), artifact_id.clone())) {
                 continue;
             }
             cards.entry(card_id.clone()).or_insert(title);
@@ -219,6 +250,65 @@ fn kind_label(artifact: &repomemo_domain::ArtifactSummary) -> String {
     label.to_owned()
 }
 
+/// `file artifact id -> repository item id` for every file of a repository
+/// that has its evidence item. Views that relate files to each other (the map,
+/// health checks) draw a repository as that one item, not as its files.
+pub(crate) fn folded_repository_files(
+    artifacts: &[repomemo_domain::ArtifactSummary],
+    repo_file_sources: &HashMap<String, String>,
+) -> HashMap<String, String> {
+    let repository_items = artifacts
+        .iter()
+        .filter(|artifact| artifact.artifact_type == ArtifactType::Repository)
+        .map(|artifact| (artifact.source_id.as_str(), artifact.id.as_str()))
+        .collect::<HashMap<_, _>>();
+    repo_file_sources
+        .iter()
+        .filter_map(|(file_id, source_id)| {
+            repository_items
+                .get(source_id.as_str())
+                .map(|item_id| (file_id.clone(), (*item_id).to_owned()))
+        })
+        .collect()
+}
+
+/// Gives each repository item the meaning of its files together: the
+/// normalised mean of their vectors and its own.
+pub(crate) fn fold_repository_centroids(
+    centroids: &mut HashMap<String, Vec<f32>>,
+    folded_into: &HashMap<String, String>,
+) {
+    let mut members: HashMap<&str, Vec<&str>> = HashMap::new();
+    for (file_id, item_id) in folded_into {
+        members.entry(item_id.as_str()).or_default().push(file_id.as_str());
+    }
+    let mut combined = Vec::new();
+    for (item_id, files) in members {
+        let vectors = files
+            .into_iter()
+            .chain(std::iter::once(item_id))
+            .filter_map(|id| centroids.get(id))
+            .collect::<Vec<_>>();
+        if let Some(vector) = mean_unit_vector(&vectors) {
+            combined.push((item_id.to_owned(), vector));
+        }
+    }
+    centroids.extend(combined);
+}
+
+/// The normalised mean of unit vectors of the same length, if any.
+fn mean_unit_vector(vectors: &[&Vec<f32>]) -> Option<Vec<f32>> {
+    let length = vectors.first()?.len();
+    let mut sum = vec![0.0_f32; length];
+    for vector in vectors.iter().filter(|vector| vector.len() == length) {
+        for (total, value) in sum.iter_mut().zip(vector.iter()) {
+            *total += value;
+        }
+    }
+    let norm = sum.iter().map(|value| value * value).sum::<f32>().sqrt();
+    (norm > 0.0).then(|| sum.into_iter().map(|value| value / norm).collect())
+}
+
 /// Links each file to its closest neighbours by meaning. Only pairs that are
 /// unusually similar for this workspace count: at least the mean plus a
 /// quarter standard deviation of all pairs, which adapts to embedding models
@@ -279,7 +369,26 @@ pub(crate) fn similarity_edges(files: &[(&str, &[f32])]) -> Vec<KnowledgeEdge> {
 
 #[cfg(test)]
 mod tests {
-    use super::similarity_edges;
+    use super::{fold_repository_centroids, similarity_edges};
+    use std::collections::HashMap;
+
+    #[test]
+    fn a_repository_means_what_its_files_mean_together() {
+        let mut centroids = HashMap::from([
+            ("file-a".to_owned(), vec![1.0_f32, 0.0]),
+            ("file-b".to_owned(), vec![0.0_f32, 1.0]),
+            ("other".to_owned(), vec![1.0_f32, 0.0]),
+        ]);
+        let folded = HashMap::from([
+            ("file-a".to_owned(), "repo".to_owned()),
+            ("file-b".to_owned(), "repo".to_owned()),
+        ]);
+        fold_repository_centroids(&mut centroids, &folded);
+        let repo = &centroids["repo"];
+        assert!((repo[0] - repo[1]).abs() < 1e-6);
+        assert!((repo[0] * repo[0] + repo[1] * repo[1] - 1.0).abs() < 1e-6);
+        assert_eq!(centroids["other"], vec![1.0, 0.0]);
+    }
 
     #[test]
     fn small_workspaces_link_only_clearly_similar_files() {

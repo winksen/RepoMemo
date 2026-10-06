@@ -5356,6 +5356,15 @@ mod tests {
         assert_eq!(detail["overview"]["key_files"][0]["path"], "README.md");
         assert_eq!(detail["ai_available"], false);
         assert!(detail["summary"].is_null());
+        // The knowledge map draws the repository as one node holding all of
+        // its files' passages, while progress still counts every file.
+        let map = read(app.clone().oneshot(auth_request("GET", &format!("/v1/workspaces/{workspace_id}/knowledge-map"), member)).await.unwrap()).await;
+        let file_nodes = map["nodes"].as_array().unwrap().iter().filter(|node| node["kind"] == "file").collect::<Vec<_>>();
+        assert_eq!(file_nodes.len(), 1, "{map}");
+        assert_eq!(file_nodes[0]["id"], item_id);
+        assert!(file_nodes[0]["passage_count"].as_i64().unwrap() >= 3);
+        assert_eq!(map["pipeline"]["file_count"], 3);
+        assert!(map["coverage"].as_array().unwrap().iter().any(|row| row["label"] == "Repository files" && row["file_count"] == 2));
         let summary = app.clone().oneshot(auth_request("POST", &format!("/v1/repositories/{repository_id}/summary"), member)).await.unwrap();
         assert_eq!(summary.status(), 400);
         assert!(read(summary).await["error"]["message"].as_str().unwrap().contains("No content was sent"));

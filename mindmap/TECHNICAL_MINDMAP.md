@@ -445,6 +445,8 @@ The assistant is a closed capability router, not a free-running agent. Each mess
 
 `RepoMemoCore::knowledge_map` computes everything per request from existing data; there are no new tables.
 
+**Repositories are one node.** A git repository is drawn as its `repository` evidence item, never as its files (`folded_repository_files`): the node's passage counts are its files' totals, its vector for similar-content links is the normalised mean of its files' vectors and its own (`fold_repository_centroids`), and a memory card citing any of its files links to it. The pipeline figures still count every file, and coverage groups repository files in one "Repository files" row. The page draws repository nodes with a ring and always labels them.
+
 - **Pipeline.** Files stored → indexed (or pending, or failed per `artifact_index_failures`) → passages → passages embedded with the current model.
 - **Coverage.** The same counts grouped by a readable kind: the artifact type, or the extension for uploaded `file`s (PDF, Word, Excel…).
 - **Graph nodes.** The 250 files with the most passages; the rest are counted in `hidden_file_count`. Memory cards that cite a visible file are added too.
@@ -467,6 +469,8 @@ The page (`KnowledgeMapPanel`) lays the graph out in the browser with a determin
 | `outdated_evidence_referenced` | A file in use names a retired file, and no file in use carries that name | needs review, create task, dismiss |
 | `index_failed` | `artifact_index_failures` has a row for a file in use | create task, mark outdated, dismiss |
 | `unconnected` (info) | With an embedding provider and 8–2,000 embedded files: no similar link (same adaptive bar as the map) and no memory card citation. Skipped when more than 15% of files would qualify | create task, dismiss |
+
+Repository files are left out of `duplicate_content` (copies inside a repository, or between two checkouts of the same code, are the repository's business) and are compared as their repository item in `unconnected`, using the same folding as the map. They still count for indexing failures and references to removed files.
 
 Mentions are found with an FTS5 phrase query, then confirmed on the passage text; at most 200 queries run per check. Each finding has a fingerprint built from the facts behind it. `POST /v1/workspaces/{id}/health/actions` (owners and admins) re-runs the checks, acts only on the finding as it stands now (409 when it changed), applies the change through the evidence lifecycle or the task list, and records the outcome in `workspace_health_actions`. A finding with a recorded outcome stays hidden until its fingerprint changes. Per detector, the page shows how many findings were acted on and how many were dismissed, to show which checks earn their place.
 

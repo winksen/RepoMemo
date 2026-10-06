@@ -880,6 +880,9 @@ body,
 .rm-map-file.notes { fill: var(--viz-notes); }
 .rm-map-file.code { fill: var(--viz-code); }
 .rm-map-file.hollow { fill: var(--color-surface); }
+.rm-map-repo-ring { fill: none; stroke-width: 1.5; pointer-events: none; }
+.rm-map-repo-ring.code { stroke: var(--viz-code); }
+.rm-map-dot.repository { box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 3.5px var(--viz-code); }
 .rm-map-file.hollow.documents { stroke: var(--viz-documents); }
 .rm-map-file.hollow.notes { stroke: var(--viz-notes); }
 .rm-map-file.hollow.code { stroke: var(--viz-code); }

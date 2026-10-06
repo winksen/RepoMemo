@@ -104,6 +104,8 @@ The overview is kept in the source's `metadata_json` (`overview`, `overview_arti
 
 **Summary (optional AI).** On the repository page, a member who can write can generate a summary when the workspace has an enabled text provider. The prompt gets the overview Markdown plus the first passages of up to 8 key files (about 16,000 characters in total, 4,000 per file), and asks for what the repository is, its main parts, technologies, how to build or run it (only if stated) and where to start reading. The result is kept in the source's metadata with the provider name, the commit it describes and its citations, until someone regenerates it; the page says when the repository has moved on since. Nothing is sent to a provider unless someone asks.
 
+**Views that relate files to each other treat the repository as this one item.** The knowledge map draws one node per repository (sized by all its files' passages, placed by their average meaning, linked to memory cards that cite any of its files) instead of one node per file, and the health checks for duplicates and unconnected files compare the repository as a whole. Without this, linking two front-end repositories put more than 300 code files on the map. Indexing progress and coverage still count every file, under "Repository files".
+
 **The page** (`RepositoryDetailView`, shown on the artifact page of a `repository` item): sync state with Sync now / Stop and a file browser, the summary, and the content overview (language and structure tables, key files that open their evidence, the README opening, recent commits), followed by the usual lifecycle and discussion panels. Renaming or deleting the item through the artifact routes is refused like for repository files.
 
 ---

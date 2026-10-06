@@ -12,7 +12,7 @@ use repomemo_domain::{
 };
 use repomemo_storage::ChunkMention;
 
-use crate::knowledge_map::similarity_edges;
+use crate::knowledge_map::{fold_repository_centroids, folded_repository_files, similarity_edges};
 use crate::RepoMemoCore;
 
 /// Full-text lookups one health check may run, across all detectors.
@@ -55,11 +55,23 @@ impl RepoMemoCore {
             .map(|artifact| (artifact.id.as_str(), artifact))
             .collect::<HashMap<_, _>>();
         let versions = version_groups(&artifacts);
+        // A repository's files are compared with the rest of the workspace as
+        // one item: duplicates inside a repository, or between two copies of
+        // the same code, are the repository's business, not the workspace's.
+        let folded_into = folded_repository_files(
+            &artifacts,
+            &self.storage.repo_artifact_sources(workspace_id).await?,
+        );
+        let live_items = live
+            .iter()
+            .copied()
+            .filter(|artifact| !folded_into.contains_key(&artifact.id))
+            .collect::<Vec<_>>();
 
         let mut budget = MAX_MENTION_QUERIES;
         let mut findings = Vec::new();
         findings.extend(older_versions(&versions, &retired));
-        findings.extend(duplicates(&live));
+        findings.extend(duplicates(&live_items));
         findings.extend(
             self.removed_symbols(workspace_id, &versions, &retired, &by_id, &mut budget)
                 .await?,
@@ -69,7 +81,7 @@ impl RepoMemoCore {
                 .await?,
         );
         findings.extend(self.index_failures(workspace_id, &retired, &by_id).await?);
-        let similarity_available = match self.unconnected(workspace_id, &live).await? {
+        let similarity_available = match self.unconnected(workspace_id, &live_items, &folded_into).await? {
             Some(unconnected) => {
                 findings.extend(unconnected);
                 true
@@ -371,6 +383,7 @@ impl RepoMemoCore {
         &self,
         workspace_id: &str,
         live: &[&ArtifactSummary],
+        folded_into: &HashMap<String, String>,
     ) -> Result<Option<Vec<HealthFinding>>> {
         let Some(model) = self
             .embedding_provider_for_workspace(workspace_id)
@@ -379,7 +392,8 @@ impl RepoMemoCore {
         else {
             return Ok(None);
         };
-        let centroids = self.storage.artifact_embedding_centroids(workspace_id, &model).await?;
+        let mut centroids = self.storage.artifact_embedding_centroids(workspace_id, &model).await?;
+        fold_repository_centroids(&mut centroids, folded_into);
         let files = live
             .iter()
             .filter_map(|artifact| {
@@ -398,7 +412,7 @@ impl RepoMemoCore {
             connected.insert(edge.target);
         }
         for (_, _, artifact_id) in self.storage.memory_card_artifact_links(workspace_id).await? {
-            connected.insert(artifact_id);
+            connected.insert(folded_into.get(&artifact_id).cloned().unwrap_or(artifact_id));
         }
         let lonely = live
             .iter()

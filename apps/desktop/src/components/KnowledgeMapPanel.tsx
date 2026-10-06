@@ -41,6 +41,7 @@ const POLL_ATTEMPTS = 120;
 const LABELLED_FILES = 5;
 
 function fileGroup(node: KnowledgeNode): FileGroup {
+  if (node.artifact_type === "repository") return "code";
   const extension = node.path?.split(".").pop()?.toLowerCase() ?? "";
   if (node.artifact_type === "code_file" || node.artifact_type === "api_spec" || ["json", "toml", "yaml", "yml"].includes(extension)) return "code";
   if (node.artifact_type === "file" && !["txt", "log"].includes(extension)) return "documents";
@@ -254,7 +255,11 @@ function RelationGraph({ canConfigure, map, onOpenArtifact, onOpenMemoryCard, on
     }
     return ids;
   }, [edges, selectedId]);
-  const labelled = useMemo(() => new Set(map.nodes.filter((node) => node.kind === "file").sort((a, b) => b.passage_count - a.passage_count).slice(0, LABELLED_FILES).map((node) => node.id)), [map.nodes]);
+  // Repositories are always named; then the largest files.
+  const labelled = useMemo(() => new Set([
+    ...map.nodes.filter((node) => node.artifact_type === "repository").map((node) => node.id),
+    ...map.nodes.filter((node) => node.kind === "file" && node.artifact_type !== "repository").sort((a, b) => b.passage_count - a.passage_count).slice(0, LABELLED_FILES).map((node) => node.id),
+  ]), [map.nodes]);
   const similarWeights = map.edges.filter((edge) => edge.kind === "similar").map((edge) => edge.weight);
   const [minWeight, maxWeight] = similarWeights.length ? [Math.min(...similarWeights), Math.max(...similarWeights)] : [0, 1];
   const selected = selectedId ? nodeById.get(selectedId) ?? null : null;
@@ -361,7 +366,7 @@ function RelationGraph({ canConfigure, map, onOpenArtifact, onOpenMemoryCard, on
       y: event.clientY - box.top,
       content: node.kind === "memory"
         ? <><strong>{node.title}</strong><span>Memory card</span></>
-        : <><strong>{node.title}</strong><span>{GROUP_LABEL[fileGroup(node)]} · {node.passage_count} passages</span>{map.pipeline.embedded_count !== null ? <span>{percent(node.embedded_count, node.passage_count)}% searchable by meaning</span> : null}{node.state !== "indexed" ? <span>{node.state === "failed" ? "Indexing failed" : "Waiting to be indexed"}</span> : null}</>,
+        : <><strong>{node.title}</strong><span>{node.artifact_type === "repository" ? "Git repository, all files" : GROUP_LABEL[fileGroup(node)]} · {node.passage_count} passages</span>{map.pipeline.embedded_count !== null ? <span>{percent(node.embedded_count, node.passage_count)}% searchable by meaning</span> : null}{node.state !== "indexed" ? <span>{node.state === "failed" ? "Indexing failed" : "Waiting to be indexed"}</span> : null}</>,
     });
   }
 
@@ -373,7 +378,7 @@ function RelationGraph({ canConfigure, map, onOpenArtifact, onOpenMemoryCard, on
 
   return <section className="rm-map-section" aria-labelledby="rm-map-graph-title">
     <div className="shared-panel-heading"><div><Graph size={18} /><h2 id="rm-map-graph-title">How your content connects</h2></div><span>{fileCount} files · {edges.length} links</span></div>
-    <p className="rm-map-intro">Each dot is a file; bigger dots hold more passages. A line joins files whose content means similar things, or a memory card (◆) to the files it cites.</p>
+    <p className="rm-map-intro">Each dot is a file, or a whole git repository (ringed dot) with all of its files; bigger dots hold more passages. A line joins items whose content means similar things, or a memory card (◆) to what it cites.</p>
     <div className="rm-map-filters">
       <label title={map.similarity_available ? undefined : "Needs AI for search"}><input checked={showSimilar && map.similarity_available} disabled={!map.similarity_available} onChange={(event) => setShowSimilar(event.target.checked)} type="checkbox" /> Similar content</label>
       <label><input checked={showCites} onChange={(event) => setShowCites(event.target.checked)} type="checkbox" /> Memory links</label>
@@ -386,6 +391,7 @@ function RelationGraph({ canConfigure, map, onOpenArtifact, onOpenMemoryCard, on
     {map.hidden_file_count ? <p className="rm-map-notice">Showing the {fileCount} largest files; {map.hidden_file_count} smaller ones are left out to keep the map readable.</p> : null}
     <div className="rm-map-legend" aria-label="Graph legend">
       {(Object.keys(GROUP_LABEL) as FileGroup[]).map((group) => <span key={group}><i className={`rm-map-dot ${group}`} /> {GROUP_LABEL[group]}</span>)}
+      <span><i className="rm-map-dot code repository" /> Repository</span>
       <span><i className="rm-map-diamond" /> Memory card</span>
       <span><i className="rm-map-dot hollow" /> Not indexed yet</span>
     </div>
@@ -424,7 +430,7 @@ function RelationGraph({ canConfigure, map, onOpenArtifact, onOpenMemoryCard, on
               const showLabel = node.id === selectedId || node.id === hoveredId || (!selectedId && labelled.has(node.id)) || (neighbours?.has(node.id) ?? false) || (vp.k >= 2.2 && !dimmed);
               const select = () => { if (!wasDragged()) setSelectedId(node.id === selectedId ? null : node.id); };
               return <g
-                aria-label={`${node.kind === "memory" ? "Memory card" : "File"} ${node.title}`}
+                aria-label={`${node.kind === "memory" ? "Memory card" : node.artifact_type === "repository" ? "Repository" : "File"} ${node.title}`}
                 aria-pressed={node.id === selectedId}
                 className={`rm-map-node${dimmed ? " dimmed" : ""}${node.id === selectedId ? " selected" : ""}`}
                 key={node.id}
@@ -442,6 +448,7 @@ function RelationGraph({ canConfigure, map, onOpenArtifact, onOpenMemoryCard, on
                   ? <rect className="rm-map-memory" height={size * 1.6} transform="rotate(45)" width={size * 1.6} x={-size * 0.8} y={-size * 0.8} />
                   : <>
                     <circle className={`rm-map-halo ${fileGroup(node)}`} r={size + 5} />
+                    {node.artifact_type === "repository" ? <circle className={`rm-map-repo-ring ${fileGroup(node)}`} r={size + 3} /> : null}
                     <circle className={`rm-map-file ${fileGroup(node)}${node.state !== "indexed" ? " hollow" : ""}`} r={size} />
                   </>}
                 {showLabel ? <text className="rm-map-label" fontSize={11 / vp.k} strokeWidth={3 / vp.k} x={size + 5 / vp.k} y={4 / vp.k}>{shorten(node.title)}</text> : null}
