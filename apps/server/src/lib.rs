@@ -4,6 +4,7 @@ mod agent;
 mod conversion;
 mod embedding;
 mod events;
+mod health;
 mod indexing;
 
 use std::{
@@ -646,6 +647,14 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
         .route(
             "/v1/workspaces/{workspace_id}/knowledge-map",
             get(workspace_knowledge_map),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/health",
+            get(health::workspace_health),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/health/actions",
+            post(health::apply_health_action),
         )
         .route(
             "/v1/workspaces/{workspace_id}/agent/capabilities",
@@ -5173,6 +5182,236 @@ mod tests {
         )
         .unwrap();
         assert_eq!(owner_chunks[0]["heading_path"], "Auto");
+
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn workspace_health_finds_drift_and_only_admins_act_on_it() {
+        let data_dir =
+            std::env::temp_dir().join(format!("repomemo-server-health-{}", uuid::Uuid::new_v4()));
+        let app = router(ServerConfig::for_test(data_dir.clone()))
+            .await
+            .unwrap();
+        let read = |response: axum::response::Response| async move {
+            serde_json::from_slice::<Value>(&to_bytes(response.into_body(), usize::MAX).await.unwrap())
+                .unwrap()
+        };
+
+        let mut tokens = Vec::new();
+        for email in ["health-owner@example.com", "health-member@example.com"] {
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .method("POST")
+                        .uri("/v1/auth/register")
+                        .header("content-type", "application/json")
+                        .body(Body::from(
+                            json!({"email": email, "display_name": email, "password": "not-a-real-password"})
+                                .to_string(),
+                        ))
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), 201);
+            tokens.push(format!("Bearer {}", read(response).await["access_token"].as_str().unwrap()));
+        }
+        let (owner, member) = (&tokens[0], &tokens[1]);
+        let organization = read(
+            app.clone()
+                .oneshot(json_request("POST", "/v1/organizations", owner, json!({"name":"Health Team"})))
+                .await
+                .unwrap(),
+        )
+        .await;
+        let workspace = read(
+            app.clone()
+                .oneshot(json_request(
+                    "POST",
+                    "/v1/workspaces",
+                    owner,
+                    json!({"organization_id": organization["id"], "name":"Health Workspace"}),
+                ))
+                .await
+                .unwrap(),
+        )
+        .await;
+        let workspace_id = workspace["workspace"]["id"].as_str().unwrap().to_owned();
+        let added = app
+            .clone()
+            .oneshot(json_request(
+                "PUT",
+                &format!("/v1/workspaces/{workspace_id}/members"),
+                owner,
+                json!({"email":"health-member@example.com","role":"member"}),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(added.status(), 200);
+
+        // Two versions of one code file: the second drops `parse_config`.
+        for (expected, body) in [
+            (1, "fn parse_config() {}\nfn load_settings() {}\n"),
+            (2, "fn load_settings() {}\n"),
+        ] {
+            let uploaded = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .method("POST")
+                        .uri(format!("/v1/workspaces/{workspace_id}/artifacts/upload"))
+                        .header("authorization", owner)
+                        .header("content-type", "text/x-rust")
+                        .header("x-repomemo-filename", "parser.rs")
+                        .body(Body::from(body))
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(uploaded.status(), 201);
+            wait_for_indexed_artifacts(&app, owner, &workspace_id, expected).await;
+        }
+        for (title, content) in [
+            ("Startup runbook", "# Startup\nCall `parse_config` before the server starts."),
+            ("Copy A", "Identical body."),
+            ("Copy B", "Identical body."),
+        ] {
+            let created = app
+                .clone()
+                .oneshot(json_request(
+                    "POST",
+                    &format!("/v1/workspaces/{workspace_id}/artifacts/text"),
+                    owner,
+                    json!({"title": title, "content": content, "language": "Markdown"}),
+                ))
+                .await
+                .unwrap();
+            assert_eq!(created.status(), 201);
+        }
+        wait_for_indexed_artifacts(&app, owner, &workspace_id, 5).await;
+
+        let health_uri = format!("/v1/workspaces/{workspace_id}/health");
+        let actions_uri = format!("/v1/workspaces/{workspace_id}/health/actions");
+        let health = app.clone().oneshot(auth_request("GET", &health_uri, member)).await.unwrap();
+        assert_eq!(health.status(), 200);
+        let health = read(health).await;
+        let finding = |health: &Value, detector: &str| {
+            health["findings"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|finding| finding["detector"] == detector)
+                .cloned()
+        };
+        let older = finding(&health, "older_version_active").expect("older version finding");
+        assert_eq!(older["files"].as_array().unwrap().len(), 2);
+        let removed = finding(&health, "removed_symbol_mentioned").expect("removed symbol finding");
+        assert!(removed["detail"].as_str().unwrap().contains("`parse_config`"));
+        assert!(removed["evidence"][0]["excerpt"].as_str().unwrap().contains("parse_config"));
+        let duplicate = finding(&health, "duplicate_content").expect("duplicate finding");
+        assert!(finding(&health, "unconnected").is_none());
+        assert_eq!(health["similarity_available"], false);
+
+        // Members can read findings but not act on them.
+        let forbidden = app
+            .clone()
+            .oneshot(json_request(
+                "POST",
+                &actions_uri,
+                member,
+                json!({"fingerprint": older["fingerprint"], "action": "supersede"}),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(forbidden.status(), 403);
+
+        let superseded = app
+            .clone()
+            .oneshot(json_request(
+                "POST",
+                &actions_uri,
+                owner,
+                json!({"fingerprint": older["fingerprint"], "action": "supersede"}),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(superseded.status(), 200);
+        let superseded = read(superseded).await;
+        let old_version_id = superseded["updated_artifact_ids"][0].as_str().unwrap().to_owned();
+        assert_ne!(old_version_id, older["keep_artifact_id"].as_str().unwrap());
+        let lifecycle = read(
+            app.clone()
+                .oneshot(auth_request("GET", &format!("/v1/artifacts/{old_version_id}/lifecycle"), owner))
+                .await
+                .unwrap(),
+        )
+        .await;
+        assert_eq!(lifecycle["status"], "superseded");
+        assert_eq!(lifecycle["superseded_by_artifact_id"], older["keep_artifact_id"]);
+
+        let not_allowed = app
+            .clone()
+            .oneshot(json_request(
+                "POST",
+                &actions_uri,
+                owner,
+                json!({"fingerprint": duplicate["fingerprint"], "action": "create_task"}),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(not_allowed.status(), 400);
+        let dismissed = app
+            .clone()
+            .oneshot(json_request(
+                "POST",
+                &actions_uri,
+                owner,
+                json!({"fingerprint": duplicate["fingerprint"], "action": "dismiss"}),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(dismissed.status(), 200);
+        let tasked = app
+            .clone()
+            .oneshot(json_request(
+                "POST",
+                &actions_uri,
+                owner,
+                json!({"fingerprint": removed["fingerprint"], "action": "create_task"}),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(tasked.status(), 200);
+        assert!(read(tasked).await["task_id"].is_string());
+
+        // Handled findings stay hidden, and a stale fingerprint is refused.
+        let health = read(app.clone().oneshot(auth_request("GET", &health_uri, owner)).await.unwrap()).await;
+        assert!(health["findings"].as_array().unwrap().is_empty());
+        let stats = |detector: &str| {
+            health["detectors"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|stats| stats["detector"] == detector)
+                .cloned()
+                .unwrap()
+        };
+        assert_eq!(stats("older_version_active")["acted_count"], 1);
+        assert_eq!(stats("duplicate_content")["dismissed_count"], 1);
+        assert_eq!(stats("removed_symbol_mentioned")["acted_count"], 1);
+        let stale = app
+            .clone()
+            .oneshot(json_request(
+                "POST",
+                &actions_uri,
+                owner,
+                json!({"fingerprint": older["fingerprint"], "action": "dismiss"}),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(stale.status(), 409);
 
         let _ = std::fs::remove_dir_all(data_dir);
     }

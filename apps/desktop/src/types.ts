@@ -531,6 +531,63 @@ export interface KnowledgeMap {
   similarity_available: boolean;
 }
 
+export type HealthDetector =
+  | "older_version_active"
+  | "duplicate_content"
+  | "removed_symbol_mentioned"
+  | "outdated_evidence_referenced"
+  | "index_failed"
+  | "unconnected";
+
+export type HealthAction = "supersede" | "needs_review" | "mark_outdated" | "create_task" | "dismiss";
+
+export interface HealthFile {
+  artifact_id: string;
+  title: string;
+  path: string;
+  created_at: string;
+}
+
+export interface HealthEvidence {
+  artifact_id: string;
+  title: string;
+  start_line: number | null;
+  end_line: number | null;
+  excerpt: string;
+}
+
+export interface HealthFinding {
+  fingerprint: string;
+  detector: HealthDetector;
+  severity: "warning" | "info";
+  title: string;
+  detail: string;
+  files: HealthFile[];
+  evidence: HealthEvidence[];
+  keep_artifact_id: string | null;
+  actions: HealthAction[];
+}
+
+export interface HealthDetectorStats {
+  detector: HealthDetector;
+  open_count: number;
+  acted_count: number;
+  dismissed_count: number;
+}
+
+export interface WorkspaceHealth {
+  findings: HealthFinding[];
+  detectors: HealthDetectorStats[];
+  checked_file_count: number;
+  similarity_available: boolean;
+}
+
+export interface HealthActionResult {
+  action: HealthAction;
+  updated_artifact_ids: string[];
+  task_id: string | null;
+}
+
 export type AgentCapability = "find_files" | "search_content" | "summarize_file" | "ask_question" | "workspace_overview";
 
 export interface AgentCapabilityInfo {

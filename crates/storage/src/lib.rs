@@ -322,6 +322,15 @@ pub struct NewCollaborationTask {
 }
 
 #[derive(Debug, Clone)]
+pub struct ChunkMention {
+    pub chunk_id: String,
+    pub artifact_id: String,
+    pub text: String,
+    pub start_line: Option<i64>,
+    pub end_line: Option<i64>,
+}
+
+#[derive(Debug, Clone)]
 pub struct NewSavedSearch {
     pub name: String,
     pub query: String,
@@ -3380,6 +3389,120 @@ impl StorageEngine {
         .execute(&self.pool)
         .await?;
         Ok(())
+    }
+
+    /// `artifact id -> (status, superseded by)` for files whose lifecycle was
+    /// ever set. Files without an entry are active.
+    pub async fn workspace_lifecycle_states(
+        &self,
+        workspace_id: &str,
+    ) -> Result<HashMap<String, (String, Option<String>)>> {
+        let rows = sqlx::query(
+            "SELECT artifact_id, status, superseded_by_artifact_id FROM artifact_lifecycle WHERE workspace_id = ?1",
+        )
+        .bind(workspace_id)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|row| {
+                (
+                    row.get("artifact_id"),
+                    (row.get("status"), row.get("superseded_by_artifact_id")),
+                )
+            })
+            .collect())
+    }
+
+    /// `(artifact id, symbol name)` for every indexed symbol in a workspace.
+    pub async fn workspace_symbol_names(&self, workspace_id: &str) -> Result<Vec<(String, String)>> {
+        let rows = sqlx::query("SELECT DISTINCT artifact_id, name FROM symbols WHERE workspace_id = ?1")
+            .bind(workspace_id)
+            .fetch_all(&self.pool)
+            .await?;
+        Ok(rows
+            .into_iter()
+            .map(|row| (row.get("artifact_id"), row.get("name")))
+            .collect())
+    }
+
+    /// Passages matching a full-text query, with their whole text so the
+    /// caller can confirm an exact mention.
+    pub async fn chunks_matching(
+        &self,
+        workspace_id: &str,
+        fts_query: &str,
+        limit: i64,
+    ) -> Result<Vec<ChunkMention>> {
+        let rows = sqlx::query(
+            r#"
+            SELECT chunks.id, chunks.artifact_id, chunks.text, chunks.start_line, chunks.end_line
+            FROM chunks_fts
+            JOIN chunks ON chunks.rowid = chunks_fts.rowid
+            WHERE chunks_fts MATCH ?1 AND chunks.workspace_id = ?2
+            ORDER BY chunks.artifact_id, chunks.chunk_index
+            LIMIT ?3
+            "#,
+        )
+        .bind(fts_query)
+        .bind(workspace_id)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|row| ChunkMention {
+                chunk_id: row.get("id"),
+                artifact_id: row.get("artifact_id"),
+                text: row.get("text"),
+                start_line: row.get("start_line"),
+                end_line: row.get("end_line"),
+            })
+            .collect())
+    }
+
+    pub async fn record_health_action(
+        &self,
+        workspace_id: &str,
+        fingerprint: &str,
+        detector: &str,
+        action: &str,
+        actor_user_id: Option<&str>,
+    ) -> Result<()> {
+        sqlx::query(
+            r#"
+            INSERT INTO workspace_health_actions
+              (id, workspace_id, fingerprint, detector, action, actor_user_id, created_at)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+            "#,
+        )
+        .bind(Uuid::new_v4().to_string())
+        .bind(workspace_id)
+        .bind(fingerprint)
+        .bind(detector)
+        .bind(action)
+        .bind(actor_user_id)
+        .bind(Utc::now().to_rfc3339())
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// `(fingerprint, detector, action)` for every recorded health action.
+    pub async fn list_health_actions(
+        &self,
+        workspace_id: &str,
+    ) -> Result<Vec<(String, String, String)>> {
+        let rows = sqlx::query(
+            "SELECT fingerprint, detector, action FROM workspace_health_actions WHERE workspace_id = ?1",
+        )
+        .bind(workspace_id)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|row| (row.get("fingerprint"), row.get("detector"), row.get("action")))
+            .collect())
     }
 
     pub async fn clear_index_failure(&self, artifact_id: &str) -> Result<()> {

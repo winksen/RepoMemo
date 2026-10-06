@@ -761,6 +761,150 @@ pub struct KnowledgeEdge {
     pub weight: f64,
 }
 
+/// A deterministic check the Workspace Health page runs. None of them call
+/// an AI provider; each finding is backed by stored facts the page shows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HealthDetector {
+    /// An earlier upload of the same file is still active next to a newer one.
+    OlderVersionActive,
+    /// Files with byte-identical content under different names.
+    DuplicateContent,
+    /// A document mentions a code symbol that the latest version of its
+    /// file no longer defines.
+    RemovedSymbolMentioned,
+    /// A document mentions a file marked outdated or superseded.
+    OutdatedEvidenceReferenced,
+    /// A file that could not be indexed, so search never sees it.
+    IndexFailed,
+    /// A file with no close neighbour by meaning and no memory citing it.
+    /// A weak signal: shown as information, never as a removal.
+    Unconnected,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HealthSeverity {
+    Warning,
+    Info,
+}
+
+/// What an administrator can do with a finding. Every action is reversible
+/// from the evidence lifecycle or the task list.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HealthAction {
+    /// Mark the finding's other files superseded by the one kept.
+    Supersede,
+    NeedsReview,
+    MarkOutdated,
+    CreateTask,
+    Dismiss,
+}
+
+impl HealthAction {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Supersede => "supersede",
+            Self::NeedsReview => "needs_review",
+            Self::MarkOutdated => "mark_outdated",
+            Self::CreateTask => "create_task",
+            Self::Dismiss => "dismiss",
+        }
+    }
+}
+
+impl HealthDetector {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::OlderVersionActive => "older_version_active",
+            Self::DuplicateContent => "duplicate_content",
+            Self::RemovedSymbolMentioned => "removed_symbol_mentioned",
+            Self::OutdatedEvidenceReferenced => "outdated_evidence_referenced",
+            Self::IndexFailed => "index_failed",
+            Self::Unconnected => "unconnected",
+        }
+    }
+
+    pub const ALL: [HealthDetector; 6] = [
+        Self::OlderVersionActive,
+        Self::DuplicateContent,
+        Self::RemovedSymbolMentioned,
+        Self::OutdatedEvidenceReferenced,
+        Self::IndexFailed,
+        Self::Unconnected,
+    ];
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HealthFile {
+    pub artifact_id: String,
+    pub title: String,
+    pub path: String,
+    pub created_at: String,
+}
+
+/// A passage that shows why a finding was raised.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HealthEvidence {
+    pub artifact_id: String,
+    pub title: String,
+    pub start_line: Option<i64>,
+    pub end_line: Option<i64>,
+    pub excerpt: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HealthFinding {
+    /// Stable for as long as the underlying facts are unchanged, so a
+    /// handled finding stays hidden until something new happens.
+    pub fingerprint: String,
+    pub detector: HealthDetector,
+    pub severity: HealthSeverity,
+    pub title: String,
+    pub detail: String,
+    /// The files an action applies to.
+    pub files: Vec<HealthFile>,
+    pub evidence: Vec<HealthEvidence>,
+    /// For `supersede`: the file kept by default.
+    pub keep_artifact_id: Option<String>,
+    pub actions: Vec<HealthAction>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HealthDetectorStats {
+    pub detector: HealthDetector,
+    pub open_count: i64,
+    /// Findings an administrator acted on (anything but dismiss).
+    pub acted_count: i64,
+    pub dismissed_count: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkspaceHealth {
+    pub findings: Vec<HealthFinding>,
+    pub detectors: Vec<HealthDetectorStats>,
+    /// Files still in use (not outdated or superseded) that were checked.
+    pub checked_file_count: i64,
+    /// False when there is no embedding provider, so `unconnected` is skipped.
+    pub similarity_available: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HealthActionRequest {
+    pub fingerprint: String,
+    pub action: HealthAction,
+    /// For `supersede`: which of the finding's files to keep.
+    pub keep_artifact_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HealthActionResult {
+    pub action: HealthAction,
+    pub updated_artifact_ids: Vec<String>,
+    pub task_id: Option<String>,
+}
+
 /// A job the workspace assistant knows how to do. The assistant only ever runs
 /// one of these; a message that matches none of them gets a plain reply.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

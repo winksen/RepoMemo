@@ -17,6 +17,7 @@ import {
   IconChevronDown as ChevronDown,
   IconChartBar as Chart,
   IconChartDots3 as MapIcon,
+  IconStethoscope as HealthIcon,
   IconCode as Code,
   IconFileText as FileText,
   IconFilter as Filter,
@@ -190,6 +191,7 @@ import { DOCUMENT_ACCEPT, DOCUMENT_KIND_LABEL, documentKindOf, isDocumentArtifac
 import { AiProviderForm } from "./components/AiProviderForm";
 import { AssistantPanel } from "./components/AssistantPanel";
 import { KnowledgeMapPanel } from "./components/KnowledgeMapPanel";
+import { WorkspaceHealthPanel } from "./components/WorkspaceHealthPanel";
 import { showToast, Toast } from "./components/ui/toast";
 import { initialSharedTheme, SharedLayout, ThemeToggle } from "./components/SharedLayout";
 
@@ -201,7 +203,7 @@ const INDEX_POLL_ATTEMPTS = 300;
 
 type AuthMode = "sign-in" | "sign-up";
 type PageState = "restoring" | "unauthenticated" | "ready" | "error";
-type WorkspaceSection = "overview" | "evidence" | "documents" | "retrieval" | "assistant" | "map" | "memory" | "tasks" | "people" | "activity" | "settings";
+type WorkspaceSection = "overview" | "evidence" | "documents" | "retrieval" | "assistant" | "map" | "health" | "memory" | "tasks" | "people" | "activity" | "settings";
 type ArtifactViewMode = "grid" | "list";
 type OrganizationNavigation = {
   activeOrganizationId: string | null;
@@ -211,7 +213,7 @@ type OrganizationNavigation = {
   cancelOrganizationCreation: () => void;
 };
 
-const WORKSPACE_SECTIONS: WorkspaceSection[] = ["overview", "evidence", "documents", "retrieval", "assistant", "map", "memory", "tasks", "people", "activity", "settings"];
+const WORKSPACE_SECTIONS: WorkspaceSection[] = ["overview", "evidence", "documents", "retrieval", "assistant", "map", "health", "memory", "tasks", "people", "activity", "settings"];
 const ADMIN_WORKSPACE_SECTIONS = new Set<WorkspaceSection>(["people", "activity", "settings"]);
 type ItemDialog =
   | { kind: "rename-folder"; folder: Folder }
@@ -1017,6 +1019,7 @@ function WorkspaceTopbar({
       {workspaceTab("retrieval", "Retrieval", <Search size={16} />)}
       {workspaceTab("assistant", "Assistant", <Sparkles size={16} />)}
       {workspaceTab("map", "Map", <MapIcon size={16} />)}
+      {workspaceTab("health", "Health", <HealthIcon size={16} />)}
       {workspaceTab("memory", "Memory", <Book size={16} />)}
       {workspaceTab("tasks", "Tasks", <Checklist size={16} />)}
       {workspaceTab("people", "People", <Users size={16} />)}
@@ -1128,6 +1131,7 @@ function SharedWorkspaceDetail({
   const isRetrievalView = section === "retrieval";
   const isAssistantView = section === "assistant";
   const isMapView = section === "map";
+  const isHealthView = section === "health";
   const isMemoryView = section === "memory";
   const isTasksView = section === "tasks";
   const isPeopleView = section === "people";
@@ -1638,7 +1642,7 @@ function SharedWorkspaceDetail({
     <SharedLayout apiAvailable={apiAvailable} onNavigate={navigate} session={session} signOut={signOut} sidebar={<OrganizationRail organizationId={organization?.id} organizations={organizations} workspaceId={workspace.workspace.id} workspaces={workspaces} />} workspaceNavigation={<WorkspaceTopbar activeSection={section} onNavigate={onNavigate} workspace={workspace} />}>
       <section className="shared-detail-shell" aria-busy={isLoading}>
         <div className="shared-detail-heading">
-          <div><h1>{isEvidenceView ? "Evidence ledger" : isDocumentsView ? "Documents" : isRetrievalView ? "Retrieve evidence" : isAssistantView ? "Assistant" : isMapView ? "Knowledge map" : isMemoryView ? "Durable team memory" : isTasksView ? "Tasks" : isPeopleView ? "People" : isActivityView ? "Activity" : isSettingsView ? "Workspace settings" : workspace.workspace.name}</h1><p>{isEvidenceView ? "Store notes and files in the workspace. New evidence is indexed automatically, so it is ready for retrieval shortly after it is saved." : isDocumentsView ? "Upload Word, Excel, PowerPoint, PDF, OneNote and Outlook files, preview them here, and keep them alongside the workspace evidence ledger." : isRetrievalView ? "Search indexed workspace evidence and inspect the source context behind every result." : isAssistantView ? "Find files, search content, summarize, and ask questions about this workspace. Every answer links back to its sources." : isMapView ? "See how far your files are through indexing and search by meaning, and how their content connects." : isMemoryView ? "Capture concise facts and decisions that should outlive the current investigation." : isTasksView ? "Turn evidence and decisions into assigned, trackable action items for the team." : isPeopleView ? "See who can access this workspace and understand each person’s role." : isActivityView ? "A durable record of shared workspace changes, including evidence, memory, indexing, and membership updates." : isSettingsView ? "Administrators control workspace access and AI integrations here. Owner-only actions remain clearly marked." : "Artifacts, search results, and durable team memory are all retrieved through the protected shared API."}</p></div>
+          <div><h1>{isEvidenceView ? "Evidence ledger" : isDocumentsView ? "Documents" : isRetrievalView ? "Retrieve evidence" : isAssistantView ? "Assistant" : isMapView ? "Knowledge map" : isHealthView ? "Workspace health" : isMemoryView ? "Durable team memory" : isTasksView ? "Tasks" : isPeopleView ? "People" : isActivityView ? "Activity" : isSettingsView ? "Workspace settings" : workspace.workspace.name}</h1><p>{isEvidenceView ? "Store notes and files in the workspace. New evidence is indexed automatically, so it is ready for retrieval shortly after it is saved." : isDocumentsView ? "Upload Word, Excel, PowerPoint, PDF, OneNote and Outlook files, preview them here, and keep them alongside the workspace evidence ledger." : isRetrievalView ? "Search indexed workspace evidence and inspect the source context behind every result." : isAssistantView ? "Find files, search content, summarize, and ask questions about this workspace. Every answer links back to its sources." : isMapView ? "See how far your files are through indexing and search by meaning, and how their content connects." : isHealthView ? "Deterministic checks for stale versions, duplicates, documents that drifted from the code, and files search cannot see. Administrators decide what happens to each finding." : isMemoryView ? "Capture concise facts and decisions that should outlive the current investigation." : isTasksView ? "Turn evidence and decisions into assigned, trackable action items for the team." : isPeopleView ? "See who can access this workspace and understand each person’s role." : isActivityView ? "A durable record of shared workspace changes, including evidence, memory, indexing, and membership updates." : isSettingsView ? "Administrators control workspace access and AI integrations here. Owner-only actions remain clearly marked." : "Artifacts, search results, and durable team memory are all retrieved through the protected shared API."}</p></div>
         </div>
         <Toast kind="error" message={error} />
         {isRestrictedView ? <div className="shared-empty-state shared-admin-restricted-state"><Shield size={25} /><strong>Workspace administrator access required</strong><span>People, Activity, and Settings are reserved for workspace owners and administrators.</span><Button onClick={() => onNavigate("overview")} type="button" variant="secondary">Go to overview</Button></div> : <>
@@ -1677,7 +1681,8 @@ function SharedWorkspaceDetail({
         </section> : null}
         {isAssistantView ? <AssistantPanel accessToken={accessToken} key={workspace.workspace.id} onOpenArtifact={onOpenArtifact} workspaceId={workspace.workspace.id} /> : null}
         {isMapView ? <KnowledgeMapPanel accessToken={accessToken} canConfigure={isWorkspaceAdmin} key={workspace.workspace.id} onOpenArtifact={onOpenArtifact} onOpenEvidence={() => onNavigate("evidence")} onOpenMemoryCard={onOpenMemoryCard} onOpenSettings={() => onNavigate("settings")} workspaceId={workspace.workspace.id} /> : null}
-        {section !== "overview" && !isAssistantView && !isMapView ? <div className={`shared-detail-grid${isEvidenceView || isDocumentsView ? " evidence-only" : isRetrievalView ? " retrieval-only" : isMemoryView ? " memory-only" : isTasksView ? " tasks-only" : isPeopleView ? " people-only" : isActivityView ? " activity-only" : isSettingsView ? " settings-only" : ""}`}>
+        {isHealthView ? <WorkspaceHealthPanel accessToken={accessToken} canAct={isWorkspaceAdmin} key={workspace.workspace.id} onOpenArtifact={onOpenArtifact} workspaceId={workspace.workspace.id} /> : null}
+        {section !== "overview" && !isAssistantView && !isMapView && !isHealthView ? <div className={`shared-detail-grid${isEvidenceView || isDocumentsView ? " evidence-only" : isRetrievalView ? " retrieval-only" : isMemoryView ? " memory-only" : isTasksView ? " tasks-only" : isPeopleView ? " people-only" : isActivityView ? " activity-only" : isSettingsView ? " settings-only" : ""}`}>
           {isEvidenceView || isDocumentsView ? <section className="shared-detail-panel">
             <div className="shared-artifact-browser">
               {itemDialogs}

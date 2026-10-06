@@ -22,6 +22,7 @@ use serde_json::json;
 
 mod agent;
 mod embeddings;
+mod health;
 mod knowledge_map;
 
 pub use agent::{agent_capabilities, agent_conversation_title, agent_turn_label};

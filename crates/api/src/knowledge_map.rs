@@ -224,7 +224,7 @@ fn kind_label(artifact: &repomemo_domain::ArtifactSummary) -> String {
 /// whose cosines sit in different ranges. The bar never rises above the 75th
 /// percentile, so a workspace about one topic still shows its closest pairs.
 /// Vectors must be unit length.
-fn similarity_edges(files: &[(&str, &[f32])]) -> Vec<KnowledgeEdge> {
+pub(crate) fn similarity_edges(files: &[(&str, &[f32])]) -> Vec<KnowledgeEdge> {
     let count = files.len();
     if count < 2 {
         return Vec::new();

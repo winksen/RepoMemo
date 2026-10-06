@@ -6,6 +6,9 @@ import type {
   AgentTurnResponse,
   AskAnswer,
   KnowledgeMap,
+  HealthAction,
+  HealthActionResult,
+  WorkspaceHealth,
   ArtifactDetail,
   ArtifactComment,
   ArtifactLifecycle,
@@ -255,6 +258,18 @@ export function askSharedWorkspace(accessToken: string, workspaceId: string, que
 
 export function getSharedKnowledgeMap(accessToken: string, workspaceId: string): Promise<KnowledgeMap> {
   return request<KnowledgeMap>(`/v1/workspaces/${workspaceId}/knowledge-map`, {}, accessToken);
+}
+
+export function getSharedWorkspaceHealth(accessToken: string, workspaceId: string): Promise<WorkspaceHealth> {
+  return request<WorkspaceHealth>(`/v1/workspaces/${workspaceId}/health`, {}, accessToken);
+}
+
+/** Workspace administrators only. `keepArtifactId` picks the file kept by `supersede`. */
+export function applySharedHealthAction(accessToken: string, workspaceId: string, fingerprint: string, action: HealthAction, keepArtifactId?: string): Promise<HealthActionResult> {
+  return request<HealthActionResult>(`/v1/workspaces/${workspaceId}/health/actions`, {
+    method: "POST",
+    body: JSON.stringify({ fingerprint, action, keep_artifact_id: keepArtifactId ?? null }),
+  }, accessToken);
 }
 
 export function getSharedAgentCapabilities(accessToken: string, workspaceId: string): Promise<AgentCapabilities> {

@@ -438,6 +438,21 @@ The page (`KnowledgeMapPanel`) lays the graph out in the browser with a determin
 
 **Conversations** are stored on the server (migration 0014). `assistant_conversations` holds one row per chat, owned by a single user in a single workspace and visible only to that user. `assistant_turns` holds one row per finished exchange: the label, the request and the full `AgentReply` as JSON. A request that fails leaves no row, and the first message creates the chat only after it gets a reply. A chat is titled from its first request until the user renames it. Turns are snapshots: a file that was deleted later still appears in an old reply, and opening it reports that it is missing. The model does not see earlier turns; each message is still routed and answered on its own. The browser remembers only which chat was last open (`localStorage`).
 
+### 6.9 Workspace health ([crates/api/src/health.rs](../crates/api/src/health.rs), Health tab)
+
+`RepoMemoCore::workspace_health` runs deterministic checks per request over stored facts. No AI provider is called. Files marked `outdated` or `superseded` are retired: they are never reported, but older versions still serve as history.
+
+| Detector | Raised when | Actions |
+|---|---|---|
+| `older_version_active` | Several uploads share a source and path and more than one is in use | supersede (keep the latest by default), dismiss |
+| `duplicate_content` | Files in use share a content hash | supersede (keep the oldest by default), dismiss |
+| `removed_symbol_mentioned` | A symbol of a file's previous version is gone from its latest version and from every other file in use, and a non-code file still names it (whole identifier; a plain word only counts when written like code) | needs review, create task, dismiss |
+| `outdated_evidence_referenced` | A file in use names a retired file, and no file in use carries that name | needs review, create task, dismiss |
+| `index_failed` | `artifact_index_failures` has a row for a file in use | create task, mark outdated, dismiss |
+| `unconnected` (info) | With an embedding provider and 8–2,000 embedded files: no similar link (same adaptive bar as the map) and no memory card citation. Skipped when more than 15% of files would qualify | create task, dismiss |
+
+Mentions are found with an FTS5 phrase query, then confirmed on the passage text; at most 200 queries run per check. Each finding has a fingerprint built from the facts behind it. `POST /v1/workspaces/{id}/health/actions` (owners and admins) re-runs the checks, acts only on the finding as it stands now (409 when it changed), applies the change through the evidence lifecycle or the task list, and records the outcome in `workspace_health_actions`. A finding with a recorded outcome stays hidden until its fingerprint changes. Per detector, the page shows how many findings were acted on and how many were dismissed, to show which checks earn their place.
+
 ---
 
 ## 7. Data model
@@ -458,6 +473,7 @@ The database is SQLite in WAL mode with foreign keys on, a pool of at most 5 con
 | 0010 | jobs_kind_cancel | `indexing_jobs.kind`, `cancel_requested` |
 | 0011 | index_version | `artifacts.index_version`, the indexer version that produced the current chunks |
 | 0014 | assistant_conversations | assistant_conversations, assistant_turns (per-user assistant chats, §6.7) |
+| 0015 | workspace_health | workspace_health_actions (what administrators did with each health finding, §6.9) |
 
 ```mermaid
 erDiagram
