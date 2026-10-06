@@ -25,6 +25,7 @@ mod embeddings;
 mod health;
 mod knowledge_map;
 mod repo_overview;
+mod repo_stack;
 mod repo_sync;
 
 pub use agent::{agent_capabilities, agent_conversation_title, agent_turn_label};

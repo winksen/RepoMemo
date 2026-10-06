@@ -807,6 +807,17 @@ export interface RepoKeyFile {
   role: "readme" | "manifest" | "entry_point" | "docs" | string;
 }
 
+export interface RepoTechnology {
+  name: string;
+  category: string;
+}
+
+export interface RepoStack {
+  kind: "frontend" | "backend" | "web_app" | "desktop_app" | "mobile_app" | "cli" | "project" | string;
+  summary: string;
+  technologies: RepoTechnology[];
+}
+
 export interface RepoOverview {
   commit: RepoCommit;
   generated_at: string;
@@ -817,6 +828,8 @@ export interface RepoOverview {
   key_files: RepoKeyFile[];
   readme_excerpt: string | null;
   recent_commits: RepoCommit[];
+  /** Absent for repositories synced before stack detection existed. */
+  stack?: RepoStack | null;
 }
 
 export interface RepoSummary {

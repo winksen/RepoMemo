@@ -27,6 +27,7 @@ use serde_json::json;
 use crate::repo_overview::{
     compute_overview, key_file_role, overview_markdown, readme_excerpt, RECENT_COMMITS,
 };
+use crate::repo_stack::{detect_stack, MAX_MANIFEST_BYTES, MAX_STACK_MANIFESTS, STACK_MANIFESTS};
 use crate::RepoMemoCore;
 
 /// Skipped paths kept per reason in a sync report.
@@ -605,7 +606,19 @@ impl RepoMemoCore {
             }
             None => None,
         };
-        let overview = compute_overview(commit, &files, excerpt, recent_commits, chrono_now());
+        let mut manifests = std::collections::BTreeMap::new();
+        let manifest_files = files.iter().filter(|file| {
+            let name = file.path.rsplit('/').next().unwrap_or(&file.path);
+            file.path.matches('/').count() <= 2
+                && STACK_MANIFESTS.contains(&name)
+                && file.size_bytes <= MAX_MANIFEST_BYTES
+        });
+        for file in manifest_files.take(MAX_STACK_MANIFESTS) {
+            let bytes = self.storage.read_artifact_blob(&file.artifact_id).await?;
+            manifests.insert(file.path.clone(), String::from_utf8_lossy(&bytes).into_owned());
+        }
+        let stack = detect_stack(&files, &manifests);
+        let overview = compute_overview(commit, &files, excerpt, recent_commits, stack, chrono_now());
         let root = source.root_uri.clone().unwrap_or_default();
         let content = overview_markdown(&source.name, &root, &overview).into_bytes();
         let content_hash = StorageEngine::content_hash(&content);

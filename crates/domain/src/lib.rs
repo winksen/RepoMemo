@@ -547,6 +547,25 @@ pub struct RepoKeyFile {
     pub role: String,
 }
 
+/// One framework, tool or language detected in a repository.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RepoTechnology {
+    pub name: String,
+    /// `frontend`, `backend`, `meta-framework`, `desktop`, `mobile`, `database`,
+    /// `testing`, `tooling`, `language`, ...
+    pub category: String,
+}
+
+/// What kind of project a repository is, read from its manifests and layout.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RepoStack {
+    /// `frontend`, `backend`, `web_app`, `desktop_app`, `mobile_app`, `cli` or `project`.
+    pub kind: String,
+    /// For example "React single-page app (TypeScript)" or "Laravel PHP backend".
+    pub summary: String,
+    pub technologies: Vec<RepoTechnology>,
+}
+
 /// What a repository holds, computed from its indexed files at each sync.
 /// Deterministic: no AI is involved.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -561,6 +580,9 @@ pub struct RepoOverview {
     /// The opening of the root README, when there is one.
     pub readme_excerpt: Option<String>,
     pub recent_commits: Vec<RepoCommit>,
+    /// Absent on overviews written before stack detection existed.
+    #[serde(default)]
+    pub stack: Option<RepoStack>,
 }
 
 /// An AI summary of a repository, kept until someone regenerates it.

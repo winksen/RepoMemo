@@ -14,7 +14,7 @@ use anyhow::{bail, Result};
 use repomemo_ai::{provider_from_settings, AiProvider, GenerateRequest};
 use repomemo_domain::{
     Citation, RepoCommit, RepoFile, RepoFolderShare, RepoKeyFile, RepoLanguageShare, RepoOverview,
-    RepoSummary,
+    RepoStack, RepoSummary,
 };
 use serde_json::json;
 
@@ -79,6 +79,7 @@ pub(crate) fn compute_overview(
     files: &[RepoFile],
     readme_excerpt: Option<String>,
     recent_commits: Vec<RepoCommit>,
+    stack: Option<RepoStack>,
     generated_at: String,
 ) -> RepoOverview {
     let mut languages: BTreeMap<String, (usize, i64)> = BTreeMap::new();
@@ -152,6 +153,7 @@ pub(crate) fn compute_overview(
         key_files,
         readme_excerpt,
         recent_commits,
+        stack,
     }
 }
 
@@ -221,6 +223,15 @@ pub(crate) fn overview_markdown(name: &str, root: &str, overview: &RepoOverview)
         overview.file_count,
         format_bytes(overview.total_bytes),
     );
+    if let Some(stack) = &overview.stack {
+        let technologies = stack
+            .technologies
+            .iter()
+            .map(|technology| technology.name.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
+        out.push_str(&format!("- Project type: {} (built with {technologies})\n", stack.summary));
+    }
     if !overview.languages.is_empty() {
         let languages = overview
             .languages
@@ -396,7 +407,7 @@ mod tests {
             file("tools/d/Cargo.toml", Some("TOML"), 10),
             file("tools/e/Cargo.toml", Some("TOML"), 10),
         ];
-        let overview = compute_overview(commit, &files, Some("# Payments".to_owned()), Vec::new(), "now".to_owned());
+        let overview = compute_overview(commit, &files, Some("# Payments".to_owned()), Vec::new(), None, "now".to_owned());
         assert_eq!(overview.file_count, 12);
         assert_eq!(overview.total_bytes, 8_000);
         assert_eq!(overview.languages[0].language, "Rust");

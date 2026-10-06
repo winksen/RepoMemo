@@ -10,6 +10,7 @@ import {
   IconRefresh as Refresh,
   IconSettings as Settings,
   IconSparkles as Sparkles,
+  IconStack2 as Layers,
   IconTrash as Trash,
 } from "@tabler/icons-react";
 import ReactMarkdown from "react-markdown";
@@ -27,6 +28,7 @@ import {
   updateSharedRepository,
 } from "../lib/sharedApi";
 import type { RepoAccessCheck, RepoFile, RepoSource, RepoSyncReport, RepositoryDetailResponse } from "../types";
+import { LanguageChart } from "./LanguageChart";
 import { Button } from "./ui/button";
 import { Dialog, DialogCancel } from "./ui/dialog";
 import { Input } from "./ui/input";
@@ -519,6 +521,13 @@ function RepositoryFiles({
   </div>;
 }
 
+/** Order and labels of the technology groups in the project analysis. */
+const STACK_CATEGORIES: [string, string][] = [
+  ["language", "Language"], ["meta-framework", "Framework"], ["frontend", "Frontend"], ["backend", "Backend"],
+  ["desktop", "Desktop"], ["mobile", "Mobile"], ["cli", "Command line"], ["game", "Game"], ["data", "Data"],
+  ["database", "Database"], ["runtime", "Runtime"], ["testing", "Testing"], ["tooling", "Tooling"],
+];
+
 function formatBytes(bytes: number) {
   if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
   if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
@@ -651,15 +660,23 @@ export function RepositoryDetailView({
       {canSync && detail.ai_available && overview ? <div className="rm-health-actions"><Button disabled={summarizing} onClick={() => void summarize()} type="button" variant={summary && !summaryIsStale ? "secondary" : "main"}><Sparkles size={15} /> {summarizing ? "Summarizing…" : summary ? "Regenerate summary" : "Generate summary"}</Button></div> : null}
     </section>
 
+    {overview?.stack ? <section className="shared-record-panel rm-repo-page">
+      <div className="shared-panel-heading"><div><Layers size={18} /><h2>Project analysis</h2></div><span>detected from manifests</span></div>
+      <p className="rm-stack-summary">{overview.stack.summary}</p>
+      <dl className="rm-stack-groups">
+        {STACK_CATEGORIES.map(([category, label]) => {
+          const items = overview.stack!.technologies.filter((technology) => technology.category === category);
+          return items.length ? <div key={category}><dt>{label}</dt><dd>{items.map((technology) => <span className="rm-stack-chip" key={technology.name}>{technology.name}</span>)}</dd></div> : null;
+        })}
+      </dl>
+    </section> : null}
+
     <section className="shared-record-panel rm-repo-page">
       <div className="shared-panel-heading"><div><FolderCode size={18} /><h2>Content overview</h2></div>{overview ? <span>{overview.file_count.toLocaleString()} files · {formatBytes(overview.total_bytes)}</span> : null}</div>
       {overview ? <div className="rm-repo-overview">
-        <div className="rm-map-coverage">
-          <table>
-            <caption className="rm-repo-caption">Languages</caption>
-            <thead><tr><th scope="col">Language</th><th scope="col">Files</th><th scope="col">Size</th><th scope="col">Share</th></tr></thead>
-            <tbody>{overview.languages.map((share) => <tr key={share.language}><th scope="row">{share.language}</th><td>{share.files.toLocaleString()}</td><td>{formatBytes(share.bytes)}</td><td>{overview.total_bytes ? `${Math.round((share.bytes / overview.total_bytes) * 100)}%` : "—"}</td></tr>)}</tbody>
-          </table>
+        <div className="rm-repo-languages">
+          <h3 className="rm-repo-caption">Languages</h3>
+          <LanguageChart languages={overview.languages} totalBytes={overview.total_bytes} />
         </div>
         <div className="rm-map-coverage">
           <table>

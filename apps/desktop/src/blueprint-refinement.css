@@ -1013,3 +1013,28 @@ body,
 .shared-image-preview img { display: block; max-width: 100%; max-height: 70vh; object-fit: contain; border-radius: 6px; }
 .shared-image-preview.loading { animation: rm-image-pulse 1.2s ease-in-out infinite; }
 @keyframes rm-image-pulse { 50% { opacity: 0.5; } }
+
+:root { --chart-1: hsl(233 70% 52%); --chart-2: hsl(166 60% 34%); --chart-3: hsl(28 85% 48%); --chart-4: hsl(330 62% 48%); --chart-5: hsl(190 70% 38%); --chart-6: hsl(48 80% 40%); --chart-7: hsl(275 52% 52%); }
+:root[data-theme="dark"] { --chart-1: hsl(230 82% 68%); --chart-2: hsl(166 52% 52%); --chart-3: hsl(28 88% 62%); --chart-4: hsl(330 65% 66%); --chart-5: hsl(190 65% 55%); --chart-6: hsl(48 85% 60%); --chart-7: hsl(275 60% 70%); }
+
+.rm-repo-languages { min-width: 0; }
+h3.rm-repo-caption { margin: 0 0 10px; }
+.rm-language-chart { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 24px; margin: 0; }
+.rm-language-chart svg { flex: none; width: 160px; height: 160px; }
+.rm-language-chart circle { transition: opacity 120ms ease-in-out; }
+.rm-language-chart-value { fill: var(--color-text); font-size: 20px; font-weight: 700; }
+.rm-language-chart-label { fill: var(--color-text-muted); font-size: 9px; }
+.rm-language-chart figcaption { flex: 1 1 220px; min-width: 0; }
+.rm-language-legend { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.rm-language-legend li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: baseline; gap: 2px 10px; font-size: 13px; }
+.rm-language-swatch { width: 10px; height: 10px; align-self: center; border-radius: 3px; }
+.rm-language-legend strong { overflow: hidden; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.rm-language-share { color: var(--color-text); font-variant-numeric: tabular-nums; font-weight: 650; }
+.rm-language-meta { grid-column: 2; color: var(--color-text-muted); font-size: 11px; }
+
+.rm-stack-summary { margin: 4px 0 14px; color: var(--color-text); font-size: 17px; font-weight: 650; }
+.rm-stack-groups { display: grid; gap: 10px; margin: 0; }
+.rm-stack-groups > div { display: grid; grid-template-columns: 110px minmax(0, 1fr); align-items: baseline; gap: 10px; }
+.rm-stack-groups dt { color: var(--color-text-muted); font-size: 12px; }
+.rm-stack-groups dd { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
+.rm-stack-chip { padding: 3px 9px; color: var(--color-text); background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: 999px; font-size: 12px; font-weight: 600; }
