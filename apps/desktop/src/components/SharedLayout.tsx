@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import {
   IconBell as Bell,
-  IconLayoutDashboard as Dashboard,
   IconLogout as Logout,
   IconMoon as Moon,
   IconShieldLock as Shield,
@@ -70,9 +69,8 @@ export function SharedLayout({
 }) {
   return <main className="shared-home">
     <header className="shared-home-header">
-      <Button aria-label="Go to dashboard" className="shared-brand" onClick={() => onNavigate("/dashboard")} type="button" variant="secondary"><img alt="" className="shared-brand-mark" src="/RM-logo.svg" /></Button>
+      <Button aria-label="Go to dashboard" className="shared-brand" onClick={() => onNavigate("/dashboard")} type="button" variant="secondary"><img alt="RepoMemo" className="shared-brand-full" src="/RM-logofull.svg" /></Button>
       <div className="shared-header-actions">
-        <Button aria-current={window.location.pathname === "/dashboard" ? "page" : undefined} className="shared-dashboard-link" onClick={() => onNavigate("/dashboard")} type="button" variant="secondary"><Dashboard size={16} /> Dashboard</Button>
         <div className="shared-user-menu" aria-label="Account controls">
           <div className="shared-account-controls">
             <ThemeToggle />

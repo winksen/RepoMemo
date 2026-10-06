@@ -58,6 +58,114 @@ export function getSharedHealth(): Promise<{ service: string; status: string; au
   return request<{ service: string; status: string; authentication: string }>("/health");
 }
 
+export const SHARED_SESSION_STORAGE_KEY = "repomemo.shared.access-token";
+const REFRESH_STORAGE_KEY = "repomemo.shared.refresh-token";
+
+function readStorage(storage: "sessionStorage" | "localStorage", key: string): string | null {
+  try {
+    return window[storage].getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeStorage(storage: "sessionStorage" | "localStorage", key: string, value: string | null) {
+  try {
+    if (value === null) window[storage].removeItem(key);
+    else window[storage].setItem(key, value);
+  } catch {
+    // storage unavailable; the session simply won't survive a reload
+  }
+}
+
+function storeTokens(response: { access_token: string; refresh_token: string }) {
+  writeStorage("sessionStorage", SHARED_SESSION_STORAGE_KEY, response.access_token);
+  writeStorage("localStorage", REFRESH_STORAGE_KEY, response.refresh_token);
+}
+
+/** Forgets the local session. Best-effort revokes the refresh token on the server. */
+export function clearSharedSession() {
+  const refreshToken = readStorage("localStorage", REFRESH_STORAGE_KEY);
+  writeStorage("sessionStorage", SHARED_SESSION_STORAGE_KEY, null);
+  writeStorage("localStorage", REFRESH_STORAGE_KEY, null);
+  if (refreshToken) {
+    fetch(`${API_URL}/v1/auth/logout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    }).catch(() => undefined);
+  }
+}
+
+// Callers hold on to the access token they were given; once it is refreshed, requests using the old value are upgraded.
+const refreshedTokens = new Map<string, string>();
+let refreshInFlight: Promise<string | null> | null = null;
+
+function latestToken(token: string): string {
+  let current = token;
+  for (let hops = 0; refreshedTokens.has(current) && hops < 50; hops += 1) current = refreshedTokens.get(current)!;
+  return current;
+}
+
+/** Trades the stored refresh token for a new access token. Resolves to null when there is no valid refresh token. */
+export function refreshSharedSession(staleAccessToken?: string): Promise<string | null> {
+  if (refreshInFlight) return refreshInFlight;
+  const refreshToken = readStorage("localStorage", REFRESH_STORAGE_KEY);
+  if (!refreshToken) return Promise.resolve(null);
+  refreshInFlight = (async () => {
+    try {
+      const response = await fetch(`${API_URL}/v1/auth/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+      if (!response.ok) {
+        // Only a definitive rejection ends the session; a flaky network keeps it.
+        if (response.status === 401) writeStorage("localStorage", REFRESH_STORAGE_KEY, null);
+        return null;
+      }
+      const tokens = await response.json() as TokenResponse;
+      storeTokens(tokens);
+      if (staleAccessToken) refreshedTokens.set(staleAccessToken, tokens.access_token);
+      return tokens.access_token;
+    } catch {
+      return null;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+  return refreshInFlight;
+}
+
+function redirectToSignIn() {
+  writeStorage("sessionStorage", SHARED_SESSION_STORAGE_KEY, null);
+  if (window.location.pathname !== "/login") {
+    window.location.replace("/login");
+  }
+}
+
+/** fetch for authenticated calls. A 401 first tries a silent refresh and one retry; if that fails the session is over, so go straight to sign-in instead of leaving protected content on screen. */
+async function authFetch(input: string, init: RequestInit): Promise<Response> {
+  const headers = new Headers(init.headers);
+  const bearer = headers.get("Authorization")?.replace(/^Bearer /, "");
+  if (!bearer) return fetch(input, init);
+
+  const token = latestToken(bearer);
+  headers.set("Authorization", `Bearer ${token}`);
+  const response = await fetch(input, { ...init, headers });
+  if (response.status !== 401) return response;
+
+  const refreshed = await refreshSharedSession(token);
+  if (!refreshed) {
+    redirectToSignIn();
+    return response;
+  }
+  headers.set("Authorization", `Bearer ${refreshed}`);
+  const retry = await fetch(input, { ...init, headers });
+  if (retry.status === 401) redirectToSignIn();
+  return retry;
+}
+
 export class SharedApiError extends Error {
   readonly status: number;
 
@@ -70,6 +178,7 @@ export class SharedApiError extends Error {
 
 interface TokenResponse {
   access_token: string;
+  refresh_token: string;
   token_type: "Bearer";
   expires_in: number;
   user: SharedUser;
@@ -89,7 +198,7 @@ async function request<T>(
     headers.set("Authorization", `Bearer ${accessToken}`);
   }
 
-  const response = await fetch(`${API_URL}${path}`, { ...options, headers });
+  const response = await authFetch(`${API_URL}${path}`, { ...options, headers });
   const payload = await response.json().catch(() => null) as { error?: { message?: string } } | T | null;
   if (!response.ok) {
     const message = payload && typeof payload === "object" && "error" in payload
@@ -101,7 +210,7 @@ async function request<T>(
 }
 
 async function requestText(path: string, accessToken: string): Promise<string> {
-  const response = await fetch(`${API_URL}${path}`, {
+  const response = await authFetch(`${API_URL}${path}`, {
     headers: { Accept: "text/markdown", Authorization: `Bearer ${accessToken}` },
   });
   if (!response.ok) {
@@ -116,7 +225,7 @@ export async function registerSharedUser(input: {
   displayName: string;
   password: string;
 }): Promise<TokenResponse> {
-  return request<TokenResponse>("/v1/auth/register", {
+  const response = await request<TokenResponse>("/v1/auth/register", {
     method: "POST",
     body: JSON.stringify({
       email: input.email,
@@ -124,16 +233,20 @@ export async function registerSharedUser(input: {
       password: input.password,
     }),
   });
+  storeTokens(response);
+  return response;
 }
 
 export async function loginSharedUser(input: {
   email: string;
   password: string;
 }): Promise<TokenResponse> {
-  return request<TokenResponse>("/v1/auth/login", {
+  const response = await request<TokenResponse>("/v1/auth/login", {
     method: "POST",
     body: JSON.stringify(input),
   });
+  storeTokens(response);
+  return response;
 }
 
 export function getSharedSession(accessToken: string): Promise<SharedSession> {
@@ -524,7 +637,7 @@ export function getSharedRenderStatus(accessToken: string, artifactId: string): 
 }
 
 export async function downloadSharedRenderedPreview(accessToken: string, artifactId: string): Promise<Blob> {
-  const response = await fetch(`${API_URL}/v1/artifacts/${artifactId}/rendered-preview`, {
+  const response = await authFetch(`${API_URL}/v1/artifacts/${artifactId}/rendered-preview`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!response.ok) {
@@ -540,7 +653,7 @@ export function createSharedFileLink(accessToken: string, artifactId: string): P
 
 /** The stored original file, fetched with the user's session. */
 export async function downloadSharedArtifactFile(accessToken: string, artifactId: string): Promise<Blob> {
-  const response = await fetch(`${API_URL}/v1/artifacts/${artifactId}/file`, {
+  const response = await authFetch(`${API_URL}/v1/artifacts/${artifactId}/file`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!response.ok) {
@@ -595,7 +708,7 @@ export function createSharedTextArtifact(accessToken: string, workspaceId: strin
 }
 
 export async function uploadSharedArtifact(accessToken: string, workspaceId: string, file: File, folderId?: string | null): Promise<ArtifactSummary> {
-  const response = await fetch(`${API_URL}/v1/workspaces/${workspaceId}/artifacts/upload`, {
+  const response = await authFetch(`${API_URL}/v1/workspaces/${workspaceId}/artifacts/upload`, {
     method: "POST",
     headers: {
       Accept: "application/json",

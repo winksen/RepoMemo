@@ -110,7 +110,9 @@ import {
   listSharedProfileTasks,
   listSharedNotifications,
   listSharedWorkspaces,
+  clearSharedSession,
   loginSharedUser,
+  refreshSharedSession,
   generateSharedWorkspaceAiOverview,
   registerSharedUser,
   searchSharedWorkspace,
@@ -195,7 +197,8 @@ import { WorkspaceHealthPanel } from "./components/WorkspaceHealthPanel";
 import { showToast, Toast } from "./components/ui/toast";
 import { initialSharedTheme, SharedLayout, ThemeToggle } from "./components/SharedLayout";
 
-const SESSION_STORAGE_KEY = "repomemo.shared.access-token";
+import { SHARED_SESSION_STORAGE_KEY as SESSION_STORAGE_KEY } from "./lib/sharedApi";
+
 const MAX_FOLDER_DEPTH = 5;
 const INDEX_POLL_INTERVAL_MS = 3000;
 // Covers the server's retry schedule (30 s, 2 min, 10 min) before showing a generic problem.
@@ -203,7 +206,7 @@ const INDEX_POLL_ATTEMPTS = 300;
 
 type AuthMode = "sign-in" | "sign-up";
 type PageState = "restoring" | "unauthenticated" | "ready" | "error";
-type WorkspaceSection = "overview" | "evidence" | "documents" | "retrieval" | "assistant" | "map" | "health" | "memory" | "tasks" | "people" | "activity" | "settings";
+type WorkspaceSection = "overview" | "evidence" | "documents" | "retrieval" | "assistant" | "map" | "health" | "memory" | "tasks" | "people" | "settings";
 type ArtifactViewMode = "grid" | "list";
 type OrganizationNavigation = {
   activeOrganizationId: string | null;
@@ -213,8 +216,8 @@ type OrganizationNavigation = {
   cancelOrganizationCreation: () => void;
 };
 
-const WORKSPACE_SECTIONS: WorkspaceSection[] = ["overview", "evidence", "documents", "retrieval", "assistant", "map", "health", "memory", "tasks", "people", "activity", "settings"];
-const ADMIN_WORKSPACE_SECTIONS = new Set<WorkspaceSection>(["people", "activity", "settings"]);
+const WORKSPACE_SECTIONS: WorkspaceSection[] = ["overview", "evidence", "documents", "retrieval", "assistant", "map", "health", "memory", "tasks", "people", "settings"];
+const ADMIN_WORKSPACE_SECTIONS = new Set<WorkspaceSection>(["people", "settings"]);
 type ItemDialog =
   | { kind: "rename-folder"; folder: Folder }
   | { kind: "delete-folder"; folder: Folder }
@@ -346,19 +349,26 @@ function SharedWebAppContent() {
   }, []);
 
   useEffect(() => {
-    const storedToken = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
-    if (!storedToken) {
+    function showSignIn() {
       if (currentPathname() === "/" || currentPathname() === "/dashboard" || currentPathname().startsWith("/workspaces")) {
         navigate("/login", true);
       }
       setPageState("unauthenticated");
+    }
+    function restore(token: string) {
+      hydrate(token).catch(() => {
+        clearSharedSession();
+        navigate("/login", true);
+        setPageState("unauthenticated");
+      });
+    }
+    const storedToken = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
+    if (storedToken) {
+      restore(storedToken);
       return;
     }
-    hydrate(storedToken).catch(() => {
-      window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
-      navigate("/login", true);
-      setPageState("unauthenticated");
-    });
+    // New tab or reload: a surviving refresh token can still mint an access token.
+    refreshSharedSession().then((token) => (token ? restore(token) : showSignIn()));
   }, []);
 
   async function hydrate(token: string) {
@@ -389,7 +399,7 @@ function SharedWebAppContent() {
   }
 
   function signOut() {
-    window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
+    clearSharedSession();
     setAccessToken(null);
     setSession(null);
     setOrganizations([]);
@@ -664,7 +674,7 @@ function SharedProfile({
     try {
       await changeSharedPassword(accessToken, { currentPassword, newPassword });
       setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
-      setNotice("Password changed. Your current session remains active.");
+      setNotice("Password changed.");
     } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
   }
 
@@ -1022,8 +1032,7 @@ function WorkspaceTopbar({
       {workspaceTab("health", "Health", <HealthIcon size={16} />)}
       {workspaceTab("memory", "Memory", <Book size={16} />)}
       {workspaceTab("tasks", "Tasks", <Checklist size={16} />)}
-      {workspaceTab("people", "People", <Users size={16} />)}
-      {workspaceTab("activity", "Activity", <Timeline size={16} />)}
+      {workspaceTab("people", "People & Activity", <Users size={16} />)}
       {workspaceTab("settings", "Settings", <Settings size={16} />)}
     </div>
   </nav>;
@@ -1089,6 +1098,7 @@ function SharedWorkspaceDetail({
   const [memoryArtifactId, setMemoryArtifactId] = useState("");
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
   const [activity, setActivity] = useState<WorkspaceActivityEvent[]>([]);
+  const [activityKind, setActivityKind] = useState<"user" | "ai">("user");
   const [activityCalendar, setActivityCalendar] = useState<WorkspaceActivityCalendar | null>(null);
   const [tasks, setTasks] = useState<CollaborationTask[]>([]);
   const [taskChecklists, setTaskChecklists] = useState<Record<string, TaskChecklistItem[]>>({});
@@ -1134,8 +1144,11 @@ function SharedWorkspaceDetail({
   const isHealthView = section === "health";
   const isMemoryView = section === "memory";
   const isTasksView = section === "tasks";
+  const aiActivity = useMemo(() => activity.filter(isAiActivity), [activity]);
+  const userActivity = useMemo(() => activity.filter((event) => !isAiActivity(event)), [activity]);
+  const visibleActivity = activityKind === "ai" ? aiActivity : userActivity;
   const isPeopleView = section === "people";
-  const isActivityView = section === "activity";
+  const isActivityView = isPeopleView;
   const isSettingsView = section === "settings";
   const isWorkspaceAdmin = workspace.role === "owner" || workspace.role === "admin";
   const isRestrictedView = ADMIN_WORKSPACE_SECTIONS.has(section) && !isWorkspaceAdmin;
@@ -1642,7 +1655,7 @@ function SharedWorkspaceDetail({
     <SharedLayout apiAvailable={apiAvailable} onNavigate={navigate} session={session} signOut={signOut} sidebar={<OrganizationRail organizationId={organization?.id} organizations={organizations} workspaceId={workspace.workspace.id} workspaces={workspaces} />} workspaceNavigation={<WorkspaceTopbar activeSection={section} onNavigate={onNavigate} workspace={workspace} />}>
       <section className="shared-detail-shell" aria-busy={isLoading}>
         <div className="shared-detail-heading">
-          <div><h1>{isEvidenceView ? "Evidence ledger" : isDocumentsView ? "Documents" : isRetrievalView ? "Retrieve evidence" : isAssistantView ? "Assistant" : isMapView ? "Knowledge map" : isHealthView ? "Workspace health" : isMemoryView ? "Durable team memory" : isTasksView ? "Tasks" : isPeopleView ? "People" : isActivityView ? "Activity" : isSettingsView ? "Workspace settings" : workspace.workspace.name}</h1><p>{isEvidenceView ? "Store notes and files in the workspace. New evidence is indexed automatically, so it is ready for retrieval shortly after it is saved." : isDocumentsView ? "Upload Word, Excel, PowerPoint, PDF, OneNote and Outlook files, preview them here, and keep them alongside the workspace evidence ledger." : isRetrievalView ? "Search indexed workspace evidence and inspect the source context behind every result." : isAssistantView ? "Find files, search content, summarize, and ask questions about this workspace. Every answer links back to its sources." : isMapView ? "See how far your files are through indexing and search by meaning, and how their content connects." : isHealthView ? "Deterministic checks for stale versions, duplicates, documents that drifted from the code, and files search cannot see. Administrators decide what happens to each finding." : isMemoryView ? "Capture concise facts and decisions that should outlive the current investigation." : isTasksView ? "Turn evidence and decisions into assigned, trackable action items for the team." : isPeopleView ? "See who can access this workspace and understand each person’s role." : isActivityView ? "A durable record of shared workspace changes, including evidence, memory, indexing, and membership updates." : isSettingsView ? "Administrators control workspace access and AI integrations here. Owner-only actions remain clearly marked." : "Artifacts, search results, and durable team memory are all retrieved through the protected shared API."}</p></div>
+          <div><h1>{isEvidenceView ? "Evidence ledger" : isDocumentsView ? "Documents" : isRetrievalView ? "Retrieve evidence" : isAssistantView ? "Assistant" : isMapView ? "Knowledge map" : isHealthView ? "Workspace health" : isMemoryView ? "Durable team memory" : isTasksView ? "Tasks" : isPeopleView ? "People & Activity" : isSettingsView ? "Workspace settings" : workspace.workspace.name}</h1><p>{isEvidenceView ? "Store notes and files in the workspace. New evidence is indexed automatically, so it is ready for retrieval shortly after it is saved." : isDocumentsView ? "Upload Word, Excel, PowerPoint, PDF, OneNote and Outlook files, preview them here, and keep them alongside the workspace evidence ledger." : isRetrievalView ? "Search indexed workspace evidence and inspect the source context behind every result." : isAssistantView ? "Find files, search content, summarize, and ask questions about this workspace. Every answer links back to its sources." : isMapView ? "See how far your files are through indexing and search by meaning, and how their content connects." : isHealthView ? "Deterministic checks for stale versions, duplicates, documents that drifted from the code, and files search cannot see. Administrators decide what happens to each finding." : isMemoryView ? "Capture concise facts and decisions that should outlive the current investigation." : isTasksView ? "Turn evidence and decisions into assigned, trackable action items for the team." : isPeopleView ? "See who can access this workspace, and review what people and the AI have done." : isActivityView ? "A durable record of shared workspace changes, including evidence, memory, indexing, and membership updates." : isSettingsView ? "Administrators control workspace access and AI integrations here. Owner-only actions remain clearly marked." : "Artifacts, search results, and durable team memory are all retrieved through the protected shared API."}</p></div>
         </div>
         <Toast kind="error" message={error} />
         {isRestrictedView ? <div className="shared-empty-state shared-admin-restricted-state"><Shield size={25} /><strong>Workspace administrator access required</strong><span>People, Activity, and Settings are reserved for workspace owners and administrators.</span><Button onClick={() => onNavigate("overview")} type="button" variant="secondary">Go to overview</Button></div> : <>
@@ -1682,7 +1695,7 @@ function SharedWorkspaceDetail({
         {isAssistantView ? <AssistantPanel accessToken={accessToken} key={workspace.workspace.id} onOpenArtifact={onOpenArtifact} workspaceId={workspace.workspace.id} /> : null}
         {isMapView ? <KnowledgeMapPanel accessToken={accessToken} canConfigure={isWorkspaceAdmin} key={workspace.workspace.id} onOpenArtifact={onOpenArtifact} onOpenEvidence={() => onNavigate("evidence")} onOpenMemoryCard={onOpenMemoryCard} onOpenSettings={() => onNavigate("settings")} workspaceId={workspace.workspace.id} /> : null}
         {isHealthView ? <WorkspaceHealthPanel accessToken={accessToken} canAct={isWorkspaceAdmin} key={workspace.workspace.id} onOpenArtifact={onOpenArtifact} workspaceId={workspace.workspace.id} /> : null}
-        {section !== "overview" && !isAssistantView && !isMapView && !isHealthView ? <div className={`shared-detail-grid${isEvidenceView || isDocumentsView ? " evidence-only" : isRetrievalView ? " retrieval-only" : isMemoryView ? " memory-only" : isTasksView ? " tasks-only" : isPeopleView ? " people-only" : isActivityView ? " activity-only" : isSettingsView ? " settings-only" : ""}`}>
+        {section !== "overview" && !isAssistantView && !isMapView && !isHealthView ? <div className={`shared-detail-grid${isEvidenceView || isDocumentsView ? " evidence-only" : isRetrievalView ? " retrieval-only" : isMemoryView ? " memory-only" : isTasksView ? " tasks-only" : isPeopleView ? " people-only" : isSettingsView ? " settings-only" : ""}`}>
           {isEvidenceView || isDocumentsView ? <section className="shared-detail-panel">
             <div className="shared-artifact-browser">
               {itemDialogs}
@@ -1752,8 +1765,11 @@ function SharedWorkspaceDetail({
             </div> : null}
             {isActivityView ? <div className="shared-activity-section">
               <ContributionCalendar items={activityCalendar?.activity_by_day ?? []} title="Workspace activity" total={activityCalendar?.total_activity_count} />
-              <div className="shared-panel-heading"><div><Timeline size={18} /><h2>Recent activity</h2></div><span>{activity.length}</span></div>
-              {activity.length ? <div className="shared-activity-list">{activity.map((event) => <article key={event.id}><div><strong>{event.summary}</strong><span>{event.actor?.display_name ?? "System"} · {event.action.replace(/_/g, " ")}</span></div><time dateTime={event.created_at}>{formatActivityTime(event.created_at)}</time></article>)}</div> : <div className="shared-empty-state"><Timeline size={25} /><strong>No recorded activity yet</strong><span>New workspace changes will appear here.</span></div>}
+              <div className="shared-panel-heading"><div><Timeline size={18} /><h2>Activity history</h2></div><span>{visibleActivity.length}</span></div>
+              <div aria-label="Activity type" className="shared-activity-filter" role="group">
+                {([["user", "User activity", userActivity.length], ["ai", "AI activity", aiActivity.length]] as const).map(([value, label, count]) => <Button aria-pressed={activityKind === value} className={activityKind === value ? "active" : ""} key={value} onClick={() => setActivityKind(value)} type="button" variant="secondary">{value === "ai" ? <Sparkles size={14} /> : <Users size={14} />}{label} <span>{count}</span></Button>)}
+              </div>
+              {visibleActivity.length ? <div className="shared-activity-list">{visibleActivity.map((event) => <article key={event.id}><div><strong>{event.summary}</strong><span>{activityKind === "ai" ? `Requested by ${event.actor?.display_name ?? "Unknown"}` : (event.actor?.display_name ?? "System")} · {event.action.replace(/_/g, " ")}</span></div><time dateTime={event.created_at}>{formatActivityTime(event.created_at)}</time></article>)}</div> : <div className="shared-empty-state">{activityKind === "ai" ? <Sparkles size={25} /> : <Timeline size={25} />}<strong>{activityKind === "ai" ? "No AI activity yet" : "No recorded activity yet"}</strong><span>{activityKind === "ai" ? "Assistant questions and generated answers will appear here." : "New workspace changes will appear here."}</span></div>}
             </div> : null}
           </aside> : null}
           {isSettingsView ? <section className="shared-settings-section">
@@ -2212,6 +2228,10 @@ function artifactTypeIcon(type: ArtifactType, size: number) {
   if (type === "code_file") return <Code size={size} />;
   if (type === "note") return <Note size={size} />;
   return <FileText size={size} />;
+}
+
+function isAiActivity(event: WorkspaceActivityEvent) {
+  return ["assistant_answered", "ai_overview_generated", "ai_question_answered"].includes(event.action);
 }
 
 function formatActivityTime(value: string) {

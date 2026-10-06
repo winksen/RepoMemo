@@ -6145,3 +6145,6 @@ input:focus, textarea:focus, select:focus { background: #fff; border-color: var(
 .shared-upload-picker-copy strong { font-size: 13px; }
 .shared-upload-picker-copy span { margin-top: 4px; color: var(--color-text-muted); font-size: 12px; }
 .shared-upload-picker-action { padding: 6px 8px; color: var(--color-text); background: var(--color-surface-3); border-radius: 6px; font-size: 12px; font-weight: 700; }
+.shared-detail-grid.people-only .shared-activity-section { margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--border, rgba(128, 128, 128, 0.25)); }
+.shared-activity-filter { display: flex; gap: 8px; margin: 12px 0; }
+.shared-activity-filter button span { opacity: 0.65; margin-left: 4px; }

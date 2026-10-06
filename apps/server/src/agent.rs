@@ -128,7 +128,10 @@ pub(crate) async fn send_agent_message(
             "assistant_answered",
             "workspace",
             Some(&workspace_id),
-            "Used the workspace assistant to generate a citation-backed reply.".to_owned(),
+            format!(
+                "Asked the assistant: {}",
+                message.message.trim().chars().take(240).collect::<String>()
+            ),
         )
         .await;
     }

@@ -63,6 +63,7 @@ use tower_http::{cors::CorsLayer, trace::TraceLayer};
 
 const JWT_ISSUER: &str = "repomemo-server";
 const ACCESS_TOKEN_TTL_MINUTES: i64 = 60;
+const REFRESH_TOKEN_TTL_DAYS: i64 = 30;
 const MAX_SHARED_UPLOAD_BYTES: usize = 10 * 1024 * 1024;
 
 #[derive(Debug, Clone)]
@@ -509,9 +510,15 @@ struct SaveArtifactCommentRequest {
 #[derive(Debug, Serialize)]
 struct TokenResponse {
     access_token: String,
+    refresh_token: String,
     token_type: &'static str,
     expires_in: u64,
     user: SharedUser,
+}
+
+#[derive(Debug, Deserialize)]
+struct RefreshRequest {
+    refresh_token: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -590,6 +597,8 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
         .route("/health", get(health))
         .route("/v1/auth/register", post(register))
         .route("/v1/auth/login", post(login))
+        .route("/v1/auth/refresh", post(refresh_session))
+        .route("/v1/auth/logout", post(logout))
         .route("/v1/session", get(session))
         .route("/v1/profile", get(get_profile).put(update_profile))
         .route("/v1/profile/password", post(change_profile_password))
@@ -870,7 +879,7 @@ async fn register(
         .touch_user_connection(&user.id)
         .await
         .map_err(ApiError::internal)?;
-    let response = issue_token(&state.jwt_secret, user)?;
+    let response = issue_session(&state, user).await?;
     Ok((StatusCode::CREATED, Json(response)))
 }
 
@@ -894,7 +903,39 @@ async fn login(
         .touch_user_connection(&account.user.id)
         .await
         .map_err(ApiError::internal)?;
-    Ok(Json(issue_token(&state.jwt_secret, account.user)?))
+    Ok(Json(issue_session(&state, account.user).await?))
+}
+
+/// Exchanges a valid refresh token for a new access token and a rotated refresh token.
+async fn refresh_session(
+    State(state): State<AppState>,
+    Json(request): Json<RefreshRequest>,
+) -> Result<Json<TokenResponse>, ApiError> {
+    let user_id = state
+        .storage
+        .consume_refresh_token(&request.refresh_token)
+        .await
+        .map_err(ApiError::internal)?
+        .ok_or_else(ApiError::unauthorized)?;
+    let user = state
+        .storage
+        .find_user(&user_id)
+        .await
+        .map_err(ApiError::internal)?
+        .ok_or_else(ApiError::unauthorized)?;
+    Ok(Json(issue_session(&state, user).await?))
+}
+
+async fn logout(
+    State(state): State<AppState>,
+    Json(request): Json<RefreshRequest>,
+) -> Result<StatusCode, ApiError> {
+    state
+        .storage
+        .revoke_refresh_token(&request.refresh_token)
+        .await
+        .map_err(ApiError::internal)?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 async fn session(
@@ -1058,6 +1099,11 @@ async fn change_profile_password(
         .update_user_password(&subject.user_id, &password_hash)
         .await
         .map_err(map_storage_error)?;
+    state
+        .storage
+        .revoke_user_refresh_tokens(&subject.user_id)
+        .await
+        .map_err(ApiError::internal)?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -1511,6 +1557,7 @@ async fn ask_workspace(
                 "No enabled AI provider is configured for this workspace. An administrator can configure one in Settings.",
             )
         })?;
+    let question = request.question.clone();
     let answer = state
         .core
         .ask_workspace(AskRequest {
@@ -1528,7 +1575,10 @@ async fn ask_workspace(
         "ai_question_answered",
         "workspace",
         Some(&workspace_id),
-        "Asked a citation-backed question of workspace evidence.".to_owned(),
+        format!(
+            "Asked: {}",
+            question.trim().chars().take(240).collect::<String>()
+        ),
     )
     .await;
     Ok(Json(answer))
@@ -3852,7 +3902,20 @@ fn verify_password(password: &str, stored_hash: &str) -> bool {
         .is_some()
 }
 
-fn issue_token(secret: &str, user: SharedUser) -> Result<TokenResponse, ApiError> {
+async fn issue_session(state: &AppState, user: SharedUser) -> Result<TokenResponse, ApiError> {
+    let refresh_token = state
+        .storage
+        .create_refresh_token(&user.id, REFRESH_TOKEN_TTL_DAYS)
+        .await
+        .map_err(ApiError::internal)?;
+    issue_token(&state.jwt_secret, user, refresh_token)
+}
+
+fn issue_token(
+    secret: &str,
+    user: SharedUser,
+    refresh_token: String,
+) -> Result<TokenResponse, ApiError> {
     let now = Utc::now();
     let expires_at = now + ChronoDuration::minutes(ACCESS_TOKEN_TTL_MINUTES);
     let claims = JwtClaims {
@@ -3870,6 +3933,7 @@ fn issue_token(secret: &str, user: SharedUser) -> Result<TokenResponse, ApiError
     .map_err(ApiError::internal)?;
     Ok(TokenResponse {
         access_token,
+        refresh_token,
         token_type: "Bearer",
         expires_in: Duration::from_secs(ACCESS_TOKEN_TTL_MINUTES as u64 * 60).as_secs(),
         user,
@@ -3927,6 +3991,34 @@ mod tests {
     };
     use serde_json::{json, Value};
     use tower::ServiceExt;
+
+    #[tokio::test]
+    async fn refresh_tokens_rotate_and_detect_reuse() {
+        let data_dir =
+            std::env::temp_dir().join(format!("repomemo-server-test-{}", uuid::Uuid::new_v4()));
+        let app = router(ServerConfig::for_test(data_dir.clone()))
+            .await
+            .unwrap();
+        let post = |uri: &str, body: String| {
+            Request::builder().method("POST").uri(uri.to_owned()).header("content-type", "application/json").body(Body::from(body)).unwrap()
+        };
+        let response = app.clone().oneshot(post("/v1/auth/register", r#"{"email":"refresh@example.com","display_name":"Refresh","password":"not-a-real-password"}"#.to_owned())).await.unwrap();
+        let first: Value = serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
+        let first_refresh = first["refresh_token"].as_str().unwrap().to_owned();
+
+        let response = app.clone().oneshot(post("/v1/auth/refresh", format!(r#"{{"refresh_token":"{first_refresh}"}}"#))).await.unwrap();
+        assert_eq!(response.status(), 200);
+        let second: Value = serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
+        let second_refresh = second["refresh_token"].as_str().unwrap().to_owned();
+        assert_ne!(first_refresh, second_refresh);
+
+        // Replaying the rotated token fails and revokes the whole family.
+        let response = app.clone().oneshot(post("/v1/auth/refresh", format!(r#"{{"refresh_token":"{first_refresh}"}}"#))).await.unwrap();
+        assert_eq!(response.status(), 401);
+        let response = app.clone().oneshot(post("/v1/auth/refresh", format!(r#"{{"refresh_token":"{second_refresh}"}}"#))).await.unwrap();
+        assert_eq!(response.status(), 401);
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
 
     #[tokio::test]
     async fn registers_and_protects_shared_workspace_routes() {

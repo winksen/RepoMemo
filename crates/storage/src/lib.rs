@@ -852,6 +852,72 @@ impl StorageEngine {
         Ok(())
     }
 
+    /// Issues a new opaque refresh token for the user and returns the raw value (only its hash is stored).
+    pub async fn create_refresh_token(&self, user_id: &str, ttl_days: i64) -> Result<String> {
+        let raw = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
+        let now = Utc::now();
+        sqlx::query(
+            "INSERT INTO refresh_tokens (token_hash, user_id, created_at, expires_at) VALUES (?1, ?2, ?3, ?4)",
+        )
+        .bind(hash_refresh_token(&raw))
+        .bind(user_id)
+        .bind(now.to_rfc3339())
+        .bind((now + chrono::Duration::days(ttl_days)).to_rfc3339())
+        .execute(&self.pool)
+        .await?;
+        Ok(raw)
+    }
+
+    /// Consumes a refresh token and returns its user id, or `None` if it is unknown, expired or revoked.
+    /// Reusing an already-revoked token revokes every refresh token of that user.
+    pub async fn consume_refresh_token(&self, raw: &str) -> Result<Option<String>> {
+        let hash = hash_refresh_token(raw);
+        let now = Utc::now().to_rfc3339();
+        let row: Option<(String, String, Option<String>)> = sqlx::query_as(
+            "SELECT user_id, expires_at, revoked_at FROM refresh_tokens WHERE token_hash = ?1",
+        )
+        .bind(&hash)
+        .fetch_optional(&self.pool)
+        .await?;
+        let Some((user_id, expires_at, revoked_at)) = row else {
+            return Ok(None);
+        };
+        if revoked_at.is_some() {
+            self.revoke_user_refresh_tokens(&user_id).await?;
+            return Ok(None);
+        }
+        // Conditional update makes concurrent rotation of the same token race-safe.
+        let changed = sqlx::query(
+            "UPDATE refresh_tokens SET revoked_at = ?1 WHERE token_hash = ?2 AND revoked_at IS NULL",
+        )
+        .bind(&now)
+        .bind(&hash)
+        .execute(&self.pool)
+        .await?;
+        if changed.rows_affected() == 0 || expires_at < now {
+            return Ok(None);
+        }
+        Ok(Some(user_id))
+    }
+
+    pub async fn revoke_refresh_token(&self, raw: &str) -> Result<()> {
+        sqlx::query("UPDATE refresh_tokens SET revoked_at = ?1 WHERE token_hash = ?2 AND revoked_at IS NULL")
+            .bind(Utc::now().to_rfc3339())
+            .bind(hash_refresh_token(raw))
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn revoke_user_refresh_tokens(&self, user_id: &str) -> Result<()> {
+        sqlx::query("UPDATE refresh_tokens SET revoked_at = ?1 WHERE user_id = ?2 AND revoked_at IS NULL")
+            .bind(Utc::now().to_rfc3339())
+            .bind(user_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
     pub async fn touch_user_connection(&self, user_id: &str) -> Result<()> {
         sqlx::query("UPDATE users SET last_connected_at = ?1 WHERE id = ?2")
             .bind(Utc::now().to_rfc3339())
@@ -5398,4 +5464,8 @@ mod tests {
         drop(storage);
         let _ = std::fs::remove_dir_all(data_dir);
     }
+}
+
+fn hash_refresh_token(raw: &str) -> String {
+    hex::encode(Sha256::digest(raw.as_bytes()))
 }
