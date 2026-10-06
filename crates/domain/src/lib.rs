@@ -520,6 +520,23 @@ pub struct RepoSource {
     pub created_at: String,
 }
 
+/// What the server found at a repository link, before it is connected.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RepoAccessCheck {
+    /// The repository root the link resolves to.
+    pub root_path: String,
+    /// The name the repository gets unless another is chosen.
+    pub name: String,
+    /// The commit a sync would read.
+    pub commit: RepoCommit,
+    /// Files tracked in that commit.
+    pub tracked_files: usize,
+    /// Of those, files the rules would index (before checking content).
+    pub indexable_files: usize,
+    /// The workspace already has this repository.
+    pub already_connected: bool,
+}
+
 /// A file of a repository source that is currently in its tree.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RepoFile {

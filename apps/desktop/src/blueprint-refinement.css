@@ -955,8 +955,6 @@ body,
 .rm-repo-progress progress::-webkit-progress-bar { background: var(--color-surface-3); border-radius: 999px; }
 .rm-repo-progress progress::-webkit-progress-value { background: var(--color-accent); border-radius: 999px; }
 .rm-repo-progress progress::-moz-progress-bar { background: var(--color-accent); border-radius: 999px; }
-.rm-repo-error { display: flex; align-items: flex-start; gap: 6px; margin: 0; padding: 8px 12px; color: var(--color-danger); background: var(--color-danger-soft); border-radius: 8px; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
-.rm-repo-error svg { flex: none; margin-top: 2px; }
 .rm-repo-report { display: grid; gap: 6px; color: var(--color-text-muted); font-size: 13px; }
 .rm-repo-report summary { cursor: pointer; width: fit-content; }
 .rm-repo-report summary:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; border-radius: 2px; }
@@ -971,6 +969,13 @@ body,
 .rm-repo-form label .rm-map-muted { font-weight: 400; }
 .rm-repo-form textarea { font-family: var(--font-mono); font-size: 12px; }
 .rm-repo-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.rm-repo-form h3 { margin: 0; color: var(--color-text); font-size: 14px; font-weight: 650; }
+.rm-repo-settings { display: grid; gap: 16px; }
+.rm-repo-links { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.rm-repo-links li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 12px; border: 1px solid var(--color-border); border-radius: 10px; min-width: 0; }
+.rm-repo-links li > div:first-child { display: grid; gap: 2px; min-width: 0; }
+.rm-repo-check { display: grid; gap: 10px; padding: 12px; background: var(--color-surface-2); border-radius: 10px; }
+.rm-repo-check > strong { display: inline-flex; align-items: center; gap: 6px; color: var(--color-success); font-size: 13px; }
 @media (max-width: 640px) {
   .rm-repo-card { padding: 12px; }
   .rm-repo-head { flex-wrap: wrap; }
@@ -978,3 +983,11 @@ body,
   .rm-repo-form-row { grid-template-columns: minmax(0, 1fr); }
   .rm-repos .rm-health-actions .rm-button { flex: 1 1 100%; }
 }
+
+.rm-pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin-top: 12px; color: var(--color-text-muted); font-size: 12px; }
+.rm-pagination > div { display: flex; align-items: center; gap: 10px; }
+
+.shared-image-preview { display: grid; place-items: center; min-height: 160px; padding: 12px; overflow: hidden; background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: 10px; }
+.shared-image-preview img { display: block; max-width: 100%; max-height: 70vh; object-fit: contain; border-radius: 6px; }
+.shared-image-preview.loading { animation: rm-image-pulse 1.2s ease-in-out infinite; }
+@keyframes rm-image-pulse { 50% { opacity: 0.5; } }

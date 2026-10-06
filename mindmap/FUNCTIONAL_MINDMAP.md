@@ -86,7 +86,8 @@ mindmap
       Lifecycle review
       Discussion and mentions
     Repositories
-      Connect a local git repository
+      Repository links in Settings
+      Access check before linking
       Sync committed files
       Edits and renames keep history
       Include and exclude rules
@@ -141,7 +142,7 @@ Joining an organization **automatically grants access to every workspace in it**
 | Open People / Activity / Settings sections | ✅ | ✅ | — | — |
 | Add or remove members | ✅ | ✅² | — | — |
 | Configure the AI provider | ✅ | ✅ | — | — |
-| Connect, configure or remove a git repository | ✅ | ✅ | — | — |
+| Add, check, edit or remove repository links (Settings) | ✅ | ✅ | — | — |
 | Sync a connected repository | ✅ | ✅ | ✅ | — |
 | Rename or delete the workspace | ✅ | — | — | — |
 
@@ -252,11 +253,11 @@ A team's code usually already lives in a git repository, with many files and a h
 
 | What you do | What happens |
 |---|---|
-| **Connect repository** (owners and admins) | Enter the folder of a git checkout on the server. RepoMemo reads what the branch has **committed**: never uncommitted edits, ignored files or build output. The first sync starts at once. |
+| **Add a repository link** (owners and admins, in **Settings › Repositories**) | Enter the folder of a git checkout on the server and press **Check access**. RepoMemo tells you whether the server can read it, which branch and commit it would read, and about how many files it would index. **Link and sync** stores the link and starts the first sync. RepoMemo reads what the branch has **committed**: never uncommitted edits, ignored files or build output. |
 | **Sync now** (writers) | RepoMemo compares the branch's latest commit with what it stored. Only new and changed files are read and indexed; unchanged files cost nothing. |
-| **Settings** (owners and admins) | Choose a branch (default: whatever is checked out), and **include** or **exclude** paths with patterns such as `docs/**`, `src/`, `**/*.test.ts`. Applies from the next sync. |
+| **Edit a link** (owners and admins, in Settings) | Choose a branch (default: whatever is checked out), and **include** or **exclude** paths with patterns such as `docs/**`, `src/`, `**/*.test.ts`. Applies from the next sync. |
 | **Browse files** | The repository's files, filterable by path. Each opens like any evidence: preview, lifecycle, comments. |
-| **Remove** (owners and admins) | Removes the repository's files, their index and memory links from the workspace. The repository on disk is untouched. |
+| **Remove a link** (owners and admins, in Settings) | Removes the repository's files, their index and memory links from the workspace. The repository on disk is untouched. |
 
 **How files follow the repository:**
 
@@ -268,7 +269,7 @@ A team's code usually already lives in a git repository, with many files and a h
 
 Repository files are searchable and citable like any evidence, but they are listed in the Repositories section rather than the Evidence ledger, and they cannot be renamed or deleted one by one: change them in the repository, or exclude their path.
 
-**Availability:** the server operator turns this on by listing the folders repositories may come from (`REPOMEMO_REPO_ROOTS`). For now only repositories on the server's own disk can be connected; remote repositories (by URL) are planned. See the [technical design](technical/repository-sources.md).
+**Availability:** repository links are a setting of each workspace; nothing has to be configured on the server. A link must point at a folder the server can read, so for now only repositories on the server's own disk can be linked; remote repositories (by URL) are planned. See the [technical design](technical/repository-sources.md).
 
 ---
 

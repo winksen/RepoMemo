@@ -18,7 +18,7 @@ mindmap
       JWT in sessionStorage
     HTTP API
       Axum 0.8 server
-      83 operations under v1
+      84 operations under v1
       JWT HS256 extractor
       Role guards per request
       SSE event stream
@@ -140,7 +140,6 @@ flowchart TD
 | `REPOMEMO_SERVER_DATA_DIR` | `.repomemo-server` | Holds `repomemo.sqlite` and `blobs/`. The path is relative to the CWD. |
 | `REPOMEMO_ALLOWED_ORIGIN` | `http://127.0.0.1:3021` | The **only** CORS origin. Allowed methods are GET, POST, PUT and DELETE. Allowed headers are `Authorization`, `Content-Type` and `X-RepoMemo-Filename`. |
 | `REPOMEMO_SERVICE_NAME` | `repomemo-server` | Parsed, but `/health` hardcodes the name, so the value is effectively unused. |
-| `REPOMEMO_REPO_ROOTS` | unset | Folders local git repositories may be connected from, in PATH format (`;` on Windows, `:` elsewhere). **Unset turns repository sources off.** See [repository sources](technical/repository-sources.md). |
 | `RUST_LOG` | `repomemo_server=info,tower_http=info` | Read by the `tracing-subscriber` EnvFilter. |
 
 Tower layers: `TraceLayer`, `DefaultBodyLimit::max(10 MiB)` and `CorsLayer`.
@@ -222,7 +221,7 @@ Other rules:
 
 ---
 
-## 5. HTTP API reference (83 operations)
+## 5. HTTP API reference (84 operations)
 
 Guard legend: **pub** = no auth, **auth** = any valid JWT, **R/W/A/O** = workspace read / write / admin / owner, **oR/oA/oO** = organization read / admin / owner. "→ activity" means the call records a `workspace_activity` row and so emits an SSE `activity` event.
 
@@ -300,7 +299,8 @@ Guard legend: **pub** = no auth, **auth** = any valid JWT, **R/W/A/O** = workspa
 
 | Method | Path | Guard | Notes |
 |---|---|---|---|
-| GET, POST | `/v1/workspaces/{ws}/repositories` | R / A | list (with `local_repositories_enabled`), connect a local repository and start its first sync |
+| GET, POST | `/v1/workspaces/{ws}/repositories` | R / A | list; link a repository and start its first sync |
+| POST | `/v1/workspaces/{ws}/repositories/check` | A | checks a link without storing it: readable, a git checkout, branch, commit, files to index |
 | GET, PUT, DELETE | `/v1/repositories/{id}` | R / A / A | detail, settings (branch, include, exclude), remove with all its files |
 | POST | `/v1/repositories/{id}/sync` | W | queues a background sync (`kind = repo_sync` job). 409 if one is running |
 | GET | `/v1/repositories/{id}/files` | R | files in the tree, with index state |
@@ -470,7 +470,7 @@ Mentions are found with an FTS5 phrase query, then confirmed on the passage text
 
 ### 6.10 Repository sync ([crates/api/src/repo_sync.rs](../crates/api/src/repo_sync.rs), Repositories tab)
 
-A git repository is a source of `type = 'git_repo'` that is kept in step with what its branch has committed. A sync lists the commit's tree with `git ls-tree`, applies the file rules, compares the result with the `repo_files` rows by git blob id, and applies the difference: new files become artifacts, edited and renamed files update their artifact **in place** (so comments, memory links and lifecycle survive), and files that left the tree keep their artifact but lose their chunks and become `outdated`. Changed files are indexed inside the same job instead of through the per-artifact queue. Syncs run in the background one at a time ([apps/server/src/repositories.rs](../apps/server/src/repositories.rs)) and only under `REPOMEMO_REPO_ROOTS`. Full design: [technical/repository-sources.md](technical/repository-sources.md).
+A git repository is a source of `type = 'git_repo'` that is kept in step with what its branch has committed. A sync lists the commit's tree with `git ls-tree`, applies the file rules, compares the result with the `repo_files` rows by git blob id, and applies the difference: new files become artifacts, edited and renamed files update their artifact **in place** (so comments, memory links and lifecycle survive), and files that left the tree keep their artifact but lose their chunks and become `outdated`. Changed files are indexed inside the same job instead of through the per-artifact queue. Repository links are a per-workspace setting (Settings › Repositories), checked by the server before they are stored. Syncs run in the background one at a time ([apps/server/src/repositories.rs](../apps/server/src/repositories.rs)). Full design: [technical/repository-sources.md](technical/repository-sources.md).
 
 ---
 

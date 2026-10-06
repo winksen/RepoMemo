@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context, Result};
 use repomemo_domain::{
-    IndexingJobStatus, RepoCommit, RepoFile, RepoSettings, RepoSkipCount, RepoSource,
+    IndexingJobStatus, RepoAccessCheck, RepoCommit, RepoFile, RepoSettings, RepoSkipCount, RepoSource,
     RepoSyncReport, Source, SourceType, REPO_SYNC_JOB_KIND,
 };
 use repomemo_git::{GitRepo, TreeFile};
@@ -63,17 +63,65 @@ enum Change<'a> {
 }
 
 impl RepoMemoCore {
-    /// The root of the git repository containing `path`, as git reports it.
-    pub async fn resolve_repo_root(&self, path: &Path) -> Result<PathBuf> {
-        Ok(GitRepo::open(path).await?.root().to_path_buf())
+    /// Looks at a repository link before it is connected: whether the server
+    /// can reach and read it, which repository and commit it resolves to, and
+    /// how many of its files the settings would index. Nothing is stored.
+    pub async fn check_repo_link(
+        &self,
+        workspace_id: &str,
+        link: &str,
+        settings: RepoSettings,
+    ) -> Result<RepoAccessCheck> {
+        if !self.storage.workspace_exists(workspace_id).await? {
+            bail!("Workspace was not found.");
+        }
+        let settings = normalize_settings(settings)?;
+        let repo = open_repo_link(link).await?;
+        let commit = repo.resolve_commit(settings.branch.as_deref()).await?;
+        let info = repo.commit_info(&commit).await?;
+        let branch = match settings.branch.clone() {
+            Some(branch) => Some(branch),
+            None => repo.current_branch().await?,
+        };
+        let tree = repo.list_files(&commit).await?;
+        let rules = RepoFileRules {
+            include: settings.include.clone(),
+            exclude: settings.exclude.clone(),
+        };
+        let indexable_files = tree
+            .iter()
+            .filter(|file| classify_repo_file(&file.path, file.size_bytes, &rules).is_ok())
+            .count();
+        let root_path = repo.root().to_string_lossy().to_string();
+        let already_connected = self
+            .storage
+            .list_sources_of_type(Some(workspace_id), SourceType::GitRepo)
+            .await?
+            .iter()
+            .any(|source| source.root_uri.as_deref() == Some(root_path.as_str()));
+        Ok(RepoAccessCheck {
+            name: repo_name(repo.root()),
+            root_path,
+            commit: RepoCommit {
+                sha: info.sha,
+                summary: info.summary,
+                author_name: info.author_name,
+                committed_at: info.committed_at,
+                branch,
+            },
+            tracked_files: tree.len(),
+            indexable_files,
+            already_connected,
+        })
     }
 
-    /// Connects the repository containing `path` to a workspace. Nothing is
-    /// read yet; start a sync to bring its files in.
+    /// Connects the repository a link points at to a workspace. The link is a
+    /// folder on the server, anywhere inside the repository. Nothing is read
+    /// yet; start a sync to bring its files in.
     pub async fn connect_local_repo(
         &self,
         workspace_id: &str,
-        path: &Path,
+        link: &str,
         name: Option<String>,
         settings: RepoSettings,
     ) -> Result<RepoSource> {
@@ -81,20 +129,14 @@ impl RepoMemoCore {
             bail!("Workspace was not found.");
         }
         let settings = normalize_settings(settings)?;
-        let repo = GitRepo::open(path).await?;
+        let repo = open_repo_link(link).await?;
         // Fail now, not on the first sync, when the branch does not exist.
         repo.resolve_commit(settings.branch.as_deref()).await?;
         let root = repo.root().to_string_lossy().to_string();
         let name = name
             .map(|value| value.trim().to_owned())
             .filter(|value| !value.is_empty())
-            .unwrap_or_else(|| {
-                repo.root()
-                    .file_name()
-                    .and_then(|value| value.to_str())
-                    .unwrap_or("Repository")
-                    .to_owned()
-            });
+            .unwrap_or_else(|| repo_name(repo.root()));
         let metadata = RepoSourceMetadata {
             settings,
             ..Default::default()
@@ -560,6 +602,46 @@ impl SkipTally {
     }
 }
 
+/// Opens the repository behind a link, explaining in plain words why the
+/// server cannot read it when it cannot.
+async fn open_repo_link(link: &str) -> Result<GitRepo> {
+    // "Copy as path" in Windows Explorer wraps the path in quotes.
+    let link = link.trim().trim_matches('"').trim();
+    if link.is_empty() {
+        bail!("Enter the folder of a git repository on the server.");
+    }
+    let lower = link.to_ascii_lowercase();
+    let is_url = ["http://", "https://", "ssh://", "git://", "git@"]
+        .iter()
+        .any(|prefix| lower.starts_with(prefix));
+    if is_url {
+        bail!(
+            "Remote repository links are not supported yet. Enter the folder of a checkout on the server, such as C:\\code\\my-repo or /srv/code/my-repo."
+        );
+    }
+    let path = PathBuf::from(link.strip_prefix("file://").unwrap_or(link));
+    if !path.is_dir() {
+        bail!(
+            "The folder {} does not exist on the server, or the server cannot see it.",
+            path.display()
+        );
+    }
+    if let Err(error) = std::fs::read_dir(&path) {
+        if error.kind() == std::io::ErrorKind::PermissionDenied {
+            bail!("The server has no read access to {}.", path.display());
+        }
+        bail!("The folder {} cannot be read: {error}", path.display());
+    }
+    GitRepo::open(&path).await
+}
+
+fn repo_name(root: &Path) -> String {
+    root.file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("Repository")
+        .to_owned()
+}
+
 fn normalize_settings(settings: RepoSettings) -> Result<RepoSettings> {
     let clean = |patterns: Vec<String>| -> Result<Vec<String>> {
         let patterns = patterns
@@ -645,7 +727,7 @@ mod tests {
         let source = core
             .connect_local_repo(
                 &workspace.id,
-                &repo_dir.join("src"),
+                &repo_dir.join("src").to_string_lossy(),
                 None,
                 RepoSettings {
                     exclude: vec!["notes.txt".to_owned()],
@@ -656,7 +738,7 @@ mod tests {
             .unwrap();
         assert_eq!(source.status, "pending");
         assert!(core
-            .connect_local_repo(&workspace.id, &repo_dir, None, RepoSettings::default())
+            .connect_local_repo(&workspace.id, &repo_dir.to_string_lossy(), None, RepoSettings::default())
             .await
             .is_err());
 

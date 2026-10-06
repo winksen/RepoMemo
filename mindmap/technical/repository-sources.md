@@ -2,24 +2,19 @@
 
 > **Branch of:** [TECHNICAL_MINDMAP.md](../TECHNICAL_MINDMAP.md) · **Functional view:** [FUNCTIONAL_MINDMAP.md §5b](../FUNCTIONAL_MINDMAP.md#5b-repositories) · **Status:** phase 1 (local path) shipped, see [ROADMAP.md](../ROADMAP.md#-in-progress-repository-indexing)
 
-A repository is not a batch of uploads. It already holds many files, it keeps changing, and git records exactly what changed. RepoMemo therefore treats a repository as a **living source**: it is connected once, and each **sync** brings the workspace in step with what the chosen branch has **committed**.
+A repository is not a batch of uploads. It already holds many files, it keeps changing, and git records exactly what changed. RepoMemo therefore treats a repository as a **living source**: it is linked once, and each **sync** brings the workspace in step with what the chosen branch has **committed**.
+
+Repository links are a **per-workspace setting**. Each workspace's owners and administrators add, edit and remove its links in **Settings › Repositories**; there is no server-wide list. Before a link is stored, the server **checks it**: it must exist, the server's account must be able to read it, it must be a git checkout, and the branch must exist. The check also reports the commit and how many files would be indexed.
 
 ---
 
 ## How to try it locally
 
-1. Pick the folder that holds your repositories, for example `C:\Users\you\DEVHUB`.
-2. Start the server with that folder allowed:
-
-   ```powershell
-   $env:REPOMEMO_JWT_SECRET = '...32+ characters...'
-   $env:REPOMEMO_REPO_ROOTS = 'C:\Users\you\DEVHUB'
-   cargo run -p repomemo-server
-   ```
-
-   Several folders are separated with `;` on Windows and `:` elsewhere. Without `REPOMEMO_REPO_ROOTS` the feature is off.
-3. In the web client, open a workspace, go to **Repositories**, choose **Connect repository**, and enter the path of a checkout (any folder inside it works; the repository root is used).
-4. The first sync starts at once. Progress, the synced commit, file counts and skipped files are shown on the repository's card. Commit something and press **Sync now** to see edits, renames and deletions followed.
+1. Start the server as usual (`cargo run -p repomemo-server`). No extra configuration is needed.
+2. In the web client, open a workspace as an owner or administrator and go to **Settings › Repositories**.
+3. Enter the **repository link**: the folder of a checkout on the server, for example `C:\Users\you\DEVHUB\my-repo`. Any folder inside the repository works, and a quoted path from Explorer's "Copy as path" is accepted. Optionally set a name, a branch and include/exclude patterns.
+4. Press **Check access**. The server reports the repository it found, the branch and commit, and about how many files will be indexed, or a toast explains what is wrong (folder missing, no read access, not a git repository, unknown branch, owned by another account).
+5. Press **Link and sync**. The first sync starts at once; follow it in the **Repositories** section. Commit something and press **Sync now** to see edits, renames and deletions followed.
 
 `git` must be installed and on the server's `PATH`.
 
@@ -58,7 +53,7 @@ flowchart TD
 | **Deleted files are kept, not deleted.** | Memory cards and comments may cite them. Their chunks are dropped so search and Ask stop returning code that no longer exists, and their lifecycle moves to `outdated` with a note naming the commit. |
 | **The sync indexes its own files in one job** (`kind = repo_sync`). | The per-artifact queue used for uploads would create one job and one activity entry per file. A repository of thousands of files gets one job with progress and cancel instead. |
 | **`git` CLI, behind a small crate** (`crates/git`). | The user's own git setup (credential helpers, `safe.directory`, long paths on Windows) applies unchanged. Only read commands are run, with `GIT_OPTIONAL_LOCKS=0`, so a sync never takes a lock in a repository someone is working in. |
-| **Opt-in folders** (`REPOMEMO_REPO_ROOTS`). | Without it, a workspace administrator could read any git folder the server process can see. |
+| **Links are a workspace setting, checked before they are stored.** | Each workspace decides which repositories it indexes, without a server-wide configuration. The check runs with the server's own account, so "access" means what the server process can read. **Trade-off:** a workspace owner or administrator can link any git checkout that account can read. Run the server under an account that only sees the repositories teams should use. |
 
 ---
 
@@ -121,8 +116,9 @@ Syncs change an artifact's lifecycle only from statuses a person would expect, s
 
 | Method | Path | Guard | Notes |
 |---|---|---|---|
-| GET | `/v1/workspaces/{ws}/repositories` | R | `{ local_repositories_enabled, allowed_roots, repositories }`. `allowed_roots` is empty for non-admins |
-| POST | `/v1/workspaces/{ws}/repositories` | A | `{ path, name?, branch?, include[], exclude[] }`. Checks the folder and the git root against `REPOMEMO_REPO_ROOTS`, then starts the first sync. 201 with `{ repository, job }`; 409 if already connected |
+| GET | `/v1/workspaces/{ws}/repositories` | R | `{ repositories }` |
+| POST | `/v1/workspaces/{ws}/repositories/check` | A | `{ link, branch?, include[], exclude[] }`. Stores nothing. Returns `RepoAccessCheck`: `root_path`, `name`, `commit` (with branch), `tracked_files`, `indexable_files`, `already_connected`. 400 with a readable reason when the server cannot use the link |
+| POST | `/v1/workspaces/{ws}/repositories` | A | `{ link, name?, branch?, include[], exclude[] }` (`path` is accepted as an alias of `link`). Runs the same checks, stores the link and starts the first sync. 201 with `{ repository, job }`; 409 if already linked |
 | GET | `/v1/repositories/{id}` | R | One `RepoSource`, with counts and the running job, if any |
 | PUT | `/v1/repositories/{id}` | A | `{ name?, branch?, include[], exclude[] }`. Applies from the next sync |
 | DELETE | `/v1/repositories/{id}` | A | Deletes the source, its artifacts, chunks and memory links. 409 while syncing. The repository on disk is not touched |
@@ -145,9 +141,9 @@ Syncs run in the background, one at a time across the server and never two for t
 | Sync engine (`connect_local_repo`, `run_repo_sync`, …) | [crates/api/src/repo_sync.rs](../../crates/api/src/repo_sync.rs) |
 | Domain types (`RepoSource`, `RepoSyncReport`, `RepoFile`) | [crates/domain/src/lib.rs](../../crates/domain/src/lib.rs) |
 | HTTP routes and background runner | [apps/server/src/repositories.rs](../../apps/server/src/repositories.rs) |
-| Web UI (Repositories section) | [RepositoriesPanel.tsx](../../apps/desktop/src/components/RepositoriesPanel.tsx) |
+| Web UI: Repositories section (`RepositoriesPanel`) and Settings › Repositories (`RepositorySettings`) | [RepositoriesPanel.tsx](../../apps/desktop/src/components/RepositoriesPanel.tsx) |
 
-Tests: `repomemo-git` (tree parsing, reading a real repository), `repomemo-ingestion` (patterns and classification), `repomemo-api` (`syncs_follow_commits_and_keep_artifact_identity`: add, edit, rename, delete, search, remove) and `repomemo-server` (`local_repositories_sync_in_the_background_within_allowed_roots`: roles, allowed roots, background sync, refused edits).
+Tests: `repomemo-git` (tree parsing, reading a real repository), `repomemo-ingestion` (patterns and classification), `repomemo-api` (`syncs_follow_commits_and_keep_artifact_identity`: add, edit, rename, delete, search, remove) and `repomemo-server` (`workspace_repository_links_are_checked_then_synced_in_the_background`: roles, link checks for URLs, missing folders and non-repositories, background sync, refused edits).
 
 ---
 
@@ -155,7 +151,7 @@ Tests: `repomemo-git` (tree parsing, reading a real repository), `repomemo-inges
 
 - **Renames are detected only when the content is identical.** A file renamed and edited in the same commit becomes a removal plus an addition, so its comments stay on the old, now outdated, artifact.
 - **Syncs are manual** (plus one at server start). There is no polling or file watching yet.
-- **Local folders only.** Remote URLs, credentials and webhooks are phase 2.
+- **Local folders only.** A link is a folder on the server; remote URLs are refused with a clear message. URLs, credentials and webhooks are phase 2, and will reuse the per-workspace link and its access check (with a per-workspace token).
 - **One branch per repository.** A repository root can be connected only once per workspace, so two branches of it cannot be indexed side by side yet.
 - The desktop app does not have the Repositories section yet; the engine is in `RepoMemoCore` and can be exposed through Tauri commands.
 - Search results do not show the commit yet, and citations are not pinned to a commit.

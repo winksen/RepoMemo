@@ -56,11 +56,15 @@ impl GitRepo {
                 }
             })?;
         if !output.status.success() {
-            bail!(
-                "{} is not inside a git repository: {}",
-                path.display(),
-                stderr_text(&output.stderr)
-            );
+            let detail = stderr_text(&output.stderr);
+            if detail.contains("dubious ownership") {
+                bail!(
+                    "git refuses to read {} because it belongs to another user account than the server's. On the server, run: git config --global --add safe.directory \"{}\"",
+                    path.display(),
+                    path.display().to_string().replace('\\', "/")
+                );
+            }
+            bail!("{} is not inside a git repository: {detail}", path.display());
         }
         let root = String::from_utf8(output.stdout)
             .context("git returned a non UTF-8 repository path")?

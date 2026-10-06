@@ -1,15 +1,13 @@
 //! Git repositories connected to shared workspaces.
 //!
-//! The sync engine lives in `RepoMemoCore`; this layer decides who may connect
-//! and sync what, and runs syncs in the background so a request never waits on
-//! a large repository. A server only reads repositories under the folders an
-//! operator listed in `REPOMEMO_REPO_ROOTS`; without it, the feature is off,
-//! because a workspace administrator must not be able to read arbitrary
-//! folders on the server's disk.
+//! Each workspace keeps its own repository links, set by its owners and
+//! administrators in Settings. The sync engine lives in `RepoMemoCore`; this
+//! layer decides who may link and sync what, checks that the server can read a
+//! link before it is connected, and runs syncs in the background so a request
+//! never waits on a large repository.
 
 use std::{
     collections::HashSet,
-    path::{Path as FsPath, PathBuf},
     sync::{Arc, Mutex},
 };
 
@@ -20,7 +18,7 @@ use axum::{
 };
 use repomemo_api::RepoMemoCore;
 use repomemo_domain::{
-    IndexingJobStatus, RepoFile, RepoSettings, RepoSource, RepoSyncReport, WorkspaceRole,
+    IndexingJobStatus, RepoAccessCheck, RepoFile, RepoSettings, RepoSource, RepoSyncReport,
     REPO_SYNC_JOB_KIND,
 };
 use serde::{Deserialize, Serialize};
@@ -31,18 +29,6 @@ use crate::{
     require_workspace_read, require_workspace_write, ApiError, AppState, AuthenticatedSubject,
 };
 
-/// Reads the allowed repository folders from `REPOMEMO_REPO_ROOTS`, a list in
-/// the platform's PATH format (`;` on Windows, `:` elsewhere).
-pub(crate) fn repo_roots_from_env() -> Vec<PathBuf> {
-    std::env::var_os("REPOMEMO_REPO_ROOTS")
-        .map(|value| {
-            std::env::split_paths(&value)
-                .filter(|path| !path.as_os_str().is_empty())
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
 /// Runs repository syncs in the background, one at a time across the server,
 /// and never two for the same repository.
 #[derive(Clone)]
@@ -51,67 +37,16 @@ pub(crate) struct RepoSyncRunner {
     embeddings: EmbeddingQueue,
     running: Arc<Mutex<HashSet<String>>>,
     permits: Arc<Semaphore>,
-    /// Canonical forms of the configured roots, paired with how they were
-    /// written, for messages.
-    roots: Arc<Vec<(PathBuf, String)>>,
 }
 
 impl RepoSyncRunner {
-    pub(crate) fn new(core: RepoMemoCore, embeddings: EmbeddingQueue, roots: Vec<PathBuf>) -> Self {
-        let roots = roots
-            .into_iter()
-            .filter_map(|root| match std::fs::canonicalize(&root) {
-                Ok(canonical) => Some((canonical, root.display().to_string())),
-                Err(error) => {
-                    tracing::warn!(root = %root.display(), error = %error, "Ignoring a repository root that cannot be read");
-                    None
-                }
-            })
-            .collect();
+    pub(crate) fn new(core: RepoMemoCore, embeddings: EmbeddingQueue) -> Self {
         Self {
             core,
             embeddings,
             running: Arc::new(Mutex::new(HashSet::new())),
             permits: Arc::new(Semaphore::new(1)),
-            roots: Arc::new(roots),
         }
-    }
-
-    fn enabled(&self) -> bool {
-        !self.roots.is_empty()
-    }
-
-    fn root_labels(&self) -> Vec<String> {
-        self.roots.iter().map(|(_, label)| label.clone()).collect()
-    }
-
-    fn is_allowed(&self, path: &FsPath) -> bool {
-        match std::fs::canonicalize(path) {
-            Ok(path) => self.roots.iter().any(|(root, _)| path.starts_with(root)),
-            Err(_) => false,
-        }
-    }
-
-    fn ensure_allowed(&self, path: &FsPath) -> Result<(), ApiError> {
-        if !self.enabled() {
-            return Err(ApiError::bad_request(
-                "Local repositories are turned off on this server. An operator can allow them by setting REPOMEMO_REPO_ROOTS to the folders that hold repositories.",
-            ));
-        }
-        if !path.is_dir() {
-            return Err(ApiError::bad_request(format!(
-                "The folder {} does not exist on the server.",
-                path.display()
-            )));
-        }
-        if !self.is_allowed(path) {
-            return Err(ApiError::bad_request(format!(
-                "{} is outside the folders this server may read repositories from: {}.",
-                path.display(),
-                self.root_labels().join(", ")
-            )));
-        }
-        Ok(())
     }
 
     /// Queues a sync. Returns `None` when one is already running for the
@@ -227,10 +162,6 @@ impl RepoSyncRunner {
             let Ok(source) = self.core.repo_source(&source_id).await else {
                 continue;
             };
-            if !self.is_allowed(FsPath::new(&source.root_path)) {
-                tracing::warn!(repository = %source.name, "Not syncing a repository outside REPOMEMO_REPO_ROOTS");
-                continue;
-            }
             if let Err(error) = self.start(&source, None).await {
                 tracing::error!(repository = %source.name, error = %error, "Failed to queue repository sync");
             }
@@ -240,16 +171,15 @@ impl RepoSyncRunner {
 
 #[derive(Debug, Serialize)]
 pub(crate) struct RepositoriesResponse {
-    local_repositories_enabled: bool,
-    /// The folders repositories may be connected from; shown to the members
-    /// who can connect one.
-    allowed_roots: Vec<String>,
     repositories: Vec<RepoSource>,
 }
 
+/// A repository link with the settings it would be indexed with.
 #[derive(Debug, Deserialize)]
-pub(crate) struct ConnectRepositoryRequest {
-    path: String,
+pub(crate) struct RepositoryLinkRequest {
+    /// A folder on the server, anywhere inside the repository.
+    #[serde(alias = "path")]
+    link: String,
     name: Option<String>,
     branch: Option<String>,
     #[serde(default)]
@@ -279,48 +209,52 @@ pub(crate) async fn list_repositories(
     State(state): State<AppState>,
     Path(workspace_id): Path<String>,
 ) -> Result<Json<RepositoriesResponse>, ApiError> {
-    let role = require_workspace_read(&state, &subject, &workspace_id).await?;
+    require_workspace_read(&state, &subject, &workspace_id).await?;
     let repositories = state
         .core
         .list_repo_sources(&workspace_id)
         .await
         .map_err(map_repo_error)?;
-    let can_connect = matches!(role, WorkspaceRole::Owner | WorkspaceRole::Admin);
-    Ok(Json(RepositoriesResponse {
-        local_repositories_enabled: state.repo_sync.enabled(),
-        allowed_roots: if can_connect { state.repo_sync.root_labels() } else { Vec::new() },
-        repositories,
-    }))
+    Ok(Json(RepositoriesResponse { repositories }))
+}
+
+/// Tells an administrator whether the server can read a repository link, and
+/// what connecting it would index, without storing anything.
+pub(crate) async fn check_repository(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+    Json(request): Json<RepositoryLinkRequest>,
+) -> Result<Json<RepoAccessCheck>, ApiError> {
+    require_workspace_admin(&state, &subject, &workspace_id).await?;
+    state
+        .core
+        .check_repo_link(
+            &workspace_id,
+            &request.link,
+            RepoSettings {
+                branch: request.branch,
+                include: request.include,
+                exclude: request.exclude,
+            },
+        )
+        .await
+        .map(Json)
+        .map_err(map_repo_error)
 }
 
 pub(crate) async fn connect_repository(
     subject: AuthenticatedSubject,
     State(state): State<AppState>,
     Path(workspace_id): Path<String>,
-    Json(request): Json<ConnectRepositoryRequest>,
+    Json(request): Json<RepositoryLinkRequest>,
 ) -> Result<(StatusCode, Json<RepositorySyncResponse>), ApiError> {
     require_workspace_admin(&state, &subject, &workspace_id).await?;
-    // "Copy as path" in Windows Explorer wraps the path in quotes.
-    let path = request.path.trim().trim_matches('"').trim();
-    if path.is_empty() {
-        return Err(ApiError::bad_request("Enter the folder of a git repository."));
-    }
-    // Check the folder before running git in it, then the repository root
-    // git reports, which may be a parent of the folder.
-    let path = PathBuf::from(path);
-    state.repo_sync.ensure_allowed(&path)?;
-    let root = state
-        .core
-        .resolve_repo_root(&path)
-        .await
-        .map_err(map_repo_error)?;
-    state.repo_sync.ensure_allowed(&root)?;
-
     let repository = state
         .core
         .connect_local_repo(
             &workspace_id,
-            &root,
+            &request.link,
             request.name,
             RepoSettings {
                 branch: request.branch,
@@ -430,9 +364,6 @@ pub(crate) async fn sync_repository(
 ) -> Result<Json<RepositorySyncResponse>, ApiError> {
     let repository = load_repository(&state, &source_id).await?;
     require_workspace_write(&state, &subject, &repository.workspace_id).await?;
-    state
-        .repo_sync
-        .ensure_allowed(FsPath::new(&repository.root_path))?;
     let job = state
         .repo_sync
         .start(&repository, Some(subject.user_id.clone()))

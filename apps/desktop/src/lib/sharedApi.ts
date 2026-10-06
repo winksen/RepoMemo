@@ -48,6 +48,7 @@ import type {
   SharedWorkspace,
   WorkspaceOverview,
   WorkspaceMetrics,
+  RepoAccessCheck,
   RepoFile,
   RepoSettings,
   RepoSource,
@@ -545,6 +546,20 @@ export function listSharedArtifacts(accessToken: string, workspaceId: string): P
   return request<ArtifactSummary[]>(`/v1/workspaces/${workspaceId}/artifacts`, {}, accessToken);
 }
 
+/** One server-side page of the artifact list, with the total across all pages. */
+export async function listSharedArtifactsPage(accessToken: string, workspaceId: string, page: { limit: number; offset: number }): Promise<{ items: ArtifactSummary[]; total: number }> {
+  const response = await authFetch(`${API_URL}/v1/workspaces/${workspaceId}/artifacts?limit=${page.limit}&offset=${page.offset}`, {
+    headers: { Accept: "application/json", Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null) as { error?: { message?: string } } | null;
+    throw new SharedApiError(response.status, payload?.error?.message ?? `The shared API returned ${response.status}.`);
+  }
+  const items = await response.json() as ArtifactSummary[];
+  const total = Number(response.headers.get("X-Total-Count"));
+  return { items, total: Number.isFinite(total) && total > 0 ? total : items.length };
+}
+
 export function querySharedArtifacts(accessToken: string, workspaceId: string, input: {
   query: string;
   artifactTypes?: ArtifactType[];
@@ -839,7 +854,11 @@ export function listSharedRepositories(accessToken: string, workspaceId: string)
   return request<RepositoryList>(`/v1/workspaces/${workspaceId}/repositories`, {}, accessToken);
 }
 
-export function connectSharedRepository(accessToken: string, workspaceId: string, input: { path: string; name?: string } & RepoSettings): Promise<{ repository: RepoSource; job: IndexingJobStatus | null }> {
+export function checkSharedRepository(accessToken: string, workspaceId: string, input: { link: string } & RepoSettings): Promise<RepoAccessCheck> {
+  return request<RepoAccessCheck>(`/v1/workspaces/${workspaceId}/repositories/check`, { method: "POST", body: JSON.stringify(input) }, accessToken);
+}
+
+export function connectSharedRepository(accessToken: string, workspaceId: string, input: { link: string; name?: string } & RepoSettings): Promise<{ repository: RepoSource; job: IndexingJobStatus | null }> {
   return request(`/v1/workspaces/${workspaceId}/repositories`, { method: "POST", body: JSON.stringify(input) }, accessToken);
 }
 

@@ -78,9 +78,6 @@ pub struct ServerConfig {
     /// LibreOffice executable used for Office previews. When unset the server
     /// looks for it; without it the extracted previews are used.
     pub soffice: Option<PathBuf>,
-    /// Folders local git repositories may be connected from
-    /// (`REPOMEMO_REPO_ROOTS`). Empty turns local repositories off.
-    pub repo_roots: Vec<PathBuf>,
 }
 
 impl ServerConfig {
@@ -111,7 +108,6 @@ impl ServerConfig {
             jwt_secret,
             allowed_origin: Some(allowed_origin),
             soffice: std::env::var_os("REPOMEMO_SOFFICE").map(PathBuf::from),
-            repo_roots: repositories::repo_roots_from_env(),
         })
     }
 
@@ -124,7 +120,6 @@ impl ServerConfig {
             jwt_secret: "test-secret-that-is-long-enough-for-jwt-signing".to_owned(),
             allowed_origin: None,
             soffice: None,
-            repo_roots: Vec::new(),
         }
     }
 }
@@ -566,10 +561,7 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
     let index_queue = IndexQueue::start(core.clone(), embedding_queue.clone());
     index_queue.resume_pending().await;
     embedding_queue.resume_pending().await;
-    if !config.repo_roots.is_empty() {
-        tracing::info!(roots = ?config.repo_roots, "Local git repositories can be connected");
-    }
-    let repo_sync = RepoSyncRunner::new(core.clone(), embedding_queue.clone(), config.repo_roots.clone());
+    let repo_sync = RepoSyncRunner::new(core.clone(), embedding_queue.clone());
     repo_sync.resume_all().await;
 
     let converter = match config.soffice.clone() {
@@ -606,7 +598,8 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
                 header::CONTENT_TYPE,
                 HeaderName::from_static("x-repomemo-filename"),
                 HeaderName::from_static("x-repomemo-folder-id"),
-            ]),
+            ])
+            .expose_headers([HeaderName::from_static("x-total-count")]),
         None => CorsLayer::new(),
     };
 
@@ -830,6 +823,10 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
         .route(
             "/v1/workspaces/{workspace_id}/repositories",
             get(repositories::list_repositories).post(repositories::connect_repository),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/repositories/check",
+            post(repositories::check_repository),
         )
         .route(
             "/v1/repositories/{source_id}",
@@ -2546,11 +2543,43 @@ async fn remove_workspace_member(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// Optional `limit`/`offset` paging for list endpoints. Without `limit` the
+/// full list is returned, so existing clients keep working.
+#[derive(Debug, Default, Deserialize)]
+struct PageQuery {
+    limit: Option<usize>,
+    offset: Option<usize>,
+}
+
+const MAX_PAGE_SIZE: usize = 500;
+
+impl PageQuery {
+    /// Returns the requested page plus an `X-Total-Count` header when paged.
+    fn apply<T>(&self, items: Vec<T>) -> (HeaderMap, Vec<T>) {
+        let mut headers = HeaderMap::new();
+        let Some(limit) = self.limit else {
+            return (headers, items);
+        };
+        let total = items.len();
+        headers.insert(
+            HeaderName::from_static("x-total-count"),
+            HeaderValue::from(total),
+        );
+        let page = items
+            .into_iter()
+            .skip(self.offset.unwrap_or(0))
+            .take(limit.clamp(1, MAX_PAGE_SIZE))
+            .collect();
+        (headers, page)
+    }
+}
+
 async fn list_artifacts(
     subject: AuthenticatedSubject,
     State(state): State<AppState>,
     Path(workspace_id): Path<String>,
-) -> Result<Json<Vec<SharedArtifactSummary>>, ApiError> {
+    Query(page): Query<PageQuery>,
+) -> Result<(HeaderMap, Json<Vec<SharedArtifactSummary>>), ApiError> {
     require_workspace_read(&state, &subject, &workspace_id).await?;
     let folder_ids = state
         .storage
@@ -2567,15 +2596,19 @@ async fn list_artifacts(
         .list_artifacts(workspace_id)
         .await
         .map_err(map_core_error)?;
-    Ok(Json(
-        artifacts
-            .into_iter()
-            .map(|summary| SharedArtifactSummary {
-                folder_id: folder_ids.get(&summary.id).cloned(),
-                repository_id: repository_ids.get(&summary.id).cloned(),
-                summary,
-            })
-            .collect(),
+    let (headers, artifacts) = page.apply(artifacts);
+    Ok((
+        headers,
+        Json(
+            artifacts
+                .into_iter()
+                .map(|summary| SharedArtifactSummary {
+                    folder_id: folder_ids.get(&summary.id).cloned(),
+                    repository_id: repository_ids.get(&summary.id).cloned(),
+                    summary,
+                })
+                .collect(),
+        ),
     ))
 }
 
@@ -2988,8 +3021,9 @@ async fn query_artifacts(
     subject: AuthenticatedSubject,
     State(state): State<AppState>,
     Path(workspace_id): Path<String>,
+    Query(page): Query<PageQuery>,
     Json(request): Json<QueryArtifactsRequest>,
-) -> Result<Json<Vec<ArtifactSummary>>, ApiError> {
+) -> Result<(HeaderMap, Json<Vec<ArtifactSummary>>), ApiError> {
     require_workspace_read(&state, &subject, &workspace_id).await?;
     let query = request.query.trim().to_lowercase();
     let languages = request
@@ -3033,8 +3067,9 @@ async fn query_artifacts(
                 .unwrap_or(true);
             query_matches && type_matches && language_matches && source_matches && indexing_matches
         })
-        .collect();
-    Ok(Json(artifacts))
+        .collect::<Vec<_>>();
+    let (headers, artifacts) = page.apply(artifacts);
+    Ok((headers, Json(artifacts)))
 }
 
 async fn create_text_artifact(
@@ -4024,6 +4059,17 @@ fn map_core_error(error: anyhow::Error) -> ApiError {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn page_query_slices_and_reports_total() {
+        let page = super::PageQuery { limit: Some(2), offset: Some(3) };
+        let (headers, items) = page.apply((0..10).collect::<Vec<_>>());
+        assert_eq!(items, vec![3, 4]);
+        assert_eq!(headers.get("x-total-count").unwrap(), "10");
+        let (headers, items) = super::PageQuery::default().apply((0..10).collect::<Vec<_>>());
+        assert_eq!(items.len(), 10);
+        assert!(headers.get("x-total-count").is_none());
+    }
+
     use super::{router, ServerConfig};
     use axum::{
         body::{to_bytes, Body},
@@ -5134,7 +5180,7 @@ mod tests {
     /// Polls the artifact list until `expected` artifacts report an index
     /// timestamp, since indexing runs on a background queue.
     #[tokio::test]
-    async fn local_repositories_sync_in_the_background_within_allowed_roots() {
+    async fn workspace_repository_links_are_checked_then_synced_in_the_background() {
         let base = std::env::temp_dir().join(format!("repomemo-server-repo-{}", uuid::Uuid::new_v4()));
         let repo_dir = base.join("repos").join("payments");
         let data_dir = base.join("data");
@@ -5157,9 +5203,7 @@ mod tests {
         git(&["add", "."]);
         git(&["commit", "--quiet", "-m", "Initial"]);
 
-        let mut config = ServerConfig::for_test(data_dir.clone());
-        config.repo_roots = vec![base.join("repos")];
-        let app = router(config).await.unwrap();
+        let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
         let read = |response: axum::response::Response| async move {
             serde_json::from_slice::<Value>(&to_bytes(response.into_body(), usize::MAX).await.unwrap())
                 .unwrap_or(Value::Null)
@@ -5217,19 +5261,35 @@ mod tests {
         assert!(added.status().is_success());
         let repositories_uri = format!("/v1/workspaces/{workspace_id}/repositories");
 
-        let listing = read(app.clone().oneshot(auth_request("GET", &repositories_uri, owner)).await.unwrap()).await;
-        assert_eq!(listing["local_repositories_enabled"], true);
-        assert_eq!(listing["allowed_roots"].as_array().unwrap().len(), 1);
         let listing = read(app.clone().oneshot(auth_request("GET", &repositories_uri, member)).await.unwrap()).await;
-        assert!(listing["allowed_roots"].as_array().unwrap().is_empty());
+        assert!(listing["repositories"].as_array().unwrap().is_empty());
+
+        // The link is checked before anything is stored.
+        let check_uri = format!("{repositories_uri}/check");
+        let check = |token: &str, link: &str| json_request("POST", &check_uri, token, json!({"link": link}));
+        assert_eq!(app.clone().oneshot(check(member, &repo_dir.display().to_string())).await.unwrap().status(), 403);
+        for (link, expected) in [
+            ("https://github.com/example/payments.git".to_owned(), "not supported yet"),
+            (base.join("missing").display().to_string(), "does not exist"),
+            (data_dir.display().to_string(), "not inside a git repository"),
+        ] {
+            let response = app.clone().oneshot(check(owner, &link)).await.unwrap();
+            assert_eq!(response.status(), 400, "{link}");
+            let message = read(response).await["error"]["message"].as_str().unwrap().to_owned();
+            assert!(message.contains(expected), "{message}");
+        }
+        let checked = read(app.clone().oneshot(check(owner, &format!("\"{}\"", repo_dir.join("src").display()))).await.unwrap()).await;
+        assert_eq!(checked["name"], "payments");
+        assert_eq!(checked["commit"]["summary"], "Initial");
+        assert_eq!(checked["commit"]["branch"], "main");
+        assert_eq!(checked["tracked_files"], 2);
+        assert_eq!(checked["indexable_files"], 2);
+        assert_eq!(checked["already_connected"], false);
 
         let connect = |token: &str, path: &std::path::Path| {
-            json_request("POST", &repositories_uri, token, json!({"path": path.display().to_string()}))
+            json_request("POST", &repositories_uri, token, json!({"link": path.display().to_string()}))
         };
         assert_eq!(app.clone().oneshot(connect(member, &repo_dir)).await.unwrap().status(), 403);
-        let outside = app.clone().oneshot(connect(owner, &data_dir)).await.unwrap();
-        assert_eq!(outside.status(), 400);
-        assert!(read(outside).await["error"]["message"].as_str().unwrap().contains("outside"));
 
         let connected = app.clone().oneshot(connect(owner, &repo_dir.join("src"))).await.unwrap();
         assert_eq!(connected.status(), 201);
@@ -5238,6 +5298,8 @@ mod tests {
         assert_eq!(connected["job"]["kind"], "repo_sync");
         let repository_id = connected["repository"]["id"].as_str().unwrap().to_owned();
         assert_eq!(app.clone().oneshot(connect(owner, &repo_dir)).await.unwrap().status(), 409);
+        let checked = read(app.clone().oneshot(check(owner, &repo_dir.display().to_string())).await.unwrap()).await;
+        assert_eq!(checked["already_connected"], true);
 
         let repository_uri = format!("/v1/repositories/{repository_id}");
         let mut repository = Value::Null;

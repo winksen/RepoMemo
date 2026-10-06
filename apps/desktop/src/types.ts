@@ -799,7 +799,15 @@ export interface RepoFile {
 }
 
 export interface RepositoryList {
-  local_repositories_enabled: boolean;
-  allowed_roots: string[];
   repositories: RepoSource[];
+}
+
+/** What the server found at a repository link, before it is linked. */
+export interface RepoAccessCheck {
+  root_path: string;
+  name: string;
+  commit: RepoCommit;
+  tracked_files: number;
+  indexable_files: number;
+  already_connected: boolean;
 }
