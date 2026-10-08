@@ -7,9 +7,13 @@ mod embedding;
 mod events;
 mod health;
 mod indexing;
+mod logs;
 mod maintenance;
 mod repositories;
 mod security;
+mod system;
+
+pub use logs::log_capture_layer;
 
 pub use maintenance::MaintenanceSettings;
 pub use security::Quota;
@@ -70,6 +74,7 @@ use crate::embedding::EmbeddingQueue;
 use crate::repositories::RepoSyncRunner;
 use crate::indexing::IndexQueue;
 use crate::security::{too_many_requests, wait_text, ClientIp, Guards};
+use crate::system::{InstanceInfo, MaintenanceStatus, SettingsCell, Telemetry};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tower_http::{
@@ -123,6 +128,11 @@ pub struct ServerConfig {
     /// turns automatic syncing off.
     pub repo_poll_interval: Option<Duration>,
     pub maintenance: MaintenanceSettings,
+    /// Accounts made system administrators at startup and when they
+    /// register. The first account on a new server always becomes one.
+    pub system_admin_emails: Vec<String>,
+    /// System audit events are kept this many days; 0 keeps them forever.
+    pub system_audit_retention_days: i64,
 }
 
 impl ServerConfig {
@@ -214,6 +224,16 @@ impl ServerConfig {
                 job_retention_days: env_parse("REPOMEMO_JOB_RETENTION_DAYS", 90)?,
                 index_retry_interval: Duration::from_secs(3600 * index_retry_hours.max(1)),
             },
+            system_admin_emails: env_text("REPOMEMO_SYSTEM_ADMIN_EMAILS")
+                .map(|emails| {
+                    emails
+                        .split(',')
+                        .map(|email| email.trim().to_lowercase())
+                        .filter(|email| !email.is_empty())
+                        .collect()
+                })
+                .unwrap_or_default(),
+            system_audit_retention_days: env_parse("REPOMEMO_SYSTEM_AUDIT_RETENTION_DAYS", 365)?,
         })
     }
 
@@ -244,6 +264,8 @@ impl ServerConfig {
                 interval: Duration::ZERO,
                 ..MaintenanceSettings::default()
             },
+            system_admin_emails: Vec::new(),
+            system_audit_retention_days: 365,
         }
     }
 }
@@ -289,7 +311,39 @@ struct RuntimeSettings {
     login_max_failures: u32,
     login_lockout: Duration,
     ai_quota: Quota,
+    repo_poll_interval: Option<Duration>,
     maintenance: MaintenanceSettings,
+    system_audit_retention_days: i64,
+    system_admin_emails: Vec<String>,
+}
+
+impl RuntimeSettings {
+    /// The settings the environment gives, before system administrators'
+    /// run-time changes.
+    fn from_config(config: &ServerConfig) -> Self {
+        Self {
+            service_name: config.service_name.clone(),
+            allow_registration: config.allow_registration,
+            trust_proxy: config.trust_proxy,
+            access_token_ttl_minutes: config.access_token_ttl_minutes,
+            refresh_token_ttl_days: config.refresh_token_ttl_days,
+            auth_quota: config.auth_quota,
+            login_max_failures: config.login_max_failures,
+            login_lockout: config.login_lockout,
+            ai_quota: config.ai_quota,
+            repo_poll_interval: config.repo_poll_interval,
+            maintenance: config.maintenance.clone(),
+            system_audit_retention_days: config.system_audit_retention_days,
+            system_admin_emails: config.system_admin_emails.clone(),
+        }
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod tests_support {
+    pub(crate) fn runtime_settings() -> super::RuntimeSettings {
+        super::RuntimeSettings::from_config(&super::ServerConfig::for_test(std::env::temp_dir()))
+    }
 }
 
 #[derive(Clone)]
@@ -302,8 +356,18 @@ struct AppState {
     embedding_queue: EmbeddingQueue,
     converter: Converter,
     repo_sync: RepoSyncRunner,
-    settings: Arc<RuntimeSettings>,
+    runtime: Arc<SettingsCell>,
     guards: Arc<Guards>,
+    instance: Arc<InstanceInfo>,
+    telemetry: Arc<Telemetry>,
+    maintenance_status: Arc<std::sync::Mutex<MaintenanceStatus>>,
+}
+
+impl AppState {
+    /// The run-time settings in force now.
+    fn settings(&self) -> Arc<RuntimeSettings> {
+        self.runtime.current()
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -741,6 +805,9 @@ struct AuthenticatedSubject {
     /// streams end then, like any other use of the token.
     expires_at: u64,
     session_version: i64,
+    /// Administers the whole server: acts as an administrator in every
+    /// organization and workspace, and may use the system API.
+    is_system_admin: bool,
 }
 
 pub async fn router(config: ServerConfig) -> Result<Router> {
@@ -765,6 +832,31 @@ async fn build_state(config: &ServerConfig) -> Result<AppState> {
         .await?;
     if interrupted > 0 {
         tracing::info!(count = interrupted, "Closed jobs interrupted by the previous shutdown");
+    }
+
+    // Settings changed by system administrators override the environment.
+    let runtime = Arc::new(SettingsCell::new(RuntimeSettings::from_config(config)));
+    let overrides = storage
+        .list_system_settings()
+        .await?
+        .into_iter()
+        .map(|setting| (setting.key, setting.value))
+        .collect::<Vec<_>>();
+    runtime.load_overrides(&overrides);
+
+    let promoted = storage.promote_system_admins(&config.system_admin_emails).await?;
+    if promoted > 0 {
+        tracing::info!(target: "audit", count = promoted, "Promoted accounts listed in REPOMEMO_SYSTEM_ADMIN_EMAILS to system administrators");
+        storage
+            .record_system_event(
+                None,
+                "system_admin_granted",
+                &format!("Made {promoted} account(s) listed in REPOMEMO_SYSTEM_ADMIN_EMAILS system administrators."),
+            )
+            .await?;
+    }
+    if storage.system_admin_count().await? == 0 && storage.count_users().await? > 0 {
+        tracing::warn!("This server has no system administrator. List one or more account emails in REPOMEMO_SYSTEM_ADMIN_EMAILS and restart.");
     }
 
     // Computed once, off the async workers, before the first sign-in needs it.
@@ -804,9 +896,8 @@ async fn build_state(config: &ServerConfig) -> Result<AppState> {
     embedding_queue.resume_pending().await;
     let repo_sync = RepoSyncRunner::new(core.clone(), embedding_queue.clone());
     repo_sync.resume_all().await;
-    if let Some(interval) = config.repo_poll_interval {
-        repo_sync.start_polling(interval);
-    }
+    let polling = runtime.clone();
+    repo_sync.start_polling(move || polling.current().repo_poll_interval);
 
     let converter = match config.soffice.clone() {
         Some(path) => Converter::with_binary(&config.data_dir, Some(path)),
@@ -817,18 +908,7 @@ async fn build_state(config: &ServerConfig) -> Result<AppState> {
     } else {
         tracing::info!("LibreOffice not found: Office previews show extracted text and tables");
     }
-    let settings = Arc::new(RuntimeSettings {
-        service_name: config.service_name.clone(),
-        allow_registration: config.allow_registration,
-        trust_proxy: config.trust_proxy,
-        access_token_ttl_minutes: config.access_token_ttl_minutes,
-        refresh_token_ttl_days: config.refresh_token_ttl_days,
-        auth_quota: config.auth_quota,
-        login_max_failures: config.login_max_failures,
-        login_lockout: config.login_lockout,
-        ai_quota: config.ai_quota,
-        maintenance: config.maintenance.clone(),
-    });
+    let instance = Arc::new(InstanceInfo::new(config, converter.enabled()));
     Ok(AppState {
         storage,
         core,
@@ -838,8 +918,11 @@ async fn build_state(config: &ServerConfig) -> Result<AppState> {
         embedding_queue,
         converter,
         repo_sync,
-        settings,
+        runtime,
         guards: Arc::new(Guards::default()),
+        instance,
+        telemetry: Arc::new(Telemetry::default()),
+        maintenance_status: Arc::new(std::sync::Mutex::new(MaintenanceStatus::default())),
     })
 }
 
@@ -861,6 +944,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
                 header::CONTENT_TYPE,
                 HeaderName::from_static("x-repomemo-filename"),
                 HeaderName::from_static("x-repomemo-folder-id"),
+                HeaderName::from_static("x-repomemo-client"),
             ])
             .expose_headers([
                 HeaderName::from_static("x-total-count"),
@@ -876,6 +960,19 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route("/v1/auth/refresh", post(refresh_session))
         .route("/v1/auth/logout", post(logout))
         .route("/v1/auth/logout-all", post(logout_everywhere))
+        .route("/v1/system/overview", get(system::overview))
+        .route("/v1/system/usage", get(system::usage))
+        .route("/v1/system/users", get(system::list_users))
+        .route("/v1/system/users/{user_id}/system-admin", put(system::set_system_admin))
+        .route("/v1/system/users/{user_id}/sessions/end", post(system::end_user_sessions))
+        .route("/v1/system/users/{user_id}/unlock", post(system::unlock_user))
+        .route("/v1/system/settings", get(system::get_settings).put(system::update_settings))
+        .route("/v1/system/settings/{key}", delete(system::reset_setting))
+        .route("/v1/system/logs", get(system::logs))
+        .route("/v1/system/audit", get(system::audit_events))
+        .route("/v1/system/jobs", get(system::jobs))
+        .route("/v1/system/maintenance", get(system::get_maintenance))
+        .route("/v1/system/maintenance/run", post(system::run_maintenance))
         .route("/v1/session", get(session))
         .route("/v1/profile", get(get_profile).put(update_profile))
         .route("/v1/profile/password", post(change_profile_password))
@@ -1139,6 +1236,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route("/v1/memory-cards/{card_id}/export", get(export_memory_card))
         .layer(CatchPanicLayer::custom(panic_response))
         .layer(middleware::from_fn(security::security_headers))
+        .layer(middleware::from_fn_with_state(state.clone(), system::track_requests))
         .layer(TraceLayer::new_for_http())
         .layer(DefaultBodyLimit::max(config.max_upload_bytes))
         .layer(cors)
@@ -1147,7 +1245,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
 
 async fn health(State(state): State<AppState>) -> Json<HealthResponse> {
     Json(HealthResponse {
-        service: state.settings.service_name.clone(),
+        service: state.settings().service_name.clone(),
         status: "ok",
         authentication: "jwt",
         registration_open: registration_open(&state).await.unwrap_or(false),
@@ -1180,7 +1278,7 @@ async fn readiness(State(state): State<AppState>) -> (StatusCode, Json<Readiness
 /// Registration is open by configuration, or because nobody has an account
 /// yet (so a server with registration closed can still get its first owner).
 async fn registration_open(state: &AppState) -> Result<bool, ApiError> {
-    if state.settings.allow_registration {
+    if state.settings().allow_registration {
         return Ok(true);
     }
     Ok(state.storage.count_users().await.map_err(ApiError::internal)? == 0)
@@ -1198,10 +1296,10 @@ enum AuthAction {
 /// Counts one authentication request against the client address's quota.
 fn check_auth_quota(state: &AppState, client: &ClientIp, action: AuthAction) -> Result<(), ApiError> {
     let quota = match action {
-        AuthAction::SignIn => state.settings.auth_quota,
+        AuthAction::SignIn => state.settings().auth_quota,
         AuthAction::Refresh => Quota {
-            limit: state.settings.auth_quota.limit.saturating_mul(4),
-            ..state.settings.auth_quota
+            limit: state.settings().auth_quota.limit.saturating_mul(4),
+            ..state.settings().auth_quota
         },
     };
     state
@@ -1252,6 +1350,27 @@ async fn register(
         .await
         .map_err(ApiError::internal)?;
     tracing::info!(target: "audit", user_id = %user.id, client = %client.0, "Account registered");
+    // The first account of a new server administers it, as do accounts the
+    // operator listed.
+    let first_account = state.storage.count_users().await.map_err(ApiError::internal)? == 1
+        && state.storage.system_admin_count().await.map_err(ApiError::internal)? == 0;
+    let listed = user
+        .email
+        .as_deref()
+        .is_some_and(|email| state.settings().system_admin_emails.iter().any(|listed| listed == email));
+    if first_account || listed {
+        state
+            .storage
+            .set_system_admin(&user.id, true)
+            .await
+            .map_err(ApiError::internal)?;
+        let reason = if first_account { "the first account on this server" } else { "listed in REPOMEMO_SYSTEM_ADMIN_EMAILS" };
+        let detail = format!("{} became a system administrator as {reason}.", user.email.as_deref().unwrap_or("A new account"));
+        tracing::info!(target: "audit", user_id = %user.id, "{detail}");
+        if let Err(error) = state.storage.record_system_event(Some(&user.id), "system_admin_granted", &detail).await {
+            tracing::error!(error = %error, "Failed to record a system audit event");
+        }
+    }
     let response = issue_session(&state, user).await?;
     Ok((StatusCode::CREATED, Json(response)))
 }
@@ -1268,7 +1387,7 @@ async fn login(
     // out from everywhere while a distributed one is still slowed down.
     let pair_key = format!("login:{email}|{}", client.0);
     let account_key = format!("login:{email}");
-    let settings = &state.settings;
+    let settings = state.settings();
     for key in [&pair_key, &account_key] {
         if let Some(wait) = state.guards.logins.locked_for(key) {
             tracing::warn!(target: "audit", email = %email, client = %client.0, "Sign-in refused: account temporarily locked");
@@ -1385,6 +1504,7 @@ async fn session(
         user,
         authentication: "jwt".to_owned(),
         memberships,
+        is_system_admin: subject.is_system_admin,
     }))
 }
 
@@ -1552,16 +1672,17 @@ async fn create_organization(
     Ok((StatusCode::CREATED, Json(organization)))
 }
 
+/// The caller's organizations; every organization for a system administrator.
 async fn list_organizations(
     subject: AuthenticatedSubject,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<Organization>>, ApiError> {
-    state
-        .storage
-        .list_organizations_for_user(&subject.user_id)
-        .await
-        .map(Json)
-        .map_err(ApiError::internal)
+    let organizations = if subject.is_system_admin {
+        state.storage.list_organizations_for_system_admin(&subject.user_id).await
+    } else {
+        state.storage.list_organizations_for_user(&subject.user_id).await
+    };
+    organizations.map(Json).map_err(ApiError::internal)
 }
 
 async fn update_organization(
@@ -1672,16 +1793,17 @@ async fn create_workspace(
     Ok((StatusCode::CREATED, Json(workspace)))
 }
 
+/// The caller's workspaces; every workspace for a system administrator.
 async fn list_workspaces(
     subject: AuthenticatedSubject,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<SharedWorkspace>>, ApiError> {
-    state
-        .storage
-        .list_shared_workspaces_for_user(&subject.user_id)
-        .await
-        .map(Json)
-        .map_err(ApiError::internal)
+    let workspaces = if subject.is_system_admin {
+        state.storage.list_shared_workspaces_for_system_admin(&subject.user_id).await
+    } else {
+        state.storage.list_shared_workspaces_for_user(&subject.user_id).await
+    };
+    workspaces.map(Json).map_err(ApiError::internal)
 }
 
 async fn update_workspace(
@@ -4057,14 +4179,38 @@ async fn workspace_events(
         workspace_id,
         closer,
     ));
+    let open = OpenEventStream::new(state.telemetry.clone());
     let stream = events
         .merge(ReceiverStream::new(closed).map(|_| EventStreamItem::Close))
         .take_while(|item| !matches!(item, EventStreamItem::Close))
-        .filter_map(|item| match item {
-            EventStreamItem::Event(event) => Some(Ok(event)),
-            EventStreamItem::Close => None,
+        .filter_map(move |item| {
+            let _counted = &open;
+            match item {
+                EventStreamItem::Event(event) => Some(Ok(event)),
+                EventStreamItem::Close => None,
+            }
         });
     Ok(Sse::new(stream).keep_alive(KeepAlive::new().interval(Duration::from_secs(15))))
+}
+
+/// Counts an open event stream for the System page while it lives.
+struct OpenEventStream(Arc<Telemetry>);
+
+impl OpenEventStream {
+    fn new(telemetry: Arc<Telemetry>) -> Self {
+        telemetry
+            .open_event_streams
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        Self(telemetry)
+    }
+}
+
+impl Drop for OpenEventStream {
+    fn drop(&mut self) {
+        self.0
+            .open_event_streams
+            .fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+    }
 }
 
 /// Closes an event stream once its token expires or its user may no longer
@@ -4084,15 +4230,12 @@ async fn watch_event_stream_access(
             _ = tokio::time::sleep(EVENT_STREAM_RECHECK.min(Duration::from_secs(remaining))) => {}
         }
         let expired = jsonwebtoken::get_current_timestamp() >= subject.expires_at;
-        let session_valid = state
-            .storage
-            .user_session_version(&subject.user_id)
-            .await
-            .map(|version| version == Some(subject.session_version))
-            .unwrap_or(true);
-        let member = state
-            .storage
-            .workspace_role_for_user(&subject.user_id, &workspace_id)
+        let access = state.storage.user_access(&subject.user_id).await.ok();
+        let session_valid = access.map_or(true, |access| {
+            access.is_some_and(|access| access.session_version == subject.session_version)
+        });
+        let is_system_admin = access.flatten().is_some_and(|access| access.is_system_admin);
+        let member = effective_workspace_role(&state, &subject.user_id, is_system_admin, &workspace_id)
             .await
             .map(|role| role.is_some())
             .unwrap_or(true);
@@ -4350,12 +4493,38 @@ async fn require_workspace_read(
     subject: &AuthenticatedSubject,
     workspace_id: &str,
 ) -> Result<WorkspaceRole, ApiError> {
-    state
-        .storage
-        .workspace_role_for_user(&subject.user_id, workspace_id)
-        .await
-        .map_err(ApiError::internal)?
+    effective_workspace_role(state, &subject.user_id, subject.is_system_admin, workspace_id)
+        .await?
         .ok_or_else(ApiError::forbidden)
+}
+
+/// The role a user acts with in a workspace: their membership, raised to
+/// administrator for a system administrator (an owner stays owner), who also
+/// acts as administrator where they are not a member.
+async fn effective_workspace_role(
+    state: &AppState,
+    user_id: &str,
+    is_system_admin: bool,
+    workspace_id: &str,
+) -> Result<Option<WorkspaceRole>, ApiError> {
+    let membership = state
+        .storage
+        .workspace_role_for_user(user_id, workspace_id)
+        .await
+        .map_err(ApiError::internal)?;
+    if !is_system_admin {
+        return Ok(membership);
+    }
+    Ok(match membership {
+        Some(WorkspaceRole::Owner) => Some(WorkspaceRole::Owner),
+        Some(_) => Some(WorkspaceRole::Admin),
+        None => state
+            .storage
+            .workspace_exists(workspace_id)
+            .await
+            .map_err(ApiError::internal)?
+            .then_some(WorkspaceRole::Admin),
+    })
 }
 
 async fn require_organization_read(
@@ -4363,12 +4532,27 @@ async fn require_organization_read(
     subject: &AuthenticatedSubject,
     organization_id: &str,
 ) -> Result<OrganizationRole, ApiError> {
-    state
+    let membership = state
         .storage
         .organization_role_for_user(&subject.user_id, organization_id)
         .await
-        .map_err(ApiError::internal)?
-        .ok_or_else(ApiError::forbidden)
+        .map_err(ApiError::internal)?;
+    if !subject.is_system_admin {
+        return membership.ok_or_else(ApiError::forbidden);
+    }
+    match membership {
+        Some(OrganizationRole::Owner) => Ok(OrganizationRole::Owner),
+        Some(_) => Ok(OrganizationRole::Admin),
+        None if state
+            .storage
+            .organization_exists(organization_id)
+            .await
+            .map_err(ApiError::internal)? =>
+        {
+            Ok(OrganizationRole::Admin)
+        }
+        None => Err(ApiError::forbidden()),
+    }
 }
 
 async fn require_organization_admin(
@@ -4486,18 +4670,18 @@ impl FromRequestParts<AppState> for AuthenticatedSubject {
         .map_err(|_| ApiError::unauthorized())?
         .claims;
         // A token outlives neither its user nor the end of its sessions.
-        let current_version = state
+        let access = state
             .storage
-            .user_session_version(&claims.sub)
+            .user_access(&claims.sub)
             .await
-            .map_err(ApiError::internal)?;
-        if current_version != Some(claims.ver) {
-            return Err(ApiError::unauthorized());
-        }
+            .map_err(ApiError::internal)?
+            .filter(|access| access.session_version == claims.ver)
+            .ok_or_else(ApiError::unauthorized)?;
         Ok(Self {
             user_id: claims.sub,
             expires_at: claims.exp as u64,
             session_version: claims.ver,
+            is_system_admin: access.is_system_admin,
         })
     }
 }
@@ -4581,7 +4765,7 @@ async fn issue_session(state: &AppState, user: SharedUser) -> Result<TokenRespon
         .ok_or_else(ApiError::unauthorized)?;
     let refresh_token = state
         .storage
-        .create_refresh_token(&user.id, state.settings.refresh_token_ttl_days)
+        .create_refresh_token(&user.id, state.settings().refresh_token_ttl_days)
         .await
         .map_err(ApiError::internal)?;
     issue_token(
@@ -4589,7 +4773,7 @@ async fn issue_session(state: &AppState, user: SharedUser) -> Result<TokenRespon
         user,
         refresh_token,
         version,
-        state.settings.access_token_ttl_minutes,
+        state.settings().access_token_ttl_minutes,
     )
 }
 
@@ -7716,6 +7900,113 @@ mod tests {
         let state = super::build_state(&config).await.unwrap();
         let report = super::maintenance::run_pass(&state, true, true).await;
         assert_eq!(report.failures, 0, "{report:?}");
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn system_administrators_see_every_workspace_and_run_the_server() {
+        let data_dir = temp_data_dir("system-admin");
+        let mut config = ServerConfig::for_test(data_dir.clone());
+        config.system_admin_emails = vec!["listed@example.com".to_owned()];
+        let app = router(config).await.unwrap();
+        let get = |uri: String, who: &str| {
+            let app = app.clone();
+            let request = auth_request("GET", &uri, who);
+            async move { app.oneshot(request).await.unwrap() }
+        };
+        let send = |method: &'static str, uri: String, who: &str, body: Value| {
+            let app = app.clone();
+            let request = json_request(method, &uri, who, body);
+            async move { app.oneshot(request).await.unwrap() }
+        };
+
+        // The first account of a new server administers it; later ones do not.
+        let (admin, _) = register_account(&app, "first@example.com").await;
+        let (owner, owner_tokens) = register_account(&app, "owner@example.com").await;
+        let owner_id = owner_tokens["user"]["id"].as_str().unwrap().to_owned();
+        assert_eq!(response_json(get("/v1/session".to_owned(), &admin).await).await["is_system_admin"], true);
+        assert_eq!(response_json(get("/v1/session".to_owned(), &owner).await).await["is_system_admin"], false);
+        let (listed, _) = register_account(&app, "listed@example.com").await;
+        assert_eq!(response_json(get("/v1/session".to_owned(), &listed).await).await["is_system_admin"], true, "listed accounts are promoted");
+
+        // Someone else's organization and workspace are visible, as an administrator.
+        let workspace_id = create_workspace(&app, &owner).await;
+        let organizations = response_json(get("/v1/organizations".to_owned(), &admin).await).await;
+        assert_eq!(organizations.as_array().unwrap().len(), 1);
+        assert_eq!(organizations[0]["role"], "admin");
+        let organization_id = organizations[0]["id"].as_str().unwrap().to_owned();
+        let workspaces = response_json(get("/v1/workspaces".to_owned(), &admin).await).await;
+        assert_eq!(workspaces[0]["role"], "admin");
+        assert_eq!(get(format!("/v1/workspaces/{workspace_id}/overview"), &admin).await.status(), 200);
+        assert_eq!(get(format!("/v1/workspaces/{workspace_id}/members"), &admin).await.status(), 200, "administrator sections");
+        assert_eq!(get(format!("/v1/organizations/{organization_id}/members"), &admin).await.status(), 200);
+        let capabilities = response_json(get(format!("/v1/workspaces/{workspace_id}/capabilities"), &admin).await).await;
+        assert_eq!(capabilities["can_manage_members"], true);
+        assert_eq!(capabilities["can_manage_workspace"], false, "owner-only actions stay with the owner");
+        assert_eq!(send("DELETE", format!("/v1/workspaces/{workspace_id}"), &admin, json!({})).await.status(), 403);
+        let created = send("POST", "/v1/workspaces".to_owned(), &admin, json!({"organization_id": organization_id, "name": "Admin made"})).await;
+        assert_eq!(created.status(), 201, "administrators create workspaces in any organization");
+        assert_eq!(get(format!("/v1/workspaces/{workspace_id}/overview"), &listed).await.status(), 200);
+
+        // The system API is for system administrators only.
+        assert_eq!(get("/v1/system/overview".to_owned(), &owner).await.status(), 403);
+        let overview = response_json(get("/v1/system/overview".to_owned(), &admin).await).await;
+        assert_eq!(overview["statistics"]["user_count"], 3);
+        assert_eq!(overview["statistics"]["workspace_count"], 2);
+        assert_eq!(overview["instance"]["system_admin_count"], 2);
+        assert!(overview["traffic"]["requests"].as_u64().unwrap() > 0);
+        let usage = response_json(get("/v1/system/usage?days=7".to_owned(), &admin).await).await;
+        assert_eq!(usage["activity_by_day"].as_array().unwrap().len(), 7);
+        assert_eq!(usage["workspaces"].as_array().unwrap().len(), 2);
+        assert_eq!(get("/v1/system/jobs".to_owned(), &admin).await.status(), 200);
+        assert_eq!(get("/v1/system/logs?level=warn".to_owned(), &admin).await.status(), 200);
+
+        // Run-time settings apply at once and can be reset.
+        let refused = send("PUT", "/v1/system/settings".to_owned(), &admin, json!({"values": {"allow_registration": false, "login_max_failures": -3}})).await;
+        assert_eq!(refused.status(), 400, "a request applies completely or not at all");
+        let health = response_json(app.clone().oneshot(Request::builder().uri("/health").body(Body::empty()).unwrap()).await.unwrap()).await;
+        assert_eq!(health["registration_open"], true);
+        let changed = send("PUT", "/v1/system/settings".to_owned(), &admin, json!({"values": {"allow_registration": false}})).await;
+        assert_eq!(changed.status(), 200);
+        let changed = response_json(changed).await;
+        let registration = changed["settings"].as_array().unwrap().iter().find(|setting| setting["key"] == "allow_registration").unwrap().clone();
+        assert_eq!((registration["value"].clone(), registration["overridden"].clone()), (json!(false), json!(true)));
+        let closed = app.clone().oneshot(public_post("/v1/auth/register", json!({"email": "late@example.com", "display_name": "Late", "password": "not-a-real-password"}))).await.unwrap();
+        assert_eq!(closed.status(), 403);
+        assert_eq!(send("DELETE", "/v1/system/settings/allow_registration".to_owned(), &admin, json!({})).await.status(), 200);
+        let reopened = app.clone().oneshot(public_post("/v1/auth/register", json!({"email": "late@example.com", "display_name": "Late", "password": "not-a-real-password"}))).await.unwrap();
+        assert_eq!(reopened.status(), 201);
+
+        // Roles, sessions and the last administrator.
+        let users = response_json(get("/v1/system/users".to_owned(), &admin).await).await;
+        assert_eq!(users.as_array().unwrap().len(), 4);
+        assert_eq!(send("PUT", format!("/v1/system/users/{owner_id}/system-admin"), &owner, json!({"enabled": true})).await.status(), 403);
+        assert_eq!(send("PUT", format!("/v1/system/users/{owner_id}/system-admin"), &admin, json!({"enabled": true})).await.status(), 204);
+        assert_eq!(get("/v1/system/overview".to_owned(), &owner).await.status(), 200, "the new role applies at once");
+        assert_eq!(send("POST", format!("/v1/system/users/{owner_id}/sessions/end"), &admin, json!({})).await.status(), 204);
+        assert_eq!(get("/v1/session".to_owned(), &owner).await.status(), 401);
+        assert_eq!(send("POST", format!("/v1/system/users/{owner_id}/unlock"), &admin, json!({})).await.status(), 200);
+        for user in users.as_array().unwrap() {
+            if user["is_system_admin"] == true && user["email"] != "first@example.com" {
+                let id = user["id"].as_str().unwrap();
+                assert_eq!(send("PUT", format!("/v1/system/users/{id}/system-admin"), &admin, json!({"enabled": false})).await.status(), 204);
+            }
+        }
+        let first_id = users.as_array().unwrap().iter().find(|user| user["email"] == "first@example.com").unwrap()["id"].as_str().unwrap().to_owned();
+        // The owner was promoted after `users` was listed.
+        assert_eq!(send("PUT", format!("/v1/system/users/{owner_id}/system-admin"), &admin, json!({"enabled": false})).await.status(), 204);
+        let last = send("PUT", format!("/v1/system/users/{first_id}/system-admin"), &admin, json!({"enabled": false})).await;
+        assert_eq!(last.status(), 409, "the last system administrator stays");
+
+        // Maintenance by hand, and the audit trail of it all.
+        let maintenance = response_json(send("POST", "/v1/system/maintenance/run".to_owned(), &admin, json!({})).await).await;
+        assert_eq!(maintenance["last_trigger"], "manual");
+        assert_eq!(maintenance["last_report"]["failures"], 0);
+        let audit = response_json(get("/v1/system/audit".to_owned(), &admin).await).await;
+        let actions = audit.as_array().unwrap().iter().map(|event| event["action"].as_str().unwrap().to_owned()).collect::<Vec<_>>();
+        for expected in ["system_admin_granted", "system_settings_changed", "system_setting_reset", "user_sessions_ended", "system_admin_revoked", "maintenance_run"] {
+            assert!(actions.iter().any(|action| action == expected), "{expected} missing from {actions:?}");
+        }
         let _ = std::fs::remove_dir_all(data_dir);
     }
 

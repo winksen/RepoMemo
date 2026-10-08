@@ -62,6 +62,10 @@ pub struct RateLimiter {
 }
 
 impl RateLimiter {
+    fn len(&self) -> usize {
+        self.windows.lock().map(|windows| windows.len()).unwrap_or(0)
+    }
+
     /// Counts one request for `key`. Returns how long to wait when the quota
     /// for the current window is used up.
     pub fn check(&self, key: &str, quota: Quota) -> Result<(), Duration> {
@@ -159,6 +163,30 @@ impl LoginThrottle {
         }
     }
 
+    /// Clears every failure count and lockout of an account (keys
+    /// `login:<email>` and `login:<email>|<address>`). Returns how many keys
+    /// were cleared.
+    pub fn clear_account(&self, email: &str) -> usize {
+        let account = format!("login:{email}");
+        let pair_prefix = format!("{account}|");
+        self.failures
+            .lock()
+            .map(|mut failures| {
+                let before = failures.len();
+                failures.retain(|key, _| key != &account && !key.starts_with(&pair_prefix));
+                before - failures.len()
+            })
+            .unwrap_or(0)
+    }
+
+    fn locked_count(&self) -> usize {
+        let now = Instant::now();
+        self.failures
+            .lock()
+            .map(|failures| failures.values().filter(|entry| entry.locked_until.is_some_and(|until| until > now)).count())
+            .unwrap_or(0)
+    }
+
     pub fn prune(&self, max_age: Duration) -> usize {
         let now = Instant::now();
         self.failures
@@ -187,6 +215,11 @@ pub struct Guards {
 }
 
 impl Guards {
+    /// Rate-limit keys tracked, and sign-in keys locked out right now.
+    pub fn stats(&self) -> (usize, usize) {
+        (self.auth.len() + self.ai.len(), self.logins.locked_count())
+    }
+
     pub fn prune(&self) -> usize {
         // Windows are at most an hour long; lockouts are kept while active.
         let max_age = Duration::from_secs(2 * 3600);
@@ -208,11 +241,11 @@ impl FromRequestParts<AppState> for ClientIp {
             .extensions
             .get::<ConnectInfo<SocketAddr>>()
             .map(|info| info.0.ip());
-        Ok(Self(client_ip(&parts.headers, peer, state.settings.trust_proxy)))
+        Ok(Self(client_ip(&parts.headers, peer, state.settings().trust_proxy)))
     }
 }
 
-fn client_ip(headers: &axum::http::HeaderMap, peer: Option<IpAddr>, trust_proxy: bool) -> String {
+pub(crate) fn client_ip(headers: &axum::http::HeaderMap, peer: Option<IpAddr>, trust_proxy: bool) -> String {
     if trust_proxy {
         let forwarded = headers
             .get("x-forwarded-for")
@@ -310,6 +343,12 @@ mod tests {
         assert!(throttle.locked_for("other").is_none());
         throttle.clear("user");
         assert!(throttle.locked_for("user").is_none());
+        throttle.record_failure("login:a@example.com|10.0.0.1", 1, lockout);
+        throttle.record_failure("login:a@example.com", 1, lockout);
+        throttle.record_failure("login:ab@example.com", 1, lockout);
+        assert_eq!(throttle.locked_count(), 3);
+        assert_eq!(throttle.clear_account("a@example.com"), 2, "only that account");
+        assert_eq!(throttle.locked_count(), 1);
         assert!(!throttle.record_failure("user", 0, lockout), "zero disables the lockout");
     }
 

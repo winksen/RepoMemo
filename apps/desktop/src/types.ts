@@ -119,6 +119,8 @@ export interface SharedSession {
   user: SharedUser;
   authentication: "jwt";
   memberships: WorkspaceMembership[];
+  /** Administers the whole server: every organization and workspace, and the System pages. */
+  is_system_admin?: boolean;
 }
 
 export interface UserProfile {
@@ -882,4 +884,195 @@ export interface RepoAccessCheck {
   tracked_files: number;
   indexable_files: number;
   already_connected: boolean;
+}
+
+// System administration
+
+export interface CountByLabel {
+  label: string;
+  count: number;
+}
+
+export interface SystemStatistics {
+  user_count: number;
+  system_admin_count: number;
+  users_active_last_7_days: number;
+  users_active_last_30_days: number;
+  active_session_count: number;
+  organization_count: number;
+  workspace_count: number;
+  artifact_count: number;
+  artifact_bytes: number;
+  indexed_artifact_count: number;
+  blob_count: number;
+  blob_bytes: number;
+  chunk_count: number;
+  embedding_count: number;
+  memory_card_count: number;
+  task_count: number;
+  comment_count: number;
+  repository_count: number;
+  enabled_provider_count: number;
+  cloud_provider_count: number;
+  jobs_by_status: CountByLabel[];
+}
+
+export interface MaintenanceReport {
+  refresh_tokens_purged: number;
+  jobs_pruned: number;
+  blobs_removed: number;
+  blob_bytes_reclaimed: number;
+  previews_removed: number;
+  untracked_files_removed: number;
+  counters_pruned: number;
+  channels_pruned: number;
+  system_events_pruned: number;
+  failures: number;
+}
+
+export interface MaintenanceStatus {
+  running: boolean;
+  last_started_at: string | null;
+  last_finished_at: string | null;
+  last_trigger: "scheduled" | "manual" | null;
+  last_report: MaintenanceReport | null;
+  next_run_at: string | null;
+}
+
+export interface SystemClient {
+  origin: string | null;
+  client: string | null;
+  agent: string;
+  last_address: string;
+  first_seen_at: string;
+  last_seen_at: string;
+  requests: number;
+}
+
+export interface SystemOverview {
+  instance: {
+    service_name: string;
+    version: string;
+    host_name: string;
+    operating_system: string;
+    architecture: string;
+    process_id: number;
+    bind_address: string;
+    data_dir: string;
+    started_at: string;
+    uptime_seconds: number;
+    system_admin_count: number;
+  };
+  statistics: SystemStatistics;
+  storage: {
+    database_bytes: number;
+    write_ahead_log_bytes: number;
+    blob_bytes: number;
+    preview_bytes: number;
+    preview_count: number;
+  };
+  background: {
+    indexing_queued: number;
+    embedding_workspaces_waiting: number;
+    repository_syncs_running: number;
+    preview_conversions_running: number;
+    event_channels: number;
+    event_subscribers: number;
+    open_event_streams: number;
+    maintenance: MaintenanceStatus;
+  };
+  protection: { tracked_rate_limit_keys: number; locked_sign_in_keys: number };
+  traffic: {
+    requests: number;
+    client_errors: number;
+    server_errors: number;
+    unauthorized: number;
+    forbidden: number;
+    rate_limited: number;
+    requests_last_hour: number;
+    requests_per_minute_last_hour: number[];
+  };
+  clients: SystemClient[];
+  logs: { capturing: boolean; buffered: number };
+}
+
+export interface WorkspaceUsage {
+  workspace_id: string;
+  workspace_name: string;
+  organization_id: string | null;
+  organization_name: string | null;
+  member_count: number;
+  artifact_count: number;
+  artifact_bytes: number;
+  chunk_count: number;
+  activity_last_30_days: number;
+  ai_requests_last_30_days: number;
+  last_activity_at: string | null;
+}
+
+export interface SystemUsage {
+  days: number;
+  activity_by_day: CountByLabel[];
+  activity_by_action: CountByLabel[];
+  top_users: CountByLabel[];
+  workspaces: WorkspaceUsage[];
+}
+
+export interface SystemUser {
+  id: string;
+  email: string;
+  display_name: string;
+  created_at: string;
+  last_connected_at: string | null;
+  is_system_admin: boolean;
+  organization_count: number;
+  workspace_count: number;
+  active_sessions: number;
+}
+
+export interface SystemSetting {
+  key: string;
+  group: string;
+  label: string;
+  description: string;
+  kind: "boolean" | "integer";
+  min: number;
+  max: number;
+  unit: string;
+  value: boolean | number;
+  default_value: boolean | number;
+  overridden: boolean;
+  updated_at: string | null;
+  updated_by: string | null;
+}
+
+export interface SystemSettings {
+  settings: SystemSetting[];
+  environment: { label: string; value: string }[];
+}
+
+export interface SystemLogRecord {
+  sequence: number;
+  timestamp: string;
+  level: "error" | "warn" | "info" | "debug" | "trace";
+  target: string;
+  message: string;
+  fields: string;
+}
+
+export interface SystemLogs {
+  capturing: boolean;
+  records: SystemLogRecord[];
+}
+
+export interface SystemAuditEvent {
+  id: string;
+  created_at: string;
+  actor: SharedUser | null;
+  action: string;
+  detail: string;
+}
+
+export interface SystemJob extends IndexingJobStatus {
+  workspace_name: string | null;
 }

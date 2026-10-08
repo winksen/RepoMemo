@@ -158,6 +158,10 @@ pub struct SharedSession {
     pub user: SharedUser,
     pub authentication: String,
     pub memberships: Vec<WorkspaceMembership>,
+    /// The user administers the whole server: every organization and
+    /// workspace, and the system settings.
+    #[serde(default)]
+    pub is_system_admin: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1204,4 +1208,79 @@ pub struct AgentReply {
     pub matches: Vec<SearchResult>,
     pub citations: Vec<Citation>,
     pub warnings: Vec<String>,
+}
+
+/// An account as system administrators see it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SystemUser {
+    pub id: String,
+    pub email: String,
+    pub display_name: String,
+    pub created_at: String,
+    pub last_connected_at: Option<String>,
+    pub is_system_admin: bool,
+    pub organization_count: i64,
+    pub workspace_count: i64,
+    /// Refresh tokens that are neither revoked nor expired.
+    pub active_sessions: i64,
+}
+
+/// Totals across the whole server.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct SystemStatistics {
+    pub user_count: i64,
+    pub system_admin_count: i64,
+    pub users_active_last_7_days: i64,
+    pub users_active_last_30_days: i64,
+    pub active_session_count: i64,
+    pub organization_count: i64,
+    pub workspace_count: i64,
+    pub artifact_count: i64,
+    pub artifact_bytes: i64,
+    pub indexed_artifact_count: i64,
+    pub blob_count: i64,
+    pub blob_bytes: i64,
+    pub chunk_count: i64,
+    pub embedding_count: i64,
+    pub memory_card_count: i64,
+    pub task_count: i64,
+    pub comment_count: i64,
+    pub repository_count: i64,
+    pub enabled_provider_count: i64,
+    pub cloud_provider_count: i64,
+    /// Jobs per status (`running`, `completed`, `failed`, `cancelled`).
+    pub jobs_by_status: Vec<CountByLabel>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CountByLabel {
+    pub label: String,
+    pub count: i64,
+}
+
+/// One workspace's footprint, for the system usage page.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkspaceUsage {
+    pub workspace_id: String,
+    pub workspace_name: String,
+    pub organization_id: Option<String>,
+    pub organization_name: Option<String>,
+    pub member_count: i64,
+    pub artifact_count: i64,
+    pub artifact_bytes: i64,
+    pub chunk_count: i64,
+    pub activity_last_30_days: i64,
+    pub ai_requests_last_30_days: i64,
+    pub last_activity_at: Option<String>,
+}
+
+/// A durable record of something a system administrator (or the system
+/// itself) did at the system level.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SystemAuditEvent {
+    pub id: String,
+    pub created_at: String,
+    pub actor: Option<SharedUser>,
+    pub action: String,
+    pub detail: String,
 }

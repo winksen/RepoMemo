@@ -81,6 +81,11 @@ impl Converter {
         }
     }
 
+    /// Conversions started and not finished yet.
+    pub fn running_count(&self) -> usize {
+        self.inner.in_flight.lock().map(|running| running.len()).unwrap_or(0)
+    }
+
     pub fn enabled(&self) -> bool {
         self.inner.soffice.is_some()
     }

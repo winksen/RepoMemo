@@ -47,6 +47,11 @@ impl EmbeddingQueue {
         }
     }
 
+    /// Workspaces waiting for an embedding pass.
+    pub fn waiting_count(&self) -> usize {
+        self.waiting.lock().map(|waiting| waiting.len()).unwrap_or(0)
+    }
+
     /// Queues every workspace, so chunks indexed while the server was down or
     /// the provider unreachable are embedded after a restart.
     pub async fn resume_pending(&self) {

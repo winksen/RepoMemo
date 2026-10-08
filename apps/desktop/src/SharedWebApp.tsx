@@ -199,6 +199,7 @@ import { DocumentViewer } from "./components/DocumentViewer";
 import { ImagePreview } from "./components/ImagePreview";
 import { DOCUMENT_ACCEPT, DOCUMENT_KIND_LABEL, documentKindOf, isDocumentArtifact } from "./lib/documents";
 import { AiPolicySettings } from "./components/AiPolicySettings";
+import { SYSTEM_SECTIONS, SystemAdminPanel, SystemNavigation, type SystemSection } from "./components/SystemAdminPanel";
 import { AiProviderForm } from "./components/AiProviderForm";
 import { AssistantPanel } from "./components/AssistantPanel";
 import { KnowledgeMapPanel } from "./components/KnowledgeMapPanel";
@@ -363,7 +364,7 @@ function SharedWebAppContent() {
 
   useEffect(() => {
     function showSignIn() {
-      if (currentPathname() === "/" || currentPathname() === "/dashboard" || currentPathname().startsWith("/workspaces")) {
+      if (currentPathname() === "/" || currentPathname() === "/dashboard" || currentPathname().startsWith("/workspaces") || currentPathname().startsWith("/system")) {
         navigate("/login", true);
       }
       setPageState("unauthenticated");
@@ -462,6 +463,16 @@ function SharedWebAppContent() {
 
   if (pathname === "/profile") {
     return <SharedProfile accessToken={accessToken} apiAvailable={apiAvailable} organizations={organizations} onSessionUserUpdated={(user) => setSession((current) => current ? { ...current, user } : current)} session={session} signOut={signOut} workspaces={workspaces} />;
+  }
+
+  if (routeParts[0] === "system") {
+    const systemSection = (routeParts[1] ?? "overview") as SystemSection;
+    if (!session.is_system_admin || !SYSTEM_SECTIONS.includes(systemSection) || routeParts.length > 2) {
+      return <SharedRouteNotFound apiAvailable={apiAvailable} onBack={() => navigate("/dashboard")} organizations={organizations} session={session} signOut={signOut} workspaces={workspaces} />;
+    }
+    return <SharedLayout apiAvailable={apiAvailable} onNavigate={navigate} session={session} signOut={signOut} sidebar={<OrganizationRail organizations={organizations} workspaces={workspaces} />} workspaceNavigation={<SystemNavigation active={systemSection} onNavigate={(section) => navigate(`/system/${section}`)} />}>
+      <SystemAdminPanel accessToken={accessToken} key={systemSection} onOpenWorkspace={(id) => navigate(`/workspaces/${encodeURIComponent(id)}/overview`)} section={systemSection} session={session} />
+    </SharedLayout>;
   }
 
   if (pathname === "/notifications") {

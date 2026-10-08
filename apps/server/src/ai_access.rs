@@ -119,13 +119,13 @@ pub(crate) fn consume_ai_quota(state: &AppState, subject: &AuthenticatedSubject)
     state
         .guards
         .ai
-        .check(&subject.user_id, state.settings.ai_quota)
+        .check(&subject.user_id, state.settings().ai_quota)
         .map_err(|wait| {
             tracing::warn!(target: "audit", user_id = %subject.user_id, "AI quota used up");
             too_many_requests(
                 format!(
                     "You have reached the limit of {} AI requests per hour on this server. Try again in {}.",
-                    state.settings.ai_quota.limit,
+                    state.settings().ai_quota.limit,
                     wait_text(wait)
                 ),
                 wait,
@@ -141,7 +141,7 @@ pub(crate) async fn get_ai_policy(
     require_workspace_read(&state, &subject, &workspace_id).await?;
     Ok(Json(AiPolicyResponse {
         min_role: workspace_ai_min_role(&state, &workspace_id).await?,
-        requests_per_hour: state.settings.ai_quota.limit,
+        requests_per_hour: state.settings().ai_quota.limit,
     }))
 }
 
@@ -169,7 +169,7 @@ pub(crate) async fn update_ai_policy(
     .await;
     Ok(Json(AiPolicyResponse {
         min_role: request.min_role,
-        requests_per_hour: state.settings.ai_quota.limit,
+        requests_per_hour: state.settings().ai_quota.limit,
     }))
 }
 

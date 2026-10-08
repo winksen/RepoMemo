@@ -1038,3 +1038,53 @@ h3.rm-repo-caption { margin: 0 0 10px; }
 .rm-stack-groups dt { color: var(--color-text-muted); font-size: 12px; }
 .rm-stack-groups dd { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
 .rm-stack-chip { padding: 3px 9px; color: var(--color-text); background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: 999px; font-size: 12px; font-weight: 600; }
+
+/* System administration */
+.rm-system-page { display: grid; gap: 20px; min-width: 0; }
+.rm-system-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+.rm-system-toolbar .rm-input { max-width: 320px; }
+.rm-system-actions { display: flex; gap: 8px; }
+.rm-system-inline { display: inline-flex; align-items: center; gap: 8px; color: var(--color-text-muted); font-size: 13px; }
+.rm-system-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 20px; min-width: 0; }
+.rm-system-facts { display: grid; gap: 0; margin: 0; }
+.rm-system-facts > div { display: grid; grid-template-columns: minmax(140px, 40%) 1fr; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--color-border); font-size: 13px; }
+.rm-system-facts > div:last-child { border-bottom: 0; }
+.rm-system-facts dt { color: var(--color-text-muted); }
+.rm-system-facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.rm-system-facts code, .rm-map-coverage code { font-family: var(--font-mono); font-size: 12px; }
+.rm-system-chart { display: grid; gap: 8px; }
+.rm-system-chart-title { margin: 0; color: var(--color-text-muted); font-size: 12px; }
+.rm-system-bars { display: flex; align-items: flex-end; gap: 2px; height: 72px; padding-bottom: 1px; border-bottom: 1px solid var(--color-border); }
+.rm-system-bar { display: flex; flex: 1 1 0; align-items: flex-end; height: 100%; min-width: 2px; }
+.rm-system-bar i { display: block; width: 100%; border-radius: 4px 4px 0 0; background: var(--color-accent); }
+.rm-system-bar:hover i { background: var(--color-accent-hover); }
+.rm-system-axis { display: flex; justify-content: space-between; color: var(--color-text-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.rm-system-tag { display: inline-block; margin-left: 6px; padding: 1px 6px; border: 1px solid var(--color-border-strong); border-radius: 6px; color: var(--color-text-muted); font-size: 11px; font-weight: 500; }
+td > .rm-system-tag { margin-left: 0; }
+.rm-system-person { display: grid; gap: 2px; }
+.rm-system-person small { color: var(--color-text-muted); font-weight: 400; }
+.rm-system-link { padding: 0; border: 0; background: none; color: var(--color-text); font: inherit; font-weight: 600; text-align: left; text-decoration: underline; text-decoration-color: var(--color-border-strong); text-underline-offset: 3px; cursor: pointer; }
+.rm-system-link:hover { text-decoration-color: currentColor; }
+.rm-system-link:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.rm-system-settings { display: grid; }
+.rm-system-setting { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--color-border); }
+.rm-system-setting:last-child { border-bottom: 0; }
+.rm-system-setting p { margin: 4px 0; color: var(--color-text-muted); font-size: 13px; max-width: 72ch; }
+.rm-system-setting small { color: var(--color-text-muted); font-size: 12px; }
+.rm-system-setting-control { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.rm-system-number { display: inline-flex; align-items: center; gap: 6px; }
+.rm-system-number .rm-input { width: 110px; }
+.rm-system-log { display: grid; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--color-border); font-size: 12px; }
+.rm-system-log li { display: grid; grid-template-columns: 84px 56px minmax(120px, 200px) minmax(0, 1fr); gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--color-border); }
+.rm-system-log time, .rm-system-log-target { color: var(--color-text-muted); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.rm-system-log-level { font-weight: 600; text-transform: uppercase; color: var(--color-text-muted); }
+.rm-system-log li.level-warn .rm-system-log-level { color: var(--color-warning); }
+.rm-system-log li.level-error .rm-system-log-level { color: var(--color-danger); }
+.rm-system-log-message { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.rm-system-log-message small { color: var(--color-text-muted); font-family: var(--font-mono); }
+@media (max-width: 760px) {
+  .rm-system-setting { grid-template-columns: 1fr; }
+  .rm-system-setting-control { justify-content: flex-start; }
+  .rm-system-log li { grid-template-columns: 70px 1fr; }
+  .rm-system-log-target, .rm-system-log-message { grid-column: 1 / -1; }
+}

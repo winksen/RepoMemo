@@ -58,6 +58,11 @@ impl RepoSyncRunner {
         }
     }
 
+    /// Syncs queued or running.
+    pub(crate) fn running_count(&self) -> usize {
+        self.running.lock().map(|running| running.len()).unwrap_or(0)
+    }
+
     fn is_running(&self, source_id: &str) -> bool {
         self.running
             .lock()
@@ -65,14 +70,22 @@ impl RepoSyncRunner {
             .unwrap_or(true)
     }
 
-    /// Checks every repository's branch each `interval` and syncs the ones
+    /// Checks every repository's branch each interval and syncs the ones
     /// that moved, so the workspace follows new commits without anyone
-    /// pressing Sync now.
-    pub(crate) fn start_polling(&self, interval: Duration) {
+    /// pressing Sync now. `interval` is read before every round, so a system
+    /// administrator can change it (or turn polling off, `None`) at run time.
+    pub(crate) fn start_polling(&self, interval: impl Fn() -> Option<Duration> + Send + 'static) {
         let runner = self.clone();
         tokio::spawn(async move {
             loop {
-                tokio::time::sleep(interval).await;
+                let Some(wait) = interval() else {
+                    tokio::time::sleep(Duration::from_secs(60)).await;
+                    continue;
+                };
+                tokio::time::sleep(wait).await;
+                if interval().is_none() {
+                    continue;
+                }
                 let started = runner.poll_once().await;
                 if started > 0 {
                     tracing::info!(count = started, "Started automatic repository syncs for branches that moved");

@@ -90,7 +90,10 @@ then set its email in the `memberEmail` collection variable.
 ### Optional server settings
 
 Every setting below has a safe default; set only what you need. Invalid values
-stop the server at startup with a message naming the variable.
+stop the server at startup with a message naming the variable. System
+administrators can change the registration, token, protection, AI-quota and
+background settings at run time in **System › Settings**; those changes are
+stored in the database and override the values below until reset.
 
 | Variable | Default | What it does |
 |---|---|---|
@@ -112,6 +115,8 @@ stop the server at startup with a message naming the variable.
 | `REPOMEMO_BLOB_GC` | `true` | Delete stored files no evidence references any more. |
 | `REPOMEMO_JOB_RETENTION_DAYS` | `90` | Finished jobs kept this long; `0` keeps them forever. |
 | `REPOMEMO_INDEX_RETRY_HOURS` | `6` | How often indexing that failed for good is retried. |
+| `REPOMEMO_SYSTEM_ADMIN_EMAILS` | unset | Comma-separated account emails made **system administrators** at startup (and when they register). The first account created on a new server becomes one automatically; use this to name one on an existing server. |
+| `REPOMEMO_SYSTEM_AUDIT_RETENTION_DAYS` | `365` | System administration events kept this long; `0` keeps them forever. |
 
 `GET /health/ready` answers 200 when the database responds and 503 otherwise,
 for load balancers and service managers. Security-relevant events (sign-ins,

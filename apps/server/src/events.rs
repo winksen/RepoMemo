@@ -80,6 +80,19 @@ impl WorkspaceEventBus {
         before - channels.len()
     }
 
+    /// Channels open, and subscribers across them.
+    pub fn stats(&self) -> (usize, usize) {
+        self.channels
+            .lock()
+            .map(|channels| {
+                (
+                    channels.len(),
+                    channels.values().map(|sender| sender.receiver_count()).sum(),
+                )
+            })
+            .unwrap_or((0, 0))
+    }
+
     #[cfg(test)]
     fn channel_count(&self) -> usize {
         self.channels.lock().map(|channels| channels.len()).unwrap_or(0)

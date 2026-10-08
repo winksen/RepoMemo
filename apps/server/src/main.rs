@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 
-use repomemo_server::{router, ServerConfig};
+use repomemo_server::{log_capture_layer, router, ServerConfig};
 use tokio::net::TcpListener;
 use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -13,6 +13,8 @@ async fn main() {
                 .unwrap_or_else(|_| "repomemo_server=info,tower_http=info,audit=info".into()),
         )
         .with(tracing_subscriber::fmt::layer())
+        // Keeps recent events in memory for System › Logs.
+        .with(log_capture_layer())
         .init();
 
     let config = ServerConfig::from_env().expect("Invalid RepoMemo server configuration");

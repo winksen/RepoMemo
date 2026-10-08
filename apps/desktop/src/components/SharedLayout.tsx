@@ -4,6 +4,7 @@ import {
   IconBell as Bell,
   IconLogout as Logout,
   IconMoon as Moon,
+  IconServer as Server,
   IconShieldLock as Shield,
   IconSun as Sun,
   IconUserCircle as UserCircle,
@@ -75,6 +76,7 @@ export function SharedLayout({
           <div className="shared-account-controls">
             <ThemeToggle />
             <Button aria-label="Open notifications" className="shared-notifications-link" onClick={() => onNavigate("/notifications")} title="Notifications" type="button" variant="secondary"><Bell size={16} /></Button>
+            {session.is_system_admin ? <Button className="shared-profile-link" onClick={() => onNavigate("/system/overview")} title="Administer this server" type="button" variant="secondary"><Server size={16} /> System</Button> : null}
             <Button className="shared-profile-link" onClick={() => onNavigate("/profile")} type="button" variant="secondary"><UserCircle size={16} /> Profile</Button>
           </div>
           <Button className="shared-user-signout" onClick={signOut} type="button" variant="secondary"><Logout size={16} /> Sign out</Button>

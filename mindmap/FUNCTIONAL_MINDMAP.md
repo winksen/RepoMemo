@@ -122,10 +122,11 @@ Each branch below maps to one section of this document. Deeper branch documents 
 
 ## 1. Who uses it: roles and permissions
 
-RepoMemo has two levels of membership.
+RepoMemo has two levels of membership, plus a server-wide role.
 
 **Organization**: the team or company boundary. Roles: `owner`, `admin`, `member`.
 **Workspace**: one body of knowledge inside an organization, such as a project or service. Roles: `owner`, `admin`, `member`, `viewer`.
+**System administrator**: a person who runs the whole server. They see **every organization and workspace**, act as an **administrator** in each (where they own something they stay owner), and use the **System** area (§1b). Owner-only actions, such as deleting a workspace, stay with owners. The first account created on a new server becomes a system administrator; others are named by an existing system administrator or by the server operator. The server always keeps at least one.
 
 Joining an organization **automatically grants access to every workspace in it**: an org owner becomes a workspace owner, an org admin becomes an admin, and an org member becomes a member. A workspace can also add a registered user directly. That user then joins the organization as a `member`.
 
@@ -160,6 +161,22 @@ Joining an organization **automatically grants access to every workspace in it**
 | Rename the organization | ✅ | — | — |
 
 Any signed-in user can create a new organization and becomes its owner.
+
+---
+
+## 1b. System area (system administrators)
+
+A **System** button in the header opens `/system`, with these pages:
+
+| Page | What it shows or does |
+|---|---|
+| **Overview** | The back end (version, host, process, address, data folder, uptime), storage (database, log, stored files, previews), background work (indexing and embedding queues, repository syncs, conversions, live event streams), traffic since start with requests per minute for the last hour, refused and rate-limited requests, locked sign-ins, and the **front-end clients** seen in the last 24 hours (browser and system, origin, address, requests). Refreshes every 30 seconds |
+| **Usage** | Activity per day and by kind, the most active people, and every workspace with its members, files, size, passages, activity, AI requests and last activity, over 7 to 365 days |
+| **Users** | Every account with its role, memberships, signed-in sessions and last connection. Make or remove system administrators, sign someone out everywhere, lift a sign-in lockout |
+| **Settings** | Registration, token lifetimes, sign-in protection, AI requests per person, repository check interval and maintenance, changed at run time and kept until reset to the server default. Settings only the server's environment controls are listed read-only |
+| **Logs** | Recent server log events, filtered by level and text, following live; security events (sign-ins, lockouts, role changes) can be shown alone |
+| **Jobs & maintenance** | Jobs across every workspace (stop a running one) and maintenance: last run, next run, what it cleaned, and **Run maintenance now** |
+| **Audit trail** | What system administrators did: role changes, settings, ended sessions, maintenance runs |
 
 ---
 

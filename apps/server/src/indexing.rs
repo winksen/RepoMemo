@@ -107,6 +107,11 @@ impl IndexQueue {
         }
     }
 
+    /// Artifacts waiting for indexing or for a retry.
+    pub fn queued_count(&self) -> usize {
+        self.queued.lock().map(|queued| queued.len()).unwrap_or(0)
+    }
+
     /// Queues every artifact that was stored but never indexed (for example
     /// because the server stopped before the queue drained) and every artifact
     /// indexed by an older indexer version, so improvements to chunking reach

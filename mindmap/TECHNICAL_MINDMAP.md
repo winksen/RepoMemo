@@ -205,6 +205,8 @@ sequenceDiagram
 
 The server resolves the caller's role **per request** from `workspace_memberships` or `organization_memberships`. Guards return the role, so handlers can apply finer rules.
 
+**System administrators** (`users.is_system_admin`, migration 0019) are loaded with the session version by the extractor, so a granted or removed role applies on the next request. `require_workspace_read` and `require_organization_read` (through `effective_workspace_role`) give them **admin** in every workspace and organization, owner where they own it, without a membership row; every finer guard and escalation rule builds on that, so owner-only actions stay with owners. `GET /v1/workspaces` and `/v1/organizations` list everything for them, `GET /v1/session` reports `is_system_admin`, and storage lets them create workspaces in any organization. The first account of a server becomes one (when none exists), as do accounts listed in `REPOMEMO_SYSTEM_ADMIN_EMAILS` (at startup and on registration); the last one cannot be removed. Without any, the server logs a warning at startup.
+
 | Guard | Passes for |
 |---|---|
 | `require_workspace_read` | any workspace role |
@@ -251,6 +253,26 @@ Guard legend: **pub** = no auth, **auth** = any valid JWT, **R/W/A/O** = workspa
 | POST | `/v1/auth/refresh` | pub | `{refresh_token}` → a new `TokenResponse` with a rotated refresh token; 401 for an unknown, expired or reused token |
 | POST | `/v1/auth/logout` | pub | `{refresh_token}` → 204, revokes that refresh token |
 | POST | `/v1/auth/logout-all` | auth | 204. Ends every session of the caller, on every device |
+
+### System administration ([system.rs](../apps/server/src/system.rs))
+
+Every route requires a system administrator (**S**); changes are recorded in `system_audit_events` and logged under `audit`.
+
+| Method | Path | Guard | Notes |
+|---|---|---|---|
+| GET | `/v1/system/overview` | S | instance, storage, statistics, background queues, maintenance status, traffic since start (with requests per minute for the last hour), protection counters, front-end clients seen in 24 h, log capture state |
+| GET | `/v1/system/usage?days=` | S | activity per day (zero-filled) and by action, top people, per-workspace footprint and activity; 1–365 days |
+| GET | `/v1/system/users` | S | every account with memberships, active sessions and last connection |
+| PUT | `/v1/system/users/{u}/system-admin` | S | `{enabled}`; 409 for the last system administrator |
+| POST | `/v1/system/users/{u}/sessions/end` | S | ends every session of the user |
+| POST | `/v1/system/users/{u}/unlock` | S | clears the user's sign-in lockouts → `{cleared}` |
+| GET, PUT | `/v1/system/settings` | S | run-time settings with value, default and who changed them, plus read-only environment facts. PUT `{values:{key:value}}` validates every value before saving any |
+| DELETE | `/v1/system/settings/{key}` | S | back to the environment default |
+| GET | `/v1/system/logs?level&audit&q&after&limit` | S | recent captured log events, newest first |
+| GET | `/v1/system/audit?limit` | S | system audit trail |
+| GET | `/v1/system/jobs?status&limit` | S | jobs across workspaces, with workspace names |
+| GET | `/v1/system/maintenance` | S | maintenance status |
+| POST | `/v1/system/maintenance/run` | S | runs a full pass now; 409 while one runs |
 | GET | `/v1/session` | auth | the user and their workspace memberships |
 | GET, PUT | `/v1/profile` | auth | GET includes a 365-day `activity_by_day` |
 | POST | `/v1/profile/password` | auth | 200 `TokenResponse` for this device; every other session ends. Requires `current_password` |
@@ -525,6 +547,7 @@ The database is SQLite in WAL mode with foreign keys on, `synchronous = NORMAL` 
 | 0016 | refresh_tokens | hashed, rotating refresh tokens (§4) |
 | 0017 | repo_files | one row per tracked path of a repository source: its artifact, git blob id, commit and `removed_at` (§6.10) |
 | 0018 | session_security | `users.session_version` (§4), and indexes for token purging, blob garbage collection and job pruning |
+| 0019 | system_administration | `users.is_system_admin`, `system_settings` (run-time overrides), `system_audit_events` (§8c) |
 
 ```mermaid
 erDiagram
@@ -581,7 +604,14 @@ Notes:
 | Index queue | [indexing.rs](../apps/server/src/indexing.rs) | §6.2 |
 | Embedding queue | [embedding.rs](../apps/server/src/embedding.rs) | §6.4 |
 | Repository syncs and polling | [repositories.rs](../apps/server/src/repositories.rs) | §6.10 |
-| Maintenance | [maintenance.rs](../apps/server/src/maintenance.rs) | Every hour (`REPOMEMO_MAINTENANCE_INTERVAL_MINUTES`), first one minute after start: purges expired refresh tokens, prunes finished jobs older than 90 days, collects orphan blobs and previews (§6.1), forgets idle rate-limit counters and event channels, re-queues missing embeddings, retries indexing that failed for good every 6 hours, and runs `PRAGMA optimize` plus a WAL checkpoint so the log does not grow without bound. A failing step is logged and the others still run |
+| Maintenance | [maintenance.rs](../apps/server/src/maintenance.rs) | Every hour (`REPOMEMO_MAINTENANCE_INTERVAL_MINUTES`), first one minute after start: purges expired refresh tokens, prunes finished jobs older than 90 days and system audit events older than 365, collects orphan blobs and previews (§6.1), forgets idle rate-limit counters, event channels and client sightings, re-queues missing embeddings, retries indexing that failed for good every 6 hours, and runs `PRAGMA optimize` plus a WAL checkpoint so the log does not grow without bound. A failing step is logged and the others still run. Its settings are read before every pass, its status (running, last and next run, last report) is kept for the System page, and a system administrator can run it by hand |
+
+## 8c. System administration internals
+
+- **Run-time settings.** `RuntimeSettings` is built from the environment, then overridden by `system_settings` rows and held in a `SettingsCell` that is swapped whole on change; handlers read a snapshot (`state.settings()`). The maintenance loop and the repository poller re-read their interval each round, so changes apply without a restart. Settings that widen what the server can reach (repository roots, AI hosts, origins, proxy trust, secret key, body limit) stay environment-only and are shown read-only.
+- **Logs.** `main.rs` adds `log_capture_layer()` ([logs.rs](../apps/server/src/logs.rs)) next to the console formatter: events that pass the log filter are kept in memory, 2,000 general and 1,000 `audit` events in separate rings so noise cannot evict security events. Nothing is written to disk by it.
+- **Telemetry.** A middleware counts requests by outcome, keeps per-minute counts for an hour, and notes each client (origin, `X-RepoMemo-Client`, user agent summarised as "Browser on OS", last address; at most 500, forgotten after 24 h). Health checks are counted but not listed. Open event streams are counted while they live.
+- **Audit.** `system_audit_events` records role grants and removals (including at startup and on first registration), settings changes and resets, ended sessions, lifted lockouts and manual maintenance, with the actor.
 
 ---
 

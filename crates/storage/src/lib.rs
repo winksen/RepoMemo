@@ -23,7 +23,9 @@ use uuid::Uuid;
 
 mod repo;
 mod secrets;
+mod system;
 pub use repo::{RepoFileRecord, RepoFileWrite};
+pub use system::{StoredSystemSetting, UserAccess};
 pub use secrets::{KEY_FILE_NAME as SECRET_KEY_FILE_NAME, MIN_MASTER_KEY_CHARS};
 use secrets::SecretBox;
 
@@ -1173,8 +1175,10 @@ impl StorageEngine {
         if updated.rows_affected() == 0 {
             bail!("Organization was not found.");
         }
+        // A system administrator may rename an organization they are not a
+        // member of; they act as its administrator.
         let row = sqlx::query_as::<_, OrganizationRow>(
-            "SELECT o.id, o.name, m.role, o.created_at, o.updated_at FROM organizations o INNER JOIN organization_memberships m ON m.organization_id = o.id WHERE o.id = ?1 AND m.user_id = ?2",
+            "SELECT o.id, o.name, COALESCE(m.role, 'admin') AS role, o.created_at, o.updated_at FROM organizations o LEFT JOIN organization_memberships m ON m.organization_id = o.id AND m.user_id = ?2 WHERE o.id = ?1",
         )
         .bind(organization_id)
         .bind(user_id)
@@ -1293,10 +1297,25 @@ impl StorageEngine {
         organization_id: &str,
         name: &str,
     ) -> Result<SharedWorkspace> {
-        let creator_role = self
+        let membership = self
             .organization_role_for_user(creator_id, organization_id)
+            .await?;
+        let is_system_admin = self
+            .user_access(creator_id)
             .await?
-            .ok_or_else(|| anyhow::anyhow!("User is not a member of this organization."))?;
+            .is_some_and(|access| access.is_system_admin);
+        // System administrators act as administrators of every organization.
+        let creator_role = match membership {
+            Some(OrganizationRole::Owner) => OrganizationRole::Owner,
+            Some(_) | None if is_system_admin => {
+                if !self.organization_exists(organization_id).await? {
+                    bail!("Organization was not found.");
+                }
+                OrganizationRole::Admin
+            }
+            Some(role) => role,
+            None => bail!("User is not a member of this organization."),
+        };
         if matches!(creator_role, OrganizationRole::Member) {
             bail!("Only organization owners and admins can create workspaces.");
         }

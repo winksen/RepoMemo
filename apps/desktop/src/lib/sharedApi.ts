@@ -1,6 +1,14 @@
 import type {
   AiMinRole,
   AiPolicy,
+  SystemAuditEvent,
+  SystemJob,
+  SystemLogs,
+  SystemOverview,
+  SystemSettings,
+  SystemUsage,
+  SystemUser,
+  MaintenanceStatus,
   AgentCapabilities,
   AgentConversation,
   AgentConversationDetail,
@@ -60,6 +68,9 @@ import type {
 } from "../types";
 
 const API_URL = (import.meta.env.VITE_REPOMEMO_API_URL ?? "http://127.0.0.1:3020").replace(/\/$/, "");
+
+/** Identifies this client to the server, which lists it under System › Overview. */
+const CLIENT_HEADER = ["X-RepoMemo-Client", "web"] as const;
 
 export const sharedApiUrl = API_URL;
 
@@ -161,6 +172,7 @@ async function authFetch(input: string, init: RequestInit): Promise<Response> {
 
   const token = latestToken(bearer);
   headers.set("Authorization", `Bearer ${token}`);
+  headers.set(...CLIENT_HEADER);
   const response = await fetch(input, { ...init, headers });
   if (response.status !== 401) return response;
 
@@ -200,6 +212,7 @@ async function request<T>(
 ): Promise<T> {
   const headers = new Headers(options.headers);
   headers.set("Accept", "application/json");
+  headers.set(...CLIENT_HEADER);
   if (options.body) {
     headers.set("Content-Type", "application/json");
   }
@@ -917,4 +930,74 @@ export function listSharedRepositoryFiles(accessToken: string, repositoryId: str
 
 export function cancelSharedJob(accessToken: string, jobId: string): Promise<IndexingJobStatus> {
   return request<IndexingJobStatus>(`/v1/jobs/${jobId}/cancel`, { method: "POST" }, accessToken);
+}
+
+// System administration (system administrators only)
+
+export function getSystemOverview(accessToken: string): Promise<SystemOverview> {
+  return request<SystemOverview>("/v1/system/overview", {}, accessToken);
+}
+
+export function getSystemUsage(accessToken: string, days: number): Promise<SystemUsage> {
+  return request<SystemUsage>(`/v1/system/usage?days=${days}`, {}, accessToken);
+}
+
+export function listSystemUsers(accessToken: string): Promise<SystemUser[]> {
+  return request<SystemUser[]>("/v1/system/users", {}, accessToken);
+}
+
+export function setSystemAdmin(accessToken: string, userId: string, enabled: boolean): Promise<void> {
+  return request<void>(`/v1/system/users/${encodeURIComponent(userId)}/system-admin`, {
+    method: "PUT",
+    body: JSON.stringify({ enabled }),
+  }, accessToken);
+}
+
+export function endSystemUserSessions(accessToken: string, userId: string): Promise<void> {
+  return request<void>(`/v1/system/users/${encodeURIComponent(userId)}/sessions/end`, { method: "POST" }, accessToken);
+}
+
+export function unlockSystemUser(accessToken: string, userId: string): Promise<{ cleared: number }> {
+  return request<{ cleared: number }>(`/v1/system/users/${encodeURIComponent(userId)}/unlock`, { method: "POST" }, accessToken);
+}
+
+export function getSystemSettings(accessToken: string): Promise<SystemSettings> {
+  return request<SystemSettings>("/v1/system/settings", {}, accessToken);
+}
+
+export function saveSystemSettings(accessToken: string, values: Record<string, boolean | number>): Promise<SystemSettings> {
+  return request<SystemSettings>("/v1/system/settings", {
+    method: "PUT",
+    body: JSON.stringify({ values }),
+  }, accessToken);
+}
+
+export function resetSystemSetting(accessToken: string, key: string): Promise<SystemSettings> {
+  return request<SystemSettings>(`/v1/system/settings/${encodeURIComponent(key)}`, { method: "DELETE" }, accessToken);
+}
+
+export function getSystemLogs(accessToken: string, filters: { level?: string; audit?: boolean; q?: string; limit?: number }): Promise<SystemLogs> {
+  const params = new URLSearchParams();
+  if (filters.level) params.set("level", filters.level);
+  if (filters.audit) params.set("audit", "true");
+  if (filters.q) params.set("q", filters.q);
+  params.set("limit", String(filters.limit ?? 300));
+  return request<SystemLogs>(`/v1/system/logs?${params.toString()}`, {}, accessToken);
+}
+
+export function listSystemAuditEvents(accessToken: string): Promise<SystemAuditEvent[]> {
+  return request<SystemAuditEvent[]>("/v1/system/audit?limit=200", {}, accessToken);
+}
+
+export function listSystemJobs(accessToken: string, status?: string): Promise<SystemJob[]> {
+  const query = status ? `?status=${encodeURIComponent(status)}&limit=100` : "?limit=100";
+  return request<SystemJob[]>(`/v1/system/jobs${query}`, {}, accessToken);
+}
+
+export function getSystemMaintenance(accessToken: string): Promise<MaintenanceStatus> {
+  return request<MaintenanceStatus>("/v1/system/maintenance", {}, accessToken);
+}
+
+export function runSystemMaintenance(accessToken: string): Promise<MaintenanceStatus> {
+  return request<MaintenanceStatus>("/v1/system/maintenance/run", { method: "POST" }, accessToken);
 }
