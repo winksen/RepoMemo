@@ -16,8 +16,8 @@ use repomemo_domain::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    map_core_error, map_storage_error, record_workspace_activity, require_workspace_read,
-    ApiError, AppState, AuthenticatedSubject,
+    ai_access, map_core_error, map_storage_error, record_workspace_activity,
+    require_workspace_read, ApiError, AppState, AuthenticatedSubject,
 };
 
 const MAX_TITLE_CHARS: usize = 120;
@@ -54,8 +54,13 @@ pub(crate) async fn list_agent_capabilities(
     State(state): State<AppState>,
     Path(workspace_id): Path<String>,
 ) -> Result<Json<AgentCapabilitiesResponse>, ApiError> {
-    require_workspace_read(&state, &subject, &workspace_id).await?;
+    let role = require_workspace_read(&state, &subject, &workspace_id).await?;
     let provider = text_provider(&state, &workspace_id).await?;
+    // AI actions show as unavailable to roles the workspace keeps AI from.
+    let provider = match provider {
+        Some(provider) if ai_access::role_may_use_ai(&state, &workspace_id, &role).await? => Some(provider),
+        _ => None,
+    };
     Ok(Json(AgentCapabilitiesResponse {
         capabilities: agent_capabilities(provider.is_some()),
         provider_name: provider.map(|provider| provider.name),
@@ -68,7 +73,7 @@ pub(crate) async fn send_agent_message(
     Path(workspace_id): Path<String>,
     Json(request): Json<AgentMessageRequest>,
 ) -> Result<Json<AgentTurnResponse>, ApiError> {
-    require_workspace_read(&state, &subject, &workspace_id).await?;
+    let role = require_workspace_read(&state, &subject, &workspace_id).await?;
     let existing = match request.conversation_id.as_deref() {
         Some(conversation_id) => {
             let conversation = owned_conversation(&state, &subject, conversation_id).await?;
@@ -85,6 +90,28 @@ pub(crate) async fn send_agent_message(
         artifact_id: request.artifact_id,
     };
     let provider = text_provider(&state, &workspace_id).await?;
+    let (provider_id, ai_unavailable_reason) = match provider {
+        Some(provider) => {
+            let min_role = ai_access::workspace_ai_min_role(&state, &workspace_id).await?;
+            if min_role.allows(&role) {
+                // Lookups and searches never call the provider; anything else
+                // may, if only to understand the message.
+                let may_call_ai = match message.capability {
+                    None => true,
+                    Some(capability) => agent_capabilities(true)
+                        .iter()
+                        .any(|info| info.id == capability && info.requires_ai),
+                };
+                if may_call_ai {
+                    ai_access::consume_ai_quota(&state, &subject)?;
+                }
+                (Some(provider.id), None)
+            } else {
+                (None, Some(ai_access::ai_not_allowed_message(min_role)))
+            }
+        }
+        None => (None, None),
+    };
     let reply = state
         .core
         .run_agent(AgentRequest {
@@ -92,7 +119,8 @@ pub(crate) async fn send_agent_message(
             message: message.message.clone(),
             capability: message.capability,
             artifact_id: message.artifact_id.clone(),
-            provider_id: provider.map(|provider| provider.id),
+            provider_id,
+            ai_unavailable_reason,
         })
         .await
         .map_err(map_core_error)?;

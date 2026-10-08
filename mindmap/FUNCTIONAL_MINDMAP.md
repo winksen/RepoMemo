@@ -143,11 +143,12 @@ Joining an organization **automatically grants access to every workspace in it**
 | Open People / Activity / Settings sections | ✅ | ✅ | — | — |
 | Add or remove members | ✅ | ✅² | — | — |
 | Configure the AI provider | ✅ | ✅ | — | — |
+| Choose who may use AI in the workspace | ✅ | ✅ | — | — |
 | Add, check, edit or remove repository links (Settings) | ✅ | ✅ | — | — |
 | Sync a connected repository | ✅ | ✅ | ✅ | — |
 | Rename or delete the workspace | ✅ | — | — | — |
 
-¹ The AI features need an enabled provider. A viewer can trigger them, so a viewer can also cause calls to a paid cloud provider.
+¹ The AI features need an enabled provider. By default everyone in the workspace can use them, viewers included; owners and admins can keep them to members and above, or to admins and owners (**Settings › Who can use AI**). Each person can also make a limited number of AI requests per hour (120 by default, set by the server operator), so nobody can run up a cloud bill by accident.
 ² Admins can grant only `member` or `viewer`, and cannot change or remove other admins or the owner. Nobody can assign `owner` through the UI.
 
 ### Organization permissions
@@ -166,10 +167,10 @@ Any signed-in user can create a new organization and becomes its owner.
 
 | Feature | What the user experiences |
 |---|---|
-| **Register** (`/register`) | Email, display name (1–120 characters), password (12+ characters). The user is signed in immediately. |
-| **Sign in** (`/login`) | Email and password. A wrong email and a wrong password produce the same message. |
-| **Session** | Lasts **60 minutes** and there is no silent renewal. The session is tied to the browser tab, so closing the tab signs the user out. |
-| **Profile** (`/profile`) | Rename yourself, change your password (the current password is required), see last connection time, workspace count, a **365-day contribution calendar**, and **tasks assigned to you**. |
+| **Register** (`/register`) | Email, display name (1–120 characters), password (12+ characters). The user is signed in immediately. The server operator can close registration; the first account can always be created. |
+| **Sign in** (`/login`) | Email and password. A wrong email and a wrong password produce the same message. After 10 failed attempts in a row the account is locked for 15 minutes from that address (both configurable), and too many attempts from one address are slowed down. |
+| **Session** | Renewed silently in the background for up to 30 days of inactivity, so nobody is signed out mid-work. |
+| **Profile** (`/profile`) | Rename yourself, change your password (the current password is required; **every other device is signed out**, this one stays signed in), **sign out everywhere** (every device, this one included), see last connection time, workspace count, a **365-day contribution calendar**, and **tasks assigned to you**. |
 | **Notifications** (`/notifications`) | "Task assigned to you" and "You were mentioned in evidence discussion". Mark one or all as read. Clicking a notification opens the related page. |
 | **Theme** | Light and dark toggle, remembered per browser. |
 | **Sign out** | Always visible in the header. |
@@ -256,6 +257,7 @@ A team's code usually already lives in a git repository, with many files and a h
 |---|---|
 | **Add a repository link** (owners and admins, in **Settings › Repositories**) | Enter the folder of a git checkout on the server and press **Check access**. RepoMemo tells you whether the server can read it, which branch and commit it would read, and about how many files it would index. **Link and sync** stores the link and starts the first sync. RepoMemo reads what the branch has **committed**: never uncommitted edits, ignored files or build output. |
 | **Sync now** (writers) | RepoMemo compares the branch's latest commit with what it stored. Only new and changed files are read and indexed; unchanged files cost nothing. |
+| **Automatic sync** | Every few minutes the server checks whether each linked branch has new commits and syncs the ones that moved, so nobody has to press Sync now. A sync that fails is not retried for the same commit for an hour. |
 | **Edit a link** (owners and admins, in Settings) | Choose a branch (default: whatever is checked out), and **include** or **exclude** paths with patterns such as `docs/**`, `src/`, `**/*.test.ts`. Applies from the next sync. |
 | **Browse files** | The repository's files, filterable by path. Each opens like any evidence: preview, lifecycle, comments. |
 | **Remove a link** (owners and admins, in Settings) | Removes the repository's files, their index and memory links from the workspace. The repository on disk is untouched. |
@@ -334,7 +336,9 @@ AI is **optional and explicit**. Nothing is sent to any AI service until an owne
 | **OpenRouter (cloud)** | The OpenRouter cloud API | An API key, a chat model, and an **explicit acknowledgement** that workspace excerpts leave the device |
 
 - **Test connection** checks the provider before relying on it.
-- The API key is kept on the server and **is never sent back to the browser**.
+- The API key is kept on the server, **encrypted**, and **is never sent back to the browser**. It is only ever sent to the address it was entered for: changing the provider's type or address requires entering the key again.
+- Provider addresses that point at cloud metadata services or link-local addresses are refused, and the server operator can limit providers to a list of hosts.
+- **Who can use AI** (Settings): everyone, members and above, or administrators and owners. Image descriptions and search vectors are built in the background for everyone's uploads and are not affected.
 - AI powers three features: **Ask your evidence**, the **AI workspace overview** (a briefing for someone joining the project, built from indexed excerpts, with citations), and **image descriptions** during indexing.
 
 ---
@@ -409,11 +413,10 @@ These are observed in the code and are useful for prioritizing:
 | No semantic (embedding) search in shared mode | Ask always uses keyword retrieval and shows a warning saying so. |
 | AI answers and the overview are shown as raw Markdown text | Headings and lists are not formatted. |
 | Search snippets show literal `<mark>` tags | The highlight markup is shown as text instead of being rendered. |
-| Sessions expire after 60 minutes with no renewal | Users are signed out mid-work and requests start failing. |
 | People need a RepoMemo account before they can be added | There is no invitation-by-email flow. |
 | No password reset | Users who are locked out need an administrator's help. |
 | Folder import exists only on desktop | Web users upload one file at a time. Code in a git repository on the server can now be connected as a whole in **Repositories** (§5b). |
-| Repositories must be on the server's disk and are synced by hand | No remote URLs, no automatic sync when the branch moves, and a file renamed *and* edited in one commit loses its history. |
+| Repositories must be on the server's disk | No remote URLs, and a file renamed *and* edited in one commit loses its history. Branches are followed automatically. |
 | A memory card created from the web cites at most one artifact | The API supports several citations, but the UI offers only one. |
 
 ---

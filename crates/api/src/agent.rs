@@ -244,7 +244,9 @@ impl RepoMemoCore {
         };
 
         let outcome = if requires_ai(capability) && request.provider_id.is_none() {
-            Ok(reply("This needs an AI provider, and none is enabled for this workspace. An administrator can enable one in Settings. Nothing was sent anywhere."))
+            Ok(reply(request.ai_unavailable_reason.as_deref().unwrap_or(
+                "This needs an AI provider, and none is enabled for this workspace. An administrator can enable one in Settings. Nothing was sent anywhere.",
+            )))
         } else {
             match capability {
                 AgentCapability::FindFiles => self.agent_find_files(&request.workspace_id, &subject).await,

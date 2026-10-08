@@ -3557,6 +3557,7 @@ dependencies = [
  "chrono",
  "jsonwebtoken",
  "rand_core 0.6.4",
+ "repomemo-ai",
  "repomemo-api",
  "repomemo-domain",
  "repomemo-storage",
@@ -3576,13 +3577,16 @@ name = "repomemo-storage"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "base64 0.22.1",
  "chrono",
  "hex",
  "repomemo-domain",
+ "ring",
  "serde_json",
  "sha2",
  "sqlx",
  "tokio",
+ "tracing",
  "uuid",
 ]
 
@@ -5229,6 +5233,7 @@ dependencies = [
  "futures-util",
  "http",
  "http-body",
+ "http-body-util",
  "pin-project-lite",
  "tower",
  "tower-layer",

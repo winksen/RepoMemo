@@ -96,7 +96,7 @@ V0.1.32 laid the groundwork: a jobs table with a kind and a cancel flag, the job
 A git repository is connected as a **living source** instead of being uploaded file by file. Each sync reads what the branch has committed and applies only the difference, keeping every file's identity (comments, memory links, lifecycle) across edits and renames. Design and limits: [technical/repository-sources.md](technical/repository-sources.md).
 
 - [x] **Phase 1: local repositories and the sync engine.** `crates/git` (read-only git CLI), file rules with include/exclude patterns, the `repo_files` table (migration 0017), snapshot sync by git blob id with exact-rename detection, removed files kept but dropped from search, lifecycle changes on edit and removal, one `repo_sync` job per sync with progress and cancel, repository links as a **per-workspace setting** with an access check before linking, resync at server start, the **Repositories** section and **Settings › Repositories** in the web client, and each repository as **one evidence item** whose page shows a content overview (no AI) and an on-request, cited AI summary.
-- [ ] **Phase 1b: polish.** Automatic sync when the branch moves, renames with edits (`git diff -M`), commit shown on search results and citations, Tauri commands so the desktop app gets the same section.
+- [ ] **Phase 1b: polish.** ~~Automatic sync when the branch moves~~ (done: branches are polled and synced when they move), renames with edits (`git diff -M`), commit shown on search results and citations, Tauri commands so the desktop app gets the same section. Repository links can be restricted to operator-chosen folders (`REPOMEMO_REPO_ROOTS`).
 - [ ] **Phase 2: remote repositories.** Connect by URL with an encrypted token, partial bare clone under the data directory, scheduled fetch, `https`/`ssh` only.
 - [ ] **Phase 3: git awareness.** Last author and date per file, `CODEOWNERS` ownership hints, commit-pinned citations, push webhooks, issue and pull-request links.
 
@@ -108,12 +108,12 @@ These items come from the gaps and risks recorded in the mindmaps. The order is 
 
 | # | Theme | Items | Why |
 |---|---|---|---|
-| 1 | **Security hardening** | Encrypt provider API keys at rest · refresh tokens and revocation (invalidate on password change) · an AI-usage capability and rate limits (viewers can currently trigger cloud calls) | Keys are stored in plaintext today, and sessions end hard after 60 minutes |
+| 1 | **Security hardening** | ✅ Encrypt provider API keys at rest · ✅ refresh tokens and revocation (session versions: a password change or "sign out everywhere" ends every session) · ✅ a workspace AI policy and per-user AI quotas · ✅ sign-in throttling and lockout · ✅ provider-URL and repository-path guards · ✅ security headers. Next: shared rate-limit counters if the server is scaled out, typed errors | Done; see the [technical mindmap](TECHNICAL_MINDMAP.md#11-risks-and-technical-debt-ranked) for what remains |
 | 2 | **Semantic search in shared mode** | Expose embedding builds as a job · embedding model setting · an embedding-capable cloud option | Ask in shared mode is keyword-only today |
 | 3 | **Web UX correctness** | Render AI answers as Markdown · render search highlights · handle session expiry gracefully · multi-citation memory cards · multi-file and folder upload | Visible rough edges in daily use |
 | 4 | **Onboarding** | Email invitations for people without an account · password reset | People can only be added after they register |
 | 5 | **Code health** | Split `SharedWebApp.tsx` by route · adopt a router and a data-fetching cache · frontend tests · typed API errors (404 instead of 400) | The web client is about 2k lines in one file and has no tests |
-| 6 | **Data hygiene and performance** | Blob garbage collection · SQL-side metrics · batched dashboard metrics · indexed vector search | Orphan blobs build up, and several endpoints scan everything in memory |
+| 6 | **Data hygiene and performance** | ✅ Blob garbage collection and background maintenance · SQL-side metrics · batched dashboard metrics · indexed vector search | Several endpoints scan everything in memory |
 | 7 | **Docs** | Grow the mindmap branch pages · refresh `PRODUCT.md` · single up-to-date API collection | Keep the documentation trustworthy |
 
 ---

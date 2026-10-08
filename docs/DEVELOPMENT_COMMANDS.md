@@ -87,6 +87,37 @@ workspace setup, evidence, indexing, retrieval, team memory, and workspace
 membership management. For the membership folder, register the teammate first,
 then set its email in the `memberEmail` collection variable.
 
+### Optional server settings
+
+Every setting below has a safe default; set only what you need. Invalid values
+stop the server at startup with a message naming the variable.
+
+| Variable | Default | What it does |
+|---|---|---|
+| `REPOMEMO_ALLOWED_ORIGIN` | `http://127.0.0.1:3021` | Browser origins allowed to call the API. Comma-separated for several; `*` is refused. |
+| `REPOMEMO_SECRET_KEY` | unset | Key (32+ characters) used to encrypt AI provider API keys at rest. When unset, a random key is created in `<data dir>/secret.key`; back that file up with the database, or the saved keys must be entered again. |
+| `REPOMEMO_ALLOW_REGISTRATION` | `true` | `false` closes sign-up. The very first account can still register, so a new server gets its owner. |
+| `REPOMEMO_TRUST_PROXY` | `false` | Read the client address from `X-Forwarded-For` / `X-Real-IP`. Only behind a reverse proxy that sets them. |
+| `REPOMEMO_MAX_UPLOAD_MB` | `10` | Largest request body (uploads). |
+| `REPOMEMO_ACCESS_TOKEN_TTL_MINUTES` | `60` | Access-token lifetime (5–1440). |
+| `REPOMEMO_REFRESH_TOKEN_TTL_DAYS` | `30` | Refresh-token lifetime (1–365). |
+| `REPOMEMO_AUTH_REQUESTS_PER_MINUTE` | `30` | Sign-in and registration requests per client address (session refreshes get four times as many); `0` turns the limit off. |
+| `REPOMEMO_LOGIN_MAX_FAILURES` | `10` | Consecutive failed sign-ins (per account and address) before a temporary lockout; the account is also locked after five times as many from all addresses. `0` turns it off. |
+| `REPOMEMO_LOGIN_LOCKOUT_MINUTES` | `15` | Length of that lockout. |
+| `REPOMEMO_AI_REQUESTS_PER_HOUR` | `120` | AI requests (Ask, overviews, summaries, assistant AI actions) per user per hour; `0` is unlimited. |
+| `REPOMEMO_AI_ALLOWED_HOSTS` | unset | Comma-separated hosts AI providers may be configured at, such as `127.0.0.1,localhost,.openrouter.ai` (a leading dot allows subdomains). Link-local and cloud-metadata addresses are always refused. |
+| `REPOMEMO_REPO_ROOTS` | unset | Folders repository links must sit inside, separated like `PATH` (`;` on Windows, `:` elsewhere). Unset allows any local folder. Network shares are refused unless a root is on one. |
+| `REPOMEMO_REPO_POLL_SECONDS` | `300` | How often linked repositories are checked for new commits and synced; `0` turns automatic syncing off. |
+| `REPOMEMO_MAINTENANCE_INTERVAL_MINUTES` | `60` | Background maintenance (token and job cleanup, blob garbage collection, retries, database checkpoint); `0` turns it off. |
+| `REPOMEMO_BLOB_GC` | `true` | Delete stored files no evidence references any more. |
+| `REPOMEMO_JOB_RETENTION_DAYS` | `90` | Finished jobs kept this long; `0` keeps them forever. |
+| `REPOMEMO_INDEX_RETRY_HOURS` | `6` | How often indexing that failed for good is retried. |
+
+`GET /health/ready` answers 200 when the database responds and 503 otherwise,
+for load balancers and service managers. Security-relevant events (sign-ins,
+lockouts, password changes, provider keys) are logged under the `audit`
+tracing target.
+
 Run the React web client in a second terminal:
 
 ```powershell

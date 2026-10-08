@@ -15,12 +15,22 @@ use repomemo_domain::{
 };
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteRow};
+use sqlx::sqlite::{
+    SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteRow, SqliteSynchronous,
+};
 use sqlx::{QueryBuilder, Row, Sqlite, SqlitePool};
 use uuid::Uuid;
 
 mod repo;
+mod secrets;
 pub use repo::{RepoFileRecord, RepoFileWrite};
+pub use secrets::{KEY_FILE_NAME as SECRET_KEY_FILE_NAME, MIN_MASTER_KEY_CHARS};
+use secrets::SecretBox;
+
+/// How long SQLite waits for a competing writer before failing with
+/// `database is locked`. Background indexing, embedding and syncs write
+/// concurrently with requests, so the default of a few seconds is too short.
+const BUSY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 
 /// Observer invoked whenever a job row is created or updated. The shared
 /// server registers one to fan events into its SSE bus; local desktop use
@@ -38,6 +48,27 @@ pub trait ActivityObserver: Send + Sync {
 #[derive(Debug, Clone)]
 pub struct StorageConfig {
     pub data_dir: PathBuf,
+    /// Key material used to encrypt secrets (AI provider API keys) at rest.
+    /// When `None`, a random key is kept in `secret.key` in the data
+    /// directory, created on first use.
+    pub master_key: Option<String>,
+}
+
+impl StorageConfig {
+    pub fn new(data_dir: impl Into<PathBuf>) -> Self {
+        Self {
+            data_dir: data_dir.into(),
+            master_key: None,
+        }
+    }
+}
+
+/// What a blob garbage-collection pass removed.
+#[derive(Debug, Clone, Default)]
+pub struct BlobCollection {
+    /// Content hashes whose blob was deleted.
+    pub removed: Vec<String>,
+    pub bytes: i64,
 }
 
 #[derive(Clone)]
@@ -45,6 +76,10 @@ pub struct StorageEngine {
     pool: SqlitePool,
     data_dir: PathBuf,
     blob_dir: PathBuf,
+    secrets: SecretBox,
+    /// Serialises blob writes with blob garbage collection, so a blob that is
+    /// being stored again is never deleted underneath the writer.
+    blob_lock: Arc<tokio::sync::Mutex<()>>,
     job_observer: Arc<RwLock<Option<Arc<dyn JobObserver>>>>,
     activity_observer: Arc<RwLock<Option<Arc<dyn ActivityObserver>>>>,
 }
@@ -594,12 +629,18 @@ impl StorageEngine {
         let blob_dir = config.data_dir.join("blobs");
         tokio::fs::create_dir_all(&blob_dir).await?;
 
+        let secrets = SecretBox::load(&config.data_dir, config.master_key.as_deref())?;
+
         let db_path = config.data_dir.join("repomemo.sqlite");
+        // WAL with `synchronous = NORMAL` never corrupts the database; at worst
+        // the last transactions before a power loss are rolled back.
         let options = SqliteConnectOptions::new()
             .filename(&db_path)
             .create_if_missing(true)
             .foreign_keys(true)
-            .journal_mode(SqliteJournalMode::Wal);
+            .journal_mode(SqliteJournalMode::Wal)
+            .synchronous(SqliteSynchronous::Normal)
+            .busy_timeout(BUSY_TIMEOUT);
 
         let pool = SqlitePoolOptions::new()
             .max_connections(5)
@@ -608,13 +649,39 @@ impl StorageEngine {
 
         sqlx::migrate!("./migrations").run(&pool).await?;
 
-        Ok(Self {
+        let engine = Self {
             pool,
             data_dir: config.data_dir,
             blob_dir,
+            secrets,
+            blob_lock: Arc::new(tokio::sync::Mutex::new(())),
             job_observer: Arc::new(RwLock::new(None)),
             activity_observer: Arc::new(RwLock::new(None)),
-        })
+        };
+        let sealed = engine.seal_plaintext_provider_keys().await?;
+        if sealed > 0 {
+            tracing::info!(count = sealed, "Encrypted AI provider API keys stored in plain text");
+        }
+        Ok(engine)
+    }
+
+    /// Checks that the database answers, for readiness probes.
+    pub async fn ping(&self) -> Result<()> {
+        sqlx::query_scalar::<_, i64>("SELECT 1")
+            .fetch_one(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// Lets SQLite refresh its query-planner statistics and folds the
+    /// write-ahead log back into the database file, so the log does not grow
+    /// without bound on a server that is never idle. Safe to run at any time.
+    pub async fn optimize(&self) -> Result<()> {
+        sqlx::query("PRAGMA optimize").execute(&self.pool).await?;
+        sqlx::query("PRAGMA wal_checkpoint(TRUNCATE)")
+            .execute(&self.pool)
+            .await?;
+        Ok(())
     }
 
     pub fn data_dir(&self) -> &Path {
@@ -744,6 +811,54 @@ impl StorageEngine {
             bail!("Workspace was not found.");
         }
         Ok(())
+    }
+
+    /// The workspace's settings object (`{}` when none were saved).
+    pub async fn workspace_settings(&self, workspace_id: &str) -> Result<Value> {
+        let settings_json =
+            sqlx::query_scalar::<_, String>("SELECT settings_json FROM workspaces WHERE id = ?1")
+                .bind(workspace_id)
+                .fetch_optional(&self.pool)
+                .await?
+                .context("Workspace was not found.")?;
+        Ok(serde_json::from_str::<Value>(&settings_json)
+            .ok()
+            .filter(Value::is_object)
+            .unwrap_or_else(|| Value::Object(Default::default())))
+    }
+
+    /// Sets one top-level key of the workspace's settings object, keeping the
+    /// others. The read and write happen in one transaction.
+    pub async fn set_workspace_setting(
+        &self,
+        workspace_id: &str,
+        key: &str,
+        value: Value,
+    ) -> Result<Value> {
+        let mut tx = self.pool.begin().await?;
+        // Take the write lock first so a concurrent change is not lost.
+        sqlx::query("UPDATE workspaces SET settings_json = settings_json WHERE id = ?1")
+            .bind(workspace_id)
+            .execute(&mut *tx)
+            .await?;
+        let settings_json =
+            sqlx::query_scalar::<_, String>("SELECT settings_json FROM workspaces WHERE id = ?1")
+                .bind(workspace_id)
+                .fetch_optional(&mut *tx)
+                .await?
+                .context("Workspace was not found.")?;
+        let mut settings = serde_json::from_str::<Value>(&settings_json)
+            .ok()
+            .filter(Value::is_object)
+            .unwrap_or_else(|| Value::Object(Default::default()));
+        settings[key] = value;
+        sqlx::query("UPDATE workspaces SET settings_json = ?1 WHERE id = ?2")
+            .bind(serde_json::to_string(&settings)?)
+            .bind(workspace_id)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        Ok(settings)
     }
 
     pub async fn create_user(
@@ -919,6 +1034,55 @@ impl StorageEngine {
             .execute(&self.pool)
             .await?;
         Ok(())
+    }
+
+    /// The version stamped on the user's access tokens, or `None` when the
+    /// user no longer exists.
+    pub async fn user_session_version(&self, user_id: &str) -> Result<Option<i64>> {
+        Ok(
+            sqlx::query_scalar::<_, i64>("SELECT session_version FROM users WHERE id = ?1")
+                .bind(user_id)
+                .fetch_optional(&self.pool)
+                .await?,
+        )
+    }
+
+    /// Ends every session of a user: access tokens issued so far stop being
+    /// accepted and every refresh token is revoked. Returns the new session
+    /// version, to stamp on a session issued right after.
+    pub async fn end_user_sessions(&self, user_id: &str) -> Result<i64> {
+        let mut tx = self.pool.begin().await?;
+        let version = sqlx::query_scalar::<_, i64>(
+            "UPDATE users SET session_version = session_version + 1 WHERE id = ?1 RETURNING session_version",
+        )
+        .bind(user_id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .context("User was not found.")?;
+        sqlx::query("UPDATE refresh_tokens SET revoked_at = ?1 WHERE user_id = ?2 AND revoked_at IS NULL")
+            .bind(Utc::now().to_rfc3339())
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        Ok(version)
+    }
+
+    pub async fn count_users(&self) -> Result<i64> {
+        Ok(sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM users")
+            .fetch_one(&self.pool)
+            .await?)
+    }
+
+    /// Deletes refresh tokens that expired before `cutoff`. Revoked tokens are
+    /// kept until they expire, because presenting one again is how a stolen
+    /// token is detected.
+    pub async fn purge_expired_refresh_tokens(&self, cutoff: &str) -> Result<u64> {
+        Ok(sqlx::query("DELETE FROM refresh_tokens WHERE expires_at < ?1")
+            .bind(cutoff)
+            .execute(&self.pool)
+            .await?
+            .rows_affected())
     }
 
     pub async fn touch_user_connection(&self, user_id: &str) -> Result<()> {
@@ -2319,8 +2483,8 @@ impl StorageEngine {
         bytes: &[u8],
         mime_type: Option<&str>,
     ) -> Result<String> {
-        if content_hash.len() < 4 {
-            bail!("content hash is too short");
+        if content_hash.len() < 4 || !content_hash.chars().all(|value| value.is_ascii_alphanumeric()) {
+            bail!("content hash is invalid");
         }
 
         let blob_path = self.blob_path(content_hash);
@@ -2328,19 +2492,18 @@ impl StorageEngine {
             tokio::fs::create_dir_all(parent).await?;
         }
 
-        if tokio::fs::metadata(&blob_path).await.is_err() {
-            tokio::fs::write(&blob_path, bytes)
-                .await
-                .with_context(|| format!("failed to write blob {}", blob_path.display()))?;
-        }
-
         let storage_uri = self.blob_storage_uri(content_hash);
         let now = Utc::now().to_rfc3339();
 
+        let _guard = self.blob_lock.lock().await;
+        // The row is written (or refreshed) first: `created_at` doubles as
+        // "last stored at", so garbage collection treats a blob that is being
+        // stored again as fresh even if no artifact references it yet.
         sqlx::query(
             r#"
-            INSERT OR IGNORE INTO blobs (hash, storage_uri, size_bytes, mime_type, created_at)
+            INSERT INTO blobs (hash, storage_uri, size_bytes, mime_type, created_at)
             VALUES (?1, ?2, ?3, ?4, ?5)
+            ON CONFLICT(hash) DO UPDATE SET created_at = excluded.created_at
             "#,
         )
         .bind(content_hash)
@@ -2351,7 +2514,141 @@ impl StorageEngine {
         .execute(&self.pool)
         .await?;
 
+        if tokio::fs::metadata(&blob_path).await.is_err() {
+            // Write to a temporary name and rename, so a crash mid-write never
+            // leaves a truncated blob that later looks complete.
+            let staging = blob_path.with_extension(format!("tmp-{}", Uuid::new_v4().simple()));
+            let written = async {
+                tokio::fs::write(&staging, bytes).await?;
+                tokio::fs::rename(&staging, &blob_path).await
+            }
+            .await;
+            if let Err(error) = written {
+                let _ = tokio::fs::remove_file(&staging).await;
+                return Err(error)
+                    .with_context(|| format!("failed to write blob {}", blob_path.display()));
+            }
+        }
+
         Ok(storage_uri)
+    }
+
+    /// Deletes blobs that no artifact references any more and that were not
+    /// stored again within `grace`, at most `limit` per call. Deleting an
+    /// artifact or a workspace, or a repository file changing, leaves its old
+    /// content behind; this reclaims it.
+    pub async fn collect_orphan_blobs(
+        &self,
+        grace: chrono::Duration,
+        limit: i64,
+    ) -> Result<BlobCollection> {
+        let cutoff = (Utc::now() - grace).to_rfc3339();
+        let candidates = sqlx::query_as::<_, (String, i64)>(
+            r#"
+            SELECT hash, size_bytes FROM blobs
+            WHERE created_at < ?1
+              AND NOT EXISTS (SELECT 1 FROM artifacts WHERE artifacts.content_hash = blobs.hash)
+            LIMIT ?2
+            "#,
+        )
+        .bind(&cutoff)
+        .bind(limit.max(1))
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut collection = BlobCollection::default();
+        for (hash, size_bytes) in candidates {
+            let _guard = self.blob_lock.lock().await;
+            // Re-check under the lock: the blob may have been stored again or
+            // referenced since it was listed.
+            let deleted = sqlx::query(
+                r#"
+                DELETE FROM blobs
+                WHERE hash = ?1 AND created_at < ?2
+                  AND NOT EXISTS (SELECT 1 FROM artifacts WHERE artifacts.content_hash = ?1)
+                "#,
+            )
+            .bind(&hash)
+            .bind(&cutoff)
+            .execute(&self.pool)
+            .await?
+            .rows_affected();
+            if deleted == 0 {
+                continue;
+            }
+            match tokio::fs::remove_file(self.blob_path(&hash)).await {
+                Ok(()) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => {
+                    tracing::warn!(hash = %hash, error = %error, "Could not delete an unreferenced blob file");
+                }
+            }
+            collection.bytes += size_bytes;
+            collection.removed.push(hash);
+        }
+        Ok(collection)
+    }
+
+    /// Deletes files in the blob directory that have no `blobs` row (left by a
+    /// crash between writing a file and recording it, or by an interrupted
+    /// write) once they are older than `grace`. Returns how many were removed.
+    pub async fn sweep_untracked_blob_files(&self, grace: std::time::Duration) -> Result<u64> {
+        let mut files = Vec::new();
+        let mut directories = vec![self.blob_dir.clone()];
+        while let Some(directory) = directories.pop() {
+            let mut entries = match tokio::fs::read_dir(&directory).await {
+                Ok(entries) => entries,
+                Err(_) => continue,
+            };
+            while let Some(entry) = entries.next_entry().await? {
+                let file_type = entry.file_type().await?;
+                if file_type.is_dir() {
+                    directories.push(entry.path());
+                } else if file_type.is_file() {
+                    files.push(entry.path());
+                }
+            }
+        }
+
+        let mut removed = 0;
+        for path in files {
+            let old_enough = tokio::fs::metadata(&path)
+                .await
+                .and_then(|metadata| metadata.modified())
+                .ok()
+                .and_then(|modified| modified.elapsed().ok())
+                .is_some_and(|age| age >= grace);
+            if !old_enough {
+                continue;
+            }
+            let name = path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or_default()
+                .to_owned();
+            let _guard = self.blob_lock.lock().await;
+            let tracked = !name.contains('.')
+                && sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM blobs WHERE hash = ?1")
+                    .bind(&name)
+                    .fetch_one(&self.pool)
+                    .await?
+                    > 0;
+            if !tracked && tokio::fs::remove_file(&path).await.is_ok() {
+                removed += 1;
+            }
+        }
+        Ok(removed)
+    }
+
+    /// Whether a blob with this content hash is still stored.
+    pub async fn blob_exists(&self, content_hash: &str) -> Result<bool> {
+        Ok(
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM blobs WHERE hash = ?1")
+                .bind(content_hash)
+                .fetch_one(&self.pool)
+                .await?
+                > 0,
+        )
     }
 
     pub async fn store_artifact(&self, artifact: NewArtifact) -> Result<StoredArtifact> {
@@ -3171,7 +3468,10 @@ impl StorageEngine {
         .bind(workspace_id)
         .fetch_all(&self.pool)
         .await?;
-        Ok(rows.into_iter().map(ProviderSettings::from).collect())
+        Ok(rows
+            .into_iter()
+            .map(|row| self.provider_settings_from_row(row))
+            .collect())
     }
 
     pub async fn get_provider_settings(&self, provider_id: &str) -> Result<ProviderSettings> {
@@ -3187,9 +3487,14 @@ impl StorageEngine {
         .fetch_optional(&self.pool)
         .await?
         .context("provider settings were not found")?;
-        Ok(row.into())
+        Ok(self.provider_settings_from_row(row))
     }
 
+    /// Saves a provider. The API key is encrypted before it is stored. When
+    /// `settings.api_key` is empty the stored key is kept, but only while the
+    /// provider keeps pointing at the same service: a key is never carried over
+    /// to another provider type or base URL, so changing where requests go
+    /// cannot send the stored key to a new address.
     pub async fn save_provider_settings(
         &self,
         settings: ProviderSettings,
@@ -3197,16 +3502,27 @@ impl StorageEngine {
         let id = if settings.id.trim().is_empty() {
             Uuid::new_v4().to_string()
         } else {
-            settings.id
+            settings.id.clone()
         };
         let now = Utc::now().to_rfc3339();
-        let mut metadata = settings.metadata;
-        if let Some(api_key) = settings.api_key.filter(|value| !value.trim().is_empty()) {
-            metadata["api_key"] = Value::String(api_key);
-        } else if let Ok(existing) = self.get_provider_settings(&id).await {
-            if let Some(api_key) = existing.api_key {
-                metadata["api_key"] = Value::String(api_key);
-            }
+        let mut metadata = settings.metadata.clone();
+        if !metadata.is_object() {
+            metadata = Value::Object(Default::default());
+        }
+        if let Some(object) = metadata.as_object_mut() {
+            object.remove(PROVIDER_API_KEY_FIELD);
+            object.remove(PROVIDER_SEALED_API_KEY_FIELD);
+        }
+        let api_key = match settings.api_key.clone().filter(|value| !value.trim().is_empty()) {
+            Some(api_key) => Some(api_key),
+            None => match self.get_provider_settings(&id).await {
+                Ok(existing) if same_provider_endpoint(&existing, &settings) => existing.api_key,
+                _ => None,
+            },
+        };
+        if let Some(api_key) = api_key {
+            metadata[PROVIDER_SEALED_API_KEY_FIELD] =
+                Value::String(self.secrets.seal(api_key.trim(), &provider_secret_context(&id))?);
         }
         let metadata_json = serde_json::to_string(&metadata)?;
         sqlx::query(
@@ -3235,6 +3551,83 @@ impl StorageEngine {
         .execute(&self.pool)
         .await?;
         self.get_provider_settings(&id).await
+    }
+
+    /// Rebuilds a provider from its row, decrypting its API key. A key that no
+    /// longer decrypts (the secret key changed) is reported once in the log and
+    /// treated as missing, so an administrator can enter it again.
+    fn provider_settings_from_row(&self, row: ProviderSettingsRow) -> ProviderSettings {
+        let mut metadata = serde_json::from_str::<Value>(&row.metadata_json)
+            .ok()
+            .filter(Value::is_object)
+            .unwrap_or_else(|| Value::Object(Default::default()));
+        let object = metadata.as_object_mut().expect("metadata is an object");
+        let sealed = object
+            .remove(PROVIDER_SEALED_API_KEY_FIELD)
+            .and_then(|value| value.as_str().map(str::to_owned));
+        let legacy = object
+            .remove(PROVIDER_API_KEY_FIELD)
+            .and_then(|value| value.as_str().map(str::to_owned));
+        let api_key = match sealed {
+            Some(sealed) => match self.secrets.open(&sealed, &provider_secret_context(&row.id)) {
+                Ok(api_key) => Some(api_key),
+                Err(error) => {
+                    tracing::warn!(provider_id = %row.id, error = %error, "An AI provider API key could not be decrypted");
+                    None
+                }
+            },
+            None => legacy,
+        };
+        ProviderSettings {
+            id: row.id,
+            workspace_id: row.workspace_id,
+            provider_type: row.provider_type,
+            name: row.name,
+            base_url: row.base_url,
+            model: row.model,
+            embedding_model: row.embedding_model,
+            enabled: row.enabled,
+            metadata,
+            api_key,
+        }
+    }
+
+    /// Encrypts API keys saved before keys were encrypted at rest. Runs at
+    /// startup; rows that are already sealed are left alone.
+    async fn seal_plaintext_provider_keys(&self) -> Result<u64> {
+        let rows = sqlx::query_as::<_, (String, String)>(
+            "SELECT id, metadata_json FROM provider_settings WHERE metadata_json LIKE '%\"api_key\"%'",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        let mut sealed = 0;
+        for (id, metadata_json) in rows {
+            let Ok(mut metadata) = serde_json::from_str::<Value>(&metadata_json) else {
+                continue;
+            };
+            let Some(object) = metadata.as_object_mut() else {
+                continue;
+            };
+            let Some(plaintext) = object
+                .remove(PROVIDER_API_KEY_FIELD)
+                .and_then(|value| value.as_str().map(str::to_owned))
+            else {
+                continue;
+            };
+            if !plaintext.trim().is_empty() && !object.contains_key(PROVIDER_SEALED_API_KEY_FIELD) {
+                object.insert(
+                    PROVIDER_SEALED_API_KEY_FIELD.to_owned(),
+                    Value::String(self.secrets.seal(plaintext.trim(), &provider_secret_context(&id))?),
+                );
+            }
+            sqlx::query("UPDATE provider_settings SET metadata_json = ?1 WHERE id = ?2")
+                .bind(serde_json::to_string(&metadata)?)
+                .bind(&id)
+                .execute(&self.pool)
+                .await?;
+            sealed += 1;
+        }
+        Ok(sealed)
     }
 
     pub async fn get_folder(&self, folder_id: &str) -> Result<Folder> {
@@ -3744,6 +4137,36 @@ impl StorageEngine {
             self.emit_job(&job);
         }
         Ok(job)
+    }
+
+    /// Marks every job a stopped process left `running` or `pending` as
+    /// failed, whatever its kind, so no job shows progress forever after a
+    /// crash or restart. Call once at startup, before new work begins.
+    pub async fn fail_all_interrupted_jobs(&self, message: &str) -> Result<u64> {
+        Ok(sqlx::query(
+            r#"
+            UPDATE indexing_jobs
+            SET status = 'failed', stage = 'failed', error_message = ?1, updated_at = ?2
+            WHERE status IN ('running', 'pending')
+            "#,
+        )
+        .bind(message)
+        .bind(Utc::now().to_rfc3339())
+        .execute(&self.pool)
+        .await?
+        .rows_affected())
+    }
+
+    /// Deletes finished jobs (completed, failed or cancelled) last updated
+    /// before `cutoff`.
+    pub async fn prune_finished_jobs(&self, cutoff: &str) -> Result<u64> {
+        Ok(sqlx::query(
+            "DELETE FROM indexing_jobs WHERE status IN ('completed', 'failed', 'cancelled') AND updated_at < ?1",
+        )
+        .bind(cutoff)
+        .execute(&self.pool)
+        .await?
+        .rows_affected())
     }
 
     pub async fn is_job_cancel_requested(&self, job_id: &str) -> Result<bool> {
@@ -4685,30 +5108,27 @@ impl From<SymbolRow> for Symbol {
     }
 }
 
-impl From<ProviderSettingsRow> for ProviderSettings {
-    fn from(row: ProviderSettingsRow) -> Self {
-        let mut metadata = serde_json::from_str::<Value>(&row.metadata_json)
-            .unwrap_or_else(|_| Value::Object(Default::default()));
-        let api_key = metadata
-            .get("api_key")
-            .and_then(Value::as_str)
-            .map(str::to_owned);
-        if let Some(object) = metadata.as_object_mut() {
-            object.remove("api_key");
-        }
-        Self {
-            id: row.id,
-            workspace_id: row.workspace_id,
-            provider_type: row.provider_type,
-            name: row.name,
-            base_url: row.base_url,
-            model: row.model,
-            embedding_model: row.embedding_model,
-            enabled: row.enabled,
-            metadata,
-            api_key,
-        }
-    }
+/// Where provider API keys were kept in plain text before encryption at rest.
+const PROVIDER_API_KEY_FIELD: &str = "api_key";
+/// Where the encrypted provider API key is kept in `metadata_json`.
+const PROVIDER_SEALED_API_KEY_FIELD: &str = "api_key_sealed";
+
+fn provider_secret_context(provider_id: &str) -> String {
+    format!("provider_settings:{provider_id}:api_key")
+}
+
+/// Whether two versions of a provider send requests to the same service.
+fn same_provider_endpoint(existing: &ProviderSettings, updated: &ProviderSettings) -> bool {
+    let endpoint = |settings: &ProviderSettings| {
+        settings
+            .base_url
+            .as_deref()
+            .unwrap_or_default()
+            .trim()
+            .trim_end_matches('/')
+            .to_ascii_lowercase()
+    };
+    existing.provider_type == updated.provider_type && endpoint(existing) == endpoint(updated)
 }
 
 impl From<IndexingJobRow> for IndexingJobStatus {
@@ -5038,9 +5458,7 @@ mod tests {
                 .unwrap()
                 .as_nanos()
         ));
-        let storage = StorageEngine::open(StorageConfig {
-            data_dir: data_dir.clone(),
-        })
+        let storage = StorageEngine::open(StorageConfig::new(data_dir.clone()))
         .await
         .unwrap();
         let workspace = storage.create_workspace("Search test").await.unwrap();
@@ -5147,9 +5565,7 @@ mod tests {
                 .unwrap()
                 .as_nanos()
         ));
-        let storage = StorageEngine::open(StorageConfig {
-            data_dir: data_dir.clone(),
-        })
+        let storage = StorageEngine::open(StorageConfig::new(data_dir.clone()))
         .await
         .unwrap();
         let workspace = storage.create_workspace("Reindex test").await.unwrap();
@@ -5309,9 +5725,7 @@ mod tests {
                 .unwrap()
                 .as_nanos()
         ));
-        let storage = StorageEngine::open(StorageConfig {
-            data_dir: data_dir.clone(),
-        })
+        let storage = StorageEngine::open(StorageConfig::new(data_dir.clone()))
         .await
         .unwrap();
         let workspace = storage.create_workspace("Concurrent index").await.unwrap();
@@ -5400,9 +5814,7 @@ mod tests {
                 .unwrap()
                 .as_nanos()
         ));
-        let storage = StorageEngine::open(StorageConfig {
-            data_dir: data_dir.clone(),
-        })
+        let storage = StorageEngine::open(StorageConfig::new(data_dir.clone()))
         .await
         .unwrap();
         let workspace = storage.create_workspace("Memory test").await.unwrap();
@@ -5471,6 +5883,210 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(updated.title, "Keep verified evidence");
+
+        storage.pool.close().await;
+        drop(storage);
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    async fn temp_storage(label: &str) -> (StorageEngine, std::path::PathBuf) {
+        let data_dir = std::env::temp_dir().join(format!("repomemo-{label}-{}", uuid::Uuid::new_v4()));
+        let storage = StorageEngine::open(StorageConfig::new(data_dir.clone())).await.unwrap();
+        (storage, data_dir)
+    }
+
+    fn cloud_provider(workspace_id: &str, base_url: &str, api_key: Option<&str>) -> repomemo_domain::ProviderSettings {
+        repomemo_domain::ProviderSettings {
+            id: String::new(),
+            workspace_id: Some(workspace_id.to_owned()),
+            provider_type: "openrouter".to_owned(),
+            name: "Cloud".to_owned(),
+            base_url: Some(base_url.to_owned()),
+            model: Some("openai/gpt-4o-mini".to_owned()),
+            embedding_model: None,
+            enabled: true,
+            metadata: json!({ "cloud_content_acknowledged": true, "purpose": "text" }),
+            api_key: api_key.map(str::to_owned),
+        }
+    }
+
+    #[tokio::test]
+    async fn provider_api_keys_are_encrypted_and_never_follow_a_new_endpoint() {
+        let (storage, data_dir) = temp_storage("provider-keys").await;
+        let workspace = storage.create_workspace("Keys").await.unwrap();
+        let saved = storage
+            .save_provider_settings(cloud_provider(&workspace.id, "https://openrouter.ai/api/v1", Some("sk-or-secret-value")))
+            .await
+            .unwrap();
+        assert_eq!(saved.api_key.as_deref(), Some("sk-or-secret-value"));
+        assert!(saved.metadata.get("api_key_sealed").is_none(), "the sealed key is not exposed in metadata");
+        let raw: String = sqlx::query_scalar("SELECT metadata_json FROM provider_settings WHERE id = ?1")
+            .bind(&saved.id)
+            .fetch_one(&storage.pool)
+            .await
+            .unwrap();
+        assert!(!raw.contains("sk-or-secret-value"), "the key is not stored in plain text");
+        assert!(raw.contains("api_key_sealed"));
+
+        // Saving without a key keeps it while the endpoint stays the same.
+        let mut unchanged = cloud_provider(&workspace.id, "https://openrouter.ai/api/v1/", None);
+        unchanged.id = saved.id.clone();
+        let kept = storage.save_provider_settings(unchanged).await.unwrap();
+        assert_eq!(kept.api_key.as_deref(), Some("sk-or-secret-value"));
+
+        // Pointing the provider somewhere else drops the stored key.
+        let mut moved = cloud_provider(&workspace.id, "https://attacker.example/api", None);
+        moved.id = saved.id.clone();
+        let moved = storage.save_provider_settings(moved).await.unwrap();
+        assert_eq!(moved.api_key, None);
+
+        // Keys saved before encryption existed are sealed at startup.
+        sqlx::query("UPDATE provider_settings SET metadata_json = ?1 WHERE id = ?2")
+            .bind(r#"{"purpose":"text","api_key":"legacy-plaintext-key"}"#)
+            .bind(&saved.id)
+            .execute(&storage.pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            storage.get_provider_settings(&saved.id).await.unwrap().api_key.as_deref(),
+            Some("legacy-plaintext-key")
+        );
+        assert_eq!(storage.seal_plaintext_provider_keys().await.unwrap(), 1);
+        let raw: String = sqlx::query_scalar("SELECT metadata_json FROM provider_settings WHERE id = ?1")
+            .bind(&saved.id)
+            .fetch_one(&storage.pool)
+            .await
+            .unwrap();
+        assert!(!raw.contains("legacy-plaintext-key"));
+        assert_eq!(
+            storage.get_provider_settings(&saved.id).await.unwrap().api_key.as_deref(),
+            Some("legacy-plaintext-key")
+        );
+
+        storage.pool.close().await;
+        drop(storage);
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn ending_sessions_bumps_the_version_and_revokes_refresh_tokens() {
+        let (storage, data_dir) = temp_storage("sessions").await;
+        let user = storage.create_user("sessions@example.com", "Sessions", "hash").await.unwrap();
+        assert_eq!(storage.user_session_version(&user.id).await.unwrap(), Some(0));
+        let refresh = storage.create_refresh_token(&user.id, 30).await.unwrap();
+        assert_eq!(storage.end_user_sessions(&user.id).await.unwrap(), 1);
+        assert_eq!(storage.user_session_version(&user.id).await.unwrap(), Some(1));
+        assert_eq!(storage.consume_refresh_token(&refresh).await.unwrap(), None);
+        assert_eq!(storage.user_session_version("missing").await.unwrap(), None);
+        assert_eq!(storage.count_users().await.unwrap(), 1);
+
+        // Only expired tokens are purged; revoked ones stay for reuse detection.
+        storage.create_refresh_token(&user.id, 30).await.unwrap();
+        storage.create_refresh_token(&user.id, -1).await.unwrap();
+        let purged = storage
+            .purge_expired_refresh_tokens(&chrono::Utc::now().to_rfc3339())
+            .await
+            .unwrap();
+        assert_eq!(purged, 1);
+
+        storage.pool.close().await;
+        drop(storage);
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn unreferenced_blobs_are_collected_after_the_grace_period() {
+        let (storage, data_dir) = temp_storage("blob-gc").await;
+        let workspace = storage.create_workspace("Blobs").await.unwrap();
+        let source = storage
+            .create_or_get_source(&workspace.id, SourceType::Upload, "Uploads", None)
+            .await
+            .unwrap();
+        let mut stored = Vec::new();
+        for text in ["kept content", "deleted content"] {
+            let bytes = text.as_bytes();
+            let hash = StorageEngine::content_hash(bytes);
+            storage.store_blob(&hash, bytes, Some("text/plain")).await.unwrap();
+            let artifact = storage
+                .store_artifact(NewArtifact {
+                    workspace_id: workspace.id.clone(),
+                    source_id: source.id.clone(),
+                    artifact_type: ArtifactType::File,
+                    title: text.to_owned(),
+                    path: format!("{text}.txt"),
+                    content_hash: hash.clone(),
+                    mime_type: Some("text/plain".to_owned()),
+                    language: None,
+                    size_bytes: bytes.len() as i64,
+                    metadata: json!({}),
+                })
+                .await
+                .unwrap()
+                .artifact;
+            stored.push((artifact, hash));
+        }
+        storage.delete_artifact(&stored[1].0.id).await.unwrap();
+
+        // Within the grace period nothing is removed.
+        let early = storage.collect_orphan_blobs(chrono::Duration::hours(1), 100).await.unwrap();
+        assert!(early.removed.is_empty());
+
+        let collected = storage.collect_orphan_blobs(chrono::Duration::seconds(-1), 100).await.unwrap();
+        assert_eq!(collected.removed, vec![stored[1].1.clone()]);
+        assert!(!storage.blob_path(&stored[1].1).exists());
+        assert!(storage.blob_path(&stored[0].1).exists());
+        assert!(storage.read_artifact_blob(&stored[0].0.id).await.is_ok());
+        assert!(!storage.blob_exists(&stored[1].1).await.unwrap());
+
+        // Storing the same content again brings it back.
+        storage.store_blob(&stored[1].1, b"deleted content", Some("text/plain")).await.unwrap();
+        assert!(storage.blob_path(&stored[1].1).exists());
+
+        // A stray file with no row is swept once it is old enough.
+        let stray = storage.blob_dir().join("zz").join("zz");
+        std::fs::create_dir_all(&stray).unwrap();
+        std::fs::write(stray.join("zzzzstray.tmp-1"), b"partial").unwrap();
+        assert_eq!(storage.sweep_untracked_blob_files(std::time::Duration::from_secs(3600)).await.unwrap(), 0);
+        assert_eq!(storage.sweep_untracked_blob_files(std::time::Duration::ZERO).await.unwrap(), 1);
+        assert!(storage.blob_path(&stored[0].1).exists());
+
+        storage.pool.close().await;
+        drop(storage);
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn interrupted_jobs_fail_and_old_finished_jobs_are_pruned() {
+        let (storage, data_dir) = temp_storage("jobs").await;
+        let workspace = storage.create_workspace("Jobs").await.unwrap();
+        let running = storage.create_job(&workspace.id, None, "embedding", "embedding_chunks", Some(4)).await.unwrap();
+        let done = storage.create_job(&workspace.id, None, "indexing", "chunking", Some(1)).await.unwrap();
+        storage.update_indexing_job(&done.id, "completed", "chunked", 1, None).await.unwrap();
+
+        assert_eq!(storage.fail_all_interrupted_jobs("Interrupted by a server restart.").await.unwrap(), 1);
+        let failed = storage.get_job(&running.id).await.unwrap().unwrap();
+        assert_eq!(failed.status, "failed");
+        assert_eq!(failed.error_message.as_deref(), Some("Interrupted by a server restart."));
+
+        let future = (chrono::Utc::now() + chrono::Duration::days(1)).to_rfc3339();
+        assert_eq!(storage.prune_finished_jobs(&future).await.unwrap(), 2);
+        assert!(storage.get_job(&done.id).await.unwrap().is_none());
+
+        storage.pool.close().await;
+        drop(storage);
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn workspace_settings_keep_other_keys() {
+        let (storage, data_dir) = temp_storage("settings").await;
+        let workspace = storage.create_workspace("Settings").await.unwrap();
+        assert_eq!(storage.workspace_settings(&workspace.id).await.unwrap(), json!({}));
+        storage.set_workspace_setting(&workspace.id, "a", json!(1)).await.unwrap();
+        let settings = storage.set_workspace_setting(&workspace.id, "b", json!("two")).await.unwrap();
+        assert_eq!(settings, json!({ "a": 1, "b": "two" }));
+        assert_eq!(storage.workspace_settings(&workspace.id).await.unwrap(), settings);
+        assert!(storage.workspace_settings("missing").await.is_err());
 
         storage.pool.close().await;
         drop(storage);

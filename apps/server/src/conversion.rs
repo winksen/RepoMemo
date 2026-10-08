@@ -100,6 +100,48 @@ impl Converter {
         self.inner.cache_dir.join(format!("{content_hash}.failed"))
     }
 
+    /// Deletes the cached preview (and any remembered failure) of a content
+    /// hash whose blob is gone. Returns true when a cached PDF was removed.
+    pub fn forget(&self, content_hash: &str) -> bool {
+        if !safe_hash(content_hash) {
+            return false;
+        }
+        let _ = std::fs::remove_file(self.failure_path(content_hash));
+        std::fs::remove_file(self.pdf_path(content_hash)).is_ok()
+    }
+
+    /// Deletes cached previews whose blob no longer exists, for example ones
+    /// left from before blob garbage collection. Returns how many were removed.
+    pub async fn prune_orphans(&self, storage: &StorageEngine) -> anyhow::Result<usize> {
+        let mut entries = match tokio::fs::read_dir(&self.inner.cache_dir).await {
+            Ok(entries) => entries,
+            Err(_) => return Ok(0),
+        };
+        let mut removed = 0;
+        while let Some(entry) = entries.next_entry().await? {
+            let path = entry.path();
+            if path.extension().and_then(|extension| extension.to_str()) != Some("pdf") {
+                continue;
+            }
+            let Some(hash) = path.file_stem().and_then(|stem| stem.to_str()).map(str::to_owned) else {
+                continue;
+            };
+            if !safe_hash(&hash) {
+                continue;
+            }
+            let in_flight = self
+                .inner
+                .in_flight
+                .lock()
+                .map(|running| running.contains(&hash))
+                .unwrap_or(true);
+            if !in_flight && !storage.blob_exists(&hash).await? && tokio::fs::remove_file(&path).await.is_ok() {
+                removed += 1;
+            }
+        }
+        Ok(removed)
+    }
+
     /// The cached PDF for a file, when its conversion has finished.
     pub fn cached_pdf(&self, content_hash: &str) -> Option<PathBuf> {
         safe_hash(content_hash)

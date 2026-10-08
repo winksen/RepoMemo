@@ -233,6 +233,17 @@ export interface WorkspaceCapabilities {
   can_comment: boolean;
   can_moderate_comments: boolean;
   can_inspect_index: boolean;
+  /** Whether this member may use AI features, per the workspace's AI policy. */
+  can_use_ai: boolean;
+}
+
+/** The lowest workspace role allowed to use AI features. */
+export type AiMinRole = "viewer" | "member" | "admin";
+
+export interface AiPolicy {
+  min_role: AiMinRole;
+  /** AI requests each person may make per hour on this server; 0 is unlimited. */
+  requests_per_hour: number;
 }
 
 export interface WorkspaceAiOverview {

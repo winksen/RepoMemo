@@ -2,7 +2,7 @@
 
 > **Audience:** engineers working on RepoMemo, reviewers, and anyone operating the shared server.
 > **Companion:** [FUNCTIONAL_MINDMAP.md](FUNCTIONAL_MINDMAP.md) covers *what* the product does. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** code at `V0.1.32` (2026-09-29). The focus is the **shared web client** (`apps/desktop/src/SharedWebApp.tsx`) and the **HTTP API** (`apps/server`). Desktop and Tauri paths are noted where they share code.
+> **Scope:** code at `V0.1.32` (2026-09-29), plus the security and background-processing hardening that followed `V0.1.56` (sections marked *hardening*). The focus is the **shared web client** (`apps/desktop/src/SharedWebApp.tsx`) and the **HTTP API** (`apps/server`). Desktop and Tauri paths are noted where they share code.
 
 ---
 
@@ -19,8 +19,9 @@ mindmap
     HTTP API
       Axum 0.8 server
       86 operations under v1
-      JWT HS256 extractor
+      JWT HS256 extractor with session versions
       Role guards per request
+      Workspace AI policy and quotas
       SSE event stream
     Core
       RepoMemoCore facade
@@ -31,13 +32,18 @@ mindmap
       AI providers
     Storage
       SQLite WAL via sqlx
-      17 migrations
-      Content-addressed blobs
+      18 migrations
+      Content-addressed blobs with garbage collection
+      Encrypted provider keys
       Job and activity observers
     Runtime
       Env config
-      CORS single origin
-      10 MiB body limit
+      CORS origin list
+      Configurable body limit
+      Rate limits and sign-in lockout
+      Security headers and panic catching
+      Background maintenance
+      Graceful shutdown
       Worker stub
     Quality
       Rust unit and integration tests
@@ -138,11 +144,16 @@ flowchart TD
 | `REPOMEMO_JWT_SECRET` | — (**required**) | Must be at least 32 characters, or startup panics. |
 | `REPOMEMO_SERVER_ADDR` | `127.0.0.1:3020` | Bind address. |
 | `REPOMEMO_SERVER_DATA_DIR` | `.repomemo-server` | Holds `repomemo.sqlite` and `blobs/`. The path is relative to the CWD. |
-| `REPOMEMO_ALLOWED_ORIGIN` | `http://127.0.0.1:3021` | The **only** CORS origin. Allowed methods are GET, POST, PUT and DELETE. Allowed headers are `Authorization`, `Content-Type` and `X-RepoMemo-Filename`. |
-| `REPOMEMO_SERVICE_NAME` | `repomemo-server` | Parsed, but `/health` hardcodes the name, so the value is effectively unused. |
-| `RUST_LOG` | `repomemo_server=info,tower_http=info` | Read by the `tracing-subscriber` EnvFilter. |
+| `REPOMEMO_ALLOWED_ORIGIN` | `http://127.0.0.1:3021` | The CORS origins, comma-separated (`*` is refused). Allowed methods are GET, POST, PUT, PATCH and DELETE. Allowed headers are `Authorization`, `Content-Type`, `X-RepoMemo-Filename` and `X-RepoMemo-Folder-Id`; `X-Total-Count` and `Retry-After` are exposed. |
+| `REPOMEMO_SERVICE_NAME` | `repomemo-server` | Returned by `/health`. |
+| `REPOMEMO_SECRET_KEY` | unset | *Hardening.* Key material for encrypting provider API keys at rest (§6.6). Unset: a random key in `<data dir>/secret.key`. |
+| `RUST_LOG` | `repomemo_server=info,tower_http=info,audit=info` | Read by the `tracing-subscriber` EnvFilter. Security events use the `audit` target. |
 
-Tower layers: `TraceLayer`, `DefaultBodyLimit::max(10 MiB)` and `CorsLayer`.
+*Hardening* added settings for registration, token lifetimes, rate limits and lockout, AI quotas and allowed AI hosts, repository roots, automatic repository syncing and background maintenance. Each has a safe default; the full table is in [DEVELOPMENT_COMMANDS.md](../docs/DEVELOPMENT_COMMANDS.md#optional-server-settings). An invalid value stops the server at startup, naming the variable. A JWT secret that is too repetitive (fewer than 8 distinct characters) is refused.
+
+Tower layers, outermost first: `CorsLayer`, `DefaultBodyLimit` (`REPOMEMO_MAX_UPLOAD_MB`, 10 MiB by default), `TraceLayer`, a security-headers middleware (`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Cache-Control: no-store` and a `default-src 'none'` CSP, each only when the handler did not set its own) and `CatchPanicLayer`, which turns a handler panic into the usual JSON 500 instead of a dropped connection.
+
+**Process.** `main.rs` serves with the peer address attached (`into_make_service_with_connect_info`, used by the rate limits) and shuts down gracefully on Ctrl-C or SIGTERM, letting in-flight requests finish. `GET /health/ready` answers 200 when the database responds and 503 otherwise.
 
 ### Web client
 
@@ -182,10 +193,13 @@ sequenceDiagram
 
 ### Authentication
 
-- Passwords are hashed with **Argon2** (default params and a random salt). The length limit is 12–1024.
-- Tokens are **HS256 JWTs** with claims `sub`, `email`, `iss`, `iat` and `exp`. The **TTL is 60 minutes**, and there is **no refresh token and no revocation**. Changing a password does not invalidate tokens that were already issued.
+- Passwords are hashed with **Argon2** (default params and a random salt) on the blocking thread pool. The length limit is 12–1024.
+- Access tokens are **HS256 JWTs** with claims `sub`, `email`, `iss`, `iat`, `exp` and `ver`. The TTL is 60 minutes by default (`REPOMEMO_ACCESS_TOKEN_TTL_MINUTES`). **Refresh tokens** (migration 0016) are opaque, stored as SHA-256 hashes, rotated on every use and valid 30 days; presenting a rotated token again revokes the whole family. The web client refreshes silently on a 401.
+- **Session versions** (*hardening*, migration 0018). `users.session_version` is stamped into each access token as `ver`, and the extractor refuses a token whose version no longer matches (one primary-key lookup per request), so a deleted user's tokens also stop working. Changing the password and `POST /v1/auth/logout-all` bump the version and revoke every refresh token: every session ends at once, not when its token expires. The password change returns a fresh session (`TokenResponse`) for the device that made it.
 - `AuthenticatedSubject` implements `FromRequestParts`. If a handler takes it as an argument, the handler is protected.
-- Login returns the same `invalid_credentials` error whether the email is unknown or the password is wrong.
+- Login returns the same `invalid_credentials` error whether the email is unknown or the password is wrong, and an unknown email is checked against a fixed Argon2 hash so the response time does not reveal which emails have accounts.
+- **Throttling** (*hardening*, [security.rs](../apps/server/src/security.rs)). Sign-in and registration are limited per client address (30 per minute by default), and session refreshes, which every open tab makes and which cannot be guessed, get a separate bucket four times as large. Failed sign-ins lock the account for that address after 10 consecutive failures, and for every address after 50, for 15 minutes; the answer is 429 `rate_limited` with `Retry-After`. Counters are in memory (one server process), keyed on the TCP peer, or on `X-Forwarded-For` when `REPOMEMO_TRUST_PROXY` is set.
+- **Registration** can be closed (`REPOMEMO_ALLOW_REGISTRATION=false`); the first account can still register. `/health` reports `registration_open`.
 
 ### Authorization
 
@@ -209,7 +223,8 @@ Other rules:
   - `upsert_organization_member` adds the user to every workspace of the org.
   - `upsert_workspace_member` adds the user to the org as a `member` if needed.
 - `can_inspect_index` (owner, admin) controls who receives chunks from `GET /v1/artifacts/{a}`. The server strips them for everyone else; the SPA only hides the button and the overview chunk count.
-- `GET …/capabilities` returns `capabilities_for_role(role)`. The SPA uses it **only to hide UI**. The server remains the authority.
+- `GET …/capabilities` returns `capabilities_for_role(role, may_use_ai)`. The SPA uses it **only to hide UI**. The server remains the authority.
+- **AI policy** (*hardening*, [ai_access.rs](../apps/server/src/ai_access.rs)). Each workspace sets the lowest role that may trigger AI (`ai_min_role` in `workspaces.settings_json`: `viewer` by default, `member` or `admin`), via `GET/PUT /v1/workspaces/{ws}/ai-policy` (read: any member; write: owner or admin). Ask, the AI overview, repository summaries and the assistant's AI actions check it (403 otherwise; the assistant answers that AI is kept to other roles and still runs lookups and searches), and each user has an hourly AI quota (`REPOMEMO_AI_REQUESTS_PER_HOUR`, 120 by default; 429 when used up). `can_use_ai` and `can_generate_ai_overview` follow the policy. Background image descriptions and embeddings are not affected.
 
 ### Error envelope
 
@@ -217,7 +232,7 @@ Other rules:
 { "error": { "code": "bad_request|unauthorized|invalid_credentials|forbidden|conflict|internal_error", "message": "…" } }
 ```
 
-`map_storage_error` and `map_core_error` classify `anyhow` errors by **substring matching** on the message. For example, `"was not found"` becomes 400, `"UNIQUE constraint failed"` becomes 409, and anything else becomes 500. **Not-found is reported as 400, not 404.**
+`map_storage_error` and `map_core_error` classify `anyhow` errors by **substring matching** on the message. `"was not found"`, `"were not found"` and sqlx's `"no rows returned"` become **404** (*hardening*; they were 400), `"UNIQUE constraint failed"` becomes 409, a few validation messages become 400, and anything else becomes 500 with a generic message (the cause is logged). Rate limits answer 429 `rate_limited` with a `Retry-After` header. Provider settings are validated before they are saved, so every validation failure is a 400 with its message.
 
 ---
 
@@ -230,11 +245,15 @@ Guard legend: **pub** = no auth, **auth** = any valid JWT, **R/W/A/O** = workspa
 | Method | Path | Guard | Notes |
 |---|---|---|---|
 | GET | `/health` | pub | `{service,status,authentication}` |
-| POST | `/v1/auth/register` | pub | 201 `TokenResponse`, 409 if the email exists |
-| POST | `/v1/auth/login` | pub | `TokenResponse`, 401 `invalid_credentials` |
+| GET | `/health/ready` | pub | 200 when the database answers, 503 otherwise |
+| POST | `/v1/auth/register` | pub | 201 `TokenResponse`, 409 if the email exists, 403 when registration is closed, 429 when rate-limited |
+| POST | `/v1/auth/login` | pub | `TokenResponse`, 401 `invalid_credentials`, 429 when rate-limited or locked out |
+| POST | `/v1/auth/refresh` | pub | `{refresh_token}` → a new `TokenResponse` with a rotated refresh token; 401 for an unknown, expired or reused token |
+| POST | `/v1/auth/logout` | pub | `{refresh_token}` → 204, revokes that refresh token |
+| POST | `/v1/auth/logout-all` | auth | 204. Ends every session of the caller, on every device |
 | GET | `/v1/session` | auth | the user and their workspace memberships |
 | GET, PUT | `/v1/profile` | auth | GET includes a 365-day `activity_by_day` |
-| POST | `/v1/profile/password` | auth | 204. Requires `current_password` |
+| POST | `/v1/profile/password` | auth | 200 `TokenResponse` for this device; every other session ends. Requires `current_password` |
 | GET | `/v1/profile/tasks` | auth | tasks assigned to the caller |
 | GET | `/v1/notifications` | auth | |
 | POST | `/v1/notifications/read-all` | auth | 204 |
@@ -267,7 +286,8 @@ Guard legend: **pub** = no auth, **auth** = any valid JWT, **R/W/A/O** = workspa
 | POST | `/v1/workspaces/{ws}/agent/messages` | R | `{message, capability?, artifact_id?, conversation_id?}` → `{conversation, turn}`. Without `conversation_id` a new chat is started after the reply succeeds. Provider failures come back as reply warnings, not errors. AI-generated replies → activity |
 | GET | `/v1/workspaces/{ws}/agent/conversations` | R | the caller's own chats, most recent first |
 | GET, PUT, DELETE | `/v1/agent/conversations/{c}` | R + owner | detail with turns / rename `{title}` (1–120) / delete. Another user's chat is a 404 |
-| GET, PUT | `/v1/workspaces/{ws}/ai-providers` | A | the response strips `api_key`. PUT upserts and keeps the stored key if the body omits it |
+| GET, PUT | `/v1/workspaces/{ws}/ai-providers` | A | the response strips `api_key`. PUT upserts and keeps the stored key if the body omits it, **unless the provider type or base URL changed** (then the key must be entered again, 400) |
+| GET, PUT | `/v1/workspaces/{ws}/ai-policy` | R / A | `{min_role, requests_per_hour}`; PUT `{min_role}` → activity (§4) |
 | POST | `/v1/workspaces/{ws}/ai-providers/{p}/test` | A | → activity |
 | GET | `/v1/workspaces/{ws}/activity` | A | last 100 |
 | GET | `/v1/workspaces/{ws}/activity/calendar` | A | 365 days |
@@ -281,7 +301,7 @@ Guard legend: **pub** = no auth, **auth** = any valid JWT, **R/W/A/O** = workspa
 | GET | `/v1/workspaces/{ws}/artifacts` | R | |
 | POST | `/v1/workspaces/{ws}/artifacts/query` | R | filters by title/path, types, languages, sources and indexed, **in memory** |
 | POST | `/v1/workspaces/{ws}/artifacts/text` | W | `{title,content,language?}` → activity. Queues background indexing |
-| POST | `/v1/workspaces/{ws}/artifacts/upload` | W | **raw body**, with the name in the `X-RepoMemo-Filename` header and the MIME type in `Content-Type` → activity. Queues background indexing |
+| POST | `/v1/workspaces/{ws}/artifacts/upload` | W | **raw body**, with the name in the `X-RepoMemo-Filename` header (percent-encoded by the web client, so names outside ASCII work; at most 255 characters) and the MIME type in `Content-Type` → activity. Queues background indexing |
 | GET, PUT, DELETE | `/v1/artifacts/{a}` | R / W / W | GET returns detail and preview; `chunks` is **empty unless the caller is owner/admin**. Word files are extracted at read time, capped at 120k chars |
 | GET | `/v1/artifacts/{a}/chunks` | A | stored chunks of one artifact, for the admin dialog. Members get 403 |
 | GET, PUT | `/v1/artifacts/{a}/lifecycle` | R / W | validates status, owner membership and the supersede target → activity |
@@ -293,7 +313,7 @@ Guard legend: **pub** = no auth, **auth** = any valid JWT, **R/W/A/O** = workspa
 | GET | `/v1/workspaces/{ws}/jobs?kind&status&limit` | R | default limit 50 |
 | GET | `/v1/jobs/{j}` | R | |
 | POST | `/v1/jobs/{j}/cancel` | W | sets `cancel_requested`. Cooperative, checked between artifacts or batches |
-| GET | `/v1/workspaces/{ws}/events` | R | **SSE** with `job` and `activity` events and a 15 s keep-alive |
+| GET | `/v1/workspaces/{ws}/events` | R | **SSE** with `job`, `activity` and `resync` events and a 15 s keep-alive; ends when the token expires or access is lost (§8) |
 
 ### Repositories
 
@@ -347,7 +367,8 @@ bytes ─► SHA-256 (hex) ─► store_blob(blobs/<hash-derived path>)  [write-
 
 - Upload type detection uses `ingestion::detect_artifact_type` on the extension. An unknown extension produces "This file type is not supported for shared upload".
 - For pasted text, the language `Markdown` becomes `markdown_doc`, `Text` or none becomes `file`, and anything else becomes `code_file`.
-- **Blobs are never deleted.** Deleting an artifact or workspace leaves orphaned blob files. No GC exists.
+- Blob files are written to a temporary name and renamed, so a crash never leaves a truncated blob that looks complete. Storing a blob again refreshes `blobs.created_at` ("last stored at").
+- **Blob garbage collection** (*hardening*). Deleting an artifact or workspace, or a repository file changing, leaves its old blob behind. The maintenance pass (§8b) deletes blobs no artifact references and not stored again within an hour, with their cached Office previews; a process-wide lock serialises it with blob writes. Once a day it also sweeps files in `blobs/` that have no row (left by a crash).
 
 ### 6.2 Index (`index_artifact` / `index_workspace` → `index_artifact_inner`)
 
@@ -427,9 +448,11 @@ The overview takes up to 2 chunks per artifact in artifact-list order, stopping 
 
 **Two purposes.** A workspace has a *text* provider (answers, overviews, summaries) and a *vision* provider (image to text), distinguished by `metadata.purpose` (`text` by default, so older providers are text providers). Image uploads are refused with a 400 until an enabled vision provider exists (`RepoMemoCore::ensure_upload_allowed`). Image indexing uses the vision provider; for the single-provider desktop setup it falls back to an enabled provider that has no purpose set.
 
-`validate_settings` requires a `name`, an `http(s)` base URL and a model. To **enable** OpenRouter it also requires an `api_key` and `metadata.cloud_content_acknowledged == true`. The HTTP timeout is 45 s.
+`validate_settings` requires a `name`, an `http(s)` base URL and a model. To **enable** OpenRouter it also requires an `api_key` and `metadata.cloud_content_acknowledged == true`. The HTTP timeout is 45 s (60 s for OpenRouter), with a 10 s connect timeout.
 
-> ⚠️ **API keys are stored in plaintext** inside `provider_settings.metadata_json.api_key`.
+**Outbound safety** (*hardening*). A base URL may not embed a user name or password, and may not point at link-local addresses (`169.254.0.0/16`, `fe80::/10`), unspecified or multicast addresses, or cloud metadata services (`169.254.169.254`, `fd00:ec2::254`, `metadata.google.internal`, `100.100.100.200`…); loopback and private networks stay allowed for local Ollama. `REPOMEMO_AI_ALLOWED_HOSTS` narrows providers to listed hosts. Redirects are **not followed** (a 3xx answer explains to enter the final address), so a provider cannot bounce a request and its key elsewhere, and responses are read up to 32 MiB (64 KiB for error bodies).
+
+**API keys are encrypted at rest** (*hardening*, [secrets.rs](../crates/storage/src/secrets.rs)) with AES-256-GCM in `metadata_json.api_key_sealed`, bound to the provider id. The key is derived (HKDF-SHA256) from `REPOMEMO_SECRET_KEY`, or from a random `secret.key` created in the data directory (mode 0600 on Unix). Plaintext keys from older versions are encrypted at startup. A key that no longer decrypts (the secret changed) is logged and treated as missing. A stored key is **never carried over to another provider type or base URL**, in the server and in storage, so an administrator cannot point a colleague's key at their own server and press Test.
 
 ### 6.7 Workspace assistant ([crates/api/src/agent.rs](../crates/api/src/agent.rs))
 
@@ -476,13 +499,13 @@ Mentions are found with an FTS5 phrase query, then confirmed on the passage text
 
 ### 6.10 Repository sync ([crates/api/src/repo_sync.rs](../crates/api/src/repo_sync.rs), Repositories tab)
 
-A git repository is a source of `type = 'git_repo'` that is kept in step with what its branch has committed. A sync lists the commit's tree with `git ls-tree`, applies the file rules, compares the result with the `repo_files` rows by git blob id, and applies the difference: new files become artifacts, edited and renamed files update their artifact **in place** (so comments, memory links and lifecycle survive), and files that left the tree keep their artifact but lose their chunks and become `outdated`. Changed files are indexed inside the same job instead of through the per-artifact queue. Each sync also writes an overview of the repository (languages, structure, key files, README opening, recent commits) as the content of **one `repository` artifact** that stands for the whole repository in the Evidence ledger; an AI summary of it is generated on request ([crates/api/src/repo_overview.rs](../crates/api/src/repo_overview.rs)). Repository links are a per-workspace setting (Settings › Repositories), checked by the server before they are stored. Syncs run in the background one at a time ([apps/server/src/repositories.rs](../apps/server/src/repositories.rs)). Full design: [technical/repository-sources.md](technical/repository-sources.md).
+A git repository is a source of `type = 'git_repo'` that is kept in step with what its branch has committed. A sync lists the commit's tree with `git ls-tree`, applies the file rules, compares the result with the `repo_files` rows by git blob id, and applies the difference: new files become artifacts, edited and renamed files update their artifact **in place** (so comments, memory links and lifecycle survive), and files that left the tree keep their artifact but lose their chunks and become `outdated`. Changed files are indexed inside the same job instead of through the per-artifact queue. Each sync also writes an overview of the repository (languages, structure, key files, README opening, recent commits) as the content of **one `repository` artifact** that stands for the whole repository in the Evidence ledger; an AI summary of it is generated on request ([crates/api/src/repo_overview.rs](../crates/api/src/repo_overview.rs)). Repository links are a per-workspace setting (Settings › Repositories), checked by the server before they are stored. Syncs run in the background one at a time ([apps/server/src/repositories.rs](../apps/server/src/repositories.rs)). *Hardening:* every 5 minutes (`REPOMEMO_REPO_POLL_SECONDS`) the server resolves each repository's branch (`RepoMemoCore::repo_head`, one `git rev-parse`) and syncs the ones that moved; a sync towards the same commit is not retried within an hour, and a repository that never synced successfully waits for a person. `REPOMEMO_REPO_ROOTS` restricts links to listed folders, checked before the filesystem is touched and again after symbolic links are resolved, and on every later sync; Windows network shares (UNC paths) are refused unless a root is on one, because merely opening one sends the server account's credentials to the named host. Full design: [technical/repository-sources.md](technical/repository-sources.md).
 
 ---
 
 ## 7. Data model
 
-The database is SQLite in WAL mode with foreign keys on, a pool of at most 5 connections, and `sqlx::migrate!` at startup.
+The database is SQLite in WAL mode with foreign keys on, `synchronous = NORMAL` (safe with WAL), a 15 s busy timeout, a pool of at most 5 connections, and `sqlx::migrate!` at startup.
 
 | # | Migration | Adds |
 |---|---|---|
@@ -499,7 +522,9 @@ The database is SQLite in WAL mode with foreign keys on, a pool of at most 5 con
 | 0011 | index_version | `artifacts.index_version`, the indexer version that produced the current chunks |
 | 0014 | assistant_conversations | assistant_conversations, assistant_turns (per-user assistant chats, §6.7) |
 | 0015 | workspace_health | workspace_health_actions (what administrators did with each health finding, §6.9) |
+| 0016 | refresh_tokens | hashed, rotating refresh tokens (§4) |
 | 0017 | repo_files | one row per tracked path of a repository source: its artifact, git blob id, commit and `removed_at` (§6.10) |
+| 0018 | session_security | `users.session_version` (§4), and indexes for token purging, blob garbage collection and job pruning |
 
 ```mermaid
 erDiagram
@@ -543,9 +568,20 @@ Notes:
 
 ## 8. Real-time events
 
-- `WorkspaceEventBus` ([events.rs](../apps/server/src/events.rs)) holds one `tokio::broadcast` channel per workspace, created lazily with capacity 128. Slow consumers lose events, and those losses are silently filtered out of the stream.
+- `WorkspaceEventBus` ([events.rs](../apps/server/src/events.rs)) holds one `tokio::broadcast` channel per watched workspace, created on subscribe with capacity 128. Publishing to a workspace nobody watches creates nothing, and the maintenance pass drops channels whose subscribers left. A consumer that falls behind receives a `resync` event (`{"type":"resync","missed":n}`) telling it to reload, instead of silently missing events.
 - Storage calls `JobObserver::on_job_changed` on every job insert or update, and `ActivityObserver::on_activity_recorded` on every activity row. The bus serialises these as `{"type":"job"|"activity", …}` with the SSE event name set to match.
+- *Hardening:* a stream lives no longer than the token that opened it. A watcher re-checks every 30 s and closes the stream once the token expires, the user's sessions are ended, or the user is no longer a member of the workspace.
 - **The SPA does not consume this stream or the jobs API.** A browser consumer also cannot use a native `EventSource`, because it cannot send the `Authorization` header. It needs a fetch-based SSE reader, or a token-in-query or cookie scheme.
+
+## 8b. Background processes (*hardening*)
+
+| Process | Where | What it does |
+|---|---|---|
+| Startup recovery | `build_state` in [lib.rs](../apps/server/src/lib.rs) | Marks every job a previous process left `running` or `pending` as failed ("Interrupted by a server restart."), whatever its kind, before queues start |
+| Index queue | [indexing.rs](../apps/server/src/indexing.rs) | §6.2 |
+| Embedding queue | [embedding.rs](../apps/server/src/embedding.rs) | §6.4 |
+| Repository syncs and polling | [repositories.rs](../apps/server/src/repositories.rs) | §6.10 |
+| Maintenance | [maintenance.rs](../apps/server/src/maintenance.rs) | Every hour (`REPOMEMO_MAINTENANCE_INTERVAL_MINUTES`), first one minute after start: purges expired refresh tokens, prunes finished jobs older than 90 days, collects orphan blobs and previews (§6.1), forgets idle rate-limit counters and event channels, re-queues missing embeddings, retries indexing that failed for good every 6 hours, and runs `PRAGMA optimize` plus a WAL checkpoint so the log does not grow without bound. A failing step is logged and the others still run |
 
 ---
 
@@ -556,7 +592,7 @@ Notes:
 | Entry | [main.tsx](../apps/desktop/src/main.tsx) loads fonts and CSS, then `App` chooses the runtime |
 | Routing | Custom: `navigate()` uses `history.pushState` plus a `popstate` listener, and `pathname.split("/")` is matched by hand in `SharedWebAppContent`. There is no router library |
 | Routes | `/login`, `/register`, `/dashboard`, `/profile`, `/notifications`, `/workspaces[?organization=&createOrganization=1]`, `/workspaces/:ws/:section`, `/workspaces/:ws/artifacts/:id`, `/workspaces/:ws/memory-cards/:id`, and a fallback `SharedRouteNotFound` |
-| Session | Token in `sessionStorage`. `hydrate()` loads session, organizations and workspaces in parallel on boot. The SPA does not handle 401 after boot, so an expired token shows up as a per-action error |
+| Session | Access token in `sessionStorage`, refresh token in `localStorage`. `hydrate()` loads session, organizations and workspaces in parallel on boot. A 401 triggers one silent refresh and a retry; when that fails the user is sent to sign-in. After a password change the client stores the fresh session the server returns. The profile page offers **Sign out everywhere** |
 | State | Local `useState` inside large components (`SharedWorkspaceDetail` has 50+ state hooks). There is no cache or query library. `load()` refetches capabilities, overview, metrics, artifacts, memory and facets, plus section-specific data, after most mutations |
 | API client | [sharedApi.ts](../apps/desktop/src/lib/sharedApi.ts) wraps `fetch`, adds `Bearer` and JSON, turns the error envelope into `SharedApiError(status, message)`, and uses `requestText` for Markdown export. It maps camelCase inputs to snake_case bodies |
 | Types | [types.ts](../apps/desktop/src/types.ts) mirrors the Rust `domain` DTOs by hand, in snake_case. There is no codegen |
@@ -592,17 +628,19 @@ Run the Rust tests with `cargo test`. See [DEVELOPMENT_COMMANDS.md](../docs/DEVE
 
 | # | Area | Issue | Suggested direction |
 |---|---|---|---|
-| 1 | Security | Provider API keys are stored in plaintext in SQLite | Encrypt at rest with a server key, or use an OS or secret store |
-| 2 | Scalability | Automatic indexing uses an in-process queue with 2 workers, no durable jobs, no retry policy, and the worker crate is a stub. The SPA polls instead of following SSE | Durable job queue claimed by the worker, retries with backoff, SSE progress |
-| 3 | Auth | No refresh or revocation, and a password change leaves old tokens valid | Short access token plus refresh, and a token version per user |
-| 4 | Cost / abuse | Viewers can trigger Ask and the AI overview, including on cloud providers | A capability flag for AI use, and rate limits |
-| 5 | Correctness | Error classification by substring matching, and not-found returns 400 | Typed errors from storage and core |
+| 1 | Security | ✅ *Mitigated:* provider API keys are encrypted at rest and never follow a changed endpoint. Residual: without `REPOMEMO_SECRET_KEY` the key file sits next to the database, so a copy of the whole data directory still reveals them | Set `REPOMEMO_SECRET_KEY` from a secret store in production |
+| 2 | Scalability | Automatic indexing uses an in-process queue with 2 workers (retries with backoff, failures retried every 6 hours, stale jobs closed at startup), and the worker crate is a stub. The SPA polls instead of following SSE | Durable job queue claimed by the worker, SSE progress in the client |
+| 3 | Auth | ✅ *Mitigated:* rotating refresh tokens, session versions (password change and sign-out-everywhere end every session at once), sign-in throttling and lockout. Residual: rate-limit counters are per process and reset on restart | Shared counters if the server is ever scaled out |
+| 4 | Cost / abuse | ✅ *Mitigated:* per-workspace AI policy and a per-user hourly AI quota | Per-workspace budgets if needed |
+| 5 | Correctness | Error classification by substring matching; not-found is now 404 | Typed errors from storage and core |
 | 6 | Performance | Vector search scans the whole table in Rust. Metrics and `artifacts/query` load everything into memory. The dashboard makes N+1 metrics calls | ANN or an index (Qdrant is per [ADR-0004](../docs/decisions/0004-embedded-vector-storage-before-qdrant.md)), SQL aggregation, and a batched metrics endpoint |
 | 7 | Scale | Vector search scans every embedding of the workspace per query (§6.4) | An ANN index (sqlite-vec) or a per-workspace in-memory vector cache |
-| 8 | Storage | Orphan blobs are never garbage-collected | Reference-counted GC job |
+| 8 | Storage | ✅ *Done:* orphan blobs and previews are garbage-collected by the maintenance pass | — |
 | 9 | Frontend maintainability | `SharedWebApp.tsx` ~2k LOC, `App.tsx` ~2.7k, `styles.css` ~6.1k, a hand-rolled router, no tests | Split per route and section, add a router and a query cache, add component tests |
 | 10 | UX correctness | Literal `<mark>` in snippets, and Markdown shown as raw text | Render the snippet safely and use `react-markdown` |
 | 11 | Data integrity | `ON DELETE RESTRICT` on creator FKs blocks future user deletion | Decide on the account-deletion policy |
+| 12 | Security | A workspace owner or admin can link any repository the server account can read | Set `REPOMEMO_REPO_ROOTS` (*hardening*) and run the server under a narrow account |
+| 13 | Security | Outbound provider URLs are checked by name and literal address only; a host name that resolves to a metadata address is not caught | `REPOMEMO_AI_ALLOWED_HOSTS`, or egress rules on the host |
 
 ---
 

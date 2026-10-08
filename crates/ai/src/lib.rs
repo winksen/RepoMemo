@@ -1,7 +1,11 @@
+use std::net::IpAddr;
+use std::sync::OnceLock;
+use std::time::Duration;
+
 use anyhow::{bail, Context, Result};
 use base64::{engine::general_purpose::STANDARD, Engine};
 use repomemo_domain::{ProviderSettings, ProviderTestResult};
-use serde::Deserialize;
+use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::{json, Value};
 
 const DEFAULT_BASE_URL: &str = "http://127.0.0.1:11434";
@@ -10,6 +14,159 @@ const OPENROUTER_BASE_URL: &str = "https://openrouter.ai/api/v1";
 /// Context window requested from Ollama. Its default is small enough that
 /// retrieved context is cut off silently, so ask for room explicitly.
 const OLLAMA_NUM_CTX: u64 = 8_192;
+/// Largest provider response read into memory. Model lists and embedding
+/// batches are a few megabytes at most; anything bigger is a misconfigured or
+/// hostile endpoint.
+const MAX_RESPONSE_BYTES: usize = 32 * 1024 * 1024;
+/// Error bodies are only read for their message.
+const MAX_ERROR_BODY_BYTES: usize = 64 * 1024;
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// Host names of cloud instance-metadata services. A provider URL pointing at
+/// one could read the server's cloud credentials.
+const METADATA_HOSTS: &[&str] = &[
+    "metadata",
+    "metadata.google.internal",
+    "metadata.goog",
+    "instance-data",
+    "instance-data.ec2.internal",
+    "metadata.azure.internal",
+];
+
+/// Which addresses AI providers may be reached at. The server sets it once at
+/// startup from its configuration; without it every host is allowed except
+/// link-local and cloud-metadata addresses, which are always refused.
+#[derive(Debug, Clone, Default)]
+pub struct EndpointPolicy {
+    /// When set, a provider's host must equal one of these names, or end with
+    /// one that starts with a dot (`.example.com`).
+    pub allowed_hosts: Option<Vec<String>>,
+}
+
+static ENDPOINT_POLICY: OnceLock<EndpointPolicy> = OnceLock::new();
+
+/// Installs the endpoint policy for this process. Returns false when one was
+/// already installed (the first one stays).
+pub fn set_endpoint_policy(policy: EndpointPolicy) -> bool {
+    ENDPOINT_POLICY.set(policy).is_ok()
+}
+
+fn endpoint_policy() -> &'static EndpointPolicy {
+    ENDPOINT_POLICY.get_or_init(EndpointPolicy::default)
+}
+
+/// Refuses provider URLs that would turn the server into a proxy towards
+/// places it should never call: credentials embedded in the URL, link-local
+/// and cloud-metadata addresses, and hosts outside the operator's allow-list.
+pub fn check_provider_url(base_url: &str) -> Result<()> {
+    check_provider_url_with(base_url, endpoint_policy())
+}
+
+fn check_provider_url_with(base_url: &str, policy: &EndpointPolicy) -> Result<()> {
+    let url = reqwest::Url::parse(base_url.trim())
+        .map_err(|_| anyhow::anyhow!("Provider base URL is not a valid URL."))?;
+    if !matches!(url.scheme(), "http" | "https") {
+        bail!("Provider base URL must start with http:// or https://.")
+    }
+    if !url.username().is_empty() || url.password().is_some() {
+        bail!("Remove the user name and password from the provider base URL; use the API key field instead.")
+    }
+    let host = url
+        .host_str()
+        .map(|host| {
+            host.trim_start_matches('[')
+                .trim_end_matches(']')
+                .trim_end_matches('.')
+                .to_ascii_lowercase()
+        })
+        .filter(|host| !host.is_empty())
+        .context("Provider base URL must name a host.")?;
+    if METADATA_HOSTS.contains(&host.as_str()) {
+        bail!("Provider base URL points at a cloud metadata service, which is not allowed.")
+    }
+    if let Ok(address) = host.parse::<IpAddr>() {
+        if is_forbidden_address(&address) {
+            bail!("Provider base URL points at a link-local or reserved address ({address}), which is not allowed.")
+        }
+    }
+    if let Some(allowed) = &policy.allowed_hosts {
+        let permitted = allowed.iter().any(|entry| {
+            let entry = entry.trim().to_ascii_lowercase();
+            match entry.strip_prefix('.') {
+                Some(suffix) => host == suffix || host.ends_with(&format!(".{suffix}")),
+                None => host == entry,
+            }
+        });
+        if !permitted {
+            bail!(
+                "The server only allows AI providers at: {}. Ask the server operator to add {host}.",
+                allowed.join(", ")
+            )
+        }
+    }
+    Ok(())
+}
+
+fn is_forbidden_address(address: &IpAddr) -> bool {
+    match address {
+        IpAddr::V4(v4) => {
+            v4.is_link_local()
+                || v4.is_unspecified()
+                || v4.is_broadcast()
+                || v4.is_multicast()
+                // Alibaba Cloud's metadata service.
+                || v4.octets() == [100, 100, 100, 200]
+        }
+        IpAddr::V6(v6) => {
+            if let Some(mapped) = v6.to_ipv4_mapped() {
+                return is_forbidden_address(&IpAddr::V4(mapped));
+            }
+            let first = v6.segments()[0];
+            v6.is_unspecified()
+                || v6.is_multicast()
+                // fe80::/10 link-local.
+                || (first & 0xffc0) == 0xfe80
+                // AWS's IPv6 metadata endpoint fd00:ec2::254.
+                || v6.segments() == [0xfd00, 0x0ec2, 0, 0, 0, 0, 0, 0x0254]
+        }
+    }
+}
+
+/// An HTTP client for provider calls. Redirects are not followed: a provider
+/// answering with one could otherwise bounce requests (and API keys) to an
+/// address the URL checks never saw.
+fn provider_client(timeout: Duration) -> reqwest::Result<reqwest::Client> {
+    reqwest::Client::builder()
+        .timeout(timeout)
+        .connect_timeout(CONNECT_TIMEOUT)
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+}
+
+/// Reads at most `limit` bytes of a response body.
+async fn read_body_limited(mut response: reqwest::Response, limit: usize) -> Result<Vec<u8>> {
+    let too_large = || anyhow::anyhow!("the provider response is larger than {} KiB", limit / 1024);
+    if response.content_length().is_some_and(|length| length > limit as u64) {
+        return Err(too_large());
+    }
+    let mut body = Vec::new();
+    while let Some(chunk) = response.chunk().await? {
+        if body.len() + chunk.len() > limit {
+            return Err(too_large());
+        }
+        body.extend_from_slice(&chunk);
+    }
+    Ok(body)
+}
+
+/// Decodes a JSON response body, refusing oversized ones.
+async fn read_json<T: DeserializeOwned>(response: reqwest::Response, invalid: &str) -> Result<T> {
+    let body = read_body_limited(response, MAX_RESPONSE_BYTES)
+        .await
+        .with_context(|| invalid.to_owned())?;
+    serde_json::from_slice(&body).with_context(|| invalid.to_owned())
+}
+
 const DEFAULT_SYSTEM_PROMPT: &str = "You are RepoMemo's assistant for a workspace of technical material. Use only the supplied context, never invent details, and say so when the context is not enough.";
 
 #[derive(Debug, Clone)]
@@ -70,9 +227,7 @@ impl OllamaProvider {
             .to_owned();
         Ok(Self {
             settings,
-            client: reqwest::Client::builder()
-                .timeout(std::time::Duration::from_secs(45))
-                .build()
+            client: provider_client(Duration::from_secs(45))
                 .context("failed to configure local AI client")?,
             base_url,
             model,
@@ -104,10 +259,8 @@ impl AiProvider for OllamaProvider {
             .await
             .context("could not reach the local Ollama provider")?;
         let response = checked(response, "The local Ollama provider rejected the request").await?;
-        let body: OllamaGenerateResponse = response
-            .json()
-            .await
-            .context("local Ollama provider returned an invalid response")?;
+        let body: OllamaGenerateResponse =
+            read_json(response, "local Ollama provider returned an invalid response").await?;
         let answer = body.response.trim().to_owned();
         if answer.is_empty() {
             bail!("local Ollama provider returned an empty summary")
@@ -130,10 +283,8 @@ impl AiProvider for OllamaProvider {
             .await
             .context("could not reach the local Ollama provider")?;
         let response = checked(response, "The local Ollama provider could not build embeddings").await?;
-        let body: OllamaEmbedResponse = response
-            .json()
-            .await
-            .context("local Ollama provider returned invalid embeddings")?;
+        let body: OllamaEmbedResponse =
+            read_json(response, "local Ollama provider returned invalid embeddings").await?;
         ensure_embeddings(body.embeddings, count)
     }
 
@@ -174,13 +325,10 @@ impl AiProvider for OllamaProvider {
             .get(self.endpoint("/api/tags"))
             .send()
             .await
-            .context("could not reach the local Ollama provider")?
-            .error_for_status()
-            .context("local Ollama provider rejected the connection test")?;
-        let body: OllamaTagsResponse = response
-            .json()
-            .await
-            .context("local Ollama provider returned an invalid response")?;
+            .context("could not reach the local Ollama provider")?;
+        let response = checked(response, "local Ollama provider rejected the connection test").await?;
+        let body: OllamaTagsResponse =
+            read_json(response, "local Ollama provider returned an invalid response").await?;
         let model_available = body.models.iter().any(|model| model.name == self.model);
         Ok(ProviderTestResult {
             provider_id: self.settings.id.clone(),
@@ -232,9 +380,7 @@ impl OpenRouterProvider {
                 .trim()
                 .to_owned(),
             api_key,
-            client: reqwest::Client::builder()
-                .timeout(std::time::Duration::from_secs(60))
-                .build()
+            client: provider_client(Duration::from_secs(60))
                 .context("failed to configure cloud AI client")?,
             settings,
         })
@@ -279,11 +425,11 @@ impl AiProvider for OpenRouterProvider {
             .send()
             .await
             .context("could not reach OpenRouter")?;
-        let body: Value = checked(response, "OpenRouter could not build embeddings")
-            .await?
-            .json()
-            .await
-            .context("OpenRouter returned invalid embeddings")?;
+        let body: Value = read_json(
+            checked(response, "OpenRouter could not build embeddings").await?,
+            "OpenRouter returned invalid embeddings",
+        )
+        .await?;
         if let Some(message) = error_message(&body) {
             bail!("OpenRouter could not build embeddings: {message}")
         }
@@ -367,11 +513,11 @@ impl AiProvider for OpenRouterProvider {
             .send()
             .await
             .context("could not reach OpenRouter")?;
-        let models: Value = checked(models, "OpenRouter could not list its models")
-            .await?
-            .json()
-            .await
-            .context("OpenRouter returned an invalid model list")?;
+        let models: Value = read_json(
+            checked(models, "OpenRouter could not list its models").await?,
+            "OpenRouter returned an invalid model list",
+        )
+        .await?;
         let ids = models["data"]
             .as_array()
             .map(|entries| entries.iter().filter_map(|entry| entry["id"].as_str()).collect::<Vec<_>>());
@@ -487,7 +633,10 @@ async fn checked(response: reqwest::Response, action: &str) -> Result<reqwest::R
     if status.is_success() {
         return Ok(response);
     }
-    let body = response.text().await.unwrap_or_default();
+    let body = read_body_limited(response, MAX_ERROR_BODY_BYTES)
+        .await
+        .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
+        .unwrap_or_default();
     let detail = serde_json::from_str::<Value>(&body)
         .ok()
         .and_then(|value| error_message(&value))
@@ -497,6 +646,7 @@ async fn checked(response: reqwest::Response, action: &str) -> Result<reqwest::R
         402 => " The provider account has run out of credits.",
         404 => " Check the model id; on OpenRouter also check the privacy settings, which can rule out every provider for a model.",
         429 => " The provider is rate limiting requests; try again shortly.",
+        300..=399 => " The provider answered with a redirect, which is not followed; enter the final address as the base URL.",
         _ => "",
     };
     if detail.is_empty() {
@@ -528,10 +678,7 @@ fn error_message(value: &Value) -> Option<String> {
 /// The first choice's text. OpenRouter can answer 200 with an `error` object
 /// when the upstream model fails, so that is checked first.
 async fn openrouter_answer(response: reqwest::Response, empty_message: &str) -> Result<String> {
-    let body: Value = response
-        .json()
-        .await
-        .context("OpenRouter returned an invalid response")?;
+    let body: Value = read_json(response, "OpenRouter returned an invalid response").await?;
     if let Some(message) = error_message(&body) {
         bail!("OpenRouter could not complete the request: {message}")
     }
@@ -604,10 +751,8 @@ impl AiProvider for ConfiguredProvider {
 }
 
 async fn ollama_image_answer(response: reqwest::Response) -> Result<String> {
-    let body: OllamaGenerateResponse = response
-        .json()
-        .await
-        .context("the vision provider returned an invalid response")?;
+    let body: OllamaGenerateResponse =
+        read_json(response, "the vision provider returned an invalid response").await?;
     let answer = body.response.trim().to_owned();
     if answer.is_empty() {
         bail!("the vision provider returned an empty image description")
@@ -631,6 +776,7 @@ pub fn validate_settings(settings: &ProviderSettings) -> Result<()> {
     if !(base_url.starts_with("http://") || base_url.starts_with("https://")) {
         bail!("Provider base URL must start with http:// or https://.")
     }
+    check_provider_url(base_url)?;
     if settings
         .model
         .as_deref()
@@ -759,6 +905,44 @@ mod tests {
         );
         assert_eq!(error_message(&json!({"error": "model 'llama9' not found"})).as_deref(), Some("model 'llama9' not found"));
         assert_eq!(error_message(&json!({"choices": []})), None);
+    }
+
+    #[test]
+    fn provider_urls_cannot_reach_metadata_or_embed_credentials() {
+        use super::{check_provider_url_with, EndpointPolicy};
+        let open = EndpointPolicy::default();
+        for allowed in [
+            "http://127.0.0.1:11434",
+            "http://localhost:11434",
+            "https://openrouter.ai/api/v1",
+            "http://192.168.1.20:11434",
+            "http://[::1]:11434",
+        ] {
+            assert!(check_provider_url_with(allowed, &open).is_ok(), "{allowed} should be allowed");
+        }
+        for refused in [
+            "http://169.254.169.254/latest/meta-data",
+            "http://metadata.google.internal/computeMetadata/v1",
+            "http://[fe80::1]:11434",
+            "http://[fd00:ec2::254]/",
+            "http://[::ffff:169.254.169.254]/",
+            "http://0.0.0.0:11434",
+            "http://100.100.100.200/",
+            "http://user:secret@example.com/",
+            "ftp://example.com/",
+            "not a url",
+        ] {
+            assert!(check_provider_url_with(refused, &open).is_err(), "{refused} should be refused");
+        }
+
+        let restricted = EndpointPolicy {
+            allowed_hosts: Some(vec!["127.0.0.1".to_owned(), ".openrouter.ai".to_owned()]),
+        };
+        assert!(check_provider_url_with("http://127.0.0.1:11434", &restricted).is_ok());
+        assert!(check_provider_url_with("https://openrouter.ai/api/v1", &restricted).is_ok());
+        assert!(check_provider_url_with("https://eu.openrouter.ai/api/v1", &restricted).is_ok());
+        assert!(check_provider_url_with("https://evil-openrouter.ai/api/v1", &restricted).is_err());
+        assert!(check_provider_url_with("http://10.0.0.5:11434", &restricted).is_err());
     }
 
     #[test]

@@ -213,6 +213,10 @@ pub struct WorkspaceCapabilities {
     pub can_moderate_comments: bool,
     /// Whether the member may inspect the stored index chunks of an artifact.
     pub can_inspect_index: bool,
+    /// Whether the member may use AI features (answers, overviews, summaries,
+    /// the assistant's AI actions), per the workspace's AI policy.
+    #[serde(default)]
+    pub can_use_ai: bool,
 }
 
 /// A citation-backed workspace briefing generated through an enabled provider.
@@ -1179,6 +1183,11 @@ pub struct AgentRequest {
     /// Target file for capabilities that work on one artifact.
     pub artifact_id: Option<String>,
     pub provider_id: Option<String>,
+    /// Why AI may not be used for this request even though a provider may be
+    /// enabled (for example the workspace keeps AI to some roles). Shown in
+    /// place of the "no provider" reply when an AI capability is asked for.
+    #[serde(default)]
+    pub ai_unavailable_reason: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

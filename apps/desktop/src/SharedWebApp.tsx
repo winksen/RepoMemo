@@ -60,6 +60,7 @@ import {
   IconUser as UserIcon,
   IconUpload as Upload,
   IconUserCircle as UserCircle,
+  IconLogout as Logout,
 } from "@tabler/icons-react";
 import {
   askSharedWorkspace,
@@ -69,6 +70,7 @@ import {
   createSharedSavedSearch,
   createSharedTaskChecklistItem,
   changeSharedPassword,
+  signOutEverywhere,
   createSharedMemoryCard,
   createSharedTextArtifact,
   createSharedWorkspace,
@@ -196,6 +198,7 @@ import { RichNoteEditor } from "./components/RichNoteEditor";
 import { DocumentViewer } from "./components/DocumentViewer";
 import { ImagePreview } from "./components/ImagePreview";
 import { DOCUMENT_ACCEPT, DOCUMENT_KIND_LABEL, documentKindOf, isDocumentArtifact } from "./lib/documents";
+import { AiPolicySettings } from "./components/AiPolicySettings";
 import { AiProviderForm } from "./components/AiProviderForm";
 import { AssistantPanel } from "./components/AssistantPanel";
 import { KnowledgeMapPanel } from "./components/KnowledgeMapPanel";
@@ -650,6 +653,7 @@ function SharedProfile({
   const [notice, setNotice] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isConfirmingSignOut, setIsConfirmingSignOut] = useState(false);
 
   async function load() {
     setIsLoading(true); setError(null);
@@ -684,8 +688,17 @@ function SharedProfile({
     try {
       await changeSharedPassword(accessToken, { currentPassword, newPassword });
       setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
-      setNotice("Password changed.");
+      setNotice("Password changed. You were signed out on every other device.");
     } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
+  }
+
+  async function endAllSessions() {
+    setIsSubmitting(true); setError(null); setNotice(null);
+    try {
+      await signOutEverywhere(accessToken);
+      setIsConfirmingSignOut(false);
+      signOut();
+    } catch (requestError) { setError(apiMessage(requestError)); setIsSubmitting(false); }
   }
 
   const initials = (profile?.user.display_name ?? session.user.display_name).split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "U";
@@ -701,6 +714,8 @@ function SharedProfile({
         <section className="shared-profile-assigned"><div className="shared-panel-heading"><div><Checklist size={18} /><h2>Assigned to you</h2></div><span>{assignedTasks.length} active</span></div>{assignedTasks.length ? <div className="shared-profile-task-list">{assignedTasks.map((task) => <Button key={task.id} onClick={() => navigate(`/workspaces/${encodeURIComponent(task.workspace_id)}/tasks`)} type="button" variant="secondary"><span><strong>{task.title}</strong><small>{task.status.replace(/_/g, " ")} · {task.priority} priority{task.due_at ? ` · due ${formatTaskDueDate(task.due_at)}` : ""}</small></span><ChevronRight size={16} /></Button>)}</div> : <p className="shared-muted-copy">No active tasks are assigned to you.</p>}</section>
         <section className="shared-profile-panel"><div className="shared-panel-heading"><div><UserCircle size={18} /><h2>Personal details</h2></div></div><form onSubmit={saveProfile}><label>Display name<Input autoComplete="name" onChange={(event) => setDisplayName(event.target.value)} required value={displayName} /></label><label>Email<Input disabled value={profile?.user.email ?? session.user.email ?? ""} /></label><Button disabled={isSubmitting} type="submit" variant="main">{isSubmitting ? <Loader className="spin" size={16} /> : <Pencil size={16} />} Save details</Button></form></section>
         <section className="shared-profile-panel"><div className="shared-panel-heading"><div><Key size={18} /><h2>Password</h2></div></div><form onSubmit={changePassword}><label>Current password<Input autoComplete="current-password" minLength={12} onChange={(event) => setCurrentPassword(event.target.value)} required type="password" value={currentPassword} /></label><label>New password<Input autoComplete="new-password" minLength={12} onChange={(event) => setNewPassword(event.target.value)} placeholder="At least 12 characters" required type="password" value={newPassword} /></label><label>Confirm new password<Input autoComplete="new-password" minLength={12} onChange={(event) => setConfirmPassword(event.target.value)} required type="password" value={confirmPassword} /></label><Button disabled={isSubmitting} type="submit" variant="secondary">{isSubmitting ? <Loader className="spin" size={16} /> : <Key size={16} />} Change password</Button></form></section>
+        <section className="shared-profile-panel"><div className="shared-panel-heading"><div><Logout size={18} /><h2>Sessions</h2></div></div><p className="shared-muted-copy">Signed in on a shared or lost device? End every session at once, this one included. Changing your password also ends your sessions on other devices.</p><Button disabled={isSubmitting} onClick={() => setIsConfirmingSignOut(true)} type="button" variant="secondary"><Logout size={16} /> Sign out everywhere</Button></section>
+        <Dialog description="Every device signed in to your account is signed out, including this one. You will need your password to sign in again." footer={<><DialogCancel onClick={() => setIsConfirmingSignOut(false)} /><Button disabled={isSubmitting} onClick={() => void endAllSessions()} type="button" variant="main">{isSubmitting ? <Loader className="spin" size={16} /> : <Logout size={16} />} Sign out everywhere</Button></>} onClose={() => setIsConfirmingSignOut(false)} open={isConfirmingSignOut} title="Sign out of every session?" />
       </div>
     </section>
   </SharedLayout>;
@@ -1806,6 +1821,7 @@ function SharedWorkspaceDetail({
               <AiProviderForm accessToken={accessToken} onSaved={onProviderSaved} providers={aiProviders} purpose="text" workspaceId={workspace.workspace.id} />
               <AiProviderForm accessToken={accessToken} onSaved={onProviderSaved} providers={aiProviders} purpose="vision" workspaceId={workspace.workspace.id} />
               <AiProviderForm accessToken={accessToken} onSaved={onProviderSaved} providers={aiProviders} purpose="embedding" status={embeddingStatus} workspaceId={workspace.workspace.id} />
+              <AiPolicySettings accessToken={accessToken} key={`ai-policy-${workspace.workspace.id}`} onSaved={() => void load()} workspaceId={workspace.workspace.id} />
               <RepositorySettings accessToken={accessToken} key={`repositories-${workspace.workspace.id}`} onChanged={() => void load()} workspaceId={workspace.workspace.id} />
               {canManageWorkspace ? <section className="shared-settings-group">
                 <div className="shared-panel-heading"><div><Settings size={18} /><h2>Workspace ownership</h2></div><span>owner only</span></div>

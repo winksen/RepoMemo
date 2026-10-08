@@ -1,4 +1,6 @@
 import type {
+  AiMinRole,
+  AiPolicy,
   AgentCapabilities,
   AgentConversation,
   AgentConversationDetail,
@@ -61,8 +63,8 @@ const API_URL = (import.meta.env.VITE_REPOMEMO_API_URL ?? "http://127.0.0.1:3020
 
 export const sharedApiUrl = API_URL;
 
-export function getSharedHealth(): Promise<{ service: string; status: string; authentication: string }> {
-  return request<{ service: string; status: string; authentication: string }>("/health");
+export function getSharedHealth(): Promise<{ service: string; status: string; authentication: string; registration_open?: boolean }> {
+  return request<{ service: string; status: string; authentication: string; registration_open?: boolean }>("/health");
 }
 
 export const SHARED_SESSION_STORAGE_KEY = "repomemo.shared.access-token";
@@ -287,11 +289,24 @@ export function updateSharedProfile(accessToken: string, displayName: string): P
   }, accessToken);
 }
 
-export function changeSharedPassword(accessToken: string, input: { currentPassword: string; newPassword: string }): Promise<void> {
-  return request<void>("/v1/profile/password", {
+/** Changes the password. The server ends every other session and returns a fresh one for this tab, which replaces the current tokens. */
+export async function changeSharedPassword(accessToken: string, input: { currentPassword: string; newPassword: string }): Promise<void> {
+  const response = await request<TokenResponse | null>("/v1/profile/password", {
     method: "POST",
     body: JSON.stringify({ current_password: input.currentPassword, new_password: input.newPassword }),
   }, accessToken);
+  if (response?.access_token && response.refresh_token) {
+    storeTokens(response);
+    // Components still hold the old token; route their next requests to the new one.
+    refreshedTokens.set(latestToken(accessToken), response.access_token);
+  }
+}
+
+/** Signs out of every session on every device, this one included. */
+export async function signOutEverywhere(accessToken: string): Promise<void> {
+  await request<void>("/v1/auth/logout-all", { method: "POST" }, accessToken);
+  writeStorage("sessionStorage", SHARED_SESSION_STORAGE_KEY, null);
+  writeStorage("localStorage", REFRESH_STORAGE_KEY, null);
 }
 
 export function listSharedOrganizations(accessToken: string): Promise<Organization[]> {
@@ -448,6 +463,17 @@ export function saveSharedWorkspaceAiProvider(accessToken: string, workspaceId: 
       cloud_content_acknowledged: input.cloudContentAcknowledged,
       purpose: input.purpose,
     }),
+  }, accessToken);
+}
+
+export function getSharedAiPolicy(accessToken: string, workspaceId: string): Promise<AiPolicy> {
+  return request<AiPolicy>(`/v1/workspaces/${workspaceId}/ai-policy`, {}, accessToken);
+}
+
+export function saveSharedAiPolicy(accessToken: string, workspaceId: string, minRole: AiMinRole): Promise<AiPolicy> {
+  return request<AiPolicy>(`/v1/workspaces/${workspaceId}/ai-policy`, {
+    method: "PUT",
+    body: JSON.stringify({ min_role: minRole }),
   }, accessToken);
 }
 
@@ -735,7 +761,8 @@ export async function uploadSharedArtifact(accessToken: string, workspaceId: str
       Accept: "application/json",
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": file.type || "application/octet-stream",
-      "X-RepoMemo-Filename": file.name,
+      // Percent-encoded so names outside ASCII survive the header.
+      "X-RepoMemo-Filename": encodeURIComponent(file.name),
       ...(folderId ? { "X-RepoMemo-Folder-Id": folderId } : {}),
     },
     body: file,

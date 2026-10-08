@@ -7,8 +7,9 @@
 //! never waits on a large repository.
 
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     sync::{Arc, Mutex},
+    time::{Duration, Instant},
 };
 
 use axum::{
@@ -25,9 +26,13 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::Semaphore;
 
 use crate::{
-    embedding::EmbeddingQueue, record_workspace_activity, require_workspace_admin,
+    ai_access, embedding::EmbeddingQueue, record_workspace_activity, require_workspace_admin,
     require_workspace_read, require_workspace_write, ApiError, AppState, AuthenticatedSubject,
 };
+
+/// An automatic sync towards the same commit is not tried again sooner than
+/// this, so a repository whose sync keeps failing is not retried every poll.
+const AUTO_SYNC_RETRY_AFTER: Duration = Duration::from_secs(3600);
 
 /// Runs repository syncs in the background, one at a time across the server,
 /// and never two for the same repository.
@@ -37,6 +42,9 @@ pub(crate) struct RepoSyncRunner {
     embeddings: EmbeddingQueue,
     running: Arc<Mutex<HashSet<String>>>,
     permits: Arc<Semaphore>,
+    /// The commit each repository was last synced towards automatically, and
+    /// when.
+    auto_attempts: Arc<Mutex<HashMap<String, (String, Instant)>>>,
 }
 
 impl RepoSyncRunner {
@@ -46,7 +54,85 @@ impl RepoSyncRunner {
             embeddings,
             running: Arc::new(Mutex::new(HashSet::new())),
             permits: Arc::new(Semaphore::new(1)),
+            auto_attempts: Arc::new(Mutex::new(HashMap::new())),
         }
+    }
+
+    fn is_running(&self, source_id: &str) -> bool {
+        self.running
+            .lock()
+            .map(|running| running.contains(source_id))
+            .unwrap_or(true)
+    }
+
+    /// Checks every repository's branch each `interval` and syncs the ones
+    /// that moved, so the workspace follows new commits without anyone
+    /// pressing Sync now.
+    pub(crate) fn start_polling(&self, interval: Duration) {
+        let runner = self.clone();
+        tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(interval).await;
+                let started = runner.poll_once().await;
+                if started > 0 {
+                    tracing::info!(count = started, "Started automatic repository syncs for branches that moved");
+                }
+            }
+        });
+    }
+
+    /// One polling round. Returns how many syncs it started.
+    pub(crate) async fn poll_once(&self) -> usize {
+        let source_ids = match self.core.list_all_repo_source_ids().await {
+            Ok(ids) => ids,
+            Err(error) => {
+                tracing::warn!(error = %error, "Failed to list repositories to poll");
+                return 0;
+            }
+        };
+        let mut started = 0;
+        for source_id in source_ids {
+            if self.is_running(&source_id) {
+                continue;
+            }
+            let head = match self.core.repo_head(&source_id).await {
+                Ok(head) => head,
+                Err(error) => {
+                    tracing::debug!(repository = %source_id, error = %format!("{error:#}"), "Could not read a repository's branch");
+                    continue;
+                }
+            };
+            if !head.moved() || head.last_synced.is_none() {
+                // Never synced successfully: that needs a person to look.
+                continue;
+            }
+            let recently_tried = self
+                .auto_attempts
+                .lock()
+                .map(|attempts| {
+                    attempts.get(&source_id).is_some_and(|(commit, at)| {
+                        commit == &head.current && at.elapsed() < AUTO_SYNC_RETRY_AFTER
+                    })
+                })
+                .unwrap_or(true);
+            if recently_tried {
+                continue;
+            }
+            let Ok(source) = self.core.repo_source(&source_id).await else {
+                continue;
+            };
+            if let Ok(mut attempts) = self.auto_attempts.lock() {
+                attempts.insert(source_id.clone(), (head.current.clone(), Instant::now()));
+            }
+            match self.start(&source, None).await {
+                Ok(Some(_)) => started += 1,
+                Ok(None) => {}
+                Err(error) => {
+                    tracing::warn!(repository = %source.name, error = %error, "Failed to queue an automatic repository sync");
+                }
+            }
+        }
+        started
     }
 
     /// Queues a sync. Returns `None` when one is already running for the
@@ -394,10 +480,11 @@ pub(crate) async fn get_repository_detail(
     Path(source_id): Path<String>,
 ) -> Result<Json<RepositoryDetailResponse>, ApiError> {
     let detail = state.core.repo_detail(&source_id).await.map_err(map_repo_error)?;
-    require_workspace_read(&state, &subject, &detail.repository.workspace_id).await?;
+    let role = require_workspace_read(&state, &subject, &detail.repository.workspace_id).await?;
     let ai_available = text_provider(&state, &detail.repository.workspace_id)
         .await?
-        .is_some();
+        .is_some()
+        && ai_access::role_may_use_ai(&state, &detail.repository.workspace_id, &role).await?;
     Ok(Json(RepositoryDetailResponse { detail, ai_available }))
 }
 
@@ -409,7 +496,7 @@ pub(crate) async fn summarize_repository(
     Path(source_id): Path<String>,
 ) -> Result<Json<RepoSummary>, ApiError> {
     let repository = load_repository(&state, &source_id).await?;
-    require_workspace_write(&state, &subject, &repository.workspace_id).await?;
+    let role = require_workspace_write(&state, &subject, &repository.workspace_id).await?;
     let provider = text_provider(&state, &repository.workspace_id)
         .await?
         .ok_or_else(|| {
@@ -417,6 +504,7 @@ pub(crate) async fn summarize_repository(
                 "No text AI provider is enabled for this workspace. An administrator can set one up in Settings. No content was sent.",
             )
         })?;
+    ai_access::authorize_ai_use(&state, &subject, &repository.workspace_id, &role).await?;
     let summary = state
         .core
         .summarize_repo(&source_id, &provider.id)

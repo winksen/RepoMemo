@@ -56,12 +56,33 @@ impl WorkspaceEventBus {
     }
 
     pub fn publish(&self, event: WorkspaceEvent) {
-        let workspace_id = event.workspace_id().to_owned();
-        let sender = self.sender_for(&workspace_id);
-        // Ignore the "no active subscribers" error: it just means nobody is
-        // listening right now. Broadcast keeps the last `CHANNEL_CAPACITY`
-        // messages so a fresh subscriber sees them.
-        let _ = sender.send(event);
+        // A broadcast channel only delivers to receivers that already exist,
+        // so a workspace nobody is watching needs no channel at all.
+        let sender = self
+            .channels
+            .lock()
+            .ok()
+            .and_then(|channels| channels.get(event.workspace_id()).cloned());
+        if let Some(sender) = sender {
+            // Fails only when every subscriber left; `prune` drops the channel.
+            let _ = sender.send(event);
+        }
+    }
+
+    /// Drops the channels of workspaces nobody is subscribed to any more.
+    /// Returns how many were dropped.
+    pub fn prune(&self) -> usize {
+        let Ok(mut channels) = self.channels.lock() else {
+            return 0;
+        };
+        let before = channels.len();
+        channels.retain(|_, sender| sender.receiver_count() > 0);
+        before - channels.len()
+    }
+
+    #[cfg(test)]
+    fn channel_count(&self) -> usize {
+        self.channels.lock().map(|channels| channels.len()).unwrap_or(0)
     }
 
     fn sender_for(&self, workspace_id: &str) -> broadcast::Sender<WorkspaceEvent> {
@@ -112,5 +133,41 @@ impl ActivityObserver for BusActivityObserver {
         self.bus.publish(WorkspaceEvent::Activity {
             event: event.clone(),
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn activity(workspace_id: &str) -> WorkspaceEvent {
+        WorkspaceEvent::Activity {
+            event: WorkspaceActivityEvent {
+                id: "event".to_owned(),
+                workspace_id: workspace_id.to_owned(),
+                actor: None,
+                action: "test".to_owned(),
+                subject_type: "workspace".to_owned(),
+                subject_id: None,
+                summary: "Test".to_owned(),
+                created_at: "2026-01-01T00:00:00Z".to_owned(),
+            },
+        }
+    }
+
+    #[test]
+    fn events_reach_subscribers_and_idle_channels_are_dropped() {
+        let bus = WorkspaceEventBus::new();
+        bus.publish(activity("unwatched"));
+        assert_eq!(bus.channel_count(), 0, "publishing creates no channel");
+
+        let mut receiver = bus.subscribe("watched");
+        bus.publish(activity("watched"));
+        assert!(matches!(receiver.try_recv(), Ok(WorkspaceEvent::Activity { .. })));
+        assert_eq!(bus.prune(), 0);
+
+        drop(receiver);
+        assert_eq!(bus.prune(), 1);
+        assert_eq!(bus.channel_count(), 0);
     }
 }

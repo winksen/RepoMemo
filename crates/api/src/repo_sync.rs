@@ -70,6 +70,21 @@ impl RepoSourceMetadata {
     }
 }
 
+/// Where a repository's branch is now, and where it was at the last sync.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RepoHead {
+    pub current: String,
+    /// `None` until a sync has completed.
+    pub last_synced: Option<String>,
+}
+
+impl RepoHead {
+    /// The branch points at another commit than the last synced one.
+    pub fn moved(&self) -> bool {
+        self.last_synced.as_deref() != Some(self.current.as_str())
+    }
+}
+
 enum Change<'a> {
     Add,
     Update { record: &'a RepoFileRecord },
@@ -90,7 +105,7 @@ impl RepoMemoCore {
             bail!("Workspace was not found.");
         }
         let settings = normalize_settings(settings)?;
-        let repo = open_repo_link(link).await?;
+        let repo = self.open_repo_link(link).await?;
         let commit = repo.resolve_commit(settings.branch.as_deref()).await?;
         let info = repo.commit_info(&commit).await?;
         let branch = match settings.branch.clone() {
@@ -143,7 +158,7 @@ impl RepoMemoCore {
             bail!("Workspace was not found.");
         }
         let settings = normalize_settings(settings)?;
-        let repo = open_repo_link(link).await?;
+        let repo = self.open_repo_link(link).await?;
         // Fail now, not on the first sync, when the branch does not exist.
         repo.resolve_commit(settings.branch.as_deref()).await?;
         let root = repo.root().to_string_lossy().to_string();
@@ -207,7 +222,9 @@ impl RepoMemoCore {
         let source = self.repo_source_row(source_id).await?;
         let settings = normalize_settings(settings)?;
         if settings.branch != RepoSourceMetadata::of(&source).settings.branch {
-            let repo = GitRepo::open(Path::new(source.root_uri.as_deref().unwrap_or_default())).await?;
+            let repo = self
+                .open_linked_repo(Path::new(source.root_uri.as_deref().unwrap_or_default()))
+                .await?;
             repo.resolve_commit(settings.branch.as_deref()).await?;
         }
         let name = name
@@ -261,6 +278,70 @@ impl RepoMemoCore {
     pub async fn list_repo_files(&self, source_id: &str) -> Result<Vec<RepoFile>> {
         self.repo_source_row(source_id).await?;
         self.storage.list_repo_file_entries(source_id).await
+    }
+
+    /// The commit the repository's branch points at now, next to the one last
+    /// synced. Cheap (one `git rev-parse`), so it can be polled to sync
+    /// automatically when the branch moves.
+    pub async fn repo_head(&self, source_id: &str) -> Result<RepoHead> {
+        let source = self.repo_source_row(source_id).await?;
+        let metadata = RepoSourceMetadata::of(&source);
+        let repo = self
+            .open_linked_repo(Path::new(source.root_uri.as_deref().unwrap_or_default()))
+            .await?;
+        let current = repo.resolve_commit(metadata.settings.branch.as_deref()).await?;
+        Ok(RepoHead {
+            current,
+            last_synced: metadata.last_synced_commit.map(|commit| commit.sha),
+        })
+    }
+
+    /// Opens the repository behind a new link, explaining in plain words why
+    /// the server cannot read it when it cannot.
+    async fn open_repo_link(&self, link: &str) -> Result<GitRepo> {
+        // "Copy as path" in Windows Explorer wraps the path in quotes.
+        let link = link.trim().trim_matches('"').trim();
+        if link.is_empty() {
+            bail!("Enter the folder of a git repository on the server.");
+        }
+        let lower = link.to_ascii_lowercase();
+        let is_url = ["http://", "https://", "ssh://", "git://", "git@"]
+            .iter()
+            .any(|prefix| lower.starts_with(prefix));
+        if is_url {
+            bail!(
+                "Remote repository links are not supported yet. Enter the folder of a checkout on the server, such as C:\\code\\my-repo or /srv/code/my-repo."
+            );
+        }
+        let path = PathBuf::from(link.strip_prefix("file://").unwrap_or(link));
+        // Before anything is read, so folders outside the allowed roots and
+        // network shares are never even probed.
+        self.repo_policy.check(&path)?;
+        if !path.is_dir() {
+            bail!(
+                "The folder {} does not exist on the server, or the server cannot see it.",
+                path.display()
+            );
+        }
+        if let Err(error) = std::fs::read_dir(&path) {
+            if error.kind() == std::io::ErrorKind::PermissionDenied {
+                bail!("The server has no read access to {}.", path.display());
+            }
+            bail!("The folder {} cannot be read: {error}", path.display());
+        }
+        let repo = GitRepo::open(&path).await?;
+        // The repository may start above the linked folder.
+        self.repo_policy.check(repo.root())?;
+        Ok(repo)
+    }
+
+    /// Opens a repository that is already linked, re-checking the link policy
+    /// so a narrowed policy also stops syncs of older links.
+    async fn open_linked_repo(&self, root: &Path) -> Result<GitRepo> {
+        self.repo_policy.check(root)?;
+        let repo = GitRepo::open(root).await?;
+        self.repo_policy.check(repo.root())?;
+        Ok(repo)
     }
 
     /// Records a queued sync. Run it with [`RepoMemoCore::run_repo_sync`].
@@ -325,7 +406,8 @@ impl RepoMemoCore {
             .update_indexing_job(job_id, "running", "reading_repository", 0, None)
             .await?;
 
-        let repo = GitRepo::open(Path::new(&root))
+        let repo = self
+            .open_linked_repo(Path::new(&root))
             .await
             .with_context(|| format!("the repository at {root} could not be opened"))?;
         let branch = metadata.settings.branch.clone();
@@ -750,39 +832,6 @@ impl SkipTally {
     }
 }
 
-/// Opens the repository behind a link, explaining in plain words why the
-/// server cannot read it when it cannot.
-async fn open_repo_link(link: &str) -> Result<GitRepo> {
-    // "Copy as path" in Windows Explorer wraps the path in quotes.
-    let link = link.trim().trim_matches('"').trim();
-    if link.is_empty() {
-        bail!("Enter the folder of a git repository on the server.");
-    }
-    let lower = link.to_ascii_lowercase();
-    let is_url = ["http://", "https://", "ssh://", "git://", "git@"]
-        .iter()
-        .any(|prefix| lower.starts_with(prefix));
-    if is_url {
-        bail!(
-            "Remote repository links are not supported yet. Enter the folder of a checkout on the server, such as C:\\code\\my-repo or /srv/code/my-repo."
-        );
-    }
-    let path = PathBuf::from(link.strip_prefix("file://").unwrap_or(link));
-    if !path.is_dir() {
-        bail!(
-            "The folder {} does not exist on the server, or the server cannot see it.",
-            path.display()
-        );
-    }
-    if let Err(error) = std::fs::read_dir(&path) {
-        if error.kind() == std::io::ErrorKind::PermissionDenied {
-            bail!("The server has no read access to {}.", path.display());
-        }
-        bail!("The folder {} cannot be read: {error}", path.display());
-    }
-    GitRepo::open(&path).await
-}
-
 fn repo_name(root: &Path) -> String {
     root.file_name()
         .and_then(|value| value.to_str())
@@ -889,8 +938,10 @@ mod tests {
             .connect_local_repo(&workspace.id, &repo_dir.to_string_lossy(), None, RepoSettings::default())
             .await
             .is_err());
+        assert!(core.repo_head(&source.id).await.unwrap().moved(), "never synced");
 
         let first = sync(&core, &source.id).await;
+        assert!(!core.repo_head(&source.id).await.unwrap().moved());
         assert_eq!(first.files_in_tree, 5);
         assert_eq!(first.added, 3);
         assert_eq!(first.skipped, 2);
@@ -938,6 +989,7 @@ mod tests {
         git(&repo_dir, &["rm", "--quiet", "README.md"]);
         git(&repo_dir, &["add", "."]);
         git(&repo_dir, &["commit", "--quiet", "-m", "Rework refunds"]);
+        assert!(core.repo_head(&source.id).await.unwrap().moved(), "a new commit moves the branch");
 
         let second = sync(&core, &source.id).await;
         assert_eq!((second.updated, second.renamed, second.removed), (1, 1, 1));

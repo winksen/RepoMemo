@@ -1,12 +1,18 @@
 //! Server-authoritative HTTP API for shared RepoMemo workspaces.
 
 mod agent;
+mod ai_access;
 mod conversion;
 mod embedding;
 mod events;
 mod health;
 mod indexing;
+mod maintenance;
 mod repositories;
+mod security;
+
+pub use maintenance::MaintenanceSettings;
+pub use security::Quota;
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -26,6 +32,7 @@ use axum::{
     body::Bytes,
     extract::{DefaultBodyLimit, FromRequestParts, Path, Query, State},
     http::{header, request::Parts, HeaderMap, HeaderName, HeaderValue, Method, StatusCode},
+    middleware,
     response::{
         sse::{Event as SseEvent, KeepAlive, Sse},
         IntoResponse, Response,
@@ -33,11 +40,14 @@ use axum::{
     routing::{delete, get, post, put},
     Json, Router,
 };
-use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
+use tokio_stream::{
+    wrappers::{errors::BroadcastStreamRecvError, BroadcastStream, ReceiverStream},
+    Stream, StreamExt,
+};
 use chrono::{Duration as ChronoDuration, Utc};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use rand_core::OsRng;
-use repomemo_api::RepoMemoCore;
+use repomemo_api::{RepoLinkPolicy, RepoMemoCore};
 use repomemo_domain::{
     ArtifactComment, ArtifactDetail, ArtifactIndexFailure, DocumentPreview, Folder, ArtifactLifecycle, ArtifactLifecycleEvent, ArtifactSummary,
     ArtifactType, AskAnswer, AskRequest, Chunk, Citation, CollaborationTask,
@@ -59,14 +69,18 @@ use crate::conversion::{Converter, RenderState};
 use crate::embedding::EmbeddingQueue;
 use crate::repositories::RepoSyncRunner;
 use crate::indexing::IndexQueue;
+use crate::security::{too_many_requests, wait_text, ClientIp, Guards};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use tower_http::{cors::CorsLayer, trace::TraceLayer};
+use tower_http::{
+    catch_panic::CatchPanicLayer,
+    cors::{AllowOrigin, CorsLayer},
+    trace::TraceLayer,
+};
 
 const JWT_ISSUER: &str = "repomemo-server";
-const ACCESS_TOKEN_TTL_MINUTES: i64 = 60;
-const REFRESH_TOKEN_TTL_DAYS: i64 = 30;
-const MAX_SHARED_UPLOAD_BYTES: usize = 10 * 1024 * 1024;
+/// Longest file name accepted for an upload.
+const MAX_UPLOAD_FILENAME_CHARS: usize = 255;
 
 #[derive(Debug, Clone)]
 pub struct ServerConfig {
@@ -74,10 +88,41 @@ pub struct ServerConfig {
     pub bind_address: SocketAddr,
     pub data_dir: PathBuf,
     pub jwt_secret: String,
-    pub allowed_origin: Option<HeaderValue>,
+    /// Browser origins allowed to call the API (CORS). Empty: no CORS headers.
+    pub allowed_origins: Vec<HeaderValue>,
     /// LibreOffice executable used for Office previews. When unset the server
     /// looks for it; without it the extracted previews are used.
     pub soffice: Option<PathBuf>,
+    /// Key material for encrypting stored secrets (AI provider API keys).
+    /// When unset a random key is kept in `secret.key` in the data directory.
+    pub secret_key: Option<String>,
+    /// Anyone may create an account. When false, only the very first account
+    /// can be registered; everyone else is added by an administrator after
+    /// registering while it was open, or by the operator.
+    pub allow_registration: bool,
+    /// Take the client address from `X-Forwarded-For` / `X-Real-IP`. Only for
+    /// a server reachable solely through a reverse proxy that sets them.
+    pub trust_proxy: bool,
+    pub max_upload_bytes: usize,
+    pub access_token_ttl_minutes: i64,
+    pub refresh_token_ttl_days: i64,
+    /// Sign-ins and registrations per client address; token refreshes get
+    /// four times as many.
+    pub auth_quota: Quota,
+    /// Consecutive failed sign-ins before an account is locked out; 0 never.
+    pub login_max_failures: u32,
+    pub login_lockout: Duration,
+    /// AI requests per user per hour; a limit of 0 is unlimited.
+    pub ai_quota: Quota,
+    /// Hosts AI providers may be configured at; `None` allows any host except
+    /// link-local and cloud-metadata addresses.
+    pub ai_allowed_hosts: Option<Vec<String>>,
+    /// Folders repository links must sit inside; empty allows any local folder.
+    pub repo_roots: Vec<PathBuf>,
+    /// How often linked repositories are checked for new commits; `None`
+    /// turns automatic syncing off.
+    pub repo_poll_interval: Option<Duration>,
+    pub maintenance: MaintenanceSettings,
 }
 
 impl ServerConfig {
@@ -87,6 +132,9 @@ impl ServerConfig {
         if jwt_secret.len() < 32 {
             bail!("REPOMEMO_JWT_SECRET must contain at least 32 characters");
         }
+        if jwt_secret.chars().collect::<BTreeSet<_>>().len() < 8 {
+            bail!("REPOMEMO_JWT_SECRET is too repetitive; use at least 32 random characters");
+        }
 
         let bind_address = std::env::var("REPOMEMO_SERVER_ADDR")
             .unwrap_or_else(|_| "127.0.0.1:3020".to_owned())
@@ -95,10 +143,48 @@ impl ServerConfig {
         let data_dir = std::env::var("REPOMEMO_SERVER_DATA_DIR")
             .map(PathBuf::from)
             .unwrap_or_else(|_| PathBuf::from(".repomemo-server"));
-        let allowed_origin = std::env::var("REPOMEMO_ALLOWED_ORIGIN")
+        let allowed_origins = std::env::var("REPOMEMO_ALLOWED_ORIGIN")
             .unwrap_or_else(|_| "http://127.0.0.1:3021".to_owned())
-            .parse()
-            .context("REPOMEMO_ALLOWED_ORIGIN must be a valid HTTP header value")?;
+            .split(',')
+            .map(str::trim)
+            .filter(|origin| !origin.is_empty())
+            .map(|origin| {
+                if origin == "*" {
+                    bail!("REPOMEMO_ALLOWED_ORIGIN must list origins; \"*\" is not allowed");
+                }
+                origin
+                    .trim_end_matches('/')
+                    .parse::<HeaderValue>()
+                    .with_context(|| format!("REPOMEMO_ALLOWED_ORIGIN has an invalid origin: {origin}"))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let secret_key = env_text("REPOMEMO_SECRET_KEY");
+        if secret_key
+            .as_ref()
+            .is_some_and(|key| key.chars().count() < repomemo_storage::MIN_MASTER_KEY_CHARS)
+        {
+            bail!(
+                "REPOMEMO_SECRET_KEY must contain at least {} characters",
+                repomemo_storage::MIN_MASTER_KEY_CHARS
+            );
+        }
+        let ai_allowed_hosts = env_text("REPOMEMO_AI_ALLOWED_HOSTS").map(|hosts| {
+            hosts
+                .split(',')
+                .map(|host| host.trim().to_ascii_lowercase())
+                .filter(|host| !host.is_empty())
+                .collect::<Vec<_>>()
+        });
+        let repo_roots = std::env::var_os("REPOMEMO_REPO_ROOTS")
+            .map(|roots| {
+                std::env::split_paths(&roots)
+                    .filter(|root| !root.as_os_str().is_empty())
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        let repo_poll_seconds: u64 = env_parse("REPOMEMO_REPO_POLL_SECONDS", 300)?;
+        let maintenance_minutes: u64 = env_parse("REPOMEMO_MAINTENANCE_INTERVAL_MINUTES", 60)?;
+        let index_retry_hours: u64 = env_parse("REPOMEMO_INDEX_RETRY_HOURS", 6)?;
 
         Ok(Self {
             service_name: std::env::var("REPOMEMO_SERVICE_NAME")
@@ -106,8 +192,28 @@ impl ServerConfig {
             bind_address,
             data_dir,
             jwt_secret,
-            allowed_origin: Some(allowed_origin),
+            allowed_origins,
             soffice: std::env::var_os("REPOMEMO_SOFFICE").map(PathBuf::from),
+            secret_key,
+            allow_registration: env_flag("REPOMEMO_ALLOW_REGISTRATION", true)?,
+            trust_proxy: env_flag("REPOMEMO_TRUST_PROXY", false)?,
+            max_upload_bytes: env_parse::<usize>("REPOMEMO_MAX_UPLOAD_MB", 10)?.clamp(1, 1024) * 1024 * 1024,
+            access_token_ttl_minutes: env_parse::<i64>("REPOMEMO_ACCESS_TOKEN_TTL_MINUTES", 60)?.clamp(5, 24 * 60),
+            refresh_token_ttl_days: env_parse::<i64>("REPOMEMO_REFRESH_TOKEN_TTL_DAYS", 30)?.clamp(1, 365),
+            auth_quota: Quota::per_minute(env_parse("REPOMEMO_AUTH_REQUESTS_PER_MINUTE", 30)?),
+            login_max_failures: env_parse("REPOMEMO_LOGIN_MAX_FAILURES", 10)?,
+            login_lockout: Duration::from_secs(60 * env_parse::<u64>("REPOMEMO_LOGIN_LOCKOUT_MINUTES", 15)?.clamp(1, 24 * 60)),
+            ai_quota: Quota::per_hour(env_parse("REPOMEMO_AI_REQUESTS_PER_HOUR", 120)?),
+            ai_allowed_hosts,
+            repo_roots,
+            repo_poll_interval: (repo_poll_seconds > 0)
+                .then(|| Duration::from_secs(repo_poll_seconds.max(30))),
+            maintenance: MaintenanceSettings {
+                interval: Duration::from_secs(60 * maintenance_minutes),
+                blob_gc: env_flag("REPOMEMO_BLOB_GC", true)?,
+                job_retention_days: env_parse("REPOMEMO_JOB_RETENTION_DAYS", 90)?,
+                index_retry_interval: Duration::from_secs(3600 * index_retry_hours.max(1)),
+            },
         })
     }
 
@@ -118,10 +224,72 @@ impl ServerConfig {
             bind_address: "127.0.0.1:0".parse().unwrap(),
             data_dir,
             jwt_secret: "test-secret-that-is-long-enough-for-jwt-signing".to_owned(),
-            allowed_origin: None,
+            allowed_origins: Vec::new(),
             soffice: None,
+            secret_key: None,
+            allow_registration: true,
+            trust_proxy: false,
+            max_upload_bytes: 10 * 1024 * 1024,
+            access_token_ttl_minutes: 60,
+            refresh_token_ttl_days: 30,
+            // Tests register many accounts from one address.
+            auth_quota: Quota::per_minute(0),
+            login_max_failures: 10,
+            login_lockout: Duration::from_secs(15 * 60),
+            ai_quota: Quota::per_hour(0),
+            ai_allowed_hosts: None,
+            repo_roots: Vec::new(),
+            repo_poll_interval: None,
+            maintenance: MaintenanceSettings {
+                interval: Duration::ZERO,
+                ..MaintenanceSettings::default()
+            },
         }
     }
+}
+
+fn env_text(name: &str) -> Option<String> {
+    std::env::var(name)
+        .ok()
+        .map(|value| value.trim().to_owned())
+        .filter(|value| !value.is_empty())
+}
+
+/// Parses an optional environment variable, with a clear error for a value
+/// that is set but invalid.
+fn env_parse<T: std::str::FromStr>(name: &str, default: T) -> Result<T> {
+    let Some(raw) = env_text(name) else {
+        return Ok(default);
+    };
+    raw.parse::<T>()
+        .map_err(|_| anyhow::anyhow!("{name} has an invalid value: {raw}"))
+}
+
+/// An optional on/off environment variable: true/false, 1/0, yes/no, on/off.
+fn env_flag(name: &str, default: bool) -> Result<bool> {
+    let Some(raw) = env_text(name) else {
+        return Ok(default);
+    };
+    match raw.to_ascii_lowercase().as_str() {
+        "1" | "true" | "yes" | "on" => Ok(true),
+        "0" | "false" | "no" | "off" => Ok(false),
+        _ => bail!("{name} must be true or false, not {raw}"),
+    }
+}
+
+/// The configuration requests need at run time.
+#[derive(Debug, Clone)]
+struct RuntimeSettings {
+    service_name: String,
+    allow_registration: bool,
+    trust_proxy: bool,
+    access_token_ttl_minutes: i64,
+    refresh_token_ttl_days: i64,
+    auth_quota: Quota,
+    login_max_failures: u32,
+    login_lockout: Duration,
+    ai_quota: Quota,
+    maintenance: MaintenanceSettings,
 }
 
 #[derive(Clone)]
@@ -134,6 +302,8 @@ struct AppState {
     embedding_queue: EmbeddingQueue,
     converter: Converter,
     repo_sync: RepoSyncRunner,
+    settings: Arc<RuntimeSettings>,
+    guards: Arc<Guards>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -141,6 +311,14 @@ pub struct HealthResponse {
     pub service: String,
     pub status: &'static str,
     pub authentication: &'static str,
+    /// Whether new accounts can be registered.
+    pub registration_open: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ReadinessResponse {
+    pub status: &'static str,
+    pub database: &'static str,
 }
 
 #[derive(Debug, Serialize)]
@@ -159,62 +337,61 @@ struct ApiError {
     status: StatusCode,
     code: &'static str,
     message: String,
+    /// Seconds to wait before retrying, sent as `Retry-After`.
+    retry_after: Option<u64>,
 }
 
 impl ApiError {
-    fn bad_request(message: impl Into<String>) -> Self {
+    fn new(status: StatusCode, code: &'static str, message: impl Into<String>) -> Self {
         Self {
-            status: StatusCode::BAD_REQUEST,
-            code: "bad_request",
+            status,
+            code,
             message: message.into(),
+            retry_after: None,
         }
+    }
+
+    fn bad_request(message: impl Into<String>) -> Self {
+        Self::new(StatusCode::BAD_REQUEST, "bad_request", message)
     }
 
     fn unauthorized() -> Self {
-        Self {
-            status: StatusCode::UNAUTHORIZED,
-            code: "unauthorized",
-            message: "A valid bearer token is required.".to_owned(),
-        }
+        Self::new(
+            StatusCode::UNAUTHORIZED,
+            "unauthorized",
+            "A valid bearer token is required.",
+        )
     }
 
     fn conflict(message: impl Into<String>) -> Self {
-        Self {
-            status: StatusCode::CONFLICT,
-            code: "conflict",
-            message: message.into(),
-        }
+        Self::new(StatusCode::CONFLICT, "conflict", message)
     }
 
     fn not_found(message: impl Into<String>) -> Self {
-        Self {
-            status: StatusCode::NOT_FOUND,
-            code: "not_found",
-            message: message.into(),
-        }
+        Self::new(StatusCode::NOT_FOUND, "not_found", message)
     }
 
     fn forbidden() -> Self {
-        Self {
-            status: StatusCode::FORBIDDEN,
-            code: "forbidden",
-            message: "Your membership does not allow access to this workspace.".to_owned(),
-        }
+        Self::forbidden_because("Your membership does not allow access to this workspace.")
+    }
+
+    fn forbidden_because(message: impl Into<String>) -> Self {
+        Self::new(StatusCode::FORBIDDEN, "forbidden", message)
     }
 
     fn internal(error: impl std::fmt::Display) -> Self {
         tracing::error!(error = %error, "Unhandled API error");
-        Self {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            code: "internal_error",
-            message: "The server could not complete this request.".to_owned(),
-        }
+        Self::new(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "internal_error",
+            "The server could not complete this request.",
+        )
     }
 }
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
-        (
+        let mut response = (
             self.status,
             Json(ErrorBody {
                 error: ErrorDetail {
@@ -223,8 +400,25 @@ impl IntoResponse for ApiError {
                 },
             }),
         )
-            .into_response()
+            .into_response();
+        if let Some(seconds) = self.retry_after {
+            response
+                .headers_mut()
+                .insert(header::RETRY_AFTER, HeaderValue::from(seconds));
+        }
+        response
     }
+}
+
+/// A panic inside a handler becomes the usual JSON error instead of a dropped
+/// connection, and is logged.
+fn panic_response(panic: Box<dyn std::any::Any + Send + 'static>) -> Response {
+    let detail = panic
+        .downcast_ref::<String>()
+        .map(String::as_str)
+        .or_else(|| panic.downcast_ref::<&str>().copied())
+        .unwrap_or("unknown panic");
+    ApiError::internal(format!("handler panicked: {detail}")).into_response()
 }
 
 #[derive(Debug, Deserialize)]
@@ -534,24 +728,71 @@ struct JwtClaims {
     iss: String,
     iat: usize,
     exp: usize,
+    /// The user's session version when the token was issued; tokens from
+    /// before a password change or "sign out everywhere" no longer match.
+    #[serde(default)]
+    ver: i64,
 }
 
 #[derive(Debug, Clone)]
 struct AuthenticatedSubject {
     user_id: String,
+    /// When the access token expires (seconds since the epoch). Long-lived
+    /// streams end then, like any other use of the token.
+    expires_at: u64,
+    session_version: i64,
 }
 
 pub async fn router(config: ServerConfig) -> Result<Router> {
+    let state = build_state(&config).await?;
+    maintenance::start(state.clone());
+    Ok(routes(state, &config))
+}
+
+/// Opens storage, recovers from the previous shutdown and starts the
+/// background queues and pollers.
+async fn build_state(config: &ServerConfig) -> Result<AppState> {
     let storage = StorageEngine::open(StorageConfig {
         data_dir: config.data_dir.clone(),
+        master_key: config.secret_key.clone(),
     })
     .await?;
+
+    // Jobs a previous process left running will never finish; close them
+    // before new work starts so no progress bar spins forever.
+    let interrupted = storage
+        .fail_all_interrupted_jobs("Interrupted by a server restart.")
+        .await?;
+    if interrupted > 0 {
+        tracing::info!(count = interrupted, "Closed jobs interrupted by the previous shutdown");
+    }
+
+    // Computed once, off the async workers, before the first sign-in needs it.
+    tokio::task::spawn_blocking(|| {
+        dummy_password_hash();
+    })
+    .await
+    .context("preparing password verification")?;
+
+    if !repomemo_ai::set_endpoint_policy(repomemo_ai::EndpointPolicy {
+        allowed_hosts: config.ai_allowed_hosts.clone(),
+    }) {
+        tracing::debug!("The AI endpoint policy was already set in this process");
+    }
+    let repo_policy = if config.repo_roots.is_empty() {
+        RepoLinkPolicy::unrestricted()
+    } else {
+        let policy = RepoLinkPolicy::with_allowed_roots(config.repo_roots.clone())
+            .context("REPOMEMO_REPO_ROOTS")?;
+        tracing::info!(roots = ?policy.allowed_roots(), "Repository links are restricted to these folders");
+        policy
+    };
 
     // Share the same storage handle with the API core so job and activity
     // observers registered here also fire for writes that happen inside
     // `RepoMemoCore`. Without this the two halves would each hold their own
     // pool and SSE would only see writes the server layer performed directly.
-    let core = RepoMemoCore::from_storage(storage.clone());
+    let core = RepoMemoCore::from_storage(storage.clone()).with_repo_link_policy(repo_policy);
 
     let event_bus = WorkspaceEventBus::new();
     storage.set_job_observer(Arc::new(BusJobObserver::new(event_bus.clone())));
@@ -563,6 +804,9 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
     embedding_queue.resume_pending().await;
     let repo_sync = RepoSyncRunner::new(core.clone(), embedding_queue.clone());
     repo_sync.resume_all().await;
+    if let Some(interval) = config.repo_poll_interval {
+        repo_sync.start_polling(interval);
+    }
 
     let converter = match config.soffice.clone() {
         Some(path) => Converter::with_binary(&config.data_dir, Some(path)),
@@ -573,19 +817,38 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
     } else {
         tracing::info!("LibreOffice not found: Office previews show extracted text and tables");
     }
-    let state = AppState {
+    let settings = Arc::new(RuntimeSettings {
+        service_name: config.service_name.clone(),
+        allow_registration: config.allow_registration,
+        trust_proxy: config.trust_proxy,
+        access_token_ttl_minutes: config.access_token_ttl_minutes,
+        refresh_token_ttl_days: config.refresh_token_ttl_days,
+        auth_quota: config.auth_quota,
+        login_max_failures: config.login_max_failures,
+        login_lockout: config.login_lockout,
+        ai_quota: config.ai_quota,
+        maintenance: config.maintenance.clone(),
+    });
+    Ok(AppState {
         storage,
         core,
-        jwt_secret: config.jwt_secret,
+        jwt_secret: config.jwt_secret.clone(),
         event_bus,
         index_queue,
         embedding_queue,
         converter,
         repo_sync,
-    };
-    let cors = match config.allowed_origin {
-        Some(origin) => CorsLayer::new()
-            .allow_origin(origin)
+        settings,
+        guards: Arc::new(Guards::default()),
+    })
+}
+
+fn routes(state: AppState, config: &ServerConfig) -> Router {
+    let cors = if config.allowed_origins.is_empty() {
+        CorsLayer::new()
+    } else {
+        CorsLayer::new()
+            .allow_origin(AllowOrigin::list(config.allowed_origins.clone()))
             .allow_methods([
                 Method::GET,
                 Method::POST,
@@ -599,16 +862,20 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
                 HeaderName::from_static("x-repomemo-filename"),
                 HeaderName::from_static("x-repomemo-folder-id"),
             ])
-            .expose_headers([HeaderName::from_static("x-total-count")]),
-        None => CorsLayer::new(),
+            .expose_headers([
+                HeaderName::from_static("x-total-count"),
+                header::RETRY_AFTER,
+            ])
     };
 
-    Ok(Router::new()
+    Router::new()
         .route("/health", get(health))
+        .route("/health/ready", get(readiness))
         .route("/v1/auth/register", post(register))
         .route("/v1/auth/login", post(login))
         .route("/v1/auth/refresh", post(refresh_session))
         .route("/v1/auth/logout", post(logout))
+        .route("/v1/auth/logout-all", post(logout_everywhere))
         .route("/v1/session", get(session))
         .route("/v1/profile", get(get_profile).put(update_profile))
         .route("/v1/profile/password", post(change_profile_password))
@@ -696,6 +963,10 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
         .route(
             "/v1/workspaces/{workspace_id}/ai-providers",
             get(list_workspace_ai_providers).put(save_workspace_ai_provider),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/ai-policy",
+            get(ai_access::get_ai_policy).put(ai_access::update_ai_policy),
         )
         .route(
             "/v1/workspaces/{workspace_id}/ai-providers/{provider_id}/test",
@@ -866,24 +1137,97 @@ pub async fn router(config: ServerConfig) -> Result<Router> {
                 .delete(delete_memory_card),
         )
         .route("/v1/memory-cards/{card_id}/export", get(export_memory_card))
+        .layer(CatchPanicLayer::custom(panic_response))
+        .layer(middleware::from_fn(security::security_headers))
         .layer(TraceLayer::new_for_http())
-        .layer(DefaultBodyLimit::max(MAX_SHARED_UPLOAD_BYTES))
+        .layer(DefaultBodyLimit::max(config.max_upload_bytes))
         .layer(cors)
-        .with_state(state))
+        .with_state(state)
 }
 
-async fn health() -> Json<HealthResponse> {
+async fn health(State(state): State<AppState>) -> Json<HealthResponse> {
     Json(HealthResponse {
-        service: "repomemo-server".to_owned(),
+        service: state.settings.service_name.clone(),
         status: "ok",
         authentication: "jwt",
+        registration_open: registration_open(&state).await.unwrap_or(false),
     })
+}
+
+/// Readiness for load balancers and orchestrators: the database answers.
+async fn readiness(State(state): State<AppState>) -> (StatusCode, Json<ReadinessResponse>) {
+    match state.storage.ping().await {
+        Ok(()) => (
+            StatusCode::OK,
+            Json(ReadinessResponse {
+                status: "ready",
+                database: "ok",
+            }),
+        ),
+        Err(error) => {
+            tracing::error!(error = %error, "Readiness check failed: the database does not answer");
+            (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(ReadinessResponse {
+                    status: "unavailable",
+                    database: "unavailable",
+                }),
+            )
+        }
+    }
+}
+
+/// Registration is open by configuration, or because nobody has an account
+/// yet (so a server with registration closed can still get its first owner).
+async fn registration_open(state: &AppState) -> Result<bool, ApiError> {
+    if state.settings.allow_registration {
+        return Ok(true);
+    }
+    Ok(state.storage.count_users().await.map_err(ApiError::internal)? == 0)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AuthAction {
+    /// Signing in or registering: guessable, so tightly limited.
+    SignIn,
+    /// Refreshing a session: every open tab does it and the token cannot be
+    /// guessed, so it only needs protecting from floods.
+    Refresh,
+}
+
+/// Counts one authentication request against the client address's quota.
+fn check_auth_quota(state: &AppState, client: &ClientIp, action: AuthAction) -> Result<(), ApiError> {
+    let quota = match action {
+        AuthAction::SignIn => state.settings.auth_quota,
+        AuthAction::Refresh => Quota {
+            limit: state.settings.auth_quota.limit.saturating_mul(4),
+            ..state.settings.auth_quota
+        },
+    };
+    state
+        .guards
+        .auth
+        .check(&format!("{action:?}:{}", client.0), quota)
+        .map_err(|wait| {
+            tracing::warn!(target: "audit", client = %client.0, ?action, "Authentication rate limit reached");
+            too_many_requests(
+                format!("Too many sign-in attempts from this address. Try again in {}.", wait_text(wait)),
+                wait,
+            )
+        })
 }
 
 async fn register(
     State(state): State<AppState>,
+    client: ClientIp,
     Json(request): Json<RegisterRequest>,
 ) -> Result<(StatusCode, Json<TokenResponse>), ApiError> {
+    check_auth_quota(&state, &client, AuthAction::SignIn)?;
+    if !registration_open(&state).await? {
+        return Err(ApiError::forbidden_because(
+            "Registration is closed on this server. Ask an administrator for an account.",
+        ));
+    }
     validate_registration(&request)?;
     if state
         .storage
@@ -896,7 +1240,7 @@ async fn register(
             "An account already exists for this email address.",
         ));
     }
-    let password_hash = hash_password(&request.password)?;
+    let password_hash = hash_password(&request.password).await?;
     let user = state
         .storage
         .create_user(&request.email, &request.display_name, &password_hash)
@@ -907,38 +1251,79 @@ async fn register(
         .touch_user_connection(&user.id)
         .await
         .map_err(ApiError::internal)?;
+    tracing::info!(target: "audit", user_id = %user.id, client = %client.0, "Account registered");
     let response = issue_session(&state, user).await?;
     Ok((StatusCode::CREATED, Json(response)))
 }
 
 async fn login(
     State(state): State<AppState>,
+    client: ClientIp,
     Json(request): Json<LoginRequest>,
 ) -> Result<Json<TokenResponse>, ApiError> {
+    check_auth_quota(&state, &client, AuthAction::SignIn)?;
+    let email = request.email.trim().to_lowercase();
+    // Failures are counted per account and address, and per account across
+    // all addresses with a higher bar, so one attacker cannot lock a victim
+    // out from everywhere while a distributed one is still slowed down.
+    let pair_key = format!("login:{email}|{}", client.0);
+    let account_key = format!("login:{email}");
+    let settings = &state.settings;
+    for key in [&pair_key, &account_key] {
+        if let Some(wait) = state.guards.logins.locked_for(key) {
+            tracing::warn!(target: "audit", email = %email, client = %client.0, "Sign-in refused: account temporarily locked");
+            return Err(too_many_requests(
+                format!(
+                    "Too many failed sign-in attempts for this account. Try again in {}.",
+                    wait_text(wait)
+                ),
+                wait,
+            ));
+        }
+    }
     let account = state
         .storage
         .find_user_for_auth(&request.email)
         .await
         .map_err(|_| invalid_credentials())?;
-    let Some(account) = account else {
+    // Verify against a fixed hash when the account does not exist, so the
+    // response time does not reveal which email addresses have accounts.
+    let (stored_hash, user) = match account {
+        Some(account) => (account.password_hash, Some(account.user)),
+        None => (dummy_password_hash().to_owned(), None),
+    };
+    let verified = verify_password(&request.password, &stored_hash).await;
+    let Some(user) = user.filter(|_| verified) else {
+        // `|`, not `||`: both counters must see every failure.
+        let locked = state.guards.logins.record_failure(
+            &pair_key,
+            settings.login_max_failures,
+            settings.login_lockout,
+        ) | state.guards.logins.record_failure(
+            &account_key,
+            settings.login_max_failures.saturating_mul(5),
+            settings.login_lockout,
+        );
+        tracing::warn!(target: "audit", email = %email, client = %client.0, locked, "Sign-in failed");
         return Err(invalid_credentials());
     };
-    if !verify_password(&request.password, &account.password_hash) {
-        return Err(invalid_credentials());
-    }
+    state.guards.logins.clear(&pair_key);
     state
         .storage
-        .touch_user_connection(&account.user.id)
+        .touch_user_connection(&user.id)
         .await
         .map_err(ApiError::internal)?;
-    Ok(Json(issue_session(&state, account.user).await?))
+    tracing::info!(target: "audit", user_id = %user.id, client = %client.0, "Signed in");
+    Ok(Json(issue_session(&state, user).await?))
 }
 
 /// Exchanges a valid refresh token for a new access token and a rotated refresh token.
 async fn refresh_session(
     State(state): State<AppState>,
+    client: ClientIp,
     Json(request): Json<RefreshRequest>,
 ) -> Result<Json<TokenResponse>, ApiError> {
+    check_auth_quota(&state, &client, AuthAction::Refresh)?;
     let user_id = state
         .storage
         .consume_refresh_token(&request.refresh_token)
@@ -963,6 +1348,21 @@ async fn logout(
         .revoke_refresh_token(&request.refresh_token)
         .await
         .map_err(ApiError::internal)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// Ends every session of the caller on every device: access tokens stop
+/// working at once and refresh tokens are revoked.
+async fn logout_everywhere(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+) -> Result<StatusCode, ApiError> {
+    state
+        .storage
+        .end_user_sessions(&subject.user_id)
+        .await
+        .map_err(ApiError::internal)?;
+    tracing::info!(target: "audit", user_id = %subject.user_id, "Signed out of every session");
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -1100,11 +1500,13 @@ async fn update_profile(
         .map_err(map_storage_error)
 }
 
+/// Changes the caller's password. Every existing session ends (other devices
+/// are signed out at once) and a fresh session is returned for this one.
 async fn change_profile_password(
     subject: AuthenticatedSubject,
     State(state): State<AppState>,
     Json(request): Json<ChangePasswordRequest>,
-) -> Result<StatusCode, ApiError> {
+) -> Result<Json<TokenResponse>, ApiError> {
     validate_password(&request.new_password)?;
     let account = state
         .storage
@@ -1118,10 +1520,11 @@ async fn change_profile_password(
         .await
         .map_err(ApiError::internal)?
         .ok_or_else(ApiError::unauthorized)?;
-    if !verify_password(&request.current_password, &stored_account.password_hash) {
+    if !verify_password(&request.current_password, &stored_account.password_hash).await {
+        tracing::warn!(target: "audit", user_id = %subject.user_id, "Password change refused: wrong current password");
         return Err(ApiError::bad_request("Current password is incorrect."));
     }
-    let password_hash = hash_password(&request.new_password)?;
+    let password_hash = hash_password(&request.new_password).await?;
     state
         .storage
         .update_user_password(&subject.user_id, &password_hash)
@@ -1129,10 +1532,11 @@ async fn change_profile_password(
         .map_err(map_storage_error)?;
     state
         .storage
-        .revoke_user_refresh_tokens(&subject.user_id)
+        .end_user_sessions(&subject.user_id)
         .await
         .map_err(ApiError::internal)?;
-    Ok(StatusCode::NO_CONTENT)
+    tracing::info!(target: "audit", user_id = %subject.user_id, "Password changed; other sessions ended");
+    Ok(Json(issue_session(&state, account).await?))
 }
 
 async fn create_organization(
@@ -1500,7 +1904,8 @@ async fn workspace_capabilities(
     Path(workspace_id): Path<String>,
 ) -> Result<Json<WorkspaceCapabilities>, ApiError> {
     let role = require_workspace_read(&state, &subject, &workspace_id).await?;
-    Ok(Json(capabilities_for_role(role)))
+    let may_use_ai = ai_access::role_may_use_ai(&state, &workspace_id, &role).await?;
+    Ok(Json(capabilities_for_role(role, may_use_ai)))
 }
 
 async fn workspace_knowledge_map(
@@ -1522,7 +1927,7 @@ async fn generate_workspace_ai_overview(
     State(state): State<AppState>,
     Path(workspace_id): Path<String>,
 ) -> Result<Json<WorkspaceAiOverview>, ApiError> {
-    require_workspace_read(&state, &subject, &workspace_id).await?;
+    let role = require_workspace_read(&state, &subject, &workspace_id).await?;
     let provider = state
         .storage
         .list_provider_settings(&workspace_id)
@@ -1543,6 +1948,7 @@ async fn generate_workspace_ai_overview(
         }));
     };
 
+    ai_access::authorize_ai_use(&state, &subject, &workspace_id, &role).await?;
     let result = state
         .core
         .summarize_workspace(workspace_id.clone(), provider.id.clone())
@@ -1573,7 +1979,7 @@ async fn ask_workspace(
     Path(workspace_id): Path<String>,
     Json(request): Json<AskWorkspaceRequest>,
 ) -> Result<Json<AskAnswer>, ApiError> {
-    require_workspace_read(&state, &subject, &workspace_id).await?;
+    let role = require_workspace_read(&state, &subject, &workspace_id).await?;
     let provider = state
         .storage
         .list_provider_settings(&workspace_id)
@@ -1586,6 +1992,7 @@ async fn ask_workspace(
                 "No enabled AI provider is configured for this workspace. An administrator can configure one in Settings.",
             )
         })?;
+    ai_access::authorize_ai_use(&state, &subject, &workspace_id, &role).await?;
     let question = request.question.clone();
     let answer = state
         .core
@@ -1654,14 +2061,30 @@ async fn save_workspace_ai_provider(
         }
         Some(settings)
     };
-    let api_key = request
-        .api_key
-        .filter(|value| !value.trim().is_empty())
-        .or_else(|| {
-            existing
-                .as_ref()
-                .and_then(|settings| settings.api_key.clone())
-        });
+    let supplied_key = request.api_key.filter(|value| !value.trim().is_empty());
+    // A stored key is only ever sent to the service it was entered for. When
+    // the provider type or address changes, the key must be entered again, so
+    // an administrator cannot point a colleague's key at another server.
+    let endpoint_changed = existing.as_ref().is_some_and(|settings| {
+        provider_endpoint(&settings.provider_type, settings.base_url.as_deref())
+            != provider_endpoint(&request.provider_type, request.base_url.as_deref())
+    });
+    let stored_key = existing.as_ref().and_then(|settings| settings.api_key.clone());
+    let api_key = match supplied_key.clone() {
+        Some(key) => Some(key),
+        None if endpoint_changed => {
+            if stored_key.is_some() && request.provider_type == "openrouter" {
+                return Err(ApiError::bad_request(
+                    "Enter the API key again: the provider's type or address changed, and a saved key is only sent to the address it was saved for.",
+                ));
+            }
+            None
+        }
+        None => stored_key,
+    };
+    if supplied_key.is_some() {
+        tracing::info!(target: "audit", user_id = %subject.user_id, workspace_id = %workspace_id, "AI provider API key set");
+    }
     let cloud_content_acknowledged = request.cloud_content_acknowledged
         || existing
             .as_ref()
@@ -1678,23 +2101,27 @@ async fn save_workspace_ai_provider(
             .map(|settings| settings.purpose())
             .unwrap_or("text"),
     };
+    let settings = ProviderSettings {
+        id: provider_id,
+        workspace_id: Some(workspace_id.clone()),
+        provider_type: request.provider_type,
+        name: request.name,
+        base_url: request.base_url,
+        model: request.model,
+        embedding_model: None,
+        enabled: request.enabled,
+        metadata: json!({
+            "cloud_content_acknowledged": cloud_content_acknowledged,
+            "purpose": purpose,
+        }),
+        api_key,
+    };
+    // Every validation failure is about the submitted settings.
+    repomemo_ai::validate_settings(&settings)
+        .map_err(|error| ApiError::bad_request(error.to_string()))?;
     let provider = state
         .core
-        .save_provider_settings(ProviderSettings {
-            id: provider_id,
-            workspace_id: Some(workspace_id.clone()),
-            provider_type: request.provider_type,
-            name: request.name,
-            base_url: request.base_url,
-            model: request.model,
-            embedding_model: None,
-            enabled: request.enabled,
-            metadata: json!({
-                "cloud_content_acknowledged": cloud_content_acknowledged,
-                "purpose": purpose,
-            }),
-            api_key,
-        })
+        .save_provider_settings(settings)
         .await
         .map_err(map_core_error)?;
     record_workspace_activity(
@@ -1762,6 +2189,18 @@ async fn test_workspace_ai_provider(
     )
     .await;
     Ok(Json(result))
+}
+
+/// The service a provider sends requests (and its key) to.
+fn provider_endpoint(provider_type: &str, base_url: Option<&str>) -> (String, String) {
+    (
+        provider_type.trim().to_owned(),
+        base_url
+            .unwrap_or_default()
+            .trim()
+            .trim_end_matches('/')
+            .to_ascii_lowercase(),
+    )
 }
 
 fn shared_provider_settings(provider: ProviderSettings) -> SharedAiProviderSettings {
@@ -3135,10 +3574,14 @@ async fn upload_artifact(
     let folder_id = validate_folder(&state, &workspace_id, requested_folder).await?;
     let filename = headers
         .get("x-repomemo-filename")
-        .and_then(|value| value.to_str().ok())
+        .and_then(decode_filename_header)
         .filter(|value| !value.trim().is_empty())
-        .ok_or_else(|| ApiError::bad_request("X-RepoMemo-Filename is required for uploads."))?
-        .to_owned();
+        .ok_or_else(|| ApiError::bad_request("X-RepoMemo-Filename is required for uploads."))?;
+    if filename.chars().count() > MAX_UPLOAD_FILENAME_CHARS || filename.chars().any(char::is_control) {
+        return Err(ApiError::bad_request(format!(
+            "File names must be at most {MAX_UPLOAD_FILENAME_CHARS} characters long, without control characters."
+        )));
+    }
     let mime_type = headers
         .get(header::CONTENT_TYPE)
         .and_then(|value| value.to_str().ok())
@@ -3185,6 +3628,35 @@ async fn upload_artifact(
     ))
 }
 
+/// The upload's file name. Clients percent-encode it so names outside ASCII
+/// survive the header; a plain ASCII name is used as it is.
+fn decode_filename_header(value: &HeaderValue) -> Option<String> {
+    let raw = std::str::from_utf8(value.as_bytes()).ok()?;
+    if !raw.contains('%') {
+        return Some(raw.to_owned());
+    }
+    percent_decode(raw).or_else(|| Some(raw.to_owned()))
+}
+
+/// Decodes `%XX` escapes; `None` when an escape is malformed or the result
+/// is not UTF-8.
+fn percent_decode(value: &str) -> Option<String> {
+    let bytes = value.as_bytes();
+    let mut decoded = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] == b'%' {
+            let hex = value.get(index + 1..index + 3)?;
+            decoded.push(u8::from_str_radix(hex, 16).ok()?);
+            index += 3;
+        } else {
+            decoded.push(bytes[index]);
+            index += 1;
+        }
+    }
+    String::from_utf8(decoded).ok()
+}
+
 async fn get_artifact(
     subject: AuthenticatedSubject,
     State(state): State<AppState>,
@@ -3198,7 +3670,7 @@ async fn get_artifact(
     let role = require_workspace_read(&state, &subject, &artifact.summary.workspace_id).await?;
     // Stored chunks are an administrative view of the index. Everyone else
     // works with the artifact content and search results.
-    if !capabilities_for_role(role).can_inspect_index {
+    if !capabilities_for_role(role, false).can_inspect_index {
         artifact.chunks.clear();
     }
     Ok(Json(artifact))
@@ -3513,7 +3985,7 @@ async fn get_job(
         .get_job(&job_id)
         .await
         .map_err(map_storage_error)?
-        .ok_or_else(|| ApiError::bad_request("The job was not found."))?;
+        .ok_or_else(|| ApiError::not_found("The job was not found."))?;
     require_workspace_read(&state, &subject, &job.workspace_id).await?;
     Ok(Json(job))
 }
@@ -3528,7 +4000,7 @@ async fn cancel_job(
         .get_job(&job_id)
         .await
         .map_err(map_storage_error)?
-        .ok_or_else(|| ApiError::bad_request("The job was not found."))?;
+        .ok_or_else(|| ApiError::not_found("The job was not found."))?;
     require_workspace_write(&state, &subject, &job.workspace_id).await?;
     let updated = state
         .storage
@@ -3538,9 +4010,26 @@ async fn cancel_job(
     Ok(Json(updated))
 }
 
+/// How often an open event stream re-checks that its user may still read the
+/// workspace.
+#[cfg(not(test))]
+const EVENT_STREAM_RECHECK: Duration = Duration::from_secs(30);
+#[cfg(test)]
+const EVENT_STREAM_RECHECK: Duration = Duration::from_millis(50);
+
+enum EventStreamItem {
+    Event(SseEvent),
+    Close,
+}
+
 /// Server-sent-events stream of job progress and activity for a workspace.
-/// Emits `job` and `activity` events; `KeepAlive` comments keep proxies from
-/// closing the connection during quiet stretches.
+/// Emits `job` and `activity` events, and `resync` when the client fell
+/// behind and missed some (it should reload what it shows). `KeepAlive`
+/// comments keep proxies from closing the connection during quiet stretches.
+///
+/// The stream ends when the access token expires, when the user's sessions
+/// are ended, or when the user leaves the workspace; the client reconnects
+/// with a fresh token.
 async fn workspace_events(
     subject: AuthenticatedSubject,
     State(state): State<AppState>,
@@ -3548,13 +4037,70 @@ async fn workspace_events(
 ) -> Result<Sse<impl Stream<Item = Result<SseEvent, Infallible>>>, ApiError> {
     require_workspace_read(&state, &subject, &workspace_id).await?;
     let receiver = state.event_bus.subscribe(&workspace_id);
-    let stream = BroadcastStream::new(receiver).filter_map(|item| {
-        let event = item.ok()?;
-        let name = event.event_name();
-        let payload = serde_json::to_string(&event).ok()?;
-        Some(Ok(SseEvent::default().event(name).data(payload)))
+    let events = BroadcastStream::new(receiver).filter_map(|item| match item {
+        Ok(event) => {
+            let payload = serde_json::to_string(&event).ok()?;
+            Some(EventStreamItem::Event(
+                SseEvent::default().event(event.event_name()).data(payload),
+            ))
+        }
+        Err(BroadcastStreamRecvError::Lagged(missed)) => Some(EventStreamItem::Event(
+            SseEvent::default()
+                .event("resync")
+                .data(json!({ "type": "resync", "missed": missed }).to_string()),
+        )),
     });
+    let (closer, closed) = tokio::sync::mpsc::channel::<()>(1);
+    tokio::spawn(watch_event_stream_access(
+        state.clone(),
+        subject,
+        workspace_id,
+        closer,
+    ));
+    let stream = events
+        .merge(ReceiverStream::new(closed).map(|_| EventStreamItem::Close))
+        .take_while(|item| !matches!(item, EventStreamItem::Close))
+        .filter_map(|item| match item {
+            EventStreamItem::Event(event) => Some(Ok(event)),
+            EventStreamItem::Close => None,
+        });
     Ok(Sse::new(stream).keep_alive(KeepAlive::new().interval(Duration::from_secs(15))))
+}
+
+/// Closes an event stream once its token expires or its user may no longer
+/// read the workspace. Stops by itself when the client disconnects.
+async fn watch_event_stream_access(
+    state: AppState,
+    subject: AuthenticatedSubject,
+    workspace_id: String,
+    closer: tokio::sync::mpsc::Sender<()>,
+) {
+    loop {
+        let remaining = subject
+            .expires_at
+            .saturating_sub(jsonwebtoken::get_current_timestamp());
+        tokio::select! {
+            _ = closer.closed() => return,
+            _ = tokio::time::sleep(EVENT_STREAM_RECHECK.min(Duration::from_secs(remaining))) => {}
+        }
+        let expired = jsonwebtoken::get_current_timestamp() >= subject.expires_at;
+        let session_valid = state
+            .storage
+            .user_session_version(&subject.user_id)
+            .await
+            .map(|version| version == Some(subject.session_version))
+            .unwrap_or(true);
+        let member = state
+            .storage
+            .workspace_role_for_user(&subject.user_id, &workspace_id)
+            .await
+            .map(|role| role.is_some())
+            .unwrap_or(true);
+        if expired || !session_valid || !member {
+            let _ = closer.send(()).await;
+            return;
+        }
+    }
 }
 
 async fn search_workspace(
@@ -3885,7 +4431,8 @@ async fn require_workspace_owner(
     Ok(role)
 }
 
-fn capabilities_for_role(role: WorkspaceRole) -> WorkspaceCapabilities {
+/// What a role may do; `may_use_ai` comes from the workspace's AI policy.
+fn capabilities_for_role(role: WorkspaceRole, may_use_ai: bool) -> WorkspaceCapabilities {
     let can_write_content = !matches!(&role, WorkspaceRole::Viewer);
     let can_manage_members = matches!(&role, WorkspaceRole::Owner | WorkspaceRole::Admin);
     WorkspaceCapabilities {
@@ -3894,7 +4441,8 @@ fn capabilities_for_role(role: WorkspaceRole) -> WorkspaceCapabilities {
         can_write_content,
         can_assign_admin: matches!(&role, WorkspaceRole::Owner),
         can_manage_workspace: matches!(&role, WorkspaceRole::Owner),
-        can_generate_ai_overview: true,
+        can_generate_ai_overview: may_use_ai,
+        can_use_ai: may_use_ai,
         can_create_tasks: can_write_content,
         can_comment: can_write_content,
         can_moderate_comments: matches!(&role, WorkspaceRole::Owner | WorkspaceRole::Admin),
@@ -3937,8 +4485,19 @@ impl FromRequestParts<AppState> for AuthenticatedSubject {
         )
         .map_err(|_| ApiError::unauthorized())?
         .claims;
+        // A token outlives neither its user nor the end of its sessions.
+        let current_version = state
+            .storage
+            .user_session_version(&claims.sub)
+            .await
+            .map_err(ApiError::internal)?;
+        if current_version != Some(claims.ver) {
+            return Err(ApiError::unauthorized());
+        }
         Ok(Self {
             user_id: claims.sub,
+            expires_at: claims.exp as u64,
+            session_version: claims.ver,
         })
     }
 }
@@ -3961,47 +4520,95 @@ fn validate_password(password: &str) -> Result<(), ApiError> {
     Ok(())
 }
 
-fn hash_password(password: &str) -> Result<String, ApiError> {
-    let salt = SaltString::generate(&mut OsRng);
-    Argon2::default()
-        .hash_password(password.as_bytes(), &salt)
-        .map(|hash| hash.to_string())
-        .map_err(ApiError::internal)
+/// Argon2 is deliberately slow (tens of milliseconds), so it runs on the
+/// blocking pool instead of holding up the async workers.
+async fn hash_password(password: &str) -> Result<String, ApiError> {
+    let password = password.to_owned();
+    tokio::task::spawn_blocking(move || {
+        let salt = SaltString::generate(&mut OsRng);
+        Argon2::default()
+            .hash_password(password.as_bytes(), &salt)
+            .map(|hash| hash.to_string())
+    })
+    .await
+    .map_err(ApiError::internal)?
+    .map_err(ApiError::internal)
 }
 
-fn verify_password(password: &str, stored_hash: &str) -> bool {
-    PasswordHash::new(stored_hash)
-        .ok()
-        .and_then(|hash| {
-            Argon2::default()
-                .verify_password(password.as_bytes(), &hash)
-                .ok()
-        })
-        .is_some()
+async fn verify_password(password: &str, stored_hash: &str) -> bool {
+    let password = password.to_owned();
+    let stored_hash = stored_hash.to_owned();
+    tokio::task::spawn_blocking(move || {
+        PasswordHash::new(&stored_hash)
+            .ok()
+            .and_then(|hash| {
+                Argon2::default()
+                    .verify_password(password.as_bytes(), &hash)
+                    .ok()
+            })
+            .is_some()
+    })
+    .await
+    .unwrap_or(false)
+}
+
+/// A valid Argon2 hash of a random password nobody knows, checked when an
+/// email has no account so that a miss costs as much time as a wrong password.
+fn dummy_password_hash() -> &'static str {
+    static HASH: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    HASH.get_or_init(|| {
+        let salt = SaltString::generate(&mut OsRng);
+        let secret = random_secret();
+        Argon2::default()
+            .hash_password(secret.as_bytes(), &salt)
+            .map(|hash| hash.to_string())
+            .unwrap_or_default()
+    })
+}
+
+fn random_secret() -> String {
+    let mut bytes = [0_u8; 32];
+    rand_core::RngCore::fill_bytes(&mut OsRng, &mut bytes);
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
 async fn issue_session(state: &AppState, user: SharedUser) -> Result<TokenResponse, ApiError> {
+    let version = state
+        .storage
+        .user_session_version(&user.id)
+        .await
+        .map_err(ApiError::internal)?
+        .ok_or_else(ApiError::unauthorized)?;
     let refresh_token = state
         .storage
-        .create_refresh_token(&user.id, REFRESH_TOKEN_TTL_DAYS)
+        .create_refresh_token(&user.id, state.settings.refresh_token_ttl_days)
         .await
         .map_err(ApiError::internal)?;
-    issue_token(&state.jwt_secret, user, refresh_token)
+    issue_token(
+        &state.jwt_secret,
+        user,
+        refresh_token,
+        version,
+        state.settings.access_token_ttl_minutes,
+    )
 }
 
 fn issue_token(
     secret: &str,
     user: SharedUser,
     refresh_token: String,
+    session_version: i64,
+    ttl_minutes: i64,
 ) -> Result<TokenResponse, ApiError> {
     let now = Utc::now();
-    let expires_at = now + ChronoDuration::minutes(ACCESS_TOKEN_TTL_MINUTES);
+    let expires_at = now + ChronoDuration::minutes(ttl_minutes);
     let claims = JwtClaims {
         sub: user.id.clone(),
         email: user.email.clone().unwrap_or_default(),
         iss: JWT_ISSUER.to_owned(),
         iat: now.timestamp() as usize,
         exp: expires_at.timestamp() as usize,
+        ver: session_version,
     };
     let access_token = encode(
         &Header::new(Algorithm::HS256),
@@ -4013,23 +4620,34 @@ fn issue_token(
         access_token,
         refresh_token,
         token_type: "Bearer",
-        expires_in: Duration::from_secs(ACCESS_TOKEN_TTL_MINUTES as u64 * 60).as_secs(),
+        expires_in: Duration::from_secs(ttl_minutes.max(0) as u64 * 60).as_secs(),
         user,
     })
 }
 
 fn invalid_credentials() -> ApiError {
-    ApiError {
-        status: StatusCode::UNAUTHORIZED,
-        code: "invalid_credentials",
-        message: "Email or password is incorrect.".to_owned(),
-    }
+    ApiError::new(
+        StatusCode::UNAUTHORIZED,
+        "invalid_credentials",
+        "Email or password is incorrect.",
+    )
+}
+
+/// Whether an error says that what was asked for does not exist.
+fn is_not_found(message: &str) -> bool {
+    message.contains("was not found")
+        || message.contains("were not found")
+        || message.contains("no rows returned")
 }
 
 fn map_storage_error(error: anyhow::Error) -> ApiError {
     let message = error.to_string();
     if message.contains("UNIQUE constraint failed") {
         ApiError::conflict("This record already exists.")
+    } else if message.contains("membership was not found") {
+        ApiError::bad_request(message)
+    } else if is_not_found(&message) {
+        ApiError::not_found(message)
     } else if message.contains("not a member")
         || message.contains("must be between")
         || message.contains("valid email")
@@ -4046,8 +4664,9 @@ fn map_storage_error(error: anyhow::Error) -> ApiError {
 
 fn map_core_error(error: anyhow::Error) -> ApiError {
     let message = error.to_string();
-    if message.contains("was not found")
-        || message.contains("is required")
+    if is_not_found(&message) {
+        ApiError::not_found(message)
+    } else if message.contains("is required")
         || message.contains("cannot be empty")
         || message.contains("must be between")
         || message.contains("Unsupported AI provider")
@@ -4182,7 +4801,19 @@ mod tests {
             ))
             .await
             .unwrap();
-        assert_eq!(changed_password.status(), 204);
+        assert_eq!(changed_password.status(), 200);
+        let changed_password: Value =
+            serde_json::from_slice(&to_bytes(changed_password.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
+        // The old token is ended with every other session; this one continues
+        // with the fresh session returned by the change.
+        let stale_profile = app
+            .clone()
+            .oneshot(auth_request("GET", "/v1/profile", &authorization))
+            .await
+            .unwrap();
+        assert_eq!(stale_profile.status(), 401);
+        let authorization = format!("Bearer {}", changed_password["access_token"].as_str().unwrap());
 
         let organization = app
             .clone()
@@ -5176,7 +5807,7 @@ mod tests {
             ))
             .await
             .unwrap();
-        assert_eq!(missing.status(), 400);
+        assert_eq!(missing.status(), 404);
         let _ = std::fs::remove_dir_all(data_dir);
     }
 
@@ -6747,6 +7378,344 @@ mod tests {
         assert!(answer["warnings"].as_array().unwrap().iter().all(|warning| !warning.as_str().unwrap().contains("keyword search only")));
         let last_prompt = prompts.lock().unwrap().last().cloned().unwrap();
         assert!(last_prompt.contains("Run the migration before switching traffic."), "the model should see the full passage: {last_prompt}");
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    fn temp_data_dir(label: &str) -> std::path::PathBuf {
+        std::env::temp_dir().join(format!("repomemo-server-{label}-{}", uuid::Uuid::new_v4()))
+    }
+
+    async fn response_json(response: axum::response::Response) -> Value {
+        let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null)
+    }
+
+    fn public_post(uri: &str, body: Value) -> Request<Body> {
+        Request::builder()
+            .method("POST")
+            .uri(uri)
+            .header("content-type", "application/json")
+            .body(Body::from(body.to_string()))
+            .unwrap()
+    }
+
+    /// Registers an account and returns its bearer header and token response.
+    async fn register_account(app: &axum::Router, email: &str) -> (String, Value) {
+        let response = app
+            .clone()
+            .oneshot(public_post(
+                "/v1/auth/register",
+                json!({"email": email, "display_name": "Person", "password": "not-a-real-password"}),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), 201);
+        let body = response_json(response).await;
+        (format!("Bearer {}", body["access_token"].as_str().unwrap()), body)
+    }
+
+    /// Creates an organization and a workspace owned by `owner`.
+    async fn create_workspace(app: &axum::Router, owner: &str) -> String {
+        let organization = response_json(
+            app.clone()
+                .oneshot(json_request("POST", "/v1/organizations", owner, json!({"name": "Team"})))
+                .await
+                .unwrap(),
+        )
+        .await;
+        let workspace = response_json(
+            app.clone()
+                .oneshot(json_request(
+                    "POST",
+                    "/v1/workspaces",
+                    owner,
+                    json!({"organization_id": organization["id"], "name": "Workspace"}),
+                ))
+                .await
+                .unwrap(),
+        )
+        .await;
+        workspace["workspace"]["id"].as_str().unwrap().to_owned()
+    }
+
+    #[tokio::test]
+    async fn signing_out_everywhere_ends_access_and_refresh_tokens() {
+        let data_dir = temp_data_dir("logout-all");
+        let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+        let (owner, tokens) = register_account(&app, "everywhere@example.com").await;
+        let session = app.clone().oneshot(auth_request("GET", "/v1/session", &owner)).await.unwrap();
+        assert_eq!(session.status(), 200);
+
+        let ended = app.clone().oneshot(auth_request("POST", "/v1/auth/logout-all", &owner)).await.unwrap();
+        assert_eq!(ended.status(), 204);
+        let session = app.clone().oneshot(auth_request("GET", "/v1/session", &owner)).await.unwrap();
+        assert_eq!(session.status(), 401, "the access token stops working at once");
+        let refreshed = app
+            .clone()
+            .oneshot(public_post("/v1/auth/refresh", json!({"refresh_token": tokens["refresh_token"]})))
+            .await
+            .unwrap();
+        assert_eq!(refreshed.status(), 401);
+
+        // Signing in again starts a new, working session.
+        let login = app
+            .clone()
+            .oneshot(public_post(
+                "/v1/auth/login",
+                json!({"email": "everywhere@example.com", "password": "not-a-real-password"}),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(login.status(), 200);
+        let fresh = format!("Bearer {}", response_json(login).await["access_token"].as_str().unwrap());
+        let session = app.clone().oneshot(auth_request("GET", "/v1/session", &fresh)).await.unwrap();
+        assert_eq!(session.status(), 200);
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn repeated_failed_sign_ins_lock_the_account_for_a_while() {
+        let data_dir = temp_data_dir("lockout");
+        let mut config = ServerConfig::for_test(data_dir.clone());
+        config.login_max_failures = 3;
+        let app = router(config).await.unwrap();
+        register_account(&app, "locked@example.com").await;
+        register_account(&app, "unaffected@example.com").await;
+        let login = |email: &str, password: &str| {
+            public_post("/v1/auth/login", json!({"email": email, "password": password}))
+        };
+
+        for _ in 0..3 {
+            let failed = app.clone().oneshot(login("locked@example.com", "wrong-password-123")).await.unwrap();
+            assert_eq!(failed.status(), 401);
+        }
+        let locked = app.clone().oneshot(login("locked@example.com", "not-a-real-password")).await.unwrap();
+        assert_eq!(locked.status(), 429, "even the right password waits out the lockout");
+        assert!(locked.headers().contains_key("retry-after"));
+        assert_eq!(response_json(locked).await["error"]["code"], "rate_limited");
+
+        let other = app.clone().oneshot(login("unaffected@example.com", "not-a-real-password")).await.unwrap();
+        assert_eq!(other.status(), 200, "other accounts are not affected");
+        let unknown = app.clone().oneshot(login("nobody@example.com", "not-a-real-password")).await.unwrap();
+        assert_eq!(unknown.status(), 401);
+        assert_eq!(response_json(unknown).await["error"]["code"], "invalid_credentials");
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn the_authentication_rate_limit_answers_429() {
+        let data_dir = temp_data_dir("auth-quota");
+        let mut config = ServerConfig::for_test(data_dir.clone());
+        config.auth_quota = super::Quota::per_minute(2);
+        let app = router(config).await.unwrap();
+        let sign_in = || public_post("/v1/auth/login", json!({"email": "nobody@example.com", "password": "not-a-real-password"}));
+        for _ in 0..2 {
+            assert_eq!(app.clone().oneshot(sign_in()).await.unwrap().status(), 401);
+        }
+        assert_eq!(app.clone().oneshot(sign_in()).await.unwrap().status(), 429);
+
+        // Refreshes have their own, wider bucket.
+        let refresh = || public_post("/v1/auth/refresh", json!({"refresh_token": "unknown"}));
+        for _ in 0..8 {
+            assert_eq!(app.clone().oneshot(refresh()).await.unwrap().status(), 401);
+        }
+        assert_eq!(app.clone().oneshot(refresh()).await.unwrap().status(), 429);
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn closed_registration_only_admits_the_first_account() {
+        let data_dir = temp_data_dir("closed-registration");
+        let mut config = ServerConfig::for_test(data_dir.clone());
+        config.allow_registration = false;
+        let app = router(config).await.unwrap();
+        let health = response_json(app.clone().oneshot(Request::builder().uri("/health").body(Body::empty()).unwrap()).await.unwrap()).await;
+        assert_eq!(health["registration_open"], true, "the first owner can still register");
+        register_account(&app, "first@example.com").await;
+
+        let second = app
+            .clone()
+            .oneshot(public_post(
+                "/v1/auth/register",
+                json!({"email": "second@example.com", "display_name": "Second", "password": "not-a-real-password"}),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(second.status(), 403);
+        let health = response_json(app.clone().oneshot(Request::builder().uri("/health").body(Body::empty()).unwrap()).await.unwrap()).await;
+        assert_eq!(health["registration_open"], false);
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn responses_carry_security_headers_and_readiness_checks_the_database() {
+        let data_dir = temp_data_dir("headers");
+        let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+        let health = app.clone().oneshot(Request::builder().uri("/health").body(Body::empty()).unwrap()).await.unwrap();
+        let headers = health.headers();
+        assert_eq!(headers["x-content-type-options"], "nosniff");
+        assert_eq!(headers["x-frame-options"], "DENY");
+        assert_eq!(headers["referrer-policy"], "no-referrer");
+        assert_eq!(headers["cache-control"], "no-store");
+        assert!(headers.contains_key("content-security-policy"));
+
+        let ready = app.clone().oneshot(Request::builder().uri("/health/ready").body(Body::empty()).unwrap()).await.unwrap();
+        assert_eq!(ready.status(), 200);
+        assert_eq!(response_json(ready).await["database"], "ok");
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn the_ai_policy_and_quota_decide_who_may_call_the_provider() {
+        let data_dir = temp_data_dir("ai-policy");
+        let mut config = ServerConfig::for_test(data_dir.clone());
+        config.ai_quota = super::Quota::per_hour(2);
+        let app = router(config).await.unwrap();
+        let (ollama_url, prompts) = start_fake_ollama().await;
+        let (owner, _) = register_account(&app, "ai-owner@example.com").await;
+        let (viewer, _) = register_account(&app, "ai-viewer@example.com").await;
+        let workspace_id = create_workspace(&app, &owner).await;
+        let call = |method: &'static str, uri: String, who: &str, body: Value| {
+            let app = app.clone();
+            let request = json_request(method, &uri, who, body);
+            async move { app.oneshot(request).await.unwrap() }
+        };
+        let added = call("PUT", format!("/v1/workspaces/{workspace_id}/members"), &owner, json!({"email": "ai-viewer@example.com", "role": "viewer"})).await;
+        assert_eq!(added.status(), 200);
+        let provider = call("PUT", format!("/v1/workspaces/{workspace_id}/ai-providers"), &owner, json!({"provider_type": "ollama", "name": "Mock", "base_url": ollama_url, "model": "mock-chat", "enabled": true, "purpose": "text"})).await;
+        assert_eq!(provider.status(), 200);
+
+        let policy = response_json(call("GET", format!("/v1/workspaces/{workspace_id}/ai-policy"), &viewer, json!({})).await).await;
+        assert_eq!(policy["min_role"], "viewer", "everyone may use AI by default");
+        let capabilities = response_json(call("GET", format!("/v1/workspaces/{workspace_id}/capabilities"), &viewer, json!({})).await).await;
+        assert_eq!(capabilities["can_use_ai"], true);
+
+        let refused = call("PUT", format!("/v1/workspaces/{workspace_id}/ai-policy"), &viewer, json!({"min_role": "admin"})).await;
+        assert_eq!(refused.status(), 403, "viewers cannot change the policy");
+        let changed = call("PUT", format!("/v1/workspaces/{workspace_id}/ai-policy"), &owner, json!({"min_role": "member"})).await;
+        assert_eq!(changed.status(), 200);
+
+        let capabilities = response_json(call("GET", format!("/v1/workspaces/{workspace_id}/capabilities"), &viewer, json!({})).await).await;
+        assert_eq!(capabilities["can_use_ai"], false);
+        assert_eq!(capabilities["can_generate_ai_overview"], false);
+        let asked = call("POST", format!("/v1/workspaces/{workspace_id}/ask"), &viewer, json!({"question": "How do we deploy?"})).await;
+        assert_eq!(asked.status(), 403);
+        assert!(response_json(asked).await["error"]["message"].as_str().unwrap().contains("available to members"));
+        let agent = response_json(call("GET", format!("/v1/workspaces/{workspace_id}/agent/capabilities"), &viewer, json!({})).await).await;
+        assert!(agent["capabilities"].as_array().unwrap().iter().filter(|entry| entry["requires_ai"] == true).all(|entry| entry["available"] == false));
+        let reply = call("POST", format!("/v1/workspaces/{workspace_id}/agent/messages"), &viewer, json!({"message": "What is this workspace about?", "capability": "workspace_overview"})).await;
+        assert_eq!(reply.status(), 200);
+        assert!(response_json(reply).await["turn"]["reply"]["reply_markdown"].as_str().unwrap().contains("available to members"));
+        assert!(prompts.lock().unwrap().is_empty(), "nothing reached the provider for the viewer");
+
+        // The owner may, up to the hourly quota.
+        for _ in 0..2 {
+            let asked = call("POST", format!("/v1/workspaces/{workspace_id}/ask"), &owner, json!({"question": "How do we deploy?"})).await;
+            assert_eq!(asked.status(), 200);
+        }
+        let limited = call("POST", format!("/v1/workspaces/{workspace_id}/ask"), &owner, json!({"question": "How do we deploy?"})).await;
+        assert_eq!(limited.status(), 429);
+        assert!(limited.headers().contains_key("retry-after"));
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn saved_provider_keys_only_go_to_the_address_they_were_saved_for() {
+        let data_dir = temp_data_dir("provider-keys");
+        let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+        let (owner, _) = register_account(&app, "keys@example.com").await;
+        let workspace_id = create_workspace(&app, &owner).await;
+        let save = |body: Value| {
+            let app = app.clone();
+            let request = json_request("PUT", &format!("/v1/workspaces/{workspace_id}/ai-providers"), &owner, body);
+            async move { app.oneshot(request).await.unwrap() }
+        };
+        let saved = save(json!({"provider_type": "openrouter", "name": "Cloud", "base_url": "https://openrouter.ai/api/v1", "model": "openai/gpt-4o-mini", "api_key": "sk-or-v1-secret", "enabled": true, "cloud_content_acknowledged": true, "purpose": "text"})).await;
+        assert_eq!(saved.status(), 200);
+        let saved = response_json(saved).await;
+        assert!(saved.get("api_key").is_none(), "keys are never sent back");
+        let id = saved["id"].as_str().unwrap().to_owned();
+
+        let moved = save(json!({"id": id, "provider_type": "openrouter", "name": "Cloud", "base_url": "https://collector.example/api/v1", "model": "openai/gpt-4o-mini", "enabled": true, "purpose": "text"})).await;
+        assert_eq!(moved.status(), 400);
+        assert!(response_json(moved).await["error"]["message"].as_str().unwrap().contains("Enter the API key again"));
+        let renamed = save(json!({"id": id, "provider_type": "openrouter", "name": "Cloud renamed", "base_url": "https://openrouter.ai/api/v1/", "model": "openai/gpt-4o-mini", "enabled": true, "purpose": "text"})).await;
+        assert_eq!(renamed.status(), 200, "the key is kept while the address stays the same");
+
+        let metadata = save(json!({"provider_type": "ollama", "name": "Metadata", "base_url": "http://169.254.169.254/latest", "model": "x", "enabled": true, "purpose": "vision"})).await;
+        assert_eq!(metadata.status(), 400);
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn uploads_accept_percent_encoded_file_names() {
+        let data_dir = temp_data_dir("upload-names");
+        let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+        let (owner, _) = register_account(&app, "names@example.com").await;
+        let workspace_id = create_workspace(&app, &owner).await;
+        let upload = |name: &str| {
+            Request::builder()
+                .method("POST")
+                .uri(format!("/v1/workspaces/{workspace_id}/artifacts/upload"))
+                .header("authorization", &owner)
+                .header("content-type", "text/markdown")
+                .header("x-repomemo-filename", name)
+                .body(Body::from("# Notes\nContent."))
+                .unwrap()
+        };
+        let encoded = app.clone().oneshot(upload("R%C3%A9sum%C3%A9%20%25%20notes.md")).await.unwrap();
+        assert_eq!(encoded.status(), 201);
+        assert_eq!(response_json(encoded).await["title"], "Résumé % notes.md");
+        let plain = app.clone().oneshot(upload("plain.md")).await.unwrap();
+        assert_eq!(response_json(plain).await["title"], "plain.md");
+        let too_long = app.clone().oneshot(upload(&format!("{}.md", "a".repeat(300)))).await.unwrap();
+        assert_eq!(too_long.status(), 400);
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn event_streams_end_when_the_member_is_removed() {
+        let data_dir = temp_data_dir("event-access");
+        let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+        let (owner, _) = register_account(&app, "stream-owner@example.com").await;
+        let (member, registration) = register_account(&app, "stream-member@example.com").await;
+        let member_id = registration["user"]["id"].as_str().unwrap().to_owned();
+        let workspace_id = create_workspace(&app, &owner).await;
+        let added = app
+            .clone()
+            .oneshot(json_request("PUT", &format!("/v1/workspaces/{workspace_id}/members"), &owner, json!({"email": "stream-member@example.com", "role": "member"})))
+            .await
+            .unwrap();
+        assert_eq!(added.status(), 200);
+
+        let stream = app
+            .clone()
+            .oneshot(auth_request("GET", &format!("/v1/workspaces/{workspace_id}/events"), &member))
+            .await
+            .unwrap();
+        assert_eq!(stream.status(), 200);
+        let removed = app
+            .clone()
+            .oneshot(auth_request("DELETE", &format!("/v1/workspaces/{workspace_id}/members/{member_id}"), &owner))
+            .await
+            .unwrap();
+        assert_eq!(removed.status(), 204);
+        let ended = tokio::time::timeout(
+            std::time::Duration::from_secs(10),
+            to_bytes(stream.into_body(), usize::MAX),
+        )
+        .await;
+        assert!(ended.is_ok(), "the stream should close once the member is removed");
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn a_maintenance_pass_runs_cleanly() {
+        let data_dir = temp_data_dir("maintenance");
+        let config = ServerConfig::for_test(data_dir.clone());
+        let state = super::build_state(&config).await.unwrap();
+        let report = super::maintenance::run_pass(&state, true, true).await;
+        assert_eq!(report.failures, 0, "{report:?}");
         let _ = std::fs::remove_dir_all(data_dir);
     }
 

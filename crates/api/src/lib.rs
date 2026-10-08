@@ -25,11 +25,14 @@ mod embeddings;
 mod health;
 mod knowledge_map;
 mod repo_overview;
+mod repo_policy;
 mod repo_stack;
 mod repo_sync;
 
 pub use agent::{agent_capabilities, agent_conversation_title, agent_turn_label};
 pub use embeddings::EmbeddingRun;
+pub use repo_policy::{is_network_path, RepoLinkPolicy};
+pub use repo_sync::RepoHead;
 
 /// Passages Ask puts in front of the model, after reranking a wider pool.
 const ASK_CONTEXT_PASSAGES: usize = 8;
@@ -47,11 +50,12 @@ const SUMMARY_MAX_PARTS: usize = 8;
 pub struct RepoMemoCore {
     storage: StorageEngine,
     retrieval: RetrievalService,
+    repo_policy: std::sync::Arc<RepoLinkPolicy>,
 }
 
 impl RepoMemoCore {
     pub async fn boot(data_dir: PathBuf) -> Result<Self> {
-        let storage = StorageEngine::open(StorageConfig { data_dir }).await?;
+        let storage = StorageEngine::open(StorageConfig::new(data_dir)).await?;
         Ok(Self::from_storage(storage))
     }
 
@@ -60,7 +64,22 @@ impl RepoMemoCore {
     /// point at the same pool and share observers (job events, activity feed).
     pub fn from_storage(storage: StorageEngine) -> Self {
         let retrieval = RetrievalService::new(storage.clone());
-        Self { storage, retrieval }
+        Self {
+            storage,
+            retrieval,
+            repo_policy: std::sync::Arc::new(RepoLinkPolicy::unrestricted()),
+        }
+    }
+
+    /// Restricts which folders repository links may point at. Applies to new
+    /// links and to every later sync of existing ones.
+    pub fn with_repo_link_policy(mut self, policy: RepoLinkPolicy) -> Self {
+        self.repo_policy = std::sync::Arc::new(policy);
+        self
+    }
+
+    pub fn repo_link_policy(&self) -> &RepoLinkPolicy {
+        &self.repo_policy
     }
 
     pub fn storage(&self) -> &StorageEngine {

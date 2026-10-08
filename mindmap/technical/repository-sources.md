@@ -47,6 +47,7 @@ flowchart TD
 
 | Decision | Why |
 |---|---|
+| **The operator can restrict links to some folders** (`REPOMEMO_REPO_ROOTS`). | A link is checked against the allowed folders before anything is read, again after symbolic links are resolved, and on every sync, so narrowing the setting also stops older links. The repository root git reports must be inside too, since a sync reads the whole repository. Windows network shares (`\\host\share`) are refused unless an allowed folder is on one: just opening a UNC path makes Windows send the server account's credentials to that host. |
 | **Read commits, not the working tree.** | What is committed is stable and reviewable. Uncommitted edits, ignored files and build output never enter the index, and `.gitignore` is respected without reimplementing it. |
 | **One artifact per path, updated in place** (`repo_files`). | Uploads are unique on `(workspace, source, path, content_hash)`, so re-importing an edited file would create a second artifact and leave the stale one searchable. A repository file keeps its artifact id across edits and renames, so comments, memory links, tasks and lifecycle history stay attached. |
 | **Snapshot comparison by git blob id**, not `git diff`. | Comparing the whole tree with the stored `repo_files` rows is always correct, even after a rebase or force-push, and an unchanged file costs nothing because its blob id is unchanged. |
@@ -178,7 +179,7 @@ Tests: `repomemo-git` (tree parsing, reading a real repository), `repomemo-inges
 ## Known limits of phase 1
 
 - **Renames are detected only when the content is identical.** A file renamed and edited in the same commit becomes a removal plus an addition, so its comments stay on the old, now outdated, artifact.
-- **Syncs are manual** (plus one at server start). There is no polling or file watching yet.
+- **Syncs follow the branch by polling.** Every `REPOMEMO_REPO_POLL_SECONDS` (300 by default; `0` turns it off) the server resolves each branch with one `git rev-parse` and syncs the repositories whose branch moved. A sync towards the same commit is not retried within an hour, and a repository that never synced successfully waits for someone to press Sync now. There is no file watching.
 - **Local folders only.** A link is a folder on the server; remote URLs are refused with a clear message. URLs, credentials and webhooks are phase 2, and will reuse the per-workspace link and its access check (with a per-workspace token).
 - **One branch per repository.** A repository root can be connected only once per workspace, so two branches of it cannot be indexed side by side yet.
 - The desktop app does not have the Repositories section yet; the engine is in `RepoMemoCore` and can be exposed through Tauri commands.
