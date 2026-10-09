@@ -164,6 +164,22 @@ Any signed-in user can create a new organization and becomes its owner.
 
 ---
 
+## 1a. First-run setup (onboarding)
+
+The very first time a server runs, with no account yet, the web app shows a **setup page** instead of sign-in:
+
+| Step | What happens |
+|---|---|
+| **Welcome** | Explains what follows and asks for the **one-time setup code** printed on the server console when it started (or set by the operator). Only someone with access to the server has it |
+| **System administrator** | Name, email and password of the account that will administer the whole server. Creating it signs that person in |
+| **Server check** | Database, data folder, key for stored credentials, git, LibreOffice, allowed browser addresses, repository folders, AI addresses, proxy, log files: each marked OK, note, attention or problem, with advice |
+| **Access and security** | Open or closed registration, session length, failed sign-ins before lockout and its length, AI requests per person |
+| **Logging** | Default level, log files on or off, how long they are kept, console format |
+| **First workspace** | Optional: an organization and a workspace, owned by the administrator |
+| **Finish** | A summary, then **Finish setup** |
+
+Until the setup is finished nobody else can register, and a closed browser picks up again after the administrator signs in. Once finished, the setup page **never shows again**: the server refuses every setup request and the `/setup` address sends people to sign-in. A server that already had accounts before this feature existed counts as set up.
+
 ## 1b. System area (system administrators)
 
 A **System** button in the header opens `/system`, with these pages:
@@ -172,9 +188,9 @@ A **System** button in the header opens `/system`, with these pages:
 |---|---|
 | **Overview** | The back end (version, host, process, address, data folder, uptime), storage (database, log, stored files, previews), background work (indexing and embedding queues, repository syncs, conversions, live event streams), traffic since start with requests per minute for the last hour, refused and rate-limited requests, locked sign-ins, and the **front-end clients** seen in the last 24 hours (browser and system, origin, address, requests). Refreshes every 30 seconds |
 | **Usage** | Activity per day and by kind, the most active people, and every workspace with its members, files, size, passages, activity, AI requests and last activity, over 7 to 365 days |
-| **Users** | Every account with its role, memberships, signed-in sessions and last connection. Make or remove system administrators, sign someone out everywhere, lift a sign-in lockout |
-| **Settings** | Registration, token lifetimes, sign-in protection, AI requests per person, repository check interval and maintenance, changed at run time and kept until reset to the server default. Settings only the server's environment controls are listed read-only |
-| **Logs** | Recent server log events, filtered by level and text, following live; security events (sign-ins, lockouts, role changes) can be shown alone |
+| **Users** | Every account with its role, a tree of its organizations (one line each, with its role) and under each the workspaces it belongs to with its role in each (owner, admin, member, viewer); system administrators show as **Admin of all organizations and workspaces** by inheritance, plus what they own, signed-in sessions and last connection. Make or remove system administrators (system administrators only) and **app administrators** (same System pages, but no automatic access to every organization and workspace), sign someone out everywhere, lift a sign-in lockout |
+| **Settings** | Registration, token lifetimes, sign-in protection, AI requests per person, repository check interval, maintenance and **logging**, changed at run time and kept until reset to the server default. Logging sets a level (off to trace) for each kind of log (security, workspace activity, background jobs, HTTP requests, AI providers, database, and everything else), the console format (readable text, compact text or JSON lines), whether logs are kept in daily files, and how many days those files are kept. Settings only the server's environment controls are listed read-only |
+| **Logs** | What is being recorded, then the events: live (recent, following as they arrive) or any earlier day kept in the log files, filtered by kind of log, workspace, level and text. A day's file can be downloaded |
 | **Jobs & maintenance** | Jobs across every workspace (stop a running one) and maintenance: last run, next run, what it cleaned, and **Run maintenance now** |
 | **Audit trail** | What system administrators did: role changes, settings, ended sessions, maintenance runs |
 
@@ -187,7 +203,7 @@ A **System** button in the header opens `/system`, with these pages:
 | **Register** (`/register`) | Email, display name (1–120 characters), password (12+ characters). The user is signed in immediately. The server operator can close registration; the first account can always be created. |
 | **Sign in** (`/login`) | Email and password. A wrong email and a wrong password produce the same message. After 10 failed attempts in a row the account is locked for 15 minutes from that address (both configurable), and too many attempts from one address are slowed down. |
 | **Session** | Renewed silently in the background for up to 30 days of inactivity, so nobody is signed out mid-work. |
-| **Profile** (`/profile`) | Rename yourself, change your password (the current password is required; **every other device is signed out**, this one stays signed in), **sign out everywhere** (every device, this one included), see last connection time, workspace count, a **365-day contribution calendar**, and **tasks assigned to you**. |
+| **Profile** (`/profile`) | Upload or remove a **profile picture** (PNG, JPEG or WebP; cropped square and shrunk to 256 px in the browser; server limit 512 KiB, 64–1024 px square). It also shows in workspace members, organization members and System › Users, and falls back to initials. Rename yourself, change your password (the current password is required; **every other device is signed out**, this one stays signed in), **sign out everywhere** (every device, this one included), see last connection time, workspace count, a **365-day contribution calendar**, and **tasks assigned to you**. |
 | **Notifications** (`/notifications`) | "Task assigned to you" and "You were mentioned in evidence discussion". Mark one or all as read. Clicking a notification opens the related page. |
 | **Theme** | Light and dark toggle, remembered per browser. |
 | **Sign out** | Always visible in the header. |

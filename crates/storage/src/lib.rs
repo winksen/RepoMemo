@@ -23,8 +23,10 @@ use uuid::Uuid;
 
 mod repo;
 mod secrets;
+mod setup;
 mod system;
 pub use repo::{RepoFileRecord, RepoFileWrite};
+pub use setup::SetupState;
 pub use system::{StoredSystemSetting, UserAccess};
 pub use secrets::{KEY_FILE_NAME as SECRET_KEY_FILE_NAME, MIN_MASTER_KEY_CHARS};
 use secrets::SecretBox;
@@ -934,6 +936,58 @@ impl StorageEngine {
         .fetch_optional(&self.pool)
         .await?;
         Ok(row.map(UserProfile::from))
+    }
+
+    /// Stores (or replaces) the user's profile picture. The caller has already
+    /// validated the image.
+    pub async fn set_user_avatar(
+        &self,
+        user_id: &str,
+        content_type: &str,
+        data: &[u8],
+    ) -> Result<()> {
+        sqlx::query(
+            "INSERT INTO user_avatars (user_id, content_type, data, updated_at) VALUES (?1, ?2, ?3, ?4)              ON CONFLICT(user_id) DO UPDATE SET content_type = excluded.content_type, data = excluded.data, updated_at = excluded.updated_at",
+        )
+        .bind(user_id)
+        .bind(content_type)
+        .bind(data)
+        .bind(Utc::now().to_rfc3339())
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// The user's profile picture as `(content type, bytes)`, if they have one.
+    pub async fn get_user_avatar(&self, user_id: &str) -> Result<Option<(String, Vec<u8>)>> {
+        let row = sqlx::query_as::<_, (String, Vec<u8>)>(
+            "SELECT content_type, data FROM user_avatars WHERE user_id = ?1",
+        )
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row)
+    }
+
+    pub async fn delete_user_avatar(&self, user_id: &str) -> Result<()> {
+        sqlx::query("DELETE FROM user_avatars WHERE user_id = ?1")
+            .bind(user_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// Whether `viewer` may see `target`'s picture: themselves, or someone who
+    /// shares an organization or a workspace with them.
+    pub async fn users_share_a_group(&self, viewer: &str, target: &str) -> Result<bool> {
+        let shared: i64 = sqlx::query_scalar(
+            "SELECT EXISTS (SELECT 1 FROM organization_memberships a JOIN organization_memberships b ON b.organization_id = a.organization_id WHERE a.user_id = ?1 AND b.user_id = ?2)                  OR EXISTS (SELECT 1 FROM workspace_memberships a JOIN workspace_memberships b ON b.workspace_id = a.workspace_id WHERE a.user_id = ?1 AND b.user_id = ?2)",
+        )
+        .bind(viewer)
+        .bind(target)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(shared != 0)
     }
 
     pub async fn update_user_display_name(

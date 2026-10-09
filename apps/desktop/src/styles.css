@@ -247,6 +247,7 @@ textarea:focus-visible {
 .rm-button.shared-rail-organization.active:hover:not(:disabled) { color: var(--color-text); background: var(--color-surface-2); border-color: transparent; }
 .shared-organization-create { margin-top: 4px; }
 .shared-rail-empty { margin: 0; color: var(--color-text-muted); font-size: 13px; line-height: 1.5; }
+.shared-rail-system { display: grid; flex: 0 0 auto; gap: 8px; margin-top: 12px; padding: 14px 0 12px; border-top: 1px solid var(--color-border); }
 .shared-rail-footer { gap: 7px; margin-top: auto; padding-top: 16px; color: var(--color-text-subtle); border-top: 1px solid var(--color-border); font-size: 12px; }
 .shared-home-content { --shared-content-inset: clamp(24px, 2vw, 36px); display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 0; overflow: hidden; }
 .shared-layout-content { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
@@ -343,11 +344,12 @@ textarea:focus-visible {
 .shared-organization-member-form .rm-dropdown-trigger { width: 100%; }
 .shared-organization-member-list { display: grid; border-top: 1px solid var(--color-border); }
 .shared-organization-member-list article { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 56px; padding: 10px 0; border-bottom: 1px solid var(--color-border); }
-.shared-organization-member-list article > div:first-child { display: grid; min-width: 0; gap: 3px; }
+.shared-organization-member-list .shared-person { display: flex; align-items: center; min-width: 0; gap: 12px; }
+.shared-organization-member-list .shared-person > div { display: grid; min-width: 0; gap: 3px; }
 .shared-organization-member-list strong,
 .shared-organization-member-list span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .shared-organization-member-list strong { font-size: 13px; }
-.shared-organization-member-list article > div:first-child span { color: var(--color-text-muted); font-size: 11px; }
+.shared-organization-member-list .shared-person > div span { color: var(--color-text-muted); font-size: 11px; }
 .shared-organization-member-actions { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 8px; }
 .shared-organization-member-actions .rm-dropdown-trigger { min-width: 106px; }
 .shared-organization-member-actions > .rm-button { display: grid; width: 34px; min-width: 34px; height: 34px; min-height: 34px; padding: 0; place-items: center; }
@@ -6158,3 +6160,8 @@ input:focus, textarea:focus, select:focus { background: #fff; border-color: var(
 .shared-detail-grid.people-only .shared-activity-section { margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--border, rgba(128, 128, 128, 0.25)); }
 .shared-activity-filter { display: flex; gap: 8px; margin: 12px 0; }
 .shared-activity-filter button span { opacity: 0.65; margin-left: 4px; }
+
+.user-avatar { display: inline-grid; flex: none; place-items: center; overflow: hidden; color: var(--color-text-muted); background: var(--color-surface-3); border-radius: 50%; font-weight: 600; line-height: 1; user-select: none; }
+.user-avatar img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.shared-profile-avatar-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 6px; }
+.shared-profile-identity small.shared-muted-copy { display: block; font-size: 11px; }

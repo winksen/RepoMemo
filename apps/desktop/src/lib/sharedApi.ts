@@ -1,8 +1,11 @@
 import type {
+  ServerSetupStatus,
+  SetupCheck,
   AiMinRole,
   AiPolicy,
   SystemAuditEvent,
   SystemJob,
+  SystemLogFiles,
   SystemLogs,
   SystemOverview,
   SystemSettings,
@@ -946,6 +949,13 @@ export function listSystemUsers(accessToken: string): Promise<SystemUser[]> {
   return request<SystemUser[]>("/v1/system/users", {}, accessToken);
 }
 
+export function setAppAdmin(accessToken: string, userId: string, enabled: boolean): Promise<void> {
+  return request<void>(`/v1/system/users/${encodeURIComponent(userId)}/app-admin`, {
+    method: "PUT",
+    body: JSON.stringify({ enabled }),
+  }, accessToken);
+}
+
 export function setSystemAdmin(accessToken: string, userId: string, enabled: boolean): Promise<void> {
   return request<void>(`/v1/system/users/${encodeURIComponent(userId)}/system-admin`, {
     method: "PUT",
@@ -965,7 +975,7 @@ export function getSystemSettings(accessToken: string): Promise<SystemSettings> 
   return request<SystemSettings>("/v1/system/settings", {}, accessToken);
 }
 
-export function saveSystemSettings(accessToken: string, values: Record<string, boolean | number>): Promise<SystemSettings> {
+export function saveSystemSettings(accessToken: string, values: Record<string, boolean | number | string>): Promise<SystemSettings> {
   return request<SystemSettings>("/v1/system/settings", {
     method: "PUT",
     body: JSON.stringify({ values }),
@@ -976,13 +986,31 @@ export function resetSystemSetting(accessToken: string, key: string): Promise<Sy
   return request<SystemSettings>(`/v1/system/settings/${encodeURIComponent(key)}`, { method: "DELETE" }, accessToken);
 }
 
-export function getSystemLogs(accessToken: string, filters: { level?: string; audit?: boolean; q?: string; limit?: number }): Promise<SystemLogs> {
+export function getSystemLogs(accessToken: string, filters: { level?: string; category?: string; workspace?: string; day?: string; q?: string; limit?: number }): Promise<SystemLogs> {
   const params = new URLSearchParams();
   if (filters.level) params.set("level", filters.level);
-  if (filters.audit) params.set("audit", "true");
+  if (filters.category) params.set("category", filters.category);
+  if (filters.workspace) params.set("workspace", filters.workspace);
+  if (filters.day) params.set("day", filters.day);
   if (filters.q) params.set("q", filters.q);
   params.set("limit", String(filters.limit ?? 300));
   return request<SystemLogs>(`/v1/system/logs?${params.toString()}`, {}, accessToken);
+}
+
+export function getSystemLogFiles(accessToken: string): Promise<SystemLogFiles> {
+  return request<SystemLogFiles>("/v1/system/logs/files", {}, accessToken);
+}
+
+/** A day's log file (JSON lines), fetched with the user's session. */
+export async function downloadSystemLogFile(accessToken: string, day: string): Promise<Blob> {
+  const response = await authFetch(`${API_URL}/v1/system/logs/files/${encodeURIComponent(day)}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null) as { error?: { message?: string } } | null;
+    throw new SharedApiError(response.status, payload?.error?.message ?? `The shared API returned ${response.status}.`);
+  }
+  return response.blob();
 }
 
 export function listSystemAuditEvents(accessToken: string): Promise<SystemAuditEvent[]> {
@@ -1000,4 +1028,99 @@ export function getSystemMaintenance(accessToken: string): Promise<MaintenanceSt
 
 export function runSystemMaintenance(accessToken: string): Promise<MaintenanceStatus> {
   return request<MaintenanceStatus>("/v1/system/maintenance/run", { method: "POST" }, accessToken);
+}
+
+// Profile pictures. <img> cannot send the bearer token, so pictures are fetched
+// and shown through object URLs, remembered per user for this page load.
+const avatarCache = new Map<string, Promise<string | null>>();
+
+/** The user's picture as an object URL, or null when they have none (or it is not visible to the caller). */
+export function fetchSharedAvatar(userId: string): Promise<string | null> {
+  const cached = avatarCache.get(userId);
+  if (cached) return cached;
+  const token = readStorage("sessionStorage", SHARED_SESSION_STORAGE_KEY);
+  const pending = (async () => {
+    if (!token) return null;
+    try {
+      const response = await authFetch(`${API_URL}/v1/users/${encodeURIComponent(userId)}/avatar`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.status !== 200) return null;
+      const type = response.headers.get("Content-Type") ?? "";
+      if (!/^image\/(png|jpeg|webp)$/.test(type)) return null;
+      return URL.createObjectURL(await response.blob());
+    } catch {
+      return null;
+    }
+  })();
+  avatarCache.set(userId, pending);
+  // A failed lookup is retried next time instead of being remembered.
+  void pending.then((url) => { if (!url && avatarCache.get(userId) === pending) avatarCache.delete(userId); });
+  return pending;
+}
+
+const avatarListeners = new Set<(userId: string) => void>();
+
+/** Calls back whenever a picture is replaced or removed in this tab, so shown copies refresh. */
+export function onSharedAvatarChanged(listener: (userId: string) => void): () => void {
+  avatarListeners.add(listener);
+  return () => { avatarListeners.delete(listener); };
+}
+
+function forgetAvatar(userId: string) {
+  const cached = avatarCache.get(userId);
+  avatarCache.delete(userId);
+  void cached?.then((url) => { if (url) setTimeout(() => URL.revokeObjectURL(url), 5000); });
+  avatarListeners.forEach((listener) => listener(userId));
+}
+
+async function sendAvatar(accessToken: string, userId: string, init: RequestInit) {
+  const response = await authFetch(`${API_URL}/v1/profile/avatar`, {
+    ...init,
+    headers: { ...(init.headers as Record<string, string> | undefined), Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null) as { error?: { message?: string } } | null;
+    throw new SharedApiError(response.status, payload?.error?.message ?? `The shared API returned ${response.status}.`);
+  }
+  forgetAvatar(userId);
+}
+
+export function uploadSharedAvatar(accessToken: string, userId: string, picture: Blob): Promise<void> {
+  return sendAvatar(accessToken, userId, { method: "PUT", body: picture, headers: { "Content-Type": picture.type } });
+}
+
+export function deleteSharedAvatar(accessToken: string, userId: string): Promise<void> {
+  return sendAvatar(accessToken, userId, { method: "DELETE" });
+}
+
+// First-run server setup
+
+/** Public: whether this server still has to be set up. */
+export function getServerSetup(): Promise<ServerSetupStatus> {
+  return request<ServerSetupStatus>("/v1/setup");
+}
+
+/** Public, new server only: checks the one-time setup code from the server console. */
+export function verifySetupCode(code: string): Promise<void> {
+  return request<void>("/v1/setup/verify-code", { method: "POST", body: JSON.stringify({ code }) });
+}
+
+/** Public, new server only: creates the first system administrator and signs them in. */
+export async function createSetupAdmin(input: { code: string; email: string; displayName: string; password: string }): Promise<TokenResponse> {
+  const response = await request<TokenResponse>("/v1/setup/admin", {
+    method: "POST",
+    body: JSON.stringify({ code: input.code, email: input.email, display_name: input.displayName, password: input.password }),
+  });
+  storeTokens(response);
+  return response;
+}
+
+export function getSetupChecks(accessToken: string): Promise<SetupCheck[]> {
+  return request<SetupCheck[]>("/v1/setup/checks", {}, accessToken);
+}
+
+/** Completes the setup for good. */
+export function completeServerSetup(accessToken: string): Promise<ServerSetupStatus> {
+  return request<ServerSetupStatus>("/v1/setup/complete", { method: "POST" }, accessToken);
 }

@@ -7,7 +7,7 @@ use anyhow::{bail, Context, Result};
 use chrono::Utc;
 use repomemo_domain::{
     CountByLabel, IndexingJobStatus, Organization, SharedUser, SharedWorkspace, SystemAuditEvent,
-    SystemStatistics, SystemUser, WorkspaceUsage,
+    SystemStatistics, SystemUser, SystemUserOrganization, SystemUserWorkspace, WorkspaceUsage,
 };
 use serde_json::Value;
 use sqlx::Row;
@@ -28,23 +28,41 @@ pub struct StoredSystemSetting {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UserAccess {
     pub session_version: i64,
+    /// Administers the server and acts as an administrator everywhere.
     pub is_system_admin: bool,
+    /// Uses the system pages and API, without the access to every organization
+    /// and workspace.
+    pub is_app_admin: bool,
 }
 
 impl StorageEngine {
     /// The session version and system-administrator flag of a user, or `None`
     /// when the user no longer exists.
     pub async fn user_access(&self, user_id: &str) -> Result<Option<UserAccess>> {
-        let row = sqlx::query_as::<_, (i64, i64)>(
-            "SELECT session_version, is_system_admin FROM users WHERE id = ?1",
+        let row = sqlx::query_as::<_, (i64, i64, i64)>(
+            "SELECT session_version, is_system_admin, is_app_admin FROM users WHERE id = ?1",
         )
         .bind(user_id)
         .fetch_optional(&self.pool)
         .await?;
-        Ok(row.map(|(session_version, is_system_admin)| UserAccess {
+        Ok(row.map(|(session_version, is_system_admin, is_app_admin)| UserAccess {
             session_version,
             is_system_admin: is_system_admin != 0,
+            is_app_admin: is_app_admin != 0,
         }))
+    }
+
+    /// Grants or removes the app-administrator role.
+    pub async fn set_app_admin(&self, user_id: &str, enabled: bool) -> Result<()> {
+        let changed = sqlx::query("UPDATE users SET is_app_admin = ?1 WHERE id = ?2")
+            .bind(enabled)
+            .bind(user_id)
+            .execute(&self.pool)
+            .await?;
+        if changed.rows_affected() == 0 {
+            bail!("User was not found.");
+        }
+        Ok(())
     }
 
     pub async fn system_admin_count(&self) -> Result<i64> {
@@ -155,17 +173,51 @@ impl StorageEngine {
         let now = Utc::now().to_rfc3339();
         let rows = sqlx::query(
             r#"
-            SELECT u.id, u.email, u.display_name, u.created_at, u.last_connected_at, u.is_system_admin,
+            SELECT u.id, u.email, u.display_name, u.created_at, u.last_connected_at, u.is_system_admin, u.is_app_admin,
               (SELECT COUNT(*) FROM organization_memberships m WHERE m.user_id = u.id) AS organization_count,
               (SELECT COUNT(*) FROM workspace_memberships m WHERE m.user_id = u.id) AS workspace_count,
               (SELECT COUNT(*) FROM refresh_tokens t WHERE t.user_id = u.id AND t.revoked_at IS NULL AND t.expires_at > ?1) AS active_sessions
             FROM users u
-            ORDER BY u.is_system_admin DESC, u.display_name COLLATE NOCASE ASC
+            ORDER BY u.is_system_admin DESC, u.is_app_admin DESC, u.display_name COLLATE NOCASE ASC
             "#,
         )
         .bind(&now)
         .fetch_all(&self.pool)
         .await?;
+        let memberships = sqlx::query(
+            "SELECT m.user_id, m.workspace_id, w.name, m.role, o.id AS organization_id, o.name AS organization_name FROM workspace_memberships m JOIN workspaces w ON w.id = m.workspace_id LEFT JOIN workspace_organizations wo ON wo.workspace_id = w.id LEFT JOIN organizations o ON o.id = wo.organization_id ORDER BY w.name COLLATE NOCASE ASC",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        let mut workspaces_by_user: BTreeMap<String, Vec<SystemUserWorkspace>> = BTreeMap::new();
+        for row in memberships {
+            workspaces_by_user
+                .entry(row.get("user_id"))
+                .or_default()
+                .push(SystemUserWorkspace {
+                    workspace_id: row.get("workspace_id"),
+                    name: row.get("name"),
+                    role: row.get("role"),
+                    organization_id: row.get("organization_id"),
+                    organization_name: row.get("organization_name"),
+                });
+        }
+        let organization_memberships = sqlx::query(
+            "SELECT m.user_id, o.id AS organization_id, o.name, m.role FROM organization_memberships m JOIN organizations o ON o.id = m.organization_id ORDER BY o.name COLLATE NOCASE ASC",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        let mut organizations_by_user: BTreeMap<String, Vec<SystemUserOrganization>> = BTreeMap::new();
+        for row in organization_memberships {
+            organizations_by_user
+                .entry(row.get("user_id"))
+                .or_default()
+                .push(SystemUserOrganization {
+                    organization_id: row.get("organization_id"),
+                    name: row.get("name"),
+                    role: row.get("role"),
+                });
+        }
         Ok(rows
             .into_iter()
             .map(|row| SystemUser {
@@ -175,9 +227,16 @@ impl StorageEngine {
                 created_at: row.get("created_at"),
                 last_connected_at: row.get("last_connected_at"),
                 is_system_admin: row.get::<i64, _>("is_system_admin") != 0,
+                is_app_admin: row.get::<i64, _>("is_app_admin") != 0,
                 organization_count: row.get("organization_count"),
                 workspace_count: row.get("workspace_count"),
                 active_sessions: row.get("active_sessions"),
+                workspaces: workspaces_by_user
+                    .remove(row.get::<String, _>("id").as_str())
+                    .unwrap_or_default(),
+                organizations: organizations_by_user
+                    .remove(row.get::<String, _>("id").as_str())
+                    .unwrap_or_default(),
             })
             .collect())
     }

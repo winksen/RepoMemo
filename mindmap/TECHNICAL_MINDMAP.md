@@ -32,7 +32,7 @@ mindmap
       AI providers
     Storage
       SQLite WAL via sqlx
-      18 migrations
+      21 migrations
       Content-addressed blobs with garbage collection
       Encrypted provider keys
       Job and activity observers
@@ -147,7 +147,8 @@ flowchart TD
 | `REPOMEMO_ALLOWED_ORIGIN` | `http://127.0.0.1:3021` | The CORS origins, comma-separated (`*` is refused). Allowed methods are GET, POST, PUT, PATCH and DELETE. Allowed headers are `Authorization`, `Content-Type`, `X-RepoMemo-Filename` and `X-RepoMemo-Folder-Id`; `X-Total-Count` and `Retry-After` are exposed. |
 | `REPOMEMO_SERVICE_NAME` | `repomemo-server` | Returned by `/health`. |
 | `REPOMEMO_SECRET_KEY` | unset | *Hardening.* Key material for encrypting provider API keys at rest (§6.6). Unset: a random key in `<data dir>/secret.key`. |
-| `RUST_LOG` | `repomemo_server=info,tower_http=info,audit=info` | Read by the `tracing-subscriber` EnvFilter. Security events use the `audit` target. |
+| `RUST_LOG` | unset | A raw tracing filter. When set it replaces the per-category levels until a system administrator sets levels in System › Settings › Logging (§8c). Security events use the `audit` target. |
+| `REPOMEMO_LOG_FORMAT`, `REPOMEMO_LOG_TO_FILE`, `REPOMEMO_LOG_RETENTION_DAYS` | `text`, `true`, `14` | Console format, daily log files and their retention (§8c); all changeable at run time |
 
 *Hardening* added settings for registration, token lifetimes, rate limits and lockout, AI quotas and allowed AI hosts, repository roots, automatic repository syncing and background maintenance. Each has a safe default; the full table is in [DEVELOPMENT_COMMANDS.md](../docs/DEVELOPMENT_COMMANDS.md#optional-server-settings). An invalid value stops the server at startup, naming the variable. A JWT secret that is too repetitive (fewer than 8 distinct characters) is refused.
 
@@ -207,6 +208,8 @@ The server resolves the caller's role **per request** from `workspace_membership
 
 **System administrators** (`users.is_system_admin`, migration 0019) are loaded with the session version by the extractor, so a granted or removed role applies on the next request. `require_workspace_read` and `require_organization_read` (through `effective_workspace_role`) give them **admin** in every workspace and organization, owner where they own it, without a membership row; every finer guard and escalation rule builds on that, so owner-only actions stay with owners. `GET /v1/workspaces` and `/v1/organizations` list everything for them, `GET /v1/session` reports `is_system_admin`, and storage lets them create workspaces in any organization. The first account of a server becomes one (when none exists), as do accounts listed in `REPOMEMO_SYSTEM_ADMIN_EMAILS` (at startup and on registration); the last one cannot be removed. Without any, the server logs a warning at startup.
 
+**App administrators** (`users.is_app_admin`, migration 0021) may use the whole System API and pages (`require_system_admin` accepts either flag) but get **no wildcard access**: every place that grants an administrator role in all organizations and workspaces (`effective_workspace_role`, `require_organization_read`, the all-organizations and all-workspaces lists, the event stream recheck, avatar viewing) still checks `is_system_admin` only. Granting or removing the system administrator role (`PUT /v1/system/users/{u}/system-admin`) needs a real system administrator, so an app administrator cannot promote themselves; app administrators can grant the app role (`PUT /v1/system/users/{u}/app-admin`).
+
 | Guard | Passes for |
 |---|---|
 | `require_workspace_read` | any workspace role |
@@ -248,6 +251,11 @@ Guard legend: **pub** = no auth, **auth** = any valid JWT, **R/W/A/O** = workspa
 |---|---|---|---|
 | GET | `/health` | pub | `{service,status,authentication}` |
 | GET | `/health/ready` | pub | 200 when the database answers, 503 otherwise |
+| GET | `/v1/setup` | pub | `{state, onboarding}` with `state` new, finishing or complete (§8b-bis) |
+| POST | `/v1/setup/verify-code` | pub | `{code}` → 204; new server only; wrong codes count towards a lockout |
+| POST | `/v1/setup/admin` | pub | `{code, email, display_name, password}` → 201 `TokenResponse`; creates the first system administrator; 409 once one exists |
+| GET | `/v1/setup/checks` | system admin, finishing | server checks with status and advice |
+| POST | `/v1/setup/complete` | system admin, finishing | completes the setup for good; 409 afterwards |
 | POST | `/v1/auth/register` | pub | 201 `TokenResponse`, 409 if the email exists, 403 when registration is closed, 429 when rate-limited |
 | POST | `/v1/auth/login` | pub | `TokenResponse`, 401 `invalid_credentials`, 429 when rate-limited or locked out |
 | POST | `/v1/auth/refresh` | pub | `{refresh_token}` → a new `TokenResponse` with a rotated refresh token; 401 for an unknown, expired or reused token |
@@ -262,13 +270,16 @@ Every route requires a system administrator (**S**); changes are recorded in `sy
 |---|---|---|---|
 | GET | `/v1/system/overview` | S | instance, storage, statistics, background queues, maintenance status, traffic since start (with requests per minute for the last hour), protection counters, front-end clients seen in 24 h, log capture state |
 | GET | `/v1/system/usage?days=` | S | activity per day (zero-filled) and by action, top people, per-workspace footprint and activity; 1–365 days |
-| GET | `/v1/system/users` | S | every account with memberships, active sessions and last connection |
-| PUT | `/v1/system/users/{u}/system-admin` | S | `{enabled}`; 409 for the last system administrator |
+| GET | `/v1/system/users` | S | every account with its direct memberships (`organizations`: id, name, role; `workspaces`: id, name, role, organization), organization count, active sessions and last connection |
+| PUT | `/v1/system/users/{u}/system-admin` | S (system admin only) | `{enabled}`; 409 for the last system administrator |
+| PUT | `/v1/system/users/{u}/app-admin` | S | `{enabled}` |
 | POST | `/v1/system/users/{u}/sessions/end` | S | ends every session of the user |
 | POST | `/v1/system/users/{u}/unlock` | S | clears the user's sign-in lockouts → `{cleared}` |
 | GET, PUT | `/v1/system/settings` | S | run-time settings with value, default and who changed them, plus read-only environment facts. PUT `{values:{key:value}}` validates every value before saving any |
 | DELETE | `/v1/system/settings/{key}` | S | back to the environment default |
-| GET | `/v1/system/logs?level&audit&q&after&limit` | S | recent captured log events, newest first |
+| GET | `/v1/system/logs?level&category&workspace&q&after&limit&day` | S | log events, newest first: recent ones from memory, or a day's file with `day=YYYY-MM-DD` (last 16 MiB read). `category` is `security`, `activity`, `jobs`, `http`, `ai`, `database` or `server`; `workspace` keeps events with that `workspace_id` |
+| GET | `/v1/system/logs/files` | S | the day files kept, plus the logging setup in force: levels per category, console format, file output, retention, effective filter |
+| GET | `/v1/system/logs/files/{day}` | S | a day's file as a download (`application/x-ndjson`); audited |
 | GET | `/v1/system/audit?limit` | S | system audit trail |
 | GET | `/v1/system/jobs?status&limit` | S | jobs across workspaces, with workspace names |
 | GET | `/v1/system/maintenance` | S | maintenance status |
@@ -277,6 +288,8 @@ Every route requires a system administrator (**S**); changes are recorded in `sy
 | GET, PUT | `/v1/profile` | auth | GET includes a 365-day `activity_by_day` |
 | POST | `/v1/profile/password` | auth | 200 `TokenResponse` for this device; every other session ends. Requires `current_password` |
 | GET | `/v1/profile/tasks` | auth | tasks assigned to the caller |
+| PUT, DELETE | `/v1/profile/avatar` | auth | PUT takes the raw image (`Content-Type` must match the bytes), 204. DELETE removes it. 20 changes per hour per user |
+| GET | `/v1/users/{user_id}/avatar` | auth | the image, or 204 when there is none or the caller shares no organization or workspace with that user (system administrators see all) |
 | GET | `/v1/notifications` | auth | |
 | POST | `/v1/notifications/read-all` | auth | 204 |
 | POST | `/v1/notifications/{id}/read` | auth | scoped to the caller's user_id |
@@ -548,6 +561,9 @@ The database is SQLite in WAL mode with foreign keys on, `synchronous = NORMAL` 
 | 0017 | repo_files | one row per tracked path of a repository source: its artifact, git blob id, commit and `removed_at` (§6.10) |
 | 0018 | session_security | `users.session_version` (§4), and indexes for token purging, blob garbage collection and job pruning |
 | 0019 | system_administration | `users.is_system_admin`, `system_settings` (run-time overrides), `system_audit_events` (§8c) |
+| 0020 | user_avatars | `user_avatars` (one PNG/JPEG/WebP blob per user, kept out of `users` so listings never load it) |
+| 0021 | app_admin | `users.is_app_admin` (System access without the wildcard) |
+| 0022 | server_setup | one-row `server_setup` (first administrator, completion); servers that already had accounts are marked complete (§8b-bis) |
 
 ```mermaid
 erDiagram
@@ -606,10 +622,27 @@ Notes:
 | Repository syncs and polling | [repositories.rs](../apps/server/src/repositories.rs) | §6.10 |
 | Maintenance | [maintenance.rs](../apps/server/src/maintenance.rs) | Every hour (`REPOMEMO_MAINTENANCE_INTERVAL_MINUTES`), first one minute after start: purges expired refresh tokens, prunes finished jobs older than 90 days and system audit events older than 365, collects orphan blobs and previews (§6.1), forgets idle rate-limit counters, event channels and client sightings, re-queues missing embeddings, retries indexing that failed for good every 6 hours, and runs `PRAGMA optimize` plus a WAL checkpoint so the log does not grow without bound. A failing step is logged and the others still run. Its settings are read before every pass, its status (running, last and next run, last report) is kept for the System page, and a system administrator can run it by hand |
 
+## 8b-bis. First-run setup (*onboarding*, [setup.rs](../apps/server/src/setup.rs))
+
+**State.** `server_setup` holds at most one row ([storage setup.rs](../crates/storage/src/setup.rs)): no row and no account is **new**; a row without `completed_at` is **finishing**; `completed_at` set is **complete**, and nothing in the application clears it. Accounts without a row (created with the onboarding off, or before it existed) count as complete; migration 0022 marks existing servers complete.
+
+**Guardrails.**
+- *Setup code.* On a new server with `REPOMEMO_SETUP_WIZARD` on, the server takes `REPOMEMO_SETUP_CODE` or makes a 12-character code (an alphabet without look-alike characters) at startup and prints it in a framed block on standard error, not through tracing, so it never reaches the log files or the Logs page. Codes are compared without regard to case or separators, in constant time. Wrong codes count per client address (10 failures, then 15 minutes), on top of the sign-in rate limit.
+- *One first administrator.* `create_setup_admin` inserts the user with `is_system_admin = 1` only `WHERE NOT EXISTS` any account or setup row, and writes the setup row in the same transaction.
+- *Registration closed.* While the onboarding is pending, `POST /v1/auth/register` answers 403 and `/health` reports `registration_open: false` and `setup_required: true`.
+- *Remaining steps.* Checks and completion need a system administrator's session and the finishing state; the settings steps use the System API. Every setup endpoint answers 409 once complete (404 with the onboarding off).
+- *Client.* The web app asks `GET /v1/setup` before anything else and shows the onboarding only when the server says so; `/setup` redirects away otherwise. In the finishing state, sign-in shows a setup notice and no registration; a signed-in account that is not a system administrator sees a waiting page.
+
+Setup events are audited (`server_setup_admin_created`, `server_setup_completed`). With `REPOMEMO_SETUP_WIZARD=false`, the first registered account becomes system administrator and completes the setup.
+
 ## 8c. System administration internals
 
 - **Run-time settings.** `RuntimeSettings` is built from the environment, then overridden by `system_settings` rows and held in a `SettingsCell` that is swapped whole on change; handlers read a snapshot (`state.settings()`). The maintenance loop and the repository poller re-read their interval each round, so changes apply without a restart. Settings that widen what the server can reach (repository roots, AI hosts, origins, proxy trust, secret key, body limit) stay environment-only and are shown read-only.
-- **Logs.** `main.rs` adds `log_capture_layer()` ([logs.rs](../apps/server/src/logs.rs)) next to the console formatter: events that pass the log filter are kept in memory, 2,000 general and 1,000 `audit` events in separate rings so noise cannot evict security events. Nothing is written to disk by it.
+- **Logging** ([logs.rs](../apps/server/src/logs.rs)). `main.rs` calls `init_logging()`, which installs one stack: a reloadable `EnvFilter`, a reloadable console layer (tracing's text or compact formatter, or a JSON-lines writer), and a capture layer that keeps events in memory (2,000 general and 1,000 `audit` events in separate rings, so noise cannot evict security events) and hands them to the file writer.
+  - *Categories.* The filter is compiled from a level per category: **security** (`audit`), **workspace activity** (`activity`), **background jobs** (`jobs`, the indexing, embedding, repository, maintenance and conversion modules, `repomemo_api::repo_sync`, `repomemo_git`), **HTTP** (`tower_http`), **AI** (`repomemo_ai`, `reqwest`), **database** (`repomemo_storage`, `sqlx`), and a default level for everything else. Defaults: info, except HTTP and database at warn. A `RUST_LOG` from the environment is used as-is until an administrator sets a level.
+  - *New log sources.* Every workspace activity row is logged under `activity` with `workspace_id`, `action`, `actor` and `subject`; job starts (debug), completions, cancellations (info) and failures (warn) under `jobs` with `workspace_id`. Both feed the Logs page's workspace filter.
+  - *Files.* With file output on, a dedicated thread appends JSON lines to `<data dir>/logs/repomemo-YYYY-MM-DD.jsonl` (UTC), flushing every second, so request handling never waits on the disk. Files are always JSON lines whatever the console format, so the server can search them. Maintenance deletes files older than the retention.
+  - *Live changes.* The logging settings are part of the run-time settings; every change re-applies the filter, the console format and file output immediately. The module never logs through tracing itself (problems go to standard error), so the sinks cannot feed back into themselves.
 - **Telemetry.** A middleware counts requests by outcome, keeps per-minute counts for an hour, and notes each client (origin, `X-RepoMemo-Client`, user agent summarised as "Browser on OS", last address; at most 500, forgotten after 24 h). Health checks are counted but not listed. Open event streams are counted while they live.
 - **Audit.** `system_audit_events` records role grants and removals (including at startup and on first registration), settings changes and resets, ended sessions, lifted lockouts and manual maintenance, with the actor.
 

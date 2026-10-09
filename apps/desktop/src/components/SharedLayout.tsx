@@ -76,7 +76,6 @@ export function SharedLayout({
           <div className="shared-account-controls">
             <ThemeToggle />
             <Button aria-label="Open notifications" className="shared-notifications-link" onClick={() => onNavigate("/notifications")} title="Notifications" type="button" variant="secondary"><Bell size={16} /></Button>
-            {session.is_system_admin ? <Button className="shared-profile-link" onClick={() => onNavigate("/system/overview")} title="Administer this server" type="button" variant="secondary"><Server size={16} /> System</Button> : null}
             <Button className="shared-profile-link" onClick={() => onNavigate("/profile")} type="button" variant="secondary"><UserCircle size={16} /> Profile</Button>
           </div>
           <Button className="shared-user-signout" onClick={signOut} type="button" variant="secondary"><Logout size={16} /> Sign out</Button>
@@ -84,11 +83,20 @@ export function SharedLayout({
       </div>
     </header>
     <div className="shared-home-frame">
-      <aside className="shared-home-rail">{sidebar}<div className="shared-rail-footer"><Shield size={15} /><span>JWT active · API {apiAvailable === true ? "healthy" : apiAvailable === false ? "offline" : "checking"}</span></div></aside>
+      <aside className="shared-home-rail">{sidebar}{session.is_system_admin || session.is_app_admin ? <SystemRailEntry onNavigate={onNavigate} /> : null}<div className="shared-rail-footer"><Shield size={15} /><span>JWT active · API {apiAvailable === true ? "healthy" : apiAvailable === false ? "offline" : "checking"}</span></div></aside>
       <section className="shared-home-content">
         {workspaceNavigation}
         <div className="shared-layout-content">{children}</div>
       </section>
     </div>
   </main>;
+}
+
+/** The System entry at the bottom of the rail, for system administrators. Highlighted on every System page. */
+function SystemRailEntry({ onNavigate }: { onNavigate: (to: string) => void }) {
+  const isActive = window.location.pathname === "/system" || window.location.pathname.startsWith("/system/");
+  return <section aria-label="System administration" className="shared-rail-system">
+    <p className="shared-eyebrow">Administration</p>
+    <Button aria-current={isActive ? "page" : undefined} className={`shared-rail-organization${isActive ? " active" : ""}`} onClick={() => onNavigate("/system/overview")} title="Administer this server" type="button" variant="secondary"><Server size={16} /><span>System</span></Button>
+  </section>;
 }

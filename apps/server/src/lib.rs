@@ -2,6 +2,7 @@
 
 mod agent;
 mod ai_access;
+mod avatars;
 mod conversion;
 mod embedding;
 mod events;
@@ -11,9 +12,10 @@ mod logs;
 mod maintenance;
 mod repositories;
 mod security;
+mod setup;
 mod system;
 
-pub use logs::log_capture_layer;
+pub use logs::{init_logging, log_capture_layer, LogSettings};
 
 pub use maintenance::MaintenanceSettings;
 pub use security::Quota;
@@ -133,6 +135,14 @@ pub struct ServerConfig {
     pub system_admin_emails: Vec<String>,
     /// System audit events are kept this many days; 0 keeps them forever.
     pub system_audit_retention_days: i64,
+    /// What is logged, how it is printed and whether it is kept in files.
+    pub logging: LogSettings,
+    /// A new server shows an onboarding that creates its first system
+    /// administrator. When off, the first account to register becomes one.
+    pub setup_wizard: bool,
+    /// The one-time code the onboarding asks for; generated and printed on
+    /// the console at startup when unset.
+    pub setup_code: Option<String>,
 }
 
 impl ServerConfig {
@@ -234,6 +244,14 @@ impl ServerConfig {
                 })
                 .unwrap_or_default(),
             system_audit_retention_days: env_parse("REPOMEMO_SYSTEM_AUDIT_RETENTION_DAYS", 365)?,
+            logging: LogSettings::from_env()?,
+            setup_wizard: env_flag("REPOMEMO_SETUP_WIZARD", true)?,
+            setup_code: match env_text("REPOMEMO_SETUP_CODE") {
+                Some(code) if code.chars().filter(char::is_ascii_alphanumeric).count() < 12 => {
+                    bail!("REPOMEMO_SETUP_CODE must contain at least 12 letters or digits")
+                }
+                code => code,
+            },
         })
     }
 
@@ -266,6 +284,13 @@ impl ServerConfig {
             },
             system_admin_emails: Vec::new(),
             system_audit_retention_days: 365,
+            logging: LogSettings {
+                to_file: false,
+                ..LogSettings::default()
+            },
+            // Tests register accounts directly; the onboarding has its own tests.
+            setup_wizard: false,
+            setup_code: None,
         }
     }
 }
@@ -315,6 +340,7 @@ struct RuntimeSettings {
     maintenance: MaintenanceSettings,
     system_audit_retention_days: i64,
     system_admin_emails: Vec<String>,
+    logging: LogSettings,
 }
 
 impl RuntimeSettings {
@@ -335,6 +361,7 @@ impl RuntimeSettings {
             maintenance: config.maintenance.clone(),
             system_audit_retention_days: config.system_audit_retention_days,
             system_admin_emails: config.system_admin_emails.clone(),
+            logging: config.logging.clone(),
         }
     }
 }
@@ -361,6 +388,7 @@ struct AppState {
     instance: Arc<InstanceInfo>,
     telemetry: Arc<Telemetry>,
     maintenance_status: Arc<std::sync::Mutex<MaintenanceStatus>>,
+    setup: Arc<setup::SetupGate>,
 }
 
 impl AppState {
@@ -377,6 +405,8 @@ pub struct HealthResponse {
     pub authentication: &'static str,
     /// Whether new accounts can be registered.
     pub registration_open: bool,
+    /// The server still has to be set up through the onboarding.
+    pub setup_required: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -808,6 +838,8 @@ struct AuthenticatedSubject {
     /// Administers the whole server: acts as an administrator in every
     /// organization and workspace, and may use the system API.
     is_system_admin: bool,
+    /// May use the system API and pages, without the wildcard access.
+    is_app_admin: bool,
 }
 
 pub async fn router(config: ServerConfig) -> Result<Router> {
@@ -835,7 +867,10 @@ async fn build_state(config: &ServerConfig) -> Result<AppState> {
     }
 
     // Settings changed by system administrators override the environment.
-    let runtime = Arc::new(SettingsCell::new(RuntimeSettings::from_config(config)));
+    let runtime = Arc::new(SettingsCell::new(
+        RuntimeSettings::from_config(config),
+        config.data_dir.clone(),
+    ));
     let overrides = storage
         .list_system_settings()
         .await?
@@ -909,6 +944,27 @@ async fn build_state(config: &ServerConfig) -> Result<AppState> {
         tracing::info!("LibreOffice not found: Office previews show extracted text and tables");
     }
     let instance = Arc::new(InstanceInfo::new(config, converter.enabled()));
+    let setup = Arc::new(setup::SetupGate::prepare(
+        config.setup_wizard,
+        config.setup_code.as_deref(),
+        &storage.setup_state().await?,
+        setup::SetupFacts {
+            secret_key_from_env: config.secret_key.is_some(),
+            allowed_origins: config
+                .allowed_origins
+                .iter()
+                .filter_map(|origin| origin.to_str().ok().map(str::to_owned))
+                .collect(),
+            repo_roots: config
+                .repo_roots
+                .iter()
+                .map(|root| root.to_string_lossy().into_owned())
+                .collect(),
+            ai_hosts_restricted: config.ai_allowed_hosts.is_some(),
+            trust_proxy: config.trust_proxy,
+            data_dir: config.data_dir.clone(),
+        },
+    ));
     Ok(AppState {
         storage,
         core,
@@ -923,6 +979,7 @@ async fn build_state(config: &ServerConfig) -> Result<AppState> {
         instance,
         telemetry: Arc::new(Telemetry::default()),
         maintenance_status: Arc::new(std::sync::Mutex::new(MaintenanceStatus::default())),
+        setup,
     })
 }
 
@@ -955,6 +1012,11 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
     Router::new()
         .route("/health", get(health))
         .route("/health/ready", get(readiness))
+        .route("/v1/setup", get(setup::get_status))
+        .route("/v1/setup/verify-code", post(setup::verify_code))
+        .route("/v1/setup/admin", post(setup::create_admin))
+        .route("/v1/setup/checks", get(setup::checks))
+        .route("/v1/setup/complete", post(setup::complete))
         .route("/v1/auth/register", post(register))
         .route("/v1/auth/login", post(login))
         .route("/v1/auth/refresh", post(refresh_session))
@@ -964,11 +1026,14 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route("/v1/system/usage", get(system::usage))
         .route("/v1/system/users", get(system::list_users))
         .route("/v1/system/users/{user_id}/system-admin", put(system::set_system_admin))
+        .route("/v1/system/users/{user_id}/app-admin", put(system::set_app_admin))
         .route("/v1/system/users/{user_id}/sessions/end", post(system::end_user_sessions))
         .route("/v1/system/users/{user_id}/unlock", post(system::unlock_user))
         .route("/v1/system/settings", get(system::get_settings).put(system::update_settings))
         .route("/v1/system/settings/{key}", delete(system::reset_setting))
         .route("/v1/system/logs", get(system::logs))
+        .route("/v1/system/logs/files", get(system::log_files))
+        .route("/v1/system/logs/files/{day}", get(system::download_log_file))
         .route("/v1/system/audit", get(system::audit_events))
         .route("/v1/system/jobs", get(system::jobs))
         .route("/v1/system/maintenance", get(system::get_maintenance))
@@ -977,6 +1042,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route("/v1/profile", get(get_profile).put(update_profile))
         .route("/v1/profile/password", post(change_profile_password))
         .route("/v1/profile/tasks", get(list_profile_tasks))
+        .merge(avatars::routes())
         .route("/v1/notifications", get(list_notifications))
         .route(
             "/v1/notifications/read-all",
@@ -1249,6 +1315,7 @@ async fn health(State(state): State<AppState>) -> Json<HealthResponse> {
         status: "ok",
         authentication: "jwt",
         registration_open: registration_open(&state).await.unwrap_or(false),
+        setup_required: setup::setup_pending(&state).await.unwrap_or(false),
     })
 }
 
@@ -1278,6 +1345,10 @@ async fn readiness(State(state): State<AppState>) -> (StatusCode, Json<Readiness
 /// Registration is open by configuration, or because nobody has an account
 /// yet (so a server with registration closed can still get its first owner).
 async fn registration_open(state: &AppState) -> Result<bool, ApiError> {
+    // Nobody registers before the onboarding is done.
+    if setup::setup_pending(state).await? {
+        return Ok(false);
+    }
     if state.settings().allow_registration {
         return Ok(true);
     }
@@ -1321,6 +1392,11 @@ async fn register(
     Json(request): Json<RegisterRequest>,
 ) -> Result<(StatusCode, Json<TokenResponse>), ApiError> {
     check_auth_quota(&state, &client, AuthAction::SignIn)?;
+    if setup::setup_pending(&state).await? {
+        return Err(ApiError::forbidden_because(
+            "This server is not set up yet. Its administrator must finish the setup first.",
+        ));
+    }
     if !registration_open(&state).await? {
         return Err(ApiError::forbidden_because(
             "Registration is closed on this server. Ask an administrator for an account.",
@@ -1364,6 +1440,14 @@ async fn register(
             .set_system_admin(&user.id, true)
             .await
             .map_err(ApiError::internal)?;
+        if first_account {
+            // With the onboarding off, the first account sets the server up.
+            state
+                .storage
+                .complete_setup(Some(&user.id))
+                .await
+                .map_err(ApiError::internal)?;
+        }
         let reason = if first_account { "the first account on this server" } else { "listed in REPOMEMO_SYSTEM_ADMIN_EMAILS" };
         let detail = format!("{} became a system administrator as {reason}.", user.email.as_deref().unwrap_or("A new account"));
         tracing::info!(target: "audit", user_id = %user.id, "{detail}");
@@ -1505,6 +1589,7 @@ async fn session(
         authentication: "jwt".to_owned(),
         memberships,
         is_system_admin: subject.is_system_admin,
+        is_app_admin: subject.is_app_admin,
     }))
 }
 
@@ -4682,6 +4767,7 @@ impl FromRequestParts<AppState> for AuthenticatedSubject {
             expires_at: claims.exp as u64,
             session_version: claims.ver,
             is_system_admin: access.is_system_admin,
+            is_app_admin: access.is_app_admin,
         })
     }
 }
@@ -8007,6 +8093,109 @@ mod tests {
         for expected in ["system_admin_granted", "system_settings_changed", "system_setting_reset", "user_sessions_ended", "system_admin_revoked", "maintenance_run"] {
             assert!(actions.iter().any(|action| action == expected), "{expected} missing from {actions:?}");
         }
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn system_administrators_control_logging() {
+        let data_dir = temp_data_dir("logging");
+        let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+        let (admin, _) = register_account(&app, "logs-admin@example.com").await;
+        let (member, _) = register_account(&app, "logs-member@example.com").await;
+        let send = |method: &'static str, uri: &str, who: &str, body: Value| {
+            let app = app.clone();
+            let request = json_request(method, uri, who, body);
+            async move { app.oneshot(request).await.unwrap() }
+        };
+
+        let settings = response_json(send("GET", "/v1/system/settings", &admin, json!({})).await).await;
+        let logging = settings["settings"].as_array().unwrap().iter().filter(|setting| setting["group"] == "Logging").collect::<Vec<_>>();
+        assert_eq!(logging.len(), 10);
+        let http = logging.iter().find(|setting| setting["key"] == "log_http_level").unwrap();
+        assert_eq!((http["kind"].clone(), http["value"].clone()), (json!("choice"), json!("warn")));
+        assert_eq!(http["options"].as_array().unwrap().len(), 6);
+
+        let invalid = send("PUT", "/v1/system/settings", &admin, json!({"values": {"log_console_format": "xml"}})).await;
+        assert_eq!(invalid.status(), 400);
+        let changed = send("PUT", "/v1/system/settings", &admin, json!({"values": {"log_http_level": "debug", "log_console_format": "json", "log_retention_days": 7}})).await;
+        assert_eq!(changed.status(), 200);
+        let files = response_json(send("GET", "/v1/system/logs/files", &admin, json!({})).await).await;
+        assert_eq!(files["retention_days"], 7);
+        assert_eq!(files["console_format"], "json");
+        assert_eq!(files["environment_filter"], false);
+        let http = files["categories"].as_array().unwrap().iter().find(|category| category["key"] == "http").unwrap().clone();
+        assert_eq!(http["level"], "debug");
+        assert_eq!(send("DELETE", "/v1/system/settings/log_http_level", &admin, json!({})).await.status(), 200);
+        let files = response_json(send("GET", "/v1/system/logs/files", &admin, json!({})).await).await;
+        let http = files["categories"].as_array().unwrap().iter().find(|category| category["key"] == "http").unwrap().clone();
+        assert_eq!(http["level"], "warn", "reset restores the default");
+
+        assert_eq!(send("GET", "/v1/system/logs?category=activity&workspace=w&level=info", &admin, json!({})).await.status(), 200);
+        assert_eq!(send("GET", "/v1/system/logs?day=2001-01-01", &admin, json!({})).await.status(), 404);
+        assert_eq!(send("GET", "/v1/system/logs/files/not-a-day", &admin, json!({})).await.status(), 400);
+        assert_eq!(send("GET", "/v1/system/logs/files", &member, json!({})).await.status(), 403);
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn a_new_server_is_set_up_once_through_the_onboarding() {
+        let data_dir = temp_data_dir("onboarding");
+        let mut config = ServerConfig::for_test(data_dir.clone());
+        config.setup_wizard = true;
+        config.setup_code = Some("ABCD-EFGH-JKLM".to_owned());
+        let app = router(config).await.unwrap();
+        let public_get = |uri: &str| Request::builder().uri(uri.to_owned()).body(Body::empty()).unwrap();
+        let admin_body = |code: &str| json!({"code": code, "email": "root@example.com", "display_name": "Root", "password": "not-a-real-password"});
+
+        let status = response_json(app.clone().oneshot(public_get("/v1/setup")).await.unwrap()).await;
+        assert_eq!((status["state"].clone(), status["onboarding"].clone()), (json!("new"), json!(true)));
+        let health = response_json(app.clone().oneshot(public_get("/health")).await.unwrap()).await;
+        assert_eq!((health["setup_required"].clone(), health["registration_open"].clone()), (json!(true), json!(false)));
+        let early = app.clone().oneshot(public_post("/v1/auth/register", json!({"email": "early@example.com", "display_name": "Early", "password": "not-a-real-password"}))).await.unwrap();
+        assert_eq!(early.status(), 403, "nobody registers before setup");
+
+        assert_eq!(app.clone().oneshot(public_post("/v1/setup/verify-code", json!({"code": "WRONG-CODE-0000"}))).await.unwrap().status(), 403);
+        assert_eq!(app.clone().oneshot(public_post("/v1/setup/verify-code", json!({"code": "abcd efgh jklm"}))).await.unwrap().status(), 204);
+        assert_eq!(app.clone().oneshot(public_post("/v1/setup/admin", admin_body("WRONG-CODE-0000"))).await.unwrap().status(), 403);
+        let created = app.clone().oneshot(public_post("/v1/setup/admin", admin_body("ABCD-EFGH-JKLM"))).await.unwrap();
+        assert_eq!(created.status(), 201);
+        let admin = format!("Bearer {}", response_json(created).await["access_token"].as_str().unwrap());
+        assert_eq!(app.clone().oneshot(public_post("/v1/setup/admin", admin_body("ABCD-EFGH-JKLM"))).await.unwrap().status(), 409, "one first administrator only");
+        let session = response_json(app.clone().oneshot(auth_request("GET", "/v1/session", &admin)).await.unwrap()).await;
+        assert_eq!(session["is_system_admin"], true);
+
+        let status = response_json(app.clone().oneshot(public_get("/v1/setup")).await.unwrap()).await;
+        assert_eq!(status["state"], "finishing");
+        let still_closed = app.clone().oneshot(public_post("/v1/auth/register", json!({"email": "early@example.com", "display_name": "Early", "password": "not-a-real-password"}))).await.unwrap();
+        assert_eq!(still_closed.status(), 403, "registration waits for the end of setup");
+        assert_eq!(app.clone().oneshot(auth_request("GET", "/v1/setup/checks", "Bearer not-a-token")).await.unwrap().status(), 401);
+        let checks = response_json(app.clone().oneshot(auth_request("GET", "/v1/setup/checks", &admin)).await.unwrap()).await;
+        assert!(checks.as_array().unwrap().iter().any(|check| check["key"] == "database" && check["status"] == "ok"));
+
+        let done = app.clone().oneshot(auth_request("POST", "/v1/setup/complete", &admin)).await.unwrap();
+        assert_eq!(done.status(), 200);
+        assert_eq!(response_json(done).await["onboarding"], false);
+
+        // From now on the onboarding is gone for good.
+        assert_eq!(app.clone().oneshot(auth_request("POST", "/v1/setup/complete", &admin)).await.unwrap().status(), 409);
+        assert_eq!(app.clone().oneshot(auth_request("GET", "/v1/setup/checks", &admin)).await.unwrap().status(), 409);
+        assert_eq!(app.clone().oneshot(public_post("/v1/setup/verify-code", json!({"code": "ABCD-EFGH-JKLM"}))).await.unwrap().status(), 409);
+        assert_eq!(app.clone().oneshot(public_post("/v1/setup/admin", admin_body("ABCD-EFGH-JKLM"))).await.unwrap().status(), 409);
+        let status = response_json(app.clone().oneshot(public_get("/v1/setup")).await.unwrap()).await;
+        assert_eq!((status["state"].clone(), status["onboarding"].clone()), (json!("complete"), json!(false)));
+        let registered = app.clone().oneshot(public_post("/v1/auth/register", json!({"email": "late@example.com", "display_name": "Late", "password": "not-a-real-password"}))).await.unwrap();
+        assert_eq!(registered.status(), 201);
+        let audit = response_json(app.clone().oneshot(auth_request("GET", "/v1/system/audit", &admin)).await.unwrap()).await;
+        let actions = audit.as_array().unwrap().iter().map(|event| event["action"].as_str().unwrap().to_owned()).collect::<Vec<_>>();
+        assert!(actions.contains(&"server_setup_admin_created".to_owned()) && actions.contains(&"server_setup_completed".to_owned()));
+
+        // A restart does not bring the onboarding back.
+        drop(app);
+        let mut config = ServerConfig::for_test(data_dir.clone());
+        config.setup_wizard = true;
+        let app = router(config).await.unwrap();
+        let status = response_json(app.clone().oneshot(public_get("/v1/setup")).await.unwrap()).await;
+        assert_eq!(status["onboarding"], false);
         let _ = std::fs::remove_dir_all(data_dir);
     }
 

@@ -127,7 +127,29 @@ impl BusJobObserver {
 
 impl JobObserver for BusJobObserver {
     fn on_job_changed(&self, job: &IndexingJobStatus) {
+        log_job(job);
         self.bus.publish(WorkspaceEvent::Job { job: job.clone() });
+    }
+}
+
+/// Logs a job's start and outcome under the `jobs` target (progress
+/// updates are not logged).
+fn log_job(job: &IndexingJobStatus) {
+    let kind = if job.kind.is_empty() { "indexing" } else { job.kind.as_str() };
+    match job.status.as_str() {
+        "running" if job.created_at == job.updated_at => {
+            tracing::debug!(target: "jobs", workspace_id = %job.workspace_id, job_id = %job.id, kind, "Job started");
+        }
+        "completed" => {
+            tracing::info!(target: "jobs", workspace_id = %job.workspace_id, job_id = %job.id, kind, items = job.progress_current, "Job completed");
+        }
+        "cancelled" => {
+            tracing::info!(target: "jobs", workspace_id = %job.workspace_id, job_id = %job.id, kind, items = job.progress_current, "Job cancelled");
+        }
+        "failed" => {
+            tracing::warn!(target: "jobs", workspace_id = %job.workspace_id, job_id = %job.id, kind, error = job.error_message.as_deref().unwrap_or(""), "Job failed");
+        }
+        _ => {}
     }
 }
 
@@ -143,6 +165,20 @@ impl BusActivityObserver {
 
 impl ActivityObserver for BusActivityObserver {
     fn on_activity_recorded(&self, event: &WorkspaceActivityEvent) {
+        let actor = event
+            .actor
+            .as_ref()
+            .map(|actor| actor.email.clone().unwrap_or_else(|| actor.display_name.clone()))
+            .unwrap_or_else(|| "system".to_owned());
+        tracing::info!(
+            target: "activity",
+            workspace_id = %event.workspace_id,
+            action = %event.action,
+            actor = %actor,
+            subject = %event.subject_id.as_deref().unwrap_or(""),
+            "{}",
+            event.summary
+        );
         self.bus.publish(WorkspaceEvent::Activity {
             event: event.clone(),
         });

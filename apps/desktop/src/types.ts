@@ -121,6 +121,8 @@ export interface SharedSession {
   memberships: WorkspaceMembership[];
   /** Administers the whole server: every organization and workspace, and the System pages. */
   is_system_admin?: boolean;
+  /** Uses the System pages without the wildcard administrator access. */
+  is_app_admin?: boolean;
 }
 
 export interface UserProfile {
@@ -1025,9 +1027,26 @@ export interface SystemUser {
   created_at: string;
   last_connected_at: string | null;
   is_system_admin: boolean;
+  is_app_admin: boolean;
   organization_count: number;
   workspace_count: number;
   active_sessions: number;
+  workspaces: SystemUserWorkspace[];
+  organizations: SystemUserOrganization[];
+}
+
+export interface SystemUserOrganization {
+  organization_id: string;
+  name: string;
+  role: "owner" | "admin" | "member";
+}
+
+export interface SystemUserWorkspace {
+  workspace_id: string;
+  name: string;
+  role: "owner" | "admin" | "member" | "viewer";
+  organization_id: string | null;
+  organization_name: string | null;
 }
 
 export interface SystemSetting {
@@ -1035,12 +1054,14 @@ export interface SystemSetting {
   group: string;
   label: string;
   description: string;
-  kind: "boolean" | "integer";
+  kind: "boolean" | "integer" | "choice";
   min: number;
   max: number;
   unit: string;
-  value: boolean | number;
-  default_value: boolean | number;
+  /** The allowed values of a choice, with their labels. */
+  options: { value: string; label: string }[];
+  value: boolean | number | string;
+  default_value: boolean | number | string;
   overridden: boolean;
   updated_at: string | null;
   updated_by: string | null;
@@ -1056,13 +1077,29 @@ export interface SystemLogRecord {
   timestamp: string;
   level: "error" | "warn" | "info" | "debug" | "trace";
   target: string;
+  /** security, activity, jobs, http, ai, database or server. */
+  category: string;
   message: string;
   fields: string;
 }
 
 export interface SystemLogs {
   capturing: boolean;
+  /** "memory" for recent events, "file" for a day's file. */
+  source: "memory" | "file";
   records: SystemLogRecord[];
+}
+
+export interface SystemLogFiles {
+  files: { day: string; bytes: number }[];
+  writing_files: boolean;
+  retention_days: number;
+  console_format: "text" | "compact" | "json";
+  effective_filter: string | null;
+  /** A RUST_LOG filter from the environment is in force instead of the levels. */
+  environment_filter: boolean;
+  default_level: string;
+  categories: { key: string; label: string; level: string }[];
 }
 
 export interface SystemAuditEvent {
@@ -1075,4 +1112,21 @@ export interface SystemAuditEvent {
 
 export interface SystemJob extends IndexingJobStatus {
   workspace_name: string | null;
+}
+
+// First-run server setup
+
+export interface ServerSetupStatus {
+  /** "new": no account yet; "finishing": the system administrator exists; "complete": set up for good. */
+  state: "new" | "finishing" | "complete";
+  /** The web app should show the onboarding. */
+  onboarding: boolean;
+}
+
+export interface SetupCheck {
+  key: string;
+  label: string;
+  status: "ok" | "info" | "warning" | "error";
+  detail: string;
+  advice: string | null;
 }

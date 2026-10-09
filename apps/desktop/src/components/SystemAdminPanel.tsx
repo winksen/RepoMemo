@@ -5,7 +5,11 @@ import {
   IconAdjustments as Adjustments,
   IconChartBar as ChartBar,
   IconClipboardList as ClipboardList,
+  IconBuildingCommunity as Building,
+  IconCrown as Crown,
   IconDatabase as Database,
+  IconDownload as Download,
+  IconEye as Eye,
   IconFileText as FileText,
   IconLoader2 as Loader,
   IconLockOpen as LockOpen,
@@ -13,15 +17,21 @@ import {
   IconRefresh as Refresh,
   IconRotate as Rotate,
   IconServer as Server,
+  IconServerCog as ServerCog,
   IconShieldCheck as ShieldCheck,
   IconShieldOff as ShieldOff,
   IconTool as Tool,
+  IconUser as UserIcon,
+  IconUserCog as UserCog,
   IconUsers as Users,
   IconWorld as World,
 } from "@tabler/icons-react";
+import { UserAvatar } from "./UserAvatar";
 import {
   cancelSharedJob,
+  downloadSystemLogFile,
   endSystemUserSessions,
+  getSystemLogFiles,
   getSystemLogs,
   getSystemOverview,
   getSystemSettings,
@@ -32,6 +42,7 @@ import {
   resetSystemSetting,
   runSystemMaintenance,
   saveSystemSettings,
+  setAppAdmin,
   setSystemAdmin,
   unlockSystemUser,
 } from "../lib/sharedApi";
@@ -39,14 +50,18 @@ import type {
   CountByLabel,
   MaintenanceStatus,
   SharedSession,
+  SharedWorkspace,
   SystemAuditEvent,
   SystemJob,
+  SystemLogFiles,
   SystemLogs,
   SystemOverview,
   SystemSetting,
   SystemSettings,
   SystemUsage,
   SystemUser,
+  SystemUserOrganization,
+  SystemUserWorkspace,
 } from "../types";
 import { ActionMenu } from "./ui/action-menu";
 import { Button } from "./ui/button";
@@ -85,17 +100,20 @@ const SECTION_INTRO: Record<SystemSection, string> = {
   usage: "How the organizations and workspaces on this server are used.",
   users: "Every account on the server. System administrators act as administrators in every organization and workspace.",
   settings: "Settings that apply to the whole server. Changes take effect at once and are recorded in the audit trail.",
-  logs: "Recent server log events kept in memory. Security events are kept apart so ordinary activity cannot push them out.",
+  logs: "Server log events: recent ones kept in memory, and earlier days from the log files. What is recorded is set under Settings › Logging.",
   jobs: "Background jobs across every workspace, and the maintenance that keeps the server tidy.",
   audit: "What system administrators did, kept durably.",
 };
 
 /** The System area for system administrators. */
-export function SystemAdminPanel({ accessToken, onOpenWorkspace, section, session }: {
+export function SystemAdminPanel({ accessToken, onNavigateSection, onOpenWorkspace, section, session, workspaces }: {
   accessToken: string;
+  onNavigateSection: (section: SystemSection) => void;
   onOpenWorkspace: (workspaceId: string) => void;
   section: SystemSection;
   session: SharedSession;
+  /** Every workspace (system administrators see all), for the log filter. */
+  workspaces: SharedWorkspace[];
 }) {
   return <section className="shared-page-content rm-system-page">
     <div className="shared-page-heading"><div><h1>System · {SECTION_LABELS[section].label}</h1><p>{SECTION_INTRO[section]}</p></div></div>
@@ -103,7 +121,7 @@ export function SystemAdminPanel({ accessToken, onOpenWorkspace, section, sessio
     {section === "usage" ? <UsageSection accessToken={accessToken} onOpenWorkspace={onOpenWorkspace} /> : null}
     {section === "users" ? <UsersSection accessToken={accessToken} session={session} /> : null}
     {section === "settings" ? <SettingsSection accessToken={accessToken} /> : null}
-    {section === "logs" ? <LogsSection accessToken={accessToken} /> : null}
+    {section === "logs" ? <LogsSection accessToken={accessToken} onOpenSettings={() => onNavigateSection("settings")} workspaces={workspaces} /> : null}
     {section === "jobs" ? <JobsSection accessToken={accessToken} /> : null}
     {section === "audit" ? <AuditSection accessToken={accessToken} /> : null}
   </section>;
@@ -331,7 +349,39 @@ function UsageSection({ accessToken, onOpenWorkspace }: { accessToken: string; o
   </>;
 }
 
-type UserAction = { kind: "grant" | "revoke" | "sign-out"; user: SystemUser };
+const ROLE_ICON = { owner: <Crown size={12} />, admin: <ShieldCheck size={12} />, member: <UserIcon size={12} />, viewer: <Eye size={12} /> };
+
+function RoleTag({ role, title }: { role: "owner" | "admin" | "member" | "viewer"; title: string }) {
+  return <span className="rm-system-tag rm-system-role" title={title}>{ROLE_ICON[role]} {role[0].toUpperCase() + role.slice(1)}</span>;
+}
+
+/** What a person belongs to, as a tree: each organization on its own line with their role, and under it the workspaces of that organization with their role in each. System administrators are administrators of every organization and workspace; only what they own is listed on top of that. */
+function AccessTree({ user }: { user: SystemUser }) {
+  // An older server omits the lists; show nothing rather than fail.
+  const inherited = user.is_system_admin;
+  const groups = new Map<string, { name: string; role: SystemUserOrganization["role"] | null; workspaces: SystemUserWorkspace[] }>();
+  for (const organization of user.organizations ?? []) {
+    if (inherited && organization.role !== "owner") continue;
+    groups.set(organization.organization_id, { name: organization.name, role: organization.role, workspaces: [] });
+  }
+  for (const workspace of user.workspaces ?? []) {
+    if (inherited && workspace.role !== "owner") continue;
+    const key = workspace.organization_id ?? "";
+    const group = groups.get(key) ?? { name: workspace.organization_name ?? "No organization", role: null, workspaces: [] };
+    group.workspaces.push(workspace);
+    groups.set(key, group);
+  }
+  if (!inherited && !groups.size) return <span className="shared-muted-copy">None</span>;
+  return <ul className="rm-system-access">
+    {inherited ? <li><span className="rm-system-tag rm-system-role" title="System administrators are administrators of every organization and workspace"><ShieldCheck size={12} /> All organizations and workspaces · Admin</span></li> : null}
+    {Array.from(groups, ([key, group]) => <li key={key}>
+      <span className="rm-system-access-org"><Building size={14} /><strong>{group.name}</strong>{group.role ? <RoleTag role={group.role} title={`${group.role} of the organization ${group.name}`} /> : null}</span>
+      {group.workspaces.length ? <ul>{group.workspaces.map((workspace) => <li key={workspace.workspace_id}><span>{workspace.name}</span><RoleTag role={workspace.role} title={`${workspace.role} of the workspace ${workspace.name}`} /></li>)}</ul> : null}
+    </li>)}
+  </ul>;
+}
+
+type UserAction = { kind: "grant" | "revoke" | "grant-app" | "revoke-app" | "sign-out"; user: SystemUser };
 
 function UsersSection({ accessToken, session }: { accessToken: string; session: SharedSession }) {
   const [users, isLoading, reload] = useSystemData<SystemUser[]>(() => listSystemUsers(accessToken), [accessToken]);
@@ -350,6 +400,9 @@ function UsersSection({ accessToken, session }: { accessToken: string; session: 
       if (pending.kind === "sign-out") {
         await endSystemUserSessions(accessToken, pending.user.id);
         showToast("success", `${pending.user.display_name} was signed out of every device.`);
+      } else if (pending.kind === "grant-app" || pending.kind === "revoke-app") {
+        await setAppAdmin(accessToken, pending.user.id, pending.kind === "grant-app");
+        showToast("success", pending.kind === "grant-app" ? `${pending.user.display_name} is now an app administrator.` : `${pending.user.display_name} is no longer an app administrator.`);
       } else {
         await setSystemAdmin(accessToken, pending.user.id, pending.kind === "grant");
         showToast("success", pending.kind === "grant" ? `${pending.user.display_name} is now a system administrator.` : `${pending.user.display_name} is no longer a system administrator.`);
@@ -370,6 +423,8 @@ function UsersSection({ accessToken, session }: { accessToken: string; session: 
   const dialog = pending ? {
     grant: { title: `Make ${pending.user.display_name} a system administrator?`, description: "They will see every organization and workspace as an administrator, and manage users, settings and maintenance for the whole server.", action: "Make system administrator" },
     revoke: { title: `Remove ${pending.user.display_name} from the system administrators?`, description: pending.user.id === session.user.id ? "You will lose access to the System pages and to workspaces you are not a member of." : "They keep their own organization and workspace memberships.", action: "Remove role" },
+    "grant-app": { title: `Make ${pending.user.display_name} an app administrator?`, description: "They can manage users, settings, logs and maintenance for the whole server, but are not an administrator of every organization and workspace: they only reach the ones they belong to.", action: "Make app administrator" },
+    "revoke-app": { title: `Remove ${pending.user.display_name} from the app administrators?`, description: pending.user.id === session.user.id ? "You will lose access to the System pages." : "They keep their own organization and workspace memberships.", action: "Remove role" },
     "sign-out": { title: `Sign ${pending.user.display_name} out everywhere?`, description: "Every device signed in to this account is signed out at once. Their password is not changed.", action: "Sign out everywhere" },
   }[pending.kind] : null;
 
@@ -379,15 +434,18 @@ function UsersSection({ accessToken, session }: { accessToken: string; session: 
       <RefreshButton isLoading={isLoading} onClick={() => void reload()} />
     </div>
     {users ? <div className="rm-map-coverage"><table>
-      <thead><tr><th scope="col">Person</th><th scope="col">Role</th><th scope="col">Organizations</th><th scope="col">Workspaces</th><th scope="col">Sessions</th><th scope="col">Last connected</th><th scope="col">Joined</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
+      <thead><tr><th scope="col">Person</th><th scope="col">Role</th><th scope="col">Organizations and workspaces</th><th scope="col">Sessions</th><th scope="col">Last connected</th><th scope="col">Joined</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
       <tbody>{visible.map((user) => <tr key={user.id}>
-        <th scope="row"><span className="rm-system-person"><strong>{user.display_name}{user.id === session.user.id ? " (you)" : ""}</strong><small>{user.email}</small></span></th>
-        <td>{user.is_system_admin ? <span className="rm-system-tag">System administrator</span> : "User"}</td>
-        <td>{count(user.organization_count)}</td><td>{count(user.workspace_count)}</td><td>{count(user.active_sessions)}</td><td>{formatTime(user.last_connected_at)}</td><td>{formatTime(user.created_at)}</td>
+        <th scope="row"><span className="rm-system-person"><UserAvatar name={user.display_name} size={32} userId={user.id} /><span><strong>{user.display_name}{user.id === session.user.id ? " (you)" : ""}</strong><small>{user.email}</small></span></span></th>
+        <td>{user.is_system_admin ? <span className="rm-system-tag rm-system-role" title="Administers the server and every organization and workspace"><ServerCog size={13} /> Sys Admin</span> : user.is_app_admin ? <span className="rm-system-tag rm-system-role" title="Uses the System pages, without access to every organization and workspace"><UserCog size={13} /> App Admin</span> : <span className="rm-system-tag rm-system-role"><UserIcon size={13} /> User</span>}</td>
+        <td><AccessTree user={user} /></td><td>{count(user.active_sessions)}</td><td>{formatTime(user.last_connected_at)}</td><td>{formatTime(user.created_at)}</td>
         <td><ActionMenu items={[
-          user.is_system_admin
+          ...(session.is_system_admin ? [user.is_system_admin
             ? { label: "Remove system administrator role", icon: <ShieldOff size={15} />, onSelect: () => setPending({ kind: "revoke", user }), destructive: true }
-            : { label: "Make system administrator", icon: <ShieldCheck size={15} />, onSelect: () => setPending({ kind: "grant", user }) },
+            : { label: "Make system administrator", icon: <ShieldCheck size={15} />, onSelect: () => setPending({ kind: "grant", user }) }] : []),
+          user.is_app_admin
+            ? { label: "Remove app administrator role", icon: <ShieldOff size={15} />, onSelect: () => setPending({ kind: "revoke-app", user }), destructive: true }
+            : { label: "Make app administrator", icon: <UserCog size={15} />, onSelect: () => setPending({ kind: "grant-app", user }) },
           { label: "Sign out everywhere", icon: <Logout size={15} />, onSelect: () => setPending({ kind: "sign-out", user }), destructive: true },
           { label: "Lift sign-in lockout", icon: <LockOpen size={15} />, onSelect: () => void unlock(user) },
         ]} label={`Actions for ${user.display_name}`} /></td>
@@ -399,7 +457,7 @@ function UsersSection({ accessToken, session }: { accessToken: string; session: 
 
 function SettingsSection({ accessToken }: { accessToken: string }) {
   const [settings, setSettings] = useState<SystemSettings | null>(null);
-  const [draft, setDraft] = useState<Record<string, boolean | number>>({});
+  const [draft, setDraft] = useState<Record<string, boolean | number | string>>({});
   const [isBusy, setIsBusy] = useState(false);
   useEffect(() => {
     getSystemSettings(accessToken).then(setSettings).catch((error) => showToast("error", errorMessage(error, "Settings could not be loaded.")));
@@ -412,7 +470,7 @@ function SettingsSection({ accessToken }: { accessToken: string }) {
   }, [settings]);
   const changed = Object.keys(draft).length;
 
-  function edit(setting: SystemSetting, value: boolean | number) {
+  function edit(setting: SystemSetting, value: boolean | number | string) {
     setDraft((current) => {
       const next = { ...current };
       if (value === setting.value) delete next[setting.key];
@@ -451,12 +509,14 @@ function SettingsSection({ accessToken }: { accessToken: string }) {
         const inputId = `system-setting-${setting.key}`;
         return <div className="rm-system-setting" key={setting.key}>
           <div><label htmlFor={inputId}><strong>{setting.label}</strong></label><p>{setting.description}</p>
-            <small>Server default: {String(setting.default_value)}{setting.unit && setting.kind === "integer" ? ` ${setting.unit}` : ""}{setting.overridden ? ` · changed${setting.updated_by ? ` by ${setting.updated_by}` : ""} ${formatTime(setting.updated_at)}` : ""}</small>
+            <small>Server default: {settingValueLabel(setting, setting.default_value)}{setting.overridden ? ` · changed${setting.updated_by ? ` by ${setting.updated_by}` : ""} ${formatTime(setting.updated_at)}` : ""}</small>
           </div>
           <div className="rm-system-setting-control">
             {setting.kind === "boolean"
               ? <label className="shared-ai-provider-toggle"><input checked={Boolean(value)} id={inputId} onChange={(event) => edit(setting, event.target.checked)} type="checkbox" /> {value ? "On" : "Off"}</label>
-              : <span className="rm-system-number"><Input id={inputId} max={setting.max} min={setting.min} onChange={(event) => edit(setting, event.target.value === "" ? setting.min : Number(event.target.value))} type="number" value={String(value)} /><small>{setting.unit}</small></span>}
+              : setting.kind === "choice"
+                ? <Dropdown aria-label={setting.label} id={inputId} onValueChange={(next) => edit(setting, next)} options={setting.options} value={String(value)} />
+                : <span className="rm-system-number"><Input id={inputId} max={setting.max} min={setting.min} onChange={(event) => edit(setting, event.target.value === "" ? setting.min : Number(event.target.value))} type="number" value={String(value)} /><small>{setting.unit}</small></span>}
             {setting.overridden ? <Button disabled={isBusy} onClick={() => void reset(setting)} type="button" variant="secondary"><Rotate size={15} /> Use default</Button> : null}
           </div>
         </div>;
@@ -470,33 +530,89 @@ function SettingsSection({ accessToken }: { accessToken: string }) {
   </>;
 }
 
-function LogsSection({ accessToken }: { accessToken: string }) {
+function settingValueLabel(setting: SystemSetting, value: boolean | number | string): string {
+  if (setting.kind === "boolean") return value ? "on" : "off";
+  if (setting.kind === "choice") return setting.options.find((option) => option.value === value)?.label ?? String(value);
+  return `${value}${setting.unit ? ` ${setting.unit}` : ""}`;
+}
+
+const LIVE_SOURCE = "live";
+const LEVEL_LABELS: Record<string, string> = { off: "off", error: "errors", warn: "warnings", info: "information", debug: "debug", trace: "trace" };
+
+function LogsSection({ accessToken, onOpenSettings, workspaces }: { accessToken: string; onOpenSettings: () => void; workspaces: SharedWorkspace[] }) {
+  const [source, setSource] = useState(LIVE_SOURCE);
   const [level, setLevel] = useState("info");
-  const [auditOnly, setAuditOnly] = useState(false);
+  const [category, setCategory] = useState("all");
+  const [workspace, setWorkspace] = useState("all");
   const [query, setQuery] = useState("");
   const [follow, setFollow] = useState(true);
   const [logs, setLogs] = useState<SystemLogs | null>(null);
+  const [files, setFiles] = useState<SystemLogFiles | null>(null);
+  const isLive = source === LIVE_SOURCE;
+
+  useEffect(() => {
+    getSystemLogFiles(accessToken).then(setFiles).catch((error) => showToast("error", errorMessage(error, "The log files could not be listed.")));
+  }, [accessToken]);
 
   useEffect(() => {
     let active = true;
-    const load = () => getSystemLogs(accessToken, { level, audit: auditOnly, q: query.trim() || undefined })
+    const load = () => getSystemLogs(accessToken, {
+      level,
+      category: category === "all" ? undefined : category,
+      workspace: workspace === "all" ? undefined : workspace,
+      day: isLive ? undefined : source,
+      q: query.trim() || undefined,
+    })
       .then((next) => { if (active) setLogs(next); })
       .catch((error) => { if (active) showToast("error", errorMessage(error, "Logs could not be loaded.")); });
     const delay = window.setTimeout(() => void load(), query ? 300 : 0);
-    const timer = follow ? window.setInterval(() => void load(), 5_000) : undefined;
+    const timer = follow && isLive ? window.setInterval(() => void load(), 5_000) : undefined;
     return () => { active = false; window.clearTimeout(delay); if (timer) window.clearInterval(timer); };
-  }, [accessToken, level, auditOnly, query, follow]);
+  }, [accessToken, level, category, workspace, source, query, follow, isLive]);
 
+  async function download() {
+    try {
+      const blob = await downloadSystemLogFile(accessToken, source);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `repomemo-${source}.jsonl`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    } catch (error) { showToast("error", errorMessage(error, "The log file could not be downloaded.")); }
+  }
+
+  const sourceOptions = [{ label: "Live: recent events", value: LIVE_SOURCE }, ...(files?.files ?? []).map((file) => ({ label: `${file.day} · ${formatBytes(file.bytes)}`, value: file.day }))];
+  const categoryOptions = [{ label: "All sources", value: "all" }, ...(files?.categories ?? []).map((entry) => ({ label: entry.label, value: entry.key })), { label: "Server and other", value: "server" }];
+  const workspaceOptions = [{ label: "All workspaces", value: "all" }, ...workspaces.map((entry) => ({ label: entry.workspace.name, value: entry.workspace.id }))];
   return <>
+    {files ? <section className="shared-settings-group">
+      <div className="shared-panel-heading"><div><Adjustments size={18} /><h2>What is recorded</h2></div><Button onClick={onOpenSettings} type="button" variant="secondary"><Adjustments size={15} /> Logging settings</Button></div>
+      {files.environment_filter
+        ? <p className="shared-muted-copy">The server's RUST_LOG filter is in force: <code>{files.effective_filter}</code>. Choosing levels in Settings replaces it.</p>
+        : <Facts items={[
+          ["Server and other", LEVEL_LABELS[files.default_level] ?? files.default_level],
+          ...files.categories.map((entry): [string, ReactNode] => [entry.label, LEVEL_LABELS[entry.level] ?? entry.level]),
+        ]} />}
+      <p className="shared-muted-copy">Console: {files.console_format === "json" ? "JSON lines" : `${files.console_format} text`} · Files: {files.writing_files ? `daily, kept ${files.retention_days ? `${files.retention_days} days` : "forever"}` : "off"}</p>
+    </section> : null}
     <div className="rm-system-toolbar">
+      <label className="rm-system-inline">Source<Dropdown aria-label="Log source" onValueChange={setSource} options={sourceOptions} value={source} /></label>
+      <label className="rm-system-inline">Category<Dropdown aria-label="Log category" onValueChange={setCategory} options={categoryOptions} value={category} /></label>
+      <label className="rm-system-inline">Workspace<Dropdown aria-label="Workspace" onValueChange={setWorkspace} options={workspaceOptions} value={workspace} /></label>
       <label className="rm-system-inline">Level<Dropdown aria-label="Lowest level shown" onValueChange={setLevel} options={[{ label: "Errors", value: "error" }, { label: "Warnings and up", value: "warn" }, { label: "Information and up", value: "info" }, { label: "Everything kept", value: "trace" }]} value={level} /></label>
+    </div>
+    <div className="rm-system-toolbar">
       <Input aria-label="Search logs" onChange={(event) => setQuery(event.target.value)} placeholder="Search message, source or fields" value={query} />
-      <label className="shared-ai-provider-toggle"><input checked={auditOnly} onChange={(event) => setAuditOnly(event.target.checked)} type="checkbox" /> Security events only</label>
-      <label className="shared-ai-provider-toggle"><input checked={follow} onChange={(event) => setFollow(event.target.checked)} type="checkbox" /> Follow</label>
+      <div className="rm-system-actions">
+        {isLive ? <label className="shared-ai-provider-toggle"><input checked={follow} onChange={(event) => setFollow(event.target.checked)} type="checkbox" /> Follow</label> : <Button onClick={() => void download()} type="button" variant="secondary"><Download size={15} /> Download {source}</Button>}
+      </div>
     </div>
     {logs && !logs.capturing ? <p className="shared-muted-copy">This server is not capturing logs in memory; read them from its console or log collector.</p> : null}
-    {logs?.records.length ? <ol className="rm-system-log" aria-label="Log events, newest first">{logs.records.map((record) => <li className={`level-${record.level}`} key={record.sequence}>
-      <time dateTime={record.timestamp}>{new Date(record.timestamp).toLocaleTimeString()}</time>
+    {logs?.records.length ? <ol className="rm-system-log" aria-label="Log events, newest first">{logs.records.map((record) => <li className={`level-${record.level}`} key={`${record.sequence}-${record.timestamp}`}>
+      <time dateTime={record.timestamp}>{isLive ? new Date(record.timestamp).toLocaleTimeString() : new Date(record.timestamp).toLocaleString()}</time>
       <span className="rm-system-log-level">{record.level}</span>
       <span className="rm-system-log-target">{record.target}</span>
       <span className="rm-system-log-message">{record.message}{record.fields ? <small>{record.fields}</small> : null}</span>

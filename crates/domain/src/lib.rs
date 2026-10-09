@@ -162,6 +162,10 @@ pub struct SharedSession {
     /// workspace, and the system settings.
     #[serde(default)]
     pub is_system_admin: bool,
+    /// The user may use the System pages without being an administrator of
+    /// every organization and workspace.
+    #[serde(default)]
+    pub is_app_admin: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1219,10 +1223,42 @@ pub struct SystemUser {
     pub created_at: String,
     pub last_connected_at: Option<String>,
     pub is_system_admin: bool,
+    #[serde(default)]
+    pub is_app_admin: bool,
     pub organization_count: i64,
     pub workspace_count: i64,
     /// Refresh tokens that are neither revoked nor expired.
     pub active_sessions: i64,
+    /// The workspaces the account is a direct member of, with its role in each.
+    /// System administrators additionally act as administrators everywhere.
+    #[serde(default)]
+    pub workspaces: Vec<SystemUserWorkspace>,
+    /// The organizations the account is a direct member of, with its role.
+    #[serde(default)]
+    pub organizations: Vec<SystemUserOrganization>,
+}
+
+/// One organization membership in the system user list.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SystemUserOrganization {
+    pub organization_id: String,
+    pub name: String,
+    /// `owner`, `admin` or `member`.
+    pub role: String,
+}
+
+/// One workspace membership in the system user list.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SystemUserWorkspace {
+    pub workspace_id: String,
+    pub name: String,
+    /// `owner`, `admin`, `member` or `viewer`.
+    pub role: String,
+    /// The organization the workspace belongs to, if any.
+    #[serde(default)]
+    pub organization_id: Option<String>,
+    #[serde(default)]
+    pub organization_name: Option<String>,
 }
 
 /// Totals across the whole server.

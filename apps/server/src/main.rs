@@ -1,21 +1,15 @@
 use std::net::SocketAddr;
 
-use repomemo_server::{log_capture_layer, router, ServerConfig};
+use repomemo_server::{init_logging, router, ServerConfig};
 use tokio::net::TcpListener;
 use tracing::info;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "repomemo_server=info,tower_http=info,audit=info".into()),
-        )
-        .with(tracing_subscriber::fmt::layer())
-        // Keeps recent events in memory for System › Logs.
-        .with(log_capture_layer())
-        .init();
+    // Console, in-memory buffer for System › Logs and optional daily files;
+    // levels and format follow the environment until a system administrator
+    // changes them in System › Settings.
+    init_logging().expect("Invalid RepoMemo logging configuration");
 
     let config = ServerConfig::from_env().expect("Invalid RepoMemo server configuration");
     let address = config.bind_address;

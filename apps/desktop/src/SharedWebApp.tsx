@@ -6,7 +6,7 @@ FIRST VIEWPORT: A calm explanatory field balances a focused access form; after a
 FORM: The established RepoMemo operate composition, adapted into a protected browser session with direct API-state feedback.
 */
 
-import type { FormEvent, ReactNode } from "react";
+import type { ChangeEvent, FormEvent, ReactNode } from "react";
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   IconArrowRight as ArrowRight,
@@ -55,9 +55,7 @@ import {
   IconTimeline as Timeline,
   IconTrash as Trash,
   IconUsers as Users,
-  IconCrown as Crown,
-  IconEye as Eye,
-  IconUser as UserIcon,
+  IconCamera as Camera,
   IconUpload as Upload,
   IconUserCircle as UserCircle,
   IconLogout as Logout,
@@ -85,6 +83,7 @@ import {
   getSharedArtifact,
   getSharedArtifactLifecycle,
   getSharedHealth,
+  getServerSetup,
   getSharedProfile,
   getSharedWorkspaceCapabilities,
   getSharedWorkspaceActivityCalendar,
@@ -142,6 +141,9 @@ import {
   updateSharedProfile,
   updateSharedMemoryCard,
   updateSharedWorkspace,
+  deleteSharedAvatar,
+  fetchSharedAvatar,
+  uploadSharedAvatar,
   type SharedApiError,
 } from "./lib/sharedApi";
 import type {
@@ -165,6 +167,7 @@ import type {
   RetrievalFacets,
   SearchResult,
   SharedAiProviderSettings,
+  ServerSetupStatus,
   SharedSession,
   SharedUser,
   SharedWorkspace,
@@ -185,6 +188,8 @@ import type {
   SavedSearch,
   TaskChecklistItem,
 } from "./types";
+import { UserAvatar } from "./components/UserAvatar";
+import { AVATAR_INPUT_TYPES, prepareAvatar } from "./lib/avatarImage";
 import { Button } from "./components/ui/button";
 import { Pagination, paginate } from "./components/ui/pagination";
 import { ActionMenu } from "./components/ui/action-menu";
@@ -199,6 +204,7 @@ import { DocumentViewer } from "./components/DocumentViewer";
 import { ImagePreview } from "./components/ImagePreview";
 import { DOCUMENT_ACCEPT, DOCUMENT_KIND_LABEL, documentKindOf, isDocumentArtifact } from "./lib/documents";
 import { AiPolicySettings } from "./components/AiPolicySettings";
+import { ServerSetup, ServerSetupWaiting } from "./components/ServerSetup";
 import { SYSTEM_SECTIONS, SystemAdminPanel, SystemNavigation, type SystemSection } from "./components/SystemAdminPanel";
 import { AiProviderForm } from "./components/AiProviderForm";
 import { AssistantPanel } from "./components/AssistantPanel";
@@ -347,9 +353,16 @@ function SharedWebAppContent() {
   const [error, setError] = useState<string | null>(null);
   const [pathname, setPathname] = useState(currentPathname);
   const [apiAvailable, setApiAvailable] = useState<boolean | null>(null);
+  // Whether the server still has to be set up; the server is the authority.
+  const [setup, setSetup] = useState<ServerSetupStatus | null>(null);
 
   useEffect(() => {
     document.documentElement.dataset.theme = initialSharedTheme();
+  }, []);
+
+  useEffect(() => {
+    // If the status cannot be read (an older server, or the API is down), the normal sign-in shows.
+    getServerSetup().then(setSetup).catch(() => setSetup({ state: "complete", onboarding: false }));
   }, []);
 
   useEffect(() => {
@@ -424,10 +437,47 @@ function SharedWebAppContent() {
   }
 
   useEffect(() => {
+    if (setup?.onboarding) {
+      if (pathname !== "/setup") navigate("/setup", true);
+      return;
+    }
+    // The setup page exists only while the server is being set up.
+    if (setup && pathname === "/setup") navigate(pageState === "ready" ? "/dashboard" : "/login", true);
     if (pageState === "ready" && (pathname === "/" || pathname === "/login" || pathname === "/register")) {
       navigate("/dashboard", true);
     }
-  }, [pageState, pathname]);
+  }, [pageState, pathname, setup]);
+
+  if (!setup) {
+    return <LoadingCanvas label="Checking the server" />;
+  }
+
+  if (setup.onboarding && setup.state === "new") {
+    return <ServerSetup
+      onAdminCreated={(token) => {
+        window.sessionStorage.setItem(SESSION_STORAGE_KEY, token);
+        setSetup({ state: "finishing", onboarding: true });
+        hydrate(token).catch(() => undefined);
+      }}
+      phase="new"
+    />;
+  }
+
+  if (setup.onboarding && pageState === "ready" && accessToken && session) {
+    if (!session.is_system_admin) return <ServerSetupWaiting onSignOut={signOut} />;
+    return <ServerSetup
+      accessToken={accessToken}
+      onFinished={() => {
+        setSetup({ state: "complete", onboarding: false });
+        navigate("/dashboard", true);
+        // Reload organizations and workspaces created during setup.
+        hydrate(accessToken).catch(() => undefined);
+      }}
+      onSignOut={signOut}
+      phase="finishing"
+      session={session}
+    />;
+  }
 
   if (pageState === "restoring") {
     return <LoadingCanvas label="Restoring your shared session" />;
@@ -436,6 +486,7 @@ function SharedWebAppContent() {
   if (pageState === "unauthenticated" || pageState === "error") {
     return (
       <AuthCanvas
+        setupPending={setup.onboarding}
         initialMode={pathname === "/register" ? "sign-up" : "sign-in"}
         initialError={pageState === "error" ? error : null}
         apiAvailable={apiAvailable}
@@ -467,11 +518,11 @@ function SharedWebAppContent() {
 
   if (routeParts[0] === "system") {
     const systemSection = (routeParts[1] ?? "overview") as SystemSection;
-    if (!session.is_system_admin || !SYSTEM_SECTIONS.includes(systemSection) || routeParts.length > 2) {
+    if (!(session.is_system_admin || session.is_app_admin) || !SYSTEM_SECTIONS.includes(systemSection) || routeParts.length > 2) {
       return <SharedRouteNotFound apiAvailable={apiAvailable} onBack={() => navigate("/dashboard")} organizations={organizations} session={session} signOut={signOut} workspaces={workspaces} />;
     }
-    return <SharedLayout apiAvailable={apiAvailable} onNavigate={navigate} session={session} signOut={signOut} sidebar={<OrganizationRail organizations={organizations} workspaces={workspaces} />} workspaceNavigation={<SystemNavigation active={systemSection} onNavigate={(section) => navigate(`/system/${section}`)} />}>
-      <SystemAdminPanel accessToken={accessToken} key={systemSection} onOpenWorkspace={(id) => navigate(`/workspaces/${encodeURIComponent(id)}/overview`)} section={systemSection} session={session} />
+    return <SharedLayout apiAvailable={apiAvailable} onNavigate={navigate} session={session} signOut={signOut} sidebar={<OrganizationRail organizations={organizations} showSelection={false} workspaces={workspaces} />} workspaceNavigation={<SystemNavigation active={systemSection} onNavigate={(section) => navigate(`/system/${section}`)} />}>
+      <SystemAdminPanel accessToken={accessToken} key={systemSection} onNavigateSection={(section) => navigate(`/system/${section}`)} onOpenWorkspace={(id) => navigate(`/workspaces/${encodeURIComponent(id)}/overview`)} section={systemSection} session={session} workspaces={workspaces} />
     </SharedLayout>;
   }
 
@@ -560,13 +611,16 @@ function AuthCanvas({
   initialMode,
   initialError,
   onAuthenticated,
+  setupPending = false,
 }: {
   apiAvailable: boolean | null;
   initialMode: AuthMode;
   initialError: string | null;
   onAuthenticated: (token: string) => void;
+  /** The server's setup is not finished: only its system administrator can sign in to complete it. */
+  setupPending?: boolean;
 }) {
-  const [mode, setMode] = useState<AuthMode>(initialMode);
+  const [mode, setMode] = useState<AuthMode>(setupPending ? "sign-in" : initialMode);
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -574,9 +628,9 @@ function AuthCanvas({
   const [error, setError] = useState<string | null>(initialError);
 
   useEffect(() => {
-    setMode(initialMode);
+    setMode(setupPending ? "sign-in" : initialMode);
     setError(initialError);
-  }, [initialError, initialMode]);
+  }, [initialError, initialMode, setupPending]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -611,15 +665,19 @@ function AuthCanvas({
 
       <section className="shared-auth-form-region" aria-label="Account access">
         <div className="shared-auth-form-shell">
-          <div className="shared-auth-switch" role="tablist" aria-label="Account action">
+          {setupPending ? null : <div className="shared-auth-switch" role="tablist" aria-label="Account action">
             <Button className={mode === "sign-in" ? "active" : ""} onClick={() => { navigate("/login"); setMode("sign-in"); setError(null); }} role="tab" type="button" variant="secondary">Sign in</Button>
             <Button className={mode === "sign-up" ? "active" : ""} onClick={() => { navigate("/register"); setMode("sign-up"); setError(null); }} role="tab" type="button" variant="secondary">Create account</Button>
-          </div>
-          <div className="shared-auth-heading">
+          </div>}
+          {setupPending ? <div className="shared-auth-heading">
+            <p className="shared-eyebrow">Server setup</p>
+            <h2>Finish setting up RepoMemo</h2>
+            <p>This server's setup is not finished. Sign in as the system administrator created during setup to complete it. Nobody else can sign in or register until then.</p>
+          </div> : <div className="shared-auth-heading">
             <p className="shared-eyebrow">{mode === "sign-in" ? "Welcome back" : "Start a shared workspace"}</p>
             <h2>{mode === "sign-in" ? "Continue to RepoMemo" : "Create your account"}</h2>
             <p>{mode === "sign-in" ? "Use the credentials registered with this server." : "Your account will be the initial owner of any organization you create."}</p>
-          </div>
+          </div>}
           <form className="shared-auth-form" onSubmit={submit}>
             {mode === "sign-up" ? <label>Display name<Input autoComplete="name" onChange={(event) => setDisplayName(event.target.value)} placeholder="Ada Lovelace" required value={displayName} /></label> : null}
             <label>Email<Input autoComplete="email" onChange={(event) => setEmail(event.target.value)} placeholder="you@company.com" required type="email" value={email} /></label>
@@ -665,6 +723,35 @@ function SharedProfile({
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isConfirmingSignOut, setIsConfirmingSignOut] = useState(false);
+  const [hasAvatar, setHasAvatar] = useState(false);
+  const avatarInput = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let active = true;
+    void fetchSharedAvatar(session.user.id).then((url) => { if (active) setHasAvatar(Boolean(url)); });
+    return () => { active = false; };
+  }, [session.user.id]);
+
+  async function changeAvatar(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setIsSubmitting(true); setError(null); setNotice(null);
+    try {
+      await uploadSharedAvatar(accessToken, session.user.id, await prepareAvatar(file));
+      setHasAvatar(true);
+      setNotice("Profile picture updated.");
+    } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
+  }
+
+  async function removeAvatar() {
+    setIsSubmitting(true); setError(null); setNotice(null);
+    try {
+      await deleteSharedAvatar(accessToken, session.user.id);
+      setHasAvatar(false);
+      setNotice("Profile picture removed.");
+    } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
+  }
 
   async function load() {
     setIsLoading(true); setError(null);
@@ -712,7 +799,6 @@ function SharedProfile({
     } catch (requestError) { setError(apiMessage(requestError)); setIsSubmitting(false); }
   }
 
-  const initials = (profile?.user.display_name ?? session.user.display_name).split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "U";
 
   return <SharedLayout apiAvailable={apiAvailable} onNavigate={navigate} session={session} signOut={signOut} sidebar={<OrganizationRail organizations={organizations} workspaces={workspaces} />}>
     <section className="shared-page-content shared-profile-page" aria-busy={isLoading}>
@@ -720,7 +806,7 @@ function SharedProfile({
       <Toast kind="error" message={error} />
       <Toast kind="success" message={notice} />
       <div className="shared-profile-layout">
-        <section className="shared-profile-identity"><div className="shared-profile-avatar" aria-hidden="true">{initials}</div><div><h2>{profile?.user.display_name ?? session.user.display_name}</h2><p>{profile?.user.email ?? session.user.email ?? "No email address"}</p></div><dl><div><dt>Last connected</dt><dd>{formatProfileTime(profile?.last_connected_at)}</dd></div><div><dt>Member since</dt><dd>{formatProfileTime(profile?.created_at)}</dd></div><div><dt>Shared workspaces</dt><dd>{profile?.workspace_count ?? "—"}</dd></div><div><dt>Recorded actions</dt><dd>{profile?.recent_activity_count ?? "—"}</dd></div></dl></section>
+        <section className="shared-profile-identity"><UserAvatar className="shared-profile-avatar" name={profile?.user.display_name ?? session.user.display_name} size={72} userId={session.user.id} /><div><h2>{profile?.user.display_name ?? session.user.display_name}</h2><p>{profile?.user.email ?? session.user.email ?? "No email address"}</p><div className="shared-profile-avatar-actions"><input accept={AVATAR_INPUT_TYPES.join(",")} aria-label="Choose a profile picture" hidden onChange={(event) => void changeAvatar(event)} ref={avatarInput} type="file" /><Button disabled={isSubmitting} onClick={() => avatarInput.current?.click()} type="button" variant="secondary"><Camera size={15} /> {hasAvatar ? "Change picture" : "Upload picture"}</Button>{hasAvatar ? <Button disabled={isSubmitting} onClick={() => void removeAvatar()} type="button" variant="secondary"><Trash size={15} /> Remove</Button> : null}</div><small className="shared-muted-copy">PNG, JPEG or WebP. It is cropped to a square and shrunk before upload.</small></div><dl><div><dt>Last connected</dt><dd>{formatProfileTime(profile?.last_connected_at)}</dd></div><div><dt>Member since</dt><dd>{formatProfileTime(profile?.created_at)}</dd></div><div><dt>Shared workspaces</dt><dd>{profile?.workspace_count ?? "—"}</dd></div><div><dt>Recorded actions</dt><dd>{profile?.recent_activity_count ?? "—"}</dd></div></dl></section>
         <ContributionCalendar items={profile?.activity_by_day ?? []} title="Your activity" total={profile?.recent_activity_count} />
         <section className="shared-profile-assigned"><div className="shared-panel-heading"><div><Checklist size={18} /><h2>Assigned to you</h2></div><span>{assignedTasks.length} active</span></div>{assignedTasks.length ? <div className="shared-profile-task-list">{assignedTasks.map((task) => <Button key={task.id} onClick={() => navigate(`/workspaces/${encodeURIComponent(task.workspace_id)}/tasks`)} type="button" variant="secondary"><span><strong>{task.title}</strong><small>{task.status.replace(/_/g, " ")} · {task.priority} priority{task.due_at ? ` · due ${formatTaskDueDate(task.due_at)}` : ""}</small></span><ChevronRight size={16} /></Button>)}</div> : <p className="shared-muted-copy">No active tasks are assigned to you.</p>}</section>
         <section className="shared-profile-panel"><div className="shared-panel-heading"><div><UserCircle size={18} /><h2>Personal details</h2></div></div><form onSubmit={saveProfile}><label>Display name<Input autoComplete="name" onChange={(event) => setDisplayName(event.target.value)} required value={displayName} /></label><label>Email<Input disabled value={profile?.user.email ?? session.user.email ?? ""} /></label><Button disabled={isSubmitting} type="submit" variant="main">{isSubmitting ? <Loader className="spin" size={16} /> : <Pencil size={16} />} Save details</Button></form></section>
@@ -1002,7 +1088,7 @@ function OrganizationAdministration({
       const isOwner = member.role === "owner";
       const protectedMember = isOwner || (organization.role === "admin" && member.role === "admin");
       const email = member.user.email ?? "";
-      return <article key={member.user.id}><div><strong>{member.user.display_name}</strong><span>{email}</span></div><div className="shared-organization-member-actions">{isOwner ? <span className="shared-member-role">Owner</span> : <Dropdown aria-label={`Role for ${member.user.display_name}`} disabled={protectedMember || isSaving} onValueChange={(value) => void saveMember(email, value as OrganizationRole)} options={[{ label: "Member", value: "member" }, ...(canAssignAdmin ? [{ label: "Admin", value: "admin" }] : [])]} value={member.role} />}{!protectedMember ? <Button aria-label={`Remove ${member.user.display_name} from ${organization.name}`} disabled={isSaving} onClick={() => void removeMember(member)} type="button" variant="secondary"><Trash size={15} /></Button> : null}</div></article>;
+      return <article key={member.user.id}><div className="shared-person"><UserAvatar name={member.user.display_name} size={32} userId={member.user.id} /><div><strong>{member.user.display_name}</strong><span>{email}</span></div></div><div className="shared-organization-member-actions">{isOwner ? <span className="shared-member-role">Owner</span> : <Dropdown aria-label={`Role for ${member.user.display_name}`} disabled={protectedMember || isSaving} onValueChange={(value) => void saveMember(email, value as OrganizationRole)} options={[{ label: "Member", value: "member" }, ...(canAssignAdmin ? [{ label: "Admin", value: "admin" }] : [])]} value={member.role} />}{!protectedMember ? <Button aria-label={`Remove ${member.user.display_name} from ${organization.name}`} disabled={isSaving} onClick={() => void removeMember(member)} type="button" variant="secondary"><Trash size={15} /></Button> : null}</div></article>;
     })}</div>
   </section>;
 }
@@ -1010,16 +1096,19 @@ function OrganizationAdministration({
 function OrganizationRail({
   organizations,
   organizationId,
+  showSelection = true,
   workspaceId,
   workspaces,
 }: {
   organizations: Organization[];
   organizationId?: string;
+  /** False on pages outside any organization (System), so nothing in the list looks current. */
+  showSelection?: boolean;
   workspaceId?: string;
   workspaces?: SharedWorkspace[];
 }) {
   const organizationNavigation = useOrganizationNavigation();
-  const selectedOrganizationId = organizationId ?? organizationNavigation.activeOrganizationId ?? organizations[0]?.id;
+  const selectedOrganizationId = showSelection ? organizationId ?? organizationNavigation.activeOrganizationId ?? organizations[0]?.id : undefined;
   const canManageOrganizations = !organizations.length || organizations.some((organization) => organization.role === "owner" || organization.role === "admin");
 
   return <div className="shared-rail-navigation">
@@ -1806,7 +1895,7 @@ function SharedWorkspaceDetail({
               </div>
               <div className="shared-member-list">
                 {members.map((member) => <article className={`shared-member-card role-${member.role}`} key={member.user.id}>
-                  <span aria-hidden="true" className="shared-member-avatar">{member.role === "owner" ? <Crown size={20} /> : member.role === "admin" ? <Shield size={20} /> : member.role === "viewer" ? <Eye size={20} /> : <UserIcon size={20} />}</span>
+                  <UserAvatar className="shared-member-avatar" name={member.user.display_name} size={40} userId={member.user.id} />
                   <div><strong>{member.user.display_name}</strong><span>{member.user.email ?? "No email"}</span></div>
                   <span className="shared-member-role">{member.role}</span>
                   {canManageMembers && member.role !== "owner" ? <Button className="shared-member-remove" disabled={isSubmitting} onClick={() => void removeMember(member.user.id)} type="button" variant="secondary">Remove</Button> : null}

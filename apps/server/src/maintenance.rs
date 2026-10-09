@@ -68,6 +68,7 @@ pub struct MaintenanceReport {
     pub counters_pruned: usize,
     pub channels_pruned: usize,
     pub system_events_pruned: u64,
+    pub log_files_removed: usize,
     pub failures: usize,
 }
 
@@ -78,6 +79,7 @@ impl MaintenanceReport {
             || self.blobs_removed > 0
             || self.previews_removed > 0
             || self.untracked_files_removed > 0
+            || self.log_files_removed > 0
             || self.failures > 0
     }
 }
@@ -214,6 +216,13 @@ pub async fn run_pass(state: &AppState, retry_indexing: bool, sweep_untracked: b
             Ok(count) => report.system_events_pruned = count,
             Err(error) => failed(&mut report, "system audit events", error),
         }
+    }
+
+    let data_dir = std::path::PathBuf::from(&state.instance.data_dir);
+    let retention = runtime.logging.retention_days;
+    match tokio::task::spawn_blocking(move || crate::logs::prune_log_files(&data_dir, retention)).await {
+        Ok(count) => report.log_files_removed = count,
+        Err(error) => failed(&mut report, "log files", error.into()),
     }
 
     report.counters_pruned = state.guards.prune() + state.telemetry.prune();
