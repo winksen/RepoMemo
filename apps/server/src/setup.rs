@@ -84,21 +84,24 @@ impl SetupGate {
     }
 
     fn code_matches(&self, candidate: &str) -> bool {
-        let Some(expected) = self.code.as_deref() else {
-            return false;
-        };
-        let candidate = normalise_code(candidate);
-        // Compare every byte so the time taken does not reveal how much matched.
-        expected.len() == candidate.len()
-            && expected
-                .bytes()
-                .zip(candidate.bytes())
-                .fold(0_u8, |difference, (left, right)| difference | (left ^ right))
-                == 0
+        self.code.as_deref().is_some_and(|expected| codes_match(expected, candidate))
     }
 }
 
-fn generate_code() -> String {
+/// Whether `candidate` is the normalised `expected` code, ignoring case and
+/// separators.
+pub(crate) fn codes_match(expected: &str, candidate: &str) -> bool {
+    let candidate = normalise_code(candidate);
+    // Compare every byte so the time taken does not reveal how much matched.
+    expected.len() == candidate.len()
+        && expected
+            .bytes()
+            .zip(candidate.bytes())
+            .fold(0_u8, |difference, (left, right)| difference | (left ^ right))
+            == 0
+}
+
+pub(crate) fn generate_code() -> String {
     let mut bytes = [0_u8; 12];
     OsRng.fill_bytes(&mut bytes);
     bytes
@@ -108,14 +111,14 @@ fn generate_code() -> String {
 }
 
 /// Upper case without separators, so `abcd-efgh` and `ABCDEFGH` match.
-fn normalise_code(code: &str) -> String {
+pub(crate) fn normalise_code(code: &str) -> String {
     code.chars()
         .filter(|character| character.is_ascii_alphanumeric())
         .map(|character| character.to_ascii_uppercase())
         .collect()
 }
 
-fn display_code(code: &str) -> String {
+pub(crate) fn display_code(code: &str) -> String {
     code.as_bytes()
         .chunks(4)
         .map(|chunk| String::from_utf8_lossy(chunk).into_owned())

@@ -11,16 +11,26 @@ async fn main() {
     // changes them in System › Settings.
     init_logging().expect("Invalid RepoMemo logging configuration");
 
-    let config = ServerConfig::from_env().expect("Invalid RepoMemo server configuration");
+    let config = match ServerConfig::from_env() {
+        Ok(config) => config,
+        Err(error) => {
+            eprintln!("Invalid RepoMemo server configuration: {error:#}");
+            std::process::exit(1);
+        }
+    };
     let address = config.bind_address;
     let listener = TcpListener::bind(address)
         .await
         .expect("failed to bind RepoMemo server address");
 
     info!(%address, "RepoMemo shared-backend foundation is listening");
-    let app = router(config)
-        .await
-        .expect("Failed to initialize RepoMemo server storage");
+    let app = match router(config).await {
+        Ok(app) => app,
+        Err(error) => {
+            eprintln!("RepoMemo could not start: {error:#}");
+            std::process::exit(1);
+        }
+    };
     // The peer address keys the sign-in rate limits.
     axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>())
         .with_graceful_shutdown(shutdown_signal())

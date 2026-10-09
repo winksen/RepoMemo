@@ -1099,19 +1099,20 @@ td > .rm-system-tag { margin-left: 0; }
 }
 
 /* First-run server setup */
-.rm-setup { display: grid; grid-template-rows: auto 1fr; min-height: 100vh; color: var(--color-text); background: var(--color-canvas); }
+.rm-setup { display: grid; grid-template-rows: auto minmax(0, 1fr); height: 100dvh; overflow: hidden; color: var(--color-text); background: var(--color-canvas); }
 .rm-setup-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px clamp(16px, 4vw, 40px); border-bottom: 1px solid var(--color-border); background: var(--color-surface); }
 .rm-setup-header-actions { display: flex; align-items: center; gap: 10px; }
 .rm-setup-signed-in { color: var(--color-text-muted); font-size: 13px; }
-.rm-setup-body { display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 760px); gap: clamp(20px, 4vw, 56px); justify-content: center; padding: clamp(24px, 5vw, 56px) clamp(16px, 4vw, 40px); }
+.rm-setup-body { display: grid; align-items: start; overflow-y: auto; overscroll-behavior: contain; grid-template-columns: minmax(220px, 300px) minmax(0, 760px); gap: clamp(20px, 4vw, 56px); justify-content: center; padding: clamp(24px, 5vw, 56px) clamp(16px, 4vw, 40px); }
+.rm-setup-nav { position: sticky; top: 0; }
 .rm-setup-nav .shared-eyebrow { margin: 0 0 14px; }
 .rm-setup-steps { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
-.rm-setup-step { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 8px; color: var(--color-text-muted); }
-.rm-setup-step span:last-child { display: grid; gap: 2px; font-size: 13px; font-weight: 650; }
-.rm-setup-step small { font-size: 11px; font-weight: 500; color: var(--color-text-subtle); }
+.rm-setup-step { display: flex; align-items: center; gap: 14px; padding: 13px 14px; border-radius: 8px; color: var(--color-text-muted); }
+.rm-setup-step span:last-child { display: grid; gap: 3px; font-size: 15px; font-weight: 650; }
+.rm-setup-step small { font-size: 12px; font-weight: 500; color: var(--color-text-subtle); }
 .rm-setup-step.current { color: var(--color-text); background: var(--color-surface-2); }
 .rm-setup-step.done { color: var(--color-text); }
-.rm-setup-step-mark { display: grid; place-items: center; width: 30px; height: 30px; flex: 0 0 auto; border: 1px solid var(--color-border); border-radius: 50%; background: var(--color-surface); }
+.rm-setup-step-mark { display: grid; place-items: center; width: 24px; height: 24px; flex: 0 0 auto; }
 .rm-setup-step.current .rm-setup-step-mark { border-color: var(--color-accent); color: var(--color-accent-text); }
 .rm-setup-step.done .rm-setup-step-mark { color: var(--color-success); }
 .rm-setup-nav-note { display: flex; gap: 8px; align-items: flex-start; margin: 20px 0 0; color: var(--color-text-subtle); font-size: 12px; line-height: 1.5; }
@@ -1141,6 +1142,21 @@ td > .rm-system-tag { margin-left: 0; }
 .rm-setup-waiting .rm-setup-panel { width: min(100%, 520px); }
 @media (max-width: 860px) {
   .rm-setup-body { grid-template-columns: 1fr; }
+  .rm-setup-nav { position: static; }
   .rm-setup-steps { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
   .rm-setup-signed-in { display: none; }
 }
+
+/* Platform: choosing the environment folder */
+.rm-platform .rm-setup-body { grid-template-columns: minmax(0, 640px); justify-content: center; }
+.rm-platform-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.rm-platform-heading h3, .rm-platform-create h3 { margin: 0; font-size: 15px; }
+.rm-platform-list { display: grid; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--color-border); }
+.rm-platform-item { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--color-border); }
+.rm-platform-icon { display: inline-flex; flex: 0 0 auto; color: var(--color-text-muted); }
+.rm-platform-item.valid .rm-platform-icon { color: var(--color-text); }
+.rm-platform-text { display: grid; flex: 1 1 auto; gap: 2px; min-width: 0; font-size: 13px; color: var(--color-text-muted); overflow-wrap: anywhere; }
+.rm-platform-text strong { color: var(--color-text); font-size: 14px; }
+.rm-platform-text small { margin-left: 6px; color: var(--color-text-muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.rm-platform-create { padding-top: 8px; }
+.rm-platform code, .rm-environment-card code { font-family: var(--font-mono); font-size: 12px; }

@@ -17,6 +17,7 @@ import {
   IconRefresh as Refresh,
   IconRotate as Rotate,
   IconServer as Server,
+  IconPlugConnectedX as Unplug,
   IconServerCog as ServerCog,
   IconShieldCheck as ShieldCheck,
   IconShieldOff as ShieldOff,
@@ -29,13 +30,16 @@ import {
 import { UserAvatar } from "./UserAvatar";
 import {
   cancelSharedJob,
+  detachEnvironment,
   downloadSystemLogFile,
   endSystemUserSessions,
+  getPlatformStatus,
   getSystemLogFiles,
   getSystemLogs,
   getSystemOverview,
   getSystemSettings,
   getSystemUsage,
+  clearSharedSession,
   listSystemAuditEvents,
   listSystemJobs,
   listSystemUsers,
@@ -120,7 +124,7 @@ export function SystemAdminPanel({ accessToken, onNavigateSection, onOpenWorkspa
     {section === "overview" ? <OverviewSection accessToken={accessToken} /> : null}
     {section === "usage" ? <UsageSection accessToken={accessToken} onOpenWorkspace={onOpenWorkspace} /> : null}
     {section === "users" ? <UsersSection accessToken={accessToken} session={session} /> : null}
-    {section === "settings" ? <SettingsSection accessToken={accessToken} /> : null}
+    {section === "settings" ? <SettingsSection accessToken={accessToken} session={session} /> : null}
     {section === "logs" ? <LogsSection accessToken={accessToken} onOpenSettings={() => onNavigateSection("settings")} workspaces={workspaces} /> : null}
     {section === "jobs" ? <JobsSection accessToken={accessToken} /> : null}
     {section === "audit" ? <AuditSection accessToken={accessToken} /> : null}
@@ -455,7 +459,35 @@ function UsersSection({ accessToken, session }: { accessToken: string; session: 
   </>;
 }
 
-function SettingsSection({ accessToken }: { accessToken: string }) {
+/** The environment folder this server is attached to, and the way to detach it (system administrators only). */
+function EnvironmentGroup({ accessToken }: { accessToken: string }) {
+  const [platform, setPlatform] = useState<{ environment: string | null; folder: string } | null>(null);
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [isBusy, setIsBusy] = useState(false);
+  useEffect(() => { getPlatformStatus().then(setPlatform).catch(() => undefined); }, []);
+
+  async function detach() {
+    setIsBusy(true);
+    try {
+      await detachEnvironment(accessToken);
+      // Every session ended on the server; start over from the environment menu.
+      clearSharedSession();
+      window.location.assign("/");
+    } catch (error) {
+      showToast("error", errorMessage(error, "The environment could not be detached."));
+      setIsBusy(false);
+    }
+  }
+
+  return <section className="shared-settings-group rm-environment-card">
+    <div className="shared-panel-heading"><div><Unplug size={18} /><h2>Environment</h2></div><span>{platform?.environment ?? "—"}</span></div>
+    <p className="shared-muted-copy">All data of this server lives in <code>{platform ? `${platform.folder}/${platform.environment ?? ""}` : "its environment folder"}</code>. Detaching signs everyone out, stops background work and closes the database. The server then waits for an environment to be chosen again, using the code printed on its console. Nothing is deleted.</p>
+    <div><Button disabled={isBusy || !platform?.environment} onClick={() => setIsConfirming(true)} type="button" variant="secondary"><Unplug size={16} /> Detach environment</Button></div>
+    <Dialog description="Everyone, you included, is signed out at once and the server stops serving this environment until an administrator with access to the server console attaches one again." footer={<><DialogCancel onClick={() => setIsConfirming(false)} /><Button disabled={isBusy} onClick={() => void detach()} type="button" variant="main">{isBusy ? <Loader className="spin" size={16} /> : null}Detach environment</Button></>} onClose={() => setIsConfirming(false)} open={isConfirming} title={`Detach ${platform?.environment ?? "the environment"}?`} />
+  </section>;
+}
+
+function SettingsSection({ accessToken, session }: { accessToken: string; session: SharedSession }) {
   const [settings, setSettings] = useState<SystemSettings | null>(null);
   const [draft, setDraft] = useState<Record<string, boolean | number | string>>({});
   const [isBusy, setIsBusy] = useState(false);
@@ -522,6 +554,7 @@ function SettingsSection({ accessToken }: { accessToken: string }) {
         </div>;
       })}</div>
     </section>)}
+    {session.is_system_admin ? <EnvironmentGroup accessToken={accessToken} /> : null}
     <section className="shared-settings-group">
       <div className="shared-panel-heading"><div><Server size={18} /><h2>Set by the server environment</h2></div><span>read only</span></div>
       <p className="shared-muted-copy">These are chosen by whoever runs the server, through environment variables, and need a restart to change.</p>

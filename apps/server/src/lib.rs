@@ -5,6 +5,7 @@ mod ai_access;
 mod avatars;
 mod conversion;
 mod embedding;
+mod environment;
 mod events;
 mod health;
 mod indexing;
@@ -93,7 +94,11 @@ const MAX_UPLOAD_FILENAME_CHARS: usize = 255;
 pub struct ServerConfig {
     pub service_name: String,
     pub bind_address: SocketAddr,
-    pub data_dir: PathBuf,
+    /// The environment folder to attach at startup (verified, and always
+    /// inside `workspace-data/` when it comes from `REPOMEMO_SERVER_DATA_DIR`).
+    /// `None` starts the server detached: an administrator picks the
+    /// environment in the web app.
+    pub data_dir: Option<PathBuf>,
     pub jwt_secret: String,
     /// Browser origins allowed to call the API (CORS). Empty: no CORS headers.
     pub allowed_origins: Vec<HeaderValue>,
@@ -160,9 +165,13 @@ impl ServerConfig {
             .unwrap_or_else(|_| "127.0.0.1:3020".to_owned())
             .parse()
             .context("REPOMEMO_SERVER_ADDR must be a valid socket address")?;
-        let data_dir = std::env::var("REPOMEMO_SERVER_DATA_DIR")
-            .map(PathBuf::from)
-            .unwrap_or_else(|_| PathBuf::from(".repomemo-server"));
+        let data_dir = match std::env::var("REPOMEMO_SERVER_DATA_DIR") {
+            Ok(value) if !value.trim().is_empty() => Some(environment::resolve_setting(
+                &environment::environments_root()?,
+                &value,
+            )?),
+            _ => None,
+        };
         let allowed_origins = std::env::var("REPOMEMO_ALLOWED_ORIGIN")
             .unwrap_or_else(|_| "http://127.0.0.1:3021".to_owned())
             .split(',')
@@ -260,7 +269,7 @@ impl ServerConfig {
         Self {
             service_name: "repomemo-server-test".to_owned(),
             bind_address: "127.0.0.1:0".parse().unwrap(),
-            data_dir,
+            data_dir: Some(data_dir),
             jwt_secret: "test-secret-that-is-long-enough-for-jwt-signing".to_owned(),
             allowed_origins: Vec::new(),
             soffice: None,
@@ -389,6 +398,10 @@ struct AppState {
     telemetry: Arc<Telemetry>,
     maintenance_status: Arc<std::sync::Mutex<MaintenanceStatus>>,
     setup: Arc<setup::SetupGate>,
+    /// The host this environment is attached to; used to detach it.
+    host: environment::HostHandle,
+    /// Set when the environment is being detached: open streams end.
+    closing: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl AppState {
@@ -842,17 +855,27 @@ struct AuthenticatedSubject {
     is_app_admin: bool,
 }
 
+/// The whole application. With `config.data_dir` set the environment is
+/// verified and attached right away; otherwise the server waits for an
+/// administrator to pick one (see [`environment`]).
 pub async fn router(config: ServerConfig) -> Result<Router> {
-    let state = build_state(&config).await?;
-    maintenance::start(state.clone());
-    Ok(routes(state, &config))
+    let host = environment::Host::start(config).await?;
+    Ok(host.router())
 }
 
-/// Opens storage, recovers from the previous shutdown and starts the
-/// background queues and pollers.
-async fn build_state(config: &ServerConfig) -> Result<AppState> {
+/// Opens storage in `config.data_dir`, recovers from the previous shutdown
+/// and starts the background queues and pollers. The returned tasks are the
+/// ones that must be stopped when the environment is detached.
+async fn build_state(
+    config: &ServerConfig,
+    host: environment::HostHandle,
+) -> Result<(AppState, Vec<tokio::task::JoinHandle<()>>)> {
+    let data_dir = config
+        .data_dir
+        .clone()
+        .context("an environment folder is required to open storage")?;
     let storage = StorageEngine::open(StorageConfig {
-        data_dir: config.data_dir.clone(),
+        data_dir: data_dir.clone(),
         master_key: config.secret_key.clone(),
     })
     .await?;
@@ -869,7 +892,7 @@ async fn build_state(config: &ServerConfig) -> Result<AppState> {
     // Settings changed by system administrators override the environment.
     let runtime = Arc::new(SettingsCell::new(
         RuntimeSettings::from_config(config),
-        config.data_dir.clone(),
+        data_dir.clone(),
     ));
     let overrides = storage
         .list_system_settings()
@@ -932,11 +955,11 @@ async fn build_state(config: &ServerConfig) -> Result<AppState> {
     let repo_sync = RepoSyncRunner::new(core.clone(), embedding_queue.clone());
     repo_sync.resume_all().await;
     let polling = runtime.clone();
-    repo_sync.start_polling(move || polling.current().repo_poll_interval);
+    let polling_task = repo_sync.start_polling(move || polling.current().repo_poll_interval);
 
     let converter = match config.soffice.clone() {
-        Some(path) => Converter::with_binary(&config.data_dir, Some(path)),
-        None => Converter::detect(&config.data_dir),
+        Some(path) => Converter::with_binary(&data_dir, Some(path)),
+        None => Converter::detect(&data_dir),
     };
     if converter.enabled() {
         tracing::info!("LibreOffice found: Office files get layout-accurate previews");
@@ -962,10 +985,10 @@ async fn build_state(config: &ServerConfig) -> Result<AppState> {
                 .collect(),
             ai_hosts_restricted: config.ai_allowed_hosts.is_some(),
             trust_proxy: config.trust_proxy,
-            data_dir: config.data_dir.clone(),
+            data_dir: data_dir.clone(),
         },
     ));
-    Ok(AppState {
+    let state = AppState {
         storage,
         core,
         jwt_secret: config.jwt_secret.clone(),
@@ -980,11 +1003,16 @@ async fn build_state(config: &ServerConfig) -> Result<AppState> {
         telemetry: Arc::new(Telemetry::default()),
         maintenance_status: Arc::new(std::sync::Mutex::new(MaintenanceStatus::default())),
         setup,
-    })
+        host,
+        closing: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+    };
+    let maintenance_task = maintenance::start(state.clone());
+    Ok((state, vec![polling_task, maintenance_task]))
 }
 
-fn routes(state: AppState, config: &ServerConfig) -> Router {
-    let cors = if config.allowed_origins.is_empty() {
+/// Cross-origin rules for the whole application, platform routes included.
+fn cors_layer(config: &ServerConfig) -> CorsLayer {
+    if config.allowed_origins.is_empty() {
         CorsLayer::new()
     } else {
         CorsLayer::new()
@@ -1007,8 +1035,12 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
                 HeaderName::from_static("x-total-count"),
                 header::RETRY_AFTER,
             ])
-    };
+    }
+}
 
+/// The routes of one attached environment. Cross-origin handling is done by
+/// the host in front of it.
+fn routes(state: AppState, config: &ServerConfig) -> Router {
     Router::new()
         .route("/health", get(health))
         .route("/health/ready", get(readiness))
@@ -1031,6 +1063,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route("/v1/system/users/{user_id}/unlock", post(system::unlock_user))
         .route("/v1/system/settings", get(system::get_settings).put(system::update_settings))
         .route("/v1/system/settings/{key}", delete(system::reset_setting))
+        .route("/v1/system/environment/detach", post(system::detach_environment))
         .route("/v1/system/logs", get(system::logs))
         .route("/v1/system/logs/files", get(system::log_files))
         .route("/v1/system/logs/files/{day}", get(system::download_log_file))
@@ -1305,7 +1338,6 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .layer(middleware::from_fn_with_state(state.clone(), system::track_requests))
         .layer(TraceLayer::new_for_http())
         .layer(DefaultBodyLimit::max(config.max_upload_bytes))
-        .layer(cors)
         .with_state(state)
 }
 
@@ -4324,7 +4356,8 @@ async fn watch_event_stream_access(
             .await
             .map(|role| role.is_some())
             .unwrap_or(true);
-        if expired || !session_valid || !member {
+        let closing = state.closing.load(std::sync::atomic::Ordering::SeqCst);
+        if expired || !session_valid || !member || closing {
             let _ = closer.send(()).await;
             return;
         }
@@ -7983,7 +8016,7 @@ mod tests {
     async fn a_maintenance_pass_runs_cleanly() {
         let data_dir = temp_data_dir("maintenance");
         let config = ServerConfig::for_test(data_dir.clone());
-        let state = super::build_state(&config).await.unwrap();
+        let (state, _tasks) = super::build_state(&config, std::sync::Weak::new()).await.unwrap();
         let report = super::maintenance::run_pass(&state, true, true).await;
         assert_eq!(report.failures, 0, "{report:?}");
         let _ = std::fs::remove_dir_all(data_dir);

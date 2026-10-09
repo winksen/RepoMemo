@@ -387,7 +387,8 @@ fn resolve_data_dir(app: &tauri::App) -> PathBuf {
 fn fallback_data_dir() -> PathBuf {
     std::env::current_dir()
         .unwrap_or_else(|_| PathBuf::from("."))
-        .join(".repomemo")
+        .join("workspace-data")
+        .join("desktop")
 }
 
 fn to_command_error(error: impl std::fmt::Display) -> String {

@@ -164,6 +164,10 @@ Any signed-in user can create a new organization and becomes its owner.
 
 ---
 
+## 1-pre. Choosing the environment (platform)
+
+All data of a server lives in one **environment folder** inside `workspace-data/` (git-ignored). A server started without `REPOMEMO_SERVER_DATA_DIR` shows a menu first: enter the code from the console, then **use** an existing environment (listed with its verification: a RepoMemo environment, empty, or cannot be attached and why) or **create** a new one. Folders outside `workspace-data/` and folders that are neither empty nor RepoMemo environments are refused. A system administrator can **detach** the environment in System › Settings: everyone is signed out and the menu shows again.
+
 ## 1a. First-run setup (onboarding)
 
 The very first time a server runs, with no account yet, the web app shows a **setup page** instead of sign-in:

@@ -1124,3 +1124,41 @@ export function getSetupChecks(accessToken: string): Promise<SetupCheck[]> {
 export function completeServerSetup(accessToken: string): Promise<ServerSetupStatus> {
   return request<ServerSetupStatus>("/v1/setup/complete", { method: "POST" }, accessToken);
 }
+
+// Platform: which environment folder the server is attached to
+
+export interface PlatformStatus {
+  attached: boolean;
+  environment: string | null;
+  /** The only folder environments may live in, such as "workspace-data". */
+  folder: string;
+}
+
+export interface EnvironmentEntry {
+  name: string;
+  status: "valid" | "empty" | "invalid";
+  detail: string;
+}
+
+/** Public: whether the server has an environment attached. */
+export function getPlatformStatus(): Promise<PlatformStatus> {
+  return request<PlatformStatus>("/v1/platform");
+}
+
+/** The folders of the environments directory with their verification; the code proves access to the server console. */
+export function listEnvironments(code: string): Promise<EnvironmentEntry[]> {
+  return request<EnvironmentEntry[]>("/v1/platform/environments/list", { method: "POST", body: JSON.stringify({ code }) });
+}
+
+export function createEnvironment(code: string, name: string): Promise<PlatformStatus> {
+  return request<PlatformStatus>("/v1/platform/environments/create", { method: "POST", body: JSON.stringify({ code, name }) });
+}
+
+export function attachEnvironment(code: string, name: string): Promise<PlatformStatus> {
+  return request<PlatformStatus>("/v1/platform/environments/attach", { method: "POST", body: JSON.stringify({ code, name }) });
+}
+
+/** System administrators: ends every session and detaches the environment; the server then waits for one to be chosen. */
+export async function detachEnvironment(accessToken: string): Promise<void> {
+  await request<void>("/v1/system/environment/detach", { method: "POST" }, accessToken);
+}

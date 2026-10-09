@@ -85,7 +85,7 @@ impl MaintenanceReport {
 }
 
 /// Starts the maintenance loop on the current runtime.
-pub fn start(state: AppState) {
+pub fn start(state: AppState) -> tokio::task::JoinHandle<()> {
     if state.settings().maintenance.interval.is_zero() {
         tracing::info!("Background maintenance is turned off");
     }
@@ -122,7 +122,7 @@ pub fn start(state: AppState) {
             }
             wait = state.settings().maintenance.interval.max(DISABLED_RECHECK);
         }
-    });
+    })
 }
 
 fn set_next_run(state: &AppState, wait: Option<Duration>) {

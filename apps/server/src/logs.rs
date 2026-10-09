@@ -497,6 +497,11 @@ fn file_sink() -> &'static FileSink {
     FILE_SINK.get_or_init(|| FileSink { sender: Mutex::new(None) })
 }
 
+/// Stops writing log files, so a detached environment's folder is left alone.
+pub(crate) fn stop_file_output() {
+    file_sink().configure(None);
+}
+
 impl FileSink {
     /// Starts writing to `dir`, or stops when `None`.
     fn configure(&self, dir: Option<PathBuf>) {

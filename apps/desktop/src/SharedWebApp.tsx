@@ -83,6 +83,7 @@ import {
   getSharedArtifact,
   getSharedArtifactLifecycle,
   getSharedHealth,
+  getPlatformStatus,
   getServerSetup,
   getSharedProfile,
   getSharedWorkspaceCapabilities,
@@ -204,6 +205,7 @@ import { DocumentViewer } from "./components/DocumentViewer";
 import { ImagePreview } from "./components/ImagePreview";
 import { DOCUMENT_ACCEPT, DOCUMENT_KIND_LABEL, documentKindOf, isDocumentArtifact } from "./lib/documents";
 import { AiPolicySettings } from "./components/AiPolicySettings";
+import { PlatformSetup } from "./components/PlatformSetup";
 import { ServerSetup, ServerSetupWaiting } from "./components/ServerSetup";
 import { SYSTEM_SECTIONS, SystemAdminPanel, SystemNavigation, type SystemSection } from "./components/SystemAdminPanel";
 import { AiProviderForm } from "./components/AiProviderForm";
@@ -355,6 +357,13 @@ function SharedWebAppContent() {
   const [apiAvailable, setApiAvailable] = useState<boolean | null>(null);
   // Whether the server still has to be set up; the server is the authority.
   const [setup, setSetup] = useState<ServerSetupStatus | null>(null);
+  // Whether the server has an environment folder attached; without one it can only show the environment menu.
+  const [platform, setPlatform] = useState<{ attached: boolean; folder: string } | null>(null);
+
+  useEffect(() => {
+    // An older server has no platform routes and is always attached.
+    getPlatformStatus().then(setPlatform).catch(() => setPlatform({ attached: true, folder: "workspace-data" }));
+  }, []);
 
   useEffect(() => {
     document.documentElement.dataset.theme = initialSharedTheme();
@@ -447,6 +456,15 @@ function SharedWebAppContent() {
       navigate("/dashboard", true);
     }
   }, [pageState, pathname, setup]);
+
+  if (!platform) {
+    return <LoadingCanvas label="Checking the server" />;
+  }
+
+  if (!platform.attached) {
+    // Everything else on the page was loaded against a server with no data; start over once one is attached.
+    return <PlatformSetup folder={platform.folder} onAttached={() => window.location.assign("/")} />;
+  }
 
   if (!setup) {
     return <LoadingCanvas label="Checking the server" />;

@@ -143,7 +143,7 @@ flowchart TD
 |---|---|---|
 | `REPOMEMO_JWT_SECRET` | — (**required**) | Must be at least 32 characters, or startup panics. |
 | `REPOMEMO_SERVER_ADDR` | `127.0.0.1:3020` | Bind address. |
-| `REPOMEMO_SERVER_DATA_DIR` | `.repomemo-server` | Holds `repomemo.sqlite` and `blobs/`. The path is relative to the CWD. |
+| `REPOMEMO_SERVER_DATA_DIR` | unset | Environment folder to attach at startup: a name (`main`) or `workspace-data/main`. Must be directly inside `workspace-data/` (relative to the CWD, git-ignored) and be empty or a valid RepoMemo environment; checked at startup, and the server refuses to start otherwise. Unset: the server starts detached and the web app offers the environment menu (§8b-ter). Holds `repomemo.sqlite`, `blobs/`, `logs/`, `secret.key`. |
 | `REPOMEMO_ALLOWED_ORIGIN` | `http://127.0.0.1:3021` | The CORS origins, comma-separated (`*` is refused). Allowed methods are GET, POST, PUT, PATCH and DELETE. Allowed headers are `Authorization`, `Content-Type`, `X-RepoMemo-Filename` and `X-RepoMemo-Folder-Id`; `X-Total-Count` and `Retry-After` are exposed. |
 | `REPOMEMO_SERVICE_NAME` | `repomemo-server` | Returned by `/health`. |
 | `REPOMEMO_SECRET_KEY` | unset | *Hardening.* Key material for encrypting provider API keys at rest (§6.6). Unset: a random key in `<data dir>/secret.key`. |
@@ -256,6 +256,11 @@ Guard legend: **pub** = no auth, **auth** = any valid JWT, **R/W/A/O** = workspa
 | POST | `/v1/setup/admin` | pub | `{code, email, display_name, password}` → 201 `TokenResponse`; creates the first system administrator; 409 once one exists |
 | GET | `/v1/setup/checks` | system admin, finishing | server checks with status and advice |
 | POST | `/v1/setup/complete` | system admin, finishing | completes the setup for good; 409 afterwards |
+| GET | `/v1/platform` | pub | `{attached, environment, folder}` |
+| POST | `/v1/platform/environments/list` | code | `{code}` → folders of `workspace-data/` with `valid`/`empty`/`invalid` and the reason; 403 on a wrong code (lockout after 10); 409 when attached |
+| POST | `/v1/platform/environments/create` | code | `{code, name}` → creates `workspace-data/<name>` and attaches it; 409 if the folder exists |
+| POST | `/v1/platform/environments/attach` | code | `{code, name}` → verifies the structure, then attaches; 400 with the reason when invalid |
+| POST | `/v1/system/environment/detach` | system admin | ends every session, stops background work, closes the database, back to detached; 204 |
 | POST | `/v1/auth/register` | pub | 201 `TokenResponse`, 409 if the email exists, 403 when registration is closed, 429 when rate-limited |
 | POST | `/v1/auth/login` | pub | `TokenResponse`, 401 `invalid_credentials`, 429 when rate-limited or locked out |
 | POST | `/v1/auth/refresh` | pub | `{refresh_token}` → a new `TokenResponse` with a rotated refresh token; 401 for an unknown, expired or reused token |
@@ -621,6 +626,10 @@ Notes:
 | Embedding queue | [embedding.rs](../apps/server/src/embedding.rs) | §6.4 |
 | Repository syncs and polling | [repositories.rs](../apps/server/src/repositories.rs) | §6.10 |
 | Maintenance | [maintenance.rs](../apps/server/src/maintenance.rs) | Every hour (`REPOMEMO_MAINTENANCE_INTERVAL_MINUTES`), first one minute after start: purges expired refresh tokens, prunes finished jobs older than 90 days and system audit events older than 365, collects orphan blobs and previews (§6.1), forgets idle rate-limit counters, event channels and client sightings, re-queues missing embeddings, retries indexing that failed for good every 6 hours, and runs `PRAGMA optimize` plus a WAL checkpoint so the log does not grow without bound. A failing step is logged and the others still run. Its settings are read before every pass, its status (running, last and next run, last report) is kept for the System page, and a system administrator can run it by hand |
+
+## 8b-ter. Platform host (environment folders, [environment.rs](../apps/server/src/environment.rs))
+
+A `Host` sits in front of the application router. Detached, it answers the `/v1/platform/*` routes, `/health` (`environment_required: true`) and 503 `environment_required` for everything else. Attached, it forwards every request to the environment router built by `build_state`. The unlock code is `REPOMEMO_SETUP_CODE` or one generated per start and printed on the console; it also opens the first-run onboarding of a new environment. Names are letters, digits and `-_.` (at most 48, no reserved Windows names); the folder must be a direct child of `workspace-data/` and not a link. Structure check ([storage environment.rs](../crates/storage/src/environment.rs)): empty, or `repomemo.sqlite` with the SQLite header, the core tables, no failed or newer migrations, and `blobs` a folder. Detach: bumps every session version and revokes refresh tokens, sets `closing` (event streams end), aborts maintenance and repository polling, checkpoints and closes the pool, stops log files.
 
 ## 8b-bis. First-run setup (*onboarding*, [setup.rs](../apps/server/src/setup.rs))
 

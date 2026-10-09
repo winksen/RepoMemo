@@ -80,8 +80,16 @@ cargo run -p repomemo-server
 ```
 
 The API binds to `127.0.0.1:3020` by default. It stores server-owned
-development data in `.repomemo-server/` and exposes JWT-protected workspace
-routes. Import `docs/api/RepoMemo_Shared_API_v2.postman_collection.json` into
+development data in an *environment* folder, always directly inside
+`workspace-data/` (git-ignored, so new projects are never tracked). Start the
+server with no `REPOMEMO_SERVER_DATA_DIR` and the web app shows a menu, unlocked
+by the code printed on the console, to create `workspace-data/<name>/` or to
+reroute to an existing one; the folder is verified first. To skip the menu set
+`REPOMEMO_SERVER_DATA_DIR=onboarding` (or `workspace-data/onboarding`): the value
+is verified at startup, and anything outside `workspace-data/`, or a folder that
+is neither empty nor a RepoMemo environment, stops the server. System
+administrators can detach the environment from System › Settings. The server
+exposes JWT-protected workspace routes. Import `docs/api/RepoMemo_Shared_API_v2.postman_collection.json` into
 Postman and run its numbered folders in order to exercise authentication,
 workspace setup, evidence, indexing, retrieval, team memory, and workspace
 membership management. For the membership folder, register the teammate first,

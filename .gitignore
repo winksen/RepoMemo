@@ -10,10 +10,12 @@ dist/
 apps/desktop/src-tauri/target/
 apps/desktop/src-tauri/gen/
 
-# Local RepoMemo workspace data
-.repomemo/
-.repomemo-server/
+# Local RepoMemo workspace data: every project/environment lives under
+# workspace-data/<name>/ (e.g. workspace-data/server, workspace-data/onboarding)
 workspace-data/
+# Legacy locations, from before everything moved under workspace-data/
+.repomemo/
+.repomemo-*/
 
 # OS/editor noise
 .DS_Store

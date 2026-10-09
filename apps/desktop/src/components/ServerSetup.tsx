@@ -40,13 +40,13 @@ import { showToast } from "./ui/toast";
 type StepKey = "welcome" | "admin" | "checks" | "access" | "logging" | "organization" | "finish";
 
 const STEPS: { key: StepKey; label: string; icon: ReactNode }[] = [
-  { key: "welcome", label: "Welcome", icon: <Key size={16} /> },
-  { key: "admin", label: "System administrator", icon: <UserShield size={16} /> },
-  { key: "checks", label: "Server check", icon: <Server size={16} /> },
-  { key: "access", label: "Access and security", icon: <ShieldLock size={16} /> },
-  { key: "logging", label: "Logging", icon: <FileText size={16} /> },
-  { key: "organization", label: "First workspace", icon: <Building size={16} /> },
-  { key: "finish", label: "Finish", icon: <Flag size={16} /> },
+  { key: "welcome", label: "Welcome", icon: <Key size={22} /> },
+  { key: "admin", label: "System administrator", icon: <UserShield size={22} /> },
+  { key: "checks", label: "Server check", icon: <Server size={22} /> },
+  { key: "access", label: "Access and security", icon: <ShieldLock size={22} /> },
+  { key: "logging", label: "Logging", icon: <FileText size={22} /> },
+  { key: "organization", label: "First workspace", icon: <Building size={22} /> },
+  { key: "finish", label: "Finish", icon: <Flag size={22} /> },
 ];
 
 /** Settings offered during setup; everything else stays at the server default and can be changed later in System › Settings. */
@@ -108,7 +108,7 @@ export function ServerSetup({ accessToken, onAdminCreated, onFinished, onSignOut
           {STEPS.map((entry, index) => {
             const state = index < stepIndex ? "done" : index === stepIndex ? "current" : "upcoming";
             return <li aria-current={state === "current" ? "step" : undefined} className={`rm-setup-step ${state}`} key={entry.key}>
-              <span className="rm-setup-step-mark" aria-hidden="true">{state === "done" ? <CircleCheck size={16} /> : entry.icon}</span>
+              <span className="rm-setup-step-mark" aria-hidden="true">{state === "done" ? <CircleCheck size={22} /> : entry.icon}</span>
               <span>{entry.label}<small>{state === "done" ? "Done" : state === "current" ? "In progress" : "To do"}</small></span>
             </li>;
           })}

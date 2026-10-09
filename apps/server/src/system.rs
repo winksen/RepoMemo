@@ -346,8 +346,9 @@ pub(crate) struct InstanceInfo {
 
 impl InstanceInfo {
     pub(crate) fn new(config: &crate::ServerConfig, libreoffice: bool) -> Self {
-        let data_dir = std::fs::canonicalize(&config.data_dir)
-            .unwrap_or_else(|_| config.data_dir.clone())
+        let configured = config.data_dir.clone().unwrap_or_default();
+        let data_dir = std::fs::canonicalize(&configured)
+            .unwrap_or(configured)
             .to_string_lossy()
             .trim_start_matches(r"\\?\")
             .to_owned();
@@ -1071,6 +1072,22 @@ pub(crate) async fn reset_setting(
     let default = read_setting(&state.runtime.defaults, &key);
     audit(&state, &subject, "system_setting_reset", format!("Restored the default of {} ({default}).", spec.label)).await;
     settings_response(&state).await.map(Json)
+}
+
+/// Detaches the environment: every session ends, background work stops, the
+/// database closes and the server waits for an environment to be chosen again.
+pub(crate) async fn detach_environment(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+) -> Result<axum::http::StatusCode, ApiError> {
+    require_full_system_admin(&subject)?;
+    let host = state
+        .host
+        .upgrade()
+        .ok_or_else(|| ApiError::not_found("This server has no environment host."))?;
+    audit(&state, &subject, "environment_detached", "Detached the environment; every session was ended.".to_owned()).await;
+    host.detach().await?;
+    Ok(axum::http::StatusCode::NO_CONTENT)
 }
 
 #[derive(Debug, Deserialize)]

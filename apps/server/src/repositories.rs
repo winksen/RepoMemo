@@ -74,7 +74,7 @@ impl RepoSyncRunner {
     /// that moved, so the workspace follows new commits without anyone
     /// pressing Sync now. `interval` is read before every round, so a system
     /// administrator can change it (or turn polling off, `None`) at run time.
-    pub(crate) fn start_polling(&self, interval: impl Fn() -> Option<Duration> + Send + 'static) {
+    pub(crate) fn start_polling(&self, interval: impl Fn() -> Option<Duration> + Send + 'static) -> tokio::task::JoinHandle<()> {
         let runner = self.clone();
         tokio::spawn(async move {
             loop {
@@ -91,7 +91,7 @@ impl RepoSyncRunner {
                     tracing::info!(count = started, "Started automatic repository syncs for branches that moved");
                 }
             }
-        });
+        })
     }
 
     /// One polling round. Returns how many syncs it started.

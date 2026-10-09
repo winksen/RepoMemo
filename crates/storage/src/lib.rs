@@ -21,15 +21,21 @@ use sqlx::sqlite::{
 use sqlx::{QueryBuilder, Row, Sqlite, SqlitePool};
 use uuid::Uuid;
 
+mod environment;
 mod repo;
 mod secrets;
 mod setup;
 mod system;
+pub use environment::{inspect_environment, EnvironmentState};
 pub use repo::{RepoFileRecord, RepoFileWrite};
 pub use setup::SetupState;
 pub use system::{StoredSystemSetting, UserAccess};
 pub use secrets::{KEY_FILE_NAME as SECRET_KEY_FILE_NAME, MIN_MASTER_KEY_CHARS};
 use secrets::SecretBox;
+
+/// The database file inside an environment folder.
+const DATABASE_FILE: &str = "repomemo.sqlite";
+static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
 
 /// How long SQLite waits for a competing writer before failing with
 /// `database is locked`. Background indexing, embedding and syncs write
@@ -635,7 +641,7 @@ impl StorageEngine {
 
         let secrets = SecretBox::load(&config.data_dir, config.master_key.as_deref())?;
 
-        let db_path = config.data_dir.join("repomemo.sqlite");
+        let db_path = config.data_dir.join(DATABASE_FILE);
         // WAL with `synchronous = NORMAL` never corrupts the database; at worst
         // the last transactions before a power loss are rolled back.
         let options = SqliteConnectOptions::new()
@@ -651,7 +657,7 @@ impl StorageEngine {
             .connect_with(options)
             .await?;
 
-        sqlx::migrate!("./migrations").run(&pool).await?;
+        MIGRATOR.run(&pool).await?;
 
         let engine = Self {
             pool,
@@ -667,6 +673,32 @@ impl StorageEngine {
             tracing::info!(count = sealed, "Encrypted AI provider API keys stored in plain text");
         }
         Ok(engine)
+    }
+
+    /// Folds the write-ahead log back and closes every connection, so the
+    /// environment folder can be left, moved or attached again. Clones of
+    /// this engine fail afterwards.
+    pub async fn close(&self) {
+        if let Err(error) = self.optimize().await {
+            tracing::warn!(error = %error, "Could not fold the write-ahead log before closing");
+        }
+        self.pool.close().await;
+    }
+
+    /// Ends every session of every user (access tokens stop being accepted,
+    /// refresh tokens are revoked). Returns how many accounts were affected.
+    pub async fn end_all_sessions(&self) -> Result<u64> {
+        let mut tx = self.pool.begin().await?;
+        let accounts = sqlx::query("UPDATE users SET session_version = session_version + 1")
+            .execute(&mut *tx)
+            .await?
+            .rows_affected();
+        sqlx::query("UPDATE refresh_tokens SET revoked_at = ?1 WHERE revoked_at IS NULL")
+            .bind(Utc::now().to_rfc3339())
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        Ok(accounts)
     }
 
     /// Checks that the database answers, for readiness probes.
