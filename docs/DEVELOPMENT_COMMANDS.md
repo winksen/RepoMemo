@@ -95,6 +95,36 @@ workspace setup, evidence, indexing, retrieval, team memory, and workspace
 membership management. For the membership folder, register the teammate first,
 then set its email in the `memberEmail` collection variable.
 
+## Open The Admin Console In A Terminal
+
+With the API running, system and app administrators can open the same console
+as System › Console in the web app, with its logo, history, Tab completion and
+usage hints:
+
+```powershell
+npm run console
+```
+
+This is `cargo run -q -p repomemo-console`. It asks for an email and password
+(hidden) and keeps the session in memory only; earlier lines are kept in
+`~/.repomemo/console-history.txt`. With a command it runs it once and exits,
+which suits scripts (`--json` prints the raw answer):
+
+```powershell
+npm run console -- status
+npm run console -- jobs list --status failed --json
+```
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `--server` or `REPOMEMO_SERVER_URL` | `http://127.0.0.1:3020` | The server to talk to. |
+| `--email` or `REPOMEMO_EMAIL` | asked | The account to sign in with; the password is always asked for. |
+| `REPOMEMO_TOKEN` | unset | An access token to use instead of signing in, for scripts. |
+| `NO_COLOR` | unset | Any value turns colours off. |
+
+Exit codes: `0` done, `1` the server refused the command, `2` sign-in or
+connection problem.
+
 ### Optional server settings
 
 Every setting below has a safe default; set only what you need. Invalid values

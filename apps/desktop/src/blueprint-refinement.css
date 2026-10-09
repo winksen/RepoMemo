@@ -1091,6 +1091,37 @@ td > .rm-system-tag { margin-left: 0; }
 .rm-system-log li.level-error .rm-system-log-level { color: var(--color-danger); }
 .rm-system-log-message { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
 .rm-system-log-message small { color: var(--color-text-muted); font-family: var(--font-mono); }
+
+/* System › Console. A real monospace face: columns of ids and values must line up. */
+.rm-console { --console-font: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace; display: grid; gap: 10px; min-width: 0; }
+.rm-console code { font-family: var(--console-font); font-size: 12px; }
+.rm-console-screen { display: grid; align-content: start; gap: 14px; min-height: 280px; max-height: min(62vh, 720px); overflow: auto; padding: 14px 16px; color: var(--color-text); background: var(--color-code-surface); border: 1px solid var(--color-border); border-radius: 8px; font-family: var(--console-font); font-size: 12.5px; line-height: 1.5; cursor: text; }
+.rm-console-entry { display: grid; gap: 6px; min-width: 0; }
+.rm-console-welcome { display: grid; gap: 4px; min-width: 0; }
+.rm-console-welcome p { margin: 0; overflow-wrap: anywhere; }
+/* The shared logo, 72 columns of box-drawing characters: never wrapped, scrolled on narrow screens. */
+.rm-console-banner { margin: 0 0 6px; overflow-x: auto; color: var(--color-accent); font-family: var(--console-font); font-size: 11px; line-height: 1; white-space: pre; }
+.rm-console-line { display: flex; align-items: center; gap: 6px; margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.rm-console-line svg { flex: none; color: var(--color-accent); }
+.rm-console-summary, .rm-console-dry-run, .rm-console-error, .rm-console-muted { margin: 0; overflow-wrap: anywhere; }
+.rm-console-muted { display: flex; align-items: center; gap: 6px; color: var(--color-text-muted); }
+.rm-console-error { color: var(--color-danger); }
+.rm-console-dry-run { color: var(--color-warning); }
+.rm-console-tag { display: inline-block; margin-right: 8px; padding: 0 6px; color: var(--color-warning); background: var(--color-warning-soft); border-radius: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.rm-console-json { margin: 0; padding: 10px 12px; overflow: auto; max-height: 360px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 6px; font-family: var(--console-font); font-size: 12px; white-space: pre; }
+.rm-console-facts { max-width: 720px; font-family: var(--console-font); }
+.rm-console-facts > div { padding: 4px 0; font-size: 12.5px; }
+.rm-console-table table { font-family: var(--console-font); font-size: 12px; }
+.rm-console-table th, .rm-console-table td { padding: 5px 10px 5px 0; white-space: nowrap; max-width: 420px; overflow: hidden; text-overflow: ellipsis; }
+.rm-console-prompt { display: flex; align-items: center; gap: 8px; padding: 0 12px; background: var(--color-surface); border: 1px solid var(--color-border-strong); border-radius: 8px; }
+.rm-console-prompt:focus-within { border-color: var(--color-focus); box-shadow: 0 0 0 3px var(--color-accent-soft); }
+.rm-console-prompt svg { flex: none; color: var(--color-accent); }
+.rm-console-input { flex: 1; min-width: 0; padding: 11px 0; color: var(--color-text); background: transparent; border: 0; outline: 0; font-family: var(--console-font); font-size: 13px; }
+.rm-console-hint { min-height: 1.4em; margin: -4px 0 0; color: var(--color-text-muted); font-family: var(--console-font); font-size: 12px; overflow-wrap: anywhere; }
+.rm-console-suggestions { display: flex; flex-wrap: wrap; gap: 6px; }
+.rm-console-suggestion { padding: 3px 9px; color: var(--color-text); background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: 999px; font-family: var(--console-font); font-size: 12px; cursor: pointer; }
+.rm-console-suggestion:hover { background: var(--color-surface-hover); }
+.rm-console-suggestion:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
 @media (max-width: 760px) {
   .rm-system-setting { grid-template-columns: 1fr; }
   .rm-system-setting-control { justify-content: flex-start; }

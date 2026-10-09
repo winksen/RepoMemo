@@ -197,6 +197,7 @@ A **System** button in the header opens `/system`, with these pages:
 | **Logs** | What is being recorded, then the events: live (recent, following as they arrive) or any earlier day kept in the log files, filtered by kind of log, workspace, level and text. A day's file can be downloaded |
 | **Jobs & maintenance** | Jobs across every workspace (stop a running one) and maintenance: last run, next run, what it cleaned, and **Run maintenance now** |
 | **Audit trail** | What system administrators did: role changes, settings, ended sessions, maintenance runs |
+| **Console** | A command line to the server for administrators who prefer typing: `status`, `jobs list --status failed`, `logs --category security --level warn`, `settings set log_http_level debug`, `users unlock alice@example.com`, `maintenance run`, and `help` for the rest. Answers show as tables or facts (`--json` for the raw answer). Anything that changes something only says what it **would** do until the line ends with `--yes`; changes are then recorded in the audit trail with the exact line. Up/Down recall earlier lines, Tab completes. The same console opens in a terminal with `repomemo-console` (`npm run console`): same logo, same commands, a hidden password prompt, and single commands for scripts (`repomemo-console jobs list --status failed`). Detaching the environment and granting the system administrator role stay on their pages |
 
 ---
 

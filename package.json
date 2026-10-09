@@ -1,6 +1,6 @@
 {
   "name": "repomemo",
-  "version": "0.1.58",
+  "version": "0.1.60",
   "private": true,
   "description": "Local-first technical memory workspace for teams.",
   "workspaces": [
@@ -12,7 +12,8 @@
     "web:dev": "npm --workspace @repomemo/desktop run dev",
     "build": "npm --workspace @repomemo/desktop run build",
     "icons": "node scripts/create-tauri-icon.mjs",
-    "typecheck": "npm --workspace @repomemo/desktop run typecheck"
+    "typecheck": "npm --workspace @repomemo/desktop run typecheck",
+    "console": "cargo run -q -p repomemo-console --"
   },
   "engines": {
     "node": ">=22",

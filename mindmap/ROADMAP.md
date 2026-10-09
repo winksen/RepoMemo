@@ -102,6 +102,18 @@ A git repository is connected as a **living source** instead of being uploaded f
 
 ---
 
+## 🔄 In progress: admin console
+
+A command console for technical administrators who would rather type than click: **System › Console** in the web app and the **`repomemo-console`** terminal client (`npm run console`), with the same logo and the same commands, both backed by `/v1/system/console`. Every command reuses an existing System handler, so rights and audit records are unchanged. Design and open questions: [technical/admin-console.md](technical/admin-console.md).
+
+- [x] **First slice.** Server-side parser and catalog; `help`, `status`, `jobs list/cancel`, `settings list/set/reset`, `logs`, `users list/unlock/signout`, `maintenance status/run`; dry runs without `--yes`; `console_command` audit events; the web prompt with history, Tab completion and table/facts/JSON answers.
+- [ ] **Live logs.** `logs --follow` over a system-wide event stream.
+- [ ] **Workspace commands.** `workspace reindex`, `repo sync`, `embeddings rebuild`, once the role rule for app administrators is decided.
+- [ ] **Personal admin tokens** so scripts do not need a browser access token.
+- [x] **Terminal client.** `repomemo-console`: logo, sign-in with a hidden password, history, Tab completion, usage hints, coloured tables, and a single-command mode with exit codes for scripts.
+
+---
+
 ## 🔜 Next (proposed priorities)
 
 These items come from the gaps and risks recorded in the mindmaps. The order is a proposal and is open for discussion.

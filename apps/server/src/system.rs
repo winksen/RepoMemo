@@ -5,6 +5,8 @@
 //! Every route here requires a system administrator. Changes are recorded in
 //! the durable system audit trail and logged under the `audit` target.
 
+pub(crate) mod console;
+
 use std::{
     collections::{BTreeMap, HashMap, VecDeque},
     net::SocketAddr,

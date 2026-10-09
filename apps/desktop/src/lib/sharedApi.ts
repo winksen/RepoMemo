@@ -3,6 +3,8 @@ import type {
   SetupCheck,
   AiMinRole,
   AiPolicy,
+  ConsoleResponse,
+  ConsoleWelcome,
   SystemAuditEvent,
   SystemJob,
   SystemLogFiles,
@@ -1028,6 +1030,19 @@ export function getSystemMaintenance(accessToken: string): Promise<MaintenanceSt
 
 export function runSystemMaintenance(accessToken: string): Promise<MaintenanceStatus> {
   return request<MaintenanceStatus>("/v1/system/maintenance/run", { method: "POST" }, accessToken);
+}
+
+/** What the admin console shows when it opens: logo, greeting and the commands, for help and completion. */
+export function getConsoleWelcome(accessToken: string): Promise<ConsoleWelcome> {
+  return request<ConsoleWelcome>("/v1/system/console", {}, accessToken);
+}
+
+/** Runs one admin console line, such as `jobs list --status failed`. */
+export function runConsoleCommand(accessToken: string, command: string): Promise<ConsoleResponse> {
+  return request<ConsoleResponse>("/v1/system/console", {
+    method: "POST",
+    body: JSON.stringify({ command }),
+  }, accessToken);
 }
 
 // Profile pictures. <img> cannot send the bearer token, so pictures are fetched

@@ -1,6 +1,6 @@
 [package]
 name = "repomemo-desktop"
-version = "0.1.0"
+version.workspace = true
 description = "RepoMemo desktop app"
 edition.workspace = true
 license.workspace = true

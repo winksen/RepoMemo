@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+pub mod console;
+
 /// Temporary server-side identity shape. Production authentication replaces
 /// the dummy session issuer, not this client-facing session contract.
 #[derive(Debug, Clone, Serialize, Deserialize)]

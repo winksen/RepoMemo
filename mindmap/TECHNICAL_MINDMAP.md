@@ -18,7 +18,7 @@ mindmap
       JWT in sessionStorage
     HTTP API
       Axum 0.8 server
-      86 operations under v1
+      88 operations under v1
       JWT HS256 extractor with session versions
       Role guards per request
       Workspace AI policy and quotas
@@ -241,7 +241,7 @@ Other rules:
 
 ---
 
-## 5. HTTP API reference (86 operations)
+## 5. HTTP API reference (88 operations)
 
 Guard legend: **pub** = no auth, **auth** = any valid JWT, **R/W/A/O** = workspace read / write / admin / owner, **oR/oA/oO** = organization read / admin / owner. "→ activity" means the call records a `workspace_activity` row and so emits an SSE `activity` event.
 
@@ -289,6 +289,8 @@ Every route requires a system administrator (**S**); changes are recorded in `sy
 | GET | `/v1/system/jobs?status&limit` | S | jobs across workspaces, with workspace names |
 | GET | `/v1/system/maintenance` | S | maintenance status |
 | POST | `/v1/system/maintenance/run` | S | runs a full pass now; 409 while one runs |
+| POST | `/v1/system/console` | S | `{command}` → `{command, summary, dry_run, view, data}`. Runs one console line through the matching System handler (same rights, same audit); changes are dry runs without `--yes`, and an applied change also records `console_command`. 400 for usage. See [admin-console.md](technical/admin-console.md) |
+| GET | `/v1/system/console` | S | what a console shows when it opens, for the web page and the terminal client alike: `banner`, `tagline`, `tips`, `version`, `user`, `role` and the command catalog (`name`, `usage`, `summary`, `changes`) |
 | GET | `/v1/session` | auth | the user and their workspace memberships |
 | GET, PUT | `/v1/profile` | auth | GET includes a 365-day `activity_by_day` |
 | POST | `/v1/profile/password` | auth | 200 `TokenResponse` for this device; every other session ends. Requires `current_password` |
@@ -653,7 +655,8 @@ Setup events are audited (`server_setup_admin_created`, `server_setup_completed`
   - *Files.* With file output on, a dedicated thread appends JSON lines to `<data dir>/logs/repomemo-YYYY-MM-DD.jsonl` (UTC), flushing every second, so request handling never waits on the disk. Files are always JSON lines whatever the console format, so the server can search them. Maintenance deletes files older than the retention.
   - *Live changes.* The logging settings are part of the run-time settings; every change re-applies the filter, the console format and file output immediately. The module never logs through tracing itself (problems go to standard error), so the sinks cannot feed back into themselves.
 - **Telemetry.** A middleware counts requests by outcome, keeps per-minute counts for an hour, and notes each client (origin, `X-RepoMemo-Client`, user agent summarised as "Browser on OS", last address; at most 500, forgotten after 24 h). Health checks are counted but not listed. Open event streams are counted while they live.
-- **Audit.** `system_audit_events` records role grants and removals (including at startup and on first registration), settings changes and resets, ended sessions, lifted lockouts and manual maintenance, with the actor.
+- **Audit.** `system_audit_events` records role grants and removals (including at startup and on first registration), settings changes and resets, ended sessions, lifted lockouts and manual maintenance, with the actor. Changes made from the admin console add a `console_command` event holding the exact line.
+- **Admin console** ([system/console.rs](../apps/server/src/system/console.rs), [technical/admin-console.md](technical/admin-console.md)). A fixed catalog of commands parsed on the server (words, quoted values, `--flag value`, `--yes`). Each command calls an existing System handler, or the workspace job cancel, with the caller's identity, so it adds no rights and no business logic. Unknown options are refused rather than ignored. Detaching the environment and granting the system administrator role are left to the pages. The logo and opening lines live in `repomemo_domain::console`, so the terminal client ([apps/console](../apps/console/src/main.rs), `repomemo-console`: `reqwest`, `rustyline` for history and completion, `rpassword`) and the web page show the same text.
 
 ---
 
@@ -751,3 +754,4 @@ This file is the root of the technical mindmap. Each branch can grow into its ow
 | Operations: config, deploy, backup | `technical/operations.md` |
 | Risks and tech-debt register | `technical/tech-debt.md` |
 | Repository sources (git) | ✅ [technical/repository-sources.md](technical/repository-sources.md) |
+| Admin console (System › Console) | 🔄 [technical/admin-console.md](technical/admin-console.md) |

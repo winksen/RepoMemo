@@ -1071,6 +1071,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route("/v1/system/jobs", get(system::jobs))
         .route("/v1/system/maintenance", get(system::get_maintenance))
         .route("/v1/system/maintenance/run", post(system::run_maintenance))
+        .route("/v1/system/console", get(system::console::welcome).post(system::console::run))
         .route("/v1/session", get(session))
         .route("/v1/profile", get(get_profile).put(update_profile))
         .route("/v1/profile/password", post(change_profile_password))
@@ -8125,6 +8126,57 @@ mod tests {
         let actions = audit.as_array().unwrap().iter().map(|event| event["action"].as_str().unwrap().to_owned()).collect::<Vec<_>>();
         for expected in ["system_admin_granted", "system_settings_changed", "system_setting_reset", "user_sessions_ended", "system_admin_revoked", "maintenance_run"] {
             assert!(actions.iter().any(|action| action == expected), "{expected} missing from {actions:?}");
+        }
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn the_admin_console_runs_commands_with_the_pages_rights() {
+        let data_dir = temp_data_dir("console");
+        let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+        let (admin, _) = register_account(&app, "console-admin@example.com").await;
+        let (member, _) = register_account(&app, "console-member@example.com").await;
+        let run = |who: &str, command: &str| {
+            let app = app.clone();
+            let request = json_request("POST", "/v1/system/console", who, json!({ "command": command }));
+            async move { app.oneshot(request).await.unwrap() }
+        };
+
+        assert_eq!(run(&member, "status").await.status(), 403, "administrators only");
+        let welcome = response_json(app.clone().oneshot(auth_request("GET", "/v1/system/console", &admin)).await.unwrap()).await;
+        assert!(welcome["banner"].as_str().unwrap().contains("██"));
+        assert_eq!(welcome["role"], "system administrator");
+        assert!(welcome["commands"].as_array().unwrap().iter().any(|command| command["name"] == "jobs list"));
+
+        let status = response_json(run(&admin, "status").await).await;
+        assert_eq!((status["command"].clone(), status["view"]["kind"].clone()), (json!("status"), json!("facts")));
+        let jobs = response_json(run(&admin, "jobs").await).await;
+        assert_eq!(jobs["command"], "jobs list");
+        assert!(jobs["data"].is_array());
+
+        // A change is a dry run until confirmed, then goes through the settings handler.
+        let preview = response_json(run(&admin, "settings set log_http_level debug").await).await;
+        assert_eq!(preview["dry_run"], true);
+        let settings = response_json(run(&admin, "settings list").await).await;
+        let http = |settings: &Value| settings["data"].as_array().unwrap().iter().find(|row| row["key"] == "log_http_level").unwrap()["value"].clone();
+        assert_eq!(http(&settings), "warn", "a dry run changes nothing");
+        let applied = response_json(run(&admin, "settings set log_http_level debug --yes").await).await;
+        assert_eq!(applied["dry_run"], false);
+        assert_eq!(http(&response_json(run(&admin, "settings").await).await), "debug");
+        assert_eq!(run(&admin, "settings set log_http_level loud --yes").await.status(), 400, "the handler's validation applies");
+        assert_eq!(run(&admin, "settings set no_such_key 1 --yes").await.status(), 404);
+
+        let unlock = response_json(run(&admin, "users unlock CONSOLE-MEMBER@example.com --yes").await).await;
+        assert_eq!(unlock["data"]["cleared"], 0);
+        assert_eq!(run(&admin, "users unlock nobody@example.com --yes").await.status(), 404);
+
+        let audit = response_json(app.clone().oneshot(auth_request("GET", "/v1/system/audit", &admin)).await.unwrap()).await;
+        let actions = audit.as_array().unwrap().iter().map(|event| event["action"].as_str().unwrap()).collect::<Vec<_>>();
+        assert_eq!(actions.iter().filter(|action| **action == "console_command").count(), 2, "{actions:?}");
+        assert!(actions.contains(&"system_settings_changed") && actions.contains(&"user_unlocked"), "{actions:?}");
+
+        for (bad, why) in [("", "empty"), ("rm -rf /", "unknown"), ("jobs list --stauts failed", "unknown option"), ("logs --level loud", "level"), ("logs --grep \"open", "quote")] {
+            assert_eq!(run(&admin, bad).await.status(), 400, "{why}");
         }
         let _ = std::fs::remove_dir_all(data_dir);
     }

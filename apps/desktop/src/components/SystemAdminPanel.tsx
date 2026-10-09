@@ -21,12 +21,14 @@ import {
   IconServerCog as ServerCog,
   IconShieldCheck as ShieldCheck,
   IconShieldOff as ShieldOff,
+  IconTerminal2 as Terminal,
   IconTool as Tool,
   IconUser as UserIcon,
   IconUserCog as UserCog,
   IconUsers as Users,
   IconWorld as World,
 } from "@tabler/icons-react";
+import { SystemConsole } from "./SystemConsole";
 import { UserAvatar } from "./UserAvatar";
 import {
   cancelSharedJob,
@@ -74,7 +76,7 @@ import { Dropdown } from "./ui/dropdown";
 import { Input } from "./ui/input";
 import { showToast } from "./ui/toast";
 
-export const SYSTEM_SECTIONS = ["overview", "usage", "users", "settings", "logs", "jobs", "audit"] as const;
+export const SYSTEM_SECTIONS = ["overview", "usage", "users", "settings", "logs", "jobs", "audit", "console"] as const;
 export type SystemSection = typeof SYSTEM_SECTIONS[number];
 
 const SECTION_LABELS: Record<SystemSection, { label: string; icon: ReactNode }> = {
@@ -85,6 +87,7 @@ const SECTION_LABELS: Record<SystemSection, { label: string; icon: ReactNode }> 
   logs: { label: "Logs", icon: <FileText size={16} /> },
   jobs: { label: "Jobs & maintenance", icon: <Tool size={16} /> },
   audit: { label: "Audit trail", icon: <ClipboardList size={16} /> },
+  console: { label: "Console", icon: <Terminal size={16} /> },
 };
 
 /** Tabs of the System area, shown in the layout's navigation slot. */
@@ -107,6 +110,7 @@ const SECTION_INTRO: Record<SystemSection, string> = {
   logs: "Server log events: recent ones kept in memory, and earlier days from the log files. What is recorded is set under Settings › Logging.",
   jobs: "Background jobs across every workspace, and the maintenance that keeps the server tidy.",
   audit: "What system administrators did, kept durably.",
+  console: "A command line to this server for technical administrators: the same actions as these pages, typed.",
 };
 
 /** The System area for system administrators. */
@@ -128,6 +132,7 @@ export function SystemAdminPanel({ accessToken, onNavigateSection, onOpenWorkspa
     {section === "logs" ? <LogsSection accessToken={accessToken} onOpenSettings={() => onNavigateSection("settings")} workspaces={workspaces} /> : null}
     {section === "jobs" ? <JobsSection accessToken={accessToken} /> : null}
     {section === "audit" ? <AuditSection accessToken={accessToken} /> : null}
+    {section === "console" ? <SystemConsole accessToken={accessToken} /> : null}
   </section>;
 }
 

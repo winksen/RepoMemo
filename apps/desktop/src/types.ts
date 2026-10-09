@@ -1114,6 +1114,42 @@ export interface SystemJob extends IndexingJobStatus {
   workspace_name: string | null;
 }
 
+/** One command of the admin console's catalog. */
+export interface ConsoleCommand {
+  name: string;
+  usage: string;
+  summary: string;
+  /** Changes something: a dry run unless the line has `--yes`. */
+  changes: boolean;
+}
+
+/** How to show a console answer's `data`. */
+export type ConsoleView =
+  | { kind: "table"; columns: string[] }
+  /** `data` is `[label, value]` pairs, in order. */
+  | { kind: "facts" }
+  | { kind: "text" };
+
+/** What a console shows when it opens; the terminal client gets the same. */
+export interface ConsoleWelcome {
+  banner: string;
+  tagline: string;
+  tips: string;
+  version: string;
+  user: string;
+  role: string;
+  commands: ConsoleCommand[];
+}
+
+export interface ConsoleResponse {
+  command: string;
+  summary: string;
+  /** Nothing changed because the line had no `--yes`. */
+  dry_run: boolean;
+  view: ConsoleView;
+  data: unknown;
+}
+
 // First-run server setup
 
 export interface ServerSetupStatus {
