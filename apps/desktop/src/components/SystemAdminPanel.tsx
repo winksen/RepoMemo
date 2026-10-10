@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import type { ReactNode } from "react";
 import {
   IconActivity as Activity,
   IconAdjustments as Adjustments,
+  IconAlertCircle as AlertCircle,
+  IconCircleCheck as CircleCheck,
   IconChartBar as ChartBar,
   IconClipboardList as ClipboardList,
   IconBuildingCommunity as Building,
@@ -75,6 +78,7 @@ import { Dialog, DialogCancel } from "./ui/dialog";
 import { Dropdown } from "./ui/dropdown";
 import { Input } from "./ui/input";
 import { showToast } from "./ui/toast";
+import { useLiveEventHub, useLiveEvents } from "../lib/liveEvents";
 
 export const SYSTEM_SECTIONS = ["overview", "usage", "users", "settings", "logs", "jobs", "audit", "console"] as const;
 export type SystemSection = typeof SYSTEM_SECTIONS[number];
@@ -141,7 +145,7 @@ function errorMessage(error: unknown, fallback: string): string {
 }
 
 /** Loads data, reloads on demand and, optionally, every `refreshMs`. */
-function useSystemData<T>(load: () => Promise<T>, dependencies: unknown[], refreshMs?: number): [T | null, boolean, () => Promise<void>] {
+function useSystemData<T>(load: () => Promise<T>, dependencies: unknown[], refreshMs?: number): [T | null, boolean, () => Promise<void>, Dispatch<SetStateAction<T | null>>] {
   const [data, setData] = useState<T | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   async function reload() {
@@ -157,7 +161,7 @@ function useSystemData<T>(load: () => Promise<T>, dependencies: unknown[], refre
     return () => window.clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, dependencies);
-  return [data, isLoading, reload];
+  return [data, isLoading, reload, setData];
 }
 
 function formatBytes(bytes: number): string {
@@ -466,7 +470,7 @@ function UsersSection({ accessToken, session }: { accessToken: string; session: 
 
 /** The environment folder this server is attached to, and the way to detach it (system administrators only). */
 function EnvironmentGroup({ accessToken }: { accessToken: string }) {
-  const [platform, setPlatform] = useState<{ environment: string | null; folder: string } | null>(null);
+  const [platform, setPlatform] = useState<{ environment: string | null; folder: string; pinned_environment: string | null } | null>(null);
   const [isConfirming, setIsConfirming] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
   useEffect(() => { getPlatformStatus().then(setPlatform).catch(() => undefined); }, []);
@@ -487,8 +491,11 @@ function EnvironmentGroup({ accessToken }: { accessToken: string }) {
   return <section className="shared-settings-group rm-environment-card">
     <div className="shared-panel-heading"><div><Unplug size={18} /><h2>Environment</h2></div><span>{platform?.environment ?? "—"}</span></div>
     <p className="shared-muted-copy">All data of this server lives in <code>{platform ? `${platform.folder}/${platform.environment ?? ""}` : "its environment folder"}</code>. Detaching signs everyone out, stops background work and closes the database. The server then waits for an environment to be chosen again, using the code printed on its console. Nothing is deleted.</p>
+    {platform?.pinned_environment
+      ? <p className="rm-platform-note" role="note"><AlertCircle size={16} /><span>This server starts with <code>{platform.pinned_environment}</code>, set by <code>REPOMEMO_SERVER_DATA_DIR</code>. Another environment chosen after detaching is used only until the server restarts, then it goes back to <code>{platform.pinned_environment}</code>.</span></p>
+      : <p className="rm-platform-note" role="note"><CircleCheck size={16} /><span>This server remembers the environment chosen in the web app and attaches it again when it restarts. After detaching, the next start shows the environment menu until one is chosen.</span></p>}
     <div><Button disabled={isBusy || !platform?.environment} onClick={() => setIsConfirming(true)} type="button" variant="secondary"><Unplug size={16} /> Detach environment</Button></div>
-    <Dialog description="Everyone, you included, is signed out at once and the server stops serving this environment until an administrator with access to the server console attaches one again." footer={<><DialogCancel onClick={() => setIsConfirming(false)} /><Button disabled={isBusy} onClick={() => void detach()} type="button" variant="main">{isBusy ? <Loader className="spin" size={16} /> : null}Detach environment</Button></>} onClose={() => setIsConfirming(false)} open={isConfirming} title={`Detach ${platform?.environment ?? "the environment"}?`} />
+    <Dialog description={<>Everyone, you included, is signed out at once and the server stops serving this environment until an administrator with access to the server console attaches one again.{platform?.pinned_environment ? <> <strong>The switch lasts only until the next restart:</strong> this server starts with <code>{platform.pinned_environment}</code> (<code>REPOMEMO_SERVER_DATA_DIR</code>), so a restart goes back to it whatever is chosen now.</> : <> The environment chosen next is remembered for later restarts.</>}</>} footer={<><DialogCancel onClick={() => setIsConfirming(false)} /><Button disabled={isBusy} onClick={() => void detach()} type="button" variant="main">{isBusy ? <Loader className="spin" size={16} /> : null}Detach environment</Button></>} onClose={() => setIsConfirming(false)} open={isConfirming} title={`Detach ${platform?.environment ?? "the environment"}?`} />
   </section>;
 }
 
@@ -660,7 +667,26 @@ function LogsSection({ accessToken, onOpenSettings, workspaces }: { accessToken:
 
 function JobsSection({ accessToken }: { accessToken: string }) {
   const [status, setStatus] = useState("all");
-  const [jobs, isLoading, reload] = useSystemData<SystemJob[]>(() => listSystemJobs(accessToken, status === "all" ? undefined : status), [accessToken, status], 10_000);
+  // Job changes in every workspace arrive on the System event stream; the
+  // list then refreshes only now and then, as a safety net.
+  const liveHub = useLiveEventHub("/v1/system/events", accessToken);
+  const [jobs, isLoading, reload, setJobs] = useSystemData<SystemJob[]>(() => listSystemJobs(accessToken, status === "all" ? undefined : status), [accessToken, status, liveHub.connected], liveHub.connected ? 60_000 : 10_000);
+  const isLive = useLiveEvents((event) => {
+    if (event.type === "resync") { void reload(); return; }
+    if (event.type !== "job") return;
+    const { job } = event;
+    const matches = status === "all" || job.status === status;
+    const known = jobs?.some((entry) => entry.id === job.id) ?? false;
+    const workspaceName = jobs?.find((entry) => entry.workspace_id === job.workspace_id)?.workspace_name;
+    // A job of a workspace not listed yet needs its name from the server.
+    if (!known && matches && workspaceName === undefined) { void listSystemJobs(accessToken, status === "all" ? undefined : status).then(setJobs).catch(() => undefined); return; }
+    setJobs((current) => {
+      if (!current) return current;
+      const index = current.findIndex((entry) => entry.id === job.id);
+      if (index >= 0) return matches ? current.map((entry, position) => position === index ? { ...entry, ...job } : entry) : current.filter((_, position) => position !== index);
+      return matches ? [{ ...job, workspace_name: workspaceName ?? null }, ...current].slice(0, 100) : current;
+    });
+  }, liveHub);
   const [maintenance, setMaintenance] = useState<MaintenanceStatus | null>(null);
   useEffect(() => { getSystemOverview(accessToken).then((overview) => setMaintenance(overview.background.maintenance)).catch(() => undefined); }, [accessToken]);
 
@@ -672,7 +698,7 @@ function JobsSection({ accessToken }: { accessToken: string }) {
   return <>
     <MaintenancePanel accessToken={accessToken} onChanged={setMaintenance} status={maintenance} />
     <section className="shared-settings-group">
-      <div className="shared-panel-heading"><div><Activity size={18} /><h2>Jobs</h2></div><span>newest first · refreshes every 10 seconds</span></div>
+      <div className="shared-panel-heading"><div><Activity size={18} /><h2>Jobs</h2></div><span>{isLive ? "newest first · live" : "newest first · refreshes every 10 seconds"}</span></div>
       <div className="rm-system-toolbar">
         <label className="rm-system-inline">Status<Dropdown aria-label="Job status" onValueChange={setStatus} options={[{ label: "All", value: "all" }, { label: "Running", value: "running" }, { label: "Failed", value: "failed" }, { label: "Completed", value: "completed" }, { label: "Cancelled", value: "cancelled" }]} value={status} /></label>
         <RefreshButton isLoading={isLoading} onClick={() => void reload()} />

@@ -6,6 +6,7 @@ import {
   IconBrain as Brain,
   IconFileSearch as FileSearch,
   IconFileText as FileText,
+  IconHistory as History,
   IconLayoutDashboard as Dashboard,
   IconLoader2 as Loader,
   IconMessage as Message,
@@ -90,6 +91,7 @@ export function AssistantPanel({ accessToken, onOpenArtifact, workspaceId }: { a
   const [chatDialog, setChatDialog] = useState<ChatDialog | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [isSavingChat, setIsSavingChat] = useState(false);
+  const [showChats, setShowChats] = useState(false);
   // Bumped whenever the visible chat changes, so a reply that arrives after
   // the user moved on is not written into the wrong thread.
   const view = useRef(0);
@@ -242,12 +244,16 @@ export function AssistantPanel({ accessToken, onOpenArtifact, workspaceId }: { a
 
   return <section className="shared-assistant" aria-label="Workspace assistant">
     {dialog}
-    <nav className="shared-assistant-chats" aria-label="Assistant chats">
-      <Button className="shared-assistant-new-chat" disabled={isBusy} onClick={startNewChat} type="button" variant="secondary"><Plus size={15} /> New chat</Button>
+    <div className="shared-assistant-toolbar">
+      <strong title={activeConversation?.title ?? "New chat"}>{activeConversation?.title ?? "New chat"}</strong>
+      <Button aria-expanded={showChats} aria-label="Chat history" onClick={() => setShowChats((current) => !current)} title="Chat history" type="button" variant="secondary"><History size={16} /></Button>
+      <Button aria-label="New chat" disabled={isBusy} onClick={() => { startNewChat(); setShowChats(false); }} title="New chat" type="button" variant="secondary"><Plus size={16} /></Button>
+    </div>
+    {showChats ? <nav className="shared-assistant-chats" aria-label="Assistant chats">
       {conversations.length ? <ul>{conversations.map((conversation) => {
         const isActive = conversation.id === activeId;
         return <li className={isActive ? "active" : ""} key={conversation.id}>
-          <button aria-current={isActive ? "page" : undefined} disabled={isBusy} onClick={() => void openChat(conversation.id)} title={conversation.title} type="button">
+          <button aria-current={isActive ? "page" : undefined} disabled={isBusy} onClick={() => { setShowChats(false); void openChat(conversation.id); }} title={conversation.title} type="button">
             <Message size={15} />
             <span><strong>{conversation.title}</strong><small>{formatChatTime(conversation.updated_at)} · {conversation.turn_count} {conversation.turn_count === 1 ? "message" : "messages"}</small></span>
           </button>
@@ -257,9 +263,8 @@ export function AssistantPanel({ accessToken, onOpenArtifact, workspaceId }: { a
           ]} label={`Actions for chat ${conversation.title}`} />
         </li>;
       })}</ul> : <p className="shared-assistant-chats-empty">Your chats appear here. Only you can see them.</p>}
-    </nav>
+    </nav> : null}
     <div className="shared-assistant-main">
-      <div className="shared-assistant-thread-title"><strong>{activeConversation?.title ?? "New chat"}</strong></div>
       <div className="shared-assistant-thread" role="log" aria-live="polite" aria-busy={isBusy || isLoadingChat}>
         {isLoadingChat ? <p className="shared-assistant-pending"><Loader className="spin" size={16} /> Loading chat…</p> : turns.length ? turns.map((turn) => <article className="shared-assistant-turn" key={turn.key}>
           <div className="shared-assistant-request"><p>{turn.label}</p>{turn.request.capability ? <span>{capabilityLabel(capabilities, turn.request.capability)}</span> : null}</div>

@@ -937,6 +937,22 @@ export function cancelSharedJob(accessToken: string, jobId: string): Promise<Ind
   return request<IndexingJobStatus>(`/v1/jobs/${jobId}/cancel`, { method: "POST" }, accessToken);
 }
 
+export function listSharedWorkspaceJobs(accessToken: string, workspaceId: string, status?: string): Promise<IndexingJobStatus[]> {
+  const query = status ? `?status=${encodeURIComponent(status)}` : "";
+  return request<IndexingJobStatus[]>(`/v1/workspaces/${workspaceId}/jobs${query}`, {}, accessToken);
+}
+
+/** Opens a server-sent-events stream such as `/v1/workspaces/{id}/events`.
+ *  Uses fetch rather than `EventSource`, which cannot send the auth header;
+ *  an expired token is refreshed like any other request. */
+export function openSharedEventStream(path: string, accessToken: string, signal: AbortSignal): Promise<Response> {
+  return authFetch(`${API_URL}${path}`, {
+    headers: { Accept: "text/event-stream", Authorization: `Bearer ${accessToken}` },
+    cache: "no-store",
+    signal,
+  });
+}
+
 // System administration (system administrators only)
 
 export function getSystemOverview(accessToken: string): Promise<SystemOverview> {
@@ -1147,6 +1163,9 @@ export interface PlatformStatus {
   environment: string | null;
   /** The only folder environments may live in, such as "workspace-data". */
   folder: string;
+  /** The environment every start attaches (`REPOMEMO_SERVER_DATA_DIR`). Null: the
+   *  environment chosen in the web app is remembered and attached again at startup. */
+  pinned_environment: string | null;
 }
 
 export interface EnvironmentEntry {

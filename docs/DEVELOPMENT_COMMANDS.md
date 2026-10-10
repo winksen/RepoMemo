@@ -84,11 +84,19 @@ development data in an *environment* folder, always directly inside
 `workspace-data/` (git-ignored, so new projects are never tracked). Start the
 server with no `REPOMEMO_SERVER_DATA_DIR` and the web app shows a menu, unlocked
 by the code printed on the console, to create `workspace-data/<name>/` or to
-reroute to an existing one; the folder is verified first. To skip the menu set
-`REPOMEMO_SERVER_DATA_DIR=onboarding` (or `workspace-data/onboarding`): the value
-is verified at startup, and anything outside `workspace-data/`, or a folder that
-is neither empty nor a RepoMemo environment, stops the server. System
-administrators can detach the environment from System › Settings. The server
+reroute to an existing one; the folder is verified first. The choice is
+remembered in `workspace-data/.last-environment` and attached again at the next
+start; detaching it in System › Settings forgets it.
+
+To pin the server to one environment instead, set
+`REPOMEMO_SERVER_DATA_DIR=main` (or `workspace-data/main`): every start attaches
+that folder. The value is verified at startup, and anything outside
+`workspace-data/`, or a folder that is neither empty nor a RepoMemo environment,
+stops the server. A pinned server can still be detached and pointed at another
+environment from the web app, but only until it restarts; the web app warns
+about this and names the environment it will go back to. `$env:` values last
+for the PowerShell window they were set in, so a restart from the same window
+keeps the pin. The server
 exposes JWT-protected workspace routes. Import `docs/api/RepoMemo_Shared_API_v2.postman_collection.json` into
 Postman and run its numbered folders in order to exercise authentication,
 workspace setup, evidence, indexing, retrieval, team memory, and workspace

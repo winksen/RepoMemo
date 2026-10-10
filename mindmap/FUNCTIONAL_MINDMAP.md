@@ -168,6 +168,8 @@ Any signed-in user can create a new organization and becomes its owner.
 
 All data of a server lives in one **environment folder** inside `workspace-data/` (git-ignored). A server started without `REPOMEMO_SERVER_DATA_DIR` shows a menu first: enter the code from the console, then **use** an existing environment (listed with its verification: a RepoMemo environment, empty, or cannot be attached and why) or **create** a new one. Folders outside `workspace-data/` and folders that are neither empty nor RepoMemo environments are refused. A system administrator can **detach** the environment in System › Settings: everyone is signed out and the menu shows again.
 
+**Does the choice survive a restart?** If the operator does not name an environment, yes: the one chosen in the menu is attached again at every start, until it is detached. If the operator names one (`REPOMEMO_SERVER_DATA_DIR`), the server always starts with that one. It can still be detached and switched from the web app, but the switch lasts only until the next restart. The menu and the detach dialog say so and name the environment it will go back to.
+
 ## 1a. First-run setup (onboarding)
 
 The very first time a server runs, with no account yet, the web app shows a **setup page** instead of sign-in:
@@ -195,7 +197,7 @@ A **System** button in the header opens `/system`, with these pages:
 | **Users** | Every account with its role, a tree of its organizations (one line each, with its role) and under each the workspaces it belongs to with its role in each (owner, admin, member, viewer); system administrators show as **Admin of all organizations and workspaces** by inheritance, plus what they own, signed-in sessions and last connection. Make or remove system administrators (system administrators only) and **app administrators** (same System pages, but no automatic access to every organization and workspace), sign someone out everywhere, lift a sign-in lockout |
 | **Settings** | Registration, token lifetimes, sign-in protection, AI requests per person, repository check interval, maintenance and **logging**, changed at run time and kept until reset to the server default. Logging sets a level (off to trace) for each kind of log (security, workspace activity, background jobs, HTTP requests, AI providers, database, and everything else), the console format (readable text, compact text or JSON lines), whether logs are kept in daily files, and how many days those files are kept. Settings only the server's environment controls are listed read-only |
 | **Logs** | What is being recorded, then the events: live (recent, following as they arrive) or any earlier day kept in the log files, filtered by kind of log, workspace, level and text. A day's file can be downloaded |
-| **Jobs & maintenance** | Jobs across every workspace (stop a running one) and maintenance: last run, next run, what it cleaned, and **Run maintenance now** |
+| **Jobs & maintenance** | Jobs across every workspace, updated live as they start, progress and finish (stop a running one), and maintenance: last run, next run, what it cleaned, and **Run maintenance now** |
 | **Audit trail** | What system administrators did: role changes, settings, ended sessions, maintenance runs |
 | **Console** | A command line to the server for administrators who prefer typing: `status`, `jobs list --status failed`, `logs --category security --level warn`, `settings set log_http_level debug`, `users unlock alice@example.com`, `maintenance run`, and `help` for the rest. Answers show as tables or facts (`--json` for the raw answer). Anything that changes something only says what it **would** do until the line ends with `--yes`; changes are then recorded in the audit trail with the exact line. Up/Down recall earlier lines, Tab completes. The same console opens in a terminal with `repomemo-console` (`npm run console`): same logo, same commands, a hidden password prompt, and single commands for scripts (`repomemo-console jobs list --status failed`). Detaching the environment and granting the system administrator role stay on their pages |
 
@@ -265,7 +267,7 @@ Evidence is anything the team stores. Each item is called an **artifact**.
 | Method | Details |
 |---|---|
 | **Paste a shared note** | A title and some text. You can pick a language: Markdown, Text, or a code language. Pasted notes are grouped under the source "Pasted notes". |
-| **Upload a file** | Up to **10 MiB**. Uploads are grouped under the source "Shared uploads". |
+| **Upload files or a folder** | Choose several files at once, or (in the Evidence view) a whole folder: its subfolders become evidence folders, up to the folder depth limit, and hidden, dependency and build folders (`.git`, `node_modules`, `target`, `dist`, `build`…) are skipped. Each file can be up to **10 MiB**; unsupported and oversized files are left out with a notice. A progress bar counts the uploads, and files that could not be stored are listed. Uploads are grouped under the source "Shared uploads". |
 
 **Supported file types:** Markdown (`md`, `mdx`), text (`txt`), Word (`doc`, `docx`), code and config (`rs`, `ts`, `tsx`, `js`, `jsx`, `py`, `json`, `toml`, `yaml`, `yml`, `sql`, `html`, `css`, `sh`, `ps1`), and images (`png`, `jpg`, `jpeg`, `gif`, `webp`, `svg`, `bmp`).
 
@@ -337,7 +339,9 @@ In plain terms, indexing does the following:
 
 Re-indexing keeps every passage whose text did not change, so memory cards and any stored embeddings that point at it stay valid. Only passages that actually changed are replaced. When RepoMemo improves how it splits content, existing evidence is refreshed automatically in the background the next time the server starts, and images are never re-analysed by that refresh.
 
-**Current behavior to be aware of:** the background queue processes up to two artifacts at a time, and the ledger polls for status rather than receiving live events. If an artifact fails to index it stays *Not indexed* and is retried at the next server start. Images stored before an AI provider was configured are indexed with no description and need a manual re-index by an admin.
+**Live status.** The ledger follows the server as it works: new files (including other people's) appear, *Indexing…* clears the moment a file is ready, and a failure shows its reason. A strip above the files counts what is still being indexed, and shows longer background work (making passages searchable by meaning, repository syncs) with a progress bar and a **Stop** button for writers. If the live connection drops, the page falls back to checking every few seconds and says so.
+
+**Current behavior to be aware of:** the background queue processes up to two artifacts at a time. A file that fails to index is retried a few times, then shows its failure reason, and is retried again later. Images stored before an AI provider was configured are indexed with no description and need a manual re-index by an admin.
 
 ---
 
@@ -348,7 +352,7 @@ Re-indexing keeps every passage whose text did not change, so memory cards and a
 - Searches the **indexed passages** of the workspace.
 - Every word must match, and words match as prefixes: `auth tok` finds "authentication token".
 - Filters: **file type**, **language**, **source**, and **10 / 20 / 50 results**. Filter options are built from what has actually been indexed.
-- Each result shows the title, type, language, source, a snippet, the path, and the line range. Clicking a result opens the artifact.
+- Each result shows the title, type, language, source, a snippet with the **matched words highlighted**, the path, and the line range. Clicking a result opens the artifact.
 - Search does **not** use AI and works offline.
 
 ### Saved searches
@@ -360,7 +364,8 @@ Writers can save a named search that includes its filters. Anyone can re-run it 
 - The user asks a question in plain language.
 - RepoMemo **first retrieves** matching passages. If nothing matches, it answers *"Indexed context is insufficient"* **without calling the AI**.
 - Otherwise it sends the best passages to the workspace's AI provider. The provider is told to use only that context.
-- The response contains the **answer**, the **citations** (artifact, path, lines), a **confidence** figure, and **warnings**. For example, a warning appears when only keyword retrieval could be used.
+- The response contains the **answer**, formatted (headings, lists, code) and labelled as AI-generated, the **citations** (artifact, path, lines), and **warnings**, for example when only keyword retrieval could be used. Citations are numbered to match the `[1]`, `[2]`… markers in the answer, and each opens its file.
+- Writers can **Save as memory**: the answer becomes a memory card titled with the question, and they choose which cited passages become its evidence links. The AI workspace overview can be saved the same way.
 
 ---
 
@@ -385,9 +390,9 @@ AI is **optional and explicit**. Nothing is sent to any AI service until an owne
 
 A memory card is a **short, durable statement the team wants to keep**. Examples are "We chose SQLite over Postgres because…" and "Deploys must go through X".
 
-- **Create**: a title and a Markdown body. You can **link one evidence item** as its citation.
+- **Create**: a title and a Markdown body, linked to **as many evidence items** as needed. A card can also be saved straight from an Ask answer or the AI overview, keeping the passages they cited.
 - **Search**: a text match on the title and body.
-- **Card page** (`/workspaces/:id/memory-cards/:cardId`): the statement, its source, and **linked evidence**. If the linked artifact has been deleted, the evidence is shown as missing.
+- **Card page** (`/workspaces/:id/memory-cards/:cardId`): the statement (formatted Markdown), its source, and **linked evidence**, each opening its file. If the linked artifact has been deleted, the evidence is shown as missing. The links of an existing card cannot be changed yet.
 - **Edit / delete**: writers only.
 - **Export** a card as a Markdown file that includes its evidence links and line ranges, for use in a wiki, an ADR or a PR description.
 
@@ -441,21 +446,16 @@ The desktop app and the shared server keep **separate data**.
 
 ---
 
-## 13. Known functional gaps (as of V0.1.32)
+## 13. Known functional gaps (after V0.1.61)
 
 These are observed in the code and are useful for prioritizing:
 
 | Gap | Impact |
 |---|---|
-| Indexing status is polled, not streamed | The ledger refreshes every few seconds while artifacts are pending. There is no per-file progress bar and no visible failure reason. |
-| No semantic (embedding) search in shared mode | Ask always uses keyword retrieval and shows a warning saying so. |
-| AI answers and the overview are shown as raw Markdown text | Headings and lists are not formatted. |
-| Search snippets show literal `<mark>` tags | The highlight markup is shown as text instead of being rendered. |
 | People need a RepoMemo account before they can be added | There is no invitation-by-email flow. |
 | No password reset | Users who are locked out need an administrator's help. |
-| Folder import exists only on desktop | Web users upload one file at a time. Code in a git repository on the server can now be connected as a whole in **Repositories** (§5b). |
 | Repositories must be on the server's disk | No remote URLs, and a file renamed *and* edited in one commit loses its history. Branches are followed automatically. |
-| A memory card created from the web cites at most one artifact | The API supports several citations, but the UI offers only one. |
+| A memory card's evidence links are fixed once it is created | Edit changes the title, source and statement only. |
 
 ---
 

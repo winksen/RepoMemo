@@ -18,7 +18,7 @@ mindmap
       JWT in sessionStorage
     HTTP API
       Axum 0.8 server
-      88 operations under v1
+      89 operations under v1
       JWT HS256 extractor with session versions
       Role guards per request
       Workspace AI policy and quotas
@@ -83,7 +83,7 @@ flowchart LR
   AI --> OLL
   AI --> OR
   ST -. "JobObserver / ActivityObserver" .-> BUS
-  BUS -. "SSE (unused by SPA)" .-> SPA
+  BUS -. "SSE (fetch reader)" .-> SPA
 ```
 
 **The same React bundle has two runtimes.** `apps/desktop/src/App.tsx` checks `"__TAURI_INTERNALS__" in window`:
@@ -143,7 +143,7 @@ flowchart TD
 |---|---|---|
 | `REPOMEMO_JWT_SECRET` | — (**required**) | Must be at least 32 characters, or startup panics. |
 | `REPOMEMO_SERVER_ADDR` | `127.0.0.1:3020` | Bind address. |
-| `REPOMEMO_SERVER_DATA_DIR` | unset | Environment folder to attach at startup: a name (`main`) or `workspace-data/main`. Must be directly inside `workspace-data/` (relative to the CWD, git-ignored) and be empty or a valid RepoMemo environment; checked at startup, and the server refuses to start otherwise. Unset: the server starts detached and the web app offers the environment menu (§8b-ter). Holds `repomemo.sqlite`, `blobs/`, `logs/`, `secret.key`. |
+| `REPOMEMO_SERVER_DATA_DIR` | unset | Environment folder to attach at startup: a name (`main`) or `workspace-data/main`. Must be directly inside `workspace-data/` (relative to the CWD, git-ignored) and be empty or a valid RepoMemo environment; checked at startup, and the server refuses to start otherwise. Set, the server is **pinned**: every start attaches it, and a switch made in the web app lasts until the next restart. Unset: the server re-attaches the environment last chosen in the web app (`workspace-data/.last-environment`), or starts detached with the environment menu (§8b-ter). Holds `repomemo.sqlite`, `blobs/`, `logs/`, `secret.key`. |
 | `REPOMEMO_ALLOWED_ORIGIN` | `http://127.0.0.1:3021` | The CORS origins, comma-separated (`*` is refused). Allowed methods are GET, POST, PUT, PATCH and DELETE. Allowed headers are `Authorization`, `Content-Type`, `X-RepoMemo-Filename` and `X-RepoMemo-Folder-Id`; `X-Total-Count` and `Retry-After` are exposed. |
 | `REPOMEMO_SERVICE_NAME` | `repomemo-server` | Returned by `/health`. |
 | `REPOMEMO_SECRET_KEY` | unset | *Hardening.* Key material for encrypting provider API keys at rest (§6.6). Unset: a random key in `<data dir>/secret.key`. |
@@ -241,7 +241,7 @@ Other rules:
 
 ---
 
-## 5. HTTP API reference (88 operations)
+## 5. HTTP API reference (89 operations)
 
 Guard legend: **pub** = no auth, **auth** = any valid JWT, **R/W/A/O** = workspace read / write / admin / owner, **oR/oA/oO** = organization read / admin / owner. "→ activity" means the call records a `workspace_activity` row and so emits an SSE `activity` event.
 
@@ -256,7 +256,7 @@ Guard legend: **pub** = no auth, **auth** = any valid JWT, **R/W/A/O** = workspa
 | POST | `/v1/setup/admin` | pub | `{code, email, display_name, password}` → 201 `TokenResponse`; creates the first system administrator; 409 once one exists |
 | GET | `/v1/setup/checks` | system admin, finishing | server checks with status and advice |
 | POST | `/v1/setup/complete` | system admin, finishing | completes the setup for good; 409 afterwards |
-| GET | `/v1/platform` | pub | `{attached, environment, folder}` |
+| GET | `/v1/platform` | pub | `{attached, environment, folder, pinned_environment}`; `pinned_environment` is the folder `REPOMEMO_SERVER_DATA_DIR` names, null when the web app's choice is remembered |
 | POST | `/v1/platform/environments/list` | code | `{code}` → folders of `workspace-data/` with `valid`/`empty`/`invalid` and the reason; 403 on a wrong code (lockout after 10); 409 when attached |
 | POST | `/v1/platform/environments/create` | code | `{code, name}` → creates `workspace-data/<name>` and attaches it; 409 if the folder exists |
 | POST | `/v1/platform/environments/attach` | code | `{code, name}` → verifies the structure, then attaches; 400 with the reason when invalid |
@@ -287,6 +287,7 @@ Every route requires a system administrator (**S**); changes are recorded in `sy
 | GET | `/v1/system/logs/files/{day}` | S | a day's file as a download (`application/x-ndjson`); audited |
 | GET | `/v1/system/audit?limit` | S | system audit trail |
 | GET | `/v1/system/jobs?status&limit` | S | jobs across workspaces, with workspace names |
+| GET | `/v1/system/events` | S | **SSE** of `job` (and `resync`) events from every workspace, for the Jobs page; no activity events, so app administrators see no workspace content. Ends when the token expires, the sessions end or the System role is removed (§8) |
 | GET | `/v1/system/maintenance` | S | maintenance status |
 | POST | `/v1/system/maintenance/run` | S | runs a full pass now; 409 while one runs |
 | POST | `/v1/system/console` | S | `{command}` → `{command, summary, dry_run, view, data}`. Runs one console line through the matching System handler (same rights, same audit); changes are dry runs without `--yes`, and an applied change also records `console_command`. 400 for usage. See [admin-console.md](technical/admin-console.md) |
@@ -449,7 +450,7 @@ flowchart TD
 
 - `prepare_fts_query` keeps at most 12 tokens and only `[alnum_]` characters. Each token becomes `"tok"*` and the tokens are joined with `AND`. This neutralises FTS operators.
 - The SQL does `chunks_fts MATCH ?` with the workspace, type, language and source filters, ranks by `bm25`, and builds snippets with `snippet(…,'<mark>','</mark>',…,24)`. The limit defaults to 40 and is clamped to 1–100.
-- The SPA renders `result.snippet` as **plain text**, so the `<mark>` tags appear literally (see §9).
+- The SPA turns only the `<mark>`/`</mark>` tags into highlights (`renderHighlightedSnippet`); every other character stays text, so stored content cannot inject markup.
 
 ### 6.4 Semantic search ([crates/api/src/embeddings.rs](../crates/api/src/embeddings.rs), [apps/server/src/embedding.rs](../apps/server/src/embedding.rs))
 
@@ -505,6 +506,7 @@ The assistant is a closed capability router, not a free-running agent. Each mess
 3. **Summarize** takes an `artifact_id`, or resolves the subject to a single file. When several files match it returns them for the user to pick from.
 4. `summarize_file`, `ask_question` and `workspace_overview` need an enabled text provider. Without one they reply that AI is not configured, and nothing is sent.
 5. `generated: true` marks text written by the provider, so the UI can label it apart from stored facts.
+6. **Placement in the web client.** The assistant is not a workspace tab. `AssistantDock` ([AssistantDock.tsx](../apps/desktop/src/components/AssistantDock.tsx)) is passed to `SharedLayout` as `aside` and docks on the right of every workspace section page, below the section tabs. It expands, shrinks to a slim rail and resizes by dragging its left edge (320–720 px); open state and width are kept in `localStorage` (`repomemo.assistant.dock`). Chat history is a toggled list inside the dock. On narrow screens it stacks under the page. The old `/workspaces/{id}/assistant` route no longer exists.
 
 ### 6.8 Knowledge map ([crates/api/src/knowledge_map.rs](../crates/api/src/knowledge_map.rs), Map tab)
 
@@ -617,7 +619,8 @@ Notes:
 - `WorkspaceEventBus` ([events.rs](../apps/server/src/events.rs)) holds one `tokio::broadcast` channel per watched workspace, created on subscribe with capacity 128. Publishing to a workspace nobody watches creates nothing, and the maintenance pass drops channels whose subscribers left. A consumer that falls behind receives a `resync` event (`{"type":"resync","missed":n}`) telling it to reload, instead of silently missing events.
 - Storage calls `JobObserver::on_job_changed` on every job insert or update, and `ActivityObserver::on_activity_recorded` on every activity row. The bus serialises these as `{"type":"job"|"activity", …}` with the SSE event name set to match.
 - *Hardening:* a stream lives no longer than the token that opened it. A watcher re-checks every 30 s and closes the stream once the token expires, the user's sessions are ended, or the user is no longer a member of the workspace.
-- **The SPA does not consume this stream or the jobs API.** A browser consumer also cannot use a native `EventSource`, because it cannot send the `Authorization` header. It needs a fetch-based SSE reader, or a token-in-query or cookie scheme.
+- **System stream.** `subscribe_system_jobs` is one more broadcast channel (capacity 256) that receives every workspace's job events, never activity. `GET /v1/system/events` serves it to system and app administrators; its watcher closes the stream on token expiry, ended sessions or a removed System role.
+- **Web client** ([liveEvents.ts](../apps/desktop/src/lib/liveEvents.ts)). A native `EventSource` cannot send the `Authorization` header, so `openSharedEventStream` uses `fetch` (through the same refresh-on-401 wrapper as every request) and `readEventStream` parses the `event:`/`data:` blocks. `useLiveEventHub(path)` keeps one stream per page open, reconnects with backoff (1 s up to 30 s) and sends listeners a `resync` after a reconnect; `useLiveEvents(listener)` subscribes, through `LiveEventsContext` for child panels. The workspace page and the artifact page each open the workspace stream. The ledger, repository list and page, tasks, memory and activity reload only what an event touched, coalesced over about 0.6 s, and metrics at most every 3 s. Running jobs are seeded from `GET …/jobs?status=running`. The System Jobs page uses the system stream. While a stream is down, the earlier polling (3 s ledger, 1.5 s repository syncs, 10 s System jobs) takes over; while it is up, polling drops to a 15–60 s safety net.
 
 ## 8b. Background processes (*hardening*)
 
@@ -631,7 +634,7 @@ Notes:
 
 ## 8b-ter. Platform host (environment folders, [environment.rs](../apps/server/src/environment.rs))
 
-A `Host` sits in front of the application router. Detached, it answers the `/v1/platform/*` routes, `/health` (`environment_required: true`) and 503 `environment_required` for everything else. Attached, it forwards every request to the environment router built by `build_state`. The unlock code is `REPOMEMO_SETUP_CODE` or one generated per start and printed on the console; it also opens the first-run onboarding of a new environment. Names are letters, digits and `-_.` (at most 48, no reserved Windows names); the folder must be a direct child of `workspace-data/` and not a link. Structure check ([storage environment.rs](../crates/storage/src/environment.rs)): empty, or `repomemo.sqlite` with the SQLite header, the core tables, no failed or newer migrations, and `blobs` a folder. Detach: bumps every session version and revokes refresh tokens, sets `closing` (event streams end), aborts maintenance and repository polling, checkpoints and closes the pool, stops log files.
+A `Host` sits in front of the application router. Detached, it answers the `/v1/platform/*` routes, `/health` (`environment_required: true`) and 503 `environment_required` for everything else. Attached, it forwards every request to the environment router built by `build_state`. The unlock code is `REPOMEMO_SETUP_CODE` or one generated per start and printed on the console; it also opens the first-run onboarding of a new environment. Names are letters, digits and `-_.` (at most 48, no reserved Windows names); the folder must be a direct child of `workspace-data/` and not a link. Structure check ([storage environment.rs](../crates/storage/src/environment.rs)): empty, or `repomemo.sqlite` with the SQLite header, the core tables, no failed or newer migrations, and `blobs` a folder. **Pinned and managed modes.** `Host.pinned` is the folder name from `REPOMEMO_SERVER_DATA_DIR`. Without it, a successful create or attach writes the name to `workspace-data/.last-environment` (the leading dot keeps it out of the list), and `Host::start` re-attaches it when it still inspects as a valid environment. Otherwise the file is removed, a warning is logged and the menu shows. Detaching removes the file. With a pin the file is never read or written, so the variable always wins at startup, and `/v1/platform` reports `pinned_environment` so the web app can warn before a switch. Detach: bumps every session version and revokes refresh tokens, sets `closing` (event streams end), aborts maintenance and repository polling, checkpoints and closes the pool, stops log files.
 
 ## 8b-bis. First-run setup (*onboarding*, [setup.rs](../apps/server/src/setup.rs))
 
@@ -677,7 +680,7 @@ Setup events are audited (`server_setup_admin_created`, `server_setup_completed`
 | Notes and folders | Shared notes are stored as `Note` artifacts (`.note` file, Markdown body). The note box is a TipTap WYSIWYG editor ([RichNoteEditor.tsx](../apps/desktop/src/components/RichNoteEditor.tsx)) that emits Markdown. Evidence can be organized in nested **folders** (`folders` table and `artifacts.folder_id`, migration 0013), limited to 5 levels by `MAX_FOLDER_DEPTH`. `GET/POST /v1/workspaces/{ws}/folders`; notes (`folder_id` in the body) and uploads (`X-RepoMemo-Folder-Id` header) can be filed into a folder, and `GET .../artifacts` adds `folder_id` to each item. A duplicate upload never moves an artifact that is already filed. `PATCH .../folders/{id}` renames; `DELETE .../folders/{id}` deletes the folder with every subfolder and file in it (the client confirms first and shows the counts); `PUT /v1/artifacts/{id}/folder` moves a file (`folder_id: null` for the top level); files are deleted with `DELETE /v1/artifacts/{id}`. Folders themselves cannot be moved yet. Cards and rows have a "more actions" menu (Radix dropdown) and confirmations use a Radix dialog |
 | Notifications | Errors and success messages are **toasts** (bottom-right, solid status-colored fill with white text, auto-dismissed after ~4.5 s, errors ~7 s), never inline banners. [toast.tsx](../apps/desktop/src/components/ui/toast.tsx) exposes `showToast(kind, message)` and a declarative `<Toast kind message />`; `ToastViewport` is mounted once in `main.tsx` |
 | Styling | [styles.css](../apps/desktop/src/styles.css) (~6.1k LOC) plus [blueprint-refinement.css](../apps/desktop/src/blueprint-refinement.css). Design rules are in [DESIGN.md](../DESIGN.md). `docs/design/` also holds design rules, but it is gitignored and exists only locally |
-| Rendering of AI output | `answer_markdown` and `summary_markdown` are rendered as **plain text**. `react-markdown` is a dependency but `SharedWebApp` does not use it |
+| Rendering of AI output | `answer_markdown`, `summary_markdown` and memory card bodies are rendered with `react-markdown` + `remark-gfm` (no raw HTML) in `.shared-markdown`. Citations (`EvidenceUsed`) open their artifact and are numbered for Ask answers. **Save as memory** posts the answer and the chosen citations to `POST …/memory-cards`. The memory form sends several artifact citations. Multi-file and folder upload run three `…/artifacts/upload` calls at a time, after creating the folder chain from `webkitRelativePath` (`createSharedFolder`), and skip hidden, dependency and build folders. |
 | Fan-out | The dashboard issues **one `/metrics` call per workspace** (`Promise.allSettled`) |
 
 ---
@@ -704,7 +707,7 @@ Run the Rust tests with `cargo test`. See [DEVELOPMENT_COMMANDS.md](../docs/DEVE
 | # | Area | Issue | Suggested direction |
 |---|---|---|---|
 | 1 | Security | ✅ *Mitigated:* provider API keys are encrypted at rest and never follow a changed endpoint. Residual: without `REPOMEMO_SECRET_KEY` the key file sits next to the database, so a copy of the whole data directory still reveals them | Set `REPOMEMO_SECRET_KEY` from a secret store in production |
-| 2 | Scalability | Automatic indexing uses an in-process queue with 2 workers (retries with backoff, failures retried every 6 hours, stale jobs closed at startup), and the worker crate is a stub. The SPA polls instead of following SSE | Durable job queue claimed by the worker, SSE progress in the client |
+| 2 | Scalability | Automatic indexing uses an in-process queue with 2 workers (retries with backoff, failures retried every 6 hours, stale jobs closed at startup), and the worker crate is a stub. The SPA now follows SSE (polling only as a fallback) | Durable job queue claimed by the worker if the server is scaled out |
 | 3 | Auth | ✅ *Mitigated:* rotating refresh tokens, session versions (password change and sign-out-everywhere end every session at once), sign-in throttling and lockout. Residual: rate-limit counters are per process and reset on restart | Shared counters if the server is ever scaled out |
 | 4 | Cost / abuse | ✅ *Mitigated:* per-workspace AI policy and a per-user hourly AI quota | Per-workspace budgets if needed |
 | 5 | Correctness | Error classification by substring matching; not-found is now 404 | Typed errors from storage and core |
@@ -712,7 +715,7 @@ Run the Rust tests with `cargo test`. See [DEVELOPMENT_COMMANDS.md](../docs/DEVE
 | 7 | Scale | Vector search scans every embedding of the workspace per query (§6.4) | An ANN index (sqlite-vec) or a per-workspace in-memory vector cache |
 | 8 | Storage | ✅ *Done:* orphan blobs and previews are garbage-collected by the maintenance pass | — |
 | 9 | Frontend maintainability | `SharedWebApp.tsx` ~2k LOC, `App.tsx` ~2.7k, `styles.css` ~6.1k, a hand-rolled router, no tests | Split per route and section, add a router and a query cache, add component tests |
-| 10 | UX correctness | Literal `<mark>` in snippets, and Markdown shown as raw text | Render the snippet safely and use `react-markdown` |
+| 10 | UX correctness | ✅ *Done (unreleased):* snippets highlight safely and AI output renders as Markdown | — |
 | 11 | Data integrity | `ON DELETE RESTRICT` on creator FKs blocks future user deletion | Decide on the account-deletion policy |
 | 12 | Security | A workspace owner or admin can link any repository the server account can read | Set `REPOMEMO_REPO_ROOTS` (*hardening*) and run the server under a narrow account |
 | 13 | Security | Outbound provider URLs are checked by name and literal address only; a host name that resolves to a metadata address is not caught | `REPOMEMO_AI_ALLOWED_HOSTS`, or egress rules on the host |
@@ -727,7 +730,7 @@ The table records whether each existing document still matches the code. The min
 |---|---|
 | [README.md](../README.md) | ✅ Rewritten as the GitHub landing page. It points to `mindmap/` |
 | [PRODUCT.md](../PRODUCT.md) | Kept because the **impeccable** design skill reads it (`.agents/skills/impeccable`). Its product content now lives in the [functional mindmap](FUNCTIONAL_MINDMAP.md#who-its-for-and-what-it-stands-for). ⚠️ Its "Operating Context" and constraints still describe a desktop-only product |
-| [mindmap/ROADMAP.md](ROADMAP.md) | ✅ Moved from `docs/` and updated to V0.1.32 |
+| [mindmap/ROADMAP.md](ROADMAP.md) | ✅ Moved from `docs/` and updated to V0.1.61 |
 | [docs/IMPLEMENTATION_TRACKER.md](../docs/IMPLEMENTATION_TRACKER.md) | ✅ Phases 1A–1H are accurate. Shared mode and collaboration are not tracked |
 | [docs/architecture/RepoMemo_ARCHITECTURE.md](../docs/architecture/RepoMemo_ARCHITECTURE.md) | Original target-architecture brief. Useful for intent, not current state |
 | [docs/architecture/SHARED_MODE_IMPLEMENTATION_PLAN.md](../docs/architecture/SHARED_MODE_IMPLEMENTATION_PLAN.md), [TEAM_COLLABORATION_AND_BACKEND_PLAN.md](../docs/architecture/TEAM_COLLABORATION_AND_BACKEND_PLAN.md) | Plans. Partially realised: SQLite, not PostgreSQL, and a stub worker |

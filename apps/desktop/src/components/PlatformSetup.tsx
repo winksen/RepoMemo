@@ -30,7 +30,7 @@ const STATUS_LABELS = { valid: "RepoMemo environment", empty: "Empty", invalid: 
  * environments can only be created in, or chosen from, the server's environments folder, and the server verifies a
  * folder's structure before it attaches to it.
  */
-export function PlatformSetup({ folder, onAttached }: { folder: string; onAttached: (status: PlatformStatus) => void }) {
+export function PlatformSetup({ folder, onAttached, pinned }: { folder: string; onAttached: (status: PlatformStatus) => void; pinned: string | null }) {
   const [code, setCode] = useState("");
   const [environments, setEnvironments] = useState<EnvironmentEntry[] | null>(null);
   const [name, setName] = useState("");
@@ -84,6 +84,9 @@ export function PlatformSetup({ folder, onAttached }: { folder: string; onAttach
           <h2>Choose the environment</h2>
           <p>All data of this server (database, files, logs) lives in one environment folder inside <code>{folder}/</code>. Nothing outside that folder can be used.</p>
         </div>
+        {pinned
+          ? <p className="rm-platform-note" role="note"><AlertCircle size={16} /><span>This server starts with <code>{pinned}</code>, set by <code>REPOMEMO_SERVER_DATA_DIR</code>. The environment you choose here is used until the server restarts, then it goes back to <code>{pinned}</code>. To keep a choice made here, start the server without that variable.</span></p>
+          : <p className="rm-platform-note" role="note"><CircleCheck size={16} /><span>The environment you choose here is remembered: the server attaches it again when it restarts, until it is detached in System settings.</span></p>}
         {environments === null ? <>
           <ul className="rm-setup-points">
             <li><ShieldLock size={16} /> Enter the code printed on the server console when it started (or the value of <code>REPOMEMO_SETUP_CODE</code>).</li>

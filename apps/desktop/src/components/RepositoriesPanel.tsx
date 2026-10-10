@@ -34,8 +34,14 @@ import { Dialog, DialogCancel } from "./ui/dialog";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { showToast } from "./ui/toast";
+import { useLiveEvents } from "../lib/liveEvents";
+import type { IndexingJobStatus, LiveEvent } from "../types";
 
 const POLL_INTERVAL_MS = 1500;
+/** With the workspace event stream open, polling is only a safety net. */
+const LIVE_FALLBACK_POLL_MS = 15_000;
+/** Activity that changes the list of repositories (syncs arrive as job events). */
+const REPOSITORY_LIST_ACTIONS = new Set(["repository_connected", "repository_updated", "repository_removed"]);
 /** Files listed at once; a filter narrows larger repositories. */
 const FILE_LIST_LIMIT = 300;
 
@@ -74,6 +80,15 @@ function errorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
 }
 
+function isRunning(job: IndexingJobStatus) {
+  return job.status === "running" || job.status === "pending";
+}
+
+/** The repository sync job an event is about, if any. */
+function repoSyncJob(event: LiveEvent): IndexingJobStatus | null {
+  return event.type === "job" && event.job.kind === "repo_sync" && event.job.source_id ? event.job : null;
+}
+
 function reportSummary(report: RepoSyncReport) {
   const parts = [
     report.added + report.restored ? `${report.added + report.restored} added` : "",
@@ -84,7 +99,8 @@ function reportSummary(report: RepoSyncReport) {
   return parts.length ? parts.join(" · ") : "No file changes";
 }
 
-/** Loads the workspace's repositories, polls while one syncs, and announces
+/** Loads the workspace's repositories, follows each sync's progress from the
+ *  workspace event stream (polling while the stream is down), and announces
  *  each sync that finishes. */
 function useRepositories(accessToken: string, workspaceId: string, onChanged: () => void) {
   const [repositories, setRepositories] = useState<RepoSource[] | null>(null);
@@ -133,12 +149,25 @@ function useRepositories(accessToken: string, workspaceId: string, onChanged: ()
     void load();
   }, [accessToken, workspaceId]);
 
+  const live = useLiveEvents((event) => {
+    if (event.type === "resync") { void load(); return; }
+    if (event.type === "activity") {
+      if (REPOSITORY_LIST_ACTIONS.has(event.event.action)) void load();
+      return;
+    }
+    const job = repoSyncJob(event);
+    if (!job) return;
+    if (!isRunning(job)) { void load(); return; }
+    runningJobs.current.set(job.source_id!, job.id);
+    setRepositories((current) => current?.map((repository) => repository.id === job.source_id ? { ...repository, active_job: job } : repository) ?? current);
+  });
+
   const syncing = Boolean(repositories?.some((repository) => repository.active_job));
   useEffect(() => {
     if (!syncing) return;
-    const timer = window.setInterval(() => void load(), POLL_INTERVAL_MS);
+    const timer = window.setInterval(() => void load(), live ? LIVE_FALLBACK_POLL_MS : POLL_INTERVAL_MS);
     return () => window.clearInterval(timer);
-  }, [syncing, accessToken, workspaceId]);
+  }, [syncing, live, accessToken, workspaceId]);
 
   return { repositories, load, track };
 }
@@ -576,12 +605,20 @@ export function RepositoryDetailView({
   }
 
   useEffect(() => { setDetail(null); runningJob.current = null; void load(); }, [accessToken, repositoryId]);
+  const live = useLiveEvents((event) => {
+    if (event.type === "resync") { void load(); return; }
+    const job = repoSyncJob(event);
+    if (!job || job.source_id !== repositoryId) return;
+    if (!isRunning(job)) { void load(); return; }
+    runningJob.current = job.id;
+    setDetail((current) => current ? { ...current, repository: { ...current.repository, active_job: job } } : current);
+  });
   const syncing = Boolean(detail?.repository.active_job);
   useEffect(() => {
     if (!syncing) return;
-    const timer = window.setInterval(() => void load(), POLL_INTERVAL_MS);
+    const timer = window.setInterval(() => void load(), live ? LIVE_FALLBACK_POLL_MS : POLL_INTERVAL_MS);
     return () => window.clearInterval(timer);
-  }, [syncing, accessToken, repositoryId]);
+  }, [syncing, live, accessToken, repositoryId]);
 
   async function sync() {
     try {

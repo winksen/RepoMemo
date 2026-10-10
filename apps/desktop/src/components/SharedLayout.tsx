@@ -53,6 +53,7 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
 
 export function SharedLayout({
   apiAvailable,
+  aside,
   children,
   session,
   sidebar,
@@ -61,6 +62,8 @@ export function SharedLayout({
   workspaceNavigation,
 }: {
   apiAvailable: boolean | null;
+  /** A section docked on the right of the page content, below the workspace navigation. */
+  aside?: ReactNode;
   children: ReactNode;
   session: SharedSession;
   sidebar: ReactNode;
@@ -86,7 +89,10 @@ export function SharedLayout({
       <aside className="shared-home-rail">{sidebar}{session.is_system_admin || session.is_app_admin ? <SystemRailEntry onNavigate={onNavigate} /> : null}<div className="shared-rail-footer"><Shield size={15} /><span>JWT active · API {apiAvailable === true ? "healthy" : apiAvailable === false ? "offline" : "checking"}</span></div></aside>
       <section className="shared-home-content">
         {workspaceNavigation}
-        <div className="shared-layout-content">{children}</div>
+        <div className="shared-layout-body">
+          <div className="shared-layout-content">{children}</div>
+          {aside}
+        </div>
       </section>
     </div>
   </main>;

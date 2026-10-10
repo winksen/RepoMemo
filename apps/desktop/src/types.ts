@@ -38,6 +38,13 @@ export interface WorkspaceActivityEvent {
   created_at: string;
 }
 
+/** One message of a workspace (or System) event stream. `resync` means
+ *  events were missed, so whatever is shown should be reloaded. */
+export type LiveEvent =
+  | { type: "job"; job: IndexingJobStatus }
+  | { type: "activity"; event: WorkspaceActivityEvent }
+  | { type: "resync"; missed?: number };
+
 export interface WorkspaceActivityCalendar {
   total_activity_count: number;
   activity_by_day: WorkspaceMetricBreakdown[];

@@ -41,9 +41,20 @@ impl WorkspaceEvent {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct WorkspaceEventBus {
     channels: Arc<Mutex<HashMap<String, broadcast::Sender<WorkspaceEvent>>>>,
+    /// Every workspace's job events, for the System jobs page.
+    system_jobs: broadcast::Sender<WorkspaceEvent>,
+}
+
+impl Default for WorkspaceEventBus {
+    fn default() -> Self {
+        Self {
+            channels: Arc::default(),
+            system_jobs: broadcast::channel(CHANNEL_CAPACITY * 2).0,
+        }
+    }
 }
 
 impl WorkspaceEventBus {
@@ -55,7 +66,17 @@ impl WorkspaceEventBus {
         self.sender_for(workspace_id).subscribe()
     }
 
+    /// Job events of every workspace. Activity stays per workspace: app
+    /// administrators may watch jobs without reading every workspace.
+    pub fn subscribe_system_jobs(&self) -> broadcast::Receiver<WorkspaceEvent> {
+        self.system_jobs.subscribe()
+    }
+
     pub fn publish(&self, event: WorkspaceEvent) {
+        if matches!(event, WorkspaceEvent::Job { .. }) {
+            // Fails only when nobody watches the System jobs page.
+            let _ = self.system_jobs.send(event.clone());
+        }
         // A broadcast channel only delivers to receivers that already exist,
         // so a workspace nobody is watching needs no channel at all.
         let sender = self
@@ -80,17 +101,19 @@ impl WorkspaceEventBus {
         before - channels.len()
     }
 
-    /// Channels open, and subscribers across them.
+    /// Channels open, and subscribers across them (System jobs watchers
+    /// included).
     pub fn stats(&self) -> (usize, usize) {
+        let system = self.system_jobs.receiver_count();
         self.channels
             .lock()
             .map(|channels| {
                 (
                     channels.len(),
-                    channels.values().map(|sender| sender.receiver_count()).sum(),
+                    channels.values().map(|sender| sender.receiver_count()).sum::<usize>() + system,
                 )
             })
-            .unwrap_or((0, 0))
+            .unwrap_or((0, system))
     }
 
     #[cfg(test)]
@@ -218,5 +241,31 @@ mod tests {
         drop(receiver);
         assert_eq!(bus.prune(), 1);
         assert_eq!(bus.channel_count(), 0);
+    }
+
+    #[test]
+    fn the_system_channel_carries_jobs_of_every_workspace_but_no_activity() {
+        let bus = WorkspaceEventBus::new();
+        let mut system = bus.subscribe_system_jobs();
+        bus.publish(activity("one"));
+        bus.publish(WorkspaceEvent::Job {
+            job: IndexingJobStatus {
+                id: "job".to_owned(),
+                workspace_id: "two".to_owned(),
+                source_id: None,
+                kind: "indexing".to_owned(),
+                status: "running".to_owned(),
+                stage: "chunking".to_owned(),
+                progress_current: 0,
+                progress_total: None,
+                error_message: None,
+                cancel_requested: false,
+                created_at: "2026-01-01T00:00:00Z".to_owned(),
+                updated_at: "2026-01-01T00:00:00Z".to_owned(),
+            },
+        });
+        assert!(matches!(system.try_recv(), Ok(WorkspaceEvent::Job { .. })));
+        assert!(system.try_recv().is_err(), "activity is not sent to the system channel");
+        assert_eq!(bus.channel_count(), 0, "unwatched workspaces still get no channel");
     }
 }

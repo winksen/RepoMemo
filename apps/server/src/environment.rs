@@ -15,9 +15,17 @@
 //! the server goes back to waiting for the platform code.
 //!
 //! `REPOMEMO_SERVER_DATA_DIR` attaches at startup instead. It takes a folder
-//! name (`onboarding`) or `workspace-data/onboarding`, and is verified the
+//! name (`main`) or `workspace-data/main`, and is verified the
 //! same way; a value outside `workspace-data/` or a folder with the wrong
 //! structure stops the server from starting.
+//!
+//! Two modes follow from that, so a choice never silently fails to stick:
+//! - **Pinned** (the variable is set): every start attaches that environment.
+//!   Detaching and choosing another one in the web app still works, but only
+//!   until the next restart; the web app says so and names the fallback.
+//! - **Managed** (the variable is not set): the environment chosen in the web
+//!   app is written to `workspace-data/.last-environment` and attached again
+//!   at the next start. Detaching forgets it, so the next start shows the menu.
 
 use std::{
     net::{IpAddr, SocketAddr},
@@ -48,6 +56,9 @@ use crate::{
 
 /// The only folder environments may live in, relative to the working directory.
 pub const ENVIRONMENTS_DIR: &str = "workspace-data";
+/// In managed mode, the environment to attach again at startup. Its leading
+/// dot keeps it out of the environment list (names cannot start with one).
+const LAST_ENVIRONMENT_FILE: &str = ".last-environment";
 const MAX_NAME_CHARS: usize = 48;
 /// Wrong platform codes from one address before it must wait.
 const MAX_CODE_FAILURES: u32 = 10;
@@ -67,6 +78,9 @@ pub(crate) struct Host {
     root: PathBuf,
     /// The code that unlocks the platform menu, normalised.
     code: String,
+    /// The environment `REPOMEMO_SERVER_DATA_DIR` names (pinned mode), or
+    /// `None` when the web app's choice is remembered instead.
+    pinned: Option<String>,
     guards: Guards,
     current: RwLock<Option<Attachment>>,
     /// One attach or detach at a time.
@@ -157,9 +171,16 @@ impl Host {
     /// verifies and attaches it (the server does not start otherwise).
     pub(crate) async fn start(config: ServerConfig) -> Result<Arc<Self>> {
         let code = normalise_code(config.setup_code.as_deref().unwrap_or(&generate_code()));
+        let pinned = config
+            .data_dir
+            .as_ref()
+            .and_then(|dir| dir.file_name())
+            .and_then(|name| name.to_str())
+            .map(str::to_owned);
         let host = Arc::new(Self {
             root: environments_root()?,
             code,
+            pinned,
             guards: Guards::default(),
             current: RwLock::new(None),
             switching: Mutex::new(()),
@@ -175,9 +196,60 @@ impl Host {
                 }
                 host.attach_dir(&dir).await?;
             }
-            None => host.print_code_banner(),
+            None => {
+                if !host.reattach_remembered().await {
+                    host.print_code_banner();
+                }
+            }
         }
         Ok(host)
+    }
+
+    /// Managed mode: attaches the environment last chosen in the web app, if
+    /// it is still a RepoMemo environment. Anything else is forgotten and the
+    /// menu is shown. Returns whether an environment was attached.
+    async fn reattach_remembered(self: &Arc<Self>) -> bool {
+        let Some(name) = read_last_environment(&self.root) else {
+            return false;
+        };
+        let problem = match self.folder(&name) {
+            Err(_) => Some("its name is not valid".to_owned()),
+            Ok(dir) => match inspect_environment(&dir).await {
+                EnvironmentState::Valid => match self.attach_dir(&dir).await {
+                    Ok(()) => None,
+                    Err(error) => Some(format!("{error:#}")),
+                },
+                EnvironmentState::Empty => Some("the folder no longer holds an environment".to_owned()),
+                EnvironmentState::Invalid(reason) => Some(reason),
+            },
+        };
+        match problem {
+            None => {
+                tracing::info!(target: "audit", environment = %name, "Attached the environment last chosen in the web app");
+                // The code still opens a first-run setup that was never
+                // finished, and the menu after a detach; print it as usual.
+                if self.config.setup_code.is_none() {
+                    eprintln!(
+                        "\n================================================================\n  RepoMemo attached {ENVIRONMENTS_DIR}/{name}, the environment last\n  chosen in the web app. Code for its first-run setup, or for the\n  environment menu after detaching:\n\n      {}\n\n  It changes every time the server starts.\n================================================================\n",
+                        display_code(&self.code)
+                    );
+                }
+                true
+            }
+            Some(reason) => {
+                tracing::warn!(target: "audit", environment = %name, %reason, "The environment last chosen in the web app cannot be attached; showing the environment menu");
+                write_last_environment(&self.root, None);
+                false
+            }
+        }
+    }
+
+    /// Managed mode only: remembers (or forgets) the web app's choice for the
+    /// next start. A pinned server always starts with its variable.
+    fn remember(&self, name: Option<&str>) {
+        if self.pinned.is_none() {
+            write_last_environment(&self.root, name);
+        }
     }
 
     fn print_code_banner(&self) {
@@ -233,6 +305,7 @@ impl Host {
             tracing::info!(target: "audit", environment = %attachment.name, "Environment detached");
         }
         crate::logs::stop_file_output();
+        self.remember(None);
         self.print_code_banner();
         Ok(())
     }
@@ -312,11 +385,42 @@ struct PlatformStatus {
     attached: bool,
     environment: Option<String>,
     folder: &'static str,
+    /// The environment every start attaches (`REPOMEMO_SERVER_DATA_DIR`).
+    /// `None`: the choice made in the web app is remembered instead.
+    pinned_environment: Option<String>,
 }
 
 async fn status(State(host): State<Arc<Host>>) -> Json<PlatformStatus> {
     let environment = host.name().await;
-    Json(PlatformStatus { attached: environment.is_some(), environment, folder: ENVIRONMENTS_DIR })
+    Json(PlatformStatus {
+        attached: environment.is_some(),
+        environment,
+        folder: ENVIRONMENTS_DIR,
+        pinned_environment: host.pinned.clone(),
+    })
+}
+
+/// The environment name remembered in managed mode, if any.
+fn read_last_environment(root: &Path) -> Option<String> {
+    let text = std::fs::read_to_string(root.join(LAST_ENVIRONMENT_FILE)).ok()?;
+    let name = text.trim();
+    (!name.is_empty()).then(|| name.to_owned())
+}
+
+/// Writes or removes the remembered environment. A failure only means the
+/// next start shows the menu, so it is logged rather than returned.
+fn write_last_environment(root: &Path, name: Option<&str>) {
+    let path = root.join(LAST_ENVIRONMENT_FILE);
+    let result = match name {
+        Some(name) => std::fs::create_dir_all(root).and_then(|()| std::fs::write(&path, name)),
+        None => match std::fs::remove_file(&path) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            other => other,
+        },
+    };
+    if let Err(error) = result {
+        tracing::warn!(target: "audit", path = %path.display(), %error, "The environment choice could not be saved for the next start");
+    }
 }
 
 #[derive(Deserialize)]
@@ -388,6 +492,7 @@ async fn create(
         let _ = tokio::fs::remove_dir(&dir).await;
         return Err(ApiError::internal(format!("{error:#}")));
     }
+    host.remember(Some(&name));
     Ok((StatusCode::CREATED, status(State(host)).await))
 }
 
@@ -399,7 +504,8 @@ async fn attach(
 ) -> Result<Json<PlatformStatus>, ApiError> {
     host.check_code(&client, &request.code)?;
     host.require_detached().await?;
-    let dir = host.folder(request.name.trim())?;
+    let name = request.name.trim().to_owned();
+    let dir = host.folder(&name)?;
     match inspect_environment(&dir).await {
         EnvironmentState::Invalid(reason) => {
             return Err(ApiError::bad_request(format!("This folder cannot be attached: {reason}")));
@@ -410,6 +516,7 @@ async fn attach(
         EnvironmentState::Empty | EnvironmentState::Valid => {}
     }
     host.attach_dir(&dir).await.map_err(|error| ApiError::internal(format!("{error:#}")))?;
+    host.remember(Some(&name));
     Ok(status(State(host)).await)
 }
 
@@ -518,6 +625,29 @@ mod tests {
         assert_eq!(status, StatusCode::OK);
         let (status, _) = call(&app, "POST", "/v1/platform/environments/attach", Some(r#"{"code":"ABCD-EFGH-JKLM","name":"other"}"#)).await;
         assert_eq!(status, StatusCode::CONFLICT);
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn the_web_app_choice_is_remembered_and_forgotten() {
+        let base = std::env::temp_dir().join(format!("repomemo-last-{}", uuid::Uuid::new_v4()));
+        let root = base.join(ENVIRONMENTS_DIR);
+        assert_eq!(read_last_environment(&root), None, "nothing remembered yet");
+        write_last_environment(&root, Some("server"));
+        assert_eq!(read_last_environment(&root).as_deref(), Some("server"));
+        write_last_environment(&root, None);
+        assert_eq!(read_last_environment(&root), None);
+        write_last_environment(&root, None);
+        assert!(validate_name(LAST_ENVIRONMENT_FILE).is_err(), "the file is never listed as an environment");
+        let _ = std::fs::remove_dir_all(base);
+    }
+
+    #[tokio::test]
+    async fn a_pinned_server_reports_the_environment_it_starts_with() {
+        let dir = std::env::temp_dir().join(format!("repomemo-pinned-{}", uuid::Uuid::new_v4()));
+        let app = crate::router(ServerConfig::for_test(dir.clone())).await.unwrap();
+        let (_, body) = call(&app, "GET", "/v1/platform", None).await;
+        assert_eq!(body["pinned_environment"], serde_json::json!(dir.file_name().unwrap().to_str().unwrap()));
         let _ = std::fs::remove_dir_all(dir);
     }
 

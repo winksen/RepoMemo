@@ -1069,6 +1069,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route("/v1/system/logs/files/{day}", get(system::download_log_file))
         .route("/v1/system/audit", get(system::audit_events))
         .route("/v1/system/jobs", get(system::jobs))
+        .route("/v1/system/events", get(system_events))
         .route("/v1/system/maintenance", get(system::get_maintenance))
         .route("/v1/system/maintenance/run", post(system::run_maintenance))
         .route("/v1/system/console", get(system::console::welcome).post(system::console::run))
@@ -4309,6 +4310,78 @@ async fn workspace_events(
             }
         });
     Ok(Sse::new(stream).keep_alive(KeepAlive::new().interval(Duration::from_secs(15))))
+}
+
+/// Server-sent-events stream of job changes in every workspace, for the
+/// System jobs page. Same `job` and `resync` events as a workspace stream, no
+/// activity. Ends when the token expires, the sessions are ended, or the user
+/// stops being a system or app administrator.
+async fn system_events(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+) -> Result<Sse<impl Stream<Item = Result<SseEvent, Infallible>>>, ApiError> {
+    system::require_system_admin(&subject)?;
+    let receiver = state.event_bus.subscribe_system_jobs();
+    let events = BroadcastStream::new(receiver).filter_map(|item| match item {
+        Ok(event) => {
+            let payload = serde_json::to_string(&event).ok()?;
+            Some(EventStreamItem::Event(
+                SseEvent::default().event(event.event_name()).data(payload),
+            ))
+        }
+        Err(BroadcastStreamRecvError::Lagged(missed)) => Some(EventStreamItem::Event(
+            SseEvent::default()
+                .event("resync")
+                .data(json!({ "type": "resync", "missed": missed }).to_string()),
+        )),
+    });
+    let (closer, closed) = tokio::sync::mpsc::channel::<()>(1);
+    tokio::spawn(watch_system_event_stream_access(state.clone(), subject, closer));
+    let open = OpenEventStream::new(state.telemetry.clone());
+    let stream = events
+        .merge(ReceiverStream::new(closed).map(|_| EventStreamItem::Close))
+        .take_while(|item| !matches!(item, EventStreamItem::Close))
+        .filter_map(move |item| {
+            let _counted = &open;
+            match item {
+                EventStreamItem::Event(event) => Some(Ok(event)),
+                EventStreamItem::Close => None,
+            }
+        });
+    Ok(Sse::new(stream).keep_alive(KeepAlive::new().interval(Duration::from_secs(15))))
+}
+
+/// Closes the System event stream once its token expires or its user loses
+/// the System role. Stops by itself when the client disconnects.
+async fn watch_system_event_stream_access(
+    state: AppState,
+    subject: AuthenticatedSubject,
+    closer: tokio::sync::mpsc::Sender<()>,
+) {
+    loop {
+        let remaining = subject
+            .expires_at
+            .saturating_sub(jsonwebtoken::get_current_timestamp());
+        tokio::select! {
+            _ = closer.closed() => return,
+            _ = tokio::time::sleep(EVENT_STREAM_RECHECK.min(Duration::from_secs(remaining))) => {}
+        }
+        let expired = jsonwebtoken::get_current_timestamp() >= subject.expires_at;
+        // A failed lookup keeps the stream; a missing user or a changed
+        // session or role ends it.
+        let allowed = match state.storage.user_access(&subject.user_id).await {
+            Ok(access) => access.is_some_and(|access| {
+                access.session_version == subject.session_version
+                    && (access.is_system_admin || access.is_app_admin)
+            }),
+            Err(_) => true,
+        };
+        let closing = state.closing.load(std::sync::atomic::Ordering::SeqCst);
+        if expired || !allowed || closing {
+            let _ = closer.send(()).await;
+            return;
+        }
+    }
 }
 
 /// Counts an open event stream for the System page while it lives.
@@ -8079,6 +8152,8 @@ mod tests {
         assert_eq!(usage["activity_by_day"].as_array().unwrap().len(), 7);
         assert_eq!(usage["workspaces"].as_array().unwrap().len(), 2);
         assert_eq!(get("/v1/system/jobs".to_owned(), &admin).await.status(), 200);
+        assert_eq!(get("/v1/system/events".to_owned(), &owner).await.status(), 403);
+        assert_eq!(get("/v1/system/events".to_owned(), &admin).await.status(), 200);
         assert_eq!(get("/v1/system/logs?level=warn".to_owned(), &admin).await.status(), 200);
 
         // Run-time settings apply at once and can be reset.
