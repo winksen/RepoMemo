@@ -20,10 +20,11 @@ use axum::{
     Json,
 };
 use repomemo_domain::{Invitation, OrganizationRole, PersonalAccessToken, WorkspaceRole};
+use repomemo_storage::NewSharedNotification;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    check_auth_quota, hash_password, issue_session, map_storage_error, record_workspace_activity,
+    check_auth_quota, create_notification, hash_password, issue_session, map_storage_error, record_workspace_activity,
     require_organization_admin, require_workspace_admin, security::ClientIp, validate_password,
     workspace_role_label, ApiError, AppState, AuthAction, AuthenticatedSubject, SessionSubject, TokenResponse,
 };
@@ -506,6 +507,21 @@ pub(crate) async fn issue_password_reset(
         .create_password_reset(&user_id, &subject.user_id, PASSWORD_RESET_TTL_HOURS)
         .await
         .map_err(map_storage_error)?;
+    // The account hears about it, in case the request did not come from them (review L4).
+    create_notification(
+        &state,
+        NewSharedNotification {
+            user_id: user_id.clone(),
+            workspace_id: None,
+            notification_type: "password_reset_issued".to_owned(),
+            title: "A password reset link was created for your account".to_owned(),
+            body: format!(
+                "An administrator created a link that sets your password, valid until {expires_at}. If you did not ask for one, tell an administrator."
+            ),
+            href: "/profile".to_owned(),
+        },
+    )
+    .await;
     let who = user.email.unwrap_or(user.display_name);
     crate::system::audit(&state, &subject, "password_reset_issued", format!("Issued a password reset link for {who}.")).await;
     // In the fragment, like invitation links: never sent to a server.
@@ -557,7 +573,13 @@ pub(crate) async fn complete_password_reset(
     Json(request): Json<CompletePasswordReset>,
 ) -> Result<Json<TokenResponse>, ApiError> {
     check_auth_quota(&state, &client, AuthAction::SignIn)?;
-    validate_password(&request.password)?;
+    let reset_email = state
+        .storage
+        .find_password_reset(&request.token)
+        .await
+        .map_err(map_storage_error)?
+        .and_then(|reset| reset.user.email);
+    validate_password(&request.password, reset_email.as_deref())?;
     // Hash first: a failure here must not use up the link.
     let password_hash = hash_password(&request.password).await?;
     let user_id = state
@@ -580,6 +602,18 @@ pub(crate) async fn complete_password_reset(
     let email = user.email.clone().unwrap_or_default().to_lowercase();
     state.guards.logins.clear_account(&email);
     tracing::info!(target: "audit", user_id = %user_id, client = %client.0, tokens_revoked = tokens, "Password reset with a link");
+    create_notification(
+        &state,
+        NewSharedNotification {
+            user_id: user_id.clone(),
+            workspace_id: None,
+            notification_type: "password_reset_used".to_owned(),
+            title: "Your password was changed with a reset link".to_owned(),
+            body: "Every device was signed out and your personal access tokens were revoked. If this was not you, tell an administrator now.".to_owned(),
+            href: "/profile".to_owned(),
+        },
+    )
+    .await;
     if let Err(error) = state
         .storage
         .record_system_event(Some(&user_id), "password_reset_used", &format!("{email} set a new password with a reset link."))

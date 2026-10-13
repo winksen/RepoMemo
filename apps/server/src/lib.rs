@@ -355,7 +355,6 @@ fn env_parse<T: std::str::FromStr>(name: &str, default: T) -> Result<T> {
         .map_err(|_| anyhow::anyhow!("{name} has an invalid value: {raw}"))
 }
 
-/// An optional on/off environment variable: true/false, 1/0, yes/no, on/off.
 /// Refuses to serve plain HTTP beyond this machine unless a TLS proxy is in
 /// front (an `https://` public address, or proxy trust) or the operator opted
 /// in for a trusted network (review M9).
@@ -376,6 +375,7 @@ impl ServerConfig {
     }
 }
 
+/// An optional on/off environment variable: true/false, 1/0, yes/no, on/off.
 fn env_flag(name: &str, default: bool) -> Result<bool> {
     let Some(raw) = env_text(name) else {
         return Ok(default);
@@ -470,8 +470,6 @@ pub struct HealthResponse {
     pub service: String,
     pub status: &'static str,
     pub authentication: &'static str,
-    /// Whether new accounts can be registered.
-    pub registration_open: bool,
     /// The server still has to be set up through the onboarding.
     pub setup_required: bool,
 }
@@ -597,6 +595,10 @@ struct RegisterRequest {
 struct LoginRequest {
     email: String,
     password: String,
+    /// A refresh token this browser still holds, if any: it shows the
+    /// sign-in comes from a device the account already uses (review L10).
+    #[serde(default)]
+    refresh_token: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1443,7 +1445,6 @@ async fn health(State(state): State<AppState>) -> Json<HealthResponse> {
         service: state.settings().service_name.clone(),
         status: "ok",
         authentication: "jwt",
-        registration_open: registration_open(&state).await.unwrap_or(false),
         setup_required: setup::setup_pending(&state).await.unwrap_or(false),
     })
 }
@@ -1609,6 +1610,12 @@ async fn login(
     let settings = state.settings();
     for key in [&pair_key, &account_key] {
         if let Some(wait) = state.guards.logins.locked_for(key) {
+            // Anyone can lock an account by failing from many addresses, or
+            // from one the owner shares; the owner's own device, which
+            // still holds a session, gets through (review L10).
+            if known_device(&state, &email, request.refresh_token.as_deref()).await {
+                continue;
+            }
             tracing::warn!(target: "audit", email = %email, client = %client.0, "Sign-in refused: account temporarily locked");
             return Err(too_many_requests(
                 format!(
@@ -1653,6 +1660,20 @@ async fn login(
         .map_err(ApiError::internal)?;
     tracing::info!(target: "audit", user_id = %user.id, client = %client.0, "Signed in");
     Ok(Json(issue_session(&state, user).await?))
+}
+
+/// Whether `refresh_token` is a usable session token of the account `email`.
+async fn known_device(state: &AppState, email: &str, refresh_token: Option<&str>) -> bool {
+    let Some(token) = refresh_token.filter(|token| !token.is_empty()) else {
+        return false;
+    };
+    let (Ok(Some(owner)), Ok(Some(user))) = (
+        state.storage.refresh_token_user(token).await,
+        state.storage.find_user_by_email(email).await,
+    ) else {
+        return false;
+    };
+    owner == user.id
 }
 
 /// Exchanges a valid refresh token for a new access token and a rotated refresh token.
@@ -1847,13 +1868,13 @@ async fn change_profile_password(
     State(state): State<AppState>,
     Json(request): Json<ChangePasswordRequest>,
 ) -> Result<Json<TokenResponse>, ApiError> {
-    validate_password(&request.new_password)?;
     let account = state
         .storage
         .find_user(&subject.user_id)
         .await
         .map_err(ApiError::internal)?
         .ok_or_else(ApiError::unauthorized)?;
+    validate_password(&request.new_password, account.email.as_deref())?;
     let stored_account = state
         .storage
         .find_user_for_auth(account.email.as_deref().unwrap_or_default())
@@ -1946,6 +1967,23 @@ async fn upsert_organization_member(
             && matches!(request.role, OrganizationRole::Admin))
     {
         return Err(ApiError::forbidden());
+    }
+    let member = match state
+        .storage
+        .find_user_by_email(&request.email)
+        .await
+        .map_err(map_storage_error)?
+    {
+        Some(user) => state
+            .storage
+            .organization_role_for_user(&user.id, &organization_id)
+            .await
+            .map_err(map_storage_error)?
+            .is_some(),
+        None => false,
+    };
+    if !member {
+        return Err(invitation_required());
     }
     if matches!(caller_role, OrganizationRole::Admin) {
         if let Some(target) = state
@@ -3228,7 +3266,19 @@ async fn notify_artifact_mentions(
     }
 }
 
-async fn create_notification(state: &AppState, notification: NewSharedNotification) {
+/// The answer to adding someone who is not in the organization yet. It is the
+/// same whether or not the address has an account, so a member form cannot
+/// tell anyone who has one (review M4); and nobody is added to an
+/// organization or workspace without accepting.
+fn invitation_required() -> ApiError {
+    ApiError::new(
+        StatusCode::CONFLICT,
+        "invitation_required",
+        "Only people already in this organization can be added directly. Create an invitation link for this address: they join when they accept it.",
+    )
+}
+
+pub(crate) async fn create_notification(state: &AppState, notification: NewSharedNotification) {
     if let Err(error) = state.storage.create_shared_notification(notification).await {
         tracing::error!(error = %error, "Failed to create shared notification");
     }
@@ -3255,6 +3305,30 @@ async fn upsert_workspace_member(
     Json(request): Json<UpsertWorkspaceMemberRequest>,
 ) -> Result<Json<WorkspaceMember>, ApiError> {
     let caller_role = require_workspace_admin(&state, &subject, &workspace_id).await?;
+    let target = state
+        .storage
+        .find_user_by_email(&request.email)
+        .await
+        .map_err(map_storage_error)?;
+    let reachable = match &target {
+        Some(user) => {
+            state
+                .storage
+                .workspace_role_for_user(&user.id, &workspace_id)
+                .await
+                .map_err(map_storage_error)?
+                .is_some()
+                || state
+                    .storage
+                    .user_in_workspace_organization(&user.id, &workspace_id)
+                    .await
+                    .map_err(map_storage_error)?
+        }
+        None => false,
+    };
+    if !reachable {
+        return Err(invitation_required());
+    }
     if matches!(&caller_role, WorkspaceRole::Admin) {
         if matches!(request.role, WorkspaceRole::Admin) {
             return Err(ApiError::forbidden());
@@ -5100,14 +5174,42 @@ fn validate_registration(request: &RegisterRequest) -> Result<(), ApiError> {
             "Display name must be between 1 and 120 characters.",
         ));
     }
-    validate_password(&request.password)
+    validate_password(&request.password, Some(&request.email))
 }
 
-fn validate_password(password: &str) -> Result<(), ApiError> {
+/// Long passwords people still pick, compared ignoring case. Short ones are
+/// already refused by the length rule.
+const COMMON_PASSWORDS: &[&str] = &[
+    "password1234", "password12345", "password123456", "password123!", "password1234!", "passwordpassword",
+    "123456789012", "1234567890123", "12345678901234", "123456789abc", "1234567890ab", "1q2w3e4r5t6y",
+    "qwertyuiop12", "qwertyuiopasdf", "qwerty123456", "qwertyqwerty", "asdfghjkl123", "1qaz2wsx3edc",
+    "iloveyou1234", "letmein12345", "welcome12345", "welcome123456", "administrator", "changeme1234",
+    "abcdefghijkl", "abc123abc123", "trustno11234", "football1234", "baseball1234", "superman1234",
+    "monkey123456", "sunshine1234", "princess1234", "dragon123456", "master123456", "admin1234567",
+];
+
+/// The rules every new password follows (review L7): 12 to 1024 characters,
+/// not a well-known password, not mostly the same few characters, and not
+/// built from the account's email address.
+fn validate_password(password: &str, email: Option<&str>) -> Result<(), ApiError> {
     if password.len() < 12 || password.len() > 1024 {
         return Err(ApiError::bad_request(
             "Password must be between 12 and 1024 characters.",
         ));
+    }
+    let lowered = password.to_lowercase();
+    if COMMON_PASSWORDS.contains(&lowered.as_str()) {
+        return Err(ApiError::bad_request("This password is too common. Choose one that is not on lists of well-known passwords."));
+    }
+    if password.chars().collect::<BTreeSet<_>>().len() < 5 {
+        return Err(ApiError::bad_request("This password repeats too few characters. Use at least five different ones."));
+    }
+    let local_part = email
+        .and_then(|email| email.trim().split('@').next())
+        .map(str::to_lowercase)
+        .filter(|part| part.chars().count() >= 4);
+    if local_part.is_some_and(|part| lowered.contains(&part)) {
+        return Err(ApiError::bad_request("The password must not contain your email address."));
     }
     Ok(())
 }
@@ -5459,6 +5561,7 @@ mod tests {
         .unwrap();
         let collaborator_authorization =
             format!("Bearer {}", collaborator["access_token"].as_str().unwrap());
+        join(&app, &authorization, "workspaces", &workspace_id, "collaborator@example.com", "member").await;
         let member = app
             .clone()
             .oneshot(json_request(
@@ -6166,6 +6269,7 @@ mod tests {
             assert_eq!(workspace.status(), 201);
         }
 
+        join(&app, &owner_authorization, "organizations", &organization_id, "org-member@example.com", "admin").await;
         let added = app
             .clone()
             .oneshot(json_request(
@@ -6482,6 +6586,7 @@ mod tests {
         )
         .await;
         let workspace_id = workspace["workspace"]["id"].as_str().unwrap().to_owned();
+        join(&app, owner, "workspaces", &workspace_id, "repo-member@example.com", "member").await;
         let added = app
             .clone()
             .oneshot(json_request(
@@ -6765,6 +6870,7 @@ mod tests {
         )
         .unwrap();
         let workspace_id = workspace["workspace"]["id"].as_str().unwrap().to_owned();
+        join(&app, owner, "workspaces", &workspace_id, "auto-member@example.com", "member").await;
         let added = app
             .clone()
             .oneshot(json_request(
@@ -6913,6 +7019,7 @@ mod tests {
         )
         .await;
         let workspace_id = workspace["workspace"]["id"].as_str().unwrap().to_owned();
+        join(&app, owner, "workspaces", &workspace_id, "health-member@example.com", "member").await;
         let added = app
             .clone()
             .oneshot(json_request(
@@ -7800,6 +7907,7 @@ mod tests {
             .await
             .unwrap();
         let other = format!("Bearer {}", read(registered).await["access_token"].as_str().unwrap());
+        join(&app, &owner, "workspaces", &workspace_id, "agent-other@example.com", "member").await;
         let added = app
             .clone()
             .oneshot(json_request("PUT", &format!("/v1/workspaces/{workspace_id}/members"), &owner, json!({"email": "agent-other@example.com", "role": "member"})))
@@ -8016,6 +8124,34 @@ mod tests {
         (format!("Bearer {}", body["access_token"].as_str().unwrap()), body)
     }
 
+    /// Brings an existing account into a workspace or organization the way
+    /// people do: `admin` makes an invitation and the account accepts it (the
+    /// member forms no longer add people who are not in yet, review M4).
+    async fn join(app: &axum::Router, admin: &str, scope: &str, id: &str, email: &str, role: &str) {
+        let invitation = response_json(
+            app.clone()
+                .oneshot(json_request("POST", &format!("/v1/{scope}/{id}/invitations"), admin, json!({"email": email, "role": role})))
+                .await
+                .unwrap(),
+        )
+        .await;
+        let token = invitation["token"].as_str().unwrap().to_owned();
+        let session = response_json(
+            app.clone()
+                .oneshot(public_post("/v1/auth/login", json!({"email": email, "password": "not-a-real-password"})))
+                .await
+                .unwrap(),
+        )
+        .await;
+        let bearer = format!("Bearer {}", session["access_token"].as_str().unwrap());
+        let accepted = app
+            .clone()
+            .oneshot(json_request("POST", "/v1/invitations/accept", &bearer, json!({"token": token})))
+            .await
+            .unwrap();
+        assert_eq!(accepted.status(), 200, "{email} accepts the invitation");
+    }
+
     /// Creates an organization and a workspace owned by `owner`.
     async fn create_workspace(app: &axum::Router, owner: &str) -> String {
         let organization = response_json(
@@ -8075,6 +8211,16 @@ mod tests {
         let _ = std::fs::remove_dir_all(data_dir);
     }
 
+    #[test]
+    fn passwords_must_not_be_common_or_built_from_the_email() {
+        assert!(super::validate_password("Password1234", None).is_err(), "well known, whatever the case");
+        assert!(super::validate_password("aaaabbbbaaaabbbb", None).is_err(), "too few different characters");
+        assert!(super::validate_password("jane.doe-is-here", Some("Jane.Doe@example.com")).is_err(), "contains the address");
+        assert!(super::validate_password("short", None).is_err());
+        assert!(super::validate_password("correct horse battery", Some("jane@example.com")).is_ok());
+        assert!(super::validate_password("with-a-tiny-local-ab-part", Some("ab@example.com")).is_ok(), "short local parts are not compared");
+    }
+
     #[tokio::test]
     async fn repeated_failed_sign_ins_lock_the_account_for_a_while() {
         let data_dir = temp_data_dir("lockout");
@@ -8098,6 +8244,21 @@ mod tests {
 
         let other = app.clone().oneshot(login("unaffected@example.com", "not-a-real-password")).await.unwrap();
         assert_eq!(other.status(), 200, "other accounts are not affected");
+        // A device that still holds the account's session is not locked out by
+        // other people's failures.
+        let session = response_json(app.clone().oneshot(login("unaffected@example.com", "not-a-real-password")).await.unwrap()).await;
+        let refresh_token = session["refresh_token"].as_str().unwrap().to_owned();
+        for _ in 0..3 {
+            let failed = app.clone().oneshot(login("unaffected@example.com", "wrong-password-123")).await.unwrap();
+            assert_eq!(failed.status(), 401);
+        }
+        assert_eq!(app.clone().oneshot(login("unaffected@example.com", "not-a-real-password")).await.unwrap().status(), 429);
+        let known = app
+            .clone()
+            .oneshot(public_post("/v1/auth/login", json!({"email": "unaffected@example.com", "password": "not-a-real-password", "refresh_token": refresh_token})))
+            .await
+            .unwrap();
+        assert_eq!(known.status(), 200, "the account's own device gets through the lockout");
         let unknown = app.clone().oneshot(login("nobody@example.com", "not-a-real-password")).await.unwrap();
         assert_eq!(unknown.status(), 401);
         assert_eq!(response_json(unknown).await["error"]["code"], "invalid_credentials");
@@ -8132,7 +8293,7 @@ mod tests {
         config.allow_registration = false;
         let app = router(config).await.unwrap();
         let health = response_json(app.clone().oneshot(Request::builder().uri("/health").body(Body::empty()).unwrap()).await.unwrap()).await;
-        assert_eq!(health["registration_open"], true, "the first owner can still register");
+        assert!(health.get("registration_open").is_none(), "the health check does not advertise registration");
         register_account(&app, "first@example.com").await;
 
         let second = app
@@ -8144,8 +8305,6 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(second.status(), 403);
-        let health = response_json(app.clone().oneshot(Request::builder().uri("/health").body(Body::empty()).unwrap()).await.unwrap()).await;
-        assert_eq!(health["registration_open"], false);
         let _ = std::fs::remove_dir_all(data_dir);
     }
 
@@ -8182,6 +8341,7 @@ mod tests {
             let request = json_request(method, &uri, who, body);
             async move { app.oneshot(request).await.unwrap() }
         };
+        join(&app, &owner, "workspaces", &workspace_id, "ai-viewer@example.com", "viewer").await;
         let added = call("PUT", format!("/v1/workspaces/{workspace_id}/members"), &owner, json!({"email": "ai-viewer@example.com", "role": "viewer"})).await;
         assert_eq!(added.status(), 200);
         let provider = call("PUT", format!("/v1/workspaces/{workspace_id}/ai-providers"), &owner, json!({"provider_type": "ollama", "name": "Mock", "base_url": ollama_url, "model": "mock-chat", "enabled": true, "purpose": "text"})).await;
@@ -8298,6 +8458,7 @@ mod tests {
         let sibling = response_json(send("POST", "/v1/workspaces".to_owned(), &owner, json!({"organization_id": organization_id, "name": "Finance"})).await).await["workspace"]["id"].as_str().unwrap().to_owned();
 
         // A viewer of one workspace gets that workspace only.
+        join(&app, &owner, "workspaces", &core, "contractor@example.com", "viewer").await;
         let added = send("PUT", format!("/v1/workspaces/{core}/members"), &owner, json!({"email": "contractor@example.com", "role": "viewer"})).await;
         assert_eq!(added.status(), 200);
         let workspaces = response_json(get("/v1/workspaces".to_owned(), &guest).await).await;
@@ -8319,8 +8480,7 @@ mod tests {
         assert_eq!(get(format!("/v1/workspaces/{later}/overview"), &guest).await.status(), 403);
 
         // Organization membership still flows to every workspace, and the guest flag goes.
-        let joined = send("PUT", format!("/v1/organizations/{organization_id}/members"), &owner, json!({"email": "contractor@example.com", "role": "member"})).await;
-        assert_eq!(joined.status(), 200);
+        join(&app, &owner, "organizations", &organization_id, "contractor@example.com", "member").await;
         assert_eq!(response_json(get("/v1/workspaces".to_owned(), &guest).await).await.as_array().unwrap().len(), 3);
         assert_eq!(response_json(get("/v1/organizations".to_owned(), &guest).await).await[0]["guest"], false);
         let _ = std::fs::remove_dir_all(data_dir);
@@ -8339,6 +8499,7 @@ mod tests {
         let (owner, _) = register_account(&app, "ws-owner@example.com").await;
         let (writer, _) = register_account(&app, "ws-writer@example.com").await;
         let workspace_id = create_workspace(&app, &owner).await;
+        join(&app, &owner, "workspaces", &workspace_id, "ws-writer@example.com", "member").await;
         assert_eq!(send("PUT", format!("/v1/workspaces/{workspace_id}/members"), &owner, json!({"email": "ws-writer@example.com", "role": "member"})).await.status(), 200);
 
         // The owner keeps the owner role, even against their own request.
@@ -8504,6 +8665,7 @@ mod tests {
         let (member, registration) = register_account(&app, "stream-member@example.com").await;
         let member_id = registration["user"]["id"].as_str().unwrap().to_owned();
         let workspace_id = create_workspace(&app, &owner).await;
+        join(&app, &owner, "workspaces", &workspace_id, "stream-member@example.com", "member").await;
         let added = app
             .clone()
             .oneshot(json_request("PUT", &format!("/v1/workspaces/{workspace_id}/members"), &owner, json!({"email": "stream-member@example.com", "role": "member"})))
@@ -8605,8 +8767,6 @@ mod tests {
         // Run-time settings apply at once and can be reset.
         let refused = send("PUT", "/v1/system/settings".to_owned(), &admin, json!({"values": {"allow_registration": false, "login_max_failures": -3}})).await;
         assert_eq!(refused.status(), 400, "a request applies completely or not at all");
-        let health = response_json(app.clone().oneshot(Request::builder().uri("/health").body(Body::empty()).unwrap()).await.unwrap()).await;
-        assert_eq!(health["registration_open"], true);
         let changed = send("PUT", "/v1/system/settings".to_owned(), &admin, json!({"values": {"allow_registration": false}})).await;
         assert_eq!(changed.status(), 200);
         let changed = response_json(changed).await;
@@ -8648,6 +8808,71 @@ mod tests {
         for expected in ["system_admin_granted", "system_settings_changed", "system_setting_reset", "user_sessions_ended", "system_admin_revoked", "maintenance_run"] {
             assert!(actions.iter().any(|action| action == expected), "{expected} missing from {actions:?}");
         }
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn app_administrators_read_the_system_pages_and_changes_need_the_system_scope() {
+        let data_dir = temp_data_dir("app-admin");
+        let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+        let get = |uri: &str, who: &str| {
+            let app = app.clone();
+            let request = auth_request("GET", uri, who);
+            async move { app.oneshot(request).await.unwrap() }
+        };
+        let send = |method: &'static str, uri: &str, who: &str, body: Value| {
+            let app = app.clone();
+            let request = json_request(method, uri, who, body);
+            async move { app.oneshot(request).await.unwrap() }
+        };
+        let (admin, _) = register_account(&app, "rooted-admin@example.com").await;
+        let (helper, helper_tokens) = register_account(&app, "app-helper@example.com").await;
+        let helper_id = helper_tokens["user"]["id"].as_str().unwrap().to_owned();
+        let (stranger, _) = register_account(&app, "plain-stranger@example.com").await;
+        assert_eq!(send("PUT", &format!("/v1/system/users/{helper_id}/app-admin"), &admin, json!({"enabled": true})).await.status(), 204);
+
+        // Everyone who is not an administrator is turned away from every System page.
+        for page in ["/v1/system/overview", "/v1/system/users", "/v1/system/settings", "/v1/system/logs", "/v1/system/audit", "/v1/system/jobs", "/v1/system/maintenance", "/v1/system/console"] {
+            assert_eq!(get(page, &stranger).await.status(), 403, "{page}");
+            assert_eq!(get(page, &helper).await.status(), 200, "{page} is readable by app administrators");
+        }
+        assert_eq!(get("/v1/system/logs/files", &helper).await.status(), 200);
+
+        // What only system administrators do stays with them (decision 1, review M8).
+        let day = "2026-01-01";
+        let refused = [
+            ("PUT", "/v1/system/settings".to_owned(), json!({"values": {"allow_registration": false}})),
+            ("DELETE", "/v1/system/settings/allow_registration".to_owned(), json!({})),
+            ("PUT", format!("/v1/system/users/{helper_id}/system-admin"), json!({"enabled": true})),
+            ("PUT", format!("/v1/system/users/{helper_id}/app-admin"), json!({"enabled": false})),
+            ("POST", format!("/v1/system/users/{helper_id}/sessions/end"), json!({})),
+            ("POST", format!("/v1/system/users/{helper_id}/unlock"), json!({})),
+            ("POST", format!("/v1/system/users/{helper_id}/password-reset"), json!({})),
+            ("POST", "/v1/system/environment/detach".to_owned(), json!({})),
+        ];
+        for (method, uri, body) in refused {
+            assert_eq!(send(method, &uri, &helper, body).await.status(), 403, "{method} {uri} is for system administrators");
+        }
+        assert_eq!(get(&format!("/v1/system/logs/files/{day}"), &helper).await.status(), 403, "raw log files");
+        assert_eq!(send("POST", "/v1/system/console", &helper, json!({"command": "settings set allow_registration false --yes"})).await.status(), 403);
+        assert_eq!(send("POST", "/v1/system/maintenance/run", &helper, json!({})).await.status(), 200, "jobs and maintenance are theirs");
+
+        // The system scope: only administrators can mint it, and only it changes things.
+        let mint = |who: String, scope: &'static str| {
+            let app = app.clone();
+            let request = json_request("POST", "/v1/profile/tokens", &who, json!({"name": "Ops", "scope": scope, "expires_in_days": 7}));
+            async move { app.oneshot(request).await.unwrap() }
+        };
+        assert_eq!(mint(stranger.clone(), "system").await.status(), 403, "members cannot mint the system scope");
+        let write = response_json(mint(admin.clone(), "write").await).await;
+        let write = format!("Bearer {}", write["secret"].as_str().unwrap());
+        let system = response_json(mint(admin.clone(), "system").await).await;
+        let system = format!("Bearer {}", system["secret"].as_str().unwrap());
+        let unlock = format!("/v1/system/users/{helper_id}/unlock");
+        assert_eq!(send("POST", &unlock, &write, json!({})).await.status(), 403, "a read-and-write token does not change the System area");
+        assert_eq!(send("POST", &unlock, &system, json!({})).await.status(), 200);
+        assert_eq!(send("POST", "/v1/system/maintenance/run", &write, json!({})).await.status(), 403);
+        assert_eq!(get("/v1/system/overview", &write).await.status(), 200, "reading is fine");
         let _ = std::fs::remove_dir_all(data_dir);
     }
 
@@ -8756,7 +8981,7 @@ mod tests {
         let status = response_json(app.clone().oneshot(public_get("/v1/setup")).await.unwrap()).await;
         assert_eq!((status["state"].clone(), status["onboarding"].clone()), (json!("new"), json!(true)));
         let health = response_json(app.clone().oneshot(public_get("/health")).await.unwrap()).await;
-        assert_eq!((health["setup_required"].clone(), health["registration_open"].clone()), (json!(true), json!(false)));
+        assert_eq!(health["setup_required"], json!(true));
         let early = app.clone().oneshot(public_post("/v1/auth/register", json!({"email": "early@example.com", "display_name": "Early", "password": "not-a-real-password"}))).await.unwrap();
         assert_eq!(early.status(), 403, "nobody registers before setup");
 

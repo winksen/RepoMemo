@@ -272,6 +272,19 @@ async fn interactive(client: &mut Client, paint: &Paint, options: &Options, welc
     ExitCode::SUCCESS
 }
 
+/// The host of a plain `http://` server address that is not this machine.
+fn insecure_remote_host(server: &str) -> Option<String> {
+    let rest = server.strip_prefix("http://")?;
+    let authority = rest.split('/').next().unwrap_or(rest);
+    let host = match authority.strip_prefix('[') {
+        Some(bracketed) => bracketed.split(']').next().unwrap_or(bracketed),
+        None => authority.rsplit_once(':').map_or(authority, |(host, _)| host),
+    };
+    let local = host.eq_ignore_ascii_case("localhost")
+        || host.parse::<std::net::IpAddr>().is_ok_and(|address| address.is_loopback());
+    (!local).then(|| host.to_owned())
+}
+
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> ExitCode {
     let options = match Options::parse(std::env::args().skip(1)) {
@@ -282,6 +295,12 @@ async fn main() -> ExitCode {
         }
     };
     let paint = Paint::detect();
+    if let Some(host) = insecure_remote_host(&options.server) {
+        eprintln!(
+            "{}",
+            paint.warning(&format!("Warning: {host} is reached over plain http://, so your password and tokens travel unencrypted. Use https:// for a server on another machine."))
+        );
+    }
     let single = !options.command.is_empty();
     let mut client = Client::new(&options.server, non_empty_env("REPOMEMO_TOKEN"));
     if !single {
@@ -320,6 +339,15 @@ mod tests {
 
     fn words(list: &[&str]) -> Vec<String> {
         list.iter().map(|word| (*word).to_owned()).collect()
+    }
+
+    #[test]
+    fn plain_http_to_another_machine_is_flagged() {
+        assert_eq!(insecure_remote_host("http://memo.example.com:3020"), Some("memo.example.com".to_owned()));
+        assert_eq!(insecure_remote_host("http://127.0.0.1:3020"), None);
+        assert_eq!(insecure_remote_host("http://localhost:3020/"), None);
+        assert_eq!(insecure_remote_host("http://[::1]:3020"), None);
+        assert_eq!(insecure_remote_host("https://memo.example.com"), None);
     }
 
     #[test]

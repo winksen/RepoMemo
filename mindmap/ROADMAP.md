@@ -165,7 +165,7 @@ Each proposal below was accepted as written. They shape the releases named in th
 
 ### Release checklists
 
-#### V0.1.66: Checkable releases (built, not yet released)
+#### V0.1.66: Checkable releases
 
 - [x] **C8 CI** (`.github/workflows/ci.yml`) on every push to `main` and every pull request. Blocking: versions agree, `cargo test` on Linux and Windows (desktop crate excluded), `npm run typecheck`, `cargo deny check advisories sources` for the server's dependencies (policy in `deny.toml`), `npm audit --omit=dev --audit-level=high`. Advisory for now: rustfmt, clippy `-D warnings`, licenses, duplicate crates and desktop-only advisories (they become blocking in V0.1.71)
 - [x] **C9 one version source:** `npm run version:set -- <version>` (`scripts/set-version.mjs`) sets `Cargo.toml`, `Cargo.lock`, both `package.json` files, `package-lock.json` and `tauri.conf.json`; `npm run version:check` in CI; the code now says 0.1.66; `CHANGELOG.md` starts with V0.1.63–V0.1.66
@@ -173,17 +173,17 @@ Each proposal below was accepted as written. They shape the releases named in th
 - [x] **D1 documentation housekeeping:** `docs/IMPLEMENTATION_TRACKER.md` retired, `PRODUCT.md` describes the team product, Postman v5 collection with the onboarding routes (local, `docs/api/` is git-ignored)
 - [ ] **C10 dependencies** (needs the lockfiles regenerated with `cargo` and `npm`, so it is done by hand): Vite 5 → current, which closes the esbuild advisory; `quick-xml` 0.39 → 0.41 in `repomemo-ingestion` so the server builds one version. The remaining duplicates are not ours: `reqwest` 0.13 and `quick-xml` 0.39 arrive through Tauri (`tauri`, `plist`) next to the versions the server uses, and are reported as warnings by `cargo deny`
 
-#### V0.1.67: Safe defaults and identity
+#### V0.1.67: Safe defaults and identity (built, not yet released)
 
-- [ ] **M1** registration closed by default once setup is complete (the setup wizard asks); `/health` stops advertising it (I2)
-- [ ] **M4** registration answers the same for known and unknown addresses; member adds offer an invitation without saying whether an account exists
-- [ ] **M8** split System rights per decision 1, with a test per System route for both administrator kinds
-- [ ] **N2 residual** a `system` scope for personal access tokens; System changes need it
-- [ ] **M9** refuse a non-loopback bind without `REPOMEMO_PUBLIC_URL=https://…` or `REPOMEMO_TRUST_PROXY`; HSTS when the public URL is HTTPS; the console warns on plain `http://` to a remote host
-- [ ] **M3** client address from the rightmost proxy entry, only when the TCP peer is the configured proxy
-- [ ] **L10** progressive delays per address instead of a global account lock; a valid session or refresh token bypasses it
-- [ ] **L4** in-app notification to the account when a reset link is issued and when it is used
-- [ ] **L7** reject the most common passwords and passwords containing the email
+- [x] **M1** `REPOMEMO_ALLOW_REGISTRATION` defaults to `false`; the first account still registers, the setup wizard asks, and `/health` no longer carries `registration_open` (I2). Storage quotas stay with V0.1.75 (O4)
+- [x] **M4** member adds refuse anyone not already in the organization or workspace with the same `409 invitation_required`, account or not, and the web app offers the invitation link. Registration itself stays distinguishable while it is open (no mail to verify with until V0.3.0), which is why it is closed by default
+- [x] **M8** `require_full_system_admin` for settings, roles, sessions, lockouts, reset links, raw log files and detach; workspace activity records hidden from app administrators. Test `app_administrators_read_the_system_pages_and_changes_need_the_system_scope`
+- [x] **N2 residual** the `system` token scope (migration 0024); System changes need a session or that scope
+- [x] **M9** `check_transport` at startup, `REPOMEMO_ALLOW_INSECURE_HTTP` for a trusted network, HSTS for an HTTPS public URL, console warning
+- [x] **M3** `ProxyTrust` (`REPOMEMO_TRUST_PROXY` plus loopback or `REPOMEMO_TRUSTED_PROXIES`), rightmost untrusted entry
+- [x] **L10** a refresh token this browser holds bypasses a lockout (per-address counters were already separate from the account-wide bar of five times as many failures)
+- [x] **L4** notifications `password_reset_issued` and `password_reset_used`
+- [x] **L7** `validate_password`: common list, at least five different characters, no email name
 
 #### V0.1.68: Browser hardening
 
@@ -286,7 +286,7 @@ Every item, with the release it is planned for. The evidence behind each is in t
 |---|---|---|---|
 | S1 | Ship-blockers for onboarding | H1, H4, L2, L3, M7 | ✅ V0.1.64 |
 | — | Second pass | N1–N6, I3 | ✅ V0.1.65 |
-| S2 | Safe defaults and identity | M1, M3, M4, M8, M9, L4, L7, L10, N2 residual | V0.1.67 |
+| S2 | Safe defaults and identity | M1, M3, M4, M8, M9, L4, L7, L10, N2 residual | ✅ V0.1.67 |
 | S4 | Browser hardening | M2, M5, M6, L9 | V0.1.68 |
 | S3 | Host exposure | H2, H3, L8, M10 | V0.1.69 |
 | — | Server timeouts | N7 | V0.1.71 |

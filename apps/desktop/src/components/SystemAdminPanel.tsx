@@ -136,7 +136,7 @@ export function SystemAdminPanel({ accessToken, onNavigateSection, onOpenWorkspa
     {section === "usage" ? <UsageSection accessToken={accessToken} onOpenWorkspace={onOpenWorkspace} /> : null}
     {section === "users" ? <UsersSection accessToken={accessToken} session={session} /> : null}
     {section === "settings" ? <SettingsSection accessToken={accessToken} session={session} /> : null}
-    {section === "logs" ? <LogsSection accessToken={accessToken} canDownload={session.is_system_admin} onOpenSettings={() => onNavigateSection("settings")} workspaces={workspaces} /> : null}
+    {section === "logs" ? <LogsSection accessToken={accessToken} canDownload={session.is_system_admin === true} onOpenSettings={() => onNavigateSection("settings")} workspaces={workspaces} /> : null}
     {section === "jobs" ? <JobsSection accessToken={accessToken} /> : null}
     {section === "audit" ? <AuditSection accessToken={accessToken} /> : null}
     {section === "console" ? <SystemConsole accessToken={accessToken} /> : null}

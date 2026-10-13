@@ -1399,6 +1399,18 @@ impl StorageEngine {
         Ok(())
     }
 
+    /// Whether the user is a member of the organization the workspace belongs to.
+    pub async fn user_in_workspace_organization(&self, user_id: &str, workspace_id: &str) -> Result<bool> {
+        Ok(sqlx::query_scalar::<_, i64>(
+            "SELECT EXISTS (SELECT 1 FROM organization_memberships om INNER JOIN workspace_organizations wo ON wo.organization_id = om.organization_id WHERE wo.workspace_id = ?1 AND om.user_id = ?2)",
+        )
+        .bind(workspace_id)
+        .bind(user_id)
+        .fetch_one(&self.pool)
+        .await?
+            > 0)
+    }
+
     pub async fn user_belongs_to_organization(
         &self,
         user_id: &str,

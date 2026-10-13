@@ -87,8 +87,8 @@ const CLIENT_HEADER = ["X-RepoMemo-Client", "web"] as const;
 
 export const sharedApiUrl = API_URL;
 
-export function getSharedHealth(): Promise<{ service: string; status: string; authentication: string; registration_open?: boolean }> {
-  return request<{ service: string; status: string; authentication: string; registration_open?: boolean }>("/health");
+export function getSharedHealth(): Promise<{ service: string; status: string; authentication: string; setup_required?: boolean }> {
+  return request<{ service: string; status: string; authentication: string; setup_required?: boolean }>("/health");
 }
 
 export const SHARED_SESSION_STORAGE_KEY = "repomemo.shared.access-token";
@@ -279,9 +279,12 @@ export async function loginSharedUser(input: {
   email: string;
   password: string;
 }): Promise<TokenResponse> {
+  // A session this browser still holds shows it is one of the account's own
+  // devices, which gets past an account-wide lockout others caused.
+  const refreshToken = readStorage("localStorage", REFRESH_STORAGE_KEY);
   const response = await request<TokenResponse>("/v1/auth/login", {
     method: "POST",
-    body: JSON.stringify(input),
+    body: JSON.stringify({ ...input, refresh_token: refreshToken ?? undefined }),
   });
   storeTokens(response);
   return response;

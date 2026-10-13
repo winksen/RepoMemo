@@ -147,7 +147,7 @@ import {
   deleteSharedAvatar,
   fetchSharedAvatar,
   uploadSharedAvatar,
-  type SharedApiError,
+  SharedApiError,
 } from "./lib/sharedApi";
 import type {
   AskAnswer,
@@ -1168,10 +1168,10 @@ function OrganizationAdministration({
       setMembers((current) => current.some((entry) => entry.user.id === member.user.id) ? current.map((entry) => entry.user.id === member.user.id ? member : entry) : [...current, member]);
       setMemberEmail("");
     } catch (requestError) {
-      // No account yet: offer the invitation link for that address instead.
-      if (apiMessage(requestError).includes("No RepoMemo account")) {
+      // Not in the organization yet (with or without an account): they join by invitation.
+      if (requestError instanceof SharedApiError && requestError.status === 409) {
         setInviteEmail(email.trim());
-        showToast("warning", `${email.trim()} has no account yet. Create an invite link for them below.`);
+        showToast("warning", `${email.trim()} is not in this organization yet. Create an invite link for them below.`);
       } else setError(apiMessage(requestError));
     } finally { setIsSaving(false); }
   }
@@ -2095,10 +2095,10 @@ function SharedWorkspaceDetail({
       setMemberRole("member");
       await load();
     } catch (requestError) {
-      // No account yet: offer the invitation link for that address instead.
-      if (apiMessage(requestError).includes("No RepoMemo account")) {
+      // Not in the organization yet (with or without an account): they join by invitation.
+      if (requestError instanceof SharedApiError && requestError.status === 409) {
         setInviteEmail(memberEmail.trim());
-        showToast("warning", `${memberEmail.trim()} has no account yet. Create an invite link for them below.`);
+        showToast("warning", `${memberEmail.trim()} is not in this organization yet. Create an invite link for them below.`);
       } else setError(apiMessage(requestError));
     } finally { setIsSubmitting(false); }
   }

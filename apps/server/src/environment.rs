@@ -541,7 +541,6 @@ fn unattached(host: &Host, path: &str) -> Response {
             "service": host.config.service_name,
             "status": "ok",
             "authentication": "jwt",
-            "registration_open": false,
             "setup_required": false,
             "environment_required": true,
         }))

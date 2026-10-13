@@ -169,13 +169,16 @@ stored in the database and override the values below until reset.
 | `REPOMEMO_SOFFICE` | found automatically | Path to LibreOffice's `soffice` for layout-accurate Office previews. Unset: looked up on `PATH` and in the usual install folder; without it, text, table and slide previews are used. |
 | `REPOMEMO_ALLOWED_ORIGIN` | `http://127.0.0.1:3021` | Browser origins allowed to call the API. Comma-separated for several; `*` is refused. |
 | `REPOMEMO_SECRET_KEY` | unset | Key (32+ characters) used to encrypt AI provider API keys at rest. When unset, a random key is created in `<data dir>/secret.key`; back that file up with the database, or the saved keys must be entered again. |
-| `REPOMEMO_ALLOW_REGISTRATION` | `true` | `false` closes sign-up; people then join with invitation links. The very first account can still register, so a new server gets its owner. Email addresses are not verified, so keep it closed on a server others can reach. |
-| `REPOMEMO_TRUST_PROXY` | `false` | Read the client address from `X-Forwarded-For` / `X-Real-IP`. Only behind a reverse proxy that sets them. |
+| `REPOMEMO_ALLOW_REGISTRATION` | `false` | `true` opens sign-up to anyone who can reach the server; by default people join with invitation links. The very first account can still register, so a new server gets its owner. Email addresses are not verified, so keep it closed on a server others can reach. |
+| `REPOMEMO_PUBLIC_URL` | unset | The address people use, such as `https://memo.example.com`. With `https://` the server may listen beyond loopback and sends `Strict-Transport-Security`. |
+| `REPOMEMO_TRUST_PROXY` | `false` | Read the client address from `X-Forwarded-For` / `X-Real-IP`, but only when the TCP peer is loopback or listed in `REPOMEMO_TRUSTED_PROXIES`; the rightmost address no trusted proxy added wins. Also accepted as proof of a TLS proxy for non-loopback binds. |
+| `REPOMEMO_TRUSTED_PROXIES` | unset | Comma-separated proxy addresses besides loopback whose forwarding headers are believed. |
+| `REPOMEMO_ALLOW_INSECURE_HTTP` | `false` | Lets the server listen beyond loopback over plain HTTP with no proxy in front. For a trusted network only; without it (and without an `https://` public URL or proxy trust) the server refuses to start. |
 | `REPOMEMO_MAX_UPLOAD_MB` | `10` | Largest request body (uploads). |
 | `REPOMEMO_ACCESS_TOKEN_TTL_MINUTES` | `60` | Access-token lifetime (5–1440). |
 | `REPOMEMO_REFRESH_TOKEN_TTL_DAYS` | `30` | Refresh-token lifetime (1–365). |
 | `REPOMEMO_AUTH_REQUESTS_PER_MINUTE` | `30` | Sign-in and registration requests per client address (session refreshes get four times as many); `0` turns the limit off. |
-| `REPOMEMO_LOGIN_MAX_FAILURES` | `10` | Consecutive failed sign-ins (per account and address) before a temporary lockout; the account is also locked after five times as many from all addresses. `0` turns it off. |
+| `REPOMEMO_LOGIN_MAX_FAILURES` | `10` | Consecutive failed sign-ins (per account and address) before a temporary lockout; the account is also locked after five times as many from all addresses. A device that still holds one of the account's sessions gets through. `0` turns it off. |
 | `REPOMEMO_LOGIN_LOCKOUT_MINUTES` | `15` | Length of that lockout. |
 | `REPOMEMO_AI_REQUESTS_PER_HOUR` | `120` | AI requests (Ask, overviews, summaries, assistant AI actions) per user per hour; `0` is unlimited. |
 | `REPOMEMO_AI_ALLOWED_HOSTS` | unset | Comma-separated hosts AI providers may be configured at, such as `127.0.0.1,localhost,.openrouter.ai` (a leading dot allows subdomains). Link-local and cloud-metadata addresses are always refused. |
