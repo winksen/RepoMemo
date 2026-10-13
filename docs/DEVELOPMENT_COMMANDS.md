@@ -146,12 +146,12 @@ stored in the database and override the values below until reset.
 
 | Variable | Default | What it does |
 |---|---|---|
-| `REPOMEMO_SERVER_ADDR` | `127.0.0.1:3020` | Address and port the API listens on. The server speaks plain HTTP; put a TLS proxy in front of it before binding beyond loopback. |
+| `REPOMEMO_SERVER_ADDR` | `127.0.0.1:3020` | Address and port the API listens on. The server speaks plain HTTP and has no connection or request timeouts of its own; put a TLS reverse proxy with header, body and idle timeouts in front of it before binding beyond loopback. |
 | `REPOMEMO_SERVICE_NAME` | `repomemo-server` | Name reported by `/health`. |
 | `REPOMEMO_SOFFICE` | found automatically | Path to LibreOffice's `soffice` for layout-accurate Office previews. Unset: looked up on `PATH` and in the usual install folder; without it, text, table and slide previews are used. |
 | `REPOMEMO_ALLOWED_ORIGIN` | `http://127.0.0.1:3021` | Browser origins allowed to call the API. Comma-separated for several; `*` is refused. |
 | `REPOMEMO_SECRET_KEY` | unset | Key (32+ characters) used to encrypt AI provider API keys at rest. When unset, a random key is created in `<data dir>/secret.key`; back that file up with the database, or the saved keys must be entered again. |
-| `REPOMEMO_ALLOW_REGISTRATION` | `true` | `false` closes sign-up. The very first account can still register, so a new server gets its owner. |
+| `REPOMEMO_ALLOW_REGISTRATION` | `true` | `false` closes sign-up; people then join with invitation links. The very first account can still register, so a new server gets its owner. Email addresses are not verified, so keep it closed on a server others can reach. |
 | `REPOMEMO_TRUST_PROXY` | `false` | Read the client address from `X-Forwarded-For` / `X-Real-IP`. Only behind a reverse proxy that sets them. |
 | `REPOMEMO_MAX_UPLOAD_MB` | `10` | Largest request body (uploads). |
 | `REPOMEMO_ACCESS_TOKEN_TTL_MINUTES` | `60` | Access-token lifetime (5–1440). |

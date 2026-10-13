@@ -2,7 +2,7 @@
 
 > **Audience:** engineers working on RepoMemo, reviewers, and anyone operating the shared server.
 > **Companion:** [FUNCTIONAL_MINDMAP.md](FUNCTIONAL_MINDMAP.md) covers *what* the product does. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** code at `V0.1.63` (2026-10-13: invitations, reset links, personal access tokens, migration 0023) plus security bundle S1 on main, marked *unreleased*. Aligned on 2026-10-13; sections marked *hardening* came with V0.1.51–V0.1.57. The focus is the **shared web client** (`apps/desktop/src/SharedWebApp.tsx`) and the **HTTP API** (`apps/server`). Desktop and Tauri paths are noted where they share code. Open security findings are in the [security review](security/2026-10-10-security-review.md), and the improvement backlog is in the [enhancement analysis](analysis/2026-10-13-enhancement-analysis.md).
+> **Scope:** code at `V0.1.64` (2026-10-13: invitations, reset links and personal access tokens in V0.1.63, migration 0023; security bundle S1 in V0.1.64) plus the security second-pass fixes on main, marked *unreleased*. Aligned on 2026-10-13; sections marked *hardening* came with V0.1.51–V0.1.57. The focus is the **shared web client** (`apps/desktop/src/SharedWebApp.tsx`) and the **HTTP API** (`apps/server`). Desktop and Tauri paths are noted where they share code. Open security findings are in the [security review](security/2026-10-10-security-review.md), and the improvement backlog is in the [enhancement analysis](analysis/2026-10-13-enhancement-analysis.md).
 
 ---
 
@@ -205,8 +205,8 @@ sequenceDiagram
 - Access tokens are **HS256 JWTs** with claims `sub`, `email`, `iss`, `iat`, `exp` and `ver`. The TTL is 60 minutes by default (`REPOMEMO_ACCESS_TOKEN_TTL_MINUTES`). **Refresh tokens** (migration 0016) are opaque, stored as SHA-256 hashes, rotated on every use and valid 30 days; presenting a rotated token again revokes the whole family. The web client refreshes silently on a 401.
 - **Session versions** (*hardening*, migration 0018). `users.session_version` is stamped into each access token as `ver`, and the extractor refuses a token whose version no longer matches (one primary-key lookup per request), so a deleted user's tokens also stop working. Changing the password and `POST /v1/auth/logout-all` bump the version and revoke every refresh token: every session ends at once, not when its token expires. The password change returns a fresh session (`TokenResponse`) for the device that made it.
 - `AuthenticatedSubject` implements `FromRequestParts`. If a handler takes it as an argument, the handler is protected.
-- **Personal access tokens** (migration 0023, [access.rs](../apps/server/src/access.rs)). A bearer value starting with `rmp_` is looked up by SHA-256 instead of decoded as a JWT. It must not be revoked or expired, and its user must exist. The subject carries `token: Some(TokenGrant { read_only })` and the user's current session version, so open event streams still end when sessions are ended. *Unreleased (S1, review L2):* what a token may reach is marked by the extractor each handler takes, not by a path list. `AuthenticatedSubject` accepts tokens but refuses read-only ones on anything other than GET/HEAD. `SessionSubject` refuses every token (403): token management, `/v1/profile/password`, `/v1/auth/logout-all`, `/v1/invitations/accept`, `/v1/system/environment/detach`, the system and app administrator grants and reset links. `ReadingSubject` lets a read-only token make a POST that only reads: workspace and memory-card search, `…/artifacts/query`, `…/ask` and `/v1/system/console`, whose handler refuses `--yes` from it. A new account-security handler must take `SessionSubject`. Last use is written at most every 5 minutes. Tokens survive password changes and the user's own sign-out-everywhere; System › *Sign out everywhere* revokes them.
-- **Invitation and reset links** ([access.rs](../apps/server/src/access.rs), storage `access.rs`). Secrets are two UUIDv4s in hex, stored as SHA-256 and found by hash lookup. *Unreleased (S1, review L3):* the web paths are `/invite#<secret>` and `/reset-password#<secret>`, so the secret never reaches a server, and the SPA sets `no-referrer`. Registration with `invitation_token` skips the closed-registration check only for the invited email; joining happens on `accept`, which marks the invitation used with a conditional update first and gives it back if the membership change fails. Maintenance deletes links a week after they expire.
+- **Personal access tokens** (migration 0023, [access.rs](../apps/server/src/access.rs)). A bearer value starting with `rmp_` is looked up by SHA-256 instead of decoded as a JWT. It must not be revoked or expired, and its user must exist. The subject carries `token: Some(TokenGrant { read_only })` and the user's current session version, so open event streams still end when sessions are ended. *Since V0.1.64 (review L2):* what a token may reach is marked by the extractor each handler takes, not by a path list. `AuthenticatedSubject` accepts tokens but refuses read-only ones on anything other than GET/HEAD. `SessionSubject` refuses every token (403): token management, `/v1/profile/password`, `/v1/auth/logout-all`, `/v1/invitations/accept`, `/v1/system/environment/detach`, the system and app administrator grants and reset links, and (second pass N2) changes to run-time settings. `ReadingSubject` lets a read-only token make a POST that only reads: workspace and memory-card search, `…/artifacts/query`, `…/ask` and `/v1/system/console`, whose handler refuses `--yes` from it. A new account-security handler must take `SessionSubject`. Last use is written at most every 5 minutes. Tokens survive password changes and the user's own sign-out-everywhere; System › *Sign out everywhere* and (*unreleased*, second pass N5) a used reset link revoke them.
+- **Invitation and reset links** ([access.rs](../apps/server/src/access.rs), storage `access.rs`). Secrets are two UUIDv4s in hex, stored as SHA-256 and found by hash lookup. *Since V0.1.64 (review L3):* the web paths are `/invite#<secret>` and `/reset-password#<secret>`, so the secret never reaches a server, and the SPA sets `no-referrer`. Registration with `invitation_token` skips the closed-registration check only for the invited email; joining happens on `accept`, which marks the invitation used with a conditional update first and gives it back if the membership change fails. Maintenance deletes links a week after they expire.
 - Login returns the same `invalid_credentials` error whether the email is unknown or the password is wrong, and an unknown email is checked against a fixed Argon2 hash so the response time does not reveal which emails have accounts.
 - **Throttling** (*hardening*, [security.rs](../apps/server/src/security.rs)). Sign-in and registration are limited per client address (30 per minute by default), and session refreshes, which every open tab makes and which cannot be guessed, get a separate bucket four times as large. Failed sign-ins lock the account for that address after 10 consecutive failures, and for every address after 50, for 15 minutes; the answer is 429 `rate_limited` with `Retry-After`. Counters are in memory (one server process), keyed on the TCP peer, or on `X-Forwarded-For` when `REPOMEMO_TRUST_PROXY` is set.
 - **Registration** can be closed (`REPOMEMO_ALLOW_REGISTRATION=false`); the first account can still register. `/health` reports `registration_open`.
@@ -215,7 +215,7 @@ sequenceDiagram
 
 The server resolves the caller's role **per request** from `workspace_memberships` or `organization_memberships`. Guards return the role, so handlers can apply finer rules.
 
-**System administrators** (`users.is_system_admin`, migration 0019) are loaded with the session version by the extractor, so a granted or removed role applies on the next request. `require_workspace_read` and `require_organization_read` (through `effective_workspace_role`) give them **admin** in every workspace and organization, owner where they own it, without a membership row; every finer guard and escalation rule builds on that, so owner-only actions stay with owners. `GET /v1/workspaces` and `/v1/organizations` list everything for them, `GET /v1/session` reports `is_system_admin`, and storage lets them create workspaces in any organization. The first account of a server becomes one (when none exists), as do accounts listed in `REPOMEMO_SYSTEM_ADMIN_EMAILS` that exist at startup. *Unreleased (S1, review H4):* registering a listed address no longer grants the role, since email addresses are not verified; it logs a warning, as does a listed address with no account at startup. The last one cannot be removed. Without any, the server logs a warning at startup.
+**System administrators** (`users.is_system_admin`, migration 0019) are loaded with the session version by the extractor, so a granted or removed role applies on the next request. `require_workspace_read` and `require_organization_read` (through `effective_workspace_role`) give them **admin** in every workspace and organization, owner where they own it, without a membership row; every finer guard and escalation rule builds on that, so owner-only actions stay with owners. `GET /v1/workspaces` and `/v1/organizations` list everything for them, `GET /v1/session` reports `is_system_admin`, and storage lets them create workspaces in any organization. The first account of a server becomes one (when none exists), as do accounts listed in `REPOMEMO_SYSTEM_ADMIN_EMAILS` that exist at startup. *Since V0.1.64 (review H4):* registering a listed address no longer grants the role, since email addresses are not verified; it logs a warning, as does a listed address with no account at startup. The last one cannot be removed. Without any, the server logs a warning at startup.
 
 **App administrators** (`users.is_app_admin`, migration 0021) may use the whole System API and pages (`require_system_admin` accepts either flag) but get **no wildcard access**: every place that grants an administrator role in all organizations and workspaces (`effective_workspace_role`, `require_organization_read`, the all-organizations and all-workspaces lists, the event stream recheck, avatar viewing) still checks `is_system_admin` only. Granting or removing the system administrator role (`PUT /v1/system/users/{u}/system-admin`) needs a real system administrator, so an app administrator cannot promote themselves; app administrators can grant the app role (`PUT /v1/system/users/{u}/app-admin`).
 
@@ -230,12 +230,12 @@ The server resolves the caller's role **per request** from `workspace_membership
 Other rules:
 
 - For **resource-scoped routes** (`/v1/artifacts/{id}`, `/v1/tasks/{id}`, `/v1/comments/{id}`…), the handler first loads the resource to find its `workspace_id` and then applies the guard.
-- **Author-or-moderator** checks apply to deleting tasks and to editing or deleting comments.
-- **Escalation rules** live in the member-upsert handlers. Nobody can grant `owner`. An admin cannot grant `admin` and cannot modify or remove an owner or admin.
+- **Author-or-moderator** checks apply to deleting tasks, to editing or deleting comments and (*unreleased*) to deleting saved searches. *Unreleased (second pass N4):* the author path needs a writer role, so someone downgraded to viewer no longer changes their old content.
+- **Escalation rules** live in the member-upsert handlers. Nobody can grant `owner`, and (*unreleased, second pass N3*) nobody can change the role of a current owner either, not even the owner themselves (400), so a workspace or organization never loses its owner through the member list. An admin cannot grant `admin` and cannot modify or remove an owner or admin.
 - **Membership propagation** happens in SQL inside storage transactions:
   - `create_shared_workspace` copies all org members into the workspace.
-  - `upsert_organization_member` adds the user to every workspace of the org.
-  - `upsert_workspace_member` writes the workspace row only (*unreleased, S1, review H1*; it used to add the user to the organization and so to every workspace in it). `list_organizations_for_user` also returns, with `guest: true`, the organizations where the user only belongs to some workspaces, so the web client can list them; a guest has no organization role and no access to its other workspaces.
+  - `upsert_organization_member` adds the user to every workspace of the org, with the matching role, except that (*unreleased*) it never lowers a workspace the person owns. Removing an organization member removes them from every workspace, owned ones included (second pass N8: no ownership transfer yet).
+  - `upsert_workspace_member` writes the workspace row only (since V0.1.64, review H1; it used to add the user to the organization and so to every workspace in it). `list_organizations_for_user` also returns, with `guest: true`, the organizations where the user only belongs to some workspaces, so the web client can list them; a guest has no organization role and no access to its other workspaces.
 - `can_inspect_index` (owner, admin) controls who receives chunks from `GET /v1/artifacts/{a}`. The server strips them for everyone else; the SPA only hides the button and the overview chunk count.
 - `GET …/capabilities` returns `capabilities_for_role(role, may_use_ai)`. The SPA uses it **only to hide UI**. The server remains the authority.
 - **AI policy** (*hardening*, [ai_access.rs](../apps/server/src/ai_access.rs)). Each workspace sets the lowest role that may trigger AI (`ai_min_role` in `workspaces.settings_json`: `viewer` by default, `member` or `admin`), via `GET/PUT /v1/workspaces/{ws}/ai-policy` (read: any member; write: owner or admin). Ask, the AI overview, repository summaries and the assistant's AI actions check it (403 otherwise; the assistant answers that AI is kept to other roles and still runs lookups and searches), and each user has an hourly AI quota (`REPOMEMO_AI_REQUESTS_PER_HOUR`, 120 by default; 429 when used up). `can_use_ai` and `can_generate_ai_overview` follow the policy. Background image descriptions and embeddings are not affected.
@@ -278,7 +278,7 @@ Guard legend: **pub** = no auth, **auth** = any valid JWT or personal access tok
 | POST | `/v1/auth/logout` | pub | `{refresh_token}` → 204, revokes that refresh token |
 | POST | `/v1/auth/logout-all` | auth | 204. Ends every session of the caller, on every device. Personal access tokens are kept |
 | POST | `/v1/auth/password-reset/preview` | pub | `{token}` → `{email, display_name, expires_at}`; 410 for a used, replaced or expired link; rate-limited like sign-in |
-| POST | `/v1/auth/password-reset` | pub | `{token, password}` → `TokenResponse`. Sets the password, ends every session, lifts lockouts, records `password_reset_used`. A refused password does not use up the link |
+| POST | `/v1/auth/password-reset` | pub | `{token, password}` → `TokenResponse`. Sets the password, ends every session, revokes the account's personal access tokens (*unreleased*), lifts lockouts, records `password_reset_used`. A refused password does not use up the link |
 | POST | `/v1/invitations/preview` | pub | `{token}` → target name, organization, role, inviter, expiry, `account_exists`; 404 unknown, 410 used, withdrawn or expired; rate-limited |
 | POST | `/v1/invitations/accept` | auth (session only) | `{token}` → `{target_type, target_id, organization_id, role}`. The caller's email must be the invited one and the inviter must still be allowed to grant the role; never lowers an existing role → activity `member_joined` |
 | DELETE | `/v1/invitations/{i}` | A / oA of its target | withdraws a pending invitation; 409 when already used or withdrawn |
@@ -299,8 +299,8 @@ Every route requires a system administrator (**S**); changes are recorded in `sy
 | POST | `/v1/system/users/{u}/sessions/end` | S | ends every session of the user and revokes their personal access tokens |
 | POST | `/v1/system/users/{u}/unlock` | S | clears the user's sign-in lockouts → `{cleared}` |
 | POST | `/v1/system/users/{u}/password-reset` | S (session only; a system administrator's account needs a system administrator) | `{token, path, expires_at}`: a one-time link for 24 hours, replacing older ones; audited `password_reset_issued` |
-| GET, PUT | `/v1/system/settings` | S | run-time settings with value, default and who changed them, plus read-only environment facts. PUT `{values:{key:value}}` validates every value before saving any |
-| DELETE | `/v1/system/settings/{key}` | S | back to the environment default |
+| GET, PUT | `/v1/system/settings` | S (PUT: session only, *unreleased*, second pass N2) | run-time settings with value, default and who changed them, plus read-only environment facts. PUT `{values:{key:value}}` validates every value before saving any |
+| DELETE | `/v1/system/settings/{key}` | S (session only, *unreleased*) | back to the environment default. The console's `settings set/reset --yes` also needs a console opened with a password |
 | GET | `/v1/system/logs?level&category&workspace&q&after&limit&day` | S | log events, newest first: recent ones from memory, or a day's file with `day=YYYY-MM-DD` (last 16 MiB read). `category` is `security`, `activity`, `jobs`, `http`, `ai`, `database` or `server`; `workspace` keeps events with that `workspace_id` |
 | GET | `/v1/system/logs/files` | S | the day files kept, plus the logging setup in force: levels per category, console format, file output, retention, effective filter |
 | GET | `/v1/system/logs/files/{day}` | S | a day's file as a download (`application/x-ndjson`); audited |
@@ -325,7 +325,7 @@ Every route requires a system administrator (**S**); changes are recorded in `sy
 
 | Method | Path | Guard | Notes |
 |---|---|---|---|
-| GET, POST | `/v1/organizations` | auth | GET: the caller's organizations, plus (*unreleased*) those where they only belong to some workspaces, with `guest: true`; every organization for a system administrator. POST makes the caller owner |
+| GET, POST | `/v1/organizations` | auth | GET: the caller's organizations, plus (since V0.1.64) those where they only belong to some workspaces, with `guest: true`; every organization for a system administrator. POST makes the caller owner |
 | PUT | `/v1/organizations/{org}` | oO | rename |
 | GET | `/v1/organizations/{org}/members` | oR | |
 | PUT | `/v1/organizations/{org}/members` | oA | upsert by email and propagate to workspaces |
@@ -371,9 +371,9 @@ Every route requires a system administrator (**S**); changes are recorded in `sy
 | GET, PUT | `/v1/artifacts/{a}/lifecycle` | R / W | validates status, owner membership and the supersede target → activity |
 | GET | `/v1/artifacts/{a}/lifecycle/history` | R | |
 | GET, POST | `/v1/artifacts/{a}/comments` | R / W | `@email` mentions → notifications → activity |
-| PUT, DELETE | `/v1/comments/{c}` | author or A | → activity |
+| PUT, DELETE | `/v1/comments/{c}` | W: author, or A | → activity |
 | POST | `/v1/artifacts/{a}/index` | W | **synchronous** manual re-index. Returns the finished job. The web client only exposes it to admins, in the chunks dialog |
-| POST | `/v1/workspaces/{ws}/index` | W | **synchronous**, loops over all artifacts and fails fast. No longer used by the web client |
+| POST | `/v1/workspaces/{ws}/index` | A (*unreleased*; was W) | **synchronous**, loops over all artifacts and fails fast. No longer used by the web client |
 | GET | `/v1/workspaces/{ws}/jobs?kind&status&limit` | R | default limit 50 |
 | GET | `/v1/jobs/{j}` | R | |
 | POST | `/v1/jobs/{j}/cancel` | W | sets `cancel_requested`. Cooperative, checked between artifacts or batches |
@@ -387,7 +387,7 @@ Every route requires a system administrator (**S**); changes are recorded in `sy
 | GET, POST | `/v1/workspaces/{ws}/folders` | R / W | list / create `{name, parent_id?}`; depth at most 5 |
 | PATCH, DELETE | `/v1/workspaces/{ws}/folders/{f}` | W | rename / delete with every subfolder and file |
 | PUT | `/v1/artifacts/{a}/folder` | W | move a file; `folder_id: null` for the top level |
-| GET | `/v1/artifacts/{a}/file` | R | the stored bytes, always as an attachment, sandboxed |
+| GET | `/v1/artifacts/{a}/file` | R | the stored bytes, always as an attachment, sandboxed. *Unreleased:* the `Content-Type` comes from the file name (`served_mime_type`); HTML, scripts and unknown types are `text/plain` |
 | GET | `/v1/artifacts/{a}/document-preview` | R | `DocumentPreview`: text, sheets, slides, email or pdf (§9) |
 | GET | `/v1/artifacts/{a}/rendered-preview/status`, `/rendered-preview` | R | starts and reports the LibreOffice conversion / serves the cached PDF |
 | POST | `/v1/artifacts/{a}/open-link` | R | five-minute signed link for "Open in Office" |
@@ -421,7 +421,7 @@ Details, including what each sync does, are in [technical/repository-sources.md]
 | GET | `/v1/workspaces/{ws}/retrieval-facets` | R | types, languages and sources of **indexed** artifacts |
 | POST | `/v1/workspaces/{ws}/search` | R | FTS5 search, see §6.3 |
 | GET, POST | `/v1/workspaces/{ws}/saved-searches` | R / W | name ≤120, query ≤500, limit 1–100 → activity |
-| DELETE | `/v1/saved-searches/{s}` | W | |
+| DELETE | `/v1/saved-searches/{s}` | W: author, or A | *Unreleased*; was any writer |
 | GET, POST | `/v1/workspaces/{ws}/memory-cards` | R / W | POST validates that each citation belongs to the workspace → activity |
 | POST | `/v1/workspaces/{ws}/memory-cards/search` | R | `LIKE %q%` on the title and body |
 | GET, PUT, DELETE | `/v1/memory-cards/{m}` | R / W / W | → activity |
@@ -432,7 +432,7 @@ Details, including what each sync does, are in [technical/repository-sources.md]
 | Method | Path | Guard | Notes |
 |---|---|---|---|
 | GET, POST | `/v1/workspaces/{ws}/tasks` | R / W | validates status, priority, assignee membership and artifact workspace. The assignee is notified → activity |
-| GET, PUT, DELETE | `/v1/tasks/{t}` | R / W / creator or A | reassignment sends a notification |
+| GET, PUT, DELETE | `/v1/tasks/{t}` | R / W / W: creator, or A | reassignment sends a notification |
 | GET, POST | `/v1/tasks/{t}/checklist` | R / W | body 1–500 |
 | PUT, DELETE | `/v1/task-checklist/{i}` | W | `{completed}` |
 
@@ -450,6 +450,7 @@ bytes ─► SHA-256 (hex) ─► store_blob(blobs/<hash-derived path>)  [write-
       ─► store_artifact  UNIQUE(workspace_id, source_id, path, content_hash) → dedupe
 ```
 
+- **Content type** (*unreleased, second pass N1 and I3*): `ingestion::served_mime_type` picks it from the file name when an upload is stored and whenever a file is served; the uploader's `Content-Type` is ignored. HTML, scripts and unknown types are `text/plain`, and SVG keeps `image/svg+xml` for `<img>` previews. The web client opens a preview in a tab of its own only for raster images, because a `blob:` URL runs with the app's origin.
 - Upload type detection uses `ingestion::detect_artifact_type` on the extension. An unknown extension produces "This file type is not supported for shared upload".
 - For pasted text, the language `Markdown` becomes `markdown_doc`, `Text` or none becomes `file`, and anything else becomes `code_file`.
 - Blob files are written to a temporary name and renamed, so a crash never leaves a truncated blob that looks complete. Storing a blob again refreshes `blobs.created_at` ("last stored at").
@@ -757,7 +758,7 @@ Security findings are tracked in the [security review of 2026-10-10](security/20
 
 | # | Area | Issue | Suggested direction |
 |---|---|---|---|
-| 1 | Security | Open review findings (S1 fixed on main, unreleased). The most urgent left: open registration by default (M1) combined with provider URLs and repository links that reach the host (H2, H3), and app administrators' reach (M8) | Roadmap S2–S5 |
+| 1 | Security | Open review findings (S1 fixed in V0.1.64; second-pass N1–N6 fixed on main, unreleased; N7 timeouts and N8 ownership transfer open). The most urgent left: open registration by default (M1) combined with provider URLs and repository links that reach the host (H2, H3), and app administrators' reach (M8) | Roadmap S2–S5 |
 | 2 | Process | **No CI.** The 163 Rust tests, the type check and dependency audits only run by hand | C8 |
 | 3 | Frontend maintainability | `SharedWebApp.tsx` 2,787 lines (202 KB, 150 `useState`), `App.tsx` 2,750, `styles.css` 6.2k, a hand-rolled router, no data cache, no tests | C1–C3, C11 |
 | 4 | Backend maintainability | `apps/server/src/lib.rs` 8,531 lines and `crates/storage/src/lib.rs` 6,206; `types.ts` mirrors the Rust DTOs by hand | C4, C5, C7 |

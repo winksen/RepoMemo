@@ -1321,6 +1321,16 @@ impl StorageEngine {
         if organization_exists == 0 {
             bail!("Organization was not found.");
         }
+        let current = sqlx::query_scalar::<_, String>(
+            "SELECT role FROM organization_memberships WHERE organization_id = ?1 AND user_id = ?2",
+        )
+        .bind(organization_id)
+        .bind(&user.id)
+        .fetch_optional(&mut *tx)
+        .await?;
+        if current.as_deref() == Some("owner") {
+            bail!("The owner role stays with the organization owner; it cannot be changed through membership management.");
+        }
         sqlx::query("INSERT INTO organization_memberships (organization_id, user_id, role, created_at) VALUES (?1, ?2, ?3, ?4) ON CONFLICT(organization_id, user_id) DO UPDATE SET role = excluded.role")
             .bind(organization_id)
             .bind(&user.id)
@@ -1328,7 +1338,9 @@ impl StorageEngine {
             .bind(&now)
             .execute(&mut *tx)
             .await?;
-        sqlx::query("INSERT INTO workspace_memberships (workspace_id, user_id, role, created_at, updated_at) SELECT wo.workspace_id, ?1, CASE ?2 WHEN 'admin' THEN 'admin' ELSE 'member' END, ?3, ?3 FROM workspace_organizations wo WHERE wo.organization_id = ?4 ON CONFLICT(workspace_id, user_id) DO UPDATE SET role = excluded.role, updated_at = excluded.updated_at")
+        // The organization role sets the role in every workspace, except that
+        // it never takes a workspace away from its owner.
+        sqlx::query("INSERT INTO workspace_memberships (workspace_id, user_id, role, created_at, updated_at) SELECT wo.workspace_id, ?1, CASE ?2 WHEN 'admin' THEN 'admin' ELSE 'member' END, ?3, ?3 FROM workspace_organizations wo WHERE wo.organization_id = ?4 ON CONFLICT(workspace_id, user_id) DO UPDATE SET role = CASE WHEN workspace_memberships.role = 'owner' THEN 'owner' ELSE excluded.role END, updated_at = excluded.updated_at")
             .bind(&user.id)
             .bind(organization_role_to_db(&role))
             .bind(&now)
@@ -2466,6 +2478,11 @@ impl StorageEngine {
         // does flow, is granted by organization administrators only.
         if !self.workspace_exists(workspace_id).await? {
             bail!("Workspace was not found.");
+        }
+        // Not even the owner may change their own role here: a workspace
+        // without an owner can no longer be renamed or deleted.
+        if matches!(self.workspace_role_for_user(&user.id, workspace_id).await?, Some(WorkspaceRole::Owner)) {
+            bail!("The owner role stays with the workspace owner; it cannot be changed through membership management.");
         }
         let now = Utc::now().to_rfc3339();
         sqlx::query("INSERT INTO workspace_memberships (workspace_id, user_id, role, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT(workspace_id, user_id) DO UPDATE SET role = excluded.role, updated_at = excluded.updated_at")

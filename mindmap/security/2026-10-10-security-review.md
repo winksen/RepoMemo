@@ -2,15 +2,22 @@
 
 > **Scope:** the shared server (`apps/server`, `crates/*`), the web client (`apps/desktop/src`), the desktop shell (`apps/desktop/src-tauri`) and the terminal console (`apps/console`), at V0.1.61 plus the unreleased work on main (live progress, environment memory, invitations, password reset links, personal access tokens).
 > **Method:** static review of the code and configuration. Nothing was run, built or attacked, and no dependency scanner was run (see [§7](#7-dependencies)). Each finding below was checked in the code; line numbers are as of this date.
-> **Status:** bundle **S1 is fixed on main** (2026-10-13, not yet released): H1, H4, L2, L3 and M7, see the table below. Everything else is open and scheduled as bundles S2–S5 in the [roadmap](../ROADMAP.md#security-from-the-2026-10-10-review).
+> **Status:** bundle **S1 is fixed and released in V0.1.64**: H1, H4, L2, L3 and M7. A **second pass** on the same day ([§11](#11-second-pass-2026-10-13)) found nine more issues, including one high (stored XSS through image previews). Six of them and I3 are fixed on main, and three are documented for later. Everything else is open and scheduled as bundles S2–S5 in the [roadmap](../ROADMAP.md#security-from-the-2026-10-10-review).
 
 | ID | Status | Fix |
 |---|---|---|
-| H1 | ✅ Fixed (unreleased) | `upsert_workspace_member` only writes the workspace row; the organization is listed to the person as a guest (`Organization.guest`). Test `workspace_members_stay_in_their_workspace` |
-| H4 | ✅ Fixed (unreleased) | Registration never promotes; only accounts that exist at startup are, with a warning for listed addresses without an account |
-| L2 | ✅ Fixed (unreleased) | `SessionSubject` and `ReadingSubject` extractors on the handlers replace `token_forbidden_path` and `read_token_may_post`; other non-GET handlers refuse read-only tokens by default |
-| L3 | ✅ Fixed (unreleased) | `/invite#<secret>`, `/reset-password#<secret>`, `<meta name="referrer" content="no-referrer">`; old path links are moved to the fragment by the web app |
-| M7 | ✅ Fixed (unreleased) | `envPrefix: ["VITE_", "TAURI_ENV_"]` |
+| H1 | ✅ Fixed in V0.1.64 | `upsert_workspace_member` only writes the workspace row; the organization is listed to the person as a guest (`Organization.guest`). Test `workspace_members_stay_in_their_workspace` |
+| H4 | ✅ Fixed in V0.1.64 | Registration never promotes; only accounts that exist at startup are, with a warning for listed addresses without an account |
+| L2 | ✅ Fixed in V0.1.64 | `SessionSubject` and `ReadingSubject` extractors on the handlers replace `token_forbidden_path` and `read_token_may_post`; other non-GET handlers refuse read-only tokens by default |
+| L3 | ✅ Fixed in V0.1.64 | `/invite#<secret>`, `/reset-password#<secret>`, `<meta name="referrer" content="no-referrer">`; old path links are moved to the fragment by the web app |
+| M7 | ✅ Fixed in V0.1.64 | `envPrefix: ["VITE_", "TAURI_ENV_"]` |
+| N1 + I3 | ✅ Fixed (unreleased) | Content types from the file name only (`served_mime_type`), never the uploader's; image previews open in a tab only for raster types (§11) |
+| N2 | ✅ Fixed (unreleased) | Run-time settings changes need a signed-in session (`SessionSubject`, and the console's `as_session`) |
+| N3 | ✅ Fixed (unreleased) | Owners keep the owner role in member upserts; organization propagation never lowers a workspace owner |
+| N4 | ✅ Fixed (unreleased) | Author edits need a writer role; saved searches are deleted by their author or an administrator |
+| N5 | ✅ Fixed (unreleased) | A used reset link also revokes the account's personal access tokens |
+| N6 | ✅ Fixed (unreleased) | `POST /v1/workspaces/{ws}/index` is for administrators |
+| N7–N9 | 📝 Documented | See §11 |
 
 ---
 
@@ -298,7 +305,7 @@ Two crates appear in two major versions: reqwest 0.12 and 0.13, and quick-xml 0.
 
 - **I1.** Memory search uses `LIKE '%q%'` without escaping `%` and `_`. This is harmless (bound, same workspace) but gives surprising matches.
 - **I2.** `/health` reports `registration_open` and `setup_required` to anyone. This is fine, but it tells a scanner that a server is open for registration.
-- **I3.** The uploader's `Content-Type` is stored and echoed on download. It is mitigated by attachment, `nosniff` and sandbox (§8), but should be derived from the detected type.
+- **I3.** ✅ *Fixed (unreleased).* The uploader's `Content-Type` was stored and echoed on download. The second pass showed it was not only cosmetic (see N1), and both storing and serving now use the type of the file name.
 - **I4.** The Postman collections in `docs/api/` are git-ignored but may hold real tokens locally. Clear them before sharing a checkout.
 
 ---
@@ -311,3 +318,85 @@ Two crates appear in two major versions: reqwest 0.12 and 0.13, and quick-xml 0.
 4. **Browser hardening:** M2 (CSP and refresh-token cookie), M5 and L9 (no remote images in rendered Markdown), M6 and M7 (desktop CSP, `envPrefix`).
 5. **Identity:** M4 (enumeration, verification plan), L3 (secrets in the fragment), L4 (reset notifications), L10 (lockout).
 6. **Robustness:** M11, M12, L1, L2, L6, then dependency scanning in CI (§7).
+
+---
+
+## 11. Second pass (2026-10-13)
+
+> **Method:** the same static review, at V0.1.64, aimed at what the first pass did not cover: every handler's guard and the resources it loads, references between resources (folders, linked evidence, supersede targets, citations, assistant files and conversations), how stored files reach the browser, what tokens and app administrators can still change, role integrity, and the server's own configuration. Checked and found sound: folder moves and uploads into folders, task evidence and assignees, supersede targets, memory card citations, assistant `artifact_id` and conversation ownership, comment and task moderation, job and repository routes, log-file day parameters, the open-link token issuer, the platform status response, CORS, `.gitignore` and the Tauri capability set (`core:default`, `dialog:default`).
+
+| ID | Severity | Finding | Status |
+|---|---|---|---|
+| N1 | **High** | Stored XSS through image previews | ✅ Fixed (unreleased) |
+| N2 | Medium | An administrator's personal access token could weaken server-wide security | ✅ Fixed (unreleased) |
+| N3 | Medium | A workspace or organization could lose its owner | ✅ Fixed (unreleased) |
+| N4 | Low | Viewers could still change their old comments; any writer could delete anyone's saved search | ✅ Fixed (unreleased) |
+| N5 | Low | Using a reset link left the account's personal access tokens working | ✅ Fixed (unreleased) |
+| N6 | Low | Any writer could run a synchronous whole-workspace re-index | ✅ Fixed (unreleased) |
+| N7 | Medium | No connection or request timeouts on the server | 📝 Documented |
+| N8 | Low | Removing an organization member can leave their workspaces without an owner | 📝 Documented |
+| N9 | Info | Hiding index chunks from members is not a confidentiality boundary | 📝 Documented |
+
+### N1. Stored XSS through image previews (High)
+
+**Where:** `apps/desktop/src/components/ImagePreview.tsx`; `crates/api/src/lib.rs` `import_upload`; `apps/server/src/lib.rs` `file_response`.
+
+**What happened:** the artifact page fetches an image with the user's session, turns it into a `blob:` URL and wraps the `<img>` in an **Open full size** link to that URL. A `blob:` URL belongs to the web app's origin. SVG is an accepted image type, and the stored content type was whatever the uploader's `Content-Type` said (I3). A writer could upload `diagram.svg` holding a `<script>`, or any image labelled `text/html`. A teammate who clicked **Open full size** ran that script **as the web app**, which can read the 30-day refresh token in `localStorage` (M2): a persistent account takeover, including of administrators.
+
+**Fix:** content types are now chosen from the file name only (`repomemo_ingestion::served_mime_type`) when an upload is stored and when any file is served. HTML, scripts and unknown types are served as `text/plain`, so this also covers repository files and older uploads. The preview opens a tab only for raster types (PNG, JPEG, GIF, WebP, BMP); an SVG is shown in `<img>` only, where scripts never run. Test: `owners_authors_and_served_types_hold`.
+
+**Still advised:** M2 (CSP for the SPA and the refresh token out of `localStorage`) would turn any future injection of this kind from a takeover into a nuisance.
+
+### N2. An administrator's personal access token could weaken server-wide security (Medium)
+
+**Where:** `apps/server/src/system.rs` `update_settings`, `reset_setting`; the console's `settings set|reset --yes`.
+
+**What happened:** a read-and-write token of a system or app administrator, typically stored in CI, could open registration, turn sign-in lockouts off or lengthen token lifetimes. Leaking it was enough to weaken every account.
+
+**Fix:** both handlers take `SessionSubject`, and the console only calls them for a console opened with a password (`as_session`). Tokens can still run dry runs, and still cancel jobs, unlock accounts, sign people out and run maintenance. **Residual:** a leaked administrator token can still sign administrators out repeatedly. A dedicated `system` scope for tokens would narrow that further (roadmap S2, with M8).
+
+### N3. A workspace or organization could lose its owner (Medium)
+
+**Where:** `crates/storage/src/lib.rs` `upsert_workspace_member`, `upsert_organization_member`.
+
+**What happened:** an owner could set their own role to member through the member list, and an organization role change overwrote the person's role in every workspace (`ON CONFLICT DO UPDATE SET role = excluded.role`), including in a workspace they own. Either way the workspace or organization was left with no owner, so nobody could rename or delete it any more (system administrators act as administrators, not owners).
+
+**Fix:** both upserts refuse to change the role of a current owner (400), and propagation keeps `owner` in the workspaces a person owns.
+
+### N4. Viewers could still change their old content; saved searches had no author rule (Low)
+
+**Where:** `update_artifact_comment`, `delete_artifact_comment`, `delete_collaboration_task`, `delete_saved_search`.
+
+**What happened:** the author check ran with the *read* guard, so someone downgraded to viewer could still edit or delete their comments and delete their tasks. Any writer could delete any saved search, though saved searches are shared with the whole workspace.
+
+**Fix:** the author path now needs a writer role, and saved searches follow the same author-or-administrator rule as comments and tasks.
+
+### N5. Using a reset link left personal access tokens working (Low)
+
+**Where:** `apps/server/src/access.rs` `complete_password_reset`. The first review suggested this in §6.
+
+**Fix:** using a reset link now also revokes the account's tokens, and the audit line records how many. A self-service password change still keeps them, as documented.
+
+### N6. Any writer could run a synchronous whole-workspace re-index (Low)
+
+**Where:** `POST /v1/workspaces/{ws}/index`, which runs inside the request and is not used by the web client.
+
+**Fix:** it now needs an administrator. Per-artifact re-indexing is unchanged.
+
+### N7. No connection or request timeouts (Medium, configuration)
+
+**Where:** `apps/server/src/main.rs` (`axum::serve`) and the router: there is no header-read timeout and no request timeout layer.
+
+**Risk:** slow or idle connections (slowloris) and long synchronous handlers hold sockets, database connections (a pool of 5) and memory with no upper bound. Event streams are meant to stay open, which is why a global timeout is not a drop-in fix.
+
+**Direction:** put the server behind a reverse proxy with header, body and idle timeouts (production guide, O3). In the server, add `tower_http::timeout::TimeoutLayer` to every route except the two event streams, and cap concurrent connections per address.
+
+### N8. Removing an organization member can leave their workspaces without an owner (Low)
+
+**Where:** `remove_organization_member` deletes the person's membership in every workspace of the organization, owned ones included.
+
+**Direction:** refuse to remove someone who still owns a workspace, and add an ownership transfer for workspaces and organizations (owner only, audited). Until then, transfer by hand before removing.
+
+### N9. Hiding index chunks is not a confidentiality boundary (Info)
+
+`GET /v1/artifacts/{a}` strips chunks for members, and only administrators open the chunks dialog. Members still read the whole file (`/file`, previews) and its passages through search snippets. This is fine as a UI choice, but no feature should rely on it to hide content from members.

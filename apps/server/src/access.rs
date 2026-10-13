@@ -574,9 +574,12 @@ pub(crate) async fn complete_password_reset(
         .ok_or_else(unusable_reset)?;
     state.storage.update_user_password(&user_id, &password_hash).await.map_err(map_storage_error)?;
     state.storage.end_user_sessions(&user_id).await.map_err(map_storage_error)?;
+    // A reset often follows a lost or taken-over account: its scripts' tokens
+    // go too, and the owner creates new ones once signed in.
+    let tokens = state.storage.revoke_user_personal_tokens(&user_id).await.map_err(map_storage_error)?;
     let email = user.email.clone().unwrap_or_default().to_lowercase();
     state.guards.logins.clear_account(&email);
-    tracing::info!(target: "audit", user_id = %user_id, client = %client.0, "Password reset with a link");
+    tracing::info!(target: "audit", user_id = %user_id, client = %client.0, tokens_revoked = tokens, "Password reset with a link");
     if let Err(error) = state
         .storage
         .record_system_event(Some(&user_id), "password_reset_used", &format!("{email} set a new password with a reset link."))

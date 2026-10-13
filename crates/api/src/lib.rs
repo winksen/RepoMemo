@@ -13,8 +13,9 @@ use repomemo_domain::{
 };
 use repomemo_indexer::{index_artifact, index_image_description, INDEXER_VERSION};
 use repomemo_ingestion::{
-    detect_artifact_type, detect_language, detect_mime, discover_import_candidates,
-    document_preview, extract_document_text, is_document, ImportCandidate, ImportOptions,
+    detect_artifact_type, detect_language, discover_import_candidates,
+    document_preview, extract_document_text, is_document, served_mime_type, ImportCandidate,
+    ImportOptions,
 };
 use repomemo_retrieval::{KeywordMode, RetrievalService};
 use repomemo_storage::{NewArtifact, StorageConfig, StorageEngine};
@@ -33,6 +34,7 @@ pub use agent::{agent_capabilities, agent_conversation_title, agent_turn_label};
 pub use embeddings::EmbeddingRun;
 pub use repo_policy::{is_network_path, RepoLinkPolicy};
 pub use repo_sync::RepoHead;
+pub use repomemo_ingestion::served_mime_type;
 
 /// Passages Ask puts in front of the model, after reranking a wider pool.
 const ASK_CONTEXT_PASSAGES: usize = 8;
@@ -249,7 +251,8 @@ impl RepoMemoCore {
         workspace_id: String,
         filename: String,
         bytes: Vec<u8>,
-        mime_type: Option<String>,
+        // What the uploader claimed; ignored, see `served_mime_type`.
+        _claimed_mime_type: Option<String>,
     ) -> Result<ArtifactSummary> {
         if workspace_id.trim().is_empty() {
             bail!("Workspace id is required.");
@@ -271,21 +274,9 @@ impl RepoMemoCore {
         let artifact_type = detect_artifact_type(path)
             .ok_or_else(|| anyhow::anyhow!("This file type is not supported for shared upload."))?;
         let language = detect_language(path);
-        let detected_mime = detect_mime(path);
-        let fallback_mime = if is_document(path) {
-            detected_mime
-                .as_deref()
-                .unwrap_or("application/octet-stream")
-        } else if matches!(artifact_type, ArtifactType::Image) {
-            "application/octet-stream"
-        } else if matches!(artifact_type, ArtifactType::MarkdownDoc) {
-            "text/markdown"
-        } else {
-            "text/plain"
-        };
-        let mime_type = mime_type
-            .filter(|value| !value.trim().is_empty())
-            .unwrap_or_else(|| fallback_mime.to_owned());
+        // From the file name, never from the uploader: a file labelled
+        // text/html or image/svg+xml could otherwise run as a page.
+        let mime_type = served_mime_type(path).to_owned();
         let source = self
             .storage
             .create_or_get_source(&workspace_id, SourceType::Upload, "Shared uploads", None)

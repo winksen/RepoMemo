@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.1.63` (2026-10-13), plus the security fixes on main (bundle S1), marked *unreleased*. Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
+> **Scope:** reflects the code at `V0.1.64` (2026-10-13), plus the security second-pass fixes on main, marked *unreleased*. Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
 
 ---
 
@@ -142,7 +142,7 @@ RepoMemo has two levels of membership, plus a server-wide role.
 **Workspace**: one body of knowledge inside an organization, such as a project or service. Roles: `owner`, `admin`, `member`, `viewer`.
 **System administrator**: a person who runs the whole server. They see **every organization and workspace**, act as an **administrator** in each (where they own something they stay owner), and use the **System** area (§1b). Owner-only actions, such as deleting a workspace, stay with owners. The first account created on a new server becomes a system administrator; others are named by an existing system administrator, or by the server operator for accounts that already exist when the server starts (registering an address the operator listed does not make it an administrator). The server always keeps at least one.
 
-Joining an organization **automatically grants access to every workspace in it**: an org owner becomes a workspace owner, an org admin becomes an admin, and an org member becomes a member. A workspace can also add a registered user directly, or invite them by link. That gives access to **that workspace only**: the person does not join the organization, sees it on their dashboard as a **guest** with just the workspaces they were added to, and gets nothing from the organization's other or future workspaces. (*Unreleased fix.* Until V0.1.63 such a person also became a member of the organization and of all its workspaces; see the [security review](security/2026-10-10-security-review.md), H1. People added that way keep that access until an administrator removes it.)
+Joining an organization **automatically grants access to every workspace in it**: an org owner becomes a workspace owner, an org admin becomes an admin, and an org member becomes a member. A workspace can also add a registered user directly, or invite them by link. That gives access to **that workspace only**: the person does not join the organization, sees it on their dashboard as a **guest** with just the workspaces they were added to, and gets nothing from the organization's other or future workspaces. (Since V0.1.64. Until V0.1.63 such a person also became a member of the organization and of all its workspaces; see the [security review](security/2026-10-10-security-review.md), H1. People added that way keep that access until an administrator removes it.)
 
 ### What each workspace role can do
 
@@ -154,7 +154,7 @@ Joining an organization **automatically grants access to every workspace in it**
 | Inspect stored index chunks and re-index one artifact | ✅ | ✅ | — | — |
 | Create and edit memory cards | ✅ | ✅ | ✅ | — |
 | Create and edit tasks, comment, change lifecycle | ✅ | ✅ | ✅ | — |
-| Edit or delete *other people's* comments and tasks | ✅ | ✅ | — | — |
+| Edit or delete *other people's* comments, tasks and saved searches | ✅ | ✅ | — | — |
 | Open People (with Activity) and Settings sections | ✅ | ✅ | — | — |
 | Act on health findings | ✅ | ✅ | — | — |
 | Add or remove members, invite by link | ✅ | ✅² | — | — |
@@ -165,7 +165,7 @@ Joining an organization **automatically grants access to every workspace in it**
 | Rename or delete the workspace | ✅ | — | — | — |
 
 ¹ The AI features need an enabled provider. By default everyone in the workspace can use them, viewers included; owners and admins can keep them to members and above, or to admins and owners (**Settings › Who can use AI**). Each person can also make a limited number of AI requests per hour (120 by default, set by the server operator), so nobody can run up a cloud bill by accident.
-² Admins can grant only `member` or `viewer`, and cannot change or remove other admins or the owner. Nobody can assign `owner` through the UI.
+² Admins can grant only `member` or `viewer`, and cannot change or remove other admins or the owner. Nobody can assign `owner` through the UI, and the owner's own role cannot be changed there either, so a workspace or organization never ends up without an owner (*unreleased fix*). Someone who becomes a viewer can no longer edit or delete their earlier comments and tasks.
 
 ### Organization permissions
 
@@ -230,7 +230,7 @@ A **System** button in the header opens `/system`, with these pages:
 | **Theme** | Light and dark toggle, remembered per browser. |
 | **Sign out** | Always visible in the header. |
 | **Invitation link** (`/invite#<link>`) | Opens what the person is invited to (workspace or organization, role, who invited them, until when). With no account for the invited address: create one there, even when registration is closed. With an account: sign in there. Already signed in with the invited address: one click to join. Signed in as someone else: told to sign out first. A link works once, for that address only, for 7 days. Joining never lowers a role the person already has |
-| **Password reset link** (`/reset-password#<link>`) | Created by a system administrator in System › Users and passed on to the person. Shows whose password it changes, asks for the new one twice, then signs this browser in and every other device out, and lifts sign-in lockouts. Works once, for 24 hours; a newer link replaces it. The sign-in page says to ask an administrator for one |
+| **Password reset link** (`/reset-password#<link>`) | Created by a system administrator in System › Users and passed on to the person. Shows whose password it changes, asks for the new one twice, then signs this browser in and every other device out, lifts sign-in lockouts and (*unreleased*) revokes the person's API tokens. Works once, for 24 hours; a newer link replaces it. The sign-in page says to ask an administrator for one |
 | **API tokens** (Profile) | Personal access tokens for scripts, CI and `repomemo-console`: a name, read-only (look and search) or read and write, and a lifetime of 7, 30, 90 or 365 days. The token is shown once; the list shows its start, scope, expiry and last use, and each can be revoked. A token acts as its owner, so it reaches only what they can, and it can never manage tokens, change the password, grant roles or accept invitations. Changing the password keeps tokens; an administrator's *Sign out everywhere* revokes them |
 
 **Inviting people.** In a workspace's **People** section and in **Organization administration**, administrators can create an **invite link** for an email address and a role, copy it, and send it however they like (no mail server needed). Pending invitations are listed with their expiry and can be withdrawn. Adding a member whose email has no account suggests the invite link instead. The rules are the same as adding a member: only owners invite administrators, and the inviter must still be allowed to grant the role when the link is used.
@@ -291,7 +291,7 @@ Evidence is anything the team stores. Each item is called an **artifact**.
 | **Write a shared note** | A title and a rich-text body (headings, lists, code, links), stored as Markdown. Notes are filed into the folder that is open. |
 | **Upload files or a folder** | Choose several files at once, or (in the Evidence view) a whole folder: its subfolders become evidence folders, up to the folder depth limit, and hidden, dependency and build folders (`.git`, `node_modules`, `target`, `dist`, `build`…) are skipped. Each file can be up to **10 MiB**; unsupported and oversized files are left out with a notice. A progress bar counts the uploads, and files that could not be stored are listed. Uploads are grouped under the source "Shared uploads". |
 
-**Supported file types:** Markdown (`md`, `mdx`), text (`txt`), code and config (`rs`, `ts`, `tsx`, `js`, `jsx`, `py`, `json`, `toml`, `yaml`, `yml`, `sql`, `html`, `css`, `sh`, `ps1`), business documents (Word `doc`, `docx`; Excel `xlsx`, `xlsm`, `xls`; PowerPoint `pptx`, `ppt`; `pdf`; OneNote `one`; Outlook `eml`, `msg`), and images (`png`, `jpg`, `jpeg`, `gif`, `webp`, `svg`, `bmp`). **Images can be uploaded only once the workspace has an image (vision) AI provider**, because an image is made searchable through its AI description.
+**Supported file types:** Markdown (`md`, `mdx`), text (`txt`), code and config (`rs`, `ts`, `tsx`, `js`, `jsx`, `py`, `json`, `toml`, `yaml`, `yml`, `sql`, `html`, `css`, `sh`, `ps1`), business documents (Word `doc`, `docx`; Excel `xlsx`, `xlsm`, `xls`; PowerPoint `pptx`, `ppt`; `pdf`; OneNote `one`; Outlook `eml`, `msg`), and images (`png`, `jpg`, `jpeg`, `gif`, `webp`, `svg`, `bmp`). **Images can be uploaded only once the workspace has an image (vision) AI provider**, because an image is made searchable through its AI description. An SVG is shown in the page but never opened on its own, because its scripts would then run as RepoMemo (*unreleased fix*).
 
 If the same file with the same content is uploaded twice, it is stored only once.
 
@@ -389,7 +389,7 @@ Re-indexing keeps every passage whose text did not change, so memory cards and a
 
 ### Saved searches
 
-Writers can save a named search that includes its filters. Anyone can re-run it with one click. Saved searches are shared with the whole workspace.
+Writers can save a named search that includes its filters. Anyone can re-run it with one click. Saved searches are shared with the whole workspace; only their author or an administrator deletes one.
 
 ### Ask your evidence (AI)
 

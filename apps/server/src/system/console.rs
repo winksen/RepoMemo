@@ -22,7 +22,7 @@ use super::{
     apply_setting, audit, read_setting, require_system_admin, spec, JobsQuery, LogsQuery, MaintenanceStatus,
     SettingKind, UpdateSettingsRequest,
 };
-use crate::{logs::CATEGORIES, map_storage_error, ApiError, AppState, AuthenticatedSubject, ReadingSubject};
+use crate::{logs::CATEGORIES, map_storage_error, ApiError, AppState, AuthenticatedSubject, ReadingSubject, SessionSubject};
 
 /// Longer lines are refused before they are parsed.
 const MAX_COMMAND_LENGTH: usize = 2_000;
@@ -341,6 +341,18 @@ pub(crate) async fn welcome(
     }))
 }
 
+/// The console's way into a handler that needs a signed-in session (see
+/// `SessionSubject`): only when the console itself was opened with one, by
+/// password in `repomemo-console` or in the web app, never with a token.
+fn as_session(subject: AuthenticatedSubject) -> Result<SessionSubject, ApiError> {
+    if subject.token.is_some() {
+        return Err(ApiError::forbidden_because(
+            "Changing run-time settings needs a signed-in session (the web app, or repomemo-console with a password); personal access tokens cannot.",
+        ));
+    }
+    Ok(SessionSubject(subject))
+}
+
 /// Runs one command line.
 pub(crate) async fn run(
     ReadingSubject(subject): ReadingSubject,
@@ -484,7 +496,7 @@ async fn execute(
                 return Ok(dry_run(spec, format!("Would change {} from {}{unit} to {}{unit}.", setting.label, shown(&current), shown(&value))));
             }
             let values = BTreeMap::from([(key.to_owned(), value.clone())]);
-            let _ = super::update_settings(who, state_, Json(UpdateSettingsRequest { values })).await?;
+            let _ = super::update_settings(as_session(who)?, state_, Json(UpdateSettingsRequest { values })).await?;
             Ok(applied(spec, format!("{} is now {}{unit}.", setting.label, shown(&value)), View::Text, Value::Null))
         }
 
@@ -495,7 +507,7 @@ async fn execute(
             if !line.yes {
                 return Ok(dry_run(spec, format!("Would restore the default of {}: {} → {}.", setting.label, shown(&current), shown(&default))));
             }
-            let _ = super::reset_setting(who, state_, Path(key.to_owned())).await?;
+            let _ = super::reset_setting(as_session(who)?, state_, Path(key.to_owned())).await?;
             Ok(applied(spec, format!("{} is back to its default, {}.", setting.label, shown(&default)), View::Text, Value::Null))
         }
 

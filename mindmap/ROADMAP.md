@@ -1,15 +1,15 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.1.63` (2026-10-13) · **Unreleased on main:** security bundle S1 (H1, H4, L2, L3, M7)
+> **Current version:** `V0.1.64` (2026-10-13) · **Unreleased on main:** the security second-pass fixes (N1–N6)
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md) · [Implementation tracker](../docs/IMPLEMENTATION_TRACKER.md)
 
 RepoMemo started as a local-first desktop workbench. It is now a **self-hosted team product**: a shared API server with a web client, organizations and roles, collaboration, git repositories as living sources, business documents, and optional AI grounded in cited evidence. A server can be installed and administered entirely from the browser (environment menu, first-run setup, System area, admin console).
 
-Between V0.1.32 and V0.1.62 the work went into **depth and operability**. Background indexing, semantic search, the assistant, the knowledge map, health checks, repository sync, security hardening, the System area and live progress all shipped. V0.1.63 added **onboarding without an account** (invitation links, reset links, personal access tokens). The fixes that should have shipped with it (security bundle S1) are built on main for the next release.
+Between V0.1.32 and V0.1.62 the work went into **depth and operability**. Background indexing, semantic search, the assistant, the knowledge map, health checks, repository sync, security hardening, the System area and live progress all shipped. V0.1.63 added **onboarding without an account** (invitation links, reset links, personal access tokens). V0.1.64 shipped the security fixes it needed (bundle S1), and a second security pass found more, now fixed on main.
 
-The next stretch is about **trust and changeability** more than new surface. That means fixing the open security findings (S1 is built, S2–S5 remain), adding CI, splitting the web client, then making memory and search more trustworthy before remote repositories and scale work. The reasoning and evidence are in the [enhancement analysis](analysis/2026-10-13-enhancement-analysis.md). Item IDs below (F, S, P, C, O) refer to it.
+The next stretch is about **trust and changeability** more than new surface. That means fixing the open security findings (S1 shipped, the second pass is built, S2–S5 remain), adding CI, splitting the web client, then making memory and search more trustworthy before remote repositories and scale work. The reasoning and evidence are in the [enhancement analysis](analysis/2026-10-13-enhancement-analysis.md). Item IDs below (F, S, P, C, O) refer to it.
 
-> ⚠️ **Version strings.** `Cargo.toml`, both `package.json` files and `tauri.conf.json` still say `0.1.60`, so System › Overview and the console report 0.1.60 on a V0.1.63 server. Item C9 fixes this.
+> ⚠️ **Version strings.** `Cargo.toml`, both `package.json` files and `tauri.conf.json` still say `0.1.60`, so System › Overview and the console report 0.1.60 on a V0.1.64 server. Item C9 fixes this.
 
 ---
 
@@ -29,18 +29,18 @@ timeline
   section Depth and operability
     Oct 2026 : V0.1.40 Auto-indexing, notes, folders : V0.1.42 Business documents : V0.1.45 Assistant : V0.1.46 Semantic search
     Oct 2026 : V0.1.48 Knowledge map : V0.1.50 Health checks : V0.1.52 Repository sync : V0.1.51 to V0.1.57 Security hardening
-    Oct 2026 : V0.1.58 System area and logging : V0.1.59 Setup wizard, avatars : V0.1.60 Environments : V0.1.61 Admin console : V0.1.62 Live progress, bulk upload : V0.1.63 Invitations, reset links, API tokens
+    Oct 2026 : V0.1.58 System area and logging : V0.1.59 Setup wizard, avatars : V0.1.60 Environments : V0.1.61 Admin console : V0.1.62 Live progress, bulk upload : V0.1.63 Invitations, reset links, API tokens : V0.1.64 Security ship-blockers (S1)
   section Trust and changeability (proposed)
-    Oct 2026 : V0.1.64 Security ship-blockers (S1), CI : V0.1.65 Safe defaults
-    Nov 2026 : V0.1.66 Web client split : V0.1.67 Memory and search trust : V0.1.68 Host exposure, repos 1b
+    Oct 2026 : V0.1.65 Security second pass, CI : V0.1.66 Safe defaults
+    Nov 2026 : V0.1.67 Web client split : V0.1.68 Memory and search trust : V0.1.69 Host exposure, repos 1b
 ```
 
 | Stage | Status |
 |---|---|
 | Phase 1: Local memory loop (1A–1H) | ✅ Complete |
 | Phase S: Shared team mode | ✅ Complete |
-| Phase D: Depth and operability (V0.1.33–V0.1.63) | ✅ Complete |
-| Security review 2026-10-10 (4 high, 12 medium, 10 low) | 🔄 S1 (H1, H4, L2, L3, M7) built, not yet released · 🔜 S2–S5 |
+| Phase D: Depth and operability (V0.1.33–V0.1.64) | ✅ Complete |
+| Security review 2026-10-10 (4 high, 12 medium, 10 low) + second pass (1 high, 3 medium, 4 low, 1 info) | ✅ S1 (V0.1.64) · 🔄 N1–N6 built, not yet released · 🔜 S2–S5, N7, N8 |
 | Repository indexing (git) | ✅ Phase 1 (local, auto-sync) · 🔜 1b polish · 🔜 phase 2 remote · 💭 phase 3 git awareness |
 | Admin console | ✅ First slice, terminal client, token sign-in · 🔜 follow-ups (F9) |
 | Next: trust and changeability | 🔜 Proposed (see *Next*) |
@@ -88,7 +88,7 @@ The detailed specs are in [docs/phases/](../docs/phases).
 | Word documents | V0.1.30–0.1.31 | `.doc`/`.docx` text extraction, indexing, Documents section with preview |
 | Jobs API and live events | V0.1.32 | Job kinds, cooperative cancel, job listing, **SSE event stream** for job and activity events |
 
-### Phase D: Depth and operability (V0.1.33–V0.1.63)
+### Phase D: Depth and operability (V0.1.33–V0.1.64)
 
 | Milestone | Version | Delivered |
 |---|---|---|
@@ -107,22 +107,24 @@ The detailed specs are in [docs/phases/](../docs/phases).
 | Admin console | V0.1.61 | System › Console and the `repomemo-console` terminal client, with dry runs and audited changes |
 | Daily-use polish and live progress | V0.1.62 | AI output rendered as Markdown with numbered citations; safe search highlights; several citations per memory card; **Save as memory** from Ask and the overview; several files or whole folders per upload (three at a time, with progress); **live progress** over a fetch-based event-stream reader (ledger, artifact page, repositories, tasks, memory, activity, a status strip with Stop) and `GET /v1/system/events` for System › Jobs, with polling as the fallback; the assistant docked beside every workspace section; the chosen environment remembered across restarts (`workspace-data/.last-environment`) unless one is pinned |
 | Onboarding and API tokens | V0.1.63 | **Invitation links** for one email address and role, single-use, 7 days, withdrawable, usable even when registration is closed, re-checked against the inviter's rights on acceptance and never lowering a role; **password reset links** issued in System › Users (one-time, 24 hours, end every session, lift lockouts; app administrators cannot reset a system administrator); **personal access tokens** (`rmp_…`, read-only or read and write, 7–365 days, revocable, last use shown) for scripts, CI and `repomemo-console` (migration 0023) |
+| Security ship-blockers (S1) | V0.1.64 | **H1:** adding someone to one workspace, directly or by invitation, gives that workspace only; their organization shows as a guest entry. **H4:** registering an address listed in `REPOMEMO_SYSTEM_ADMIN_EMAILS` grants nothing; only accounts that exist at startup are promoted. **L2:** token limits are marked on the handlers (`SessionSubject`, `ReadingSubject`) instead of a path denylist. **L3:** link secrets are in the URL fragment (`/invite#…`, `/reset-password#…`), with `no-referrer`; older path links are moved to the fragment. **M7:** only `VITE_` and `TAURI_ENV_` variables reach the bundle. People added before V0.1.64 keep the wider access they received; review organization members once |
 
 ---
 
 ## 🔄 In progress
 
-### Security bundle S1 (built, not yet released, target V0.1.64)
+### Security second pass (built, not yet released, target V0.1.65)
 
-The fixes that should ship with onboarding. Details in the [security review](security/2026-10-10-security-review.md).
+A second review on 2026-10-13, after S1 shipped, of everything the first one did not cover. Details in the [security review §11](security/2026-10-10-security-review.md#11-second-pass-2026-10-13).
 
-- [x] **H1, membership stays in its workspace.** Adding someone to a workspace (directly or by invitation) no longer makes them an organization member or a member of its other workspaces. Their organization is listed with `guest: true`, so the dashboard shows only the workspaces they were added to. Organization membership still gives access to every workspace and is granted by organization administrators only. Accounts that already received the wider access keep it; review organization members once after upgrading.
-- [x] **H4, no system administrator by registration.** `REPOMEMO_SYSTEM_ADMIN_EMAILS` promotes only accounts that exist at startup. Registering a listed address logs a warning instead of granting the role, and the server warns at startup about listed addresses with no account.
-- [x] **L2, token limits marked on the handler.** The path denylist is gone. Handlers that need a browser session take `SessionSubject` (tokens, password, sign-out everywhere, invitations, role grants, reset links, detaching the environment). POSTs that only read take `ReadingSubject` (searches, the artifact query, Ask, the console, whose `--yes` is still refused to read-only tokens). Every other non-GET request refuses read-only tokens by default.
-- [x] **L3, link secrets in the URL fragment.** Links are now `/invite#<secret>` and `/reset-password#<secret>`, and the web app sends `Referrer-Policy: no-referrer`. Links already sent in the V0.1.63 form (`/invite/<secret>`) still open: the web app moves the secret into the fragment.
-- [x] **M7, no `TAURI_` secrets in the bundle.** `envPrefix` is `VITE_` and `TAURI_ENV_` only.
+- [x] **N1 (high), stored XSS through image previews.** Content types now come from the file name, never from the uploader (this also closes I3), and image previews open in a tab only for raster types.
+- [x] **N2:** run-time settings need a signed-in session, so a leaked administrator token cannot open registration or turn lockouts off.
+- [x] **N3:** owners keep their role, and organization changes never take a workspace from its owner.
+- [x] **N4:** viewers no longer change their old comments or tasks, and saved searches are deleted by their author or an administrator.
+- [x] **N5:** a used reset link revokes the account's personal access tokens.
+- [x] **N6:** the synchronous whole-workspace re-index is for administrators.
 - [ ] Still to do with this release: **C8** CI and **C9** one version source.
-- [ ] Later: sending invitations and reset links by email (F6), a console command for reset links and a System view of every user's tokens (F9), revoking tokens when a reset link is used.
+- [ ] Later: sending invitations and reset links by email (F6), a console command for reset links and a System view of every user's tokens (F9).
 
 ### Repository indexing
 
@@ -161,12 +163,13 @@ These come from checking the code at V0.1.62 and V0.1.63. The [enhancement analy
 | Release | Theme | Items | Why in this order |
 |---|---|---|---|
 | ~~V0.1.63~~ | Onboarding | Shipped without S1 | — |
-| **V0.1.64** | Onboarding, safely | **S1** (H1, H4, L2, L3, M7: built), **C8** CI, **C9** one version source | Invitations widen H1, and tokens are cheapest to fix before anyone scripts against them. CI and a correct version make every later release checkable |
-| **V0.1.65** | Safe defaults | **S2** (registration closed after setup, split System permissions, HTTPS checks, proxy address, lockout), **S4** (no remote images in AI Markdown, CSP for the SPA and Tauri, refresh-token cookie) | Now that invitations cover onboarding, open registration is no longer needed by default |
-| **V0.1.66** | Web client foundation | **C1** split `SharedWebApp.tsx`, **C2** router and query cache, **C3** frontend tests, **P6** route-level code splitting, **C7** generated types | Every product item below touches this file. Splitting it first makes them cheaper and safer |
-| **V0.1.67** | Memory and search you can trust | **F1** memory-card staleness and citation editing, **F2** search by lifecycle, folder and date, **F3** symbol search on the web, **F8** live map and health | The product's core promise: knowledge that stays true and trusted evidence first |
-| **V0.1.68** | Host exposure, repositories 1b | **S3** (provider URL allowlist and DNS pinning, repository roots required, git hardening, LibreOffice sandbox), **F4** phase 1b | S3 must land before remote clones |
-| **V0.1.69+** | Scale and operations | Timing spans first, then **P1–P5** (vector index, SQL-side query and metrics, batched dashboard, cached map and health), **O1** backup and restore, **F4** phase 2 remote repositories, **S5** robustness | Measure before optimizing; operators need backups before trusting real data |
+| ~~V0.1.64~~ | Onboarding, safely | Shipped S1 (H1, H4, L2, L3, M7) | — |
+| **V0.1.65** | Second pass, checkable releases | Second-pass fixes **N1–N6** (built), **C8** CI, **C9** one version source | N1 is a stored XSS. CI and a correct version make every later release checkable |
+| **V0.1.66** | Safe defaults | **S2** (registration closed after setup, split System permissions, HTTPS checks, proxy address, lockout), **S4** (no remote images in AI Markdown, CSP for the SPA and Tauri, refresh-token cookie) | Now that invitations cover onboarding, open registration is no longer needed by default |
+| **V0.1.67** | Web client foundation | **C1** split `SharedWebApp.tsx`, **C2** router and query cache, **C3** frontend tests, **P6** route-level code splitting, **C7** generated types | Every product item below touches this file. Splitting it first makes them cheaper and safer |
+| **V0.1.68** | Memory and search you can trust | **F1** memory-card staleness and citation editing, **F2** search by lifecycle, folder and date, **F3** symbol search on the web, **F8** live map and health | The product's core promise: knowledge that stays true and trusted evidence first |
+| **V0.1.69** | Host exposure, repositories 1b | **S3** (provider URL allowlist and DNS pinning, repository roots required, git hardening, LibreOffice sandbox), **F4** phase 1b | S3 must land before remote clones |
+| **V0.1.70+** | Scale and operations | Timing spans first, then **P1–P5** (vector index, SQL-side query and metrics, batched dashboard, cached map and health), **O1** backup and restore, **F4** phase 2 remote repositories, **S5** robustness | Measure before optimizing; operators need backups before trusting real data |
 
 ### Product features
 
@@ -179,6 +182,7 @@ These come from checking the code at V0.1.62 and V0.1.63. The [enhancement analy
 | F5 | **Assistant memory.** The last few turns go with each message; search across all of the caller's workspaces | M |
 | F6 | **Mail delivery** (SMTP in System › Settings) for invitations, reset links, mentions and assignments, then email verification for self-registration | M |
 | F7 | **Evidence ergonomics.** Move folders, multi-select actions, upload a new version of a file into the same artifact | M |
+| F11 | **Ownership transfer** for workspaces and organizations (owner only, audited), and no removal of someone who still owns a workspace (second pass N8) | S |
 | F8 | **Live map and health** from the event stream | S |
 | F9 | **Console follow-ups** (see *Admin console*) | S–M |
 | F10 | **Desktop decision.** Make the desktop app a client of a server, or freeze it as the local-loop edition. It lags far behind the web client (no notes, folders, repositories, documents or assistant) | Decision |
@@ -187,13 +191,13 @@ These come from checking the code at V0.1.62 and V0.1.63. The [enhancement analy
 
 | ID | Bundle | Review IDs | Size |
 |---|---|---|---|
-| S1 | Ship-blockers for onboarding (✅ built) | H1, H4, L2, L3, M7 | S–M |
-| S2 | Safe defaults | M1, M8, M9, M3, L10 | M |
+| S1 | Ship-blockers for onboarding (✅ V0.1.64) | H1, H4, L2, L3, M7 | S–M |
+| S2 | Safe defaults | M1, M8, M9, M3, L10, a `system` scope for personal access tokens (N2 residual) | M |
 | S3 | Host exposure | H2, H3, L8, M10 | M |
 | S4 | Browser hardening | M5, L9, M2, M6 | M |
 | S5 | Robustness and supply chain | M11, M12, L1, L5, L6, L7, dependency scanning | M |
 
-Each fix comes with a test that locks it in. Done for S1: `workspace_members_stay_in_their_workspace` (H1), and `invitations_reset_links_and_personal_tokens` now checks every session-only handler and the read-only POSTs (L2), the `#` link form (L3) and, with `system_administrators_see_every_workspace_and_run_the_server`, that registering a listed address grants nothing (H4). Still planned: a Markdown image in an AI answer is not rendered (M5).
+Each fix comes with a test that locks it in. Done for the second pass: `owners_authors_and_served_types_hold` (N1–N4, N6). Done for S1: `workspace_members_stay_in_their_workspace` (H1), and `invitations_reset_links_and_personal_tokens` now checks every session-only handler and the read-only POSTs (L2), the `#` link form (L3) and, with `system_administrators_see_every_workspace_and_run_the_server`, that registering a listed address grants nothing (H4). Still planned: a Markdown image in an AI answer is not rendered (M5).
 
 ### Platform performance
 
@@ -233,7 +237,7 @@ Each fix comes with a test that locks it in. Done for S1: `workspace_members_sta
 |---|---|---|
 | O1 | Backup and restore of an environment (database snapshot, blobs, `secret.key`) from System and the console | M |
 | O2 | Workspace export and import as an archive | M |
-| O3 | Production guide: static SPA with CSP, TLS proxy, Windows service and systemd units | S |
+| O3 | Production guide: static SPA with CSP and frame protection, TLS proxy with header, body and idle timeouts, Windows service and systemd units; plus a request timeout layer in the server outside the event streams (second pass N7) | S–M |
 | O4 | Quotas per workspace and user, and a free-disk floor shown in System › Overview | M |
 | O5 | OpenMetrics export of the counters System › Overview already keeps | S |
 

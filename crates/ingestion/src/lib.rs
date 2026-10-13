@@ -285,6 +285,34 @@ fn relative_path(path: &Path, source_root: &Path) -> String {
         .replace('\\', "/")
 }
 
+/// The content type RepoMemo stores and serves for a file, from its name only:
+/// never what an uploader claimed. Types a browser would run as a page
+/// (HTML, scripts, anything unknown) are served as plain text; SVG keeps its
+/// type for `<img>` previews, which do not run scripts.
+pub fn served_mime_type(path: &Path) -> &'static str {
+    match extension(path).as_deref() {
+        Some("md" | "mdx") => "text/markdown; charset=utf-8",
+        Some("doc") => "application/msword",
+        Some("docx") => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        Some("xlsx") => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        Some("xlsm") => "application/vnd.ms-excel.sheet.macroEnabled.12",
+        Some("xls") => "application/vnd.ms-excel",
+        Some("pptx") => "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        Some("ppt") => "application/vnd.ms-powerpoint",
+        Some("pdf") => "application/pdf",
+        Some("one") => "application/onenote",
+        Some("msg") => "application/vnd.ms-outlook",
+        Some("eml") => "message/rfc822",
+        Some("png") => "image/png",
+        Some("jpg" | "jpeg") => "image/jpeg",
+        Some("gif") => "image/gif",
+        Some("webp") => "image/webp",
+        Some("svg") => "image/svg+xml",
+        Some("bmp") => "image/bmp",
+        _ => "text/plain; charset=utf-8",
+    }
+}
+
 pub fn detect_mime(path: &Path) -> Option<String> {
     let extension = extension(path)?;
     let mime = match extension.as_str() {

@@ -138,7 +138,7 @@ fn category_setting(category: &str) -> String {
 }
 
 const SETTINGS: &[SettingSpec] = &[
-    SettingSpec { key: "allow_registration", group: "Accounts", label: "Open registration", description: "Anyone who can reach the server can create an account. When off, people are added after an administrator creates their account elsewhere; the first account can always register.", kind: SettingKind::Boolean, min: 0, max: 1, unit: "", options: &[] },
+    SettingSpec { key: "allow_registration", group: "Accounts", label: "Open registration", description: "Anyone who can reach the server can create an account. When off, people join with an invitation link from a workspace or organization administrator; the first account can always register. Email addresses are not verified, so leave it off on a server others can reach.", kind: SettingKind::Boolean, min: 0, max: 1, unit: "", options: &[] },
     SettingSpec { key: "access_token_ttl_minutes", group: "Accounts", label: "Access token lifetime", description: "How long a sign-in token is valid before the browser renews it silently.", kind: SettingKind::Integer, min: 5, max: 1440, unit: "minutes", options: &[] },
     SettingSpec { key: "refresh_token_ttl_days", group: "Accounts", label: "Session lifetime", description: "How long a session lasts without use before people must sign in again.", kind: SettingKind::Integer, min: 1, max: 365, unit: "days", options: &[] },
     SettingSpec { key: "auth_requests_per_minute", group: "Protection", label: "Sign-in requests per address", description: "Sign-ins and registrations allowed per client address each minute (session renewals get four times as many). 0 turns the limit off.", kind: SettingKind::Integer, min: 0, max: 10_000, unit: "per minute", options: &[] },
@@ -1027,8 +1027,11 @@ async fn settings_response(state: &AppState) -> Result<SettingsResponse, ApiErro
 
 /// Changes one or more settings. All values are checked before any is
 /// saved, so a request either applies completely or not at all.
+/// Run-time settings include what protects every account (registration,
+/// lockouts, token lifetimes), so changing them needs a signed-in session:
+/// a leaked personal access token of an administrator cannot weaken them.
 pub(crate) async fn update_settings(
-    subject: AuthenticatedSubject,
+    SessionSubject(subject): SessionSubject,
     State(state): State<AppState>,
     Json(request): Json<UpdateSettingsRequest>,
 ) -> Result<Json<SettingsResponse>, ApiError> {
@@ -1060,7 +1063,7 @@ pub(crate) async fn update_settings(
 
 /// Restores a setting's server default.
 pub(crate) async fn reset_setting(
-    subject: AuthenticatedSubject,
+    SessionSubject(subject): SessionSubject,
     State(state): State<AppState>,
     Path(key): Path<String>,
 ) -> Result<Json<SettingsResponse>, ApiError> {

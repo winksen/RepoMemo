@@ -55,7 +55,7 @@ use tokio_stream::{
 use chrono::{Duration as ChronoDuration, Utc};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use rand_core::OsRng;
-use repomemo_api::{RepoLinkPolicy, RepoMemoCore};
+use repomemo_api::{served_mime_type, RepoLinkPolicy, RepoMemoCore};
 use repomemo_domain::{
     ArtifactComment, ArtifactDetail, ArtifactIndexFailure, DocumentPreview, Folder, ArtifactLifecycle, ArtifactLifecycleEvent, ArtifactSummary,
     ArtifactType, AskAnswer, AskRequest, Chunk, Citation, CollaborationTask,
@@ -2650,7 +2650,8 @@ async fn delete_collaboration_task(
         .get_collaboration_task(&task_id)
         .await
         .map_err(map_storage_error)?;
-    let role = require_workspace_read(&state, &subject, &task.workspace_id).await?;
+    // Authors who are now viewers no longer change content, their own included.
+    let role = require_workspace_write(&state, &subject, &task.workspace_id).await?;
     if task.created_by.id != subject.user_id
         && !matches!(role, WorkspaceRole::Owner | WorkspaceRole::Admin)
     {
@@ -2745,7 +2746,13 @@ async fn delete_saved_search(
         .get_saved_search(&search_id)
         .await
         .map_err(map_storage_error)?;
-    require_workspace_write(&state, &subject, &saved.workspace_id).await?;
+    // Saved searches are shared; only their author or an administrator removes one.
+    let role = require_workspace_write(&state, &subject, &saved.workspace_id).await?;
+    if saved.created_by.id != subject.user_id
+        && !matches!(role, WorkspaceRole::Owner | WorkspaceRole::Admin)
+    {
+        return Err(ApiError::forbidden());
+    }
     state
         .storage
         .delete_saved_search(&search_id)
@@ -2987,7 +2994,8 @@ async fn update_artifact_comment(
         .get_artifact_comment(&comment_id)
         .await
         .map_err(map_storage_error)?;
-    let role = require_workspace_read(&state, &subject, &current.workspace_id).await?;
+    // Authors who are now viewers no longer change content, their own included.
+    let role = require_workspace_write(&state, &subject, &current.workspace_id).await?;
     if current.author.id != subject.user_id
         && !matches!(role, WorkspaceRole::Owner | WorkspaceRole::Admin)
     {
@@ -3022,7 +3030,8 @@ async fn delete_artifact_comment(
         .get_artifact_comment(&comment_id)
         .await
         .map_err(map_storage_error)?;
-    let role = require_workspace_read(&state, &subject, &comment.workspace_id).await?;
+    // Authors who are now viewers no longer change content, their own included.
+    let role = require_workspace_write(&state, &subject, &comment.workspace_id).await?;
     if comment.author.id != subject.user_id
         && !matches!(role, WorkspaceRole::Owner | WorkspaceRole::Admin)
     {
@@ -3401,7 +3410,10 @@ struct FileLinkResponse {
 
 /// The stored original as a download. Always an attachment, sandboxed and
 /// never sniffed, so an uploaded HTML or SVG file cannot run in the browser.
-fn file_response(summary: &ArtifactSummary, bytes: Vec<u8>) -> Response {
+/// The stored bytes of an artifact as a download. The content type comes
+/// from the file name (`served_mime_type`), never from what an uploader or a
+/// repository claimed, unless `content_type` names one (a rendered PDF).
+fn file_response(summary: &ArtifactSummary, bytes: Vec<u8>, content_type: Option<&'static str>) -> Response {
     let filename = summary
         .path
         .rsplit(['/', '\\'])
@@ -3431,12 +3443,8 @@ fn file_response(summary: &ArtifactSummary, bytes: Vec<u8>) -> Response {
         })
         .collect();
     let mut headers = HeaderMap::new();
-    let content_type = summary
-        .mime_type
-        .as_deref()
-        .and_then(|value| HeaderValue::from_str(value).ok())
-        .unwrap_or_else(|| HeaderValue::from_static("application/octet-stream"));
-    headers.insert(header::CONTENT_TYPE, content_type);
+    let content_type = content_type.unwrap_or_else(|| served_mime_type(std::path::Path::new(&summary.path)));
+    headers.insert(header::CONTENT_TYPE, HeaderValue::from_static(content_type));
     if let Ok(value) = HeaderValue::from_str(&format!(
         "attachment; filename=\"{ascii}\"; filename*=UTF-8''{encoded}"
     )) {
@@ -3469,7 +3477,7 @@ async fn download_artifact_file(
         .read_artifact_blob(&artifact_id)
         .await
         .map_err(map_storage_error)?;
-    Ok(file_response(&summary, bytes))
+    Ok(file_response(&summary, bytes, None))
 }
 
 async fn artifact_document_preview(
@@ -3544,7 +3552,7 @@ async fn rendered_preview_pdf(
     let mut rendered = summary;
     rendered.mime_type = Some("application/pdf".to_owned());
     rendered.path = format!("{}.pdf", rendered.title);
-    Ok(file_response(&rendered, bytes))
+    Ok(file_response(&rendered, bytes, Some("application/pdf")))
 }
 
 /// A short-lived, single-file link that a desktop app (Word, Excel, ...) can
@@ -3608,7 +3616,7 @@ async fn shared_file_by_link(
         .read_artifact_blob(&claims.sub)
         .await
         .map_err(map_storage_error)?;
-    Ok(file_response(&summary, bytes))
+    Ok(file_response(&summary, bytes, None))
 }
 
 async fn rename_folder(
@@ -4206,12 +4214,15 @@ async fn index_artifact(
     Ok(Json(job))
 }
 
+/// Re-indexes the whole workspace inside the request. Administrators only:
+/// it holds a connection and the server's indexing work for as long as it
+/// runs, and new evidence is indexed in the background anyway.
 async fn index_workspace(
     subject: AuthenticatedSubject,
     State(state): State<AppState>,
     Path(workspace_id): Path<String>,
 ) -> Result<Json<IndexingJobStatus>, ApiError> {
-    require_workspace_write(&state, &subject, &workspace_id).await?;
+    require_workspace_admin(&state, &subject, &workspace_id).await?;
     let job = state
         .core
         .index_workspace(workspace_id.clone())
@@ -8233,6 +8244,74 @@ mod tests {
         assert_eq!(joined.status(), 200);
         assert_eq!(response_json(get("/v1/workspaces".to_owned(), &guest).await).await.as_array().unwrap().len(), 3);
         assert_eq!(response_json(get("/v1/organizations".to_owned(), &guest).await).await[0]["guest"], false);
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn owners_authors_and_served_types_hold() {
+        let data_dir = temp_data_dir("second-pass");
+        let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+        let send = |method: &'static str, uri: String, who: &str, body: Value| {
+            let app = app.clone();
+            let request = json_request(method, &uri, who, body);
+            async move { app.oneshot(request).await.unwrap() }
+        };
+        let (admin, _) = register_account(&app, "first-admin@example.com").await;
+        let (owner, _) = register_account(&app, "ws-owner@example.com").await;
+        let (writer, _) = register_account(&app, "ws-writer@example.com").await;
+        let workspace_id = create_workspace(&app, &owner).await;
+        assert_eq!(send("PUT", format!("/v1/workspaces/{workspace_id}/members"), &owner, json!({"email": "ws-writer@example.com", "role": "member"})).await.status(), 200);
+
+        // The owner keeps the owner role, even against their own request.
+        let demoted = send("PUT", format!("/v1/workspaces/{workspace_id}/members"), &owner, json!({"email": "ws-owner@example.com", "role": "member"})).await;
+        assert_eq!(demoted.status(), 400, "a workspace cannot lose its owner");
+        let organization_id = response_json(app.clone().oneshot(auth_request("GET", "/v1/organizations", &owner)).await.unwrap()).await[0]["id"].as_str().unwrap().to_owned();
+        assert_eq!(send("PUT", format!("/v1/organizations/{organization_id}/members"), &owner, json!({"email": "ws-owner@example.com", "role": "member"})).await.status(), 400, "nor an organization");
+
+        // A writer's comment and task stop being theirs to change once they are a viewer.
+        let artifact = response_json(send("POST", format!("/v1/workspaces/{workspace_id}/artifacts/text"), &writer, json!({"title": "Notes", "content": "Plain text"})).await).await;
+        let artifact_id = artifact["id"].as_str().unwrap().to_owned();
+        let comment = response_json(send("POST", format!("/v1/artifacts/{artifact_id}/comments"), &writer, json!({"body": "Mine"})).await).await;
+        let comment_id = comment["id"].as_str().unwrap().to_owned();
+        let search = response_json(send("POST", format!("/v1/workspaces/{workspace_id}/saved-searches"), &owner, json!({"name": "Owner's", "query": "plain", "artifact_types": [], "languages": [], "source_ids": [], "result_limit": 20})).await).await;
+        let search_id = search["id"].as_str().unwrap().to_owned();
+        assert_eq!(send("DELETE", format!("/v1/saved-searches/{search_id}"), &writer, json!({})).await.status(), 403, "someone else's saved search");
+        assert_eq!(send("POST", format!("/v1/workspaces/{workspace_id}/index"), &writer, json!({})).await.status(), 403, "a workspace-wide re-index inside the request is for administrators");
+        assert_eq!(send("PUT", format!("/v1/workspaces/{workspace_id}/members"), &owner, json!({"email": "ws-writer@example.com", "role": "viewer"})).await.status(), 200);
+        assert_eq!(send("PUT", format!("/v1/comments/{comment_id}"), &writer, json!({"body": "Changed"})).await.status(), 403, "viewers change nothing, their old comments included");
+        assert_eq!(send("DELETE", format!("/v1/comments/{comment_id}"), &writer, json!({})).await.status(), 403);
+        assert_eq!(send("DELETE", format!("/v1/saved-searches/{search_id}"), &owner, json!({})).await.status(), 204);
+
+        // Served types come from the file name, whatever the uploader claimed.
+        let uploaded = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/v1/workspaces/{workspace_id}/artifacts/upload"))
+                    .header("authorization", &owner)
+                    .header("content-type", "text/html")
+                    .header("x-repomemo-filename", "page.html")
+                    .body(Body::from("<script>alert(1)</script>"))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(uploaded.status(), 201);
+        let page_id = response_json(uploaded).await["id"].as_str().unwrap().to_owned();
+        let file = app.clone().oneshot(auth_request("GET", &format!("/v1/artifacts/{page_id}/file"), &owner)).await.unwrap();
+        assert_eq!(file.headers()["content-type"], "text/plain; charset=utf-8");
+        assert!(file.headers()["content-disposition"].to_str().unwrap().starts_with("attachment"));
+
+        // Run-time settings need a signed-in session, not a token.
+        let token = response_json(send("POST", "/v1/profile/tokens".to_owned(), &admin, json!({"name": "Ops", "scope": "write", "expires_in_days": 7})).await).await;
+        let token = format!("Bearer {}", token["secret"].as_str().unwrap());
+        assert_eq!(send("PUT", "/v1/system/settings".to_owned(), &token, json!({"values": {"allow_registration": false}})).await.status(), 403);
+        assert_eq!(send("DELETE", "/v1/system/settings/allow_registration".to_owned(), &token, json!({})).await.status(), 403);
+        assert_eq!(send("POST", "/v1/system/console".to_owned(), &token, json!({"command": "settings set allow_registration false --yes"})).await.status(), 403);
+        assert_eq!(send("POST", "/v1/system/console".to_owned(), &token, json!({"command": "settings set allow_registration false"})).await.status(), 200, "dry runs still work");
+        assert_eq!(send("POST", "/v1/system/console".to_owned(), &admin, json!({"command": "settings set allow_registration false --yes"})).await.status(), 200, "a signed-in console may");
+
         let _ = std::fs::remove_dir_all(data_dir);
     }
 
