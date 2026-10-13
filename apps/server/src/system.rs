@@ -573,7 +573,7 @@ fn sighting(state: &AppState, request: &Request) -> Option<(String, Option<Strin
         .get::<ConnectInfo<SocketAddr>>()
         .map(|info| info.0.ip());
     Some((
-        client_ip(request.headers(), peer, state.settings().trust_proxy),
+        client_ip(request.headers(), peer, &state.settings().proxy),
         header("origin"),
         header("x-repomemo-client"),
         describe_agent(header("user-agent").as_deref().unwrap_or("")),
@@ -640,14 +640,28 @@ pub(crate) fn require_system_admin(subject: &AuthenticatedSubject) -> Result<(),
     }
 }
 
-/// Granting or removing the wildcard role stays with system administrators, so
-/// an app administrator cannot promote themselves into it.
-fn require_full_system_admin(subject: &AuthenticatedSubject) -> Result<(), ApiError> {
+/// What only system administrators do (review M8): roles, run-time settings,
+/// other people's sessions, lockouts and passwords, the environment, and the
+/// raw log files. App administrators read the System pages and run jobs and
+/// maintenance.
+pub(crate) fn require_full_system_admin(subject: &AuthenticatedSubject) -> Result<(), ApiError> {
     if subject.is_system_admin {
         Ok(())
     } else {
-        Err(ApiError::forbidden_because("Only system administrators can grant or remove the system administrator role."))
+        Err(ApiError::forbidden_because("Only system administrators can do this; app administrators read these pages and run jobs and maintenance."))
     }
+}
+
+/// Changes in the System area need a signed-in session or a personal access
+/// token with the `system` scope, so a leaked read-and-write token cannot
+/// sign people out or run maintenance.
+pub(crate) fn require_system_change(subject: &AuthenticatedSubject) -> Result<(), ApiError> {
+    if subject.token.as_ref().is_some_and(|token| !token.system) {
+        return Err(ApiError::forbidden_because(
+            "System changes need a signed-in session or a personal access token with the system scope.",
+        ));
+    }
+    Ok(())
 }
 
 /// Records a system administration action durably and in the log.
@@ -894,7 +908,7 @@ pub(crate) async fn set_app_admin(
     Path(user_id): Path<String>,
     Json(request): Json<SystemAdminRequest>,
 ) -> Result<StatusCode, ApiError> {
-    require_system_admin(&subject)?;
+    require_full_system_admin(&subject)?;
     let user = state
         .storage
         .find_user(&user_id)
@@ -921,7 +935,8 @@ pub(crate) async fn end_user_sessions(
     State(state): State<AppState>,
     Path(user_id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
-    require_system_admin(&subject)?;
+    require_full_system_admin(&subject)?;
+    require_system_change(&subject)?;
     let user = state
         .storage
         .find_user(&user_id)
@@ -955,7 +970,8 @@ pub(crate) async fn unlock_user(
     State(state): State<AppState>,
     Path(user_id): Path<String>,
 ) -> Result<Json<Value>, ApiError> {
-    require_system_admin(&subject)?;
+    require_full_system_admin(&subject)?;
+    require_system_change(&subject)?;
     let user = state
         .storage
         .find_user(&user_id)
@@ -1036,7 +1052,7 @@ pub(crate) async fn update_settings(
     State(state): State<AppState>,
     Json(request): Json<UpdateSettingsRequest>,
 ) -> Result<Json<SettingsResponse>, ApiError> {
-    require_system_admin(&subject)?;
+    require_full_system_admin(&subject)?;
     if request.values.is_empty() {
         return Err(ApiError::bad_request("No settings were given."));
     }
@@ -1068,7 +1084,7 @@ pub(crate) async fn reset_setting(
     State(state): State<AppState>,
     Path(key): Path<String>,
 ) -> Result<Json<SettingsResponse>, ApiError> {
-    require_system_admin(&subject)?;
+    require_full_system_admin(&subject)?;
     let spec = spec(&key).ok_or_else(|| ApiError::not_found(format!("{key} is not a setting.")))?;
     state
         .storage
@@ -1152,12 +1168,12 @@ pub(crate) async fn logs(
             .await
             .map_err(ApiError::internal)?
             .map_err(|error| ApiError::not_found(format!("{error:#}")))?;
-        return Ok(Json(LogsResponse { capturing: logs::buffer().is_some(), source: "file", records }));
+        return Ok(Json(LogsResponse { capturing: logs::buffer().is_some(), source: "file", records: visible_records(&subject, records) }));
     }
     let Some(buffer) = logs::buffer() else {
         return Ok(Json(LogsResponse { capturing: false, source: "memory", records: Vec::new() }));
     };
-    Ok(Json(LogsResponse { capturing: true, source: "memory", records: buffer.query(&filter) }))
+    Ok(Json(LogsResponse { capturing: true, source: "memory", records: visible_records(&subject, buffer.query(&filter)) }))
 }
 
 #[derive(Debug, Serialize)]
@@ -1182,6 +1198,16 @@ pub(crate) struct LogFilesResponse {
     categories: Vec<LogCategoryView>,
 }
 
+/// Workspace activity names people's evidence and actions; app
+/// administrators have no access to workspaces, so they do not see it in the
+/// logs either (review M8).
+fn visible_records(subject: &AuthenticatedSubject, mut records: Vec<LogRecord>) -> Vec<LogRecord> {
+    if !subject.is_system_admin {
+        records.retain(|record| record.category != "activity");
+    }
+    records
+}
+
 /// The day files kept, and how logging is set up now.
 pub(crate) async fn log_files(
     subject: AuthenticatedSubject,
@@ -1204,6 +1230,7 @@ pub(crate) async fn log_files(
         default_level: logging.level.clone(),
         categories: CATEGORIES
             .iter()
+            .filter(|category| subject.is_system_admin || category.key != "activity")
             .map(|category| LogCategoryView {
                 key: category.key,
                 label: category.label,
@@ -1223,7 +1250,7 @@ pub(crate) async fn download_log_file(
     State(state): State<AppState>,
     Path(day): Path<String>,
 ) -> Result<Response, ApiError> {
-    require_system_admin(&subject)?;
+    require_full_system_admin(&subject)?;
     let path = logs::log_file_path(&PathBuf::from(&state.instance.data_dir), &day)
         .map_err(|error| ApiError::bad_request(error.to_string()))?;
     let bytes = tokio::fs::read(&path)
@@ -1309,6 +1336,7 @@ pub(crate) async fn run_maintenance(
     State(state): State<AppState>,
 ) -> Result<Json<MaintenanceStatus>, ApiError> {
     require_system_admin(&subject)?;
+    require_system_change(&subject)?;
     let report = maintenance::run_tracked(&state, "manual", true, true)
         .await
         .ok_or_else(|| ApiError::conflict("Maintenance is already running."))?;

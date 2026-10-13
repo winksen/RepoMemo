@@ -223,6 +223,7 @@ pub(crate) async fn create_admin(
         email: request.email.clone(),
         display_name: request.display_name.clone(),
         password: request.password.clone(),
+        invitation_token: None,
     })?;
     let password_hash = hash_password(&request.password).await?;
     let user = state

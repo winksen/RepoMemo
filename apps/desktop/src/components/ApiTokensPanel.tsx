@@ -31,16 +31,18 @@ const SCOPE_OPTIONS = [
   { label: "Read only: look and search", value: "read" },
   { label: "Read and write: everything you may do", value: "write" },
 ];
+/** Only for system and app administrators: also changes in the System area (maintenance, sessions, lockouts). */
+const SYSTEM_SCOPE_OPTION = { label: "System: read, write and System changes", value: "system" };
 
 /**
  * Profile › API tokens: personal access tokens for scripts, CI and the
  * terminal console (`REPOMEMO_TOKEN`). A token acts as its owner within its
  * scope, but never manages tokens, passwords or roles.
  */
-export function ApiTokensPanel({ accessToken }: { accessToken: string }) {
+export function ApiTokensPanel({ accessToken, isAdministrator }: { accessToken: string; isAdministrator: boolean }) {
   const [tokens, setTokens] = useState<PersonalAccessToken[] | null>(null);
   const [name, setName] = useState("");
-  const [scope, setScope] = useState<"read" | "write">("read");
+  const [scope, setScope] = useState<"read" | "write" | "system">("read");
   const [expiry, setExpiry] = useState("90");
   const [secret, setSecret] = useState<string | null>(null);
   const [revoking, setRevoking] = useState<PersonalAccessToken | null>(null);
@@ -80,14 +82,14 @@ export function ApiTokensPanel({ accessToken }: { accessToken: string }) {
     <p className="shared-muted-copy">For scripts, CI and the terminal console: send <code>Authorization: Bearer &lt;token&gt;</code>, or set <code>REPOMEMO_TOKEN</code> for <code>repomemo-console</code>. A token acts as you, so it only reaches what you can. It cannot manage tokens, change your password or grant roles. It keeps working when you change your password; revoke it here, or ask an administrator to sign you out everywhere.</p>
     <form className="rm-tokens-form" onSubmit={create}>
       <label>Name<Input maxLength={80} onChange={(event) => setName(event.target.value)} placeholder="CI release notes" required value={name} /></label>
-      <label>Access<Dropdown aria-label="Token access" onValueChange={(value) => setScope(value as "read" | "write")} options={SCOPE_OPTIONS} value={scope} /></label>
+      <label>Access<Dropdown aria-label="Token access" onValueChange={(value) => setScope(value as "read" | "write" | "system")} options={isAdministrator ? [...SCOPE_OPTIONS, SYSTEM_SCOPE_OPTION] : SCOPE_OPTIONS} value={scope} /></label>
       <label>Expires after<Dropdown aria-label="Token lifetime" onValueChange={setExpiry} options={EXPIRY_OPTIONS} value={expiry} /></label>
       <Button disabled={isBusy || !name.trim()} type="submit" variant="secondary"><Plus size={16} /> Create token</Button>
     </form>
     {tokens?.length ? <ul className="rm-tokens-list">{tokens.map((token) => {
       const expired = token.expires_at <= now;
       return <li className={expired ? "expired" : ""} key={token.id}>
-        <span className="rm-tokens-text"><strong>{token.name} <small className="rm-system-tag">{token.scope === "write" ? "read and write" : "read only"}</small>{expired ? <small className="rm-system-tag">expired</small> : null}</strong><small><code>{token.prefix}…</code> · created {formatDate(token.created_at)} · {expired ? "expired" : "expires"} {formatDate(token.expires_at)} · last used {formatDate(token.last_used_at)}</small></span>
+        <span className="rm-tokens-text"><strong>{token.name} <small className="rm-system-tag">{token.scope === "system" ? "system" : token.scope === "write" ? "read and write" : "read only"}</small>{expired ? <small className="rm-system-tag">expired</small> : null}</strong><small><code>{token.prefix}…</code> · created {formatDate(token.created_at)} · {expired ? "expired" : "expires"} {formatDate(token.expires_at)} · last used {formatDate(token.last_used_at)}</small></span>
         <Button aria-label={`Revoke ${token.name}`} disabled={isBusy} onClick={() => setRevoking(token)} type="button" variant="secondary"><Trash size={15} /> {expired ? "Remove" : "Revoke"}</Button>
       </li>;
     })}</ul> : tokens ? <p className="shared-muted-copy">No tokens yet.</p> : null}

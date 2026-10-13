@@ -375,6 +375,9 @@ pub(crate) async fn run(
     if spec.changes && line.yes && subject.token.as_ref().is_some_and(|token| token.read_only) {
         return Err(ApiError::forbidden_because("This personal access token is read-only: it can run dry runs and lookups, not changes."));
     }
+    if spec.changes && line.yes {
+        super::require_system_change(&subject)?;
+    }
     tracing::debug!(user_id = %subject.user_id, command = spec.name, "Console command");
     let response = execute(&state, &subject, spec, arguments, &line).await?;
     if response.applied {

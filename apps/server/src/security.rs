@@ -14,7 +14,7 @@ use std::{
 };
 
 use axum::{
-    extract::{ConnectInfo, FromRequestParts, Request},
+    extract::{ConnectInfo, FromRequestParts, Request, State},
     http::{header, request::Parts, HeaderName, HeaderValue},
     middleware::Next,
     response::Response,
@@ -227,9 +227,23 @@ impl Guards {
     }
 }
 
-/// The address a request came from: the TCP peer, or the first address in
-/// `X-Forwarded-For` / `X-Real-IP` when the server is configured to trust a
-/// reverse proxy in front of it.
+/// Which reverse proxies may tell the server who the client is.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ProxyTrust {
+    /// `REPOMEMO_TRUST_PROXY`: read `X-Forwarded-For` / `X-Real-IP` at all.
+    pub enabled: bool,
+    /// `REPOMEMO_TRUSTED_PROXIES`: proxy addresses besides loopback.
+    pub proxies: Vec<IpAddr>,
+}
+
+impl ProxyTrust {
+    fn trusts(&self, address: IpAddr) -> bool {
+        address.is_loopback() || self.proxies.contains(&address)
+    }
+}
+
+/// The address a request came from: the TCP peer, or, when that peer is a
+/// trusted proxy, the address it reports (see [`client_ip`]).
 #[derive(Debug, Clone)]
 pub struct ClientIp(pub String);
 
@@ -241,20 +255,36 @@ impl FromRequestParts<AppState> for ClientIp {
             .extensions
             .get::<ConnectInfo<SocketAddr>>()
             .map(|info| info.0.ip());
-        Ok(Self(client_ip(&parts.headers, peer, state.settings().trust_proxy)))
+        Ok(Self(client_ip(&parts.headers, peer, &state.settings().proxy)))
     }
 }
 
-pub(crate) fn client_ip(headers: &axum::http::HeaderMap, peer: Option<IpAddr>, trust_proxy: bool) -> String {
-    if trust_proxy {
+/// The client's address. Proxy headers count only when proxy trust is on and
+/// the TCP peer is a trusted proxy (loopback or a listed address); anyone
+/// else could write them. `X-Forwarded-For` is read from the right, skipping
+/// trusted proxies: proxies append to it, so the leftmost entries are
+/// whatever the client sent (review M3).
+pub(crate) fn client_ip(headers: &axum::http::HeaderMap, peer: Option<IpAddr>, proxy: &ProxyTrust) -> String {
+    if proxy.enabled && peer.is_some_and(|address| proxy.trusts(address)) {
         let forwarded = headers
-            .get("x-forwarded-for")
-            .and_then(|value| value.to_str().ok())
-            .and_then(|value| value.split(',').next())
-            .or_else(|| headers.get("x-real-ip").and_then(|value| value.to_str().ok()))
+            .get_all("x-forwarded-for")
+            .iter()
+            .filter_map(|value| value.to_str().ok())
+            .flat_map(|value| value.split(','))
             .map(str::trim)
-            .and_then(|value| value.parse::<IpAddr>().ok());
-        if let Some(address) = forwarded {
+            .collect::<Vec<_>>();
+        let from_chain = forwarded
+            .iter()
+            .rev()
+            .filter_map(|entry| entry.parse::<IpAddr>().ok())
+            .find(|address| !proxy.trusts(*address));
+        let real_ip = || {
+            headers
+                .get("x-real-ip")
+                .and_then(|value| value.to_str().ok())
+                .and_then(|value| value.trim().parse::<IpAddr>().ok())
+        };
+        if let Some(address) = from_chain.or_else(real_ip) {
             return address.to_string();
         }
     }
@@ -284,12 +314,25 @@ pub fn wait_text(duration: Duration) -> String {
     }
 }
 
+/// What the security headers add beyond the fixed set.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct HeaderPolicy {
+    /// The server is reached over HTTPS (`REPOMEMO_PUBLIC_URL`), so browsers
+    /// are told to keep using it (HSTS, review M9).
+    pub hsts: bool,
+}
+
 /// Adds conservative security headers to every response that did not set its
 /// own. The API only serves JSON, server-sent events and file downloads to
 /// script, so nothing needs to be framed, sniffed, cached or sent a referrer.
-pub async fn security_headers(request: Request, next: Next) -> Response {
+pub async fn security_headers(State(policy): State<HeaderPolicy>, request: Request, next: Next) -> Response {
     let mut response = next.run(request).await;
     let headers = response.headers_mut();
+    if policy.hsts {
+        headers
+            .entry(header::STRICT_TRANSPORT_SECURITY)
+            .or_insert_with(|| HeaderValue::from_static("max-age=31536000"));
+    }
     let defaults: [(HeaderName, &'static str); 5] = [
         (header::X_CONTENT_TYPE_OPTIONS, "nosniff"),
         (header::X_FRAME_OPTIONS, "DENY"),
@@ -354,13 +397,24 @@ mod tests {
 
     #[test]
     fn client_addresses_only_come_from_proxy_headers_when_trusted() {
+        let off = ProxyTrust::default();
+        let on = ProxyTrust { enabled: true, proxies: vec!["10.0.0.1".parse().unwrap()] };
+        let proxy = Some("10.0.0.1".parse().unwrap());
+        let stranger = Some("198.51.100.7".parse().unwrap());
         let mut headers = axum::http::HeaderMap::new();
+        // The client wrote the first entry; the proxy appended the real address.
+        headers.insert("x-forwarded-for", HeaderValue::from_static("1.2.3.4, 203.0.113.9"));
+        assert_eq!(client_ip(&headers, proxy, &off), "10.0.0.1", "headers are ignored unless trusted");
+        assert_eq!(client_ip(&headers, proxy, &on), "203.0.113.9", "the rightmost entry the proxy added");
+        assert_eq!(client_ip(&headers, stranger, &on), "198.51.100.7", "only a trusted peer's headers count");
+        let local = Some("127.0.0.1".parse().unwrap());
+        assert_eq!(client_ip(&headers, local, &on), "203.0.113.9", "a proxy on the same machine is trusted");
         headers.insert("x-forwarded-for", HeaderValue::from_static("203.0.113.9, 10.0.0.1"));
-        let peer = Some("10.0.0.1".parse().unwrap());
-        assert_eq!(client_ip(&headers, peer, false), "10.0.0.1");
-        assert_eq!(client_ip(&headers, peer, true), "203.0.113.9");
+        assert_eq!(client_ip(&headers, proxy, &on), "203.0.113.9", "trusted proxies in the chain are skipped");
         headers.insert("x-forwarded-for", HeaderValue::from_static("not-an-address"));
-        assert_eq!(client_ip(&headers, peer, true), "10.0.0.1");
-        assert_eq!(client_ip(&axum::http::HeaderMap::new(), None, true), "unknown");
+        assert_eq!(client_ip(&headers, proxy, &on), "10.0.0.1");
+        headers.insert("x-real-ip", HeaderValue::from_static("203.0.113.10"));
+        assert_eq!(client_ip(&headers, proxy, &on), "203.0.113.10");
+        assert_eq!(client_ip(&axum::http::HeaderMap::new(), None, &on), "unknown");
     }
 }

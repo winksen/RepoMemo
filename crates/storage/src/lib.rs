@@ -1110,6 +1110,19 @@ impl StorageEngine {
         Ok(Some(user_id))
     }
 
+    /// The user a refresh token belongs to while it is still usable, without
+    /// using it up. For telling the account's own device apart at sign-in.
+    pub async fn refresh_token_user(&self, raw: &str) -> Result<Option<String>> {
+        let now = Utc::now().to_rfc3339();
+        Ok(sqlx::query_scalar::<_, String>(
+            "SELECT user_id FROM refresh_tokens WHERE token_hash = ?1 AND revoked_at IS NULL AND expires_at > ?2",
+        )
+        .bind(hash_refresh_token(raw))
+        .bind(now)
+        .fetch_optional(&self.pool)
+        .await?)
+    }
+
     pub async fn revoke_refresh_token(&self, raw: &str) -> Result<()> {
         sqlx::query("UPDATE refresh_tokens SET revoked_at = ?1 WHERE token_hash = ?2 AND revoked_at IS NULL")
             .bind(Utc::now().to_rfc3339())

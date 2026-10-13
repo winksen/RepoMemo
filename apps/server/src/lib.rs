@@ -25,7 +25,7 @@ pub use security::Quota;
 use std::{
     collections::{BTreeMap, BTreeSet},
     convert::Infallible,
-    net::SocketAddr,
+    net::{IpAddr, SocketAddr},
     path::PathBuf,
     sync::Arc,
     time::Duration,
@@ -116,6 +116,15 @@ pub struct ServerConfig {
     /// Take the client address from `X-Forwarded-For` / `X-Real-IP`. Only for
     /// a server reachable solely through a reverse proxy that sets them.
     pub trust_proxy: bool,
+    /// Proxy addresses besides loopback whose forwarding headers are read
+    /// (`REPOMEMO_TRUSTED_PROXIES`).
+    pub trusted_proxies: Vec<IpAddr>,
+    /// The address people use, such as `https://memo.example.com`
+    /// (`REPOMEMO_PUBLIC_URL`). HTTPS turns HSTS on.
+    pub public_url: Option<String>,
+    /// Allows binding beyond loopback over plain HTTP without a proxy
+    /// (`REPOMEMO_ALLOW_INSECURE_HTTP`), for a trusted network only.
+    pub allow_insecure_http: bool,
     pub max_upload_bytes: usize,
     pub access_token_ttl_minutes: i64,
     pub refresh_token_ttl_days: i64,
@@ -212,6 +221,23 @@ impl ServerConfig {
                     .collect::<Vec<_>>()
             })
             .unwrap_or_default();
+        let trusted_proxies = env_text("REPOMEMO_TRUSTED_PROXIES")
+            .map(|list| {
+                list.split(',')
+                    .map(str::trim)
+                    .filter(|entry| !entry.is_empty())
+                    .map(|entry| entry.parse::<IpAddr>().with_context(|| format!("REPOMEMO_TRUSTED_PROXIES has an invalid address: {entry}")))
+                    .collect::<Result<Vec<_>>>()
+            })
+            .transpose()?
+            .unwrap_or_default();
+        let public_url = env_text("REPOMEMO_PUBLIC_URL").map(|url| url.trim_end_matches('/').to_owned());
+        if public_url.as_deref().is_some_and(|url| !url.starts_with("https://") && !url.starts_with("http://")) {
+            bail!("REPOMEMO_PUBLIC_URL must start with https:// (or http://)");
+        }
+        let trust_proxy = env_flag("REPOMEMO_TRUST_PROXY", false)?;
+        let allow_insecure_http = env_flag("REPOMEMO_ALLOW_INSECURE_HTTP", false)?;
+        check_transport(bind_address, public_url.as_deref(), trust_proxy, allow_insecure_http)?;
         let repo_poll_seconds: u64 = env_parse("REPOMEMO_REPO_POLL_SECONDS", 300)?;
         let maintenance_minutes: u64 = env_parse("REPOMEMO_MAINTENANCE_INTERVAL_MINUTES", 60)?;
         let index_retry_hours: u64 = env_parse("REPOMEMO_INDEX_RETRY_HOURS", 6)?;
@@ -225,8 +251,12 @@ impl ServerConfig {
             allowed_origins,
             soffice: std::env::var_os("REPOMEMO_SOFFICE").map(PathBuf::from),
             secret_key,
-            allow_registration: env_flag("REPOMEMO_ALLOW_REGISTRATION", true)?,
-            trust_proxy: env_flag("REPOMEMO_TRUST_PROXY", false)?,
+            // Closed by default: people join with invitation links (review M1).
+            allow_registration: env_flag("REPOMEMO_ALLOW_REGISTRATION", false)?,
+            trust_proxy,
+            trusted_proxies,
+            public_url,
+            allow_insecure_http,
             max_upload_bytes: env_parse::<usize>("REPOMEMO_MAX_UPLOAD_MB", 10)?.clamp(1, 1024) * 1024 * 1024,
             access_token_ttl_minutes: env_parse::<i64>("REPOMEMO_ACCESS_TOKEN_TTL_MINUTES", 60)?.clamp(5, 24 * 60),
             refresh_token_ttl_days: env_parse::<i64>("REPOMEMO_REFRESH_TOKEN_TTL_DAYS", 30)?.clamp(1, 365),
@@ -277,6 +307,9 @@ impl ServerConfig {
             secret_key: None,
             allow_registration: true,
             trust_proxy: false,
+            trusted_proxies: Vec::new(),
+            public_url: None,
+            allow_insecure_http: false,
             max_upload_bytes: 10 * 1024 * 1024,
             access_token_ttl_minutes: 60,
             refresh_token_ttl_days: 30,
@@ -323,6 +356,26 @@ fn env_parse<T: std::str::FromStr>(name: &str, default: T) -> Result<T> {
 }
 
 /// An optional on/off environment variable: true/false, 1/0, yes/no, on/off.
+/// Refuses to serve plain HTTP beyond this machine unless a TLS proxy is in
+/// front (an `https://` public address, or proxy trust) or the operator opted
+/// in for a trusted network (review M9).
+fn check_transport(bind: SocketAddr, public_url: Option<&str>, trust_proxy: bool, allow_insecure_http: bool) -> Result<()> {
+    let behind_tls = public_url.is_some_and(|url| url.starts_with("https://")) || trust_proxy;
+    if !bind.ip().is_loopback() && !behind_tls && !allow_insecure_http {
+        bail!(
+            "REPOMEMO_SERVER_ADDR ({bind}) is reachable from other machines over plain HTTP. Put a TLS reverse proxy in front and set REPOMEMO_PUBLIC_URL=https://… (or REPOMEMO_TRUST_PROXY=true), or set REPOMEMO_ALLOW_INSECURE_HTTP=true for a trusted network only."
+        );
+    }
+    Ok(())
+}
+
+impl ServerConfig {
+    /// Whose forwarding headers name the client (see `security::client_ip`).
+    pub fn proxy_trust(&self) -> security::ProxyTrust {
+        security::ProxyTrust { enabled: self.trust_proxy, proxies: self.trusted_proxies.clone() }
+    }
+}
+
 fn env_flag(name: &str, default: bool) -> Result<bool> {
     let Some(raw) = env_text(name) else {
         return Ok(default);
@@ -339,7 +392,7 @@ fn env_flag(name: &str, default: bool) -> Result<bool> {
 struct RuntimeSettings {
     service_name: String,
     allow_registration: bool,
-    trust_proxy: bool,
+    proxy: security::ProxyTrust,
     access_token_ttl_minutes: i64,
     refresh_token_ttl_days: i64,
     auth_quota: Quota,
@@ -360,7 +413,7 @@ impl RuntimeSettings {
         Self {
             service_name: config.service_name.clone(),
             allow_registration: config.allow_registration,
-            trust_proxy: config.trust_proxy,
+            proxy: config.proxy_trust(),
             access_token_ttl_minutes: config.access_token_ttl_minutes,
             refresh_token_ttl_days: config.refresh_token_ttl_days,
             auth_quota: config.auth_quota,
@@ -867,6 +920,8 @@ struct AuthenticatedSubject {
 #[derive(Debug, Clone)]
 struct TokenGrant {
     read_only: bool,
+    /// The `system` scope: also changes in the System area.
+    system: bool,
 }
 
 /// The whole application. With `config.data_dir` set the environment is
@@ -1373,7 +1428,10 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         )
         .route("/v1/memory-cards/{card_id}/export", get(export_memory_card))
         .layer(CatchPanicLayer::custom(panic_response))
-        .layer(middleware::from_fn(security::security_headers))
+        .layer(middleware::from_fn_with_state(
+            security::HeaderPolicy { hsts: config.public_url.as_deref().is_some_and(|url| url.starts_with("https://")) },
+            security::security_headers,
+        ))
         .layer(middleware::from_fn_with_state(state.clone(), system::track_requests))
         .layer(TraceLayer::new_for_http())
         .layer(DefaultBodyLimit::max(config.max_upload_bytes))
@@ -5020,7 +5078,8 @@ async fn authenticate_personal_token(
         .await
         .map_err(ApiError::internal)?
         .ok_or_else(ApiError::unauthorized)?;
-    let read_only = grant.scope != "write";
+    let read_only = !matches!(grant.scope.as_str(), "write" | "system");
+    let system = grant.scope == "system";
     tracing::debug!(target: "audit", user_id = %grant.user_id, token_id = %grant.token_id, method = %parts.method, path = parts.uri.path(), "Personal access token used");
     let expires_at = chrono::DateTime::parse_from_rfc3339(&grant.expires_at)
         .map(|at| at.timestamp().max(0) as u64)
@@ -5031,7 +5090,7 @@ async fn authenticate_personal_token(
         session_version: access.session_version,
         is_system_admin: access.is_system_admin,
         is_app_admin: access.is_app_admin,
-        token: Some(TokenGrant { read_only }),
+        token: Some(TokenGrant { read_only, system }),
     })
 }
 
@@ -7438,7 +7497,9 @@ mod tests {
         let data_dir =
             std::env::temp_dir().join(format!("repomemo-server-render-{}", uuid::Uuid::new_v4()));
         let mut config = ServerConfig::for_test(data_dir.clone());
-        config.soffice = Some(fake_soffice(&data_dir.join("bin")));
+        // Next to the environment, not inside it: an environment folder must
+        // hold nothing but RepoMemo's own files.
+        config.soffice = Some(fake_soffice(&data_dir.with_extension("bin")));
         let app = router(config).await.unwrap();
         let response = app
             .clone()
@@ -8655,7 +8716,7 @@ mod tests {
 
         let settings = response_json(send("GET", "/v1/system/settings", &admin, json!({})).await).await;
         let logging = settings["settings"].as_array().unwrap().iter().filter(|setting| setting["group"] == "Logging").collect::<Vec<_>>();
-        assert_eq!(logging.len(), 10);
+        assert_eq!(logging.len(), 11, "default level, seven categories, format, files, retention");
         let http = logging.iter().find(|setting| setting["key"] == "log_http_level").unwrap();
         assert_eq!((http["kind"].clone(), http["value"].clone()), (json!("choice"), json!("warn")));
         assert_eq!(http["options"].as_array().unwrap().len(), 6);

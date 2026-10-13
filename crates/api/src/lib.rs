@@ -14,8 +14,7 @@ use repomemo_domain::{
 use repomemo_indexer::{index_artifact, index_image_description, INDEXER_VERSION};
 use repomemo_ingestion::{
     detect_artifact_type, detect_language, discover_import_candidates,
-    document_preview, extract_document_text, is_document, served_mime_type, ImportCandidate,
-    ImportOptions,
+    document_preview, extract_document_text, is_document, ImportCandidate, ImportOptions,
 };
 use repomemo_retrieval::{KeywordMode, RetrievalService};
 use repomemo_storage::{NewArtifact, StorageConfig, StorageEngine};

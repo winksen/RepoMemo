@@ -330,8 +330,8 @@ impl StorageEngine {
         if name.is_empty() || name.chars().count() > 80 {
             bail!("Token name must be between 1 and 80 characters.");
         }
-        if !matches!(scope, "read" | "write") {
-            bail!("Token scope must be read or write.");
+        if !matches!(scope, "read" | "write" | "system") {
+            bail!("Token scope must be read, write or system.");
         }
         let id = Uuid::new_v4().to_string();
         let secret = new_secret();

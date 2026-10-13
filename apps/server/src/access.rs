@@ -484,7 +484,7 @@ pub(crate) async fn issue_password_reset(
     State(state): State<AppState>,
     Path(user_id): Path<String>,
 ) -> Result<(StatusCode, Json<IssuedPasswordReset>), ApiError> {
-    crate::system::require_system_admin(&subject)?;
+    crate::system::require_full_system_admin(&subject)?;
     let target = state
         .storage
         .user_access(&user_id)
@@ -618,6 +618,9 @@ pub(crate) async fn create_token(
     State(state): State<AppState>,
     Json(request): Json<CreateTokenRequest>,
 ) -> Result<(StatusCode, Json<CreatedToken>), ApiError> {
+    if request.scope.trim() == "system" && !(subject.is_system_admin || subject.is_app_admin) {
+        return Err(ApiError::forbidden_because("Only system and app administrators can create tokens with the system scope."));
+    }
     if !TOKEN_TTL_DAYS.contains(&request.expires_in_days) {
         return Err(ApiError::bad_request("A token lasts 7, 30, 90 or 365 days."));
     }

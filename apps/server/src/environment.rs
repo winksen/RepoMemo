@@ -318,7 +318,10 @@ impl Host {
             .route("/v1/platform/environments/list", post(list))
             .route("/v1/platform/environments/create", post(create))
             .route("/v1/platform/environments/attach", post(attach))
-            .layer(axum::middleware::from_fn(security_headers))
+            .layer(axum::middleware::from_fn_with_state(
+                crate::security::HeaderPolicy { hsts: self.config.public_url.as_deref().is_some_and(|url| url.starts_with("https://")) },
+                security_headers,
+            ))
             .layer(tower_http::trace::TraceLayer::new_for_http());
         Router::new()
             .merge(platform)
@@ -376,7 +379,7 @@ impl FromRequestParts<Arc<Host>> for Peer {
     async fn from_request_parts(parts: &mut Parts, host: &Arc<Host>) -> Result<Self, Self::Rejection> {
         let peer: Option<IpAddr> = parts.extensions.get::<ConnectInfo<SocketAddr>>().map(|info| info.0.ip());
         let headers: &HeaderMap = &parts.headers;
-        Ok(Self(client_ip(headers, peer, host.config.trust_proxy)))
+        Ok(Self(client_ip(headers, peer, &host.config.proxy_trust())))
     }
 }
 

@@ -136,7 +136,7 @@ export function SystemAdminPanel({ accessToken, onNavigateSection, onOpenWorkspa
     {section === "usage" ? <UsageSection accessToken={accessToken} onOpenWorkspace={onOpenWorkspace} /> : null}
     {section === "users" ? <UsersSection accessToken={accessToken} session={session} /> : null}
     {section === "settings" ? <SettingsSection accessToken={accessToken} session={session} /> : null}
-    {section === "logs" ? <LogsSection accessToken={accessToken} onOpenSettings={() => onNavigateSection("settings")} workspaces={workspaces} /> : null}
+    {section === "logs" ? <LogsSection accessToken={accessToken} canDownload={session.is_system_admin} onOpenSettings={() => onNavigateSection("settings")} workspaces={workspaces} /> : null}
     {section === "jobs" ? <JobsSection accessToken={accessToken} /> : null}
     {section === "audit" ? <AuditSection accessToken={accessToken} /> : null}
     {section === "console" ? <SystemConsole accessToken={accessToken} /> : null}
@@ -463,17 +463,17 @@ function UsersSection({ accessToken, session }: { accessToken: string; session: 
         <th scope="row"><span className="rm-system-person"><UserAvatar name={user.display_name} size={32} userId={user.id} /><span><strong>{user.display_name}{user.id === session.user.id ? " (you)" : ""}</strong><small>{user.email}</small></span></span></th>
         <td>{user.is_system_admin ? <span className="rm-system-tag rm-system-role" title="Administers the server and every organization and workspace"><ServerCog size={13} /> Sys Admin</span> : user.is_app_admin ? <span className="rm-system-tag rm-system-role" title="Uses the System pages, without access to every organization and workspace"><UserCog size={13} /> App Admin</span> : <span className="rm-system-tag rm-system-role"><UserIcon size={13} /> User</span>}</td>
         <td><AccessTree user={user} /></td><td>{count(user.active_sessions)}</td><td>{formatTime(user.last_connected_at)}</td><td>{formatTime(user.created_at)}</td>
-        <td><ActionMenu items={[
-          ...(session.is_system_admin ? [user.is_system_admin
+        <td>{session.is_system_admin ? <ActionMenu items={[
+          user.is_system_admin
             ? { label: "Remove system administrator role", icon: <ShieldOff size={15} />, onSelect: () => setPending({ kind: "revoke", user }), destructive: true }
-            : { label: "Make system administrator", icon: <ShieldCheck size={15} />, onSelect: () => setPending({ kind: "grant", user }) }] : []),
+            : { label: "Make system administrator", icon: <ShieldCheck size={15} />, onSelect: () => setPending({ kind: "grant", user }) },
           user.is_app_admin
             ? { label: "Remove app administrator role", icon: <ShieldOff size={15} />, onSelect: () => setPending({ kind: "revoke-app", user }), destructive: true }
             : { label: "Make app administrator", icon: <UserCog size={15} />, onSelect: () => setPending({ kind: "grant-app", user }) },
-          ...(user.is_system_admin && !session.is_system_admin ? [] : [{ label: "Create password reset link", icon: <Key size={15} />, onSelect: () => setPending({ kind: "reset", user }) }]),
+          { label: "Create password reset link", icon: <Key size={15} />, onSelect: () => setPending({ kind: "reset", user }) },
           { label: "Sign out everywhere", icon: <Logout size={15} />, onSelect: () => setPending({ kind: "sign-out", user }), destructive: true },
           { label: "Lift sign-in lockout", icon: <LockOpen size={15} />, onSelect: () => void unlock(user) },
-        ]} label={`Actions for ${user.display_name}`} /></td>
+        ]} label={`Actions for ${user.display_name}`} /> : null}</td>
       </tr>)}</tbody>
     </table></div> : <p className="shared-muted-copy">{isLoading ? "Loading users…" : "Users are not available."}</p>}
     <Dialog description={dialog?.description} footer={<><DialogCancel onClick={() => setPending(null)} /><Button disabled={isBusy} onClick={() => void confirm()} type="button" variant="main">{isBusy ? <Loader className="spin" size={16} /> : null}{dialog?.action}</Button></>} onClose={() => setPending(null)} open={Boolean(pending)} title={dialog?.title ?? ""} />
@@ -557,8 +557,10 @@ function SettingsSection({ accessToken, session }: { accessToken: string; sessio
   }
 
   if (!settings) return <p className="shared-muted-copy"><Loader className="spin" size={14} /> Loading settings…</p>;
+  // App administrators read the settings; system administrators change them.
+  const readOnly = !session.is_system_admin;
   return <>
-    <div className="rm-system-toolbar"><span className="shared-muted-copy">{changed ? `${changed} unsaved change${changed === 1 ? "" : "s"}` : "No unsaved changes"}</span><div className="rm-system-actions"><Button disabled={!changed || isBusy} onClick={() => setDraft({})} type="button" variant="secondary">Discard</Button><Button disabled={!changed || isBusy} onClick={() => void save()} type="button" variant="main">{isBusy ? <Loader className="spin" size={16} /> : null} Save changes</Button></div></div>
+    {readOnly ? <p className="shared-muted-copy">Read only: only system administrators change these settings.</p> : <div className="rm-system-toolbar"><span className="shared-muted-copy">{changed ? `${changed} unsaved change${changed === 1 ? "" : "s"}` : "No unsaved changes"}</span><div className="rm-system-actions"><Button disabled={!changed || isBusy} onClick={() => setDraft({})} type="button" variant="secondary">Discard</Button><Button disabled={!changed || isBusy} onClick={() => void save()} type="button" variant="main">{isBusy ? <Loader className="spin" size={16} /> : null} Save changes</Button></div></div>}
     {groups.map(([group, entries]) => <section className="shared-settings-group" key={group}>
       <div className="shared-panel-heading"><div><Adjustments size={18} /><h2>{group}</h2></div></div>
       <div className="rm-system-settings">{entries.map((setting) => {
@@ -570,11 +572,11 @@ function SettingsSection({ accessToken, session }: { accessToken: string; sessio
           </div>
           <div className="rm-system-setting-control">
             {setting.kind === "boolean"
-              ? <label className="shared-ai-provider-toggle"><input checked={Boolean(value)} id={inputId} onChange={(event) => edit(setting, event.target.checked)} type="checkbox" /> {value ? "On" : "Off"}</label>
+              ? <label className="shared-ai-provider-toggle"><input checked={Boolean(value)} disabled={readOnly} id={inputId} onChange={(event) => edit(setting, event.target.checked)} type="checkbox" /> {value ? "On" : "Off"}</label>
               : setting.kind === "choice"
-                ? <Dropdown aria-label={setting.label} id={inputId} onValueChange={(next) => edit(setting, next)} options={setting.options} value={String(value)} />
-                : <span className="rm-system-number"><Input id={inputId} max={setting.max} min={setting.min} onChange={(event) => edit(setting, event.target.value === "" ? setting.min : Number(event.target.value))} type="number" value={String(value)} /><small>{setting.unit}</small></span>}
-            {setting.overridden ? <Button disabled={isBusy} onClick={() => void reset(setting)} type="button" variant="secondary"><Rotate size={15} /> Use default</Button> : null}
+                ? <Dropdown aria-label={setting.label} disabled={readOnly} id={inputId} onValueChange={(next) => edit(setting, next)} options={setting.options} value={String(value)} />
+                : <span className="rm-system-number"><Input disabled={readOnly} id={inputId} max={setting.max} min={setting.min} onChange={(event) => edit(setting, event.target.value === "" ? setting.min : Number(event.target.value))} type="number" value={String(value)} /><small>{setting.unit}</small></span>}
+            {setting.overridden && !readOnly ? <Button disabled={isBusy} onClick={() => void reset(setting)} type="button" variant="secondary"><Rotate size={15} /> Use default</Button> : null}
           </div>
         </div>;
       })}</div>
@@ -597,7 +599,7 @@ function settingValueLabel(setting: SystemSetting, value: boolean | number | str
 const LIVE_SOURCE = "live";
 const LEVEL_LABELS: Record<string, string> = { off: "off", error: "errors", warn: "warnings", info: "information", debug: "debug", trace: "trace" };
 
-function LogsSection({ accessToken, onOpenSettings, workspaces }: { accessToken: string; onOpenSettings: () => void; workspaces: SharedWorkspace[] }) {
+function LogsSection({ accessToken, canDownload, onOpenSettings, workspaces }: { accessToken: string; canDownload: boolean; onOpenSettings: () => void; workspaces: SharedWorkspace[] }) {
   const [source, setSource] = useState(LIVE_SOURCE);
   const [level, setLevel] = useState("info");
   const [category, setCategory] = useState("all");
@@ -665,7 +667,7 @@ function LogsSection({ accessToken, onOpenSettings, workspaces }: { accessToken:
     <div className="rm-system-toolbar">
       <Input aria-label="Search logs" onChange={(event) => setQuery(event.target.value)} placeholder="Search message, source or fields" value={query} />
       <div className="rm-system-actions">
-        {isLive ? <label className="shared-ai-provider-toggle"><input checked={follow} onChange={(event) => setFollow(event.target.checked)} type="checkbox" /> Follow</label> : <Button onClick={() => void download()} type="button" variant="secondary"><Download size={15} /> Download {source}</Button>}
+        {isLive ? <label className="shared-ai-provider-toggle"><input checked={follow} onChange={(event) => setFollow(event.target.checked)} type="checkbox" /> Follow</label> : canDownload ? <Button onClick={() => void download()} type="button" variant="secondary"><Download size={15} /> Download {source}</Button> : null}
       </div>
     </div>
     {logs && !logs.capturing ? <p className="shared-muted-copy">This server is not capturing logs in memory; read them from its console or log collector.</p> : null}
