@@ -54,6 +54,24 @@ Why: verifies Rust crates, Tauri command wiring, SQLx migrations, and compile-ti
 This requires Rust/Cargo to be installed and available on `PATH`.
 See `docs/WINDOWS_SETUP.md` if PowerShell reports `cargo` as not recognized.
 
+## Versions And Continuous Integration
+
+The product version lives in several files (Cargo, npm, Tauri). Set them all at
+once, and check that they agree (CI runs the check on every push):
+
+```powershell
+npm run version:set -- 0.1.67
+npm run version:check
+```
+
+Record what changed in `CHANGELOG.md` under the new version.
+
+CI (`.github/workflows/ci.yml`) runs on every push to `main` and every pull
+request: the version check, Rust tests on Linux and Windows (the desktop crate
+is left out), the web type check, `npm audit --omit=dev`, and `cargo deny`
+(policy in `deny.toml`). rustfmt, clippy, license and duplicate-crate checks are
+reported but do not fail the run yet.
+
 ## Run Rust Tests
 
 ```powershell
@@ -98,13 +116,13 @@ about this and names the environment it will go back to. `$env:` values last
 for the PowerShell window they were set in, so a restart from the same window
 keeps the pin. The server
 exposes JWT-protected workspace routes. Import the newest collection,
-`docs/api/RepoMemo-Shared-API_v4.postman_collection.json` (the folder is
+`docs/api/RepoMemo-Shared-API_v5.postman_collection.json` (the folder is
 git-ignored, so it exists only in local checkouts), into Postman and run its
-numbered folders in order to exercise authentication, workspace setup,
-evidence, indexing, retrieval, team memory, and workspace membership
-management. For the membership folder, register the teammate first, then set
-its email in the `memberEmail` collection variable. The collection predates the
-invitation, reset-link and personal-token routes.
+folders in order to exercise authentication, workspace setup, evidence,
+indexing, retrieval, team memory, workspace membership management, and (new in
+v5) invitation links, password reset links and personal access tokens. For the
+membership folder, register the teammate first, then set its email in the
+`memberEmail` collection variable.
 
 ## Open The Admin Console In A Terminal
 

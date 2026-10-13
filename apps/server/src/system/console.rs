@@ -53,7 +53,7 @@ const COMMANDS: &[CommandSpec] = &[
     CommandSpec { name: "settings list", usage: "settings list", summary: "Run-time settings with their value and server default.", changes: false, arguments: 0, flags: &[] },
     CommandSpec { name: "settings set", usage: "settings set <key> <value> --yes", summary: "Changes a run-time setting.", changes: true, arguments: 2, flags: &[] },
     CommandSpec { name: "settings reset", usage: "settings reset <key> --yes", summary: "Restores a setting's server default.", changes: true, arguments: 1, flags: &[] },
-    CommandSpec { name: "logs", usage: "logs [--level warn] [--category security|activity|jobs|http|ai|database|server] [--grep text] [--workspace id] [--day YYYY-MM-DD] [--limit n]", summary: "Log events, newest first: recent ones, or a day's file.", changes: false, arguments: 0, flags: &["level", "category", "grep", "workspace", "day", "limit"] },
+    CommandSpec { name: "logs", usage: "logs [--level warn] [--category security|activity|jobs|http|ai|database|performance|server] [--grep text] [--workspace id] [--day YYYY-MM-DD] [--limit n]", summary: "Log events, newest first: recent ones, or a day's file.", changes: false, arguments: 0, flags: &["level", "category", "grep", "workspace", "day", "limit"] },
     CommandSpec { name: "users list", usage: "users list", summary: "Every account with its roles and sessions.", changes: false, arguments: 0, flags: &[] },
     CommandSpec { name: "users unlock", usage: "users unlock <email> --yes", summary: "Lifts the sign-in lockouts of an account.", changes: true, arguments: 1, flags: &[] },
     CommandSpec { name: "users signout", usage: "users signout <email> --yes", summary: "Signs an account out of every device.", changes: true, arguments: 1, flags: &[] },

@@ -1,0 +1,103 @@
+# Every push to main and every pull request (roadmap C8).
+#
+# Blocking: versions agree, Rust tests on Linux and Windows, the web type
+# check, and security advisories for the server's dependencies and the web
+# client's production dependencies.
+# Advisory (reported, not yet blocking): rustfmt and clippy until the code base
+# is formatted and clean (roadmap V0.1.71), licenses and duplicate crates, and
+# advisories that only reach the desktop shell.
+#
+# The desktop crate (apps/desktop/src-tauri) is left out of the Rust jobs: it
+# needs WebKit/GTK system libraries on Linux and is frozen as the local edition.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  versions:
+    name: Versions agree
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/set-version.mjs --check
+
+  web:
+    name: Web client
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+  rust-tests:
+    name: Rust tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --workspace --exclude repomemo-desktop --locked
+
+  rust-advisories:
+    name: Rust advisories (server)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          arguments: --exclude repomemo-desktop
+          command: check advisories sources
+
+  rust-lint:
+    name: rustfmt and clippy (advisory)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: rustfmt
+        run: cargo fmt --all --check
+      - name: clippy
+        if: success() || failure()
+        run: cargo clippy --workspace --exclude repomemo-desktop --all-targets --locked -- -D warnings
+
+  rust-policy:
+    name: Licenses, duplicates, desktop advisories (advisory)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check bans licenses advisories

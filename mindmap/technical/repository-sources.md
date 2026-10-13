@@ -1,6 +1,6 @@
 # Repository sources (git)
 
-> **Branch of:** [TECHNICAL_MINDMAP.md](../TECHNICAL_MINDMAP.md) · **Functional view:** [FUNCTIONAL_MINDMAP.md §5b](../FUNCTIONAL_MINDMAP.md#5b-repositories) · **Status:** phase 1 (local path, automatic sync when the branch moves) shipped; phase 1b and 2 planned as roadmap item F4, see [ROADMAP.md](../ROADMAP.md#repository-indexing)
+> **Branch of:** [TECHNICAL_MINDMAP.md](../TECHNICAL_MINDMAP.md) · **Functional view:** [FUNCTIONAL_MINDMAP.md §5b](../FUNCTIONAL_MINDMAP.md#5b-repositories) · **Status:** phase 1 (local path, automatic sync when the branch moves) shipped; phase 1b planned for V0.1.73 and phase 2 for V0.3.0 (roadmap item F4), see [ROADMAP.md](../ROADMAP.md#repository-indexing-track)
 
 A repository is not a batch of uploads. It already holds many files, it keeps changing, and git records exactly what changed. RepoMemo therefore treats a repository as a **living source**: it is linked once, and each **sync** brings the workspace in step with what the chosen branch has **committed**.
 

@@ -2,7 +2,7 @@
 
 > **Scope:** the code on `main` at V0.1.62, plus the unreleased onboarding work in the working tree (invitations, reset links, personal access tokens, migration 0023).
 > **Method:** the roadmap and mindmaps were read against the code. Nothing was run or built. Each finding names the file it comes from, so it can be checked again.
-> **Feeds:** the *Next* section of [ROADMAP.md](../ROADMAP.md). Item IDs (F, S, P, C, O) are used there.
+> **Feeds:** the [Road to V0.2.0](../ROADMAP.md#-road-to-v020) and the backlog in ROADMAP.md, which use the same item IDs (F, S, P, C, O). The roadmap is the plan of record; §8 below was the first proposal and is superseded by it.
 > **Companion:** [security review of 2026-10-10](../security/2026-10-10-security-review.md). Its H, M and L IDs are referenced here and not repeated.
 
 ---
@@ -133,7 +133,7 @@ All findings of the [2026-10-10 review](../security/2026-10-10-security-review.m
 
 ---
 
-## 8. Suggested order
+## 8. Suggested order (superseded by the roadmap's release plan)
 
 ```mermaid
 flowchart LR

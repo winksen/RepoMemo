@@ -27,12 +27,14 @@ pub(crate) async fn workspace_health(
     Path(workspace_id): Path<String>,
 ) -> Result<Json<WorkspaceHealth>, ApiError> {
     require_workspace_read(&state, &subject, &workspace_id).await?;
-    state
+    let started = std::time::Instant::now();
+    let health = state
         .core
         .workspace_health(&workspace_id)
         .await
-        .map(Json)
-        .map_err(map_core_error)
+        .map_err(map_core_error)?;
+    crate::record_timing("health", &workspace_id, started, health.checked_file_count.max(0) as usize);
+    Ok(Json(health))
 }
 
 pub(crate) async fn apply_health_action(

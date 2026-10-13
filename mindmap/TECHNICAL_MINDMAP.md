@@ -2,7 +2,7 @@
 
 > **Audience:** engineers working on RepoMemo, reviewers, and anyone operating the shared server.
 > **Companion:** [FUNCTIONAL_MINDMAP.md](FUNCTIONAL_MINDMAP.md) covers *what* the product does. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** code at `V0.1.64` (2026-10-13: invitations, reset links and personal access tokens in V0.1.63, migration 0023; security bundle S1 in V0.1.64) plus the security second-pass fixes on main, marked *unreleased*. Aligned on 2026-10-13; sections marked *hardening* came with V0.1.51–V0.1.57. The focus is the **shared web client** (`apps/desktop/src/SharedWebApp.tsx`) and the **HTTP API** (`apps/server`). Desktop and Tauri paths are noted where they share code. Open security findings are in the [security review](security/2026-10-10-security-review.md), and the improvement backlog is in the [enhancement analysis](analysis/2026-10-13-enhancement-analysis.md).
+> **Scope:** code at `V0.1.65` (2026-10-13: invitations, reset links and personal access tokens in V0.1.63, migration 0023; security bundle S1 in V0.1.64; the security second pass in V0.1.65), plus V0.1.66 on main (CI, one version source, performance timings). The plan to V0.2.0 is in the [roadmap](ROADMAP.md#-road-to-v020). Aligned on 2026-10-13; sections marked *hardening* came with V0.1.51–V0.1.57. The focus is the **shared web client** (`apps/desktop/src/SharedWebApp.tsx`) and the **HTTP API** (`apps/server`). Desktop and Tauri paths are noted where they share code. Open security findings are in the [security review](security/2026-10-10-security-review.md), and the improvement backlog is in the [enhancement analysis](analysis/2026-10-13-enhancement-analysis.md).
 
 ---
 
@@ -50,7 +50,7 @@ mindmap
     Quality
       163 Rust tests
       No frontend tests
-      No CI yet
+      CI on every push
       Known risks
 ```
 
@@ -205,7 +205,7 @@ sequenceDiagram
 - Access tokens are **HS256 JWTs** with claims `sub`, `email`, `iss`, `iat`, `exp` and `ver`. The TTL is 60 minutes by default (`REPOMEMO_ACCESS_TOKEN_TTL_MINUTES`). **Refresh tokens** (migration 0016) are opaque, stored as SHA-256 hashes, rotated on every use and valid 30 days; presenting a rotated token again revokes the whole family. The web client refreshes silently on a 401.
 - **Session versions** (*hardening*, migration 0018). `users.session_version` is stamped into each access token as `ver`, and the extractor refuses a token whose version no longer matches (one primary-key lookup per request), so a deleted user's tokens also stop working. Changing the password and `POST /v1/auth/logout-all` bump the version and revoke every refresh token: every session ends at once, not when its token expires. The password change returns a fresh session (`TokenResponse`) for the device that made it.
 - `AuthenticatedSubject` implements `FromRequestParts`. If a handler takes it as an argument, the handler is protected.
-- **Personal access tokens** (migration 0023, [access.rs](../apps/server/src/access.rs)). A bearer value starting with `rmp_` is looked up by SHA-256 instead of decoded as a JWT. It must not be revoked or expired, and its user must exist. The subject carries `token: Some(TokenGrant { read_only })` and the user's current session version, so open event streams still end when sessions are ended. *Since V0.1.64 (review L2):* what a token may reach is marked by the extractor each handler takes, not by a path list. `AuthenticatedSubject` accepts tokens but refuses read-only ones on anything other than GET/HEAD. `SessionSubject` refuses every token (403): token management, `/v1/profile/password`, `/v1/auth/logout-all`, `/v1/invitations/accept`, `/v1/system/environment/detach`, the system and app administrator grants and reset links, and (second pass N2) changes to run-time settings. `ReadingSubject` lets a read-only token make a POST that only reads: workspace and memory-card search, `…/artifacts/query`, `…/ask` and `/v1/system/console`, whose handler refuses `--yes` from it. A new account-security handler must take `SessionSubject`. Last use is written at most every 5 minutes. Tokens survive password changes and the user's own sign-out-everywhere; System › *Sign out everywhere* and (*unreleased*, second pass N5) a used reset link revoke them.
+- **Personal access tokens** (migration 0023, [access.rs](../apps/server/src/access.rs)). A bearer value starting with `rmp_` is looked up by SHA-256 instead of decoded as a JWT. It must not be revoked or expired, and its user must exist. The subject carries `token: Some(TokenGrant { read_only })` and the user's current session version, so open event streams still end when sessions are ended. *Since V0.1.64 (review L2):* what a token may reach is marked by the extractor each handler takes, not by a path list. `AuthenticatedSubject` accepts tokens but refuses read-only ones on anything other than GET/HEAD. `SessionSubject` refuses every token (403): token management, `/v1/profile/password`, `/v1/auth/logout-all`, `/v1/invitations/accept`, `/v1/system/environment/detach`, the system and app administrator grants and reset links, and (second pass N2) changes to run-time settings. `ReadingSubject` lets a read-only token make a POST that only reads: workspace and memory-card search, `…/artifacts/query`, `…/ask` and `/v1/system/console`, whose handler refuses `--yes` from it. A new account-security handler must take `SessionSubject`. Last use is written at most every 5 minutes. Tokens survive password changes and the user's own sign-out-everywhere; System › *Sign out everywhere* and (since V0.1.65, second pass N5) a used reset link revoke them.
 - **Invitation and reset links** ([access.rs](../apps/server/src/access.rs), storage `access.rs`). Secrets are two UUIDv4s in hex, stored as SHA-256 and found by hash lookup. *Since V0.1.64 (review L3):* the web paths are `/invite#<secret>` and `/reset-password#<secret>`, so the secret never reaches a server, and the SPA sets `no-referrer`. Registration with `invitation_token` skips the closed-registration check only for the invited email; joining happens on `accept`, which marks the invitation used with a conditional update first and gives it back if the membership change fails. Maintenance deletes links a week after they expire.
 - Login returns the same `invalid_credentials` error whether the email is unknown or the password is wrong, and an unknown email is checked against a fixed Argon2 hash so the response time does not reveal which emails have accounts.
 - **Throttling** (*hardening*, [security.rs](../apps/server/src/security.rs)). Sign-in and registration are limited per client address (30 per minute by default), and session refreshes, which every open tab makes and which cannot be guessed, get a separate bucket four times as large. Failed sign-ins lock the account for that address after 10 consecutive failures, and for every address after 50, for 15 minutes; the answer is 429 `rate_limited` with `Retry-After`. Counters are in memory (one server process), keyed on the TCP peer, or on `X-Forwarded-For` when `REPOMEMO_TRUST_PROXY` is set.
@@ -230,11 +230,11 @@ The server resolves the caller's role **per request** from `workspace_membership
 Other rules:
 
 - For **resource-scoped routes** (`/v1/artifacts/{id}`, `/v1/tasks/{id}`, `/v1/comments/{id}`…), the handler first loads the resource to find its `workspace_id` and then applies the guard.
-- **Author-or-moderator** checks apply to deleting tasks, to editing or deleting comments and (*unreleased*) to deleting saved searches. *Unreleased (second pass N4):* the author path needs a writer role, so someone downgraded to viewer no longer changes their old content.
-- **Escalation rules** live in the member-upsert handlers. Nobody can grant `owner`, and (*unreleased, second pass N3*) nobody can change the role of a current owner either, not even the owner themselves (400), so a workspace or organization never loses its owner through the member list. An admin cannot grant `admin` and cannot modify or remove an owner or admin.
+- **Author-or-moderator** checks apply to deleting tasks, to editing or deleting comments and (since V0.1.65) to deleting saved searches. *Since V0.1.65 (second pass N4):* the author path needs a writer role, so someone downgraded to viewer no longer changes their old content.
+- **Escalation rules** live in the member-upsert handlers. Nobody can grant `owner`, and (since V0.1.65, second pass N3) nobody can change the role of a current owner either, not even the owner themselves (400), so a workspace or organization never loses its owner through the member list. An admin cannot grant `admin` and cannot modify or remove an owner or admin.
 - **Membership propagation** happens in SQL inside storage transactions:
   - `create_shared_workspace` copies all org members into the workspace.
-  - `upsert_organization_member` adds the user to every workspace of the org, with the matching role, except that (*unreleased*) it never lowers a workspace the person owns. Removing an organization member removes them from every workspace, owned ones included (second pass N8: no ownership transfer yet).
+  - `upsert_organization_member` adds the user to every workspace of the org, with the matching role, except that (since V0.1.65) it never lowers a workspace the person owns. Removing an organization member removes them from every workspace, owned ones included (second pass N8: no ownership transfer yet).
   - `upsert_workspace_member` writes the workspace row only (since V0.1.64, review H1; it used to add the user to the organization and so to every workspace in it). `list_organizations_for_user` also returns, with `guest: true`, the organizations where the user only belongs to some workspaces, so the web client can list them; a guest has no organization role and no access to its other workspaces.
 - `can_inspect_index` (owner, admin) controls who receives chunks from `GET /v1/artifacts/{a}`. The server strips them for everyone else; the SPA only hides the button and the overview chunk count.
 - `GET …/capabilities` returns `capabilities_for_role(role, may_use_ai)`. The SPA uses it **only to hide UI**. The server remains the authority.
@@ -278,7 +278,7 @@ Guard legend: **pub** = no auth, **auth** = any valid JWT or personal access tok
 | POST | `/v1/auth/logout` | pub | `{refresh_token}` → 204, revokes that refresh token |
 | POST | `/v1/auth/logout-all` | auth | 204. Ends every session of the caller, on every device. Personal access tokens are kept |
 | POST | `/v1/auth/password-reset/preview` | pub | `{token}` → `{email, display_name, expires_at}`; 410 for a used, replaced or expired link; rate-limited like sign-in |
-| POST | `/v1/auth/password-reset` | pub | `{token, password}` → `TokenResponse`. Sets the password, ends every session, revokes the account's personal access tokens (*unreleased*), lifts lockouts, records `password_reset_used`. A refused password does not use up the link |
+| POST | `/v1/auth/password-reset` | pub | `{token, password}` → `TokenResponse`. Sets the password, ends every session, revokes the account's personal access tokens (since V0.1.65), lifts lockouts, records `password_reset_used`. A refused password does not use up the link |
 | POST | `/v1/invitations/preview` | pub | `{token}` → target name, organization, role, inviter, expiry, `account_exists`; 404 unknown, 410 used, withdrawn or expired; rate-limited |
 | POST | `/v1/invitations/accept` | auth (session only) | `{token}` → `{target_type, target_id, organization_id, role}`. The caller's email must be the invited one and the inviter must still be allowed to grant the role; never lowers an existing role → activity `member_joined` |
 | DELETE | `/v1/invitations/{i}` | A / oA of its target | withdraws a pending invitation; 409 when already used or withdrawn |
@@ -299,8 +299,8 @@ Every route requires a system administrator (**S**); changes are recorded in `sy
 | POST | `/v1/system/users/{u}/sessions/end` | S | ends every session of the user and revokes their personal access tokens |
 | POST | `/v1/system/users/{u}/unlock` | S | clears the user's sign-in lockouts → `{cleared}` |
 | POST | `/v1/system/users/{u}/password-reset` | S (session only; a system administrator's account needs a system administrator) | `{token, path, expires_at}`: a one-time link for 24 hours, replacing older ones; audited `password_reset_issued` |
-| GET, PUT | `/v1/system/settings` | S (PUT: session only, *unreleased*, second pass N2) | run-time settings with value, default and who changed them, plus read-only environment facts. PUT `{values:{key:value}}` validates every value before saving any |
-| DELETE | `/v1/system/settings/{key}` | S (session only, *unreleased*) | back to the environment default. The console's `settings set/reset --yes` also needs a console opened with a password |
+| GET, PUT | `/v1/system/settings` | S (PUT: session only since V0.1.65, second pass N2) | run-time settings with value, default and who changed them, plus read-only environment facts. PUT `{values:{key:value}}` validates every value before saving any |
+| DELETE | `/v1/system/settings/{key}` | S (session only since V0.1.65) | back to the environment default. The console's `settings set/reset --yes` also needs a console opened with a password |
 | GET | `/v1/system/logs?level&category&workspace&q&after&limit&day` | S | log events, newest first: recent ones from memory, or a day's file with `day=YYYY-MM-DD` (last 16 MiB read). `category` is `security`, `activity`, `jobs`, `http`, `ai`, `database` or `server`; `workspace` keeps events with that `workspace_id` |
 | GET | `/v1/system/logs/files` | S | the day files kept, plus the logging setup in force: levels per category, console format, file output, retention, effective filter |
 | GET | `/v1/system/logs/files/{day}` | S | a day's file as a download (`application/x-ndjson`); audited |
@@ -373,7 +373,7 @@ Every route requires a system administrator (**S**); changes are recorded in `sy
 | GET, POST | `/v1/artifacts/{a}/comments` | R / W | `@email` mentions → notifications → activity |
 | PUT, DELETE | `/v1/comments/{c}` | W: author, or A | → activity |
 | POST | `/v1/artifacts/{a}/index` | W | **synchronous** manual re-index. Returns the finished job. The web client only exposes it to admins, in the chunks dialog |
-| POST | `/v1/workspaces/{ws}/index` | A (*unreleased*; was W) | **synchronous**, loops over all artifacts and fails fast. No longer used by the web client |
+| POST | `/v1/workspaces/{ws}/index` | A (since V0.1.65; was W) | **synchronous**, loops over all artifacts and fails fast. No longer used by the web client |
 | GET | `/v1/workspaces/{ws}/jobs?kind&status&limit` | R | default limit 50 |
 | GET | `/v1/jobs/{j}` | R | |
 | POST | `/v1/jobs/{j}/cancel` | W | sets `cancel_requested`. Cooperative, checked between artifacts or batches |
@@ -387,7 +387,7 @@ Every route requires a system administrator (**S**); changes are recorded in `sy
 | GET, POST | `/v1/workspaces/{ws}/folders` | R / W | list / create `{name, parent_id?}`; depth at most 5 |
 | PATCH, DELETE | `/v1/workspaces/{ws}/folders/{f}` | W | rename / delete with every subfolder and file |
 | PUT | `/v1/artifacts/{a}/folder` | W | move a file; `folder_id: null` for the top level |
-| GET | `/v1/artifacts/{a}/file` | R | the stored bytes, always as an attachment, sandboxed. *Unreleased:* the `Content-Type` comes from the file name (`served_mime_type`); HTML, scripts and unknown types are `text/plain` |
+| GET | `/v1/artifacts/{a}/file` | R | the stored bytes, always as an attachment, sandboxed. *Since V0.1.65:* the `Content-Type` comes from the file name (`served_mime_type`); HTML, scripts and unknown types are `text/plain` |
 | GET | `/v1/artifacts/{a}/document-preview` | R | `DocumentPreview`: text, sheets, slides, email or pdf (§9) |
 | GET | `/v1/artifacts/{a}/rendered-preview/status`, `/rendered-preview` | R | starts and reports the LibreOffice conversion / serves the cached PDF |
 | POST | `/v1/artifacts/{a}/open-link` | R | five-minute signed link for "Open in Office" |
@@ -421,7 +421,7 @@ Details, including what each sync does, are in [technical/repository-sources.md]
 | GET | `/v1/workspaces/{ws}/retrieval-facets` | R | types, languages and sources of **indexed** artifacts |
 | POST | `/v1/workspaces/{ws}/search` | R | FTS5 search, see §6.3 |
 | GET, POST | `/v1/workspaces/{ws}/saved-searches` | R / W | name ≤120, query ≤500, limit 1–100 → activity |
-| DELETE | `/v1/saved-searches/{s}` | W: author, or A | *Unreleased*; was any writer |
+| DELETE | `/v1/saved-searches/{s}` | W: author, or A | Since V0.1.65; was any writer |
 | GET, POST | `/v1/workspaces/{ws}/memory-cards` | R / W | POST validates that each citation belongs to the workspace → activity |
 | POST | `/v1/workspaces/{ws}/memory-cards/search` | R | `LIKE %q%` on the title and body |
 | GET, PUT, DELETE | `/v1/memory-cards/{m}` | R / W / W | → activity |
@@ -450,7 +450,7 @@ bytes ─► SHA-256 (hex) ─► store_blob(blobs/<hash-derived path>)  [write-
       ─► store_artifact  UNIQUE(workspace_id, source_id, path, content_hash) → dedupe
 ```
 
-- **Content type** (*unreleased, second pass N1 and I3*): `ingestion::served_mime_type` picks it from the file name when an upload is stored and whenever a file is served; the uploader's `Content-Type` is ignored. HTML, scripts and unknown types are `text/plain`, and SVG keeps `image/svg+xml` for `<img>` previews. The web client opens a preview in a tab of its own only for raster images, because a `blob:` URL runs with the app's origin.
+- **Content type** (since V0.1.65, second pass N1 and I3): `ingestion::served_mime_type` picks it from the file name when an upload is stored and whenever a file is served; the uploader's `Content-Type` is ignored. HTML, scripts and unknown types are `text/plain`, and SVG keeps `image/svg+xml` for `<img>` previews. The web client opens a preview in a tab of its own only for raster images, because a `blob:` URL runs with the app's origin.
 - Upload type detection uses `ingestion::detect_artifact_type` on the extension. An unknown extension produces "This file type is not supported for shared upload".
 - For pasted text, the language `Markdown` becomes `markdown_doc`, `Text` or none becomes `file`, and anything else becomes `code_file`.
 - Blob files are written to a temporary name and renamed, so a crash never leaves a truncated blob that looks complete. Storing a blob again refreshes `blobs.created_at` ("last stored at").
@@ -699,7 +699,7 @@ Setup events are audited (`server_setup_admin_created`, `server_setup_completed`
 
 - **Run-time settings.** `RuntimeSettings` is built from the environment, then overridden by `system_settings` rows and held in a `SettingsCell` that is swapped whole on change; handlers read a snapshot (`state.settings()`). The maintenance loop and the repository poller re-read their interval each round, so changes apply without a restart. Settings that widen what the server can reach (repository roots, AI hosts, origins, proxy trust, secret key, body limit) stay environment-only and are shown read-only.
 - **Logging** ([logs.rs](../apps/server/src/logs.rs)). `main.rs` calls `init_logging()`, which installs one stack: a reloadable `EnvFilter`, a reloadable console layer (tracing's text or compact formatter, or a JSON-lines writer), and a capture layer that keeps events in memory (2,000 general and 1,000 `audit` events in separate rings, so noise cannot evict security events) and hands them to the file writer.
-  - *Categories.* The filter is compiled from a level per category: **security** (`audit`), **workspace activity** (`activity`), **background jobs** (`jobs`, the indexing, embedding, repository, maintenance and conversion modules, `repomemo_api::repo_sync`, `repomemo_git`), **HTTP** (`tower_http`), **AI** (`repomemo_ai`, `reqwest`), **database** (`repomemo_storage`, `sqlx`), and a default level for everything else. Defaults: info, except HTTP and database at warn. A `RUST_LOG` from the environment is used as-is until an administrator sets a level.
+  - *Categories.* The filter is compiled from a level per category: **security** (`audit`), **workspace activity** (`activity`), **background jobs** (`jobs`, the indexing, embedding, repository, maintenance and conversion modules, `repomemo_api::repo_sync`, `repomemo_git`), **HTTP** (`tower_http`), **AI** (`repomemo_ai`, `reqwest`), **database** (`repomemo_storage`, `sqlx`), **performance** (`timing`: since V0.1.66, `record_timing` in [lib.rs](../apps/server/src/lib.rs) logs at debug how long search, Ask, metrics, the artifact query, the knowledge map and health took, with `operation`, `workspace_id`, `elapsed_ms` and `items`), and a default level for everything else. Defaults: info, except HTTP and database at warn. A `RUST_LOG` from the environment is used as-is until an administrator sets a level.
   - *New log sources.* Every workspace activity row is logged under `activity` with `workspace_id`, `action`, `actor` and `subject`; job starts (debug), completions, cancellations (info) and failures (warn) under `jobs` with `workspace_id`. Both feed the Logs page's workspace filter.
   - *Files.* With file output on, a dedicated thread appends JSON lines to `<data dir>/logs/repomemo-YYYY-MM-DD.jsonl` (UTC), flushing every second, so request handling never waits on the disk. Files are always JSON lines whatever the console format, so the server can search them. Maintenance deletes files older than the retention.
   - *Live changes.* The logging settings are part of the run-time settings; every change re-applies the filter, the console format and file output immediately. The module never logs through tracing itself (problems go to standard error), so the sinks cannot feed back into themselves.
@@ -748,7 +748,7 @@ Counts of `#[test]` and `#[tokio::test]` functions on 2026-10-13 (163 in total).
 | `crates/git` | 3 | tree parsing, reading a real repository |
 | Web client | **0** | no unit, component or e2e tests. `npm run typecheck` is the only gate |
 
-Run the Rust tests with `cargo test`. See [DEVELOPMENT_COMMANDS.md](../docs/DEVELOPMENT_COMMANDS.md). **There is no CI** (no `.github/workflows`), so nothing runs these automatically (roadmap C8).
+Run the Rust tests with `cargo test`. See [DEVELOPMENT_COMMANDS.md](../docs/DEVELOPMENT_COMMANDS.md). **CI** ([ci.yml](../.github/workflows/ci.yml), since V0.1.66) runs them on Linux and Windows on every push to `main` and every pull request, with the version check, the web type check and dependency audits (`cargo deny`, policy in [deny.toml](../deny.toml); `npm audit`). rustfmt and clippy are reported but not blocking until V0.1.71.
 
 ---
 
@@ -758,13 +758,13 @@ Security findings are tracked in the [security review of 2026-10-10](security/20
 
 | # | Area | Issue | Suggested direction |
 |---|---|---|---|
-| 1 | Security | Open review findings (S1 fixed in V0.1.64; second-pass N1–N6 fixed on main, unreleased; N7 timeouts and N8 ownership transfer open). The most urgent left: open registration by default (M1) combined with provider URLs and repository links that reach the host (H2, H3), and app administrators' reach (M8) | Roadmap S2–S5 |
-| 2 | Process | **No CI.** The 163 Rust tests, the type check and dependency audits only run by hand | C8 |
+| 1 | Security | Open review findings (S1 fixed in V0.1.64; second-pass N1–N6 fixed in V0.1.65; every remaining finding scheduled before V0.2.0; N7 timeouts and N8 ownership transfer open). The most urgent left: open registration by default (M1) combined with provider URLs and repository links that reach the host (H2, H3), and app administrators' reach (M8) | Roadmap S2–S5 |
+| 2 | Process | ✅ *Mostly done (V0.1.66):* CI runs tests, type check, version check and audits. Residual: rustfmt and clippy are advisory, and the web client has no tests yet | C8 follow-up (V0.1.71), C3 (V0.1.70) |
 | 3 | Frontend maintainability | `SharedWebApp.tsx` 2,787 lines (202 KB, 150 `useState`), `App.tsx` 2,750, `styles.css` 6.2k, a hand-rolled router, no data cache, no tests | C1–C3, C11 |
 | 4 | Backend maintainability | `apps/server/src/lib.rs` 8,531 lines and `crates/storage/src/lib.rs` 6,206; `types.ts` mirrors the Rust DTOs by hand | C4, C5, C7 |
 | 5 | Correctness | Error classification by substring matching (9 `contains` checks in `map_storage_error`); some handlers return raw error text as 400 (review L6) | Typed errors (C6) |
 | 6 | Performance / scale | Vector search decodes every embedding of the workspace per query (§6.4). Metrics, `artifacts/query`, the knowledge map and health load whole workspaces per request. The dashboard makes one metrics call per workspace | P0 timings, then P1–P5 |
-| 7 | Release hygiene | Version strings say `0.1.60` at V0.1.62, so System › Overview and the console report the wrong version; two `reqwest` and two `quick-xml` versions; Vite 5 | C9, C10 |
+| 7 | Release hygiene | ✅ *Version fixed (V0.1.66):* one version source and a changelog. Residual: Vite 5, and `quick-xml` 0.39 in ingestion next to calamine's 0.41. The second `reqwest` and `quick-xml` 0.39 come from Tauri | C10 |
 | 8 | Scalability | In-process queues (2 indexing slots, one embedding workspace at a time), per-process rate-limit counters, a pool of 5 connections shared by readers and the writer, a stub worker | P8; *Later: scale-out* |
 | 9 | Security | ✅ *Mitigated:* provider API keys are encrypted at rest and never follow a changed endpoint. Residual: without `REPOMEMO_SECRET_KEY` the key file sits next to the database, with no restrictive ACL on Windows (review L5) | Set `REPOMEMO_SECRET_KEY` from a secret store in production |
 | 10 | Auth | ✅ *Mitigated:* rotating refresh tokens, session versions, sign-in throttling and lockout. Residual: refresh token in `localStorage` and no CSP for the SPA (review M2) | S4 |
@@ -782,8 +782,8 @@ The table records whether each existing document still matches the code. The min
 |---|---|
 | [README.md](../README.md) | ✅ Rewritten as the GitHub landing page. It points to `mindmap/` |
 | [PRODUCT.md](../PRODUCT.md) | Kept because the **impeccable** design skill reads it (`.agents/skills/impeccable`). Its product content now lives in the [functional mindmap](FUNCTIONAL_MINDMAP.md#who-its-for-and-what-it-stands-for). ⚠️ Its "Operating Context" and constraints still describe a desktop-only product |
-| [mindmap/ROADMAP.md](ROADMAP.md) | ✅ Updated to V0.1.62 on 2026-10-13, with the *Next* plan from the enhancement analysis |
-| [mindmap/security/2026-10-10-security-review.md](security/2026-10-10-security-review.md) | ✅ Still accurate on 2026-10-13: no finding patched yet |
+| [mindmap/ROADMAP.md](ROADMAP.md) | ✅ Updated to V0.1.65 on 2026-10-13, with the release plan to V0.2.0 |
+| [mindmap/security/2026-10-10-security-review.md](security/2026-10-10-security-review.md) | ✅ Status table current at V0.1.65 (S1 and the second pass fixed; the rest scheduled before V0.2.0) |
 | [mindmap/analysis/2026-10-13-enhancement-analysis.md](analysis/2026-10-13-enhancement-analysis.md) | ✅ New: product, security, performance, code-health and operations backlog behind the roadmap |
 | [docs/DEVELOPMENT_COMMANDS.md](../docs/DEVELOPMENT_COMMANDS.md) | ✅ Every `REPOMEMO_*` variable in the code is listed (checked 2026-10-13) |
 | [docs/IMPLEMENTATION_TRACKER.md](../docs/IMPLEMENTATION_TRACKER.md) | Phases 1A–1H are accurate. Shared mode and everything after it are tracked in the roadmap instead; retire or redirect it |

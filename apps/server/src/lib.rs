@@ -2027,6 +2027,7 @@ async fn workspace_metrics(
     Path(workspace_id): Path<String>,
 ) -> Result<Json<WorkspaceMetricsResponse>, ApiError> {
     require_workspace_read(&state, &subject, &workspace_id).await?;
+    let started = std::time::Instant::now();
     let overview = state
         .core
         .workspace_overview(workspace_id.clone())
@@ -2111,6 +2112,7 @@ async fn workspace_metrics(
         .map_err(map_core_error)?
         .map(|(embedded, _)| embedded);
 
+    record_timing("metrics", &workspace_id, started, artifacts.len());
     Ok(Json(WorkspaceMetricsResponse {
         workspace_id,
         generated_at: Utc::now().to_rfc3339(),
@@ -2198,12 +2200,14 @@ async fn workspace_knowledge_map(
     Path(workspace_id): Path<String>,
 ) -> Result<Json<KnowledgeMap>, ApiError> {
     require_workspace_read(&state, &subject, &workspace_id).await?;
-    state
+    let started = std::time::Instant::now();
+    let map = state
         .core
         .knowledge_map(&workspace_id)
         .await
-        .map(Json)
-        .map_err(map_core_error)
+        .map_err(map_core_error)?;
+    record_timing("knowledge_map", &workspace_id, started, map.nodes.len());
+    Ok(Json(map))
 }
 
 async fn generate_workspace_ai_overview(
@@ -2278,6 +2282,7 @@ async fn ask_workspace(
         })?;
     ai_access::authorize_ai_use(&state, &subject, &workspace_id, &role).await?;
     let question = request.question.clone();
+    let started = std::time::Instant::now();
     let answer = state
         .core
         .ask_workspace(AskRequest {
@@ -2288,6 +2293,7 @@ async fn ask_workspace(
         })
         .await
         .map_err(map_core_error)?;
+    record_timing("ask", &workspace_id, started, answer.retrieved_context.len());
     record_workspace_activity(
         &state,
         &workspace_id,
@@ -3759,6 +3765,7 @@ async fn query_artifacts(
     Json(request): Json<QueryArtifactsRequest>,
 ) -> Result<(HeaderMap, Json<Vec<ArtifactSummary>>), ApiError> {
     require_workspace_read(&state, &subject, &workspace_id).await?;
+    let started = std::time::Instant::now();
     let query = request.query.trim().to_lowercase();
     let languages = request
         .languages
@@ -3767,7 +3774,7 @@ async fn query_artifacts(
         .collect::<Vec<_>>();
     let artifacts = state
         .core
-        .list_artifacts(workspace_id)
+        .list_artifacts(workspace_id.clone())
         .await
         .map_err(map_core_error)?
         .into_iter()
@@ -3802,6 +3809,7 @@ async fn query_artifacts(
             query_matches && type_matches && language_matches && source_matches && indexing_matches
         })
         .collect::<Vec<_>>();
+    record_timing("artifact_query", &workspace_id, started, artifacts.len());
     let (headers, artifacts) = page.apply(artifacts);
     Ok((headers, Json(artifacts)))
 }
@@ -4499,10 +4507,11 @@ async fn search_workspace(
     Json(request): Json<SearchWorkspaceRequest>,
 ) -> Result<Json<Vec<SearchResult>>, ApiError> {
     require_workspace_read(&state, &subject, &workspace_id).await?;
+    let started = std::time::Instant::now();
     let result = state
         .core
         .search_workspace(SearchRequest {
-            workspace_id,
+            workspace_id: workspace_id.clone(),
             query: request.query,
             artifact_types: request.artifact_types,
             languages: request.languages,
@@ -4511,6 +4520,7 @@ async fn search_workspace(
         })
         .await
         .map_err(map_core_error)?;
+    record_timing("search", &workspace_id, started, result.len());
     Ok(Json(result))
 }
 
@@ -5161,6 +5171,14 @@ fn is_not_found(message: &str) -> bool {
     message.contains("was not found")
         || message.contains("were not found")
         || message.contains("no rows returned")
+}
+
+/// Records how long a workspace operation took and how much it handled,
+/// under the `timing` target: System › Settings › Logging › Performance, at
+/// debug. These numbers decide the performance work (roadmap P1–P5).
+pub(crate) fn record_timing(operation: &'static str, workspace_id: &str, started: std::time::Instant, items: usize) {
+    let elapsed_ms = started.elapsed().as_millis() as u64;
+    tracing::debug!(target: "timing", operation, workspace_id = %workspace_id, elapsed_ms, items, "{operation} took {elapsed_ms} ms");
 }
 
 fn map_storage_error(error: anyhow::Error) -> ApiError {

@@ -81,6 +81,7 @@ pub const CATEGORIES: &[LogCategory] = &[
     LogCategory { key: "http", label: "HTTP requests", targets: &["tower_http"], default_level: "warn" },
     LogCategory { key: "ai", label: "AI providers", targets: &["repomemo_ai", "reqwest"], default_level: "info" },
     LogCategory { key: "database", label: "Database", targets: &["repomemo_storage", "sqlx"], default_level: "warn" },
+    LogCategory { key: "performance", label: "Performance", targets: &["timing"], default_level: "info" },
 ];
 
 /// The category of everything else.

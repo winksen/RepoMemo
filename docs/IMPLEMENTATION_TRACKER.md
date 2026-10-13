@@ -1,6 +1,8 @@
-# RepoMemo Implementation Tracker
+# RepoMemo Implementation Tracker (retired)
 
-This tracker records what has been added, what is partially wired, and what remains intentionally deferred.
+> **Retired in V0.1.66.** This page covers the desktop phases 1A–1H only and is kept as history. What has shipped since, and the plan to V0.2.0, are in [mindmap/ROADMAP.md](../mindmap/ROADMAP.md); release notes are in [CHANGELOG.md](../CHANGELOG.md).
+
+This tracker records what was added in the desktop phases, what was partially wired, and what was deferred at the time.
 
 ## Phase 1A: Skeleton
 

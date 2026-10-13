@@ -2,7 +2,7 @@
 
 > **Scope:** the shared server (`apps/server`, `crates/*`), the web client (`apps/desktop/src`), the desktop shell (`apps/desktop/src-tauri`) and the terminal console (`apps/console`), at V0.1.61 plus the unreleased work on main (live progress, environment memory, invitations, password reset links, personal access tokens).
 > **Method:** static review of the code and configuration. Nothing was run, built or attacked, and no dependency scanner was run (see [§7](#7-dependencies)). Each finding below was checked in the code; line numbers are as of this date.
-> **Status:** bundle **S1 is fixed and released in V0.1.64**: H1, H4, L2, L3 and M7. A **second pass** on the same day ([§11](#11-second-pass-2026-10-13)) found nine more issues, including one high (stored XSS through image previews). Six of them and I3 are fixed on main, and three are documented for later. Everything else is open and scheduled as bundles S2–S5 in the [roadmap](../ROADMAP.md#security-from-the-2026-10-10-review).
+> **Status:** bundle **S1 is fixed and released in V0.1.64**: H1, H4, L2, L3 and M7. A **second pass** on the same day ([§11](#11-second-pass-2026-10-13)) found nine more issues, including one high (stored XSS through image previews). Six of them and I3 are fixed in V0.1.65, and three are documented for later. Every remaining finding has a target release before V0.2.0 in the [roadmap](../ROADMAP.md#security).
 
 | ID | Status | Fix |
 |---|---|---|
@@ -11,12 +11,12 @@
 | L2 | ✅ Fixed in V0.1.64 | `SessionSubject` and `ReadingSubject` extractors on the handlers replace `token_forbidden_path` and `read_token_may_post`; other non-GET handlers refuse read-only tokens by default |
 | L3 | ✅ Fixed in V0.1.64 | `/invite#<secret>`, `/reset-password#<secret>`, `<meta name="referrer" content="no-referrer">`; old path links are moved to the fragment by the web app |
 | M7 | ✅ Fixed in V0.1.64 | `envPrefix: ["VITE_", "TAURI_ENV_"]` |
-| N1 + I3 | ✅ Fixed (unreleased) | Content types from the file name only (`served_mime_type`), never the uploader's; image previews open in a tab only for raster types (§11) |
-| N2 | ✅ Fixed (unreleased) | Run-time settings changes need a signed-in session (`SessionSubject`, and the console's `as_session`) |
-| N3 | ✅ Fixed (unreleased) | Owners keep the owner role in member upserts; organization propagation never lowers a workspace owner |
-| N4 | ✅ Fixed (unreleased) | Author edits need a writer role; saved searches are deleted by their author or an administrator |
-| N5 | ✅ Fixed (unreleased) | A used reset link also revokes the account's personal access tokens |
-| N6 | ✅ Fixed (unreleased) | `POST /v1/workspaces/{ws}/index` is for administrators |
+| N1 + I3 | ✅ Fixed in V0.1.65 | Content types from the file name only (`served_mime_type`), never the uploader's; image previews open in a tab only for raster types (§11) |
+| N2 | ✅ Fixed in V0.1.65 | Run-time settings changes need a signed-in session (`SessionSubject`, and the console's `as_session`) |
+| N3 | ✅ Fixed in V0.1.65 | Owners keep the owner role in member upserts; organization propagation never lowers a workspace owner |
+| N4 | ✅ Fixed in V0.1.65 | Author edits need a writer role; saved searches are deleted by their author or an administrator |
+| N5 | ✅ Fixed in V0.1.65 | A used reset link also revokes the account's personal access tokens |
+| N6 | ✅ Fixed in V0.1.65 | `POST /v1/workspaces/{ws}/index` is for administrators |
 | N7–N9 | 📝 Documented | See §11 |
 
 ---
@@ -305,7 +305,7 @@ Two crates appear in two major versions: reqwest 0.12 and 0.13, and quick-xml 0.
 
 - **I1.** Memory search uses `LIKE '%q%'` without escaping `%` and `_`. This is harmless (bound, same workspace) but gives surprising matches.
 - **I2.** `/health` reports `registration_open` and `setup_required` to anyone. This is fine, but it tells a scanner that a server is open for registration.
-- **I3.** ✅ *Fixed (unreleased).* The uploader's `Content-Type` was stored and echoed on download. The second pass showed it was not only cosmetic (see N1), and both storing and serving now use the type of the file name.
+- **I3.** ✅ *Fixed in V0.1.65.* The uploader's `Content-Type` was stored and echoed on download. The second pass showed it was not only cosmetic (see N1), and both storing and serving now use the type of the file name.
 - **I4.** The Postman collections in `docs/api/` are git-ignored but may hold real tokens locally. Clear them before sharing a checkout.
 
 ---
@@ -327,12 +327,12 @@ Two crates appear in two major versions: reqwest 0.12 and 0.13, and quick-xml 0.
 
 | ID | Severity | Finding | Status |
 |---|---|---|---|
-| N1 | **High** | Stored XSS through image previews | ✅ Fixed (unreleased) |
-| N2 | Medium | An administrator's personal access token could weaken server-wide security | ✅ Fixed (unreleased) |
-| N3 | Medium | A workspace or organization could lose its owner | ✅ Fixed (unreleased) |
-| N4 | Low | Viewers could still change their old comments; any writer could delete anyone's saved search | ✅ Fixed (unreleased) |
-| N5 | Low | Using a reset link left the account's personal access tokens working | ✅ Fixed (unreleased) |
-| N6 | Low | Any writer could run a synchronous whole-workspace re-index | ✅ Fixed (unreleased) |
+| N1 | **High** | Stored XSS through image previews | ✅ Fixed in V0.1.65 |
+| N2 | Medium | An administrator's personal access token could weaken server-wide security | ✅ Fixed in V0.1.65 |
+| N3 | Medium | A workspace or organization could lose its owner | ✅ Fixed in V0.1.65 |
+| N4 | Low | Viewers could still change their old comments; any writer could delete anyone's saved search | ✅ Fixed in V0.1.65 |
+| N5 | Low | Using a reset link left the account's personal access tokens working | ✅ Fixed in V0.1.65 |
+| N6 | Low | Any writer could run a synchronous whole-workspace re-index | ✅ Fixed in V0.1.65 |
 | N7 | Medium | No connection or request timeouts on the server | 📝 Documented |
 | N8 | Low | Removing an organization member can leave their workspaces without an owner | 📝 Documented |
 | N9 | Info | Hiding index chunks from members is not a confidentiality boundary | 📝 Documented |
