@@ -2,7 +2,7 @@
 
 > **Audience:** engineers working on RepoMemo, reviewers, and anyone operating the shared server.
 > **Companion:** [FUNCTIONAL_MINDMAP.md](FUNCTIONAL_MINDMAP.md) covers *what* the product does. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** code at `V0.1.32` (2026-09-29), plus the security and background-processing hardening that followed `V0.1.56` (sections marked *hardening*). The focus is the **shared web client** (`apps/desktop/src/SharedWebApp.tsx`) and the **HTTP API** (`apps/server`). Desktop and Tauri paths are noted where they share code.
+> **Scope:** code at `V0.1.62` (2026-10-10) plus the unreleased onboarding work on main (migration 0023: invitations, reset links, personal access tokens). Aligned on 2026-10-13; sections marked *hardening* came with V0.1.51–V0.1.57. The focus is the **shared web client** (`apps/desktop/src/SharedWebApp.tsx`) and the **HTTP API** (`apps/server`). Desktop and Tauri paths are noted where they share code. Open security findings are in the [security review](security/2026-10-10-security-review.md), and the improvement backlog is in the [enhancement analysis](analysis/2026-10-13-enhancement-analysis.md).
 
 ---
 
@@ -15,11 +15,13 @@ mindmap
       React 18 plus Vite SPA
       Hand-rolled router
       sharedApi fetch wrapper
-      JWT in sessionStorage
+      Access token in sessionStorage
+      Fetch-based SSE reader
     HTTP API
       Axum 0.8 server
-      89 operations under v1
+      157 operations under v1
       JWT HS256 extractor with session versions
+      Personal access tokens
       Role guards per request
       Workspace AI policy and quotas
       SSE event stream
@@ -32,7 +34,7 @@ mindmap
       AI providers
     Storage
       SQLite WAL via sqlx
-      21 migrations
+      23 migrations
       Content-addressed blobs with garbage collection
       Encrypted provider keys
       Job and activity observers
@@ -46,8 +48,9 @@ mindmap
       Graceful shutdown
       Worker stub
     Quality
-      Rust unit and integration tests
+      163 Rust tests
       No frontend tests
+      No CI yet
       Known risks
 ```
 
@@ -100,6 +103,9 @@ flowchart TD
   server[apps/server] --> api[crates/api]
   server --> storage
   server --> domain
+  server --> ai
+  console["apps/console (repomemo-console)"] --> domain
+  console -. "HTTP" .-> server
   tauri[apps/desktop/src-tauri] --> api
   tauri --> domain
   worker["apps/worker (stub, no deps)"]
@@ -119,17 +125,18 @@ flowchart TD
 
 | Unit | Responsibility | Key file(s) | Size |
 |---|---|---|---|
-| `crates/domain` | Serde DTOs shared by every layer: `ArtifactSummary`, `Chunk`, `Citation`, `WorkspaceRole`… | [lib.rs](../crates/domain/src/lib.rs) | ~570 LOC |
-| `crates/storage` | `StorageEngine`: the sqlx pool, migrations, blob I/O, **all SQL**, observers | [lib.rs](../crates/storage/src/lib.rs), [migrations/](../crates/storage/migrations) | ~4,260 LOC |
-| `crates/ingestion` | File discovery, type and language detection, binary sniffing, Word (`.docx` zip/XML, `.doc` CFB) text extraction | [lib.rs](../crates/ingestion/src/lib.rs) | ~650 |
-| `crates/indexer` | Chunking (Markdown by heading, structure-aware code chunks for TS/TSX/JS, Python and Rust, 100-line windows as fallback) and tree-sitter symbols. Exports `INDEXER_VERSION` | [lib.rs](../crates/indexer/src/lib.rs) | ~570 |
-| `crates/retrieval` | FTS query sanitising, hybrid FTS + vector merge | [lib.rs](../crates/retrieval/src/lib.rs) | ~100 |
-| `crates/ai` | `AiProvider` trait, with Ollama and OpenRouter implementations over `reqwest` (rustls) | [lib.rs](../crates/ai/src/lib.rs) | ~530 |
-| `crates/git` | Read-only `git` CLI access: resolve a branch, list a commit's tree, stream blobs through `git cat-file --batch` | [lib.rs](../crates/git/src/lib.rs) | ~360 |
-| `crates/api` | `RepoMemoCore` facade: import, index, search, summarize, ask, memory cards | [lib.rs](../crates/api/src/lib.rs) | ~1,075 |
-| `apps/server` | Axum router, auth, authorization, collaboration handlers, SSE | [lib.rs](../apps/server/src/lib.rs), [events.rs](../apps/server/src/events.rs) | ~4,320 |
+| `crates/domain` | Serde DTOs shared by every layer: `ArtifactSummary`, `Chunk`, `Citation`, `WorkspaceRole`…, and the console banner | [lib.rs](../crates/domain/src/lib.rs) | ~1,370 LOC |
+| `crates/storage` | `StorageEngine`: the sqlx pool, migrations, blob I/O, **all SQL**, observers, secrets, environments. `lib.rs` alone is ~6,200 lines; `access.rs`, `repo.rs`, `system.rs`, `setup.rs` are split out | [lib.rs](../crates/storage/src/lib.rs), [migrations/](../crates/storage/migrations) | ~8,500 LOC |
+| `crates/ingestion` | File discovery, type and language detection, binary sniffing, business document extraction and previews ([documents.rs](../crates/ingestion/src/documents.rs)), repository file rules ([repo.rs](../crates/ingestion/src/repo.rs)) | [lib.rs](../crates/ingestion/src/lib.rs) | ~2,400 |
+| `crates/indexer` | Chunking (Markdown by heading, structure-aware code chunks for TS/TSX/JS, Python and Rust, 100-line windows as fallback) and tree-sitter symbols. Exports `INDEXER_VERSION` | [lib.rs](../crates/indexer/src/lib.rs) | ~950 |
+| `crates/retrieval` | FTS query sanitising, hybrid FTS + vector merge | [lib.rs](../crates/retrieval/src/lib.rs) | ~220 |
+| `crates/ai` | `AiProvider` trait, with Ollama and OpenRouter implementations over `reqwest` (rustls), outbound URL checks, LLM rerank | [lib.rs](../crates/ai/src/lib.rs) | ~950 |
+| `crates/git` | Read-only `git` CLI access: resolve a branch, list a commit's tree, stream blobs through `git cat-file --batch` | [lib.rs](../crates/git/src/lib.rs) | ~400 |
+| `crates/api` | `RepoMemoCore` facade: import, index, search, summarize, ask, memory cards, plus the assistant, knowledge map, health checks, embeddings and repository sync, overview and stack modules | [lib.rs](../crates/api/src/lib.rs) | ~5,500 |
+| `apps/server` | Axum router, auth, authorization, collaboration handlers, SSE, background queues, System area, logging, setup, environments, access links and tokens. `lib.rs` alone is ~8,500 lines | [lib.rs](../apps/server/src/lib.rs), [events.rs](../apps/server/src/events.rs), [system.rs](../apps/server/src/system.rs), [access.rs](../apps/server/src/access.rs) | ~16,500 |
+| `apps/console` | `repomemo-console` terminal client for the admin console (§8c) | [main.rs](../apps/console/src/main.rs) | ~870 |
 | `apps/worker` | Placeholder process. It logs and waits for Ctrl-C, and has **no job claiming** | [main.rs](../apps/worker/src/main.rs) | 30 |
-| Web client | SPA, API client, types, layout | [SharedWebApp.tsx](../apps/desktop/src/SharedWebApp.tsx), [sharedApi.ts](../apps/desktop/src/lib/sharedApi.ts), [types.ts](../apps/desktop/src/types.ts), [SharedLayout.tsx](../apps/desktop/src/components/SharedLayout.tsx) | ~3,140 |
+| Web client | SPA, API client, types, layout, about 20 components. `SharedWebApp.tsx` alone is 2,787 lines (202 KB); the desktop `App.tsx` 2,750 | [SharedWebApp.tsx](../apps/desktop/src/SharedWebApp.tsx), [sharedApi.ts](../apps/desktop/src/lib/sharedApi.ts), [types.ts](../apps/desktop/src/types.ts), [SharedLayout.tsx](../apps/desktop/src/components/SharedLayout.tsx) | ~10,900 (plus ~7,400 CSS) |
 
 **Layering note.** The server calls `RepoMemoCore` for evidence, indexing, search, AI and memory. It calls **`StorageEngine` directly** for auth, organizations, memberships, tasks, comments, lifecycle, notifications, saved searches, activity and jobs. Both use **one shared `StorageEngine`**, created with `RepoMemoCore::from_storage(storage.clone())`, so writes made inside the core still fire the server's observers.
 
@@ -198,6 +205,8 @@ sequenceDiagram
 - Access tokens are **HS256 JWTs** with claims `sub`, `email`, `iss`, `iat`, `exp` and `ver`. The TTL is 60 minutes by default (`REPOMEMO_ACCESS_TOKEN_TTL_MINUTES`). **Refresh tokens** (migration 0016) are opaque, stored as SHA-256 hashes, rotated on every use and valid 30 days; presenting a rotated token again revokes the whole family. The web client refreshes silently on a 401.
 - **Session versions** (*hardening*, migration 0018). `users.session_version` is stamped into each access token as `ver`, and the extractor refuses a token whose version no longer matches (one primary-key lookup per request), so a deleted user's tokens also stop working. Changing the password and `POST /v1/auth/logout-all` bump the version and revoke every refresh token: every session ends at once, not when its token expires. The password change returns a fresh session (`TokenResponse`) for the device that made it.
 - `AuthenticatedSubject` implements `FromRequestParts`. If a handler takes it as an argument, the handler is protected.
+- **Personal access tokens** (migration 0023, [access.rs](../apps/server/src/access.rs)). A bearer value starting with `rmp_` is looked up by SHA-256 instead of decoded as a JWT. It must not be revoked or expired, and its user must exist. The subject carries `token: Some(TokenGrant { read_only })` and the user's current session version, so open event streams still end when sessions are ended. Whatever the scope, tokens are refused (403) on `/v1/profile/tokens*`, `/v1/profile/password`, `/v1/auth/logout-all`, `/v1/invitations/accept`, `/v1/system/environment/detach`, and role grants and reset links under `/v1/system/users/*`. A read-only token may only GET/HEAD, plus POST to `…/search`, `…/artifacts/query`, `…/ask` and `/v1/system/console`, where the handler refuses `--yes` from it. Last use is written at most every 5 minutes. Tokens survive password changes and the user's own sign-out-everywhere; System › *Sign out everywhere* revokes them.
+- **Invitation and reset links** ([access.rs](../apps/server/src/access.rs), storage `access.rs`). Secrets are two UUIDv4s in hex, stored as SHA-256 and found by hash lookup. Registration with `invitation_token` skips the closed-registration check only for the invited email; joining happens on `accept`, which marks the invitation used with a conditional update first and gives it back if the membership change fails. Maintenance deletes links a week after they expire.
 - Login returns the same `invalid_credentials` error whether the email is unknown or the password is wrong, and an unknown email is checked against a fixed Argon2 hash so the response time does not reveal which emails have accounts.
 - **Throttling** (*hardening*, [security.rs](../apps/server/src/security.rs)). Sign-in and registration are limited per client address (30 per minute by default), and session refreshes, which every open tab makes and which cannot be guessed, get a separate bucket four times as large. Failed sign-ins lock the account for that address after 10 consecutive failures, and for every address after 50, for 15 minutes; the answer is 429 `rate_limited` with `Retry-After`. Counters are in memory (one server process), keyed on the TCP peer, or on `X-Forwarded-For` when `REPOMEMO_TRUST_PROXY` is set.
 - **Registration** can be closed (`REPOMEMO_ALLOW_REGISTRATION=false`); the first account can still register. `/health` reports `registration_open`.
@@ -241,9 +250,11 @@ Other rules:
 
 ---
 
-## 5. HTTP API reference (89 operations)
+## 5. HTTP API reference (157 operations under `/v1`)
 
-Guard legend: **pub** = no auth, **auth** = any valid JWT, **R/W/A/O** = workspace read / write / admin / owner, **oR/oA/oO** = organization read / admin / owner. "→ activity" means the call records a `workspace_activity` row and so emits an SSE `activity` event.
+Counted as method and path pairs: 150 in the main router ([lib.rs](../apps/server/src/lib.rs)), 4 platform routes ([environment.rs](../apps/server/src/environment.rs)) and 3 avatar routes ([avatars.rs](../apps/server/src/avatars.rs)), plus `/health` and `/health/ready`.
+
+Guard legend: **pub** = no auth, **auth** = any valid JWT or personal access token, **R/W/A/O** = workspace read / write / admin / owner, **oR/oA/oO** = organization read / admin / owner. "→ activity" means the call records a `workspace_activity` row and so emits an SSE `activity` event.
 
 ### Identity and session
 
@@ -265,7 +276,14 @@ Guard legend: **pub** = no auth, **auth** = any valid JWT, **R/W/A/O** = workspa
 | POST | `/v1/auth/login` | pub | `TokenResponse`, 401 `invalid_credentials`, 429 when rate-limited or locked out |
 | POST | `/v1/auth/refresh` | pub | `{refresh_token}` → a new `TokenResponse` with a rotated refresh token; 401 for an unknown, expired or reused token |
 | POST | `/v1/auth/logout` | pub | `{refresh_token}` → 204, revokes that refresh token |
-| POST | `/v1/auth/logout-all` | auth | 204. Ends every session of the caller, on every device |
+| POST | `/v1/auth/logout-all` | auth | 204. Ends every session of the caller, on every device. Personal access tokens are kept |
+| POST | `/v1/auth/password-reset/preview` | pub | `{token}` → `{email, display_name, expires_at}`; 410 for a used, replaced or expired link; rate-limited like sign-in |
+| POST | `/v1/auth/password-reset` | pub | `{token, password}` → `TokenResponse`. Sets the password, ends every session, lifts lockouts, records `password_reset_used`. A refused password does not use up the link |
+| POST | `/v1/invitations/preview` | pub | `{token}` → target name, organization, role, inviter, expiry, `account_exists`; 404 unknown, 410 used, withdrawn or expired; rate-limited |
+| POST | `/v1/invitations/accept` | auth (session only) | `{token}` → `{target_type, target_id, organization_id, role}`. The caller's email must be the invited one and the inviter must still be allowed to grant the role; never lowers an existing role → activity `member_joined` |
+| DELETE | `/v1/invitations/{i}` | A / oA of its target | withdraws a pending invitation; 409 when already used or withdrawn |
+| GET, POST | `/v1/profile/tokens` | auth (session only) | list (not revoked, expired included) / create `{name, scope, expires_in_days}` with scope `read` or `write` and 7, 30, 90 or 365 days → `{token, secret}` (secret shown once) |
+| DELETE | `/v1/profile/tokens/{t}` | auth (session only) | revokes one of the caller's tokens |
 
 ### System administration ([system.rs](../apps/server/src/system.rs))
 
@@ -278,8 +296,9 @@ Every route requires a system administrator (**S**); changes are recorded in `sy
 | GET | `/v1/system/users` | S | every account with its direct memberships (`organizations`: id, name, role; `workspaces`: id, name, role, organization), organization count, active sessions and last connection |
 | PUT | `/v1/system/users/{u}/system-admin` | S (system admin only) | `{enabled}`; 409 for the last system administrator |
 | PUT | `/v1/system/users/{u}/app-admin` | S | `{enabled}` |
-| POST | `/v1/system/users/{u}/sessions/end` | S | ends every session of the user |
+| POST | `/v1/system/users/{u}/sessions/end` | S | ends every session of the user and revokes their personal access tokens |
 | POST | `/v1/system/users/{u}/unlock` | S | clears the user's sign-in lockouts → `{cleared}` |
+| POST | `/v1/system/users/{u}/password-reset` | S (session only; a system administrator's account needs a system administrator) | `{token, path, expires_at}`: a one-time link for 24 hours, replacing older ones; audited `password_reset_issued` |
 | GET, PUT | `/v1/system/settings` | S | run-time settings with value, default and who changed them, plus read-only environment facts. PUT `{values:{key:value}}` validates every value before saving any |
 | DELETE | `/v1/system/settings/{key}` | S | back to the environment default |
 | GET | `/v1/system/logs?level&category&workspace&q&after&limit&day` | S | log events, newest first: recent ones from memory, or a day's file with `day=YYYY-MM-DD` (last 16 MiB read). `category` is `security`, `activity`, `jobs`, `http`, `ai`, `database` or `server`; `workspace` keeps events with that `workspace_id` |
@@ -311,6 +330,7 @@ Every route requires a system administrator (**S**); changes are recorded in `sy
 | GET | `/v1/organizations/{org}/members` | oR | |
 | PUT | `/v1/organizations/{org}/members` | oA | upsert by email and propagate to workspaces |
 | DELETE | `/v1/organizations/{org}/members/{user}` | oA | the owner cannot be removed |
+| GET, POST | `/v1/organizations/{org}/invitations` | oA | pending invitations / create `{email, role}` (admin or member) → `{invitation, token, path}`, token shown once. Only owners invite admins; 409 when already a member |
 
 ### Workspaces, administration and AI
 
@@ -336,6 +356,7 @@ Every route requires a system administrator (**S**); changes are recorded in `sy
 | GET | `/v1/workspaces/{ws}/activity/calendar` | A | 365 days |
 | GET, PUT | `/v1/workspaces/{ws}/members` | A | PUT applies the escalation rules → activity |
 | DELETE | `/v1/workspaces/{ws}/members/{user}` | A | → activity |
+| GET, POST | `/v1/workspaces/{ws}/invitations` | A | pending invitations / create `{email, role}` (admin, member or viewer) → `{invitation, token, path}`, token shown once. Only owners invite admins; 409 when already a member → activity `member_invited` |
 
 ### Evidence, indexing and jobs
 
@@ -357,6 +378,27 @@ Every route requires a system administrator (**S**); changes are recorded in `sy
 | GET | `/v1/jobs/{j}` | R | |
 | POST | `/v1/jobs/{j}/cancel` | W | sets `cancel_requested`. Cooperative, checked between artifacts or batches |
 | GET | `/v1/workspaces/{ws}/events` | R | **SSE** with `job`, `activity` and `resync` events and a 15 s keep-alive; ends when the token expires or access is lost (§8) |
+| GET | `/v1/workspaces/{ws}/artifacts/index-failures` | R | stored indexing failure reasons (§6.2) |
+
+### Folders, documents and file links
+
+| Method | Path | Guard | Notes |
+|---|---|---|---|
+| GET, POST | `/v1/workspaces/{ws}/folders` | R / W | list / create `{name, parent_id?}`; depth at most 5 |
+| PATCH, DELETE | `/v1/workspaces/{ws}/folders/{f}` | W | rename / delete with every subfolder and file |
+| PUT | `/v1/artifacts/{a}/folder` | W | move a file; `folder_id: null` for the top level |
+| GET | `/v1/artifacts/{a}/file` | R | the stored bytes, always as an attachment, sandboxed |
+| GET | `/v1/artifacts/{a}/document-preview` | R | `DocumentPreview`: text, sheets, slides, email or pdf (§9) |
+| GET | `/v1/artifacts/{a}/rendered-preview/status`, `/rendered-preview` | R | starts and reports the LibreOffice conversion / serves the cached PDF |
+| POST | `/v1/artifacts/{a}/open-link` | R | five-minute signed link for "Open in Office" |
+| GET | `/v1/shared-files/{token}/{filename}` | pub (signed link) | serves the file for that link (review L1) |
+
+### Health
+
+| Method | Path | Guard | Notes |
+|---|---|---|---|
+| GET | `/v1/workspaces/{ws}/health` | R | findings per detector, with counts of past actions (§6.9) |
+| POST | `/v1/workspaces/{ws}/health/actions` | A | acts on one finding as it stands now; 409 when it changed |
 
 ### Repositories
 
@@ -484,10 +526,10 @@ The overview takes up to 2 chunks per artifact in artifact-list order, stopping 
 | | Ollama | OpenRouter |
 |---|---|---|
 | generate | `POST /api/generate` | `POST /chat/completions` |
-| embed | `POST /api/embed` | ❌ bails ("not configured in Phase 1F") |
+| embed | `POST /api/embed` | `POST /embeddings` |
 | analyze_image | `/api/generate` with images | chat completions with an image part |
 | test | `GET /api/tags` | `GET /models` |
-| rerank | identity order (stub) | identity order (stub) |
+| rerank | `llm_rerank` (listwise prompt through `generate`) | `llm_rerank` |
 
 **Two purposes.** A workspace has a *text* provider (answers, overviews, summaries) and a *vision* provider (image to text), distinguished by `metadata.purpose` (`text` by default, so older providers are text providers). Image uploads are refused with a 400 until an enabled vision provider exists (`RepoMemoCore::ensure_upload_allowed`). Image indexing uses the vision provider; for the single-provider desktop setup it falls back to an enabled provider that has no purpose set.
 
@@ -564,6 +606,8 @@ The database is SQLite in WAL mode with foreign keys on, `synchronous = NORMAL` 
 | 0009 | workflow_depth | workspace_saved_searches, workspace_task_checklist_items |
 | 0010 | jobs_kind_cancel | `indexing_jobs.kind`, `cancel_requested` |
 | 0011 | index_version | `artifacts.index_version`, the indexer version that produced the current chunks |
+| 0012 | index_failures | `artifact_index_failures` (reason and time of the last failed indexing, §6.2) |
+| 0013 | folders | `folders` (nested, depth ≤ 5) and `artifacts.folder_id` (§9) |
 | 0014 | assistant_conversations | assistant_conversations, assistant_turns (per-user assistant chats, §6.7) |
 | 0015 | workspace_health | workspace_health_actions (what administrators did with each health finding, §6.9) |
 | 0016 | refresh_tokens | hashed, rotating refresh tokens (§4) |
@@ -573,6 +617,7 @@ The database is SQLite in WAL mode with foreign keys on, `synchronous = NORMAL` 
 | 0020 | user_avatars | `user_avatars` (one PNG/JPEG/WebP blob per user, kept out of `users` so listings never load it) |
 | 0021 | app_admin | `users.is_app_admin` (System access without the wildcard) |
 | 0022 | server_setup | one-row `server_setup` (first administrator, completion); servers that already had accounts are marked complete (§8b-bis) |
+| 0023 | access_links_and_tokens | *Unreleased.* `invitations` (hashed link token, email, target, role, inviter, expiry, accepted/revoked), `password_resets` (hashed, one-time, 24 h), `personal_access_tokens` (hashed `rmp_…`, prefix, scope, expiry, last use, revoked) (§4) |
 
 ```mermaid
 erDiagram
@@ -669,9 +714,9 @@ Setup events are audited (`server_setup_admin_created`, `server_setup_completed`
 |---|---|
 | Entry | [main.tsx](../apps/desktop/src/main.tsx) loads fonts and CSS, then `App` chooses the runtime |
 | Routing | Custom: `navigate()` uses `history.pushState` plus a `popstate` listener, and `pathname.split("/")` is matched by hand in `SharedWebAppContent`. There is no router library |
-| Routes | `/login`, `/register`, `/dashboard`, `/profile`, `/notifications`, `/workspaces[?organization=&createOrganization=1]`, `/workspaces/:ws/:section`, `/workspaces/:ws/artifacts/:id`, `/workspaces/:ws/memory-cards/:id`, and a fallback `SharedRouteNotFound` |
+| Routes | `/setup`, `/login`, `/register`, `/invite/:token`, `/reset-password/:token`, `/dashboard`, `/profile`, `/notifications`, `/system[/:page]`, `/workspaces[?organization=&createOrganization=1]`, `/workspaces/:ws/:section` (11 sections: overview, evidence, documents, repositories, retrieval, map, health, memory, tasks, people, settings), `/workspaces/:ws/artifacts/:id`, `/workspaces/:ws/memory-cards/:id`, and a fallback `SharedRouteNotFound`. Before any route, `GET /v1/platform` and `GET /v1/setup` decide whether the environment menu or the setup wizard shows instead |
 | Session | Access token in `sessionStorage`, refresh token in `localStorage`. `hydrate()` loads session, organizations and workspaces in parallel on boot. A 401 triggers one silent refresh and a retry; when that fails the user is sent to sign-in. After a password change the client stores the fresh session the server returns. The profile page offers **Sign out everywhere** |
-| State | Local `useState` inside large components (`SharedWorkspaceDetail` has 50+ state hooks). There is no cache or query library. `load()` refetches capabilities, overview, metrics, artifacts, memory and facets, plus section-specific data, after most mutations |
+| State | Local `useState` inside large components (150 `useState` and 31 `useEffect` calls in `SharedWebApp.tsx`; `SharedWorkspaceDetail` alone has 50+). There is no cache or query library, and no route-level code splitting (no `React.lazy`). `load()` refetches capabilities, overview, metrics, artifacts, memory and facets, plus section-specific data, after most mutations |
 | API client | [sharedApi.ts](../apps/desktop/src/lib/sharedApi.ts) wraps `fetch`, adds `Bearer` and JSON, turns the error envelope into `SharedApiError(status, message)`, and uses `requestText` for Markdown export. It maps camelCase inputs to snake_case bodies |
 | Types | [types.ts](../apps/desktop/src/types.ts) mirrors the Rust `domain` DTOs by hand, in snake_case. There is no codegen |
 | Layout | `SharedLayout` provides the header, theme, notifications, profile and sign-out, plus a rail (`OrganizationRail`) and a `WorkspaceTopbar` |
@@ -687,38 +732,44 @@ Setup events are audited (`server_setup_admin_created`, `server_setup_completed`
 
 ## 10. Testing
 
+Counts of `#[test]` and `#[tokio::test]` functions on 2026-10-13 (163 in total).
+
 | Where | Count | What |
 |---|---|---|
-| `apps/server` | 4 `tokio::test` | End-to-end through the router with `tower::oneshot`: auth protection, the evidence flow, org→workspace role inheritance, and job listing and cancellation |
-| `crates/indexer` | 9 | chunking and symbol extraction per language |
-| `crates/ingestion` | 5 | detection and Word extraction |
-| `crates/ai` | 4 | settings validation |
-| `crates/storage` | 4 | storage behaviour |
-| `crates/retrieval` | 2 | FTS query sanitising |
-| `crates/api` | 1 | |
+| `apps/server` | 61 | End-to-end through the router with `tower::oneshot`: auth and session versions, roles and inheritance, evidence and indexing, jobs, repositories (with a fake Ollama), health actions, System area, console, setup, environments, invitations, reset links and token limits |
+| `crates/api` | 28 | sync engine (`syncs_follow_commits_and_keep_artifact_identity`), repository overview, root policy and stack detection, assistant routing, health mention matching, knowledge-map links, summaries, memory export |
+| `crates/storage` | 21 | FTS, re-indexing and locking, memory cards, encrypted keys and secrets, sessions, blob collection, job pruning, environments, setup, invitations, reset links and tokens |
+| `crates/ingestion` | 16 | detection, Word and business document extraction, repository file rules |
+| `crates/indexer` | 14 | chunking and symbol extraction per language |
+| `crates/ai` | 8 | settings validation, outbound URL checks |
+| `apps/console` | 7 | parsing and rendering |
+| `crates/retrieval` | 5 | FTS query sanitising, rank fusion |
+| `crates/git` | 3 | tree parsing, reading a real repository |
 | Web client | **0** | no unit, component or e2e tests. `npm run typecheck` is the only gate |
 
-Run the Rust tests with `cargo test`. See [DEVELOPMENT_COMMANDS.md](../docs/DEVELOPMENT_COMMANDS.md).
+Run the Rust tests with `cargo test`. See [DEVELOPMENT_COMMANDS.md](../docs/DEVELOPMENT_COMMANDS.md). **There is no CI** (no `.github/workflows`), so nothing runs these automatically (roadmap C8).
 
 ---
 
 ## 11. Risks and technical debt (ranked)
 
+Security findings are tracked in the [security review of 2026-10-10](security/2026-10-10-security-review.md) (4 high, 12 medium, 10 low, none patched on 2026-10-13) and are not repeated here, except where a risk below overlaps. IDs in the last column refer to the [roadmap](ROADMAP.md).
+
 | # | Area | Issue | Suggested direction |
 |---|---|---|---|
-| 1 | Security | ✅ *Mitigated:* provider API keys are encrypted at rest and never follow a changed endpoint. Residual: without `REPOMEMO_SECRET_KEY` the key file sits next to the database, so a copy of the whole data directory still reveals them | Set `REPOMEMO_SECRET_KEY` from a secret store in production |
-| 2 | Scalability | Automatic indexing uses an in-process queue with 2 workers (retries with backoff, failures retried every 6 hours, stale jobs closed at startup), and the worker crate is a stub. The SPA now follows SSE (polling only as a fallback) | Durable job queue claimed by the worker if the server is scaled out |
-| 3 | Auth | ✅ *Mitigated:* rotating refresh tokens, session versions (password change and sign-out-everywhere end every session at once), sign-in throttling and lockout. Residual: rate-limit counters are per process and reset on restart | Shared counters if the server is ever scaled out |
-| 4 | Cost / abuse | ✅ *Mitigated:* per-workspace AI policy and a per-user hourly AI quota | Per-workspace budgets if needed |
-| 5 | Correctness | Error classification by substring matching; not-found is now 404 | Typed errors from storage and core |
-| 6 | Performance | Vector search scans the whole table in Rust. Metrics and `artifacts/query` load everything into memory. The dashboard makes N+1 metrics calls | ANN or an index (Qdrant is per [ADR-0004](../docs/decisions/0004-embedded-vector-storage-before-qdrant.md)), SQL aggregation, and a batched metrics endpoint |
-| 7 | Scale | Vector search scans every embedding of the workspace per query (§6.4) | An ANN index (sqlite-vec) or a per-workspace in-memory vector cache |
-| 8 | Storage | ✅ *Done:* orphan blobs and previews are garbage-collected by the maintenance pass | — |
-| 9 | Frontend maintainability | `SharedWebApp.tsx` ~2k LOC, `App.tsx` ~2.7k, `styles.css` ~6.1k, a hand-rolled router, no tests | Split per route and section, add a router and a query cache, add component tests |
-| 10 | UX correctness | ✅ *Done (unreleased):* snippets highlight safely and AI output renders as Markdown | — |
-| 11 | Data integrity | `ON DELETE RESTRICT` on creator FKs blocks future user deletion | Decide on the account-deletion policy |
-| 12 | Security | A workspace owner or admin can link any repository the server account can read | Set `REPOMEMO_REPO_ROOTS` (*hardening*) and run the server under a narrow account |
-| 13 | Security | Outbound provider URLs are checked by name and literal address only; a host name that resolves to a metadata address is not caught | `REPOMEMO_AI_ALLOWED_HOSTS`, or egress rules on the host |
+| 1 | Security | Open review findings. The most urgent: membership propagates to every workspace of the organization (H1), and the unreleased invitation links accept through the same code; open registration by default (M1) combined with provider URLs and repository links that reach the host (H2, H3) | Roadmap S1–S5; S1 ships with onboarding |
+| 2 | Process | **No CI.** The 163 Rust tests, the type check and dependency audits only run by hand | C8 |
+| 3 | Frontend maintainability | `SharedWebApp.tsx` 2,787 lines (202 KB, 150 `useState`), `App.tsx` 2,750, `styles.css` 6.2k, a hand-rolled router, no data cache, no tests | C1–C3, C11 |
+| 4 | Backend maintainability | `apps/server/src/lib.rs` 8,531 lines and `crates/storage/src/lib.rs` 6,206; `types.ts` mirrors the Rust DTOs by hand | C4, C5, C7 |
+| 5 | Correctness | Error classification by substring matching (9 `contains` checks in `map_storage_error`); some handlers return raw error text as 400 (review L6) | Typed errors (C6) |
+| 6 | Performance / scale | Vector search decodes every embedding of the workspace per query (§6.4). Metrics, `artifacts/query`, the knowledge map and health load whole workspaces per request. The dashboard makes one metrics call per workspace | P0 timings, then P1–P5 |
+| 7 | Release hygiene | Version strings say `0.1.60` at V0.1.62, so System › Overview and the console report the wrong version; two `reqwest` and two `quick-xml` versions; Vite 5 | C9, C10 |
+| 8 | Scalability | In-process queues (2 indexing slots, one embedding workspace at a time), per-process rate-limit counters, a pool of 5 connections shared by readers and the writer, a stub worker | P8; *Later: scale-out* |
+| 9 | Security | ✅ *Mitigated:* provider API keys are encrypted at rest and never follow a changed endpoint. Residual: without `REPOMEMO_SECRET_KEY` the key file sits next to the database, with no restrictive ACL on Windows (review L5) | Set `REPOMEMO_SECRET_KEY` from a secret store in production |
+| 10 | Auth | ✅ *Mitigated:* rotating refresh tokens, session versions, sign-in throttling and lockout. Residual: refresh token in `localStorage` and no CSP for the SPA (review M2) | S4 |
+| 11 | Cost / abuse | ✅ *Mitigated* for interactive AI (policy and hourly quota). Background image descriptions and embeddings are not counted (review M12) | S5 |
+| 12 | Data integrity | `ON DELETE RESTRICT` on creator FKs blocks future user deletion | Decide on the account-deletion policy |
+| 13 | Product drift | The desktop app lags far behind the web client and duplicates UI code | Decision F10 |
 
 ---
 
@@ -730,8 +781,11 @@ The table records whether each existing document still matches the code. The min
 |---|---|
 | [README.md](../README.md) | ✅ Rewritten as the GitHub landing page. It points to `mindmap/` |
 | [PRODUCT.md](../PRODUCT.md) | Kept because the **impeccable** design skill reads it (`.agents/skills/impeccable`). Its product content now lives in the [functional mindmap](FUNCTIONAL_MINDMAP.md#who-its-for-and-what-it-stands-for). ⚠️ Its "Operating Context" and constraints still describe a desktop-only product |
-| [mindmap/ROADMAP.md](ROADMAP.md) | ✅ Moved from `docs/` and updated to V0.1.61 |
-| [docs/IMPLEMENTATION_TRACKER.md](../docs/IMPLEMENTATION_TRACKER.md) | ✅ Phases 1A–1H are accurate. Shared mode and collaboration are not tracked |
+| [mindmap/ROADMAP.md](ROADMAP.md) | ✅ Updated to V0.1.62 on 2026-10-13, with the *Next* plan from the enhancement analysis |
+| [mindmap/security/2026-10-10-security-review.md](security/2026-10-10-security-review.md) | ✅ Still accurate on 2026-10-13: no finding patched yet |
+| [mindmap/analysis/2026-10-13-enhancement-analysis.md](analysis/2026-10-13-enhancement-analysis.md) | ✅ New: product, security, performance, code-health and operations backlog behind the roadmap |
+| [docs/DEVELOPMENT_COMMANDS.md](../docs/DEVELOPMENT_COMMANDS.md) | ✅ Every `REPOMEMO_*` variable in the code is listed (checked 2026-10-13) |
+| [docs/IMPLEMENTATION_TRACKER.md](../docs/IMPLEMENTATION_TRACKER.md) | Phases 1A–1H are accurate. Shared mode and everything after it are tracked in the roadmap instead; retire or redirect it |
 | [docs/architecture/RepoMemo_ARCHITECTURE.md](../docs/architecture/RepoMemo_ARCHITECTURE.md) | Original target-architecture brief. Useful for intent, not current state |
 | [docs/architecture/SHARED_MODE_IMPLEMENTATION_PLAN.md](../docs/architecture/SHARED_MODE_IMPLEMENTATION_PLAN.md), [TEAM_COLLABORATION_AND_BACKEND_PLAN.md](../docs/architecture/TEAM_COLLABORATION_AND_BACKEND_PLAN.md) | Plans. Partially realised: SQLite, not PostgreSQL, and a stub worker |
 | [docs/decisions/](../docs/decisions) | ✅ The ADRs are still valid |
@@ -755,6 +809,7 @@ This file is the root of the technical mindmap. Each branch can grow into its ow
 | Events, jobs and the worker | `technical/jobs-and-events.md` |
 | Web client architecture | `technical/web-client.md` |
 | Operations: config, deploy, backup | `technical/operations.md` |
-| Risks and tech-debt register | `technical/tech-debt.md` |
+| Risks and tech-debt register | `technical/tech-debt.md` (for now: §11 and the [enhancement analysis](analysis/2026-10-13-enhancement-analysis.md)) |
+| Security review | ✅ [security/2026-10-10-security-review.md](security/2026-10-10-security-review.md) |
 | Repository sources (git) | ✅ [technical/repository-sources.md](technical/repository-sources.md) |
 | Admin console (System › Console) | 🔄 [technical/admin-console.md](technical/admin-console.md) |

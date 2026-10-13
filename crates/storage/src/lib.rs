@@ -21,11 +21,13 @@ use sqlx::sqlite::{
 use sqlx::{QueryBuilder, Row, Sqlite, SqlitePool};
 use uuid::Uuid;
 
+mod access;
 mod environment;
 mod repo;
 mod secrets;
 mod setup;
 mod system;
+pub use access::{PasswordReset, PersonalTokenGrant, StoredInvitation, PERSONAL_TOKEN_PREFIX};
 pub use environment::{inspect_environment, EnvironmentState};
 pub use repo::{RepoFileRecord, RepoFileWrite};
 pub use setup::SetupState;

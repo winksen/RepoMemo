@@ -60,6 +60,8 @@ impl Default for MaintenanceSettings {
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize)]
 pub struct MaintenanceReport {
     pub refresh_tokens_purged: u64,
+    /// Invitation and password reset links that expired more than a week ago.
+    pub access_links_purged: u64,
     pub jobs_pruned: u64,
     pub blobs_removed: usize,
     pub blob_bytes_reclaimed: i64,
@@ -75,6 +77,7 @@ pub struct MaintenanceReport {
 impl MaintenanceReport {
     fn is_noteworthy(&self) -> bool {
         self.refresh_tokens_purged > 0
+            || self.access_links_purged > 0
             || self.jobs_pruned > 0
             || self.blobs_removed > 0
             || self.previews_removed > 0
@@ -174,6 +177,15 @@ pub async fn run_pass(state: &AppState, retry_indexing: bool, sweep_untracked: b
     {
         Ok(count) => report.refresh_tokens_purged = count,
         Err(error) => failed(&mut report, "refresh tokens", error),
+    }
+
+    // Kept a week past expiry, so "this link expired" can still be explained.
+    match storage
+        .purge_expired_access_links(&(Utc::now() - chrono::Duration::days(7)).to_rfc3339())
+        .await
+    {
+        Ok(count) => report.access_links_purged = count,
+        Err(error) => failed(&mut report, "invitation and reset links", error),
     }
 
     if settings.job_retention_days > 0 {

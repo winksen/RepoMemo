@@ -6214,3 +6214,29 @@ input:focus, textarea:focus, select:focus { background: #fff; border-color: var(
 /* Whether the environment choice survives a restart (environment menu, System › Settings) */
 .rm-platform-note { display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 10px 12px; color: var(--color-text); background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: 8px; font-size: 13px; line-height: 1.5; }
 .rm-platform-note svg { flex: none; margin-top: 2px; color: var(--color-text-muted); }
+
+/* Secrets shown once: invitation links, reset links, API tokens */
+.rm-secret-field { display: flex; gap: 8px; }
+.rm-secret-field .rm-input { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 12px; }
+.rm-secret-warning { margin: 0; color: var(--color-text-muted); font-size: 12px; line-height: 1.5; }
+
+/* Invitations (workspace People, organization administration) */
+.rm-invite { display: grid; gap: 10px; }
+.rm-invite-form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(120px, 160px) auto; gap: 8px; align-items: center; }
+.rm-invite-list, .rm-tokens-list { display: grid; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--color-border); }
+.rm-invite-list li, .rm-tokens-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--color-border); }
+.rm-invite-text, .rm-tokens-text { display: grid; gap: 2px; min-width: 0; }
+.rm-invite-text strong, .rm-tokens-text strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.rm-invite-text small, .rm-tokens-text small { color: var(--color-text-muted); font-size: 12px; overflow-wrap: anywhere; }
+.rm-tokens-text strong .rm-system-tag { margin-left: 6px; font-weight: 500; }
+.rm-tokens-list li.expired .rm-tokens-text strong { color: var(--color-text-muted); }
+@media (max-width: 640px) { .rm-invite-form { grid-template-columns: 1fr; } }
+
+/* API tokens (profile) */
+.rm-tokens { display: grid; gap: 12px; }
+.rm-tokens-form { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.4fr) minmax(0, 1fr) auto; gap: 8px; align-items: end; }
+.rm-tokens-form label { display: grid; gap: 5px; color: var(--color-text-muted); font-size: 12px; font-weight: 600; }
+@media (max-width: 760px) { .rm-tokens-form { grid-template-columns: 1fr; } }
+
+/* Sign-in page hints */
+.shared-auth-hint { margin: 12px 0 0; color: var(--color-text-muted); font-size: 12px; line-height: 1.5; }

@@ -70,6 +70,14 @@ import type {
   RepoSettings,
   RepoSource,
   RepositoryList,
+  Invitation,
+  CreatedInvitation,
+  InvitationPreview,
+  AcceptedInvitation,
+  IssuedPasswordReset,
+  PasswordResetPreview,
+  PersonalAccessToken,
+  CreatedPersonalToken,
 } from "../types";
 
 const API_URL = (import.meta.env.VITE_REPOMEMO_API_URL ?? "http://127.0.0.1:3020").replace(/\/$/, "");
@@ -251,6 +259,8 @@ export async function registerSharedUser(input: {
   email: string;
   displayName: string;
   password: string;
+  /** An invitation for this email: allows the account even when registration is closed. */
+  invitationToken?: string;
 }): Promise<TokenResponse> {
   const response = await request<TokenResponse>("/v1/auth/register", {
     method: "POST",
@@ -258,6 +268,7 @@ export async function registerSharedUser(input: {
       email: input.email,
       display_name: input.displayName,
       password: input.password,
+      ...(input.invitationToken ? { invitation_token: input.invitationToken } : {}),
     }),
   });
   storeTokens(response);
@@ -1196,3 +1207,64 @@ export function attachEnvironment(code: string, name: string): Promise<PlatformS
 export async function detachEnvironment(accessToken: string): Promise<void> {
   await request<void>("/v1/system/environment/detach", { method: "POST" }, accessToken);
 }
+
+// Invitations, password reset links and personal access tokens
+
+export type InvitationTarget = "organization" | "workspace";
+
+/** Creates an invitation link; its secret is returned only now. */
+export function createSharedInvitation(accessToken: string, targetType: InvitationTarget, targetId: string, input: { email: string; role: string }): Promise<CreatedInvitation> {
+  const base = targetType === "workspace" ? "workspaces" : "organizations";
+  return request<CreatedInvitation>(`/v1/${base}/${encodeURIComponent(targetId)}/invitations`, { method: "POST", body: JSON.stringify(input) }, accessToken);
+}
+
+export function listSharedInvitations(accessToken: string, targetType: InvitationTarget, targetId: string): Promise<Invitation[]> {
+  const base = targetType === "workspace" ? "workspaces" : "organizations";
+  return request<Invitation[]>(`/v1/${base}/${encodeURIComponent(targetId)}/invitations`, {}, accessToken);
+}
+
+export function revokeSharedInvitation(accessToken: string, invitationId: string): Promise<void> {
+  return request<void>(`/v1/invitations/${encodeURIComponent(invitationId)}`, { method: "DELETE" }, accessToken);
+}
+
+/** Public: what an invitation link is for. */
+export function previewSharedInvitation(token: string): Promise<InvitationPreview> {
+  return request<InvitationPreview>("/v1/invitations/preview", { method: "POST", body: JSON.stringify({ token }) });
+}
+
+export function acceptSharedInvitation(accessToken: string, token: string): Promise<AcceptedInvitation> {
+  return request<AcceptedInvitation>("/v1/invitations/accept", { method: "POST", body: JSON.stringify({ token }) }, accessToken);
+}
+
+/** System administrators: a one-time link that lets the user choose a new password. */
+export function issueSharedPasswordReset(accessToken: string, userId: string): Promise<IssuedPasswordReset> {
+  return request<IssuedPasswordReset>(`/v1/system/users/${encodeURIComponent(userId)}/password-reset`, { method: "POST" }, accessToken);
+}
+
+export function previewSharedPasswordReset(token: string): Promise<PasswordResetPreview> {
+  return request<PasswordResetPreview>("/v1/auth/password-reset/preview", { method: "POST", body: JSON.stringify({ token }) });
+}
+
+/** Sets the new password and signs this browser in; every other session of the account ends. */
+export async function completeSharedPasswordReset(token: string, password: string): Promise<TokenResponse> {
+  const response = await request<TokenResponse>("/v1/auth/password-reset", { method: "POST", body: JSON.stringify({ token, password }) });
+  storeTokens(response);
+  return response;
+}
+
+export function listPersonalTokens(accessToken: string): Promise<PersonalAccessToken[]> {
+  return request<PersonalAccessToken[]>("/v1/profile/tokens", {}, accessToken);
+}
+
+/** Creates a personal access token; its secret is returned only now. */
+export function createPersonalToken(accessToken: string, input: { name: string; scope: "read" | "write"; expiresInDays: number }): Promise<CreatedPersonalToken> {
+  return request<CreatedPersonalToken>("/v1/profile/tokens", {
+    method: "POST",
+    body: JSON.stringify({ name: input.name, scope: input.scope, expires_in_days: input.expiresInDays }),
+  }, accessToken);
+}
+
+export function revokePersonalToken(accessToken: string, tokenId: string): Promise<void> {
+  return request<void>(`/v1/profile/tokens/${encodeURIComponent(tokenId)}`, { method: "DELETE" }, accessToken);
+}
+

@@ -97,11 +97,14 @@ environment from the web app, but only until it restarts; the web app warns
 about this and names the environment it will go back to. `$env:` values last
 for the PowerShell window they were set in, so a restart from the same window
 keeps the pin. The server
-exposes JWT-protected workspace routes. Import `docs/api/RepoMemo_Shared_API_v2.postman_collection.json` into
-Postman and run its numbered folders in order to exercise authentication,
-workspace setup, evidence, indexing, retrieval, team memory, and workspace
-membership management. For the membership folder, register the teammate first,
-then set its email in the `memberEmail` collection variable.
+exposes JWT-protected workspace routes. Import the newest collection,
+`docs/api/RepoMemo-Shared-API_v4.postman_collection.json` (the folder is
+git-ignored, so it exists only in local checkouts), into Postman and run its
+numbered folders in order to exercise authentication, workspace setup,
+evidence, indexing, retrieval, team memory, and workspace membership
+management. For the membership folder, register the teammate first, then set
+its email in the `memberEmail` collection variable. The collection predates the
+invitation, reset-link and personal-token routes.
 
 ## Open The Admin Console In A Terminal
 
@@ -127,7 +130,7 @@ npm run console -- jobs list --status failed --json
 |---|---|---|
 | `--server` or `REPOMEMO_SERVER_URL` | `http://127.0.0.1:3020` | The server to talk to. |
 | `--email` or `REPOMEMO_EMAIL` | asked | The account to sign in with; the password is always asked for. |
-| `REPOMEMO_TOKEN` | unset | An access token to use instead of signing in, for scripts. |
+| `REPOMEMO_TOKEN` | unset | A personal access token (`rmp_…`, created in the web app under Profile › API tokens) to use instead of signing in, for scripts. A read-only token runs lookups and dry runs only. |
 | `NO_COLOR` | unset | Any value turns colours off. |
 
 Exit codes: `0` done, `1` the server refused the command, `2` sign-in or
@@ -143,6 +146,9 @@ stored in the database and override the values below until reset.
 
 | Variable | Default | What it does |
 |---|---|---|
+| `REPOMEMO_SERVER_ADDR` | `127.0.0.1:3020` | Address and port the API listens on. The server speaks plain HTTP; put a TLS proxy in front of it before binding beyond loopback. |
+| `REPOMEMO_SERVICE_NAME` | `repomemo-server` | Name reported by `/health`. |
+| `REPOMEMO_SOFFICE` | found automatically | Path to LibreOffice's `soffice` for layout-accurate Office previews. Unset: looked up on `PATH` and in the usual install folder; without it, text, table and slide previews are used. |
 | `REPOMEMO_ALLOWED_ORIGIN` | `http://127.0.0.1:3021` | Browser origins allowed to call the API. Comma-separated for several; `*` is refused. |
 | `REPOMEMO_SECRET_KEY` | unset | Key (32+ characters) used to encrypt AI provider API keys at rest. When unset, a random key is created in `<data dir>/secret.key`; back that file up with the database, or the saved keys must be entered again. |
 | `REPOMEMO_ALLOW_REGISTRATION` | `true` | `false` closes sign-up. The very first account can still register, so a new server gets its owner. |

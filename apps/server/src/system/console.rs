@@ -360,6 +360,9 @@ pub(crate) async fn run(
         ApiError::bad_request(format!("{} is not a command. Type help to list them.", line.words.join(" ")))
     })?;
     check(spec, arguments, &line)?;
+    if spec.changes && line.yes && subject.token.as_ref().is_some_and(|token| token.read_only) {
+        return Err(ApiError::forbidden_because("This personal access token is read-only: it can run dry runs and lookups, not changes."));
+    }
     tracing::debug!(user_id = %subject.user_id, command = spec.name, "Console command");
     let response = execute(&state, &subject, spec, arguments, &line).await?;
     if response.applied {

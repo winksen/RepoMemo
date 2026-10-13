@@ -220,6 +220,10 @@ import { WorkspaceHealthPanel } from "./components/WorkspaceHealthPanel";
 import { RepositoriesPanel, RepositoryDetailView, RepositorySettings } from "./components/RepositoriesPanel";
 import { showToast, Toast } from "./components/ui/toast";
 import { LiveEventsContext, useLiveEventHub, useLiveEvents } from "./lib/liveEvents";
+import { InvitePage } from "./components/InvitePage";
+import { PasswordResetPage } from "./components/PasswordResetPage";
+import { ApiTokensPanel } from "./components/ApiTokensPanel";
+import { InviteMembers } from "./components/InviteMembers";
 import { initialSharedTheme, SharedLayout, ThemeToggle } from "./components/SharedLayout";
 
 import { SHARED_SESSION_STORAGE_KEY as SESSION_STORAGE_KEY } from "./lib/sharedApi";
@@ -470,9 +474,9 @@ function SharedWebAppContent() {
     }
   }
 
-  function handleAuthenticated(token: string) {
+  function handleAuthenticated(token: string, destination = "/dashboard") {
     window.sessionStorage.setItem(SESSION_STORAGE_KEY, token);
-    navigate("/dashboard", true);
+    navigate(destination, true);
     hydrate(token).catch(() => undefined);
   }
 
@@ -541,6 +545,23 @@ function SharedWebAppContent() {
 
   if (pageState === "restoring") {
     return <LoadingCanvas label="Restoring your shared session" />;
+  }
+
+  // Links people receive: they work signed in or not.
+  const linkParts = pathname.split("/").filter(Boolean);
+  if (linkParts[0] === "invite" && linkParts[1]) {
+    const signedIn = pageState === "ready" && accessToken && session;
+    return <InvitePage
+      accessToken={signedIn ? accessToken : null}
+      onAuthenticated={(token, destination) => handleAuthenticated(token, destination)}
+      onJoined={(destination) => { navigate(destination, true); if (accessToken) hydrate(accessToken).catch(() => undefined); }}
+      onSignOut={() => { clearSharedSession(); window.location.assign(pathname); }}
+      session={signedIn ? session : null}
+      token={decodeURIComponent(linkParts[1])}
+    />;
+  }
+  if (linkParts[0] === "reset-password" && linkParts[1]) {
+    return <PasswordResetPage onAuthenticated={(token) => handleAuthenticated(token)} token={decodeURIComponent(linkParts[1])} />;
   }
 
   if (pageState === "unauthenticated" || pageState === "error") {
@@ -748,6 +769,7 @@ function AuthCanvas({
               {mode === "sign-in" ? "Sign in to shared mode" : "Create account and continue"}
             </Button>
           </form>
+          {mode === "sign-in" ? <p className="shared-auth-hint">Forgot your password? Ask a system administrator of this server for a reset link (System › Users).</p> : <p className="shared-auth-hint">Invited by a teammate? Open the invitation link you received instead: it creates the account with the right access.</p>}
           <p className="shared-api-note">API {apiAvailable === true ? "healthy" : apiAvailable === false ? "unreachable" : "checking"} · <code>{sharedApiUrl}</code></p>
         </div>
       </section>
@@ -872,6 +894,7 @@ function SharedProfile({
         <section className="shared-profile-panel"><div className="shared-panel-heading"><div><UserCircle size={18} /><h2>Personal details</h2></div></div><form onSubmit={saveProfile}><label>Display name<Input autoComplete="name" onChange={(event) => setDisplayName(event.target.value)} required value={displayName} /></label><label>Email<Input disabled value={profile?.user.email ?? session.user.email ?? ""} /></label><Button disabled={isSubmitting} type="submit" variant="main">{isSubmitting ? <Loader className="spin" size={16} /> : <Pencil size={16} />} Save details</Button></form></section>
         <section className="shared-profile-panel"><div className="shared-panel-heading"><div><Key size={18} /><h2>Password</h2></div></div><form onSubmit={changePassword}><label>Current password<Input autoComplete="current-password" minLength={12} onChange={(event) => setCurrentPassword(event.target.value)} required type="password" value={currentPassword} /></label><label>New password<Input autoComplete="new-password" minLength={12} onChange={(event) => setNewPassword(event.target.value)} placeholder="At least 12 characters" required type="password" value={newPassword} /></label><label>Confirm new password<Input autoComplete="new-password" minLength={12} onChange={(event) => setConfirmPassword(event.target.value)} required type="password" value={confirmPassword} /></label><Button disabled={isSubmitting} type="submit" variant="secondary">{isSubmitting ? <Loader className="spin" size={16} /> : <Key size={16} />} Change password</Button></form></section>
         <section className="shared-profile-panel"><div className="shared-panel-heading"><div><Logout size={18} /><h2>Sessions</h2></div></div><p className="shared-muted-copy">Signed in on a shared or lost device? End every session at once, this one included. Changing your password also ends your sessions on other devices.</p><Button disabled={isSubmitting} onClick={() => setIsConfirmingSignOut(true)} type="button" variant="secondary"><Logout size={16} /> Sign out everywhere</Button></section>
+        <ApiTokensPanel accessToken={accessToken} />
         <Dialog description="Every device signed in to your account is signed out, including this one. You will need your password to sign in again." footer={<><DialogCancel onClick={() => setIsConfirmingSignOut(false)} /><Button disabled={isSubmitting} onClick={() => void endAllSessions()} type="button" variant="main">{isSubmitting ? <Loader className="spin" size={16} /> : <Logout size={16} />} Sign out everywhere</Button></>} onClose={() => setIsConfirmingSignOut(false)} open={isConfirmingSignOut} title="Sign out of every session?" />
       </div>
     </section>
@@ -1105,6 +1128,7 @@ function OrganizationAdministration({
   const [organizationName, setOrganizationName] = useState(organization.name);
   const [memberEmail, setMemberEmail] = useState("");
   const [memberRole, setMemberRole] = useState<OrganizationRole>("member");
+  const [inviteEmail, setInviteEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -1130,7 +1154,13 @@ function OrganizationAdministration({
       const member = await upsertSharedOrganizationMember(accessToken, organization.id, { email, role });
       setMembers((current) => current.some((entry) => entry.user.id === member.user.id) ? current.map((entry) => entry.user.id === member.user.id ? member : entry) : [...current, member]);
       setMemberEmail("");
-    } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSaving(false); }
+    } catch (requestError) {
+      // No account yet: offer the invitation link for that address instead.
+      if (apiMessage(requestError).includes("No RepoMemo account")) {
+        setInviteEmail(email.trim());
+        showToast("warning", `${email.trim()} has no account yet. Create an invite link for them below.`);
+      } else setError(apiMessage(requestError));
+    } finally { setIsSaving(false); }
   }
 
   async function removeMember(member: OrganizationMember) {
@@ -1150,6 +1180,7 @@ function OrganizationAdministration({
       const email = member.user.email ?? "";
       return <article key={member.user.id}><div className="shared-person"><UserAvatar name={member.user.display_name} size={32} userId={member.user.id} /><div><strong>{member.user.display_name}</strong><span>{email}</span></div></div><div className="shared-organization-member-actions">{isOwner ? <span className="shared-member-role">Owner</span> : <Dropdown aria-label={`Role for ${member.user.display_name}`} disabled={protectedMember || isSaving} onValueChange={(value) => void saveMember(email, value as OrganizationRole)} options={[{ label: "Member", value: "member" }, ...(canAssignAdmin ? [{ label: "Admin", value: "admin" }] : [])]} value={member.role} />}{!protectedMember ? <Button aria-label={`Remove ${member.user.display_name} from ${organization.name}`} disabled={isSaving} onClick={() => void removeMember(member)} type="button" variant="secondary"><Trash size={15} /></Button> : null}</div></article>;
     })}</div>
+    <InviteMembers accessToken={accessToken} initialEmail={inviteEmail} key={`invite-${organization.id}`} roleOptions={[{ label: "Member", value: "member" }, ...(canAssignAdmin ? [{ label: "Admin", value: "admin" }] : [])]} targetId={organization.id} targetLabel="organization" targetType="organization" />
   </section>;
 }
 
@@ -1317,6 +1348,7 @@ function SharedWorkspaceDetail({
   const [indexFailures, setIndexFailures] = useState<Record<string, ArtifactIndexFailure>>({});
   const [memberEmail, setMemberEmail] = useState("");
   const [memberRole, setMemberRole] = useState<WorkspaceRole>("member");
+  const [inviteEmail, setInviteEmail] = useState("");
   const [workspaceName, setWorkspaceName] = useState(workspace.workspace.name);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -2049,7 +2081,13 @@ function SharedWorkspaceDetail({
       setMemberEmail("");
       setMemberRole("member");
       await load();
-    } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
+    } catch (requestError) {
+      // No account yet: offer the invitation link for that address instead.
+      if (apiMessage(requestError).includes("No RepoMemo account")) {
+        setInviteEmail(memberEmail.trim());
+        showToast("warning", `${memberEmail.trim()} has no account yet. Create an invite link for them below.`);
+      } else setError(apiMessage(requestError));
+    } finally { setIsSubmitting(false); }
   }
 
   async function removeMember(userId: string) {
@@ -2177,6 +2215,7 @@ function SharedWorkspaceDetail({
                 <p className="shared-muted-copy">Add a registered RepoMemo user or update their role. Administrators cannot create, edit, or remove other administrators; owners retain the final authority.</p>
                 <form className="shared-member-form" onSubmit={saveMember}><Input aria-label="Member email" onChange={(event) => setMemberEmail(event.target.value)} placeholder="person@example.com" required type="email" value={memberEmail} /><Dropdown aria-label="Member role" onValueChange={(value) => setMemberRole(value as WorkspaceRole)} options={[{ label: "Viewer", value: "viewer" }, { label: "Member", value: "member" }, ...(canAssignAdmin ? [{ label: "Admin", value: "admin" }] : [])]} value={memberRole} /><Button disabled={isSubmitting} type="submit" variant="secondary">Add / update</Button></form>
               </section> : null}
+              {canManageMembers ? <InviteMembers accessToken={accessToken} initialEmail={inviteEmail} key={`invite-${workspace.workspace.id}`} roleOptions={[{ label: "Member", value: "member" }, { label: "Viewer", value: "viewer" }, ...(canAssignAdmin ? [{ label: "Admin", value: "admin" }] : [])]} targetId={workspace.workspace.id} targetLabel="workspace" targetType="workspace" /> : null}
             </div> : null}
             {isActivityView ? <div className="shared-activity-section">
               <ContributionCalendar items={activityCalendar?.activity_by_day ?? []} title="Workspace activity" total={activityCalendar?.total_activity_count} />

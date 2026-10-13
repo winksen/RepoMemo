@@ -928,6 +928,7 @@ export interface SystemStatistics {
 
 export interface MaintenanceReport {
   refresh_tokens_purged: number;
+  access_links_purged?: number;
   jobs_pruned: number;
   blobs_removed: number;
   blob_bytes_reclaimed: number;
@@ -1173,3 +1174,73 @@ export interface SetupCheck {
   detail: string;
   advice: string | null;
 }
+
+/** A pending invitation to an organization or workspace (never its secret). */
+export interface Invitation {
+  id: string;
+  email: string;
+  target_type: "organization" | "workspace";
+  target_id: string;
+  role: string;
+  invited_by: SharedUser | null;
+  created_at: string;
+  expires_at: string;
+}
+
+export interface CreatedInvitation {
+  invitation: Invitation;
+  /** The secret, shown once. */
+  token: string;
+  /** `/invite/<token>`, to put after the web app's origin. */
+  path: string;
+}
+
+export interface InvitationPreview {
+  email: string;
+  target_type: "organization" | "workspace";
+  target_id: string;
+  target_name: string;
+  organization_name: string;
+  role: string;
+  invited_by: string | null;
+  expires_at: string;
+  account_exists: boolean;
+}
+
+export interface AcceptedInvitation {
+  target_type: "organization" | "workspace";
+  target_id: string;
+  organization_id: string;
+  role: string;
+}
+
+export interface IssuedPasswordReset {
+  token: string;
+  /** `/reset-password/<token>`, to put after the web app's origin. */
+  path: string;
+  expires_at: string;
+}
+
+export interface PasswordResetPreview {
+  email: string | null;
+  display_name: string;
+  expires_at: string;
+}
+
+export interface PersonalAccessToken {
+  id: string;
+  name: string;
+  /** The start of the token, to tell tokens apart. */
+  prefix: string;
+  scope: "read" | "write";
+  created_at: string;
+  expires_at: string;
+  last_used_at: string | null;
+}
+
+export interface CreatedPersonalToken {
+  token: PersonalAccessToken;
+  /** The token itself, shown once. */
+  secret: string;
+}
+

@@ -14,6 +14,7 @@ import {
   IconDownload as Download,
   IconEye as Eye,
   IconFileText as FileText,
+  IconKey as Key,
   IconLoader2 as Loader,
   IconLockOpen as LockOpen,
   IconLogout as Logout,
@@ -38,6 +39,7 @@ import {
   detachEnvironment,
   downloadSystemLogFile,
   endSystemUserSessions,
+  issueSharedPasswordReset,
   getPlatformStatus,
   getSystemLogFiles,
   getSystemLogs,
@@ -79,6 +81,7 @@ import { Dropdown } from "./ui/dropdown";
 import { Input } from "./ui/input";
 import { showToast } from "./ui/toast";
 import { useLiveEventHub, useLiveEvents } from "../lib/liveEvents";
+import { appLink, SecretDialog } from "./SecretDialog";
 
 export const SYSTEM_SECTIONS = ["overview", "usage", "users", "settings", "logs", "jobs", "audit", "console"] as const;
 export type SystemSection = typeof SYSTEM_SECTIONS[number];
@@ -394,12 +397,13 @@ function AccessTree({ user }: { user: SystemUser }) {
   </ul>;
 }
 
-type UserAction = { kind: "grant" | "revoke" | "grant-app" | "revoke-app" | "sign-out"; user: SystemUser };
+type UserAction = { kind: "grant" | "revoke" | "grant-app" | "revoke-app" | "sign-out" | "reset"; user: SystemUser };
 
 function UsersSection({ accessToken, session }: { accessToken: string; session: SharedSession }) {
   const [users, isLoading, reload] = useSystemData<SystemUser[]>(() => listSystemUsers(accessToken), [accessToken]);
   const [filter, setFilter] = useState("");
   const [pending, setPending] = useState<UserAction | null>(null);
+  const [resetLink, setResetLink] = useState<{ user: SystemUser; url: string; expiresAt: string } | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const visible = useMemo(() => {
     const needle = filter.trim().toLowerCase();
@@ -410,9 +414,15 @@ function UsersSection({ accessToken, session }: { accessToken: string; session: 
     if (!pending) return;
     setIsBusy(true);
     try {
+      if (pending.kind === "reset") {
+        const issued = await issueSharedPasswordReset(accessToken, pending.user.id);
+        setResetLink({ user: pending.user, url: appLink(issued.path), expiresAt: issued.expires_at });
+        setPending(null);
+        return;
+      }
       if (pending.kind === "sign-out") {
         await endSystemUserSessions(accessToken, pending.user.id);
-        showToast("success", `${pending.user.display_name} was signed out of every device.`);
+        showToast("success", `${pending.user.display_name} was signed out of every device and their API tokens were revoked.`);
       } else if (pending.kind === "grant-app" || pending.kind === "revoke-app") {
         await setAppAdmin(accessToken, pending.user.id, pending.kind === "grant-app");
         showToast("success", pending.kind === "grant-app" ? `${pending.user.display_name} is now an app administrator.` : `${pending.user.display_name} is no longer an app administrator.`);
@@ -438,7 +448,8 @@ function UsersSection({ accessToken, session }: { accessToken: string; session: 
     revoke: { title: `Remove ${pending.user.display_name} from the system administrators?`, description: pending.user.id === session.user.id ? "You will lose access to the System pages and to workspaces you are not a member of." : "They keep their own organization and workspace memberships.", action: "Remove role" },
     "grant-app": { title: `Make ${pending.user.display_name} an app administrator?`, description: "They can manage users, settings, logs and maintenance for the whole server, but are not an administrator of every organization and workspace: they only reach the ones they belong to.", action: "Make app administrator" },
     "revoke-app": { title: `Remove ${pending.user.display_name} from the app administrators?`, description: pending.user.id === session.user.id ? "You will lose access to the System pages." : "They keep their own organization and workspace memberships.", action: "Remove role" },
-    "sign-out": { title: `Sign ${pending.user.display_name} out everywhere?`, description: "Every device signed in to this account is signed out at once. Their password is not changed.", action: "Sign out everywhere" },
+    "sign-out": { title: `Sign ${pending.user.display_name} out everywhere?`, description: "Every device signed in to this account is signed out at once, and its personal access tokens are revoked, so scripts using them stop too. Their password is not changed.", action: "Sign out everywhere" },
+    reset: { title: `Create a password reset link for ${pending.user.display_name}?`, description: "You get a one-time link to pass on to them. It works for 24 hours; a newer link replaces it. Their current password keeps working until the link is used; then every device of the account is signed out and sign-in lockouts are lifted.", action: "Create link" },
   }[pending.kind] : null;
 
   return <>
@@ -459,12 +470,14 @@ function UsersSection({ accessToken, session }: { accessToken: string; session: 
           user.is_app_admin
             ? { label: "Remove app administrator role", icon: <ShieldOff size={15} />, onSelect: () => setPending({ kind: "revoke-app", user }), destructive: true }
             : { label: "Make app administrator", icon: <UserCog size={15} />, onSelect: () => setPending({ kind: "grant-app", user }) },
+          ...(user.is_system_admin && !session.is_system_admin ? [] : [{ label: "Create password reset link", icon: <Key size={15} />, onSelect: () => setPending({ kind: "reset", user }) }]),
           { label: "Sign out everywhere", icon: <Logout size={15} />, onSelect: () => setPending({ kind: "sign-out", user }), destructive: true },
           { label: "Lift sign-in lockout", icon: <LockOpen size={15} />, onSelect: () => void unlock(user) },
         ]} label={`Actions for ${user.display_name}`} /></td>
       </tr>)}</tbody>
     </table></div> : <p className="shared-muted-copy">{isLoading ? "Loading users…" : "Users are not available."}</p>}
     <Dialog description={dialog?.description} footer={<><DialogCancel onClick={() => setPending(null)} /><Button disabled={isBusy} onClick={() => void confirm()} type="button" variant="main">{isBusy ? <Loader className="spin" size={16} /> : null}{dialog?.action}</Button></>} onClose={() => setPending(null)} open={Boolean(pending)} title={dialog?.title ?? ""} />
+    {resetLink ? <SecretDialog description={`Send this link to ${resetLink.user.display_name} (${resetLink.user.email}) through a channel you trust. It lets whoever opens it choose the account's password, once, until ${formatTime(resetLink.expiresAt)}.`} onClose={() => setResetLink(null)} title="Password reset link" value={resetLink.url} /> : null}
   </>;
 }
 

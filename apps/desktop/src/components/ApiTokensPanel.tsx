@@ -1,0 +1,97 @@
+import { useEffect, useState } from "react";
+import type { FormEvent } from "react";
+import { IconApi as ApiIcon, IconPlus as Plus, IconTrash as Trash } from "@tabler/icons-react";
+import { createPersonalToken, listPersonalTokens, revokePersonalToken } from "../lib/sharedApi";
+import type { PersonalAccessToken } from "../types";
+import { SecretDialog } from "./SecretDialog";
+import { Button } from "./ui/button";
+import { Dialog, DialogCancel } from "./ui/dialog";
+import { Dropdown } from "./ui/dropdown";
+import { Input } from "./ui/input";
+import { showToast } from "./ui/toast";
+
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+function formatDate(value: string | null) {
+  if (!value) return "never";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString(undefined, { dateStyle: "medium" });
+}
+
+const EXPIRY_OPTIONS = [
+  { label: "7 days", value: "7" },
+  { label: "30 days", value: "30" },
+  { label: "90 days", value: "90" },
+  { label: "1 year", value: "365" },
+];
+
+const SCOPE_OPTIONS = [
+  { label: "Read only: look and search", value: "read" },
+  { label: "Read and write: everything you may do", value: "write" },
+];
+
+/**
+ * Profile › API tokens: personal access tokens for scripts, CI and the
+ * terminal console (`REPOMEMO_TOKEN`). A token acts as its owner within its
+ * scope, but never manages tokens, passwords or roles.
+ */
+export function ApiTokensPanel({ accessToken }: { accessToken: string }) {
+  const [tokens, setTokens] = useState<PersonalAccessToken[] | null>(null);
+  const [name, setName] = useState("");
+  const [scope, setScope] = useState<"read" | "write">("read");
+  const [expiry, setExpiry] = useState("90");
+  const [secret, setSecret] = useState<string | null>(null);
+  const [revoking, setRevoking] = useState<PersonalAccessToken | null>(null);
+  const [isBusy, setIsBusy] = useState(false);
+
+  useEffect(() => {
+    listPersonalTokens(accessToken).then(setTokens).catch((error) => { showToast("error", errorMessage(error, "API tokens could not be loaded.")); setTokens([]); });
+  }, [accessToken]);
+
+  async function create(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsBusy(true);
+    try {
+      const created = await createPersonalToken(accessToken, { name: name.trim(), scope, expiresInDays: Number(expiry) });
+      setTokens((current) => [created.token, ...(current ?? [])]);
+      setSecret(created.secret);
+      setName("");
+    } catch (error) { showToast("error", errorMessage(error, "The token could not be created.")); }
+    finally { setIsBusy(false); }
+  }
+
+  async function revoke() {
+    if (!revoking) return;
+    setIsBusy(true);
+    try {
+      await revokePersonalToken(accessToken, revoking.id);
+      setTokens((current) => current?.filter((entry) => entry.id !== revoking.id) ?? current);
+      showToast("success", `${revoking.name} was revoked. Scripts using it stop working now.`);
+      setRevoking(null);
+    } catch (error) { showToast("error", errorMessage(error, "The token could not be revoked.")); }
+    finally { setIsBusy(false); }
+  }
+
+  const now = new Date().toISOString();
+  return <section className="shared-profile-panel rm-tokens">
+    <div className="shared-panel-heading"><div><ApiIcon size={18} /><h2>API tokens</h2></div><span>{tokens?.length ?? 0}</span></div>
+    <p className="shared-muted-copy">For scripts, CI and the terminal console: send <code>Authorization: Bearer &lt;token&gt;</code>, or set <code>REPOMEMO_TOKEN</code> for <code>repomemo-console</code>. A token acts as you, so it only reaches what you can. It cannot manage tokens, change your password or grant roles. It keeps working when you change your password; revoke it here, or ask an administrator to sign you out everywhere.</p>
+    <form className="rm-tokens-form" onSubmit={create}>
+      <label>Name<Input maxLength={80} onChange={(event) => setName(event.target.value)} placeholder="CI release notes" required value={name} /></label>
+      <label>Access<Dropdown aria-label="Token access" onValueChange={(value) => setScope(value as "read" | "write")} options={SCOPE_OPTIONS} value={scope} /></label>
+      <label>Expires after<Dropdown aria-label="Token lifetime" onValueChange={setExpiry} options={EXPIRY_OPTIONS} value={expiry} /></label>
+      <Button disabled={isBusy || !name.trim()} type="submit" variant="secondary"><Plus size={16} /> Create token</Button>
+    </form>
+    {tokens?.length ? <ul className="rm-tokens-list">{tokens.map((token) => {
+      const expired = token.expires_at <= now;
+      return <li className={expired ? "expired" : ""} key={token.id}>
+        <span className="rm-tokens-text"><strong>{token.name} <small className="rm-system-tag">{token.scope === "write" ? "read and write" : "read only"}</small>{expired ? <small className="rm-system-tag">expired</small> : null}</strong><small><code>{token.prefix}…</code> · created {formatDate(token.created_at)} · {expired ? "expired" : "expires"} {formatDate(token.expires_at)} · last used {formatDate(token.last_used_at)}</small></span>
+        <Button aria-label={`Revoke ${token.name}`} disabled={isBusy} onClick={() => setRevoking(token)} type="button" variant="secondary"><Trash size={15} /> {expired ? "Remove" : "Revoke"}</Button>
+      </li>;
+    })}</ul> : tokens ? <p className="shared-muted-copy">No tokens yet.</p> : null}
+    {secret ? <SecretDialog description="Use it as a bearer token, or set it as REPOMEMO_TOKEN for repomemo-console. Treat it like a password." onClose={() => setSecret(null)} title="New API token" value={secret} /> : null}
+    <Dialog description={revoking ? `Scripts using ${revoking.name} (${revoking.prefix}…) stop working at once. This cannot be undone.` : undefined} footer={<><DialogCancel onClick={() => setRevoking(null)} /><Button disabled={isBusy} onClick={() => void revoke()} type="button" variant="main">Revoke token</Button></>} onClose={() => setRevoking(null)} open={Boolean(revoking)} title={`Revoke ${revoking?.name ?? "the token"}?`} />
+  </section>;
+}

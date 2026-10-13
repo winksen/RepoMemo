@@ -1,5 +1,6 @@
 //! Server-authoritative HTTP API for shared RepoMemo workspaces.
 
+mod access;
 mod agent;
 mod ai_access;
 mod avatars;
@@ -533,6 +534,10 @@ struct RegisterRequest {
     email: String,
     display_name: String,
     password: String,
+    /// An invitation for this email: lets the account be created even when
+    /// registration is closed. Joining happens when the invitation is accepted.
+    #[serde(default)]
+    invitation_token: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -853,6 +858,15 @@ struct AuthenticatedSubject {
     is_system_admin: bool,
     /// May use the system API and pages, without the wildcard access.
     is_app_admin: bool,
+    /// Set when the request came with a personal access token instead of a
+    /// browser session.
+    token: Option<TokenGrant>,
+}
+
+/// What a personal access token used for a request may do.
+#[derive(Debug, Clone)]
+struct TokenGrant {
+    read_only: bool,
 }
 
 /// The whole application. With `config.data_dir` set the environment is
@@ -1054,6 +1068,13 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route("/v1/auth/refresh", post(refresh_session))
         .route("/v1/auth/logout", post(logout))
         .route("/v1/auth/logout-all", post(logout_everywhere))
+        .route("/v1/auth/password-reset/preview", post(access::preview_password_reset))
+        .route("/v1/auth/password-reset", post(access::complete_password_reset))
+        .route("/v1/invitations/preview", post(access::preview_invitation))
+        .route("/v1/invitations/accept", post(access::accept_invitation))
+        .route("/v1/invitations/{invitation_id}", delete(access::revoke_invitation))
+        .route("/v1/profile/tokens", get(access::list_tokens).post(access::create_token))
+        .route("/v1/profile/tokens/{token_id}", delete(access::revoke_token))
         .route("/v1/system/overview", get(system::overview))
         .route("/v1/system/usage", get(system::usage))
         .route("/v1/system/users", get(system::list_users))
@@ -1061,6 +1082,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route("/v1/system/users/{user_id}/app-admin", put(system::set_app_admin))
         .route("/v1/system/users/{user_id}/sessions/end", post(system::end_user_sessions))
         .route("/v1/system/users/{user_id}/unlock", post(system::unlock_user))
+        .route("/v1/system/users/{user_id}/password-reset", post(access::issue_password_reset))
         .route("/v1/system/settings", get(system::get_settings).put(system::update_settings))
         .route("/v1/system/settings/{key}", delete(system::reset_setting))
         .route("/v1/system/environment/detach", post(system::detach_environment))
@@ -1098,6 +1120,10 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route(
             "/v1/organizations/{organization_id}/members",
             get(list_organization_members).put(upsert_organization_member),
+        )
+        .route(
+            "/v1/organizations/{organization_id}/invitations",
+            get(access::list_organization_invitations).post(access::create_organization_invitation),
         )
         .route(
             "/v1/organizations/{organization_id}/members/{user_id}",
@@ -1207,6 +1233,10 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route(
             "/v1/workspaces/{workspace_id}/members",
             get(list_workspace_members).put(upsert_workspace_member),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/invitations",
+            get(access::list_workspace_invitations).post(access::create_workspace_invitation),
         )
         .route(
             "/v1/workspaces/{workspace_id}/members/{user_id}",
@@ -1431,10 +1461,15 @@ async fn register(
             "This server is not set up yet. Its administrator must finish the setup first.",
         ));
     }
-    if !registration_open(&state).await? {
-        return Err(ApiError::forbidden_because(
-            "Registration is closed on this server. Ask an administrator for an account.",
-        ));
+    match request.invitation_token.as_deref().filter(|token| !token.trim().is_empty()) {
+        Some(token) => access::invitation_allows_registration(&state, token, &request.email).await?,
+        None => {
+            if !registration_open(&state).await? {
+                return Err(ApiError::forbidden_because(
+                    "Registration is closed on this server. Ask an administrator for an account.",
+                ));
+            }
+        }
     }
     validate_registration(&request)?;
     if state
@@ -4852,6 +4887,9 @@ impl FromRequestParts<AppState> for AuthenticatedSubject {
         let token = header_value
             .strip_prefix("Bearer ")
             .ok_or_else(ApiError::unauthorized)?;
+        if token.starts_with(repomemo_storage::PERSONAL_TOKEN_PREFIX) {
+            return authenticate_personal_token(parts, state, token).await;
+        }
         let mut validation = Validation::new(Algorithm::HS256);
         validation.set_issuer(&[JWT_ISSUER]);
         let claims = decode::<JwtClaims>(
@@ -4875,8 +4913,52 @@ impl FromRequestParts<AppState> for AuthenticatedSubject {
             session_version: claims.ver,
             is_system_admin: access.is_system_admin,
             is_app_admin: access.is_app_admin,
+            token: None,
         })
     }
+}
+
+/// A personal access token acts as its user, within its scope. It never
+/// reaches the account's own security (tokens, password, roles, sign-out
+/// everywhere), and a read-only token only reads and searches.
+async fn authenticate_personal_token(
+    parts: &Parts,
+    state: &AppState,
+    token: &str,
+) -> Result<AuthenticatedSubject, ApiError> {
+    let grant = state
+        .storage
+        .authenticate_personal_token(token)
+        .await
+        .map_err(ApiError::internal)?
+        .ok_or_else(ApiError::unauthorized)?;
+    let access = state
+        .storage
+        .user_access(&grant.user_id)
+        .await
+        .map_err(ApiError::internal)?
+        .ok_or_else(ApiError::unauthorized)?;
+    let read_only = grant.scope != "write";
+    let path = parts.uri.path();
+    let reading = matches!(parts.method, Method::GET | Method::HEAD);
+    if access::token_forbidden_path(path) {
+        return Err(access::token_refusal(false));
+    }
+    if read_only && !reading && !(parts.method == Method::POST && access::read_token_may_post(path)) {
+        return Err(access::token_refusal(true));
+    }
+    tracing::debug!(target: "audit", user_id = %grant.user_id, token_id = %grant.token_id, method = %parts.method, path, "Personal access token used");
+    let expires_at = chrono::DateTime::parse_from_rfc3339(&grant.expires_at)
+        .map(|at| at.timestamp().max(0) as u64)
+        .unwrap_or(0);
+    Ok(AuthenticatedSubject {
+        user_id: grant.user_id,
+        expires_at,
+        session_version: access.session_version,
+        is_system_admin: access.is_system_admin,
+        is_app_admin: access.is_app_admin,
+        token: Some(TokenGrant { read_only }),
+    })
 }
 
 fn validate_registration(request: &RegisterRequest) -> Result<(), ApiError> {
@@ -8047,6 +8129,84 @@ mod tests {
         assert_eq!(response_json(plain).await["title"], "plain.md");
         let too_long = app.clone().oneshot(upload(&format!("{}.md", "a".repeat(300)))).await.unwrap();
         assert_eq!(too_long.status(), 400);
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn invitations_reset_links_and_personal_tokens() {
+        let data_dir = temp_data_dir("access-links");
+        let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+        // The first account administers the server.
+        let (owner, _) = register_account(&app, "access-owner@example.com").await;
+        let workspace_id = create_workspace(&app, &owner).await;
+        let send = |method: &'static str, uri: String, who: &str, body: Value| {
+            let app = app.clone();
+            let request = json_request(method, &uri, who, body);
+            async move { app.oneshot(request).await.unwrap() }
+        };
+        let get = |uri: String, who: &str| {
+            let app = app.clone();
+            let request = auth_request("GET", &uri, who);
+            async move { app.oneshot(request).await.unwrap() }
+        };
+        let public = |uri: &'static str, body: Value| {
+            let app = app.clone();
+            async move { app.oneshot(public_post(uri, body)).await.unwrap() }
+        };
+
+        // Invitation: registration is closed, but the invited address may join.
+        assert_eq!(send("PUT", "/v1/system/settings".to_owned(), &owner, json!({"values": {"allow_registration": false}})).await.status(), 200);
+        let created = response_json(send("POST", format!("/v1/workspaces/{workspace_id}/invitations"), &owner, json!({"email": "Invited@example.com", "role": "viewer"})).await).await;
+        let token = created["token"].as_str().unwrap().to_owned();
+        assert_eq!(created["path"], json!(format!("/invite/{token}")));
+        assert_eq!(created["invitation"]["email"], "invited@example.com");
+        let preview = public("/v1/invitations/preview", json!({"token": token})).await;
+        assert_eq!(preview.status(), 200);
+        assert_eq!(response_json(preview).await["account_exists"], false);
+        let other = public("/v1/auth/register", json!({"email": "other@example.com", "display_name": "Other", "password": "not-a-real-password", "invitation_token": token})).await;
+        assert_eq!(other.status(), 400, "the invitation is for one address");
+        let uninvited = public("/v1/auth/register", json!({"email": "other@example.com", "display_name": "Other", "password": "not-a-real-password"})).await;
+        assert_eq!(uninvited.status(), 403, "registration stays closed for everyone else");
+        let registered = public("/v1/auth/register", json!({"email": "invited@example.com", "display_name": "Invited", "password": "not-a-real-password", "invitation_token": token})).await;
+        assert_eq!(registered.status(), 201);
+        let registered = response_json(registered).await;
+        let invited = format!("Bearer {}", registered["access_token"].as_str().unwrap());
+        let invited_id = registered["user"]["id"].as_str().unwrap().to_owned();
+        assert_eq!(get(format!("/v1/workspaces/{workspace_id}/overview"), &invited).await.status(), 403, "joining needs the acceptance");
+        let accepted = send("POST", "/v1/invitations/accept".to_owned(), &invited, json!({"token": token})).await;
+        assert_eq!(accepted.status(), 200);
+        assert_eq!(response_json(accepted).await["role"], "viewer");
+        assert_eq!(get(format!("/v1/workspaces/{workspace_id}/overview"), &invited).await.status(), 200);
+        assert_eq!(send("POST", "/v1/invitations/accept".to_owned(), &invited, json!({"token": token})).await.status(), 410, "a link works once");
+        assert_eq!(send("POST", format!("/v1/workspaces/{workspace_id}/invitations"), &invited, json!({"email": "x@example.com", "role": "viewer"})).await.status(), 403, "viewers cannot invite");
+
+        // Password reset link from the system administrator.
+        assert_eq!(send("POST", format!("/v1/system/users/{invited_id}/password-reset"), &invited, json!({})).await.status(), 403);
+        let issued = response_json(send("POST", format!("/v1/system/users/{invited_id}/password-reset"), &owner, json!({})).await).await;
+        let reset = issued["token"].as_str().unwrap().to_owned();
+        assert_eq!(public("/v1/auth/password-reset/preview", json!({"token": reset})).await.status(), 200);
+        assert_eq!(public("/v1/auth/password-reset", json!({"token": reset, "password": "short"})).await.status(), 400);
+        assert_eq!(public("/v1/auth/password-reset", json!({"token": reset, "password": "a-brand-new-password"})).await.status(), 200, "a refused password does not use up the link");
+        assert_eq!(get("/v1/session".to_owned(), &invited).await.status(), 401, "older sessions end");
+        assert_eq!(public("/v1/auth/password-reset", json!({"token": reset, "password": "another-new-password"})).await.status(), 410);
+        assert_eq!(public("/v1/auth/login", json!({"email": "invited@example.com", "password": "a-brand-new-password"})).await.status(), 200);
+
+        // Personal access tokens.
+        let read = response_json(send("POST", "/v1/profile/tokens".to_owned(), &owner, json!({"name": "CI", "scope": "read", "expires_in_days": 30})).await).await;
+        let read = format!("Bearer {}", read["secret"].as_str().unwrap());
+        assert_eq!(get(format!("/v1/workspaces/{workspace_id}/artifacts"), &read).await.status(), 200);
+        assert!(send("POST", format!("/v1/workspaces/{workspace_id}/search"), &read, json!({"query": "anything"})).await.status().is_success(), "read tokens search");
+        assert_eq!(send("POST", format!("/v1/workspaces/{workspace_id}/artifacts/text"), &read, json!({"title": "x", "content": "y"})).await.status(), 403, "read-only");
+        assert_eq!(get("/v1/profile/tokens".to_owned(), &read).await.status(), 403, "tokens cannot manage tokens");
+        assert_eq!(send("POST", "/v1/profile/tokens".to_owned(), &owner, json!({"name": "Forever", "scope": "write", "expires_in_days": 0})).await.status(), 400, "every token expires");
+        let write = response_json(send("POST", "/v1/profile/tokens".to_owned(), &owner, json!({"name": "Deploy", "scope": "write", "expires_in_days": 7})).await).await;
+        let write_bearer = format!("Bearer {}", write["secret"].as_str().unwrap());
+        assert!(send("POST", format!("/v1/workspaces/{workspace_id}/artifacts/text"), &write_bearer, json!({"title": "From CI", "content": "Release notes"})).await.status().is_success());
+        assert_eq!(send("POST", "/v1/profile/password".to_owned(), &write_bearer, json!({"current_password": "x", "new_password": "y"})).await.status(), 403, "tokens never change passwords");
+        assert_eq!(send("POST", format!("/v1/system/users/{invited_id}/password-reset"), &write_bearer, json!({})).await.status(), 403);
+        let token_id = write["token"]["id"].as_str().unwrap().to_owned();
+        assert_eq!(send("DELETE", format!("/v1/profile/tokens/{token_id}"), &owner, json!({})).await.status(), 204);
+        assert_eq!(get(format!("/v1/workspaces/{workspace_id}/artifacts"), &write_bearer).await.status(), 401, "revoked");
         let _ = std::fs::remove_dir_all(data_dir);
     }
 

@@ -37,7 +37,9 @@ Options:
   -V, --version    Show the version
 
 Environment:
-  REPOMEMO_TOKEN   An access token to use instead of signing in, for scripts
+  REPOMEMO_TOKEN   A personal access token (rmp_..., created in the web app under
+                   Profile > API tokens) to use instead of signing in, for scripts.
+                   A read-only token runs lookups and dry runs, not changes.
 
 Exit codes: 0 done, 1 the server refused the command, 2 sign-in or connection problem.
 
@@ -159,7 +161,7 @@ fn ask(label: &str) -> Result<String, ExitCode> {
 /// Asks for the email (unless given) and the password, hidden. Three tries.
 async fn sign_in(client: &mut Client, options: &Options, paint: &Paint) -> Result<(), ExitCode> {
     if !io::stdin().is_terminal() {
-        eprintln!("{}", paint.error("Signing in needs a terminal. For scripts, set REPOMEMO_TOKEN to an access token."));
+        eprintln!("{}", paint.error("Signing in needs a terminal. For scripts, set REPOMEMO_TOKEN to a personal access token (Profile > API tokens in the web app)."));
         return Err(ExitCode::from(EXIT_TROUBLE));
     }
     println!("{}", paint.muted(&format!("Sign in to {} with a system or app administrator account.", client.base())));

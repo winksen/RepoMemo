@@ -16,7 +16,7 @@ The console gives them a **command line to the server** in two places that look 
 | Same rights as the System pages: system and app administrators only, with the same per-action limits | A new permission model. The console adds no rights of its own |
 | Every change is explicit (`--yes`) and lands in the audit trail, marked as coming from the console | Bulk or scripted multi-step operations (pipes, variables, loops) |
 | A terminal client with the same logo, commands and prompt behaviour as the web page | A shell on the host or an SSH entry point: the terminal client talks HTTP like the browser |
-| Built only on existing handlers, so behavior and validation never drift from the pages | Streaming output (`logs --follow`). Planned on the SSE stream |
+| Built only on existing handlers, so behavior and validation never drift from the pages | Streaming output (`logs --follow`). Planned on the system event stream |
 
 ---
 
@@ -66,7 +66,7 @@ flowchart LR
 - The prompt ([prompt.rs](../../apps/console/src/prompt.rs), `rustyline`) works like the web one: **Up/Down** history (kept in `~/.repomemo/console-history.txt`), **Tab** completes command names, a grey **usage hint** follows what you type (Right arrow accepts the rest of a name), `clear` or **Ctrl+L**, and `exit` or **Ctrl+D** to leave.
 - Answers are drawn by [render.rs](../../apps/console/src/render.rs): the summary, a **DRY RUN** tag in yellow, aligned facts and tables (long cells cut with `…`), refusals in red. Colours are off when the output is not a terminal or `NO_COLOR` is set.
 - **Sessions** stay in memory only. The access token is renewed silently with the refresh token, like the web app; if the session ends (for example after "sign out everywhere") the console asks to sign in again.
-- **Scripts.** `repomemo-console jobs list --status failed --json` runs one command and exits with `0` (done), `1` (refused) or `2` (sign-in or connection problem). `REPOMEMO_TOKEN` skips the sign-in; `--server`/`REPOMEMO_SERVER_URL` and `--email`/`REPOMEMO_EMAIL` pick the server and account.
+- **Scripts.** `repomemo-console jobs list --status failed --json` runs one command and exits with `0` (done), `1` (refused) or `2` (sign-in or connection problem). `REPOMEMO_TOKEN` (a personal access token from Profile › API tokens) skips the sign-in; `--server`/`REPOMEMO_SERVER_URL` and `--email`/`REPOMEMO_EMAIL` pick the server and account.
 - Requests carry `X-RepoMemo-Client: console`, so the terminal shows under System › Overview › clients.
 
 ### Web client ([SystemConsole.tsx](../../apps/desktop/src/components/SystemConsole.tsx))
@@ -113,9 +113,9 @@ flowchart LR
 
 ## Open questions
 
-1. **Live logs.** `logs --follow` over a system-wide SSE stream (the per-workspace stream exists; a system one does not).
+1. **Live logs.** `logs --follow`. Since V0.1.62 a system-wide stream exists (`GET /v1/system/events`), but it carries job events only. Live logs need log events added to it (or a sibling stream), and the activity category must stay hidden from app administrators (review M8). Roadmap F9.
 2. **Workspace commands.** `workspace reindex <name>`, `repo sync <name>`, `embeddings rebuild`: useful, but they reach into workspaces. Should they follow workspace roles (app administrators refused) or system roles?
-3. **Personal tokens for scripts.** Unattended scripts need `REPOMEMO_TOKEN`, a short-lived access token. A personal, revocable API token for administrators would make scripting practical.
+3. ~~**Personal tokens for scripts.**~~ Done: personal access tokens (`rmp_…`, read-only or read and write, 7 to 365 days) are created in Profile › API tokens and work as `REPOMEMO_TOKEN`. A read-only token can run lookups and dry runs; `--yes` is refused.
 4. **Should reads be audited?** Today only changes are. Every command, read or change, is logged at debug level (server category) with the user and command name.
 5. **Remembered sign-in in the terminal.** The terminal client signs in every time. Keeping the refresh token in the operating system's credential store would avoid that, at the cost of a long-lived secret on the machine.
 

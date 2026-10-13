@@ -1322,3 +1322,34 @@ pub struct SystemAuditEvent {
     pub action: String,
     pub detail: String,
 }
+
+/// A pending invitation to an organization or a workspace. The link token
+/// itself is never stored or listed; it is returned once, when created.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Invitation {
+    pub id: String,
+    pub email: String,
+    /// `organization` or `workspace`.
+    pub target_type: String,
+    pub target_id: String,
+    /// An organization role (`admin`, `member`) or a workspace role (`admin`,
+    /// `member`, `viewer`), depending on `target_type`.
+    pub role: String,
+    pub invited_by: Option<SharedUser>,
+    pub created_at: String,
+    pub expires_at: String,
+}
+
+/// A personal access token as its owner sees it: never the secret itself.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PersonalAccessToken {
+    pub id: String,
+    pub name: String,
+    /// The start of the token (`rmp_` and a few characters), to tell tokens apart.
+    pub prefix: String,
+    /// `read` (look and search) or `write` (everything the owner may do).
+    pub scope: String,
+    pub created_at: String,
+    pub expires_at: String,
+    pub last_used_at: Option<String>,
+}

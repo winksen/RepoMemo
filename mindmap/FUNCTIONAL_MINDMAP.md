@@ -2,13 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.1.32` (2026-09-29). The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
+> **Scope:** reflects the code at `V0.1.62` (2026-10-10), plus the unreleased onboarding work on main (invitation links, password reset links, API tokens), marked *unreleased*. Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
 
 ---
 
 ## The product in one paragraph
 
-RepoMemo is a **team memory workspace for technical knowledge**. A team stores its evidence (notes, code files, Markdown docs, Word documents, screenshots and diagrams) in a shared workspace. RepoMemo **indexes** that evidence so it can be **searched** by keyword, and can optionally **ask an AI** questions that are answered **only from the stored evidence, with citations**. Knowledge worth keeping is saved as **memory cards**. Around that core, the team can **review** evidence (lifecycle status), **discuss** it (comments with @mentions), and **track work** (a task board with checklists). The core stays useful without AI: storing, browsing, indexing and searching all work with no AI provider configured.
+RepoMemo is a **team memory workspace for technical knowledge**. A team stores its evidence (notes, code files, Markdown docs, Office documents, PDFs, emails, screenshots and diagrams, and whole **git repositories** that stay in step with their branch) in a shared workspace, organised in folders. RepoMemo **indexes** that evidence so it can be **searched** by keyword and by meaning, and can optionally **ask an AI** questions that are answered **only from the stored evidence, with citations**. Knowledge worth keeping is saved as **memory cards**. Around that core, the team can **review** evidence (lifecycle status), **discuss** it (comments with @mentions), **track work** (a task board with checklists), see how its knowledge connects (**knowledge map**) and what has drifted (**health checks**), and use a docked **assistant**. The core stays useful without AI: storing, browsing, indexing, keyword search, the map's pipeline and the health checks all work with no AI provider configured.
 
 ---
 
@@ -65,9 +65,16 @@ mindmap
       Evidence before inference
       Useful without AI
       Private by default
+    Platform
+      Environment folders
+      First-run setup
+      System area
+      Admin console
     Account
       Register and sign in
+      Invitation and reset links
       Profile and password
+      API tokens
       Activity calendar
       Notifications
     Organizations
@@ -79,10 +86,11 @@ mindmap
       Overview pulse
       Rename and delete
     Evidence
-      Paste a note
-      Upload a file
+      Rich-text notes
+      Upload files and folders
+      Folders
       Browse and filter
-      Word document preview
+      Office, PDF and email previews
       Lifecycle review
       Discussion and mentions
     Repositories
@@ -98,12 +106,18 @@ mindmap
       Extract code symbols
       Describe images with AI
     Retrieval
-      Keyword search with filters
+      Keyword and meaning search
       Saved searches
       Ask with citations
+    Understanding
+      Assistant dock
+      Knowledge map
+      Health checks
     AI
       Local Ollama
       Cloud OpenRouter
+      Text, vision and embedding providers
+      Who may use AI
       Workspace overview
     Memory
       Durable cards
@@ -128,7 +142,7 @@ RepoMemo has two levels of membership, plus a server-wide role.
 **Workspace**: one body of knowledge inside an organization, such as a project or service. Roles: `owner`, `admin`, `member`, `viewer`.
 **System administrator**: a person who runs the whole server. They see **every organization and workspace**, act as an **administrator** in each (where they own something they stay owner), and use the **System** area (§1b). Owner-only actions, such as deleting a workspace, stay with owners. The first account created on a new server becomes a system administrator; others are named by an existing system administrator or by the server operator. The server always keeps at least one.
 
-Joining an organization **automatically grants access to every workspace in it**: an org owner becomes a workspace owner, an org admin becomes an admin, and an org member becomes a member. A workspace can also add a registered user directly. That user then joins the organization as a `member`.
+Joining an organization **automatically grants access to every workspace in it**: an org owner becomes a workspace owner, an org admin becomes an admin, and an org member becomes a member. A workspace can also add a registered user directly. That user then joins the organization as a `member`, and so, through the rule above, also becomes a `member` of **every other workspace of the organization**, even when they were added to one workspace as a viewer. The [security review](security/2026-10-10-security-review.md) (H1) flags this as unintended, and the roadmap fixes it in S1.
 
 ### What each workspace role can do
 
@@ -141,8 +155,9 @@ Joining an organization **automatically grants access to every workspace in it**
 | Create and edit memory cards | ✅ | ✅ | ✅ | — |
 | Create and edit tasks, comment, change lifecycle | ✅ | ✅ | ✅ | — |
 | Edit or delete *other people's* comments and tasks | ✅ | ✅ | — | — |
-| Open People / Activity / Settings sections | ✅ | ✅ | — | — |
-| Add or remove members | ✅ | ✅² | — | — |
+| Open People (with Activity) and Settings sections | ✅ | ✅ | — | — |
+| Act on health findings | ✅ | ✅ | — | — |
+| Add or remove members, invite by link | ✅ | ✅² | — | — |
 | Configure the AI provider | ✅ | ✅ | — | — |
 | Choose who may use AI in the workspace | ✅ | ✅ | — | — |
 | Add, check, edit or remove repository links (Settings) | ✅ | ✅ | — | — |
@@ -157,7 +172,7 @@ Joining an organization **automatically grants access to every workspace in it**
 | Action | Org owner | Org admin | Org member |
 |---|:-:|:-:|:-:|
 | Create a workspace in the org | ✅ | ✅ | — |
-| Add members / change roles | ✅ | ✅ (not admins) | — |
+| Add members / change roles / invite by link | ✅ | ✅ (not admins) | — |
 | Rename the organization | ✅ | — | — |
 
 Any signed-in user can create a new organization and becomes its owner.
@@ -214,8 +229,13 @@ A **System** button in the header opens `/system`, with these pages:
 | **Notifications** (`/notifications`) | "Task assigned to you" and "You were mentioned in evidence discussion". Mark one or all as read. Clicking a notification opens the related page. |
 | **Theme** | Light and dark toggle, remembered per browser. |
 | **Sign out** | Always visible in the header. |
+| **Invitation link** (`/invite/<link>`), *unreleased* | Opens what the person is invited to (workspace or organization, role, who invited them, until when). With no account for the invited address: create one there, even when registration is closed. With an account: sign in there. Already signed in with the invited address: one click to join. Signed in as someone else: told to sign out first. A link works once, for that address only, for 7 days. Joining never lowers a role the person already has |
+| **Password reset link** (`/reset-password/<link>`), *unreleased* | Created by a system administrator in System › Users and passed on to the person. Shows whose password it changes, asks for the new one twice, then signs this browser in and every other device out, and lifts sign-in lockouts. Works once, for 24 hours; a newer link replaces it. The sign-in page says to ask an administrator for one |
+| **API tokens** (Profile), *unreleased* | Personal access tokens for scripts, CI and `repomemo-console`: a name, read-only (look and search) or read and write, and a lifetime of 7, 30, 90 or 365 days. The token is shown once; the list shows its start, scope, expiry and last use, and each can be revoked. A token acts as its owner, so it reaches only what they can, and it can never manage tokens, change the password, grant roles or accept invitations. Changing the password keeps tokens; an administrator's *Sign out everywhere* revokes them |
 
-**Not available yet:** password reset, email invitations for people without an account, SSO.
+**Inviting people** (*unreleased*). In a workspace's **People** section and in **Organization administration**, administrators can create an **invite link** for an email address and a role, copy it, and send it however they like (no mail server needed). Pending invitations are listed with their expiry and can be withdrawn. Adding a member whose email has no account suggests the invite link instead. The rules are the same as adding a member: only owners invite administrators, and the inviter must still be allowed to grant the role when the link is used.
+
+**Not available yet:** sending invitations or reset links by email from the server, SSO.
 
 ---
 
@@ -229,19 +249,21 @@ A **System** button in the header opens `/system`, with these pages:
 
 ## 4. Workspaces
 
-A workspace is opened at `/workspaces/:id/<section>` and has **nine sections**:
+A workspace is opened at `/workspaces/:id/<section>` and has **eleven sections**. The **assistant** (§7b) is docked on the right of every section page.
 
 | Section | Purpose | Who sees it |
 |---|---|---|
 | **Overview** | "Workspace pulse" metrics and the AI overview | Everyone |
-| **Evidence** | The evidence ledger: browse, add notes, upload files. New evidence is indexed automatically | Everyone (only writers can add) |
-| **Documents** | The same ledger filtered to Word files, with an inline text preview | Everyone |
-| **Retrieval** | Keyword search, saved searches, "Ask your evidence" | Everyone |
+| **Evidence** | The evidence ledger: browse folders, add notes, upload files and folders, with live indexing status. New evidence is indexed automatically | Everyone (only writers can add) |
+| **Documents** | The ledger filtered to business documents (Word, Excel, PowerPoint, PDF, OneNote, Outlook), with previews | Everyone |
+| **Repositories** | Linked git repositories, their sync state and files (§5b) | Everyone (linking is in Settings) |
+| **Retrieval** | Keyword and meaning search, saved searches, "Ask your evidence" | Everyone |
+| **Map** | The knowledge map: indexing pipeline, coverage, and a graph of related files and memory cards (§7b) | Everyone |
+| **Health** | Deterministic checks for drift, duplicates and failures, with actions (§7b) | Everyone (acting on a finding: owner and admin) |
 | **Memory** | Team memory cards: search and create | Everyone |
 | **Tasks** | Team action board | Everyone |
-| **People** | Member list and a summary of *your* capabilities | Owner and admin |
-| **Activity** | Recent activity feed and a 365-day calendar | Owner and admin |
-| **Settings** | Members, AI provider, rename or delete | Owner and admin (rename and delete are owner only) |
+| **People** | Members, invitations, a summary of *your* capabilities, and the activity feed (user or AI activity) with a 365-day calendar | Owner and admin |
+| **Settings** | Members, AI providers and who may use AI, repository links, rename or delete | Owner and admin (rename and delete are owner only) |
 
 ### Workspace pulse (Overview)
 
@@ -266,12 +288,20 @@ Evidence is anything the team stores. Each item is called an **artifact**.
 
 | Method | Details |
 |---|---|
-| **Paste a shared note** | A title and some text. You can pick a language: Markdown, Text, or a code language. Pasted notes are grouped under the source "Pasted notes". |
+| **Write a shared note** | A title and a rich-text body (headings, lists, code, links), stored as Markdown. Notes are filed into the folder that is open. |
 | **Upload files or a folder** | Choose several files at once, or (in the Evidence view) a whole folder: its subfolders become evidence folders, up to the folder depth limit, and hidden, dependency and build folders (`.git`, `node_modules`, `target`, `dist`, `build`…) are skipped. Each file can be up to **10 MiB**; unsupported and oversized files are left out with a notice. A progress bar counts the uploads, and files that could not be stored are listed. Uploads are grouped under the source "Shared uploads". |
 
-**Supported file types:** Markdown (`md`, `mdx`), text (`txt`), Word (`doc`, `docx`), code and config (`rs`, `ts`, `tsx`, `js`, `jsx`, `py`, `json`, `toml`, `yaml`, `yml`, `sql`, `html`, `css`, `sh`, `ps1`), and images (`png`, `jpg`, `jpeg`, `gif`, `webp`, `svg`, `bmp`).
+**Supported file types:** Markdown (`md`, `mdx`), text (`txt`), code and config (`rs`, `ts`, `tsx`, `js`, `jsx`, `py`, `json`, `toml`, `yaml`, `yml`, `sql`, `html`, `css`, `sh`, `ps1`), business documents (Word `doc`, `docx`; Excel `xlsx`, `xlsm`, `xls`; PowerPoint `pptx`, `ppt`; `pdf`; OneNote `one`; Outlook `eml`, `msg`), and images (`png`, `jpg`, `jpeg`, `gif`, `webp`, `svg`, `bmp`). **Images can be uploaded only once the workspace has an image (vision) AI provider**, because an image is made searchable through its AI description.
 
 If the same file with the same content is uploaded twice, it is stored only once.
+
+### Folders
+
+Evidence can be organised in **nested folders, up to 5 levels**. Writers create, rename and delete folders (deleting removes everything inside, after a confirmation that shows the counts) and move files between folders. Folders themselves cannot be moved yet. Uploading a folder recreates its subfolders.
+
+### Business documents
+
+Office files, PDFs and emails are previewed in the browser: text and tables for Word and Excel, slides for PowerPoint, the message for Outlook, and the PDF itself. When **LibreOffice** is installed on the server, Word, Excel and PowerPoint files are also shown as a layout-accurate PDF. **Open in Office** opens the file in the desktop Office app through a short-lived link; download is always offered. OneNote text is recovered approximately and labelled so.
 
 ### Working with evidence
 
@@ -332,28 +362,30 @@ The stored passages are an administrative detail. Regular members see search res
 
 In plain terms, indexing does the following:
 
-1. **Reads the text.** Word documents are converted locally.
+1. **Reads the text.** Office documents, PDFs and emails are converted to text on the server, with no outside service.
 2. **Splits it into passages.** Markdown is split by heading. TypeScript, JavaScript, Python and Rust are split along their structure, so a function, class or impl block is not cut in half: small neighbours are grouped, and large classes are split by method. Each passage records its scope (for example `impl Store > save`), which is also searchable. Other text and code files are split into windows of about 100 lines. Every passage keeps its line range so citations point to exact lines.
 3. **Extracts code symbols** from TypeScript, JavaScript, Python and Rust: functions, classes, methods, interfaces and enums.
-4. **Handles images differently.** If the workspace has an AI provider enabled, the image is sent to it and a **text description** is stored and made searchable, including any text visible in the image. Without a provider, images stay stored but cannot be searched.
+4. **Handles images differently.** The image is sent to the workspace's image (vision) provider and a **text description** is stored and made searchable, including any text visible in the image. Without such a provider, image uploads are refused with a message saying an administrator can set one up.
+5. **Makes passages searchable by meaning** when the workspace has an embedding provider: a background queue turns each passage into a vector, and Settings shows the progress.
 
 Re-indexing keeps every passage whose text did not change, so memory cards and any stored embeddings that point at it stay valid. Only passages that actually changed are replaced. When RepoMemo improves how it splits content, existing evidence is refreshed automatically in the background the next time the server starts, and images are never re-analysed by that refresh.
 
 **Live status.** The ledger follows the server as it works: new files (including other people's) appear, *Indexing…* clears the moment a file is ready, and a failure shows its reason. A strip above the files counts what is still being indexed, and shows longer background work (making passages searchable by meaning, repository syncs) with a progress bar and a **Stop** button for writers. If the live connection drops, the page falls back to checking every few seconds and says so.
 
-**Current behavior to be aware of:** the background queue processes up to two artifacts at a time. A file that fails to index is retried a few times, then shows its failure reason, and is retried again later. Images stored before an AI provider was configured are indexed with no description and need a manual re-index by an admin.
+**Current behavior to be aware of:** the background queue processes up to two artifacts at a time. A file that fails to index is retried a few times, then shows its failure reason, and is retried again every few hours. Images stored before a vision provider was required (older servers) may have no description and need a manual re-index by an admin.
 
 ---
 
 ## 7. Retrieval: finding evidence
 
-### Keyword search
+### Search
 
 - Searches the **indexed passages** of the workspace.
 - Every word must match, and words match as prefixes: `auth tok` finds "authentication token".
-- Filters: **file type**, **language**, **source**, and **10 / 20 / 50 results**. Filter options are built from what has actually been indexed.
+- When the workspace has an embedding provider, search also finds passages **by meaning** and merges both result lists, so a question phrased differently from the text still finds it. If the provider fails, search falls back to keywords.
+- Filters: **file type**, **language**, **source**, and **10 / 20 / 50 results**. Filter options are built from what has actually been indexed. There is no filter by folder, lifecycle status or date yet, and code symbols are not searchable on the web yet (the desktop app has symbol search).
 - Each result shows the title, type, language, source, a snippet with the **matched words highlighted**, the path, and the line range. Clicking a result opens the artifact.
-- Search does **not** use AI and works offline.
+- Keyword search does **not** use AI and works offline.
 
 ### Saved searches
 
@@ -369,6 +401,37 @@ Writers can save a named search that includes its filters. Anyone can re-run it 
 
 ---
 
+## 7b. Assistant, knowledge map and health
+
+### Assistant
+
+A chat panel **docked on the right of every workspace section**. It can be widened, narrowed to a slim rail, or stacked under the page on small screens. Each message does exactly one of five things: **find files**, **search content**, **summarize a file**, **ask a question** (the same cited Ask as Retrieval), or give a **workspace overview**. Common phrasings are recognised without AI; otherwise the AI provider picks the action, and without one the assistant lists what it can do. Finding and searching work without AI. Chats are kept per person and can be renamed and deleted. Text written by AI is labelled as such. The assistant does **not** yet see earlier messages of a chat: each message is answered on its own.
+
+### Knowledge map (Map)
+
+Shows how much of the workspace is usable and how it connects, with no AI call:
+
+- **Pipeline**: files stored → indexed (pending or failed) → passages → passages searchable by meaning.
+- **Coverage** by kind of file.
+- **Graph**: the files with the most passages, linked to **similar files** (when an embedding provider exists) and to the **memory cards that cite them**. A repository is drawn as one ringed node. A table view lists every link.
+
+### Health checks (Health)
+
+Deterministic checks of what has drifted, with no AI call:
+
+| Finding | Offered actions (owner and admin) |
+|---|---|
+| Several versions of the same uploaded file still in use | Supersede the older ones, dismiss |
+| Files in use with identical content | Supersede, dismiss |
+| A code symbol that was removed is still named in docs | Mark *needs review*, create a task, dismiss |
+| A file in use refers to a retired (outdated or superseded) file | Mark *needs review*, create a task, dismiss |
+| A file that failed to index | Create a task, mark outdated, dismiss |
+| A file connected to nothing (no similar file, no memory card) | Create a task, dismiss |
+
+A finding that was acted on stays hidden until the facts behind it change. Per check, the page counts how many findings were acted on or dismissed. There is no check yet for **memory cards whose cited passages changed** (roadmap F1).
+
+---
+
 ## 8. AI integration
 
 AI is **optional and explicit**. Nothing is sent to any AI service until an owner or admin configures and enables a provider in **Settings → AI integration**.
@@ -381,8 +444,9 @@ AI is **optional and explicit**. Nothing is sent to any AI service until an owne
 - **Test connection** checks the provider before relying on it.
 - The API key is kept on the server, **encrypted**, and **is never sent back to the browser**. It is only ever sent to the address it was entered for: changing the provider's type or address requires entering the key again.
 - Provider addresses that point at cloud metadata services or link-local addresses are refused, and the server operator can limit providers to a list of hosts.
+- **Three kinds of provider**, each set up separately: a **text** provider (answers, overviews, summaries, the assistant), an **image (vision)** provider (image descriptions; required before images can be uploaded), and an **embedding** provider (search by meaning; `bge-m3` is suggested because it is multilingual).
 - **Who can use AI** (Settings): everyone, members and above, or administrators and owners. Image descriptions and search vectors are built in the background for everyone's uploads and are not affected.
-- AI powers three features: **Ask your evidence**, the **AI workspace overview** (a briefing for someone joining the project, built from indexed excerpts, with citations), and **image descriptions** during indexing.
+- AI powers: **Ask your evidence** (with an AI re-ranking of the best passages), the **AI workspace overview** (a briefing for someone joining the project, built from indexed excerpts, with citations), **repository summaries**, the **assistant**, **image descriptions** during indexing, and **search by meaning**.
 
 ---
 
@@ -419,7 +483,7 @@ A memory card is a **short, durable statement the team wants to keep**. Examples
 ## 11. Typical team journey
 
 ```
-Create organization ─► Create workspace ─► Invite teammates (they register first)
+Create organization ─► Create workspace ─► Invite teammates (by link, or add existing accounts)
       │
       ▼
 Paste notes / upload files ─► Index evidence ─► Search / save searches
@@ -435,27 +499,31 @@ Create tasks from findings  ◄──────────────  Save 
 
 ## 12. Local desktop mode
 
-The same application also ships as a **Windows desktop app** built with Tauri. It is fully local: no accounts, no organizations and no collaboration features. It adds capabilities the web app does not have yet:
+The same application also ships as a **Windows desktop app** built with Tauri. It is fully local: no accounts, no organizations and no collaboration features. It still has two things the web app does not expose: **symbol search** and a per-artifact **AI summary** button (on the web, the assistant summarizes a file). Folder import and search by meaning, once desktop-only, now exist on the web too.
 
-- importing **whole folders** from disk, which skips `.git`, `node_modules`, `target`, `dist`, `build`, `.next` and `.vite`
-- symbol search
-- per-artifact AI summaries
-- building **embeddings** for semantic search
+It does **not** have the web app's notes, folders, business document previews, repositories, assistant, knowledge map, health checks or System area. Whether the desktop app becomes a client of a server or stays the local-loop edition is an open decision (roadmap F10).
 
 The desktop app and the shared server keep **separate data**.
 
 ---
 
-## 13. Known functional gaps (after V0.1.61)
+## 13. Known functional gaps (after V0.1.62)
 
-These are observed in the code and are useful for prioritizing:
+These are observed in the code and are useful for prioritizing. The roadmap item that addresses each one is in brackets.
 
 | Gap | Impact |
 |---|---|
-| People need a RepoMemo account before they can be added | There is no invitation-by-email flow. |
-| No password reset | Users who are locked out need an administrator's help. |
-| Repositories must be on the server's disk | No remote URLs, and a file renamed *and* edited in one commit loses its history. Branches are followed automatically. |
-| A memory card's evidence links are fixed once it is created | Edit changes the title, source and statement only. |
+| Nothing tells you when a memory card goes stale | A card keeps citing passages that changed or were removed by a re-upload or a repository sync [F1]. |
+| A memory card's evidence links are fixed once it is created | Edit changes the title, source and statement only [F1]. |
+| Search cannot filter by lifecycle, folder or date | Outdated and superseded evidence ranks like verified evidence [F2]. |
+| Code symbols are not searchable on the web | They are extracted during indexing but have no search [F3]. |
+| Repositories must be on the server's disk | No remote URLs, and a file renamed *and* edited in one commit loses its history [F4]. |
+| The assistant does not remember the conversation | Follow-up questions must repeat their context [F5]. |
+| Invitations and reset links are passed on by hand | There is no mail delivery and no email verification; the person whose password is reset is not told [F6]. |
+| Folders cannot be moved; no bulk actions; a re-upload is a new artifact | Comments and memory links stay on the old file [F7]. |
+| The map and health pages do not update live | They show the state when the page was opened [F8]. |
+
+Invitation links and administrator reset links, gaps until V0.1.62, are built and wait for release.
 
 ---
 
@@ -486,4 +554,11 @@ This gateway is the root of the functional mindmap. Each branch can grow into it
 | **Citation** | A pointer from an AI answer or memory card to the exact artifact and lines that support it. |
 | **Memory card** | A durable, human-curated statement linked to evidence. |
 | **Lifecycle** | The review status of an artifact: active, needs review, verified, outdated or superseded. |
-| **Provider** | The AI backend, Ollama or OpenRouter, configured for a workspace. |
+| **Provider** | The AI backend, Ollama or OpenRouter, configured for a workspace for one purpose: text, vision (images) or embedding (search by meaning). |
+| **Folder** | A named group of evidence inside a workspace, nested up to 5 levels. |
+| **Note** | Evidence written in the app with the rich-text editor, stored as Markdown. |
+| **Knowledge map** | The page that shows indexing coverage and how files and memory cards connect. |
+| **Health finding** | A deterministic observation of drift (duplicates, older versions, removed symbols still named…) with actions. |
+| **Environment** | The folder under `workspace-data/` that holds all of one server's data. |
+| **Invitation link** | A one-time link for one email address and role, used to join a workspace or organization. |
+| **Personal access token** | A revocable `rmp_…` key that acts as its owner for scripts, CI and the terminal console. |

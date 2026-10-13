@@ -1,6 +1,6 @@
 # Repository sources (git)
 
-> **Branch of:** [TECHNICAL_MINDMAP.md](../TECHNICAL_MINDMAP.md) · **Functional view:** [FUNCTIONAL_MINDMAP.md §5b](../FUNCTIONAL_MINDMAP.md#5b-repositories) · **Status:** phase 1 (local path) shipped, see [ROADMAP.md](../ROADMAP.md#-in-progress-repository-indexing)
+> **Branch of:** [TECHNICAL_MINDMAP.md](../TECHNICAL_MINDMAP.md) · **Functional view:** [FUNCTIONAL_MINDMAP.md §5b](../FUNCTIONAL_MINDMAP.md#5b-repositories) · **Status:** phase 1 (local path, automatic sync when the branch moves) shipped; phase 1b and 2 planned as roadmap item F4, see [ROADMAP.md](../ROADMAP.md#repository-indexing)
 
 A repository is not a batch of uploads. It already holds many files, it keeps changing, and git records exactly what changed. RepoMemo therefore treats a repository as a **living source**: it is linked once, and each **sync** brings the workspace in step with what the chosen branch has **committed**.
 
@@ -187,6 +187,8 @@ Tests: `repomemo-git` (tree parsing, reading a real repository), `repomemo-inges
 
 ## Next phases
 
-1. **Phase 1b, polish:** automatic sync when the branch moves (a cheap `rev-parse` poll), similarity-based renames via `git diff -M` when the last commit is reachable, a commit badge on search results, Tauri commands for the desktop app.
-2. **Phase 2, remote repositories:** connect by URL with an encrypted token, a bare partial clone (`--filter=blob:none`) under the data directory, scheduled fetch, `https`/`ssh` only and `protocol.file.allow=never`.
+Automatic sync when the branch moves, first listed under phase 1b, has shipped (see *Known limits* above).
+
+1. **Phase 1b, polish:** similarity-based renames via `git diff -M` when the last commit is reachable, a commit badge on search results, Tauri commands for the desktop app (once the desktop decision, roadmap F10, is made).
+2. **Phase 2, remote repositories:** connect by URL with an encrypted token, a bare partial clone (`--filter=blob:none`) under the data directory, scheduled fetch, `https`/`ssh` only and `protocol.file.allow=never`. Lands after the host-exposure fixes (roadmap S3: [security review](../security/2026-10-10-security-review.md) H3 and L8).
 3. **Phase 3, git awareness:** last author and date per file from one `git log` pass, `CODEOWNERS` as ownership hints, commit-pinned citations, push webhooks, and links to issues and pull requests.

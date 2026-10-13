@@ -650,7 +650,7 @@ fn require_full_system_admin(subject: &AuthenticatedSubject) -> Result<(), ApiEr
 }
 
 /// Records a system administration action durably and in the log.
-async fn audit(state: &AppState, subject: &AuthenticatedSubject, action: &str, detail: String) {
+pub(crate) async fn audit(state: &AppState, subject: &AuthenticatedSubject, action: &str, detail: String) {
     tracing::info!(target: "audit", user_id = %subject.user_id, action, detail = %detail, "System administration");
     if let Err(error) = state
         .storage
@@ -932,8 +932,19 @@ pub(crate) async fn end_user_sessions(
         .end_user_sessions(&user_id)
         .await
         .map_err(map_storage_error)?;
+    // The administrator's way to cut an account off: its scripts too.
+    let tokens = state
+        .storage
+        .revoke_user_personal_tokens(&user_id)
+        .await
+        .map_err(map_storage_error)?;
     let who = user.email.unwrap_or(user.display_name);
-    audit(&state, &subject, "user_sessions_ended", format!("Signed {who} out of every device.")).await;
+    let detail = if tokens > 0 {
+        format!("Signed {who} out of every device and revoked {tokens} personal access token(s).")
+    } else {
+        format!("Signed {who} out of every device.")
+    };
+    audit(&state, &subject, "user_sessions_ended", detail).await;
     Ok(StatusCode::NO_CONTENT)
 }
 
