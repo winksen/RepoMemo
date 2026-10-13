@@ -49,7 +49,8 @@ pub struct Client {
 }
 
 impl Client {
-    /// `token` is an access token from `REPOMEMO_TOKEN`, used instead of signing in.
+    /// `token` is a personal access token (`rmp_…`) from `REPOMEMO_TOKEN`, used
+    /// instead of signing in. There is no refresh token, so it is never renewed.
     pub fn new(base: &str, token: Option<String>) -> Self {
         Self {
             http: reqwest::Client::new(),

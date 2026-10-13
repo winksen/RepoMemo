@@ -37,7 +37,7 @@ use crate::{
     maintenance::{self, MaintenanceReport},
     map_storage_error,
     security::client_ip,
-    ApiError, AppState, AuthenticatedSubject, Quota, RuntimeSettings,
+    ApiError, AppState, AuthenticatedSubject, Quota, RuntimeSettings, SessionSubject,
 };
 
 // ---------------------------------------------------------------------------
@@ -854,7 +854,7 @@ pub(crate) struct SystemAdminRequest {
 }
 
 pub(crate) async fn set_system_admin(
-    subject: AuthenticatedSubject,
+    SessionSubject(subject): SessionSubject,
     State(state): State<AppState>,
     Path(user_id): Path<String>,
     Json(request): Json<SystemAdminRequest>,
@@ -888,7 +888,7 @@ pub(crate) async fn set_system_admin(
 }
 
 pub(crate) async fn set_app_admin(
-    subject: AuthenticatedSubject,
+    SessionSubject(subject): SessionSubject,
     State(state): State<AppState>,
     Path(user_id): Path<String>,
     Json(request): Json<SystemAdminRequest>,
@@ -1090,7 +1090,7 @@ pub(crate) async fn reset_setting(
 /// Detaches the environment: every session ends, background work stops, the
 /// database closes and the server waits for an environment to be chosen again.
 pub(crate) async fn detach_environment(
-    subject: AuthenticatedSubject,
+    SessionSubject(subject): SessionSubject,
     State(state): State<AppState>,
 ) -> Result<axum::http::StatusCode, ApiError> {
     require_full_system_admin(&subject)?;

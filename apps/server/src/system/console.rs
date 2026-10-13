@@ -22,7 +22,7 @@ use super::{
     apply_setting, audit, read_setting, require_system_admin, spec, JobsQuery, LogsQuery, MaintenanceStatus,
     SettingKind, UpdateSettingsRequest,
 };
-use crate::{logs::CATEGORIES, map_storage_error, ApiError, AppState, AuthenticatedSubject};
+use crate::{logs::CATEGORIES, map_storage_error, ApiError, AppState, AuthenticatedSubject, ReadingSubject};
 
 /// Longer lines are refused before they are parsed.
 const MAX_COMMAND_LENGTH: usize = 2_000;
@@ -343,7 +343,7 @@ pub(crate) async fn welcome(
 
 /// Runs one command line.
 pub(crate) async fn run(
-    subject: AuthenticatedSubject,
+    ReadingSubject(subject): ReadingSubject,
     State(state): State<AppState>,
     Json(request): Json<ConsoleRequest>,
 ) -> Result<Json<ConsoleResponse>, ApiError> {

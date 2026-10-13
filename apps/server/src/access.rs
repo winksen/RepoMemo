@@ -9,7 +9,7 @@
 //!   sets the new password, ends every session and lifts sign-in lockouts.
 //! - **Personal access tokens** act as their owner, read-only or with full
 //!   rights. They cannot manage tokens, passwords or roles; that needs a
-//!   browser session (see `token_may_call` in the extractor).
+//!   browser session (handlers that need one take `SessionSubject`).
 //!
 //! Every secret is shown once and stored only as a hash (see the storage
 //! crate's `access` module).
@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     check_auth_quota, hash_password, issue_session, map_storage_error, record_workspace_activity,
     require_organization_admin, require_workspace_admin, security::ClientIp, validate_password,
-    workspace_role_label, ApiError, AppState, AuthAction, AuthenticatedSubject, TokenResponse,
+    workspace_role_label, ApiError, AppState, AuthAction, AuthenticatedSubject, SessionSubject, TokenResponse,
 };
 
 /// How long an invitation link works.
@@ -38,15 +38,6 @@ const TOKEN_TTL_DAYS: [i64; 4] = [7, 30, 90, 365];
 
 fn gone(message: impl Into<String>) -> ApiError {
     ApiError::new(StatusCode::GONE, "gone", message)
-}
-
-/// Accepting invitations and managing tokens are things a person does, not
-/// a script.
-fn require_session(subject: &AuthenticatedSubject) -> Result<(), ApiError> {
-    if subject.token.is_some() {
-        return Err(ApiError::forbidden_because("Sign in in the browser to do this; personal access tokens cannot."));
-    }
-    Ok(())
 }
 
 // ------------------------------------------------------------------ invitations
@@ -62,11 +53,13 @@ pub(crate) struct CreatedInvitation {
     invitation: Invitation,
     /// The secret, shown once. The web app builds `{its origin}{path}`.
     token: String,
+    /// `/invite#<token>`: the secret is in the fragment, which browsers never
+    /// send to a server, so it stays out of access logs and `Referer`.
     path: String,
 }
 
 fn created(invitation: Invitation, token: String) -> CreatedInvitation {
-    let path = format!("/invite/{token}");
+    let path = format!("/invite#{token}");
     CreatedInvitation { invitation, token, path }
 }
 
@@ -372,11 +365,10 @@ pub(crate) struct AcceptedInvitation {
 /// Joins the invitation's organization or workspace as the signed-in user,
 /// whose email must be the invited one.
 pub(crate) async fn accept_invitation(
-    subject: AuthenticatedSubject,
+    SessionSubject(subject): SessionSubject,
     State(state): State<AppState>,
     Json(request): Json<TokenBody>,
 ) -> Result<Json<AcceptedInvitation>, ApiError> {
-    require_session(&subject)?;
     let stored = usable_invitation(&state, &request.token).await?;
     let invitation = stored.invitation;
     let user = state
@@ -488,7 +480,7 @@ pub(crate) struct IssuedPasswordReset {
 
 /// System › Users: a one-time link that lets the user choose a new password.
 pub(crate) async fn issue_password_reset(
-    subject: AuthenticatedSubject,
+    SessionSubject(subject): SessionSubject,
     State(state): State<AppState>,
     Path(user_id): Path<String>,
 ) -> Result<(StatusCode, Json<IssuedPasswordReset>), ApiError> {
@@ -516,7 +508,8 @@ pub(crate) async fn issue_password_reset(
         .map_err(map_storage_error)?;
     let who = user.email.unwrap_or(user.display_name);
     crate::system::audit(&state, &subject, "password_reset_issued", format!("Issued a password reset link for {who}.")).await;
-    let path = format!("/reset-password/{token}");
+    // In the fragment, like invitation links: never sent to a server.
+    let path = format!("/reset-password#{token}");
     Ok((StatusCode::CREATED, Json(IssuedPasswordReset { token, path, expires_at })))
 }
 
@@ -597,10 +590,9 @@ pub(crate) async fn complete_password_reset(
 // ------------------------------------------------------- personal access tokens
 
 pub(crate) async fn list_tokens(
-    subject: AuthenticatedSubject,
+    SessionSubject(subject): SessionSubject,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<PersonalAccessToken>>, ApiError> {
-    require_session(&subject)?;
     state.storage.list_personal_tokens(&subject.user_id).await.map(Json).map_err(map_storage_error)
 }
 
@@ -619,11 +611,10 @@ pub(crate) struct CreatedToken {
 }
 
 pub(crate) async fn create_token(
-    subject: AuthenticatedSubject,
+    SessionSubject(subject): SessionSubject,
     State(state): State<AppState>,
     Json(request): Json<CreateTokenRequest>,
 ) -> Result<(StatusCode, Json<CreatedToken>), ApiError> {
-    require_session(&subject)?;
     if !TOKEN_TTL_DAYS.contains(&request.expires_in_days) {
         return Err(ApiError::bad_request("A token lasts 7, 30, 90 or 365 days."));
     }
@@ -637,38 +628,15 @@ pub(crate) async fn create_token(
 }
 
 pub(crate) async fn revoke_token(
-    subject: AuthenticatedSubject,
+    SessionSubject(subject): SessionSubject,
     State(state): State<AppState>,
     Path(token_id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
-    require_session(&subject)?;
     if !state.storage.revoke_personal_token(&subject.user_id, &token_id).await.map_err(map_storage_error)? {
         return Err(ApiError::not_found("Token was not found."));
     }
     tracing::info!(target: "audit", user_id = %subject.user_id, token_id = %token_id, "Personal access token revoked");
     Ok(StatusCode::NO_CONTENT)
-}
-
-/// Requests a personal access token may never make, whatever its scope: they
-/// change how the account itself is reached, or the server's environment.
-pub(crate) fn token_forbidden_path(path: &str) -> bool {
-    path.starts_with("/v1/profile/tokens")
-        || path == "/v1/profile/password"
-        || path == "/v1/auth/logout-all"
-        || path == "/v1/invitations/accept"
-        || path == "/v1/system/environment/detach"
-        || (path.starts_with("/v1/system/users/")
-            && (path.ends_with("/system-admin") || path.ends_with("/app-admin") || path.ends_with("/password-reset")))
-}
-
-/// Requests other than GET that a read-only token may make: searches and
-/// questions, which read but use POST for their body. The console is checked
-/// again in its handler, which refuses changes from a read-only token.
-pub(crate) fn read_token_may_post(path: &str) -> bool {
-    path.ends_with("/search")
-        || path.ends_with("/artifacts/query")
-        || path.ends_with("/ask")
-        || path == "/v1/system/console"
 }
 
 /// What a script sees when it asks for something its token cannot do.
@@ -683,19 +651,6 @@ pub(crate) fn token_refusal(read_only: bool) -> ApiError {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn tokens_never_reach_account_security() {
-        for path in ["/v1/profile/tokens", "/v1/profile/tokens/abc", "/v1/profile/password", "/v1/auth/logout-all", "/v1/system/users/u/system-admin", "/v1/system/users/u/password-reset", "/v1/system/environment/detach", "/v1/invitations/accept"] {
-            assert!(token_forbidden_path(path), "{path}");
-        }
-        for path in ["/v1/workspaces", "/v1/system/jobs", "/v1/system/users/u/sessions/end", "/v1/profile"] {
-            assert!(!token_forbidden_path(path), "{path}");
-        }
-        assert!(read_token_may_post("/v1/workspaces/w/search"));
-        assert!(read_token_may_post("/v1/workspaces/w/ask"));
-        assert!(!read_token_may_post("/v1/workspaces/w/artifacts/text"));
-    }
 
     #[test]
     fn only_owners_grant_administrators() {

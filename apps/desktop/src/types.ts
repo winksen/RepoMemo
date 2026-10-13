@@ -148,6 +148,8 @@ export interface Organization {
   role: OrganizationRole;
   created_at: string;
   updated_at: string;
+  /** Listed only for workspaces the user was added to directly: not a member of the organization, so `role` is only for display. */
+  guest?: boolean;
 }
 
 export interface OrganizationMember {
@@ -1191,7 +1193,7 @@ export interface CreatedInvitation {
   invitation: Invitation;
   /** The secret, shown once. */
   token: string;
-  /** `/invite/<token>`, to put after the web app's origin. */
+  /** `/invite#<token>`, to put after the web app's origin (the secret stays in the fragment). */
   path: string;
 }
 
@@ -1216,7 +1218,7 @@ export interface AcceptedInvitation {
 
 export interface IssuedPasswordReset {
   token: string;
-  /** `/reset-password/<token>`, to put after the web app's origin. */
+  /** `/reset-password#<token>`, to put after the web app's origin (the secret stays in the fragment). */
   path: string;
   expires_at: string;
 }

@@ -139,6 +139,8 @@ struct OrganizationRow {
     role: String,
     created_at: String,
     updated_at: String,
+    #[sqlx(default)]
+    guest: bool,
 }
 
 #[derive(Debug, sqlx::FromRow)]
@@ -1215,12 +1217,20 @@ impl StorageEngine {
             role: OrganizationRole::Owner,
             created_at: now.clone(),
             updated_at: now,
+            guest: false,
         })
     }
 
+    /// The organizations a user is a member of, plus, as guests, those where
+    /// they only belong to some workspaces, so those workspaces can be found.
     pub async fn list_organizations_for_user(&self, user_id: &str) -> Result<Vec<Organization>> {
         let rows = sqlx::query_as::<_, OrganizationRow>(
-            "SELECT o.id, o.name, m.role, o.created_at, o.updated_at FROM organizations o INNER JOIN organization_memberships m ON m.organization_id = o.id WHERE m.user_id = ?1 ORDER BY o.name ASC",
+            "SELECT o.id, o.name, m.role, o.created_at, o.updated_at, 0 AS guest FROM organizations o INNER JOIN organization_memberships m ON m.organization_id = o.id WHERE m.user_id = ?1 \
+             UNION ALL \
+             SELECT o.id, o.name, 'member' AS role, o.created_at, o.updated_at, 1 AS guest FROM organizations o \
+             WHERE EXISTS (SELECT 1 FROM workspace_organizations wo INNER JOIN workspace_memberships wm ON wm.workspace_id = wo.workspace_id WHERE wo.organization_id = o.id AND wm.user_id = ?1) \
+             AND NOT EXISTS (SELECT 1 FROM organization_memberships m WHERE m.organization_id = o.id AND m.user_id = ?1) \
+             ORDER BY 2 ASC",
         )
         .bind(user_id)
         .fetch_all(&self.pool)
@@ -2450,36 +2460,22 @@ impl StorageEngine {
             .find_user_by_email(email)
             .await?
             .ok_or_else(|| anyhow::anyhow!("No RepoMemo account exists for this email address."))?;
-        let organization_id = sqlx::query_scalar::<_, String>(
-            "SELECT organization_id FROM workspace_organizations WHERE workspace_id = ?1",
-        )
-        .bind(workspace_id)
-        .fetch_optional(&self.pool)
-        .await?
-        .ok_or_else(|| anyhow::anyhow!("Workspace was not found."))?;
+        // Membership of one workspace is just that: the person does not join
+        // the organization, so nothing flows to its other workspaces (they
+        // see the organization as a guest). Organization membership, which
+        // does flow, is granted by organization administrators only.
+        if !self.workspace_exists(workspace_id).await? {
+            bail!("Workspace was not found.");
+        }
         let now = Utc::now().to_rfc3339();
-        let mut tx = self.pool.begin().await?;
-        sqlx::query("INSERT OR IGNORE INTO organization_memberships (organization_id, user_id, role, created_at) VALUES (?1, ?2, 'member', ?3)")
-            .bind(&organization_id)
-            .bind(&user.id)
-            .bind(&now)
-            .execute(&mut *tx)
-            .await?;
-        sqlx::query("INSERT OR IGNORE INTO workspace_memberships (workspace_id, user_id, role, created_at, updated_at) SELECT wo.workspace_id, ?1, 'member', ?2, ?2 FROM workspace_organizations wo WHERE wo.organization_id = ?3")
-            .bind(&user.id)
-            .bind(&now)
-            .bind(&organization_id)
-            .execute(&mut *tx)
-            .await?;
         sqlx::query("INSERT INTO workspace_memberships (workspace_id, user_id, role, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT(workspace_id, user_id) DO UPDATE SET role = excluded.role, updated_at = excluded.updated_at")
             .bind(workspace_id)
             .bind(&user.id)
             .bind(workspace_role_to_db(&role))
             .bind(&now)
             .bind(&now)
-            .execute(&mut *tx)
+            .execute(&self.pool)
             .await?;
-        tx.commit().await?;
         self.list_workspace_members(workspace_id)
             .await?
             .into_iter()
@@ -4853,6 +4849,7 @@ impl From<OrganizationRow> for Organization {
             role: organization_role_from_db(&row.role).unwrap_or(OrganizationRole::Member),
             created_at: row.created_at,
             updated_at: row.updated_at,
+            guest: row.guest,
         }
     }
 }

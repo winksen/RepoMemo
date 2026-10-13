@@ -167,7 +167,7 @@ stored in the database and override the values below until reset.
 | `REPOMEMO_BLOB_GC` | `true` | Delete stored files no evidence references any more. |
 | `REPOMEMO_JOB_RETENTION_DAYS` | `90` | Finished jobs kept this long; `0` keeps them forever. |
 | `REPOMEMO_INDEX_RETRY_HOURS` | `6` | How often indexing that failed for good is retried. |
-| `REPOMEMO_SYSTEM_ADMIN_EMAILS` | unset | Comma-separated account emails made **system administrators** at startup (and when they register). The first account created on a new server becomes one automatically; use this to name one on an existing server. |
+| `REPOMEMO_SYSTEM_ADMIN_EMAILS` | unset | Comma-separated account emails made **system administrators** at startup, if the account exists then. Registering a listed address later does **not** grant the role (addresses are not verified); the server logs a warning instead, and an administrator grants it in System › Users. The first account created on a new server becomes one automatically; use this to name one on an existing server. |
 | `REPOMEMO_SYSTEM_AUDIT_RETENTION_DAYS` | `365` | System administration events kept this long; `0` keeps them forever. |
 | `REPOMEMO_SETUP_WIZARD` | `true` | A brand-new server (no account yet) opens the **onboarding** in the web app to create its first system administrator. `false` skips it: the first account to register becomes system administrator, as before. |
 | `REPOMEMO_SETUP_CODE` | generated | The one-time code the onboarding asks for (at least 12 letters or digits). When unset, the server makes one at each start until setup is done and prints it on its console, in a framed block, never in the log files. |

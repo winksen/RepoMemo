@@ -2,7 +2,15 @@
 
 > **Scope:** the shared server (`apps/server`, `crates/*`), the web client (`apps/desktop/src`), the desktop shell (`apps/desktop/src-tauri`) and the terminal console (`apps/console`), at V0.1.61 plus the unreleased work on main (live progress, environment memory, invitations, password reset links, personal access tokens).
 > **Method:** static review of the code and configuration. Nothing was run, built or attacked, and no dependency scanner was run (see [§7](#7-dependencies)). Each finding below was checked in the code; line numbers are as of this date.
-> **Status:** for review. Nothing has been patched yet (rechecked on 2026-10-13). The fixes are scheduled as bundles S1–S5 in the [roadmap](../ROADMAP.md#security-from-the-2026-10-10-review).
+> **Status:** bundle **S1 is fixed on main** (2026-10-13, not yet released): H1, H4, L2, L3 and M7, see the table below. Everything else is open and scheduled as bundles S2–S5 in the [roadmap](../ROADMAP.md#security-from-the-2026-10-10-review).
+
+| ID | Status | Fix |
+|---|---|---|
+| H1 | ✅ Fixed (unreleased) | `upsert_workspace_member` only writes the workspace row; the organization is listed to the person as a guest (`Organization.guest`). Test `workspace_members_stay_in_their_workspace` |
+| H4 | ✅ Fixed (unreleased) | Registration never promotes; only accounts that exist at startup are, with a warning for listed addresses without an account |
+| L2 | ✅ Fixed (unreleased) | `SessionSubject` and `ReadingSubject` extractors on the handlers replace `token_forbidden_path` and `read_token_may_post`; other non-GET handlers refuse read-only tokens by default |
+| L3 | ✅ Fixed (unreleased) | `/invite#<secret>`, `/reset-password#<secret>`, `<meta name="referrer" content="no-referrer">`; old path links are moved to the fragment by the web app |
+| M7 | ✅ Fixed (unreleased) | `envPrefix: ["VITE_", "TAURI_ENV_"]` |
 
 ---
 

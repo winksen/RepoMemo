@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.1.62` (2026-10-10), plus the unreleased onboarding work on main (invitation links, password reset links, API tokens), marked *unreleased*. Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
+> **Scope:** reflects the code at `V0.1.63` (2026-10-13), plus the security fixes on main (bundle S1), marked *unreleased*. Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
 
 ---
 
@@ -140,9 +140,9 @@ RepoMemo has two levels of membership, plus a server-wide role.
 
 **Organization**: the team or company boundary. Roles: `owner`, `admin`, `member`.
 **Workspace**: one body of knowledge inside an organization, such as a project or service. Roles: `owner`, `admin`, `member`, `viewer`.
-**System administrator**: a person who runs the whole server. They see **every organization and workspace**, act as an **administrator** in each (where they own something they stay owner), and use the **System** area (§1b). Owner-only actions, such as deleting a workspace, stay with owners. The first account created on a new server becomes a system administrator; others are named by an existing system administrator or by the server operator. The server always keeps at least one.
+**System administrator**: a person who runs the whole server. They see **every organization and workspace**, act as an **administrator** in each (where they own something they stay owner), and use the **System** area (§1b). Owner-only actions, such as deleting a workspace, stay with owners. The first account created on a new server becomes a system administrator; others are named by an existing system administrator, or by the server operator for accounts that already exist when the server starts (registering an address the operator listed does not make it an administrator). The server always keeps at least one.
 
-Joining an organization **automatically grants access to every workspace in it**: an org owner becomes a workspace owner, an org admin becomes an admin, and an org member becomes a member. A workspace can also add a registered user directly. That user then joins the organization as a `member`, and so, through the rule above, also becomes a `member` of **every other workspace of the organization**, even when they were added to one workspace as a viewer. The [security review](security/2026-10-10-security-review.md) (H1) flags this as unintended, and the roadmap fixes it in S1.
+Joining an organization **automatically grants access to every workspace in it**: an org owner becomes a workspace owner, an org admin becomes an admin, and an org member becomes a member. A workspace can also add a registered user directly, or invite them by link. That gives access to **that workspace only**: the person does not join the organization, sees it on their dashboard as a **guest** with just the workspaces they were added to, and gets nothing from the organization's other or future workspaces. (*Unreleased fix.* Until V0.1.63 such a person also became a member of the organization and of all its workspaces; see the [security review](security/2026-10-10-security-review.md), H1. People added that way keep that access until an administrator removes it.)
 
 ### What each workspace role can do
 
@@ -229,11 +229,11 @@ A **System** button in the header opens `/system`, with these pages:
 | **Notifications** (`/notifications`) | "Task assigned to you" and "You were mentioned in evidence discussion". Mark one or all as read. Clicking a notification opens the related page. |
 | **Theme** | Light and dark toggle, remembered per browser. |
 | **Sign out** | Always visible in the header. |
-| **Invitation link** (`/invite/<link>`), *unreleased* | Opens what the person is invited to (workspace or organization, role, who invited them, until when). With no account for the invited address: create one there, even when registration is closed. With an account: sign in there. Already signed in with the invited address: one click to join. Signed in as someone else: told to sign out first. A link works once, for that address only, for 7 days. Joining never lowers a role the person already has |
-| **Password reset link** (`/reset-password/<link>`), *unreleased* | Created by a system administrator in System › Users and passed on to the person. Shows whose password it changes, asks for the new one twice, then signs this browser in and every other device out, and lifts sign-in lockouts. Works once, for 24 hours; a newer link replaces it. The sign-in page says to ask an administrator for one |
-| **API tokens** (Profile), *unreleased* | Personal access tokens for scripts, CI and `repomemo-console`: a name, read-only (look and search) or read and write, and a lifetime of 7, 30, 90 or 365 days. The token is shown once; the list shows its start, scope, expiry and last use, and each can be revoked. A token acts as its owner, so it reaches only what they can, and it can never manage tokens, change the password, grant roles or accept invitations. Changing the password keeps tokens; an administrator's *Sign out everywhere* revokes them |
+| **Invitation link** (`/invite#<link>`) | Opens what the person is invited to (workspace or organization, role, who invited them, until when). With no account for the invited address: create one there, even when registration is closed. With an account: sign in there. Already signed in with the invited address: one click to join. Signed in as someone else: told to sign out first. A link works once, for that address only, for 7 days. Joining never lowers a role the person already has |
+| **Password reset link** (`/reset-password#<link>`) | Created by a system administrator in System › Users and passed on to the person. Shows whose password it changes, asks for the new one twice, then signs this browser in and every other device out, and lifts sign-in lockouts. Works once, for 24 hours; a newer link replaces it. The sign-in page says to ask an administrator for one |
+| **API tokens** (Profile) | Personal access tokens for scripts, CI and `repomemo-console`: a name, read-only (look and search) or read and write, and a lifetime of 7, 30, 90 or 365 days. The token is shown once; the list shows its start, scope, expiry and last use, and each can be revoked. A token acts as its owner, so it reaches only what they can, and it can never manage tokens, change the password, grant roles or accept invitations. Changing the password keeps tokens; an administrator's *Sign out everywhere* revokes them |
 
-**Inviting people** (*unreleased*). In a workspace's **People** section and in **Organization administration**, administrators can create an **invite link** for an email address and a role, copy it, and send it however they like (no mail server needed). Pending invitations are listed with their expiry and can be withdrawn. Adding a member whose email has no account suggests the invite link instead. The rules are the same as adding a member: only owners invite administrators, and the inviter must still be allowed to grant the role when the link is used.
+**Inviting people.** In a workspace's **People** section and in **Organization administration**, administrators can create an **invite link** for an email address and a role, copy it, and send it however they like (no mail server needed). Pending invitations are listed with their expiry and can be withdrawn. Adding a member whose email has no account suggests the invite link instead. The rules are the same as adding a member: only owners invite administrators, and the inviter must still be allowed to grant the role when the link is used.
 
 **Not available yet:** sending invitations or reset links by email from the server, SSO.
 
@@ -507,7 +507,7 @@ The desktop app and the shared server keep **separate data**.
 
 ---
 
-## 13. Known functional gaps (after V0.1.62)
+## 13. Known functional gaps (after V0.1.63)
 
 These are observed in the code and are useful for prioritizing. The roadmap item that addresses each one is in brackets.
 
@@ -523,7 +523,7 @@ These are observed in the code and are useful for prioritizing. The roadmap item
 | Folders cannot be moved; no bulk actions; a re-upload is a new artifact | Comments and memory links stay on the old file [F7]. |
 | The map and health pages do not update live | They show the state when the page was opened [F8]. |
 
-Invitation links and administrator reset links, gaps until V0.1.62, are built and wait for release.
+Invitation links and administrator reset links, gaps until V0.1.62, shipped in V0.1.63.
 
 ---
 

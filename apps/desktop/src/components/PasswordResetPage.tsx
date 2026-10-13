@@ -13,7 +13,8 @@ function errorMessage(error: unknown, fallback: string): string {
 }
 
 /**
- * `/reset-password/<token>`: a one-time link from a system administrator.
+ * `/reset-password#<token>`: a one-time link from a system administrator.
+ * The secret is in the fragment, so it never reaches a server or its logs.
  * Choosing a new password signs out every other device of the account and
  * signs this browser in.
  */

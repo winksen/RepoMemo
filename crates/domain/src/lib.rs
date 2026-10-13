@@ -177,6 +177,11 @@ pub struct Organization {
     pub role: OrganizationRole,
     pub created_at: String,
     pub updated_at: String,
+    /// Listed only because the user belongs to some of its workspaces: they
+    /// are not a member of the organization, `role` is then `member` for
+    /// display, and nothing flows to its other workspaces.
+    #[serde(default)]
+    pub guest: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

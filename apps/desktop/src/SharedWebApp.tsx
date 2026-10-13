@@ -343,6 +343,11 @@ function currentPathname() {
   return window.location.pathname.replace(/\/+$/, "") || "/";
 }
 
+/** The secret of an invitation or reset link, from the URL fragment. */
+function currentLinkSecret() {
+  try { return decodeURIComponent(window.location.hash.replace(/^#/, "")).trim(); } catch { return ""; }
+}
+
 function currentLocation() {
   return `${currentPathname()}${window.location.search}`;
 }
@@ -400,6 +405,8 @@ function SharedWebAppContent() {
   const [workspaces, setWorkspaces] = useState<SharedWorkspace[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pathname, setPathname] = useState(currentPathname);
+  // Invitation and reset links carry their secret in the fragment (`/invite#<secret>`), never sent to a server.
+  const [linkSecret, setLinkSecret] = useState(currentLinkSecret);
   const [apiAvailable, setApiAvailable] = useState<boolean | null>(null);
   // Whether the server still has to be set up; the server is the authority.
   const [setup, setSetup] = useState<ServerSetupStatus | null>(null);
@@ -421,10 +428,17 @@ function SharedWebAppContent() {
   }, []);
 
   useEffect(() => {
-    const syncPathname = () => setPathname(currentPathname());
+    const syncPathname = () => { setPathname(currentPathname()); setLinkSecret(currentLinkSecret()); };
     window.addEventListener("popstate", syncPathname);
-    return () => window.removeEventListener("popstate", syncPathname);
+    window.addEventListener("hashchange", syncPathname);
+    return () => { window.removeEventListener("popstate", syncPathname); window.removeEventListener("hashchange", syncPathname); };
   }, []);
+
+  useEffect(() => {
+    // Links made by V0.1.63 carried the secret in the path (`/invite/<secret>`); keep them working, with the secret moved to the fragment.
+    const legacyLink = /^\/(invite|reset-password)\/([^/]+)$/.exec(pathname);
+    if (legacyLink) navigate(`/${legacyLink[1]}#${legacyLink[2]}`, true);
+  }, [pathname]);
 
   useEffect(() => {
     getSharedHealth().then(() => setApiAvailable(true)).catch(() => setApiAvailable(false));
@@ -548,20 +562,19 @@ function SharedWebAppContent() {
   }
 
   // Links people receive: they work signed in or not.
-  const linkParts = pathname.split("/").filter(Boolean);
-  if (linkParts[0] === "invite" && linkParts[1]) {
+  if (pathname === "/invite" && linkSecret) {
     const signedIn = pageState === "ready" && accessToken && session;
     return <InvitePage
       accessToken={signedIn ? accessToken : null}
       onAuthenticated={(token, destination) => handleAuthenticated(token, destination)}
       onJoined={(destination) => { navigate(destination, true); if (accessToken) hydrate(accessToken).catch(() => undefined); }}
-      onSignOut={() => { clearSharedSession(); window.location.assign(pathname); }}
+      onSignOut={() => { clearSharedSession(); window.location.reload(); }}
       session={signedIn ? session : null}
-      token={decodeURIComponent(linkParts[1])}
+      token={linkSecret}
     />;
   }
-  if (linkParts[0] === "reset-password" && linkParts[1]) {
-    return <PasswordResetPage onAuthenticated={(token) => handleAuthenticated(token)} token={decodeURIComponent(linkParts[1])} />;
+  if (pathname === "/reset-password" && linkSecret) {
+    return <PasswordResetPage onAuthenticated={(token) => handleAuthenticated(token)} token={linkSecret} />;
   }
 
   if (pageState === "unauthenticated" || pageState === "error") {
@@ -1019,7 +1032,7 @@ function SharedDashboard({
           const activeTasks = organizationMetrics.reduce((total, metrics) => total + metrics.open_task_count + metrics.in_progress_task_count, 0);
           const artifacts = organizationMetrics.reduce((total, metrics) => total + metrics.artifact_count, 0);
           return <section className="shared-dashboard-organization" key={organization.id}>
-            <div className="shared-dashboard-organization-heading"><div><span className="shared-dashboard-organization-mark"><Building size={17} /></span><div><h2>{organization.name}</h2><p>{organizationWorkspaces.length} workspace{organizationWorkspaces.length === 1 ? "" : "s"}{organizationMetrics.length ? ` · ${artifacts} artifacts · ${activeTasks} active tasks` : ""}</p></div></div><Button onClick={() => navigate(`/workspaces?organization=${encodeURIComponent(organization.id)}`)} type="button" variant="secondary">View workspaces <ChevronRight size={16} /></Button></div>
+            <div className="shared-dashboard-organization-heading"><div><span className="shared-dashboard-organization-mark"><Building size={17} /></span><div><h2>{organization.name}</h2><p>{organizationWorkspaces.length} workspace{organizationWorkspaces.length === 1 ? "" : "s"}{organizationMetrics.length ? ` · ${artifacts} artifacts · ${activeTasks} active tasks` : ""}{organization.guest ? " · Guest: only the workspaces you were added to" : ""}</p></div></div><Button onClick={() => navigate(`/workspaces?organization=${encodeURIComponent(organization.id)}`)} type="button" variant="secondary">View workspaces <ChevronRight size={16} /></Button></div>
             {organizationWorkspaces.length ? <div className="shared-dashboard-workspace-list">{organizationWorkspaces.map((entry) => {
               const metrics = metricsByWorkspace[entry.workspace.id];
               const activeWorkspaceTasks = metrics ? metrics.open_task_count + metrics.in_progress_task_count : null;

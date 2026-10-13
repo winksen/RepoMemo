@@ -916,7 +916,14 @@ async fn build_state(
         .collect::<Vec<_>>();
     runtime.load_overrides(&overrides);
 
+    // Only accounts that exist now are promoted; a listed address registered
+    // later is not (see `register`).
     let promoted = storage.promote_system_admins(&config.system_admin_emails).await?;
+    for email in &config.system_admin_emails {
+        if matches!(storage.find_user_by_email(email).await, Ok(None)) {
+            tracing::warn!(target: "audit", email = %email, "REPOMEMO_SYSTEM_ADMIN_EMAILS lists an address with no account. Registering it will not make it a system administrator; grant the role in System › Users once the person has an account.");
+        }
+    }
     if promoted > 0 {
         tracing::info!(target: "audit", count = promoted, "Promoted accounts listed in REPOMEMO_SYSTEM_ADMIN_EMAILS to system administrators");
         storage
@@ -1495,34 +1502,35 @@ async fn register(
         .await
         .map_err(ApiError::internal)?;
     tracing::info!(target: "audit", user_id = %user.id, client = %client.0, "Account registered");
-    // The first account of a new server administers it, as do accounts the
-    // operator listed.
+    // The first account of a new server administers it. Accounts listed in
+    // REPOMEMO_SYSTEM_ADMIN_EMAILS are promoted only at startup, once they
+    // exist: email addresses are not verified, so whoever registers a listed
+    // address first must not get the role.
     let first_account = state.storage.count_users().await.map_err(ApiError::internal)? == 1
         && state.storage.system_admin_count().await.map_err(ApiError::internal)? == 0;
-    let listed = user
-        .email
-        .as_deref()
-        .is_some_and(|email| state.settings().system_admin_emails.iter().any(|listed| listed == email));
-    if first_account || listed {
+    if first_account {
         state
             .storage
             .set_system_admin(&user.id, true)
             .await
             .map_err(ApiError::internal)?;
-        if first_account {
-            // With the onboarding off, the first account sets the server up.
-            state
-                .storage
-                .complete_setup(Some(&user.id))
-                .await
-                .map_err(ApiError::internal)?;
-        }
-        let reason = if first_account { "the first account on this server" } else { "listed in REPOMEMO_SYSTEM_ADMIN_EMAILS" };
-        let detail = format!("{} became a system administrator as {reason}.", user.email.as_deref().unwrap_or("A new account"));
+        // With the onboarding off, the first account sets the server up.
+        state
+            .storage
+            .complete_setup(Some(&user.id))
+            .await
+            .map_err(ApiError::internal)?;
+        let detail = format!("{} became a system administrator as the first account on this server.", user.email.as_deref().unwrap_or("A new account"));
         tracing::info!(target: "audit", user_id = %user.id, "{detail}");
         if let Err(error) = state.storage.record_system_event(Some(&user.id), "system_admin_granted", &detail).await {
             tracing::error!(error = %error, "Failed to record a system audit event");
         }
+    } else if user
+        .email
+        .as_deref()
+        .is_some_and(|email| state.settings().system_admin_emails.iter().any(|listed| listed == email))
+    {
+        tracing::warn!(target: "audit", user_id = %user.id, "An account registered with an address listed in REPOMEMO_SYSTEM_ADMIN_EMAILS. It was not made a system administrator; if it belongs to the intended person, grant the role in System › Users.");
     }
     let response = issue_session(&state, user).await?;
     Ok((StatusCode::CREATED, Json(response)))
@@ -1626,7 +1634,7 @@ async fn logout(
 /// Ends every session of the caller on every device: access tokens stop
 /// working at once and refresh tokens are revoked.
 async fn logout_everywhere(
-    subject: AuthenticatedSubject,
+    SessionSubject(subject): SessionSubject,
     State(state): State<AppState>,
 ) -> Result<StatusCode, ApiError> {
     state
@@ -1777,7 +1785,7 @@ async fn update_profile(
 /// Changes the caller's password. Every existing session ends (other devices
 /// are signed out at once) and a fresh session is returned for this one.
 async fn change_profile_password(
-    subject: AuthenticatedSubject,
+    SessionSubject(subject): SessionSubject,
     State(state): State<AppState>,
     Json(request): Json<ChangePasswordRequest>,
 ) -> Result<Json<TokenResponse>, ApiError> {
@@ -2250,7 +2258,7 @@ async fn generate_workspace_ai_overview(
 }
 
 async fn ask_workspace(
-    subject: AuthenticatedSubject,
+    ReadingSubject(subject): ReadingSubject,
     State(state): State<AppState>,
     Path(workspace_id): Path<String>,
     Json(request): Json<AskWorkspaceRequest>,
@@ -3736,7 +3744,7 @@ async fn validate_folder(
 }
 
 async fn query_artifacts(
-    subject: AuthenticatedSubject,
+    ReadingSubject(subject): ReadingSubject,
     State(state): State<AppState>,
     Path(workspace_id): Path<String>,
     Query(page): Query<PageQuery>,
@@ -4474,7 +4482,7 @@ async fn watch_event_stream_access(
 }
 
 async fn search_workspace(
-    subject: AuthenticatedSubject,
+    ReadingSubject(subject): ReadingSubject,
     State(state): State<AppState>,
     Path(workspace_id): Path<String>,
     Json(request): Json<SearchWorkspaceRequest>,
@@ -4564,7 +4572,7 @@ async fn list_memory_cards(
 }
 
 async fn search_memory_cards(
-    subject: AuthenticatedSubject,
+    ReadingSubject(subject): ReadingSubject,
     State(state): State<AppState>,
     Path(workspace_id): Path<String>,
     Json(request): Json<SearchMemoryCardsRequest>,
@@ -4872,6 +4880,12 @@ fn workspace_role_label(role: &WorkspaceRole) -> &'static str {
     }
 }
 
+/// The caller of a handler. A personal access token is accepted; a read-only
+/// one only for GET and HEAD. Handlers mark stricter or looser needs in their
+/// signature instead: [`SessionSubject`] for the account's own security
+/// (tokens, password, roles, sign-out everywhere, invitations, the
+/// environment), [`ReadingSubject`] for a POST that only reads (searches,
+/// questions, console lookups).
 impl FromRequestParts<AppState> for AuthenticatedSubject {
     type Rejection = ApiError;
 
@@ -4879,48 +4893,95 @@ impl FromRequestParts<AppState> for AuthenticatedSubject {
         parts: &mut Parts,
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
-        let header_value = parts
-            .headers
-            .get(header::AUTHORIZATION)
-            .and_then(|value| value.to_str().ok())
-            .ok_or_else(ApiError::unauthorized)?;
-        let token = header_value
-            .strip_prefix("Bearer ")
-            .ok_or_else(ApiError::unauthorized)?;
-        if token.starts_with(repomemo_storage::PERSONAL_TOKEN_PREFIX) {
-            return authenticate_personal_token(parts, state, token).await;
+        let subject = authenticate(parts, state).await?;
+        let reading = matches!(parts.method, Method::GET | Method::HEAD);
+        if subject.token.as_ref().is_some_and(|token| token.read_only) && !reading {
+            return Err(access::token_refusal(true));
         }
-        let mut validation = Validation::new(Algorithm::HS256);
-        validation.set_issuer(&[JWT_ISSUER]);
-        let claims = decode::<JwtClaims>(
-            token,
-            &DecodingKey::from_secret(state.jwt_secret.as_bytes()),
-            &validation,
-        )
-        .map_err(|_| ApiError::unauthorized())?
-        .claims;
-        // A token outlives neither its user nor the end of its sessions.
-        let access = state
-            .storage
-            .user_access(&claims.sub)
-            .await
-            .map_err(ApiError::internal)?
-            .filter(|access| access.session_version == claims.ver)
-            .ok_or_else(ApiError::unauthorized)?;
-        Ok(Self {
-            user_id: claims.sub,
-            expires_at: claims.exp as u64,
-            session_version: claims.ver,
-            is_system_admin: access.is_system_admin,
-            is_app_admin: access.is_app_admin,
-            token: None,
-        })
+        Ok(subject)
     }
 }
 
-/// A personal access token acts as its user, within its scope. It never
-/// reaches the account's own security (tokens, password, roles, sign-out
-/// everywhere), and a read-only token only reads and searches.
+/// The caller, signed in with a browser session: personal access tokens are
+/// refused, whatever their scope. For what changes how the account itself is
+/// reached, or the server's environment.
+pub(crate) struct SessionSubject(pub(crate) AuthenticatedSubject);
+
+impl FromRequestParts<AppState> for SessionSubject {
+    type Rejection = ApiError;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
+        let subject = authenticate(parts, state).await?;
+        if subject.token.is_some() {
+            return Err(access::token_refusal(false));
+        }
+        Ok(Self(subject))
+    }
+}
+
+/// The caller of a POST that only reads (its body carries a query): a
+/// read-only personal access token may make it. A handler that also changes
+/// something on request (the console's `--yes`) checks the token itself.
+pub(crate) struct ReadingSubject(pub(crate) AuthenticatedSubject);
+
+impl FromRequestParts<AppState> for ReadingSubject {
+    type Rejection = ApiError;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
+        authenticate(parts, state).await.map(Self)
+    }
+}
+
+/// Who is calling, from a session's JWT or a personal access token, with no
+/// check of what the request is.
+async fn authenticate(parts: &Parts, state: &AppState) -> Result<AuthenticatedSubject, ApiError> {
+    let header_value = parts
+        .headers
+        .get(header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .ok_or_else(ApiError::unauthorized)?;
+    let token = header_value
+        .strip_prefix("Bearer ")
+        .ok_or_else(ApiError::unauthorized)?;
+    if token.starts_with(repomemo_storage::PERSONAL_TOKEN_PREFIX) {
+        return authenticate_personal_token(parts, state, token).await;
+    }
+    let mut validation = Validation::new(Algorithm::HS256);
+    validation.set_issuer(&[JWT_ISSUER]);
+    let claims = decode::<JwtClaims>(
+        token,
+        &DecodingKey::from_secret(state.jwt_secret.as_bytes()),
+        &validation,
+    )
+    .map_err(|_| ApiError::unauthorized())?
+    .claims;
+    // A token outlives neither its user nor the end of its sessions.
+    let access = state
+        .storage
+        .user_access(&claims.sub)
+        .await
+        .map_err(ApiError::internal)?
+        .filter(|access| access.session_version == claims.ver)
+        .ok_or_else(ApiError::unauthorized)?;
+    Ok(AuthenticatedSubject {
+        user_id: claims.sub,
+        expires_at: claims.exp as u64,
+        session_version: claims.ver,
+        is_system_admin: access.is_system_admin,
+        is_app_admin: access.is_app_admin,
+        token: None,
+    })
+}
+
+/// A personal access token acts as its user, within its scope. What it may
+/// reach is decided by the extractor the handler asks for (see
+/// [`AuthenticatedSubject`]), not here.
 async fn authenticate_personal_token(
     parts: &Parts,
     state: &AppState,
@@ -4939,15 +5000,7 @@ async fn authenticate_personal_token(
         .map_err(ApiError::internal)?
         .ok_or_else(ApiError::unauthorized)?;
     let read_only = grant.scope != "write";
-    let path = parts.uri.path();
-    let reading = matches!(parts.method, Method::GET | Method::HEAD);
-    if access::token_forbidden_path(path) {
-        return Err(access::token_refusal(false));
-    }
-    if read_only && !reading && !(parts.method == Method::POST && access::read_token_may_post(path)) {
-        return Err(access::token_refusal(true));
-    }
-    tracing::debug!(target: "audit", user_id = %grant.user_id, token_id = %grant.token_id, method = %parts.method, path, "Personal access token used");
+    tracing::debug!(target: "audit", user_id = %grant.user_id, token_id = %grant.token_id, method = %parts.method, path = parts.uri.path(), "Personal access token used");
     let expires_at = chrono::DateTime::parse_from_rfc3339(&grant.expires_at)
         .map(|at| at.timestamp().max(0) as u64)
         .unwrap_or(0);
@@ -8133,6 +8186,57 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn workspace_members_stay_in_their_workspace() {
+        let data_dir = temp_data_dir("workspace-guests");
+        let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+        let send = |method: &'static str, uri: String, who: &str, body: Value| {
+            let app = app.clone();
+            let request = json_request(method, &uri, who, body);
+            async move { app.oneshot(request).await.unwrap() }
+        };
+        let get = |uri: String, who: &str| {
+            let app = app.clone();
+            let request = auth_request("GET", &uri, who);
+            async move { app.oneshot(request).await.unwrap() }
+        };
+        let (_, _) = register_account(&app, "server-admin@example.com").await;
+        // Not the first account, so no system administrator's wildcard.
+        let (owner, _) = register_account(&app, "team-owner@example.com").await;
+        let (guest, _) = register_account(&app, "contractor@example.com").await;
+        let core = create_workspace(&app, &owner).await;
+        let organization_id = response_json(get("/v1/organizations".to_owned(), &owner).await).await[0]["id"].as_str().unwrap().to_owned();
+        let sibling = response_json(send("POST", "/v1/workspaces".to_owned(), &owner, json!({"organization_id": organization_id, "name": "Finance"})).await).await["workspace"]["id"].as_str().unwrap().to_owned();
+
+        // A viewer of one workspace gets that workspace only.
+        let added = send("PUT", format!("/v1/workspaces/{core}/members"), &owner, json!({"email": "contractor@example.com", "role": "viewer"})).await;
+        assert_eq!(added.status(), 200);
+        let workspaces = response_json(get("/v1/workspaces".to_owned(), &guest).await).await;
+        assert_eq!(workspaces.as_array().unwrap().len(), 1, "{workspaces}");
+        assert_eq!(workspaces[0]["role"], "viewer");
+        assert_eq!(get(format!("/v1/workspaces/{sibling}/overview"), &guest).await.status(), 403, "no role in the sibling workspace");
+        assert_eq!(send("POST", format!("/v1/workspaces/{sibling}/artifacts/text"), &guest, json!({"title": "x", "content": "y"})).await.status(), 403);
+
+        // The organization is listed as a guest, without its members or administration.
+        let organizations = response_json(get("/v1/organizations".to_owned(), &guest).await).await;
+        assert_eq!(organizations.as_array().unwrap().len(), 1);
+        assert_eq!(organizations[0]["guest"], true);
+        assert_eq!(get(format!("/v1/organizations/{organization_id}/members"), &guest).await.status(), 403);
+        let members = response_json(get(format!("/v1/organizations/{organization_id}/members"), &owner).await).await;
+        assert!(members.as_array().unwrap().iter().all(|member| member["user"]["email"] != "contractor@example.com"), "{members}");
+
+        // Workspaces created later are not opened to them either.
+        let later = response_json(send("POST", "/v1/workspaces".to_owned(), &owner, json!({"organization_id": organization_id, "name": "Later"})).await).await["workspace"]["id"].as_str().unwrap().to_owned();
+        assert_eq!(get(format!("/v1/workspaces/{later}/overview"), &guest).await.status(), 403);
+
+        // Organization membership still flows to every workspace, and the guest flag goes.
+        let joined = send("PUT", format!("/v1/organizations/{organization_id}/members"), &owner, json!({"email": "contractor@example.com", "role": "member"})).await;
+        assert_eq!(joined.status(), 200);
+        assert_eq!(response_json(get("/v1/workspaces".to_owned(), &guest).await).await.as_array().unwrap().len(), 3);
+        assert_eq!(response_json(get("/v1/organizations".to_owned(), &guest).await).await[0]["guest"], false);
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
     async fn invitations_reset_links_and_personal_tokens() {
         let data_dir = temp_data_dir("access-links");
         let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
@@ -8158,7 +8262,7 @@ mod tests {
         assert_eq!(send("PUT", "/v1/system/settings".to_owned(), &owner, json!({"values": {"allow_registration": false}})).await.status(), 200);
         let created = response_json(send("POST", format!("/v1/workspaces/{workspace_id}/invitations"), &owner, json!({"email": "Invited@example.com", "role": "viewer"})).await).await;
         let token = created["token"].as_str().unwrap().to_owned();
-        assert_eq!(created["path"], json!(format!("/invite/{token}")));
+        assert_eq!(created["path"], json!(format!("/invite#{token}")), "the secret is in the fragment");
         assert_eq!(created["invitation"]["email"], "invited@example.com");
         let preview = public("/v1/invitations/preview", json!({"token": token})).await;
         assert_eq!(preview.status(), 200);
@@ -8173,10 +8277,13 @@ mod tests {
         let invited = format!("Bearer {}", registered["access_token"].as_str().unwrap());
         let invited_id = registered["user"]["id"].as_str().unwrap().to_owned();
         assert_eq!(get(format!("/v1/workspaces/{workspace_id}/overview"), &invited).await.status(), 403, "joining needs the acceptance");
+        let organization_id = response_json(get("/v1/organizations".to_owned(), &owner).await).await[0]["id"].as_str().unwrap().to_owned();
+        let sibling = response_json(send("POST", "/v1/workspaces".to_owned(), &owner, json!({"organization_id": organization_id, "name": "Sibling"})).await).await["workspace"]["id"].as_str().unwrap().to_owned();
         let accepted = send("POST", "/v1/invitations/accept".to_owned(), &invited, json!({"token": token})).await;
         assert_eq!(accepted.status(), 200);
         assert_eq!(response_json(accepted).await["role"], "viewer");
         assert_eq!(get(format!("/v1/workspaces/{workspace_id}/overview"), &invited).await.status(), 200);
+        assert_eq!(get(format!("/v1/workspaces/{sibling}/overview"), &invited).await.status(), 403, "a workspace invitation opens that workspace only");
         assert_eq!(send("POST", "/v1/invitations/accept".to_owned(), &invited, json!({"token": token})).await.status(), 410, "a link works once");
         assert_eq!(send("POST", format!("/v1/workspaces/{workspace_id}/invitations"), &invited, json!({"email": "x@example.com", "role": "viewer"})).await.status(), 403, "viewers cannot invite");
 
@@ -8204,6 +8311,27 @@ mod tests {
         assert!(send("POST", format!("/v1/workspaces/{workspace_id}/artifacts/text"), &write_bearer, json!({"title": "From CI", "content": "Release notes"})).await.status().is_success());
         assert_eq!(send("POST", "/v1/profile/password".to_owned(), &write_bearer, json!({"current_password": "x", "new_password": "y"})).await.status(), 403, "tokens never change passwords");
         assert_eq!(send("POST", format!("/v1/system/users/{invited_id}/password-reset"), &write_bearer, json!({})).await.status(), 403);
+        // Every handler that takes a `SessionSubject` refuses tokens, whatever their scope.
+        let session_only = [
+            ("GET", "/v1/profile/tokens".to_owned(), json!({})),
+            ("POST", "/v1/profile/tokens".to_owned(), json!({"name": "Nested", "scope": "write", "expires_in_days": 7})),
+            ("DELETE", "/v1/profile/tokens/any".to_owned(), json!({})),
+            ("POST", "/v1/auth/logout-all".to_owned(), json!({})),
+            ("POST", "/v1/invitations/accept".to_owned(), json!({"token": "unused"})),
+            ("PUT", format!("/v1/system/users/{invited_id}/system-admin"), json!({"enabled": true})),
+            ("PUT", format!("/v1/system/users/{invited_id}/app-admin"), json!({"enabled": true})),
+            ("POST", "/v1/system/environment/detach".to_owned(), json!({})),
+        ];
+        for (method, uri, body) in session_only {
+            assert_eq!(send(method, uri.clone(), &write_bearer, body).await.status(), 403, "{method} {uri} must need a browser session");
+        }
+        assert_eq!(get("/v1/session".to_owned(), &owner).await.status(), 200, "nothing above took effect");
+        // A read-only token may make the POSTs that only read, and nothing else.
+        assert_eq!(send("POST", format!("/v1/workspaces/{workspace_id}/memory-cards/search"), &read, json!({"query": "anything"})).await.status(), 200);
+        assert_eq!(send("POST", format!("/v1/workspaces/{workspace_id}/artifacts/query"), &read, json!({"query": ""})).await.status(), 200);
+        assert_eq!(send("POST", "/v1/system/console".to_owned(), &read, json!({"command": "status"})).await.status(), 200);
+        assert_eq!(send("POST", "/v1/system/console".to_owned(), &read, json!({"command": "maintenance run --yes"})).await.status(), 403, "read-only tokens run dry runs only");
+        assert_eq!(send("POST", format!("/v1/workspaces/{workspace_id}/memory-cards"), &read, json!({"title": "x", "body_markdown": "y", "source": "test", "citations": []})).await.status(), 403, "other POSTs stay closed to read-only tokens");
         let token_id = write["token"]["id"].as_str().unwrap().to_owned();
         assert_eq!(send("DELETE", format!("/v1/profile/tokens/{token_id}"), &owner, json!({})).await.status(), 204);
         assert_eq!(get(format!("/v1/workspaces/{workspace_id}/artifacts"), &write_bearer).await.status(), 401, "revoked");
@@ -8280,7 +8408,7 @@ mod tests {
         assert_eq!(response_json(get("/v1/session".to_owned(), &admin).await).await["is_system_admin"], true);
         assert_eq!(response_json(get("/v1/session".to_owned(), &owner).await).await["is_system_admin"], false);
         let (listed, _) = register_account(&app, "listed@example.com").await;
-        assert_eq!(response_json(get("/v1/session".to_owned(), &listed).await).await["is_system_admin"], true, "listed accounts are promoted");
+        assert_eq!(response_json(get("/v1/session".to_owned(), &listed).await).await["is_system_admin"], false, "registering a listed address does not grant the role (only accounts that exist at startup are promoted)");
 
         // Someone else's organization and workspace are visible, as an administrator.
         let workspace_id = create_workspace(&app, &owner).await;
@@ -8299,14 +8427,14 @@ mod tests {
         assert_eq!(send("DELETE", format!("/v1/workspaces/{workspace_id}"), &admin, json!({})).await.status(), 403);
         let created = send("POST", "/v1/workspaces".to_owned(), &admin, json!({"organization_id": organization_id, "name": "Admin made"})).await;
         assert_eq!(created.status(), 201, "administrators create workspaces in any organization");
-        assert_eq!(get(format!("/v1/workspaces/{workspace_id}/overview"), &listed).await.status(), 200);
+        assert_eq!(get(format!("/v1/workspaces/{workspace_id}/overview"), &listed).await.status(), 403);
 
         // The system API is for system administrators only.
         assert_eq!(get("/v1/system/overview".to_owned(), &owner).await.status(), 403);
         let overview = response_json(get("/v1/system/overview".to_owned(), &admin).await).await;
         assert_eq!(overview["statistics"]["user_count"], 3);
         assert_eq!(overview["statistics"]["workspace_count"], 2);
-        assert_eq!(overview["instance"]["system_admin_count"], 2);
+        assert_eq!(overview["instance"]["system_admin_count"], 1);
         assert!(overview["traffic"]["requests"].as_u64().unwrap() > 0);
         let usage = response_json(get("/v1/system/usage?days=7".to_owned(), &admin).await).await;
         assert_eq!(usage["activity_by_day"].as_array().unwrap().len(), 7);

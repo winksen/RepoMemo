@@ -25,7 +25,8 @@ export function invitationDestination(accepted: AcceptedInvitation): string {
 }
 
 /**
- * `/invite/<token>`: what the invitation is for, then the shortest way in.
+ * `/invite#<token>`: what the invitation is for, then the shortest way in.
+ * The secret is in the fragment, so it never reaches a server or its logs.
  * Signed in with the invited address: join. Not signed in: sign in, or create
  * the account (allowed by the invitation even when registration is closed),
  * then join. Signed in as someone else: say so.
@@ -90,7 +91,7 @@ export function InvitePage({
         onAuthenticated(response.access_token, destination);
       } catch (error) {
         showToast("error", errorMessage(error, "You are signed in, but the invitation could not be accepted."));
-        onAuthenticated(response.access_token, `/invite/${token}`);
+        onAuthenticated(response.access_token, `/invite#${encodeURIComponent(token)}`);
       }
     } catch (error) { showToast("error", errorMessage(error, preview.account_exists ? "Sign-in failed." : "The account could not be created.")); setIsBusy(false); }
   }
