@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.2 (2026-10-14)
+
+The workspace page, split.
+
+### Changed
+- **One component per section.** `SharedWorkspaceDetail` (1,089 lines) is now the shell (320 lines: live events, loading and the layout) and `src/web/workspace/` holds `OverviewSection`, `EvidenceSection`, `RetrievalSection`, `MemorySection`, `TasksSection`, `PeopleSection` and `SettingsSection` (the largest, evidence, is 371 lines). Sections read their server data through the hooks of `workspace/data.ts`, which share the query cache, and receive what every section needs (who is looking, what they may do, the busy flag, a reload) as one `WorkspacePage` object.
+- Nothing changes on screen. Filters, drafts, results and the open folder are still there when a person leaves a section and comes back (`sectionState`); they start clean in another workspace, as the page already reset its folder there.
+- Tasks and People read the member list when they open (it used to be fetched ahead for every section); the page still reads it ahead, so the list is there at once.
+
+### Added
+- Tests of the section state (30 web tests).
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.1 (2026-10-14)
 
 Operations: the production guide and the server checks, corrected against the code.
