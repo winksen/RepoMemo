@@ -9,6 +9,8 @@ import { Dialog, DialogCancel } from "../components/ui/dialog";
 import { Input } from "../components/ui/input";
 import { Toast } from "../components/ui/toast";
 import { ApiTokensPanel } from "../components/ApiTokensPanel";
+import { accountKeys } from "../lib/queryClient";
+import { useServerState } from "../lib/useServerState";
 import { SharedLayout } from "../components/SharedLayout";
 import { apiMessage, formatProfileTime, formatTaskDueDate } from "./format";
 import { navigate } from "./router";
@@ -32,15 +34,21 @@ export function SharedProfile({
   signOut: () => void;
   workspaces: SharedWorkspace[];
 }) {
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [assignedTasks, setAssignedTasks] = useState<CollaborationTask[]>([]);
+  // Profile and assigned tasks come from the query cache: shown at once on a
+  // later visit and refetched when the page opens.
+  const [profile, setProfile, profileQuery] = useServerState<UserProfile | null>({
+    key: accountKeys.profile(session.user.id), fetch: () => getSharedProfile(accessToken), initial: null, staleTime: 0,
+  });
+  const [assignedTasks, , tasksQuery] = useServerState<CollaborationTask[]>({
+    key: accountKeys.profileTasks(session.user.id), fetch: () => listSharedProfileTasks(accessToken), initial: [], staleTime: 0,
+  });
   const [displayName, setDisplayName] = useState(session.user.display_name);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const isLoading = profileQuery.isLoading || tasksQuery.isLoading;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isConfirmingSignOut, setIsConfirmingSignOut] = useState(false);
   const [hasAvatar, setHasAvatar] = useState(false);
@@ -73,20 +81,9 @@ export function SharedProfile({
     } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
   }
 
-  async function load() {
-    setIsLoading(true); setError(null);
-    try {
-      const [nextProfile, nextAssignedTasks] = await Promise.all([
-        getSharedProfile(accessToken),
-        listSharedProfileTasks(accessToken),
-      ]);
-      setProfile(nextProfile);
-      setAssignedTasks(nextAssignedTasks);
-      setDisplayName(nextProfile.user.display_name);
-    } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsLoading(false); }
-  }
-
-  useEffect(() => { void load(); }, [accessToken]);
+  const loadError = profileQuery.error ?? tasksQuery.error;
+  useEffect(() => { if (loadError) setError(apiMessage(loadError)); }, [loadError]);
+  useEffect(() => { if (profile) setDisplayName(profile.user.display_name); }, [profile?.user.display_name]);
 
   async function saveProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

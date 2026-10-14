@@ -14,10 +14,12 @@ export function useServerState<T>(options: {
   fetch: () => Promise<T>;
   initial: T;
   enabled?: boolean;
+  /** A page that must not show an old answer for long asks for `0`: the cached value shows at once and is refetched when the page opens. */
+  staleTime?: number;
 }) {
-  const { key, fetch, enabled = true } = options;
+  const { key, fetch, enabled = true, staleTime } = options;
   const initial = useRef(options.initial);
-  const query = useQuery({ queryKey: key, queryFn: fetch, enabled });
+  const query = useQuery({ queryKey: key, queryFn: fetch, enabled, ...(staleTime === undefined ? {} : { staleTime }) });
   const keyText = JSON.stringify(key);
   const set = useCallback((next: SetStateAction<T>) => {
     queryClient.setQueryData<T>(JSON.parse(keyText) as unknown[], (current) => (

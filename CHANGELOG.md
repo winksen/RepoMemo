@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.3 (2026-10-14)
+
+The remaining web pages, on the query cache.
+
+### Changed
+- **No page loads its own data any more.** The dashboard, profile (with the tasks assigned to you), notifications, evidence detail (file, comments, lifecycle and its history, chunks) and memory card pages read their data through the cache that the workspace page already used. A page you opened before shows what it had at once and refreshes it in the background; details and personal pages always refetch when they open.
+- **Live events refresh them.** The evidence page marks its file, comments or lifecycle stale when someone else changes them or indexing finishes, through the cache instead of its own fetches. The memory card page now listens to the workspace stream too: another person editing the card, or evidence changing (which can make a card *need review*), refreshes it once per burst, and a dropped connection refreshes it on reconnect.
+- Entries of the evidence and memory card pages live under their workspace in the cache, so a full reload of the workspace page refreshes them with everything else, and the file list and member list are shared with the workspace page instead of fetched again.
+
+### Added
+- `staleTime` on `useServerState`, `accountKeys` for what belongs to a person rather than a workspace, and two tests of the cache (32 web tests).
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.2 (2026-10-14)
 
 The workspace page, split.

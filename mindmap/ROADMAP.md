@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.2` (2026-10-14), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.3` (2026-10-14), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -317,7 +317,7 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 |---|---|---|---|---|---|
 | **V0.2.1** ✅ | 🐞 | Operations | Corrections the clean-machine install (R6) found in the production guide and the server checks | R6 follow-up | A second clean install follows the guide with no workaround |
 | **V0.2.2** ✅ | 🔧 | Workspace page | The workspace page split into one component per section | C13a | No section component over 500 lines; behaviour unchanged, tests green |
-| **V0.2.3** | 🔧 | Web data | The dashboard, profile, artifact and memory pages on the query cache | C13b | No page loads its own data outside the cache; live events refresh them |
+| **V0.2.3** ✅ | 🔧 | Web data | The dashboard, profile, artifact and memory pages on the query cache | C13b | No page loads its own data outside the cache; live events refresh them |
 | **V0.2.4** | 🔧 | Web tests | Rendering tests of the invitation and reset pages | C13c | Each state of both pages (valid, used, expired, signed in as someone else) has a test |
 | **V0.2.5** | 📘 | Styles | `styles.css` split per component, dead rules removed | C11 | No stylesheet over 1,000 lines; no visual change |
 | **V0.2.6** | 🔧 | Jobs | Manual re-index endpoints answer `202` with the job instead of indexing in the request | C14 | No request indexes in place; the admin dialog follows the job |
@@ -432,6 +432,13 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 - [x] Behaviour kept: sections remember their state in a per-workspace store while away; `key={workspaceId}` restarts them in another workspace
 - [x] Tests: `src/test/sectionState.test.tsx`; 30 tests, typecheck clean
 
+#### V0.2.3: Remaining pages on the query cache
+
+- [x] **C13b** `Dashboard.tsx`, `Profile.tsx`, `Notifications.tsx`, `ArtifactDetail.tsx` (and its chunks dialog) and `MemoryCardDetail.tsx` use `useServerState`; keys in `queryClient.ts` (`accountKeys`, and `workspaceKeys.artifact*` / `memoryCard` under the workspace); `staleTime: 0` where an old answer must not linger
+- [x] Live events: the evidence page invalidates its entries; the memory card page opens the workspace stream and refreshes the card on other people's edits and on evidence changes
+- [x] Kept: the avatar check has its own small module cache (`fetchSharedAvatar`); the app shell's organization and workspace lists load once per session
+- [x] Tests: two more in `queryState.test.tsx` (32)
+
 ### Decisions to agree before work starts
 
 | # | Decision | Needed by | Proposal |
@@ -511,7 +518,7 @@ Every item of both roads, with the release it is planned for. The evidence behin
 | P4 | One dashboard call | S | ✅ V0.1.74 |
 | P5 | Cached map and health | M | ✅ V0.1.74 |
 | P6 | Code splitting of the web bundle | S | ✅ V0.1.70 |
-| P7 | Query cache with targeted invalidation | M | ✅ V0.1.70 (remaining pages: C13) |
+| P7 | Query cache with targeted invalidation | M | ✅ V0.1.70, remaining pages V0.2.3 |
 | P8 | Writer connection plus read pool; configurable concurrency | M | ✅ V0.1.71 |
 | P9 | Parser time budget (memory caps need a subprocess) | M | ✅ V0.1.74 |
 | P10 | Readings in a subprocess with time and memory limits (R2-4) | M | V0.2.44 |
@@ -533,7 +540,7 @@ Every item of both roads, with the release it is planned for. The evidence behin
 | C10 | Dependency hygiene (`quick-xml` in ingestion; Vite 5 kept) | S | ✅ V0.1.71 |
 | C11 | Split `styles.css` per component | M | V0.2.5 |
 | C12 | Remove the worker stub | S | ✅ V0.1.71 (decision 4) |
-| C13 | Workspace page split per section (13a ✅ V0.2.2), remaining pages on the query cache (13b), link-page rendering tests (13c) | M | V0.2.2–V0.2.4 |
+| C13 | Workspace page split per section (13a ✅ V0.2.2), remaining pages on the query cache (13b ✅ V0.2.3), link-page rendering tests (13c) | M | V0.2.2–V0.2.4 |
 | C14 | Asynchronous manual re-index endpoints | S | V0.2.6 |
 
 ### Operations and documentation

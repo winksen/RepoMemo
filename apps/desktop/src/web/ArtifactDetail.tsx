@@ -1,8 +1,8 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { SafeMarkdown } from "../components/SafeMarkdown";
 import { IconLoader2 as Loader, IconMessageCircle as MessageCircle, IconPencil as Pencil, IconShieldLock as Shield, IconStack2 as Layers, IconTrash as Trash, IconUpload as Upload } from "@tabler/icons-react";
-import { uploadSharedArtifactVersion, createSharedArtifactComment, deleteSharedArtifact, deleteSharedArtifactComment, getSharedArtifact, getSharedArtifactLifecycle, indexSharedArtifact, listSharedArtifactChunks, listSharedArtifactComments, listSharedArtifactLifecycleEvents, listSharedArtifacts, listSharedWorkspaceMembers, updateSharedArtifact, updateSharedArtifactComment, updateSharedArtifactLifecycle } from "../lib/sharedApi";
-import { type ArtifactComment, type ArtifactDetail, type ArtifactLifecycle, type ArtifactLifecycleEvent, type ArtifactLifecycleStatus, type ArtifactSummary, type Chunk, type Organization, type SharedSession, type SharedWorkspace, type WorkspaceMember } from "../types";
+import { uploadSharedArtifactVersion, createSharedArtifactComment, deleteSharedArtifact, deleteSharedArtifactComment, getSharedArtifact, getSharedArtifactLifecycle, indexSharedArtifact, listSharedArtifactChunks, listSharedArtifactComments, listSharedArtifactLifecycleEvents, updateSharedArtifact, updateSharedArtifactComment, updateSharedArtifactLifecycle } from "../lib/sharedApi";
+import { type ArtifactComment, type ArtifactDetail, type ArtifactLifecycle, type ArtifactLifecycleEvent, type ArtifactLifecycleStatus, type ArtifactSummary, type Chunk, type Organization, type SharedSession, type SharedWorkspace } from "../types";
 import { Button } from "../components/ui/button";
 import { Dropdown } from "../components/ui/dropdown";
 import { Input } from "../components/ui/input";
@@ -12,7 +12,10 @@ import { isDocumentArtifact } from "../lib/documents";
 import { DocumentViewer, RepositoryDetailView } from "./lazy";
 import { Toast, showToast } from "../components/ui/toast";
 import { LiveEventsContext, useLiveEventHub, useLiveEvents } from "../lib/liveEvents";
+import { invalidateKeys, queryClient, workspaceKeys } from "../lib/queryClient";
+import { useServerState } from "../lib/useServerState";
 import { INDEX_POLL_ATTEMPTS, INDEX_POLL_INTERVAL_MS, LIVE_FALLBACK_POLL_MS } from "./constants";
+import { useArtifacts, useMembers } from "./workspace/data";
 import { apiMessage, formatActivityTime } from "./format";
 import { SharedRecordLayout } from "./MemoryCardDetail";
 
@@ -41,17 +44,33 @@ export function SharedArtifactDetail({
   workspace: SharedWorkspace;
   workspaces: SharedWorkspace[];
 }) {
-  const [artifact, setArtifact] = useState<ArtifactDetail | null>(null);
-  const [comments, setComments] = useState<ArtifactComment[]>([]);
-  const [lifecycle, setLifecycle] = useState<ArtifactLifecycle | null>(null);
-  const [lifecycleEvents, setLifecycleEvents] = useState<ArtifactLifecycleEvent[]>([]);
-  const [workspaceMembers, setWorkspaceMembers] = useState<WorkspaceMember[]>([]);
-  const [workspaceArtifacts, setWorkspaceArtifacts] = useState<ArtifactSummary[]>([]);
+  // Everything the page shows is in the query cache, under its workspace: shown
+  // at once on a later visit, refetched when the page opens, and marked stale
+  // by live events and by changes made here.
+  const workspaceId = workspace.workspace.id;
+  const [artifact, setArtifact, artifactQuery] = useServerState<ArtifactDetail | null>({
+    key: workspaceKeys.artifact(workspaceId, artifactId), fetch: () => getSharedArtifact(accessToken, artifactId), initial: null, staleTime: 0,
+  });
+  const [comments, setComments, commentsQuery] = useServerState<ArtifactComment[]>({
+    key: workspaceKeys.artifactComments(workspaceId, artifactId), fetch: () => listSharedArtifactComments(accessToken, artifactId), initial: [], staleTime: 0,
+  });
+  const [lifecycle, , lifecycleQuery] = useServerState<ArtifactLifecycle | null>({
+    key: workspaceKeys.artifactLifecycle(workspaceId, artifactId), fetch: () => getSharedArtifactLifecycle(accessToken, artifactId), initial: null, staleTime: 0,
+  });
+  const [lifecycleEvents, , lifecycleEventsQuery] = useServerState<ArtifactLifecycleEvent[]>({
+    key: workspaceKeys.artifactLifecycleEvents(workspaceId, artifactId), fetch: () => listSharedArtifactLifecycleEvents(accessToken, artifactId), initial: [], staleTime: 0,
+  });
+  const [workspaceMembers, , membersQuery] = useMembers(accessToken, workspaceId, true);
+  const [workspaceArtifacts, , workspaceArtifactsQuery] = useArtifacts(accessToken, workspaceId);
+  const pageQueries = [artifactQuery, commentsQuery, lifecycleQuery, lifecycleEventsQuery, membersQuery, workspaceArtifactsQuery];
+  const [isReloading, setIsReloading] = useState(false);
+  const isLoading = isReloading || pageQueries.some((query) => query.isLoading);
+  const loadError = pageQueries.find((query) => query.error)?.error ?? null;
   const [commentBody, setCommentBody] = useState("");
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editingCommentBody, setEditingCommentBody] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  useEffect(() => { if (loadError) setError(apiMessage(loadError)); }, [loadError]);
   const [showChunks, setShowChunks] = useState(false);
   const [indexingStalled, setIndexingStalled] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -83,22 +102,21 @@ export function SharedArtifactDetail({
     } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsMutating(false); }
   }
 
+  /** Marks everything this page shows stale and waits for the refetch (after a change that touches several parts). */
   async function load() {
-    setIsLoading(true); setError(null);
+    setIsReloading(true); setError(null);
     try {
-      const [nextArtifact, nextComments, nextLifecycle, nextLifecycleEvents, nextMembers, nextArtifacts] = await Promise.all([
-        getSharedArtifact(accessToken, artifactId),
-        listSharedArtifactComments(accessToken, artifactId),
-        getSharedArtifactLifecycle(accessToken, artifactId),
-        listSharedArtifactLifecycleEvents(accessToken, artifactId),
-        listSharedWorkspaceMembers(accessToken, workspace.workspace.id),
-        listSharedArtifacts(accessToken, workspace.workspace.id),
+      await invalidateKeys([
+        workspaceKeys.artifact(workspaceId, artifactId),
+        workspaceKeys.artifactComments(workspaceId, artifactId),
+        workspaceKeys.artifactLifecycle(workspaceId, artifactId),
+        workspaceKeys.artifactLifecycleEvents(workspaceId, artifactId),
+        workspaceKeys.members(workspaceId),
+        workspaceKeys.artifacts(workspaceId),
       ]);
-      setArtifact(nextArtifact); setComments(nextComments); setLifecycle(nextLifecycle); setLifecycleEvents(nextLifecycleEvents); setWorkspaceMembers(nextMembers); setWorkspaceArtifacts(nextArtifacts);
-    } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsLoading(false); }
+    } finally { setIsReloading(false); }
   }
 
-  useEffect(() => { void load(); }, [accessToken, artifactId]);
   useEffect(() => { setTitle(artifact?.summary.title ?? ""); }, [artifact?.summary.title]);
   useEffect(() => {
     setLifecycleStatus(lifecycle?.status ?? "active");
@@ -117,13 +135,11 @@ export function SharedArtifactDetail({
     const { action, actor } = event.event;
     const byOthers = actor?.id !== session.user.id;
     if (action === "artifact_indexed" || action === "artifact_updated") {
-      getSharedArtifact(accessToken, artifactId).then(setArtifact).catch(() => undefined);
+      void invalidateKeys([workspaceKeys.artifact(workspaceId, artifactId)]);
     } else if (action.startsWith("comment_") && byOthers) {
-      listSharedArtifactComments(accessToken, artifactId).then(setComments).catch(() => undefined);
+      void invalidateKeys([workspaceKeys.artifactComments(workspaceId, artifactId)]);
     } else if (action === "evidence_lifecycle_updated" && byOthers) {
-      Promise.all([getSharedArtifactLifecycle(accessToken, artifactId), listSharedArtifactLifecycleEvents(accessToken, artifactId)])
-        .then(([nextLifecycle, nextEvents]) => { setLifecycle(nextLifecycle); setLifecycleEvents(nextEvents); })
-        .catch(() => undefined);
+      void invalidateKeys([workspaceKeys.artifactLifecycle(workspaceId, artifactId), workspaceKeys.artifactLifecycleEvents(workspaceId, artifactId)]);
     }
   }, liveHub);
 
@@ -238,24 +254,22 @@ export function IndexedChunksDialog({
   onReindexed: () => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const [chunks, setChunks] = useState<Chunk[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const chunksKey = workspaceKeys.artifactChunks(artifact.workspace_id, artifact.id);
+  const [chunks, , chunksQuery] = useServerState<Chunk[] | null>({
+    key: chunksKey, fetch: () => listSharedArtifactChunks(accessToken, artifact.id), initial: null, staleTime: 0,
+  });
+  const [reindexError, setError] = useState<string | null>(null);
+  const error = reindexError ?? (chunksQuery.error ? apiMessage(chunksQuery.error) : null);
   const [isReindexing, setIsReindexing] = useState(false);
-
-  async function loadChunks() {
-    setError(null);
-    try { setChunks(await listSharedArtifactChunks(accessToken, artifact.id)); } catch (requestError) { setError(apiMessage(requestError)); }
-  }
 
   useEffect(() => {
     const dialog = dialogRef.current;
     if (dialog && !dialog.open) dialog.showModal();
-    void loadChunks();
   }, [artifact.id]);
 
   async function reindex() {
     setIsReindexing(true); setError(null);
-    try { await indexSharedArtifact(accessToken, artifact.id); await loadChunks(); onReindexed(); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsReindexing(false); }
+    try { await indexSharedArtifact(accessToken, artifact.id); await queryClient.invalidateQueries({ queryKey: chunksKey }); onReindexed(); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsReindexing(false); }
   }
 
   return (

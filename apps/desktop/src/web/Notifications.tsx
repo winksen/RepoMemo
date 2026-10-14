@@ -4,6 +4,8 @@ import { listSharedNotifications, markAllSharedNotificationsRead, markSharedNoti
 import { type Organization, type SharedNotification, type SharedSession, type SharedWorkspace } from "../types";
 import { Button } from "../components/ui/button";
 import { Toast } from "../components/ui/toast";
+import { accountKeys } from "../lib/queryClient";
+import { useServerState } from "../lib/useServerState";
 import { SharedLayout } from "../components/SharedLayout";
 import { apiMessage, formatActivityTime } from "./format";
 import { navigate } from "./router";
@@ -24,17 +26,13 @@ export function SharedNotifications({
   signOut: () => void;
   workspaces: SharedWorkspace[];
 }) {
-  const [notifications, setNotifications] = useState<SharedNotification[]>([]);
+  const [notifications, setNotifications, notificationsQuery] = useServerState<SharedNotification[]>({
+    key: accountKeys.notifications(session.user.id), fetch: () => listSharedNotifications(accessToken), initial: [], staleTime: 0,
+  });
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const isLoading = notificationsQuery.isLoading;
   const [isMutating, setIsMutating] = useState(false);
-
-  async function load() {
-    setIsLoading(true); setError(null);
-    try { setNotifications(await listSharedNotifications(accessToken)); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsLoading(false); }
-  }
-
-  useEffect(() => { void load(); }, [accessToken]);
+  useEffect(() => { if (notificationsQuery.error) setError(apiMessage(notificationsQuery.error)); }, [notificationsQuery.error]);
 
   async function openNotification(notification: SharedNotification) {
     setError(null);

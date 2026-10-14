@@ -1,4 +1,4 @@
-import { type FormEvent, type ReactNode, useEffect, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { SafeMarkdown } from "../components/SafeMarkdown";
 import { IconArrowLeft as ArrowLeft, IconFileText as FileText, IconLoader2 as Loader, IconMarkdown as Markdown, IconPencil as Pencil, IconTrash as Trash } from "@tabler/icons-react";
 import { deleteSharedMemoryCard, exportSharedMemoryCard, getSharedMemoryCard, listSharedArtifacts, updateSharedMemoryCard } from "../lib/sharedApi";
@@ -8,7 +8,10 @@ import { Input } from "../components/ui/input";
 import { Textarea } from "../components/ui/textarea";
 import { Toast } from "../components/ui/toast";
 import { SharedLayout } from "../components/SharedLayout";
-import { type WorkspaceSection } from "./constants";
+import { invalidateKeys, queryClient, workspaceKeys } from "../lib/queryClient";
+import { useLiveEventHub, useLiveEvents } from "../lib/liveEvents";
+import { useServerState } from "../lib/useServerState";
+import { LEDGER_ACTIONS, LIVE_REFRESH_DELAY_MS, type WorkspaceSection } from "./constants";
 import { apiMessage, citationLines } from "./format";
 import { navigate } from "./router";
 import { OrganizationRail, WorkspaceTopbar } from "./Organization";
@@ -48,9 +51,16 @@ export function SharedMemoryCardDetail({
   workspace: SharedWorkspace;
   workspaces: SharedWorkspace[];
 }) {
-  const [card, setCard] = useState<MemoryCardDetail | null>(null);
+  // The card is in the query cache under its workspace: shown at once on a
+  // later visit, refetched when the page opens, and marked stale by live events.
+  const workspaceId = workspace.workspace.id;
+  const cardKey = workspaceKeys.memoryCard(workspaceId, cardId);
+  const [card, , cardQuery] = useServerState<MemoryCardDetail | null>({
+    key: cardKey, fetch: () => getSharedMemoryCard(accessToken, cardId), initial: null, staleTime: 0,
+  });
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isReloading, setIsReloading] = useState(false);
+  const isLoading = isReloading || cardQuery.isLoading;
   const [isExporting, setIsExporting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isMutating, setIsMutating] = useState(false);
@@ -59,16 +69,35 @@ export function SharedMemoryCardDetail({
   const [source, setSource] = useState("");
   // Evidence being edited: what the card will cite once saved.
   const [citations, setCitations] = useState<EditableCitation[]>([]);
-  const [artifacts, setArtifacts] = useState<ArtifactSummary[]>([]);
   const [addArtifactId, setAddArtifactId] = useState("");
   const canWrite = workspace.role !== "viewer";
+  // The evidence a card can cite is the workspace's file list, read when editing starts.
+  const [artifacts] = useServerState<ArtifactSummary[]>({
+    key: workspaceKeys.artifacts(workspaceId), fetch: () => listSharedArtifacts(accessToken, workspaceId), initial: [], enabled: isEditing,
+  });
 
   async function load() {
-    setIsLoading(true); setError(null);
-    try { setCard(await getSharedMemoryCard(accessToken, cardId)); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsLoading(false); }
+    setIsReloading(true); setError(null);
+    try { await invalidateKeys([cardKey]); } finally { setIsReloading(false); }
   }
+  useEffect(() => { if (cardQuery.error) setError(apiMessage(cardQuery.error)); }, [cardQuery.error]);
 
-  useEffect(() => { void load(); }, [accessToken, cardId]);
+  // Live updates: another person editing this card, or evidence it cites
+  // changing (which can make it need review), refreshes it once per burst.
+  const liveHub = useLiveEventHub(`/v1/workspaces/${encodeURIComponent(workspaceId)}/events`, accessToken);
+  const refreshTimer = useRef<number | null>(null);
+  useEffect(() => () => { if (refreshTimer.current !== null) window.clearTimeout(refreshTimer.current); }, []);
+  useLiveEvents((event) => {
+    const affectsCard = event.type === "resync"
+      || (event.type === "activity" && (
+        (event.event.action === "memory_updated" && event.event.subject_id === cardId && event.event.actor?.id !== session.user.id)
+        || LEDGER_ACTIONS.has(event.event.action)));
+    if (!affectsCard || refreshTimer.current !== null) return;
+    refreshTimer.current = window.setTimeout(() => {
+      refreshTimer.current = null;
+      void queryClient.invalidateQueries({ queryKey: cardKey });
+    }, LIVE_REFRESH_DELAY_MS);
+  }, liveHub);
   useEffect(() => {
     setTitle(card?.card.title ?? "");
     setBodyMarkdown(card?.card.body_markdown ?? "");
@@ -86,7 +115,6 @@ export function SharedMemoryCardDetail({
       confidence: null,
     })));
     setIsEditing(true);
-    listSharedArtifacts(accessToken, workspace.workspace.id).then(setArtifacts).catch(() => undefined);
   }
 
   function addCitation() {

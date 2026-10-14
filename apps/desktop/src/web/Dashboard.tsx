@@ -2,6 +2,8 @@ import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { IconBuildingCommunity as Building, IconChevronRight as ChevronRight, IconLayoutDashboard as Dashboard, IconLoader2 as Loader, IconPlus as Plus, IconShieldLock as Shield, IconStack2 as Layers } from "@tabler/icons-react";
 import { createSharedOrganization, createSharedWorkspace, type DashboardWorkspaceFigures, getSharedDashboard } from "../lib/sharedApi";
 import { type Organization, type SharedSession, type SharedWorkspace } from "../types";
+import { accountKeys } from "../lib/queryClient";
+import { useServerState } from "../lib/useServerState";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Toast } from "../components/ui/toast";
@@ -28,23 +30,18 @@ export function SharedDashboard({
   signOut: () => void;
   workspaces: SharedWorkspace[];
 }) {
-  const [metricsByWorkspace, setMetricsByWorkspace] = useState<Record<string, DashboardWorkspaceFigures>>({});
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  async function load() {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const figures = await getSharedDashboard(accessToken);
-      setMetricsByWorkspace(Object.fromEntries(figures.workspaces.map((entry) => [entry.workspace_id, entry])));
-    } catch (loadError) {
-      setError(apiMessage(loadError));
-    }
-    setIsLoading(false);
-  }
-
-  useEffect(() => { void load(); }, [accessToken, workspaces]);
+  // The figures come from the query cache: shown at once when the page was open
+  // before, refetched on every visit, and again when the workspace list changes.
+  const workspaceIds = useMemo(() => workspaces.map((entry) => entry.workspace.id).join(","), [workspaces]);
+  const [metricsByWorkspace, , figuresQuery] = useServerState<Record<string, DashboardWorkspaceFigures>>({
+    key: accountKeys.dashboard(workspaceIds),
+    fetch: async () => Object.fromEntries((await getSharedDashboard(accessToken)).workspaces.map((entry) => [entry.workspace_id, entry])),
+    initial: {},
+    staleTime: 0,
+  });
+  const isLoading = figuresQuery.isLoading;
+  useEffect(() => { setError(figuresQuery.error ? apiMessage(figuresQuery.error) : null); }, [figuresQuery.error]);
 
   const summary = useMemo(() => Object.values(metricsByWorkspace).reduce((total, metrics) => ({
     artifacts: total.artifacts + metrics.artifact_count,
