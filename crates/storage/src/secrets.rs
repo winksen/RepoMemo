@@ -128,6 +128,8 @@ fn load_or_create_key_file(path: &Path) -> Result<Vec<u8>> {
             if key.len() < KEY_FILE_BYTES {
                 bail!("{} holds a key that is too short", path.display());
             }
+            // A key file made by an earlier version may be open to other accounts.
+            restrict_to_owner(path);
             Ok(key)
         }
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => create_key_file(path),
@@ -153,12 +155,65 @@ fn create_key_file(path: &Path) -> Result<Vec<u8>> {
             file.write_all(STANDARD.encode(&key).as_bytes())
                 .and_then(|_| file.sync_all())
                 .with_context(|| format!("the key file {} could not be written", path.display()))?;
+            restrict_to_owner(path);
             Ok(key)
         }
         // Another process created it first: use that key.
         Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => load_or_create_key_file(path),
         Err(error) => Err(error).with_context(|| format!("the key file {} could not be created", path.display())),
     }
+}
+
+/// Makes the key file readable by its owner only (review L5). On Unix the
+/// file is created with mode 0600 and older files are tightened to it; on
+/// Windows the folder's inherited permissions are removed and only the
+/// current account is granted access. Failing is logged, not fatal: the
+/// operator can set `REPOMEMO_SECRET_KEY` instead.
+fn restrict_to_owner(path: &Path) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let result = std::fs::metadata(path).and_then(|metadata| {
+            if metadata.permissions().mode() & 0o077 == 0 {
+                return Ok(());
+            }
+            std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))
+        });
+        if let Err(error) = result {
+            tracing::warn!(path = %path.display(), error = %error, "The key file permissions could not be restricted");
+        }
+    }
+    #[cfg(windows)]
+    {
+        let Ok(account) = std::env::var("USERNAME") else {
+            tracing::warn!(path = %path.display(), "The key file permissions were not restricted: the account name is unknown");
+            return;
+        };
+        let account = match std::env::var("USERDOMAIN") {
+            Ok(domain) if !domain.is_empty() => format!("{domain}\\{account}"),
+            _ => account,
+        };
+        match std::process::Command::new("icacls")
+            .arg(path)
+            .args(["/inheritance:r", "/grant:r"])
+            .arg(format!("{account}:(F)"))
+            .output()
+        {
+            Ok(output) if output.status.success() => {}
+            Ok(output) => tracing::warn!(
+                path = %path.display(),
+                detail = %String::from_utf8_lossy(&output.stdout).trim(),
+                "The key file permissions could not be restricted; set REPOMEMO_SECRET_KEY or restrict the data folder"
+            ),
+            Err(error) => tracing::warn!(
+                path = %path.display(),
+                error = %error,
+                "The key file permissions could not be restricted; set REPOMEMO_SECRET_KEY or restrict the data folder"
+            ),
+        }
+    }
+    #[cfg(not(any(unix, windows)))]
+    let _ = path;
 }
 
 #[cfg(test)]

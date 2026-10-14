@@ -26,6 +26,9 @@ pub enum EmbeddingRun {
     UpToDate,
     Embedded(usize),
     Cancelled(usize),
+    /// The workspace used up its daily allowance of background AI calls; the
+    /// rest is embedded after midnight UTC.
+    BudgetSpent(usize),
 }
 
 impl RepoMemoCore {
@@ -85,6 +88,22 @@ impl RepoMemoCore {
                 .await?;
             if batch.is_empty() {
                 break;
+            }
+            if !self.ai_budget.try_spend(workspace_id, 1) {
+                let reason = format!(
+                    "The workspace reached its daily limit of {} background AI calls. Embedding continues tomorrow.",
+                    self.ai_budget.daily_limit()
+                );
+                self.storage
+                    .update_indexing_job(
+                        &job.id,
+                        "failed",
+                        "daily_budget_reached",
+                        completed as i64,
+                        Some(&reason),
+                    )
+                    .await?;
+                return Ok(EmbeddingRun::BudgetSpent(completed));
             }
             let texts = batch.iter().map(embedding_text).collect::<Vec<_>>();
             let vectors = match provider.embed(texts, json!({})).await {

@@ -18,6 +18,7 @@ use repomemo_storage::{NewArtifact, StorageConfig, StorageEngine};
 use serde_json::json;
 
 mod agent;
+mod budget;
 mod embeddings;
 mod health;
 mod knowledge_map;
@@ -27,10 +28,11 @@ mod repo_stack;
 mod repo_sync;
 
 pub use agent::{agent_capabilities, agent_conversation_title, agent_turn_label};
+pub use budget::BackgroundAiBudget;
 pub use embeddings::EmbeddingRun;
 pub use repo_policy::{is_network_path, RepoLinkPolicy};
 pub use repo_sync::RepoHead;
-pub use repomemo_ingestion::served_mime_type;
+pub use repomemo_ingestion::{abandoned_readings, served_mime_type, set_document_time_limit};
 
 /// Passages Ask puts in front of the model, after reranking a wider pool.
 const ASK_CONTEXT_PASSAGES: usize = 8;
@@ -49,6 +51,7 @@ pub struct RepoMemoCore {
     storage: StorageEngine,
     retrieval: RetrievalService,
     repo_policy: std::sync::Arc<RepoLinkPolicy>,
+    ai_budget: BackgroundAiBudget,
 }
 
 impl RepoMemoCore {
@@ -66,7 +69,13 @@ impl RepoMemoCore {
             storage,
             retrieval,
             repo_policy: std::sync::Arc::new(RepoLinkPolicy::unrestricted()),
+            ai_budget: BackgroundAiBudget::default(),
         }
+    }
+
+    /// The daily allowance of AI calls made in the background.
+    pub fn background_ai_budget(&self) -> &BackgroundAiBudget {
+        &self.ai_budget
     }
 
     /// Restricts which folders repository links may point at. Applies to new
@@ -1092,6 +1101,12 @@ impl RepoMemoCore {
         let (output, stage) = if matches!(summary.artifact_type, ArtifactType::Image) {
             match self.vision_provider_for_workspace(&summary.workspace_id).await? {
                 Some(settings) => {
+                    if !self.ai_budget.try_spend(&summary.workspace_id, 1) {
+                        bail!(
+                            "This workspace reached its daily limit of {} background AI calls. Images are described again tomorrow.",
+                            self.ai_budget.daily_limit()
+                        );
+                    }
                     let provider = provider_from_settings(settings)?;
                     // Fail fast with a readable reason (Ollama stopped, model
                     // missing) instead of waiting on a doomed image request.

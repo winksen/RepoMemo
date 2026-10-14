@@ -11,6 +11,7 @@ mod avatars;
 mod collaboration;
 mod config;
 mod conversion;
+mod derived;
 mod embedding;
 mod environment;
 mod errors;
@@ -92,8 +93,8 @@ use repomemo_domain::{
     WorkspaceCapabilities, WorkspaceMember, WorkspaceOverview, WorkspaceRole,
 };
 use repomemo_storage::{
-    NewCollaborationTask, NewSavedSearch, NewSharedNotification, NewTaskChecklistItem, SaveArtifactLifecycle,
-    StorageConfig, StorageEngine,
+    ArtifactQuery, NewCollaborationTask, NewSavedSearch, NewSharedNotification, NewTaskChecklistItem,
+    SaveArtifactLifecycle, StorageConfig, StorageEngine,
 };
 use tokio_stream::{
     wrappers::{errors::BroadcastStreamRecvError, BroadcastStream, ReceiverStream},
@@ -105,7 +106,7 @@ use crate::embedding::EmbeddingQueue;
 use crate::events::{BusActivityObserver, BusJobObserver, WorkspaceEventBus};
 use crate::indexing::IndexQueue;
 use crate::repositories::RepoSyncRunner;
-use crate::security::{too_many_requests, wait_text, ClientIp, Guards};
+use crate::security::{consume_heavy_quota, too_many_requests, wait_text, ClientIp, Guards};
 use crate::system::{InstanceInfo, MaintenanceStatus, SettingsCell, Telemetry};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -139,6 +140,8 @@ struct AppState {
     repo_sync: RepoSyncRunner,
     runtime: Arc<SettingsCell>,
     guards: Arc<Guards>,
+    /// Knowledge maps and health reports, kept while a workspace is unchanged.
+    derived: Arc<derived::DerivedCache>,
     instance: Arc<InstanceInfo>,
     telemetry: Arc<Telemetry>,
     maintenance_status: Arc<std::sync::Mutex<MaintenanceStatus>>,
@@ -194,6 +197,7 @@ async fn build_state(
         data_dir: data_dir.clone(),
         master_key: config.secret_key.clone(),
         read_connections: config.db_read_connections,
+        vector_index_mb: config.vector_index_mb,
     })
     .await?;
 
@@ -261,6 +265,7 @@ async fn build_state(
     }) {
         tracing::debug!("The AI endpoint policy was already set in this process");
     }
+    repomemo_api::set_document_time_limit(config.document_time_limit);
     // Git runs on folders other people chose: isolate it from the service
     // account's own configuration (review L8). The configured repository
     // folders, and the ones the operator lists, are the trusted ones.
@@ -288,6 +293,7 @@ async fn build_state(
     // `RepoMemoCore`. Without this the two halves would each hold their own
     // pool and SSE would only see writes the server layer performed directly.
     let core = RepoMemoCore::from_storage(storage.clone()).with_repo_link_policy(repo_policy);
+    runtime.share_background_limit(core.background_ai_budget().limit_handle());
 
     let event_bus = WorkspaceEventBus::new();
     storage.set_job_observer(Arc::new(BusJobObserver::new(event_bus.clone())));
@@ -352,6 +358,7 @@ async fn build_state(
         repo_sync,
         runtime,
         guards: Arc::new(Guards::default()),
+        derived: Arc::new(derived::DerivedCache::default()),
         instance,
         telemetry: Arc::new(Telemetry::default()),
         maintenance_status: Arc::new(std::sync::Mutex::new(MaintenanceStatus::default())),
@@ -463,6 +470,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             "/v1/organizations/{organization_id}/members/{user_id}",
             delete(remove_organization_member),
         )
+        .route("/v1/dashboard", get(dashboard))
         .route("/v1/workspaces", get(list_workspaces).post(create_workspace))
         .route(
             "/v1/workspaces/{workspace_id}",
@@ -703,7 +711,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             security::security_headers,
         ))
         .layer(middleware::from_fn_with_state(state.clone(), system::track_requests))
-        .layer(TraceLayer::new_for_http())
+        .layer(TraceLayer::new_for_http().make_span_with(security::redacted_span))
         .layer(DefaultBodyLimit::max(config.max_upload_bytes))
         .with_state(state)
 }

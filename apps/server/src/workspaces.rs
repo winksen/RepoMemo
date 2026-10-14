@@ -29,6 +29,42 @@ pub(crate) async fn list_workspaces(
     workspaces.map(Json).map_err(ApiError::internal)
 }
 
+/// The figures the dashboard shows for every workspace the caller can open,
+/// in one request (the page used to ask for each workspace's metrics).
+pub(crate) async fn dashboard(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+) -> Result<Json<DashboardResponse>, ApiError> {
+    consume_heavy_quota(&state, &subject)?;
+    let started = std::time::Instant::now();
+    let workspaces = if subject.is_system_admin {
+        state
+            .storage
+            .list_shared_workspaces_for_system_admin(&subject.user_id)
+            .await
+    } else {
+        state.storage.list_shared_workspaces_for_user(&subject.user_id).await
+    }
+    .map_err(ApiError::internal)?;
+    let ids = workspaces
+        .iter()
+        .map(|entry| entry.workspace.id.clone())
+        .collect::<Vec<_>>();
+    let counts = state.storage.dashboard_counts(&ids).await.map_err(map_storage_error)?;
+    record_timing("dashboard", "all", started, ids.len());
+    Ok(Json(DashboardResponse {
+        workspaces: counts
+            .into_iter()
+            .map(|counts| DashboardWorkspace {
+                workspace_id: counts.workspace_id,
+                artifact_count: counts.artifacts,
+                active_task_count: counts.active_tasks,
+                memory_card_count: counts.memory_cards,
+            })
+            .collect(),
+    }))
+}
+
 pub(crate) async fn update_workspace(
     subject: AuthenticatedSubject,
     State(state): State<AppState>,
@@ -88,17 +124,19 @@ pub(crate) async fn workspace_metrics(
     Path(workspace_id): Path<String>,
 ) -> Result<Json<WorkspaceMetricsResponse>, ApiError> {
     require_workspace_read(&state, &subject, &workspace_id).await?;
+    consume_heavy_quota(&state, &subject)?;
     let started = std::time::Instant::now();
     let overview = state
         .core
         .workspace_overview(workspace_id.clone())
         .await
         .map_err(map_core_error)?;
-    let artifacts = state
-        .core
-        .list_artifacts(workspace_id.clone())
+    let freshness_threshold = (Utc::now() - ChronoDuration::days(7)).to_rfc3339();
+    let stats = state
+        .storage
+        .workspace_artifact_stats(&workspace_id, &freshness_threshold)
         .await
-        .map_err(map_core_error)?;
+        .map_err(map_storage_error)?;
     let activity = state
         .storage
         .list_workspace_activity(&workspace_id, 100)
@@ -124,32 +162,19 @@ pub(crate) async fn workspace_metrics(
         .rev()
         .map(|offset| ((today - ChronoDuration::days(offset)).to_string(), 0))
         .collect::<BTreeMap<_, _>>();
-    let freshness_threshold = (Utc::now() - ChronoDuration::days(7)).to_rfc3339();
-    let mut indexed_artifact_count = 0;
-    let mut total_artifact_bytes = 0;
-    let mut indexed_artifact_bytes = 0;
-    let mut artifacts_created_last_7_days = 0;
-    let mut artifacts_updated_last_7_days = 0;
-
-    for artifact in &artifacts {
-        if artifact.indexed_at.is_some() {
-            indexed_artifact_count += 1;
-            indexed_artifact_bytes += artifact.size_bytes;
-        }
-        total_artifact_bytes += artifact.size_bytes;
-        let artifact_type = artifact_type_label(&artifact.artifact_type).to_owned();
-        *artifact_types.entry(artifact_type.clone()).or_default() += 1;
-        *artifact_bytes_by_type.entry(artifact_type).or_default() += artifact.size_bytes;
-        artifacts_created_last_7_days += i64::from(artifact.created_at >= freshness_threshold);
-        artifacts_updated_last_7_days += i64::from(artifact.updated_at >= freshness_threshold);
-        if let Some(language) = artifact
-            .language
-            .as_ref()
-            .filter(|language| !language.trim().is_empty())
-        {
-            *languages.entry(language.clone()).or_default() += 1;
-        }
+    for (artifact_type, files, bytes) in &stats.by_type {
+        let label = artifact_type_label(artifact_type).to_owned();
+        *artifact_types.entry(label.clone()).or_default() += files;
+        *artifact_bytes_by_type.entry(label).or_default() += bytes;
     }
+    for (language, files) in &stats.by_language {
+        *languages.entry(language.clone()).or_default() += files;
+    }
+    let indexed_artifact_count = stats.indexed;
+    let total_artifact_bytes = stats.total_bytes;
+    let indexed_artifact_bytes = stats.indexed_bytes;
+    let artifacts_created_last_7_days = stats.created_since;
+    let artifacts_updated_last_7_days = stats.updated_since;
     for event in &activity {
         *activity_actions.entry(event.action.replace('_', " ")).or_default() += 1;
         if let Some(day) = event.created_at.get(..10) {
@@ -171,7 +196,12 @@ pub(crate) async fn workspace_metrics(
         .map_err(map_core_error)?
         .map(|(embedded, _)| embedded);
 
-    record_timing("metrics", &workspace_id, started, artifacts.len());
+    record_timing(
+        "metrics",
+        &workspace_id,
+        started,
+        overview.artifact_count.max(0) as usize,
+    );
     Ok(Json(WorkspaceMetricsResponse {
         workspace_id,
         generated_at: Utc::now().to_rfc3339(),
@@ -254,8 +284,19 @@ pub(crate) async fn workspace_knowledge_map(
     Path(workspace_id): Path<String>,
 ) -> Result<Json<KnowledgeMap>, ApiError> {
     require_workspace_read(&state, &subject, &workspace_id).await?;
+    consume_heavy_quota(&state, &subject)?;
     let started = std::time::Instant::now();
+    let version = state
+        .storage
+        .workspace_content_version(&workspace_id)
+        .await
+        .map_err(map_storage_error)?;
+    if let Some(map) = state.derived.knowledge_map(&workspace_id, &version) {
+        record_timing("knowledge_map_cached", &workspace_id, started, map.nodes.len());
+        return Ok(Json(map));
+    }
     let map = state.core.knowledge_map(&workspace_id).await.map_err(map_core_error)?;
+    state.derived.keep_knowledge_map(&workspace_id, version, map.clone());
     record_timing("knowledge_map", &workspace_id, started, map.nodes.len());
     Ok(Json(map))
 }

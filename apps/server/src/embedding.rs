@@ -95,6 +95,9 @@ async fn embed_workspace(core: &RepoMemoCore, workspace_id: &str) {
         Ok(EmbeddingRun::Cancelled(count)) => {
             tracing::info!(workspace_id = %workspace_id, count, "Embedding cancelled");
         }
+        Ok(EmbeddingRun::BudgetSpent(count)) => {
+            tracing::warn!(target: "audit", workspace_id = %workspace_id, count, "Embedding paused: the workspace used its daily allowance of background AI calls");
+        }
         Ok(EmbeddingRun::NotConfigured | EmbeddingRun::UpToDate) => {}
         Err(error) => {
             // The job records the reason; the next indexed file, provider

@@ -32,14 +32,17 @@ mod repo;
 mod search;
 mod secrets;
 mod setup;
+mod stats;
 mod system;
 mod users;
+mod vectors;
 pub use access::{PasswordReset, PersonalTokenGrant, StoredInvitation, PERSONAL_TOKEN_PREFIX};
 pub use environment::{inspect_environment, EnvironmentState};
 pub use repo::{RepoFileRecord, RepoFileWrite};
 use secrets::SecretBox;
 pub use secrets::{KEY_FILE_NAME as SECRET_KEY_FILE_NAME, MIN_MASTER_KEY_CHARS};
 pub use setup::SetupState;
+pub use stats::{ArtifactQuery, ArtifactStats, DashboardCounts};
 pub use system::{StoredSystemSetting, UserAccess};
 
 /// The database file inside an environment folder.
@@ -75,6 +78,9 @@ pub struct StorageConfig {
     /// one connection of their own, so a burst of reads never waits for a
     /// write lock and writers never queue behind each other inside SQLite.
     pub read_connections: u32,
+    /// Memory the in-memory vector indexes may hold, in MiB; 0 turns them off
+    /// and meaning searches scan the database.
+    pub vector_index_mb: u32,
 }
 
 impl StorageConfig {
@@ -83,12 +89,17 @@ impl StorageConfig {
             data_dir: data_dir.into(),
             master_key: None,
             read_connections: DEFAULT_READ_CONNECTIONS,
+            vector_index_mb: DEFAULT_VECTOR_INDEX_MB,
         }
     }
 }
 
 /// How many connections serve reads unless the operator says otherwise.
 pub const DEFAULT_READ_CONNECTIONS: u32 = 4;
+
+/// Memory for vector indexes unless the operator says otherwise: a workspace
+/// of 50,000 passages with 768-dimensional vectors takes about 150 MiB.
+pub const DEFAULT_VECTOR_INDEX_MB: u32 = 512;
 
 /// What a blob garbage-collection pass removed.
 #[derive(Debug, Clone, Default)]
@@ -110,6 +121,8 @@ pub struct StorageEngine {
     /// Serialises blob writes with blob garbage collection, so a blob that is
     /// being stored again is never deleted underneath the writer.
     blob_lock: Arc<tokio::sync::Mutex<()>>,
+    /// Passage vectors held in memory for meaning search.
+    vectors: Arc<vectors::VectorCache>,
     job_observer: Arc<RwLock<Option<Arc<dyn JobObserver>>>>,
     activity_observer: Arc<RwLock<Option<Arc<dyn ActivityObserver>>>>,
 }
@@ -694,6 +707,7 @@ impl StorageEngine {
             blob_dir,
             secrets,
             blob_lock: Arc::new(tokio::sync::Mutex::new(())),
+            vectors: Arc::new(vectors::VectorCache::new(config.vector_index_mb)),
             job_observer: Arc::new(RwLock::new(None)),
             activity_observer: Arc::new(RwLock::new(None)),
         };

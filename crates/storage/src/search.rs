@@ -1,5 +1,20 @@
 use super::*;
 
+/// A passage the vector index named, with what a result needs.
+#[derive(Debug, sqlx::FromRow)]
+struct EmbeddingCandidateRow {
+    chunk_id: String,
+    artifact_id: String,
+    title: String,
+    path: String,
+    artifact_type: String,
+    language: Option<String>,
+    text: String,
+    start_line: Option<i64>,
+    end_line: Option<i64>,
+    source_name: String,
+}
+
 impl StorageEngine {
     pub async fn list_symbols(&self, artifact_id: &str) -> Result<Vec<Symbol>> {
         let rows = sqlx::query_as::<_, SymbolRow>(
@@ -90,32 +105,38 @@ impl StorageEngine {
     ) -> Result<()> {
         let now = Utc::now().to_rfc3339();
         let mut tx = self.pool.begin().await?;
-        for (chunk_id, vector) in embeddings {
+        for (chunk_id, vector) in &embeddings {
             if vector.is_empty() {
                 continue;
             }
             let dimensions = vector.len() as i64;
-            let bytes = encode_embedding(&vector);
+            let bytes = encode_embedding(vector);
             sqlx::query(
                 r#"INSERT INTO chunk_embeddings (chunk_id, workspace_id, model, dimensions, vector_blob, created_at, updated_at)
                    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6)
                    ON CONFLICT(chunk_id) DO UPDATE SET model = excluded.model, dimensions = excluded.dimensions,
                      vector_blob = excluded.vector_blob, updated_at = excluded.updated_at"#,
             )
-            .bind(&chunk_id).bind(workspace_id).bind(model).bind(dimensions).bind(bytes).bind(&now)
+            .bind(chunk_id).bind(workspace_id).bind(model).bind(dimensions).bind(bytes).bind(&now)
             .execute(&mut *tx).await?;
             sqlx::query("UPDATE chunks SET embedding_status = 'ready' WHERE id = ?1")
-                .bind(&chunk_id)
+                .bind(chunk_id)
                 .execute(&mut *tx)
                 .await?;
         }
         tx.commit().await?;
+        // A search index that exists is brought along, not rebuilt.
+        self.vectors.apply(workspace_id, model, &embeddings);
         Ok(())
     }
 
     /// Nearest chunks to `query` among those embedded with `model`, honouring
     /// the same type, language and source filters as keyword search. Vectors
     /// from another model are skipped: their dimensions and meaning differ.
+    ///
+    /// The nearest vectors come from the workspace's in-memory index; the
+    /// database is asked only about those passages (and the filters). A
+    /// workspace too large for the index is scanned in the database instead.
     pub async fn search_chunks_by_embedding(
         &self,
         request: &SearchRequest,
@@ -126,6 +147,117 @@ impl StorageEngine {
             return Ok(Vec::new());
         }
         let folders = self.search_folder_scope(request).await?;
+        let limit = request.limit.unwrap_or(12).clamp(1, 100) as usize;
+        let mut results = match self.vector_index(&request.workspace_id, model).await? {
+            Some(index) => self.search_vector_index(request, &folders, index, query, limit).await?,
+            None => self.scan_chunks_by_embedding(request, &folders, model, query).await?,
+        };
+        results.truncate(limit);
+        self.attach_commits(&mut results).await?;
+        Ok(results)
+    }
+
+    /// Takes the nearest vectors from `index`, widening the net until enough
+    /// of them pass the request's filters or the index is exhausted.
+    pub(crate) async fn search_vector_index(
+        &self,
+        request: &SearchRequest,
+        folders: &[String],
+        index: Arc<RwLock<vectors::WorkspaceVectors>>,
+        query: &[f32],
+        limit: usize,
+    ) -> Result<Vec<SearchResult>> {
+        let Some(unit) = vectors::normalised(query) else {
+            return Ok(Vec::new());
+        };
+        let unit = Arc::new(unit);
+        let mut wanted = (limit * 4).max(64);
+        loop {
+            let nearest = {
+                let index = index.clone();
+                let unit = unit.clone();
+                tokio::task::spawn_blocking(move || {
+                    index
+                        .read()
+                        .map(|index| index.nearest(&unit, wanted))
+                        .map_err(|_| anyhow::anyhow!("the vector index is unavailable"))
+                })
+                .await??
+            };
+            let exhausted = nearest.len() < wanted;
+            let rows = self.passages_of_vectors(request, folders, &nearest).await?;
+            if rows.len() >= limit || exhausted {
+                return Ok(rows);
+            }
+            wanted = wanted.saturating_mul(8);
+        }
+    }
+
+    /// The passages among `nearest` that pass the request's filters, in the
+    /// order of `nearest`, with their similarity as the score.
+    async fn passages_of_vectors(
+        &self,
+        request: &SearchRequest,
+        folders: &[String],
+        nearest: &[(String, f32)],
+    ) -> Result<Vec<SearchResult>> {
+        let mut found: HashMap<String, EmbeddingCandidateRow> = HashMap::new();
+        for batch in nearest.chunks(400) {
+            let mut builder = QueryBuilder::<Sqlite>::new(
+                r#"SELECT chunks.id AS chunk_id, chunks.artifact_id, artifacts.title, artifacts.path,
+                     artifacts.type AS artifact_type, artifacts.language, chunks.text, chunks.start_line,
+                     chunks.end_line, sources.name AS source_name
+                   FROM chunks
+                   JOIN artifacts ON artifacts.id = chunks.artifact_id
+                   JOIN sources ON sources.id = artifacts.source_id
+                   WHERE chunks.workspace_id = "#,
+            );
+            builder.push_bind(&request.workspace_id);
+            builder.push(" AND chunks.id IN (");
+            let mut separated = builder.separated(", ");
+            for (chunk_id, _) in batch {
+                separated.push_bind(chunk_id.clone());
+            }
+            separated.push_unseparated(")");
+            push_search_filters(&mut builder, request, folders);
+            for row in builder
+                .build_query_as::<EmbeddingCandidateRow>()
+                .fetch_all(self.reader())
+                .await?
+            {
+                found.insert(row.chunk_id.clone(), row);
+            }
+        }
+        Ok(nearest
+            .iter()
+            .filter_map(|(chunk_id, score)| {
+                let row = found.remove(chunk_id)?;
+                Some(SearchResult {
+                    artifact_id: row.artifact_id,
+                    chunk_id: row.chunk_id,
+                    title: row.title,
+                    path: row.path,
+                    artifact_type: artifact_type_from_db(&row.artifact_type),
+                    language: row.language,
+                    snippet: row.text.chars().take(360).collect(),
+                    start_line: row.start_line,
+                    end_line: row.end_line,
+                    score: f64::from(*score),
+                    source_name: row.source_name,
+                    commit: None,
+                })
+            })
+            .collect())
+    }
+
+    /// The slow path: decode every vector of the workspace and compare.
+    pub(crate) async fn scan_chunks_by_embedding(
+        &self,
+        request: &SearchRequest,
+        folders: &[String],
+        model: &str,
+        query: &[f32],
+    ) -> Result<Vec<SearchResult>> {
         let mut builder = QueryBuilder::<Sqlite>::new(
             r#"SELECT chunks.id AS chunk_id, chunks.artifact_id, artifacts.title, artifacts.path,
                  artifacts.type AS artifact_type, artifacts.language, chunks.text, chunks.start_line,
@@ -137,12 +269,11 @@ impl StorageEngine {
         builder.push_bind(&request.workspace_id);
         builder.push(" AND chunk_embeddings.model = ");
         builder.push_bind(model);
-        push_search_filters(&mut builder, request, &folders);
+        push_search_filters(&mut builder, request, folders);
         let rows = builder
             .build_query_as::<EmbeddingSearchRow>()
             .fetch_all(self.reader())
             .await?;
-        let limit = request.limit.unwrap_or(12);
         let mut results = rows
             .into_iter()
             .filter_map(|row| {
@@ -165,8 +296,6 @@ impl StorageEngine {
             })
             .collect::<Vec<_>>();
         results.sort_by(|left, right| right.score.total_cmp(&left.score));
-        results.truncate(limit.clamp(1, 100) as usize);
-        self.attach_commits(&mut results).await?;
         Ok(results)
     }
 

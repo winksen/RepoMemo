@@ -423,6 +423,19 @@ export function getSharedWorkspaceOverview(accessToken: string, workspaceId: str
   return request<WorkspaceOverview>(`/v1/workspaces/${workspaceId}/overview`, {}, accessToken);
 }
 
+/** The dashboard's figures for every workspace the person can open. */
+export interface DashboardWorkspaceFigures {
+  workspace_id: string;
+  artifact_count: number;
+  /** Tasks that are open or in progress. */
+  active_task_count: number;
+  memory_card_count: number;
+}
+
+export function getSharedDashboard(accessToken: string): Promise<{ workspaces: DashboardWorkspaceFigures[] }> {
+  return request<{ workspaces: DashboardWorkspaceFigures[] }>("/v1/dashboard", {}, accessToken);
+}
+
 export function getSharedWorkspaceMetrics(accessToken: string, workspaceId: string): Promise<WorkspaceMetrics> {
   return request<WorkspaceMetrics>(`/v1/workspaces/${workspaceId}/metrics`, {}, accessToken);
 }

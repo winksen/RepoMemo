@@ -9,8 +9,10 @@ use quick_xml::events::Event;
 use quick_xml::Reader;
 use repomemo_domain::{ArtifactType, ImportSkippedItem, SourceType};
 
+mod budget;
 mod documents;
 pub mod repo;
+pub use budget::{abandoned_readings, set_time_limit as set_document_time_limit};
 pub use documents::{
     document_extensions, document_kind, document_preview, extract_document_text, is_document, DocumentKind,
 };

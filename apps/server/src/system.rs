@@ -50,6 +50,8 @@ pub(crate) struct SettingsCell {
     current: RwLock<Arc<RuntimeSettings>>,
     /// Where log files go when file logging is on.
     data_dir: PathBuf,
+    /// The daily allowance of background AI calls the core spends from.
+    background_limit: std::sync::OnceLock<Arc<std::sync::atomic::AtomicU32>>,
 }
 
 impl SettingsCell {
@@ -58,7 +60,18 @@ impl SettingsCell {
             current: RwLock::new(Arc::new(defaults.clone())),
             defaults,
             data_dir,
+            background_limit: std::sync::OnceLock::new(),
         }
+    }
+
+    /// Keeps `limit` equal to the background AI allowance of the settings in
+    /// force, now and after every change.
+    pub(crate) fn share_background_limit(&self, limit: Arc<std::sync::atomic::AtomicU32>) {
+        limit.store(
+            self.current().background_ai_per_day,
+            std::sync::atomic::Ordering::Relaxed,
+        );
+        let _ = self.background_limit.set(limit);
     }
 
     pub(crate) fn current(&self) -> Arc<RuntimeSettings> {
@@ -73,6 +86,9 @@ impl SettingsCell {
     fn replace(&self, settings: RuntimeSettings) {
         if let Err(error) = logs::apply(&settings.logging, &self.data_dir) {
             tracing::warn!(error = %format!("{error:#}"), "The logging settings could not be applied");
+        }
+        if let Some(limit) = self.background_limit.get() {
+            limit.store(settings.background_ai_per_day, std::sync::atomic::Ordering::Relaxed);
         }
         let mut current = self.current.write().unwrap_or_else(|poisoned| poisoned.into_inner());
         *current = Arc::new(settings);
@@ -142,6 +158,8 @@ const SETTINGS: &[SettingSpec] = &[
     SettingSpec { key: "login_max_failures", group: "Protection", label: "Failed sign-ins before lockout", description: "Consecutive failures for one account from one address before it is locked; after five times as many from all addresses the account is locked everywhere. 0 turns lockout off.", kind: SettingKind::Integer, min: 0, max: 1_000, unit: "failures", options: &[] },
     SettingSpec { key: "login_lockout_minutes", group: "Protection", label: "Lockout length", description: "How long a locked account waits before sign-in is allowed again.", kind: SettingKind::Integer, min: 1, max: 1440, unit: "minutes", options: &[] },
     SettingSpec { key: "ai_requests_per_hour", group: "AI", label: "AI requests per person", description: "Answers, overviews, summaries and assistant AI actions each person may start per hour. 0 is unlimited.", kind: SettingKind::Integer, min: 0, max: 100_000, unit: "per hour", options: &[] },
+    SettingSpec { key: "heavy_requests_per_minute", group: "Protection", label: "Heavy requests per person", description: "Searches, questions to the map, health checks, figures and file queries each person may make per minute. 0 turns the limit off.", kind: SettingKind::Integer, min: 0, max: 100_000, unit: "per minute", options: &[] },
+    SettingSpec { key: "background_ai_per_day", group: "AI", label: "Background AI calls per workspace", description: "Image descriptions and embedding batches the server makes on its own for one workspace per day. Work beyond it waits for the next day. 0 is unlimited.", kind: SettingKind::Integer, min: 0, max: 1_000_000, unit: "per day", options: &[] },
     SettingSpec { key: "repo_poll_seconds", group: "Background", label: "Repository check interval", description: "How often linked repositories are checked for new commits and synced. 0 turns automatic syncing off; otherwise at least 30 seconds.", kind: SettingKind::Integer, min: 0, max: 86_400, unit: "seconds", options: &[] },
     SettingSpec { key: "maintenance_interval_minutes", group: "Background", label: "Maintenance interval", description: "How often background maintenance runs (cleanup, garbage collection, retries, database checkpoint). 0 turns it off.", kind: SettingKind::Integer, min: 0, max: 10_080, unit: "minutes", options: &[] },
     SettingSpec { key: "blob_gc", group: "Background", label: "Delete unused stored files", description: "Maintenance deletes stored files that no evidence references any more, and their cached previews.", kind: SettingKind::Boolean, min: 0, max: 1, unit: "", options: &[] },
@@ -175,6 +193,8 @@ fn read_setting(settings: &RuntimeSettings, key: &str) -> Value {
         "login_max_failures" => json!(settings.login_max_failures),
         "login_lockout_minutes" => json!(settings.login_lockout.as_secs() / 60),
         "ai_requests_per_hour" => json!(settings.ai_quota.limit),
+        "heavy_requests_per_minute" => json!(settings.heavy_quota.limit),
+        "background_ai_per_day" => json!(settings.background_ai_per_day),
         "repo_poll_seconds" => json!(settings.repo_poll_interval.map_or(0, |interval| interval.as_secs())),
         "maintenance_interval_minutes" => json!(maintenance.interval.as_secs() / 60),
         "blob_gc" => json!(maintenance.blob_gc),
@@ -270,6 +290,8 @@ fn apply_setting(settings: &mut RuntimeSettings, key: &str, value: &Value) -> Re
                 "login_max_failures" => settings.login_max_failures = count,
                 "login_lockout_minutes" => settings.login_lockout = Duration::from_secs(seconds * 60),
                 "ai_requests_per_hour" => settings.ai_quota = Quota::per_hour(count),
+                "heavy_requests_per_minute" => settings.heavy_quota = Quota::per_minute(count),
+                "background_ai_per_day" => settings.background_ai_per_day = count,
                 "repo_poll_seconds" => {
                     if number > 0 && number < 30 {
                         return Err(format!("{} must be 0 (off) or at least 30 seconds.", spec.label));
@@ -396,6 +418,22 @@ impl InstanceInfo {
             ("Indexing at once", config.index_concurrency.to_string()),
             ("Embedding workspaces at once", config.embedding_concurrency.to_string()),
             ("Database read connections", config.db_read_connections.to_string()),
+            (
+                "Memory for vector indexes",
+                if config.vector_index_mb == 0 {
+                    "off (meaning search scans the database)".to_owned()
+                } else {
+                    format!("{} MiB", config.vector_index_mb)
+                },
+            ),
+            (
+                "Time to read one document",
+                if config.document_time_limit.is_zero() {
+                    "no limit".to_owned()
+                } else {
+                    format!("{} s", config.document_time_limit.as_secs())
+                },
+            ),
             (
                 "Secret key for stored credentials",
                 if config.secret_key.is_some() {

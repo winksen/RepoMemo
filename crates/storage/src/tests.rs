@@ -714,3 +714,289 @@ async fn workspace_settings_keep_other_keys() {
     drop(storage);
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn vector_search_uses_the_index_and_agrees_with_a_scan() {
+    let (storage, data_dir) = temp_storage("vectors").await;
+    let workspace = storage.create_workspace("Vectors").await.unwrap();
+    let source = storage
+        .create_or_get_source(&workspace.id, SourceType::Folder, "fixture", Some("fixture"))
+        .await
+        .unwrap();
+    let bytes = b"vectors";
+    let content_hash = StorageEngine::content_hash(bytes);
+    storage
+        .store_blob(&content_hash, bytes, Some("text/markdown"))
+        .await
+        .unwrap();
+    let artifact = storage
+        .store_artifact(NewArtifact {
+            workspace_id: workspace.id.clone(),
+            source_id: source.id,
+            artifact_type: ArtifactType::MarkdownDoc,
+            title: "Vectors".to_owned(),
+            path: "vectors.md".to_owned(),
+            content_hash,
+            mime_type: Some("text/markdown".to_owned()),
+            language: Some("Markdown".to_owned()),
+            size_bytes: bytes.len() as i64,
+            metadata: json!({}),
+        })
+        .await
+        .unwrap()
+        .artifact;
+    let chunk = |index: i64, text: &str| Chunk {
+        id: String::new(),
+        artifact_id: artifact.id.clone(),
+        workspace_id: workspace.id.clone(),
+        chunk_index: index,
+        text: text.to_owned(),
+        token_count: Some(1),
+        start_line: Some(index + 1),
+        end_line: Some(index + 1),
+        heading_path: None,
+        content_hash: StorageEngine::content_hash(text.as_bytes()),
+        embedding_status: "not_configured".to_owned(),
+        metadata: json!({}),
+    };
+    storage
+        .replace_artifact_index(
+            &artifact.id,
+            vec![
+                chunk(0, "east"),
+                chunk(1, "north"),
+                chunk(2, "north east"),
+                chunk(3, "west"),
+            ],
+            Vec::new(),
+            1,
+        )
+        .await
+        .unwrap();
+    let chunks = storage.list_chunks_for_artifact(&artifact.id).await.unwrap();
+    let id_of = |text: &str| chunks.iter().find(|chunk| chunk.text == text).unwrap().id.clone();
+    storage
+        .upsert_embeddings(
+            &workspace.id,
+            "m",
+            vec![
+                (id_of("east"), vec![1.0, 0.0]),
+                (id_of("north"), vec![0.0, 1.0]),
+                (id_of("north east"), vec![1.0, 1.0]),
+            ],
+        )
+        .await
+        .unwrap();
+
+    let request = SearchRequest {
+        workspace_id: workspace.id.clone(),
+        limit: Some(2),
+        ..Default::default()
+    };
+    let query = [1.0_f32, 0.1];
+    let indexed = storage.search_chunks_by_embedding(&request, "m", &query).await.unwrap();
+    let scanned = storage
+        .scan_chunks_by_embedding(&request, &[], "m", &query)
+        .await
+        .unwrap();
+    assert_eq!(indexed.len(), 2);
+    assert_eq!(indexed[0].chunk_id, id_of("east"));
+    assert_eq!(indexed[1].chunk_id, id_of("north east"));
+    assert_eq!(
+        indexed.iter().map(|result| &result.chunk_id).collect::<Vec<_>>(),
+        scanned
+            .iter()
+            .take(2)
+            .map(|result| &result.chunk_id)
+            .collect::<Vec<_>>()
+    );
+    assert!((indexed[0].score - scanned[0].score).abs() < 1e-4);
+    assert_eq!(storage.vector_index_usage().1, 1, "the workspace has an index now");
+
+    // A vector written after the index was built is found without a rebuild.
+    storage
+        .upsert_embeddings(&workspace.id, "m", vec![(id_of("west"), vec![1.0, 0.12])])
+        .await
+        .unwrap();
+    let after = storage.search_chunks_by_embedding(&request, "m", &query).await.unwrap();
+    assert_eq!(after[0].chunk_id, id_of("west"));
+
+    // Another model has no vectors here.
+    assert!(storage
+        .search_chunks_by_embedding(&request, "other", &query)
+        .await
+        .unwrap()
+        .is_empty());
+
+    storage.pool.close().await;
+    drop(storage);
+    let _ = std::fs::remove_dir_all(data_dir);
+}
+
+/// Timings on a large workspace (roadmap V0.1.74 targets). Slow, so it only
+/// runs on request:
+/// `cargo test -p repomemo-storage --release performance_at_scale -- --ignored --nocapture`
+/// `REPOMEMO_PERF_PASSAGES` sets the size (default 50,000).
+#[tokio::test]
+#[ignore = "a performance run, not a check"]
+async fn performance_at_scale() {
+    use std::time::Instant;
+    let passages: usize = std::env::var("REPOMEMO_PERF_PASSAGES")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(50_000);
+    let per_file = 100;
+    let dims = 384;
+    let (storage, data_dir) = temp_storage("scale").await;
+    let workspace = storage.create_workspace("Scale").await.unwrap();
+    let source = storage
+        .create_or_get_source(&workspace.id, SourceType::Folder, "fixture", Some("fixture"))
+        .await
+        .unwrap();
+
+    let started = Instant::now();
+    let mut seed = 0x2545_f491_u64;
+    let mut next = move || {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        (seed % 10_000) as f32 / 10_000.0 - 0.5
+    };
+    let mut batch: Vec<(String, Vec<f32>)> = Vec::new();
+    for file in 0..passages.div_ceil(per_file) {
+        let bytes = format!("file {file}").into_bytes();
+        let content_hash = StorageEngine::content_hash(&bytes);
+        storage
+            .store_blob(&content_hash, &bytes, Some("text/markdown"))
+            .await
+            .unwrap();
+        let artifact = storage
+            .store_artifact(NewArtifact {
+                workspace_id: workspace.id.clone(),
+                source_id: source.id.clone(),
+                artifact_type: ArtifactType::MarkdownDoc,
+                title: format!("Document {file}"),
+                path: format!("docs/{file}.md"),
+                content_hash,
+                mime_type: Some("text/markdown".to_owned()),
+                language: Some("Markdown".to_owned()),
+                size_bytes: bytes.len() as i64,
+                metadata: json!({}),
+            })
+            .await
+            .unwrap()
+            .artifact;
+        let count = per_file.min(passages - file * per_file);
+        let chunks = (0..count)
+            .map(|index| {
+                let text = format!(
+                    "passage {index} of document {file} covers topic{} and release",
+                    (file + index) % 97
+                );
+                Chunk {
+                    id: String::new(),
+                    artifact_id: artifact.id.clone(),
+                    workspace_id: workspace.id.clone(),
+                    chunk_index: index as i64,
+                    token_count: Some(12),
+                    start_line: Some(index as i64 + 1),
+                    end_line: Some(index as i64 + 1),
+                    heading_path: None,
+                    content_hash: StorageEngine::content_hash(text.as_bytes()),
+                    embedding_status: "not_configured".to_owned(),
+                    metadata: json!({}),
+                    text,
+                }
+            })
+            .collect();
+        storage
+            .replace_artifact_index(&artifact.id, chunks, Vec::new(), 1)
+            .await
+            .unwrap();
+        for chunk in storage.list_chunks_for_artifact(&artifact.id).await.unwrap() {
+            batch.push((chunk.id, (0..dims).map(|_| next()).collect()));
+        }
+        if batch.len() >= 2_000 {
+            storage
+                .upsert_embeddings(&workspace.id, "perf", std::mem::take(&mut batch))
+                .await
+                .unwrap();
+        }
+    }
+    if !batch.is_empty() {
+        storage.upsert_embeddings(&workspace.id, "perf", batch).await.unwrap();
+    }
+    println!("built {passages} passages in {:?}", started.elapsed());
+
+    let percentile = |mut samples: Vec<u128>| {
+        samples.sort_unstable();
+        samples[(samples.len() * 95 / 100).min(samples.len() - 1)]
+    };
+    let request = SearchRequest {
+        workspace_id: workspace.id.clone(),
+        query: "release".to_owned(),
+        limit: Some(12),
+        ..Default::default()
+    };
+    let query: Vec<f32> = (0..dims).map(|index| ((index * 31 % 17) as f32) - 8.0).collect();
+
+    let first = Instant::now();
+    storage
+        .search_chunks_by_embedding(&request, "perf", &query)
+        .await
+        .unwrap();
+    println!("vector search, first (builds the index): {:?}", first.elapsed());
+    let mut samples = Vec::new();
+    for _ in 0..20 {
+        let started = Instant::now();
+        let found = storage
+            .search_chunks_by_embedding(&request, "perf", &query)
+            .await
+            .unwrap();
+        samples.push(started.elapsed().as_millis());
+        assert_eq!(found.len(), 12);
+    }
+    println!(
+        "vector search p95: {} ms (target 300 ms with keyword search)",
+        percentile(samples)
+    );
+
+    let mut samples = Vec::new();
+    for _ in 0..20 {
+        let started = Instant::now();
+        storage.search_chunks(&request, "\"release\"*").await.unwrap();
+        samples.push(started.elapsed().as_millis());
+    }
+    println!("keyword search p95: {} ms", percentile(samples));
+
+    let mut samples = Vec::new();
+    for _ in 0..20 {
+        let started = Instant::now();
+        storage
+            .workspace_artifact_stats(&workspace.id, "2000-01-01")
+            .await
+            .unwrap();
+        storage.workspace_overview(&workspace.id).await.unwrap();
+        samples.push(started.elapsed().as_millis());
+    }
+    println!("figures (artifact stats and overview) p95: {} ms", percentile(samples));
+
+    let started = Instant::now();
+    storage.workspace_content_version(&workspace.id).await.unwrap();
+    println!("content version: {:?}", started.elapsed());
+    let started = Instant::now();
+    let (page, total) = storage
+        .query_artifacts(&super::ArtifactQuery {
+            workspace_id: workspace.id.clone(),
+            text: "document 1".to_owned(),
+            limit: Some(50),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    println!("artifact query: {:?} ({} of {total})", started.elapsed(), page.len());
+
+    storage.pool.close().await;
+    drop(storage);
+    let _ = std::fs::remove_dir_all(data_dir);
+}

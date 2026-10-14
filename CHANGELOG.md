@@ -2,6 +2,36 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)), then `0.2.1` and so on for fixes. Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.1.74 (2026-10-14)
+
+Performance and robustness.
+
+### Added
+- **A dashboard in one request.** `GET /v1/dashboard` returns the figures of every workspace the person can open (files, active tasks, memory cards). The dashboard page used to ask for the full metrics of each workspace.
+- **Limits on heavy requests.** Search, symbol search, figures, the knowledge map, Workspace Health and the file query each allow a person `REPOMEMO_HEAVY_REQUESTS_PER_MINUTE` requests a minute (240 by default, `0` is unlimited; also a setting in System › Settings). Beyond it the answer is `429` with `Retry-After`.
+- **A daily allowance for background AI.** Image descriptions and embedding batches the server starts on its own are counted per workspace per day (`REPOMEMO_BACKGROUND_AI_PER_DAY`, 2,000 by default, `0` is unlimited; also a setting). A workspace that used it up pauses until midnight UTC: embedding resumes by itself, an image waits for the next indexing retry, and the job says why.
+- **A time budget for document readers.** Reading a Word, Excel, PowerPoint, PDF, OneNote or Outlook file stops waiting after `REPOMEMO_DOCUMENT_TIMEOUT_SECONDS` (60 by default, `0` for no limit); the file is reported as failed with the reason.
+- **`REPOMEMO_VECTOR_INDEX_MB`** (512 by default, `0` turns it off) sets the memory for in-memory vector indexes. System › Overview lists it with the document time limit.
+- A performance run for operators: `cargo test -p repomemo-storage --release performance_at_scale -- --ignored --nocapture` builds a workspace of `REPOMEMO_PERF_PASSAGES` passages (50,000 by default) and prints search, figures and query timings.
+
+### Changed
+- **Meaning search no longer scans the database.** The vectors of a workspace are kept in memory as one matrix, built on the first search, kept current by the embedding queue and checked against the database on every search. A workspace whose vectors do not fit `REPOMEMO_VECTOR_INDEX_MB` is scanned as before.
+- **Figures and the file query are computed by the database.** `GET …/metrics` uses SQL aggregates instead of loading every file; `POST …/artifacts/query` filters, counts and pages in SQL (`X-Total-Count` when paged). Text matching ignores case for ASCII letters only (it used to ignore case for every script).
+- **The knowledge map and Workspace Health are kept while a workspace is unchanged.** They are recomputed when files, passages, vectors, memory cards, links, evidence states, health decisions or providers change, and at the latest after ten minutes.
+- File links for "Open in Office" are valid for **60 seconds** (they were 5 minutes) and belong to the client that first used them (see Security).
+
+### Security
+- **Heavy endpoints are rate limited and cached, parsers have a time budget (M11).** A reading that overruns is abandoned, not killed: it ends by itself, and new readings are refused while four abandoned ones are still running. There is no memory cap on a reading.
+- **Background AI is counted (M12).** See the daily allowance above.
+- **File links are not reusable (L1).** A link works for 60 seconds, for the first client that fetches it (the same client may repeat the request for 30 seconds, as Office apps do), and its path is replaced by `/v1/shared-files/[link]/name` in request logs.
+- **`secret.key` is owner-only on Windows (L5).** The folder's inherited permissions are removed and only the account running the server keeps access (`icacls`); on Unix an older file with wider permissions is set to `0600`. Failing to do so is logged, and `REPOMEMO_SECRET_KEY` avoids the file altogether.
+
+### Upgrading
+- Links to open a file in Office that were issued before the upgrade stop working; open the file again.
+- A backup or service account other than the server's own can no longer read `secret.key` on Windows. Give it access, or keep the key in `REPOMEMO_SECRET_KEY`.
+- Scripts that make more than 240 searches or reports a minute as one person need a higher `REPOMEMO_HEAVY_REQUESTS_PER_MINUTE`.
+- A workspace that embeds more than 2,000 batches (about 64,000 passages) in one day pauses until the next day; raise `REPOMEMO_BACKGROUND_AI_PER_DAY` or set `0`.
+
 ## V0.1.73 (2026-10-14)
 
 Evidence, ownership and repositories, phase 1b.

@@ -53,6 +53,12 @@ pub struct ServerConfig {
     pub embedding_concurrency: usize,
     /// Database connections that serve reads (`REPOMEMO_DB_READ_CONNECTIONS`).
     pub db_read_connections: u32,
+    /// Memory for in-memory vector indexes, in MiB (`REPOMEMO_VECTOR_INDEX_MB`,
+    /// 0 turns them off).
+    pub vector_index_mb: u32,
+    /// How long reading one document may take (`REPOMEMO_DOCUMENT_TIMEOUT_SECONDS`,
+    /// 0 for no limit).
+    pub document_time_limit: Duration,
     pub access_token_ttl_minutes: i64,
     pub refresh_token_ttl_days: i64,
     /// Sign-ins and registrations per client address; token refreshes get
@@ -63,6 +69,12 @@ pub struct ServerConfig {
     pub login_lockout: Duration,
     /// AI requests per user per hour; a limit of 0 is unlimited.
     pub ai_quota: Quota,
+    /// Requests to the heavy read endpoints (search, map, health, metrics,
+    /// artifact query) per user per minute; 0 is unlimited.
+    pub heavy_quota: Quota,
+    /// Vision and embedding calls made in the background per workspace per
+    /// day; 0 is unlimited.
+    pub background_ai_per_day: u32,
     /// Hosts AI providers may be configured at; `None` allows any host except
     /// link-local and cloud-metadata addresses.
     pub ai_allowed_hosts: Option<Vec<String>>,
@@ -214,6 +226,9 @@ impl ServerConfig {
             index_concurrency: env_parse::<usize>("REPOMEMO_INDEX_CONCURRENCY", 2)?.clamp(1, 16),
             embedding_concurrency: env_parse::<usize>("REPOMEMO_EMBEDDING_CONCURRENCY", 1)?.clamp(1, 8),
             db_read_connections: env_parse::<u32>("REPOMEMO_DB_READ_CONNECTIONS", 4)?.clamp(1, 64),
+            vector_index_mb: env_parse::<u32>("REPOMEMO_VECTOR_INDEX_MB", repomemo_storage::DEFAULT_VECTOR_INDEX_MB)?
+                .min(64 * 1024),
+            document_time_limit: Duration::from_secs(env_parse("REPOMEMO_DOCUMENT_TIMEOUT_SECONDS", 60)?),
             access_token_ttl_minutes: env_parse::<i64>("REPOMEMO_ACCESS_TOKEN_TTL_MINUTES", 60)?.clamp(5, 24 * 60),
             refresh_token_ttl_days: env_parse::<i64>("REPOMEMO_REFRESH_TOKEN_TTL_DAYS", 30)?.clamp(1, 365),
             auth_quota: Quota::per_minute(env_parse("REPOMEMO_AUTH_REQUESTS_PER_MINUTE", 30)?),
@@ -222,6 +237,8 @@ impl ServerConfig {
                 60 * env_parse::<u64>("REPOMEMO_LOGIN_LOCKOUT_MINUTES", 15)?.clamp(1, 24 * 60),
             ),
             ai_quota: Quota::per_hour(env_parse("REPOMEMO_AI_REQUESTS_PER_HOUR", 120)?),
+            heavy_quota: Quota::per_minute(env_parse("REPOMEMO_HEAVY_REQUESTS_PER_MINUTE", 240)?),
+            background_ai_per_day: env_parse("REPOMEMO_BACKGROUND_AI_PER_DAY", 2000)?,
             ai_allowed_hosts,
             repo_roots,
             git_safe_directories: std::env::var_os("REPOMEMO_GIT_SAFE_DIRECTORIES")
@@ -282,6 +299,8 @@ impl ServerConfig {
             index_concurrency: 2,
             embedding_concurrency: 1,
             db_read_connections: 4,
+            vector_index_mb: 64,
+            document_time_limit: Duration::from_secs(60),
             access_token_ttl_minutes: 60,
             refresh_token_ttl_days: 30,
             // Tests register many accounts from one address.
@@ -289,6 +308,8 @@ impl ServerConfig {
             login_max_failures: 10,
             login_lockout: Duration::from_secs(15 * 60),
             ai_quota: Quota::per_hour(0),
+            heavy_quota: Quota::per_minute(0),
+            background_ai_per_day: 0,
             ai_allowed_hosts: None,
             repo_roots: Vec::new(),
             git_safe_directories: Vec::new(),
@@ -382,6 +403,8 @@ pub(crate) struct RuntimeSettings {
     pub(crate) login_max_failures: u32,
     pub(crate) login_lockout: Duration,
     pub(crate) ai_quota: Quota,
+    pub(crate) heavy_quota: Quota,
+    pub(crate) background_ai_per_day: u32,
     pub(crate) repo_poll_interval: Option<Duration>,
     pub(crate) maintenance: MaintenanceSettings,
     pub(crate) system_audit_retention_days: i64,
@@ -408,6 +431,8 @@ impl RuntimeSettings {
             login_max_failures: config.login_max_failures,
             login_lockout: config.login_lockout,
             ai_quota: config.ai_quota,
+            heavy_quota: config.heavy_quota,
+            background_ai_per_day: config.background_ai_per_day,
             repo_poll_interval: config.repo_poll_interval,
             maintenance: config.maintenance.clone(),
             system_audit_retention_days: config.system_audit_retention_days,

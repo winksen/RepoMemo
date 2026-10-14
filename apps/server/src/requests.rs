@@ -234,6 +234,21 @@ pub(crate) struct WorkspaceActivityCalendarResponse {
     pub(crate) activity_by_day: Vec<WorkspaceMetricBreakdown>,
 }
 
+/// The dashboard's figures, one entry per workspace the caller can open.
+#[derive(Debug, Serialize)]
+pub(crate) struct DashboardResponse {
+    pub(crate) workspaces: Vec<DashboardWorkspace>,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct DashboardWorkspace {
+    pub(crate) workspace_id: String,
+    pub(crate) artifact_count: i64,
+    /// Tasks that are open or in progress.
+    pub(crate) active_task_count: i64,
+    pub(crate) memory_card_count: i64,
+}
+
 #[derive(Debug, Serialize)]
 pub(crate) struct WorkspaceMetricsResponse {
     pub(crate) workspace_id: String,
@@ -428,13 +443,22 @@ impl PageQuery {
 
 pub(crate) const FILE_LINK_ISSUER: &str = "repomemo-file-link";
 
-pub(crate) const FILE_LINK_TTL_SECONDS: u64 = 300;
+/// A file link is valid for one minute and for one client (review L1).
+pub(crate) const FILE_LINK_TTL_SECONDS: u64 = 60;
+
+/// Office apps open a link with several requests in a row (a probe, then the
+/// download, sometimes in ranges). The same client may repeat a request this
+/// long after its first; anyone else is refused once the link was used.
+pub(crate) const FILE_LINK_GRACE_SECONDS: u64 = 30;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub(crate) struct FileLinkClaims {
     pub(crate) sub: String,
     pub(crate) iss: String,
     pub(crate) exp: u64,
+    /// Identifies the link, so its use can be remembered.
+    #[serde(default)]
+    pub(crate) jti: String,
 }
 
 #[derive(Debug, Serialize)]

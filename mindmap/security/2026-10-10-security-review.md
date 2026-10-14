@@ -33,6 +33,10 @@
 | N2 residual | ✅ Fixed in V0.1.67 | `system` token scope |
 | N7 | ✅ Fixed in V0.1.71 | Request timeout on every route but the streams, header read timeout, live streams per account |
 | L6 | ✅ Fixed in V0.1.71 | Typed errors; internal errors are generic 500s |
+| M11 | ✅ Mitigated in V0.1.74 | Time budget for document readers (abandoned, not killed; new ones refused while four overran), `429` on heavy endpoints, map and health cached, figures and file query in SQL. No memory cap, no subprocess isolation |
+| M12 | ✅ Fixed in V0.1.74 | Per-workspace daily allowance of background vision and embedding calls (`REPOMEMO_BACKGROUND_AI_PER_DAY`) |
+| L1 | ✅ Fixed in V0.1.74 | 60 seconds, first client only (with a 30-second grace for Office's follow-up requests), path redacted in request logs |
+| L5 | ✅ Fixed in V0.1.74 | `icacls` owner-only on Windows, `0600` enforced on Unix |
 | N8 | ✅ Fixed in V0.1.73 | Removal refused (409) while the person owns a workspace of the organization; ownership transfer for workspaces and organizations |
 | N9 | 📝 Documented | See §11 |
 

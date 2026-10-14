@@ -1,7 +1,7 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { IconBuildingCommunity as Building, IconChevronRight as ChevronRight, IconLayoutDashboard as Dashboard, IconLoader2 as Loader, IconPlus as Plus, IconShieldLock as Shield, IconStack2 as Layers } from "@tabler/icons-react";
-import { createSharedOrganization, createSharedWorkspace, getSharedWorkspaceMetrics } from "../lib/sharedApi";
-import { type Organization, type SharedSession, type SharedWorkspace, type WorkspaceMetrics } from "../types";
+import { createSharedOrganization, createSharedWorkspace, type DashboardWorkspaceFigures, getSharedDashboard } from "../lib/sharedApi";
+import { type Organization, type SharedSession, type SharedWorkspace } from "../types";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Toast } from "../components/ui/toast";
@@ -28,22 +28,19 @@ export function SharedDashboard({
   signOut: () => void;
   workspaces: SharedWorkspace[];
 }) {
-  const [metricsByWorkspace, setMetricsByWorkspace] = useState<Record<string, WorkspaceMetrics>>({});
+  const [metricsByWorkspace, setMetricsByWorkspace] = useState<Record<string, DashboardWorkspaceFigures>>({});
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   async function load() {
     setIsLoading(true);
     setError(null);
-    const results = await Promise.allSettled(workspaces.map(async (entry) => [entry.workspace.id, await getSharedWorkspaceMetrics(accessToken, entry.workspace.id)] as const));
-    const nextMetrics: Record<string, WorkspaceMetrics> = {};
-    let failedCount = 0;
-    for (const result of results) {
-      if (result.status === "fulfilled") nextMetrics[result.value[0]] = result.value[1];
-      else failedCount += 1;
+    try {
+      const figures = await getSharedDashboard(accessToken);
+      setMetricsByWorkspace(Object.fromEntries(figures.workspaces.map((entry) => [entry.workspace_id, entry])));
+    } catch (loadError) {
+      setError(apiMessage(loadError));
     }
-    setMetricsByWorkspace(nextMetrics);
-    setError(failedCount ? `Metrics could not be loaded for ${failedCount} workspace${failedCount === 1 ? "" : "s"}.` : null);
     setIsLoading(false);
   }
 
@@ -51,7 +48,7 @@ export function SharedDashboard({
 
   const summary = useMemo(() => Object.values(metricsByWorkspace).reduce((total, metrics) => ({
     artifacts: total.artifacts + metrics.artifact_count,
-    tasks: total.tasks + metrics.open_task_count + metrics.in_progress_task_count,
+    tasks: total.tasks + metrics.active_task_count,
     memory: total.memory + metrics.memory_card_count,
   }), { artifacts: 0, tasks: 0, memory: 0 }), [metricsByWorkspace]);
 
@@ -69,14 +66,14 @@ export function SharedDashboard({
       <section className="shared-dashboard-ledger" aria-label="Organization workspaces">
         {organizations.length ? organizations.map((organization) => {
           const organizationWorkspaces = workspaces.filter((entry) => entry.organization_id === organization.id);
-          const organizationMetrics = organizationWorkspaces.map((entry) => metricsByWorkspace[entry.workspace.id]).filter((metrics): metrics is WorkspaceMetrics => Boolean(metrics));
-          const activeTasks = organizationMetrics.reduce((total, metrics) => total + metrics.open_task_count + metrics.in_progress_task_count, 0);
+          const organizationMetrics = organizationWorkspaces.map((entry) => metricsByWorkspace[entry.workspace.id]).filter((metrics): metrics is DashboardWorkspaceFigures => Boolean(metrics));
+          const activeTasks = organizationMetrics.reduce((total, metrics) => total + metrics.active_task_count, 0);
           const artifacts = organizationMetrics.reduce((total, metrics) => total + metrics.artifact_count, 0);
           return <section className="shared-dashboard-organization" key={organization.id}>
             <div className="shared-dashboard-organization-heading"><div><span className="shared-dashboard-organization-mark"><Building size={17} /></span><div><h2>{organization.name}</h2><p>{organizationWorkspaces.length} workspace{organizationWorkspaces.length === 1 ? "" : "s"}{organizationMetrics.length ? ` · ${artifacts} artifacts · ${activeTasks} active tasks` : ""}{organization.guest ? " · Guest: only the workspaces you were added to" : ""}</p></div></div><Button onClick={() => navigate(`/workspaces?organization=${encodeURIComponent(organization.id)}`)} type="button" variant="secondary">View workspaces <ChevronRight size={16} /></Button></div>
             {organizationWorkspaces.length ? <div className="shared-dashboard-workspace-list">{organizationWorkspaces.map((entry) => {
               const metrics = metricsByWorkspace[entry.workspace.id];
-              const activeWorkspaceTasks = metrics ? metrics.open_task_count + metrics.in_progress_task_count : null;
+              const activeWorkspaceTasks = metrics ? metrics.active_task_count : null;
               return <Button className="shared-dashboard-workspace" key={entry.workspace.id} onClick={() => onOpenWorkspace(entry)} type="button" variant="secondary"><span className="shared-workspace-icon"><Layers size={16} /></span><span><strong>{entry.workspace.name}</strong><small>{entry.role} access · updated {new Date(entry.workspace.updated_at).toLocaleDateString()}</small></span><span className="shared-dashboard-workspace-metrics">{metrics ? <><span>{metrics.artifact_count} artifacts</span><span>{activeWorkspaceTasks} active tasks</span></> : <span>Loading workspace data</span>}</span><ChevronRight size={16} /></Button>;
             })}</div> : <p className="shared-muted-copy">No accessible workspaces in this organization yet.</p>}
           </section>;

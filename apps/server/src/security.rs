@@ -206,13 +206,49 @@ impl LoginThrottle {
     }
 }
 
+/// Which file links were used, and by whom first (review L1).
+#[derive(Default)]
+pub struct FileLinkUses {
+    used: Mutex<HashMap<String, (Instant, String)>>,
+}
+
+impl FileLinkUses {
+    /// Whether this fetch of the link may go ahead. A link nobody fetched yet
+    /// is open to whoever holds it; once fetched it stays open only to that
+    /// client, and only for `grace`. `record` is false for probes (HEAD).
+    pub fn claim(&self, link_id: &str, client: &str, record: bool, grace: Duration, lifetime: Duration) -> bool {
+        let Ok(mut used) = self.used.lock() else {
+            return true;
+        };
+        let now = Instant::now();
+        used.retain(|_, (first, _)| now.duration_since(*first) < lifetime);
+        match used.get(link_id) {
+            Some((first, first_client)) => first_client == client && now.duration_since(*first) <= grace,
+            None => {
+                if record {
+                    used.insert(link_id.to_owned(), (now, client.to_owned()));
+                }
+                true
+            }
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.used.lock().map(|used| used.len()).unwrap_or(0)
+    }
+}
+
 /// Rate limits and sign-in throttling, shared by all requests.
 #[derive(Default)]
 pub struct Guards {
+    /// File links that were fetched.
+    pub file_links: FileLinkUses,
     /// Sign-in, registration and token refresh, per client address.
     pub auth: RateLimiter,
     /// AI requests, per user.
     pub ai: RateLimiter,
+    /// Searches, figures, the map and health, per user.
+    pub heavy: RateLimiter,
     /// Failed sign-ins per account and address.
     pub logins: LoginThrottle,
 }
@@ -220,13 +256,16 @@ pub struct Guards {
 impl Guards {
     /// Rate-limit keys tracked, and sign-in keys locked out right now.
     pub fn stats(&self) -> (usize, usize) {
-        (self.auth.len() + self.ai.len(), self.logins.locked_count())
+        (
+            self.auth.len() + self.ai.len() + self.heavy.len() + self.file_links.len(),
+            self.logins.locked_count(),
+        )
     }
 
     pub fn prune(&self) -> usize {
         // Windows are at most an hour long; lockouts are kept while active.
         let max_age = Duration::from_secs(2 * 3600);
-        self.auth.prune(max_age) + self.ai.prune(max_age) + self.logins.prune(max_age)
+        self.auth.prune(max_age) + self.ai.prune(max_age) + self.heavy.prune(max_age) + self.logins.prune(max_age)
     }
 }
 
@@ -293,6 +332,46 @@ pub(crate) fn client_ip(headers: &axum::http::HeaderMap, peer: Option<IpAddr>, p
     }
     peer.map(|address| address.to_string())
         .unwrap_or_else(|| "unknown".to_owned())
+}
+
+/// Counts one request to a heavy read endpoint (search, map, health, figures,
+/// file queries) against the person's per-minute allowance (review M11).
+pub(crate) fn consume_heavy_quota(state: &AppState, subject: &crate::AuthenticatedSubject) -> Result<(), ApiError> {
+    let quota = state.settings().heavy_quota;
+    state.guards.heavy.check(&subject.user_id, quota).map_err(|wait| {
+        tracing::warn!(target: "audit", user_id = %subject.user_id, "Heavy request limit reached");
+        too_many_requests(
+            format!(
+                "You have made {} searches and reports in a minute, which is the limit on this server. Try again in {}.",
+                quota.limit,
+                wait_text(wait)
+            ),
+            wait,
+        )
+    })
+}
+
+/// The path of a request as it may be logged. A file link carries its bearer
+/// token in the path, which must not reach a log (review L1).
+pub(crate) fn loggable_path(path: &str) -> String {
+    match path.strip_prefix("/v1/shared-files/") {
+        Some(rest) => {
+            let name = rest.split_once('/').map_or("", |(_, name)| name);
+            format!("/v1/shared-files/[link]/{name}")
+        }
+        None => path.to_owned(),
+    }
+}
+
+/// The log span of a request: what tower-http would record, with the path
+/// made safe by [`loggable_path`].
+pub(crate) fn redacted_span<B>(request: &axum::http::Request<B>) -> tracing::Span {
+    tracing::debug_span!(
+        "request",
+        method = %request.method(),
+        uri = %loggable_path(request.uri().path()),
+        version = ?request.version(),
+    )
 }
 
 /// The 429 answer for a used-up quota, with `Retry-After`.
@@ -377,6 +456,43 @@ mod tests {
             .is_ok());
         // A disabled quota never opens a window.
         assert_eq!(limiter.prune(Duration::ZERO), 2);
+    }
+
+    #[test]
+    fn file_link_secrets_stay_out_of_logged_paths() {
+        assert_eq!(
+            loggable_path("/v1/shared-files/eyJhbGciOi.secret.sig/plan.eml"),
+            "/v1/shared-files/[link]/plan.eml"
+        );
+        assert_eq!(loggable_path("/v1/workspaces/abc"), "/v1/workspaces/abc");
+    }
+
+    #[test]
+    fn a_file_link_belongs_to_the_client_that_first_used_it() {
+        let uses = FileLinkUses::default();
+        let (grace, lifetime) = (Duration::from_millis(60), Duration::from_secs(5));
+        assert!(
+            uses.claim("link", "10.0.0.1", false, grace, lifetime),
+            "a probe opens nothing"
+        );
+        assert!(uses.claim("link", "10.0.0.2", true, grace, lifetime), "first fetch");
+        assert!(
+            uses.claim("link", "10.0.0.2", true, grace, lifetime),
+            "the same client repeats within the grace"
+        );
+        assert!(
+            !uses.claim("link", "10.0.0.1", true, grace, lifetime),
+            "another client is refused"
+        );
+        std::thread::sleep(Duration::from_millis(80));
+        assert!(
+            !uses.claim("link", "10.0.0.2", true, grace, lifetime),
+            "even the first client, after the grace"
+        );
+        assert!(
+            uses.claim("other", "10.0.0.1", true, grace, lifetime),
+            "links are independent"
+        );
     }
 
     #[test]

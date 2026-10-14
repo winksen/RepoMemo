@@ -235,6 +235,7 @@ pub(crate) async fn create_file_link(
         sub: artifact_id,
         iss: FILE_LINK_ISSUER.to_owned(),
         exp: jsonwebtoken::get_current_timestamp() + FILE_LINK_TTL_SECONDS,
+        jti: random_secret(),
     };
     let token = encode(
         &Header::new(Algorithm::HS256),
@@ -252,6 +253,8 @@ pub(crate) async fn create_file_link(
 
 pub(crate) async fn shared_file_by_link(
     State(state): State<AppState>,
+    ClientIp(client): ClientIp,
+    method: Method,
     Path((token, _filename)): Path<(String, String)>,
 ) -> Result<Response, ApiError> {
     let mut validation = Validation::new(Algorithm::HS256);
@@ -263,6 +266,18 @@ pub(crate) async fn shared_file_by_link(
     )
     .map_err(|_| ApiError::unauthorized())?
     .claims;
+    // One client, one minute: a link found in a log is no use (review L1).
+    let may_fetch = !claims.jti.is_empty()
+        && state.guards.file_links.claim(
+            &claims.jti,
+            &client,
+            method != Method::HEAD,
+            Duration::from_secs(FILE_LINK_GRACE_SECONDS),
+            Duration::from_secs(FILE_LINK_TTL_SECONDS + 5),
+        );
+    if !may_fetch {
+        return Err(ApiError::unauthorized());
+    }
     let summary = state
         .storage
         .get_artifact_summary(&claims.sub)
@@ -412,48 +427,30 @@ pub(crate) async fn query_artifacts(
     Json(request): Json<QueryArtifactsRequest>,
 ) -> Result<(HeaderMap, Json<Vec<ArtifactSummary>>), ApiError> {
     require_workspace_read(&state, &subject, &workspace_id).await?;
+    consume_heavy_quota(&state, &subject)?;
     let started = std::time::Instant::now();
-    let query = request.query.trim().to_lowercase();
-    let languages = request
-        .languages
-        .into_iter()
-        .map(|language| language.to_lowercase())
-        .collect::<Vec<_>>();
-    let artifacts = state
-        .core
-        .list_artifacts(workspace_id.clone())
-        .await
-        .map_err(map_core_error)?
-        .into_iter()
-        .filter(|artifact| {
-            let query_matches = query.is_empty()
-                || artifact.title.to_lowercase().contains(&query)
-                || artifact.path.to_lowercase().contains(&query);
-            let type_matches = request.artifact_types.is_empty()
-                || request
-                    .artifact_types
-                    .iter()
-                    .any(|artifact_type| artifact_type == &artifact.artifact_type);
-            let language_matches = languages.is_empty()
-                || artifact
-                    .language
-                    .as_deref()
-                    .map(|language| languages.iter().any(|candidate| candidate == &language.to_lowercase()))
-                    .unwrap_or(false);
-            let source_matches = request.source_ids.is_empty()
-                || request
-                    .source_ids
-                    .iter()
-                    .any(|source_id| source_id == &artifact.source_id);
-            let indexing_matches = request
-                .indexed
-                .map(|indexed| artifact.indexed_at.is_some() == indexed)
-                .unwrap_or(true);
-            query_matches && type_matches && language_matches && source_matches && indexing_matches
+    let (artifacts, total) = state
+        .storage
+        .query_artifacts(&ArtifactQuery {
+            workspace_id: workspace_id.clone(),
+            text: request.query.trim().to_owned(),
+            artifact_types: request.artifact_types,
+            languages: request.languages,
+            source_ids: request.source_ids,
+            indexed: request.indexed,
+            limit: page.limit.map(|limit| limit.clamp(1, MAX_PAGE_SIZE) as i64),
+            offset: page.offset.unwrap_or(0) as i64,
         })
-        .collect::<Vec<_>>();
+        .await
+        .map_err(map_storage_error)?;
     record_timing("artifact_query", &workspace_id, started, artifacts.len());
-    let (headers, artifacts) = page.apply(artifacts);
+    let mut headers = HeaderMap::new();
+    if page.limit.is_some() {
+        headers.insert(
+            HeaderName::from_static("x-total-count"),
+            HeaderValue::from(total.max(0) as u64),
+        );
+    }
     Ok((headers, Json(artifacts)))
 }
 

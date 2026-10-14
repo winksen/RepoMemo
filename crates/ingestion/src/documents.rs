@@ -15,6 +15,7 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::Reader;
 use repomemo_domain::{DocumentPreview, EmailAttachmentInfo, SheetPreview, SlidePreview};
 
+use super::budget::within_budget;
 use super::{extension, extract_word_text, read_zip_member, zip_entry_names};
 
 const MAX_SHEET_ROWS: usize = 50_000;
@@ -82,6 +83,14 @@ pub fn document_extensions() -> &'static [&'static str] {
 /// file types. A document with no readable text (for example a scanned PDF)
 /// yields an empty string rather than an error.
 pub fn extract_document_text(path: &Path, bytes: &[u8]) -> Result<Option<String>> {
+    if document_kind(path).is_none() {
+        return Ok(None);
+    }
+    let (path, bytes) = (path.to_path_buf(), bytes.to_vec());
+    within_budget("document reader", move || read_document_text(&path, &bytes))
+}
+
+fn read_document_text(path: &Path, bytes: &[u8]) -> Result<Option<String>> {
     let Some(kind) = document_kind(path) else {
         return Ok(None);
     };
@@ -102,6 +111,15 @@ pub fn extract_document_text(path: &Path, bytes: &[u8]) -> Result<Option<String>
 /// A preview for the reader. Never fails: a file that cannot be read yields
 /// `Unavailable` with the reason, so the client can still offer to open it.
 pub fn document_preview(path: &Path, bytes: &[u8]) -> DocumentPreview {
+    if document_kind(path).is_none() {
+        return unavailable("This file type has no preview.");
+    }
+    let (path, bytes) = (path.to_path_buf(), bytes.to_vec());
+    within_budget("preview reader", move || Ok(read_document_preview(&path, &bytes)))
+        .unwrap_or_else(|error| unavailable(&format!("{error:#}")))
+}
+
+fn read_document_preview(path: &Path, bytes: &[u8]) -> DocumentPreview {
     let Some(kind) = document_kind(path) else {
         return unavailable("This file type has no preview.");
     };

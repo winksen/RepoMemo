@@ -193,6 +193,10 @@ stored in the database and override the values below until reset.
 | `REPOMEMO_INDEX_CONCURRENCY` | `2` | Artifacts indexed at once (1–16). Indexing may call a vision provider. |
 | `REPOMEMO_EMBEDDING_CONCURRENCY` | `1` | Workspaces embedded at once (1–8). Raise it only for a provider that can take it. |
 | `REPOMEMO_DB_READ_CONNECTIONS` | `4` | Read-only database connections (1–64). Writes always use one. |
+| `REPOMEMO_VECTOR_INDEX_MB` | `512` | Memory for in-memory vector indexes of meaning search, in MiB. A workspace of 50,000 passages with 768-dimensional vectors takes about 150 MiB. `0` turns the indexes off (the database is scanned). A workspace that does not fit is scanned. |
+| `REPOMEMO_DOCUMENT_TIMEOUT_SECONDS` | `60` | How long reading one document may take before it is skipped. `0` for no limit. |
+| `REPOMEMO_HEAVY_REQUESTS_PER_MINUTE` | `240` | Searches, figures, map, health and file queries per person per minute; `0` is unlimited. Also a run-time setting. |
+| `REPOMEMO_BACKGROUND_AI_PER_DAY` | `2000` | Image descriptions and embedding batches the server makes on its own per workspace per day (UTC); `0` is unlimited. Also a run-time setting. |
 | `REPOMEMO_ACCESS_TOKEN_TTL_MINUTES` | `60` | Access-token lifetime (5–1440). |
 | `REPOMEMO_REFRESH_TOKEN_TTL_DAYS` | `30` | Refresh-token lifetime (1–365). |
 | `REPOMEMO_AUTH_REQUESTS_PER_MINUTE` | `30` | Sign-in and registration requests per client address (session refreshes get four times as many); `0` turns the limit off. |

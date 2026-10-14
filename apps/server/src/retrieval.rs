@@ -7,6 +7,7 @@ pub(crate) async fn search_workspace(
     Json(request): Json<SearchWorkspaceRequest>,
 ) -> Result<Json<Vec<SearchResult>>, ApiError> {
     require_workspace_read(&state, &subject, &workspace_id).await?;
+    consume_heavy_quota(&state, &subject)?;
     for status in &request.lifecycle_statuses {
         if !matches!(
             status.as_str(),
@@ -61,6 +62,7 @@ pub(crate) async fn search_symbols(
     Query(query): Query<SymbolSearchQuery>,
 ) -> Result<Json<Vec<repomemo_domain::SymbolSearchResult>>, ApiError> {
     require_workspace_read(&state, &subject, &workspace_id).await?;
+    consume_heavy_quota(&state, &subject)?;
     let started = std::time::Instant::now();
     let found = state
         .core

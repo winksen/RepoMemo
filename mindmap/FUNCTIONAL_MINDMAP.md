@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.1.73` (2026-10-14). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
+> **Scope:** reflects the code at `V0.1.74` (2026-10-14). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
 
 ---
 
@@ -164,7 +164,7 @@ Joining an organization **automatically grants access to every workspace in it**
 | Sync a connected repository | ✅ | ✅ | ✅ | — |
 | Rename or delete the workspace | ✅ | — | — | — |
 
-¹ The AI features need an enabled provider. By default everyone in the workspace can use them, viewers included; owners and admins can keep them to members and above, or to admins and owners (**Settings › Who can use AI**). Each person can also make a limited number of AI requests per hour (120 by default, set by the server operator), so nobody can run up a cloud bill by accident.
+¹ The AI features need an enabled provider. By default everyone in the workspace can use them, viewers included; owners and admins can keep them to members and above, or to admins and owners (**Settings › Who can use AI**). Each person can also make a limited number of AI requests per hour (120 by default, set by the server operator), so nobody can run up a cloud bill by accident. The server's own background work (describing images, preparing search vectors) has a daily allowance per workspace too (2,000 calls by default).
 ² Admins can grant only `member` or `viewer`, and cannot change or remove other admins or the owner. Nobody can assign `owner` through the UI, and the owner's own role cannot be changed there either, so a workspace or organization never ends up without an owner (since V0.1.65). Someone who becomes a viewer can no longer edit or delete their earlier comments and tasks.
 
 ### Organization permissions
@@ -210,7 +210,7 @@ A **System** button in the header opens `/system`, with these pages:
 | **Overview** | The back end (version, host, process, address, data folder, uptime), storage (database, log, stored files, previews), background work (indexing and embedding queues, repository syncs, conversions, live event streams), traffic since start with requests per minute for the last hour, refused and rate-limited requests, locked sign-ins, and the **front-end clients** seen in the last 24 hours (browser and system, origin, address, requests). Refreshes every 30 seconds |
 | **Usage** | Activity per day and by kind, the most active people, and every workspace with its members, files, size, passages, activity, AI requests and last activity, over 7 to 365 days |
 | **Users** | Every account with its role, a tree of its organizations (one line each, with its role) and under each the workspaces it belongs to with its role in each (owner, admin, member, viewer); system administrators show as **Admin of all organizations and workspaces** by inheritance, plus what they own, signed-in sessions and last connection. Make or remove system administrators (system administrators only) and **app administrators** (same System pages, but no automatic access to every organization and workspace), sign someone out everywhere, lift a sign-in lockout |
-| **Settings** | Registration, token lifetimes, sign-in protection, AI requests per person, repository check interval, maintenance and **logging**, changed at run time and kept until reset to the server default. Logging sets a level (off to trace) for each kind of log (security, workspace activity, background jobs, HTTP requests, AI providers, database, performance (how long searches, questions, metrics, the knowledge map and health checks take, at debug), and everything else), the console format (readable text, compact text or JSON lines), whether logs are kept in daily files, and how many days those files are kept. Settings only the server's environment controls are listed read-only |
+| **Settings** | Registration, token lifetimes, sign-in protection, AI requests per person, heavy requests per person (searches and reports per minute), background AI calls per workspace, repository check interval, maintenance and **logging**, changed at run time and kept until reset to the server default. Logging sets a level (off to trace) for each kind of log (security, workspace activity, background jobs, HTTP requests, AI providers, database, performance (how long searches, questions, metrics, the knowledge map and health checks take, at debug), and everything else), the console format (readable text, compact text or JSON lines), whether logs are kept in daily files, and how many days those files are kept. Settings only the server's environment controls are listed read-only |
 | **Logs** | What is being recorded, then the events: live (recent, following as they arrive) or any earlier day kept in the log files, filtered by kind of log, workspace, level and text. A day's file can be downloaded |
 | **Jobs & maintenance** | Jobs across every workspace, updated live as they start, progress and finish (stop a running one), and maintenance: last run, next run, what it cleaned, and **Run maintenance now** |
 | **Audit trail** | What system administrators did: role changes, settings, ended sessions, maintenance runs |
@@ -241,7 +241,7 @@ A **System** button in the header opens `/system`, with these pages:
 
 ## 3. Organizations and the dashboard
 
-- **Dashboard** (`/dashboard`): every organization you belong to, its workspaces, and aggregate totals (artifacts, active tasks, memory cards).
+- **Dashboard** (`/dashboard`): every organization you belong to, its workspaces, and aggregate totals (artifacts, active tasks, memory cards), loaded in one request.
 - **Workspace directory** (`/workspaces`): pick an organization, create workspaces (owner or admin), and create a new organization.
 - **Organization administration**: list members, add a registered user by email with a role, and remove members, subject to the rules in §1.
 

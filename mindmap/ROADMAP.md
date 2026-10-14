@@ -224,22 +224,22 @@ Each proposal below was accepted as written. They shape the releases named in th
 - [x] **F3** `GET /v1/workspaces/{ws}/symbols`, a *Code symbols* box on Retrieval (a symbol search is not a filter of passage search: it answers where a name is defined), the `find_symbol` assistant capability
 - [x] **F8** `useLiveRefresh` in both panels
 
-#### V0.1.73: Evidence, ownership, repositories 1b (built, not yet released)
+#### V0.1.73: Evidence, ownership, repositories 1b
 
 - [x] **F11 (N8)** `transfer_workspace_ownership` and `transfer_organization_ownership` (session only, owner only, activity and System audit); `remove_organization_member` refuses with 409 while the person owns a workspace of it
 - [x] **F7** `StorageEngine::move_folder`, `POST …/artifacts/bulk`, `replace_artifact_content` (the content hash changes under the same id; indexing runs again)
 - [x] **F4 phase 1b** `GitRepo::renamed_files` (`git diff --name-status -z -M50%`) pairs a vanished path with its new one during a sync; `SearchResult.commit` and `Citation.commit` come from `repo_files.commit_sha`. The desktop app does not get either (decision 3)
 - [x] **F9** `logs --follow` is the terminal client polling with `--after`; `users reset-link` and `tokens list` are server commands
 
-#### V0.1.74: Performance and robustness
+#### V0.1.74: Performance and robustness (built, not yet released)
 
-- [ ] **Targets**, at 50,000 passages: search under 300 ms and the dashboard under 500 ms (p95), map and health under 2 s on first load, then cached
-- [ ] **P1** per-workspace in-memory vector index (sqlite-vec only if memory becomes the limit)
-- [ ] **P2, P3, P4** artifact query and metrics in SQL; one `GET /v1/dashboard`
-- [ ] **P5** map and health cached per workspace content version
-- [ ] **P9, M11** time and memory budgets for document parsers; rate limits on heavy endpoints
-- [ ] **M12** background image descriptions and embeddings counted against a per-workspace budget
-- [ ] **L1** single-use, 60-second file links, never logged; **L5** owner-only ACL on `secret.key` on Windows
+- [x] **Targets**, at 50,000 passages: search under 300 ms and the dashboard under 500 ms (p95), map and health under 2 s on first load, then cached. Measured by `performance_at_scale` (`cargo test -p repomemo-storage --release performance_at_scale -- --ignored --nocapture`). The run recorded so far is a **debug build** (unoptimized SQLite included, so an upper bound): keyword search p95 406 ms, meaning search p95 919 ms and the first search 21 s while the index is built, figures p95 19 ms, content version 22 ms, file query 6 ms. The release-build run is **R4 in V0.1.76**
+- [x] **P1** `crates/storage/src/vectors.rs`: one index per workspace (unit vectors in one `f32` matrix), checked by vector count on every search, updated in place by `upsert_embeddings`, rebuilt when the count differs; `REPOMEMO_VECTOR_INDEX_MB` bounds the memory and a workspace that does not fit falls back to the scan. The nearest vectors are widened until enough pass the filters. sqlite-vec stays unneeded until memory is the limit
+- [x] **P2, P3, P4** `StorageEngine::query_artifacts` (filters, count and page in SQL), `workspace_artifact_stats` (`GROUP BY type` and language), `dashboard_counts` and `GET /v1/dashboard`; the dashboard page makes one call
+- [x] **P5** `DerivedCache` keyed by `workspace_content_version` (counts and latest changes of files, passages, vectors, cards, links, states, health decisions, providers), ten-minute expiry
+- [x] **P9, M11** `repomemo_ingestion::budget`: each reading on its own thread with `REPOMEMO_DOCUMENT_TIMEOUT_SECONDS`, abandoned readings counted and new ones refused after four; `heavy` rate limiter on search, symbols, metrics, map, health and the file query. A memory cap per reading is not done: it needs a subprocess
+- [x] **M12** `BackgroundAiBudget` in `RepoMemoCore`, spent per embedding batch and per image description; the limit follows the run-time setting
+- [x] **L1** 60-second links with a `jti`, `FileLinkUses` (first client, 30 s grace), `redacted_span` for request logs; **L5** `restrict_to_owner` in `secrets.rs`
 
 #### V0.1.75: Operations
 
@@ -290,7 +290,7 @@ Every item, with the release it is planned for. The evidence behind each is in t
 | S4 | Browser hardening | M2, M5, M6, L9 | ✅ V0.1.68 |
 | S3 | Host exposure | H2, H3, L8, M10 | ✅ V0.1.69 |
 | — | Server timeouts | N7 | ✅ V0.1.71 |
-| S5 | Robustness | M11, M12, L1, L5, L6 | V0.1.71, V0.1.74 |
+| S5 | Robustness | M11, M12, L1, L5, L6 | ✅ V0.1.71, V0.1.74 |
 | — | Integrity | N8 | ✅ V0.1.73 |
 | — | Supply chain | dependency scanning (review §7) | ✅ V0.1.66 (CI) |
 | — | Accepted | N9 (not a boundary, documented), I1, I4 | — |
@@ -300,15 +300,15 @@ Every item, with the release it is planned for. The evidence behind each is in t
 | ID | Item | Size | Target |
 |---|---|---|---|
 | P0 | Timings (Performance log category) | S | ✅ V0.1.66 |
-| P1 | Vector search without a full scan | M | V0.1.74 |
-| P2 | `artifacts/query` in SQL | S | V0.1.74 |
-| P3 | Workspace metrics as SQL aggregates | S–M | V0.1.74 |
-| P4 | One dashboard call | S | V0.1.74 |
-| P5 | Cached map and health | M | V0.1.74 |
+| P1 | Vector search without a full scan | M | ✅ V0.1.74 |
+| P2 | `artifacts/query` in SQL | S | ✅ V0.1.74 |
+| P3 | Workspace metrics as SQL aggregates | S–M | ✅ V0.1.74 |
+| P4 | One dashboard call | S | ✅ V0.1.74 |
+| P5 | Cached map and health | M | ✅ V0.1.74 |
 | P6 | Code splitting of the web bundle | S | V0.1.70 |
 | P7 | Query cache with targeted invalidation | M | V0.1.70 |
 | P8 | Writer connection plus read pool; configurable concurrency | M | ✅ V0.1.71 |
-| P9 | Parser time and memory budgets | M | V0.1.74 |
+| P9 | Parser time budget (memory caps need a subprocess) | M | ✅ V0.1.74 |
 
 ### Code health and release engineering
 
