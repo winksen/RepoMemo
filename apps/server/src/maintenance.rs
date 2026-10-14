@@ -123,6 +123,7 @@ pub fn start(state: AppState) -> tokio::task::JoinHandle<()> {
                     tracing::debug!(?report, "Background maintenance pass finished");
                 }
             }
+            crate::backup::run_scheduled(&state);
             wait = state.settings().maintenance.interval.max(DISABLED_RECHECK);
         }
     })

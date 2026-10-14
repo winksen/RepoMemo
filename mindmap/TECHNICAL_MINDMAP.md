@@ -2,7 +2,7 @@
 
 > **Audience:** engineers working on RepoMemo, reviewers, and anyone operating the shared server.
 > **Companion:** [FUNCTIONAL_MINDMAP.md](FUNCTIONAL_MINDMAP.md) covers *what* the product does. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** code at `V0.1.74` (2026-10-14: invitations, reset links and personal access tokens in V0.1.63, migration 0023; security bundle S1 in V0.1.64; the security second pass in V0.1.65; CI, one version source and performance timings in V0.1.66; safe defaults and identity, migration 0024, in V0.1.67; browser hardening in V0.1.68; host exposure in V0.1.69; web client foundation in V0.1.70; server foundation in V0.1.71; memory and search you can trust in V0.1.72; evidence, ownership and repositories 1b in V0.1.73; performance and robustness in V0.1.74). The plan to V0.2.0 is in the [roadmap](ROADMAP.md#-road-to-v020). Aligned on 2026-10-13; sections marked *hardening* came with V0.1.51–V0.1.57. The focus is the **shared web client** (`apps/desktop/src/SharedWebApp.tsx`) and the **HTTP API** (`apps/server`). Desktop and Tauri paths are noted where they share code. Open security findings are in the [security review](security/2026-10-10-security-review.md), and the improvement backlog is in the [enhancement analysis](analysis/2026-10-13-enhancement-analysis.md).
+> **Scope:** code at `V0.1.75` (2026-10-14: invitations, reset links and personal access tokens in V0.1.63, migration 0023; security bundle S1 in V0.1.64; the security second pass in V0.1.65; CI, one version source and performance timings in V0.1.66; safe defaults and identity, migration 0024, in V0.1.67; browser hardening in V0.1.68; host exposure in V0.1.69; web client foundation in V0.1.70; server foundation in V0.1.71; memory and search you can trust in V0.1.72; evidence, ownership and repositories 1b in V0.1.73; performance and robustness in V0.1.74; operations in V0.1.75, with the [production guide](technical/operations.md)). The plan to V0.2.0 is in the [roadmap](ROADMAP.md#-road-to-v020). Aligned on 2026-10-13; sections marked *hardening* came with V0.1.51–V0.1.57. The focus is the **shared web client** (`apps/desktop/src/SharedWebApp.tsx`) and the **HTTP API** (`apps/server`). Desktop and Tauri paths are noted where they share code. Open security findings are in the [security review](security/2026-10-10-security-review.md), and the improvement backlog is in the [enhancement analysis](analysis/2026-10-13-enhancement-analysis.md).
 
 ---
 
@@ -249,11 +249,11 @@ Other rules:
 
 ---
 
-## 5. HTTP API reference (157 operations under `/v1`)
+## 5. HTTP API reference (163 operations under `/v1`)
 
-Counted as method and path pairs: 151 in the main router (`routes()` in [lib.rs](../apps/server/src/lib.rs)), 4 platform routes ([environment.rs](../apps/server/src/environment.rs)) and 3 avatar routes ([avatars.rs](../apps/server/src/avatars.rs)), plus `/health` and `/health/ready`.
+Counted as method and path pairs: 156 in the main router (`routes()` in [lib.rs](../apps/server/src/lib.rs)), 4 platform routes ([environment.rs](../apps/server/src/environment.rs)) and 3 avatar routes ([avatars.rs](../apps/server/src/avatars.rs)), plus `/health` and `/health/ready`.
 
-Guard legend: **pub** = no auth, **auth** = any valid JWT or personal access token, **R/W/A/O** = workspace read / write / admin / owner, **oR/oA/oO** = organization read / admin / owner. "→ activity" means the call records a `workspace_activity` row and so emits an SSE `activity` event.
+Guard legend: **pub** = no auth, **auth** = any valid JWT or personal access token, **R/W/A/O** = workspace read / write / admin / owner, **oR/oA/oO** = organization read / admin / owner. "→ activity" means the call records a `workspace_activity` row and so emits an SSE `activity` event. **F** = system administrators only (`require_full_system_admin`), and *change* = a session or a `system` token (`require_system_change`).
 
 ### Identity and session
 
@@ -308,6 +308,11 @@ Every route requires a system administrator (**S**); changes are recorded in `sy
 | GET | `/v1/system/events` | S | **SSE** of `job` (and `resync`) events from every workspace, for the Jobs page; no activity events, so app administrators see no workspace content. Ends when the token expires, the sessions end or the System role is removed (§8) |
 | GET | `/v1/system/maintenance` | S | maintenance status |
 | POST | `/v1/system/maintenance/run` | S | runs a full pass now; 409 while one runs |
+| GET | `/v1/system/backups` | S | backups (manifest each), the state of the running or last backup or restore, folder, keep, interval, free disk |
+| POST | `/v1/system/backups` | F + change | starts a backup in the background → 202; 409 while a backup or restore runs |
+| DELETE | `/v1/system/backups/{name}` | F + change | → 204; the name must be one the server wrote |
+| POST | `/v1/system/backups/{name}/restore` | F + change | `{environment}` → 202; copies into `workspace-data/<environment>` (a valid new name that does not exist) and opens it to verify |
+| GET | `/v1/system/metrics` | F; token needs `system` | OpenMetrics text (§8c) |
 | POST | `/v1/system/console` | S | `{command}` → `{command, summary, dry_run, view, data}`. Runs one console line through the matching System handler (same rights, same audit); changes are dry runs without `--yes`, and an applied change also records `console_command`. 400 for usage. See [admin-console.md](technical/admin-console.md) |
 | GET | `/v1/system/console` | S | what a console shows when it opens, for the web page and the terminal client alike: `banner`, `tagline`, `tips`, `version`, `user`, `role` and the command catalog (`name`, `usage`, `summary`, `changes`) |
 | GET | `/v1/session` | auth | the user and their workspace memberships |
@@ -713,6 +718,9 @@ Setup events are audited (`server_setup_admin_created`, `server_setup_completed`
   - *Live changes.* The logging settings are part of the run-time settings; every change re-applies the filter, the console format and file output immediately. The module never logs through tracing itself (problems go to standard error), so the sinks cannot feed back into themselves.
 - **Telemetry.** A middleware counts requests by outcome, keeps per-minute counts for an hour, and notes each client (origin, `X-RepoMemo-Client`, user agent summarised as "Browser on OS", last address; at most 500, forgotten after 24 h). Health checks are counted but not listed. Open event streams are counted while they live.
 - **Audit.** `system_audit_events` records role grants and removals (including at startup and on first registration), settings changes and resets, ended sessions, lifted lockouts and manual maintenance, with the actor. Changes made from the admin console add a `console_command` event holding the exact line.
+- **Quotas** ([quotas.rs](../apps/server/src/quotas.rs), *since V0.1.75*). `check_incoming` runs before an upload, a new file version or a new note is stored: free disk below `disk_floor_mb` plus the incoming size → `507 disk_low`; the workspace's stored bytes (`SUM(size_bytes)`) plus the incoming size over `workspace_storage_mb` → `413 workspace_full`; for uploads, the person's `uploads` rate limiter (per hour) → `429`. `check_new_workspace` counts workspaces the person owns (`workspaces_per_person` → `409 workspace_limit`). Free space comes from `GetDiskFreeSpaceExW` on Windows (one `unsafe` call) and `df -Pk` elsewhere; when it is unknown, the floor does not apply. All four are run-time settings in the *Limits* group.
+- **Backups** ([backup.rs](../apps/server/src/backup.rs), *since V0.1.75*). `make_backup` writes `backups/<name>.partial/`: `repomemo.sqlite` through `StorageEngine::snapshot_database` (`VACUUM INTO` on a read connection, so writes carry on and the copy is a consistent WAL snapshot), `blobs/` through `copy_files` (a file the newest backup has at the same path and size is hard-linked; a file that vanished is counted as `missing_blobs`), `secret.key` when present, and `manifest.json` last; then the folder is renamed to `backup-YYYYMMDD-HHMMSS`, so a listing never shows half a backup, and older ones beyond `backup_keep` and leftover `.partial` folders are deleted. One backup or restore runs at a time (`BackupStatus`, polled by the page). `restore_backup` stages `workspace-data/<name>.restoring`, renames it into place and opens it with `StorageEngine::open` (migrations run, `system_statistics` counts, then `close`); a copy that does not open is removed. The restore always targets a new name (`environment::validate_name`), so the running environment is never written. `run_scheduled` is called by the maintenance loop after each pass.
+- **Metrics** (`system::metrics`, *since V0.1.75*). An `Exposition` builder writes OpenMetrics text (`# TYPE`, `# HELP`, counters as `<name>_total`, `# EOF`) from `system_statistics`, the telemetry counters, the queues, file sizes, free disk, `StorageEngine::vector_index_usage`, `abandoned_readings` and the newest backup. Name and label values are fixed in code, so only label values are escaped.
 - **Admin console** ([system/console.rs](../apps/server/src/system/console.rs), [technical/admin-console.md](technical/admin-console.md)). A fixed catalog of commands parsed on the server (words, quoted values, `--flag value`, `--yes`). Each command calls an existing System handler, or the workspace job cancel, with the caller's identity, so it adds no rights and no business logic. Unknown options are refused rather than ignored. Detaching the environment and granting the system administrator role are left to the pages. The logo and opening lines live in `repomemo_domain::console`, so the terminal client ([apps/console](../apps/console/src/main.rs), `repomemo-console`: `reqwest`, `rustyline` for history and completion, `rpassword`) and the web page show the same text.
 
 ---
@@ -817,7 +825,7 @@ This file is the root of the technical mindmap. Each branch can grow into its ow
 | Data model and migrations | `technical/data-model.md` |
 | Events, jobs and the worker | `technical/jobs-and-events.md` |
 | Web client architecture | `technical/web-client.md` |
-| Operations: config, deploy, backup | `technical/operations.md` |
+| Operations: config, deploy, backup | ✅ [technical/operations.md](technical/operations.md) |
 | Risks and tech-debt register | `technical/tech-debt.md` (for now: §11 and the [enhancement analysis](analysis/2026-10-13-enhancement-analysis.md)) |
 | Security review | ✅ [security/2026-10-10-security-review.md](security/2026-10-10-security-review.md) |
 | Repository sources (git) | ✅ [technical/repository-sources.md](technical/repository-sources.md) |

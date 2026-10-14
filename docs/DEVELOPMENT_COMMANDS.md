@@ -193,6 +193,12 @@ stored in the database and override the values below until reset.
 | `REPOMEMO_INDEX_CONCURRENCY` | `2` | Artifacts indexed at once (1–16). Indexing may call a vision provider. |
 | `REPOMEMO_EMBEDDING_CONCURRENCY` | `1` | Workspaces embedded at once (1–8). Raise it only for a provider that can take it. |
 | `REPOMEMO_DB_READ_CONNECTIONS` | `4` | Read-only database connections (1–64). Writes always use one. |
+| `REPOMEMO_WORKSPACE_STORAGE_MB` | `20480` | Evidence one workspace may hold, in MiB; uploads and notes beyond it answer `413`. `0` is unlimited. Also a run-time setting. |
+| `REPOMEMO_UPLOADS_PER_HOUR` | `600` | Files and new versions one person may upload per hour; `0` is unlimited. Also a run-time setting. |
+| `REPOMEMO_WORKSPACES_PER_PERSON` | `25` | Workspaces one person may own; `0` is unlimited. Also a run-time setting. |
+| `REPOMEMO_DISK_FLOOR_MB` | `1024` | Uploads answer `507` while less than this is free on the disk of the data folder; `0` turns the check off. Also a run-time setting. |
+| `REPOMEMO_BACKUP_INTERVAL_HOURS` | `0` | The server backs up by itself when the newest backup is older than this (checked by the maintenance loop); `0` is off. Also a run-time setting. |
+| `REPOMEMO_BACKUP_KEEP` | `7` | Backups kept; older ones are deleted after a new one. Also a run-time setting. |
 | `REPOMEMO_VECTOR_INDEX_MB` | `512` | Memory for in-memory vector indexes of meaning search, in MiB. A workspace of 50,000 passages with 768-dimensional vectors takes about 150 MiB. `0` turns the indexes off (the database is scanned). A workspace that does not fit is scanned. |
 | `REPOMEMO_DOCUMENT_TIMEOUT_SECONDS` | `60` | How long reading one document may take before it is skipped. `0` for no limit. |
 | `REPOMEMO_HEAVY_REQUESTS_PER_MINUTE` | `240` | Searches, figures, map, health and file queries per person per minute; `0` is unlimited. Also a run-time setting. |

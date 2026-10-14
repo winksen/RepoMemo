@@ -5,6 +5,7 @@ pub(crate) async fn create_workspace(
     State(state): State<AppState>,
     Json(request): Json<CreateWorkspaceRequest>,
 ) -> Result<(StatusCode, Json<SharedWorkspace>), ApiError> {
+    quotas::check_new_workspace(&state, &subject).await?;
     let workspace = state
         .storage
         .create_shared_workspace(&subject.user_id, &request.organization_id, &request.name)

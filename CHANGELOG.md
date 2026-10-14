@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)), then `0.2.1` and so on for fixes. Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.1.75 (2026-10-14)
+
+Operations: what an operator needs before trusting the server.
+
+### Added
+- **Backup and restore.** System › Jobs & maintenance › **Back up now**, the console (`backup list`, `backup create --yes`, `backup restore <backup> <environment> --yes`, `backup delete <backup> --yes`) and `GET/POST /v1/system/backups`, `DELETE /v1/system/backups/{name}`, `POST /v1/system/backups/{name}/restore`. A backup is a folder in `<data folder>/backups/` with a consistent snapshot of the database (`VACUUM INTO`, taken while the server runs), the stored files, the key file and a manifest; each backup links the files the one before it had, so only new files cost space. A restore never touches the running environment: it copies a backup into a **new environment folder**, opens it to prove it works and says how many workspaces, files and people it holds; attach it from the environment menu.
+- **Automatic backups.** `REPOMEMO_BACKUP_INTERVAL_HOURS` (0, off, by default; also a setting) makes the maintenance loop back up by itself when the newest backup is older, and `REPOMEMO_BACKUP_KEEP` (7) bounds how many are kept.
+- **Quotas that protect the disk.** Storage per workspace (`REPOMEMO_WORKSPACE_STORAGE_MB`, 20,480 MiB: `413 workspace_full`), uploads per person per hour (`REPOMEMO_UPLOADS_PER_HOUR`, 600: `429`), workspaces owned per person (`REPOMEMO_WORKSPACES_PER_PERSON`, 25: `409 workspace_limit`) and a free-disk floor (`REPOMEMO_DISK_FLOOR_MB`, 1,024 MiB: uploads answer `507 disk_low`). All are settings in System › Settings (group *Limits*); `0` turns one off. System › Overview shows free disk space and the allowances.
+- **Metrics.** `GET /v1/system/metrics` in the OpenMetrics text format: version, uptime, requests and errors, accounts, workspaces, files, passages, vectors, jobs by status, database and log size, free disk, queues, vector index memory, abandoned document readings, backups and the time of the last one. It needs a system administrator's session or a personal access token with the `system` scope.
+- **A production guide**, [mindmap/technical/operations.md](mindmap/technical/operations.md): the settings that must be right, nginx and Caddy configurations with timeouts and event streams, systemd and Windows service definitions, readiness checks, limits, backups and the restore drill, monitoring with alerts, the LibreOffice sandbox, upgrades and a troubleshooting table.
+
+### Upgrading
+- Nothing changes in the database. Uploads over a workspace's 20 GiB allowance, or while less than 1 GiB is free, are refused from now on: raise the settings or set them to `0` for the old behaviour.
+- Backups are kept next to the data, so copy the `backups` folder to another machine (the guide shows how). They hold `secret.key`: protect them like the data.
+
 ## V0.1.74 (2026-10-14)
 
 Performance and robustness.

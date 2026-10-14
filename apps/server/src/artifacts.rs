@@ -462,6 +462,7 @@ pub(crate) async fn create_text_artifact(
 ) -> Result<(StatusCode, Json<SharedArtifactSummary>), ApiError> {
     require_workspace_write(&state, &subject, &workspace_id).await?;
     let folder_id = validate_folder(&state, &workspace_id, request.folder_id.as_deref()).await?;
+    quotas::check_incoming(&state, &subject, &workspace_id, request.content.len() as u64, false).await?;
     let artifact = state
         .core
         .import_text(workspace_id.clone(), request.title, request.content, request.language)
@@ -526,6 +527,7 @@ pub(crate) async fn upload_artifact(
         .ensure_upload_allowed(&workspace_id, &filename)
         .await
         .map_err(map_core_error)?;
+    quotas::check_incoming(&state, &subject, &workspace_id, body.len() as u64, true).await?;
     let artifact = state
         .core
         .import_upload(workspace_id.clone(), filename, body.to_vec(), mime_type)
@@ -1091,6 +1093,7 @@ pub(crate) async fn upload_artifact_version(
             "The file name is too long or has control characters.",
         ));
     }
+    quotas::check_incoming(&state, &subject, &workspace_id, body.len() as u64, true).await?;
     let artifact = state
         .core
         .replace_artifact_version(&artifact_id, &filename, body.to_vec())

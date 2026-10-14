@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import type { ReactNode } from "react";
 import {
@@ -36,11 +36,14 @@ import { SystemConsole } from "./SystemConsole";
 import { UserAvatar } from "./UserAvatar";
 import {
   cancelSharedJob,
+  createSystemBackup,
+  deleteSystemBackup,
   detachEnvironment,
   downloadSystemLogFile,
   endSystemUserSessions,
   issueSharedPasswordReset,
   getPlatformStatus,
+  getSystemBackups,
   getSystemLogFiles,
   getSystemLogs,
   getSystemOverview,
@@ -51,6 +54,7 @@ import {
   listSystemJobs,
   listSystemUsers,
   resetSystemSetting,
+  restoreSystemBackup,
   runSystemMaintenance,
   saveSystemSettings,
   setAppAdmin,
@@ -58,6 +62,7 @@ import {
   unlockSystemUser,
 } from "../lib/sharedApi";
 import type {
+  BackupsOverview,
   CountByLabel,
   MaintenanceStatus,
   SharedSession,
@@ -116,7 +121,7 @@ const SECTION_INTRO: Record<SystemSection, string> = {
   users: "Every account on the server. System administrators act as administrators in every organization and workspace.",
   settings: "Settings that apply to the whole server. Changes take effect at once and are recorded in the audit trail.",
   logs: "Server log events: recent ones kept in memory, and earlier days from the log files. What is recorded is set under Settings › Logging.",
-  jobs: "Background jobs across every workspace, and the maintenance that keeps the server tidy.",
+  jobs: "Background jobs across every workspace, the maintenance that keeps the server tidy, and backups.",
   audit: "What system administrators did, kept durably.",
   console: "A command line to this server for technical administrators: the same actions as these pages, typed.",
 };
@@ -138,7 +143,7 @@ export function SystemAdminPanel({ accessToken, onNavigateSection, onOpenWorkspa
     {section === "users" ? <UsersSection accessToken={accessToken} session={session} /> : null}
     {section === "settings" ? <SettingsSection accessToken={accessToken} session={session} /> : null}
     {section === "logs" ? <LogsSection accessToken={accessToken} canDownload={session.is_system_admin === true} onOpenSettings={() => onNavigateSection("settings")} workspaces={workspaces} /> : null}
-    {section === "jobs" ? <JobsSection accessToken={accessToken} /> : null}
+    {section === "jobs" ? <JobsSection accessToken={accessToken} canChange={session.is_system_admin === true} /> : null}
     {section === "audit" ? <AuditSection accessToken={accessToken} /> : null}
     {section === "console" ? <SystemConsole accessToken={accessToken} /> : null}
   </section>;
@@ -288,6 +293,8 @@ function OverviewSection({ accessToken }: { accessToken: string }) {
           ["Write-ahead log", formatBytes(storage.write_ahead_log_bytes)],
           ["Stored files", `${count(statistics.blob_count)} · ${formatBytes(storage.blob_bytes)}`],
           ["Cached previews", `${count(storage.preview_count)} · ${formatBytes(storage.preview_bytes)}`],
+          ["Free disk", storage.disk_free_bytes == null ? "unknown" : `${formatBytes(storage.disk_free_bytes)}${storage.disk_floor_bytes ? ` · uploads stop below ${formatBytes(storage.disk_floor_bytes)}` : ""}`],
+          ["Storage per workspace", storage.workspace_storage_bytes ? formatBytes(storage.workspace_storage_bytes) : "unlimited"],
           ["Passages", count(statistics.chunk_count)],
           ["Search vectors", count(statistics.embedding_count)],
           ["Memory cards · tasks · comments", `${count(statistics.memory_card_count)} · ${count(statistics.task_count)} · ${count(statistics.comment_count)}`],
@@ -682,7 +689,85 @@ function LogsSection({ accessToken, canDownload, onOpenSettings, workspaces }: {
   </>;
 }
 
-function JobsSection({ accessToken }: { accessToken: string }) {
+/** Backups of the environment, and restoring one into a new environment folder. */
+function BackupsPanel({ accessToken, canChange }: { accessToken: string; canChange: boolean }) {
+  const [overview, setOverview] = useState<BackupsOverview | null>(null);
+  const [restoring, setRestoring] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [environment, setEnvironment] = useState("");
+  const [isBusy, setIsBusy] = useState(false);
+  const wasRunning = useRef(false);
+  const running = overview?.status.running ?? false;
+
+  async function load() {
+    try { setOverview(await getSystemBackups(accessToken)); }
+    catch (error) { showToast("error", errorMessage(error, "Backups could not be listed.")); }
+  }
+  useEffect(() => { void load(); }, [accessToken]);
+  useEffect(() => {
+    if (!running) return undefined;
+    const timer = window.setInterval(() => void load(), 2_000);
+    return () => window.clearInterval(timer);
+  }, [running, accessToken]);
+  useEffect(() => {
+    // Say how a backup or restore ended, once, when it was running before.
+    if (wasRunning.current && !running && overview?.status.message) showToast(overview.status.succeeded ? "success" : "error", overview.status.message);
+    wasRunning.current = running;
+  }, [running, overview]);
+
+  async function backUp() {
+    setIsBusy(true);
+    try { setOverview(await createSystemBackup(accessToken)); }
+    catch (error) { showToast("error", errorMessage(error, "The backup could not start.")); }
+    finally { setIsBusy(false); }
+  }
+  async function restore() {
+    if (!restoring) return;
+    setIsBusy(true);
+    try { setOverview(await restoreSystemBackup(accessToken, restoring, environment.trim())); setRestoring(null); setEnvironment(""); }
+    catch (error) { showToast("error", errorMessage(error, "The restore could not start.")); }
+    finally { setIsBusy(false); }
+  }
+  async function remove() {
+    if (!deleting) return;
+    setIsBusy(true);
+    try { await deleteSystemBackup(accessToken, deleting); setDeleting(null); showToast("success", "The backup was deleted."); await load(); }
+    catch (error) { showToast("error", errorMessage(error, "The backup could not be deleted.")); }
+    finally { setIsBusy(false); }
+  }
+
+  const status = overview?.status;
+  return <section className="shared-settings-group">
+    <div className="shared-panel-heading"><div><Database size={18} /><h2>Backups</h2></div><span>{running ? `${status?.operation ?? "backup"} running…` : overview ? `${overview.backups.length} kept` : "loading"}</span></div>
+    <p className="shared-muted-copy">A backup holds a consistent copy of the database, the stored files and the key file, made while the server runs. It sits in the data folder, so copy it to another machine for it to survive a lost disk, and protect it like the data. Restoring never touches the running environment: it creates a new one, which you attach from the environment menu.</p>
+    <Facts items={[
+      ["Folder", <code key="dir">{overview?.directory ?? "—"}</code>],
+      ["Automatic backups", overview ? (overview.interval_hours ? `every ${overview.interval_hours} h, ${overview.keep} kept` : `off, ${overview.keep} kept (Settings › Automatic backups)`) : "—"],
+      ["Free disk", overview?.disk_free_bytes != null ? formatBytes(overview.disk_free_bytes) : "unknown"],
+      ["Last backup or restore", status?.finished_at ? `${formatTime(status.finished_at)} · ${status.message ?? ""}` : "none since the server started"],
+    ]} />
+    {canChange ? <div><Button disabled={isBusy || running} onClick={() => void backUp()} type="button" variant="main">{running ? <Loader className="spin" size={16} /> : <Database size={16} />} Back up now</Button></div> : <p className="shared-muted-copy">Only system administrators make, restore and delete backups.</p>}
+    {overview?.backups.length ? <div className="rm-map-coverage"><table>
+      <thead><tr><th scope="col">Backup</th><th scope="col">Made</th><th scope="col">Version</th><th scope="col">Files</th><th scope="col">Database</th><th scope="col">Key</th>{canChange ? <th scope="col"><span className="sr-only">Actions</span></th> : null}</tr></thead>
+      <tbody>{overview.backups.map((backup) => <tr key={backup.name}>
+        <th scope="row">{backup.name}<small className="rm-system-tag">{backup.trigger}</small></th>
+        <td>{formatTime(backup.created_at)}</td><td>{backup.version}</td>
+        <td>{count(backup.blob_count)} · {formatBytes(backup.blob_bytes)}{backup.missing_blobs ? ` · ${count(backup.missing_blobs)} missing` : ""}</td>
+        <td>{formatBytes(backup.database_bytes)}</td><td>{backup.includes_key ? "included" : "not in it"}</td>
+        {canChange ? <td><ActionMenu items={[
+          { label: "Restore as a new environment…", onSelect: () => { setEnvironment(""); setRestoring(backup.name); } },
+          { label: "Delete", onSelect: () => setDeleting(backup.name), destructive: true },
+        ]} label={`Actions for ${backup.name}`} /></td> : null}
+      </tr>)}</tbody>
+    </table></div> : <p className="shared-muted-copy">{overview ? "No backups yet." : "Loading backups…"}</p>}
+    <Dialog description="The backup is copied into a new environment folder under workspace-data and checked: it must open. The running environment is not changed. Attach the new one from the environment menu when you want to use it." footer={<><DialogCancel onClick={() => setRestoring(null)} /><Button disabled={isBusy || !environment.trim()} onClick={() => void restore()} type="button" variant="main">{isBusy ? <Loader className="spin" size={16} /> : null}Restore</Button></>} onClose={() => setRestoring(null)} open={Boolean(restoring)} title={`Restore ${restoring ?? "the backup"}`}>
+      <label className="rm-system-inline">New environment name<Input aria-label="New environment name" onChange={(event) => setEnvironment(event.target.value)} placeholder="restored-2026-10" value={environment} /></label>
+    </Dialog>
+    <Dialog description="The backup is deleted from the backups folder. Other backups that share its stored files keep them." footer={<><DialogCancel onClick={() => setDeleting(null)} /><Button disabled={isBusy} onClick={() => void remove()} type="button" variant="main">{isBusy ? <Loader className="spin" size={16} /> : null}Delete backup</Button></>} onClose={() => setDeleting(null)} open={Boolean(deleting)} title={`Delete ${deleting ?? "the backup"}?`} />
+  </section>;
+}
+
+function JobsSection({ accessToken, canChange }: { accessToken: string; canChange: boolean }) {
   const [status, setStatus] = useState("all");
   // Job changes in every workspace arrive on the System event stream; the
   // list then refreshes only now and then, as a safety net.
@@ -714,6 +799,7 @@ function JobsSection({ accessToken }: { accessToken: string }) {
 
   return <>
     <MaintenancePanel accessToken={accessToken} onChanged={setMaintenance} status={maintenance} />
+    <BackupsPanel accessToken={accessToken} canChange={canChange} />
     <section className="shared-settings-group">
       <div className="shared-panel-heading"><div><Activity size={18} /><h2>Jobs</h2></div><span>{isLive ? "newest first · live" : "newest first · refreshes every 10 seconds"}</span></div>
       <div className="rm-system-toolbar">

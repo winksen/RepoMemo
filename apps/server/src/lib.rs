@@ -8,6 +8,7 @@ mod ai_access;
 mod artifacts;
 mod auth;
 mod avatars;
+mod backup;
 mod collaboration;
 mod config;
 mod conversion;
@@ -22,6 +23,7 @@ mod logs;
 mod maintenance;
 mod organizations;
 mod profile;
+mod quotas;
 mod repositories;
 mod requests;
 mod retrieval;
@@ -145,6 +147,8 @@ struct AppState {
     instance: Arc<InstanceInfo>,
     telemetry: Arc<Telemetry>,
     maintenance_status: Arc<std::sync::Mutex<MaintenanceStatus>>,
+    /// The backup or restore that is running, or what the last one did.
+    backup_status: Arc<std::sync::Mutex<backup::BackupStatus>>,
     setup: Arc<setup::SetupGate>,
     /// The host this environment is attached to; used to detach it.
     host: environment::HostHandle,
@@ -362,6 +366,7 @@ async fn build_state(
         instance,
         telemetry: Arc::new(Telemetry::default()),
         maintenance_status: Arc::new(std::sync::Mutex::new(MaintenanceStatus::default())),
+        backup_status: Arc::new(std::sync::Mutex::new(backup::BackupStatus::default())),
         setup,
         host,
         closing: Arc::new(std::sync::atomic::AtomicBool::new(false)),
@@ -444,6 +449,10 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route("/v1/system/jobs", get(system::jobs))
         .route("/v1/system/maintenance", get(system::get_maintenance))
         .route("/v1/system/maintenance/run", post(system::run_maintenance))
+        .route("/v1/system/backups", get(backup::list).post(backup::create))
+        .route("/v1/system/backups/{name}", delete(backup::delete))
+        .route("/v1/system/backups/{name}/restore", post(backup::restore))
+        .route("/v1/system/metrics", get(system::metrics))
         .route(
             "/v1/system/console",
             get(system::console::welcome).post(system::console::run),

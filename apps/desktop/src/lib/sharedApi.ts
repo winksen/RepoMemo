@@ -13,6 +13,7 @@ import type {
   SystemSettings,
   SystemUsage,
   SystemUser,
+  BackupsOverview,
   MaintenanceStatus,
   AgentCapabilities,
   AgentConversation,
@@ -1184,6 +1185,25 @@ export function getSystemMaintenance(accessToken: string): Promise<MaintenanceSt
 
 export function runSystemMaintenance(accessToken: string): Promise<MaintenanceStatus> {
   return request<MaintenanceStatus>("/v1/system/maintenance/run", { method: "POST" }, accessToken);
+}
+
+export function getSystemBackups(accessToken: string): Promise<BackupsOverview> {
+  return request<BackupsOverview>("/v1/system/backups", {}, accessToken);
+}
+
+export function createSystemBackup(accessToken: string): Promise<BackupsOverview> {
+  return request<BackupsOverview>("/v1/system/backups", { method: "POST", body: JSON.stringify({}) }, accessToken);
+}
+
+export function deleteSystemBackup(accessToken: string, name: string): Promise<void> {
+  return request<void>(`/v1/system/backups/${encodeURIComponent(name)}`, { method: "DELETE" }, accessToken);
+}
+
+export function restoreSystemBackup(accessToken: string, name: string, environment: string): Promise<BackupsOverview> {
+  return request<BackupsOverview>(`/v1/system/backups/${encodeURIComponent(name)}/restore`, {
+    method: "POST",
+    body: JSON.stringify({ environment }),
+  }, accessToken);
 }
 
 /** What the admin console shows when it opens: logo, greeting and the commands, for help and completion. */

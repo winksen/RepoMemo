@@ -1,0 +1,338 @@
+use super::*;
+
+async fn upload(app: &axum::Router, who: &str, workspace_id: &str, name: &str, bytes: Vec<u8>) -> u16 {
+    app.clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/v1/workspaces/{workspace_id}/artifacts/upload"))
+                .header("authorization", who)
+                .header("x-repomemo-filename", name)
+                .header("content-type", "text/plain")
+                .body(Body::from(bytes))
+                .unwrap(),
+        )
+        .await
+        .unwrap()
+        .status()
+        .as_u16()
+}
+
+async fn wait_for_backup_work(app: &axum::Router, admin: &str) -> Value {
+    for _ in 0..200 {
+        let overview = response_json(
+            app.clone()
+                .oneshot(auth_request("GET", "/v1/system/backups", admin))
+                .await
+                .unwrap(),
+        )
+        .await;
+        if overview["status"]["running"] == false && overview["status"]["succeeded"].is_boolean() {
+            return overview;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+    panic!("the backup did not finish in time");
+}
+
+#[tokio::test]
+async fn a_backup_restores_into_a_new_environment_that_opens() {
+    let data_dir = temp_data_dir("backup");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let (admin, _) = register_account(&app, "backup-admin@example.com").await;
+    let (member, _) = register_account(&app, "backup-member@example.com").await;
+    let workspace_id = create_workspace(&app, &admin).await;
+    for (name, text) in [("plan.txt", "Ship on Friday"), ("notes.txt", "Rollback plan")] {
+        assert_eq!(
+            upload(&app, &admin, &workspace_id, name, text.as_bytes().to_vec()).await,
+            201
+        );
+    }
+
+    // Only system administrators back up.
+    let denied = app
+        .clone()
+        .oneshot(auth_request("GET", "/v1/system/backups", &member))
+        .await
+        .unwrap();
+    assert_eq!(denied.status(), 403);
+
+    let started = app
+        .clone()
+        .oneshot(json_request("POST", "/v1/system/backups", &admin, json!({})))
+        .await
+        .unwrap();
+    assert_eq!(started.status(), 202);
+    let overview = wait_for_backup_work(&app, &admin).await;
+    assert_eq!(overview["status"]["succeeded"], true, "{overview}");
+    let backups = overview["backups"].as_array().unwrap();
+    assert_eq!(backups.len(), 1);
+    let name = backups[0]["name"].as_str().unwrap().to_owned();
+    assert_eq!(backups[0]["blob_count"], 2);
+    assert_eq!(backups[0]["includes_key"], true);
+    assert!(data_dir.join("backups").join(&name).join("repomemo.sqlite").is_file());
+
+    // A second backup reuses the files of the first (names carry the second).
+    tokio::time::sleep(std::time::Duration::from_millis(1_100)).await;
+    app.clone()
+        .oneshot(json_request("POST", "/v1/system/backups", &admin, json!({})))
+        .await
+        .unwrap();
+    let overview = {
+        let mut latest = Value::Null;
+        for _ in 0..200 {
+            latest = wait_for_backup_work(&app, &admin).await;
+            if latest["backups"].as_array().unwrap().len() == 2 {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+        latest
+    };
+    assert_eq!(overview["backups"].as_array().unwrap().len(), 2);
+    assert_eq!(overview["backups"][0]["reused_blobs"], 2);
+
+    // Restore into a new environment folder, which must open.
+    let environment = format!("restore-test-{}", &uuid::Uuid::new_v4().simple().to_string()[..8]);
+    let bad_name = app
+        .clone()
+        .oneshot(json_request(
+            "POST",
+            &format!("/v1/system/backups/{name}/restore"),
+            &admin,
+            json!({"environment": "../escape"}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(bad_name.status(), 400);
+    let unknown = app
+        .clone()
+        .oneshot(json_request(
+            "POST",
+            "/v1/system/backups/backup-19990101-000000/restore",
+            &admin,
+            json!({"environment": environment}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(unknown.status(), 404);
+    let restore = app
+        .clone()
+        .oneshot(json_request(
+            "POST",
+            &format!("/v1/system/backups/{name}/restore"),
+            &admin,
+            json!({"environment": environment}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(restore.status(), 202);
+    let overview = loop {
+        let overview = wait_for_backup_work(&app, &admin).await;
+        if overview["status"]["operation"] == "restore" {
+            break overview;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    };
+    assert_eq!(overview["status"]["succeeded"], true, "{overview}");
+    let message = overview["status"]["message"].as_str().unwrap();
+    assert!(message.contains("1 workspaces, 2 files, 2 people"), "{message}");
+    let root = crate::environment::environments_root().unwrap();
+    let restored = root.join(&environment);
+    assert!(restored.join("repomemo.sqlite").is_file());
+    assert!(restored.join("blobs").is_dir());
+    let _ = std::fs::remove_dir_all(&restored);
+    let _ = std::fs::remove_dir(&root);
+
+    // Delete one.
+    let deleted = app
+        .clone()
+        .oneshot(json_request(
+            "DELETE",
+            &format!("/v1/system/backups/{name}"),
+            &admin,
+            json!({}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(deleted.status(), 204);
+    let overview = response_json(
+        app.clone()
+            .oneshot(auth_request("GET", "/v1/system/backups", &admin))
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(overview["backups"].as_array().unwrap().len(), 1);
+    let _ = std::fs::remove_dir_all(data_dir);
+}
+
+#[tokio::test]
+async fn quotas_protect_the_disk_and_the_server() {
+    let data_dir = temp_data_dir("quotas");
+    let mut config = ServerConfig::for_test(data_dir.clone());
+    config.workspace_storage_mb = 1;
+    config.upload_quota = crate::Quota::per_hour(3);
+    config.workspaces_per_person = 1;
+    let app = router(config).await.unwrap();
+    let (owner, _) = register_account(&app, "quota-owner@example.com").await;
+    let workspace_id = create_workspace(&app, &owner).await;
+
+    // A second workspace is over the person's allowance.
+    let organizations = response_json(
+        app.clone()
+            .oneshot(auth_request("GET", "/v1/organizations", &owner))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let second = app
+        .clone()
+        .oneshot(json_request(
+            "POST",
+            "/v1/workspaces",
+            &owner,
+            json!({"organization_id": organizations[0]["id"], "name": "Another"}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(second.status(), 409);
+    let body = response_json(second).await;
+    assert_eq!(body["error"]["code"], "workspace_limit");
+
+    // Within the allowance, then over it.
+    assert_eq!(
+        upload(&app, &owner, &workspace_id, "small.txt", vec![b'a'; 600 * 1024]).await,
+        201
+    );
+    assert_eq!(
+        upload(&app, &owner, &workspace_id, "big.txt", vec![b'b'; 600 * 1024]).await,
+        413
+    );
+    // The note box counts as stored evidence too.
+    let note = app
+        .clone()
+        .oneshot(json_request(
+            "POST",
+            &format!("/v1/workspaces/{workspace_id}/artifacts/text"),
+            &owner,
+            json!({"title": "Long", "content": "x".repeat(600 * 1024)}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(note.status(), 413);
+
+    // Uploads per hour: three are allowed; refusals for room do not count.
+    for name in ["tiny-1.txt", "tiny-2.txt"] {
+        assert_eq!(upload(&app, &owner, &workspace_id, name, b"1".to_vec()).await, 201);
+    }
+    assert_eq!(
+        upload(&app, &owner, &workspace_id, "tiny-3.txt", b"1".to_vec()).await,
+        429
+    );
+    let _ = std::fs::remove_dir_all(data_dir);
+}
+
+#[tokio::test]
+async fn uploads_stop_when_the_disk_is_nearly_full() {
+    let data_dir = temp_data_dir("disk-floor");
+    let mut config = ServerConfig::for_test(data_dir.clone());
+    // About a petabyte: more than any test machine has free.
+    config.disk_floor_mb = 1_000_000_000;
+    let app = router(config).await.unwrap();
+    let (owner, _) = register_account(&app, "disk-owner@example.com").await;
+    let workspace_id = create_workspace(&app, &owner).await;
+    assert_eq!(
+        upload(&app, &owner, &workspace_id, "any.txt", b"text".to_vec()).await,
+        507
+    );
+    let _ = std::fs::remove_dir_all(data_dir);
+}
+
+#[tokio::test]
+async fn metrics_are_open_metrics_for_system_administrators() {
+    let data_dir = temp_data_dir("metrics");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let (admin, _) = register_account(&app, "metrics-admin@example.com").await;
+    let (member, _) = register_account(&app, "metrics-member@example.com").await;
+    let workspace_id = create_workspace(&app, &admin).await;
+    assert_eq!(
+        upload(&app, &admin, &workspace_id, "a.txt", b"hello".to_vec()).await,
+        201
+    );
+
+    let denied = app
+        .clone()
+        .oneshot(auth_request("GET", "/v1/system/metrics", &member))
+        .await
+        .unwrap();
+    assert_eq!(denied.status(), 403);
+    let anonymous = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/v1/system/metrics")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(anonymous.status(), 401);
+
+    let response = app
+        .clone()
+        .oneshot(auth_request("GET", "/v1/system/metrics", &admin))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 200);
+    assert!(response
+        .headers()
+        .get("content-type")
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .starts_with("application/openmetrics-text"));
+    let text = String::from_utf8(to_bytes(response.into_body(), usize::MAX).await.unwrap().to_vec()).unwrap();
+    assert!(text.contains("repomemo_build_info{version=\""));
+    assert!(text.contains("repomemo_users 2\n"), "{text}");
+    assert!(text.contains("repomemo_artifacts 1\n"));
+    assert!(text.contains("repomemo_http_requests_total "));
+    assert!(text.ends_with("# EOF\n"));
+    let _ = std::fs::remove_dir_all(data_dir);
+}
+
+#[tokio::test]
+async fn the_console_lists_backups_and_asks_before_changing_anything() {
+    let data_dir = temp_data_dir("console-backup");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let (admin, _) = register_account(&app, "console-backup@example.com").await;
+    let run = |command: String| {
+        let app = app.clone();
+        let admin = admin.clone();
+        async move {
+            response_json(
+                app.oneshot(json_request(
+                    "POST",
+                    "/v1/system/console",
+                    &admin,
+                    json!({"command": command}),
+                ))
+                .await
+                .unwrap(),
+            )
+            .await
+        }
+    };
+    let list = run("backup list".to_owned()).await;
+    assert_eq!(list["command"], "backup list");
+    assert_eq!(list["data"].as_array().unwrap().len(), 0);
+    let dry = run("backup create".to_owned()).await;
+    assert_eq!(dry["dry_run"], true);
+    let started = run("backup create --yes".to_owned()).await;
+    assert_eq!(started["dry_run"], false);
+    let overview = wait_for_backup_work(&app, &admin).await;
+    assert_eq!(overview["backups"].as_array().unwrap().len(), 1);
+    let listed = run("backup".to_owned()).await;
+    assert_eq!(listed["data"].as_array().unwrap().len(), 1);
+    let _ = std::fs::remove_dir_all(data_dir);
+}

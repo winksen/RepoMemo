@@ -13,6 +13,7 @@ mod auth;
 mod evidence;
 mod evidence_tools;
 mod memory;
+mod operations;
 mod performance;
 mod system;
 mod workspaces;

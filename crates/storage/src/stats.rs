@@ -220,6 +220,38 @@ impl StorageEngine {
         Ok(workspace_ids.iter().filter_map(|id| by_workspace.remove(id)).collect())
     }
 
+    /// Bytes of evidence a workspace holds (the sum of its files' sizes).
+    pub async fn workspace_stored_bytes(&self, workspace_id: &str) -> Result<i64> {
+        Ok(
+            sqlx::query_scalar::<_, i64>("SELECT COALESCE(SUM(size_bytes), 0) FROM artifacts WHERE workspace_id = ?1")
+                .bind(workspace_id)
+                .fetch_one(self.reader())
+                .await?,
+        )
+    }
+
+    /// Workspaces the person owns.
+    pub async fn count_owned_workspaces(&self, user_id: &str) -> Result<i64> {
+        Ok(sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM workspace_memberships WHERE user_id = ?1 AND role = 'owner'",
+        )
+        .bind(user_id)
+        .fetch_one(self.reader())
+        .await?)
+    }
+
+    /// Writes a consistent copy of the database to `target`, which must not
+    /// exist. Reads and writes carry on while it is made.
+    pub async fn snapshot_database(&self, target: &Path) -> Result<()> {
+        let target = target.to_str().context("the backup path is not valid text")?.to_owned();
+        sqlx::query("VACUUM INTO ?1")
+            .bind(target)
+            .execute(self.reader())
+            .await
+            .context("the database snapshot could not be written")?;
+        Ok(())
+    }
+
     /// A short text that changes whenever something the knowledge map or
     /// Workspace Health is computed from changes: files and their index,
     /// passages, vectors, memory cards and their links, evidence states,

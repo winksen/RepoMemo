@@ -231,7 +231,7 @@ Each proposal below was accepted as written. They shape the releases named in th
 - [x] **F4 phase 1b** `GitRepo::renamed_files` (`git diff --name-status -z -M50%`) pairs a vanished path with its new one during a sync; `SearchResult.commit` and `Citation.commit` come from `repo_files.commit_sha`. The desktop app does not get either (decision 3)
 - [x] **F9** `logs --follow` is the terminal client polling with `--after`; `users reset-link` and `tokens list` are server commands
 
-#### V0.1.74: Performance and robustness (built, not yet released)
+#### V0.1.74: Performance and robustness
 
 - [x] **Targets**, at 50,000 passages: search under 300 ms and the dashboard under 500 ms (p95), map and health under 2 s on first load, then cached. Measured by `performance_at_scale` (`cargo test -p repomemo-storage --release performance_at_scale -- --ignored --nocapture`). The run recorded so far is a **debug build** (unoptimized SQLite included, so an upper bound): keyword search p95 406 ms, meaning search p95 919 ms and the first search 21 s while the index is built, figures p95 19 ms, content version 22 ms, file query 6 ms. The release-build run is **R4 in V0.1.76**
 - [x] **P1** `crates/storage/src/vectors.rs`: one index per workspace (unit vectors in one `f32` matrix), checked by vector count on every search, updated in place by `upsert_embeddings`, rebuilt when the count differs; `REPOMEMO_VECTOR_INDEX_MB` bounds the memory and a workspace that does not fit falls back to the scan. The nearest vectors are widened until enough pass the filters. sqlite-vec stays unneeded until memory is the limit
@@ -241,12 +241,12 @@ Each proposal below was accepted as written. They shape the releases named in th
 - [x] **M12** `BackgroundAiBudget` in `RepoMemoCore`, spent per embedding batch and per image description; the limit follows the run-time setting
 - [x] **L1** 60-second links with a `jti`, `FileLinkUses` (first client, 30 s grace), `redacted_span` for request logs; **L5** `restrict_to_owner` in `secrets.rs`
 
-#### V0.1.75: Operations
+#### V0.1.75: Operations (built, not yet released)
 
-- [ ] **O1** backup and restore of an environment (database snapshot with `VACUUM INTO`, blobs, `secret.key`) from System › Maintenance and the console (`backup create`, `backup list`, `backup restore`)
-- [ ] **O3** production guide (`technical/operations.md`): TLS proxy with timeouts, static SPA with the CSP, Windows service and systemd units, readiness checks, upgrade steps
-- [ ] **O4** storage quotas per workspace, uploads per hour per user, workspaces per user, and a free-disk floor shown in System › Overview
-- [ ] **O5** OpenMetrics export of the System counters (system administrators or a `system` token)
+- [x] **O1** `apps/server/src/backup.rs`: `StorageEngine::snapshot_database` (`VACUUM INTO` on a read connection, so writers carry on), blobs copied with hard links to the previous backup's files, manifest written last and the folder renamed into place, `BackupStatus` polled by the page; restore into a new `workspace-data/<name>` folder (staged, then renamed) and verified by opening it; scheduled from the maintenance loop (`REPOMEMO_BACKUP_INTERVAL_HOURS`, `REPOMEMO_BACKUP_KEEP`). Console `backup list|create|restore|delete`. Not done: compressing or encrypting a backup, an offsite target (the guide shows rsync and robocopy)
+- [x] **O3** [technical/operations.md](technical/operations.md): settings that must be right, nginx and Caddy with timeouts and unbuffered event streams, systemd and NSSM, readiness checks, limits, backup and restore drill, Prometheus scrape and alerts, the LibreOffice wrapper, upgrade and rollback, troubleshooting. Followed on a clean machine in V0.1.76 (R6)
+- [x] **O4** `quotas.rs`: `check_incoming` (disk floor, storage per workspace, uploads per hour) on uploads, new versions and notes; `check_new_workspace`; `free_disk_bytes` (`GetDiskFreeSpaceExW` on Windows, `df` elsewhere) shown in System › Overview. Settings in the *Limits* group
+- [x] **O5** `GET /v1/system/metrics`, an `Exposition` writer for the OpenMetrics text format; system administrators or a `system` token
 
 #### V0.1.76: Release candidate
 
@@ -276,7 +276,7 @@ Every item, with the release it is planned for. The evidence behind each is in t
 | F6 | **Mail delivery** (SMTP) for invitations, resets, mentions; then email verification | M | V0.3.0 (decided, decision 5) |
 | F7 | **Evidence ergonomics.** Move folders, multi-select, new version of a file | M | ✅ V0.1.73 |
 | F8 | **Live map and health** | S | ✅ V0.1.72 |
-| F9 | **Console follow-ups.** `logs --follow`, `users reset-link`, `tokens list`, backup commands; workspace commands once the app-admin rule is settled | S–M | ✅ V0.1.73, V0.1.75 |
+| F9 | **Console follow-ups.** `logs --follow`, `users reset-link`, `tokens list`, backup commands; workspace commands once the app-admin rule is settled | S–M | ✅ V0.1.73, V0.1.75 (workspace commands wait) |
 | F10 | **Desktop decision:** frozen as the local edition, security fixes only | Decision | ✅ Decided (decision 3) |
 | F11 | **Ownership transfer** and no removal of a workspace owner (N8) | S | ✅ V0.1.73 |
 
@@ -331,11 +331,11 @@ Every item, with the release it is planned for. The evidence behind each is in t
 
 | ID | Item | Size | Target |
 |---|---|---|---|
-| O1 | Backup and restore | M | V0.1.75 |
+| O1 | Backup and restore | M | ✅ V0.1.75 |
 | O2 | Workspace export and import | M | V0.3.0 |
-| O3 | Production guide | S–M | V0.1.75 |
-| O4 | Quotas and disk floor | M | V0.1.75 |
-| O5 | OpenMetrics export | S | V0.1.75 |
+| O3 | Production guide | S–M | ✅ V0.1.75 |
+| O4 | Quotas and disk floor | M | ✅ V0.1.75 |
+| O5 | OpenMetrics export | S | ✅ V0.1.75 |
 | D1 | Tracker retired, `PRODUCT.md`, Postman v5 | S | ✅ V0.1.66 |
 | R5 | Mindmaps, branch pages, changelog, upgrade notes | M | V0.1.76 |
 

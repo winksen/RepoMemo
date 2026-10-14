@@ -22,7 +22,7 @@ use axum::{
     extract::{ConnectInfo, Path, Query, Request, State},
     http::{header, HeaderValue, StatusCode},
     middleware::Next,
-    response::Response,
+    response::{IntoResponse, Response},
     Json,
 };
 use chrono::Utc;
@@ -160,6 +160,12 @@ const SETTINGS: &[SettingSpec] = &[
     SettingSpec { key: "ai_requests_per_hour", group: "AI", label: "AI requests per person", description: "Answers, overviews, summaries and assistant AI actions each person may start per hour. 0 is unlimited.", kind: SettingKind::Integer, min: 0, max: 100_000, unit: "per hour", options: &[] },
     SettingSpec { key: "heavy_requests_per_minute", group: "Protection", label: "Heavy requests per person", description: "Searches, questions to the map, health checks, figures and file queries each person may make per minute. 0 turns the limit off.", kind: SettingKind::Integer, min: 0, max: 100_000, unit: "per minute", options: &[] },
     SettingSpec { key: "background_ai_per_day", group: "AI", label: "Background AI calls per workspace", description: "Image descriptions and embedding batches the server makes on its own for one workspace per day. Work beyond it waits for the next day. 0 is unlimited.", kind: SettingKind::Integer, min: 0, max: 1_000_000, unit: "per day", options: &[] },
+    SettingSpec { key: "workspace_storage_mb", group: "Limits", label: "Storage per workspace", description: "The most evidence one workspace may hold. Uploads and new notes that would go over are refused. 0 is unlimited.", kind: SettingKind::Integer, min: 0, max: 100_000_000, unit: "MiB", options: &[] },
+    SettingSpec { key: "uploads_per_hour", group: "Limits", label: "Uploads per person", description: "Files and new file versions each person may upload per hour. 0 is unlimited.", kind: SettingKind::Integer, min: 0, max: 1_000_000, unit: "per hour", options: &[] },
+    SettingSpec { key: "workspaces_per_person", group: "Limits", label: "Workspaces per person", description: "Workspaces one person may own at once. 0 is unlimited.", kind: SettingKind::Integer, min: 0, max: 100_000, unit: "workspaces", options: &[] },
+    SettingSpec { key: "disk_floor_mb", group: "Limits", label: "Free disk floor", description: "Uploads are refused while less than this is free on the disk that holds the data folder. 0 turns the check off.", kind: SettingKind::Integer, min: 0, max: 100_000_000, unit: "MiB", options: &[] },
+    SettingSpec { key: "backup_interval_hours", group: "Background", label: "Automatic backups", description: "How often the server backs up the environment by itself (see Maintenance). 0 turns automatic backups off.", kind: SettingKind::Integer, min: 0, max: 8_760, unit: "hours", options: &[] },
+    SettingSpec { key: "backup_keep", group: "Background", label: "Backups kept", description: "How many backups are kept; older ones are deleted after a new one is made.", kind: SettingKind::Integer, min: 1, max: 1_000, unit: "backups", options: &[] },
     SettingSpec { key: "repo_poll_seconds", group: "Background", label: "Repository check interval", description: "How often linked repositories are checked for new commits and synced. 0 turns automatic syncing off; otherwise at least 30 seconds.", kind: SettingKind::Integer, min: 0, max: 86_400, unit: "seconds", options: &[] },
     SettingSpec { key: "maintenance_interval_minutes", group: "Background", label: "Maintenance interval", description: "How often background maintenance runs (cleanup, garbage collection, retries, database checkpoint). 0 turns it off.", kind: SettingKind::Integer, min: 0, max: 10_080, unit: "minutes", options: &[] },
     SettingSpec { key: "blob_gc", group: "Background", label: "Delete unused stored files", description: "Maintenance deletes stored files that no evidence references any more, and their cached previews.", kind: SettingKind::Boolean, min: 0, max: 1, unit: "", options: &[] },
@@ -195,6 +201,12 @@ fn read_setting(settings: &RuntimeSettings, key: &str) -> Value {
         "ai_requests_per_hour" => json!(settings.ai_quota.limit),
         "heavy_requests_per_minute" => json!(settings.heavy_quota.limit),
         "background_ai_per_day" => json!(settings.background_ai_per_day),
+        "workspace_storage_mb" => json!(settings.workspace_storage_mb),
+        "uploads_per_hour" => json!(settings.upload_quota.limit),
+        "workspaces_per_person" => json!(settings.workspaces_per_person),
+        "disk_floor_mb" => json!(settings.disk_floor_mb),
+        "backup_interval_hours" => json!(settings.backup_interval_hours),
+        "backup_keep" => json!(settings.backup_keep),
         "repo_poll_seconds" => json!(settings.repo_poll_interval.map_or(0, |interval| interval.as_secs())),
         "maintenance_interval_minutes" => json!(maintenance.interval.as_secs() / 60),
         "blob_gc" => json!(maintenance.blob_gc),
@@ -292,6 +304,12 @@ fn apply_setting(settings: &mut RuntimeSettings, key: &str, value: &Value) -> Re
                 "ai_requests_per_hour" => settings.ai_quota = Quota::per_hour(count),
                 "heavy_requests_per_minute" => settings.heavy_quota = Quota::per_minute(count),
                 "background_ai_per_day" => settings.background_ai_per_day = count,
+                "workspace_storage_mb" => settings.workspace_storage_mb = seconds,
+                "uploads_per_hour" => settings.upload_quota = Quota::per_hour(count),
+                "workspaces_per_person" => settings.workspaces_per_person = count,
+                "disk_floor_mb" => settings.disk_floor_mb = seconds,
+                "backup_interval_hours" => settings.backup_interval_hours = seconds,
+                "backup_keep" => settings.backup_keep = count,
                 "repo_poll_seconds" => {
                     if number > 0 && number < 30 {
                         return Err(format!("{} must be 0 (off) or at least 30 seconds.", spec.label));
@@ -847,6 +865,12 @@ struct StorageView {
     blob_bytes: i64,
     preview_bytes: u64,
     preview_count: u64,
+    /// Free space on the disk of the data folder, when the platform tells.
+    disk_free_bytes: Option<u64>,
+    /// Uploads are refused below this (a run-time setting); 0 is off.
+    disk_floor_bytes: u64,
+    /// Storage one workspace may hold; 0 is unlimited.
+    workspace_storage_bytes: u64,
 }
 
 #[derive(Debug, Serialize)]
@@ -914,6 +938,9 @@ pub(crate) async fn overview(
             blob_bytes: statistics.blob_bytes,
             preview_bytes,
             preview_count,
+            disk_free_bytes: crate::quotas::free_disk_bytes(&data_dir),
+            disk_floor_bytes: state.settings().disk_floor_mb * 1024 * 1024,
+            workspace_storage_bytes: state.settings().workspace_storage_mb * 1024 * 1024,
         },
         statistics,
         background: BackgroundView {
@@ -1585,6 +1612,257 @@ pub(crate) async fn run_maintenance(
     Ok(Json(maintenance_status(&state)))
 }
 
+// ---------------------------------------------------------------------------
+// OpenMetrics
+
+/// The OpenMetrics text format (what Prometheus reads), built a metric at a
+/// time. Names are fixed in code, so only label values need escaping.
+#[derive(Default)]
+struct Exposition {
+    text: String,
+}
+
+impl Exposition {
+    fn family(&mut self, name: &str, kind: &str, help: &str) {
+        self.text
+            .push_str(&format!("# TYPE {name} {kind}\n# HELP {name} {help}\n"));
+    }
+
+    fn escape(value: &str) -> String {
+        value.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n")
+    }
+
+    fn gauge(&mut self, name: &str, help: &str, value: impl std::fmt::Display) {
+        self.family(name, "gauge", help);
+        self.text.push_str(&format!("{name} {value}\n"));
+    }
+
+    fn counter(&mut self, name: &str, help: &str, value: impl std::fmt::Display) {
+        self.family(name, "counter", help);
+        self.text.push_str(&format!("{name}_total {value}\n"));
+    }
+
+    /// One gauge sample per label value.
+    fn labelled_gauge(&mut self, name: &str, help: &str, label: &str, samples: &[(String, i64)]) {
+        self.family(name, "gauge", help);
+        for (value, count) in samples {
+            self.text
+                .push_str(&format!("{name}{{{label}=\"{}\"}} {count}\n", Self::escape(value)));
+        }
+    }
+
+    fn finish(mut self) -> String {
+        self.text.push_str("# EOF\n");
+        self.text
+    }
+}
+
+/// The System counters in OpenMetrics text, for a monitoring system to
+/// scrape. Needs a system administrator's session or a personal access token
+/// with the `system` scope (see the production guide).
+pub(crate) async fn metrics(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+) -> Result<Response, ApiError> {
+    require_full_system_admin(&subject)?;
+    if subject.token.as_ref().is_some_and(|token| !token.system) {
+        return Err(ApiError::forbidden_because(
+            "Reading metrics with a personal access token needs the system scope.",
+        ));
+    }
+    let statistics = state.storage.system_statistics().await.map_err(map_storage_error)?;
+    let data_dir = PathBuf::from(state.storage.data_dir());
+    let file_size = |name: &str| std::fs::metadata(data_dir.join(name)).map_or(0, |metadata| metadata.len());
+    let traffic = state.telemetry.traffic();
+    let (tracked_keys, locked_sign_ins) = state.guards.stats();
+    let (vector_bytes, vector_workspaces) = state.storage.vector_index_usage();
+    let backups = crate::backup::overview(&state);
+    let maintenance = maintenance_status(&state);
+
+    let mut out = Exposition::default();
+    out.family("repomemo_build", "info", "The RepoMemo version that is running.");
+    out.text.push_str(&format!(
+        "repomemo_build_info{{version=\"{}\"}} 1\n",
+        Exposition::escape(state.instance.version)
+    ));
+    out.gauge(
+        "repomemo_uptime_seconds",
+        "Seconds since the server started.",
+        state.instance.started.elapsed().as_secs(),
+    );
+    out.counter(
+        "repomemo_http_requests",
+        "Requests served since the server started.",
+        traffic.requests,
+    );
+    out.counter(
+        "repomemo_http_client_errors",
+        "Responses with a 4xx status.",
+        traffic.client_errors,
+    );
+    out.counter(
+        "repomemo_http_server_errors",
+        "Responses with a 5xx status.",
+        traffic.server_errors,
+    );
+    out.counter(
+        "repomemo_http_unauthorized",
+        "Responses with status 401.",
+        traffic.unauthorized,
+    );
+    out.counter(
+        "repomemo_http_forbidden",
+        "Responses with status 403.",
+        traffic.forbidden,
+    );
+    out.counter(
+        "repomemo_http_rate_limited",
+        "Responses with status 429.",
+        traffic.rate_limited,
+    );
+
+    out.gauge("repomemo_users", "Accounts.", statistics.user_count);
+    out.gauge(
+        "repomemo_active_sessions",
+        "Sessions that can still be renewed.",
+        statistics.active_session_count,
+    );
+    out.gauge(
+        "repomemo_organizations",
+        "Organizations.",
+        statistics.organization_count,
+    );
+    out.gauge("repomemo_workspaces", "Workspaces.", statistics.workspace_count);
+    out.gauge("repomemo_artifacts", "Evidence items.", statistics.artifact_count);
+    out.gauge(
+        "repomemo_indexed_artifacts",
+        "Evidence items that are indexed.",
+        statistics.indexed_artifact_count,
+    );
+    out.gauge(
+        "repomemo_artifact_bytes",
+        "Size of all evidence items.",
+        statistics.artifact_bytes,
+    );
+    out.gauge("repomemo_blobs", "Stored files.", statistics.blob_count);
+    out.gauge(
+        "repomemo_blob_bytes",
+        "Size of the stored files.",
+        statistics.blob_bytes,
+    );
+    out.gauge("repomemo_passages", "Searchable passages.", statistics.chunk_count);
+    out.gauge(
+        "repomemo_vectors",
+        "Passages with a search vector.",
+        statistics.embedding_count,
+    );
+    out.gauge("repomemo_memory_cards", "Memory cards.", statistics.memory_card_count);
+    out.gauge("repomemo_tasks", "Tasks.", statistics.task_count);
+    out.gauge(
+        "repomemo_repositories",
+        "Linked repositories.",
+        statistics.repository_count,
+    );
+    out.labelled_gauge(
+        "repomemo_jobs",
+        "Background jobs by status.",
+        "status",
+        &statistics
+            .jobs_by_status
+            .iter()
+            .map(|entry| (entry.label.clone(), entry.count))
+            .collect::<Vec<_>>(),
+    );
+
+    out.gauge(
+        "repomemo_database_bytes",
+        "Size of the database file.",
+        file_size("repomemo.sqlite"),
+    );
+    out.gauge(
+        "repomemo_wal_bytes",
+        "Size of the write-ahead log.",
+        file_size("repomemo.sqlite-wal"),
+    );
+    if let Some(free) = crate::quotas::free_disk_bytes(&data_dir) {
+        out.gauge(
+            "repomemo_disk_free_bytes",
+            "Free space on the disk of the data folder.",
+            free,
+        );
+    }
+    out.gauge(
+        "repomemo_indexing_queued",
+        "Files waiting to be indexed.",
+        state.index_queue.queued_count(),
+    );
+    out.gauge(
+        "repomemo_embedding_workspaces_waiting",
+        "Workspaces waiting for search vectors.",
+        state.embedding_queue.waiting_count(),
+    );
+    out.gauge(
+        "repomemo_repository_syncs_running",
+        "Repository syncs running now.",
+        state.repo_sync.running_count(),
+    );
+    out.gauge(
+        "repomemo_open_event_streams",
+        "Live event streams that are open.",
+        state.telemetry.open_event_streams.load(Ordering::Relaxed),
+    );
+    out.gauge(
+        "repomemo_rate_limit_keys",
+        "Rate limit counters in memory.",
+        tracked_keys,
+    );
+    out.gauge(
+        "repomemo_locked_sign_ins",
+        "Sign-in keys that are locked out.",
+        locked_sign_ins,
+    );
+    out.gauge(
+        "repomemo_vector_index_bytes",
+        "Memory held by vector indexes.",
+        vector_bytes,
+    );
+    out.gauge(
+        "repomemo_vector_index_workspaces",
+        "Workspaces with a vector index.",
+        vector_workspaces,
+    );
+    out.gauge(
+        "repomemo_abandoned_document_readings",
+        "Document readings that overran their time and are still running.",
+        repomemo_api::abandoned_readings(),
+    );
+    out.gauge(
+        "repomemo_maintenance_failed_steps",
+        "Steps that failed in the last maintenance pass.",
+        maintenance.last_report.as_ref().map_or(0, |report| report.failures),
+    );
+    out.gauge("repomemo_backups", "Backups kept.", backups.backups.len());
+    let last_backup = backups
+        .backups
+        .first()
+        .and_then(|backup| chrono::DateTime::parse_from_rfc3339(&backup.created_at).ok())
+        .map_or(0, |created| created.timestamp());
+    out.gauge(
+        "repomemo_backup_last_timestamp_seconds",
+        "When the newest backup was made (0 when there is none).",
+        last_backup,
+    );
+
+    Ok((
+        [(
+            axum::http::header::CONTENT_TYPE,
+            "application/openmetrics-text; version=1.0.0; charset=utf-8",
+        )],
+        out.finish(),
+    )
+        .into_response())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1625,6 +1903,42 @@ mod tests {
         apply_setting(&mut settings, "log_http_level", &json!("debug")).unwrap();
         assert_eq!(settings.logging.env_filter, None);
         assert!(settings.logging.directives().contains("tower_http=debug"));
+    }
+
+    #[test]
+    fn metrics_are_written_in_the_openmetrics_text_format() {
+        let mut out = Exposition::default();
+        out.gauge("repomemo_users", "Accounts.", 3);
+        out.counter("repomemo_http_requests", "Requests.", 10);
+        out.labelled_gauge(
+            "repomemo_jobs",
+            "Jobs.",
+            "status",
+            &[("running".to_owned(), 2), ("say \"hi\"".to_owned(), 1)],
+        );
+        let text = out.finish();
+        assert!(text.contains(
+            "# TYPE repomemo_users gauge
+# HELP repomemo_users Accounts.
+repomemo_users 3
+"
+        ));
+        assert!(text.contains(
+            "repomemo_http_requests_total 10
+"
+        ));
+        assert!(text.contains(
+            "repomemo_jobs{status=\"running\"} 2
+"
+        ));
+        assert!(text.contains(
+            "repomemo_jobs{status=\"say \\\"hi\\\"\"} 1
+"
+        ));
+        assert!(text.ends_with(
+            "# EOF
+"
+        ));
     }
 
     #[test]

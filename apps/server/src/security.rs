@@ -249,6 +249,8 @@ pub struct Guards {
     pub ai: RateLimiter,
     /// Searches, figures, the map and health, per user.
     pub heavy: RateLimiter,
+    /// Files uploaded, per user.
+    pub uploads: RateLimiter,
     /// Failed sign-ins per account and address.
     pub logins: LoginThrottle,
 }
@@ -257,7 +259,7 @@ impl Guards {
     /// Rate-limit keys tracked, and sign-in keys locked out right now.
     pub fn stats(&self) -> (usize, usize) {
         (
-            self.auth.len() + self.ai.len() + self.heavy.len() + self.file_links.len(),
+            self.auth.len() + self.ai.len() + self.heavy.len() + self.uploads.len() + self.file_links.len(),
             self.logins.locked_count(),
         )
     }
@@ -265,7 +267,11 @@ impl Guards {
     pub fn prune(&self) -> usize {
         // Windows are at most an hour long; lockouts are kept while active.
         let max_age = Duration::from_secs(2 * 3600);
-        self.auth.prune(max_age) + self.ai.prune(max_age) + self.heavy.prune(max_age) + self.logins.prune(max_age)
+        self.auth.prune(max_age)
+            + self.ai.prune(max_age)
+            + self.heavy.prune(max_age)
+            + self.uploads.prune(max_age)
+            + self.logins.prune(max_age)
     }
 }
 

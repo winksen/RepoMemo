@@ -95,6 +95,10 @@ flowchart LR
 | `users signout <email>` | **yes** | `POST /v1/system/users/{u}/sessions/end` |
 | `maintenance status` | no | `GET /v1/system/maintenance` |
 | `maintenance run` | **yes** | `POST /v1/system/maintenance/run` |
+| `backup list` | no | `GET /v1/system/backups` |
+| `backup create` | **yes** | `POST /v1/system/backups` (starts it; `backup list` shows progress) |
+| `backup restore <backup> <environment>` | **yes** | `POST /v1/system/backups/{name}/restore` (a new environment folder; system administrators) |
+| `backup delete <backup>` | **yes** | `DELETE /v1/system/backups/{name}` |
 
 **Deliberately left out:** detaching the environment and granting the system administrator role. Both are rare, hard to undo, and the pages' confirmation dialogs explain what follows. They stay on the pages.
 

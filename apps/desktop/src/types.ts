@@ -534,6 +534,37 @@ export interface MaintenanceReport {
   failures: number;
 }
 
+export interface BackupManifest {
+  name: string;
+  created_at: string;
+  version: string;
+  trigger: "manual" | "scheduled";
+  database_bytes: number;
+  blob_count: number;
+  blob_bytes: number;
+  missing_blobs: number;
+  reused_blobs: number;
+  includes_key: boolean;
+}
+
+export interface BackupStatus {
+  running: boolean;
+  operation: "backup" | "restore" | null;
+  started_at: string | null;
+  finished_at: string | null;
+  succeeded: boolean | null;
+  message: string | null;
+}
+
+export interface BackupsOverview {
+  backups: BackupManifest[];
+  status: BackupStatus;
+  directory: string;
+  keep: number;
+  interval_hours: number;
+  disk_free_bytes: number | null;
+}
+
 export interface MaintenanceStatus {
   running: boolean;
   last_started_at: string | null;
@@ -574,6 +605,12 @@ export interface SystemOverview {
     blob_bytes: number;
     preview_bytes: number;
     preview_count: number;
+    /** Free space on the disk of the data folder, when the server can tell. */
+    disk_free_bytes: number | null;
+    /** Uploads are refused below this; 0 when the check is off. */
+    disk_floor_bytes: number;
+    /** Storage one workspace may hold; 0 is unlimited. */
+    workspace_storage_bytes: number;
   };
   background: {
     indexing_queued: number;

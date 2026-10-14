@@ -75,6 +75,23 @@ pub struct ServerConfig {
     /// Vision and embedding calls made in the background per workspace per
     /// day; 0 is unlimited.
     pub background_ai_per_day: u32,
+    /// Storage one workspace may hold, in MiB (`REPOMEMO_WORKSPACE_STORAGE_MB`);
+    /// 0 is unlimited.
+    pub workspace_storage_mb: u64,
+    /// Files one person may upload per hour (`REPOMEMO_UPLOADS_PER_HOUR`);
+    /// 0 is unlimited.
+    pub upload_quota: Quota,
+    /// Workspaces one person may own (`REPOMEMO_WORKSPACES_PER_PERSON`);
+    /// 0 is unlimited.
+    pub workspaces_per_person: u32,
+    /// Uploads are refused when less than this is free on the data disk, in
+    /// MiB (`REPOMEMO_DISK_FLOOR_MB`); 0 turns the check off.
+    pub disk_floor_mb: u64,
+    /// Hours between automatic backups (`REPOMEMO_BACKUP_INTERVAL_HOURS`);
+    /// 0 turns them off.
+    pub backup_interval_hours: u64,
+    /// Backups kept; older ones are deleted after a new one (`REPOMEMO_BACKUP_KEEP`).
+    pub backup_keep: u32,
     /// Hosts AI providers may be configured at; `None` allows any host except
     /// link-local and cloud-metadata addresses.
     pub ai_allowed_hosts: Option<Vec<String>>,
@@ -239,6 +256,12 @@ impl ServerConfig {
             ai_quota: Quota::per_hour(env_parse("REPOMEMO_AI_REQUESTS_PER_HOUR", 120)?),
             heavy_quota: Quota::per_minute(env_parse("REPOMEMO_HEAVY_REQUESTS_PER_MINUTE", 240)?),
             background_ai_per_day: env_parse("REPOMEMO_BACKGROUND_AI_PER_DAY", 2000)?,
+            workspace_storage_mb: env_parse("REPOMEMO_WORKSPACE_STORAGE_MB", 20 * 1024)?,
+            upload_quota: Quota::per_hour(env_parse("REPOMEMO_UPLOADS_PER_HOUR", 600)?),
+            workspaces_per_person: env_parse("REPOMEMO_WORKSPACES_PER_PERSON", 25)?,
+            disk_floor_mb: env_parse("REPOMEMO_DISK_FLOOR_MB", 1024)?,
+            backup_interval_hours: env_parse("REPOMEMO_BACKUP_INTERVAL_HOURS", 0)?,
+            backup_keep: env_parse::<u32>("REPOMEMO_BACKUP_KEEP", 7)?.max(1),
             ai_allowed_hosts,
             repo_roots,
             git_safe_directories: std::env::var_os("REPOMEMO_GIT_SAFE_DIRECTORIES")
@@ -310,6 +333,12 @@ impl ServerConfig {
             ai_quota: Quota::per_hour(0),
             heavy_quota: Quota::per_minute(0),
             background_ai_per_day: 0,
+            workspace_storage_mb: 0,
+            upload_quota: Quota::per_hour(0),
+            workspaces_per_person: 0,
+            disk_floor_mb: 0,
+            backup_interval_hours: 0,
+            backup_keep: 7,
             ai_allowed_hosts: None,
             repo_roots: Vec::new(),
             git_safe_directories: Vec::new(),
@@ -405,6 +434,12 @@ pub(crate) struct RuntimeSettings {
     pub(crate) ai_quota: Quota,
     pub(crate) heavy_quota: Quota,
     pub(crate) background_ai_per_day: u32,
+    pub(crate) workspace_storage_mb: u64,
+    pub(crate) upload_quota: Quota,
+    pub(crate) workspaces_per_person: u32,
+    pub(crate) disk_floor_mb: u64,
+    pub(crate) backup_interval_hours: u64,
+    pub(crate) backup_keep: u32,
     pub(crate) repo_poll_interval: Option<Duration>,
     pub(crate) maintenance: MaintenanceSettings,
     pub(crate) system_audit_retention_days: i64,
@@ -433,6 +468,12 @@ impl RuntimeSettings {
             ai_quota: config.ai_quota,
             heavy_quota: config.heavy_quota,
             background_ai_per_day: config.background_ai_per_day,
+            workspace_storage_mb: config.workspace_storage_mb,
+            upload_quota: config.upload_quota,
+            workspaces_per_person: config.workspaces_per_person,
+            disk_floor_mb: config.disk_floor_mb,
+            backup_interval_hours: config.backup_interval_hours,
+            backup_keep: config.backup_keep,
             repo_poll_interval: config.repo_poll_interval,
             maintenance: config.maintenance.clone(),
             system_audit_retention_days: config.system_audit_retention_days,

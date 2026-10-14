@@ -24,7 +24,7 @@
 | M2 | ✅ Fixed in V0.1.68 | `HttpOnly; SameSite=Strict` refresh cookie (`web_session.rs`); CSP meta tag and header file from the web build. Residual: the host serves the header |
 | M5, L9 | ✅ Fixed in V0.1.68 | `SafeMarkdown`: no images, links show their host and open with `noopener noreferrer` |
 | M6 | ✅ Fixed in V0.1.68 | Strict `csp` in `tauri.conf.json` |
-| M1 | ✅ Fixed in V0.1.67 | Registration closed by default; quotas follow in V0.1.75 |
+| M1 | ✅ Fixed in V0.1.67 | Registration closed by default; quotas (storage per workspace, uploads per hour, workspaces per person, free-disk floor) in V0.1.75 |
 | M3 | ✅ Fixed in V0.1.67 | Forwarding headers only from a trusted peer, read from the right |
 | M4 | ✅ Mitigated in V0.1.67 | Member forms answer `invitation_required` for everyone not in; open registration still reveals an existing address until mail exists |
 | M8 | ✅ Fixed in V0.1.67 | `require_full_system_admin`; app administrators read and run jobs and maintenance |

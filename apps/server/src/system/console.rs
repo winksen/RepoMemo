@@ -61,6 +61,10 @@ const COMMANDS: &[CommandSpec] = &[
     CommandSpec { name: "tokens list", usage: "tokens list [--user email]", summary: "Personal access tokens of your account, or of another account (system administrators).", changes: false, arguments: 0, flags: &["user"] },
     CommandSpec { name: "users unlock", usage: "users unlock <email> --yes", summary: "Lifts the sign-in lockouts of an account.", changes: true, arguments: 1, flags: &[] },
     CommandSpec { name: "users signout", usage: "users signout <email> --yes", summary: "Signs an account out of every device.", changes: true, arguments: 1, flags: &[] },
+    CommandSpec { name: "backup list", usage: "backup list", summary: "Backups kept in the data folder, with the state of the last backup or restore.", changes: false, arguments: 0, flags: &[] },
+    CommandSpec { name: "backup create", usage: "backup create --yes", summary: "Starts a backup of the database, stored files and key file; watch it with backup list.", changes: true, arguments: 0, flags: &[] },
+    CommandSpec { name: "backup restore", usage: "backup restore <backup> <environment> --yes", summary: "Restores a backup into a new environment folder (it never touches the running one) and checks that it opens.", changes: true, arguments: 2, flags: &[] },
+    CommandSpec { name: "backup delete", usage: "backup delete <backup> --yes", summary: "Deletes one backup.", changes: true, arguments: 1, flags: &[] },
     CommandSpec { name: "maintenance status", usage: "maintenance status", summary: "The last maintenance run and the next one.", changes: false, arguments: 0, flags: &[] },
     CommandSpec { name: "maintenance run", usage: "maintenance run --yes", summary: "Runs a full maintenance pass now.", changes: true, arguments: 0, flags: &[] },
 ];
@@ -72,6 +76,7 @@ const GROUP_DEFAULTS: &[(&str, &str)] = &[
     ("users", "users list"),
     ("tokens", "tokens list"),
     ("maintenance", "maintenance status"),
+    ("backup", "backup list"),
 ];
 
 // ---------------------------------------------------------------------------
@@ -908,6 +913,83 @@ async fn execute(
             Ok(applied(
                 spec,
                 format!("Signed {name} out of every device."),
+                View::Text,
+                Value::Null,
+            ))
+        }
+
+        "backup list" => {
+            let overview = crate::backup::overview(state);
+            let status = &overview.status;
+            let summary = match (status.running, status.message.as_deref()) {
+                (true, _) => format!("A {} is running.", status.operation.unwrap_or("backup")),
+                (false, Some(message)) => message.to_owned(),
+                (false, None) => format!("{} backup(s) kept in {}.", overview.backups.len(), overview.directory),
+            };
+            Ok(answer(
+                spec,
+                summary,
+                View::Table {
+                    columns: &[
+                        "name",
+                        "created_at",
+                        "version",
+                        "trigger",
+                        "database_bytes",
+                        "blob_count",
+                        "blob_bytes",
+                        "includes_key",
+                    ],
+                },
+                to_json(overview.backups)?,
+            ))
+        }
+
+        "backup create" => {
+            if !line.yes {
+                return Ok(dry_run(
+                    spec,
+                    "Would back up the database, the stored files and the key file into the backups folder of the data folder.",
+                ));
+            }
+            crate::system::require_full_system_admin(subject)?;
+            crate::backup::start_backup(state, "manual")?;
+            Ok(applied(
+                spec,
+                "The backup started. Check it with backup list.",
+                View::Text,
+                Value::Null,
+            ))
+        }
+
+        "backup restore" => {
+            let (name, environment) = (&arguments[0], arguments[1].trim());
+            if !line.yes {
+                return Ok(dry_run(
+                    spec,
+                    format!("Would restore {name} into a new environment folder named {environment}."),
+                ));
+            }
+            crate::system::require_full_system_admin(subject)?;
+            crate::backup::start_restore(state, name, environment)?;
+            Ok(applied(
+                spec,
+                format!("Restoring {name} into {environment}. Check it with backup list; attach it from the environment menu when it is done."),
+                View::Text,
+                Value::Null,
+            ))
+        }
+
+        "backup delete" => {
+            let name = &arguments[0];
+            if !line.yes {
+                return Ok(dry_run(spec, format!("Would delete the backup {name}.")));
+            }
+            crate::system::require_full_system_admin(subject)?;
+            crate::backup::delete_backup(state, name).await?;
+            Ok(applied(
+                spec,
+                format!("Deleted the backup {name}."),
                 View::Text,
                 Value::Null,
             ))
