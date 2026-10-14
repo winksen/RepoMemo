@@ -158,7 +158,11 @@ impl JobObserver for BusJobObserver {
 /// Logs a job's start and outcome under the `jobs` target (progress
 /// updates are not logged).
 fn log_job(job: &IndexingJobStatus) {
-    let kind = if job.kind.is_empty() { "indexing" } else { job.kind.as_str() };
+    let kind = if job.kind.is_empty() {
+        "indexing"
+    } else {
+        job.kind.as_str()
+    };
     match job.status.as_str() {
         "running" if job.created_at == job.updated_at => {
             tracing::debug!(target: "jobs", workspace_id = %job.workspace_id, job_id = %job.id, kind, "Job started");
@@ -202,9 +206,7 @@ impl ActivityObserver for BusActivityObserver {
             "{}",
             event.summary
         );
-        self.bus.publish(WorkspaceEvent::Activity {
-            event: event.clone(),
-        });
+        self.bus.publish(WorkspaceEvent::Activity { event: event.clone() });
     }
 }
 

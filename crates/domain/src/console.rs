@@ -15,4 +15,5 @@ pub const CONSOLE_BANNER: &str = concat!(
 pub const CONSOLE_TAGLINE: &str = "Team memory for technical knowledge · admin console";
 
 /// What a new console session suggests first.
-pub const CONSOLE_TIPS: &str = "Type help to list the commands. Changes are dry runs until you add --yes; add --json to see the raw answer.";
+pub const CONSOLE_TIPS: &str =
+    "Type help to list the commands. Changes are dry runs until you add --yes; add --json to see the raw answer.";

@@ -30,10 +30,7 @@ pub enum EmbeddingRun {
 
 impl RepoMemoCore {
     /// The enabled provider set up for embeddings, if any.
-    pub async fn embedding_provider_for_workspace(
-        &self,
-        workspace_id: &str,
-    ) -> Result<Option<ProviderSettings>> {
+    pub async fn embedding_provider_for_workspace(&self, workspace_id: &str) -> Result<Option<ProviderSettings>> {
         Ok(self
             .storage
             .list_provider_settings(workspace_id)
@@ -105,7 +102,11 @@ impl RepoMemoCore {
                 .upsert_embeddings(
                     workspace_id,
                     &model,
-                    batch.into_iter().map(|candidate| candidate.chunk_id).zip(vectors).collect(),
+                    batch
+                        .into_iter()
+                        .map(|candidate| candidate.chunk_id)
+                        .zip(vectors)
+                        .collect(),
                 )
                 .await?;
             completed += count;

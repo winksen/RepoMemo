@@ -1,11 +1,10 @@
 # Every push to main and every pull request (roadmap C8).
 #
 # Blocking: versions agree, Rust tests on Linux and Windows, the web type
-# check, and security advisories for the server's dependencies and the web
-# client's production dependencies.
-# Advisory (reported, not yet blocking): rustfmt and clippy until the code base
-# is formatted and clean (roadmap V0.1.71), licenses and duplicate crates, and
-# advisories that only reach the desktop shell.
+# check, web tests and generated types, rustfmt and clippy, and security
+# advisories for the server's dependencies and the web client's production
+# dependencies.
+# Advisory (reported, not blocking): duplicate crate versions.
 #
 # The desktop crate (apps/desktop/src-tauri) is left out of the Rust jobs: it
 # needs WebKit/GTK system libraries on Linux and is frozen as the local edition.
@@ -81,9 +80,8 @@ jobs:
           command: check advisories sources
 
   rust-lint:
-    name: rustfmt and clippy (advisory)
+    name: rustfmt and clippy
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -97,9 +95,8 @@ jobs:
         run: cargo clippy --workspace --exclude repomemo-desktop --all-targets --locked -- -D warnings
 
   rust-policy:
-    name: Licenses, duplicates, desktop advisories (advisory)
+    name: Licenses, bans and advisories (whole workspace)
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: EmbarkStudios/cargo-deny-action@v2

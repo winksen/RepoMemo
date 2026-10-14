@@ -95,7 +95,10 @@ async fn check_schema(pool: &sqlx::SqlitePool) -> Result<(), String> {
         .fetch_all(pool)
         .await
         .map_err(|error| format!("{DATABASE_FILE} is not readable: {error}."))?;
-    if let Some(missing) = REQUIRED_TABLES.iter().find(|table| !tables.iter().any(|name| name == *table)) {
+    if let Some(missing) = REQUIRED_TABLES
+        .iter()
+        .find(|table| !tables.iter().any(|name| name == *table))
+    {
         return Err(format!(
             "{DATABASE_FILE} does not have the RepoMemo structure (table `{missing}` is missing)."
         ));
@@ -143,7 +146,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
 
         let real = temp("real");
-        let engine = super::super::StorageEngine::open(super::super::StorageConfig { data_dir: real.clone(), master_key: None })
+        let engine = super::super::StorageEngine::open(super::super::StorageConfig::new(real.clone()))
             .await
             .unwrap();
         engine.close().await;

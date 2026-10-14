@@ -16,11 +16,7 @@ impl RetrievalService {
         self.keyword_search(request, KeywordMode::AllTerms).await
     }
 
-    async fn keyword_search(
-        &self,
-        request: SearchRequest,
-        mode: KeywordMode,
-    ) -> Result<Vec<SearchResult>> {
+    async fn keyword_search(&self, request: SearchRequest, mode: KeywordMode) -> Result<Vec<SearchResult>> {
         if request.workspace_id.trim().is_empty() {
             bail!("Workspace id is required.");
         }
@@ -54,11 +50,7 @@ impl RetrievalService {
         };
         let keyword = self.keyword_search(deep.clone(), mode).await?;
         let semantic = match query_embedding {
-            Some((model, vector)) => {
-                self.storage
-                    .search_chunks_by_embedding(&deep, model, vector)
-                    .await?
-            }
+            Some((model, vector)) => self.storage.search_chunks_by_embedding(&deep, model, vector).await?,
             None => Vec::new(),
         };
         let used_embeddings = !semantic.is_empty();
@@ -109,21 +101,22 @@ pub enum KeywordMode {
 }
 
 pub fn prepare_fts_query(query: &str) -> Option<String> {
-    let tokens = fts_tokens(query).take(12).map(|token| format!("\"{token}\"*")).collect::<Vec<_>>();
+    let tokens = fts_tokens(query)
+        .take(12)
+        .map(|token| format!("\"{token}\"*"))
+        .collect::<Vec<_>>();
     (!tokens.is_empty()).then(|| tokens.join(" AND "))
 }
 
 /// Common English and French words that carry no topic, dropped from
 /// questions before an any-word search.
 const STOPWORDS: &[&str] = &[
-    "a", "about", "an", "and", "are", "as", "at", "be", "by", "can", "could", "did", "do", "does",
-    "for", "from", "has", "have", "how", "i", "in", "is", "it", "its", "me", "my", "of", "on",
-    "or", "our", "should", "tell", "that", "the", "their", "there", "this", "to", "was", "we",
-    "were", "what", "when", "where", "which", "who", "why", "will", "with", "would", "you",
-    "au", "aux", "avec", "ce", "ces", "comment", "dans", "de", "des", "du", "elle", "en", "est",
-    "et", "il", "la", "le", "les", "leur", "mon", "ne", "nous", "ou", "où", "par", "pas", "pour",
-    "pourquoi", "quand", "que", "quel", "quelle", "qui", "sa", "se", "son", "sont", "sur", "un",
-    "une", "vous",
+    "a", "about", "an", "and", "are", "as", "at", "be", "by", "can", "could", "did", "do", "does", "for", "from",
+    "has", "have", "how", "i", "in", "is", "it", "its", "me", "my", "of", "on", "or", "our", "should", "tell", "that",
+    "the", "their", "there", "this", "to", "was", "we", "were", "what", "when", "where", "which", "who", "why", "will",
+    "with", "would", "you", "au", "aux", "avec", "ce", "ces", "comment", "dans", "de", "des", "du", "elle", "en",
+    "est", "et", "il", "la", "le", "les", "leur", "mon", "ne", "nous", "ou", "où", "par", "pas", "pour", "pourquoi",
+    "quand", "que", "quel", "quelle", "qui", "sa", "se", "son", "sont", "sur", "un", "une", "vous",
 ];
 
 pub fn prepare_question_fts_query(query: &str) -> Option<String> {

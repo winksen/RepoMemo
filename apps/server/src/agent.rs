@@ -10,14 +10,14 @@ use axum::{
 };
 use repomemo_api::{agent_capabilities, agent_conversation_title, agent_turn_label};
 use repomemo_domain::{
-    AgentCapability, AgentCapabilityInfo, AgentConversation, AgentConversationDetail,
-    AgentMessage, AgentRequest, AgentTurn, ProviderSettings,
+    AgentCapability, AgentCapabilityInfo, AgentConversation, AgentConversationDetail, AgentMessage, AgentRequest,
+    AgentTurn, ProviderSettings,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ai_access, map_core_error, map_storage_error, record_workspace_activity,
-    require_workspace_read, ApiError, AppState, AuthenticatedSubject,
+    ai_access, map_core_error, map_storage_error, record_workspace_activity, require_workspace_read, ApiError,
+    AppState, AuthenticatedSubject,
 };
 
 const MAX_TITLE_CHARS: usize = 120;
@@ -133,11 +133,7 @@ pub(crate) async fn send_agent_message(
         None => {
             state
                 .storage
-                .create_agent_conversation(
-                    &workspace_id,
-                    &subject.user_id,
-                    &agent_conversation_title(&label),
-                )
+                .create_agent_conversation(&workspace_id, &subject.user_id, &agent_conversation_title(&label))
                 .await
                 .map_err(map_storage_error)?
                 .id
@@ -195,10 +191,7 @@ pub(crate) async fn get_agent_conversation(
         .list_agent_turns(&conversation.id)
         .await
         .map_err(map_storage_error)?;
-    Ok(Json(AgentConversationDetail {
-        conversation,
-        turns,
-    }))
+    Ok(Json(AgentConversationDetail { conversation, turns }))
 }
 
 pub(crate) async fn rename_agent_conversation(
@@ -249,23 +242,14 @@ async fn owned_conversation(
         .storage
         .get_agent_conversation(conversation_id, &subject.user_id)
         .await
-        .map_err(|error| {
-            if error.to_string().contains("was not found") {
-                conversation_not_found()
-            } else {
-                map_storage_error(error)
-            }
-        })
+        .map_err(map_storage_error)
 }
 
 fn conversation_not_found() -> ApiError {
     ApiError::not_found("Assistant conversation was not found.")
 }
 
-async fn text_provider(
-    state: &AppState,
-    workspace_id: &str,
-) -> Result<Option<ProviderSettings>, ApiError> {
+async fn text_provider(state: &AppState, workspace_id: &str) -> Result<Option<ProviderSettings>, ApiError> {
     Ok(state
         .storage
         .list_provider_settings(workspace_id)

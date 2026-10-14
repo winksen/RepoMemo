@@ -66,10 +66,7 @@ pub(crate) struct UpdateAiPolicyRequest {
     min_role: AiMinRole,
 }
 
-pub(crate) async fn workspace_ai_min_role(
-    state: &AppState,
-    workspace_id: &str,
-) -> Result<AiMinRole, ApiError> {
+pub(crate) async fn workspace_ai_min_role(state: &AppState, workspace_id: &str) -> Result<AiMinRole, ApiError> {
     let settings = state
         .storage
         .workspace_settings(workspace_id)

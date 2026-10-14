@@ -61,12 +61,10 @@ pub fn validate_avatar(data: &[u8]) -> Result<&'static str, ApiError> {
     } else if data.len() > 12 && &data[0..4] == b"RIFF" && &data[8..12] == b"WEBP" {
         ("image/webp", webp_dimensions(data))
     } else {
-        return Err(ApiError::bad_request(
-            "The picture must be a PNG, JPEG or WebP image.",
-        ));
+        return Err(ApiError::bad_request("The picture must be a PNG, JPEG or WebP image."));
     };
-    let (width, height) = dimensions
-        .ok_or_else(|| ApiError::bad_request("The picture is damaged or not a still image."))?;
+    let (width, height) =
+        dimensions.ok_or_else(|| ApiError::bad_request("The picture is damaged or not a still image."))?;
     if width != height {
         return Err(ApiError::bad_request("The picture must be square."));
     }
@@ -112,8 +110,7 @@ fn jpeg_dimensions(data: &[u8]) -> Option<(u32, u32)> {
         if length < 2 {
             return None;
         }
-        let is_frame_header =
-            matches!(marker, 0xC0..=0xCF) && !matches!(marker, 0xC4 | 0xC8 | 0xCC);
+        let is_frame_header = matches!(marker, 0xC0..=0xCF) && !matches!(marker, 0xC4 | 0xC8 | 0xCC);
         if is_frame_header {
             let frame = data.get(position + 4..position + 9)?;
             let height = u16::from_be_bytes([frame[1], frame[2]]) as u32;
@@ -162,10 +159,7 @@ fn check_change_quota(state: &AppState, user_id: &str) -> Result<(), ApiError> {
     state
         .guards
         .auth
-        .check(
-            &format!("avatar:{user_id}"),
-            Quota::per_hour(AVATAR_CHANGES_PER_HOUR),
-        )
+        .check(&format!("avatar:{user_id}"), Quota::per_hour(AVATAR_CHANGES_PER_HOUR))
         .map_err(|wait| {
             too_many_requests(
                 format!("Too many picture changes. Try again in {}.", wait_text(wait)),
@@ -189,9 +183,7 @@ async fn upload_avatar(
         .and_then(|value| value.to_str().ok())
         .map(|value| value.split(';').next().unwrap_or("").trim().to_ascii_lowercase());
     if declared.as_deref() != Some(content_type) {
-        return Err(ApiError::bad_request(
-            "The Content-Type does not match the picture.",
-        ));
+        return Err(ApiError::bad_request("The Content-Type does not match the picture."));
     }
     state
         .storage
@@ -202,10 +194,7 @@ async fn upload_avatar(
     Ok(StatusCode::NO_CONTENT)
 }
 
-async fn remove_avatar(
-    subject: AuthenticatedSubject,
-    State(state): State<AppState>,
-) -> Result<StatusCode, ApiError> {
+async fn remove_avatar(subject: AuthenticatedSubject, State(state): State<AppState>) -> Result<StatusCode, ApiError> {
     check_change_quota(&state, &subject.user_id)?;
     state
         .storage
@@ -250,10 +239,7 @@ async fn download_avatar(
         header::CONTENT_SECURITY_POLICY,
         HeaderValue::from_static("default-src 'none'; sandbox"),
     );
-    headers.insert(
-        header::CACHE_CONTROL,
-        HeaderValue::from_static("private, max-age=60"),
-    );
+    headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("private, max-age=60"));
     headers.insert(
         HeaderName::from_static("cross-origin-resource-policy"),
         HeaderValue::from_static("cross-origin"),

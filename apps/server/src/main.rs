@@ -1,6 +1,4 @@
-use std::net::SocketAddr;
-
-use repomemo_server::{init_logging, router, ServerConfig};
+use repomemo_server::{init_logging, router, serve, ServerConfig};
 use tokio::net::TcpListener;
 use tracing::info;
 
@@ -19,6 +17,7 @@ async fn main() {
         }
     };
     let address = config.bind_address;
+    let header_read_timeout = config.header_read_timeout;
     let listener = TcpListener::bind(address)
         .await
         .expect("failed to bind RepoMemo server address");
@@ -31,9 +30,7 @@ async fn main() {
             std::process::exit(1);
         }
     };
-    // The peer address keys the sign-in rate limits.
-    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>())
-        .with_graceful_shutdown(shutdown_signal())
+    serve(listener, app, header_read_timeout, shutdown_signal())
         .await
         .expect("RepoMemo server stopped unexpectedly");
     info!("RepoMemo server stopped");

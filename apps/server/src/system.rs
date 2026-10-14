@@ -74,10 +74,7 @@ impl SettingsCell {
         if let Err(error) = logs::apply(&settings.logging, &self.data_dir) {
             tracing::warn!(error = %format!("{error:#}"), "The logging settings could not be applied");
         }
-        let mut current = self
-            .current
-            .write()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut current = self.current.write().unwrap_or_else(|poisoned| poisoned.into_inner());
         *current = Arc::new(settings);
     }
 
@@ -226,14 +223,21 @@ fn apply_setting(settings: &mut RuntimeSettings, key: &str, value: &Value) -> Re
                     format!(
                         "{} must be one of: {}.",
                         spec.label,
-                        spec.options.iter().map(|(option, _)| *option).collect::<Vec<_>>().join(", ")
+                        spec.options
+                            .iter()
+                            .map(|(option, _)| *option)
+                            .collect::<Vec<_>>()
+                            .join(", ")
                     )
                 })?;
             if key == "log_console_format" {
                 settings.logging.console_format = ConsoleFormat::parse(choice).expect("listed formats parse");
             } else if key == "log_level" {
                 if choice == "off" {
-                    return Err(format!("{} cannot be off; turn single sources off instead.", spec.label));
+                    return Err(format!(
+                        "{} cannot be off; turn single sources off instead.",
+                        spec.label
+                    ));
                 }
                 settings.logging.level = choice.to_owned();
                 // Levels set here replace a RUST_LOG filter from the environment.
@@ -251,7 +255,12 @@ fn apply_setting(settings: &mut RuntimeSettings, key: &str, value: &Value) -> Re
             let number = value
                 .as_i64()
                 .filter(|number| (spec.min..=spec.max).contains(number))
-                .ok_or_else(|| format!("{} must be a whole number from {} to {}.", spec.label, spec.min, spec.max))?;
+                .ok_or_else(|| {
+                    format!(
+                        "{} must be a whole number from {} to {}.",
+                        spec.label, spec.min, spec.max
+                    )
+                })?;
             let count = number as u32;
             let seconds = number as u64;
             match key {
@@ -267,13 +276,9 @@ fn apply_setting(settings: &mut RuntimeSettings, key: &str, value: &Value) -> Re
                     }
                     settings.repo_poll_interval = (number > 0).then(|| Duration::from_secs(seconds));
                 }
-                "maintenance_interval_minutes" => {
-                    settings.maintenance.interval = Duration::from_secs(seconds * 60)
-                }
+                "maintenance_interval_minutes" => settings.maintenance.interval = Duration::from_secs(seconds * 60),
                 "job_retention_days" => settings.maintenance.job_retention_days = number,
-                "index_retry_hours" => {
-                    settings.maintenance.index_retry_interval = Duration::from_secs(seconds * 3600)
-                }
+                "index_retry_hours" => settings.maintenance.index_retry_interval = Duration::from_secs(seconds * 3600),
                 "system_audit_retention_days" => settings.system_audit_retention_days = number,
                 "log_retention_days" => settings.logging.retention_days = number,
                 _ => unreachable!("every integer setting is handled"),
@@ -355,7 +360,13 @@ impl InstanceInfo {
             .to_string_lossy()
             .trim_start_matches(r"\\?\")
             .to_owned();
-        let list = |items: &[String]| if items.is_empty() { "any".to_owned() } else { items.join(", ") };
+        let list = |items: &[String]| {
+            if items.is_empty() {
+                "any".to_owned()
+            } else {
+                items.join(", ")
+            }
+        };
         let environment = vec![
             ("Listening address", config.bind_address.to_string()),
             ("Data folder", data_dir.clone()),
@@ -369,21 +380,66 @@ impl InstanceInfo {
                     .join(", "),
             ),
             ("Behind a trusted proxy", yes_no(config.trust_proxy)),
-            ("Largest upload", format!("{} MiB", config.max_upload_bytes / (1024 * 1024))),
+            (
+                "Largest upload",
+                format!("{} MiB", config.max_upload_bytes / (1024 * 1024)),
+            ),
+            (
+                "Request timeout",
+                if config.request_timeout.is_zero() {
+                    "none".to_owned()
+                } else {
+                    format!("{} s (live streams excepted)", config.request_timeout.as_secs())
+                },
+            ),
+            ("Live streams per person", config.max_event_streams_per_user.to_string()),
+            ("Indexing at once", config.index_concurrency.to_string()),
+            ("Embedding workspaces at once", config.embedding_concurrency.to_string()),
+            ("Database read connections", config.db_read_connections.to_string()),
             (
                 "Secret key for stored credentials",
-                if config.secret_key.is_some() { "from REPOMEMO_SECRET_KEY".to_owned() } else { "key file in the data folder".to_owned() },
+                if config.secret_key.is_some() {
+                    "from REPOMEMO_SECRET_KEY".to_owned()
+                } else {
+                    "key file in the data folder".to_owned()
+                },
             ),
-            ("AI provider hosts", config.ai_allowed_hosts.as_deref().map_or_else(|| "any (* set; metadata addresses refused)".to_owned(), list)),
+            (
+                "AI provider hosts",
+                config
+                    .ai_allowed_hosts
+                    .as_deref()
+                    .map_or_else(|| "any (* set; metadata addresses refused)".to_owned(), list),
+            ),
             (
                 "Repository folders",
-                list(&config.repo_roots.iter().map(|root| root.to_string_lossy().into_owned()).collect::<Vec<_>>()),
+                list(
+                    &config
+                        .repo_roots
+                        .iter()
+                        .map(|root| root.to_string_lossy().into_owned())
+                        .collect::<Vec<_>>(),
+                ),
             ),
-            ("System administrators from the environment", config.system_admin_emails.len().to_string()),
-            ("LibreOffice previews", if libreoffice { "available".to_owned() } else { "not installed".to_owned() }),
+            (
+                "System administrators from the environment",
+                config.system_admin_emails.len().to_string(),
+            ),
+            (
+                "LibreOffice previews",
+                if libreoffice {
+                    "available".to_owned()
+                } else {
+                    "not installed".to_owned()
+                },
+            ),
             (
                 "Log filter from RUST_LOG",
-                config.logging.env_filter.clone().unwrap_or_else(|| "not set".to_owned()),
+                config
+                    .logging
+                    .env_filter
+                    .clone()
+                    .unwrap_or_else(|| "not set".to_owned()),
             ),
         ];
         Self {
@@ -439,9 +495,37 @@ pub(crate) struct Telemetry {
     /// Requests per minute for the last hour: (minute since the epoch, count).
     per_minute: Mutex<VecDeque<(u64, u64)>>,
     pub(crate) open_event_streams: AtomicUsize,
+    /// Open event streams per account (review N7, M11).
+    streams_by_user: Mutex<HashMap<String, usize>>,
 }
 
 impl Telemetry {
+    /// Counts a stream for `user_id` unless they already hold `limit`.
+    pub(crate) fn claim_event_stream(&self, user_id: &str, limit: usize) -> bool {
+        let Ok(mut streams) = self.streams_by_user.lock() else {
+            return true;
+        };
+        let count = streams.entry(user_id.to_owned()).or_insert(0);
+        if *count >= limit {
+            return false;
+        }
+        *count += 1;
+        self.open_event_streams.fetch_add(1, Ordering::Relaxed);
+        true
+    }
+
+    pub(crate) fn release_event_stream(&self, user_id: &str) {
+        if let Ok(mut streams) = self.streams_by_user.lock() {
+            if let Some(count) = streams.get_mut(user_id) {
+                *count = count.saturating_sub(1);
+                if *count == 0 {
+                    streams.remove(user_id);
+                }
+            }
+        }
+        self.open_event_streams.fetch_sub(1, Ordering::Relaxed);
+    }
+
     fn record(&self, status: StatusCode, sighting: Option<(String, Option<String>, Option<String>, String)>) {
         self.requests.fetch_add(1, Ordering::Relaxed);
         match status.as_u16() {
@@ -461,12 +545,21 @@ impl Telemetry {
                 Some((last, count)) if *last == minute => *count += 1,
                 _ => per_minute.push_back((minute, 1)),
             }
-            while per_minute.front().is_some_and(|(first, _)| *first + TRAFFIC_MINUTES as u64 <= minute) {
+            while per_minute
+                .front()
+                .is_some_and(|(first, _)| *first + TRAFFIC_MINUTES as u64 <= minute)
+            {
                 per_minute.pop_front();
             }
         }
-        let Some((address, origin, client, agent)) = sighting else { return };
-        let key = format!("{}|{}|{agent}", origin.as_deref().unwrap_or("-"), client.as_deref().unwrap_or("-"));
+        let Some((address, origin, client, agent)) = sighting else {
+            return;
+        };
+        let key = format!(
+            "{}|{}|{agent}",
+            origin.as_deref().unwrap_or("-"),
+            client.as_deref().unwrap_or("-")
+        );
         let now = Utc::now().to_rfc3339();
         if let Ok(mut clients) = self.clients.lock() {
             if !clients.contains_key(&key) && clients.len() >= MAX_CLIENTS {
@@ -503,7 +596,7 @@ impl Telemetry {
             .lock()
             .map(|clients| clients.values().cloned().collect::<Vec<_>>())
             .unwrap_or_default();
-        clients.sort_by(|left, right| right.last_seen.cmp(&left.last_seen));
+        clients.sort_by_key(|client| std::cmp::Reverse(client.last_seen));
         clients
     }
 
@@ -518,7 +611,10 @@ impl Telemetry {
             .rev()
             .map(|ago| {
                 let at = minute.saturating_sub(ago);
-                recent.iter().find(|(bucket, _)| *bucket == at).map_or(0, |(_, count)| *count)
+                recent
+                    .iter()
+                    .find(|(bucket, _)| *bucket == at)
+                    .map_or(0, |(_, count)| *count)
             })
             .collect::<Vec<_>>();
         TrafficView {
@@ -595,7 +691,13 @@ fn describe_agent(agent: &str) -> String {
     .iter()
     .find(|(marker, _)| agent.contains(marker))
     .map(|(_, name)| (*name).to_owned())
-    .or_else(|| agent.split(['/', ' ']).next().filter(|name| !name.is_empty()).map(str::to_owned))
+    .or_else(|| {
+        agent
+            .split(['/', ' '])
+            .next()
+            .filter(|name| !name.is_empty())
+            .map(str::to_owned)
+    })
     .unwrap_or_else(|| "Unknown client".to_owned());
     let system = [
         ("Windows", "Windows"),
@@ -636,7 +738,9 @@ pub(crate) fn require_system_admin(subject: &AuthenticatedSubject) -> Result<(),
     if subject.is_system_admin || subject.is_app_admin {
         Ok(())
     } else {
-        Err(ApiError::forbidden_because("Only system and app administrators can use this."))
+        Err(ApiError::forbidden_because(
+            "Only system and app administrators can use this.",
+        ))
     }
 }
 
@@ -648,7 +752,9 @@ pub(crate) fn require_full_system_admin(subject: &AuthenticatedSubject) -> Resul
     if subject.is_system_admin {
         Ok(())
     } else {
-        Err(ApiError::forbidden_because("Only system administrators can do this; app administrators read these pages and run jobs and maintenance."))
+        Err(ApiError::forbidden_because(
+            "Only system administrators can do this; app administrators read these pages and run jobs and maintenance.",
+        ))
     }
 }
 
@@ -842,7 +948,10 @@ pub(crate) async fn usage(
     let activity_by_day = (0..days)
         .map(|offset| {
             let day = (since + chrono::Duration::days(offset)).to_string();
-            CountByLabel { count: counts.get(&day).copied().unwrap_or(0), label: day }
+            CountByLabel {
+                count: counts.get(&day).copied().unwrap_or(0),
+                label: day,
+            }
         })
         .collect();
     Ok(Json(UsageResponse {
@@ -901,19 +1010,24 @@ pub(crate) async fn set_system_admin(
         .storage
         .set_system_admin(&user_id, request.enabled)
         .await
-        .map_err(|error| {
-            let message = error.to_string();
-            if message.contains("last system administrator") {
-                ApiError::conflict(message)
-            } else {
-                map_storage_error(error)
-            }
-        })?;
+        .map_err(map_storage_error)?;
     let who = user.email.unwrap_or(user.display_name);
     if request.enabled {
-        audit(&state, &subject, "system_admin_granted", format!("Made {who} a system administrator.")).await;
+        audit(
+            &state,
+            &subject,
+            "system_admin_granted",
+            format!("Made {who} a system administrator."),
+        )
+        .await;
     } else {
-        audit(&state, &subject, "system_admin_revoked", format!("Removed {who} from the system administrators.")).await;
+        audit(
+            &state,
+            &subject,
+            "system_admin_revoked",
+            format!("Removed {who} from the system administrators."),
+        )
+        .await;
     }
     Ok(StatusCode::NO_CONTENT)
 }
@@ -938,9 +1052,21 @@ pub(crate) async fn set_app_admin(
         .map_err(map_storage_error)?;
     let who = user.email.unwrap_or(user.display_name);
     if request.enabled {
-        audit(&state, &subject, "app_admin_granted", format!("Made {who} an app administrator.")).await;
+        audit(
+            &state,
+            &subject,
+            "app_admin_granted",
+            format!("Made {who} an app administrator."),
+        )
+        .await;
     } else {
-        audit(&state, &subject, "app_admin_revoked", format!("Removed {who} from the app administrators.")).await;
+        audit(
+            &state,
+            &subject,
+            "app_admin_revoked",
+            format!("Removed {who} from the app administrators."),
+        )
+        .await;
     }
     Ok(StatusCode::NO_CONTENT)
 }
@@ -996,7 +1122,13 @@ pub(crate) async fn unlock_user(
         .ok_or_else(|| ApiError::not_found("User was not found."))?;
     let email = user.email.clone().unwrap_or_default().to_lowercase();
     let cleared = state.guards.logins.clear_account(&email);
-    audit(&state, &subject, "user_unlocked", format!("Lifted sign-in lockouts of {email}.")).await;
+    audit(
+        &state,
+        &subject,
+        "user_unlocked",
+        format!("Lifted sign-in lockouts of {email}."),
+    )
+    .await;
     Ok(Json(json!({ "cleared": cleared })))
 }
 
@@ -1053,7 +1185,10 @@ async fn settings_response(state: &AppState) -> Result<SettingsResponse, ApiErro
             .instance
             .environment
             .iter()
-            .map(|(label, value)| EnvironmentFact { label, value: value.clone() })
+            .map(|(label, value)| EnvironmentFact {
+                label,
+                value: value.clone(),
+            })
             .collect(),
     })
 }
@@ -1090,7 +1225,13 @@ pub(crate) async fn update_settings(
         .map(|(key, value)| format!("{} = {value}", spec(key).map_or(key.as_str(), |spec| spec.label)))
         .collect::<Vec<_>>()
         .join("; ");
-    audit(&state, &subject, "system_settings_changed", format!("Changed {changes}.")).await;
+    audit(
+        &state,
+        &subject,
+        "system_settings_changed",
+        format!("Changed {changes}."),
+    )
+    .await;
     settings_response(&state).await.map(Json)
 }
 
@@ -1119,7 +1260,13 @@ pub(crate) async fn reset_setting(
         .collect::<Vec<_>>();
     state.runtime.load_overrides(&remaining);
     let default = read_setting(&state.runtime.defaults, &key);
-    audit(&state, &subject, "system_setting_reset", format!("Restored the default of {} ({default}).", spec.label)).await;
+    audit(
+        &state,
+        &subject,
+        "system_setting_reset",
+        format!("Restored the default of {} ({default}).", spec.label),
+    )
+    .await;
     settings_response(&state).await.map(Json)
 }
 
@@ -1134,7 +1281,13 @@ pub(crate) async fn detach_environment(
         .host
         .upgrade()
         .ok_or_else(|| ApiError::not_found("This server has no environment host."))?;
-    audit(&state, &subject, "environment_detached", "Detached the environment; every session was ended.".to_owned()).await;
+    audit(
+        &state,
+        &subject,
+        "environment_detached",
+        "Detached the environment; every session was ended.".to_owned(),
+    )
+    .await;
     host.detach().await?;
     Ok(axum::http::StatusCode::NO_CONTENT)
 }
@@ -1184,12 +1337,24 @@ pub(crate) async fn logs(
             .await
             .map_err(ApiError::internal)?
             .map_err(|error| ApiError::not_found(format!("{error:#}")))?;
-        return Ok(Json(LogsResponse { capturing: logs::buffer().is_some(), source: "file", records: visible_records(&subject, records) }));
+        return Ok(Json(LogsResponse {
+            capturing: logs::buffer().is_some(),
+            source: "file",
+            records: visible_records(&subject, records),
+        }));
     }
     let Some(buffer) = logs::buffer() else {
-        return Ok(Json(LogsResponse { capturing: false, source: "memory", records: Vec::new() }));
+        return Ok(Json(LogsResponse {
+            capturing: false,
+            source: "memory",
+            records: Vec::new(),
+        }));
     };
-    Ok(Json(LogsResponse { capturing: true, source: "memory", records: visible_records(&subject, buffer.query(&filter)) }))
+    Ok(Json(LogsResponse {
+        capturing: true,
+        source: "memory",
+        records: visible_records(&subject, buffer.query(&filter)),
+    }))
 }
 
 #[derive(Debug, Serialize)]
@@ -1272,8 +1437,18 @@ pub(crate) async fn download_log_file(
     let bytes = tokio::fs::read(&path)
         .await
         .map_err(|_| ApiError::not_found(format!("There is no log file for {day}.")))?;
-    audit(&state, &subject, "log_file_downloaded", format!("Downloaded the log file of {day}.")).await;
-    let filename = path.file_name().and_then(|name| name.to_str()).unwrap_or("repomemo.jsonl").to_owned();
+    audit(
+        &state,
+        &subject,
+        "log_file_downloaded",
+        format!("Downloaded the log file of {day}."),
+    )
+    .await;
+    let filename = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("repomemo.jsonl")
+        .to_owned();
     let mut response = Response::new(axum::body::Body::from(bytes));
     let headers = response.headers_mut();
     headers.insert(header::CONTENT_TYPE, HeaderValue::from_static("application/x-ndjson"));
@@ -1324,7 +1499,10 @@ pub(crate) async fn jobs(
     let names = state.storage.workspace_names().await.map_err(map_storage_error)?;
     let jobs = state
         .storage
-        .list_all_jobs(query.status.as_deref().filter(|status| !status.is_empty()), query.limit.unwrap_or(100))
+        .list_all_jobs(
+            query.status.as_deref().filter(|status| !status.is_empty()),
+            query.limit.unwrap_or(100),
+        )
         .await
         .map_err(map_storage_error)?;
     Ok(Json(
@@ -1392,13 +1570,20 @@ mod tests {
         apply_setting(&mut settings, "repo_poll_seconds", &json!(0)).unwrap();
         assert_eq!(settings.repo_poll_interval, None);
         assert!(apply_setting(&mut settings, "log_http_level", &json!("loud")).is_err());
-        assert!(apply_setting(&mut settings, "log_level", &json!("off")).is_err(), "the default level stays on");
+        assert!(
+            apply_setting(&mut settings, "log_level", &json!("off")).is_err(),
+            "the default level stays on"
+        );
 
         // Choosing levels here replaces a RUST_LOG filter from the environment.
         let mut settings = crate::tests_support::runtime_settings();
         settings.logging.env_filter = Some("debug".to_owned());
         apply_setting(&mut settings, "log_console_format", &json!("json")).unwrap();
-        assert_eq!(settings.logging.env_filter.as_deref(), Some("debug"), "the format does not touch the filter");
+        assert_eq!(
+            settings.logging.env_filter.as_deref(),
+            Some("debug"),
+            "the format does not touch the filter"
+        );
         apply_setting(&mut settings, "log_http_level", &json!("debug")).unwrap();
         assert_eq!(settings.logging.env_filter, None);
         assert!(settings.logging.directives().contains("tower_http=debug"));
@@ -1410,7 +1595,10 @@ mod tests {
             describe_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36 Edg/130.0"),
             "Edge on Windows"
         );
-        assert_eq!(describe_agent("Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) Gecko/20100101 Firefox/131.0"), "Firefox on macOS");
+        assert_eq!(
+            describe_agent("Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) Gecko/20100101 Firefox/131.0"),
+            "Firefox on macOS"
+        );
         assert_eq!(describe_agent("curl/8.4.0"), "curl");
         assert_eq!(describe_agent(""), "Unknown client");
     }
@@ -1418,12 +1606,27 @@ mod tests {
     #[test]
     fn telemetry_counts_requests_and_clients() {
         let telemetry = Telemetry::default();
-        let sighting = || Some(("10.0.0.1".to_owned(), Some("http://127.0.0.1:3021".to_owned()), Some("web".to_owned()), "Chrome on Windows".to_owned()));
+        let sighting = || {
+            Some((
+                "10.0.0.1".to_owned(),
+                Some("http://127.0.0.1:3021".to_owned()),
+                Some("web".to_owned()),
+                "Chrome on Windows".to_owned(),
+            ))
+        };
         telemetry.record(StatusCode::OK, sighting());
         telemetry.record(StatusCode::TOO_MANY_REQUESTS, sighting());
         telemetry.record(StatusCode::INTERNAL_SERVER_ERROR, None);
         let traffic = telemetry.traffic();
-        assert_eq!((traffic.requests, traffic.client_errors, traffic.server_errors, traffic.rate_limited), (3, 1, 1, 1));
+        assert_eq!(
+            (
+                traffic.requests,
+                traffic.client_errors,
+                traffic.server_errors,
+                traffic.rate_limited
+            ),
+            (3, 1, 1, 1)
+        );
         assert_eq!(traffic.requests_last_hour, 3);
         assert_eq!(traffic.requests_per_minute_last_hour.len(), TRAFFIC_MINUTES);
         let clients = telemetry.clients();

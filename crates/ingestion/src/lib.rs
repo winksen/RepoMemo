@@ -12,17 +12,16 @@ use repomemo_domain::{ArtifactType, ImportSkippedItem, SourceType};
 mod documents;
 pub mod repo;
 pub use documents::{
-    document_extensions, document_kind, document_preview, extract_document_text, is_document,
-    DocumentKind,
+    document_extensions, document_kind, document_preview, extract_document_text, is_document, DocumentKind,
 };
 
 const DEFAULT_MAX_FILE_BYTES: u64 = 5 * 1024 * 1024;
 const BINARY_SAMPLE_BYTES: usize = 8192;
 
 const ACCEPTED_EXTENSIONS: &[&str] = &[
-    "md", "mdx", "txt", "rs", "ts", "tsx", "js", "jsx", "py", "json", "toml", "yaml", "yml", "sql",
-    "html", "css", "sh", "ps1", "doc", "docx", "xlsx", "xlsm", "xls", "pptx", "ppt", "pdf", "one",
-    "eml", "msg", "png", "jpg", "jpeg", "gif", "webp", "svg", "bmp",
+    "md", "mdx", "txt", "rs", "ts", "tsx", "js", "jsx", "py", "json", "toml", "yaml", "yml", "sql", "html", "css",
+    "sh", "ps1", "doc", "docx", "xlsx", "xlsm", "xls", "pptx", "ppt", "pdf", "one", "eml", "msg", "png", "jpg", "jpeg",
+    "gif", "webp", "svg", "bmp",
 ];
 
 const IMAGE_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp"];
@@ -39,15 +38,7 @@ pub fn is_word_document(path: &Path) -> bool {
     extension(path).is_some_and(|extension| is_word_extension(&extension))
 }
 
-const IGNORED_DIRECTORIES: &[&str] = &[
-    ".git",
-    "node_modules",
-    "target",
-    "dist",
-    "build",
-    ".next",
-    ".vite",
-];
+const IGNORED_DIRECTORIES: &[&str] = &[".git", "node_modules", "target", "dist", "build", ".next", ".vite"];
 
 #[derive(Debug, Clone)]
 pub struct ImportOptions {
@@ -81,10 +72,7 @@ pub struct ImportDiscovery {
     pub skipped_items: Vec<ImportSkippedItem>,
 }
 
-pub fn discover_import_candidates(
-    paths: &[PathBuf],
-    options: &ImportOptions,
-) -> Result<ImportDiscovery> {
+pub fn discover_import_candidates(paths: &[PathBuf], options: &ImportOptions) -> Result<ImportDiscovery> {
     let mut discovery = ImportDiscovery::default();
 
     for path in paths {
@@ -108,11 +96,7 @@ pub fn discover_import_candidates(
                 inspect_directory(&path, options, &mut discovery)?;
             }
             Ok(_) => push_skip(&mut discovery, &path, "unsupported path type"),
-            Err(error) => push_skip(
-                &mut discovery,
-                &path,
-                &format!("could not read path metadata: {error}"),
-            ),
+            Err(error) => push_skip(&mut discovery, &path, &format!("could not read path metadata: {error}")),
         }
     }
 
@@ -182,11 +166,7 @@ pub fn is_probably_binary(path: &Path) -> bool {
     sample[..bytes_read].contains(&0)
 }
 
-fn inspect_directory(
-    root: &Path,
-    options: &ImportOptions,
-    discovery: &mut ImportDiscovery,
-) -> Result<()> {
+fn inspect_directory(root: &Path, options: &ImportOptions, discovery: &mut ImportDiscovery) -> Result<()> {
     let mut queue = VecDeque::from([root.to_path_buf()]);
 
     while let Some(directory) = queue.pop_front() {
@@ -196,11 +176,7 @@ fn inspect_directory(
             let metadata = match entry.metadata() {
                 Ok(metadata) => metadata,
                 Err(error) => {
-                    push_skip(
-                        discovery,
-                        &path,
-                        &format!("could not read path metadata: {error}"),
-                    );
+                    push_skip(discovery, &path, &format!("could not read path metadata: {error}"));
                     continue;
                 }
             };
@@ -215,14 +191,7 @@ fn inspect_directory(
             }
 
             if metadata.is_file() {
-                inspect_file(
-                    &path,
-                    root,
-                    SourceType::Folder,
-                    metadata.len(),
-                    options,
-                    discovery,
-                );
+                inspect_file(&path, root, SourceType::Folder, metadata.len(), options, discovery);
             }
         }
     }
@@ -358,8 +327,8 @@ pub fn extract_word_text(path: &Path, bytes: &[u8]) -> Result<Option<String>> {
 const MAX_WORD_XML_BYTES: u64 = 16 * 1024 * 1024;
 
 fn extract_docx_text(bytes: &[u8]) -> Result<String> {
-    let document_xml = read_zip_member(bytes, "word/document.xml")
-        .context("could not read word/document.xml from the DOCX file")?;
+    let document_xml =
+        read_zip_member(bytes, "word/document.xml").context("could not read word/document.xml from the DOCX file")?;
     let mut reader = Reader::from_reader(document_xml.as_slice());
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
@@ -374,14 +343,11 @@ fn extract_docx_text(bytes: &[u8]) -> Result<String> {
             }
             Ok(Event::Empty(event)) if word_tag(event.name().as_ref(), b"tab") => text.push('\t'),
             Ok(Event::Empty(event))
-                if word_tag(event.name().as_ref(), b"br")
-                    || word_tag(event.name().as_ref(), b"cr") =>
+                if word_tag(event.name().as_ref(), b"br") || word_tag(event.name().as_ref(), b"cr") =>
             {
                 text.push('\n')
             }
-            Ok(Event::Text(event)) => {
-                text.push_str(&event.decode().context("invalid XML text in DOCX")?)
-            }
+            Ok(Event::Text(event)) => text.push_str(&event.decode().context("invalid XML text in DOCX")?),
             Ok(Event::Eof) => break,
             Err(error) => return Err(anyhow::anyhow!("invalid WordprocessingML: {error}")),
             _ => {}
@@ -462,9 +428,7 @@ fn read_zip_member(bytes: &[u8], member_name: &str) -> Result<Vec<u8>> {
         if filename != member_name {
             continue;
         }
-        if bytes.get(local_header_offset..local_header_offset + 4)
-            != Some(&[0x50, 0x4b, 0x03, 0x04])
-        {
+        if bytes.get(local_header_offset..local_header_offset + 4) != Some(&[0x50, 0x4b, 0x03, 0x04]) {
             bail!("DOCX ZIP local entry is malformed");
         }
         let local_name_length = le_u16(bytes, local_header_offset + 26)? as usize;
@@ -513,9 +477,7 @@ fn extract_legacy_doc_text(bytes: &[u8]) -> Result<String> {
         .open_stream("/WordDocument")
         .context("legacy .doc is missing its WordDocument stream")?;
     let mut word_document = Vec::new();
-    stream
-        .take(MAX_WORD_XML_BYTES + 1)
-        .read_to_end(&mut word_document)?;
+    stream.take(MAX_WORD_XML_BYTES + 1).read_to_end(&mut word_document)?;
     if word_document.len() as u64 > MAX_WORD_XML_BYTES {
         bail!("legacy .doc body exceeds the 16 MiB extraction limit");
     }
@@ -619,10 +581,7 @@ mod tests {
             detect_language(Path::new("component.tsx")).as_deref(),
             Some("TypeScript")
         );
-        assert_eq!(
-            detect_language(Path::new("script.py")).as_deref(),
-            Some("Python")
-        );
+        assert_eq!(detect_language(Path::new("script.py")).as_deref(), Some("Python"));
         assert_eq!(detect_language(Path::new("unknown.bin")), None);
     }
 
@@ -634,8 +593,7 @@ mod tests {
         fs::write(root.join("README.md"), "# RepoMemo").unwrap();
         fs::write(ignored.join("package.json"), "{}").unwrap();
 
-        let discovery =
-            discover_import_candidates(&[root.clone()], &ImportOptions::default()).unwrap();
+        let discovery = discover_import_candidates(std::slice::from_ref(&root), &ImportOptions::default()).unwrap();
 
         assert_eq!(discovery.scanned, 1);
         assert_eq!(discovery.candidates.len(), 1);
@@ -720,10 +678,7 @@ mod tests {
     }
 
     fn temp_path(prefix: &str) -> PathBuf {
-        let nanos = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
+        let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
         std::env::temp_dir().join(format!("{prefix}-{nanos}"))
     }
 }

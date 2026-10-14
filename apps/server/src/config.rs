@@ -1,0 +1,418 @@
+use crate::*;
+
+#[derive(Debug, Clone)]
+pub struct ServerConfig {
+    pub service_name: String,
+    pub bind_address: SocketAddr,
+    /// The environment folder to attach at startup (verified, and always
+    /// inside `workspace-data/` when it comes from `REPOMEMO_SERVER_DATA_DIR`).
+    /// `None` starts the server detached: an administrator picks the
+    /// environment in the web app.
+    pub data_dir: Option<PathBuf>,
+    pub jwt_secret: String,
+    /// Browser origins allowed to call the API (CORS). Empty: no CORS headers.
+    pub allowed_origins: Vec<HeaderValue>,
+    /// LibreOffice executable used for Office previews. When unset the server
+    /// looks for it; without it the extracted previews are used.
+    pub soffice: Option<PathBuf>,
+    /// A command LibreOffice is started through (`REPOMEMO_SOFFICE_WRAPPER`),
+    /// split on spaces; `{work}` and `{profile}` stand for the folders it needs.
+    pub soffice_wrapper: Vec<String>,
+    /// Key material for encrypting stored secrets (AI provider API keys).
+    /// When unset a random key is kept in `secret.key` in the data directory.
+    pub secret_key: Option<String>,
+    /// Anyone may create an account. When false, only the very first account
+    /// can be registered; everyone else is added by an administrator after
+    /// registering while it was open, or by the operator.
+    pub allow_registration: bool,
+    /// Take the client address from `X-Forwarded-For` / `X-Real-IP`. Only for
+    /// a server reachable solely through a reverse proxy that sets them.
+    pub trust_proxy: bool,
+    /// Proxy addresses besides loopback whose forwarding headers are read
+    /// (`REPOMEMO_TRUSTED_PROXIES`).
+    pub trusted_proxies: Vec<IpAddr>,
+    /// The address people use, such as `https://memo.example.com`
+    /// (`REPOMEMO_PUBLIC_URL`). HTTPS turns HSTS on.
+    pub public_url: Option<String>,
+    /// Allows binding beyond loopback over plain HTTP without a proxy
+    /// (`REPOMEMO_ALLOW_INSECURE_HTTP`), for a trusted network only.
+    pub allow_insecure_http: bool,
+    pub max_upload_bytes: usize,
+    /// How long a request may take, event streams excepted
+    /// (`REPOMEMO_REQUEST_TIMEOUT_SECONDS`, 0 turns it off).
+    pub request_timeout: Duration,
+    /// How long a client may take to send its request headers
+    /// (`REPOMEMO_HEADER_TIMEOUT_SECONDS`, 0 turns it off).
+    pub header_read_timeout: Duration,
+    /// Event streams one person may hold open at once
+    /// (`REPOMEMO_MAX_EVENT_STREAMS_PER_USER`).
+    pub max_event_streams_per_user: usize,
+    /// Artifacts indexed at once (`REPOMEMO_INDEX_CONCURRENCY`).
+    pub index_concurrency: usize,
+    /// Workspaces embedded at once (`REPOMEMO_EMBEDDING_CONCURRENCY`).
+    pub embedding_concurrency: usize,
+    /// Database connections that serve reads (`REPOMEMO_DB_READ_CONNECTIONS`).
+    pub db_read_connections: u32,
+    pub access_token_ttl_minutes: i64,
+    pub refresh_token_ttl_days: i64,
+    /// Sign-ins and registrations per client address; token refreshes get
+    /// four times as many.
+    pub auth_quota: Quota,
+    /// Consecutive failed sign-ins before an account is locked out; 0 never.
+    pub login_max_failures: u32,
+    pub login_lockout: Duration,
+    /// AI requests per user per hour; a limit of 0 is unlimited.
+    pub ai_quota: Quota,
+    /// Hosts AI providers may be configured at; `None` allows any host except
+    /// link-local and cloud-metadata addresses.
+    pub ai_allowed_hosts: Option<Vec<String>>,
+    /// Folders repository links must sit inside; empty allows any local folder.
+    pub repo_roots: Vec<PathBuf>,
+    /// Folders git may read although another account owns them
+    /// (`REPOMEMO_GIT_SAFE_DIRECTORIES`).
+    pub git_safe_directories: Vec<PathBuf>,
+    /// How often linked repositories are checked for new commits; `None`
+    /// turns automatic syncing off.
+    pub repo_poll_interval: Option<Duration>,
+    pub maintenance: MaintenanceSettings,
+    /// Accounts made system administrators at startup and when they
+    /// register. The first account on a new server always becomes one.
+    pub system_admin_emails: Vec<String>,
+    /// System audit events are kept this many days; 0 keeps them forever.
+    pub system_audit_retention_days: i64,
+    /// What is logged, how it is printed and whether it is kept in files.
+    pub logging: LogSettings,
+    /// A new server shows an onboarding that creates its first system
+    /// administrator. When off, the first account to register becomes one.
+    pub setup_wizard: bool,
+    /// The one-time code the onboarding asks for; generated and printed on
+    /// the console at startup when unset.
+    pub setup_code: Option<String>,
+}
+
+impl ServerConfig {
+    pub fn from_env() -> Result<Self> {
+        let jwt_secret = std::env::var("REPOMEMO_JWT_SECRET")
+            .context("REPOMEMO_JWT_SECRET is required; use at least 32 random characters")?;
+        if jwt_secret.len() < 32 {
+            bail!("REPOMEMO_JWT_SECRET must contain at least 32 characters");
+        }
+        if jwt_secret.chars().collect::<BTreeSet<_>>().len() < 8 {
+            bail!("REPOMEMO_JWT_SECRET is too repetitive; use at least 32 random characters");
+        }
+
+        let bind_address = std::env::var("REPOMEMO_SERVER_ADDR")
+            .unwrap_or_else(|_| "127.0.0.1:3020".to_owned())
+            .parse()
+            .context("REPOMEMO_SERVER_ADDR must be a valid socket address")?;
+        let data_dir = match std::env::var("REPOMEMO_SERVER_DATA_DIR") {
+            Ok(value) if !value.trim().is_empty() => Some(environment::resolve_setting(
+                &environment::environments_root()?,
+                &value,
+            )?),
+            _ => None,
+        };
+        let allowed_origins = std::env::var("REPOMEMO_ALLOWED_ORIGIN")
+            .unwrap_or_else(|_| "http://127.0.0.1:3021".to_owned())
+            .split(',')
+            .map(str::trim)
+            .filter(|origin| !origin.is_empty())
+            .map(|origin| {
+                if origin == "*" {
+                    bail!("REPOMEMO_ALLOWED_ORIGIN must list origins; \"*\" is not allowed");
+                }
+                origin
+                    .trim_end_matches('/')
+                    .parse::<HeaderValue>()
+                    .with_context(|| format!("REPOMEMO_ALLOWED_ORIGIN has an invalid origin: {origin}"))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let secret_key = env_text("REPOMEMO_SECRET_KEY");
+        if secret_key
+            .as_ref()
+            .is_some_and(|key| key.chars().count() < repomemo_storage::MIN_MASTER_KEY_CHARS)
+        {
+            bail!(
+                "REPOMEMO_SECRET_KEY must contain at least {} characters",
+                repomemo_storage::MIN_MASTER_KEY_CHARS
+            );
+        }
+        // Unset: this machine and OpenRouter only. `*` opens every host
+        // (link-local and cloud-metadata addresses stay refused).
+        let ai_allowed_hosts = match env_text("REPOMEMO_AI_ALLOWED_HOSTS") {
+            None => Some(
+                repomemo_ai::DEFAULT_ALLOWED_HOSTS
+                    .iter()
+                    .map(|host| (*host).to_owned())
+                    .collect(),
+            ),
+            Some(hosts) if hosts.trim() == "*" => None,
+            Some(hosts) => Some(
+                hosts
+                    .split(',')
+                    .map(|host| host.trim().to_ascii_lowercase())
+                    .filter(|host| !host.is_empty())
+                    .collect::<Vec<_>>(),
+            ),
+        };
+        let repo_roots = std::env::var_os("REPOMEMO_REPO_ROOTS")
+            .map(|roots| {
+                std::env::split_paths(&roots)
+                    .filter(|root| !root.as_os_str().is_empty())
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        let trusted_proxies = env_text("REPOMEMO_TRUSTED_PROXIES")
+            .map(|list| {
+                list.split(',')
+                    .map(str::trim)
+                    .filter(|entry| !entry.is_empty())
+                    .map(|entry| {
+                        entry
+                            .parse::<IpAddr>()
+                            .with_context(|| format!("REPOMEMO_TRUSTED_PROXIES has an invalid address: {entry}"))
+                    })
+                    .collect::<Result<Vec<_>>>()
+            })
+            .transpose()?
+            .unwrap_or_default();
+        let public_url = env_text("REPOMEMO_PUBLIC_URL").map(|url| url.trim_end_matches('/').to_owned());
+        if public_url
+            .as_deref()
+            .is_some_and(|url| !url.starts_with("https://") && !url.starts_with("http://"))
+        {
+            bail!("REPOMEMO_PUBLIC_URL must start with https:// (or http://)");
+        }
+        let trust_proxy = env_flag("REPOMEMO_TRUST_PROXY", false)?;
+        let allow_insecure_http = env_flag("REPOMEMO_ALLOW_INSECURE_HTTP", false)?;
+        check_transport(bind_address, public_url.as_deref(), trust_proxy, allow_insecure_http)?;
+        let repo_poll_seconds: u64 = env_parse("REPOMEMO_REPO_POLL_SECONDS", 300)?;
+        let maintenance_minutes: u64 = env_parse("REPOMEMO_MAINTENANCE_INTERVAL_MINUTES", 60)?;
+        let index_retry_hours: u64 = env_parse("REPOMEMO_INDEX_RETRY_HOURS", 6)?;
+
+        Ok(Self {
+            service_name: std::env::var("REPOMEMO_SERVICE_NAME").unwrap_or_else(|_| "repomemo-server".to_owned()),
+            bind_address,
+            data_dir,
+            jwt_secret,
+            allowed_origins,
+            soffice: std::env::var_os("REPOMEMO_SOFFICE").map(PathBuf::from),
+            soffice_wrapper: env_text("REPOMEMO_SOFFICE_WRAPPER")
+                .map(|command| command.split_whitespace().map(str::to_owned).collect())
+                .unwrap_or_default(),
+            secret_key,
+            // Closed by default: people join with invitation links (review M1).
+            allow_registration: env_flag("REPOMEMO_ALLOW_REGISTRATION", false)?,
+            trust_proxy,
+            trusted_proxies,
+            public_url,
+            allow_insecure_http,
+            max_upload_bytes: env_parse::<usize>("REPOMEMO_MAX_UPLOAD_MB", 10)?.clamp(1, 1024) * 1024 * 1024,
+            request_timeout: Duration::from_secs(env_parse("REPOMEMO_REQUEST_TIMEOUT_SECONDS", 120)?),
+            header_read_timeout: Duration::from_secs(env_parse("REPOMEMO_HEADER_TIMEOUT_SECONDS", 30)?),
+            max_event_streams_per_user: env_parse::<usize>("REPOMEMO_MAX_EVENT_STREAMS_PER_USER", 10)?.clamp(1, 1000),
+            index_concurrency: env_parse::<usize>("REPOMEMO_INDEX_CONCURRENCY", 2)?.clamp(1, 16),
+            embedding_concurrency: env_parse::<usize>("REPOMEMO_EMBEDDING_CONCURRENCY", 1)?.clamp(1, 8),
+            db_read_connections: env_parse::<u32>("REPOMEMO_DB_READ_CONNECTIONS", 4)?.clamp(1, 64),
+            access_token_ttl_minutes: env_parse::<i64>("REPOMEMO_ACCESS_TOKEN_TTL_MINUTES", 60)?.clamp(5, 24 * 60),
+            refresh_token_ttl_days: env_parse::<i64>("REPOMEMO_REFRESH_TOKEN_TTL_DAYS", 30)?.clamp(1, 365),
+            auth_quota: Quota::per_minute(env_parse("REPOMEMO_AUTH_REQUESTS_PER_MINUTE", 30)?),
+            login_max_failures: env_parse("REPOMEMO_LOGIN_MAX_FAILURES", 10)?,
+            login_lockout: Duration::from_secs(
+                60 * env_parse::<u64>("REPOMEMO_LOGIN_LOCKOUT_MINUTES", 15)?.clamp(1, 24 * 60),
+            ),
+            ai_quota: Quota::per_hour(env_parse("REPOMEMO_AI_REQUESTS_PER_HOUR", 120)?),
+            ai_allowed_hosts,
+            repo_roots,
+            git_safe_directories: std::env::var_os("REPOMEMO_GIT_SAFE_DIRECTORIES")
+                .map(|folders| {
+                    std::env::split_paths(&folders)
+                        .filter(|folder| !folder.as_os_str().is_empty())
+                        .collect()
+                })
+                .unwrap_or_default(),
+            repo_poll_interval: (repo_poll_seconds > 0).then(|| Duration::from_secs(repo_poll_seconds.max(30))),
+            maintenance: MaintenanceSettings {
+                interval: Duration::from_secs(60 * maintenance_minutes),
+                blob_gc: env_flag("REPOMEMO_BLOB_GC", true)?,
+                job_retention_days: env_parse("REPOMEMO_JOB_RETENTION_DAYS", 90)?,
+                index_retry_interval: Duration::from_secs(3600 * index_retry_hours.max(1)),
+            },
+            system_admin_emails: env_text("REPOMEMO_SYSTEM_ADMIN_EMAILS")
+                .map(|emails| {
+                    emails
+                        .split(',')
+                        .map(|email| email.trim().to_lowercase())
+                        .filter(|email| !email.is_empty())
+                        .collect()
+                })
+                .unwrap_or_default(),
+            system_audit_retention_days: env_parse("REPOMEMO_SYSTEM_AUDIT_RETENTION_DAYS", 365)?,
+            logging: LogSettings::from_env()?,
+            setup_wizard: env_flag("REPOMEMO_SETUP_WIZARD", true)?,
+            setup_code: match env_text("REPOMEMO_SETUP_CODE") {
+                Some(code) if code.chars().filter(char::is_ascii_alphanumeric).count() < 12 => {
+                    bail!("REPOMEMO_SETUP_CODE must contain at least 12 letters or digits")
+                }
+                code => code,
+            },
+        })
+    }
+
+    #[cfg(test)]
+    pub(crate) fn for_test(data_dir: PathBuf) -> Self {
+        Self {
+            service_name: "repomemo-server-test".to_owned(),
+            bind_address: "127.0.0.1:0".parse().unwrap(),
+            data_dir: Some(data_dir),
+            jwt_secret: "test-secret-that-is-long-enough-for-jwt-signing".to_owned(),
+            allowed_origins: Vec::new(),
+            soffice: None,
+            soffice_wrapper: Vec::new(),
+            secret_key: None,
+            allow_registration: true,
+            trust_proxy: false,
+            trusted_proxies: Vec::new(),
+            public_url: None,
+            allow_insecure_http: false,
+            max_upload_bytes: 10 * 1024 * 1024,
+            request_timeout: Duration::from_secs(120),
+            header_read_timeout: Duration::from_secs(30),
+            max_event_streams_per_user: 10,
+            index_concurrency: 2,
+            embedding_concurrency: 1,
+            db_read_connections: 4,
+            access_token_ttl_minutes: 60,
+            refresh_token_ttl_days: 30,
+            // Tests register many accounts from one address.
+            auth_quota: Quota::per_minute(0),
+            login_max_failures: 10,
+            login_lockout: Duration::from_secs(15 * 60),
+            ai_quota: Quota::per_hour(0),
+            ai_allowed_hosts: None,
+            repo_roots: Vec::new(),
+            git_safe_directories: Vec::new(),
+            repo_poll_interval: None,
+            maintenance: MaintenanceSettings {
+                interval: Duration::ZERO,
+                ..MaintenanceSettings::default()
+            },
+            system_admin_emails: Vec::new(),
+            system_audit_retention_days: 365,
+            logging: LogSettings {
+                to_file: false,
+                ..LogSettings::default()
+            },
+            // Tests register accounts directly; the onboarding has its own tests.
+            setup_wizard: false,
+            setup_code: None,
+        }
+    }
+}
+
+pub(crate) fn env_text(name: &str) -> Option<String> {
+    std::env::var(name)
+        .ok()
+        .map(|value| value.trim().to_owned())
+        .filter(|value| !value.is_empty())
+}
+
+/// Parses an optional environment variable, with a clear error for a value
+/// that is set but invalid.
+pub(crate) fn env_parse<T: std::str::FromStr>(name: &str, default: T) -> Result<T> {
+    let Some(raw) = env_text(name) else {
+        return Ok(default);
+    };
+    raw.parse::<T>()
+        .map_err(|_| anyhow::anyhow!("{name} has an invalid value: {raw}"))
+}
+
+/// Refuses to serve plain HTTP beyond this machine unless a TLS proxy is in
+/// front (an `https://` public address, or proxy trust) or the operator opted
+/// in for a trusted network (review M9).
+pub(crate) fn check_transport(
+    bind: SocketAddr,
+    public_url: Option<&str>,
+    trust_proxy: bool,
+    allow_insecure_http: bool,
+) -> Result<()> {
+    let behind_tls = public_url.is_some_and(|url| url.starts_with("https://")) || trust_proxy;
+    if !bind.ip().is_loopback() && !behind_tls && !allow_insecure_http {
+        bail!(
+            "REPOMEMO_SERVER_ADDR ({bind}) is reachable from other machines over plain HTTP. Put a TLS reverse proxy in front and set REPOMEMO_PUBLIC_URL=https://… (or REPOMEMO_TRUST_PROXY=true), or set REPOMEMO_ALLOW_INSECURE_HTTP=true for a trusted network only."
+        );
+    }
+    Ok(())
+}
+
+impl ServerConfig {
+    /// Whose forwarding headers name the client (see `security::client_ip`).
+    pub fn proxy_trust(&self) -> security::ProxyTrust {
+        security::ProxyTrust {
+            enabled: self.trust_proxy,
+            proxies: self.trusted_proxies.clone(),
+        }
+    }
+}
+
+/// An optional on/off environment variable: true/false, 1/0, yes/no, on/off.
+pub(crate) fn env_flag(name: &str, default: bool) -> Result<bool> {
+    let Some(raw) = env_text(name) else {
+        return Ok(default);
+    };
+    match raw.to_ascii_lowercase().as_str() {
+        "1" | "true" | "yes" | "on" => Ok(true),
+        "0" | "false" | "no" | "off" => Ok(false),
+        _ => bail!("{name} must be true or false, not {raw}"),
+    }
+}
+
+/// The configuration requests need at run time.
+#[derive(Debug, Clone)]
+pub(crate) struct RuntimeSettings {
+    pub(crate) service_name: String,
+    pub(crate) allow_registration: bool,
+    pub(crate) proxy: security::ProxyTrust,
+    /// The refresh cookie carries `Secure` (the public address is HTTPS).
+    pub(crate) secure_cookies: bool,
+    pub(crate) max_event_streams_per_user: usize,
+    pub(crate) access_token_ttl_minutes: i64,
+    pub(crate) refresh_token_ttl_days: i64,
+    pub(crate) auth_quota: Quota,
+    pub(crate) login_max_failures: u32,
+    pub(crate) login_lockout: Duration,
+    pub(crate) ai_quota: Quota,
+    pub(crate) repo_poll_interval: Option<Duration>,
+    pub(crate) maintenance: MaintenanceSettings,
+    pub(crate) system_audit_retention_days: i64,
+    pub(crate) system_admin_emails: Vec<String>,
+    pub(crate) logging: LogSettings,
+}
+
+impl RuntimeSettings {
+    /// The settings the environment gives, before system administrators'
+    /// run-time changes.
+    pub(crate) fn from_config(config: &ServerConfig) -> Self {
+        Self {
+            service_name: config.service_name.clone(),
+            allow_registration: config.allow_registration,
+            proxy: config.proxy_trust(),
+            secure_cookies: config
+                .public_url
+                .as_deref()
+                .is_some_and(|url| url.starts_with("https://")),
+            max_event_streams_per_user: config.max_event_streams_per_user,
+            access_token_ttl_minutes: config.access_token_ttl_minutes,
+            refresh_token_ttl_days: config.refresh_token_ttl_days,
+            auth_quota: config.auth_quota,
+            login_max_failures: config.login_max_failures,
+            login_lockout: config.login_lockout,
+            ai_quota: config.ai_quota,
+            repo_poll_interval: config.repo_poll_interval,
+            maintenance: config.maintenance.clone(),
+            system_audit_retention_days: config.system_audit_retention_days,
+            system_admin_emails: config.system_admin_emails.clone(),
+            logging: config.logging.clone(),
+        }
+    }
+}

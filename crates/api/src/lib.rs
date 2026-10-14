@@ -1,20 +1,17 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context, Result};
-use repomemo_ai::{
-    provider_from_settings, validate_settings, AiProvider, GenerateRequest, ImageAnalysisRequest,
-};
+use repomemo_ai::{provider_from_settings, validate_settings, AiProvider, GenerateRequest, ImageAnalysisRequest};
 use repomemo_domain::{
-    AppSettings, ArtifactDetail, ArtifactSummary, ArtifactType, AskAnswer, AskRequest, DocumentPreview,
-    CreateMemoryCardRequest, ImportReport, ImportRequest, IndexingJobStatus, MemoryCard,
-    MemoryCardDetail, MemoryCardSummary, ProviderSettings, ProviderTestResult, SearchRequest,
-    SearchResult, SourceType, SummaryResult, Symbol, SymbolSearchResult, UpdateMemoryCardRequest,
-    Workspace, WorkspaceOverview,
+    AppSettings, ArtifactDetail, ArtifactSummary, ArtifactType, AskAnswer, AskRequest, CreateMemoryCardRequest,
+    DocumentPreview, ImportReport, ImportRequest, IndexingJobStatus, MemoryCard, MemoryCardDetail, MemoryCardSummary,
+    ProviderSettings, ProviderTestResult, SearchRequest, SearchResult, SourceType, SummaryResult, Symbol,
+    SymbolSearchResult, UpdateMemoryCardRequest, Workspace, WorkspaceOverview,
 };
 use repomemo_indexer::{index_artifact, index_image_description, INDEXER_VERSION};
 use repomemo_ingestion::{
-    detect_artifact_type, detect_language, discover_import_candidates,
-    document_preview, extract_document_text, is_document, ImportCandidate, ImportOptions,
+    detect_artifact_type, detect_language, discover_import_candidates, document_preview, extract_document_text,
+    is_document, ImportCandidate, ImportOptions,
 };
 use repomemo_retrieval::{KeywordMode, RetrievalService};
 use repomemo_storage::{NewArtifact, StorageConfig, StorageEngine};
@@ -95,14 +92,8 @@ impl RepoMemoCore {
         self.storage.list_workspaces().await
     }
 
-    pub async fn update_workspace_name(
-        &self,
-        workspace_id: String,
-        name: String,
-    ) -> Result<Workspace> {
-        self.storage
-            .update_workspace_name(&workspace_id, &name)
-            .await
+    pub async fn update_workspace_name(&self, workspace_id: String, name: String) -> Result<Workspace> {
+        self.storage.update_workspace_name(&workspace_id, &name).await
     }
 
     pub async fn delete_workspace(&self, workspace_id: String) -> Result<()> {
@@ -111,15 +102,15 @@ impl RepoMemoCore {
 
     pub async fn import_paths(&self, request: ImportRequest) -> Result<ImportReport> {
         if request.workspace_id.trim().is_empty() {
-            bail!("Workspace id is required.");
+            repomemo_domain::bail_invalid!("Workspace id is required.");
         }
 
         if request.paths.is_empty() {
-            bail!("Choose at least one file or folder to import.");
+            repomemo_domain::bail_invalid!("Choose at least one file or folder to import.");
         }
 
         if !self.storage.workspace_exists(&request.workspace_id).await? {
-            bail!("Workspace was not found.");
+            repomemo_domain::bail_not_found!("Workspace was not found.");
         }
 
         let paths = request.paths.iter().map(PathBuf::from).collect::<Vec<_>>();
@@ -136,10 +127,7 @@ impl RepoMemoCore {
         };
 
         for candidate in discovery.candidates {
-            match self
-                .import_candidate(&request.workspace_id, candidate)
-                .await
-            {
+            match self.import_candidate(&request.workspace_id, candidate).await {
                 Ok(stored) if stored.created => {
                     report.imported += 1;
                     report.imported_artifacts.push(stored.artifact);
@@ -150,12 +138,10 @@ impl RepoMemoCore {
                 }
                 Err(error) => {
                     report.failed += 1;
-                    report
-                        .skipped_items
-                        .push(repomemo_domain::ImportSkippedItem {
-                            path: error.path,
-                            reason: error.reason,
-                        });
+                    report.skipped_items.push(repomemo_domain::ImportSkippedItem {
+                        path: error.path,
+                        reason: error.reason,
+                    });
                 }
             }
         }
@@ -173,13 +159,13 @@ impl RepoMemoCore {
         language: Option<String>,
     ) -> Result<ArtifactSummary> {
         if workspace_id.trim().is_empty() {
-            bail!("Workspace id is required.");
+            repomemo_domain::bail_invalid!("Workspace id is required.");
         }
         if content.trim().is_empty() {
-            bail!("Pasted content cannot be empty.");
+            repomemo_domain::bail_invalid!("Pasted content cannot be empty.");
         }
         if !self.storage.workspace_exists(&workspace_id).await? {
-            bail!("Workspace was not found.");
+            repomemo_domain::bail_not_found!("Workspace was not found.");
         }
 
         let language = language
@@ -224,9 +210,7 @@ impl RepoMemoCore {
         let content_hash = StorageEngine::content_hash(&bytes);
         let size_bytes = bytes.len() as i64;
 
-        self.storage
-            .store_blob(&content_hash, &bytes, Some(mime_type))
-            .await?;
+        self.storage.store_blob(&content_hash, &bytes, Some(mime_type)).await?;
 
         self.storage
             .store_artifact(NewArtifact {
@@ -254,13 +238,13 @@ impl RepoMemoCore {
         _claimed_mime_type: Option<String>,
     ) -> Result<ArtifactSummary> {
         if workspace_id.trim().is_empty() {
-            bail!("Workspace id is required.");
+            repomemo_domain::bail_invalid!("Workspace id is required.");
         }
         if bytes.is_empty() {
-            bail!("Uploaded files cannot be empty.");
+            repomemo_domain::bail_invalid!("Uploaded files cannot be empty.");
         }
         if !self.storage.workspace_exists(&workspace_id).await? {
-            bail!("Workspace was not found.");
+            repomemo_domain::bail_not_found!("Workspace was not found.");
         }
 
         let path = Path::new(&filename);
@@ -268,10 +252,10 @@ impl RepoMemoCore {
             .file_name()
             .and_then(|name| name.to_str())
             .filter(|name| !name.trim().is_empty())
-            .ok_or_else(|| anyhow::anyhow!("A valid upload filename is required."))?
+            .ok_or_else(|| repomemo_domain::invalid!("A valid upload filename is required."))?
             .to_owned();
         let artifact_type = detect_artifact_type(path)
-            .ok_or_else(|| anyhow::anyhow!("This file type is not supported for shared upload."))?;
+            .ok_or_else(|| repomemo_domain::invalid!("This file type is not supported for shared upload."))?;
         let language = detect_language(path);
         // From the file name, never from the uploader: a file labelled
         // text/html or image/svg+xml could otherwise run as a page.
@@ -284,9 +268,7 @@ impl RepoMemoCore {
         let content_hash = StorageEngine::content_hash(&bytes);
         let size_bytes = bytes.len() as i64;
 
-        self.storage
-            .store_blob(&content_hash, &bytes, Some(&mime_type))
-            .await?;
+        self.storage.store_blob(&content_hash, &bytes, Some(&mime_type)).await?;
         self.storage
             .store_artifact(NewArtifact {
                 workspace_id,
@@ -340,14 +322,8 @@ impl RepoMemoCore {
             .context("the document preview task failed")
     }
 
-    pub async fn update_artifact_title(
-        &self,
-        artifact_id: String,
-        title: String,
-    ) -> Result<ArtifactSummary> {
-        self.storage
-            .update_artifact_title(&artifact_id, &title)
-            .await
+    pub async fn update_artifact_title(&self, artifact_id: String, title: String) -> Result<ArtifactSummary> {
+        self.storage.update_artifact_title(&artifact_id, &title).await
     }
 
     pub async fn delete_artifact(&self, artifact_id: String) -> Result<()> {
@@ -356,7 +332,7 @@ impl RepoMemoCore {
 
     pub async fn index_artifact(&self, artifact_id: String) -> Result<IndexingJobStatus> {
         if artifact_id.trim().is_empty() {
-            bail!("Artifact id is required.");
+            repomemo_domain::bail_invalid!("Artifact id is required.");
         }
 
         let summary = self.storage.get_artifact_summary(&artifact_id).await?;
@@ -367,12 +343,7 @@ impl RepoMemoCore {
         };
         let job = self
             .storage
-            .create_indexing_job(
-                &summary.workspace_id,
-                Some(&summary.source_id),
-                stage,
-                Some(1),
-            )
+            .create_indexing_job(&summary.workspace_id, Some(&summary.source_id), stage, Some(1))
             .await?;
 
         match self.index_artifact_inner(&summary).await {
@@ -394,11 +365,11 @@ impl RepoMemoCore {
 
     pub async fn index_workspace(&self, workspace_id: String) -> Result<IndexingJobStatus> {
         if workspace_id.trim().is_empty() {
-            bail!("Workspace id is required.");
+            repomemo_domain::bail_invalid!("Workspace id is required.");
         }
 
         if !self.storage.workspace_exists(&workspace_id).await? {
-            bail!("Workspace was not found.");
+            repomemo_domain::bail_not_found!("Workspace was not found.");
         }
 
         // Incremental: artifacts already indexed by the current indexer are left alone.
@@ -409,13 +380,7 @@ impl RepoMemoCore {
         let total = artifacts.len() as i64;
         let job = self
             .storage
-            .create_job(
-                &workspace_id,
-                None,
-                "indexing",
-                "chunking_workspace",
-                Some(total),
-            )
+            .create_job(&workspace_id, None, "indexing", "chunking_workspace", Some(total))
             .await?;
 
         let mut indexed = 0_i64;
@@ -470,7 +435,7 @@ impl RepoMemoCore {
     pub async fn create_memory_card(&self, request: CreateMemoryCardRequest) -> Result<MemoryCard> {
         validate_memory_card_fields(&request.title, &request.body_markdown, &request.source)?;
         if !self.storage.workspace_exists(&request.workspace_id).await? {
-            bail!("Workspace was not found.");
+            repomemo_domain::bail_not_found!("Workspace was not found.");
         }
         self.storage
             .create_memory_card(
@@ -499,34 +464,28 @@ impl RepoMemoCore {
 
     pub async fn delete_memory_card(&self, card_id: String) -> Result<()> {
         if card_id.trim().is_empty() {
-            bail!("Memory card id is required.");
+            repomemo_domain::bail_invalid!("Memory card id is required.");
         }
         self.storage.delete_memory_card(&card_id).await
     }
 
     pub async fn list_memory_cards(&self, workspace_id: String) -> Result<Vec<MemoryCardSummary>> {
         if workspace_id.trim().is_empty() {
-            bail!("Workspace id is required.");
+            repomemo_domain::bail_invalid!("Workspace id is required.");
         }
         self.storage.list_memory_cards(&workspace_id).await
     }
 
-    pub async fn search_memory_cards(
-        &self,
-        workspace_id: String,
-        query: String,
-    ) -> Result<Vec<MemoryCardSummary>> {
+    pub async fn search_memory_cards(&self, workspace_id: String, query: String) -> Result<Vec<MemoryCardSummary>> {
         if workspace_id.trim().is_empty() {
-            bail!("Workspace id is required.");
+            repomemo_domain::bail_invalid!("Workspace id is required.");
         }
-        self.storage
-            .search_memory_cards(&workspace_id, &query)
-            .await
+        self.storage.search_memory_cards(&workspace_id, &query).await
     }
 
     pub async fn get_memory_card(&self, card_id: String) -> Result<MemoryCardDetail> {
         if card_id.trim().is_empty() {
-            bail!("Memory card id is required.");
+            repomemo_domain::bail_invalid!("Memory card id is required.");
         }
         self.storage.get_memory_card(&card_id).await
     }
@@ -552,9 +511,7 @@ impl RepoMemoCore {
                     };
                     markdown.push_str(&format!(
                         "\n- [{}]({}){}\n",
-                        evidence
-                            .title
-                            .unwrap_or_else(|| "Untitled evidence".to_owned()),
+                        evidence.title.unwrap_or_else(|| "Untitled evidence".to_owned()),
                         evidence.path.unwrap_or_else(|| evidence.target_id.clone()),
                         location,
                     ));
@@ -592,42 +549,32 @@ impl RepoMemoCore {
 
     pub async fn list_symbols(&self, artifact_id: String) -> Result<Vec<Symbol>> {
         if artifact_id.trim().is_empty() {
-            bail!("Artifact id is required.");
+            repomemo_domain::bail_invalid!("Artifact id is required.");
         }
         self.storage.list_symbols(&artifact_id).await
     }
 
-    pub async fn search_symbols(
-        &self,
-        workspace_id: String,
-        query: String,
-    ) -> Result<Vec<SymbolSearchResult>> {
+    pub async fn search_symbols(&self, workspace_id: String, query: String) -> Result<Vec<SymbolSearchResult>> {
         if workspace_id.trim().is_empty() {
-            bail!("Workspace id is required.");
+            repomemo_domain::bail_invalid!("Workspace id is required.");
         }
         self.storage.search_symbols(&workspace_id, &query, 30).await
     }
 
-    pub async fn list_provider_settings(
-        &self,
-        workspace_id: String,
-    ) -> Result<Vec<ProviderSettings>> {
+    pub async fn list_provider_settings(&self, workspace_id: String) -> Result<Vec<ProviderSettings>> {
         if workspace_id.trim().is_empty() {
-            bail!("Workspace id is required.");
+            repomemo_domain::bail_invalid!("Workspace id is required.");
         }
         self.storage.list_provider_settings(&workspace_id).await
     }
 
-    pub async fn save_provider_settings(
-        &self,
-        settings: ProviderSettings,
-    ) -> Result<ProviderSettings> {
+    pub async fn save_provider_settings(&self, settings: ProviderSettings) -> Result<ProviderSettings> {
         let workspace_id = settings
             .workspace_id
             .as_deref()
             .context("Provider settings must belong to a workspace.")?;
         if !self.storage.workspace_exists(workspace_id).await? {
-            bail!("Workspace was not found.");
+            repomemo_domain::bail_not_found!("Workspace was not found.");
         }
         validate_settings(&settings)?;
         self.storage.save_provider_settings(settings).await
@@ -643,48 +590,56 @@ impl RepoMemoCore {
                 .embed(vec!["RepoMemo connection test".to_owned()], json!({}))
                 .await
             {
-                Ok(vectors) => (true, format!(
+                Ok(vectors) => (
+                    true,
+                    format!(
                     "Embeddings work with {model} ({} dimensions). Indexed passages are embedded in the background.",
                     vectors.first().map_or(0, Vec::len)
-                )),
+                ),
+                ),
                 Err(error) => (false, format!("{error:#}")),
             };
-            return Ok(ProviderTestResult { provider_id, success, message });
+            return Ok(ProviderTestResult {
+                provider_id,
+                success,
+                message,
+            });
         }
         let provider = provider_from_settings(settings)?;
         provider.test_connection().await
     }
 
-    pub async fn summarize_artifact(
-        &self,
-        artifact_id: String,
-        provider_id: String,
-    ) -> Result<SummaryResult> {
+    pub async fn summarize_artifact(&self, artifact_id: String, provider_id: String) -> Result<SummaryResult> {
         let detail = self.storage.get_artifact(&artifact_id).await?;
         if detail.chunks.is_empty() {
-            bail!(
+            repomemo_domain::bail_invalid!(
                 "Index this artifact before requesting a summary so RepoMemo can cite its content."
             );
         }
         let settings = self.storage.get_provider_settings(&provider_id).await?;
         if !settings.enabled {
-            bail!("Enable this local provider before using AI. No content was sent.");
+            repomemo_domain::bail_invalid!("Enable this local provider before using AI. No content was sent.");
         }
         if settings.workspace_id.as_deref() != Some(detail.summary.workspace_id.as_str()) {
-            bail!("The selected provider belongs to a different workspace.");
+            repomemo_domain::bail_invalid!("The selected provider belongs to a different workspace.");
         }
         let provider = provider_from_settings(settings)?;
         let title = detail.summary.title.clone();
         let sections = detail
             .chunks
             .iter()
-            .map(|chunk| match chunk.heading_path.as_deref().filter(|heading| !heading.is_empty()) {
-                Some(heading) => format!("{heading}\n{}", chunk.text),
-                None => chunk.text.clone(),
-            })
+            .map(
+                |chunk| match chunk.heading_path.as_deref().filter(|heading| !heading.is_empty()) {
+                    Some(heading) => format!("{heading}\n{}", chunk.text),
+                    None => chunk.text.clone(),
+                },
+            )
             .collect::<Vec<_>>();
         let total_chars = sections.iter().map(|section| section.chars().count()).sum::<usize>();
-        let mut warnings = vec!["Generated by the configured AI provider. Verify cited source text before relying on the summary.".to_owned()];
+        let mut warnings = vec![
+            "Generated by the configured AI provider. Verify cited source text before relying on the summary."
+                .to_owned(),
+        ];
         let system = "You summarize technical documents faithfully for engineers. Use only the supplied text, keep names, numbers and decisions exact, and never add facts.".to_owned();
 
         let (summary_markdown, used) = if total_chars <= SUMMARY_SINGLE_PASS_CHARS {
@@ -753,17 +708,13 @@ impl RepoMemoCore {
         })
     }
 
-    pub async fn summarize_workspace(
-        &self,
-        workspace_id: String,
-        provider_id: String,
-    ) -> Result<SummaryResult> {
+    pub async fn summarize_workspace(&self, workspace_id: String, provider_id: String) -> Result<SummaryResult> {
         let settings = self.storage.get_provider_settings(&provider_id).await?;
         if !settings.enabled {
-            bail!("Enable this provider before using AI. No content was sent.");
+            repomemo_domain::bail_invalid!("Enable this provider before using AI. No content was sent.");
         }
         if settings.workspace_id.as_deref() != Some(workspace_id.as_str()) {
-            bail!("The selected provider belongs to a different workspace.");
+            repomemo_domain::bail_invalid!("The selected provider belongs to a different workspace.");
         }
         let artifacts = self.storage.list_artifacts(&workspace_id).await?;
         let mut context_sections = Vec::new();
@@ -796,7 +747,9 @@ impl RepoMemoCore {
             }
         }
         if context_sections.is_empty() {
-            bail!("Index at least one artifact before requesting a workspace summary so RepoMemo can cite its content.");
+            repomemo_domain::bail_invalid!(
+                "Index at least one artifact before requesting a workspace summary so RepoMemo can cite its content."
+            );
         }
         let provider = provider_from_settings(settings)?;
         let summary_markdown = provider.generate(GenerateRequest {
@@ -805,7 +758,14 @@ impl RepoMemoCore {
             context: context_sections.join("\n\n"),
             options: json!({ "temperature": 0.2 }),
         }).await?;
-        Ok(SummaryResult { summary_markdown, citations, warnings: vec!["This overview is based on the cited indexed excerpts, not necessarily every file in the workspace.".to_owned()] })
+        Ok(SummaryResult {
+            summary_markdown,
+            citations,
+            warnings: vec![
+                "This overview is based on the cited indexed excerpts, not necessarily every file in the workspace."
+                    .to_owned(),
+            ],
+        })
     }
 
     pub async fn app_settings(&self) -> Result<AppSettings> {
@@ -817,21 +777,17 @@ impl RepoMemoCore {
         })
     }
 
-    pub async fn embed_workspace(
-        &self,
-        workspace_id: String,
-        provider_id: String,
-    ) -> Result<IndexingJobStatus> {
+    pub async fn embed_workspace(&self, workspace_id: String, provider_id: String) -> Result<IndexingJobStatus> {
         let settings = self.storage.get_provider_settings(&provider_id).await?;
         if !settings.enabled {
-            bail!("Enable this provider before building embeddings.");
+            repomemo_domain::bail_invalid!("Enable this provider before building embeddings.");
         }
         if settings.workspace_id.as_deref() != Some(workspace_id.as_str()) {
-            bail!("The selected provider belongs to a different workspace.");
+            repomemo_domain::bail_invalid!("The selected provider belongs to a different workspace.");
         }
         let chunks = self.storage.list_workspace_chunks(&workspace_id).await?;
         if chunks.is_empty() {
-            bail!("Index artifacts before building embeddings.");
+            repomemo_domain::bail_invalid!("Index artifacts before building embeddings.");
         }
         let job = self
             .storage
@@ -853,10 +809,7 @@ impl RepoMemoCore {
                     .await;
             }
             let vectors = provider
-                .embed(
-                    batch.iter().map(|chunk| chunk.text.clone()).collect(),
-                    json!({}),
-                )
+                .embed(batch.iter().map(|chunk| chunk.text.clone()).collect(), json!({}))
                 .await?;
             if vectors.len() != batch.len() {
                 bail!("Provider returned an unexpected embedding count.");
@@ -888,7 +841,7 @@ impl RepoMemoCore {
 
     pub async fn ask_workspace(&self, request: AskRequest) -> Result<AskAnswer> {
         if request.workspace_id.trim().is_empty() || request.question.trim().is_empty() {
-            bail!("A workspace and question are required.");
+            repomemo_domain::bail_invalid!("A workspace and question are required.");
         }
         let provider_id = request
             .provider_id
@@ -896,10 +849,10 @@ impl RepoMemoCore {
             .context("Enable a provider before using Ask.")?;
         let settings = self.storage.get_provider_settings(provider_id).await?;
         if !settings.enabled {
-            bail!("Enable this provider before using Ask. No content was sent.");
+            repomemo_domain::bail_invalid!("Enable this provider before using Ask. No content was sent.");
         }
         if settings.workspace_id.as_deref() != Some(request.workspace_id.as_str()) {
-            bail!("The selected provider belongs to a different workspace.");
+            repomemo_domain::bail_invalid!("The selected provider belongs to a different workspace.");
         }
         let provider = provider_from_settings(settings)?;
         let mut warnings = Vec::new();
@@ -913,7 +866,9 @@ impl RepoMemoCore {
         {
             Ok(embedding) => embedding,
             Err(error) => {
-                warnings.push(format!("Search by meaning was skipped because the embedding provider failed: {error:#}"));
+                warnings.push(format!(
+                    "Search by meaning was skipped because the embedding provider failed: {error:#}"
+                ));
                 None
             }
         };
@@ -936,14 +891,12 @@ impl RepoMemoCore {
             .await?;
         if candidates.is_empty() {
             return Ok(AskAnswer {
-                answer_markdown: "Indexed context is insufficient for a reliable answer."
-                    .to_owned(),
+                answer_markdown: "Indexed context is insufficient for a reliable answer.".to_owned(),
                 citations: Vec::new(),
                 retrieved_context: candidates,
                 confidence: Some(0.0),
                 warnings: vec![
-                    "No matching indexed context was found; no provider generation was requested."
-                        .to_owned(),
+                    "No matching indexed context was found; no provider generation was requested.".to_owned(),
                 ],
             });
         }
@@ -951,7 +904,12 @@ impl RepoMemoCore {
         // Search results carry short snippets; the model needs the passages.
         let texts = self
             .storage
-            .chunk_texts(&candidates.iter().map(|result| result.chunk_id.clone()).collect::<Vec<_>>())
+            .chunk_texts(
+                &candidates
+                    .iter()
+                    .map(|result| result.chunk_id.clone())
+                    .collect::<Vec<_>>(),
+            )
             .await?;
         let passage = |result: &SearchResult| {
             texts
@@ -971,12 +929,19 @@ impl RepoMemoCore {
             match provider.rerank(request.question.clone(), listing).await {
                 Ok(order) => {
                     let mut slots = ranked.into_iter().map(Some).collect::<Vec<_>>();
-                    ranked = order.into_iter().filter_map(|index| slots.get_mut(index).and_then(Option::take)).collect();
+                    ranked = order
+                        .into_iter()
+                        .filter_map(|index| slots.get_mut(index).and_then(Option::take))
+                        .collect();
                 }
-                Err(error) => warnings.push(format!("Results were not reranked because the AI provider failed: {error:#}")),
+                Err(error) => warnings.push(format!(
+                    "Results were not reranked because the AI provider failed: {error:#}"
+                )),
             }
         }
-        ranked.truncate(request.limit.map_or(ASK_CONTEXT_PASSAGES, |limit| (limit.max(1) as usize).min(ASK_CONTEXT_PASSAGES)));
+        ranked.truncate(request.limit.map_or(ASK_CONTEXT_PASSAGES, |limit| {
+            (limit.max(1) as usize).min(ASK_CONTEXT_PASSAGES)
+        }));
         let retrieved_context = ranked;
 
         let context = retrieved_context
@@ -1008,9 +973,7 @@ impl RepoMemoCore {
                 confidence: Some(result.score),
             })
             .collect::<Vec<_>>();
-        let confidence = retrieved_context
-            .first()
-            .map(|result| result.score.clamp(0.0, 1.0));
+        let confidence = retrieved_context.first().map(|result| result.score.clamp(0.0, 1.0));
         if !used_embeddings && !semantic_configured {
             warnings.push("Answer used keyword search only. An administrator can set up AI for search in Settings so passages are also found by meaning.".to_owned());
         }
@@ -1089,10 +1052,7 @@ impl RepoMemoCore {
     async fn index_artifact_inner(&self, summary: &ArtifactSummary) -> Result<ArtifactIndexResult> {
         let bytes = self.storage.read_artifact_blob(&summary.id).await?;
         let (output, stage) = if matches!(summary.artifact_type, ArtifactType::Image) {
-            match self
-                .vision_provider_for_workspace(&summary.workspace_id)
-                .await?
-            {
+            match self.vision_provider_for_workspace(&summary.workspace_id).await? {
                 Some(settings) => {
                     let provider = provider_from_settings(settings)?;
                     // Fail fast with a readable reason (Ollama stopped, model
@@ -1137,10 +1097,7 @@ impl RepoMemoCore {
     /// The provider that describes images: an enabled provider set up for
     /// vision, or else an enabled provider saved before purposes existed (the
     /// single-provider desktop setup).
-    async fn vision_provider_for_workspace(
-        &self,
-        workspace_id: &str,
-    ) -> Result<Option<ProviderSettings>> {
+    async fn vision_provider_for_workspace(&self, workspace_id: &str) -> Result<Option<ProviderSettings>> {
         let providers = self.storage.list_provider_settings(workspace_id).await?;
         Ok(providers
             .iter()
@@ -1156,10 +1113,7 @@ impl RepoMemoCore {
     /// Image uploads are only accepted once an image AI provider is enabled, so
     /// a picture is never stored without a way to make it searchable.
     pub async fn ensure_upload_allowed(&self, workspace_id: &str, filename: &str) -> Result<()> {
-        let is_image = matches!(
-            detect_artifact_type(Path::new(filename)),
-            Some(ArtifactType::Image)
-        );
+        let is_image = matches!(detect_artifact_type(Path::new(filename)), Some(ArtifactType::Image));
         if !is_image {
             return Ok(());
         }
@@ -1170,7 +1124,7 @@ impl RepoMemoCore {
             .iter()
             .any(|settings| settings.enabled && settings.purpose() == "vision");
         if !has_vision {
-            bail!(
+            repomemo_domain::bail_invalid!(
                 "An image AI provider is required to upload images. An administrator can set one up in Settings."
             );
         }
@@ -1228,13 +1182,13 @@ fn image_analysis_prompt(summary: &ArtifactSummary) -> String {
 
 fn validate_memory_card_fields(title: &str, body_markdown: &str, source: &str) -> Result<()> {
     if title.trim().is_empty() {
-        bail!("Memory card title is required.");
+        repomemo_domain::bail_invalid!("Memory card title is required.");
     }
     if body_markdown.trim().is_empty() {
-        bail!("Memory card body is required.");
+        repomemo_domain::bail_invalid!("Memory card body is required.");
     }
     if source.trim().is_empty() {
-        bail!("Memory card source is required.");
+        repomemo_domain::bail_invalid!("Memory card source is required.");
     }
     Ok(())
 }
@@ -1275,9 +1229,7 @@ fn sanitize_filename(title: &str, extension: &str) -> String {
             }
         })
         .collect();
-    let slug = slug
-        .trim_matches(|c: char| c == '-' || c == '_')
-        .to_string();
+    let slug = slug.trim_matches(|c: char| c == '-' || c == '_').to_string();
     let slug = if slug.is_empty() {
         "pasted-note".to_owned()
     } else {
@@ -1304,16 +1256,10 @@ mod tests {
     async fn memory_card_export_includes_the_linked_evidence() {
         let data_dir = std::env::temp_dir().join(format!(
             "repomemo-memory-export-test-{}",
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
         ));
         let core = RepoMemoCore::boot(data_dir.clone()).await.unwrap();
-        let workspace = core
-            .create_workspace("Memory export".to_owned())
-            .await
-            .unwrap();
+        let workspace = core.create_workspace("Memory export".to_owned()).await.unwrap();
         let artifact = core
             .import_text(
                 workspace.id.clone(),
@@ -1355,22 +1301,17 @@ mod tests {
     async fn workspace_indexing_skips_artifacts_that_are_already_current() {
         let data_dir = std::env::temp_dir().join(format!(
             "repomemo-incremental-index-test-{}",
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
         ));
         let core = RepoMemoCore::boot(data_dir.clone()).await.unwrap();
-        let workspace = core
-            .create_workspace("Incremental".to_owned())
-            .await
-            .unwrap();
+        let workspace = core.create_workspace("Incremental".to_owned()).await.unwrap();
         let first = core
             .import_text(
                 workspace.id.clone(),
                 "First".to_owned(),
                 "# First
-One.".to_owned(),
+One."
+                    .to_owned(),
                 Some("Markdown".to_owned()),
             )
             .await
@@ -1398,10 +1339,7 @@ One.".to_owned(),
 
         // A forced re-index of unchanged content keeps chunk identity too.
         core.index_artifact(first.id.clone()).await.unwrap();
-        assert_eq!(
-            chunk_ids(core.get_artifact(first.id).await.unwrap()),
-            indexed_ids
-        );
+        assert_eq!(chunk_ids(core.get_artifact(first.id).await.unwrap()), indexed_ids);
 
         drop(core);
         let _ = std::fs::remove_dir_all(data_dir);

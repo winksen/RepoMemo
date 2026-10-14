@@ -104,14 +104,19 @@ pub(crate) async fn web_session(State(state): State<AppState>, request: Request,
                 }
             };
             if let Some(object) = value.as_object_mut() {
-                let has_token = object.get("refresh_token").and_then(Value::as_str).is_some_and(|token| !token.is_empty());
+                let has_token = object
+                    .get("refresh_token")
+                    .and_then(Value::as_str)
+                    .is_some_and(|token| !token.is_empty());
                 if !has_token {
                     object.insert("refresh_token".to_owned(), Value::String(token));
                 }
             }
             let rewritten = serde_json::to_vec(&value).unwrap_or_default();
             parts.headers.remove(header::CONTENT_LENGTH);
-            parts.headers.insert(header::CONTENT_TYPE, HeaderValue::from_static("application/json"));
+            parts
+                .headers
+                .insert(header::CONTENT_TYPE, HeaderValue::from_static("application/json"));
             request = Request::from_parts(parts, Body::from(rewritten));
         }
     }
@@ -147,7 +152,9 @@ pub(crate) async fn web_session(State(state): State<AppState>, request: Request,
         };
         value["refresh_token"] = Value::String(String::new());
         let max_age = settings.refresh_token_ttl_days.max(1) * 24 * 60 * 60;
-        parts.headers.append(header::SET_COOKIE, set_cookie(&token, max_age, settings.secure_cookies));
+        parts
+            .headers
+            .append(header::SET_COOKIE, set_cookie(&token, max_age, settings.secure_cookies));
         parts.headers.remove(header::CONTENT_LENGTH);
         return Response::from_parts(parts, Body::from(serde_json::to_vec(&value).unwrap_or_default()));
     }
@@ -161,7 +168,10 @@ mod tests {
     #[test]
     fn the_cookie_is_found_among_others() {
         let mut headers = HeaderMap::new();
-        headers.insert(header::COOKIE, HeaderValue::from_static("theme=dark; repomemo_refresh=abc123; other=1"));
+        headers.insert(
+            header::COOKIE,
+            HeaderValue::from_static("theme=dark; repomemo_refresh=abc123; other=1"),
+        );
         assert_eq!(cookie_token(&headers).as_deref(), Some("abc123"));
         headers.insert(header::COOKIE, HeaderValue::from_static("repomemo_refresh_extra=zzz"));
         assert_eq!(cookie_token(&headers), None, "a longer name is not ours");

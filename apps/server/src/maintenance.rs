@@ -130,7 +130,9 @@ pub fn start(state: AppState) -> tokio::task::JoinHandle<()> {
 
 fn set_next_run(state: &AppState, wait: Option<Duration>) {
     if let Ok(mut status) = state.maintenance_status.lock() {
-        status.next_run_at = wait.and_then(|wait| chrono::Duration::from_std(wait).ok()).map(|wait| (Utc::now() + wait).to_rfc3339());
+        status.next_run_at = wait
+            .and_then(|wait| chrono::Duration::from_std(wait).ok())
+            .map(|wait| (Utc::now() + wait).to_rfc3339());
     }
 }
 
@@ -171,10 +173,7 @@ pub async fn run_pass(state: &AppState, retry_indexing: bool, sweep_untracked: b
         report.failures += 1;
     }
 
-    match storage
-        .purge_expired_refresh_tokens(&Utc::now().to_rfc3339())
-        .await
-    {
+    match storage.purge_expired_refresh_tokens(&Utc::now().to_rfc3339()).await {
         Ok(count) => report.refresh_tokens_purged = count,
         Err(error) => failed(&mut report, "refresh tokens", error),
     }

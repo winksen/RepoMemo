@@ -7,8 +7,8 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use anyhow::Result;
 use repomemo_domain::{
-    ArtifactSummary, ArtifactType, HealthAction, HealthDetector, HealthDetectorStats,
-    HealthEvidence, HealthFile, HealthFinding, HealthSeverity, WorkspaceHealth,
+    ArtifactSummary, ArtifactType, HealthAction, HealthDetector, HealthDetectorStats, HealthEvidence, HealthFile,
+    HealthFinding, HealthSeverity, WorkspaceHealth,
 };
 use repomemo_storage::ChunkMention;
 
@@ -16,6 +16,9 @@ use crate::knowledge_map::{fold_repository_centroids, folded_repository_files, s
 use crate::RepoMemoCore;
 
 /// Full-text lookups one health check may run, across all detectors.
+/// A removed name, the passage that names it and its position.
+type MentionedName = (String, ChunkMention, usize);
+
 const MAX_MENTION_QUERIES: usize = 200;
 const MENTIONS_PER_QUERY: i64 = 200;
 const EVIDENCE_PER_FINDING: usize = 4;
@@ -58,10 +61,7 @@ impl RepoMemoCore {
         // A repository's files are compared with the rest of the workspace as
         // one item: duplicates inside a repository, or between two copies of
         // the same code, are the repository's business, not the workspace's.
-        let folded_into = folded_repository_files(
-            &artifacts,
-            &self.storage.repo_artifact_sources(workspace_id).await?,
-        );
+        let folded_into = folded_repository_files(&artifacts, &self.storage.repo_artifact_sources(workspace_id).await?);
         let live_items = live
             .iter()
             .copied()
@@ -105,9 +105,7 @@ impl RepoMemoCore {
         let detectors = HealthDetector::ALL
             .iter()
             .map(|&detector| {
-                let recorded = actions
-                    .iter()
-                    .filter(|(_, name, _)| name == detector.as_str());
+                let recorded = actions.iter().filter(|(_, name, _)| name == detector.as_str());
                 let dismissed_count = recorded
                     .clone()
                     .filter(|(_, _, action)| action == HealthAction::Dismiss.as_str())
@@ -154,7 +152,7 @@ impl RepoMemoCore {
         let empty = HashSet::new();
 
         // (document, code file) -> removed names with the passages naming them.
-        let mut mentions: BTreeMap<(String, String), Vec<(String, ChunkMention, usize)>> = BTreeMap::new();
+        let mut mentions: BTreeMap<(String, String), Vec<MentionedName>> = BTreeMap::new();
         for group in versions {
             let [.., previous, latest] = group.as_slice() else {
                 continue;
@@ -164,7 +162,10 @@ impl RepoMemoCore {
             }
             let before = symbols.get(&previous.id).unwrap_or(&empty);
             let after = symbols.get(&latest.id).unwrap_or(&empty);
-            let group_ids = group.iter().map(|artifact| artifact.id.as_str()).collect::<HashSet<_>>();
+            let group_ids = group
+                .iter()
+                .map(|artifact| artifact.id.as_str())
+                .collect::<HashSet<_>>();
             let defined_elsewhere = |name: &str| {
                 defined_in
                     .get(name)
@@ -213,7 +214,11 @@ impl RepoMemoCore {
                 continue;
             };
             let names = found.iter().map(|(name, _, _)| name.as_str()).collect::<BTreeSet<_>>();
-            let listed = names.iter().map(|name| format!("`{name}`")).collect::<Vec<_>>().join(", ");
+            let listed = names
+                .iter()
+                .map(|name| format!("`{name}`"))
+                .collect::<Vec<_>>()
+                .join(", ");
             let them = if names.len() == 1 { "it" } else { "them" };
             findings.push(HealthFinding {
                 fingerprint: format!(
@@ -303,7 +308,10 @@ impl RepoMemoCore {
             let Some(document) = by_id.get(document_id.as_str()) else {
                 continue;
             };
-            let mut target_ids = found.iter().map(|(target, _, _)| target.id.as_str()).collect::<Vec<_>>();
+            let mut target_ids = found
+                .iter()
+                .map(|(target, _, _)| target.id.as_str())
+                .collect::<Vec<_>>();
             target_ids.sort_unstable();
             target_ids.dedup();
             let reasons = target_ids
@@ -340,7 +348,11 @@ impl RepoMemoCore {
                     .map(|(_, mention, at)| evidence(document, mention, *at))
                     .collect(),
                 keep_artifact_id: None,
-                actions: vec![HealthAction::NeedsReview, HealthAction::CreateTask, HealthAction::Dismiss],
+                actions: vec![
+                    HealthAction::NeedsReview,
+                    HealthAction::CreateTask,
+                    HealthAction::Dismiss,
+                ],
             });
         }
         Ok(findings)
@@ -588,9 +600,7 @@ fn is_identifier(name: &str) -> bool {
 /// Names unlikely to appear as plain words: snake_case, camelCase or with
 /// digits. Others only count when written like code.
 fn is_distinctive(name: &str) -> bool {
-    name.contains('_')
-        || name.chars().any(|c| c.is_ascii_digit())
-        || name.chars().skip(1).any(char::is_uppercase)
+    name.contains('_') || name.chars().any(|c| c.is_ascii_digit()) || name.chars().skip(1).any(char::is_uppercase)
 }
 
 /// Byte offset of the first mention of `name` as a whole identifier that
@@ -602,9 +612,7 @@ fn find_identifier(text: &str, name: &str) -> Option<usize> {
         if before.is_some_and(is_identifier_char) || after.is_some_and(is_identifier_char) {
             return false;
         }
-        is_distinctive(name)
-            || matches!(before, Some('`' | '.' | ':'))
-            || matches!(after, Some('(' | '`'))
+        is_distinctive(name) || matches!(before, Some('`' | '.' | ':')) || matches!(after, Some('(' | '`'))
     })
 }
 

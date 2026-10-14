@@ -80,9 +80,9 @@ types that match; only types the client shapes differently are written by hand.
 
 CI (`.github/workflows/ci.yml`) runs on every push to `main` and every pull
 request: the version check, Rust tests on Linux and Windows (the desktop crate
-is left out), the web type check, the web client tests, the generated-types check, `npm audit --omit=dev`, and `cargo deny`
-(policy in `deny.toml`). rustfmt, clippy, license and duplicate-crate checks are
-reported but do not fail the run yet.
+is left out), the web type check, the web client tests, the generated-types check, `npm audit --omit=dev`, `cargo deny`
+(policy in `deny.toml`), `cargo fmt --all --check` and clippy with `-D warnings`.
+Licenses and banned crates are checked as well; duplicate versions only warn.
 
 ## Run Rust Tests
 
@@ -187,6 +187,12 @@ stored in the database and override the values below until reset.
 | `REPOMEMO_TRUSTED_PROXIES` | unset | Comma-separated proxy addresses besides loopback whose forwarding headers are believed. |
 | `REPOMEMO_ALLOW_INSECURE_HTTP` | `false` | Lets the server listen beyond loopback over plain HTTP with no proxy in front. For a trusted network only; without it (and without an `https://` public URL or proxy trust) the server refuses to start. |
 | `REPOMEMO_MAX_UPLOAD_MB` | `10` | Largest request body (uploads). |
+| `REPOMEMO_REQUEST_TIMEOUT_SECONDS` | `120` | How long a request may take before it is answered `408`. Live event streams are not limited. `0` turns it off. |
+| `REPOMEMO_HEADER_TIMEOUT_SECONDS` | `30` | How long a client has to send its request headers; a slower one is disconnected. `0` turns it off. |
+| `REPOMEMO_MAX_EVENT_STREAMS_PER_USER` | `10` | Live event streams one account may hold open (one per open workspace page or System jobs page). |
+| `REPOMEMO_INDEX_CONCURRENCY` | `2` | Artifacts indexed at once (1–16). Indexing may call a vision provider. |
+| `REPOMEMO_EMBEDDING_CONCURRENCY` | `1` | Workspaces embedded at once (1–8). Raise it only for a provider that can take it. |
+| `REPOMEMO_DB_READ_CONNECTIONS` | `4` | Read-only database connections (1–64). Writes always use one. |
 | `REPOMEMO_ACCESS_TOKEN_TTL_MINUTES` | `60` | Access-token lifetime (5–1440). |
 | `REPOMEMO_REFRESH_TOKEN_TTL_DAYS` | `30` | Refresh-token lifetime (1–365). |
 | `REPOMEMO_AUTH_REQUESTS_PER_MINUTE` | `30` | Sign-in and registration requests per client address (session refreshes get four times as many); `0` turns the limit off. |
@@ -234,8 +240,3 @@ writes `apps/desktop/dist/content-security-policy.txt`: send its content as the
 `Content-Security-Policy` header from whatever serves `dist/`, after building
 with `VITE_REPOMEMO_API_URL` set to the API address people will use.
 
-Run the background worker foundation separately:
-
-```powershell
-cargo run -p repomemo-worker
-```

@@ -10,7 +10,13 @@ yanked = "warn"
 # deep in third-party trees are not ours to replace.
 unmaintained = "workspace"
 # An ignored advisory needs a reason and a date to revisit it.
-ignore = []
+ignore = [
+  # Marvin attack on RSA decryption. `rsa` arrives through jsonwebtoken, which
+  # RepoMemo uses for HS256 only (HMAC): no RSA key is ever loaded, nothing is
+  # decrypted, and there is no fixed release. Revisit by 2027-01-15, or once
+  # jsonwebtoken lets the RSA backend be left out.
+  { id = "RUSTSEC-2023-0071", reason = "rsa is linked by jsonwebtoken but never used: tokens are HS256" },
+]
 
 [bans]
 # Two versions of a crate cost build time but are not a defect: reqwest 0.13

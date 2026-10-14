@@ -114,9 +114,7 @@ impl SecretBox {
                 Aad::from(context.as_bytes()),
                 &mut payload[NONCE_LEN..],
             )
-            .map_err(|_| {
-                anyhow!("the stored secret could not be decrypted; the secret key may have changed")
-            })?;
+            .map_err(|_| anyhow!("the stored secret could not be decrypted; the secret key may have changed"))?;
         String::from_utf8(plaintext.to_vec()).context("the stored secret is not UTF-8 text")
     }
 }
@@ -133,9 +131,7 @@ fn load_or_create_key_file(path: &Path) -> Result<Vec<u8>> {
             Ok(key)
         }
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => create_key_file(path),
-        Err(error) => {
-            Err(error).with_context(|| format!("the key file {} could not be read", path.display()))
-        }
+        Err(error) => Err(error).with_context(|| format!("the key file {} could not be read", path.display())),
     }
 }
 
@@ -161,9 +157,7 @@ fn create_key_file(path: &Path) -> Result<Vec<u8>> {
         }
         // Another process created it first: use that key.
         Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => load_or_create_key_file(path),
-        Err(error) => {
-            Err(error).with_context(|| format!("the key file {} could not be created", path.display()))
-        }
+        Err(error) => Err(error).with_context(|| format!("the key file {} could not be created", path.display())),
     }
 }
 

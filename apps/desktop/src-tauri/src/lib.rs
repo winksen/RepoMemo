@@ -2,11 +2,10 @@ use std::path::PathBuf;
 
 use repomemo_api::RepoMemoCore;
 use repomemo_domain::{
-    AppSettings, ArtifactDetail, ArtifactSummary, AskAnswer, AskRequest, CreateMemoryCardRequest,
-    ImportReport, ImportRequest, IndexingJobStatus, MemoryCard, MemoryCardDetail,
-    MemoryCardSummary, ProviderSettings, ProviderTestResult, SearchRequest, SearchResult,
-    SummaryResult, Symbol, SymbolSearchResult, UpdateMemoryCardRequest, Workspace,
-    WorkspaceOverview,
+    AppSettings, ArtifactDetail, ArtifactSummary, AskAnswer, AskRequest, CreateMemoryCardRequest, ImportReport,
+    ImportRequest, IndexingJobStatus, MemoryCard, MemoryCardDetail, MemoryCardSummary, ProviderSettings,
+    ProviderTestResult, SearchRequest, SearchResult, SummaryResult, Symbol, SymbolSearchResult,
+    UpdateMemoryCardRequest, Workspace, WorkspaceOverview,
 };
 use serde::Deserialize;
 use tauri::{Manager, State};
@@ -27,11 +26,7 @@ async fn create_workspace(state: State<'_, AppState>, name: String) -> Result<Wo
         return Err("Workspace name is required.".to_owned());
     }
 
-    state
-        .core
-        .create_workspace(name)
-        .await
-        .map_err(to_command_error)
+    state.core.create_workspace(name).await.map_err(to_command_error)
 }
 
 #[tauri::command]
@@ -47,10 +42,7 @@ async fn import_paths(
 ) -> Result<ImportReport, String> {
     state
         .core
-        .import_paths(ImportRequest {
-            workspace_id,
-            paths,
-        })
+        .import_paths(ImportRequest { workspace_id, paths })
         .await
         .map_err(to_command_error)
 }
@@ -64,75 +56,36 @@ struct ImportTextRequest {
 }
 
 #[tauri::command]
-async fn import_text(
-    state: State<'_, AppState>,
-    request: ImportTextRequest,
-) -> Result<ArtifactSummary, String> {
+async fn import_text(state: State<'_, AppState>, request: ImportTextRequest) -> Result<ArtifactSummary, String> {
     state
         .core
-        .import_text(
-            request.workspace_id,
-            request.title,
-            request.content,
-            request.language,
-        )
+        .import_text(request.workspace_id, request.title, request.content, request.language)
         .await
         .map_err(to_command_error)
 }
 
 #[tauri::command]
-async fn list_artifacts(
-    state: State<'_, AppState>,
-    workspace_id: String,
-) -> Result<Vec<ArtifactSummary>, String> {
-    state
-        .core
-        .list_artifacts(workspace_id)
-        .await
-        .map_err(to_command_error)
+async fn list_artifacts(state: State<'_, AppState>, workspace_id: String) -> Result<Vec<ArtifactSummary>, String> {
+    state.core.list_artifacts(workspace_id).await.map_err(to_command_error)
 }
 
 #[tauri::command]
-async fn get_artifact(
-    state: State<'_, AppState>,
-    artifact_id: String,
-) -> Result<ArtifactDetail, String> {
-    state
-        .core
-        .get_artifact(artifact_id)
-        .await
-        .map_err(to_command_error)
+async fn get_artifact(state: State<'_, AppState>, artifact_id: String) -> Result<ArtifactDetail, String> {
+    state.core.get_artifact(artifact_id).await.map_err(to_command_error)
 }
 
 #[tauri::command]
-async fn index_artifact(
-    state: State<'_, AppState>,
-    artifact_id: String,
-) -> Result<IndexingJobStatus, String> {
-    state
-        .core
-        .index_artifact(artifact_id)
-        .await
-        .map_err(to_command_error)
+async fn index_artifact(state: State<'_, AppState>, artifact_id: String) -> Result<IndexingJobStatus, String> {
+    state.core.index_artifact(artifact_id).await.map_err(to_command_error)
 }
 
 #[tauri::command]
-async fn index_workspace(
-    state: State<'_, AppState>,
-    workspace_id: String,
-) -> Result<IndexingJobStatus, String> {
-    state
-        .core
-        .index_workspace(workspace_id)
-        .await
-        .map_err(to_command_error)
+async fn index_workspace(state: State<'_, AppState>, workspace_id: String) -> Result<IndexingJobStatus, String> {
+    state.core.index_workspace(workspace_id).await.map_err(to_command_error)
 }
 
 #[tauri::command]
-async fn get_workspace_overview(
-    state: State<'_, AppState>,
-    workspace_id: String,
-) -> Result<WorkspaceOverview, String> {
+async fn get_workspace_overview(state: State<'_, AppState>, workspace_id: String) -> Result<WorkspaceOverview, String> {
     state
         .core
         .workspace_overview(workspace_id)
@@ -145,11 +98,7 @@ async fn create_memory_card(
     state: State<'_, AppState>,
     request: CreateMemoryCardRequest,
 ) -> Result<MemoryCard, String> {
-    state
-        .core
-        .create_memory_card(request)
-        .await
-        .map_err(to_command_error)
+    state.core.create_memory_card(request).await.map_err(to_command_error)
 }
 
 #[tauri::command]
@@ -157,18 +106,11 @@ async fn update_memory_card(
     state: State<'_, AppState>,
     request: UpdateMemoryCardRequest,
 ) -> Result<MemoryCard, String> {
-    state
-        .core
-        .update_memory_card(request)
-        .await
-        .map_err(to_command_error)
+    state.core.update_memory_card(request).await.map_err(to_command_error)
 }
 
 #[tauri::command]
-async fn list_memory_cards(
-    state: State<'_, AppState>,
-    workspace_id: String,
-) -> Result<Vec<MemoryCardSummary>, String> {
+async fn list_memory_cards(state: State<'_, AppState>, workspace_id: String) -> Result<Vec<MemoryCardSummary>, String> {
     state
         .core
         .list_memory_cards(workspace_id)
@@ -190,48 +132,23 @@ async fn search_memory_cards(
 }
 
 #[tauri::command]
-async fn get_memory_card(
-    state: State<'_, AppState>,
-    card_id: String,
-) -> Result<MemoryCardDetail, String> {
-    state
-        .core
-        .get_memory_card(card_id)
-        .await
-        .map_err(to_command_error)
+async fn get_memory_card(state: State<'_, AppState>, card_id: String) -> Result<MemoryCardDetail, String> {
+    state.core.get_memory_card(card_id).await.map_err(to_command_error)
 }
 
 #[tauri::command]
 async fn export_memory_card(state: State<'_, AppState>, card_id: String) -> Result<String, String> {
-    state
-        .core
-        .export_memory_card(card_id)
-        .await
-        .map_err(to_command_error)
+    state.core.export_memory_card(card_id).await.map_err(to_command_error)
 }
 
 #[tauri::command]
-async fn search_workspace(
-    state: State<'_, AppState>,
-    request: SearchRequest,
-) -> Result<Vec<SearchResult>, String> {
-    state
-        .core
-        .search_workspace(request)
-        .await
-        .map_err(to_command_error)
+async fn search_workspace(state: State<'_, AppState>, request: SearchRequest) -> Result<Vec<SearchResult>, String> {
+    state.core.search_workspace(request).await.map_err(to_command_error)
 }
 
 #[tauri::command]
-async fn list_symbols(
-    state: State<'_, AppState>,
-    artifact_id: String,
-) -> Result<Vec<Symbol>, String> {
-    state
-        .core
-        .list_symbols(artifact_id)
-        .await
-        .map_err(to_command_error)
+async fn list_symbols(state: State<'_, AppState>, artifact_id: String) -> Result<Vec<Symbol>, String> {
+    state.core.list_symbols(artifact_id).await.map_err(to_command_error)
 }
 
 #[tauri::command]
@@ -272,15 +189,8 @@ async fn save_provider_settings(
 }
 
 #[tauri::command]
-async fn test_provider(
-    state: State<'_, AppState>,
-    provider_id: String,
-) -> Result<ProviderTestResult, String> {
-    state
-        .core
-        .test_provider(provider_id)
-        .await
-        .map_err(to_command_error)
+async fn test_provider(state: State<'_, AppState>, provider_id: String) -> Result<ProviderTestResult, String> {
+    state.core.test_provider(provider_id).await.map_err(to_command_error)
 }
 
 #[tauri::command]
@@ -323,15 +233,8 @@ async fn embed_workspace(
 }
 
 #[tauri::command]
-async fn ask_workspace(
-    state: State<'_, AppState>,
-    request: AskRequest,
-) -> Result<AskAnswer, String> {
-    state
-        .core
-        .ask_workspace(request)
-        .await
-        .map_err(to_command_error)
+async fn ask_workspace(state: State<'_, AppState>, request: AskRequest) -> Result<AskAnswer, String> {
+    state.core.ask_workspace(request).await.map_err(to_command_error)
 }
 
 pub fn run() {
@@ -379,9 +282,7 @@ pub fn run() {
 }
 
 fn resolve_data_dir(app: &tauri::App) -> PathBuf {
-    app.path()
-        .app_data_dir()
-        .unwrap_or_else(|_| fallback_data_dir())
+    app.path().app_data_dir().unwrap_or_else(|_| fallback_data_dir())
 }
 
 fn fallback_data_dir() -> PathBuf {

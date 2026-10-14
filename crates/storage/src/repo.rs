@@ -3,18 +3,16 @@
 
 use std::collections::HashMap;
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use chrono::Utc;
-use repomemo_domain::{
-    ArtifactSummary, ArtifactType, IndexingJobStatus, RepoFile, Source, SourceType,
-};
+use repomemo_domain::{ArtifactSummary, ArtifactType, IndexingJobStatus, RepoFile, Source, SourceType};
 use serde_json::Value;
 use sqlx::Row;
 use uuid::Uuid;
 
 use super::{
-    artifact_type_from_db, artifact_type_to_db, source_type_to_db, ArtifactSummaryRow,
-    IndexingJobRow, SourceRow, StorageEngine,
+    artifact_type_from_db, artifact_type_to_db, source_type_to_db, ArtifactSummaryRow, IndexingJobRow, SourceRow,
+    StorageEngine,
 };
 
 /// A row of `repo_files`.
@@ -62,10 +60,10 @@ impl StorageEngine {
         .bind(workspace_id)
         .bind(source_type_to_db(&SourceType::GitRepo))
         .bind(root_path)
-        .fetch_one(&self.pool)
+        .fetch_one(self.reader())
         .await?;
         if existing > 0 {
-            bail!("This repository is already connected to the workspace.");
+            repomemo_domain::bail_conflict!("This repository is already connected to the workspace.");
         }
 
         let id = Uuid::new_v4().to_string();
@@ -89,15 +87,13 @@ impl StorageEngine {
     }
 
     pub async fn get_source(&self, source_id: &str) -> Result<Source> {
-        let row = sqlx::query_as::<_, SourceRow>(&format!(
-            "SELECT {SOURCE_COLUMNS} FROM sources WHERE id = ?1"
-        ))
-        .bind(source_id)
-        .fetch_optional(&self.pool)
-        .await?;
+        let row = sqlx::query_as::<_, SourceRow>(&format!("SELECT {SOURCE_COLUMNS} FROM sources WHERE id = ?1"))
+            .bind(source_id)
+            .fetch_optional(self.reader())
+            .await?;
         match row {
             Some(row) => Ok(Source::from(row)),
-            None => bail!("Source was not found."),
+            None => repomemo_domain::bail_not_found!("Source was not found."),
         }
     }
 
@@ -112,7 +108,7 @@ impl StorageEngine {
         ))
         .bind(workspace_id)
         .bind(source_type_to_db(&source_type))
-        .fetch_all(&self.pool)
+        .fetch_all(self.reader())
         .await?;
         Ok(rows.into_iter().map(Source::from).collect())
     }
@@ -186,7 +182,7 @@ impl StorageEngine {
             "SELECT path, artifact_id, blob_sha, commit_sha, removed_at FROM repo_files WHERE source_id = ?1",
         )
         .bind(source_id)
-        .fetch_all(&self.pool)
+        .fetch_all(self.reader())
         .await?;
         Ok(rows
             .into_iter()
@@ -202,12 +198,7 @@ impl StorageEngine {
 
     /// Stores a file that is new to the repository source as a new artifact.
     /// The content blob must already be stored. Returns the artifact id.
-    pub async fn add_repo_file(
-        &self,
-        workspace_id: &str,
-        source_id: &str,
-        file: RepoFileWrite,
-    ) -> Result<String> {
+    pub async fn add_repo_file(&self, workspace_id: &str, source_id: &str, file: RepoFileWrite) -> Result<String> {
         let id = Uuid::new_v4().to_string();
         let now = Utc::now().to_rfc3339();
         let mut tx = self.pool.begin().await?;
@@ -267,12 +258,11 @@ impl StorageEngine {
     ) -> Result<()> {
         let now = Utc::now().to_rfc3339();
         let mut tx = self.pool.begin().await?;
-        let (workspace_id, previous_hash) = sqlx::query_as::<_, (String, String)>(
-            "SELECT workspace_id, content_hash FROM artifacts WHERE id = ?1",
-        )
-        .bind(artifact_id)
-        .fetch_one(&mut *tx)
-        .await?;
+        let (workspace_id, previous_hash) =
+            sqlx::query_as::<_, (String, String)>("SELECT workspace_id, content_hash FROM artifacts WHERE id = ?1")
+                .bind(artifact_id)
+                .fetch_one(&mut *tx)
+                .await?;
         let content_changed = previous_hash != file.content_hash;
 
         sqlx::query(
@@ -358,12 +348,7 @@ impl StorageEngine {
     /// Marks a file that left the repository tree. The artifact is kept for
     /// the comments and memory cards that point at it, but its chunks are
     /// dropped so search and Ask stop returning code that no longer exists.
-    pub async fn remove_repo_file(
-        &self,
-        source_id: &str,
-        path: &str,
-        commit_sha: &str,
-    ) -> Result<()> {
+    pub async fn remove_repo_file(&self, source_id: &str, path: &str, commit_sha: &str) -> Result<()> {
         let now = Utc::now().to_rfc3339();
         let mut tx = self.pool.begin().await?;
         let Some((artifact_id, workspace_id)) = sqlx::query_as::<_, (String, String)>(
@@ -448,16 +433,13 @@ impl StorageEngine {
         )
         .bind(source_id)
         .bind(current_index_version)
-        .fetch_all(&self.pool)
+        .fetch_all(self.reader())
         .await?;
         Ok(rows.into_iter().map(ArtifactSummary::from).collect())
     }
 
     /// `source id -> (files in the tree, of which indexed)` for a workspace.
-    pub async fn repo_source_file_counts(
-        &self,
-        workspace_id: &str,
-    ) -> Result<HashMap<String, (i64, i64)>> {
+    pub async fn repo_source_file_counts(&self, workspace_id: &str) -> Result<HashMap<String, (i64, i64)>> {
         let rows = sqlx::query(
             r#"
             SELECT repo_files.source_id,
@@ -469,7 +451,7 @@ impl StorageEngine {
             "#,
         )
         .bind(workspace_id)
-        .fetch_all(&self.pool)
+        .fetch_all(self.reader())
         .await?;
         Ok(rows
             .into_iter()
@@ -497,7 +479,7 @@ impl StorageEngine {
             "#,
         )
         .bind(source_id)
-        .fetch_all(&self.pool)
+        .fetch_all(self.reader())
         .await?;
         Ok(rows
             .into_iter()
@@ -528,7 +510,7 @@ impl StorageEngine {
             "#,
         )
         .bind(workspace_id)
-        .fetch_all(&self.pool)
+        .fetch_all(self.reader())
         .await?;
         Ok(rows.into_iter().collect())
     }
@@ -609,16 +591,12 @@ impl StorageEngine {
             "#,
         )
         .bind(artifact_id)
-        .fetch_optional(&self.pool)
+        .fetch_optional(self.reader())
         .await?)
     }
 
     /// The most recent job of a kind for a source.
-    pub async fn latest_source_job(
-        &self,
-        source_id: &str,
-        kind: &str,
-    ) -> Result<Option<IndexingJobStatus>> {
+    pub async fn latest_source_job(&self, source_id: &str, kind: &str) -> Result<Option<IndexingJobStatus>> {
         let row = sqlx::query_as::<_, IndexingJobRow>(
             r#"
             SELECT id, workspace_id, source_id, kind, status, stage, progress_current,
@@ -631,7 +609,7 @@ impl StorageEngine {
         )
         .bind(source_id)
         .bind(kind)
-        .fetch_optional(&self.pool)
+        .fetch_optional(self.reader())
         .await?;
         Ok(row.map(IndexingJobStatus::from))
     }
@@ -673,13 +651,11 @@ async fn set_system_lifecycle(
     action: &str,
     now: &str,
 ) -> Result<()> {
-    let current = sqlx::query_scalar::<_, String>(
-        "SELECT status FROM artifact_lifecycle WHERE artifact_id = ?1",
-    )
-    .bind(artifact_id)
-    .fetch_optional(&mut **tx)
-    .await?
-    .unwrap_or_else(|| "active".to_owned());
+    let current = sqlx::query_scalar::<_, String>("SELECT status FROM artifact_lifecycle WHERE artifact_id = ?1")
+        .bind(artifact_id)
+        .fetch_optional(&mut **tx)
+        .await?
+        .unwrap_or_else(|| "active".to_owned());
     if !from.contains(&current.as_str()) || current == to {
         return Ok(());
     }

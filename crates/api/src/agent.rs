@@ -3,11 +3,11 @@
 //! enabled provider, and then run over the existing search, summary and ask
 //! flows. Anything that matches no capability gets a plain reply.
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use repomemo_ai::{provider_from_settings, AiProvider, GenerateRequest};
 use repomemo_domain::{
-    AgentCapability, AgentCapabilityInfo, AgentMessage, AgentReply, AgentRequest, AgentRouting,
-    ArtifactSummary, AskRequest, SearchRequest,
+    AgentCapability, AgentCapabilityInfo, AgentMessage, AgentReply, AgentRequest, AgentRouting, ArtifactSummary,
+    AskRequest, SearchRequest,
 };
 use serde_json::{json, Value};
 
@@ -87,14 +87,41 @@ const POLITE_PREFIXES: &[&str] = &[
     "help me",
 ];
 const QUESTION_WORDS: &[&str] = &[
-    "what", "why", "how", "when", "who", "whom", "whose", "which", "where", "does", "do", "did",
-    "is", "are", "was", "were", "can", "could", "should", "would", "will", "has", "have",
-    "explain", "describe", "tell me",
+    "what", "why", "how", "when", "who", "whom", "whose", "which", "where", "does", "do", "did", "is", "are", "was",
+    "were", "can", "could", "should", "would", "will", "has", "have", "explain", "describe", "tell me",
 ];
 const FILLER_WORDS: &[&str] = &[
-    "me", "the", "a", "an", "all", "my", "our", "of", "for", "about", "on", "to", "up", "file",
-    "files", "document", "documents", "doc", "docs", "named", "called", "titled", "that",
-    "which", "with", "containing", "contain", "contains", "mention", "mentions", "mentioning",
+    "me",
+    "the",
+    "a",
+    "an",
+    "all",
+    "my",
+    "our",
+    "of",
+    "for",
+    "about",
+    "on",
+    "to",
+    "up",
+    "file",
+    "files",
+    "document",
+    "documents",
+    "doc",
+    "docs",
+    "named",
+    "called",
+    "titled",
+    "that",
+    "which",
+    "with",
+    "containing",
+    "contain",
+    "contains",
+    "mention",
+    "mentions",
+    "mentioning",
     "please",
 ];
 const WORKSPACE_REFERENCES: &[&str] = &[
@@ -195,23 +222,21 @@ pub fn agent_conversation_title(label: &str) -> String {
 fn requires_ai(capability: AgentCapability) -> bool {
     matches!(
         capability,
-        AgentCapability::SummarizeFile
-            | AgentCapability::AskQuestion
-            | AgentCapability::WorkspaceOverview
+        AgentCapability::SummarizeFile | AgentCapability::AskQuestion | AgentCapability::WorkspaceOverview
     )
 }
 
 impl RepoMemoCore {
     pub async fn run_agent(&self, request: AgentRequest) -> Result<AgentReply> {
         if request.workspace_id.trim().is_empty() {
-            bail!("Workspace id is required.");
+            repomemo_domain::bail_invalid!("Workspace id is required.");
         }
         let message = request.message.trim();
         if message.is_empty() && request.capability.is_none() {
-            bail!("A message is required.");
+            repomemo_domain::bail_invalid!("A message is required.");
         }
         if message.chars().count() > MAX_MESSAGE_CHARS {
-            bail!("Messages must be between 1 and {MAX_MESSAGE_CHARS} characters.");
+            repomemo_domain::bail_invalid!("Messages must be between 1 and {MAX_MESSAGE_CHARS} characters.");
         }
 
         let mut warnings = Vec::new();
@@ -280,7 +305,7 @@ impl RepoMemoCore {
     ) -> Result<Option<(AgentCapability, String)>> {
         let settings = self.storage.get_provider_settings(provider_id).await?;
         if !settings.enabled || settings.workspace_id.as_deref() != Some(workspace_id) {
-            bail!("The selected provider is not enabled for this workspace.");
+            repomemo_domain::bail_invalid!("The selected provider is not enabled for this workspace.");
         }
         let provider = provider_from_settings(settings)?;
         let raw = provider
@@ -296,7 +321,9 @@ impl RepoMemoCore {
 
     async fn agent_find_files(&self, workspace_id: &str, subject: &str) -> Result<AgentReply> {
         if subject.is_empty() {
-            return Ok(reply("Which file are you looking for? Give a name, part of a path, or an extension like `.pdf`."));
+            return Ok(reply(
+                "Which file are you looking for? Give a name, part of a path, or an extension like `.pdf`.",
+            ));
         }
         let matches = self.match_files(workspace_id, subject).await?;
         if matches.is_empty() {
@@ -338,7 +365,9 @@ impl RepoMemoCore {
         }
         let passages = self.search_passages(workspace_id, subject).await?;
         let mut result = reply(if passages.is_empty() {
-            format!("No indexed content mentions “{subject}”. Files that are still being indexed are not searchable yet.")
+            format!(
+                "No indexed content mentions “{subject}”. Files that are still being indexed are not searchable yet."
+            )
         } else {
             format!(
                 "{} indexed {} “{subject}”.",
@@ -356,19 +385,22 @@ impl RepoMemoCore {
             Some(artifact_id) => {
                 let detail = self.storage.get_artifact(artifact_id).await?;
                 if detail.summary.workspace_id != request.workspace_id {
-                    bail!("That file belongs to a different workspace.");
+                    repomemo_domain::bail_invalid!("That file belongs to a different workspace.");
                 }
                 detail.summary
             }
             None => {
                 if subject.is_empty() {
-                    return Ok(reply("Which file should I summarize? Give its name or part of its path."));
+                    return Ok(reply(
+                        "Which file should I summarize? Give its name or part of its path.",
+                    ));
                 }
                 let mut matches = self.match_files(&request.workspace_id, subject).await?;
-                let clear_winner = matches.len() == 1
-                    || (matches.len() > 1 && matches[0].exact && !matches[1].exact);
+                let clear_winner = matches.len() == 1 || (matches.len() > 1 && matches[0].exact && !matches[1].exact);
                 if matches.is_empty() {
-                    return Ok(reply(format!("No file name or path matches “{subject}”. Use Find files to look it up first.")));
+                    return Ok(reply(format!(
+                        "No file name or path matches “{subject}”. Use Find files to look it up first."
+                    )));
                 }
                 if !clear_winner {
                     let mut result = reply(format!("Several files match “{subject}”. Pick the one to summarize."));
@@ -425,11 +457,7 @@ impl RepoMemoCore {
         Ok(result)
     }
 
-    async fn search_passages(
-        &self,
-        workspace_id: &str,
-        query: &str,
-    ) -> Result<Vec<repomemo_domain::SearchResult>> {
+    async fn search_passages(&self, workspace_id: &str, query: &str) -> Result<Vec<repomemo_domain::SearchResult>> {
         self.search_workspace(SearchRequest {
             workspace_id: workspace_id.to_owned(),
             query: query.to_owned(),
@@ -512,9 +540,7 @@ fn extensions_for(term: &str) -> &'static [&'static str] {
         "excel" | "spreadsheet" => &[".xls", ".xlsx", ".csv"],
         "powerpoint" | "slide" | "presentation" => &[".ppt", ".pptx"],
         "pdf" => &[".pdf"],
-        "image" | "picture" | "screenshot" => {
-            &[".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp"]
-        }
+        "image" | "picture" | "screenshot" => &[".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp"],
         "email" | "mail" => &[".msg", ".eml"],
         _ => &[],
     }
@@ -555,9 +581,7 @@ pub(crate) fn route_by_rules(message: &str) -> Option<(AgentCapability, String)>
             subject.clear();
         }
         let names_a_file = lower.contains("file") || lower.contains("doc");
-        if (subject.is_empty() && !names_a_file)
-            || WORKSPACE_REFERENCES.contains(&subject.to_lowercase().as_str())
-        {
+        if (subject.is_empty() && !names_a_file) || WORKSPACE_REFERENCES.contains(&subject.to_lowercase().as_str()) {
             return Some((AgentCapability::WorkspaceOverview, String::new()));
         }
         return Some((AgentCapability::SummarizeFile, subject));
@@ -571,10 +595,7 @@ pub(crate) fn route_by_rules(message: &str) -> Option<(AgentCapability, String)>
     if let Some(rest) = after_phrase(text, &lower, FIND_PREFIXES, true) {
         return Some((AgentCapability::FindFiles, clean_subject(rest)));
     }
-    let is_question = lower.ends_with('?')
-        || QUESTION_WORDS
-            .iter()
-            .any(|word| starts_with_phrase(&lower, word));
+    let is_question = lower.ends_with('?') || QUESTION_WORDS.iter().any(|word| starts_with_phrase(&lower, word));
     is_question.then(|| (AgentCapability::AskQuestion, text.trim().to_owned()))
 }
 
@@ -582,10 +603,7 @@ fn strip_polite_prefix(text: &str) -> &str {
     let mut text = text.trim_start();
     loop {
         let lower = text.to_ascii_lowercase();
-        match POLITE_PREFIXES
-            .iter()
-            .find(|prefix| starts_with_phrase(&lower, prefix))
-        {
+        match POLITE_PREFIXES.iter().find(|prefix| starts_with_phrase(&lower, prefix)) {
             Some(prefix) => text = text[prefix.len()..].trim_start_matches([' ', ',']),
             None => return text,
         }
@@ -621,20 +639,14 @@ fn find_phrase(lower: &str, phrase: &str) -> Option<usize> {
 }
 
 fn is_boundary(lower: &str, index: usize) -> bool {
-    lower[index..]
-        .chars()
-        .next()
-        .map_or(true, |c| !c.is_alphanumeric())
+    lower[index..].chars().next().map_or(true, |c| !c.is_alphanumeric())
 }
 
 /// Drops quotes, trailing punctuation and filler words around the part of a
 /// request that names a file or search terms.
 pub(crate) fn clean_subject(raw: &str) -> String {
     const EDGE: &[char] = &[' ', ':', ',', '.', '?', '!', '"', '\'', '`', '“', '”', '‘', '’'];
-    let mut words = raw
-        .trim_matches(EDGE)
-        .split_whitespace()
-        .collect::<Vec<_>>();
+    let mut words = raw.trim_matches(EDGE).split_whitespace().collect::<Vec<_>>();
     let is_filler = |word: &str| FILLER_WORDS.contains(&word.to_ascii_lowercase().as_str());
     while words.first().is_some_and(|word| is_filler(word)) {
         words.remove(0);
@@ -681,32 +693,77 @@ mod tests {
 
     #[test]
     fn routes_file_lookups() {
-        assert_eq!(route("find the readme file"), Some((AgentCapability::FindFiles, "readme".to_owned())));
-        assert_eq!(route("Please locate all pdf files"), Some((AgentCapability::FindFiles, "pdf".to_owned())));
-        assert_eq!(route("where is config.yaml?"), Some((AgentCapability::FindFiles, "config.yaml".to_owned())));
+        assert_eq!(
+            route("find the readme file"),
+            Some((AgentCapability::FindFiles, "readme".to_owned()))
+        );
+        assert_eq!(
+            route("Please locate all pdf files"),
+            Some((AgentCapability::FindFiles, "pdf".to_owned()))
+        );
+        assert_eq!(
+            route("where is config.yaml?"),
+            Some((AgentCapability::FindFiles, "config.yaml".to_owned()))
+        );
     }
 
     #[test]
     fn routes_content_searches_before_lookups() {
-        assert_eq!(route("find mentions of retry budget"), Some((AgentCapability::SearchContent, "retry budget".to_owned())));
-        assert_eq!(route("search for \"JWT_ISSUER\""), Some((AgentCapability::SearchContent, "JWT_ISSUER".to_owned())));
-        assert_eq!(route("Which files mention LibreOffice?"), Some((AgentCapability::SearchContent, "LibreOffice".to_owned())));
+        assert_eq!(
+            route("find mentions of retry budget"),
+            Some((AgentCapability::SearchContent, "retry budget".to_owned()))
+        );
+        assert_eq!(
+            route("search for \"JWT_ISSUER\""),
+            Some((AgentCapability::SearchContent, "JWT_ISSUER".to_owned()))
+        );
+        assert_eq!(
+            route("Which files mention LibreOffice?"),
+            Some((AgentCapability::SearchContent, "LibreOffice".to_owned()))
+        );
     }
 
     #[test]
     fn routes_summaries_and_overviews() {
-        assert_eq!(route("Summarize ARCHITECTURE.md"), Some((AgentCapability::SummarizeFile, "ARCHITECTURE.md".to_owned())));
-        assert_eq!(route("can you give me a summary of the onboarding doc"), Some((AgentCapability::SummarizeFile, "onboarding".to_owned())));
-        assert_eq!(route("summarize this project"), Some((AgentCapability::WorkspaceOverview, String::new())));
-        assert_eq!(route("tl;dr"), Some((AgentCapability::WorkspaceOverview, String::new())));
-        assert_eq!(route("give me an overview"), Some((AgentCapability::WorkspaceOverview, String::new())));
-        assert_eq!(route("summarize this file"), Some((AgentCapability::SummarizeFile, String::new())));
+        assert_eq!(
+            route("Summarize ARCHITECTURE.md"),
+            Some((AgentCapability::SummarizeFile, "ARCHITECTURE.md".to_owned()))
+        );
+        assert_eq!(
+            route("can you give me a summary of the onboarding doc"),
+            Some((AgentCapability::SummarizeFile, "onboarding".to_owned()))
+        );
+        assert_eq!(
+            route("summarize this project"),
+            Some((AgentCapability::WorkspaceOverview, String::new()))
+        );
+        assert_eq!(
+            route("tl;dr"),
+            Some((AgentCapability::WorkspaceOverview, String::new()))
+        );
+        assert_eq!(
+            route("give me an overview"),
+            Some((AgentCapability::WorkspaceOverview, String::new()))
+        );
+        assert_eq!(
+            route("summarize this file"),
+            Some((AgentCapability::SummarizeFile, String::new()))
+        );
     }
 
     #[test]
     fn routes_questions_and_leaves_the_rest() {
-        assert_eq!(route("Why do uploads fail over 10 MiB?"), Some((AgentCapability::AskQuestion, "Why do uploads fail over 10 MiB?".to_owned())));
-        assert_eq!(route("the auth flow uses JWT?"), Some((AgentCapability::AskQuestion, "the auth flow uses JWT?".to_owned())));
+        assert_eq!(
+            route("Why do uploads fail over 10 MiB?"),
+            Some((
+                AgentCapability::AskQuestion,
+                "Why do uploads fail over 10 MiB?".to_owned()
+            ))
+        );
+        assert_eq!(
+            route("the auth flow uses JWT?"),
+            Some((AgentCapability::AskQuestion, "the auth flow uses JWT?".to_owned()))
+        );
         assert_eq!(route("write me a poem"), None);
         assert_eq!(route("hello"), None);
     }
@@ -721,11 +778,17 @@ mod tests {
     #[test]
     fn parses_model_routes_leniently() {
         assert_eq!(
-            parse_model_route("Sure! {\"capability\": \"find_files\", \"subject\": \"the deploy files\"}", "x"),
+            parse_model_route(
+                "Sure! {\"capability\": \"find_files\", \"subject\": \"the deploy files\"}",
+                "x"
+            ),
             Some((AgentCapability::FindFiles, "deploy".to_owned()))
         );
         assert_eq!(
-            parse_model_route("{\"capability\": \"ask_question\", \"subject\": \"\"}", "How is auth done?"),
+            parse_model_route(
+                "{\"capability\": \"ask_question\", \"subject\": \"\"}",
+                "How is auth done?"
+            ),
             Some((AgentCapability::AskQuestion, "How is auth done?".to_owned()))
         );
         assert_eq!(parse_model_route("{\"capability\": \"none\"}", "x"), None);
@@ -740,9 +803,18 @@ mod tests {
             artifact_id: artifact.map(str::to_owned),
         };
         assert_eq!(agent_turn_label(&picked(None, "  find readme ", None)), "find readme");
-        assert_eq!(agent_turn_label(&picked(Some(AgentCapability::WorkspaceOverview), "", None)), "Workspace overview");
-        assert_eq!(agent_turn_label(&picked(Some(AgentCapability::SummarizeFile), "README.md", Some("a1"))), "Summarize README.md");
-        assert_eq!(agent_conversation_title("Why do\n uploads   fail?"), "Why do uploads fail?");
+        assert_eq!(
+            agent_turn_label(&picked(Some(AgentCapability::WorkspaceOverview), "", None)),
+            "Workspace overview"
+        );
+        assert_eq!(
+            agent_turn_label(&picked(Some(AgentCapability::SummarizeFile), "README.md", Some("a1"))),
+            "Summarize README.md"
+        );
+        assert_eq!(
+            agent_conversation_title("Why do\n uploads   fail?"),
+            "Why do uploads fail?"
+        );
         let long = agent_conversation_title(&"é".repeat(200));
         assert_eq!(long.chars().count(), MAX_TITLE_CHARS);
         assert!(long.ends_with('…'));
@@ -751,7 +823,9 @@ mod tests {
     #[test]
     fn ai_capabilities_are_unavailable_without_a_provider() {
         let offline = agent_capabilities(false);
-        assert!(offline.iter().all(|capability| capability.available != capability.requires_ai));
+        assert!(offline
+            .iter()
+            .all(|capability| capability.available != capability.requires_ai));
         assert!(agent_capabilities(true).iter().all(|capability| capability.available));
     }
 }

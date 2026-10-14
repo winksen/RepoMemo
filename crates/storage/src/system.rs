@@ -3,11 +3,11 @@
 
 use std::collections::BTreeMap;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use chrono::Utc;
 use repomemo_domain::{
-    CountByLabel, IndexingJobStatus, Organization, SharedUser, SharedWorkspace, SystemAuditEvent,
-    SystemStatistics, SystemUser, SystemUserOrganization, SystemUserWorkspace, WorkspaceUsage,
+    CountByLabel, IndexingJobStatus, Organization, SharedUser, SharedWorkspace, SystemAuditEvent, SystemStatistics,
+    SystemUser, SystemUserOrganization, SystemUserWorkspace, WorkspaceUsage,
 };
 use serde_json::Value;
 use sqlx::Row;
@@ -43,7 +43,7 @@ impl StorageEngine {
             "SELECT session_version, is_system_admin, is_app_admin FROM users WHERE id = ?1",
         )
         .bind(user_id)
-        .fetch_optional(&self.pool)
+        .fetch_optional(self.reader())
         .await?;
         Ok(row.map(|(session_version, is_system_admin, is_app_admin)| UserAccess {
             session_version,
@@ -60,7 +60,7 @@ impl StorageEngine {
             .execute(&self.pool)
             .await?;
         if changed.rows_affected() == 0 {
-            bail!("User was not found.");
+            repomemo_domain::bail_not_found!("User was not found.");
         }
         Ok(())
     }
@@ -68,7 +68,7 @@ impl StorageEngine {
     pub async fn system_admin_count(&self) -> Result<i64> {
         Ok(
             sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM users WHERE is_system_admin = 1")
-                .fetch_one(&self.pool)
+                .fetch_one(self.reader())
                 .await?,
         )
     }
@@ -85,15 +85,16 @@ impl StorageEngine {
             .execute(&mut *tx)
             .await?;
         if changed.rows_affected() == 0 {
-            bail!("User was not found.");
+            repomemo_domain::bail_not_found!("User was not found.");
         }
         if !enabled {
-            let remaining =
-                sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM users WHERE is_system_admin = 1")
-                    .fetch_one(&mut *tx)
-                    .await?;
+            let remaining = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM users WHERE is_system_admin = 1")
+                .fetch_one(&mut *tx)
+                .await?;
             if remaining == 0 {
-                bail!("The last system administrator cannot be removed; grant the role to someone else first.");
+                repomemo_domain::bail_conflict!(
+                    "The last system administrator cannot be removed; grant the role to someone else first."
+                );
             }
         }
         tx.commit().await?;
@@ -108,13 +109,11 @@ impl StorageEngine {
             let Ok(email) = normalize_email(email) else {
                 continue;
             };
-            promoted += sqlx::query(
-                "UPDATE users SET is_system_admin = 1 WHERE email = ?1 AND is_system_admin = 0",
-            )
-            .bind(&email)
-            .execute(&self.pool)
-            .await?
-            .rows_affected();
+            promoted += sqlx::query("UPDATE users SET is_system_admin = 1 WHERE email = ?1 AND is_system_admin = 0")
+                .bind(&email)
+                .execute(&self.pool)
+                .await?
+                .rows_affected();
         }
         Ok(promoted)
     }
@@ -123,7 +122,7 @@ impl StorageEngine {
         Ok(
             sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM organizations WHERE id = ?1")
                 .bind(organization_id)
-                .fetch_one(&self.pool)
+                .fetch_one(self.reader())
                 .await?
                 > 0,
         )
@@ -143,16 +142,13 @@ impl StorageEngine {
             "#,
         )
         .bind(user_id)
-        .fetch_all(&self.pool)
+        .fetch_all(self.reader())
         .await?;
         Ok(rows.into_iter().map(Organization::from).collect())
     }
 
     /// Every workspace, with the role a system administrator holds in it.
-    pub async fn list_shared_workspaces_for_system_admin(
-        &self,
-        user_id: &str,
-    ) -> Result<Vec<SharedWorkspace>> {
+    pub async fn list_shared_workspaces_for_system_admin(&self, user_id: &str) -> Result<Vec<SharedWorkspace>> {
         let rows = sqlx::query_as::<_, SharedWorkspaceRow>(
             r#"
             SELECT w.id, w.name, w.created_at, w.updated_at, w.settings_json, wo.organization_id,
@@ -164,7 +160,7 @@ impl StorageEngine {
             "#,
         )
         .bind(user_id)
-        .fetch_all(&self.pool)
+        .fetch_all(self.reader())
         .await?;
         rows.into_iter().map(SharedWorkspace::try_from).collect()
     }
@@ -182,12 +178,12 @@ impl StorageEngine {
             "#,
         )
         .bind(&now)
-        .fetch_all(&self.pool)
+        .fetch_all(self.reader())
         .await?;
         let memberships = sqlx::query(
             "SELECT m.user_id, m.workspace_id, w.name, m.role, o.id AS organization_id, o.name AS organization_name FROM workspace_memberships m JOIN workspaces w ON w.id = m.workspace_id LEFT JOIN workspace_organizations wo ON wo.workspace_id = w.id LEFT JOIN organizations o ON o.id = wo.organization_id ORDER BY w.name COLLATE NOCASE ASC",
         )
-        .fetch_all(&self.pool)
+        .fetch_all(self.reader())
         .await?;
         let mut workspaces_by_user: BTreeMap<String, Vec<SystemUserWorkspace>> = BTreeMap::new();
         for row in memberships {
@@ -205,7 +201,7 @@ impl StorageEngine {
         let organization_memberships = sqlx::query(
             "SELECT m.user_id, o.id AS organization_id, o.name, m.role FROM organization_memberships m JOIN organizations o ON o.id = m.organization_id ORDER BY o.name COLLATE NOCASE ASC",
         )
-        .fetch_all(&self.pool)
+        .fetch_all(self.reader())
         .await?;
         let mut organizations_by_user: BTreeMap<String, Vec<SystemUserOrganization>> = BTreeMap::new();
         for row in organization_memberships {
@@ -244,19 +240,17 @@ impl StorageEngine {
     pub async fn system_statistics(&self) -> Result<SystemStatistics> {
         let now = Utc::now();
         let since = |days: i64| (now - chrono::Duration::days(days)).to_rfc3339();
-        let count = |sql: &'static str| async move {
-            sqlx::query_scalar::<_, i64>(sql).fetch_one(&self.pool).await
-        };
+        let count = |sql: &'static str| async move { sqlx::query_scalar::<_, i64>(sql).fetch_one(self.reader()).await };
         let active_since = |cutoff: String| async move {
             sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM users WHERE last_connected_at >= ?1")
                 .bind(cutoff)
-                .fetch_one(&self.pool)
+                .fetch_one(self.reader())
                 .await
         };
         let jobs_by_status = sqlx::query_as::<_, (String, i64)>(
             "SELECT status, COUNT(*) FROM indexing_jobs GROUP BY status ORDER BY status",
         )
-        .fetch_all(&self.pool)
+        .fetch_all(self.reader())
         .await?
         .into_iter()
         .map(|(label, count)| CountByLabel { label, count })
@@ -270,7 +264,7 @@ impl StorageEngine {
                 "SELECT COUNT(*) FROM refresh_tokens WHERE revoked_at IS NULL AND expires_at > ?1",
             )
             .bind(now.to_rfc3339())
-            .fetch_one(&self.pool)
+            .fetch_one(self.reader())
             .await?,
             organization_count: count("SELECT COUNT(*) FROM organizations").await?,
             workspace_count: count("SELECT COUNT(*) FROM workspaces").await?,
@@ -300,7 +294,7 @@ impl StorageEngine {
             "SELECT substr(created_at, 1, 10) AS day, COUNT(*) FROM workspace_activity WHERE created_at >= ?1 GROUP BY day ORDER BY day",
         )
         .bind(since)
-        .fetch_all(&self.pool)
+        .fetch_all(self.reader())
         .await?
         .into_iter()
         .map(|(label, count)| CountByLabel { label, count })
@@ -314,7 +308,7 @@ impl StorageEngine {
             "SELECT action, COUNT(*) AS total FROM workspace_activity WHERE created_at >= ?1 GROUP BY action ORDER BY total DESC, action",
         )
         .bind(since)
-        .fetch_all(&self.pool)
+        .fetch_all(self.reader())
         .await?
         .into_iter()
         .map(|(label, count)| CountByLabel { label, count })
@@ -333,7 +327,7 @@ impl StorageEngine {
         )
         .bind(since)
         .bind(limit.clamp(1, 100))
-        .fetch_all(&self.pool)
+        .fetch_all(self.reader())
         .await?
         .into_iter()
         .map(|(label, count)| CountByLabel { label, count })
@@ -359,7 +353,7 @@ impl StorageEngine {
             "#,
         )
         .bind(since)
-        .fetch_all(&self.pool)
+        .fetch_all(self.reader())
         .await?;
         Ok(rows
             .into_iter()
@@ -391,7 +385,7 @@ impl StorageEngine {
         builder.push_bind(limit.clamp(1, 500));
         Ok(builder
             .build_query_as::<IndexingJobRow>()
-            .fetch_all(&self.pool)
+            .fetch_all(self.reader())
             .await?
             .into_iter()
             .map(IndexingJobStatus::from)
@@ -401,7 +395,7 @@ impl StorageEngine {
     /// Workspace names by id, to label jobs and usage rows.
     pub async fn workspace_names(&self) -> Result<BTreeMap<String, String>> {
         Ok(sqlx::query_as::<_, (String, String)>("SELECT id, name FROM workspaces")
-            .fetch_all(&self.pool)
+            .fetch_all(self.reader())
             .await?
             .into_iter()
             .collect())
@@ -415,7 +409,7 @@ impl StorageEngine {
             ORDER BY s.key
             "#,
         )
-        .fetch_all(&self.pool)
+        .fetch_all(self.reader())
         .await?;
         Ok(rows
             .into_iter()
@@ -484,7 +478,7 @@ impl StorageEngine {
             "#,
         )
         .bind(limit.clamp(1, 1000))
-        .fetch_all(&self.pool)
+        .fetch_all(self.reader())
         .await?;
         Ok(rows
             .into_iter()
@@ -524,23 +518,44 @@ mod tests {
         let owner = storage.create_user("owner@example.com", "Owner", "hash").await.unwrap();
         let admin = storage.create_user("Admin@Example.com", "Admin", "hash").await.unwrap();
         let organization = storage.create_organization(&owner.id, "Team").await.unwrap();
-        storage.create_shared_workspace(&owner.id, &organization.id, "Ledger").await.unwrap();
+        storage
+            .create_shared_workspace(&owner.id, &organization.id, "Ledger")
+            .await
+            .unwrap();
 
         assert!(storage.list_organizations_for_user(&admin.id).await.unwrap().is_empty());
-        assert_eq!(storage.promote_system_admins(&["admin@example.com".to_owned(), "nobody@example.com".to_owned()]).await.unwrap(), 1);
+        assert_eq!(
+            storage
+                .promote_system_admins(&["admin@example.com".to_owned(), "nobody@example.com".to_owned()])
+                .await
+                .unwrap(),
+            1
+        );
         let access = storage.user_access(&admin.id).await.unwrap().unwrap();
         assert!(access.is_system_admin);
 
         let organizations = storage.list_organizations_for_system_admin(&admin.id).await.unwrap();
         assert_eq!(organizations.len(), 1);
         assert_eq!(organizations[0].role, repomemo_domain::OrganizationRole::Admin);
-        let workspaces = storage.list_shared_workspaces_for_system_admin(&admin.id).await.unwrap();
+        let workspaces = storage
+            .list_shared_workspaces_for_system_admin(&admin.id)
+            .await
+            .unwrap();
         assert_eq!(workspaces.len(), 1);
         assert!(matches!(workspaces[0].role, repomemo_domain::WorkspaceRole::Admin));
-        let owned = storage.list_shared_workspaces_for_system_admin(&owner.id).await.unwrap();
-        assert!(matches!(owned[0].role, repomemo_domain::WorkspaceRole::Owner), "owners stay owners");
+        let owned = storage
+            .list_shared_workspaces_for_system_admin(&owner.id)
+            .await
+            .unwrap();
+        assert!(
+            matches!(owned[0].role, repomemo_domain::WorkspaceRole::Owner),
+            "owners stay owners"
+        );
 
-        assert!(storage.set_system_admin(&admin.id, false).await.is_err(), "the last one stays");
+        assert!(
+            storage.set_system_admin(&admin.id, false).await.is_err(),
+            "the last one stays"
+        );
         storage.set_system_admin(&owner.id, true).await.unwrap();
         storage.set_system_admin(&admin.id, false).await.unwrap();
         assert_eq!(storage.system_admin_count().await.unwrap(), 1);
@@ -549,19 +564,32 @@ mod tests {
         assert_eq!(users.len(), 2);
         assert!(users[0].is_system_admin);
         let statistics = storage.system_statistics().await.unwrap();
-        assert_eq!((statistics.user_count, statistics.organization_count, statistics.workspace_count), (2, 1, 1));
+        assert_eq!(
+            (
+                statistics.user_count,
+                statistics.organization_count,
+                statistics.workspace_count
+            ),
+            (2, 1, 1)
+        );
         let usage = storage.system_workspace_usage("1970-01-01T00:00:00Z").await.unwrap();
         assert_eq!(usage[0].member_count, 1);
         assert_eq!(usage[0].activity_last_30_days, 1, "workspace creation is recorded");
 
-        storage.set_system_setting("allow_registration", &json!(false), Some(&owner.id)).await.unwrap();
+        storage
+            .set_system_setting("allow_registration", &json!(false), Some(&owner.id))
+            .await
+            .unwrap();
         let settings = storage.list_system_settings().await.unwrap();
         assert_eq!(settings[0].value, json!(false));
         assert_eq!(settings[0].updated_by.as_ref().unwrap().id, owner.id);
         assert!(storage.delete_system_setting("allow_registration").await.unwrap());
         assert!(storage.list_system_settings().await.unwrap().is_empty());
 
-        storage.record_system_event(Some(&owner.id), "test", "Something happened.").await.unwrap();
+        storage
+            .record_system_event(Some(&owner.id), "test", "Something happened.")
+            .await
+            .unwrap();
         let events = storage.list_system_events(10).await.unwrap();
         assert_eq!(events[0].actor.as_ref().unwrap().display_name, "Owner");
 

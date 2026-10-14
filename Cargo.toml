@@ -9,7 +9,6 @@ members = [
   "crates/storage",
   "crates/api",
   "apps/server",
-  "apps/worker",
   "apps/console",
   "apps/desktop/src-tauri"
 ]
@@ -19,7 +18,7 @@ resolver = "2"
 # The product version: the server reports it (System › Overview, the console).
 # Set it everywhere at once with `npm run version:set -- <version>`; CI checks
 # that Cargo.toml, Cargo.lock, package.json and tauri.conf.json agree.
-version = "0.1.70"
+version = "0.1.71"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/repomemo/repomemo"
@@ -34,7 +33,7 @@ chrono = { version = "0.4", features = ["serde"] }
 calamine = { version = "0.36", default-features = false }
 cfb = "0.7"
 flate2 = "1.1"
-quick-xml = "0.39"
+quick-xml = "0.41"
 ring = "0.17"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 hex = "0.4"

@@ -62,11 +62,7 @@ pub struct RepoFileKind {
 
 /// Decides from the path and size whether a tracked file is kept. Returns the
 /// reason when it is skipped.
-pub fn classify_repo_file(
-    path: &str,
-    size_bytes: u64,
-    rules: &RepoFileRules,
-) -> Result<RepoFileKind, String> {
+pub fn classify_repo_file(path: &str, size_bytes: u64, rules: &RepoFileRules) -> Result<RepoFileKind, String> {
     if !rules.include.is_empty() && !rules.include.iter().any(|pattern| pattern_matches(pattern, path)) {
         return Err("not matched by the include patterns".to_owned());
     }

@@ -18,7 +18,9 @@ impl Paint {
     pub fn detect() -> Self {
         use std::io::IsTerminal;
         let wanted = std::io::stdout().is_terminal() && std::env::var_os("NO_COLOR").is_none();
-        Self { on: wanted && ansi_supported() }
+        Self {
+            on: wanted && ansi_supported(),
+        }
     }
 
     pub fn enabled(&self) -> bool {
@@ -26,7 +28,11 @@ impl Paint {
     }
 
     fn wrap(&self, code: &str, text: &str) -> String {
-        if self.on { format!("\x1b[{code}m{text}\x1b[0m") } else { text.to_owned() }
+        if self.on {
+            format!("\x1b[{code}m{text}\x1b[0m")
+        } else {
+            text.to_owned()
+        }
     }
 
     /// The RepoMemo green, for the logo and the prompt.
@@ -63,7 +69,11 @@ fn ansi_supported() -> bool {
 
 /// The logo and tagline, shown as the console opens.
 pub fn banner(paint: &Paint) -> String {
-    let logo = CONSOLE_BANNER.lines().map(|line| paint.accent(line)).collect::<Vec<_>>().join("\n");
+    let logo = CONSOLE_BANNER
+        .lines()
+        .map(|line| paint.accent(line))
+        .collect::<Vec<_>>()
+        .join("\n");
     format!("{logo}\n{}\n", paint.muted(CONSOLE_TAGLINE))
 }
 
@@ -94,7 +104,12 @@ pub fn answer(paint: &Paint, response: &Value) -> String {
         Some("table") => {
             let columns = response["view"]["columns"]
                 .as_array()
-                .map(|columns| columns.iter().filter_map(|column| column.as_str().map(str::to_owned)).collect::<Vec<_>>())
+                .map(|columns| {
+                    columns
+                        .iter()
+                        .filter_map(|column| column.as_str().map(str::to_owned))
+                        .collect::<Vec<_>>()
+                })
                 .unwrap_or_default();
             out.push_str(&table(paint, &columns, data));
         }
@@ -133,7 +148,12 @@ fn pad(text: &str, to: usize) -> String {
 fn facts(paint: &Paint, data: &Value) -> String {
     let pairs = data
         .as_array()
-        .map(|pairs| pairs.iter().map(|pair| (cell(&pair[0]), cell(&pair[1]))).collect::<Vec<_>>())
+        .map(|pairs| {
+            pairs
+                .iter()
+                .map(|pair| (cell(&pair[0]), cell(&pair[1])))
+                .collect::<Vec<_>>()
+        })
         .unwrap_or_default();
     let label_width = pairs.iter().map(|(label, _)| width(label)).max().unwrap_or(0);
     pairs
@@ -147,19 +167,40 @@ fn table(paint: &Paint, columns: &[String], data: &Value) -> String {
         .as_array()
         .map(|rows| {
             rows.iter()
-                .map(|row| columns.iter().map(|column| clip(cell(&row[column.as_str()]), MAX_CELL)).collect::<Vec<_>>())
+                .map(|row| {
+                    columns
+                        .iter()
+                        .map(|column| clip(cell(&row[column.as_str()]), MAX_CELL))
+                        .collect::<Vec<_>>()
+                })
                 .collect::<Vec<_>>()
         })
         .unwrap_or_default();
     if rows.is_empty() {
         return String::new();
     }
-    let headers = columns.iter().map(|column| column.replace('_', " ")).collect::<Vec<_>>();
+    let headers = columns
+        .iter()
+        .map(|column| column.replace('_', " "))
+        .collect::<Vec<_>>();
     let widths = (0..columns.len())
-        .map(|index| rows.iter().map(|row| width(&row[index])).chain([width(&headers[index])]).max().unwrap_or(0))
+        .map(|index| {
+            rows.iter()
+                .map(|row| width(&row[index]))
+                .chain([width(&headers[index])])
+                .max()
+                .unwrap_or(0)
+        })
         .collect::<Vec<_>>();
     let line = |cells: &[String]| {
-        cells.iter().zip(&widths).map(|(text, to)| pad(text, *to)).collect::<Vec<_>>().join("  ").trim_end().to_owned()
+        cells
+            .iter()
+            .zip(&widths)
+            .map(|(text, to)| pad(text, *to))
+            .collect::<Vec<_>>()
+            .join("  ")
+            .trim_end()
+            .to_owned()
     };
     let mut out = format!("  {}\n", paint.muted(&line(&headers)));
     for row in &rows {

@@ -10,11 +10,11 @@
 
 use std::collections::BTreeMap;
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use repomemo_ai::{provider_from_settings, AiProvider, GenerateRequest};
 use repomemo_domain::{
-    Citation, RepoCommit, RepoFile, RepoFolderShare, RepoKeyFile, RepoLanguageShare, RepoOverview,
-    RepoStack, RepoSummary,
+    Citation, RepoCommit, RepoFile, RepoFolderShare, RepoKeyFile, RepoLanguageShare, RepoOverview, RepoStack,
+    RepoSummary,
 };
 use serde_json::json;
 
@@ -34,14 +34,44 @@ const SUMMARY_FILE_CHARS: usize = 4_000;
 const SUMMARY_KEY_FILES: usize = 8;
 
 const MANIFESTS: &[&str] = &[
-    "Cargo.toml", "package.json", "pyproject.toml", "setup.py", "requirements.txt", "go.mod",
-    "pom.xml", "build.gradle", "build.gradle.kts", "Gemfile", "composer.json", "Dockerfile",
-    "docker-compose.yml", "docker-compose.yaml", "Makefile", "CMakeLists.txt",
+    "Cargo.toml",
+    "package.json",
+    "pyproject.toml",
+    "setup.py",
+    "requirements.txt",
+    "go.mod",
+    "pom.xml",
+    "build.gradle",
+    "build.gradle.kts",
+    "Gemfile",
+    "composer.json",
+    "Dockerfile",
+    "docker-compose.yml",
+    "docker-compose.yaml",
+    "Makefile",
+    "CMakeLists.txt",
 ];
 const ENTRY_POINTS: &[&str] = &[
-    "main.rs", "lib.rs", "main.py", "__main__.py", "app.py", "manage.py", "main.go", "index.ts",
-    "index.tsx", "index.js", "main.ts", "main.tsx", "main.js", "App.tsx", "App.jsx", "server.ts",
-    "server.js", "Program.cs", "Main.java", "Application.java",
+    "main.rs",
+    "lib.rs",
+    "main.py",
+    "__main__.py",
+    "app.py",
+    "manage.py",
+    "main.go",
+    "index.ts",
+    "index.tsx",
+    "index.js",
+    "main.ts",
+    "main.tsx",
+    "main.js",
+    "App.tsx",
+    "App.jsx",
+    "server.ts",
+    "server.js",
+    "Program.cs",
+    "Main.java",
+    "Application.java",
 ];
 
 /// Why a file is worth opening first, if it is.
@@ -230,7 +260,10 @@ pub(crate) fn overview_markdown(name: &str, root: &str, overview: &RepoOverview)
             .map(|technology| technology.name.as_str())
             .collect::<Vec<_>>()
             .join(", ");
-        out.push_str(&format!("- Project type: {} (built with {technologies})\n", stack.summary));
+        out.push_str(&format!(
+            "- Project type: {} (built with {technologies})\n",
+            stack.summary
+        ));
     }
     if !overview.languages.is_empty() {
         let languages = overview
@@ -294,14 +327,14 @@ impl RepoMemoCore {
         let detail = self.repo_detail(source_id).await?;
         let repository = detail.repository;
         let Some(overview) = detail.overview else {
-            bail!("Sync the repository before summarizing it.");
+            repomemo_domain::bail_invalid!("Sync the repository before summarizing it.");
         };
         let settings = self.storage.get_provider_settings(provider_id).await?;
         if !settings.enabled {
-            bail!("Enable this AI provider before summarizing. No content was sent.");
+            repomemo_domain::bail_invalid!("Enable this AI provider before summarizing. No content was sent.");
         }
         if settings.workspace_id.as_deref() != Some(repository.workspace_id.as_str()) {
-            bail!("The selected provider belongs to a different workspace.");
+            repomemo_domain::bail_invalid!("The selected provider belongs to a different workspace.");
         }
         let provider_name = settings.name.clone();
         let provider = provider_from_settings(settings)?;
@@ -407,13 +440,30 @@ mod tests {
             file("tools/d/Cargo.toml", Some("TOML"), 10),
             file("tools/e/Cargo.toml", Some("TOML"), 10),
         ];
-        let overview = compute_overview(commit, &files, Some("# Payments".to_owned()), Vec::new(), None, "now".to_owned());
+        let overview = compute_overview(
+            commit,
+            &files,
+            Some("# Payments".to_owned()),
+            Vec::new(),
+            None,
+            "now".to_owned(),
+        );
         assert_eq!(overview.file_count, 12);
         assert_eq!(overview.total_bytes, 8_000);
         assert_eq!(overview.languages[0].language, "Rust");
         assert_eq!(overview.languages[0].files, 2);
-        assert_eq!(overview.folders[0], RepoFolderShare { path: "tools".to_owned(), files: 5 });
-        let key = overview.key_files.iter().map(|file| (file.path.as_str(), file.role.as_str())).collect::<Vec<_>>();
+        assert_eq!(
+            overview.folders[0],
+            RepoFolderShare {
+                path: "tools".to_owned(),
+                files: 5
+            }
+        );
+        let key = overview
+            .key_files
+            .iter()
+            .map(|file| (file.path.as_str(), file.role.as_str()))
+            .collect::<Vec<_>>();
         // Five manifests at most: the root one first, so the entry point stays.
         assert_eq!(
             key,
@@ -440,7 +490,10 @@ mod tests {
     #[test]
     fn readme_excerpts_drop_html_and_images() {
         let text = "<p align=\"center\">\n  <img src=\"logo.svg\" />\n</p>\n\n<p align=\"center\">\n  <strong>Refunds, done right.</strong><br />\n</p>\n\n![badge](x.svg)\n\n# Payments\n\nIssues refunds.\n";
-        assert_eq!(readme_excerpt(text).as_deref(), Some("Refunds, done right.\n\n# Payments\n\nIssues refunds."));
+        assert_eq!(
+            readme_excerpt(text).as_deref(),
+            Some("Refunds, done right.\n\n# Payments\n\nIssues refunds.")
+        );
         assert_eq!(readme_excerpt("<div></div>\n"), None);
     }
 }

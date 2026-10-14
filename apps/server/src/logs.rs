@@ -34,8 +34,8 @@ use chrono::{NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use tracing::{field::Field, Event, Level, Subscriber};
 use tracing_subscriber::{
-    fmt, layer::Context, layer::SubscriberExt, registry::LookupSpan, reload,
-    util::SubscriberInitExt, EnvFilter, Layer, Registry,
+    fmt, layer::Context, layer::SubscriberExt, registry::LookupSpan, reload, util::SubscriberInitExt, EnvFilter, Layer,
+    Registry,
 };
 
 const GENERAL_CAPACITY: usize = 2_000;
@@ -61,8 +61,18 @@ pub struct LogCategory {
 
 /// Every category except "server", which is everything not listed here.
 pub const CATEGORIES: &[LogCategory] = &[
-    LogCategory { key: "security", label: "Security", targets: &["audit"], default_level: "info" },
-    LogCategory { key: "activity", label: "Workspace activity", targets: &["activity"], default_level: "info" },
+    LogCategory {
+        key: "security",
+        label: "Security",
+        targets: &["audit"],
+        default_level: "info",
+    },
+    LogCategory {
+        key: "activity",
+        label: "Workspace activity",
+        targets: &["activity"],
+        default_level: "info",
+    },
     LogCategory {
         key: "jobs",
         label: "Background jobs",
@@ -78,10 +88,30 @@ pub const CATEGORIES: &[LogCategory] = &[
         ],
         default_level: "info",
     },
-    LogCategory { key: "http", label: "HTTP requests", targets: &["tower_http"], default_level: "warn" },
-    LogCategory { key: "ai", label: "AI providers", targets: &["repomemo_ai", "reqwest"], default_level: "info" },
-    LogCategory { key: "database", label: "Database", targets: &["repomemo_storage", "sqlx"], default_level: "warn" },
-    LogCategory { key: "performance", label: "Performance", targets: &["timing"], default_level: "info" },
+    LogCategory {
+        key: "http",
+        label: "HTTP requests",
+        targets: &["tower_http"],
+        default_level: "warn",
+    },
+    LogCategory {
+        key: "ai",
+        label: "AI providers",
+        targets: &["repomemo_ai", "reqwest"],
+        default_level: "info",
+    },
+    LogCategory {
+        key: "database",
+        label: "Database",
+        targets: &["repomemo_storage", "sqlx"],
+        default_level: "warn",
+    },
+    LogCategory {
+        key: "performance",
+        label: "Performance",
+        targets: &["timing"],
+        default_level: "info",
+    },
 ];
 
 /// The category of everything else.
@@ -154,8 +184,16 @@ impl LogSettings {
     /// Defaults from the environment: `RUST_LOG`, `REPOMEMO_LOG_FORMAT`,
     /// `REPOMEMO_LOG_TO_FILE` and `REPOMEMO_LOG_RETENTION_DAYS`.
     pub fn from_env() -> Result<Self> {
-        let text = |name: &str| std::env::var(name).ok().map(|value| value.trim().to_owned()).filter(|value| !value.is_empty());
-        let mut settings = Self { env_filter: text("RUST_LOG"), ..Self::default() };
+        let text = |name: &str| {
+            std::env::var(name)
+                .ok()
+                .map(|value| value.trim().to_owned())
+                .filter(|value| !value.is_empty())
+        };
+        let mut settings = Self {
+            env_filter: text("RUST_LOG"),
+            ..Self::default()
+        };
         if let Some(format) = text("REPOMEMO_LOG_FORMAT") {
             settings.console_format = ConsoleFormat::parse(&format)
                 .with_context(|| format!("REPOMEMO_LOG_FORMAT must be text, compact or json, not {format}"))?;
@@ -172,7 +210,9 @@ impl LogSettings {
                 .parse::<i64>()
                 .ok()
                 .filter(|days| (0..=3650).contains(days))
-                .with_context(|| format!("REPOMEMO_LOG_RETENTION_DAYS must be a number of days from 0 to 3650, not {days}"))?;
+                .with_context(|| {
+                    format!("REPOMEMO_LOG_RETENTION_DAYS must be a number of days from 0 to 3650, not {days}")
+                })?;
         }
         Ok(settings)
     }
@@ -284,9 +324,13 @@ pub fn apply(settings: &LogSettings, data_dir: &Path) -> Result<()> {
 
 /// The filter in force, when the stack is installed.
 pub fn effective_filter() -> Option<String> {
-    CONTROL
-        .get()
-        .and_then(|control| control.applied.lock().ok().and_then(|applied| applied.as_ref().map(|(filter, _)| filter.clone())))
+    CONTROL.get().and_then(|control| {
+        control
+            .applied
+            .lock()
+            .ok()
+            .and_then(|applied| applied.as_ref().map(|(filter, _)| filter.clone()))
+    })
 }
 
 /// Whether events are being written to files now.
@@ -419,12 +463,26 @@ pub struct LogQuery {
 impl LogQuery {
     fn matches(&self, record: &LogRecord) -> bool {
         let min_rank = self.min_level.as_deref().map(level_rank).unwrap_or(u8::MAX);
-        let needle = self.contains.as_deref().map(str::to_lowercase).filter(|text| !text.is_empty());
-        let workspace = self.workspace_id.as_deref().filter(|id| !id.is_empty()).map(|id| format!("workspace_id={id}"));
+        let needle = self
+            .contains
+            .as_deref()
+            .map(str::to_lowercase)
+            .filter(|text| !text.is_empty());
+        let workspace = self
+            .workspace_id
+            .as_deref()
+            .filter(|id| !id.is_empty())
+            .map(|id| format!("workspace_id={id}"));
         level_rank(record.level) <= min_rank
             && self.after.map_or(true, |after| record.sequence > after)
-            && self.category.as_deref().filter(|category| !category.is_empty()).map_or(true, |category| record.category == category)
-            && workspace.map_or(true, |workspace| record.fields.split(' ').any(|field| field == workspace))
+            && self
+                .category
+                .as_deref()
+                .filter(|category| !category.is_empty())
+                .map_or(true, |category| record.category == category)
+            && workspace.map_or(true, |workspace| {
+                record.fields.split(' ').any(|field| field == workspace)
+            })
             && needle.map_or(true, |needle| {
                 record.message.to_lowercase().contains(&needle)
                     || record.target.to_lowercase().contains(&needle)
@@ -448,7 +506,7 @@ impl LogBuffer {
         };
         let mut records = collect(&self.audit);
         records.extend(collect(&self.general));
-        records.sort_by(|left, right| right.sequence.cmp(&left.sequence));
+        records.sort_by_key(|record| std::cmp::Reverse(record.sequence));
         records.truncate(query.limit());
         records
     }
@@ -495,7 +553,9 @@ struct FileSink {
 }
 
 fn file_sink() -> &'static FileSink {
-    FILE_SINK.get_or_init(|| FileSink { sender: Mutex::new(None) })
+    FILE_SINK.get_or_init(|| FileSink {
+        sender: Mutex::new(None),
+    })
 }
 
 /// Stops writing log files, so a detached environment's folder is left alone.
@@ -548,7 +608,11 @@ fn run_file_writer(dir: &Path, receiver: mpsc::Receiver<String>) {
                     if let Some((_, mut writer)) = current.take() {
                         let _ = writer.flush();
                     }
-                    match std::fs::OpenOptions::new().create(true).append(true).open(file_for_day(dir, today)) {
+                    match std::fs::OpenOptions::new()
+                        .create(true)
+                        .append(true)
+                        .open(file_for_day(dir, today))
+                    {
                         Ok(file) => current = Some((today, BufWriter::new(file))),
                         Err(error) => {
                             eprintln!("RepoMemo could not open its log file in {}: {error}", dir.display());
@@ -588,7 +652,10 @@ pub fn list_log_files(data_dir: &Path) -> Vec<LogFileInfo> {
                 .flatten()
                 .filter_map(|entry| {
                     let day = day_of_file(entry.file_name().to_str()?)?;
-                    Some(LogFileInfo { day: day.to_string(), bytes: entry.metadata().ok()?.len() })
+                    Some(LogFileInfo {
+                        day: day.to_string(),
+                        bytes: entry.metadata().ok()?.len(),
+                    })
                 })
                 .collect::<Vec<_>>()
         })
@@ -742,22 +809,63 @@ mod tests {
             tracing::info!(target: "repomemo_server::indexing", workspace_id = "ws-2", "Indexing");
         });
         let buffer = buffer().unwrap();
-        let all = buffer.query(&LogQuery { limit: 100, ..Default::default() });
+        let all = buffer.query(&LogQuery {
+            limit: 100,
+            ..Default::default()
+        });
         let indexed = all.iter().find(|record| record.message == "Indexed evidence").unwrap();
-        assert_eq!((indexed.level, indexed.category, indexed.fields.as_str()), ("info", "server", "count=3"));
+        assert_eq!(
+            (indexed.level, indexed.category, indexed.fields.as_str()),
+            ("info", "server", "count=3")
+        );
 
-        let security = buffer.query(&LogQuery { category: Some("security".to_owned()), limit: 100, ..Default::default() });
+        let security = buffer.query(&LogQuery {
+            category: Some("security".to_owned()),
+            limit: 100,
+            ..Default::default()
+        });
         assert!(!security.is_empty() && security.iter().all(|record| record.target == "audit"));
-        let jobs = buffer.query(&LogQuery { category: Some("jobs".to_owned()), limit: 100, ..Default::default() });
+        let jobs = buffer.query(&LogQuery {
+            category: Some("jobs".to_owned()),
+            limit: 100,
+            ..Default::default()
+        });
         assert!(jobs.iter().any(|record| record.message == "Indexing"));
-        let workspace = buffer.query(&LogQuery { workspace_id: Some("ws-1".to_owned()), limit: 100, ..Default::default() });
-        assert!(!workspace.is_empty() && workspace.iter().all(|record| record.fields.contains("workspace_id=ws-1")));
+        let workspace = buffer.query(&LogQuery {
+            workspace_id: Some("ws-1".to_owned()),
+            limit: 100,
+            ..Default::default()
+        });
+        assert!(
+            !workspace.is_empty()
+                && workspace
+                    .iter()
+                    .all(|record| record.fields.contains("workspace_id=ws-1"))
+        );
 
-        let warnings = buffer.query(&LogQuery { min_level: Some("warn".to_owned()), limit: 100, ..Default::default() });
-        assert!(warnings.iter().all(|record| record.level == "warn" || record.level == "error"));
-        assert!(!buffer.query(&LogQuery { contains: Some("INDEXED".to_owned()), limit: 100, ..Default::default() }).is_empty());
+        let warnings = buffer.query(&LogQuery {
+            min_level: Some("warn".to_owned()),
+            limit: 100,
+            ..Default::default()
+        });
+        assert!(warnings
+            .iter()
+            .all(|record| record.level == "warn" || record.level == "error"));
+        assert!(!buffer
+            .query(&LogQuery {
+                contains: Some("INDEXED".to_owned()),
+                limit: 100,
+                ..Default::default()
+            })
+            .is_empty());
         let newest = all.first().unwrap().sequence;
-        assert!(buffer.query(&LogQuery { after: Some(newest), limit: 100, ..Default::default() }).is_empty());
+        assert!(buffer
+            .query(&LogQuery {
+                after: Some(newest),
+                limit: 100,
+                ..Default::default()
+            })
+            .is_empty());
     }
 
     #[test]
@@ -777,7 +885,11 @@ mod tests {
         assert_eq!(category_of("repomemo_server::indexing"), "jobs");
         assert_eq!(category_of("tower_http::trace::on_response"), "http");
         assert_eq!(category_of("repomemo_server"), "server");
-        assert_eq!(category_of("auditor"), "server", "a prefix must end at a module boundary");
+        assert_eq!(
+            category_of("auditor"),
+            "server",
+            "a prefix must end at a module boundary"
+        );
     }
 
     #[test]
@@ -787,22 +899,58 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let today = Utc::now().date_naive();
         let line = |level: &str, target: &str, message: &str| {
-            serde_json::to_string(&FileLine { timestamp: Utc::now().to_rfc3339(), level: level.to_owned(), target: target.to_owned(), message: message.to_owned(), fields: String::new() }).unwrap()
+            serde_json::to_string(&FileLine {
+                timestamp: Utc::now().to_rfc3339(),
+                level: level.to_owned(),
+                target: target.to_owned(),
+                message: message.to_owned(),
+                fields: String::new(),
+            })
+            .unwrap()
         };
         std::fs::write(
             file_for_day(&dir, today),
-            [line("info", "repomemo_server", "first"), line("warn", "audit", "second"), "not json".to_owned()].join("\n"),
+            [
+                line("info", "repomemo_server", "first"),
+                line("warn", "audit", "second"),
+                "not json".to_owned(),
+            ]
+            .join("\n"),
         )
         .unwrap();
-        std::fs::write(file_for_day(&dir, today - chrono::Duration::days(30)), line("info", "x", "old")).unwrap();
+        std::fs::write(
+            file_for_day(&dir, today - chrono::Duration::days(30)),
+            line("info", "x", "old"),
+        )
+        .unwrap();
         std::fs::write(dir.join("unrelated.txt"), "ignored").unwrap();
 
         let files = list_log_files(&data_dir);
         assert_eq!(files.len(), 2);
         assert_eq!(files[0].day, today.to_string());
-        let records = read_log_file(&data_dir, &today.to_string(), &LogQuery { limit: 10, ..Default::default() }).unwrap();
-        assert_eq!(records.iter().map(|record| record.message.as_str()).collect::<Vec<_>>(), vec!["second", "first"]);
-        let security = read_log_file(&data_dir, &today.to_string(), &LogQuery { category: Some("security".to_owned()), limit: 10, ..Default::default() }).unwrap();
+        let records = read_log_file(
+            &data_dir,
+            &today.to_string(),
+            &LogQuery {
+                limit: 10,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            records.iter().map(|record| record.message.as_str()).collect::<Vec<_>>(),
+            vec!["second", "first"]
+        );
+        let security = read_log_file(
+            &data_dir,
+            &today.to_string(),
+            &LogQuery {
+                category: Some("security".to_owned()),
+                limit: 10,
+                ..Default::default()
+            },
+        )
+        .unwrap();
         assert_eq!(security.len(), 1);
         assert!(log_file_path(&data_dir, "../../etc").is_err());
         assert!(read_log_file(&data_dir, "2001-01-01", &LogQuery::default()).is_err());
@@ -816,10 +964,20 @@ mod tests {
     #[test]
     fn the_file_sink_writes_lines_to_the_day_file() {
         let data_dir = std::env::temp_dir().join(format!("repomemo-sink-{}", uuid::Uuid::new_v4()));
-        let sink = FileSink { sender: Mutex::new(None) };
+        let sink = FileSink {
+            sender: Mutex::new(None),
+        };
         sink.configure(Some(log_dir(&data_dir)));
         assert!(sink.is_active());
-        let record = LogRecord { sequence: 1, timestamp: Utc::now().to_rfc3339(), level: "info", target: "activity".to_owned(), category: "activity", message: "Stored".to_owned(), fields: "workspace_id=w".to_owned() };
+        let record = LogRecord {
+            sequence: 1,
+            timestamp: Utc::now().to_rfc3339(),
+            level: "info",
+            target: "activity".to_owned(),
+            category: "activity",
+            message: "Stored".to_owned(),
+            fields: "workspace_id=w".to_owned(),
+        };
         sink.write(&record);
         sink.configure(None);
         assert!(!sink.is_active());

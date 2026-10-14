@@ -13,9 +13,7 @@ use std::path::Path;
 use anyhow::{bail, Context, Result};
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::Reader;
-use repomemo_domain::{
-    DocumentPreview, EmailAttachmentInfo, SheetPreview, SlidePreview,
-};
+use repomemo_domain::{DocumentPreview, EmailAttachmentInfo, SheetPreview, SlidePreview};
 
 use super::{extension, extract_word_text, read_zip_member, zip_entry_names};
 
@@ -116,11 +114,7 @@ pub fn document_preview(path: &Path, bytes: &[u8]) -> DocumentPreview {
             let sheets = read_sheets(path, bytes)?;
             let total_sheets = sheets.len();
             Ok(DocumentPreview::Sheets {
-                sheets: sheets
-                    .into_iter()
-                    .take(PREVIEW_SHEETS)
-                    .map(sheet_preview)
-                    .collect(),
+                sheets: sheets.into_iter().take(PREVIEW_SHEETS).map(sheet_preview).collect(),
                 total_sheets,
             })
         }
@@ -194,7 +188,12 @@ fn local(name: &[u8]) -> &[u8] {
 fn attribute(event: &BytesStart, key: &[u8]) -> Option<String> {
     event.attributes().flatten().find_map(|attribute| {
         (local(attribute.key.as_ref()) == key)
-            .then(|| attribute.unescape_value().ok().map(|value| value.into_owned()))
+            .then(|| {
+                attribute
+                    .normalized_value(quick_xml::XmlVersion::Implicit1_0)
+                    .ok()
+                    .map(|value| value.into_owned())
+            })
             .flatten()
     })
 }
@@ -235,8 +234,8 @@ fn read_sheets(path: &Path, bytes: &[u8]) -> Result<Vec<ParsedSheet>> {
 
 fn read_legacy_xls(bytes: &[u8]) -> Result<Vec<ParsedSheet>> {
     use calamine::{Data, Reader as _, Xls};
-    let mut workbook: Xls<_> = calamine::open_workbook_from_rs(Cursor::new(bytes))
-        .context("could not read the legacy Excel workbook")?;
+    let mut workbook: Xls<_> =
+        calamine::open_workbook_from_rs(Cursor::new(bytes)).context("could not read the legacy Excel workbook")?;
     let mut sheets = Vec::new();
     for (name, range) in workbook.worksheets().into_iter().take(MAX_SHEETS) {
         let mut rows = Vec::new();
@@ -259,8 +258,7 @@ fn read_legacy_xls(bytes: &[u8]) -> Result<Vec<ParsedSheet>> {
 }
 
 fn read_xlsx(bytes: &[u8]) -> Result<Vec<ParsedSheet>> {
-    let workbook = read_zip_member(bytes, "xl/workbook.xml")
-        .context("this does not look like an Excel workbook")?;
+    let workbook = read_zip_member(bytes, "xl/workbook.xml").context("this does not look like an Excel workbook")?;
     let relationships = read_zip_member(bytes, "xl/_rels/workbook.xml.rels")?;
     let declared = workbook_sheets(&workbook)?;
     let targets = relationship_targets(&relationships)?;
@@ -299,12 +297,8 @@ fn workbook_sheets(xml: &[u8]) -> Result<Vec<(String, String)>> {
     let mut sheets = Vec::new();
     loop {
         match reader.read_event_into(&mut buffer) {
-            Ok(Event::Start(event)) | Ok(Event::Empty(event))
-                if local(event.name().as_ref()) == b"sheet" =>
-            {
-                if let (Some(name), Some(id)) =
-                    (attribute(&event, b"name"), attribute(&event, b"id"))
-                {
+            Ok(Event::Start(event)) | Ok(Event::Empty(event)) if local(event.name().as_ref()) == b"sheet" => {
+                if let (Some(name), Some(id)) = (attribute(&event, b"name"), attribute(&event, b"id")) {
                     sheets.push((name, id));
                 }
             }
@@ -323,12 +317,8 @@ fn relationship_targets(xml: &[u8]) -> Result<HashMap<String, String>> {
     let mut targets = HashMap::new();
     loop {
         match reader.read_event_into(&mut buffer) {
-            Ok(Event::Start(event)) | Ok(Event::Empty(event))
-                if local(event.name().as_ref()) == b"Relationship" =>
-            {
-                if let (Some(id), Some(target)) =
-                    (attribute(&event, b"Id"), attribute(&event, b"Target"))
-                {
+            Ok(Event::Start(event)) | Ok(Event::Empty(event)) if local(event.name().as_ref()) == b"Relationship" => {
+                if let (Some(id), Some(target)) = (attribute(&event, b"Id"), attribute(&event, b"Target")) {
                     targets.insert(id, target);
                 }
             }
@@ -369,12 +359,8 @@ fn shared_strings(xml: &[u8]) -> Result<Vec<String>> {
                 b"t" => in_text = false,
                 _ => {}
             },
-            Ok(Event::Text(text)) if in_text => {
-                current.push_str(&text.decode().context("invalid shared string")?)
-            }
-            Ok(Event::GeneralRef(reference)) if in_text => {
-                push_reference(&mut current, &reference)
-            }
+            Ok(Event::Text(text)) if in_text => current.push_str(&text.decode().context("invalid shared string")?),
+            Ok(Event::GeneralRef(reference)) if in_text => push_reference(&mut current, &reference),
             Ok(Event::Eof) => break,
             Err(error) => bail!("invalid sharedStrings.xml: {error}"),
             _ => {}
@@ -393,30 +379,24 @@ fn date_styles(xml: &[u8]) -> Vec<bool> {
     let mut in_cell_xfs = false;
     loop {
         match reader.read_event_into(&mut buffer) {
-            Ok(Event::Start(event)) | Ok(Event::Empty(event)) => {
-                match local(event.name().as_ref()) {
-                    b"numFmt" => {
-                        if let (Some(id), Some(code)) =
-                            (attribute(&event, b"numFmtId"), attribute(&event, b"formatCode"))
-                        {
-                            if let Ok(id) = id.parse() {
-                                custom.insert(id, code);
-                            }
+            Ok(Event::Start(event)) | Ok(Event::Empty(event)) => match local(event.name().as_ref()) {
+                b"numFmt" => {
+                    if let (Some(id), Some(code)) = (attribute(&event, b"numFmtId"), attribute(&event, b"formatCode")) {
+                        if let Ok(id) = id.parse() {
+                            custom.insert(id, code);
                         }
                     }
-                    b"cellXfs" => in_cell_xfs = true,
-                    b"xf" if in_cell_xfs => {
-                        let id = attribute(&event, b"numFmtId")
-                            .and_then(|value| value.parse::<u32>().ok())
-                            .unwrap_or(0);
-                        styles.push(is_date_format(id, custom.get(&id).map(String::as_str)));
-                    }
-                    _ => {}
                 }
-            }
-            Ok(Event::End(event)) if local(event.name().as_ref()) == b"cellXfs" => {
-                in_cell_xfs = false
-            }
+                b"cellXfs" => in_cell_xfs = true,
+                b"xf" if in_cell_xfs => {
+                    let id = attribute(&event, b"numFmtId")
+                        .and_then(|value| value.parse::<u32>().ok())
+                        .unwrap_or(0);
+                    styles.push(is_date_format(id, custom.get(&id).map(String::as_str)));
+                }
+                _ => {}
+            },
+            Ok(Event::End(event)) if local(event.name().as_ref()) == b"cellXfs" => in_cell_xfs = false,
             Ok(Event::Eof) | Err(_) => break,
             _ => {}
         }
@@ -444,8 +424,7 @@ fn is_date_format(id: u32, code: Option<&str>) -> bool {
             _ => stripped.push(character.to_ascii_lowercase()),
         }
     }
-    stripped.contains(['y', 'd', 'h', 's'])
-        || (stripped.contains('m') && !stripped.contains(['0', '#']))
+    stripped.contains(['y', 'd', 'h', 's']) || (stripped.contains('m') && !stripped.contains(['0', '#']))
 }
 
 fn column_index(reference: &str) -> Option<usize> {
@@ -463,11 +442,7 @@ fn column_index(reference: &str) -> Option<usize> {
     Some(index - 1)
 }
 
-fn parse_sheet_rows(
-    xml: &[u8],
-    shared: &[String],
-    date_styles: &[bool],
-) -> Result<Vec<Vec<String>>> {
+fn parse_sheet_rows(xml: &[u8], shared: &[String], date_styles: &[bool]) -> Result<Vec<Vec<String>>> {
     let mut reader = xml_reader(xml);
     let mut buffer = Vec::new();
     let mut rows: Vec<Vec<String>> = Vec::new();
@@ -510,9 +485,7 @@ fn parse_sheet_rows(
             Ok(Event::Text(text)) if in_value || in_inline_text => {
                 value.push_str(&text.decode().context("invalid cell text")?)
             }
-            Ok(Event::GeneralRef(reference)) if in_value || in_inline_text => {
-                push_reference(&mut value, &reference)
-            }
+            Ok(Event::GeneralRef(reference)) if in_value || in_inline_text => push_reference(&mut value, &reference),
             Ok(Event::End(event)) => match local(event.name().as_ref()) {
                 b"v" => in_value = false,
                 b"t" => in_inline_text = false,
@@ -607,21 +580,21 @@ fn civil_from_days(days: i64) -> (i64, u32, u32) {
     let shifted = days + 719_468;
     let era = shifted.div_euclid(146_097);
     let day_of_era = shifted.rem_euclid(146_097);
-    let year_of_era =
-        (day_of_era - day_of_era / 1460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
+    let year_of_era = (day_of_era - day_of_era / 1460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
     let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
     let month_part = (5 * day_of_year + 2) / 153;
     let day = (day_of_year - (153 * month_part + 2) / 5 + 1) as u32;
-    let month = if month_part < 10 { month_part + 3 } else { month_part - 9 } as u32;
+    let month = if month_part < 10 {
+        month_part + 3
+    } else {
+        month_part - 9
+    } as u32;
     let year = year_of_era + era * 400 + i64::from(month <= 2);
     (year, month, day)
 }
 
 fn trim_trailing_empty_rows(rows: &mut Vec<Vec<String>>) {
-    while rows
-        .last()
-        .is_some_and(|row| row.iter().all(String::is_empty))
-    {
+    while rows.last().is_some_and(|row| row.iter().all(String::is_empty)) {
         rows.pop();
     }
 }
@@ -738,9 +711,7 @@ fn slide_paragraphs(xml: &[u8], notes_page: bool) -> Result<(Option<String>, Vec
 
     loop {
         match reader.read_event_into(&mut buffer) {
-            Ok(Event::Start(event)) | Ok(Event::Empty(event))
-                if local(event.name().as_ref()) == b"ph" =>
-            {
+            Ok(Event::Start(event)) | Ok(Event::Empty(event)) if local(event.name().as_ref()) == b"ph" => {
                 placeholder = Some(attribute(&event, b"type").unwrap_or_else(|| "body".into()));
             }
             Ok(Event::Start(event)) => match local(event.name().as_ref()) {
@@ -753,9 +724,7 @@ fn slide_paragraphs(xml: &[u8], notes_page: bool) -> Result<(Option<String>, Vec
                 b"br" if in_paragraph => paragraph.push('\n'),
                 _ => {}
             },
-            Ok(Event::Text(text)) if in_text => {
-                paragraph.push_str(&text.decode().context("invalid slide text")?)
-            }
+            Ok(Event::Text(text)) if in_text => paragraph.push_str(&text.decode().context("invalid slide text")?),
             Ok(Event::GeneralRef(reference)) if in_text => push_reference(&mut paragraph, &reference),
             Ok(Event::End(event)) => match local(event.name().as_ref()) {
                 b"t" => in_text = false,
@@ -774,10 +743,7 @@ fn slide_paragraphs(xml: &[u8], notes_page: bool) -> Result<(Option<String>, Vec
                     };
                     if skipped {
                         // not slide content
-                    } else if !notes_page
-                        && matches!(kind, "title" | "ctrTitle")
-                        && title.is_none()
-                    {
+                    } else if !notes_page && matches!(kind, "title" | "ctrTitle") && title.is_none() {
                         title = Some(value);
                     } else {
                         paragraphs.push(value);
@@ -832,12 +798,8 @@ fn legacy_ppt_text(bytes: &[u8]) -> Result<String> {
     while offset + 8 <= data.len() {
         let version = data[offset] & 0x0f;
         let record_type = u16::from_le_bytes([data[offset + 2], data[offset + 3]]);
-        let length = u32::from_le_bytes([
-            data[offset + 4],
-            data[offset + 5],
-            data[offset + 6],
-            data[offset + 7],
-        ]) as usize;
+        let length =
+            u32::from_le_bytes([data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7]]) as usize;
         offset += 8;
         if version == 0x0f {
             continue; // a container: step inside it
@@ -941,10 +903,7 @@ fn onenote_text(bytes: &[u8]) -> String {
 
 fn flush_onenote_run(current: &mut Vec<u16>, runs: &mut Vec<String>) {
     if current.len() >= 8 {
-        let text = String::from_utf16_lossy(current)
-            .replace('\r', "\n")
-            .trim()
-            .to_owned();
+        let text = String::from_utf16_lossy(current).replace('\r', "\n").trim().to_owned();
         let letters = text.chars().filter(|c| c.is_alphabetic()).count();
         let total = text.chars().count();
         let has_word = text
@@ -1002,10 +961,7 @@ fn read_eml(bytes: &[u8]) -> Result<EmailData> {
             .unwrap_or_default()
     }
 
-    let body = message
-        .body_text(0)
-        .map(|text| text.into_owned())
-        .unwrap_or_default();
+    let body = message.body_text(0).map(|text| text.into_owned()).unwrap_or_default();
     let attachments = message
         .attachments()
         .map(|part| EmailAttachmentInfo {
@@ -1028,13 +984,12 @@ fn read_eml(bytes: &[u8]) -> Result<EmailData> {
 }
 
 fn read_msg(bytes: &[u8]) -> Result<EmailData> {
-    let mut compound = cfb::CompoundFile::open(Cursor::new(bytes))
-        .context("this does not look like an Outlook .msg file")?;
+    let mut compound =
+        cfb::CompoundFile::open(Cursor::new(bytes)).context("this does not look like an Outlook .msg file")?;
 
     let subject = msg_text(&mut compound, 0x0037);
     let sender_name = msg_text(&mut compound, 0x0C1A);
-    let sender_address =
-        msg_text(&mut compound, 0x5D01).or_else(|| msg_text(&mut compound, 0x0C1F));
+    let sender_address = msg_text(&mut compound, 0x5D01).or_else(|| msg_text(&mut compound, 0x0C1F));
     let to = msg_text(&mut compound, 0x0E04);
     let cc = msg_text(&mut compound, 0x0E03);
     let mut body = msg_text(&mut compound, 0x1000).unwrap_or_default();
@@ -1047,9 +1002,7 @@ fn read_msg(bytes: &[u8]) -> Result<EmailData> {
     let properties = msg_stream(&mut compound, "/__properties_version1.0");
 
     let from = match (sender_name, sender_address) {
-        (Some(name), Some(address)) if !name.is_empty() && name != address => {
-            Some(format!("{name} <{address}>"))
-        }
+        (Some(name), Some(address)) if !name.is_empty() && name != address => Some(format!("{name} <{address}>")),
         (_, Some(address)) if !address.is_empty() => Some(address),
         (Some(name), _) if !name.is_empty() => Some(name),
         _ => None,
@@ -1369,7 +1322,8 @@ mod tests {
         let objects = [
             "<</Type/Catalog/Pages 2 0 R>>".to_owned(),
             "<</Type/Pages/Kids[3 0 R]/Count 1>>".to_owned(),
-            "<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>".to_owned(),
+            "<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>"
+                .to_owned(),
             {
                 let content = "BT /F1 12 Tf 20 100 Td (Hello PDF world) Tj ET";
                 format!("<</Length {}>>\nstream\n{content}\nendstream", content.len())
@@ -1419,11 +1373,25 @@ mod tests {
         write(&mut compound, "/__substg1.0_0C1A001F", &utf16("Ada Lovelace"));
         write(&mut compound, "/__substg1.0_5D01001F", &utf16("ada@example.com"));
         write(&mut compound, "/__substg1.0_0E04001F", &utf16("Bob; Carol"));
-        write(&mut compound, "/__substg1.0_1000001F", &utf16("Numbers attached.
-Thanks"));
+        write(
+            &mut compound,
+            "/__substg1.0_1000001F",
+            &utf16(
+                "Numbers attached.
+Thanks",
+            ),
+        );
         compound.create_storage("/__attach_version1.0_#00000000").unwrap();
-        write(&mut compound, "/__attach_version1.0_#00000000/__substg1.0_3707001F", &utf16("budget.xlsx"));
-        write(&mut compound, "/__attach_version1.0_#00000000/__substg1.0_37010102", &[1, 2, 3, 4]);
+        write(
+            &mut compound,
+            "/__attach_version1.0_#00000000/__substg1.0_3707001F",
+            &utf16("budget.xlsx"),
+        );
+        write(
+            &mut compound,
+            "/__attach_version1.0_#00000000/__substg1.0_37010102",
+            &[1, 2, 3, 4],
+        );
         let bytes = compound.into_inner().into_inner();
 
         match document_preview(Path::new("budget.msg"), &bytes) {

@@ -114,10 +114,15 @@ impl Options {
 fn join_words(words: &[String]) -> String {
     words
         .iter()
-        .map(|word| match (word.is_empty() || word.chars().any(char::is_whitespace), word.contains('"')) {
-            (false, _) => word.clone(),
-            (true, false) => format!("\"{word}\""),
-            (true, true) => format!("'{word}'"),
+        .map(|word| {
+            match (
+                word.is_empty() || word.chars().any(char::is_whitespace),
+                word.contains('"'),
+            ) {
+                (false, _) => word.clone(),
+                (true, false) => format!("\"{word}\""),
+                (true, true) => format!("'{word}'"),
+            }
         })
         .collect::<Vec<_>>()
         .join(" ")
@@ -129,7 +134,13 @@ fn strip_json(line: &str) -> (String, bool) {
     if !raw {
         return (line.to_owned(), false);
     }
-    (line.split_whitespace().filter(|word| *word != "--json").collect::<Vec<_>>().join(" "), true)
+    (
+        line.split_whitespace()
+            .filter(|word| *word != "--json")
+            .collect::<Vec<_>>()
+            .join(" "),
+        true,
+    )
 }
 
 fn describe(failure: &Failure, client: &Client) -> String {
@@ -164,7 +175,13 @@ async fn sign_in(client: &mut Client, options: &Options, paint: &Paint) -> Resul
         eprintln!("{}", paint.error("Signing in needs a terminal. For scripts, set REPOMEMO_TOKEN to a personal access token (Profile > API tokens in the web app)."));
         return Err(ExitCode::from(EXIT_TROUBLE));
     }
-    println!("{}", paint.muted(&format!("Sign in to {} with a system or app administrator account.", client.base())));
+    println!(
+        "{}",
+        paint.muted(&format!(
+            "Sign in to {} with a system or app administrator account.",
+            client.base()
+        ))
+    );
     for _ in 0..3 {
         let email = match &options.email {
             Some(email) => {
@@ -281,7 +298,9 @@ fn insecure_remote_host(server: &str) -> Option<String> {
         None => authority.rsplit_once(':').map_or(authority, |(host, _)| host),
     };
     let local = host.eq_ignore_ascii_case("localhost")
-        || host.parse::<std::net::IpAddr>().is_ok_and(|address| address.is_loopback());
+        || host
+            .parse::<std::net::IpAddr>()
+            .is_ok_and(|address| address.is_loopback());
     (!local).then(|| host.to_owned())
 }
 
@@ -315,7 +334,11 @@ async fn main() -> ExitCode {
         Ok(welcome) => welcome,
         Err(failure) => {
             eprintln!("{}", paint.error(&describe(&failure, &client)));
-            return ExitCode::from(if matches!(failure, Failure::Refused(_)) { EXIT_REFUSED } else { EXIT_TROUBLE });
+            return ExitCode::from(if matches!(failure, Failure::Refused(_)) {
+                EXIT_REFUSED
+            } else {
+                EXIT_TROUBLE
+            });
         }
     };
     if single {
@@ -343,7 +366,10 @@ mod tests {
 
     #[test]
     fn plain_http_to_another_machine_is_flagged() {
-        assert_eq!(insecure_remote_host("http://memo.example.com:3020"), Some("memo.example.com".to_owned()));
+        assert_eq!(
+            insecure_remote_host("http://memo.example.com:3020"),
+            Some("memo.example.com".to_owned())
+        );
         assert_eq!(insecure_remote_host("http://127.0.0.1:3020"), None);
         assert_eq!(insecure_remote_host("http://localhost:3020/"), None);
         assert_eq!(insecure_remote_host("http://[::1]:3020"), None);
@@ -352,18 +378,29 @@ mod tests {
 
     #[test]
     fn options_come_before_the_command() {
-        let options = Options::parse(words(&["--server", "http://host:3020", "jobs", "list", "--status", "failed"]).into_iter()).unwrap();
+        let options =
+            Options::parse(words(&["--server", "http://host:3020", "jobs", "list", "--status", "failed"]).into_iter())
+                .unwrap();
         assert_eq!(options.server, "http://host:3020");
         assert_eq!(options.command, words(&["jobs", "list", "--status", "failed"]));
         let options = Options::parse(words(&["--email=a@b.c", "--", "--json", "status"]).into_iter()).unwrap();
-        assert_eq!((options.email.as_deref(), options.command), (Some("a@b.c"), words(&["--json", "status"])));
+        assert_eq!(
+            (options.email.as_deref(), options.command),
+            (Some("a@b.c"), words(&["--json", "status"]))
+        );
         assert!(Options::parse(words(&["--server"]).into_iter()).is_err());
     }
 
     #[test]
     fn shell_words_become_one_line_again() {
-        assert_eq!(join_words(&words(&["logs", "--grep", "sign in failed"])), r#"logs --grep "sign in failed""#);
-        assert_eq!(join_words(&words(&["logs", "--grep", r#"say "hi" now"#])), r#"logs --grep 'say "hi" now'"#);
+        assert_eq!(
+            join_words(&words(&["logs", "--grep", "sign in failed"])),
+            r#"logs --grep "sign in failed""#
+        );
+        assert_eq!(
+            join_words(&words(&["logs", "--grep", r#"say "hi" now"#])),
+            r#"logs --grep 'say "hi" now'"#
+        );
         assert_eq!(strip_json("jobs list --json"), ("jobs list".to_owned(), true));
         assert_eq!(strip_json("status"), ("status".to_owned(), false));
     }

@@ -31,7 +31,9 @@
 | M9 | ✅ Fixed in V0.1.67 | `check_transport`, HSTS, console warning |
 | L4, L7, L10 | ✅ Fixed in V0.1.67 | Reset notifications, common-password list, known-device lockout bypass |
 | N2 residual | ✅ Fixed in V0.1.67 | `system` token scope |
-| N7–N9 | 📝 Documented | See §11 |
+| N7 | ✅ Fixed in V0.1.71 | Request timeout on every route but the streams, header read timeout, live streams per account |
+| L6 | ✅ Fixed in V0.1.71 | Typed errors; internal errors are generic 500s |
+| N8, N9 | 📝 Documented | See §11 |
 
 ---
 

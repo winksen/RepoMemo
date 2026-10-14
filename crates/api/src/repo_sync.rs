@@ -11,11 +11,10 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use repomemo_domain::{
-    IndexingJobStatus, RepoAccessCheck, RepoCommit, RepoDetail, RepoFile, RepoOverview,
-    RepoSettings, RepoSummary, RepoSkipCount, RepoSource,
-    RepoSyncReport, Source, SourceType, REPO_SYNC_JOB_KIND,
+    IndexingJobStatus, RepoAccessCheck, RepoCommit, RepoDetail, RepoFile, RepoOverview, RepoSettings, RepoSkipCount,
+    RepoSource, RepoSummary, RepoSyncReport, Source, SourceType, REPO_SYNC_JOB_KIND,
 };
 use repomemo_git::{GitRepo, TreeFile};
 use repomemo_indexer::INDEXER_VERSION;
@@ -24,9 +23,7 @@ use repomemo_storage::{RepoFileRecord, RepoFileWrite, StorageEngine};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::repo_overview::{
-    compute_overview, key_file_role, overview_markdown, readme_excerpt, RECENT_COMMITS,
-};
+use crate::repo_overview::{compute_overview, key_file_role, overview_markdown, readme_excerpt, RECENT_COMMITS};
 use crate::repo_stack::{detect_stack, MAX_MANIFEST_BYTES, MAX_STACK_MANIFESTS, STACK_MANIFESTS};
 use crate::RepoMemoCore;
 
@@ -102,7 +99,7 @@ impl RepoMemoCore {
         settings: RepoSettings,
     ) -> Result<RepoAccessCheck> {
         if !self.storage.workspace_exists(workspace_id).await? {
-            bail!("Workspace was not found.");
+            repomemo_domain::bail_not_found!("Workspace was not found.");
         }
         let settings = normalize_settings(settings)?;
         let repo = self.open_repo_link(link).await?;
@@ -155,7 +152,7 @@ impl RepoMemoCore {
         settings: RepoSettings,
     ) -> Result<RepoSource> {
         if !self.storage.workspace_exists(workspace_id).await? {
-            bail!("Workspace was not found.");
+            repomemo_domain::bail_not_found!("Workspace was not found.");
         }
         let settings = normalize_settings(settings)?;
         let repo = self.open_repo_link(link).await?;
@@ -179,10 +176,7 @@ impl RepoMemoCore {
 
     pub async fn repo_source(&self, source_id: &str) -> Result<RepoSource> {
         let source = self.repo_source_row(source_id).await?;
-        let counts = self
-            .storage
-            .repo_source_file_counts(&source.workspace_id)
-            .await?;
+        let counts = self.storage.repo_source_file_counts(&source.workspace_id).await?;
         self.build_repo_source(source, &counts).await
     }
 
@@ -302,14 +296,14 @@ impl RepoMemoCore {
         // "Copy as path" in Windows Explorer wraps the path in quotes.
         let link = link.trim().trim_matches('"').trim();
         if link.is_empty() {
-            bail!("Enter the folder of a git repository on the server.");
+            repomemo_domain::bail_invalid!("Enter the folder of a git repository on the server.");
         }
         let lower = link.to_ascii_lowercase();
         let is_url = ["http://", "https://", "ssh://", "git://", "git@"]
             .iter()
             .any(|prefix| lower.starts_with(prefix));
         if is_url {
-            bail!(
+            repomemo_domain::bail_invalid!(
                 "Remote repository links are not supported yet. Enter the folder of a checkout on the server, such as C:\\code\\my-repo or /srv/code/my-repo."
             );
         }
@@ -318,16 +312,16 @@ impl RepoMemoCore {
         // network shares are never even probed.
         self.repo_policy.check(&path)?;
         if !path.is_dir() {
-            bail!(
+            repomemo_domain::bail_invalid!(
                 "The folder {} does not exist on the server, or the server cannot see it.",
                 path.display()
             );
         }
         if let Err(error) = std::fs::read_dir(&path) {
             if error.kind() == std::io::ErrorKind::PermissionDenied {
-                bail!("The server has no read access to {}.", path.display());
+                repomemo_domain::bail_invalid!("The server has no read access to {}.", path.display());
             }
-            bail!("The folder {} cannot be read: {error}", path.display());
+            repomemo_domain::bail_invalid!("The folder {} cannot be read: {error}", path.display());
         }
         let repo = GitRepo::open(&path).await?;
         // The repository may start above the linked folder.
@@ -484,9 +478,7 @@ impl RepoMemoCore {
 
         let mut progress = 0_usize;
         let planned = changes.len() + removals.len();
-        self.storage
-            .set_job_progress_total(job_id, planned as i64)
-            .await?;
+        self.storage.set_job_progress_total(job_id, planned as i64).await?;
         self.storage
             .update_indexing_job(job_id, "running", "storing_files", 0, None)
             .await?;
@@ -512,9 +504,7 @@ impl RepoMemoCore {
                 progress += 1;
                 continue;
             }
-            let write = self
-                .store_repo_blob(&root, &commit, file, kind, &bytes)
-                .await?;
+            let write = self.store_repo_blob(&root, &commit, file, kind, &bytes).await?;
             match change {
                 Change::Add => {
                     self.storage
@@ -524,7 +514,14 @@ impl RepoMemoCore {
                 }
                 Change::Update { record } => {
                     self.storage
-                        .update_repo_file(source_id, &record.artifact_id, &record.path, record.removed, false, write)
+                        .update_repo_file(
+                            source_id,
+                            &record.artifact_id,
+                            &record.path,
+                            record.removed,
+                            false,
+                            write,
+                        )
                         .await?;
                     if record.removed {
                         report.restored += 1;
@@ -662,7 +659,13 @@ impl RepoMemoCore {
         metadata.last_error = None;
         metadata.summary = self.latest_repo_summary(source_id).await?;
         self.storage
-            .update_source(source_id, &source.name, "ready", &metadata.to_value(), !report.cancelled)
+            .update_source(
+                source_id,
+                &source.name,
+                "ready",
+                &metadata.to_value(),
+                !report.cancelled,
+            )
             .await?;
         Ok(report)
     }
@@ -740,12 +743,7 @@ impl RepoMemoCore {
             .store_blob(&content_hash, bytes, kind.mime_type.as_deref())
             .await?;
         Ok(RepoFileWrite {
-            title: file
-                .path
-                .rsplit('/')
-                .next()
-                .unwrap_or(&file.path)
-                .to_owned(),
+            title: file.path.rsplit('/').next().unwrap_or(&file.path).to_owned(),
             path: file.path.clone(),
             artifact_type: kind.artifact_type.clone(),
             language: kind.language.clone(),
@@ -766,16 +764,12 @@ impl RepoMemoCore {
     async fn repo_source_row(&self, source_id: &str) -> Result<Source> {
         let source = self.storage.get_source(source_id).await?;
         if !matches!(source.source_type, SourceType::GitRepo) {
-            bail!("Source was not found.");
+            repomemo_domain::bail_not_found!("Source was not found.");
         }
         Ok(source)
     }
 
-    async fn build_repo_source(
-        &self,
-        source: Source,
-        counts: &HashMap<String, (i64, i64)>,
-    ) -> Result<RepoSource> {
+    async fn build_repo_source(&self, source: Source, counts: &HashMap<String, (i64, i64)>) -> Result<RepoSource> {
         let metadata = RepoSourceMetadata::of(&source);
         let (file_count, indexed_file_count) = counts.get(&source.id).copied().unwrap_or_default();
         let active_job = self
@@ -812,13 +806,10 @@ struct SkipTally {
 impl SkipTally {
     fn add(&mut self, reason: String, path: &str) {
         self.total += 1;
-        let entry = self
-            .by_reason
-            .entry(reason.clone())
-            .or_insert_with(|| RepoSkipCount {
-                reason,
-                ..Default::default()
-            });
+        let entry = self.by_reason.entry(reason.clone()).or_insert_with(|| RepoSkipCount {
+            reason,
+            ..Default::default()
+        });
         entry.count += 1;
         if entry.examples.len() < SKIP_EXAMPLES {
             entry.examples.push(path.to_owned());
@@ -827,7 +818,7 @@ impl SkipTally {
 
     fn into_counts(self) -> Vec<RepoSkipCount> {
         let mut counts = self.by_reason.into_values().collect::<Vec<_>>();
-        counts.sort_by(|left, right| right.count.cmp(&left.count));
+        counts.sort_by_key(|skip| std::cmp::Reverse(skip.count));
         counts
     }
 }
@@ -847,7 +838,7 @@ fn normalize_settings(settings: RepoSettings) -> Result<RepoSettings> {
             .filter(|pattern| !pattern.is_empty() && !pattern.starts_with('#'))
             .collect::<Vec<_>>();
         if patterns.len() > MAX_PATTERNS {
-            bail!("Use at most {MAX_PATTERNS} include and {MAX_PATTERNS} exclude patterns.");
+            repomemo_domain::bail_invalid!("Use at most {MAX_PATTERNS} include and {MAX_PATTERNS} exclude patterns.");
         }
         Ok(patterns)
     };
@@ -874,10 +865,7 @@ mod tests {
     fn unique_dir(label: &str) -> PathBuf {
         std::env::temp_dir().join(format!(
             "repomemo-{label}-{}",
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
         ))
     }
 
@@ -912,7 +900,11 @@ mod tests {
         std::fs::create_dir_all(&repo_dir).unwrap();
         git(&repo_dir, &["init", "--quiet", "--initial-branch=main"]);
         write(&repo_dir, "README.md", "# Payments\n\nHow refunds work.\n");
-        write(&repo_dir, "src/refund.rs", "pub fn issue_refund(amount: u64) -> u64 {\n    amount\n}\n");
+        write(
+            &repo_dir,
+            "src/refund.rs",
+            "pub fn issue_refund(amount: u64) -> u64 {\n    amount\n}\n",
+        );
         write(&repo_dir, "src/old_name.py", "def settle():\n    return 1\n");
         write(&repo_dir, "package-lock.json", "{}");
         write(&repo_dir, "notes.txt", "kept out by the exclude pattern");
@@ -935,7 +927,12 @@ mod tests {
             .unwrap();
         assert_eq!(source.status, "pending");
         assert!(core
-            .connect_local_repo(&workspace.id, &repo_dir.to_string_lossy(), None, RepoSettings::default())
+            .connect_local_repo(
+                &workspace.id,
+                &repo_dir.to_string_lossy(),
+                None,
+                RepoSettings::default()
+            )
             .await
             .is_err());
         assert!(core.repo_head(&source.id).await.unwrap().moved(), "never synced");
@@ -957,7 +954,10 @@ mod tests {
         let detail = core.repo_detail(&source.id).await.unwrap();
         let overview = detail.overview.unwrap();
         assert_eq!(overview.file_count, 3);
-        assert_eq!(overview.readme_excerpt.as_deref(), Some("# Payments\n\nHow refunds work."));
+        assert_eq!(
+            overview.readme_excerpt.as_deref(),
+            Some("# Payments\n\nHow refunds work.")
+        );
         assert_eq!(overview.recent_commits.len(), 1);
         let overview_id = detail.repository.overview_artifact_id.unwrap();
         let item = core.get_artifact(overview_id.clone()).await.unwrap();
@@ -984,12 +984,19 @@ mod tests {
         assert_eq!(again.unchanged, 3);
 
         // Edit, rename, delete.
-        write(&repo_dir, "src/refund.rs", "pub fn issue_partial_refund(amount: u64) -> u64 {\n    amount / 2\n}\n");
+        write(
+            &repo_dir,
+            "src/refund.rs",
+            "pub fn issue_partial_refund(amount: u64) -> u64 {\n    amount / 2\n}\n",
+        );
         git(&repo_dir, &["mv", "src/old_name.py", "src/settlement.py"]);
         git(&repo_dir, &["rm", "--quiet", "README.md"]);
         git(&repo_dir, &["add", "."]);
         git(&repo_dir, &["commit", "--quiet", "-m", "Rework refunds"]);
-        assert!(core.repo_head(&source.id).await.unwrap().moved(), "a new commit moves the branch");
+        assert!(
+            core.repo_head(&source.id).await.unwrap().moved(),
+            "a new commit moves the branch"
+        );
 
         let second = sync(&core, &source.id).await;
         assert_eq!((second.updated, second.renamed, second.removed), (1, 1, 1));
@@ -1007,7 +1014,10 @@ mod tests {
         assert_eq!(commit.summary, "Rework refunds");
         assert_eq!(commit.branch.as_deref(), Some("main"));
         let detail = core.repo_detail(&source.id).await.unwrap();
-        assert_eq!(detail.repository.overview_artifact_id.as_deref(), Some(overview_id.as_str()));
+        assert_eq!(
+            detail.repository.overview_artifact_id.as_deref(),
+            Some(overview_id.as_str())
+        );
         let overview = detail.overview.unwrap();
         assert_eq!(overview.file_count, 2);
         assert_eq!(overview.readme_excerpt, None);

@@ -50,7 +50,7 @@ impl GitRepo {
     /// when git is not installed or the path is not inside a repository.
     pub async fn open(path: &Path) -> Result<Self> {
         if !path.is_dir() {
-            bail!("The folder {} does not exist.", path.display());
+            repomemo_domain::bail_invalid!("The folder {} does not exist.", path.display());
         }
         let output = git_command(path)
             .args(["rev-parse", "--show-toplevel"])
@@ -58,7 +58,7 @@ impl GitRepo {
             .await
             .map_err(|error| {
                 if error.kind() == std::io::ErrorKind::NotFound {
-                    anyhow!("git was not found. Install git and make sure it is on the PATH.")
+                    repomemo_domain::not_found!("git was not found. Install git and make sure it is on the PATH.")
                 } else {
                     anyhow!("git could not be started: {error}")
                 }
@@ -67,25 +67,25 @@ impl GitRepo {
             let detail = stderr_text(&output.stderr);
             if detail.contains("dubious ownership") {
                 if HARDENING.get().is_some() {
-                    bail!(
+                    repomemo_domain::bail_invalid!(
                         "git refuses to read {} because it belongs to another user account than the server's. Ask the server operator to list its folder in REPOMEMO_GIT_SAFE_DIRECTORIES, or to give the server's account ownership of it.",
                         path.display()
                     );
                 }
-                bail!(
+                repomemo_domain::bail_invalid!(
                     "git refuses to read {} because it belongs to another user account than the server's. On the server, run: git config --global --add safe.directory \"{}\"",
                     path.display(),
                     path.display().to_string().replace('\\', "/")
                 );
             }
-            bail!("{} is not inside a git repository: {detail}", path.display());
+            repomemo_domain::bail_invalid!("{} is not inside a git repository: {detail}", path.display());
         }
         let root = String::from_utf8(output.stdout)
             .context("git returned a non UTF-8 repository path")?
             .trim()
             .to_owned();
         if root.is_empty() {
-            bail!("{} is a bare repository; choose a checkout instead.", path.display());
+            repomemo_domain::bail_invalid!("{} is a bare repository; choose a checkout instead.", path.display());
         }
         Ok(Self {
             root: PathBuf::from(root),
@@ -126,8 +126,10 @@ impl GitRepo {
         match output {
             Ok(sha) if !sha.trim().is_empty() => Ok(sha.trim().to_owned()),
             _ => match branch {
-                Some(branch) => bail!("The branch {branch} does not exist in this repository."),
-                None => bail!("This repository has no commits yet."),
+                Some(branch) => {
+                    repomemo_domain::bail_invalid!("The branch {branch} does not exist in this repository.")
+                }
+                None => repomemo_domain::bail_invalid!("This repository has no commits yet."),
             },
         }
     }
@@ -227,9 +229,7 @@ impl BlobReader {
         if !blob_sha.chars().all(|value| value.is_ascii_hexdigit()) {
             bail!("invalid object id {blob_sha}");
         }
-        self.stdin
-            .write_all(format!("{blob_sha}\n").as_bytes())
-            .await?;
+        self.stdin.write_all(format!("{blob_sha}\n").as_bytes()).await?;
         self.stdin.flush().await?;
 
         // Header: "<sha> <type> <size>\n", or "<sha> missing\n".
@@ -292,7 +292,9 @@ fn git_command(directory: &Path) -> Command {
         for directory in &hardening.safe_directories {
             let directory = directory.replace('\\', "/");
             command.arg("-c").arg(format!("safe.directory={directory}"));
-            command.arg("-c").arg(format!("safe.directory={}/*", directory.trim_end_matches('/')));
+            command
+                .arg("-c")
+                .arg(format!("safe.directory={}/*", directory.trim_end_matches('/')));
         }
     }
     #[cfg(windows)]
@@ -319,7 +321,7 @@ fn validate_branch_name(branch: &str) -> Result<()> {
             .chars()
             .any(|value| value.is_whitespace() || value.is_control() || "~^:?*[\\".contains(value));
     if invalid {
-        bail!("{branch:?} is not a valid branch name.");
+        repomemo_domain::bail_invalid!("{branch:?} is not a valid branch name.");
     }
     Ok(())
 }
@@ -380,7 +382,7 @@ mod tests {
 
     #[test]
     fn ls_tree_output_keeps_regular_files_only() {
-        let output = b"100644 blob aaaa       12\tsrc/main.rs\0120000 blob bbbb        6\tlink\0160000 commit cccc       -\tvendor/sub\0100755 blob dddd      300\tscripts/run.sh\0";
+        let output = b"100644 blob aaaa       12\tsrc/main.rs\x00120000 blob bbbb        6\tlink\x00160000 commit cccc       -\tvendor/sub\x00100755 blob dddd      300\tscripts/run.sh\0";
         let files = parse_ls_tree(output).unwrap();
         assert_eq!(
             files,
@@ -402,16 +404,34 @@ mod tests {
     #[test]
     fn hardened_commands_ignore_the_account_configuration() {
         // Process-wide, so this is the only test that calls it.
-        assert!(harden(Hardening { safe_directories: vec!["C:\\repos".to_owned()] }));
+        assert!(harden(Hardening {
+            safe_directories: vec!["C:\\repos".to_owned()]
+        }));
         let command = git_command(Path::new("."));
         let std_command = command.as_std();
-        let args = std_command.get_args().map(|arg| arg.to_string_lossy().into_owned()).collect::<Vec<_>>();
-        for expected in ["protocol.allow=never", "submodule.recurse=false", "safe.directory=C:/repos", "safe.directory=C:/repos/*"] {
-            assert!(args.iter().any(|arg| arg == expected), "{expected} missing from {args:?}");
+        let args = std_command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+        for expected in [
+            "protocol.allow=never",
+            "submodule.recurse=false",
+            "safe.directory=C:/repos",
+            "safe.directory=C:/repos/*",
+        ] {
+            assert!(
+                args.iter().any(|arg| arg == expected),
+                "{expected} missing from {args:?}"
+            );
         }
         let envs = std_command
             .get_envs()
-            .filter_map(|(key, value)| Some((key.to_string_lossy().into_owned(), value?.to_string_lossy().into_owned())))
+            .filter_map(|(key, value)| {
+                Some((
+                    key.to_string_lossy().into_owned(),
+                    value?.to_string_lossy().into_owned(),
+                ))
+            })
             .collect::<std::collections::HashMap<_, _>>();
         assert_eq!(envs.get("GIT_CONFIG_NOSYSTEM").map(String::as_str), Some("1"));
         assert_eq!(envs.get("GIT_CONFIG_GLOBAL").map(String::as_str), Some(null_device()));
@@ -430,10 +450,7 @@ mod tests {
     async fn reads_committed_files_and_their_content() {
         let dir = std::env::temp_dir().join(format!(
             "repomemo-git-test-{}",
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
         ));
         std::fs::create_dir_all(dir.join("docs")).unwrap();
         git(&dir, &["init", "--quiet", "--initial-branch=main"]);

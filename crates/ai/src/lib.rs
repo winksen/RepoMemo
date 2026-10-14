@@ -83,8 +83,8 @@ pub fn check_provider_url(base_url: &str) -> Result<()> {
 }
 
 fn check_provider_url_with(base_url: &str, policy: &EndpointPolicy) -> Result<()> {
-    let url = reqwest::Url::parse(base_url.trim())
-        .map_err(|_| anyhow::anyhow!("Provider base URL is not a valid URL."))?;
+    let url =
+        reqwest::Url::parse(base_url.trim()).map_err(|_| anyhow::anyhow!("Provider base URL is not a valid URL."))?;
     if !matches!(url.scheme(), "http" | "https") {
         bail!("Provider base URL must start with http:// or https://.")
     }
@@ -228,7 +228,9 @@ fn provider_client(timeout: Duration) -> reqwest::Result<reqwest::Client> {
         .timeout(timeout)
         .connect_timeout(CONNECT_TIMEOUT)
         .redirect(reqwest::redirect::Policy::none())
-        .dns_resolver(Arc::new(CheckedResolver { public_only: endpoint_policy().public_hostnames_only }))
+        .dns_resolver(Arc::new(CheckedResolver {
+            public_only: endpoint_policy().public_hostnames_only,
+        }))
         .build()
 }
 
@@ -308,16 +310,10 @@ impl OllamaProvider {
             .unwrap_or(DEFAULT_BASE_URL)
             .trim_end_matches('/')
             .to_owned();
-        let model = settings
-            .model
-            .as_deref()
-            .unwrap_or_default()
-            .trim()
-            .to_owned();
+        let model = settings.model.as_deref().unwrap_or_default().trim().to_owned();
         Ok(Self {
             settings,
-            client: provider_client(Duration::from_secs(45))
-                .context("failed to configure local AI client")?,
+            client: provider_client(Duration::from_secs(45)).context("failed to configure local AI client")?,
             base_url,
             model,
         })
@@ -358,11 +354,7 @@ impl AiProvider for OllamaProvider {
     }
 
     async fn embed(&self, texts: Vec<String>, _options: Value) -> Result<Vec<Vec<f32>>> {
-        let model = self
-            .settings
-            .embedding_model
-            .as_deref()
-            .unwrap_or(&self.model);
+        let model = self.settings.embedding_model.as_deref().unwrap_or(&self.model);
         let count = texts.len();
         let response = self
             .client
@@ -380,7 +372,8 @@ impl AiProvider for OllamaProvider {
     async fn summarize(&self, target: String, options: Value) -> Result<String> {
         self.generate(GenerateRequest {
             system: None,
-            prompt: "Write a concise factual summary. Use only the supplied content and do not invent details.".to_owned(),
+            prompt: "Write a concise factual summary. Use only the supplied content and do not invent details."
+                .to_owned(),
             context: target,
             options,
         })
@@ -404,7 +397,11 @@ impl AiProvider for OllamaProvider {
             .send()
             .await
             .context("could not reach the local Ollama vision model")?;
-        let response = checked(response, "The configured Ollama model could not analyze this image; choose a vision-capable model").await?;
+        let response = checked(
+            response,
+            "The configured Ollama model could not analyze this image; choose a vision-capable model",
+        )
+        .await?;
         ollama_image_answer(response).await
     }
 
@@ -425,10 +422,7 @@ impl AiProvider for OllamaProvider {
             message: if model_available {
                 format!("Local provider is ready with {}.", self.model)
             } else {
-                format!(
-                    "Provider connected, but model '{}' was not found.",
-                    self.model
-                )
+                format!("Provider connected, but model '{}' was not found.", self.model)
             },
         })
     }
@@ -446,12 +440,7 @@ pub struct OpenRouterProvider {
 impl OpenRouterProvider {
     pub fn from_settings(settings: ProviderSettings) -> Result<Self> {
         validate_settings(&settings)?;
-        let api_key = settings
-            .api_key
-            .clone()
-            .unwrap_or_default()
-            .trim()
-            .to_owned();
+        let api_key = settings.api_key.clone().unwrap_or_default().trim().to_owned();
         if api_key.is_empty() {
             bail!("An OpenRouter API key is required.");
         }
@@ -462,15 +451,9 @@ impl OpenRouterProvider {
                 .unwrap_or(OPENROUTER_BASE_URL)
                 .trim_end_matches('/')
                 .to_owned(),
-            model: settings
-                .model
-                .as_deref()
-                .unwrap_or_default()
-                .trim()
-                .to_owned(),
+            model: settings.model.as_deref().unwrap_or_default().trim().to_owned(),
             api_key,
-            client: provider_client(Duration::from_secs(60))
-                .context("failed to configure cloud AI client")?,
+            client: provider_client(Duration::from_secs(60)).context("failed to configure cloud AI client")?,
             settings,
         })
     }
@@ -486,7 +469,8 @@ impl OpenRouterProvider {
 
 impl AiProvider for OpenRouterProvider {
     async fn generate(&self, request: GenerateRequest) -> Result<String> {
-        let response = self.request(reqwest::Method::POST, "/chat/completions")
+        let response = self
+            .request(reqwest::Method::POST, "/chat/completions")
             .json(&json!({
                 "model": self.model,
                 "messages": [
@@ -495,18 +479,16 @@ impl AiProvider for OpenRouterProvider {
                 ],
                 "temperature": request.options.get("temperature").and_then(Value::as_f64).unwrap_or(0.2),
             }))
-            .send().await.context("could not reach OpenRouter")?;
+            .send()
+            .await
+            .context("could not reach OpenRouter")?;
         let response = checked(response, "OpenRouter rejected the request").await?;
         openrouter_answer(response, "OpenRouter returned an empty answer").await
     }
 
     /// OpenRouter's OpenAI-compatible embeddings endpoint.
     async fn embed(&self, texts: Vec<String>, _options: Value) -> Result<Vec<Vec<f32>>> {
-        let model = self
-            .settings
-            .embedding_model
-            .as_deref()
-            .unwrap_or(&self.model);
+        let model = self.settings.embedding_model.as_deref().unwrap_or(&self.model);
         let count = texts.len();
         let response = self
             .request(reqwest::Method::POST, "/embeddings")
@@ -531,7 +513,13 @@ impl AiProvider for OpenRouterProvider {
                 let index = row["index"].as_u64().unwrap_or(0) as usize;
                 let vector = row["embedding"]
                     .as_array()
-                    .map(|values| values.iter().filter_map(Value::as_f64).map(|value| value as f32).collect())
+                    .map(|values| {
+                        values
+                            .iter()
+                            .filter_map(Value::as_f64)
+                            .map(|value| value as f32)
+                            .collect()
+                    })
                     .unwrap_or_default();
                 (index, vector)
             })
@@ -576,7 +564,11 @@ impl AiProvider for OpenRouterProvider {
             .send()
             .await
             .context("could not reach OpenRouter for image analysis")?;
-        let response = checked(response, "The configured OpenRouter model could not analyze this image; choose a vision-capable model").await?;
+        let response = checked(
+            response,
+            "The configured OpenRouter model could not analyze this image; choose a vision-capable model",
+        )
+        .await?;
         openrouter_answer(response, "OpenRouter returned an empty image description").await
     }
 
@@ -595,7 +587,10 @@ impl AiProvider for OpenRouterProvider {
             .await
             .context("could not reach OpenRouter")?;
         if matches!(key.status().as_u16(), 401 | 403) {
-            return Ok(result(false, "OpenRouter rejected the API key. Paste a valid key and save the provider again.".to_owned()));
+            return Ok(result(
+                false,
+                "OpenRouter rejected the API key. Paste a valid key and save the provider again.".to_owned(),
+            ));
         }
 
         let models = self
@@ -608,9 +603,12 @@ impl AiProvider for OpenRouterProvider {
             "OpenRouter returned an invalid model list",
         )
         .await?;
-        let ids = models["data"]
-            .as_array()
-            .map(|entries| entries.iter().filter_map(|entry| entry["id"].as_str()).collect::<Vec<_>>());
+        let ids = models["data"].as_array().map(|entries| {
+            entries
+                .iter()
+                .filter_map(|entry| entry["id"].as_str())
+                .collect::<Vec<_>>()
+        });
         if let Some(ids) = ids.filter(|ids| !ids.contains(&self.model.as_str())) {
             // A model that is only served for free is listed as `<id>:free`,
             // and the plain id then has no endpoints.
@@ -619,8 +617,16 @@ impl AiProvider for OpenRouterProvider {
                 .iter()
                 .find(|id| id.split(':').next() == Some(base))
                 .map(|id| format!(" Did you mean '{id}'?"))
-                .unwrap_or_else(|| " Copy the exact id from openrouter.ai/models, for example 'openai/gpt-4o-mini'.".to_owned());
-            return Ok(result(false, format!("OpenRouter does not serve a model with the id '{}'.{suggestion}", self.model)));
+                .unwrap_or_else(|| {
+                    " Copy the exact id from openrouter.ai/models, for example 'openai/gpt-4o-mini'.".to_owned()
+                });
+            return Ok(result(
+                false,
+                format!(
+                    "OpenRouter does not serve a model with the id '{}'.{suggestion}",
+                    self.model
+                ),
+            ));
         }
 
         let probe = self
@@ -633,7 +639,9 @@ impl AiProvider for OpenRouterProvider {
             .send()
             .await
             .context("could not reach OpenRouter")?;
-        if let Err(error) = async { openrouter_answer(checked(probe, "OpenRouter rejected a test request").await?, "").await }.await {
+        if let Err(error) =
+            async { openrouter_answer(checked(probe, "OpenRouter rejected a test request").await?, "").await }.await
+        {
             return Ok(result(false, error.to_string()));
         }
         Ok(result(true, format!("OpenRouter is ready with {}. Workspace content will leave this device only when you request an AI action.", self.model)))
@@ -644,7 +652,10 @@ impl AiProvider for OpenRouterProvider {
 /// batch or loop on chunks that silently got no embedding.
 fn ensure_embeddings(vectors: Vec<Vec<f32>>, expected: usize) -> Result<Vec<Vec<f32>>> {
     if vectors.len() != expected {
-        bail!("The provider returned {} embeddings for {expected} inputs.", vectors.len())
+        bail!(
+            "The provider returned {} embeddings for {expected} inputs.",
+            vectors.len()
+        )
     }
     if vectors.iter().any(Vec::is_empty) {
         bail!("The provider returned an empty embedding; check that the model is an embedding model.")
@@ -793,12 +804,10 @@ pub enum ConfiguredProvider {
 
 pub fn provider_from_settings(settings: ProviderSettings) -> Result<ConfiguredProvider> {
     match settings.provider_type.as_str() {
-        "ollama" => Ok(ConfiguredProvider::Ollama(OllamaProvider::from_settings(
+        "ollama" => Ok(ConfiguredProvider::Ollama(OllamaProvider::from_settings(settings)?)),
+        "openrouter" => Ok(ConfiguredProvider::OpenRouter(OpenRouterProvider::from_settings(
             settings,
         )?)),
-        "openrouter" => Ok(ConfiguredProvider::OpenRouter(
-            OpenRouterProvider::from_settings(settings)?,
-        )),
         _ => bail!("Unsupported AI provider."),
     }
 }
@@ -843,8 +852,7 @@ impl AiProvider for ConfiguredProvider {
 }
 
 async fn ollama_image_answer(response: reqwest::Response) -> Result<String> {
-    let body: OllamaGenerateResponse =
-        read_json(response, "the vision provider returned an invalid response").await?;
+    let body: OllamaGenerateResponse = read_json(response, "the vision provider returned an invalid response").await?;
     let answer = body.response.trim().to_owned();
     if answer.is_empty() {
         bail!("the vision provider returned an empty image description")
@@ -869,23 +877,12 @@ pub fn validate_settings(settings: &ProviderSettings) -> Result<()> {
         bail!("Provider base URL must start with http:// or https://.")
     }
     check_provider_url(base_url)?;
-    if settings
-        .model
-        .as_deref()
-        .unwrap_or_default()
-        .trim()
-        .is_empty()
-    {
+    if settings.model.as_deref().unwrap_or_default().trim().is_empty() {
         bail!("A chat model is required.")
     }
     if settings.provider_type == "openrouter"
         && settings.enabled
-        && settings
-            .api_key
-            .as_deref()
-            .unwrap_or_default()
-            .trim()
-            .is_empty()
+        && settings.api_key.as_deref().unwrap_or_default().trim().is_empty()
     {
         bail!("An OpenRouter API key is required before enabling cloud AI.")
     }
@@ -992,10 +989,16 @@ mod tests {
             Some("Insufficient credits")
         );
         assert_eq!(
-            error_message(&json!({"error": {"message": "Provider returned error", "metadata": {"raw": "model overloaded"}}})).as_deref(),
+            error_message(
+                &json!({"error": {"message": "Provider returned error", "metadata": {"raw": "model overloaded"}}})
+            )
+            .as_deref(),
             Some("Provider returned error (model overloaded)")
         );
-        assert_eq!(error_message(&json!({"error": "model 'llama9' not found"})).as_deref(), Some("model 'llama9' not found"));
+        assert_eq!(
+            error_message(&json!({"error": "model 'llama9' not found"})).as_deref(),
+            Some("model 'llama9' not found")
+        );
         assert_eq!(error_message(&json!({"choices": []})), None);
     }
 
@@ -1010,7 +1013,10 @@ mod tests {
             "http://192.168.1.20:11434",
             "http://[::1]:11434",
         ] {
-            assert!(check_provider_url_with(allowed, &open).is_ok(), "{allowed} should be allowed");
+            assert!(
+                check_provider_url_with(allowed, &open).is_ok(),
+                "{allowed} should be allowed"
+            );
         }
         for refused in [
             "http://169.254.169.254/latest/meta-data",
@@ -1024,7 +1030,10 @@ mod tests {
             "ftp://example.com/",
             "not a url",
         ] {
-            assert!(check_provider_url_with(refused, &open).is_err(), "{refused} should be refused");
+            assert!(
+                check_provider_url_with(refused, &open).is_err(),
+                "{refused} should be refused"
+            );
         }
 
         let restricted = EndpointPolicy {
@@ -1042,11 +1051,27 @@ mod tests {
     fn the_built_in_policy_allows_this_machine_and_openrouter_only() {
         use super::{check_provider_url_with, EndpointPolicy};
         let built_in = EndpointPolicy::built_in();
-        for allowed in ["http://127.0.0.1:11434", "http://localhost:11434", "http://[::1]:11434", "https://openrouter.ai/api/v1"] {
-            assert!(check_provider_url_with(allowed, &built_in).is_ok(), "{allowed} should be allowed");
+        for allowed in [
+            "http://127.0.0.1:11434",
+            "http://localhost:11434",
+            "http://[::1]:11434",
+            "https://openrouter.ai/api/v1",
+        ] {
+            assert!(
+                check_provider_url_with(allowed, &built_in).is_ok(),
+                "{allowed} should be allowed"
+            );
         }
-        for refused in ["http://192.168.1.20:11434", "http://10.0.0.5:11434", "https://api.openai.com/v1", "https://eu.openrouter.ai/api/v1"] {
-            assert!(check_provider_url_with(refused, &built_in).is_err(), "{refused} should be refused");
+        for refused in [
+            "http://192.168.1.20:11434",
+            "http://10.0.0.5:11434",
+            "https://api.openai.com/v1",
+            "https://eu.openrouter.ai/api/v1",
+        ] {
+            assert!(
+                check_provider_url_with(refused, &built_in).is_err(),
+                "{refused} should be refused"
+            );
         }
     }
 
@@ -1055,15 +1080,30 @@ mod tests {
         use super::permitted_addresses;
         use std::net::SocketAddr;
         let at = |text: &str| text.parse::<SocketAddr>().unwrap();
-        let mixed = vec![at("10.0.0.5:0"), at("93.184.216.34:0"), at("169.254.169.254:0"), at("[fd00::1]:0")];
-        assert_eq!(permitted_addresses("openrouter.ai", mixed.clone(), true), vec![at("93.184.216.34:0")], "public addresses only");
+        let mixed = vec![
+            at("10.0.0.5:0"),
+            at("93.184.216.34:0"),
+            at("169.254.169.254:0"),
+            at("[fd00::1]:0"),
+        ];
+        assert_eq!(
+            permitted_addresses("openrouter.ai", mixed.clone(), true),
+            vec![at("93.184.216.34:0")],
+            "public addresses only"
+        );
         assert_eq!(
             permitted_addresses("llm.internal", mixed, false),
             vec![at("10.0.0.5:0"), at("93.184.216.34:0"), at("[fd00::1]:0")],
             "an operator's own list may name internal hosts, but never metadata addresses"
         );
-        assert_eq!(permitted_addresses("localhost", vec![at("127.0.0.1:0")], true), vec![at("127.0.0.1:0")]);
-        assert!(permitted_addresses("evil.example", vec![at("127.0.0.1:0")], true).is_empty(), "a name pointed at loopback is refused");
+        assert_eq!(
+            permitted_addresses("localhost", vec![at("127.0.0.1:0")], true),
+            vec![at("127.0.0.1:0")]
+        );
+        assert!(
+            permitted_addresses("evil.example", vec![at("127.0.0.1:0")], true).is_empty(),
+            "a name pointed at loopback is refused"
+        );
     }
 
     #[test]

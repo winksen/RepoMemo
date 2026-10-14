@@ -21,17 +21,14 @@ pub struct EmbeddingQueue {
 }
 
 impl EmbeddingQueue {
-    /// Starts the worker on the current Tokio runtime. Workspaces are
-    /// embedded one at a time so a local embedding model is not overloaded.
-    pub fn start(core: RepoMemoCore) -> Self {
+    /// Starts the worker on the current Tokio runtime. Up to `concurrency`
+    /// workspaces are embedded at once (one by default, so a local embedding
+    /// model is not overloaded).
+    pub fn start(core: RepoMemoCore, concurrency: usize) -> Self {
         let (sender, receiver) = mpsc::unbounded_channel();
         let waiting = Arc::new(Mutex::new(HashSet::new()));
-        tokio::spawn(run_worker(core.clone(), waiting.clone(), receiver));
-        Self {
-            sender,
-            waiting,
-            core,
-        }
+        tokio::spawn(run_worker(core.clone(), waiting.clone(), receiver, concurrency.max(1)));
+        Self { sender, waiting, core }
     }
 
     /// Queues a workspace unless it is already waiting. A workspace without an
@@ -70,26 +67,39 @@ async fn run_worker(
     core: RepoMemoCore,
     waiting: Arc<Mutex<HashSet<String>>>,
     mut receiver: mpsc::UnboundedReceiver<String>,
+    concurrency: usize,
 ) {
+    let permits = Arc::new(tokio::sync::Semaphore::new(concurrency));
     while let Some(workspace_id) = receiver.recv().await {
+        let Ok(permit) = permits.clone().acquire_owned().await else {
+            break;
+        };
         // Leave the waiting set before running, so chunks indexed during this
         // pass queue another one instead of being dropped.
         if let Ok(mut waiting) = waiting.lock() {
             waiting.remove(&workspace_id);
         }
-        match core.embed_missing_chunks(&workspace_id).await {
-            Ok(EmbeddingRun::Embedded(count)) => {
-                tracing::info!(workspace_id = %workspace_id, count, "Embedded chunks for semantic search");
-            }
-            Ok(EmbeddingRun::Cancelled(count)) => {
-                tracing::info!(workspace_id = %workspace_id, count, "Embedding cancelled");
-            }
-            Ok(EmbeddingRun::NotConfigured | EmbeddingRun::UpToDate) => {}
-            Err(error) => {
-                // The job records the reason; the next indexed file, provider
-                // change or restart tries again.
-                tracing::warn!(workspace_id = %workspace_id, error = %format!("{error:#}"), "Embedding failed");
-            }
+        let core = core.clone();
+        tokio::spawn(async move {
+            embed_workspace(&core, &workspace_id).await;
+            drop(permit);
+        });
+    }
+}
+
+async fn embed_workspace(core: &RepoMemoCore, workspace_id: &str) {
+    match core.embed_missing_chunks(workspace_id).await {
+        Ok(EmbeddingRun::Embedded(count)) => {
+            tracing::info!(workspace_id = %workspace_id, count, "Embedded chunks for semantic search");
+        }
+        Ok(EmbeddingRun::Cancelled(count)) => {
+            tracing::info!(workspace_id = %workspace_id, count, "Embedding cancelled");
+        }
+        Ok(EmbeddingRun::NotConfigured | EmbeddingRun::UpToDate) => {}
+        Err(error) => {
+            // The job records the reason; the next indexed file, provider
+            // change or restart tries again.
+            tracing::warn!(workspace_id = %workspace_id, error = %format!("{error:#}"), "Embedding failed");
         }
     }
 }

@@ -76,10 +76,9 @@ impl RateLimiter {
         let Ok(mut windows) = self.windows.lock() else {
             return Ok(());
         };
-        let window = windows.entry(key.to_owned()).or_insert(Window {
-            started: now,
-            count: 0,
-        });
+        let window = windows
+            .entry(key.to_owned())
+            .or_insert(Window { started: now, count: 0 });
         if now.duration_since(window.started) >= quota.period {
             window.started = now;
             window.count = 0;
@@ -183,7 +182,12 @@ impl LoginThrottle {
         let now = Instant::now();
         self.failures
             .lock()
-            .map(|failures| failures.values().filter(|entry| entry.locked_until.is_some_and(|until| until > now)).count())
+            .map(|failures| {
+                failures
+                    .values()
+                    .filter(|entry| entry.locked_until.is_some_and(|until| until > now))
+                    .count()
+            })
             .unwrap_or(0)
     }
 
@@ -194,8 +198,7 @@ impl LoginThrottle {
             .map(|mut failures| {
                 let before = failures.len();
                 failures.retain(|_, entry| {
-                    entry.locked_until.is_some_and(|until| until > now)
-                        || now.duration_since(entry.last_at) < max_age
+                    entry.locked_until.is_some_and(|until| until > now) || now.duration_since(entry.last_at) < max_age
                 });
                 before - failures.len()
             })
@@ -295,11 +298,7 @@ pub(crate) fn client_ip(headers: &axum::http::HeaderMap, peer: Option<IpAddr>, p
 /// The 429 answer for a used-up quota, with `Retry-After`.
 pub fn too_many_requests(message: impl Into<String>, retry_after: Duration) -> ApiError {
     let seconds = retry_after.as_secs().max(1);
-    let mut error = ApiError::new(
-        axum::http::StatusCode::TOO_MANY_REQUESTS,
-        "rate_limited",
-        message,
-    );
+    let mut error = ApiError::new(axum::http::StatusCode::TOO_MANY_REQUESTS, "rate_limited", message);
     error.retry_after = Some(seconds);
     error
 }
@@ -344,9 +343,7 @@ pub async fn security_headers(State(policy): State<HeaderPolicy>, request: Reque
         ),
     ];
     for (name, value) in defaults {
-        headers
-            .entry(name)
-            .or_insert_with(|| HeaderValue::from_static(value));
+        headers.entry(name).or_insert_with(|| HeaderValue::from_static(value));
     }
     response
 }
@@ -369,7 +366,15 @@ mod tests {
         assert!(limiter.check("b", quota).is_ok(), "keys are independent");
         std::thread::sleep(Duration::from_millis(90));
         assert!(limiter.check("a", quota).is_ok(), "a new window starts");
-        assert!(limiter.check("c", Quota { limit: 0, period: Duration::from_secs(1) }).is_ok());
+        assert!(limiter
+            .check(
+                "c",
+                Quota {
+                    limit: 0,
+                    period: Duration::from_secs(1)
+                }
+            )
+            .is_ok());
         // A disabled quota never opens a window.
         assert_eq!(limiter.prune(Duration::ZERO), 2);
     }
@@ -392,25 +397,51 @@ mod tests {
         assert_eq!(throttle.locked_count(), 3);
         assert_eq!(throttle.clear_account("a@example.com"), 2, "only that account");
         assert_eq!(throttle.locked_count(), 1);
-        assert!(!throttle.record_failure("user", 0, lockout), "zero disables the lockout");
+        assert!(
+            !throttle.record_failure("user", 0, lockout),
+            "zero disables the lockout"
+        );
     }
 
     #[test]
     fn client_addresses_only_come_from_proxy_headers_when_trusted() {
         let off = ProxyTrust::default();
-        let on = ProxyTrust { enabled: true, proxies: vec!["10.0.0.1".parse().unwrap()] };
+        let on = ProxyTrust {
+            enabled: true,
+            proxies: vec!["10.0.0.1".parse().unwrap()],
+        };
         let proxy = Some("10.0.0.1".parse().unwrap());
         let stranger = Some("198.51.100.7".parse().unwrap());
         let mut headers = axum::http::HeaderMap::new();
         // The client wrote the first entry; the proxy appended the real address.
         headers.insert("x-forwarded-for", HeaderValue::from_static("1.2.3.4, 203.0.113.9"));
-        assert_eq!(client_ip(&headers, proxy, &off), "10.0.0.1", "headers are ignored unless trusted");
-        assert_eq!(client_ip(&headers, proxy, &on), "203.0.113.9", "the rightmost entry the proxy added");
-        assert_eq!(client_ip(&headers, stranger, &on), "198.51.100.7", "only a trusted peer's headers count");
+        assert_eq!(
+            client_ip(&headers, proxy, &off),
+            "10.0.0.1",
+            "headers are ignored unless trusted"
+        );
+        assert_eq!(
+            client_ip(&headers, proxy, &on),
+            "203.0.113.9",
+            "the rightmost entry the proxy added"
+        );
+        assert_eq!(
+            client_ip(&headers, stranger, &on),
+            "198.51.100.7",
+            "only a trusted peer's headers count"
+        );
         let local = Some("127.0.0.1".parse().unwrap());
-        assert_eq!(client_ip(&headers, local, &on), "203.0.113.9", "a proxy on the same machine is trusted");
+        assert_eq!(
+            client_ip(&headers, local, &on),
+            "203.0.113.9",
+            "a proxy on the same machine is trusted"
+        );
         headers.insert("x-forwarded-for", HeaderValue::from_static("203.0.113.9, 10.0.0.1"));
-        assert_eq!(client_ip(&headers, proxy, &on), "203.0.113.9", "trusted proxies in the chain are skipped");
+        assert_eq!(
+            client_ip(&headers, proxy, &on),
+            "203.0.113.9",
+            "trusted proxies in the chain are skipped"
+        );
         headers.insert("x-forwarded-for", HeaderValue::from_static("not-an-address"));
         assert_eq!(client_ip(&headers, proxy, &on), "10.0.0.1");
         headers.insert("x-real-ip", HeaderValue::from_static("203.0.113.10"));

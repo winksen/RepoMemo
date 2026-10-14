@@ -98,7 +98,9 @@ pub fn environments_root() -> Result<PathBuf> {
 pub fn validate_name(name: &str) -> Result<(), String> {
     let name_ok = !name.is_empty()
         && name.len() <= MAX_NAME_CHARS
-        && name.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
         && name.chars().next().is_some_and(|c| c.is_ascii_alphanumeric())
         && !name.ends_with('.');
     if !name_ok {
@@ -108,7 +110,9 @@ pub fn validate_name(name: &str) -> Result<(), String> {
     }
     let stem = name.split('.').next().unwrap_or(name).to_ascii_uppercase();
     let reserved = matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
-        || ((stem.starts_with("COM") || stem.starts_with("LPT")) && stem.len() == 4 && stem.ends_with(|c: char| c.is_ascii_digit()));
+        || ((stem.starts_with("COM") || stem.starts_with("LPT"))
+            && stem.len() == 4
+            && stem.ends_with(|c: char| c.is_ascii_digit()));
     if reserved {
         return Err("This name is reserved by the operating system.".to_owned());
     }
@@ -137,7 +141,9 @@ pub fn resolve_setting(root: &Path, value: &str) -> Result<PathBuf> {
     .with_context(|| {
         format!("REPOMEMO_SERVER_DATA_DIR must name one folder inside {ENVIRONMENTS_DIR}/ (for example `{ENVIRONMENTS_DIR}/main`), not `{value}`")
     })?;
-    validate_name(&name).map_err(anyhow::Error::msg).context("REPOMEMO_SERVER_DATA_DIR")?;
+    validate_name(&name)
+        .map_err(anyhow::Error::msg)
+        .context("REPOMEMO_SERVER_DATA_DIR")?;
     Ok(root.join(name))
 }
 
@@ -271,7 +277,11 @@ impl Host {
         if self.current.read().await.is_some() {
             bail!("An environment is already attached; detach it first.");
         }
-        let name = dir.file_name().and_then(|n| n.to_str()).unwrap_or("environment").to_owned();
+        let name = dir
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("environment")
+            .to_owned();
         let mut scoped = self.config.clone();
         scoped.data_dir = Some(dir.to_path_buf());
         // The platform code also opens the first-run onboarding of a new environment.
@@ -279,7 +289,12 @@ impl Host {
         let (state, tasks) = build_state(&scoped, Arc::downgrade(self)).await?;
         let router = crate::routes(state.clone(), &scoped);
         tracing::info!(target: "audit", environment = %name, "Environment attached");
-        *self.current.write().await = Some(Attachment { name, router, state, tasks });
+        *self.current.write().await = Some(Attachment {
+            name,
+            router,
+            state,
+            tasks,
+        });
         Ok(())
     }
 
@@ -319,7 +334,13 @@ impl Host {
             .route("/v1/platform/environments/create", post(create))
             .route("/v1/platform/environments/attach", post(attach))
             .layer(axum::middleware::from_fn_with_state(
-                crate::security::HeaderPolicy { hsts: self.config.public_url.as_deref().is_some_and(|url| url.starts_with("https://")) },
+                crate::security::HeaderPolicy {
+                    hsts: self
+                        .config
+                        .public_url
+                        .as_deref()
+                        .is_some_and(|url| url.starts_with("https://")),
+                },
                 security_headers,
             ))
             .layer(tower_http::trace::TraceLayer::new_for_http());
@@ -331,7 +352,11 @@ impl Host {
     }
 
     async fn name(&self) -> Option<String> {
-        self.current.read().await.as_ref().map(|attachment| attachment.name.clone())
+        self.current
+            .read()
+            .await
+            .as_ref()
+            .map(|attachment| attachment.name.clone())
     }
 
     /// Counts a wrong code against the client address, or clears its record.
@@ -339,7 +364,10 @@ impl Host {
         let key = format!("platform:{client}");
         if let Some(wait) = self.guards.logins.locked_for(&key) {
             return Err(too_many_requests(
-                format!("Too many wrong codes from this address. Try again in {}.", wait_text(wait)),
+                format!(
+                    "Too many wrong codes from this address. Try again in {}.",
+                    wait_text(wait)
+                ),
                 wait,
             ));
         }
@@ -356,7 +384,9 @@ impl Host {
 
     async fn require_detached(&self) -> Result<(), ApiError> {
         if self.current.read().await.is_some() {
-            return Err(ApiError::conflict("An environment is attached already. Detach it in System settings first."));
+            return Err(ApiError::conflict(
+                "An environment is attached already. Detach it in System settings first.",
+            ));
         }
         Ok(())
     }
@@ -377,7 +407,10 @@ impl FromRequestParts<Arc<Host>> for Peer {
     type Rejection = std::convert::Infallible;
 
     async fn from_request_parts(parts: &mut Parts, host: &Arc<Host>) -> Result<Self, Self::Rejection> {
-        let peer: Option<IpAddr> = parts.extensions.get::<ConnectInfo<SocketAddr>>().map(|info| info.0.ip());
+        let peer: Option<IpAddr> = parts
+            .extensions
+            .get::<ConnectInfo<SocketAddr>>()
+            .map(|info| info.0.ip());
         let headers: &HeaderMap = &parts.headers;
         Ok(Self(client_ip(headers, peer, &host.config.proxy_trust())))
     }
@@ -459,7 +492,9 @@ async fn list(
     let mut entries = Vec::new();
     if let Ok(mut folders) = tokio::fs::read_dir(&host.root).await {
         while let Ok(Some(folder)) = folders.next_entry().await {
-            let Some(name) = folder.file_name().to_str().map(str::to_owned) else { continue };
+            let Some(name) = folder.file_name().to_str().map(str::to_owned) else {
+                continue;
+            };
             let is_folder = folder.file_type().await.is_ok_and(|kind| kind.is_dir());
             if !is_folder || validate_name(&name).is_err() {
                 continue;
@@ -467,7 +502,7 @@ async fn list(
             entries.push(describe(&folder.path(), name).await);
         }
     }
-    entries.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    entries.sort_by_key(|a| a.name.to_lowercase());
     Ok(Json(entries))
 }
 
@@ -488,7 +523,9 @@ async fn create(
     let name = request.name.trim().to_owned();
     let dir = host.folder(&name)?;
     if dir.exists() {
-        return Err(ApiError::conflict("A folder with this name exists already. Choose it from the list instead."));
+        return Err(ApiError::conflict(
+            "A folder with this name exists already. Choose it from the list instead.",
+        ));
     }
     tokio::fs::create_dir_all(&dir).await.map_err(ApiError::internal)?;
     if let Err(error) = host.attach_dir(&dir).await {
@@ -511,21 +548,32 @@ async fn attach(
     let dir = host.folder(&name)?;
     match inspect_environment(&dir).await {
         EnvironmentState::Invalid(reason) => {
-            return Err(ApiError::bad_request(format!("This folder cannot be attached: {reason}")));
+            return Err(ApiError::bad_request(format!(
+                "This folder cannot be attached: {reason}"
+            )));
         }
         EnvironmentState::Empty if !dir.exists() => {
-            return Err(ApiError::not_found("This environment does not exist. Create it instead."));
+            return Err(ApiError::not_found(
+                "This environment does not exist. Create it instead.",
+            ));
         }
         EnvironmentState::Empty | EnvironmentState::Valid => {}
     }
-    host.attach_dir(&dir).await.map_err(|error| ApiError::internal(format!("{error:#}")))?;
+    host.attach_dir(&dir)
+        .await
+        .map_err(|error| ApiError::internal(format!("{error:#}")))?;
     host.remember(Some(&name));
     Ok(status(State(host)).await)
 }
 
 /// Everything else: the attached environment answers, or none is attached.
 async fn delegate(State(host): State<Arc<Host>>, request: Request) -> Response {
-    let router = host.current.read().await.as_ref().map(|attachment| attachment.router.clone());
+    let router = host
+        .current
+        .read()
+        .await
+        .as_ref()
+        .map(|attachment| attachment.router.clone());
     match router {
         Some(router) => match router.oneshot(request).await {
             Ok(response) => response,
@@ -571,7 +619,20 @@ mod tests {
         for good in ["main", "onboarding", "client-a_2", "v1.2"] {
             assert!(validate_name(good).is_ok(), "{good}");
         }
-        for bad in ["", ".hidden", "-x", "a/b", "a\\b", "..", "con", "COM1", "nul.txt", "trailing.", "sp ace", &"x".repeat(49)] {
+        for bad in [
+            "",
+            ".hidden",
+            "-x",
+            "a/b",
+            "a\\b",
+            "..",
+            "con",
+            "COM1",
+            "nul.txt",
+            "trailing.",
+            "sp ace",
+            &"x".repeat(49),
+        ] {
             assert!(validate_name(bad).is_err(), "{bad}");
         }
     }
@@ -586,7 +647,10 @@ mod tests {
         let response = app.clone().oneshot(request).await.unwrap();
         let status = response.status();
         let bytes = axum::body::to_bytes(response.into_body(), 1 << 20).await.unwrap();
-        (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+        (
+            status,
+            serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+        )
     }
 
     #[tokio::test]
@@ -600,13 +664,34 @@ mod tests {
         assert_eq!(status, StatusCode::OK);
         assert_eq!(body["attached"], false);
         let (status, body) = call(&app, "GET", "/health", None).await;
-        assert_eq!((status, body["environment_required"].clone()), (StatusCode::OK, serde_json::json!(true)));
+        assert_eq!(
+            (status, body["environment_required"].clone()),
+            (StatusCode::OK, serde_json::json!(true))
+        );
         let (status, body) = call(&app, "GET", "/v1/workspaces", None).await;
-        assert_eq!((status, body["error"]["code"].clone()), (StatusCode::SERVICE_UNAVAILABLE, serde_json::json!("environment_required")));
+        assert_eq!(
+            (status, body["error"]["code"].clone()),
+            (
+                StatusCode::SERVICE_UNAVAILABLE,
+                serde_json::json!("environment_required")
+            )
+        );
 
-        let (status, _) = call(&app, "POST", "/v1/platform/environments/list", Some(r#"{"code":"WRONG-CODE-0000"}"#)).await;
+        let (status, _) = call(
+            &app,
+            "POST",
+            "/v1/platform/environments/list",
+            Some(r#"{"code":"WRONG-CODE-0000"}"#),
+        )
+        .await;
         assert_eq!(status, StatusCode::FORBIDDEN);
-        let (status, _) = call(&app, "POST", "/v1/platform/environments/list", Some(r#"{"code":"abcd-efgh-jklm"}"#)).await;
+        let (status, _) = call(
+            &app,
+            "POST",
+            "/v1/platform/environments/list",
+            Some(r#"{"code":"abcd-efgh-jklm"}"#),
+        )
+        .await;
         assert_eq!(status, StatusCode::OK);
         for name in ["../escape", "a/b", ".hidden"] {
             let body = serde_json::json!({ "code": "ABCD-EFGH-JKLM", "name": name }).to_string();
@@ -625,7 +710,13 @@ mod tests {
         assert_eq!(body["attached"], true);
         let (status, _) = call(&app, "GET", "/health", None).await;
         assert_eq!(status, StatusCode::OK);
-        let (status, _) = call(&app, "POST", "/v1/platform/environments/attach", Some(r#"{"code":"ABCD-EFGH-JKLM","name":"other"}"#)).await;
+        let (status, _) = call(
+            &app,
+            "POST",
+            "/v1/platform/environments/attach",
+            Some(r#"{"code":"ABCD-EFGH-JKLM","name":"other"}"#),
+        )
+        .await;
         assert_eq!(status, StatusCode::CONFLICT);
         let _ = std::fs::remove_dir_all(dir);
     }
@@ -640,7 +731,10 @@ mod tests {
         write_last_environment(&root, None);
         assert_eq!(read_last_environment(&root), None);
         write_last_environment(&root, None);
-        assert!(validate_name(LAST_ENVIRONMENT_FILE).is_err(), "the file is never listed as an environment");
+        assert!(
+            validate_name(LAST_ENVIRONMENT_FILE).is_err(),
+            "the file is never listed as an environment"
+        );
         let _ = std::fs::remove_dir_all(base);
     }
 
@@ -649,7 +743,10 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("repomemo-pinned-{}", uuid::Uuid::new_v4()));
         let app = crate::router(ServerConfig::for_test(dir.clone())).await.unwrap();
         let (_, body) = call(&app, "GET", "/v1/platform", None).await;
-        assert_eq!(body["pinned_environment"], serde_json::json!(dir.file_name().unwrap().to_str().unwrap()));
+        assert_eq!(
+            body["pinned_environment"],
+            serde_json::json!(dir.file_name().unwrap().to_str().unwrap())
+        );
         let _ = std::fs::remove_dir_all(dir);
     }
 
@@ -657,8 +754,19 @@ mod tests {
     fn the_setting_must_name_one_folder_inside_the_root() {
         let root = std::env::temp_dir().join("repomemo-root-test").join(ENVIRONMENTS_DIR);
         assert_eq!(resolve_setting(&root, "main").unwrap(), root.join("main"));
-        assert_eq!(resolve_setting(&root, "workspace-data/main").unwrap(), root.join("main"));
-        for bad in ["..", "../main", "workspace-data/a/b", ".repomemo-server", "/etc", "workspace-data", ""] {
+        assert_eq!(
+            resolve_setting(&root, "workspace-data/main").unwrap(),
+            root.join("main")
+        );
+        for bad in [
+            "..",
+            "../main",
+            "workspace-data/a/b",
+            ".repomemo-server",
+            "/etc",
+            "workspace-data",
+            "",
+        ] {
             assert!(resolve_setting(&root, bad).is_err(), "{bad}");
         }
     }

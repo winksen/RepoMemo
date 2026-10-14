@@ -2,6 +2,27 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)), then `0.2.1` and so on for fixes. Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.1.71 (2026-10-14)
+
+Server foundation: the base the product work after it builds on. Behaviour changes are limited to the items below.
+
+### Changed
+- **The server is split by area.** `apps/server/src/lib.rs` (9,000 lines with its tests) is the router and state, with the handlers in `auth`, `access_control`, `profile`, `organizations`, `workspaces`, `artifacts`, `collaboration`, `retrieval`, `ai`, `streams`, `requests`, `errors` and `config`, and its tests in `tests/`. No module is over 1,500 lines.
+- **The storage crate is split by area.** `crates/storage/src/lib.rs` (6,200 lines) keeps the engine, the row types and the helpers; its methods live in `users`, `organizations`, `activity`, `collaboration`, `artifacts`, `search`, `memory`, `jobs` and `providers`.
+- **Typed errors.** What a person caused (a record that does not exist, input that is not acceptable, a name that is taken) is created with `not_found!`, `invalid!` and `conflict!` in `repomemo-domain` and carries its kind. The HTTP layer answers from the kind, no longer from the words of the message, and every other failure is a generic 500 with the detail in the log. Handlers that returned storage errors as 400 (token creation, folders) now answer with the right status (review L6).
+- **One writer connection and a pool of readers.** Writes and transactions go through a single SQLite connection (writers queue instead of failing with "database is locked"); reads use their own read-only connections (`REPOMEMO_DB_READ_CONNECTIONS`, default 4) and never wait for a write.
+- Indexing and embedding concurrency are settings: `REPOMEMO_INDEX_CONCURRENCY` (default 2) and `REPOMEMO_EMBEDDING_CONCURRENCY` (default 1). System › Overview lists them.
+- **The code base is formatted with rustfmt and clean under clippy** (`-D warnings`), and CI fails otherwise. License and duplicate-crate checks run in CI as well.
+- `apps/worker`, a placeholder that did nothing, is removed.
+- **Dependencies.** `quick-xml` 0.41 in the document readers closes two advisories about hostile XML (RUSTSEC-2026-0194, -0195), and `cargo update` brings `anyhow`, `rustls` and the rest to their patched releases, so `cargo deny` is clean for the whole workspace. One advisory is ignored with its reason in `deny.toml`: `rsa` is linked by `jsonwebtoken` but unused, since tokens are HS256.
+
+### Security
+- **Request timeouts (N7).** Every route except the live event streams answers within `REPOMEMO_REQUEST_TIMEOUT_SECONDS` (default 120; `408` after that). A client has `REPOMEMO_HEADER_TIMEOUT_SECONDS` (default 30) to send its request headers, which ends slow-header connections. One account can hold `REPOMEMO_MAX_EVENT_STREAMS_PER_USER` live streams (default 10; `429` after that). Part of M11.
+
+### Upgrading
+- A request that takes longer than two minutes (a very large upload over a slow link) needs a higher `REPOMEMO_REQUEST_TIMEOUT_SECONDS`.
+- Scripts that matched error texts of the API should use status codes and the `error.code` field.
+
 ## V0.1.70 (2026-10-14)
 
 Web client foundation: the base every later product release builds on. No change in what the app does.

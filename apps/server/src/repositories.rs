@@ -19,15 +19,15 @@ use axum::{
 };
 use repomemo_api::RepoMemoCore;
 use repomemo_domain::{
-    IndexingJobStatus, ProviderSettings, RepoAccessCheck, RepoDetail, RepoFile, RepoSettings,
-    RepoSource, RepoSummary, RepoSyncReport, REPO_SYNC_JOB_KIND,
+    IndexingJobStatus, ProviderSettings, RepoAccessCheck, RepoDetail, RepoFile, RepoSettings, RepoSource, RepoSummary,
+    RepoSyncReport, REPO_SYNC_JOB_KIND,
 };
 use serde::{Deserialize, Serialize};
 use tokio::sync::Semaphore;
 
 use crate::{
-    ai_access, embedding::EmbeddingQueue, record_workspace_activity, require_workspace_admin,
-    require_workspace_read, require_workspace_write, ApiError, AppState, AuthenticatedSubject,
+    ai_access, embedding::EmbeddingQueue, record_workspace_activity, require_workspace_admin, require_workspace_read,
+    require_workspace_write, ApiError, AppState, AuthenticatedSubject,
 };
 
 /// An automatic sync towards the same commit is not tried again sooner than
@@ -74,7 +74,10 @@ impl RepoSyncRunner {
     /// that moved, so the workspace follows new commits without anyone
     /// pressing Sync now. `interval` is read before every round, so a system
     /// administrator can change it (or turn polling off, `None`) at run time.
-    pub(crate) fn start_polling(&self, interval: impl Fn() -> Option<Duration> + Send + 'static) -> tokio::task::JoinHandle<()> {
+    pub(crate) fn start_polling(
+        &self,
+        interval: impl Fn() -> Option<Duration> + Send + 'static,
+    ) -> tokio::task::JoinHandle<()> {
         let runner = self.clone();
         tokio::spawn(async move {
             loop {
@@ -88,7 +91,10 @@ impl RepoSyncRunner {
                 }
                 let started = runner.poll_once().await;
                 if started > 0 {
-                    tracing::info!(count = started, "Started automatic repository syncs for branches that moved");
+                    tracing::info!(
+                        count = started,
+                        "Started automatic repository syncs for branches that moved"
+                    );
                 }
             }
         })
@@ -123,9 +129,9 @@ impl RepoSyncRunner {
                 .auto_attempts
                 .lock()
                 .map(|attempts| {
-                    attempts.get(&source_id).is_some_and(|(commit, at)| {
-                        commit == &head.current && at.elapsed() < AUTO_SYNC_RETRY_AFTER
-                    })
+                    attempts
+                        .get(&source_id)
+                        .is_some_and(|(commit, at)| commit == &head.current && at.elapsed() < AUTO_SYNC_RETRY_AFTER)
                 })
                 .unwrap_or(true);
             if recently_tried {
@@ -184,12 +190,7 @@ impl RepoSyncRunner {
         Ok(Some(job))
     }
 
-    async fn finish(
-        &self,
-        source: &RepoSource,
-        actor_user_id: Option<&str>,
-        result: anyhow::Result<RepoSyncReport>,
-    ) {
+    async fn finish(&self, source: &RepoSource, actor_user_id: Option<&str>, result: anyhow::Result<RepoSyncReport>) {
         let (action, summary) = match result {
             Ok(report) => {
                 if report.indexed > 0 || report.removed > 0 {
@@ -206,13 +207,20 @@ impl RepoSyncRunner {
                     "repository_synced",
                     format!(
                         "{verb} repository {} at {short}: {} added, {} updated, {} renamed, {} removed.",
-                        source.name, report.added + report.restored, report.updated, report.renamed, report.removed
+                        source.name,
+                        report.added + report.restored,
+                        report.updated,
+                        report.renamed,
+                        report.removed
                     ),
                 )
             }
             Err(error) => {
                 tracing::warn!(repository = %source.name, error = %format!("{error:#}"), "Repository sync failed");
-                ("repository_sync_failed", format!("Syncing repository {} failed.", source.name))
+                (
+                    "repository_sync_failed",
+                    format!("Syncing repository {} failed.", source.name),
+                )
             }
         };
         if let Err(error) = self
@@ -450,7 +458,10 @@ pub(crate) async fn delete_repository(
         "repository_removed",
         "repository",
         Some(&source_id),
-        format!("Removed repository {} and its {} files.", repository.name, repository.file_count),
+        format!(
+            "Removed repository {} and its {} files.",
+            repository.name, repository.file_count
+        ),
     )
     .await;
     Ok(StatusCode::NO_CONTENT)
@@ -494,9 +505,7 @@ pub(crate) async fn get_repository_detail(
 ) -> Result<Json<RepositoryDetailResponse>, ApiError> {
     let detail = state.core.repo_detail(&source_id).await.map_err(map_repo_error)?;
     let role = require_workspace_read(&state, &subject, &detail.repository.workspace_id).await?;
-    let ai_available = text_provider(&state, &detail.repository.workspace_id)
-        .await?
-        .is_some()
+    let ai_available = text_provider(&state, &detail.repository.workspace_id).await?.is_some()
         && ai_access::role_may_use_ai(&state, &detail.repository.workspace_id, &role).await?;
     Ok(Json(RepositoryDetailResponse { detail, ai_available }))
 }
@@ -562,10 +571,7 @@ pub(crate) async fn list_repository_files(
 }
 
 /// Refuses edits that a repository sync would undo.
-pub(crate) async fn ensure_not_repository_file(
-    state: &AppState,
-    artifact_id: &str,
-) -> Result<(), ApiError> {
+pub(crate) async fn ensure_not_repository_file(state: &AppState, artifact_id: &str) -> Result<(), ApiError> {
     let repository = state
         .storage
         .repo_name_for_artifact(artifact_id)
@@ -584,16 +590,8 @@ async fn load_repository(state: &AppState, source_id: &str) -> Result<RepoSource
 }
 
 /// Repository errors are mostly about the user's input (a folder that is not
-/// a repository, a branch that does not exist), so their message is shown.
+/// a repository, a branch that does not exist): those carry their kind and
+/// their message is shown. Anything else is the server's problem.
 fn map_repo_error(error: anyhow::Error) -> ApiError {
-    let message = format!("{error:#}");
-    if message.contains("was not found") {
-        ApiError::not_found(error.to_string())
-    } else if message.contains("already connected") {
-        ApiError::conflict(error.to_string())
-    } else if message.contains("database") || message.contains("sqlx") {
-        ApiError::internal(error)
-    } else {
-        ApiError::bad_request(message)
-    }
+    crate::map_storage_error(error)
 }

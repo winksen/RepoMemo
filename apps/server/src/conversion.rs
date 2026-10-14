@@ -109,7 +109,9 @@ impl Converter {
     /// Asks LibreOffice for its version (for System › Overview). Quiet on
     /// failure: the converter itself reports what goes wrong.
     pub async fn probe_version(&self) {
-        let Some(soffice) = self.inner.soffice.clone() else { return };
+        let Some(soffice) = self.inner.soffice.clone() else {
+            return;
+        };
         let mut command = self.command(&soffice, &self.inner.cache_dir.join("tmp"));
         command
             .arg("--version")
@@ -138,7 +140,9 @@ impl Converter {
         let mut command = match self.inner.wrapper.split_first() {
             Some((program, arguments)) => {
                 let mut command = Command::new(replace(program));
-                command.args(arguments.iter().map(|argument| replace(argument))).arg(soffice);
+                command
+                    .args(arguments.iter().map(|argument| replace(argument)))
+                    .arg(soffice);
                 command
             }
             None => Command::new(soffice),
@@ -303,11 +307,7 @@ impl Converter {
             .filter(|extension| SUPPORTED_EXTENSIONS.contains(&extension.as_str()))
             .ok_or("This file type is not converted.")?;
 
-        let work = self
-            .inner
-            .cache_dir
-            .join("tmp")
-            .join(uuid_like(&summary.content_hash));
+        let work = self.inner.cache_dir.join("tmp").join(uuid_like(&summary.content_hash));
         tokio::fs::create_dir_all(&work)
             .await
             .map_err(|error| error.to_string())?;
@@ -324,9 +324,7 @@ impl Converter {
         let finished = match result {
             Ok(()) => match tokio::fs::metadata(&output).await {
                 Ok(meta) if meta.len() == 0 => Err("The converter produced an empty PDF.".to_owned()),
-                Ok(meta) if meta.len() > MAX_PDF_BYTES => {
-                    Err("The converted PDF is too large to preview.".to_owned())
-                }
+                Ok(meta) if meta.len() > MAX_PDF_BYTES => Err("The converted PDF is too large to preview.".to_owned()),
                 Ok(_) => {
                     let target = self.pdf_path(&summary.content_hash);
                     let staging = target.with_extension("pdf.part");
@@ -461,12 +459,13 @@ fn find_soffice() -> Option<PathBuf> {
     } else if cfg!(target_os = "macos") {
         &["/Applications/LibreOffice.app/Contents/MacOS/soffice"]
     } else {
-        &["/usr/bin/soffice", "/usr/lib/libreoffice/program/soffice", "/opt/libreoffice/program/soffice"]
+        &[
+            "/usr/bin/soffice",
+            "/usr/lib/libreoffice/program/soffice",
+            "/opt/libreoffice/program/soffice",
+        ]
     };
-    known
-        .iter()
-        .map(PathBuf::from)
-        .find(|candidate| candidate.is_file())
+    known.iter().map(PathBuf::from).find(|candidate| candidate.is_file())
 }
 
 #[cfg(test)]
@@ -490,7 +489,14 @@ mod tests {
 
     #[test]
     fn secrets_of_the_server_stay_out_of_libreoffice() {
-        for secret in ["REPOMEMO_SECRET_KEY", "repomemo_setup_code", "AWS_SECRET_ACCESS_KEY", "GITHUB_TOKEN", "DB_PASSWORD", "RUST_LOG"] {
+        for secret in [
+            "REPOMEMO_SECRET_KEY",
+            "repomemo_setup_code",
+            "AWS_SECRET_ACCESS_KEY",
+            "GITHUB_TOKEN",
+            "DB_PASSWORD",
+            "RUST_LOG",
+        ] {
             assert!(is_secret_variable(secret), "{secret}");
         }
         for harmless in ["PATH", "SystemRoot", "TEMP", "HOME", "LANG"] {
@@ -503,13 +509,20 @@ mod tests {
         let converter = Converter::with_options(
             &std::env::temp_dir().join("repomemo-wrapper-test"),
             None,
-            vec!["sandbox".to_owned(), "--bind={work}".to_owned(), "--net=none".to_owned()],
+            vec![
+                "sandbox".to_owned(),
+                "--bind={work}".to_owned(),
+                "--net=none".to_owned(),
+            ],
         );
         assert!(converter.sandboxed());
         let command = converter.command(Path::new("/usr/bin/soffice"), Path::new("/work/dir"));
         let std_command = command.as_std();
         assert_eq!(std_command.get_program().to_string_lossy(), "sandbox");
-        let arguments = std_command.get_args().map(|argument| argument.to_string_lossy().into_owned()).collect::<Vec<_>>();
+        let arguments = std_command
+            .get_args()
+            .map(|argument| argument.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
         assert_eq!(arguments, vec!["--bind=/work/dir", "--net=none", "/usr/bin/soffice"]);
     }
 

@@ -70,19 +70,26 @@ impl Client {
 
     pub async fn sign_in(&mut self, email: &str, password: &str) -> Result<(), Failure> {
         let answer = self
-            .call(Method::POST, "/v1/auth/login", Some(json!({ "email": email, "password": password })), false)
+            .call(
+                Method::POST,
+                "/v1/auth/login",
+                Some(json!({ "email": email, "password": password })),
+                false,
+            )
             .await?;
         self.store(answer)
     }
 
     pub async fn welcome(&mut self) -> Result<Welcome, Failure> {
         let answer = self.authorized(Method::GET, "/v1/system/console", None).await?;
-        serde_json::from_value(answer).map_err(|error| Failure::Server(format!("The server's welcome was not understood: {error}")))
+        serde_json::from_value(answer)
+            .map_err(|error| Failure::Server(format!("The server's welcome was not understood: {error}")))
     }
 
     /// Runs one console line; the answer is the server's JSON as is.
     pub async fn run(&mut self, command: &str) -> Result<Value, Failure> {
-        self.authorized(Method::POST, "/v1/system/console", Some(json!({ "command": command }))).await
+        self.authorized(Method::POST, "/v1/system/console", Some(json!({ "command": command })))
+            .await
     }
 
     fn store(&mut self, answer: Value) -> Result<(), Failure> {
@@ -95,9 +102,16 @@ impl Client {
 
     /// Renews the access token once it has expired, like the web app does.
     async fn renew(&mut self) -> bool {
-        let Some(refresh) = self.refresh.clone() else { return false };
+        let Some(refresh) = self.refresh.clone() else {
+            return false;
+        };
         let renewed = match self
-            .call(Method::POST, "/v1/auth/refresh", Some(json!({ "refresh_token": refresh })), false)
+            .call(
+                Method::POST,
+                "/v1/auth/refresh",
+                Some(json!({ "refresh_token": refresh })),
+                false,
+            )
             .await
         {
             Ok(answer) => self.store(answer).is_ok(),
@@ -131,7 +145,10 @@ impl Client {
         if let Some(body) = body {
             request = request.json(&body);
         }
-        let response = request.send().await.map_err(|error| Failure::Unreachable(error.to_string()))?;
+        let response = request
+            .send()
+            .await
+            .map_err(|error| Failure::Unreachable(error.to_string()))?;
         let status = response.status();
         let answer: Value = response.json().await.unwrap_or(Value::Null);
         if status.is_success() {

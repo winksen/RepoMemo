@@ -17,10 +17,6 @@ use tokio::sync::{mpsc, Semaphore};
 
 use crate::embedding::EmbeddingQueue;
 
-/// Indexing can call a vision provider, so keep a small ceiling on how many
-/// artifacts are processed at once instead of one task per upload.
-const MAX_CONCURRENT_INDEXING: usize = 2;
-
 /// A failed attempt is retried after each of these delays, then given up on so
 /// an unreachable provider is not hammered forever. Giving up records the
 /// reason for the shared client; the next server start or a provider change
@@ -58,7 +54,10 @@ impl IndexQueue {
     /// Starts the queue worker on the current Tokio runtime. The worker stops
     /// once every clone of the queue has been dropped. Each indexed artifact
     /// asks `embeddings` to embed its workspace's new chunks.
-    pub fn start(core: RepoMemoCore, embeddings: EmbeddingQueue) -> Self {
+    ///
+    /// Indexing can call a vision provider, so `concurrency` caps how many
+    /// artifacts are processed at once instead of one task per upload.
+    pub fn start(core: RepoMemoCore, embeddings: EmbeddingQueue, concurrency: usize) -> Self {
         let (sender, receiver) = mpsc::unbounded_channel();
         let queued = Arc::new(Mutex::new(HashSet::new()));
         tokio::spawn(run_worker(
@@ -67,12 +66,9 @@ impl IndexQueue {
             queued.clone(),
             sender.clone(),
             receiver,
+            concurrency.max(1),
         ));
-        Self {
-            sender,
-            queued,
-            core,
-        }
+        Self { sender, queued, core }
     }
 
     /// Schedules a newly stored artifact for indexing unless it is already
@@ -139,8 +135,9 @@ async fn run_worker(
     queued: Arc<Mutex<HashSet<String>>>,
     sender: mpsc::UnboundedSender<IndexRequest>,
     mut receiver: mpsc::UnboundedReceiver<IndexRequest>,
+    concurrency: usize,
 ) {
-    let permits = Arc::new(Semaphore::new(MAX_CONCURRENT_INDEXING));
+    let permits = Arc::new(Semaphore::new(concurrency));
     while let Some(request) = receiver.recv().await {
         let Ok(permit) = permits.clone().acquire_owned().await else {
             break;

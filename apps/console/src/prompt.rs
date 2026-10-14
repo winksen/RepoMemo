@@ -25,8 +25,14 @@ impl ConsoleHelper {
     pub fn new(commands: &[CommandInfo], color: bool) -> Self {
         let mut commands = commands.to_vec();
         // Handled by the terminal itself, never sent to the server.
-        for (name, usage) in [("clear", "clear (empties the screen)"), ("exit", "exit (leaves the console)")] {
-            commands.push(CommandInfo { name: name.to_owned(), usage: usage.to_owned() });
+        for (name, usage) in [
+            ("clear", "clear (empties the screen)"),
+            ("exit", "exit (leaves the console)"),
+        ] {
+            commands.push(CommandInfo {
+                name: name.to_owned(),
+                usage: usage.to_owned(),
+            });
         }
         Self { commands, color }
     }
@@ -79,18 +85,34 @@ impl Hinter for ConsoleHelper {
             .filter(|command| words == command.name || words.starts_with(&format!("{} ", command.name)))
             .max_by_key(|command| command.name.len());
         if let Some(command) = named {
-            return Some(ConsoleHint { display: format!("   {}", command.usage), completion: None });
+            return Some(ConsoleHint {
+                display: format!("   {}", command.usage),
+                completion: None,
+            });
         }
         // Part of a name: the rest when one command fits, else the choices.
-        let candidates = self.commands.iter().filter(|command| command.name.starts_with(&words)).collect::<Vec<_>>();
+        let candidates = self
+            .commands
+            .iter()
+            .filter(|command| command.name.starts_with(&words))
+            .collect::<Vec<_>>();
         match candidates.as_slice() {
             [] => None,
             [only] if !line.ends_with(char::is_whitespace) => {
                 let rest = only.name[words.len()..].to_owned();
-                Some(ConsoleHint { display: rest.clone(), completion: Some(rest) })
+                Some(ConsoleHint {
+                    display: rest.clone(),
+                    completion: Some(rest),
+                })
             }
             many => Some(ConsoleHint {
-                display: format!("   {}", many.iter().map(|command| command.name.as_str()).collect::<Vec<_>>().join(" · ")),
+                display: format!(
+                    "   {}",
+                    many.iter()
+                        .map(|command| command.name.as_str())
+                        .collect::<Vec<_>>()
+                        .join(" · ")
+                ),
                 completion: None,
             }),
         }
@@ -116,11 +138,19 @@ impl Completer for ConsoleHelper {
 
 impl Highlighter for ConsoleHelper {
     fn highlight_prompt<'b, 's: 'b, 'p: 'b>(&'s self, prompt: &'p str, _default: bool) -> Cow<'b, str> {
-        if self.color { Cow::Owned(format!("\x1b[1;38;5;36m{prompt}\x1b[0m")) } else { Cow::Borrowed(prompt) }
+        if self.color {
+            Cow::Owned(format!("\x1b[1;38;5;36m{prompt}\x1b[0m"))
+        } else {
+            Cow::Borrowed(prompt)
+        }
     }
 
     fn highlight_hint<'h>(&self, hint: &'h str) -> Cow<'h, str> {
-        if self.color { Cow::Owned(format!("\x1b[90m{hint}\x1b[0m")) } else { Cow::Borrowed(hint) }
+        if self.color {
+            Cow::Owned(format!("\x1b[90m{hint}\x1b[0m"))
+        } else {
+            Cow::Borrowed(hint)
+        }
     }
 }
 
@@ -135,8 +165,18 @@ mod tests {
     use super::*;
 
     fn helper() -> ConsoleHelper {
-        let command = |name: &str, usage: &str| CommandInfo { name: name.to_owned(), usage: usage.to_owned() };
-        ConsoleHelper::new(&[command("status", "status"), command("jobs list", "jobs list [--status s]"), command("jobs cancel", "jobs cancel <job-id> --yes")], false)
+        let command = |name: &str, usage: &str| CommandInfo {
+            name: name.to_owned(),
+            usage: usage.to_owned(),
+        };
+        ConsoleHelper::new(
+            &[
+                command("status", "status"),
+                command("jobs list", "jobs list [--status s]"),
+                command("jobs cancel", "jobs cancel <job-id> --yes"),
+            ],
+            false,
+        )
     }
 
     #[test]
@@ -144,10 +184,17 @@ mod tests {
         let helper = helper();
         let history = DefaultHistory::new();
         let context = Context::new(&history);
-        let hint = |line: &str| helper.hint(line, line.len(), &context).map(|hint| (hint.display, hint.completion));
+        let hint = |line: &str| {
+            helper
+                .hint(line, line.len(), &context)
+                .map(|hint| (hint.display, hint.completion))
+        };
         assert_eq!(hint("sta"), Some(("tus".to_owned(), Some("tus".to_owned()))));
         assert_eq!(hint("jobs"), Some(("   jobs list · jobs cancel".to_owned(), None)));
-        assert_eq!(hint("JOBS  cancel abc"), Some(("   jobs cancel <job-id> --yes".to_owned(), None)));
+        assert_eq!(
+            hint("JOBS  cancel abc"),
+            Some(("   jobs cancel <job-id> --yes".to_owned(), None))
+        );
         assert_eq!(hint("nope"), None);
     }
 
@@ -156,7 +203,13 @@ mod tests {
         let helper = helper();
         let history = DefaultHistory::new();
         let context = Context::new(&history);
-        assert_eq!(helper.complete("  jobs c", 8, &context).unwrap(), (2, vec!["jobs cancel ".to_owned()]));
-        assert_eq!(helper.complete("st", 2, &context).unwrap(), (0, vec!["status ".to_owned()]));
+        assert_eq!(
+            helper.complete("  jobs c", 8, &context).unwrap(),
+            (2, vec!["jobs cancel ".to_owned()])
+        );
+        assert_eq!(
+            helper.complete("st", 2, &context).unwrap(),
+            (0, vec!["status ".to_owned()])
+        );
     }
 }

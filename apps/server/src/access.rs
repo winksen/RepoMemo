@@ -25,8 +25,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     check_auth_quota, create_notification, hash_password, issue_session, map_storage_error, record_workspace_activity,
-    require_organization_admin, require_workspace_admin, security::ClientIp, validate_password,
-    workspace_role_label, ApiError, AppState, AuthAction, AuthenticatedSubject, SessionSubject, TokenResponse,
+    require_organization_admin, require_workspace_admin, security::ClientIp, validate_password, workspace_role_label,
+    ApiError, AppState, AuthAction, AuthenticatedSubject, SessionSubject, TokenResponse,
 };
 
 /// How long an invitation link works.
@@ -61,7 +61,11 @@ pub(crate) struct CreatedInvitation {
 
 fn created(invitation: Invitation, token: String) -> CreatedInvitation {
     let path = format!("/invite#{token}");
-    CreatedInvitation { invitation, token, path }
+    CreatedInvitation {
+        invitation,
+        token,
+        path,
+    }
 }
 
 fn parse_workspace_role(value: &str) -> Result<WorkspaceRole, ApiError> {
@@ -109,14 +113,18 @@ fn organization_role_label(role: &OrganizationRole) -> &'static str {
 /// The same rule as adding a member: only owners grant the admin role.
 fn check_workspace_grant(caller: &WorkspaceRole, role: &WorkspaceRole) -> Result<(), ApiError> {
     if matches!(role, WorkspaceRole::Admin) && !matches!(caller, WorkspaceRole::Owner) {
-        return Err(ApiError::forbidden_because("Only the workspace owner can invite administrators."));
+        return Err(ApiError::forbidden_because(
+            "Only the workspace owner can invite administrators.",
+        ));
     }
     Ok(())
 }
 
 fn check_organization_grant(caller: &OrganizationRole, role: &OrganizationRole) -> Result<(), ApiError> {
     if matches!(role, OrganizationRole::Admin) && !matches!(caller, OrganizationRole::Owner) {
-        return Err(ApiError::forbidden_because("Only the organization owner can invite administrators."));
+        return Err(ApiError::forbidden_because(
+            "Only the organization owner can invite administrators.",
+        ));
     }
     Ok(())
 }
@@ -130,14 +138,34 @@ pub(crate) async fn create_workspace_invitation(
     let caller = require_workspace_admin(&state, &subject, &workspace_id).await?;
     let role = parse_workspace_role(request.role.trim())?;
     check_workspace_grant(&caller, &role)?;
-    if let Some(user) = state.storage.find_user_by_email(&request.email).await.map_err(map_storage_error)? {
-        if state.storage.workspace_role_for_user(&user.id, &workspace_id).await.map_err(map_storage_error)?.is_some() {
-            return Err(ApiError::conflict("This person is already a member of this workspace. Change their role in the member list."));
+    if let Some(user) = state
+        .storage
+        .find_user_by_email(&request.email)
+        .await
+        .map_err(map_storage_error)?
+    {
+        if state
+            .storage
+            .workspace_role_for_user(&user.id, &workspace_id)
+            .await
+            .map_err(map_storage_error)?
+            .is_some()
+        {
+            return Err(ApiError::conflict(
+                "This person is already a member of this workspace. Change their role in the member list.",
+            ));
         }
     }
     let (invitation, token) = state
         .storage
-        .create_invitation(&request.email, "workspace", &workspace_id, workspace_role_label(&role), &subject.user_id, INVITATION_TTL_DAYS)
+        .create_invitation(
+            &request.email,
+            "workspace",
+            &workspace_id,
+            workspace_role_label(&role),
+            &subject.user_id,
+            INVITATION_TTL_DAYS,
+        )
         .await
         .map_err(map_storage_error)?;
     tracing::info!(target: "audit", user_id = %subject.user_id, workspace_id = %workspace_id, invitation_id = %invitation.id, "Workspace invitation created");
@@ -177,14 +205,34 @@ pub(crate) async fn create_organization_invitation(
     let caller = require_organization_admin(&state, &subject, &organization_id).await?;
     let role = parse_organization_role(request.role.trim())?;
     check_organization_grant(&caller, &role)?;
-    if let Some(user) = state.storage.find_user_by_email(&request.email).await.map_err(map_storage_error)? {
-        if state.storage.organization_role_for_user(&user.id, &organization_id).await.map_err(map_storage_error)?.is_some() {
-            return Err(ApiError::conflict("This person is already a member of this organization. Change their role in the member list."));
+    if let Some(user) = state
+        .storage
+        .find_user_by_email(&request.email)
+        .await
+        .map_err(map_storage_error)?
+    {
+        if state
+            .storage
+            .organization_role_for_user(&user.id, &organization_id)
+            .await
+            .map_err(map_storage_error)?
+            .is_some()
+        {
+            return Err(ApiError::conflict(
+                "This person is already a member of this organization. Change their role in the member list.",
+            ));
         }
     }
     let (invitation, token) = state
         .storage
-        .create_invitation(&request.email, "organization", &organization_id, organization_role_label(&role), &subject.user_id, INVITATION_TTL_DAYS)
+        .create_invitation(
+            &request.email,
+            "organization",
+            &organization_id,
+            organization_role_label(&role),
+            &subject.user_id,
+            INVITATION_TTL_DAYS,
+        )
         .await
         .map_err(map_storage_error)?;
     tracing::info!(target: "audit", user_id = %subject.user_id, organization_id = %organization_id, invitation_id = %invitation.id, "Organization invitation created");
@@ -226,7 +274,12 @@ pub(crate) async fn revoke_invitation(
             require_organization_admin(&state, &subject, &invitation.target_id).await?;
         }
     }
-    if !state.storage.revoke_invitation(&invitation_id).await.map_err(map_storage_error)? {
+    if !state
+        .storage
+        .revoke_invitation(&invitation_id)
+        .await
+        .map_err(map_storage_error)?
+    {
         return Err(ApiError::conflict("This invitation was already used or withdrawn."));
     }
     tracing::info!(target: "audit", user_id = %subject.user_id, invitation_id = %invitation_id, "Invitation withdrawn");
@@ -272,7 +325,9 @@ async fn usable_invitation(state: &AppState, token: &str) -> Result<repomemo_sto
         .find_invitation_by_token(token)
         .await
         .map_err(map_storage_error)?
-        .ok_or_else(|| ApiError::not_found("This invitation link is not valid. Check that it was copied completely."))?;
+        .ok_or_else(|| {
+            ApiError::not_found("This invitation link is not valid. Check that it was copied completely.")
+        })?;
     if let Some(reason) = stored.unusable_reason() {
         return Err(gone(reason));
     }
@@ -392,9 +447,16 @@ pub(crate) async fn accept_invitation(
         .map_err(map_storage_error)?
         .ok_or_else(|| gone("The organization or workspace of this invitation no longer exists."))?;
     if !inviter_may_still_grant(&state, &invitation).await? {
-        return Err(gone("The person who invited you can no longer add members with this role. Ask for a new invitation."));
+        return Err(gone(
+            "The person who invited you can no longer add members with this role. Ask for a new invitation.",
+        ));
     }
-    if !state.storage.mark_invitation_accepted(&invitation.id, &user.id).await.map_err(map_storage_error)? {
+    if !state
+        .storage
+        .mark_invitation_accepted(&invitation.id, &user.id)
+        .await
+        .map_err(map_storage_error)?
+    {
         return Err(gone("This invitation has already been used."));
     }
     let joined = join(&state, &invitation, &user.id, &email).await;
@@ -432,7 +494,11 @@ pub(crate) async fn accept_invitation(
 async fn join(state: &AppState, invitation: &Invitation, user_id: &str, email: &str) -> Result<String, ApiError> {
     if invitation.target_type == "workspace" {
         let role = parse_workspace_role(&invitation.role)?;
-        let current = state.storage.workspace_role_for_user(user_id, &invitation.target_id).await.map_err(map_storage_error)?;
+        let current = state
+            .storage
+            .workspace_role_for_user(user_id, &invitation.target_id)
+            .await
+            .map_err(map_storage_error)?;
         if let Some(current) = current.filter(|current| workspace_rank(current) >= workspace_rank(&role)) {
             return Ok(workspace_role_label(&current).to_owned());
         }
@@ -444,7 +510,11 @@ async fn join(state: &AppState, invitation: &Invitation, user_id: &str, email: &
         Ok(workspace_role_label(&member.role).to_owned())
     } else {
         let role = parse_organization_role(&invitation.role)?;
-        let current = state.storage.organization_role_for_user(user_id, &invitation.target_id).await.map_err(map_storage_error)?;
+        let current = state
+            .storage
+            .organization_role_for_user(user_id, &invitation.target_id)
+            .await
+            .map_err(map_storage_error)?;
         if let Some(current) = current.filter(|current| organization_rank(current) >= organization_rank(&role)) {
             return Ok(organization_role_label(&current).to_owned());
         }
@@ -494,7 +564,9 @@ pub(crate) async fn issue_password_reset(
         .ok_or_else(|| ApiError::not_found("User was not found."))?;
     // Otherwise an app administrator could take over a system administrator's account.
     if target.is_system_admin && !subject.is_system_admin {
-        return Err(ApiError::forbidden_because("Only system administrators can reset a system administrator's password."));
+        return Err(ApiError::forbidden_because(
+            "Only system administrators can reset a system administrator's password.",
+        ));
     }
     let user = state
         .storage
@@ -523,10 +595,23 @@ pub(crate) async fn issue_password_reset(
     )
     .await;
     let who = user.email.unwrap_or(user.display_name);
-    crate::system::audit(&state, &subject, "password_reset_issued", format!("Issued a password reset link for {who}.")).await;
+    crate::system::audit(
+        &state,
+        &subject,
+        "password_reset_issued",
+        format!("Issued a password reset link for {who}."),
+    )
+    .await;
     // In the fragment, like invitation links: never sent to a server.
     let path = format!("/reset-password#{token}");
-    Ok((StatusCode::CREATED, Json(IssuedPasswordReset { token, path, expires_at })))
+    Ok((
+        StatusCode::CREATED,
+        Json(IssuedPasswordReset {
+            token,
+            path,
+            expires_at,
+        }),
+    ))
 }
 
 #[derive(Serialize)]
@@ -556,7 +641,11 @@ pub(crate) async fn preview_password_reset(
     if reset.used || reset.expires_at < chrono::Utc::now().to_rfc3339() {
         return Err(unusable_reset());
     }
-    Ok(Json(PasswordResetPreview { email: reset.user.email, display_name: reset.user.display_name, expires_at: reset.expires_at }))
+    Ok(Json(PasswordResetPreview {
+        email: reset.user.email,
+        display_name: reset.user.display_name,
+        expires_at: reset.expires_at,
+    }))
 }
 
 #[derive(Deserialize)]
@@ -594,11 +683,23 @@ pub(crate) async fn complete_password_reset(
         .await
         .map_err(ApiError::internal)?
         .ok_or_else(unusable_reset)?;
-    state.storage.update_user_password(&user_id, &password_hash).await.map_err(map_storage_error)?;
-    state.storage.end_user_sessions(&user_id).await.map_err(map_storage_error)?;
+    state
+        .storage
+        .update_user_password(&user_id, &password_hash)
+        .await
+        .map_err(map_storage_error)?;
+    state
+        .storage
+        .end_user_sessions(&user_id)
+        .await
+        .map_err(map_storage_error)?;
     // A reset often follows a lost or taken-over account: its scripts' tokens
     // go too, and the owner creates new ones once signed in.
-    let tokens = state.storage.revoke_user_personal_tokens(&user_id).await.map_err(map_storage_error)?;
+    let tokens = state
+        .storage
+        .revoke_user_personal_tokens(&user_id)
+        .await
+        .map_err(map_storage_error)?;
     let email = user.email.clone().unwrap_or_default().to_lowercase();
     state.guards.logins.clear_account(&email);
     tracing::info!(target: "audit", user_id = %user_id, client = %client.0, tokens_revoked = tokens, "Password reset with a link");
@@ -616,7 +717,11 @@ pub(crate) async fn complete_password_reset(
     .await;
     if let Err(error) = state
         .storage
-        .record_system_event(Some(&user_id), "password_reset_used", &format!("{email} set a new password with a reset link."))
+        .record_system_event(
+            Some(&user_id),
+            "password_reset_used",
+            &format!("{email} set a new password with a reset link."),
+        )
         .await
     {
         tracing::error!(error = %error, "Failed to record a system audit event");
@@ -630,7 +735,12 @@ pub(crate) async fn list_tokens(
     SessionSubject(subject): SessionSubject,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<PersonalAccessToken>>, ApiError> {
-    state.storage.list_personal_tokens(&subject.user_id).await.map(Json).map_err(map_storage_error)
+    state
+        .storage
+        .list_personal_tokens(&subject.user_id)
+        .await
+        .map(Json)
+        .map_err(map_storage_error)
 }
 
 #[derive(Deserialize)]
@@ -653,16 +763,23 @@ pub(crate) async fn create_token(
     Json(request): Json<CreateTokenRequest>,
 ) -> Result<(StatusCode, Json<CreatedToken>), ApiError> {
     if request.scope.trim() == "system" && !(subject.is_system_admin || subject.is_app_admin) {
-        return Err(ApiError::forbidden_because("Only system and app administrators can create tokens with the system scope."));
+        return Err(ApiError::forbidden_because(
+            "Only system and app administrators can create tokens with the system scope.",
+        ));
     }
     if !TOKEN_TTL_DAYS.contains(&request.expires_in_days) {
         return Err(ApiError::bad_request("A token lasts 7, 30, 90 or 365 days."));
     }
     let (token, secret) = state
         .storage
-        .create_personal_token(&subject.user_id, &request.name, request.scope.trim(), request.expires_in_days)
+        .create_personal_token(
+            &subject.user_id,
+            &request.name,
+            request.scope.trim(),
+            request.expires_in_days,
+        )
         .await
-        .map_err(|error| ApiError::bad_request(error.to_string()))?;
+        .map_err(map_storage_error)?;
     tracing::info!(target: "audit", user_id = %subject.user_id, token_id = %token.id, scope = %token.scope, "Personal access token created");
     Ok((StatusCode::CREATED, Json(CreatedToken { token, secret })))
 }
@@ -672,7 +789,12 @@ pub(crate) async fn revoke_token(
     State(state): State<AppState>,
     Path(token_id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
-    if !state.storage.revoke_personal_token(&subject.user_id, &token_id).await.map_err(map_storage_error)? {
+    if !state
+        .storage
+        .revoke_personal_token(&subject.user_id, &token_id)
+        .await
+        .map_err(map_storage_error)?
+    {
         return Err(ApiError::not_found("Token was not found."));
     }
     tracing::info!(target: "audit", user_id = %subject.user_id, token_id = %token_id, "Personal access token revoked");

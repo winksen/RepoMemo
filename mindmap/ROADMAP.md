@@ -171,7 +171,7 @@ Each proposal below was accepted as written. They shape the releases named in th
 - [x] **C9 one version source:** `npm run version:set -- <version>` (`scripts/set-version.mjs`) sets `Cargo.toml`, `Cargo.lock`, both `package.json` files, `package-lock.json` and `tauri.conf.json`; `npm run version:check` in CI; the code now says 0.1.66; `CHANGELOG.md` starts with V0.1.63–V0.1.66
 - [x] **P0 timings:** search, Ask, metrics, the artifact query, the knowledge map and health record their duration and size under the `timing` target, in a new **Performance** log category (`log_performance_level`, debug to see them), filterable by workspace in System › Logs
 - [x] **D1 documentation housekeeping:** `docs/IMPLEMENTATION_TRACKER.md` retired, `PRODUCT.md` describes the team product, Postman v5 collection with the onboarding routes (local, `docs/api/` is git-ignored)
-- [ ] **C10 dependencies** (needs the lockfiles regenerated with `cargo` and `npm`, so it is done by hand): Vite 5 → current, which closes the esbuild advisory; `quick-xml` 0.39 → 0.41 in `repomemo-ingestion` so the server builds one version. The remaining duplicates are not ours: `reqwest` 0.13 and `quick-xml` 0.39 arrive through Tauri (`tauri`, `plist`) next to the versions the server uses, and are reported as warnings by `cargo deny`
+- [x] **C10 dependencies** (V0.1.71): `quick-xml` 0.41 in `repomemo-ingestion` (closes RUSTSEC-2026-0194 and -0195) and a `cargo update`; the license, ban and advisory check is blocking. Vite 5 stays: the esbuild advisory reaches the development server only, and `npm audit --omit=dev` is clean. The remaining duplicates arrive through Tauri and only warn
 
 #### V0.1.67: Safe defaults and identity
 
@@ -199,7 +199,7 @@ Each proposal below was accepted as written. They shape the releases named in th
 - [x] **L8** `repomemo_git::harden`: `protocol.allow=never` (the https/ssh allowlist arrives with remote repositories), no system or global configuration, no submodule recursion, `safe.directory` only for the configured folders
 - [x] **M10** scrubbed environment, `REPOMEMO_SOFFICE_WRAPPER` for the operator's sandbox command, version and sandbox state in System › Overview and the server check. The sandbox itself is the operator's (recipes follow in the production guide, V0.1.75)
 
-#### V0.1.70: Web client foundation (built, not yet released)
+#### V0.1.70: Web client foundation
 
 - [x] **C1** `SharedWebApp.tsx` is the shell; `src/web/` holds the pages (`WorkspaceDetail.tsx` is the largest at about 1,000 lines), `constants.ts`, `format.ts`, `router.ts`, `navigation.tsx`, `common.tsx`. Splitting the sections of the workspace page into components of their own comes with the next product work that touches them
 - [x] **C2** `web/router.ts` (`Route`, `parseRoute`, `routePath`); `lib/queryClient.ts` and `lib/useServerState.ts` (cache-backed state with a `useState`-like setter) used by the workspace page. The dashboard, profile and detail pages still load their own data
@@ -208,14 +208,14 @@ Each proposal below was accepted as written. They shape the releases named in th
 - [x] **C7** `scripts/generate-types.mjs` reads `crates/domain` (a regular subset of Rust, failing loudly on anything else). Server-local response types (token response, setup, System) stay hand-written
 - [x] **C3** 27 tests in `src/test/`: session renewal, live events, Markdown safety, upload filter, routes, image preview rules, query cache. The link pages are covered through the router and session tests; a rendering test of the invitation page needs the page split further
 
-#### V0.1.71: Server foundation
+#### V0.1.71: Server foundation (built, not yet released)
 
-- [ ] **C4** `apps/server/src/lib.rs` split into route modules per domain
-- [ ] **C5 + C6** storage split by aggregate with typed errors; `map_storage_error` stops matching substrings, and internal errors stop reaching clients as 400s (L6)
-- [ ] **N7** a request timeout layer on every route except event streams; header-read timeout; limit of open event streams per user (M11 part)
-- [ ] **P8** one writer connection plus a read pool; indexing and embedding concurrency as settings
-- [ ] **C12** remove `apps/worker` per decision 4
-- [ ] **C8 follow-up** run rustfmt over the code base and fix clippy findings, then make both blocking in CI, with licenses and duplicate crates
+- [x] **C4** 13 modules plus `tests/` (scripted, then compiled and tested unchanged); the largest is `system.rs` at 1,460 lines
+- [x] **C5 + C6** nine storage modules; `repomemo_domain::{not_found, invalid, conflict}` and `classify`; the server maps by kind; unique violations are detected through sqlx, not text; the five handlers that returned storage errors as 400 use the mapping
+- [x] **N7** `TimeoutLayer` as a `route_layer` before the stream routes are added; `serve.rs` is the accept loop with a header read timeout (tested with a half-sent request); `Telemetry::claim_event_stream` per account
+- [x] **P8** `StorageEngine::reader()` serves 138 read statements, the writer pool has one connection; concurrency settings are environment variables listed in System › Overview. Not yet measured: the 50,000-passage run belongs to V0.1.74
+- [x] **C12** removed
+- [x] **C8 follow-up** `rustfmt.toml` (`max_width = 120`), every file formatted, clippy clean with `-D warnings`; the lint job and the licenses and bans job are blocking
 
 #### V0.1.72: Memory and search you can trust
 
@@ -289,7 +289,7 @@ Every item, with the release it is planned for. The evidence behind each is in t
 | S2 | Safe defaults and identity | M1, M3, M4, M8, M9, L4, L7, L10, N2 residual | ✅ V0.1.67 |
 | S4 | Browser hardening | M2, M5, M6, L9 | ✅ V0.1.68 |
 | S3 | Host exposure | H2, H3, L8, M10 | ✅ V0.1.69 |
-| — | Server timeouts | N7 | V0.1.71 |
+| — | Server timeouts | N7 | ✅ V0.1.71 |
 | S5 | Robustness | M11, M12, L1, L5, L6 | V0.1.71, V0.1.74 |
 | — | Integrity | N8 | V0.1.73 |
 | — | Supply chain | dependency scanning (review §7) | ✅ V0.1.66 (CI) |
@@ -307,7 +307,7 @@ Every item, with the release it is planned for. The evidence behind each is in t
 | P5 | Cached map and health | M | V0.1.74 |
 | P6 | Code splitting of the web bundle | S | V0.1.70 |
 | P7 | Query cache with targeted invalidation | M | V0.1.70 |
-| P8 | Writer connection plus read pool; configurable concurrency | M | V0.1.71 |
+| P8 | Writer connection plus read pool; configurable concurrency | M | ✅ V0.1.71 |
 | P9 | Parser time and memory budgets | M | V0.1.74 |
 
 ### Code health and release engineering
@@ -317,15 +317,15 @@ Every item, with the release it is planned for. The evidence behind each is in t
 | C1 | Split `SharedWebApp.tsx` | M | V0.1.70 |
 | C2 | Router module and TanStack Query | M | V0.1.70 |
 | C3 | Frontend tests | S–M | V0.1.70 |
-| C4 | Split `apps/server/src/lib.rs` | M | V0.1.71 |
-| C5 | Split `crates/storage/src/lib.rs` | M | V0.1.71 |
-| C6 | Typed errors | M | V0.1.71 |
+| C4 | Split `apps/server/src/lib.rs` | M | ✅ V0.1.71 |
+| C5 | Split `crates/storage/src/lib.rs` | M | ✅ V0.1.71 |
+| C6 | Typed errors | M | ✅ V0.1.71 |
 | C7 | Generated TypeScript types | S–M | V0.1.70 |
-| C8 | CI | S | ✅ V0.1.66 (rustfmt and clippy blocking from V0.1.71) |
+| C8 | CI | S | ✅ V0.1.66 (rustfmt and clippy blocking since V0.1.71) |
 | C9 | One version source, changelog | S | ✅ V0.1.66 |
 | C10 | Dependency hygiene (Vite, `quick-xml` in ingestion) | S | V0.1.66 (by hand) |
 | C11 | Split `styles.css` per component | M | V0.3.0 |
-| C12 | Remove the worker stub | S | V0.1.71 (decided, decision 4) |
+| C12 | Remove the worker stub | S | ✅ V0.1.71 (decision 4) |
 
 ### Operations and documentation
 

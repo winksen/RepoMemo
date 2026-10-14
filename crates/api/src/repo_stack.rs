@@ -12,8 +12,17 @@ use serde_json::Value;
 
 /// Manifest file names read for detection.
 pub(crate) const STACK_MANIFESTS: &[&str] = &[
-    "package.json", "composer.json", "Cargo.toml", "requirements.txt", "pyproject.toml", "Pipfile",
-    "go.mod", "pom.xml", "build.gradle", "build.gradle.kts", "Gemfile",
+    "package.json",
+    "composer.json",
+    "Cargo.toml",
+    "requirements.txt",
+    "pyproject.toml",
+    "Pipfile",
+    "go.mod",
+    "pom.xml",
+    "build.gradle",
+    "build.gradle.kts",
+    "Gemfile",
 ];
 /// Manifests larger than this are skipped, and no more than
 /// `MAX_STACK_MANIFESTS` are read, so a huge monorepo stays cheap to sync.
@@ -33,7 +42,11 @@ struct Rule {
 }
 
 const fn rule(dependency: &'static str, name: &'static str, category: &'static str) -> Rule {
-    Rule { dependency, name, category }
+    Rule {
+        dependency,
+        name,
+        category,
+    }
 }
 
 /// `package.json` dependencies, in the order they are reported.
@@ -169,13 +182,22 @@ pub(crate) fn detect_stack(files: &[RepoFile], manifests: &BTreeMap<String, Stri
     let mut found: Vec<RepoTechnology> = Vec::new();
     let mut add = |name: &str, category: &str| {
         if !found.iter().any(|technology| technology.name == name) {
-            found.push(RepoTechnology { name: name.to_owned(), category: category.to_owned() });
+            found.push(RepoTechnology {
+                name: name.to_owned(),
+                category: category.to_owned(),
+            });
         }
     };
 
     let mut node = BTreeSet::new();
-    let (mut composer, mut python, mut rust, mut go, mut ruby, mut jvm) =
-        (String::new(), String::new(), String::new(), String::new(), String::new(), String::new());
+    let (mut composer, mut python, mut rust, mut go, mut ruby, mut jvm) = (
+        String::new(),
+        String::new(),
+        String::new(),
+        String::new(),
+        String::new(),
+        String::new(),
+    );
     for (path, text) in manifests {
         match file_name(path) {
             "package.json" => node.extend(node_dependencies(text)),
@@ -232,17 +254,27 @@ pub(crate) fn detect_stack(files: &[RepoFile], manifests: &BTreeMap<String, Stri
     // The language that holds the most code.
     let mut bytes: BTreeMap<&str, i64> = BTreeMap::new();
     for file in files {
-        if let Some(language) = file.language.as_deref().filter(|language| !NON_PRIMARY_LANGUAGES.contains(language)) {
+        if let Some(language) = file
+            .language
+            .as_deref()
+            .filter(|language| !NON_PRIMARY_LANGUAGES.contains(language))
+        {
             *bytes.entry(language).or_default() += file.size_bytes;
         }
     }
-    let primary = bytes.iter().max_by_key(|(_, size)| **size).map(|(language, _)| (*language).to_owned());
+    let primary = bytes
+        .iter()
+        .max_by_key(|(_, size)| **size)
+        .map(|(language, _)| (*language).to_owned());
     if let Some(language) = &primary {
         add(language, "language");
     }
 
     let first = |category: &str| {
-        found.iter().find(|technology| technology.category == category).map(|technology| technology.name.clone())
+        found
+            .iter()
+            .find(|technology| technology.category == category)
+            .map(|technology| technology.name.clone())
     };
     let frontend = first("frontend");
     let meta = first("meta-framework");
@@ -253,7 +285,10 @@ pub(crate) fn detect_stack(files: &[RepoFile], manifests: &BTreeMap<String, Stri
     let typescript = found.iter().any(|technology| technology.name == "TypeScript");
 
     let (kind, summary) = if let Some(desktop) = &desktop {
-        let interface = frontend.as_ref().map(|name| format!(" with a {name} interface")).unwrap_or_default();
+        let interface = frontend
+            .as_ref()
+            .map(|name| format!(" with a {name} interface"))
+            .unwrap_or_default();
         let server = backend
             .as_ref()
             .map(|name| format!(" and a {name} {} backend", backend_language(name)))
@@ -265,9 +300,18 @@ pub(crate) fn detect_stack(files: &[RepoFile], manifests: &BTreeMap<String, Stri
         ("web_app", format!("{meta} full-stack web app"))
     } else if let (Some(front), Some(back)) = (&frontend, &backend) {
         if matches!(front.as_str(), "Livewire" | "Inertia") {
-            ("web_app", format!("{back} {} full-stack app with {front}", backend_language(back)))
+            (
+                "web_app",
+                format!("{back} {} full-stack app with {front}", backend_language(back)),
+            )
         } else {
-            ("web_app", format!("{front} single-page app with a {back} {} backend", backend_language(back)))
+            (
+                "web_app",
+                format!(
+                    "{front} single-page app with a {back} {} backend",
+                    backend_language(back)
+                ),
+            )
         }
     } else if let Some(front) = &frontend {
         let flavor = if typescript { " (TypeScript)" } else { "" };
@@ -283,7 +327,11 @@ pub(crate) fn detect_stack(files: &[RepoFile], manifests: &BTreeMap<String, Stri
         return None;
     };
 
-    Some(RepoStack { kind: kind.to_owned(), summary, technologies: found })
+    Some(RepoStack {
+        kind: kind.to_owned(),
+        summary,
+        technologies: found,
+    })
 }
 
 #[cfg(test)]
@@ -305,7 +353,10 @@ mod tests {
     }
 
     fn manifests(entries: &[(&str, &str)]) -> BTreeMap<String, String> {
-        entries.iter().map(|(path, text)| ((*path).to_owned(), (*text).to_owned())).collect()
+        entries
+            .iter()
+            .map(|(path, text)| ((*path).to_owned(), (*text).to_owned()))
+            .collect()
     }
 
     #[test]
@@ -313,7 +364,10 @@ mod tests {
         let files = vec![file("src/App.tsx", "TypeScript", 900)];
         let stack = detect_stack(
             &files,
-            &manifests(&[("package.json", r#"{"dependencies":{"react":"18"},"devDependencies":{"vite":"5","typescript":"5"}}"#)]),
+            &manifests(&[(
+                "package.json",
+                r#"{"dependencies":{"react":"18"},"devDependencies":{"vite":"5","typescript":"5"}}"#,
+            )]),
         )
         .unwrap();
         assert_eq!(stack.kind, "frontend");
@@ -324,7 +378,11 @@ mod tests {
     #[test]
     fn detects_a_laravel_backend() {
         let files = vec![file("artisan", "PHP", 10), file("app/Http/Controller.php", "PHP", 500)];
-        let stack = detect_stack(&files, &manifests(&[("composer.json", r#"{"require":{"laravel/framework":"^11"}}"#)])).unwrap();
+        let stack = detect_stack(
+            &files,
+            &manifests(&[("composer.json", r#"{"require":{"laravel/framework":"^11"}}"#)]),
+        )
+        .unwrap();
         assert_eq!(stack.kind, "backend");
         assert_eq!(stack.summary, "Laravel PHP backend");
     }
@@ -335,13 +393,19 @@ mod tests {
         let stack = detect_stack(
             &files,
             &manifests(&[
-                ("Cargo.toml", "[dependencies]\ntauri = \"2\"\naxum = \"0.8\"\naxum-extra = \"0.9\""),
+                (
+                    "Cargo.toml",
+                    "[dependencies]\ntauri = \"2\"\naxum = \"0.8\"\naxum-extra = \"0.9\"",
+                ),
                 ("web/package.json", r#"{"dependencies":{"react":"18"}}"#),
             ]),
         )
         .unwrap();
         assert_eq!(stack.kind, "desktop_app");
-        assert_eq!(stack.summary, "Tauri desktop app with a React interface and a Axum Rust backend");
+        assert_eq!(
+            stack.summary,
+            "Tauri desktop app with a React interface and a Axum Rust backend"
+        );
     }
 
     #[test]

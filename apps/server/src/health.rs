@@ -8,14 +8,12 @@ use axum::{
     extract::{Path, State},
     Json,
 };
-use repomemo_domain::{
-    HealthAction, HealthActionRequest, HealthActionResult, HealthFinding, WorkspaceHealth,
-};
+use repomemo_domain::{HealthAction, HealthActionRequest, HealthActionResult, HealthFinding, WorkspaceHealth};
 use repomemo_storage::{NewCollaborationTask, SaveArtifactLifecycle};
 
 use crate::{
-    map_core_error, map_storage_error, record_workspace_activity, require_workspace_admin,
-    require_workspace_read, ApiError, AppState, AuthenticatedSubject,
+    map_core_error, map_storage_error, record_workspace_activity, require_workspace_admin, require_workspace_read,
+    ApiError, AppState, AuthenticatedSubject,
 };
 
 const MAX_TASK_TITLE_CHARS: usize = 180;
@@ -33,7 +31,12 @@ pub(crate) async fn workspace_health(
         .workspace_health(&workspace_id)
         .await
         .map_err(map_core_error)?;
-    crate::record_timing("health", &workspace_id, started, health.checked_file_count.max(0) as usize);
+    crate::record_timing(
+        "health",
+        &workspace_id,
+        started,
+        health.checked_file_count.max(0) as usize,
+    );
     Ok(Json(health))
 }
 
@@ -69,12 +72,24 @@ pub(crate) async fn apply_health_action(
                 .filter(|keep| finding.files.iter().any(|file| &file.artifact_id == keep))
                 .ok_or_else(|| ApiError::bad_request("Choose one of this finding's files to keep."))?;
             for file in finding.files.iter().filter(|file| file.artifact_id != keep) {
-                set_lifecycle(&state, &subject, &file.artifact_id, "superseded", Some(keep.clone()), &finding).await?;
+                set_lifecycle(
+                    &state,
+                    &subject,
+                    &file.artifact_id,
+                    "superseded",
+                    Some(keep.clone()),
+                    &finding,
+                )
+                .await?;
                 updated_artifact_ids.push(file.artifact_id.clone());
             }
         }
         HealthAction::NeedsReview | HealthAction::MarkOutdated => {
-            let status = if request.action == HealthAction::NeedsReview { "needs_review" } else { "outdated" };
+            let status = if request.action == HealthAction::NeedsReview {
+                "needs_review"
+            } else {
+                "outdated"
+            };
             for file in &finding.files {
                 set_lifecycle(&state, &subject, &file.artifact_id, status, None, &finding).await?;
                 updated_artifact_ids.push(file.artifact_id.clone());

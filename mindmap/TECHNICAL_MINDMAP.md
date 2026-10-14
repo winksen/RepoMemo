@@ -2,7 +2,7 @@
 
 > **Audience:** engineers working on RepoMemo, reviewers, and anyone operating the shared server.
 > **Companion:** [FUNCTIONAL_MINDMAP.md](FUNCTIONAL_MINDMAP.md) covers *what* the product does. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** code at `V0.1.70` (2026-10-14: invitations, reset links and personal access tokens in V0.1.63, migration 0023; security bundle S1 in V0.1.64; the security second pass in V0.1.65; CI, one version source and performance timings in V0.1.66; safe defaults and identity, migration 0024, in V0.1.67; browser hardening in V0.1.68; host exposure in V0.1.69; web client foundation in V0.1.70). The plan to V0.2.0 is in the [roadmap](ROADMAP.md#-road-to-v020). Aligned on 2026-10-13; sections marked *hardening* came with V0.1.51–V0.1.57. The focus is the **shared web client** (`apps/desktop/src/SharedWebApp.tsx`) and the **HTTP API** (`apps/server`). Desktop and Tauri paths are noted where they share code. Open security findings are in the [security review](security/2026-10-10-security-review.md), and the improvement backlog is in the [enhancement analysis](analysis/2026-10-13-enhancement-analysis.md).
+> **Scope:** code at `V0.1.71` (2026-10-14: invitations, reset links and personal access tokens in V0.1.63, migration 0023; security bundle S1 in V0.1.64; the security second pass in V0.1.65; CI, one version source and performance timings in V0.1.66; safe defaults and identity, migration 0024, in V0.1.67; browser hardening in V0.1.68; host exposure in V0.1.69; web client foundation in V0.1.70; server foundation in V0.1.71). The plan to V0.2.0 is in the [roadmap](ROADMAP.md#-road-to-v020). Aligned on 2026-10-13; sections marked *hardening* came with V0.1.51–V0.1.57. The focus is the **shared web client** (`apps/desktop/src/SharedWebApp.tsx`) and the **HTTP API** (`apps/server`). Desktop and Tauri paths are noted where they share code. Open security findings are in the [security review](security/2026-10-10-security-review.md), and the improvement backlog is in the [enhancement analysis](analysis/2026-10-13-enhancement-analysis.md).
 
 ---
 
@@ -108,7 +108,6 @@ flowchart TD
   console -. "HTTP" .-> server
   tauri[apps/desktop/src-tauri] --> api
   tauri --> domain
-  worker["apps/worker (stub, no deps)"]
   api --> ai[crates/ai]
   api --> ingestion[crates/ingestion]
   api --> indexer[crates/indexer]
@@ -126,16 +125,15 @@ flowchart TD
 | Unit | Responsibility | Key file(s) | Size |
 |---|---|---|---|
 | `crates/domain` | Serde DTOs shared by every layer: `ArtifactSummary`, `Chunk`, `Citation`, `WorkspaceRole`…, and the console banner | [lib.rs](../crates/domain/src/lib.rs) | ~1,370 LOC |
-| `crates/storage` | `StorageEngine`: the sqlx pool, migrations, blob I/O, **all SQL**, observers, secrets, environments. `lib.rs` alone is ~6,200 lines; `access.rs`, `repo.rs`, `system.rs`, `setup.rs` are split out | [lib.rs](../crates/storage/src/lib.rs), [migrations/](../crates/storage/migrations) | ~8,500 LOC |
+| `crates/storage` | `StorageEngine`: the sqlx pool, migrations, blob I/O, **all SQL**, observers, secrets, environments. Since V0.1.71 `lib.rs` (engine, row types, helpers, about 1,500 lines) is joined by `users`, `organizations`, `activity`, `collaboration`, `artifacts`, `search`, `memory`, `jobs` and `providers`, next to `access`, `repo`, `system` and `setup`. One writer connection (`pool`) and a read pool (`reader()`) | [lib.rs](../crates/storage/src/lib.rs), [migrations/](../crates/storage/migrations) | ~8,500 LOC |
 | `crates/ingestion` | File discovery, type and language detection, binary sniffing, business document extraction and previews ([documents.rs](../crates/ingestion/src/documents.rs)), repository file rules ([repo.rs](../crates/ingestion/src/repo.rs)) | [lib.rs](../crates/ingestion/src/lib.rs) | ~2,400 |
 | `crates/indexer` | Chunking (Markdown by heading, structure-aware code chunks for TS/TSX/JS, Python and Rust, 100-line windows as fallback) and tree-sitter symbols. Exports `INDEXER_VERSION` | [lib.rs](../crates/indexer/src/lib.rs) | ~950 |
 | `crates/retrieval` | FTS query sanitising, hybrid FTS + vector merge | [lib.rs](../crates/retrieval/src/lib.rs) | ~220 |
 | `crates/ai` | `AiProvider` trait, with Ollama and OpenRouter implementations over `reqwest` (rustls), outbound URL checks, LLM rerank | [lib.rs](../crates/ai/src/lib.rs) | ~950 |
 | `crates/git` | Read-only `git` CLI access: resolve a branch, list a commit's tree, stream blobs through `git cat-file --batch` | [lib.rs](../crates/git/src/lib.rs) | ~400 |
 | `crates/api` | `RepoMemoCore` facade: import, index, search, summarize, ask, memory cards, plus the assistant, knowledge map, health checks, embeddings and repository sync, overview and stack modules | [lib.rs](../crates/api/src/lib.rs) | ~5,500 |
-| `apps/server` | Axum router, auth, authorization, collaboration handlers, SSE, background queues, System area, logging, setup, environments, access links and tokens. `lib.rs` alone is ~8,500 lines | [lib.rs](../apps/server/src/lib.rs), [events.rs](../apps/server/src/events.rs), [system.rs](../apps/server/src/system.rs), [access.rs](../apps/server/src/access.rs) | ~16,500 |
+| `apps/server` | Axum router, auth, authorization, collaboration handlers, SSE, background queues, System area, logging, setup, environments, access links and tokens. Since V0.1.71 `lib.rs` holds the router and state (about 770 lines), with the handlers in `auth`, `access_control`, `profile`, `organizations`, `workspaces`, `artifacts`, `collaboration`, `retrieval`, `ai`, `streams`, plus `requests`, `errors`, `config`, `serve`, `web_session` and `tests/` | [lib.rs](../apps/server/src/lib.rs), [events.rs](../apps/server/src/events.rs), [system.rs](../apps/server/src/system.rs), [access.rs](../apps/server/src/access.rs) | ~16,500 |
 | `apps/console` | `repomemo-console` terminal client for the admin console (§8c) | [main.rs](../apps/console/src/main.rs) | ~870 |
-| `apps/worker` | Placeholder process. It logs and waits for Ctrl-C, and has **no job claiming** | [main.rs](../apps/worker/src/main.rs) | 30 |
 | Web client | SPA, API client, types, layout, about 20 components. `SharedWebApp.tsx` is the shell (about 340 lines) with the pages in `src/web/` (`WorkspaceDetail.tsx` about 1,000); the desktop `App.tsx` 2,750 | [SharedWebApp.tsx](../apps/desktop/src/SharedWebApp.tsx), [sharedApi.ts](../apps/desktop/src/lib/sharedApi.ts), [types.ts](../apps/desktop/src/types.ts), [SharedLayout.tsx](../apps/desktop/src/components/SharedLayout.tsx) | ~10,900 (plus ~7,400 CSS) |
 
 **Layering note.** The server calls `RepoMemoCore` for evidence, indexing, search, AI and memory. It calls **`StorageEngine` directly** for auth, organizations, memberships, tasks, comments, lifecycle, notifications, saved searches, activity and jobs. Both use **one shared `StorageEngine`**, created with `RepoMemoCore::from_storage(storage.clone())`, so writes made inside the core still fire the server's observers.
@@ -247,13 +245,13 @@ Other rules:
 { "error": { "code": "bad_request|unauthorized|invalid_credentials|forbidden|conflict|internal_error", "message": "…" } }
 ```
 
-`map_storage_error` and `map_core_error` classify `anyhow` errors by **substring matching** on the message. `"was not found"`, `"were not found"` and sqlx's `"no rows returned"` become **404** (*hardening*; they were 400), `"UNIQUE constraint failed"` becomes 409, a few validation messages become 400, and anything else becomes 500 with a generic message (the cause is logged). Rate limits answer 429 `rate_limited` with a `Retry-After` header. Provider settings are validated before they are saved, so every validation failure is a 400 with its message.
+`map_storage_error` (also used for core and repository errors) answers from the **kind** of the error, not from its words (*since V0.1.71*, review L6): an error created with `repomemo_domain::not_found!`, `invalid!` or `conflict!` carries a `DomainError` that `classify` finds through `context` layers and becomes 404, 400 or 409 with its message; a database uniqueness violation (`repomemo_storage::is_unique_violation`) becomes 409; anything else becomes 500 with a generic message and the cause in the log. New validation or lookup failures in the storage and api crates must use the macros, or they are 500s. Rate limits answer 429 `rate_limited` with a `Retry-After` header. Provider settings are validated before they are saved, so every validation failure is a 400 with its message.
 
 ---
 
 ## 5. HTTP API reference (157 operations under `/v1`)
 
-Counted as method and path pairs: 150 in the main router ([lib.rs](../apps/server/src/lib.rs)), 4 platform routes ([environment.rs](../apps/server/src/environment.rs)) and 3 avatar routes ([avatars.rs](../apps/server/src/avatars.rs)), plus `/health` and `/health/ready`.
+Counted as method and path pairs: 150 in the main router (`routes()` in [lib.rs](../apps/server/src/lib.rs)), 4 platform routes ([environment.rs](../apps/server/src/environment.rs)) and 3 avatar routes ([avatars.rs](../apps/server/src/avatars.rs)), plus `/health` and `/health/ready`.
 
 Guard legend: **pub** = no auth, **auth** = any valid JWT or personal access token, **R/W/A/O** = workspace read / write / admin / owner, **oR/oA/oO** = organization read / admin / owner. "→ activity" means the call records a `workspace_activity` row and so emits an SSE `activity` event.
 
@@ -487,7 +485,7 @@ flowchart TD
 - **Structure-aware code chunks.** For languages with a tree-sitter grammar (TS/TSX/JS, Python, Rust) the file is parsed once and shared with symbol extraction. Top-level declarations become units, comments and attributes stay attached to the declaration below, and units are packed to about 1,800 characters within the same scope. A unit over 3,600 characters is split along its members (class methods, impl items, statements) up to three levels deep, with the enclosing scope stored in `heading_path`, for example `impl Store > save`. Units that cannot be split further are cut by size. Chunks always cover every line exactly once, so citations never point at unowned lines. If there is no grammar or parse tree, the 100-line windows apply.
 - **Stable chunk identity.** `replace_artifact_index` matches new chunks to existing ones by content hash. A match keeps its row, so its id, its `chunk_embeddings` row and any `links` to it survive a re-index. Only chunks whose text changed are inserted or deleted. The transaction takes the write lock first (a no-op update) because SQLite fails a read-then-write transaction instantly with `database is locked` when another indexing task commits in between.
 - **Index versions.** `INDEXER_VERSION` (currently 2) is stamped on each artifact. `list_artifacts_needing_index` returns artifacts that are unindexed or older than the current version, and skips images that were already indexed. Manual `POST /v1/workspaces/{ws}/index` and the startup sweep both use it, so unchanged evidence is not re-processed. Bump the constant whenever chunking or symbol logic changes. Refreshes do not update `updated_at` and do not write activity entries.
-- The manual `POST …/index` endpoints still run **inside the HTTP request**. The worker crate remains a stub.
+- The manual `POST …/index` endpoints still run **inside the HTTP request**. There is no worker process (`apps/worker` was removed in V0.1.71); the queues run in the server.
 - `index_workspace` (manual, now unused by the SPA) only processes artifacts that need indexing (see index versions above). It checks `cancel_requested` between artifacts and stops at the first failure with status `failed`.
 
 ### 6.3 Keyword search (`RetrievalService::search` → `StorageEngine::search_chunks`)
@@ -593,7 +591,7 @@ A git repository is a source of `type = 'git_repo'` that is kept in step with wh
 
 ## 7. Data model
 
-The database is SQLite in WAL mode with foreign keys on, `synchronous = NORMAL` (safe with WAL), a 15 s busy timeout, a pool of at most 5 connections, and `sqlx::migrate!` at startup.
+The database is SQLite in WAL mode with foreign keys on, `synchronous = NORMAL` (safe with WAL), a 15 s busy timeout, and `sqlx::migrate!` at startup. *Since V0.1.71:* one writer connection runs every write and transaction (writers queue in the pool instead of hitting `SQLITE_BUSY`), and `REPOMEMO_DB_READ_CONNECTIONS` (default 4) read-only connections serve statements that only read (`StorageEngine::reader()`; a new read statement should use it, a new write the default `pool`). A statement inside an open transaction must use that transaction, since the writer pool has no second connection. `crates/storage/build.rs` rebuilds the crate when a migration is added.
 
 | # | Migration | Adds |
 |---|---|---|
@@ -760,14 +758,14 @@ Security findings are tracked in the [security review of 2026-10-10](security/20
 
 | # | Area | Issue | Suggested direction |
 |---|---|---|---|
-| 1 | Security | Open review findings (S1 fixed in V0.1.64; second-pass N1–N6 fixed in V0.1.65; S2, with registration closed by default, in V0.1.67; every remaining finding scheduled before V0.2.0; N7 timeouts and N8 ownership transfer open). The most urgent left: provider URLs and repository links that reach the host (H2, H3) | Roadmap S2–S5 |
+| 1 | Security | Open review findings (S1 fixed in V0.1.64; second-pass N1–N6 fixed in V0.1.65; S2, with registration closed by default, in V0.1.67; every remaining finding scheduled before V0.2.0; N7 timeouts fixed in V0.1.71, N8 ownership transfer open). The most urgent left: provider URLs and repository links that reach the host (H2, H3) | Roadmap S2–S5 |
 | 2 | Process | ✅ *Mostly done (V0.1.66, V0.1.70):* CI runs Rust and web tests, type check, generated-types check, version check and audits. Residual: rustfmt and clippy are advisory | C8 follow-up (V0.1.71) |
 | 3 | Frontend maintainability | ✅ *Foundation done (V0.1.70):* modules under `src/web/`, a typed router, a query cache for the workspace page, generated types and 27 tests. Residual: `WorkspaceDetail.tsx` (about 1,000 lines, 50+ `useState`), `App.tsx` 2,750 (frozen), `styles.css` 6.2k | C11 (V0.3.0) |
-| 4 | Backend maintainability | `apps/server/src/lib.rs` 8,531 lines and `crates/storage/src/lib.rs` 6,206; `types.ts` mirrors the Rust DTOs by hand | C4, C5, C7 |
-| 5 | Correctness | Error classification by substring matching (9 `contains` checks in `map_storage_error`); some handlers return raw error text as 400 (review L6) | Typed errors (C6) |
+| 4 | Backend maintainability | ✅ *Done (V0.1.71):* no server or storage module over 1,500 lines, rustfmt and clippy blocking in CI, DTO types generated (V0.1.70) | — |
+| 5 | Correctness | ✅ *Fixed (V0.1.71):* typed errors; internal errors are generic 500s | — |
 | 6 | Performance / scale | Vector search decodes every embedding of the workspace per query (§6.4). Metrics, `artifacts/query`, the knowledge map and health load whole workspaces per request. The dashboard makes one metrics call per workspace | P0 timings, then P1–P5 |
 | 7 | Release hygiene | ✅ *Version fixed (V0.1.66):* one version source and a changelog. Residual: Vite 5, and `quick-xml` 0.39 in ingestion next to calamine's 0.41. The second `reqwest` and `quick-xml` 0.39 come from Tauri | C10 |
-| 8 | Scalability | In-process queues (2 indexing slots, one embedding workspace at a time), per-process rate-limit counters, a pool of 5 connections shared by readers and the writer, a stub worker | P8; *Later: scale-out* |
+| 8 | Scalability | In-process queues (indexing and embedding concurrency are settings since V0.1.71; 2 and 1 by default), per-process rate-limit counters, a single writer connection (read pool since V0.1.71) | *Later: scale-out* |
 | 9 | Security | ✅ *Mitigated:* provider API keys are encrypted at rest and never follow a changed endpoint. Residual: without `REPOMEMO_SECRET_KEY` the key file sits next to the database, with no restrictive ACL on Windows (review L5) | Set `REPOMEMO_SECRET_KEY` from a secret store in production |
 | 10 | Auth | ✅ *Mitigated:* rotating refresh tokens, session versions, sign-in throttling and lockout. Since V0.1.68 the refresh token is an `HttpOnly` cookie and the built SPA ships a CSP (review M2). Residual: the host must send the header and keep the app and API on one site | Operations guide (V0.1.75) |
 | 11 | Cost / abuse | ✅ *Mitigated* for interactive AI (policy and hourly quota). Background image descriptions and embeddings are not counted (review M12) | S5 |

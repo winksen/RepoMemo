@@ -6,7 +6,7 @@
 //! same way refresh tokens are. Links are single-use; tokens last until they
 //! expire or are revoked.
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use chrono::{Duration, Utc};
 use repomemo_domain::{Invitation, PersonalAccessToken, SharedUser};
 use uuid::Uuid;
@@ -84,7 +84,20 @@ type InvitationRow = (
 const INVITATION_COLUMNS: &str = "i.id, i.email, i.target_type, i.target_id, i.role, u.id, u.display_name, u.email, i.created_at, i.expires_at, i.accepted_at, i.revoked_at";
 
 fn invitation_from_row(row: InvitationRow) -> StoredInvitation {
-    let (id, email, target_type, target_id, role, by_id, by_name, by_email, created_at, expires_at, accepted_at, revoked_at) = row;
+    let (
+        id,
+        email,
+        target_type,
+        target_id,
+        role,
+        by_id,
+        by_name,
+        by_email,
+        created_at,
+        expires_at,
+        accepted_at,
+        revoked_at,
+    ) = row;
     StoredInvitation {
         invitation: Invitation {
             id,
@@ -92,7 +105,11 @@ fn invitation_from_row(row: InvitationRow) -> StoredInvitation {
             target_type,
             target_id,
             role,
-            invited_by: by_id.map(|id| SharedUser { id, display_name: by_name.unwrap_or_default(), email: by_email }),
+            invited_by: by_id.map(|id| SharedUser {
+                id,
+                display_name: by_name.unwrap_or_default(),
+                email: by_email,
+            }),
             created_at,
             expires_at,
         },
@@ -104,7 +121,15 @@ fn invitation_from_row(row: InvitationRow) -> StoredInvitation {
 type TokenRow = (String, String, String, String, String, String, Option<String>);
 
 fn token_from_row((id, name, prefix, scope, created_at, expires_at, last_used_at): TokenRow) -> PersonalAccessToken {
-    PersonalAccessToken { id, name, prefix, scope, created_at, expires_at, last_used_at }
+    PersonalAccessToken {
+        id,
+        name,
+        prefix,
+        scope,
+        created_at,
+        expires_at,
+        last_used_at,
+    }
 }
 
 impl StorageEngine {
@@ -123,7 +148,7 @@ impl StorageEngine {
         ttl_days: i64,
     ) -> Result<(Invitation, String)> {
         if !matches!(target_type, "organization" | "workspace") {
-            bail!("An invitation is for an organization or a workspace.");
+            repomemo_domain::bail_invalid!("An invitation is for an organization or a workspace.");
         }
         let email = normalize_email(email)?;
         let id = Uuid::new_v4().to_string();
@@ -170,9 +195,12 @@ impl StorageEngine {
         .bind(target_type)
         .bind(target_id)
         .bind(Utc::now().to_rfc3339())
-        .fetch_all(&self.pool)
+        .fetch_all(self.reader())
         .await?;
-        Ok(rows.into_iter().map(|row| invitation_from_row(row).invitation).collect())
+        Ok(rows
+            .into_iter()
+            .map(|row| invitation_from_row(row).invitation)
+            .collect())
     }
 
     pub async fn find_invitation(&self, id: &str) -> Result<Option<StoredInvitation>> {
@@ -180,7 +208,7 @@ impl StorageEngine {
             "SELECT {INVITATION_COLUMNS} FROM invitations i LEFT JOIN users u ON u.id = i.invited_by_user_id WHERE i.id = ?1"
         ))
         .bind(id)
-        .fetch_optional(&self.pool)
+        .fetch_optional(self.reader())
         .await?;
         Ok(row.map(invitation_from_row))
     }
@@ -190,14 +218,18 @@ impl StorageEngine {
             "SELECT {INVITATION_COLUMNS} FROM invitations i LEFT JOIN users u ON u.id = i.invited_by_user_id WHERE i.token_hash = ?1"
         ))
         .bind(hash_secret(raw.trim()))
-        .fetch_optional(&self.pool)
+        .fetch_optional(self.reader())
         .await?;
         Ok(row.map(invitation_from_row))
     }
 
     /// The invited place's name, its organization's name and id, or `None`
     /// when the target no longer exists.
-    pub async fn invitation_target(&self, target_type: &str, target_id: &str) -> Result<Option<(String, String, String)>> {
+    pub async fn invitation_target(
+        &self,
+        target_type: &str,
+        target_id: &str,
+    ) -> Result<Option<(String, String, String)>> {
         let query = match target_type {
             "workspace" => "SELECT w.name, o.name, o.id FROM workspaces w JOIN workspace_organizations wo ON wo.workspace_id = w.id JOIN organizations o ON o.id = wo.organization_id WHERE w.id = ?1",
             "organization" => "SELECT o.name, o.name, o.id FROM organizations o WHERE o.id = ?1",
@@ -205,7 +237,7 @@ impl StorageEngine {
         };
         Ok(sqlx::query_as::<_, (String, String, String)>(query)
             .bind(target_id)
-            .fetch_optional(&self.pool)
+            .fetch_optional(self.reader())
             .await?)
     }
 
@@ -250,7 +282,12 @@ impl StorageEngine {
 
     /// Issues a reset link for a user and returns its raw token and expiry.
     /// Earlier unused links of that user stop working.
-    pub async fn create_password_reset(&self, user_id: &str, created_by: &str, ttl_hours: i64) -> Result<(String, String)> {
+    pub async fn create_password_reset(
+        &self,
+        user_id: &str,
+        created_by: &str,
+        ttl_hours: i64,
+    ) -> Result<(String, String)> {
         let raw = new_secret();
         let now = Utc::now();
         let expires_at = (now + Duration::hours(ttl_hours)).to_rfc3339();
@@ -278,10 +315,14 @@ impl StorageEngine {
             "SELECT u.id, u.display_name, u.email, r.expires_at, r.used_at FROM password_resets r JOIN users u ON u.id = r.user_id WHERE r.token_hash = ?1",
         )
         .bind(hash_secret(raw.trim()))
-        .fetch_optional(&self.pool)
+        .fetch_optional(self.reader())
         .await?;
         Ok(row.map(|(id, display_name, email, expires_at, used_at)| PasswordReset {
-            user: SharedUser { id, display_name, email },
+            user: SharedUser {
+                id,
+                display_name,
+                email,
+            },
             expires_at,
             used: used_at.is_some(),
         }))
@@ -328,10 +369,10 @@ impl StorageEngine {
     ) -> Result<(PersonalAccessToken, String)> {
         let name = name.trim();
         if name.is_empty() || name.chars().count() > 80 {
-            bail!("Token name must be between 1 and 80 characters.");
+            repomemo_domain::bail_invalid!("Token name must be between 1 and 80 characters.");
         }
         if !matches!(scope, "read" | "write" | "system") {
-            bail!("Token scope must be read, write or system.");
+            repomemo_domain::bail_invalid!("Token scope must be read, write or system.");
         }
         let id = Uuid::new_v4().to_string();
         let secret = new_secret();
@@ -370,7 +411,7 @@ impl StorageEngine {
             "SELECT id, name, prefix, scope, created_at, expires_at, last_used_at FROM personal_access_tokens WHERE user_id = ?1 AND revoked_at IS NULL ORDER BY created_at DESC",
         )
         .bind(user_id)
-        .fetch_all(&self.pool)
+        .fetch_all(self.reader())
         .await?;
         Ok(rows.into_iter().map(token_from_row).collect())
     }
@@ -390,12 +431,14 @@ impl StorageEngine {
 
     /// Revokes every token of a user. Returns how many were revoked.
     pub async fn revoke_user_personal_tokens(&self, user_id: &str) -> Result<u64> {
-        Ok(sqlx::query("UPDATE personal_access_tokens SET revoked_at = ?1 WHERE user_id = ?2 AND revoked_at IS NULL")
-            .bind(Utc::now().to_rfc3339())
-            .bind(user_id)
-            .execute(&self.pool)
-            .await?
-            .rows_affected())
+        Ok(
+            sqlx::query("UPDATE personal_access_tokens SET revoked_at = ?1 WHERE user_id = ?2 AND revoked_at IS NULL")
+                .bind(Utc::now().to_rfc3339())
+                .bind(user_id)
+                .execute(&self.pool)
+                .await?
+                .rows_affected(),
+        )
     }
 
     /// Checks a raw token: what it grants, or `None` when it is unknown,
@@ -409,7 +452,7 @@ impl StorageEngine {
             "SELECT id, user_id, scope, expires_at, last_used_at FROM personal_access_tokens WHERE token_hash = ?1 AND revoked_at IS NULL",
         )
         .bind(hash_secret(raw))
-        .fetch_optional(&self.pool)
+        .fetch_optional(self.reader())
         .await?;
         let Some((token_id, user_id, scope, expires_at, last_used_at)) = row else {
             return Ok(None);
@@ -425,7 +468,12 @@ impl StorageEngine {
                 .execute(&self.pool)
                 .await?;
         }
-        Ok(Some(PersonalTokenGrant { token_id, user_id, scope, expires_at }))
+        Ok(Some(PersonalTokenGrant {
+            token_id,
+            user_id,
+            scope,
+            expires_at,
+        }))
     }
 }
 
@@ -435,7 +483,9 @@ mod tests {
 
     async fn storage() -> (StorageEngine, std::path::PathBuf) {
         let dir = std::env::temp_dir().join(format!("repomemo-access-{}", Uuid::new_v4()));
-        let storage = StorageEngine::open(crate::StorageConfig::new(dir.clone())).await.unwrap();
+        let storage = StorageEngine::open(crate::StorageConfig::new(dir.clone()))
+            .await
+            .unwrap();
         (storage, dir)
     }
 
@@ -443,19 +493,35 @@ mod tests {
     async fn invitations_are_single_use_and_the_newest_link_wins() {
         let (storage, dir) = storage().await;
         let inviter = storage.create_user("owner@example.com", "Owner", "hash").await.unwrap();
-        let (first, first_raw) = storage.create_invitation("New@Example.com", "workspace", "ws", "member", &inviter.id, 7).await.unwrap();
+        let (first, first_raw) = storage
+            .create_invitation("New@Example.com", "workspace", "ws", "member", &inviter.id, 7)
+            .await
+            .unwrap();
         assert_eq!(first.email, "new@example.com");
-        let (second, second_raw) = storage.create_invitation("new@example.com", "workspace", "ws", "viewer", &inviter.id, 7).await.unwrap();
+        let (second, second_raw) = storage
+            .create_invitation("new@example.com", "workspace", "ws", "viewer", &inviter.id, 7)
+            .await
+            .unwrap();
         let old = storage.find_invitation_by_token(&first_raw).await.unwrap().unwrap();
         assert!(old.unusable_reason().is_some(), "the older link is withdrawn");
-        assert_eq!(storage.list_pending_invitations("workspace", "ws").await.unwrap().len(), 1);
+        assert_eq!(
+            storage.list_pending_invitations("workspace", "ws").await.unwrap().len(),
+            1
+        );
 
         let current = storage.find_invitation_by_token(&second_raw).await.unwrap().unwrap();
         assert_eq!(current.invitation.id, second.id);
         assert!(current.unusable_reason().is_none());
         assert!(storage.mark_invitation_accepted(&second.id, &inviter.id).await.unwrap());
-        assert!(!storage.mark_invitation_accepted(&second.id, &inviter.id).await.unwrap(), "used once only");
-        assert!(storage.list_pending_invitations("workspace", "ws").await.unwrap().is_empty());
+        assert!(
+            !storage.mark_invitation_accepted(&second.id, &inviter.id).await.unwrap(),
+            "used once only"
+        );
+        assert!(storage
+            .list_pending_invitations("workspace", "ws")
+            .await
+            .unwrap()
+            .is_empty());
         assert!(!storage.revoke_invitation(&first.id).await.unwrap());
         let _ = std::fs::remove_dir_all(dir);
     }
@@ -463,12 +529,24 @@ mod tests {
     #[tokio::test]
     async fn reset_links_work_once_and_replace_each_other() {
         let (storage, dir) = storage().await;
-        let user = storage.create_user("forgot@example.com", "Forgot", "hash").await.unwrap();
+        let user = storage
+            .create_user("forgot@example.com", "Forgot", "hash")
+            .await
+            .unwrap();
         let (first, _) = storage.create_password_reset(&user.id, &user.id, 24).await.unwrap();
         let (second, _) = storage.create_password_reset(&user.id, &user.id, 24).await.unwrap();
-        assert!(storage.find_password_reset(&first).await.unwrap().is_none(), "a new link replaces the old one");
-        assert_eq!(storage.find_password_reset(&second).await.unwrap().unwrap().user.id, user.id);
-        assert_eq!(storage.consume_password_reset(&second).await.unwrap().as_deref(), Some(user.id.as_str()));
+        assert!(
+            storage.find_password_reset(&first).await.unwrap().is_none(),
+            "a new link replaces the old one"
+        );
+        assert_eq!(
+            storage.find_password_reset(&second).await.unwrap().unwrap().user.id,
+            user.id
+        );
+        assert_eq!(
+            storage.consume_password_reset(&second).await.unwrap().as_deref(),
+            Some(user.id.as_str())
+        );
         assert_eq!(storage.consume_password_reset(&second).await.unwrap(), None);
         let _ = std::fs::remove_dir_all(dir);
     }
@@ -476,13 +554,25 @@ mod tests {
     #[tokio::test]
     async fn personal_tokens_authenticate_until_revoked() {
         let (storage, dir) = storage().await;
-        let user = storage.create_user("script@example.com", "Script", "hash").await.unwrap();
+        let user = storage
+            .create_user("script@example.com", "Script", "hash")
+            .await
+            .unwrap();
         let (token, raw) = storage.create_personal_token(&user.id, "CI", "read", 30).await.unwrap();
         assert!(raw.starts_with(PERSONAL_TOKEN_PREFIX) && raw.starts_with(&token.prefix));
         let grant = storage.authenticate_personal_token(&raw).await.unwrap().unwrap();
-        assert_eq!((grant.user_id.as_str(), grant.scope.as_str()), (user.id.as_str(), "read"));
-        assert!(storage.list_personal_tokens(&user.id).await.unwrap()[0].last_used_at.is_some());
-        assert!(storage.authenticate_personal_token("rmp_unknown").await.unwrap().is_none());
+        assert_eq!(
+            (grant.user_id.as_str(), grant.scope.as_str()),
+            (user.id.as_str(), "read")
+        );
+        assert!(storage.list_personal_tokens(&user.id).await.unwrap()[0]
+            .last_used_at
+            .is_some());
+        assert!(storage
+            .authenticate_personal_token("rmp_unknown")
+            .await
+            .unwrap()
+            .is_none());
         assert!(storage.revoke_personal_token(&user.id, &token.id).await.unwrap());
         assert!(storage.authenticate_personal_token(&raw).await.unwrap().is_none());
         assert!(storage.create_personal_token(&user.id, " ", "read", 30).await.is_err());

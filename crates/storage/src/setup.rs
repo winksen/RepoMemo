@@ -33,7 +33,7 @@ impl SetupState {
 impl StorageEngine {
     pub async fn setup_state(&self) -> Result<SetupState> {
         let row = sqlx::query("SELECT admin_user_id, completed_at FROM server_setup WHERE id = 1")
-            .fetch_optional(&self.pool)
+            .fetch_optional(self.reader())
             .await?;
         if let Some(row) = row {
             return Ok(match row.get::<Option<String>, _>("completed_at") {
@@ -126,7 +126,10 @@ mod tests {
 
     async fn storage() -> (StorageEngine, std::path::PathBuf) {
         let data_dir = std::env::temp_dir().join(format!("repomemo-setup-{}", uuid::Uuid::new_v4()));
-        (StorageEngine::open(StorageConfig::new(data_dir.clone())).await.unwrap(), data_dir)
+        (
+            StorageEngine::open(StorageConfig::new(data_dir.clone())).await.unwrap(),
+            data_dir,
+        )
     }
 
     #[tokio::test]
@@ -134,19 +137,39 @@ mod tests {
         let (storage, data_dir) = storage().await;
         assert_eq!(storage.setup_state().await.unwrap(), SetupState::New);
 
-        let admin = storage.create_setup_admin("Admin@Example.com", "Admin", "hash").await.unwrap().unwrap();
+        let admin = storage
+            .create_setup_admin("Admin@Example.com", "Admin", "hash")
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(admin.email.as_deref(), Some("admin@example.com"));
         assert!(storage.user_access(&admin.id).await.unwrap().unwrap().is_system_admin);
         assert_eq!(
             storage.setup_state().await.unwrap(),
-            SetupState::Finishing { admin_user_id: Some(admin.id.clone()) }
+            SetupState::Finishing {
+                admin_user_id: Some(admin.id.clone())
+            }
         );
-        assert!(storage.create_setup_admin("second@example.com", "Second", "hash").await.unwrap().is_none(), "only one first admin");
+        assert!(
+            storage
+                .create_setup_admin("second@example.com", "Second", "hash")
+                .await
+                .unwrap()
+                .is_none(),
+            "only one first admin"
+        );
 
         assert!(storage.complete_setup(Some(&admin.id)).await.unwrap());
         assert_eq!(storage.setup_state().await.unwrap(), SetupState::Complete);
-        assert!(!storage.complete_setup(Some(&admin.id)).await.unwrap(), "completion happens once");
-        assert!(storage.create_setup_admin("third@example.com", "Third", "hash").await.unwrap().is_none());
+        assert!(
+            !storage.complete_setup(Some(&admin.id)).await.unwrap(),
+            "completion happens once"
+        );
+        assert!(storage
+            .create_setup_admin("third@example.com", "Third", "hash")
+            .await
+            .unwrap()
+            .is_none());
 
         storage.pool.close().await;
         let _ = std::fs::remove_dir_all(data_dir);
@@ -155,9 +178,16 @@ mod tests {
     #[tokio::test]
     async fn servers_with_accounts_are_already_set_up() {
         let (storage, data_dir) = storage().await;
-        storage.create_user("someone@example.com", "Someone", "hash").await.unwrap();
+        storage
+            .create_user("someone@example.com", "Someone", "hash")
+            .await
+            .unwrap();
         assert_eq!(storage.setup_state().await.unwrap(), SetupState::Complete);
-        assert!(storage.create_setup_admin("late@example.com", "Late", "hash").await.unwrap().is_none());
+        assert!(storage
+            .create_setup_admin("late@example.com", "Late", "hash")
+            .await
+            .unwrap()
+            .is_none());
         storage.pool.close().await;
         let _ = std::fs::remove_dir_all(data_dir);
     }

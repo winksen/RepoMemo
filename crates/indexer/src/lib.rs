@@ -87,10 +87,7 @@ pub fn index_artifact(summary: &ArtifactSummary, bytes: &[u8]) -> Result<IndexAr
 
     let is_markdown = matches!(
         summary.artifact_type,
-        ArtifactType::MarkdownDoc
-            | ArtifactType::Note
-            | ArtifactType::Decision
-            | ArtifactType::Runbook
+        ArtifactType::MarkdownDoc | ArtifactType::Note | ArtifactType::Decision | ArtifactType::Runbook
     ) || matches!(summary.language.as_deref(), Some("Markdown"));
     let chunks = if is_markdown {
         chunk_markdown(summary, &text)
@@ -114,10 +111,7 @@ pub fn index_artifact(summary: &ArtifactSummary, bytes: &[u8]) -> Result<IndexAr
 
 /// Turns a vision model's faithful description into the single searchable representation
 /// for an image. Images deliberately have no line chunks or symbol index.
-pub fn index_image_description(
-    summary: &ArtifactSummary,
-    description: &str,
-) -> IndexArtifactOutput {
+pub fn index_image_description(summary: &ArtifactSummary, description: &str) -> IndexArtifactOutput {
     let text = description.trim();
     if text.is_empty() {
         return IndexArtifactOutput {
@@ -160,9 +154,7 @@ fn tree_sitter_language(summary: &ArtifactSummary) -> Option<Language> {
         Some("TypeScript") if summary.path.to_ascii_lowercase().ends_with(".tsx") => {
             tree_sitter_typescript::LANGUAGE_TSX.into()
         }
-        Some("TypeScript") | Some("JavaScript") => {
-            tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into()
-        }
+        Some("TypeScript") | Some("JavaScript") => tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into(),
         Some("Python") => tree_sitter_python::LANGUAGE.into(),
         Some("Rust") => tree_sitter_rust::LANGUAGE.into(),
         _ => return None,
@@ -184,12 +176,7 @@ fn symbols_from_tree(tree: &Tree, summary: &ArtifactSummary, text: &str) -> Vec<
     symbols
 }
 
-fn collect_symbols(
-    node: Node<'_>,
-    summary: &ArtifactSummary,
-    text: &str,
-    output: &mut Vec<Symbol>,
-) {
+fn collect_symbols(node: Node<'_>, summary: &ArtifactSummary, text: &str, output: &mut Vec<Symbol>) {
     if let Some((kind, name_node)) = symbol_descriptor(node, summary.language.as_deref()) {
         if let Ok(name) = name_node.utf8_text(text.as_bytes()) {
             let name = name.trim();
@@ -225,14 +212,10 @@ fn symbol_descriptor<'a>(node: Node<'a>, language: Option<&str>) -> Option<(Symb
         (Some("TypeScript") | Some("JavaScript"), "interface_declaration") => SymbolKind::Interface,
         (Some("TypeScript") | Some("JavaScript"), "enum_declaration") => SymbolKind::Enum,
         (Some("TypeScript") | Some("JavaScript"), "method_definition") => SymbolKind::Method,
-        (Some("Python"), "function_definition") if has_ancestor_kind(node, "class_definition") => {
-            SymbolKind::Method
-        }
+        (Some("Python"), "function_definition") if has_ancestor_kind(node, "class_definition") => SymbolKind::Method,
         (Some("Python"), "function_definition") => SymbolKind::Function,
         (Some("Python"), "class_definition") => SymbolKind::Class,
-        (Some("Rust"), "function_item") if has_ancestor_kind(node, "impl_item") => {
-            SymbolKind::Method
-        }
+        (Some("Rust"), "function_item") if has_ancestor_kind(node, "impl_item") => SymbolKind::Method,
         (Some("Rust"), "function_item") => SymbolKind::Function,
         (Some("Rust"), "enum_item") => SymbolKind::Enum,
         (Some("Rust"), "struct_item") => SymbolKind::Class,
@@ -332,11 +315,7 @@ struct CodeGroup {
 /// Every chunk records the enclosing scope and declared names in its heading
 /// path, which is also searchable. Returns `None` when the tree has nothing to
 /// anchor on, so the caller can fall back to plain line windows.
-fn chunk_code_by_structure(
-    summary: &ArtifactSummary,
-    text: &str,
-    tree: &Tree,
-) -> Option<Vec<Chunk>> {
+fn chunk_code_by_structure(summary: &ArtifactSummary, text: &str, tree: &Tree) -> Option<Vec<Chunk>> {
     let lines = numbered_lines(text);
     if lines.is_empty() {
         return None;
@@ -372,13 +351,7 @@ fn chunk_code_by_structure(
     (!chunks.is_empty()).then_some(chunks)
 }
 
-fn collect_code_units(
-    container: Node<'_>,
-    text: &str,
-    context: &[String],
-    depth: usize,
-    out: &mut Vec<CodeUnit>,
-) {
+fn collect_code_units(container: Node<'_>, text: &str, context: &[String], depth: usize, out: &mut Vec<CodeUnit>) {
     let mut cursor = container.walk();
     for child in container.named_children(&mut cursor) {
         let target = declaration_target(child);
@@ -530,10 +503,7 @@ fn pack_code_units(units: &[CodeUnit], lines: &[Line]) -> Vec<CodeGroup> {
     for unit in units {
         let unit_chars = row_chars(unit);
         match groups.last_mut() {
-            Some(group)
-                if group.context == unit.context
-                    && current_chars + unit_chars <= CODE_TARGET_CHARS =>
-            {
+            Some(group) if group.context == unit.context && current_chars + unit_chars <= CODE_TARGET_CHARS => {
                 group.end_row = unit.end_row;
                 group.labels.extend(unit.label.clone());
                 current_chars += unit_chars;
@@ -582,10 +552,7 @@ fn split_markdown_sections(text: &str) -> Vec<MarkdownSection> {
             heading_stack.push((level, heading));
 
             current = MarkdownSection {
-                heading_path: heading_stack
-                    .iter()
-                    .map(|(_, heading)| heading.clone())
-                    .collect(),
+                heading_path: heading_stack.iter().map(|(_, heading)| heading.clone()).collect(),
                 lines: vec![line],
             };
         } else {
@@ -602,10 +569,7 @@ fn split_markdown_sections(text: &str) -> Vec<MarkdownSection> {
 
 fn parse_markdown_heading(line: &str) -> Option<(usize, String)> {
     let trimmed = line.trim_start();
-    let level = trimmed
-        .chars()
-        .take_while(|character| *character == '#')
-        .count();
+    let level = trimmed.chars().take_while(|character| *character == '#').count();
 
     if level == 0 || level > 6 {
         return None;
@@ -666,11 +630,7 @@ fn build_chunk(
 ) -> Option<Chunk> {
     let start_line = lines.first()?.number;
     let end_line = lines.last()?.number;
-    let text = lines
-        .into_iter()
-        .map(|line| line.text)
-        .collect::<Vec<_>>()
-        .join("\n");
+    let text = lines.into_iter().map(|line| line.text).collect::<Vec<_>>().join("\n");
 
     if text.trim().is_empty() {
         return None;
@@ -721,10 +681,7 @@ mod tests {
         assert_eq!(output.chunks[0].heading_path.as_deref(), Some("Intro"));
         assert_eq!(output.chunks[0].start_line, Some(1));
         assert_eq!(output.chunks[0].end_line, Some(3));
-        assert_eq!(
-            output.chunks[1].heading_path.as_deref(),
-            Some("Intro > Setup")
-        );
+        assert_eq!(output.chunks[1].heading_path.as_deref(), Some("Intro > Setup"));
         assert_eq!(output.chunks[1].start_line, Some(4));
     }
 
@@ -774,11 +731,11 @@ mod tests {
         let output = index_artifact(&summary, text.as_bytes()).unwrap();
 
         assert!(output.chunks.len() > 3);
-        assert!(output
-            .chunks
-            .iter()
-            .skip(1)
-            .all(|chunk| chunk.heading_path.as_deref().unwrap().starts_with("impl Store")));
+        assert!(output.chunks.iter().skip(1).all(|chunk| chunk
+            .heading_path
+            .as_deref()
+            .unwrap()
+            .starts_with("impl Store")));
         // No method is cut in half: every chunk that opens a method also closes it.
         for chunk in &output.chunks {
             let opens = chunk.text.matches("fn method_").count();
@@ -798,15 +755,11 @@ mod tests {
 
         let output = index_artifact(&summary, text.as_bytes()).unwrap();
 
-        assert!(output.chunks[0]
+        assert!(output.chunks[0].heading_path.as_deref().unwrap().contains("first"));
+        assert!(output.chunks.iter().any(|chunk| chunk
             .heading_path
             .as_deref()
-            .unwrap()
-            .contains("first"));
-        assert!(output
-            .chunks
-            .iter()
-            .any(|chunk| chunk.heading_path.as_deref().is_some_and(|path| path.starts_with("Index > one"))));
+            .is_some_and(|path| path.starts_with("Index > one"))));
         assert_covers_all_lines(&output.chunks, &text);
     }
 
@@ -817,10 +770,7 @@ mod tests {
 
         let output = index_artifact(&summary, text.as_bytes()).unwrap();
 
-        assert_eq!(
-            output.chunks[0].heading_path.as_deref(),
-            Some("createStore, readStore")
-        );
+        assert_eq!(output.chunks[0].heading_path.as_deref(), Some("createStore, readStore"));
         assert_covers_all_lines(&output.chunks, text);
     }
 
@@ -857,15 +807,9 @@ mod tests {
         let output = index_image_description(&summary, "A login screen with an email field.");
 
         assert_eq!(output.chunks.len(), 1);
-        assert_eq!(
-            output.chunks[0].heading_path.as_deref(),
-            Some("Visual description")
-        );
+        assert_eq!(output.chunks[0].heading_path.as_deref(), Some("Visual description"));
         assert_eq!(output.chunks[0].start_line, None);
-        assert_eq!(
-            output.chunks[0].metadata["representation"],
-            "visual_description"
-        );
+        assert_eq!(output.chunks[0].metadata["representation"], "visual_description");
     }
 
     #[test]
@@ -894,7 +838,8 @@ mod tests {
     #[test]
     fn rust_symbols_include_enums_functions_and_impl_methods() {
         let summary = artifact_summary(ArtifactType::CodeFile, Some("Rust"));
-        let text = "enum State { Ready }\nstruct Index;\nimpl Index { fn search(&self) {} }\nfn build() -> Index { Index }\n";
+        let text =
+            "enum State { Ready }\nstruct Index;\nimpl Index { fn search(&self) {} }\nfn build() -> Index { Index }\n";
         let output = index_artifact(&summary, text.as_bytes()).unwrap();
 
         assert!(has_symbol(&output, "State", SymbolKind::Enum, 1));

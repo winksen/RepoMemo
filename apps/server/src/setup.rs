@@ -28,8 +28,8 @@ use serde::{Deserialize, Serialize};
 use crate::{
     check_auth_quota, hash_password, issue_session, logs, map_storage_error,
     security::{too_many_requests, wait_text},
-    validate_registration, ApiError, AppState, AuthAction, AuthenticatedSubject, ClientIp,
-    RegisterRequest, TokenResponse,
+    validate_registration, ApiError, AppState, AuthAction, AuthenticatedSubject, ClientIp, RegisterRequest,
+    TokenResponse,
 };
 
 /// Failed setup codes from one address before it must wait.
@@ -84,7 +84,9 @@ impl SetupGate {
     }
 
     fn code_matches(&self, candidate: &str) -> bool {
-        self.code.as_deref().is_some_and(|expected| codes_match(expected, candidate))
+        self.code
+            .as_deref()
+            .is_some_and(|expected| codes_match(expected, candidate))
     }
 }
 
@@ -131,7 +133,12 @@ pub(crate) async fn setup_pending(state: &AppState) -> Result<bool, ApiError> {
     if !state.setup.wizard {
         return Ok(false);
     }
-    Ok(!state.storage.setup_state().await.map_err(map_storage_error)?.is_complete())
+    Ok(!state
+        .storage
+        .setup_state()
+        .await
+        .map_err(map_storage_error)?
+        .is_complete())
 }
 
 #[derive(Debug, Serialize)]
@@ -176,12 +183,18 @@ async fn check_new_server_and_code(state: &AppState, client: &ClientIp, code: &s
     let key = format!("setup:{}", client.0);
     if let Some(wait) = state.guards.logins.locked_for(&key) {
         return Err(too_many_requests(
-            format!("Too many wrong setup codes from this address. Try again in {}.", wait_text(wait)),
+            format!(
+                "Too many wrong setup codes from this address. Try again in {}.",
+                wait_text(wait)
+            ),
             wait,
         ));
     }
     if !state.setup.code_matches(code) {
-        let locked = state.guards.logins.record_failure(&key, MAX_CODE_FAILURES, CODE_LOCKOUT);
+        let locked = state
+            .guards
+            .logins
+            .record_failure(&key, MAX_CODE_FAILURES, CODE_LOCKOUT);
         tracing::warn!(target: "audit", client = %client.0, locked, "Wrong server setup code");
         return Err(ApiError::forbidden_because(
             "The setup code is not correct. It is printed on the server console when the server starts.",
@@ -230,14 +243,7 @@ pub(crate) async fn create_admin(
         .storage
         .create_setup_admin(&request.email, &request.display_name, &password_hash)
         .await
-        .map_err(|error| {
-            let message = error.to_string();
-            if message.contains("valid email") {
-                ApiError::bad_request(message)
-            } else {
-                ApiError::internal(error)
-            }
-        })?
+        .map_err(map_storage_error)?
         .ok_or_else(|| ApiError::conflict("This server already has its system administrator."))?;
     state
         .storage
@@ -249,7 +255,11 @@ pub(crate) async fn create_admin(
         user.email.as_deref().unwrap_or("An account")
     );
     tracing::info!(target: "audit", user_id = %user.id, client = %client.0, "{detail}");
-    if let Err(error) = state.storage.record_system_event(Some(&user.id), "server_setup_admin_created", &detail).await {
+    if let Err(error) = state
+        .storage
+        .record_system_event(Some(&user.id), "server_setup_admin_created", &detail)
+        .await
+    {
         tracing::error!(error = %error, "Failed to record a system audit event");
     }
     let session = issue_session(&state, user).await?;
@@ -263,7 +273,9 @@ async fn require_finishing_admin(state: &AppState, subject: &AuthenticatedSubjec
         return Err(ApiError::not_found("The onboarding is turned off on this server."));
     }
     if !subject.is_system_admin {
-        return Err(ApiError::forbidden_because("Only the system administrator can finish setting up the server."));
+        return Err(ApiError::forbidden_because(
+            "Only the system administrator can finish setting up the server.",
+        ));
     }
     match state.storage.setup_state().await.map_err(map_storage_error)? {
         SetupState::Finishing { .. } => Ok(()),
@@ -301,8 +313,20 @@ pub(crate) async fn checks(
     let mut checks = Vec::new();
 
     checks.push(match state.storage.ping().await {
-        Ok(()) => SetupCheck { key: "database", label: "Database", status: CheckStatus::Ok, detail: "The database answers.".to_owned(), advice: None },
-        Err(error) => SetupCheck { key: "database", label: "Database", status: CheckStatus::Error, detail: format!("The database does not answer: {error}"), advice: Some("Check that the data folder is on a local disk with free space.") },
+        Ok(()) => SetupCheck {
+            key: "database",
+            label: "Database",
+            status: CheckStatus::Ok,
+            detail: "The database answers.".to_owned(),
+            advice: None,
+        },
+        Err(error) => SetupCheck {
+            key: "database",
+            label: "Database",
+            status: CheckStatus::Error,
+            detail: format!("The database does not answer: {error}"),
+            advice: Some("Check that the data folder is on a local disk with free space."),
+        },
     });
 
     let probe = facts.data_dir.join(format!(".setup-check-{}", uuid_like()));
@@ -311,8 +335,13 @@ pub(crate) async fn checks(
         key: "data_folder",
         label: "Data folder",
         status: if writable { CheckStatus::Ok } else { CheckStatus::Error },
-        detail: format!("{} {}", facts.data_dir.display(), if writable { "is writable." } else { "cannot be written." }),
-        advice: (!writable).then_some("Give the server's account write access to its data folder (REPOMEMO_SERVER_DATA_DIR)."),
+        detail: format!(
+            "{} {}",
+            facts.data_dir.display(),
+            if writable { "is writable." } else { "cannot be written." }
+        ),
+        advice: (!writable)
+            .then_some("Give the server's account write access to its data folder (REPOMEMO_SERVER_DATA_DIR)."),
     });
 
     checks.push(if facts.secret_key_from_env {
@@ -323,12 +352,27 @@ pub(crate) async fn checks(
 
     let git = tokio::time::timeout(
         Duration::from_secs(5),
-        tokio::process::Command::new("git").arg("--version").kill_on_drop(true).output(),
+        tokio::process::Command::new("git")
+            .arg("--version")
+            .kill_on_drop(true)
+            .output(),
     )
     .await;
     checks.push(match git {
-        Ok(Ok(output)) if output.status.success() => SetupCheck { key: "git", label: "git", status: CheckStatus::Ok, detail: String::from_utf8_lossy(&output.stdout).trim().to_owned(), advice: None },
-        _ => SetupCheck { key: "git", label: "git", status: CheckStatus::Warning, detail: "git was not found.".to_owned(), advice: Some("Install git and add it to the server's PATH to link repositories.") },
+        Ok(Ok(output)) if output.status.success() => SetupCheck {
+            key: "git",
+            label: "git",
+            status: CheckStatus::Ok,
+            detail: String::from_utf8_lossy(&output.stdout).trim().to_owned(),
+            advice: None,
+        },
+        _ => SetupCheck {
+            key: "git",
+            label: "git",
+            status: CheckStatus::Warning,
+            detail: "git was not found.".to_owned(),
+            advice: Some("Install git and add it to the server's PATH to link repositories."),
+        },
     });
 
     checks.push(if state.converter.enabled() {
@@ -353,32 +397,67 @@ pub(crate) async fn checks(
     });
 
     checks.push(if facts.repo_roots.is_empty() {
-        SetupCheck { key: "repo_roots", label: "Repository folders", status: CheckStatus::Info, detail: "Repository links are turned off.".to_owned(), advice: Some("Optional. Set REPOMEMO_REPO_ROOTS to the folders that hold repositories to link them.") }
+        SetupCheck {
+            key: "repo_roots",
+            label: "Repository folders",
+            status: CheckStatus::Info,
+            detail: "Repository links are turned off.".to_owned(),
+            advice: Some("Optional. Set REPOMEMO_REPO_ROOTS to the folders that hold repositories to link them."),
+        }
     } else {
-        SetupCheck { key: "repo_roots", label: "Repository folders", status: CheckStatus::Ok, detail: facts.repo_roots.join(", "), advice: None }
+        SetupCheck {
+            key: "repo_roots",
+            label: "Repository folders",
+            status: CheckStatus::Ok,
+            detail: facts.repo_roots.join(", "),
+            advice: None,
+        }
     });
 
     checks.push(SetupCheck {
         key: "ai_hosts",
         label: "AI provider addresses",
-        status: if facts.ai_hosts_restricted { CheckStatus::Ok } else { CheckStatus::Info },
-        detail: if facts.ai_hosts_restricted { "This machine and OpenRouter, unless REPOMEMO_AI_ALLOWED_HOSTS lists others.".to_owned() } else { "Any address except link-local and cloud-metadata ones (REPOMEMO_AI_ALLOWED_HOSTS=*).".to_owned() },
-        advice: (!facts.ai_hosts_restricted).then_some("Set REPOMEMO_AI_ALLOWED_HOSTS to the AI services you use instead of *."),
+        status: if facts.ai_hosts_restricted {
+            CheckStatus::Ok
+        } else {
+            CheckStatus::Info
+        },
+        detail: if facts.ai_hosts_restricted {
+            "This machine and OpenRouter, unless REPOMEMO_AI_ALLOWED_HOSTS lists others.".to_owned()
+        } else {
+            "Any address except link-local and cloud-metadata ones (REPOMEMO_AI_ALLOWED_HOSTS=*).".to_owned()
+        },
+        advice: (!facts.ai_hosts_restricted)
+            .then_some("Set REPOMEMO_AI_ALLOWED_HOSTS to the AI services you use instead of *."),
     });
 
     checks.push(SetupCheck {
         key: "proxy",
         label: "Client addresses",
         status: CheckStatus::Info,
-        detail: if facts.trust_proxy { "Taken from X-Forwarded-For (behind a trusted proxy).".to_owned() } else { "Taken from the connection.".to_owned() },
-        advice: Some("Behind a reverse proxy, set REPOMEMO_TRUST_PROXY=true so sign-in limits apply per person, not per proxy."),
+        detail: if facts.trust_proxy {
+            "Taken from X-Forwarded-For (behind a trusted proxy).".to_owned()
+        } else {
+            "Taken from the connection.".to_owned()
+        },
+        advice: Some(
+            "Behind a reverse proxy, set REPOMEMO_TRUST_PROXY=true so sign-in limits apply per person, not per proxy.",
+        ),
     });
 
     checks.push(SetupCheck {
         key: "log_files",
         label: "Log files",
-        status: if logs::writing_files() { CheckStatus::Ok } else { CheckStatus::Info },
-        detail: if logs::writing_files() { "Daily log files are written to the data folder.".to_owned() } else { "Logs go to the console only.".to_owned() },
+        status: if logs::writing_files() {
+            CheckStatus::Ok
+        } else {
+            CheckStatus::Info
+        },
+        detail: if logs::writing_files() {
+            "Daily log files are written to the data folder.".to_owned()
+        } else {
+            "Logs go to the console only.".to_owned()
+        },
         advice: None,
     });
 
@@ -408,7 +487,11 @@ pub(crate) async fn complete(
     tracing::info!(target: "audit", user_id = %subject.user_id, "Server setup completed");
     if let Err(error) = state
         .storage
-        .record_system_event(Some(&subject.user_id), "server_setup_completed", "Completed the server setup.")
+        .record_system_event(
+            Some(&subject.user_id),
+            "server_setup_completed",
+            "Completed the server setup.",
+        )
         .await
     {
         tracing::error!(error = %error, "Failed to record a system audit event");
@@ -428,13 +511,23 @@ mod tests {
         let gate = SetupGate {
             wizard: true,
             code: Some(code.clone()),
-            facts: SetupFacts { secret_key_from_env: false, allowed_origins: Vec::new(), repo_roots: Vec::new(), ai_hosts_restricted: false, trust_proxy: false, data_dir: PathBuf::new() },
+            facts: SetupFacts {
+                secret_key_from_env: false,
+                allowed_origins: Vec::new(),
+                repo_roots: Vec::new(),
+                ai_hosts_restricted: false,
+                trust_proxy: false,
+                data_dir: PathBuf::new(),
+            },
         };
         assert!(gate.code_matches(&display_code(&code).to_lowercase()));
         assert!(gate.code_matches(&format!(" {code} ")));
         assert!(!gate.code_matches(&code[..11]));
         assert!(!gate.code_matches(""));
         let closed = SetupGate { code: None, ..gate };
-        assert!(!closed.code_matches(&code), "no code once the server has an administrator");
+        assert!(
+            !closed.code_matches(&code),
+            "no code once the server has an administrator"
+        );
     }
 }

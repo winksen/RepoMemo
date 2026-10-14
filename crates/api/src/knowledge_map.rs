@@ -122,7 +122,7 @@ impl RepoMemoCore {
             row.passage_count += passages;
             row.embedded_count += embedded;
         }
-        coverage.sort_by(|a, b| b.file_count.cmp(&a.file_count));
+        coverage.sort_by_key(|row| std::cmp::Reverse(row.file_count));
 
         // The graph keeps the files with the most content. Files of a
         // repository are not drawn on their own: their repository is.
@@ -159,14 +159,15 @@ impl RepoMemoCore {
         let mut edges = Vec::new();
         let mut similarity_available = false;
         if let Some(model) = embedding_model.as_deref() {
-            let mut centroids = self
-                .storage
-                .artifact_embedding_centroids(workspace_id, model)
-                .await?;
+            let mut centroids = self.storage.artifact_embedding_centroids(workspace_id, model).await?;
             fold_repository_centroids(&mut centroids, &folded_into);
             let files = nodes
                 .iter()
-                .filter_map(|node| centroids.get(&node.id).map(|vector| (node.id.as_str(), vector.as_slice())))
+                .filter_map(|node| {
+                    centroids
+                        .get(&node.id)
+                        .map(|vector| (node.id.as_str(), vector.as_slice()))
+                })
                 .collect::<Vec<_>>();
             similarity_available = !files.is_empty();
             edges.extend(similarity_edges(&files));
@@ -397,7 +398,10 @@ mod tests {
         let retry = [0.0_f32, 1.0];
         let edges = similarity_edges(&[("deploy", &deploy), ("release", &release), ("retry", &retry)]);
         assert_eq!(edges.len(), 1);
-        assert_eq!((edges[0].source.as_str(), edges[0].target.as_str()), ("deploy", "release"));
+        assert_eq!(
+            (edges[0].source.as_str(), edges[0].target.as_str()),
+            ("deploy", "release")
+        );
     }
 
     #[test]
@@ -412,10 +416,21 @@ mod tests {
             })
             .collect::<Vec<_>>();
         let outlier = [0.0_f32, -1.0];
-        let mut files = close.iter().enumerate().map(|(index, vector)| (["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"][index], vector.as_slice())).collect::<Vec<_>>();
+        let mut files = close
+            .iter()
+            .enumerate()
+            .map(|(index, vector)| {
+                (
+                    ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"][index],
+                    vector.as_slice(),
+                )
+            })
+            .collect::<Vec<_>>();
         files.push(("outlier", &outlier));
         let edges = similarity_edges(&files);
-        assert!(edges.iter().all(|edge| edge.source != "outlier" && edge.target != "outlier"));
+        assert!(edges
+            .iter()
+            .all(|edge| edge.source != "outlier" && edge.target != "outlier"));
         assert!(edges.len() <= 12 * 3);
         assert!(!edges.is_empty());
     }

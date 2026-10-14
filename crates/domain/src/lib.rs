@@ -2,6 +2,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 pub mod console;
+mod error;
+
+pub use error::{classify, DomainError, ErrorKind};
 
 /// Temporary server-side identity shape. Production authentication replaces
 /// the dummy session issuer, not this client-facing session contract.
@@ -290,8 +293,12 @@ pub enum DocumentPreview {
         attachments: Vec<EmailAttachmentInfo>,
     },
     /// The browser renders the PDF itself; only the page count is needed.
-    Pdf { page_count: Option<usize> },
-    Unavailable { reason: String },
+    Pdf {
+        page_count: Option<usize>,
+    },
+    Unavailable {
+        reason: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

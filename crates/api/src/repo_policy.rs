@@ -13,7 +13,7 @@
 
 use std::path::{Component, Path, PathBuf, Prefix};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 
 #[derive(Debug, Clone, Default)]
 pub struct RepoLinkPolicy {
@@ -34,7 +34,10 @@ impl RepoLinkPolicy {
     /// No repository can be linked or synced. What a server has until its
     /// operator names the folders that hold repositories.
     pub fn disabled() -> Self {
-        Self { allowed_roots: Vec::new(), disabled: true }
+        Self {
+            allowed_roots: Vec::new(),
+            disabled: true,
+        }
     }
 
     /// Only repositories inside these folders. Each must exist.
@@ -42,11 +45,17 @@ impl RepoLinkPolicy {
         let mut allowed_roots = Vec::new();
         for root in roots {
             let canonical = std::fs::canonicalize(&root).with_context(|| {
-                format!("the repository root {} does not exist or cannot be read", root.display())
+                format!(
+                    "the repository root {} does not exist or cannot be read",
+                    root.display()
+                )
             })?;
             allowed_roots.push(canonical);
         }
-        Ok(Self { allowed_roots, disabled: false })
+        Ok(Self {
+            allowed_roots,
+            disabled: false,
+        })
     }
 
     pub fn allowed_roots(&self) -> &[PathBuf] {
@@ -66,10 +75,10 @@ impl RepoLinkPolicy {
     /// resolved.
     pub fn check(&self, path: &Path) -> Result<()> {
         if self.disabled {
-            bail!("Repository links are turned off on this server. Its operator turns them on by setting REPOMEMO_REPO_ROOTS to the folders that hold repositories.");
+            repomemo_domain::bail_invalid!("Repository links are turned off on this server. Its operator turns them on by setting REPOMEMO_REPO_ROOTS to the folders that hold repositories.");
         }
         if is_network_path(path) && !self.allowed_roots.iter().any(|root| is_network_path(root)) {
-            bail!(
+            repomemo_domain::bail_invalid!(
                 "Repository links must be folders on the server's own disks; network shares such as {} are not allowed.",
                 path.display()
             );
@@ -78,7 +87,10 @@ impl RepoLinkPolicy {
             return Ok(());
         }
         if !path.is_absolute() {
-            bail!("Enter the full path of the repository folder, such as {}.", self.example());
+            repomemo_domain::bail_invalid!(
+                "Enter the full path of the repository folder, such as {}.",
+                self.example()
+            );
         }
         let lexical = normalize_lexically(path);
         // The same answer for a folder that is elsewhere, one that does not
@@ -111,7 +123,7 @@ impl RepoLinkPolicy {
     }
 
     fn outside_error(&self) -> anyhow::Error {
-        anyhow::anyhow!(
+        repomemo_domain::invalid!(
             "This server only links repositories inside: {}.",
             self.allowed_roots
                 .iter()
@@ -214,7 +226,10 @@ mod tests {
         assert!(policy.check(&allowed).is_ok());
         assert!(policy.check(&other).is_err());
         assert!(policy.check(&allowed.join("..").join("other")).is_err());
-        assert!(policy.check(Path::new("allowed/repo")).is_err(), "relative links are refused");
+        assert!(
+            policy.check(Path::new("allowed/repo")).is_err(),
+            "relative links are refused"
+        );
         // A sibling whose name starts like the root is outside it.
         assert!(policy.check(&base.join("allowed-not")).is_err());
         assert!(RepoLinkPolicy::with_allowed_roots(vec![base.join("missing")]).is_err());
