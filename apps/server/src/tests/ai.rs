@@ -683,3 +683,94 @@ async fn saved_provider_keys_only_go_to_the_address_they_were_saved_for() {
     assert_eq!(metadata.status(), 400);
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn the_console_rebuilds_a_workspaces_embeddings_after_a_dry_run() {
+    let data_dir = temp_data_dir("console-embeddings");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let (ollama_url, _) = start_fake_ollama().await;
+    let (admin, _) = register_account(&app, "console-embed-admin@example.com").await;
+    let workspace_id = create_workspace(&app, &admin).await;
+    let run = |command: String| {
+        let app = app.clone();
+        let request = json_request("POST", "/v1/system/console", &admin, json!({ "command": command }));
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    for (title, content) in [
+        (
+            "Deploy runbook",
+            "# Deploy\nRun the migration before switching traffic.",
+        ),
+        ("Retry policy", "# Retries\nUploads use an exponential backoff budget."),
+    ] {
+        let created = app
+            .clone()
+            .oneshot(json_request(
+                "POST",
+                &format!("/v1/workspaces/{workspace_id}/artifacts/text"),
+                &admin,
+                json!({"title": title, "content": content, "language": "Markdown"}),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(created.status(), 201);
+    }
+    wait_for_indexed_artifacts(&app, &admin, &workspace_id, 2).await;
+    let saved = app
+        .clone()
+        .oneshot(json_request(
+            "PUT",
+            &format!("/v1/workspaces/{workspace_id}/ai-providers"),
+            &admin,
+            json!({"provider_type": "ollama", "name": "Mock embedding", "base_url": ollama_url, "model": "mock-embed", "enabled": true, "purpose": "embedding"}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(saved.status(), 200);
+    let metrics = |app: axum::Router, admin: String, workspace_id: String| async move {
+        response_json(
+            app.oneshot(auth_request(
+                "GET",
+                &format!("/v1/workspaces/{workspace_id}/metrics"),
+                &admin,
+            ))
+            .await
+            .unwrap(),
+        )
+        .await
+    };
+    let wait_embedded = || async {
+        for _ in 0..100 {
+            let figures = metrics(app.clone(), admin.clone(), workspace_id.clone()).await;
+            let (embedded, total) = (
+                figures["embedded_chunk_count"].as_i64(),
+                figures["chunk_count"].as_i64(),
+            );
+            if embedded.is_some_and(|count| count > 0 && Some(count) == total) {
+                return total.unwrap();
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+        panic!("chunks were not embedded in time");
+    };
+    let passages = wait_embedded().await;
+
+    let dry = response_json(run(format!("embeddings rebuild {workspace_id}")).await).await;
+    assert_eq!(dry["dry_run"], true);
+    let text = dry["summary"].as_str().unwrap();
+    assert!(
+        text.contains(&format!("{passages} passage(s)")) && text.contains("mock-embed"),
+        "{text}"
+    );
+    assert_eq!(
+        metrics(app.clone(), admin.clone(), workspace_id.clone()).await["embedded_chunk_count"],
+        passages,
+        "a dry run removes nothing"
+    );
+
+    let applied = response_json(run(format!("embeddings rebuild {workspace_id} --yes")).await).await;
+    assert_eq!(applied["dry_run"], false);
+    assert_eq!(applied["data"]["removed"], passages);
+    assert_eq!(wait_embedded().await, passages, "every passage is embedded again");
+    let _ = std::fs::remove_dir_all(data_dir);
+}

@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.2.6` (2026-10-14). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
+> **Scope:** reflects the code at `V0.2.7` (2026-10-14). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
 
 ---
 
@@ -214,7 +214,7 @@ A **System** button in the header opens `/system`, with these pages:
 | **Logs** | What is being recorded, then the events: live (recent, following as they arrive) or any earlier day kept in the log files, filtered by kind of log, workspace, level and text. A day's file can be downloaded |
 | **Jobs & maintenance** | Jobs across every workspace, updated live as they start, progress and finish (stop a running one), and maintenance: last run, next run, what it cleaned, and **Run maintenance now**. Below it, **Backups**: back up now, the list of backups with what each holds, and *Restore as a new environment…* (the running environment is never overwritten; the copy is opened to prove it works and attached from the environment menu), and delete. The server can also back up by itself on a schedule. Backups sit in the data folder, so they are copied off the machine by the operator ([production guide](technical/operations.md)) |
 | **Audit trail** | What system administrators did: role changes, settings, ended sessions, maintenance runs |
-| **Console** | A command line to the server for administrators who prefer typing: `status`, `jobs list --status failed`, `logs --category security --level warn` (add `--follow` to keep watching), `users reset-link <email> --yes`, `tokens list`, `settings set log_http_level debug`, `users unlock alice@example.com`, `maintenance run`, `backup list`, `backup create --yes`, and `help` for the rest. Answers show as tables or facts (`--json` for the raw answer). Anything that changes something only says what it **would** do until the line ends with `--yes`; changes are then recorded in the audit trail with the exact line. Up/Down recall earlier lines, Tab completes. The same console opens in a terminal with `repomemo-console` (`npm run console`): same logo, same commands, a hidden password prompt, and single commands for scripts (`repomemo-console jobs list --status failed`). Detaching the environment and granting the system administrator role stay on their pages |
+| **Console** | A command line to the server for administrators who prefer typing: `status`, `jobs list --status failed`, `logs --category security --level warn` (add `--follow` to keep watching), `users reset-link <email> --yes`, `tokens list`, `settings set log_http_level debug`, `users unlock alice@example.com`, `maintenance run`, `backup list`, `backup create --yes`, for system administrators `workspace reindex <workspace> --yes`, `repo sync <repository> --yes` and `embeddings rebuild <workspace> --yes` (each says what it would do first), and `help` for the rest. Answers show as tables or facts (`--json` for the raw answer). Anything that changes something only says what it **would** do until the line ends with `--yes`; changes are then recorded in the audit trail with the exact line. Up/Down recall earlier lines, Tab completes. The same console opens in a terminal with `repomemo-console` (`npm run console`): same logo, same commands, a hidden password prompt, and single commands for scripts (`repomemo-console jobs list --status failed`). Detaching the environment and granting the system administrator role stay on their pages |
 
 ---
 
@@ -507,7 +507,7 @@ The desktop app and the shared server keep **separate data**.
 
 ---
 
-## 13. Known functional gaps (at V0.2.6)
+## 13. Known functional gaps (at V0.2.7)
 
 These are observed in the code and are useful for prioritizing. The roadmap item that addresses each one is in brackets.
 

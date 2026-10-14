@@ -31,6 +31,20 @@ pub enum EmbeddingRun {
     BudgetSpent(usize),
 }
 
+/// What rebuilding a workspace's vectors would involve.
+#[derive(Debug, Clone)]
+pub struct EmbeddingRebuildPlan {
+    /// The model that would embed the passages; `None` without an enabled embedding provider.
+    pub model: Option<String>,
+    pub passages: i64,
+    /// Vectors stored now, from any model.
+    pub stored_vectors: i64,
+    /// Provider requests the pass makes (one per batch of passages).
+    pub provider_calls: i64,
+    /// The workspace's daily allowance of background AI calls (0 is unlimited).
+    pub daily_limit: u32,
+}
+
 impl RepoMemoCore {
     /// The enabled provider set up for embeddings, if any.
     pub async fn embedding_provider_for_workspace(&self, workspace_id: &str) -> Result<Option<ProviderSettings>> {
@@ -53,6 +67,42 @@ impl RepoMemoCore {
             )),
             None => Ok(None),
         }
+    }
+
+    /// What rebuilding a workspace's vectors would cost, for a dry run.
+    pub async fn embedding_rebuild_plan(&self, workspace_id: &str) -> Result<EmbeddingRebuildPlan> {
+        let model = self
+            .embedding_provider_for_workspace(workspace_id)
+            .await?
+            .map(|settings| settings.embedding_model_name().to_owned());
+        let (_, passages) = self
+            .storage
+            .embedding_coverage(workspace_id, model.as_deref().unwrap_or(""))
+            .await?;
+        let stored_vectors = self.storage.embedding_count(workspace_id).await?;
+        Ok(EmbeddingRebuildPlan {
+            model,
+            passages,
+            stored_vectors,
+            provider_calls: (passages + EMBED_BATCH - 1) / EMBED_BATCH,
+            daily_limit: self.ai_budget.daily_limit(),
+        })
+    }
+
+    /// Removes the workspace's stored vectors so the next embedding pass makes
+    /// every one again. The caller asks the embedding queue to run it.
+    pub async fn clear_embeddings(&self, workspace_id: &str) -> Result<u64> {
+        self.storage.clear_workspace_embeddings(workspace_id).await
+    }
+
+    /// Files that the current indexer has not indexed yet (never, or by an
+    /// older version): what a whole-workspace re-index would do.
+    pub async fn stale_artifact_count(&self, workspace_id: &str) -> Result<usize> {
+        Ok(self
+            .storage
+            .list_artifacts_needing_index(Some(workspace_id), repomemo_indexer::INDEXER_VERSION, true)
+            .await?
+            .len())
     }
 
     /// Embeds every chunk that has no vector from the current embedding

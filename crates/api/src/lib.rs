@@ -29,7 +29,7 @@ mod repo_sync;
 
 pub use agent::{agent_capabilities, agent_conversation_title, agent_turn_label};
 pub use budget::BackgroundAiBudget;
-pub use embeddings::EmbeddingRun;
+pub use embeddings::{EmbeddingRebuildPlan, EmbeddingRun};
 pub use repo_policy::{is_network_path, RepoLinkPolicy};
 pub use repo_sync::RepoHead;
 pub use repomemo_ingestion::{abandoned_readings, served_mime_type, set_document_time_limit};

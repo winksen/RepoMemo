@@ -31,6 +31,9 @@ The console gives them a **command line to the server** in two places that look 
 | What did the security log say in the last minutes? | Logs, choose the kind and level | `logs --category security --level warn` |
 | Someone is locked out | Users, find them, menu, Unlock | `users unlock alice@example.com --yes` |
 | Free disk space now | Jobs & maintenance, Run | `maintenance run --yes` |
+| Re-index one workspace after an indexer upgrade | Workspace settings, per file | `workspace reindex <workspace> --yes` |
+| Pull a repository's new commits now | Repositories, Sync now | `repo sync <repository> --yes` |
+| Search by meaning after changing the embedding model | (nothing: each file waits for a change) | `embeddings rebuild <workspace> --yes` |
 
 ---
 
@@ -99,6 +102,13 @@ flowchart LR
 | `backup create` | **yes** | `POST /v1/system/backups` (starts it; `backup list` shows progress) |
 | `backup restore <backup> <environment>` | **yes** | `POST /v1/system/backups/{name}/restore` (a new environment folder; system administrators) |
 | `backup delete <backup>` | **yes** | `DELETE /v1/system/backups/{name}` |
+| `workspace list` | no | the workspaces of the server with their file and memory card counts (system administrators) |
+| `workspace reindex <workspace>` | **yes** | `POST /v1/workspaces/{id}/index` (V0.2.6: `202` with the job); the dry run counts the files the current indexer has not indexed (system administrators) |
+| `repo list [--workspace w]` | no | the linked repositories with their sync state (system administrators) |
+| `repo sync <repository>` | **yes** | the repository sync runner, as `POST /v1/repositories/{id}/sync` does; `409` while it is syncing (system administrators) |
+| `embeddings rebuild <workspace>` | **yes** | removes the workspace's vectors (`StorageEngine::clear_workspace_embeddings`) and queues the embedding pass; the dry run reports the passages, the model and the provider calls against the daily allowance, and a pass already running is a `409` (system administrators) |
+
+A *workspace* or *repository* is given by its id or by its name when only one has it; two with the same name are refused with their ids.
 
 **Deliberately left out:** detaching the environment and granting the system administrator role. Both are rare, hard to undo, and the pages' confirmation dialogs explain what follows. They stay on the pages.
 

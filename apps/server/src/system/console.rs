@@ -67,6 +67,11 @@ const COMMANDS: &[CommandSpec] = &[
     CommandSpec { name: "backup delete", usage: "backup delete <backup> --yes", summary: "Deletes one backup.", changes: true, arguments: 1, flags: &[] },
     CommandSpec { name: "maintenance status", usage: "maintenance status", summary: "The last maintenance run and the next one.", changes: false, arguments: 0, flags: &[] },
     CommandSpec { name: "maintenance run", usage: "maintenance run --yes", summary: "Runs a full maintenance pass now.", changes: true, arguments: 0, flags: &[] },
+    CommandSpec { name: "workspace list", usage: "workspace list", summary: "Every workspace on the server with its id (system administrators).", changes: false, arguments: 0, flags: &[] },
+    CommandSpec { name: "workspace reindex", usage: "workspace reindex <workspace> --yes", summary: "Re-indexes the files of a workspace that the current indexer has not indexed, as a background job (system administrators). The workspace is its id or its name.", changes: true, arguments: 1, flags: &[] },
+    CommandSpec { name: "repo list", usage: "repo list [--workspace id-or-name]", summary: "Linked repositories across the server, or in one workspace, with their sync state (system administrators).", changes: false, arguments: 0, flags: &["workspace"] },
+    CommandSpec { name: "repo sync", usage: "repo sync <repository> --yes", summary: "Syncs a linked repository now, as a background job (system administrators). The repository is its id or its name.", changes: true, arguments: 1, flags: &[] },
+    CommandSpec { name: "embeddings rebuild", usage: "embeddings rebuild <workspace> --yes", summary: "Removes a workspace's stored vectors and embeds every passage again with its embedding provider, in the background (system administrators).", changes: true, arguments: 1, flags: &[] },
 ];
 
 /// A group name alone runs its first command.
@@ -77,6 +82,8 @@ const GROUP_DEFAULTS: &[(&str, &str)] = &[
     ("tokens", "tokens list"),
     ("maintenance", "maintenance status"),
     ("backup", "backup list"),
+    ("workspace", "workspace list"),
+    ("repo", "repo list"),
 ];
 
 // ---------------------------------------------------------------------------
@@ -1019,8 +1026,272 @@ async fn execute(
             Ok(applied(spec, summary, View::Facts, maintenance_facts(&status)))
         }
 
+        "workspace list" => {
+            super::require_full_system_admin(subject)?;
+            let workspaces = state.core.list_workspaces().await.map_err(map_storage_error)?;
+            let mut rows = Vec::with_capacity(workspaces.len());
+            for workspace in &workspaces {
+                let overview = state
+                    .core
+                    .workspace_overview(workspace.id.clone())
+                    .await
+                    .map_err(map_storage_error)?;
+                rows.push(json!({
+                    "id": workspace.id,
+                    "name": workspace.name,
+                    "files": overview.artifact_count,
+                    "memory_cards": overview.memory_card_count,
+                    "created_at": workspace.created_at,
+                }));
+            }
+            Ok(answer(
+                spec,
+                format!("{} workspace(s).", rows.len()),
+                View::Table {
+                    columns: &["id", "name", "files", "memory_cards", "created_at"],
+                },
+                Value::Array(rows),
+            ))
+        }
+
+        "workspace reindex" => {
+            super::require_full_system_admin(subject)?;
+            let workspace = find_workspace(state, &arguments[0]).await?;
+            let stale = state
+                .core
+                .stale_artifact_count(&workspace.id)
+                .await
+                .map_err(map_storage_error)?;
+            if !line.yes {
+                return Ok(dry_run(
+                    spec,
+                    format!(
+                        "Would re-index {stale} file(s) of {} that the current indexer has not indexed, as a background job.",
+                        workspace.name
+                    ),
+                ));
+            }
+            let (_, job) = crate::index_workspace(who, state_, Path(workspace.id.clone())).await?;
+            Ok(applied(
+                spec,
+                format!(
+                    "Re-indexing {stale} file(s) of {} as job {}. Follow it with jobs list.",
+                    workspace.name, job.0.id
+                ),
+                View::Text,
+                to_json(job.0)?,
+            ))
+        }
+
+        "repo list" => {
+            super::require_full_system_admin(subject)?;
+            let workspaces = match line.flag("workspace") {
+                Some(which) => vec![find_workspace(state, &which).await?],
+                None => state.core.list_workspaces().await.map_err(map_storage_error)?,
+            };
+            let mut rows = Vec::new();
+            for workspace in &workspaces {
+                for source in state
+                    .core
+                    .list_repo_sources(&workspace.id)
+                    .await
+                    .map_err(map_storage_error)?
+                {
+                    rows.push(json!({
+                        "id": source.id,
+                        "name": source.name,
+                        "workspace": workspace.name,
+                        "status": source.status,
+                        "last_synced_at": source.last_synced_at,
+                        "files": source.file_count,
+                        "last_error": source.last_error,
+                    }));
+                }
+            }
+            Ok(answer(
+                spec,
+                format!("{} repositor(ies).", rows.len()),
+                View::Table {
+                    columns: &[
+                        "id",
+                        "name",
+                        "workspace",
+                        "status",
+                        "last_synced_at",
+                        "files",
+                        "last_error",
+                    ],
+                },
+                Value::Array(rows),
+            ))
+        }
+
+        "repo sync" => {
+            super::require_full_system_admin(subject)?;
+            let (repository, workspace_name) = find_repository(state, &arguments[0]).await?;
+            if repository.active_job.is_some() {
+                return Err(ApiError::conflict(format!(
+                    "{} is already syncing; follow it with jobs list.",
+                    repository.name
+                )));
+            }
+            if !line.yes {
+                return Ok(dry_run(
+                    spec,
+                    format!(
+                        "Would sync the repository {} of {workspace_name} ({}, {} files, last synced {}).",
+                        repository.name,
+                        repository.status,
+                        repository.file_count,
+                        repository.last_synced_at.as_deref().unwrap_or("never")
+                    ),
+                ));
+            }
+            let job = state
+                .repo_sync
+                .start(&repository, Some(subject.user_id.clone()))
+                .await
+                .map_err(map_storage_error)?
+                .ok_or_else(|| ApiError::conflict(format!("{} is already syncing.", repository.name)))?;
+            Ok(applied(
+                spec,
+                format!(
+                    "Syncing {} of {workspace_name} as job {}. Follow it with jobs list.",
+                    repository.name, job.id
+                ),
+                View::Text,
+                to_json(job)?,
+            ))
+        }
+
+        "embeddings rebuild" => {
+            super::require_full_system_admin(subject)?;
+            let workspace = find_workspace(state, &arguments[0]).await?;
+            let plan = state
+                .core
+                .embedding_rebuild_plan(&workspace.id)
+                .await
+                .map_err(map_storage_error)?;
+            let Some(model) = plan.model.as_deref() else {
+                return Err(ApiError::conflict(format!(
+                    "{} has no enabled embedding provider, so there is nothing to rebuild the vectors with. Set one up in the workspace settings first.",
+                    workspace.name
+                )));
+            };
+            let allowance = if plan.daily_limit == 0 {
+                String::new()
+            } else {
+                let days = (plan.provider_calls + i64::from(plan.daily_limit) - 1) / i64::from(plan.daily_limit);
+                if days > 1 {
+                    format!(
+                        " That is more than the workspace's daily allowance of {} background AI calls: it finishes over {days} days.",
+                        plan.daily_limit
+                    )
+                } else {
+                    String::new()
+                }
+            };
+            if !line.yes {
+                return Ok(dry_run(
+                    spec,
+                    format!(
+                        "Would remove {} stored vector(s) of {} and embed its {} passage(s) again with {model}, in about {} provider call(s). Search by meaning is partial until it finishes; keyword search is not affected.{allowance}",
+                        plan.stored_vectors, workspace.name, plan.passages, plan.provider_calls
+                    ),
+                ));
+            }
+            let running = state
+                .storage
+                .list_workspace_jobs(&workspace.id, Some("embedding"), Some("running"), 5)
+                .await
+                .map_err(map_storage_error)?;
+            if !running.is_empty() {
+                return Err(ApiError::conflict(format!(
+                    "An embedding pass of {} is running (job {}). Let it finish, or stop it with jobs cancel, then rebuild.",
+                    workspace.name, running[0].id
+                )));
+            }
+            let removed = state
+                .core
+                .clear_embeddings(&workspace.id)
+                .await
+                .map_err(map_storage_error)?;
+            state.embedding_queue.request(&workspace.id);
+            Ok(applied(
+                spec,
+                format!(
+                    "Removed {removed} vector(s) of {}; its {} passage(s) are being embedded again with {model}. Follow it with jobs list.{allowance}",
+                    workspace.name, plan.passages
+                ),
+                View::Text,
+                json!({ "workspace_id": workspace.id, "removed": removed, "passages": plan.passages, "model": model }),
+            ))
+        }
+
         other => Err(ApiError::internal(format!(
             "The console command {other} has no implementation"
+        ))),
+    }
+}
+
+/// A workspace by id, or by name when exactly one has it.
+async fn find_workspace(state: &AppState, who: &str) -> Result<repomemo_domain::Workspace, ApiError> {
+    let all = state.core.list_workspaces().await.map_err(map_storage_error)?;
+    if let Some(found) = all.iter().find(|workspace| workspace.id == who) {
+        return Ok(found.clone());
+    }
+    let named = all
+        .iter()
+        .filter(|workspace| workspace.name.eq_ignore_ascii_case(who))
+        .collect::<Vec<_>>();
+    match named.as_slice() {
+        [only] => Ok((*only).clone()),
+        [] => Err(ApiError::not_found(format!(
+            "No workspace has the id or name {who}. Type workspace list to see them."
+        ))),
+        several => Err(ApiError::conflict(format!(
+            "{} workspaces are named {who}; use the id: {}.",
+            several.len(),
+            several
+                .iter()
+                .map(|workspace| workspace.id.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        ))),
+    }
+}
+
+/// A linked repository by id, or by name when exactly one has it, with the
+/// name of its workspace.
+async fn find_repository(state: &AppState, who: &str) -> Result<(repomemo_domain::RepoSource, String), ApiError> {
+    let mut found = Vec::new();
+    for workspace in state.core.list_workspaces().await.map_err(map_storage_error)? {
+        for source in state
+            .core
+            .list_repo_sources(&workspace.id)
+            .await
+            .map_err(map_storage_error)?
+        {
+            if source.id == who || source.name.eq_ignore_ascii_case(who) {
+                found.push((source, workspace.name.clone()));
+            }
+        }
+    }
+    if let Some(index) = found.iter().position(|(source, _)| source.id == who) {
+        return Ok(found.swap_remove(index));
+    }
+    match found.len() {
+        0 => Err(ApiError::not_found(format!(
+            "No repository has the id or name {who}. Type repo list to see them."
+        ))),
+        1 => Ok(found.remove(0)),
+        count => Err(ApiError::conflict(format!(
+            "{count} repositories are named {who}; use the id: {}.",
+            found
+                .iter()
+                .map(|(source, workspace)| format!("{} (in {workspace})", source.id))
+                .collect::<Vec<_>>()
+                .join(", ")
         ))),
     }
 }

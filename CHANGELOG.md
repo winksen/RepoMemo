@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.7 (2026-10-14)
+
+Workspace commands in the admin console.
+
+### Added
+- **`workspace reindex <workspace> --yes`**: re-indexes the files of a workspace that the current indexer has not indexed, as a background job (the same pass as `POST /v1/workspaces/{id}/index`, which answers `202` since V0.2.6). The dry run says how many files it would take.
+- **`repo sync <repository> --yes`**: syncs a linked repository now, as a background job. The dry run shows its state and when it last synced; a repository that is syncing is a `409`.
+- **`embeddings rebuild <workspace> --yes`**: removes a workspace's stored vectors, whatever model made them, and embeds every passage again with its embedding provider. The dry run reports the vectors it would remove, the passages, the model, the provider calls and whether that exceeds the workspace's daily allowance of background AI calls; a workspace without an embedding provider, or with a pass already running, is refused. Search by meaning is partial until the pass has run; keyword search is not affected.
+- **`workspace list` and `repo list [--workspace w]`** to find what the commands above take. A workspace or repository is given by its id, or by its name when only one has it.
+- Each of these is for **system administrators** (app administrators are refused), is a dry run without `--yes`, and leaves a `console_command` line with the exact command in the audit trail. They work from `repomemo-console` and from System › Console.
+
+### Upgrading
+- Nothing to do. `StorageEngine::clear_workspace_embeddings` and the core's `embedding_rebuild_plan`, `clear_embeddings` and `stale_artifact_count` back the new commands.
+
 ## V0.2.6 (2026-10-14)
 
 Manual re-indexing no longer holds a request open.

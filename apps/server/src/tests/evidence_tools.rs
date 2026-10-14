@@ -425,3 +425,83 @@ async fn the_console_creates_reset_links_and_lists_tokens() {
     assert_eq!(run("logs --after soon").await.status(), 400);
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn the_console_starts_workspace_work_as_dry_runs_then_audited_jobs() {
+    let data_dir = temp_data_dir("console-workspace");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let (admin, _) = register_account(&app, "console-ws-admin@example.com").await;
+    let workspace_id = create_workspace(&app, &admin).await;
+    let run = |who: &str, command: String| {
+        let app = app.clone();
+        let request = json_request("POST", "/v1/system/console", who, json!({ "command": command }));
+        async move { app.oneshot(request).await.unwrap() }
+    };
+
+    // Finding the workspace: by id from the list, then by name.
+    let listed = response_json(run(&admin, "workspace list".to_owned()).await).await;
+    assert_eq!(listed["command"], "workspace list");
+    assert!(listed["data"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|row| row["id"] == workspace_id && row["name"] == "Workspace"));
+    assert_eq!(
+        run(&admin, "workspace reindex nowhere".to_owned()).await.status(),
+        404,
+        "an unknown workspace"
+    );
+
+    // A dry run says what would happen and starts nothing.
+    let jobs_before = response_json(run(&admin, "jobs list".to_owned()).await).await["data"]
+        .as_array()
+        .unwrap()
+        .len();
+    let dry = response_json(run(&admin, "workspace reindex workspace".to_owned()).await).await;
+    assert_eq!(dry["dry_run"], true);
+    assert!(dry["summary"].as_str().unwrap().contains("Would re-index"));
+    let jobs_after_dry = response_json(run(&admin, "jobs list".to_owned()).await).await["data"]
+        .as_array()
+        .unwrap()
+        .len();
+    assert_eq!(jobs_before, jobs_after_dry, "a dry run starts no job");
+
+    // Confirmed, it answers with the job and leaves an audit line with the exact command.
+    let started = response_json(run(&admin, format!("workspace reindex {workspace_id} --yes")).await).await;
+    assert_eq!(started["dry_run"], false);
+    assert_eq!(started["data"]["kind"], "indexing");
+    assert_eq!(started["data"]["stage"], "chunking_workspace");
+
+    // Repositories: none are linked, and an unknown one is not found.
+    let repositories = response_json(run(&admin, "repo".to_owned()).await).await;
+    assert_eq!(repositories["command"], "repo list");
+    assert_eq!(repositories["data"].as_array().unwrap().len(), 0);
+    assert_eq!(run(&admin, "repo sync nothing --yes".to_owned()).await.status(), 404);
+
+    // A workspace without an embedding provider has nothing to rebuild with.
+    assert_eq!(
+        run(&admin, format!("embeddings rebuild {workspace_id}")).await.status(),
+        409
+    );
+
+    let audit = response_json(
+        app.clone()
+            .oneshot(auth_request("GET", "/v1/system/audit", &admin))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let lines = audit
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|event| event["action"] == "console_command")
+        .map(|event| event["detail"].as_str().unwrap().to_owned())
+        .collect::<Vec<_>>();
+    assert_eq!(lines.len(), 1, "only the confirmed command is audited: {lines:?}");
+    assert!(
+        lines[0].contains(&format!("workspace reindex {workspace_id} --yes")),
+        "{lines:?}"
+    );
+    let _ = std::fs::remove_dir_all(data_dir);
+}

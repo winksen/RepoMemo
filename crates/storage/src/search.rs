@@ -454,6 +454,26 @@ impl StorageEngine {
         Ok((row.get("embedded"), row.get("total")))
     }
 
+    /// Forgets every stored vector of a workspace, whatever model made it, so
+    /// the next embedding pass makes them all again. Returns how many were
+    /// removed. Keyword search is unaffected; meaning search has nothing to
+    /// look at until the pass has run.
+    pub async fn clear_workspace_embeddings(&self, workspace_id: &str) -> Result<u64> {
+        let mut tx = self.pool.begin().await?;
+        let removed = sqlx::query("DELETE FROM chunk_embeddings WHERE workspace_id = ?1")
+            .bind(workspace_id)
+            .execute(&mut *tx)
+            .await?
+            .rows_affected();
+        sqlx::query("UPDATE chunks SET embedding_status = 'not_configured' WHERE workspace_id = ?1 AND embedding_status != 'not_configured'")
+            .bind(workspace_id)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        self.vectors.forget(workspace_id);
+        Ok(removed)
+    }
+
     pub async fn embedding_count(&self, workspace_id: &str) -> Result<i64> {
         let row = sqlx::query("SELECT COUNT(*) AS count FROM chunk_embeddings WHERE workspace_id = ?1")
             .bind(workspace_id)

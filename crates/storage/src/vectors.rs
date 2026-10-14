@@ -149,7 +149,7 @@ impl VectorCache {
         }
     }
 
-    fn forget(&self, workspace_id: &str) {
+    pub(crate) fn forget(&self, workspace_id: &str) {
         if let Ok(mut workspaces) = self.workspaces.lock() {
             workspaces.remove(workspace_id);
         }
