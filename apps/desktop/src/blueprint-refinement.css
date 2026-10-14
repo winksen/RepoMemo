@@ -618,6 +618,8 @@ body,
 .shared-markdown pre { padding: 12px; overflow: auto; background: var(--color-surface-3); border-radius: 8px; }
 .shared-markdown pre code { padding: 0; background: transparent; }
 .shared-markdown a { color: var(--color-accent-text); }
+.shared-markdown .shared-markdown-link-target { color: var(--color-text-muted); font-size: 0.9em; overflow-wrap: anywhere; }
+.shared-markdown .shared-markdown-blocked-image { display: inline-block; padding: 1px 6px; color: var(--color-text-muted); background: var(--color-surface-3); border-radius: 4px; font-size: 0.9em; overflow-wrap: anywhere; }
 
 .rm-rich-toolbar button.on { color: var(--color-text); background: var(--color-surface-3); }
 .rm-rich-link { display: flex; gap: 6px; }

@@ -1,4 +1,5 @@
 import type { FormEvent } from "react";
+import { SafeMarkdown } from "./SafeMarkdown";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   IconCircleCheck as CircleCheck,
@@ -13,8 +14,6 @@ import {
   IconStack2 as Layers,
   IconTrash as Trash,
 } from "@tabler/icons-react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import {
   cancelSharedJob,
   checkSharedRepository,
@@ -690,7 +689,7 @@ export function RepositoryDetailView({
     <section className="shared-record-panel rm-repo-page">
       <div className="shared-panel-heading"><div><Sparkles size={18} /><h2>Summary</h2></div>{summary ? <span>{summary.provider_name}</span> : null}</div>
       {summary ? <>
-        <div className="shared-markdown rm-repo-summary"><ReactMarkdown remarkPlugins={[remarkGfm]}>{summary.summary_markdown}</ReactMarkdown></div>
+        <div className="shared-markdown rm-repo-summary"><SafeMarkdown>{summary.summary_markdown}</SafeMarkdown></div>
         <p className="rm-map-muted">Written for commit <code>{summary.commit_sha.slice(0, 7)}</code> on {formatDate(summary.generated_at)}.{summaryIsStale ? " The repository has changed since; regenerate it to describe the current commit." : ""} {summary.warnings.join(" ")}</p>
         {citedFiles.length ? <div className="rm-repo-cited"><span className="rm-map-muted">Based on</span>{citedFiles.map(([artifactId, path]) => <button className="rm-map-link" key={artifactId} onClick={() => onOpenArtifact(artifactId)} type="button">{path}</button>)}</div> : null}
       </> : <p className="shared-muted-copy">{detail.ai_available ? "No summary yet. A summary describes what the repository is, its main parts and where to start reading, from the overview below and the opening of its key files." : "A summary needs a text AI provider, which an administrator can set up in Settings. The overview below needs no AI."}</p>}
@@ -728,7 +727,7 @@ export function RepositoryDetailView({
         </div> : null}
         {overview.readme_excerpt ? <div className="rm-repo-block">
           <h3>From the README</h3>
-          <div className="shared-markdown rm-repo-readme"><ReactMarkdown remarkPlugins={[remarkGfm]}>{overview.readme_excerpt}</ReactMarkdown></div>
+          <div className="shared-markdown rm-repo-readme"><SafeMarkdown>{overview.readme_excerpt}</SafeMarkdown></div>
         </div> : null}
         {overview.recent_commits.length ? <div className="rm-repo-block">
           <h3>Recent commits</h3>

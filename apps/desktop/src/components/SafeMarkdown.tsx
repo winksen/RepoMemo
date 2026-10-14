@@ -1,0 +1,63 @@
+import type { ReactNode } from "react";
+import ReactMarkdown, { type Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
+
+/**
+ * Markdown from outside the page's own code: AI answers, notes, memory cards,
+ * repository READMEs. Two rules keep it from phoning home or misleading
+ * (review M5, L9):
+ *
+ * - **No images.** A remote image is a request the page makes for whoever
+ *   wrote the Markdown, and its address can carry what the model was shown.
+ *   Images become a note with their text and address.
+ * - **Links say where they go.** The target host is shown next to the text and
+ *   the link opens in a new tab without an opener or a referrer.
+ */
+
+/** The host of an `http(s)` address, or null for anything else. */
+export function externalHost(address: string | undefined): string | null {
+  if (!address) return null;
+  try {
+    const url = new URL(address);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.host : null;
+  } catch {
+    return null;
+  }
+}
+
+function plainText(children: ReactNode): string {
+  if (typeof children === "string") return children;
+  if (typeof children === "number") return String(children);
+  if (Array.isArray(children)) return children.map(plainText).join("");
+  return "";
+}
+
+const components: Components = {
+  img({ alt, src }) {
+    const target = typeof src === "string" ? src : "";
+    return (
+      <span className="shared-markdown-blocked-image" title={target || undefined}>
+        Image not loaded{alt ? `: ${alt}` : ""}{target ? ` (${externalHost(target) ?? target})` : ""}
+      </span>
+    );
+  },
+  a({ href, children }) {
+    const host = externalHost(href);
+    if (!host) {
+      // Anchors inside the page, mail links and anything else that is not a web address.
+      return <a href={href} rel="noopener noreferrer">{children}</a>;
+    }
+    // Only name the host again when the text does not already show it.
+    const showsTarget = plainText(children).includes(host);
+    return (
+      <>
+        <a href={href} rel="noopener noreferrer nofollow" target="_blank" title={href}>{children}</a>
+        {showsTarget ? null : <span className="shared-markdown-link-target"> ({host})</span>}
+      </>
+    );
+  },
+};
+
+export function SafeMarkdown({ children }: { children: string }) {
+  return <ReactMarkdown components={components} remarkPlugins={[remarkGfm]}>{children}</ReactMarkdown>;
+}

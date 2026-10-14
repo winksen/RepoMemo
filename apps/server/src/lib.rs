@@ -16,6 +16,7 @@ mod repositories;
 mod security;
 mod setup;
 mod system;
+mod web_session;
 
 pub use logs::{init_logging, log_capture_layer, LogSettings};
 
@@ -393,6 +394,8 @@ struct RuntimeSettings {
     service_name: String,
     allow_registration: bool,
     proxy: security::ProxyTrust,
+    /// The refresh cookie carries `Secure` (the public address is HTTPS).
+    secure_cookies: bool,
     access_token_ttl_minutes: i64,
     refresh_token_ttl_days: i64,
     auth_quota: Quota,
@@ -414,6 +417,7 @@ impl RuntimeSettings {
             service_name: config.service_name.clone(),
             allow_registration: config.allow_registration,
             proxy: config.proxy_trust(),
+            secure_cookies: config.public_url.as_deref().is_some_and(|url| url.starts_with("https://")),
             access_token_ttl_minutes: config.access_token_ttl_minutes,
             refresh_token_ttl_days: config.refresh_token_ttl_days,
             auth_quota: config.auth_quota,
@@ -885,6 +889,8 @@ struct TokenResponse {
 
 #[derive(Debug, Deserialize)]
 struct RefreshRequest {
+    /// Empty for the web app, whose token travels in a cookie (see `web_session`).
+    #[serde(default)]
     refresh_token: String,
 }
 
@@ -1113,6 +1119,8 @@ fn cors_layer(config: &ServerConfig) -> CorsLayer {
                 HeaderName::from_static("x-total-count"),
                 header::RETRY_AFTER,
             ])
+            // The web app's refresh cookie crosses ports of the same site.
+            .allow_credentials(true)
     }
 }
 
@@ -1429,6 +1437,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
                 .delete(delete_memory_card),
         )
         .route("/v1/memory-cards/{card_id}/export", get(export_memory_card))
+        .layer(middleware::from_fn_with_state(state.clone(), web_session::web_session))
         .layer(CatchPanicLayer::custom(panic_response))
         .layer(middleware::from_fn_with_state(
             security::HeaderPolicy { hsts: config.public_url.as_deref().is_some_and(|url| url.starts_with("https://")) },
@@ -8208,6 +8217,68 @@ mod tests {
         let fresh = format!("Bearer {}", response_json(login).await["access_token"].as_str().unwrap());
         let session = app.clone().oneshot(auth_request("GET", "/v1/session", &fresh)).await.unwrap();
         assert_eq!(session.status(), 200);
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn the_web_app_keeps_its_refresh_token_in_a_cookie() {
+        let data_dir = temp_data_dir("refresh-cookie");
+        let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+        let web = |uri: &str, cookie: Option<&str>, body: Value| {
+            let mut request = Request::builder()
+                .method("POST")
+                .uri(uri)
+                .header("content-type", "application/json")
+                .header("x-repomemo-client", "web");
+            if let Some(cookie) = cookie {
+                request = request.header("cookie", format!("repomemo_refresh={cookie}"));
+            }
+            request.body(Body::from(body.to_string())).unwrap()
+        };
+        let set_cookie = |response: &axum::response::Response| {
+            response
+                .headers()
+                .get("set-cookie")
+                .map(|value| value.to_str().unwrap().to_owned())
+                .unwrap_or_default()
+        };
+        let token_of = |cookie: &str| cookie.split(';').next().unwrap().trim_start_matches("repomemo_refresh=").to_owned();
+
+        let registered = app
+            .clone()
+            .oneshot(web("/v1/auth/register", None, json!({"email": "cookie-user@example.com", "display_name": "Cookie", "password": "not-a-real-password"})))
+            .await
+            .unwrap();
+        assert_eq!(registered.status(), 201);
+        let cookie = set_cookie(&registered);
+        assert!(cookie.contains("HttpOnly") && cookie.contains("SameSite=Strict") && cookie.contains("Path=/v1/auth"), "{cookie}");
+        let body = response_json(registered).await;
+        assert_eq!(body["refresh_token"], "", "the token is not in the body for the web app");
+        let first = token_of(&cookie);
+        assert!(!first.is_empty());
+
+        // The cookie alone renews the session, and rotates.
+        let refreshed = app.clone().oneshot(web("/v1/auth/refresh", Some(&first), json!({}))).await.unwrap();
+        assert_eq!(refreshed.status(), 200);
+        let second = token_of(&set_cookie(&refreshed));
+        assert!(!second.is_empty() && second != first);
+        assert!(response_json(refreshed).await["access_token"].as_str().is_some());
+        assert_eq!(app.clone().oneshot(web("/v1/auth/refresh", Some(&first), json!({}))).await.unwrap().status(), 401, "a used token is refused");
+
+        // Other clients still get the token in the body and send it there.
+        let script = app
+            .clone()
+            .oneshot(public_post("/v1/auth/login", json!({"email": "cookie-user@example.com", "password": "not-a-real-password"})))
+            .await
+            .unwrap();
+        assert!(script.headers().get("set-cookie").is_none());
+        assert!(!response_json(script).await["refresh_token"].as_str().unwrap().is_empty());
+
+        // Signing out revokes the token and clears the cookie.
+        let out = app.clone().oneshot(web("/v1/auth/logout", Some(&second), json!({}))).await.unwrap();
+        assert_eq!(out.status(), 204);
+        assert!(set_cookie(&out).contains("Max-Age=0"));
+        assert_eq!(app.clone().oneshot(web("/v1/auth/refresh", Some(&second), json!({}))).await.unwrap().status(), 401);
         let _ = std::fs::remove_dir_all(data_dir);
     }
 

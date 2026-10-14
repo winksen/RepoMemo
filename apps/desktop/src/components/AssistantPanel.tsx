@@ -1,7 +1,6 @@
 import type { FormEvent, KeyboardEvent } from "react";
+import { SafeMarkdown } from "./SafeMarkdown";
 import { useEffect, useRef, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import {
   IconBrain as Brain,
   IconFileSearch as FileSearch,
@@ -343,7 +342,7 @@ function Reply({ canSummarize, capabilities, isBusy, onOpenArtifact, onSummarize
       <span><Sparkles size={14} /> Assistant{note ? ` · ${note}` : ""}</span>
       {reply.generated ? <span className="shared-assistant-generated">AI-generated · verify against the cited sources</span> : null}
     </div>
-    <div className="shared-markdown"><ReactMarkdown remarkPlugins={[remarkGfm]}>{reply.reply_markdown}</ReactMarkdown></div>
+    <div className="shared-markdown"><SafeMarkdown>{reply.reply_markdown}</SafeMarkdown></div>
     {reply.warnings.length ? <div className="shared-ai-overview-warning">{reply.warnings.map((warning) => <p key={warning}>{warning}</p>)}</div> : null}
     {reply.files.length ? <ul className="shared-assistant-files">{reply.files.map((file) => <li key={file.id}>
       <Button className="shared-assistant-file" onClick={() => onOpenArtifact(file.id)} type="button" variant="secondary"><FileText size={16} /><span><strong>{file.title}</strong><small>{file.path}</small></span></Button>

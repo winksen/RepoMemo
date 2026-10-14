@@ -212,6 +212,14 @@ Open `http://127.0.0.1:3021`. The web client reads `VITE_REPOMEMO_API_URL`,
 which defaults to `http://127.0.0.1:3020`; copy `apps/desktop/.env.example` to
 `apps/desktop/.env.local` to override it.
 
+The web client keeps its refresh token in an `HttpOnly; SameSite=Strict`
+cookie, so the web app and the API must be on one site: `127.0.0.1:3021` and
+`127.0.0.1:3020` are (ports do not matter), and so is one host behind a
+reverse proxy. Do not mix `localhost` and `127.0.0.1`. `npm run build`
+writes `apps/desktop/dist/content-security-policy.txt`: send its content as the
+`Content-Security-Policy` header from whatever serves `dist/`, after building
+with `VITE_REPOMEMO_API_URL` set to the API address people will use.
+
 Run the background worker foundation separately:
 
 ```powershell

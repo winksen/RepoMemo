@@ -2,6 +2,25 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)), then `0.2.1` and so on for fixes. Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.1.68 (2026-10-14)
+
+Browser hardening (bundle S4).
+
+### Security
+- **The refresh token is out of reach of scripts (M2).** The web app's refresh token travels in an `HttpOnly; SameSite=Strict` cookie (`repomemo_refresh`, path `/v1/auth`, `Secure` when `REPOMEMO_PUBLIC_URL` is HTTPS) instead of `localStorage`. Only requests with `X-RepoMemo-Client: web` are affected; the console and scripts still use the token in the response body. The web app and the API must share a site (one host behind the proxy; different ports are fine). Tokens kept by an earlier version are exchanged once on the next visit.
+- **A content security policy for the built web app (M2).** `npm run build` puts it in `index.html` and writes the header value, with `frame-ancestors 'none'`, to `dist/content-security-policy.txt` for the host to send: scripts from the app only, requests to itself and the API, images from itself, `blob:` and `data:`, frames only for `blob:` previews, no plugins.
+- **A strict policy for the desktop shell (M6)** in `tauri.conf.json`: its own files and the local IPC only, no remote connections.
+- **No remote images in Markdown (M5).** AI answers, notes, memory cards and repository summaries show an image as a note with its text and address instead of fetching it, so a prompt-injected image cannot send workspace content out in a URL.
+- **External links show where they go (L9).** The target host is shown next to the link, which opens in a new tab with `noopener noreferrer`.
+- **Invitation and reset secrets leave the address bar (L3).** The link page reads the fragment once and removes it from the address and the history entry.
+
+### Changed
+- The API allows credentialed cross-origin calls from the origins in `REPOMEMO_ALLOWED_ORIGIN` (needed for the cookie when the web app is on another port).
+
+### Upgrading
+- Serve the web app and the API from one host (a reverse proxy routing `/v1` and `/health` to the server), or at least one site; a cookie-less setup across different sites can no longer renew sessions.
+- Send the header from `dist/content-security-policy.txt` from the host that serves the web app, and rebuild the web app with `VITE_REPOMEMO_API_URL` set so the policy names your API.
+
 ## V0.1.67 (2026-10-14)
 
 Safe defaults and identity (bundle S2).

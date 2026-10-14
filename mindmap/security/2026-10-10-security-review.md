@@ -17,6 +17,9 @@
 | N4 | ✅ Fixed in V0.1.65 | Author edits need a writer role; saved searches are deleted by their author or an administrator |
 | N5 | ✅ Fixed in V0.1.65 | A used reset link also revokes the account's personal access tokens |
 | N6 | ✅ Fixed in V0.1.65 | `POST /v1/workspaces/{ws}/index` is for administrators |
+| M2 | ✅ Fixed in V0.1.68 | `HttpOnly; SameSite=Strict` refresh cookie (`web_session.rs`); CSP meta tag and header file from the web build. Residual: the host serves the header |
+| M5, L9 | ✅ Fixed in V0.1.68 | `SafeMarkdown`: no images, links show their host and open with `noopener noreferrer` |
+| M6 | ✅ Fixed in V0.1.68 | Strict `csp` in `tauri.conf.json` |
 | M1 | ✅ Fixed in V0.1.67 | Registration closed by default; quotas follow in V0.1.75 |
 | M3 | ✅ Fixed in V0.1.67 | Forwarding headers only from a trusted peer, read from the right |
 | M4 | ✅ Mitigated in V0.1.67 | Member forms answer `invitation_required` for everyone not in; open registration still reveals an existing address until mail exists |

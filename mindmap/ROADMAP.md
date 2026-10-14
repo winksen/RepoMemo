@@ -173,7 +173,7 @@ Each proposal below was accepted as written. They shape the releases named in th
 - [x] **D1 documentation housekeeping:** `docs/IMPLEMENTATION_TRACKER.md` retired, `PRODUCT.md` describes the team product, Postman v5 collection with the onboarding routes (local, `docs/api/` is git-ignored)
 - [ ] **C10 dependencies** (needs the lockfiles regenerated with `cargo` and `npm`, so it is done by hand): Vite 5 → current, which closes the esbuild advisory; `quick-xml` 0.39 → 0.41 in `repomemo-ingestion` so the server builds one version. The remaining duplicates are not ours: `reqwest` 0.13 and `quick-xml` 0.39 arrive through Tauri (`tauri`, `plist`) next to the versions the server uses, and are reported as warnings by `cargo deny`
 
-#### V0.1.67: Safe defaults and identity (built, not yet released)
+#### V0.1.67: Safe defaults and identity
 
 - [x] **M1** `REPOMEMO_ALLOW_REGISTRATION` defaults to `false`; the first account still registers, the setup wizard asks, and `/health` no longer carries `registration_open` (I2). Storage quotas stay with V0.1.75 (O4)
 - [x] **M4** member adds refuse anyone not already in the organization or workspace with the same `409 invitation_required`, account or not, and the web app offers the invitation link. Registration itself stays distinguishable while it is open (no mail to verify with until V0.3.0), which is why it is closed by default
@@ -185,12 +185,12 @@ Each proposal below was accepted as written. They shape the releases named in th
 - [x] **L4** notifications `password_reset_issued` and `password_reset_used`
 - [x] **L7** `validate_password`: common list, at least five different characters, no email name
 
-#### V0.1.68: Browser hardening
+#### V0.1.68: Browser hardening (built, not yet released)
 
-- [ ] **M5, L9** no remote images in rendered Markdown (AI output, notes, memory cards); external links show their target and open with `noopener`. Test: a Markdown image in an AI answer is not rendered
-- [ ] **M2** CSP for the built SPA (`script-src 'self'`, `connect-src` the API, `img-src 'self' blob: data:`, `frame-src blob:`, `object-src 'none'`, `base-uri 'none'`, `frame-ancestors 'none'`), served by the documented host; refresh token per decision 2
-- [ ] **M6** a strict CSP in `tauri.conf.json`
-- [ ] **L3 follow-up** clear the fragment from history once a link page has read it
+- [x] **M5, L9** `SafeMarkdown` replaces every `react-markdown` use: images become a note with text and address, external links show their host and open with `noopener noreferrer`. The test of the image rule moves to the frontend test suite (C3, V0.1.70), which needs the test runner that release adds
+- [x] **M2** the Vite build injects the policy as a meta tag and writes `content-security-policy.txt` (with `frame-ancestors`) for the host; the refresh token is an `HttpOnly; SameSite=Strict` cookie handled by `web_session.rs` for web clients. The cookie path is `/v1/auth` (not only `/v1/auth/refresh`) so sign-in and sign-out receive it
+- [x] **M6** strict `csp` and a `devCsp` that adds the Vite dev server
+- [x] **L3 follow-up** the web app keeps the secret in memory and replaces the history entry
 
 #### V0.1.69: Host exposure
 
@@ -287,7 +287,7 @@ Every item, with the release it is planned for. The evidence behind each is in t
 | S1 | Ship-blockers for onboarding | H1, H4, L2, L3, M7 | ✅ V0.1.64 |
 | — | Second pass | N1–N6, I3 | ✅ V0.1.65 |
 | S2 | Safe defaults and identity | M1, M3, M4, M8, M9, L4, L7, L10, N2 residual | ✅ V0.1.67 |
-| S4 | Browser hardening | M2, M5, M6, L9 | V0.1.68 |
+| S4 | Browser hardening | M2, M5, M6, L9 | ✅ V0.1.68 |
 | S3 | Host exposure | H2, H3, L8, M10 | V0.1.69 |
 | — | Server timeouts | N7 | V0.1.71 |
 | S5 | Robustness | M11, M12, L1, L5, L6 | V0.1.71, V0.1.74 |

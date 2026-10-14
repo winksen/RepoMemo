@@ -92,7 +92,12 @@ export function getSharedHealth(): Promise<{ service: string; status: string; au
 }
 
 export const SHARED_SESSION_STORAGE_KEY = "repomemo.shared.access-token";
+// Before V0.1.68 the refresh token itself was kept here. It now lives in an
+// HttpOnly cookie that scripts cannot read; this key only holds the old token
+// until it has been exchanged, and `SESSION_MARKER_KEY` records that this
+// browser has a session worth renewing.
 const REFRESH_STORAGE_KEY = "repomemo.shared.refresh-token";
+const SESSION_MARKER_KEY = "repomemo.shared.session";
 
 function readStorage(storage: "sessionStorage" | "localStorage", key: string): string | null {
   try {
@@ -111,21 +116,29 @@ function writeStorage(storage: "sessionStorage" | "localStorage", key: string, v
   }
 }
 
-function storeTokens(response: { access_token: string; refresh_token: string }) {
+function storeTokens(response: { access_token: string }) {
   writeStorage("sessionStorage", SHARED_SESSION_STORAGE_KEY, response.access_token);
-  writeStorage("localStorage", REFRESH_STORAGE_KEY, response.refresh_token);
+  writeStorage("localStorage", SESSION_MARKER_KEY, "1");
+  writeStorage("localStorage", REFRESH_STORAGE_KEY, null);
 }
 
-/** Forgets the local session. Best-effort revokes the refresh token on the server. */
-export function clearSharedSession() {
-  const refreshToken = readStorage("localStorage", REFRESH_STORAGE_KEY);
+function forgetSession() {
   writeStorage("sessionStorage", SHARED_SESSION_STORAGE_KEY, null);
+  writeStorage("localStorage", SESSION_MARKER_KEY, null);
   writeStorage("localStorage", REFRESH_STORAGE_KEY, null);
-  if (refreshToken) {
+}
+
+/** Forgets the local session. Best-effort revokes the refresh token on the server, which also clears the cookie. */
+export function clearSharedSession() {
+  const hadSession = readStorage("localStorage", SESSION_MARKER_KEY) !== null || readStorage("localStorage", REFRESH_STORAGE_KEY) !== null;
+  const legacyToken = readStorage("localStorage", REFRESH_STORAGE_KEY);
+  forgetSession();
+  if (hadSession) {
     fetch(`${API_URL}/v1/auth/logout`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refresh_token: refreshToken }),
+      credentials: "include",
+      headers: { "Content-Type": "application/json", ...Object.fromEntries([CLIENT_HEADER]) },
+      body: JSON.stringify(legacyToken ? { refresh_token: legacyToken } : {}),
     }).catch(() => undefined);
   }
 }
@@ -140,21 +153,23 @@ function latestToken(token: string): string {
   return current;
 }
 
-/** Trades the stored refresh token for a new access token. Resolves to null when there is no valid refresh token. */
+/** Trades the session cookie for a new access token. Resolves to null when there is no valid session. */
 export function refreshSharedSession(staleAccessToken?: string): Promise<string | null> {
   if (refreshInFlight) return refreshInFlight;
-  const refreshToken = readStorage("localStorage", REFRESH_STORAGE_KEY);
-  if (!refreshToken) return Promise.resolve(null);
+  // A token kept by an earlier version is sent once, so the server can move it into the cookie.
+  const legacyToken = readStorage("localStorage", REFRESH_STORAGE_KEY);
+  if (!legacyToken && readStorage("localStorage", SESSION_MARKER_KEY) === null) return Promise.resolve(null);
   refreshInFlight = (async () => {
     try {
       const response = await fetch(`${API_URL}/v1/auth/refresh`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ refresh_token: refreshToken }),
+        credentials: "include",
+        headers: { "Content-Type": "application/json", Accept: "application/json", ...Object.fromEntries([CLIENT_HEADER]) },
+        body: JSON.stringify(legacyToken ? { refresh_token: legacyToken } : {}),
       });
       if (!response.ok) {
         // Only a definitive rejection ends the session; a flaky network keeps it.
-        if (response.status === 401) writeStorage("localStorage", REFRESH_STORAGE_KEY, null);
+        if (response.status === 401) forgetSession();
         return null;
       }
       const tokens = await response.json() as TokenResponse;
@@ -233,7 +248,8 @@ async function request<T>(
     headers.set("Authorization", `Bearer ${accessToken}`);
   }
 
-  const response = await authFetch(`${API_URL}${path}`, { ...options, headers });
+  // Credentials: the session cookie travels to the API, which may sit on another port of the same site.
+  const response = await authFetch(`${API_URL}${path}`, { ...options, headers, credentials: "include" });
   const payload = await response.json().catch(() => null) as { error?: { message?: string } } | T | null;
   if (!response.ok) {
     const message = payload && typeof payload === "object" && "error" in payload
@@ -279,12 +295,11 @@ export async function loginSharedUser(input: {
   email: string;
   password: string;
 }): Promise<TokenResponse> {
-  // A session this browser still holds shows it is one of the account's own
-  // devices, which gets past an account-wide lockout others caused.
-  const refreshToken = readStorage("localStorage", REFRESH_STORAGE_KEY);
+  // The session cookie, when this browser still has one, shows it is one of
+  // the account's own devices, which gets past a lockout others caused.
   const response = await request<TokenResponse>("/v1/auth/login", {
     method: "POST",
-    body: JSON.stringify({ ...input, refresh_token: refreshToken ?? undefined }),
+    body: JSON.stringify(input),
   });
   storeTokens(response);
   return response;
@@ -327,7 +342,7 @@ export async function changeSharedPassword(accessToken: string, input: { current
     method: "POST",
     body: JSON.stringify({ current_password: input.currentPassword, new_password: input.newPassword }),
   }, accessToken);
-  if (response?.access_token && response.refresh_token) {
+  if (response?.access_token) {
     storeTokens(response);
     // Components still hold the old token; route their next requests to the new one.
     refreshedTokens.set(latestToken(accessToken), response.access_token);
@@ -337,8 +352,7 @@ export async function changeSharedPassword(accessToken: string, input: { current
 /** Signs out of every session on every device, this one included. */
 export async function signOutEverywhere(accessToken: string): Promise<void> {
   await request<void>("/v1/auth/logout-all", { method: "POST" }, accessToken);
-  writeStorage("sessionStorage", SHARED_SESSION_STORAGE_KEY, null);
-  writeStorage("localStorage", REFRESH_STORAGE_KEY, null);
+  forgetSession();
 }
 
 export function listSharedOrganizations(accessToken: string): Promise<Organization[]> {
