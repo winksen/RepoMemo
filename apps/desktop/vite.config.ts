@@ -1,4 +1,5 @@
-import { defineConfig, loadEnv, type Plugin } from "vite";
+import { loadEnv, type Plugin } from "vite";
+import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 
 /**
@@ -61,5 +62,10 @@ export default defineConfig(({ mode }) => {
     // `TAURI_` prefix: it would also inline TAURI_SIGNING_PRIVATE_KEY (and its
     // password) during a release build, shipping the updater signing key.
     envPrefix: ["VITE_", "TAURI_ENV_"],
+    test: {
+      environment: "jsdom",
+      include: ["src/**/*.test.{ts,tsx}"],
+      restoreMocks: true,
+    },
   };
 });

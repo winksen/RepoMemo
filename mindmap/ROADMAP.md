@@ -192,21 +192,21 @@ Each proposal below was accepted as written. They shape the releases named in th
 - [x] **M6** strict `csp` and a `devCsp` that adds the Vite dev server
 - [x] **L3 follow-up** the web app keeps the secret in memory and replaces the history entry
 
-#### V0.1.69: Host exposure (built, not yet released)
+#### V0.1.69: Host exposure
 
 - [x] **H2** built-in list (`127.0.0.1`, `localhost`, `::1`, `openrouter.ai`) unless `REPOMEMO_AI_ALLOWED_HOSTS` says otherwise (`*` for everything); a checking DNS resolver filters every connection (public addresses only for the built-in list); provider bodies go to the log, not to the user
 - [x] **H3** `RepoLinkPolicy::disabled()` on a server without roots (disabled, not defaulted: an operator opts in by naming folders); the refusal outside the roots does not depend on whether the path exists
 - [x] **L8** `repomemo_git::harden`: `protocol.allow=never` (the https/ssh allowlist arrives with remote repositories), no system or global configuration, no submodule recursion, `safe.directory` only for the configured folders
 - [x] **M10** scrubbed environment, `REPOMEMO_SOFFICE_WRAPPER` for the operator's sandbox command, version and sandbox state in System › Overview and the server check. The sandbox itself is the operator's (recipes follow in the production guide, V0.1.75)
 
-#### V0.1.70: Web client foundation
+#### V0.1.70: Web client foundation (built, not yet released)
 
-- [ ] **C1** split `SharedWebApp.tsx` by route and section (dashboard, profile, workspace shell, each section, artifact and memory pages)
-- [ ] **C2** a router module with typed routes, and TanStack Query for server state
-- [ ] **P7** targeted cache invalidation from live events instead of `load()` refetching six endpoints
-- [ ] **P6** route-level code splitting (System area, console, map, document viewer, editor)
-- [ ] **C7** TypeScript types generated from the Rust DTOs
-- [ ] **C3** Vitest + Testing Library: API client refresh, live events, Markdown safety, upload walker, link pages, image preview rules
+- [x] **C1** `SharedWebApp.tsx` is the shell; `src/web/` holds the pages (`WorkspaceDetail.tsx` is the largest at about 1,000 lines), `constants.ts`, `format.ts`, `router.ts`, `navigation.tsx`, `common.tsx`. Splitting the sections of the workspace page into components of their own comes with the next product work that touches them
+- [x] **C2** `web/router.ts` (`Route`, `parseRoute`, `routePath`); `lib/queryClient.ts` and `lib/useServerState.ts` (cache-backed state with a `useState`-like setter) used by the workspace page. The dashboard, profile and detail pages still load their own data
+- [x] **P7** `workspaceInvalidation` names what an event makes stale; `load()` is a full invalidation, used after bulk changes and on resync
+- [x] **P6** `web/lazy.tsx`: System area (with the console), map, document viewer, editor, health and repository panels
+- [x] **C7** `scripts/generate-types.mjs` reads `crates/domain` (a regular subset of Rust, failing loudly on anything else). Server-local response types (token response, setup, System) stay hand-written
+- [x] **C3** 27 tests in `src/test/`: session renewal, live events, Markdown safety, upload filter, routes, image preview rules, query cache. The link pages are covered through the router and session tests; a rendering test of the invitation page needs the page split further
 
 #### V0.1.71: Server foundation
 

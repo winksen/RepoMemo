@@ -80,6 +80,8 @@ import type {
   CreatedPersonalToken,
 } from "../types";
 
+import { queryClient } from "./queryClient";
+
 const API_URL = (import.meta.env.VITE_REPOMEMO_API_URL ?? "http://127.0.0.1:3020").replace(/\/$/, "");
 
 /** Identifies this client to the server, which lists it under System › Overview. */
@@ -123,6 +125,8 @@ function storeTokens(response: { access_token: string }) {
 }
 
 function forgetSession() {
+  // Nothing of the account may outlive its session in this tab.
+  queryClient.clear();
   writeStorage("sessionStorage", SHARED_SESSION_STORAGE_KEY, null);
   writeStorage("localStorage", SESSION_MARKER_KEY, null);
   writeStorage("localStorage", REFRESH_STORAGE_KEY, null);

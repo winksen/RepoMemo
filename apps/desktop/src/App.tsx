@@ -1149,7 +1149,7 @@ function LocalDesktopApp() {
 
         <footer className="status-spine-footer">
           <span className="state-lamp" aria-hidden="true" />
-          Local-first
+          Local edition
           <span>v0.1</span>
         </footer>
       </aside>

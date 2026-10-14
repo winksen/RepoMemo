@@ -1,41 +1,157 @@
+// Types of the API's data transfer objects that the Rust domain crate defines are
+// generated (src/generated/domain.ts, `npm run types:generate`) and re-exported here.
+// The declarations below are the ones the client shapes differently from the wire.
+import type {
+  AgentCapability,
+  AgentCapabilityInfo,
+  AgentConversation,
+  AppSettings,
+  ArtifactComment,
+  ArtifactIndexFailure,
+  ArtifactLifecycleEvent,
+  ArtifactType,
+  AskAnswer,
+  AskRequest,
+  Citation,
+  CountByLabel,
+  CreateMemoryCardRequest,
+  DocumentPreview,
+  EmailAttachmentInfo,
+  Folder,
+  HealthAction,
+  HealthActionResult,
+  HealthDetector,
+  HealthDetectorStats,
+  HealthEvidence,
+  HealthFile,
+  HealthFinding,
+  ImportSkippedItem,
+  IndexState,
+  KnowledgeCoverage,
+  KnowledgeEdge,
+  KnowledgeMap,
+  KnowledgeNode,
+  KnowledgePipeline,
+  MemoryCardSummary,
+  MemoryEvidence,
+  OrganizationMember,
+  OrganizationRole,
+  ProviderTestResult,
+  RepoAccessCheck,
+  RepoCommit,
+  RepoFile,
+  RepoFolderShare,
+  RepoKeyFile,
+  RepoLanguageShare,
+  RepoSettings,
+  RepoSkipCount,
+  RepoStack,
+  RepoSummary,
+  RepoSyncReport,
+  RepoTechnology,
+  SavedSearch,
+  SearchRequest,
+  SearchResult,
+  SharedNotification,
+  SharedUser,
+  SheetPreview,
+  SlidePreview,
+  SourceType,
+  SummaryResult,
+  SymbolKind,
+  SystemAuditEvent,
+  SystemStatistics,
+  TaskChecklistItem,
+  UpdateMemoryCardRequest,
+  WorkspaceActivityEvent,
+  WorkspaceAiOverview,
+  WorkspaceCapabilities,
+  WorkspaceHealth,
+  WorkspaceMember,
+  WorkspaceMembership,
+  WorkspaceOverview,
+  WorkspaceRole,
+  WorkspaceUsage,
+} from "./generated/domain";
+export type {
+  AgentCapability,
+  AgentCapabilityInfo,
+  AgentConversation,
+  AppSettings,
+  ArtifactComment,
+  ArtifactIndexFailure,
+  ArtifactLifecycleEvent,
+  ArtifactType,
+  AskAnswer,
+  AskRequest,
+  Citation,
+  CountByLabel,
+  CreateMemoryCardRequest,
+  DocumentPreview,
+  EmailAttachmentInfo,
+  Folder,
+  HealthAction,
+  HealthActionResult,
+  HealthDetector,
+  HealthDetectorStats,
+  HealthEvidence,
+  HealthFile,
+  HealthFinding,
+  ImportSkippedItem,
+  IndexState,
+  KnowledgeCoverage,
+  KnowledgeEdge,
+  KnowledgeMap,
+  KnowledgeNode,
+  KnowledgePipeline,
+  MemoryCardSummary,
+  MemoryEvidence,
+  OrganizationMember,
+  OrganizationRole,
+  ProviderTestResult,
+  RepoAccessCheck,
+  RepoCommit,
+  RepoFile,
+  RepoFolderShare,
+  RepoKeyFile,
+  RepoLanguageShare,
+  RepoSettings,
+  RepoSkipCount,
+  RepoStack,
+  RepoSummary,
+  RepoSyncReport,
+  RepoTechnology,
+  SavedSearch,
+  SearchRequest,
+  SearchResult,
+  SharedNotification,
+  SharedUser,
+  SheetPreview,
+  SlidePreview,
+  SourceType,
+  SummaryResult,
+  SymbolKind,
+  SystemAuditEvent,
+  SystemStatistics,
+  TaskChecklistItem,
+  UpdateMemoryCardRequest,
+  WorkspaceActivityEvent,
+  WorkspaceAiOverview,
+  WorkspaceCapabilities,
+  WorkspaceHealth,
+  WorkspaceMember,
+  WorkspaceMembership,
+  WorkspaceOverview,
+  WorkspaceRole,
+  WorkspaceUsage,
+} from "./generated/domain";
+
 export interface Workspace {
   id: string;
   name: string;
   created_at: string;
   updated_at: string;
   settings: Record<string, unknown>;
-}
-
-export interface SharedUser {
-  id: string;
-  display_name: string;
-  email: string | null;
-}
-
-export type WorkspaceRole = "owner" | "admin" | "member" | "viewer";
-export type OrganizationRole = "owner" | "admin" | "member";
-
-export interface WorkspaceMembership {
-  workspace_id: string;
-  role: WorkspaceRole;
-}
-
-export interface WorkspaceMember {
-  user: SharedUser;
-  role: WorkspaceRole;
-  joined_at: string;
-  updated_at: string;
-}
-
-export interface WorkspaceActivityEvent {
-  id: string;
-  workspace_id: string;
-  actor: SharedUser | null;
-  action: string;
-  subject_type: string;
-  subject_id: string | null;
-  summary: string;
-  created_at: string;
 }
 
 /** One message of a workspace (or System) event stream. `resync` means
@@ -69,24 +185,6 @@ export interface CollaborationTask {
   updated_at: string;
 }
 
-export interface SavedSearch {
-  id: string; workspace_id: string; name: string; query: string; artifact_types: ArtifactType[]; languages: string[]; source_ids: string[]; result_limit: number; created_by: SharedUser; created_at: string; updated_at: string;
-}
-
-export interface TaskChecklistItem {
-  id: string; task_id: string; workspace_id: string; body: string; position: number; completed_at: string | null; completed_by: SharedUser | null; created_by: SharedUser; created_at: string; updated_at: string;
-}
-
-export interface ArtifactComment {
-  id: string;
-  workspace_id: string;
-  artifact_id: string;
-  author: SharedUser;
-  body: string;
-  created_at: string;
-  updated_at: string;
-}
-
 export type ArtifactLifecycleStatus = "active" | "needs_review" | "verified" | "outdated" | "superseded";
 
 export interface ArtifactLifecycle {
@@ -100,26 +198,6 @@ export interface ArtifactLifecycle {
   superseded_by_artifact_id: string | null;
   created_at: string;
   updated_at: string;
-}
-
-export interface ArtifactLifecycleEvent {
-  id: string;
-  artifact_id: string;
-  actor: SharedUser | null;
-  action: string;
-  detail: string;
-  created_at: string;
-}
-
-export interface SharedNotification {
-  id: string;
-  workspace_id: string | null;
-  notification_type: "task_assigned" | "evidence_mention" | string;
-  title: string;
-  body: string;
-  href: string;
-  read_at: string | null;
-  created_at: string;
 }
 
 export interface SharedSession {
@@ -152,47 +230,10 @@ export interface Organization {
   guest?: boolean;
 }
 
-export interface OrganizationMember {
-  user: SharedUser;
-  role: OrganizationRole;
-  joined_at: string;
-}
-
 export interface SharedWorkspace {
   workspace: Workspace;
   organization_id: string;
   role: WorkspaceRole;
-}
-
-export interface AppSettings {
-  data_dir: string;
-  ai_enabled: boolean;
-  active_provider: string | null;
-}
-
-export type SourceType = "upload" | "folder" | "git_repo" | "manual" | "connector";
-
-export type ArtifactType =
-  | "file"
-  | "markdown_doc"
-  | "code_file"
-  | "image"
-  | "issue"
-  | "pr"
-  | "decision"
-  | "incident"
-  | "runbook"
-  | "api_spec"
-  | "note"
-  | "repository";
-
-export interface WorkspaceOverview {
-  workspace_id: string;
-  source_count: number;
-  artifact_count: number;
-  chunk_count: number;
-  symbol_count: number;
-  memory_card_count: number;
 }
 
 export interface WorkspaceMetricBreakdown {
@@ -233,23 +274,6 @@ export interface WorkspaceMetrics {
   languages: WorkspaceMetricBreakdown[];
 }
 
-export interface WorkspaceCapabilities {
-  role: WorkspaceRole;
-  can_read: boolean;
-  can_write_content: boolean;
-  can_delete_content: boolean;
-  can_manage_members: boolean;
-  can_assign_admin: boolean;
-  can_manage_workspace: boolean;
-  can_generate_ai_overview: boolean;
-  can_create_tasks: boolean;
-  can_comment: boolean;
-  can_moderate_comments: boolean;
-  can_inspect_index: boolean;
-  /** Whether this member may use AI features, per the workspace's AI policy. */
-  can_use_ai: boolean;
-}
-
 /** The lowest workspace role allowed to use AI features. */
 export type AiMinRole = "viewer" | "member" | "admin";
 
@@ -257,14 +281,6 @@ export interface AiPolicy {
   min_role: AiMinRole;
   /** AI requests each person may make per hour on this server; 0 is unlimited. */
   requests_per_hour: number;
-}
-
-export interface WorkspaceAiOverview {
-  provider_configured: boolean;
-  provider_name: string | null;
-  summary_markdown: string | null;
-  citations: Citation[];
-  warnings: string[];
 }
 
 export interface SharedAiProviderSettings {
@@ -277,62 +293,10 @@ export interface SharedAiProviderSettings {
   purpose: "text" | "vision" | "embedding";
 }
 
-export interface SheetPreview {
-  name: string;
-  rows: string[][];
-  total_rows: number;
-  total_columns: number;
-}
-
-export interface SlidePreview {
-  number: number;
-  title: string | null;
-  text: string[];
-  notes: string | null;
-}
-
-export interface EmailAttachmentInfo {
-  name: string;
-  size_bytes: number;
-}
-
-export type DocumentPreview =
-  | { kind: "text"; text: string; truncated: boolean; approximate: boolean }
-  | { kind: "sheets"; sheets: SheetPreview[]; total_sheets: number }
-  | { kind: "slides"; slides: SlidePreview[]; total_slides: number }
-  | {
-      kind: "email";
-      subject: string | null;
-      from: string | null;
-      to: string[];
-      cc: string[];
-      date: string | null;
-      body: string;
-      truncated: boolean;
-      attachments: EmailAttachmentInfo[];
-    }
-  | { kind: "pdf"; page_count: number | null }
-  | { kind: "unavailable"; reason: string };
-
 export interface FileLink {
   token: string;
   filename: string;
   expires_in_seconds: number;
-}
-
-export interface Folder {
-  id: string;
-  workspace_id: string;
-  parent_id: string | null;
-  name: string;
-  created_at: string;
-}
-
-export interface ArtifactIndexFailure {
-  artifact_id: string;
-  message: string;
-  attempts: number;
-  failed_at: string;
 }
 
 export interface ArtifactSummary {
@@ -393,11 +357,6 @@ export interface IndexingJobStatus {
   updated_at: string;
 }
 
-export interface ImportSkippedItem {
-  path: string;
-  reason: string;
-}
-
 export interface ImportReport {
   workspace_id: string;
   scanned: number;
@@ -409,29 +368,6 @@ export interface ImportReport {
   skipped_items: ImportSkippedItem[];
 }
 
-export interface SearchRequest {
-  workspace_id: string;
-  query: string;
-  artifact_types: ArtifactType[];
-  languages: string[];
-  source_ids: string[];
-  limit: number | null;
-}
-
-export interface SearchResult {
-  artifact_id: string;
-  chunk_id: string;
-  title: string;
-  path: string;
-  artifact_type: ArtifactType;
-  language: string | null;
-  snippet: string;
-  start_line: number | null;
-  end_line: number | null;
-  score: number;
-  source_name: string;
-}
-
 export interface RetrievalFacets {
   artifact_types: ArtifactType[];
   languages: string[];
@@ -440,17 +376,6 @@ export interface RetrievalFacets {
     name: string;
   }>;
 }
-
-export type SymbolKind =
-  | "function"
-  | "class"
-  | "method"
-  | "interface"
-  | "enum"
-  | "route"
-  | "endpoint"
-  | "config"
-  | "test";
 
 export interface Symbol {
   id: string;
@@ -485,149 +410,6 @@ export interface ProviderSettings {
   api_key?: string | null;
 }
 
-export interface ProviderTestResult {
-  provider_id: string;
-  success: boolean;
-  message: string;
-}
-
-export interface Citation {
-  artifact_id: string;
-  chunk_id: string | null;
-  title: string;
-  path: string;
-  start_line: number | null;
-  end_line: number | null;
-  confidence: number | null;
-}
-
-export interface AskAnswer {
-  answer_markdown: string;
-  citations: Citation[];
-  retrieved_context: SearchResult[];
-  confidence: number | null;
-  warnings: string[];
-}
-
-export type IndexState = "indexed" | "pending" | "failed";
-
-export interface KnowledgePipeline {
-  file_count: number;
-  indexed_count: number;
-  pending_count: number;
-  failed_count: number;
-  passage_count: number;
-  /** null when no embedding provider is set up. */
-  embedded_count: number | null;
-  embedding_model: string | null;
-}
-
-export interface KnowledgeCoverage {
-  /** A readable kind such as "PDF", "Markdown" or "Code". */
-  label: string;
-  file_count: number;
-  indexed_count: number;
-  pending_count: number;
-  failed_count: number;
-  passage_count: number;
-  embedded_count: number;
-}
-
-export interface KnowledgeNode {
-  id: string;
-  kind: "file" | "memory";
-  title: string;
-  path: string | null;
-  artifact_type: ArtifactType | null;
-  state: IndexState | null;
-  passage_count: number;
-  embedded_count: number;
-}
-
-export interface KnowledgeEdge {
-  source: string;
-  target: string;
-  kind: "similar" | "cites";
-  weight: number;
-}
-
-export interface KnowledgeMap {
-  pipeline: KnowledgePipeline;
-  coverage: KnowledgeCoverage[];
-  nodes: KnowledgeNode[];
-  edges: KnowledgeEdge[];
-  hidden_file_count: number;
-  similarity_available: boolean;
-}
-
-export type HealthDetector =
-  | "older_version_active"
-  | "duplicate_content"
-  | "removed_symbol_mentioned"
-  | "outdated_evidence_referenced"
-  | "index_failed"
-  | "unconnected";
-
-export type HealthAction = "supersede" | "needs_review" | "mark_outdated" | "create_task" | "dismiss";
-
-export interface HealthFile {
-  artifact_id: string;
-  title: string;
-  path: string;
-  created_at: string;
-}
-
-export interface HealthEvidence {
-  artifact_id: string;
-  title: string;
-  start_line: number | null;
-  end_line: number | null;
-  excerpt: string;
-}
-
-export interface HealthFinding {
-  fingerprint: string;
-  detector: HealthDetector;
-  severity: "warning" | "info";
-  title: string;
-  detail: string;
-  files: HealthFile[];
-  evidence: HealthEvidence[];
-  keep_artifact_id: string | null;
-  actions: HealthAction[];
-}
-
-export interface HealthDetectorStats {
-  detector: HealthDetector;
-  open_count: number;
-  acted_count: number;
-  dismissed_count: number;
-}
-
-export interface WorkspaceHealth {
-  findings: HealthFinding[];
-  detectors: HealthDetectorStats[];
-  checked_file_count: number;
-  similarity_available: boolean;
-}
-
-export interface HealthActionResult {
-  action: HealthAction;
-  updated_artifact_ids: string[];
-  task_id: string | null;
-}
-
-export type AgentCapability = "find_files" | "search_content" | "summarize_file" | "ask_question" | "workspace_overview";
-
-export interface AgentCapabilityInfo {
-  id: AgentCapability;
-  label: string;
-  description: string;
-  placeholder: string;
-  requires_ai: boolean;
-  available: boolean;
-}
-
 export interface AgentCapabilities {
   capabilities: AgentCapabilityInfo[];
   provider_name: string | null;
@@ -637,15 +419,6 @@ export interface AgentMessage {
   message: string;
   capability?: AgentCapability | null;
   artifact_id?: string | null;
-}
-
-export interface AgentConversation {
-  id: string;
-  workspace_id: string;
-  title: string;
-  turn_count: number;
-  created_at: string;
-  updated_at: string;
 }
 
 export interface AgentTurn {
@@ -692,107 +465,9 @@ export interface MemoryCard {
   metadata: Record<string, unknown>;
 }
 
-export interface MemoryCardSummary {
-  id: string;
-  workspace_id: string;
-  title: string;
-  body_excerpt: string;
-  source: string;
-  evidence_count: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface MemoryEvidence {
-  link_id: string;
-  target_id: string;
-  target_type: string;
-  artifact_id: string | null;
-  chunk_id: string | null;
-  title: string | null;
-  path: string | null;
-  start_line: number | null;
-  end_line: number | null;
-  exists: boolean;
-}
-
 export interface MemoryCardDetail {
   card: MemoryCard;
   evidence: MemoryEvidence[];
-}
-
-export interface CreateMemoryCardRequest {
-  workspace_id: string;
-  title: string;
-  body_markdown: string;
-  source: string;
-  confidence: number | null;
-  citations: Citation[];
-}
-
-export interface UpdateMemoryCardRequest {
-  card_id: string;
-  title: string;
-  body_markdown: string;
-  source: string;
-  confidence: number | null;
-}
-
-export interface SummaryResult {
-  summary_markdown: string;
-  citations: Citation[];
-  warnings: string[];
-}
-
-export interface AskRequest {
-  workspace_id: string;
-  question: string;
-  provider_id: string | null;
-  limit: number | null;
-}
-
-export interface AskAnswer {
-  answer_markdown: string;
-  citations: Citation[];
-  retrieved_context: SearchResult[];
-  confidence: number | null;
-  warnings: string[];
-}
-
-export interface RepoSettings {
-  branch: string | null;
-  include: string[];
-  exclude: string[];
-}
-
-export interface RepoCommit {
-  sha: string;
-  summary: string;
-  author_name: string;
-  committed_at: string;
-  branch: string | null;
-}
-
-export interface RepoSkipCount {
-  reason: string;
-  count: number;
-  examples: string[];
-}
-
-export interface RepoSyncReport {
-  commit_sha: string;
-  files_in_tree: number;
-  added: number;
-  updated: number;
-  renamed: number;
-  removed: number;
-  restored: number;
-  unchanged: number;
-  skipped: number;
-  skipped_by_reason: RepoSkipCount[];
-  indexed: number;
-  index_failed: number;
-  cancelled: boolean;
 }
 
 export interface RepoSource {
@@ -814,34 +489,6 @@ export interface RepoSource {
   created_at: string;
 }
 
-export interface RepoLanguageShare {
-  language: string;
-  files: number;
-  bytes: number;
-}
-
-export interface RepoFolderShare {
-  path: string;
-  files: number;
-}
-
-export interface RepoKeyFile {
-  path: string;
-  artifact_id: string;
-  role: "readme" | "manifest" | "entry_point" | "docs" | string;
-}
-
-export interface RepoTechnology {
-  name: string;
-  category: string;
-}
-
-export interface RepoStack {
-  kind: "frontend" | "backend" | "web_app" | "desktop_app" | "mobile_app" | "cli" | "project" | string;
-  summary: string;
-  technologies: RepoTechnology[];
-}
-
 export interface RepoOverview {
   commit: RepoCommit;
   generated_at: string;
@@ -856,15 +503,6 @@ export interface RepoOverview {
   stack?: RepoStack | null;
 }
 
-export interface RepoSummary {
-  summary_markdown: string;
-  citations: Citation[];
-  warnings: string[];
-  provider_name: string;
-  commit_sha: string;
-  generated_at: string;
-}
-
 export interface RepositoryDetailResponse {
   repository: RepoSource;
   overview: RepoOverview | null;
@@ -872,61 +510,11 @@ export interface RepositoryDetailResponse {
   ai_available: boolean;
 }
 
-export interface RepoFile {
-  path: string;
-  artifact_id: string;
-  artifact_type: ArtifactType;
-  language: string | null;
-  size_bytes: number;
-  indexed: boolean;
-  index_failure: string | null;
-  commit_sha: string;
-}
-
 export interface RepositoryList {
   repositories: RepoSource[];
 }
 
-/** What the server found at a repository link, before it is linked. */
-export interface RepoAccessCheck {
-  root_path: string;
-  name: string;
-  commit: RepoCommit;
-  tracked_files: number;
-  indexable_files: number;
-  already_connected: boolean;
-}
-
 // System administration
-
-export interface CountByLabel {
-  label: string;
-  count: number;
-}
-
-export interface SystemStatistics {
-  user_count: number;
-  system_admin_count: number;
-  users_active_last_7_days: number;
-  users_active_last_30_days: number;
-  active_session_count: number;
-  organization_count: number;
-  workspace_count: number;
-  artifact_count: number;
-  artifact_bytes: number;
-  indexed_artifact_count: number;
-  blob_count: number;
-  blob_bytes: number;
-  chunk_count: number;
-  embedding_count: number;
-  memory_card_count: number;
-  task_count: number;
-  comment_count: number;
-  repository_count: number;
-  enabled_provider_count: number;
-  cloud_provider_count: number;
-  jobs_by_status: CountByLabel[];
-}
 
 export interface MaintenanceReport {
   refresh_tokens_purged: number;
@@ -1007,20 +595,6 @@ export interface SystemOverview {
   };
   clients: SystemClient[];
   logs: { capturing: boolean; buffered: number };
-}
-
-export interface WorkspaceUsage {
-  workspace_id: string;
-  workspace_name: string;
-  organization_id: string | null;
-  organization_name: string | null;
-  member_count: number;
-  artifact_count: number;
-  artifact_bytes: number;
-  chunk_count: number;
-  activity_last_30_days: number;
-  ai_requests_last_30_days: number;
-  last_activity_at: string | null;
 }
 
 export interface SystemUsage {
@@ -1111,14 +685,6 @@ export interface SystemLogFiles {
   environment_filter: boolean;
   default_level: string;
   categories: { key: string; label: string; level: string }[];
-}
-
-export interface SystemAuditEvent {
-  id: string;
-  created_at: string;
-  actor: SharedUser | null;
-  action: string;
-  detail: string;
 }
 
 export interface SystemJob extends IndexingJobStatus {
@@ -1247,4 +813,3 @@ export interface CreatedPersonalToken {
   /** The token itself, shown once. */
   secret: string;
 }
-

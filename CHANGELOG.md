@@ -2,7 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)), then `0.2.1` and so on for fixes. Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
-## V0.1.69 (2026-10-14)
+## V0.1.70 (2026-10-14)
+
+Web client foundation: the base every later product release builds on. No change in what the app does.
+
+### Changed
+- **`SharedWebApp.tsx` is split by page.** The 2,800-line file is now the app shell (about 340 lines) plus modules under `src/web/`: the dashboard and workspace home, profile, notifications, organization pages, workspace detail, artifact and memory card pages, shared constants, formatting helpers and the router.
+- **A typed router** (`src/web/router.ts`): `parseRoute` turns an address into a `Route` (workspace and section, artifact, memory card, System page, not found) and `routePath` builds it back, instead of matching `pathname.split("/")` by hand.
+- **Server state lives in a cache** (TanStack Query, `src/lib/queryClient.ts`). A workspace page shows cached data at once and refreshes it in the background. Live events and mutations mark only what they touched as stale (ledger, memory cards, tasks, figures), so one change no longer refetches the whole page; a stream resync refetches everything once.
+- **Heavy panels load on demand:** the System area, the rich note editor, the knowledge map, the document viewer, workspace health and the repository pages are separate bundles fetched when first shown.
+- **Types from the Rust source.** `npm run types:generate` writes `src/generated/domain.ts` from `crates/domain`; `src/types.ts` re-exports the 70 types that match and keeps the 28 the client shapes differently. CI fails when the generated file is out of date (`npm run types:check`).
+- The local desktop app is labelled **Local edition**: it is frozen, with security fixes only (roadmap decision 3).
+
+### Added
+- **Web client tests** (Vitest and Testing Library, `npm run test:web`, in CI): session renewal through the cookie, live event parsing, Markdown safety (no images, link targets), image preview rules, the upload file filter, routes, and the query cache.
+
 
 Host exposure (bundle S3): the last two high findings.
 

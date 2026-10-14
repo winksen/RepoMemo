@@ -50,6 +50,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      - name: Generated types match the Rust domain crate
+        run: npm run types:check
+      - name: Web client tests
+        run: npm run test:web
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
 

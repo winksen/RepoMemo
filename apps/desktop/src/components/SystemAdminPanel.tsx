@@ -83,8 +83,9 @@ import { showToast } from "./ui/toast";
 import { useLiveEventHub, useLiveEvents } from "../lib/liveEvents";
 import { appLink, SecretDialog } from "./SecretDialog";
 
-export const SYSTEM_SECTIONS = ["overview", "usage", "users", "settings", "logs", "jobs", "audit", "console"] as const;
-export type SystemSection = typeof SYSTEM_SECTIONS[number];
+import { SYSTEM_SECTIONS, type SystemSection } from "../web/constants";
+export { SYSTEM_SECTIONS };
+export type { SystemSection };
 
 const SECTION_LABELS: Record<SystemSection, { label: string; icon: ReactNode }> = {
   overview: { label: "Overview", icon: <Server size={16} /> },

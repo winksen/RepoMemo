@@ -66,9 +66,21 @@ npm run version:check
 
 Record what changed in `CHANGELOG.md` under the new version.
 
+## Web Client Tests And Generated Types
+
+```powershell
+npm run test:web          # Vitest + Testing Library (apps/desktop/src/test)
+npm run types:generate    # rewrite apps/desktop/src/generated/domain.ts from crates/domain
+npm run types:check       # fail when that file is out of date (CI runs this)
+```
+
+After changing a data transfer object in `crates/domain/src/lib.rs`, run
+`types:generate` and commit the result. `src/types.ts` re-exports the generated
+types that match; only types the client shapes differently are written by hand.
+
 CI (`.github/workflows/ci.yml`) runs on every push to `main` and every pull
 request: the version check, Rust tests on Linux and Windows (the desktop crate
-is left out), the web type check, `npm audit --omit=dev`, and `cargo deny`
+is left out), the web type check, the web client tests, the generated-types check, `npm audit --omit=dev`, and `cargo deny`
 (policy in `deny.toml`). rustfmt, clippy, license and duplicate-crate checks are
 reported but do not fail the run yet.
 
