@@ -2,6 +2,18 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.4 (2026-10-14)
+
+Rendering tests for the two pages a person opens from a link.
+
+### Added
+- **Tests of the invitation page** for each state: being checked; valid for someone with an account (sign in, join, continue to the workspace); valid for someone without one (create the account with the invited address and the invitation as proof); signed in as the invited address (one button to join); signed in as someone else (sign out, no way to join); used, expired and withdrawn links with the server's reason; no reason given; joining failing after signing in (the page stays so it can be retried); the destination of an organization invitation.
+- **Tests of the password reset page**: being checked; valid (the account is named, two fields); saving signs this browser in; two different passwords are never sent; the server refusing a password keeps the form; used and expired links; no reason given.
+- 51 web tests in all. No product code changed.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.3 (2026-10-14)
 
 The remaining web pages, on the query cache.
