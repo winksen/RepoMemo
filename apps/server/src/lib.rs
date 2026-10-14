@@ -348,6 +348,7 @@ async fn build_state(
                 .collect(),
             ai_hosts_restricted: config.ai_allowed_hosts.is_some(),
             trust_proxy: config.trust_proxy,
+            public_url: config.public_url.clone(),
             data_dir: data_dir.clone(),
         },
     ));

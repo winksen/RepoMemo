@@ -1,6 +1,6 @@
 # Production guide: running RepoMemo for a team
 
-> **Branch of:** [TECHNICAL_MINDMAP.md](../TECHNICAL_MINDMAP.md) · **Functional view:** [FUNCTIONAL_MINDMAP.md §1b](../FUNCTIONAL_MINDMAP.md#1b-system-area-system-administrators) · **Status:** V0.1.75, to be followed on a clean machine in V0.1.76 (R6)
+> **Branch of:** [TECHNICAL_MINDMAP.md](../TECHNICAL_MINDMAP.md) · **Functional view:** [FUNCTIONAL_MINDMAP.md §1b](../FUNCTIONAL_MINDMAP.md#1b-system-area-system-administrators) · **Status:** V0.2.1; written in V0.1.75, checked line by line against the code in V0.2.1, and to be followed on a clean machine (R6)
 
 This is what an operator needs to put RepoMemo on a server others can reach, keep it running, and get it back when something goes wrong. Every setting named here is described in [docs/DEVELOPMENT_COMMANDS.md](../../docs/DEVELOPMENT_COMMANDS.md#environment-variables); this page says which ones to set, and why.
 
@@ -36,12 +36,15 @@ Set these in the service's environment, not in a file the web server can read.
 | `REPOMEMO_PUBLIC_URL` | `https://memo.example.com` | Turns HSTS on, makes the refresh cookie `Secure` |
 | `REPOMEMO_TRUST_PROXY` | `true` | Read the client address from the proxy, so rate limits and lockouts are per person and not per proxy. Only the loopback address (or `REPOMEMO_TRUSTED_PROXIES`) is believed |
 | `REPOMEMO_ALLOWED_ORIGIN` | `https://memo.example.com` | Browser origins allowed to call the API |
+| `REPOMEMO_BACKUP_INTERVAL_HOURS` | `24` | Backs up by itself (see §6); off by default, and the server check warns until it is set |
 | `REPOMEMO_SERVER_DATA_DIR` | `main` | Pins the environment (`workspace-data/main`). Without it a restart attaches whichever one was chosen last |
 | `REPOMEMO_SYSTEM_ADMIN_EMAILS` | the operators' addresses | Accounts promoted to system administrators at startup |
 | `REPOMEMO_SETUP_CODE` | 12 or more letters and digits, once | Unlocks the first-run setup; printed on the console when unset |
 | `REPOMEMO_REPO_ROOTS` | the folders that hold repositories | Repository links are **off** without it |
 
 Leave `REPOMEMO_ALLOW_REGISTRATION` at its default (closed): people join with invitation links.
+
+The setup wizard's **Server checks** report on these: the database and the data folder, the key for stored credentials, the public address (HTTPS), client addresses behind the proxy, automatic backups, browser origins, repository folders, the AI host list and LibreOffice. A warning says what to set.
 
 The server's **working directory** decides where `workspace-data/` is: set it in the service definition to a folder the service account owns, such as `/var/lib/repomemo` or `D:\RepoMemo`.
 

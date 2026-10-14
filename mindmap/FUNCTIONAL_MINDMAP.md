@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.2.0` (2026-10-14). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
+> **Scope:** reflects the code at `V0.2.1` (2026-10-14). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
 
 ---
 
@@ -193,7 +193,7 @@ The very first time a server runs, with no account yet, the web app shows a **se
 |---|---|
 | **Welcome** | Explains what follows and asks for the **one-time setup code** printed on the server console when it started (or set by the operator). Only someone with access to the server has it |
 | **System administrator** | Name, email and password of the account that will administer the whole server. Creating it signs that person in |
-| **Server check** | Database, data folder, key for stored credentials, git, LibreOffice, allowed browser addresses, repository folders, AI addresses, proxy, log files: each marked OK, note, attention or problem, with advice |
+| **Server check** | Database, data folder, key for stored credentials, git, LibreOffice, allowed browser addresses, repository folders, AI addresses, public address (HTTPS), client addresses behind a proxy, automatic backups, log files: each marked OK, note, attention or problem, with advice |
 | **Access and security** | Open or closed registration, session length, failed sign-ins before lockout and its length, AI requests per person |
 | **Logging** | Default level, log files on or off, how long they are kept, console format |
 | **First workspace** | Optional: an organization and a workspace, owned by the administrator |
@@ -507,7 +507,7 @@ The desktop app and the shared server keep **separate data**.
 
 ---
 
-## 13. Known functional gaps (at V0.2.0)
+## 13. Known functional gaps (at V0.2.1)
 
 These are observed in the code and are useful for prioritizing. The roadmap item that addresses each one is in brackets.
 

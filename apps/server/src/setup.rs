@@ -54,6 +54,7 @@ pub(crate) struct SetupFacts {
     pub repo_roots: Vec<String>,
     pub ai_hosts_restricted: bool,
     pub trust_proxy: bool,
+    pub public_url: Option<String>,
     pub data_dir: PathBuf,
 }
 
@@ -385,15 +386,26 @@ pub(crate) async fn checks(
             advice: (!sandboxed).then_some("Set REPOMEMO_SOFFICE_WRAPPER to a command that runs it without network and without the data folder (see the operations notes)."),
         }
     } else {
-        SetupCheck { key: "libreoffice", label: "LibreOffice", status: CheckStatus::Info, detail: "Not installed: Office files show extracted text and tables.".to_owned(), advice: Some("Optional. Install LibreOffice (or set REPOMEMO_SOFFICE) for faithful previews.") }
+        SetupCheck { key: "libreoffice", label: "LibreOffice", status: CheckStatus::Info, detail: "Not installed: Office files show extracted text and tables.".to_owned(), advice: Some("Optional. Install LibreOffice, or set REPOMEMO_SOFFICE to its soffice program, for faithful previews.") }
     });
 
     checks.push(SetupCheck {
         key: "origins",
         label: "Browser origins",
-        status: if facts.allowed_origins.is_empty() { CheckStatus::Warning } else { CheckStatus::Ok },
-        detail: if facts.allowed_origins.is_empty() { "No browser origin is allowed.".to_owned() } else { facts.allowed_origins.join(", ") },
-        advice: Some("Only these addresses can use the web app. Set REPOMEMO_ALLOWED_ORIGIN to the address people open, and serve it over HTTPS."),
+        status: if facts.allowed_origins.is_empty() {
+            CheckStatus::Warning
+        } else {
+            CheckStatus::Ok
+        },
+        detail: if facts.allowed_origins.is_empty() {
+            "No browser origin is allowed.".to_owned()
+        } else {
+            facts.allowed_origins.join(", ")
+        },
+        advice: facts
+            .allowed_origins
+            .is_empty()
+            .then_some("Set REPOMEMO_ALLOWED_ORIGIN to the address people open, and serve it over HTTPS."),
     });
 
     checks.push(if facts.repo_roots.is_empty() {
@@ -431,17 +443,58 @@ pub(crate) async fn checks(
             .then_some("Set REPOMEMO_AI_ALLOWED_HOSTS to the AI services you use instead of *."),
     });
 
+    // Over HTTPS the server is almost always behind a proxy, and then every
+    // client would share the proxy's address for limits and lockouts.
+    let https = facts
+        .public_url
+        .as_deref()
+        .is_some_and(|url| url.starts_with("https://"));
+    checks.push(SetupCheck {
+        key: "public_url",
+        label: "Public address",
+        status: if https { CheckStatus::Ok } else { CheckStatus::Warning },
+        detail: match facts.public_url.as_deref() {
+            Some(url) if https => format!("{url}: HSTS is on and the refresh cookie is Secure."),
+            Some(url) => format!("{url} is not HTTPS: HSTS is off and the refresh cookie is not Secure."),
+            None => "Not set: HSTS is off and the refresh cookie is not Secure.".to_owned(),
+        },
+        advice: (!https).then_some("Serve RepoMemo over HTTPS behind a reverse proxy and set REPOMEMO_PUBLIC_URL=https://… (see the production guide)."),
+    });
+
     checks.push(SetupCheck {
         key: "proxy",
         label: "Client addresses",
-        status: CheckStatus::Info,
+        status: if facts.trust_proxy || !https {
+            CheckStatus::Ok
+        } else {
+            CheckStatus::Warning
+        },
         detail: if facts.trust_proxy {
             "Taken from X-Forwarded-For (behind a trusted proxy).".to_owned()
         } else {
             "Taken from the connection.".to_owned()
         },
-        advice: Some(
+        advice: (https && !facts.trust_proxy).then_some(
             "Behind a reverse proxy, set REPOMEMO_TRUST_PROXY=true so sign-in limits apply per person, not per proxy.",
+        ),
+    });
+
+    let backup_hours = state.settings().backup_interval_hours;
+    checks.push(SetupCheck {
+        key: "backups",
+        label: "Automatic backups",
+        status: if backup_hours > 0 {
+            CheckStatus::Ok
+        } else {
+            CheckStatus::Warning
+        },
+        detail: if backup_hours > 0 {
+            format!("A backup is made when the newest is older than {backup_hours} hours.")
+        } else {
+            "Off: backups are made by hand only.".to_owned()
+        },
+        advice: (backup_hours == 0).then_some(
+            "Set REPOMEMO_BACKUP_INTERVAL_HOURS (24 is a good start) and copy the backups folder to another machine.",
         ),
     });
 
@@ -517,6 +570,7 @@ mod tests {
                 repo_roots: Vec::new(),
                 ai_hosts_restricted: false,
                 trust_proxy: false,
+                public_url: None,
                 data_dir: PathBuf::new(),
             },
         };

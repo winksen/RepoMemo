@@ -956,6 +956,18 @@ async fn a_new_server_is_set_up_once_through_the_onboarding() {
         .unwrap()
         .iter()
         .any(|check| check["key"] == "database" && check["status"] == "ok"));
+    // The test server is neither on HTTPS nor backing up: both are reported
+    // with what to set, not left silent.
+    for key in ["public_url", "backups"] {
+        assert!(
+            checks
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|check| check["key"] == key && check["status"] == "warning" && check["advice"].is_string()),
+            "{key} is a warning with advice"
+        );
+    }
 
     let done = app
         .clone()

@@ -2,6 +2,18 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.1 (2026-10-14)
+
+Operations: the production guide and the server checks, corrected against the code.
+
+### Changed
+- **Server checks say what is missing.** The setup wizard's checks gain *Public address* (HTTPS, which turns HSTS and the `Secure` cookie on) and *Automatic backups*, and *Client addresses* warns when the address is HTTPS but `REPOMEMO_TRUST_PROXY` is not set, because every person would then share the proxy's address for limits and lockouts. Advice appears only where something is missing. The LibreOffice hint names `REPOMEMO_SOFFICE`.
+- **The production guide** lists the checks, adds `REPOMEMO_BACKUP_INTERVAL_HOURS` to the settings that must be right, and drops the "to be followed in V0.1.76" status. Every variable, default, route and metric it names was compared with the code: no other difference was found.
+
+### Upgrading
+- Nothing to do. A server without HTTPS or backups shows two new warnings in the setup checks.
+- The clean-machine install (R6) itself is still the maintainer's: anything it finds becomes the next fix.
+
 ## V0.2.0 (2026-10-14)
 
 **Team-ready.** The first minor release: a server a team can install, expose and trust with its knowledge. It is V0.1.76 with the version number changed; no feature was added after the candidate and the candidate's checks found nothing to fix.
