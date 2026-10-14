@@ -1,7 +1,7 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.1.76` (2026-10-14), the release candidate for `V0.2.0` *Team-ready* · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
-> **Feature freeze (since V0.1.76):** only fixes from the release candidate go into V0.2.0; new work waits for V0.3.0.
+> **Current version:** `V0.2.0` (2026-10-14), *Team-ready*, built and waiting for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
 RepoMemo started as a local-first desktop workbench. It is now a **self-hosted team product**: a shared API server with a web client, organizations and roles, collaboration, git repositories as living sources, business documents, and optional AI grounded in cited evidence. A server can be installed and administered entirely from the browser (environment menu, first-run setup, System area, admin console).
@@ -54,7 +54,7 @@ timeline
 | Phase S: Shared team mode | ✅ Complete |
 | Phase D: Depth and operability (V0.1.33–V0.1.65) | ✅ Complete |
 | Security review 2026-10-10, second and third passes | ✅ Every finding fixed, mitigated or accepted in writing (V0.1.76); R2-4 and R2-5 scheduled for V0.2.8 |
-| Road to V0.2.0 (V0.1.66–V0.1.76) | 🔄 V0.1.66–V0.1.75 built; V0.1.76 is the release candidate, R6 (clean install) open |
+| Road to V0.2.0 (V0.1.66–V0.1.76) | 🔄 Built and versioned `0.2.0`; R6 (clean install) and the tag are the maintainer's |
 | Road to V0.3.0 (V0.2.1–V0.2.56, one change each) | 🔜 Proposed 2026-10-14; decisions 7–14 to agree |
 | V0.4.0 and later: scale-out, single sign-on, hosted | 💭 Direction |
 
@@ -259,7 +259,7 @@ Each proposal below was accepted as written. They shape the releases named in th
 - [x] **O4** `quotas.rs`: `check_incoming` (disk floor, storage per workspace, uploads per hour) on uploads, new versions and notes; `check_new_workspace`; `free_disk_bytes` (`GetDiskFreeSpaceExW` on Windows, `df` elsewhere) shown in System › Overview. Settings in the *Limits* group
 - [x] **O5** `GET /v1/system/metrics`, an `Exposition` writer for the OpenMetrics text format; system administrators or a `system` token
 
-#### V0.1.76: Release candidate (built, not yet released)
+#### V0.1.76: Release candidate
 
 - [x] **R1** feature freeze: fixes only until V0.2.0 (see the note at the top)
 - [x] **R2** third security pass: [review §12](security/2026-10-10-security-review.md#12-third-pass-2026-10-14-release-candidate-v0176). No high or medium; R2-1 (repository syncs ignored quotas) and R2-2 (key file copy in a backup) fixed; the status table is closed
@@ -270,8 +270,10 @@ Each proposal below was accepted as written. They shape the releases named in th
 
 #### V0.2.0: Team-ready
 
-- [ ] **R6** the clean-machine install (above), then the fixes it calls for
-- [ ] Tag `v0.2.0`; the changelog's V0.1.66–V0.1.76 entries become the 0.2.0 release notes
+- [x] The version is `0.2.0` everywhere (`npm run version:set -- 0.2.0`); the candidate's checks left nothing to fix
+- [x] The changelog's V0.2.0 entry names the part of the promise each release delivered; V0.1.66–V0.1.76 stay as its detailed notes
+- [ ] **R6** the clean-machine install (above); what it finds becomes V0.2.1
+- [ ] Tag `v0.2.0` once R6 passes
 
 ---
 

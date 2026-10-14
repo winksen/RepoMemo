@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.0 (2026-10-14)
+
+**Team-ready.** The first minor release: a server a team can install, expose and trust with its knowledge. It is V0.1.76 with the version number changed; no feature was added after the candidate and the candidate's checks found nothing to fix.
+
+What 0.2.0 promises, and the release that delivered each part:
+
+- **Secure by default** (V0.1.64–V0.1.69, V0.1.76): registration is closed unless an operator opens it, invitations onboard people, refresh tokens live in an `HttpOnly` cookie, the browser runs under a strict content security policy, the server only reaches hosts it is told about, and three security passes are closed in writing.
+- **Checked on every commit** (V0.1.66, V0.1.71): CI, one version source, formatting, lints and dependency audits.
+- **Deployable and recoverable** (V0.1.75): a production guide, backups that restore into a new environment, quotas and a disk floor, OpenMetrics.
+- **Memory stays true** (V0.1.72, V0.1.73): cards that say when their evidence changed, search that can put trusted evidence first, symbol search, ownership transfer.
+- **Changeable** (V0.1.70, V0.1.71): the web client and the server are split into modules with tests.
+- **Fast enough to trust** (V0.1.74, V0.1.76): measured at 50,000 passages in a release build.
+- **Upgradable** (V0.1.76): environments from V0.1.40 and later upgrade in place; see [UPGRADING.md](UPGRADING.md).
+
+### Upgrading
+- Nothing beyond [UPGRADING.md](UPGRADING.md). Entries V0.1.66–V0.1.76 below are the detailed release notes of this version.
+- The version is `0.2.0` in `Cargo.toml`, both `package.json` files, `tauri.conf.json` and the lock files (`npm run version:check`). The tag `v0.2.0` is created by the maintainer after the clean-machine install (R6); until then the build is the release candidate.
+
 ## V0.1.76 (2026-10-14)
 
 Release candidate for 0.2.0. **Feature freeze:** from here to 0.2.0 only fixes from this candidate go in.
