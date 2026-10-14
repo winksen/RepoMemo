@@ -64,6 +64,9 @@ export function InviteMembers({
     try {
       const created = await createSharedInvitation(accessToken, targetType, targetId, { email: email.trim(), role });
       setLink({ email: created.invitation.email, url: appLink(created.path) });
+      if (created.mail === "queued") showToast("success", `The invitation was sent to ${created.invitation.email}. The link is below to copy as well.`);
+      else if (created.mail === "no_public_address") showToast("warning", "Mail is set up but the server does not know its public address (REPOMEMO_PUBLIC_URL), so nothing was mailed. Pass the link on yourself.");
+      else if (created.mail === "failed") showToast("warning", "The invitation could not be queued for mail. Pass the link on yourself.");
       setEmail("");
       onInvited?.();
       await load();

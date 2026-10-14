@@ -2,6 +2,18 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.10 (2026-10-14)
+
+Invitations are sent by email.
+
+### Changed
+- **Creating an invitation mails it.** When mail is set up (V0.2.9) and the server knows its public address (`REPOMEMO_PUBLIC_URL`), the invited address receives a message that names who invited them, where to, in which role, the link and the date it expires. It goes through the outbox, so a slow mail server never holds the request. The link is still returned and shown to copy: the answer's new `mail` field says what became of the message (`queued`, `not_set_up`, `no_public_address`, `failed`), and the page says so.
+- **A crafted name adds nothing to the mail.** The inviter's and the workspace's or organization's names are cleaned for the subject (control characters, such as a line break, become spaces; long names are cut), and the message builder refuses any header value with a control character anyway.
+- The outbox listing never shows a body, and a sent message's body is emptied, so a link in a mail is not kept.
+
+### Upgrading
+- Nothing to do. Without `REPOMEMO_PUBLIC_URL` no link can be put in a mail: set it (the production guide already asks for it).
+
 ## V0.2.9 (2026-10-14)
 
 Mail delivery: the groundwork every mail feature after it stands on.

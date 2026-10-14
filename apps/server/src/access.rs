@@ -57,14 +57,18 @@ pub(crate) struct CreatedInvitation {
     /// `/invite#<token>`: the secret is in the fragment, which browsers never
     /// send to a server, so it stays out of access logs and `Referer`.
     path: String,
+    /// What became of the mail with the link: `queued`, `not_set_up`,
+    /// `no_public_address` or `failed`. The link is returned either way.
+    mail: &'static str,
 }
 
-fn created(invitation: Invitation, token: String) -> CreatedInvitation {
+fn created(invitation: Invitation, token: String, mail: &'static str) -> CreatedInvitation {
     let path = format!("/invite#{token}");
     CreatedInvitation {
         invitation,
         token,
         path,
+        mail,
     }
 }
 
@@ -179,7 +183,16 @@ pub(crate) async fn create_workspace_invitation(
         format!("Invited {} as {}.", invitation.email, invitation.role),
     )
     .await;
-    Ok((StatusCode::CREATED, Json(created(invitation, token))))
+    let workspace_name = state
+        .core
+        .list_workspaces()
+        .await
+        .ok()
+        .and_then(|all| all.into_iter().find(|workspace| workspace.id == workspace_id))
+        .map_or_else(|| "a workspace".to_owned(), |workspace| workspace.name);
+    let path = format!("/invite#{token}");
+    let mail = crate::mail::mail_invitation(&state, &subject.user_id, &invitation, &workspace_name, &path).await;
+    Ok((StatusCode::CREATED, Json(created(invitation, token, mail))))
 }
 
 pub(crate) async fn list_workspace_invitations(
@@ -236,7 +249,16 @@ pub(crate) async fn create_organization_invitation(
         .await
         .map_err(map_storage_error)?;
     tracing::info!(target: "audit", user_id = %subject.user_id, organization_id = %organization_id, invitation_id = %invitation.id, "Organization invitation created");
-    Ok((StatusCode::CREATED, Json(created(invitation, token))))
+    let organization_name = state
+        .storage
+        .list_organizations_for_user(&subject.user_id)
+        .await
+        .ok()
+        .and_then(|all| all.into_iter().find(|organization| organization.id == organization_id))
+        .map_or_else(|| "an organization".to_owned(), |organization| organization.name);
+    let path = format!("/invite#{token}");
+    let mail = crate::mail::mail_invitation(&state, &subject.user_id, &invitation, &organization_name, &path).await;
+    Ok((StatusCode::CREATED, Json(created(invitation, token, mail))))
 }
 
 pub(crate) async fn list_organization_invitations(

@@ -459,3 +459,68 @@ async fn mail_is_set_up_in_system_settings_and_sent_from_the_outbox() {
     );
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn an_invitation_is_mailed_through_the_outbox_when_mail_is_set_up() {
+    let data_dir = temp_data_dir("mail-invitation");
+    let mut config = ServerConfig::for_test(data_dir.clone());
+    config.public_url = Some("https://memo.example.com".to_owned());
+    let app = router(config).await.unwrap();
+    let (admin, _) = register_account(&app, "invite-mail-admin@example.com").await;
+    let workspace_id = create_workspace(&app, &admin).await;
+    let call = |method: &'static str, uri: String, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, &admin, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+
+    // Without mail the link is still returned, and the answer says nothing was mailed.
+    let before = call(
+        "POST",
+        format!("/v1/workspaces/{workspace_id}/invitations"),
+        json!({"email": "first@example.com", "role": "member"}),
+    )
+    .await;
+    assert_eq!(before.status(), 201);
+    let before = response_json(before).await;
+    assert_eq!(before["mail"], "not_set_up");
+    assert!(before["path"].as_str().unwrap().starts_with("/invite#"));
+
+    let saved = call(
+        "PUT",
+        "/v1/system/mail".to_owned(),
+        json!({"enabled": true, "host": "mail.invalid", "port": 587, "security": "starttls", "username": "",
+               "from_address": "memo@example.com", "from_name": "RepoMemo"}),
+    )
+    .await;
+    assert_eq!(saved.status(), 200);
+    let sent = call(
+        "POST",
+        format!("/v1/workspaces/{workspace_id}/invitations"),
+        json!({"email": "second@example.com", "role": "viewer"}),
+    )
+    .await;
+    assert_eq!(sent.status(), 201);
+    let sent = response_json(sent).await;
+    assert_eq!(sent["mail"], "queued");
+    assert!(sent["token"].is_string(), "the link is returned as well");
+
+    let outbox = response_json(call("GET", "/v1/system/mail/outbox".to_owned(), json!({})).await).await;
+    let entry = outbox
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|entry| entry["kind"] == "invitation")
+        .expect("the invitation is in the outbox");
+    assert_eq!(entry["to_address"], "second@example.com");
+    let subject = entry["subject"].as_str().unwrap();
+    assert!(
+        subject.ends_with("on RepoMemo") && !subject.chars().any(char::is_control),
+        "{subject:?}"
+    );
+    assert!(
+        !outbox.to_string().contains(sent["token"].as_str().unwrap()),
+        "the outbox listing never carries the link"
+    );
+    let _ = std::fs::remove_dir_all(data_dir);
+}

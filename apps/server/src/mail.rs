@@ -56,16 +56,23 @@ pub(crate) struct MailService {
     storage: StorageEngine,
     policy: Arc<OutboundPolicy>,
     wake: Arc<Notify>,
+    /// The address people use (`REPOMEMO_PUBLIC_URL`): links in mail are made from it.
+    public_url: Option<String>,
 }
 
 impl MailService {
     /// Creates the service and starts its worker. The task must be stopped
     /// when the environment is detached.
-    pub(crate) fn start(storage: StorageEngine, policy: OutboundPolicy) -> (Self, tokio::task::JoinHandle<()>) {
+    pub(crate) fn start(
+        storage: StorageEngine,
+        policy: OutboundPolicy,
+        public_url: Option<String>,
+    ) -> (Self, tokio::task::JoinHandle<()>) {
         let service = Self {
             storage,
             policy: Arc::new(policy),
             wake: Arc::new(Notify::new()),
+            public_url,
         };
         let worker = service.clone();
         let task = tokio::spawn(async move { worker.run().await });
@@ -74,6 +81,14 @@ impl MailService {
 
     pub(crate) fn policy(&self) -> &OutboundPolicy {
         &self.policy
+    }
+
+    /// An absolute link for a path of the web app, or `None` when the server
+    /// does not know the address people use (mail cannot carry a relative link).
+    pub(crate) fn link(&self, path: &str) -> Option<String> {
+        self.public_url
+            .as_deref()
+            .map(|base| format!("{}{path}", base.trim_end_matches('/')))
     }
 
     /// Mail can be sent: a server and a sender are saved and sending is on.
@@ -245,6 +260,92 @@ async fn deliver_one(
                 }
             }
         }
+    }
+}
+
+/// A person's or a place's name as it may appear in a subject: control
+/// characters (a crafted name with a line break) become spaces, runs of spaces
+/// collapse and the length is bounded.
+pub(crate) fn plain(text: &str, limit: usize) -> String {
+    let cleaned = text
+        .chars()
+        .map(|c| if c.is_control() { ' ' } else { c })
+        .collect::<String>();
+    let collapsed = cleaned.split_whitespace().collect::<Vec<_>>().join(" ");
+    if collapsed.chars().count() <= limit {
+        collapsed
+    } else {
+        format!(
+            "{}…",
+            collapsed.chars().take(limit.saturating_sub(1)).collect::<String>()
+        )
+    }
+}
+
+/// The subject and body of an invitation mail.
+pub(crate) fn invitation_message(
+    inviter: &str,
+    target_kind: &str,
+    target_name: &str,
+    role: &str,
+    link: &str,
+    expires_on: &str,
+) -> (String, String) {
+    let inviter = plain(inviter, 80);
+    let target = plain(target_name, 80);
+    let subject = format!("{inviter} invited you to {target} on RepoMemo");
+    let body = format!(
+        "{inviter} invited you to join the {target} {target_kind} on RepoMemo as {role}.\n\n\
+         Open this link to accept. It works once, for this email address only, and expires on {expires_on}:\n\n\
+         {link}\n\n\
+         If you were not expecting this, you can ignore this message.\n"
+    );
+    (subject, body)
+}
+
+/// Sends the invitation by mail when mail is set up and the public address is
+/// known. Returns what happened, for the answer to the person inviting:
+/// `queued`, `not_set_up`, `no_public_address` or `failed`. The link is shown
+/// to the inviter in every case, so a mail that does not go changes nothing.
+pub(crate) async fn mail_invitation(
+    state: &AppState,
+    inviter_id: &str,
+    invitation: &repomemo_domain::Invitation,
+    target_name: &str,
+    path: &str,
+) -> &'static str {
+    let Some(link) = state.mail.link(path) else {
+        return if state.mail.is_ready().await {
+            "no_public_address"
+        } else {
+            "not_set_up"
+        };
+    };
+    let inviter = match state.storage.find_user(inviter_id).await {
+        Ok(Some(user)) => user.display_name,
+        _ => "Someone".to_owned(),
+    };
+    let expires_on = invitation
+        .expires_at
+        .get(..10)
+        .unwrap_or(&invitation.expires_at)
+        .to_owned();
+    let (subject, body) = invitation_message(
+        &inviter,
+        &invitation.target_type,
+        target_name,
+        &invitation.role,
+        &link,
+        &expires_on,
+    );
+    match state
+        .mail
+        .send_to(&invitation.email, &subject, &body, "invitation")
+        .await
+    {
+        Ok(_) => "queued",
+        Err(NotQueued::NotSetUp) => "not_set_up",
+        Err(_) => "failed",
     }
 }
 
@@ -537,6 +638,33 @@ mod tests {
             ..OutboundPolicy::default()
         };
         assert!(validate(&request("10.1.2.3"), &listed).is_ok());
+    }
+
+    #[test]
+    fn an_invitation_names_who_where_and_for_how_long_and_a_crafted_name_adds_nothing() {
+        let (subject, body) = invitation_message(
+            "Ada Lovelace",
+            "workspace",
+            "Atlas",
+            "member",
+            "https://memo.example.com/invite#abc",
+            "2026-10-21",
+        );
+        assert_eq!(subject, "Ada Lovelace invited you to Atlas on RepoMemo");
+        assert!(body.contains("https://memo.example.com/invite#abc"));
+        assert!(body.contains("expires on 2026-10-21") && body.contains("as member"));
+        let (subject, _) = invitation_message(
+            "Eve\r\nBcc: boss@example.com",
+            "workspace",
+            &"Long ".repeat(60),
+            "member",
+            "https://memo.example.com/invite#abc",
+            "2026-10-21",
+        );
+        assert!(!subject.chars().any(char::is_control), "{subject:?}");
+        assert!(subject.chars().count() < 200);
+        assert_eq!(plain("a \t b\n c", 20), "a b c");
+        assert_eq!(plain("abcdef", 4), "abc…");
     }
 
     #[test]

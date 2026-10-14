@@ -808,6 +808,8 @@ export interface CreatedInvitation {
   token: string;
   /** `/invite#<token>`, to put after the web app's origin (the secret stays in the fragment). */
   path: string;
+  /** What became of the mail with the link: `queued`, `not_set_up`, `no_public_address` or `failed`. */
+  mail: "queued" | "not_set_up" | "no_public_address" | "failed";
 }
 
 export interface InvitationPreview {

@@ -361,6 +361,7 @@ async fn build_state(
             allowed_hosts: config.smtp_allowed_hosts.clone(),
             extra_roots: config.smtp_extra_roots.clone(),
         },
+        config.public_url.clone(),
     );
     let state = AppState {
         storage,
