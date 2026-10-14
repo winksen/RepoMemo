@@ -2,6 +2,18 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.12 (2026-10-14)
+
+Mentions and task assignments are mailed.
+
+### Added
+- **A mail with each notice that asks for attention:** being assigned a task and being mentioned (`@email`) in an evidence comment. The message says who did it, what it is about and carries a link to the task board or the file. It goes through the outbox, only when mail is set up and `REPOMEMO_PUBLIC_URL` is known.
+- **Once per event, never to the person who caused it:** a notice and its mail are made in the same step, so changing a task without changing its assignee sends nothing, and assigning a task to yourself or mentioning yourself sends nothing. Titles are cleaned for the subject, so a crafted title adds no header.
+- The in-app notices are unchanged and still the record; the mail says so. Choosing, per kind, what arrives where comes with V0.2.14.
+
+### Upgrading
+- Nothing to do. People in workspaces start receiving these mails as soon as mail is switched on.
+
 ## V0.2.11 (2026-10-14)
 
 "Forgot your password?" by email.

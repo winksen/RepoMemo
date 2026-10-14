@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.11` (2026-10-14), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.12` (2026-10-14), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -331,7 +331,7 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 | **V0.2.9** ✅ | ✨ | System › Settings | SMTP delivery: settings with an encrypted password, an outbox with retries, *Send test mail*, console `mail test` | F6a, decision 7 | A test mail arrives through a TLS server; a slow server never holds a request; the SMTP host follows the outbound address rules |
 | **V0.2.10** ✅ | ✨ | People | Invitations sent by email (the link is still shown to copy) | F6b | The invited address receives the link; a crafted name cannot add mail headers |
 | **V0.2.11** ✅ | ✨ | Sign-in | "Forgot your password?" by email | F12, decision 8 | The same answer for every address; rate-limited; a one-time link valid 1 hour ends every session |
-| **V0.2.12** | ✨ | Notifications | Mentions and task assignments sent by email | F6c | Sent once per event, never to the person who caused it |
+| **V0.2.12** ✅ | ✨ | Notifications | Mentions and task assignments sent by email | F6c | Sent once per event, never to the person who caused it |
 | **V0.2.13** | ✨ | Accounts | Email verification on registration and on a changed address | F13, decision 9 | An unverified account cannot join, create or be added; invitations count as verification |
 | **V0.2.14** | ✨ | Profile | Notification preferences: in the app, by mail, both or none, per kind | F14a | Each kind of notification honours the choice |
 | **V0.2.15** | ✨ | Notifications | A daily digest by email | F14b | One mail a day at most, only when something happened |
@@ -491,6 +491,11 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 - [x] Test: `forgot_password_answers_the_same_for_every_address_and_mails_only_a_real_one`
 - [ ] Try it with a real mailbox (the maintainer's)
 
+#### V0.2.12: Mentions and assignments by mail
+
+- [x] **F6c** `mail::mail_notification` / `NotificationMail`, called from `notify_task_assignee` and `notify_artifact_mentions` (`profile.rs`) right after the in-app notice, so one event is one mail; `actor == recipient` returns early
+- [x] Test: `assignments_and_mentions_are_mailed_once_and_never_to_the_person_who_caused_them`; unit: `a_notification_mail_says_who_what_and_where_and_a_crafted_title_adds_nothing`
+
 ### Decisions to agree before work starts
 
 | # | Decision | Needed by | Proposal |
@@ -520,7 +525,7 @@ Every item of both roads, with the release it is planned for. The evidence behin
 | F4 | **Repositories.** Phase 1b (renames with edits, commit on citations) | M | ✅ V0.1.73 |
 | F4 | **Repositories.** Phase 2: remote by URL over `https` (2a) and `ssh` (2b) | L | V0.2.20, V0.2.21 |
 | F5 | **Assistant memory** (5a) and **cross-workspace search** (5b) | M | V0.2.32, V0.2.33 |
-| F6 | **Mail delivery:** SMTP and outbox (6a ✅ V0.2.9), invitations (6b ✅ V0.2.10), mentions and assignments (6c) | M | V0.2.9, V0.2.10, V0.2.12 (decisions 5, 7) |
+| F6 | **Mail delivery:** SMTP and outbox (6a ✅ V0.2.9), invitations (6b ✅ V0.2.10), mentions and assignments (6c ✅ V0.2.12) | M | V0.2.9, V0.2.10, V0.2.12 (decisions 5, 7) |
 | F7 | **Evidence ergonomics.** Move folders, multi-select, new version of a file | M | ✅ V0.1.73 |
 | F8 | **Live map and health** | S | ✅ V0.1.72 |
 | F9 | **Console follow-ups.** `logs --follow`, `users reset-link`, `tokens list`, backup commands; workspace commands for system administrators | S–M | ✅ V0.1.73, V0.1.75, V0.2.7 |

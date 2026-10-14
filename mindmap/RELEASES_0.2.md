@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.2 → 0.3
 
-> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.11` (2026-10-14) · **Next:** `V0.2.12`
+> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.12` (2026-10-14) · **Next:** `V0.2.13`
 > **Previous line:** [Releases 0.1 → 0.2](RELEASES_0.1.md) · **Related:** [Roadmap, Road to V0.3.0](ROADMAP.md#-road-to-v030) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
 Every release of the 0.2 line, shipped and planned, one row each. The plan comes from the [Road to V0.3.0](ROADMAP.md#-road-to-v030): **one change per release**, each shippable alone, with the security rules for a new outside connection in the release that opens it. Planned rows are proposals until decisions 7–14 in the roadmap are agreed.
@@ -44,7 +44,7 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | **V0.2.9** | ✅ 2026-10-14 | B. Mail | ✨ Feature | System › Settings | SMTP over TLS only: settings with a sealed password, an outbox with retries (1, 5, 30 min, 2, 6 h), *Send test mail*, console `mail status` and `mail test`, a `repomemo-mail` crate tested against a scripted TLS server; the host follows the outbound address rules (F6a, decision 7) | A test mail arrives through a TLS server; a slow server never holds a request; the SMTP host follows the outbound address rules |
 | **V0.2.10** | ✅ 2026-10-14 | B. Mail | ✨ Feature | People | Creating an invitation queues a mail with the link (who, where, role, expiry) when mail is set up and `REPOMEMO_PUBLIC_URL` is known; the link is still shown to copy and the answer says what became of the mail; names are cleaned so none can add a header (F6b) | The invited address receives the link; a crafted name cannot add mail headers |
 | **V0.2.11** | ✅ 2026-10-14 | B. Mail | ✨ Feature | Sign-in | "Forgot your password?": the same answer for every address, 3 mails an hour per address plus the sign-in limits, a one-time link valid 1 hour that ends every session, an in-app notice (F12, decision 8) | The same answer for every address; rate-limited; a one-time link valid 1 hour ends every session |
-| **V0.2.12** | 🔜 Planned | B. Mail | ✨ Feature | Notifications | Mentions and task assignments sent by email (F6c) | Sent once per event, never to the person who caused it |
+| **V0.2.12** | ✅ 2026-10-14 | B. Mail | ✨ Feature | Notifications | A mail with each task assignment and `@email` mention, queued in the same step as the in-app notice, so once per event and never to the person who caused it (F6c) | Sent once per event, never to the person who caused it |
 | **V0.2.13** | 🔜 Planned | B. Mail | ✨ Feature | Accounts | Email verification on registration and on a changed address (F13, decision 9) | An unverified account cannot join, create or be added; invitations count as verification |
 | **V0.2.14** | 🔜 Planned | B. Mail | ✨ Feature | Profile | Notification preferences per kind: in the app, by mail, both or none (F14a) | Each kind of notification honours the choice |
 | **V0.2.15** | 🔜 Planned | B. Mail | ✨ Feature | Notifications | A daily digest by email (F14b) | One mail a day at most, only when something happened |

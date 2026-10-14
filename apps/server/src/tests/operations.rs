@@ -600,3 +600,137 @@ async fn forgot_password_answers_the_same_for_every_address_and_mails_only_a_rea
     assert!(count <= 3, "at most three mails an hour per address, got {count}");
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn assignments_and_mentions_are_mailed_once_and_never_to_the_person_who_caused_them() {
+    let data_dir = temp_data_dir("mail-notifications");
+    let mut config = ServerConfig::for_test(data_dir.clone());
+    config.public_url = Some("https://memo.example.com".to_owned());
+    let app = router(config).await.unwrap();
+    let (admin, admin_body) = register_account(&app, "notify-admin@example.com").await;
+    let (_, member_body) = register_account(&app, "notify-member@example.com").await;
+    let admin_id = admin_body["user"]["id"].as_str().unwrap().to_owned();
+    let member_id = member_body["user"]["id"].as_str().unwrap().to_owned();
+    let workspace_id = create_workspace(&app, &admin).await;
+    join(
+        &app,
+        &admin,
+        "workspaces",
+        &workspace_id,
+        "notify-member@example.com",
+        "member",
+    )
+    .await;
+    let saved = app
+        .clone()
+        .oneshot(json_request(
+            "PUT",
+            "/v1/system/mail",
+            &admin,
+            json!({"enabled": true, "host": "mail.invalid", "port": 587, "security": "starttls", "username": "",
+                   "from_address": "memo@example.com", "from_name": "RepoMemo"}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(saved.status(), 200);
+    let call = |method: &'static str, uri: String, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, &admin, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let task = |assignee: &str, title: &str| json!({"title": title, "description": "", "status": "open", "priority": "medium", "assignee_user_id": assignee});
+
+    // Assigned to someone else: one mail. To oneself: none.
+    let created = call(
+        "POST",
+        format!("/v1/workspaces/{workspace_id}/tasks"),
+        task(&member_id, "Fix the deploy"),
+    )
+    .await;
+    assert_eq!(created.status(), 201);
+    let created = response_json(created).await;
+    assert_eq!(
+        call(
+            "POST",
+            format!("/v1/workspaces/{workspace_id}/tasks"),
+            task(&admin_id, "My own task")
+        )
+        .await
+        .status(),
+        201
+    );
+    // Saving the task again with the same assignee sends nothing more.
+    let task_id = created["id"].as_str().unwrap().to_owned();
+    assert_eq!(
+        call(
+            "PUT",
+            format!("/v1/tasks/{task_id}"),
+            task(&member_id, "Fix the deploy (edited)")
+        )
+        .await
+        .status(),
+        200
+    );
+
+    // A mention of someone else in a comment: one mail; of oneself: none.
+    let artifact = response_json(
+        call(
+            "POST",
+            format!("/v1/workspaces/{workspace_id}/artifacts/text"),
+            json!({"title": "Runbook", "content": "Steps.", "language": "Markdown"}),
+        )
+        .await,
+    )
+    .await;
+    let artifact_id = artifact["id"].as_str().unwrap().to_owned();
+    for body in [
+        "Please check @notify-member@example.com",
+        "Note to self @notify-admin@example.com",
+    ] {
+        let response = call(
+            "POST",
+            format!("/v1/artifacts/{artifact_id}/comments"),
+            json!({ "body": body }),
+        )
+        .await;
+        assert_eq!(response.status(), 201);
+    }
+
+    for _ in 0..30 {
+        let outbox = response_json(call("GET", "/v1/system/mail/outbox".to_owned(), json!({})).await).await;
+        let waiting = outbox
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|entry| entry["kind"] != "invitation")
+            .count();
+        if waiting >= 2 {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    let outbox = response_json(call("GET", "/v1/system/mail/outbox".to_owned(), json!({})).await).await;
+    let mut kinds = outbox
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|entry| entry["kind"] != "invitation")
+        .map(|entry| {
+            (
+                entry["kind"].as_str().unwrap().to_owned(),
+                entry["to_address"].as_str().unwrap().to_owned(),
+            )
+        })
+        .collect::<Vec<_>>();
+    kinds.sort();
+    assert_eq!(
+        kinds,
+        vec![
+            ("evidence_mention".to_owned(), "notify-member@example.com".to_owned()),
+            ("task_assigned".to_owned(), "notify-member@example.com".to_owned()),
+        ],
+        "one mail per event, none to the person who acted"
+    );
+    let _ = std::fs::remove_dir_all(data_dir);
+}

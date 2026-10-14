@@ -349,6 +349,65 @@ pub(crate) async fn mail_invitation(
     }
 }
 
+/// What a notification says in a mail: who did it, to what, and where to go.
+pub(crate) struct NotificationMail<'a> {
+    /// Mail kind and notification type: `task_assigned` or `evidence_mention`.
+    pub kind: &'a str,
+    pub actor_id: &'a str,
+    pub recipient_id: &'a str,
+    /// What the person did, as a sentence after their name ("assigned you the task").
+    pub action: &'a str,
+    /// The task or file the event is about.
+    pub subject_title: &'a str,
+    /// The workspace's page for it, as a path of the web app.
+    pub path: &'a str,
+}
+
+/// The subject and body of a notification mail.
+pub(crate) fn notification_message(actor: &str, action: &str, title: &str, link: &str) -> (String, String) {
+    let actor = plain(actor, 80);
+    let title = plain(title, 100);
+    let subject = format!("{actor} {action}: {title}");
+    let body = format!(
+        "{actor} {action} \"{title}\" on RepoMemo.\n\nOpen it here:\n\n{link}\n\n\
+         You get this message because the same notice is waiting for you in RepoMemo.\n"
+    );
+    (subject, body)
+}
+
+/// Mails a notification to its recipient, once, when mail is set up and the
+/// public address is known. It never goes to the person who caused the event:
+/// callers do not notify them in the first place, and this checks again.
+/// Failing to queue it changes nothing for the person acting.
+pub(crate) async fn mail_notification(state: &AppState, mail: NotificationMail<'_>) {
+    if mail.actor_id == mail.recipient_id {
+        return;
+    }
+    let Some(link) = state.mail.link(mail.path) else {
+        return;
+    };
+    if !state.mail.is_ready().await {
+        return;
+    }
+    let (Ok(Some(recipient)), actor) = (
+        state.storage.find_user(mail.recipient_id).await,
+        state.storage.find_user(mail.actor_id).await,
+    ) else {
+        return;
+    };
+    let Some(address) = recipient.email else {
+        return;
+    };
+    let actor_name = actor
+        .ok()
+        .flatten()
+        .map_or_else(|| "Someone".to_owned(), |user| user.display_name);
+    let (subject, body) = notification_message(&actor_name, mail.action, mail.subject_title, &link);
+    if let Err(refusal) = state.mail.send_to(&address, &subject, &body, mail.kind).await {
+        tracing::warn!(target: "mail", kind = mail.kind, reason = ?refusal, "A notification mail was not queued");
+    }
+}
+
 // ---------------------------------------------------------------------------
 // System › Settings › Mail
 
@@ -665,6 +724,22 @@ mod tests {
         assert!(subject.chars().count() < 200);
         assert_eq!(plain("a \t b\n c", 20), "a b c");
         assert_eq!(plain("abcdef", 4), "abc…");
+    }
+
+    #[test]
+    fn a_notification_mail_says_who_what_and_where_and_a_crafted_title_adds_nothing() {
+        let (subject, body) = notification_message(
+            "Grace",
+            "assigned you the task",
+            "Fix the deploy\r\nBcc: x@example.com",
+            "https://memo.example.com/workspaces/w/tasks",
+        );
+        assert_eq!(
+            subject,
+            "Grace assigned you the task: Fix the deploy Bcc: x@example.com"
+        );
+        assert!(!subject.chars().any(char::is_control));
+        assert!(body.contains("https://memo.example.com/workspaces/w/tasks"));
     }
 
     #[test]

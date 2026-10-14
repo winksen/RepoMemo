@@ -128,6 +128,18 @@ pub(crate) async fn notify_task_assignee(state: &AppState, actor_user_id: &str, 
         },
     )
     .await;
+    crate::mail::mail_notification(
+        state,
+        crate::mail::NotificationMail {
+            kind: "task_assigned",
+            actor_id: actor_user_id,
+            recipient_id: &assignee.id,
+            action: "assigned you the task",
+            subject_title: &task.title,
+            path: &format!("/workspaces/{}/tasks", task.workspace_id),
+        },
+    )
+    .await;
 }
 
 pub(crate) async fn notify_artifact_mentions(
@@ -166,15 +178,28 @@ pub(crate) async fn notify_artifact_mentions(
         if member.user.id == actor_user_id || !mentioned_emails.contains(&email.to_ascii_lowercase()) {
             continue;
         }
+        let path = format!("/workspaces/{workspace_id}/artifacts/{artifact_id}");
         create_notification(
             state,
             NewSharedNotification {
-                user_id: member.user.id,
+                user_id: member.user.id.clone(),
                 workspace_id: Some(workspace_id.to_owned()),
                 notification_type: "evidence_mention".to_owned(),
                 title: "You were mentioned in evidence discussion".to_owned(),
                 body: format!("You were mentioned on {}.", artifact_title),
-                href: format!("/workspaces/{workspace_id}/artifacts/{artifact_id}"),
+                href: path.clone(),
+            },
+        )
+        .await;
+        crate::mail::mail_notification(
+            state,
+            crate::mail::NotificationMail {
+                kind: "evidence_mention",
+                actor_id: actor_user_id,
+                recipient_id: &member.user.id,
+                action: "mentioned you on",
+                subject_title: artifact_title,
+                path: &path,
             },
         )
         .await;
