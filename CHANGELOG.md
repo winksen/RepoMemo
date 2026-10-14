@@ -2,6 +2,19 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.15 (2026-10-14)
+
+A daily digest by email.
+
+### Added
+- **Profile › Notifications › a summary by mail, once a day** (off until asked for; `daily_digest` with `mail` or `none`). A person who asked for it gets one message that counts the in-app notices they have not read since their last summary and lists the newest ten, with a link to the notifications page.
+- **At most one a day, and only when something happened:** a person is not sent another within 24 hours of the last, and no message is made when nothing unread came after it (the next one then covers everything since the last summary). People whose address is unconfirmed get none.
+- It goes through the outbox like every mail, so it needs mail set up and `REPOMEMO_PUBLIC_URL`. A person who wants the digest instead of single mails sets *a task is assigned* and *a mention* to *in the app only*.
+- Migration 0028 (`mail_digests`: when each person was last sent one). Asking for the digest wakes the sender at once.
+
+### Upgrading
+- Nothing to do. Nobody gets a digest until they turn it on.
+
 ## V0.2.14 (2026-10-14)
 
 Notification preferences.

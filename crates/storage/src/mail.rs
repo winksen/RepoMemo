@@ -61,6 +61,23 @@ pub struct MailOutboxCounts {
     pub failed_last_day: i64,
 }
 
+/// A person who asked for the daily digest and is due one.
+#[derive(Debug, Clone)]
+pub struct DigestCandidate {
+    pub user_id: String,
+    pub email: String,
+    pub display_name: String,
+    /// Notices created after this are the digest's; the last digest, or a day ago.
+    pub since: String,
+}
+
+/// One unread notice, as the digest lists it.
+#[derive(Debug, Clone)]
+pub struct DigestNotice {
+    pub title: String,
+    pub body: String,
+}
+
 const MAIL_SECRET_CONTEXT: &str = "mail-settings:smtp-password";
 
 fn entry_from_row(row: &sqlx::sqlite::SqliteRow) -> MailOutboxEntry {
@@ -335,6 +352,80 @@ impl StorageEngine {
             sent_last_day: row.get("sent"),
             failed_last_day: row.get("failed"),
         })
+    }
+
+    /// People who asked for the digest, whose address is confirmed and who were
+    /// not sent one in the last day.
+    pub async fn digest_candidates(&self) -> Result<Vec<DigestCandidate>> {
+        let day_ago = (Utc::now() - chrono::Duration::hours(24)).to_rfc3339();
+        let rows = sqlx::query(
+            r#"SELECT u.id, u.email, u.display_name, COALESCE(d.last_sent_at, ?1) AS since
+               FROM notification_preferences p
+               JOIN users u ON u.id = p.user_id
+               LEFT JOIN mail_digests d ON d.user_id = u.id
+               WHERE p.kind = 'daily_digest' AND p.channel = 'mail'
+                 AND u.email_unverified_at IS NULL
+                 AND (d.last_sent_at IS NULL OR d.last_sent_at <= ?1)"#,
+        )
+        .bind(day_ago)
+        .fetch_all(self.reader())
+        .await?;
+        Ok(rows
+            .iter()
+            .map(|row| DigestCandidate {
+                user_id: row.get("id"),
+                email: row.get("email"),
+                display_name: row.get("display_name"),
+                since: row.get("since"),
+            })
+            .collect())
+    }
+
+    /// The notices a person has not read that came after `since`, newest first.
+    pub async fn unread_notices_since(
+        &self,
+        user_id: &str,
+        since: &str,
+        limit: i64,
+    ) -> Result<(i64, Vec<DigestNotice>)> {
+        let total = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM workspace_notifications WHERE user_id = ?1 AND read_at IS NULL AND created_at > ?2",
+        )
+        .bind(user_id)
+        .bind(since)
+        .fetch_one(self.reader())
+        .await?;
+        let rows = sqlx::query(
+            r#"SELECT title, body FROM workspace_notifications
+               WHERE user_id = ?1 AND read_at IS NULL AND created_at > ?2
+               ORDER BY created_at DESC LIMIT ?3"#,
+        )
+        .bind(user_id)
+        .bind(since)
+        .bind(limit)
+        .fetch_all(self.reader())
+        .await?;
+        Ok((
+            total,
+            rows.iter()
+                .map(|row| DigestNotice {
+                    title: row.get("title"),
+                    body: row.get("body"),
+                })
+                .collect(),
+        ))
+    }
+
+    pub async fn record_digest_sent(&self, user_id: &str) -> Result<()> {
+        sqlx::query(
+            r#"INSERT INTO mail_digests (user_id, last_sent_at) VALUES (?1, ?2)
+               ON CONFLICT(user_id) DO UPDATE SET last_sent_at = excluded.last_sent_at"#,
+        )
+        .bind(user_id)
+        .bind(Utc::now().to_rfc3339())
+        .execute(&self.pool)
+        .await?;
+        Ok(())
     }
 
     /// Removes finished messages older than `older_than_days`.

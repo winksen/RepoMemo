@@ -119,14 +119,27 @@ pub(crate) async fn update_profile(
 
 /// The kinds of notice a person chooses a channel for. Security notices
 /// (password resets) always reach the app and the mail: they are not here.
-const CHOOSABLE_KINDS: [(&str, &str); 2] = [
+const CHOOSABLE_KINDS: [(&str, &str); 3] = [
     ("task_assigned", "A task is assigned to you"),
     ("evidence_mention", "You are mentioned in a comment"),
+    (
+        "daily_digest",
+        "A summary by mail of what you have not read, once a day",
+    ),
 ];
+
+/// The digest is off until asked for; everything else starts as both.
+fn default_channel(kind: &str) -> &'static str {
+    if kind == "daily_digest" {
+        "none"
+    } else {
+        "both"
+    }
+}
 
 /// Where a notice of `kind` goes for this person: `(in the app, by mail)`.
 async fn delivery(state: &AppState, user_id: &str, kind: &str) -> (bool, bool) {
-    if !CHOOSABLE_KINDS.iter().any(|(known, _)| *known == kind) {
+    if !CHOOSABLE_KINDS.iter().any(|(known, _)| *known == kind) || kind == "daily_digest" {
         return (true, true);
     }
     match state.storage.notification_channel(user_id, kind).await.as_deref() {
@@ -161,7 +174,10 @@ pub(crate) async fn get_notification_preferences(
             .map(|(kind, label)| NotificationPreference {
                 kind,
                 label,
-                channel: chosen.get(*kind).cloned().unwrap_or_else(|| "both".to_owned()),
+                channel: chosen
+                    .get(*kind)
+                    .cloned()
+                    .unwrap_or_else(|| default_channel(kind).to_owned()),
             })
             .collect(),
     ))
@@ -181,11 +197,18 @@ pub(crate) async fn set_notification_preference(
     if !CHOOSABLE_KINDS.iter().any(|(kind, _)| *kind == request.kind) {
         return Err(ApiError::bad_request("That kind of notice cannot be chosen."));
     }
+    if request.kind == "daily_digest" && !matches!(request.channel.as_str(), "mail" | "none") {
+        return Err(ApiError::bad_request(
+            "The daily summary is sent by mail or not at all.",
+        ));
+    }
     state
         .storage
         .set_notification_preference(&subject.user_id, &request.kind, &request.channel)
         .await
         .map_err(map_storage_error)?;
+    // A digest asked for now should not wait for the worker's next look.
+    state.mail.nudge();
     get_notification_preferences(subject, State(state)).await
 }
 

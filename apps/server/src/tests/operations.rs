@@ -946,11 +946,14 @@ async fn a_person_chooses_where_each_kind_of_notice_reaches_them() {
     // The defaults, and what cannot be chosen.
     let preferences =
         response_json(call("GET", "/v1/profile/notification-preferences", &member, json!({})).await).await;
-    assert!(preferences
-        .as_array()
-        .unwrap()
-        .iter()
-        .all(|preference| preference["channel"] == "both"));
+    for preference in preferences.as_array().unwrap() {
+        let expected = if preference["kind"] == "daily_digest" {
+            "none"
+        } else {
+            "both"
+        };
+        assert_eq!(preference["channel"], expected, "{preference}");
+    }
     assert_eq!(
         call(
             "PUT",
@@ -1016,5 +1019,120 @@ async fn a_person_chooses_where_each_kind_of_notice_reaches_them() {
         assert_eq!(notices().await, expected_notices, "{channel}: notices");
         assert_eq!(mails().await, expected_mails, "{channel}: mails");
     }
+    let _ = std::fs::remove_dir_all(data_dir);
+}
+
+#[tokio::test]
+async fn the_daily_digest_is_asked_for_and_sent_once_when_something_is_unread() {
+    let data_dir = temp_data_dir("daily-digest");
+    let mut config = ServerConfig::for_test(data_dir.clone());
+    config.public_url = Some("https://memo.example.com".to_owned());
+    let app = router(config).await.unwrap();
+    let (admin, _) = register_account(&app, "digest-admin@example.com").await;
+    let (member, member_body) = register_account(&app, "digest-member@example.com").await;
+    let member_id = member_body["user"]["id"].as_str().unwrap().to_owned();
+    let workspace_id = create_workspace(&app, &admin).await;
+    join(
+        &app,
+        &admin,
+        "workspaces",
+        &workspace_id,
+        "digest-member@example.com",
+        "member",
+    )
+    .await;
+    let call = |method: &'static str, uri: String, who: String, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, &who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let saved = call(
+        "PUT",
+        "/v1/system/mail".to_owned(),
+        admin.clone(),
+        json!({"enabled": true, "host": "mail.invalid", "port": 587, "security": "starttls", "username": "",
+               "from_address": "memo@example.com", "from_name": "RepoMemo"}),
+    )
+    .await;
+    assert_eq!(saved.status(), 200);
+    let digests = || {
+        let call = &call;
+        let admin = admin.clone();
+        async move {
+            tokio::time::sleep(std::time::Duration::from_millis(400)).await;
+            response_json(call("GET", "/v1/system/mail/outbox".to_owned(), admin, json!({})).await)
+                .await
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|entry| entry["kind"] == "digest")
+                .count()
+        }
+    };
+
+    // Notices individually kept to the app, so only the digest would mail them.
+    assert_eq!(
+        call(
+            "PUT",
+            "/v1/profile/notification-preferences".to_owned(),
+            member.clone(),
+            json!({"kind": "task_assigned", "channel": "app"})
+        )
+        .await
+        .status(),
+        200
+    );
+    let task = |title: &str| json!({"title": title, "description": "", "status": "open", "priority": "medium", "assignee_user_id": member_id});
+    assert_eq!(
+        call(
+            "POST",
+            format!("/v1/workspaces/{workspace_id}/tasks"),
+            admin.clone(),
+            task("First")
+        )
+        .await
+        .status(),
+        201
+    );
+
+    // Not asked for yet: nothing is sent. The digest takes only mail or off.
+    assert_eq!(digests().await, 0);
+    assert_eq!(
+        call(
+            "PUT",
+            "/v1/profile/notification-preferences".to_owned(),
+            member.clone(),
+            json!({"kind": "daily_digest", "channel": "both"})
+        )
+        .await
+        .status(),
+        400
+    );
+    assert_eq!(
+        call(
+            "PUT",
+            "/v1/profile/notification-preferences".to_owned(),
+            member.clone(),
+            json!({"kind": "daily_digest", "channel": "mail"})
+        )
+        .await
+        .status(),
+        200
+    );
+    assert_eq!(digests().await, 1, "asked for, with something unread: one mail");
+
+    // Another notice the same day does not make a second mail.
+    assert_eq!(
+        call(
+            "POST",
+            format!("/v1/workspaces/{workspace_id}/tasks"),
+            admin.clone(),
+            task("Second")
+        )
+        .await
+        .status(),
+        201
+    );
+    assert_eq!(digests().await, 1, "at most one a day");
     let _ = std::fs::remove_dir_all(data_dir);
 }

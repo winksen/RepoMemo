@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.2 → 0.3
 
-> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.14` (2026-10-14) · **Next:** `V0.2.15`
+> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.15` (2026-10-14) · **Next:** `V0.2.16`
 > **Previous line:** [Releases 0.1 → 0.2](RELEASES_0.1.md) · **Related:** [Roadmap, Road to V0.3.0](ROADMAP.md#-road-to-v030) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
 Every release of the 0.2 line, shipped and planned, one row each. The plan comes from the [Road to V0.3.0](ROADMAP.md#-road-to-v030): **one change per release**, each shippable alone, with the security rules for a new outside connection in the release that opens it. Planned rows are proposals until decisions 7–14 in the roadmap are agreed.
@@ -47,7 +47,7 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | **V0.2.12** | ✅ 2026-10-14 | B. Mail | ✨ Feature | Notifications | A mail with each task assignment and `@email` mention, queued in the same step as the in-app notice, so once per event and never to the person who caused it (F6c) | Sent once per event, never to the person who caused it |
 | **V0.2.13** | ✅ 2026-10-14 | B. Mail | ✨ Feature | Accounts | Verification links on registration (open server, mail on) and on a changed address; unverified accounts cannot create organizations or workspaces; an invitation counts as verification; migration 0026 (F13, decision 9) | An unverified account cannot join, create or be added; invitations count as verification |
 | **V0.2.14** | ✅ 2026-10-14 | B. Mail | ✨ Feature | Profile | Notification preferences per kind (task assigned, mention): in the app, by mail, both or none; security notices always both; migration 0027 (F14a) | Each kind of notification honours the choice |
-| **V0.2.15** | 🔜 Planned | B. Mail | ✨ Feature | Notifications | A daily digest by email (F14b) | One mail a day at most, only when something happened |
+| **V0.2.15** | ✅ 2026-10-14 | B. Mail | ✨ Feature | Notifications | A daily digest by mail for people who ask for it: the unread notices since their last summary, at most once in 24 hours and only when something is waiting; migration 0028 (F14b) | One mail a day at most, only when something happened |
 | **V0.2.16** | 🔜 Planned | C. Accounts | ✨ Feature | System › Users | Deactivate and reactivate an account (F15a, decision 10) | A deactivated account cannot sign in or use tokens; owners must transfer first |
 | **V0.2.17** | 🔜 Planned | C. Accounts | ✨ Feature | System › Users | Anonymize a deactivated account (F15b, decision 10) | Personal data gone; what they wrote stays, credited to "Former member"; creator links no longer block (risk 12 closed) |
 | **V0.2.18** | 🔜 Planned | C. Accounts | 🔒 Security | Registration | Open registration answers the same for a known address and mails its owner instead (M4 residual) | Registration can be opened without revealing who has an account |

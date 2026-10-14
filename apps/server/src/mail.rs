@@ -91,6 +91,11 @@ impl MailService {
             .map(|base| format!("{}{path}", base.trim_end_matches('/')))
     }
 
+    /// Asks the worker to look at the outbox and the digests now.
+    pub(crate) fn nudge(&self) {
+        self.wake.notify_one();
+    }
+
     /// Mail can be sent: a server and a sender are saved and sending is on.
     pub(crate) async fn is_ready(&self) -> bool {
         match self.storage.mail_settings().await {
@@ -132,6 +137,7 @@ impl MailService {
         }
         let mut last_prune = std::time::Instant::now();
         loop {
+            self.queue_digests().await;
             self.deliver_due().await;
             if last_prune.elapsed() >= Duration::from_secs(3600) {
                 last_prune = std::time::Instant::now();
@@ -150,6 +156,54 @@ impl MailService {
             tokio::select! {
                 _ = self.wake.notified() => {}
                 _ = tokio::time::sleep(wait) => {}
+            }
+        }
+    }
+
+    /// Queues the daily digest of people who asked for it, at most one a day
+    /// each and only when they have something unread that came after the last.
+    async fn queue_digests(&self) {
+        let Some(base) = self.link("/notifications") else {
+            return;
+        };
+        if !self.is_ready().await {
+            return;
+        }
+        let Ok(candidates) = self.storage.digest_candidates().await else {
+            return;
+        };
+        for person in candidates {
+            let Ok((total, notices)) = self
+                .storage
+                .unread_notices_since(&person.user_id, &person.since, 10)
+                .await
+            else {
+                continue;
+            };
+            if total == 0 {
+                continue;
+            }
+            let (subject, body) = digest_message(
+                &person.display_name,
+                total,
+                &notices
+                    .iter()
+                    .map(|notice| (notice.title.as_str(), notice.body.as_str()))
+                    .collect::<Vec<_>>(),
+                &base,
+            );
+            match self
+                .storage
+                .enqueue_mail(&person.email, &subject, &body, "digest")
+                .await
+            {
+                Ok(_) => {
+                    if let Err(error) = self.storage.record_digest_sent(&person.user_id).await {
+                        tracing::warn!(error = %error, "Could not record a digest as sent");
+                    }
+                    self.wake.notify_one();
+                }
+                Err(error) => tracing::warn!(error = %error, "Could not queue a digest"),
             }
         }
     }
@@ -347,6 +401,30 @@ pub(crate) async fn mail_invitation(
         Err(NotQueued::NotSetUp) => "not_set_up",
         Err(_) => "failed",
     }
+}
+
+/// The subject and body of the daily digest: how many notices are waiting
+/// and the newest few.
+pub(crate) fn digest_message(name: &str, total: i64, notices: &[(&str, &str)], link: &str) -> (String, String) {
+    let subject = if total == 1 {
+        "RepoMemo: 1 thing is waiting for you".to_owned()
+    } else {
+        format!("RepoMemo: {total} things are waiting for you")
+    };
+    let mut body = format!(
+        "Hello {},\n\nSince your last summary, these have not been read:\n\n",
+        plain(name, 80)
+    );
+    for (title, text) in notices {
+        body.push_str(&format!("- {}: {}\n", plain(title, 100), plain(text, 160)));
+    }
+    if total > notices.len() as i64 {
+        body.push_str(&format!("- and {} more\n", total - notices.len() as i64));
+    }
+    body.push_str(&format!(
+        "\nOpen them all: {link}\n\nYou get this at most once a day, and only when something happened. Turn it off in your profile, under Notifications.\n"
+    ));
+    (subject, body)
 }
 
 /// What a notification says in a mail: who did it, to what, and where to go.
@@ -740,6 +818,28 @@ mod tests {
         );
         assert!(!subject.chars().any(char::is_control));
         assert!(body.contains("https://memo.example.com/workspaces/w/tasks"));
+    }
+
+    #[test]
+    fn a_digest_counts_and_lists_the_newest_and_a_crafted_title_adds_nothing() {
+        let (subject, body) = digest_message(
+            "Ada",
+            12,
+            &[
+                ("Task assigned to you", "Fix the deploy was assigned to you."),
+                ("Mention\r\nBcc: x@example.com", "On Runbook."),
+            ],
+            "https://memo.example.com/notifications",
+        );
+        assert_eq!(subject, "RepoMemo: 12 things are waiting for you");
+        assert!(body.contains("- Task assigned to you: Fix the deploy was assigned to you."));
+        assert!(body.contains("- and 10 more"));
+        assert!(body.contains("https://memo.example.com/notifications"));
+        assert!(!body.contains("Mention\r\n"), "control characters are cleaned");
+        assert_eq!(
+            digest_message("Ada", 1, &[], "x").0,
+            "RepoMemo: 1 thing is waiting for you"
+        );
     }
 
     #[test]
