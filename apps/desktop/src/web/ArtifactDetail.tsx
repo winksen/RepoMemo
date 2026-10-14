@@ -1,7 +1,7 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { SafeMarkdown } from "../components/SafeMarkdown";
-import { IconLoader2 as Loader, IconMessageCircle as MessageCircle, IconPencil as Pencil, IconShieldLock as Shield, IconStack2 as Layers, IconTrash as Trash } from "@tabler/icons-react";
-import { createSharedArtifactComment, deleteSharedArtifact, deleteSharedArtifactComment, getSharedArtifact, getSharedArtifactLifecycle, indexSharedArtifact, listSharedArtifactChunks, listSharedArtifactComments, listSharedArtifactLifecycleEvents, listSharedArtifacts, listSharedWorkspaceMembers, updateSharedArtifact, updateSharedArtifactComment, updateSharedArtifactLifecycle } from "../lib/sharedApi";
+import { IconLoader2 as Loader, IconMessageCircle as MessageCircle, IconPencil as Pencil, IconShieldLock as Shield, IconStack2 as Layers, IconTrash as Trash, IconUpload as Upload } from "@tabler/icons-react";
+import { uploadSharedArtifactVersion, createSharedArtifactComment, deleteSharedArtifact, deleteSharedArtifactComment, getSharedArtifact, getSharedArtifactLifecycle, indexSharedArtifact, listSharedArtifactChunks, listSharedArtifactComments, listSharedArtifactLifecycleEvents, listSharedArtifacts, listSharedWorkspaceMembers, updateSharedArtifact, updateSharedArtifactComment, updateSharedArtifactLifecycle } from "../lib/sharedApi";
 import { type ArtifactComment, type ArtifactDetail, type ArtifactLifecycle, type ArtifactLifecycleEvent, type ArtifactLifecycleStatus, type ArtifactSummary, type Chunk, type Organization, type SharedSession, type SharedWorkspace, type WorkspaceMember } from "../types";
 import { Button } from "../components/ui/button";
 import { Dropdown } from "../components/ui/dropdown";
@@ -10,7 +10,7 @@ import { Textarea } from "../components/ui/textarea";
 import { ImagePreview } from "../components/ImagePreview";
 import { isDocumentArtifact } from "../lib/documents";
 import { DocumentViewer, RepositoryDetailView } from "./lazy";
-import { Toast } from "../components/ui/toast";
+import { Toast, showToast } from "../components/ui/toast";
 import { LiveEventsContext, useLiveEventHub, useLiveEvents } from "../lib/liveEvents";
 import { INDEX_POLL_ATTEMPTS, INDEX_POLL_INTERVAL_MS, LIVE_FALLBACK_POLL_MS } from "./constants";
 import { apiMessage, formatActivityTime } from "./format";
@@ -70,6 +70,18 @@ export function SharedArtifactDetail({
   const isRepositoryItem = artifact?.summary.artifact_type === "repository";
   const isRepositoryFile = artifact?.metadata?.origin === "git_repo" || isRepositoryItem;
   const isAwaitingIndex = Boolean(artifact) && !artifact?.summary.indexed_at;
+
+  const versionInput = useRef<HTMLInputElement | null>(null);
+
+  /** The file replaces this artifact's content; comments, folder, state and memory links stay. */
+  async function uploadVersion(file: File) {
+    setIsMutating(true); setError(null);
+    try {
+      await uploadSharedArtifactVersion(accessToken, artifactId, file);
+      showToast("success", "New version stored. It is being indexed again.");
+      await load();
+    } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsMutating(false); }
+  }
 
   async function load() {
     setIsLoading(true); setError(null);
@@ -199,7 +211,7 @@ export function SharedArtifactDetail({
   return (
     <LiveEventsContext.Provider value={liveHub}>
     <SharedRecordLayout activeSection="evidence" apiAvailable={apiAvailable} organization={organization} organizations={organizations} session={session} signOut={signOut} title={artifact?.summary.title ?? "Artifact"} subtitle={artifact?.summary.path ?? "Loading protected evidence…"} workspace={workspace} workspaces={workspaces}>
-      <div className="shared-detail-actions">{isRepositoryFile ? <span className="shared-muted-copy">{isRepositoryItem ? "Kept in step with the repository, last synced at commit" : "Synced from a repository at commit"} <code>{String(artifact?.metadata?.commit ?? "").slice(0, 7)}</code></span> : canWrite ? <><Button disabled={isLoading || isMutating} onClick={() => setIsEditing((value) => !value)} type="button" variant="secondary"><Pencil size={16} /> {isEditing ? "Cancel edit" : "Edit"}</Button><Button className="shared-danger-action" disabled={isLoading || isMutating} onClick={() => void removeArtifact()} type="button" variant="secondary"><Trash size={16} /> Delete</Button></> : null}{canInspectIndex ? <Button disabled={isLoading || !artifact} onClick={() => setShowChunks(true)} type="button" variant="secondary"><Layers size={16} /> Indexed chunks</Button> : null}</div>
+      <div className="shared-detail-actions">{isRepositoryFile ? <span className="shared-muted-copy">{isRepositoryItem ? "Kept in step with the repository, last synced at commit" : "Synced from a repository at commit"} <code>{String(artifact?.metadata?.commit ?? "").slice(0, 7)}</code></span> : canWrite ? <><Button disabled={isLoading || isMutating} onClick={() => setIsEditing((value) => !value)} type="button" variant="secondary"><Pencil size={16} /> {isEditing ? "Cancel edit" : "Edit"}</Button><Button className="shared-danger-action" disabled={isLoading || isMutating} onClick={() => void removeArtifact()} type="button" variant="secondary"><Trash size={16} /> Delete</Button></> : null}{canWrite && !isRepositoryFile ? <><input accept={artifact ? `.${artifact.summary.path.split(".").pop() ?? ""}` : undefined} aria-label="New version of this file" hidden onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void uploadVersion(file); }} ref={versionInput} type="file" /><Button disabled={isLoading || isMutating || !artifact} onClick={() => versionInput.current?.click()} type="button" variant="secondary"><Upload size={16} /> New version</Button></> : null}{canInspectIndex ? <Button disabled={isLoading || !artifact} onClick={() => setShowChunks(true)} type="button" variant="secondary"><Layers size={16} /> Indexed chunks</Button> : null}</div>
       <Toast kind="error" message={error} />
       <div className="shared-record-meta"><span>{artifact?.summary.artifact_type ?? "artifact"}</span><span>{artifact?.summary.language ?? "Unspecified language"}</span><span>{artifact?.summary.indexed_at ? "Indexed" : indexingStalled ? "Not indexed" : "Indexing…"}</span></div>
       {isEditing ? <form className="shared-record-edit-form" onSubmit={saveArtifact}><label>Evidence title<Input onChange={(event) => setTitle(event.target.value)} required value={title} /></label><Button disabled={isMutating} type="submit" variant="main">{isMutating ? <Loader className="spin" size={16} /> : <Pencil size={16} />} Save evidence</Button></form> : null}

@@ -276,3 +276,71 @@ pub(crate) async fn remove_workspace_member(
     .await;
     Ok(StatusCode::NO_CONTENT)
 }
+
+/// Hands a workspace to another member. Owners only, from a signed-in
+/// session; the previous owner stays an administrator. Recorded in the
+/// workspace activity and in the System audit.
+pub(crate) async fn transfer_workspace_ownership(
+    SessionSubject(subject): SessionSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+    Json(request): Json<TransferOwnershipRequest>,
+) -> Result<StatusCode, ApiError> {
+    require_workspace_owner(&state, &subject, &workspace_id).await?;
+    if request.user_id == subject.user_id {
+        return Err(ApiError::bad_request("Choose someone else to hand the workspace to."));
+    }
+    let new_owner = state
+        .storage
+        .transfer_workspace_ownership(&workspace_id, &request.user_id)
+        .await
+        .map_err(map_storage_error)?;
+    let who = new_owner.email.clone().unwrap_or(new_owner.display_name.clone());
+    record_workspace_activity(
+        &state,
+        &workspace_id,
+        &subject.user_id,
+        "ownership_transferred",
+        "workspace",
+        Some(&workspace_id),
+        format!("Handed the workspace to {who}."),
+    )
+    .await;
+    crate::system::audit(
+        &state,
+        &subject,
+        "workspace_ownership_transferred",
+        format!("Workspace {workspace_id} was handed to {who}."),
+    )
+    .await;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// Hands an organization to another member. Owners only, from a signed-in session.
+pub(crate) async fn transfer_organization_ownership(
+    SessionSubject(subject): SessionSubject,
+    State(state): State<AppState>,
+    Path(organization_id): Path<String>,
+    Json(request): Json<TransferOwnershipRequest>,
+) -> Result<StatusCode, ApiError> {
+    require_organization_owner(&state, &subject, &organization_id).await?;
+    if request.user_id == subject.user_id {
+        return Err(ApiError::bad_request(
+            "Choose someone else to hand the organization to.",
+        ));
+    }
+    let new_owner = state
+        .storage
+        .transfer_organization_ownership(&organization_id, &request.user_id)
+        .await
+        .map_err(map_storage_error)?;
+    let who = new_owner.email.clone().unwrap_or(new_owner.display_name.clone());
+    crate::system::audit(
+        &state,
+        &subject,
+        "organization_ownership_transferred",
+        format!("Organization {organization_id} was handed to {who}."),
+    )
+    .await;
+    Ok(StatusCode::NO_CONTENT)
+}

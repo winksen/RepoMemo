@@ -1264,6 +1264,7 @@ impl From<SearchResultRow> for SearchResult {
             end_line: row.end_line,
             score: row.score,
             source_name: row.source_name,
+            commit: None,
         }
     }
 }

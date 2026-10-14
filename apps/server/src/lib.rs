@@ -651,6 +651,20 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             get(get_retrieval_facets),
         )
         .route("/v1/workspaces/{workspace_id}/search", post(search_workspace))
+        .route("/v1/workspaces/{workspace_id}/artifacts/bulk", post(bulk_artifacts))
+        .route(
+            "/v1/workspaces/{workspace_id}/folders/{folder_id}/move",
+            post(move_folder),
+        )
+        .route("/v1/artifacts/{artifact_id}/versions", post(upload_artifact_version))
+        .route(
+            "/v1/workspaces/{workspace_id}/transfer-ownership",
+            post(transfer_workspace_ownership),
+        )
+        .route(
+            "/v1/organizations/{organization_id}/transfer-ownership",
+            post(transfer_organization_ownership),
+        )
         .route("/v1/workspaces/{workspace_id}/symbols", get(search_symbols))
         .route(
             "/v1/workspaces/{workspace_id}/memory-cards",

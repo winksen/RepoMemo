@@ -920,3 +920,201 @@ pub(crate) async fn cancel_job(
         .map_err(map_storage_error)?;
     Ok(Json(updated))
 }
+
+/// Moves a folder, with its contents, below another folder or to the top level.
+pub(crate) async fn move_folder(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path((workspace_id, folder_id)): Path<(String, String)>,
+    Json(request): Json<MoveFolderRequest>,
+) -> Result<Json<Folder>, ApiError> {
+    require_workspace_write(&state, &subject, &workspace_id).await?;
+    validate_folder(&state, &workspace_id, Some(&folder_id)).await?;
+    let parent_id = validate_folder(&state, &workspace_id, request.parent_id.as_deref()).await?;
+    let folder = state
+        .storage
+        .move_folder(&folder_id, parent_id.as_deref())
+        .await
+        .map_err(map_storage_error)?;
+    record_workspace_activity(
+        &state,
+        &workspace_id,
+        &subject.user_id,
+        "folder_moved",
+        "folder",
+        Some(&folder.id),
+        format!("Moved folder {}.", folder.name),
+    )
+    .await;
+    Ok(Json(folder))
+}
+
+const MAX_BULK_ARTIFACTS: usize = 200;
+
+/// Moves, deletes or changes the evidence state of many files at once. Each
+/// file is handled on its own, so one that cannot be (a repository file, a
+/// file already gone) does not stop the others; the answer lists both.
+pub(crate) async fn bulk_artifacts(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+    Json(request): Json<BulkArtifactsRequest>,
+) -> Result<Json<BulkArtifactsResponse>, ApiError> {
+    require_workspace_write(&state, &subject, &workspace_id).await?;
+    if request.artifact_ids.is_empty() || request.artifact_ids.len() > MAX_BULK_ARTIFACTS {
+        return Err(ApiError::bad_request(format!(
+            "Choose between 1 and {MAX_BULK_ARTIFACTS} files."
+        )));
+    }
+    let folder_id = match request.action.as_str() {
+        "move" => validate_folder(&state, &workspace_id, request.folder_id.as_deref()).await?,
+        "delete" => None,
+        "lifecycle" => {
+            if !matches!(
+                request.status.as_deref(),
+                Some("active" | "needs_review" | "verified" | "outdated")
+            ) {
+                return Err(ApiError::bad_request(
+                    "Choose active, needs_review, verified or outdated.",
+                ));
+            }
+            None
+        }
+        _ => return Err(ApiError::bad_request("The action is move, delete or lifecycle.")),
+    };
+    let mut done = Vec::new();
+    let mut failed = Vec::new();
+    for artifact_id in &request.artifact_ids {
+        let outcome: Result<(), ApiError> = async {
+            let summary = state
+                .storage
+                .get_artifact_summary(artifact_id)
+                .await
+                .map_err(map_storage_error)?;
+            if summary.workspace_id != workspace_id {
+                return Err(ApiError::not_found("Artifact was not found."));
+            }
+            match request.action.as_str() {
+                "move" => {
+                    repositories::ensure_not_repository_file(&state, artifact_id).await?;
+                    state
+                        .storage
+                        .move_artifact_to_folder(artifact_id, folder_id.as_deref())
+                        .await
+                        .map_err(map_storage_error)
+                }
+                "delete" => {
+                    repositories::ensure_not_repository_file(&state, artifact_id).await?;
+                    state
+                        .core
+                        .delete_artifact(artifact_id.clone())
+                        .await
+                        .map_err(map_core_error)
+                }
+                _ => {
+                    let current = state
+                        .storage
+                        .get_artifact_lifecycle(artifact_id)
+                        .await
+                        .map_err(map_storage_error)?;
+                    state
+                        .storage
+                        .save_artifact_lifecycle(
+                            artifact_id,
+                            &subject.user_id,
+                            SaveArtifactLifecycle {
+                                status: request.status.clone().unwrap_or_default(),
+                                owner_user_id: current.owner.map(|owner| owner.id),
+                                review_note: current.review_note,
+                                superseded_by_artifact_id: None,
+                            },
+                        )
+                        .await
+                        .map(|_| ())
+                        .map_err(map_storage_error)
+                }
+            }
+        }
+        .await;
+        match outcome {
+            Ok(()) => done.push(artifact_id.clone()),
+            Err(error) => failed.push(BulkFailure {
+                artifact_id: artifact_id.clone(),
+                message: error.message,
+            }),
+        }
+    }
+    if !done.is_empty() {
+        let (action, verb) = match request.action.as_str() {
+            "move" => ("evidence_moved", "Moved"),
+            "delete" => ("artifact_deleted", "Deleted"),
+            _ => ("evidence_lifecycle_updated", "Changed the state of"),
+        };
+        record_workspace_activity(
+            &state,
+            &workspace_id,
+            &subject.user_id,
+            action,
+            "artifact",
+            None,
+            format!(
+                "{verb} {} {}.",
+                done.len(),
+                if done.len() == 1 { "file" } else { "files" }
+            ),
+        )
+        .await;
+    }
+    Ok(Json(BulkArtifactsResponse { done, failed }))
+}
+
+/// Uploads a new version of a file into the same artifact.
+pub(crate) async fn upload_artifact_version(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(artifact_id): Path<String>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Json<SharedArtifactSummary>, ApiError> {
+    let current = state
+        .core
+        .get_artifact(artifact_id.clone())
+        .await
+        .map_err(map_core_error)?;
+    let workspace_id = current.summary.workspace_id.clone();
+    require_workspace_write(&state, &subject, &workspace_id).await?;
+    repositories::ensure_not_repository_file(&state, &artifact_id).await?;
+    let filename = headers
+        .get("x-repomemo-filename")
+        .and_then(decode_filename_header)
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| ApiError::bad_request("X-RepoMemo-Filename is required for uploads."))?;
+    if filename.chars().count() > MAX_UPLOAD_FILENAME_CHARS || filename.chars().any(char::is_control) {
+        return Err(ApiError::bad_request(
+            "The file name is too long or has control characters.",
+        ));
+    }
+    let artifact = state
+        .core
+        .replace_artifact_version(&artifact_id, &filename, body.to_vec())
+        .await
+        .map_err(map_core_error)?;
+    state.converter.ensure(state.storage.clone(), artifact.clone());
+    record_workspace_activity(
+        &state,
+        &workspace_id,
+        &subject.user_id,
+        "artifact_updated",
+        "artifact",
+        Some(&artifact.id),
+        format!("Uploaded a new version of {}.", artifact.title),
+    )
+    .await;
+    state.index_queue.enqueue(&artifact, Some(&subject.user_id));
+    let folder_id = None;
+    Ok(Json(SharedArtifactSummary {
+        summary: artifact,
+        folder_id,
+        repository_id: None,
+    }))
+}

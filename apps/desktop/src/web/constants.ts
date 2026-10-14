@@ -32,7 +32,7 @@ export const LIVE_METRICS_DELAY_MS = 3_000;
 /** Activity that changes what the evidence ledger shows. */
 export const LEDGER_ACTIONS = new Set([
   "evidence_stored", "evidence_uploaded", "evidence_moved", "artifact_updated", "artifact_deleted", "artifact_indexed",
-  "folder_created", "folder_renamed", "folder_deleted", "repository_connected", "repository_removed", "repository_synced",
+  "folder_created", "folder_renamed", "folder_deleted", "folder_moved", "evidence_lifecycle_updated", "repository_connected", "repository_removed", "repository_synced",
 ]);
 
 export const MEMORY_ACTIONS = new Set(["memory_created", "memory_updated", "memory_deleted"]);
@@ -95,6 +95,9 @@ export type ItemDialog =
   | { kind: "rename-folder"; folder: Folder }
   | { kind: "delete-folder"; folder: Folder }
   | { kind: "move-file"; artifact: ArtifactSummary }
+  | { kind: "move-folder"; folder: Folder }
+  | { kind: "move-files"; artifacts: ArtifactSummary[] }
+  | { kind: "delete-files"; artifacts: ArtifactSummary[] }
   | { kind: "delete-file"; artifact: ArtifactSummary };
 
 export type FileCategory = "repository" | "markdown" | "note" | "text" | "code" | "word" | "excel" | "powerpoint" | "pdf" | "onenote" | "email" | "image";

@@ -414,6 +414,7 @@ async fn memory_cards_link_evidence_and_are_searchable() {
                 start_line: None,
                 end_line: None,
                 confidence: None,
+                commit: None,
             }],
         )
         .await

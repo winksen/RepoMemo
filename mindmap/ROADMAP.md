@@ -217,19 +217,19 @@ Each proposal below was accepted as written. They shape the releases named in th
 - [x] **C12** removed
 - [x] **C8 follow-up** `rustfmt.toml` (`max_width = 120`), every file formatted, clippy clean with `-D warnings`; the lint job and the licenses and bans job are blocking
 
-#### V0.1.72: Memory and search you can trust (built, not yet released)
+#### V0.1.72: Memory and search you can trust
 
 - [x] **F1** `StorageEngine::memory_review_reasons` (missing / retired / changed), `needs_review` on summaries, `review` on the detail, the `stale_memory_citation` detector, citations on `PUT /v1/memory-cards/{id}`. Because passages are identified by content, a cited passage that is still there has not changed; whole-file citations also count a later update
 - [x] **F2** filters in `push_search_filters` (keyword and vector search), `favour_verified` in hybrid search (Ask and the assistant use it, and hide retired evidence by default)
 - [x] **F3** `GET /v1/workspaces/{ws}/symbols`, a *Code symbols* box on Retrieval (a symbol search is not a filter of passage search: it answers where a name is defined), the `find_symbol` assistant capability
 - [x] **F8** `useLiveRefresh` in both panels
 
-#### V0.1.73: Evidence, ownership, repositories 1b
+#### V0.1.73: Evidence, ownership, repositories 1b (built, not yet released)
 
-- [ ] **F11 (N8)** ownership transfer for workspaces and organizations (owner only, audited); refuse removing someone who still owns a workspace
-- [ ] **F7** move folders; multi-select move, delete and lifecycle; upload a new version of a file into the same artifact
-- [ ] **F4 phase 1b** renames with edits (`git diff -M`), the commit on search results and citations
-- [ ] **F9** console: `logs --follow`, `users reset-link`, `tokens list`
+- [x] **F11 (N8)** `transfer_workspace_ownership` and `transfer_organization_ownership` (session only, owner only, activity and System audit); `remove_organization_member` refuses with 409 while the person owns a workspace of it
+- [x] **F7** `StorageEngine::move_folder`, `POST …/artifacts/bulk`, `replace_artifact_content` (the content hash changes under the same id; indexing runs again)
+- [x] **F4 phase 1b** `GitRepo::renamed_files` (`git diff --name-status -z -M50%`) pairs a vanished path with its new one during a sync; `SearchResult.commit` and `Citation.commit` come from `repo_files.commit_sha`. The desktop app does not get either (decision 3)
+- [x] **F9** `logs --follow` is the terminal client polling with `--after`; `users reset-link` and `tokens list` are server commands
 
 #### V0.1.74: Performance and robustness
 
@@ -270,15 +270,15 @@ Every item, with the release it is planned for. The evidence behind each is in t
 | F1 | **Memory that stays true.** Stale-citation detector, *needs review* on cards, citation editing | S–M | ✅ V0.1.72 |
 | F2 | **Search by trust.** Lifecycle, folder and date filters; boost verified evidence | S | ✅ V0.1.72 |
 | F3 | **Symbol search on the web** | S | ✅ V0.1.72 |
-| F4 | **Repositories.** Phase 1b (renames with edits, commit on citations) | M | V0.1.73 |
+| F4 | **Repositories.** Phase 1b (renames with edits, commit on citations) | M | ✅ V0.1.73 |
 | F4 | **Repositories.** Phase 2 (remote by URL, encrypted token, partial clone, scheduled fetch) | L | V0.3.0 |
 | F5 | **Assistant memory.** Earlier turns in context; search across workspaces | M | V0.3.0 |
 | F6 | **Mail delivery** (SMTP) for invitations, resets, mentions; then email verification | M | V0.3.0 (decided, decision 5) |
-| F7 | **Evidence ergonomics.** Move folders, multi-select, new version of a file | M | V0.1.73 |
+| F7 | **Evidence ergonomics.** Move folders, multi-select, new version of a file | M | ✅ V0.1.73 |
 | F8 | **Live map and health** | S | ✅ V0.1.72 |
-| F9 | **Console follow-ups.** `logs --follow`, `users reset-link`, `tokens list`, backup commands; workspace commands once the app-admin rule is settled | S–M | V0.1.73, V0.1.75 |
+| F9 | **Console follow-ups.** `logs --follow`, `users reset-link`, `tokens list`, backup commands; workspace commands once the app-admin rule is settled | S–M | ✅ V0.1.73, V0.1.75 |
 | F10 | **Desktop decision:** frozen as the local edition, security fixes only | Decision | ✅ Decided (decision 3) |
-| F11 | **Ownership transfer** and no removal of a workspace owner (N8) | S | V0.1.73 |
+| F11 | **Ownership transfer** and no removal of a workspace owner (N8) | S | ✅ V0.1.73 |
 
 ### Security
 
@@ -291,7 +291,7 @@ Every item, with the release it is planned for. The evidence behind each is in t
 | S3 | Host exposure | H2, H3, L8, M10 | ✅ V0.1.69 |
 | — | Server timeouts | N7 | ✅ V0.1.71 |
 | S5 | Robustness | M11, M12, L1, L5, L6 | V0.1.71, V0.1.74 |
-| — | Integrity | N8 | V0.1.73 |
+| — | Integrity | N8 | ✅ V0.1.73 |
 | — | Supply chain | dependency scanning (review §7) | ✅ V0.1.66 (CI) |
 | — | Accepted | N9 (not a boundary, documented), I1, I4 | — |
 
@@ -344,7 +344,7 @@ Every item, with the release it is planned for. The evidence behind each is in t
 Design and limits: [technical/repository-sources.md](technical/repository-sources.md).
 
 - [x] **Phase 1:** local repositories, the sync engine, automatic sync when the branch moves, `REPOMEMO_REPO_ROOTS` and the UNC guard.
-- [ ] **Phase 1b (V0.1.73):** renames with edits, the commit on results and citations. Tauri commands only if decision 3 makes the desktop app a client.
+- [x] **Phase 1b (V0.1.73):** renames with edits, the commit on results and citations.
 - [ ] **Phase 2 (V0.3.0):** remote repositories by URL, after S3.
 - [ ] **Phase 3 (later):** last author and date per file, `CODEOWNERS` hints, commit-pinned citations, push webhooks, issue and pull-request links.
 

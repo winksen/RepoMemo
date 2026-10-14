@@ -73,6 +73,38 @@ pub(crate) struct RenameFolderRequest {
 }
 
 #[derive(Debug, Deserialize)]
+pub(crate) struct MoveFolderRequest {
+    /// The new parent; `null` for the top level.
+    pub(crate) parent_id: Option<String>,
+}
+
+/// One action over many files at once.
+#[derive(Debug, Deserialize)]
+pub(crate) struct BulkArtifactsRequest {
+    /// `move`, `delete` or `lifecycle`.
+    pub(crate) action: String,
+    pub(crate) artifact_ids: Vec<String>,
+    /// For `move`: the folder, or `null` for the top level.
+    #[serde(default)]
+    pub(crate) folder_id: Option<String>,
+    /// For `lifecycle`: `active`, `needs_review`, `verified` or `outdated`.
+    #[serde(default)]
+    pub(crate) status: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct BulkFailure {
+    pub(crate) artifact_id: String,
+    pub(crate) message: String,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct BulkArtifactsResponse {
+    pub(crate) done: Vec<String>,
+    pub(crate) failed: Vec<BulkFailure>,
+}
+
+#[derive(Debug, Deserialize)]
 pub(crate) struct MoveArtifactRequest {
     pub(crate) folder_id: Option<String>,
 }
@@ -256,6 +288,11 @@ pub(crate) struct CreateMemoryCardBody {
     pub(crate) confidence: Option<f64>,
     #[serde(default)]
     pub(crate) citations: Vec<Citation>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct TransferOwnershipRequest {
+    pub(crate) user_id: String,
 }
 
 #[derive(Debug, Deserialize)]

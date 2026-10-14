@@ -448,6 +448,18 @@ impl RepoMemoCore {
                 vanished.entry(record.blob_sha.as_str()).or_default().push(record);
             }
         }
+        // A file renamed and edited in the same commit has a new blob id, so
+        // only git's similarity detection can pair it with its old path.
+        let renames_with_edits: HashMap<String, String> = match metadata.last_synced_commit.as_ref() {
+            Some(previous) if previous.sha != commit => repo
+                .renamed_files(&previous.sha, &commit)
+                .await
+                .unwrap_or_default()
+                .into_iter()
+                .map(|(old, new)| (new, old))
+                .collect(),
+            _ => HashMap::new(),
+        };
         let mut changes = Vec::new();
         for (file, kind) in &wanted {
             match by_path.get(file.path.as_str()) {
@@ -456,9 +468,22 @@ impl RepoMemoCore {
                 }
                 Some(record) => changes.push((file, kind, Change::Update { record })),
                 None => {
-                    let renamed_from = vanished
+                    let mut renamed_from = vanished
                         .get_mut(file.blob_sha.as_str())
                         .and_then(|records| records.pop());
+                    if renamed_from.is_none() {
+                        let old_path = renames_with_edits.get(file.path.as_str());
+                        let candidate = old_path
+                            .and_then(|old| by_path.get(old.as_str()))
+                            .filter(|record| !record.removed && !wanted_paths.contains(record.path.as_str()));
+                        if let Some(record) = candidate {
+                            // It is renamed, not removed.
+                            if let Some(group) = vanished.get_mut(record.blob_sha.as_str()) {
+                                group.retain(|other| other.path != record.path);
+                            }
+                            renamed_from = Some(*record);
+                        }
+                    }
                     changes.push((
                         file,
                         kind,
@@ -1047,6 +1072,40 @@ mod tests {
             .iter()
             .all(|artifact| artifact.path != "README.md"));
         assert!(core.artifacts_needing_index().await.unwrap().is_empty());
+
+        // Renamed and edited in the same commit: still the same artifact, and
+        // results say which commit their text is from.
+        git(&repo_dir, &["mv", "src/settlement.py", "src/payout.py"]);
+        write(
+            &repo_dir,
+            "src/payout.py",
+            "def settle():
+    return 1
+# paid out
+",
+        );
+        git(&repo_dir, &["add", "."]);
+        git(&repo_dir, &["commit", "--quiet", "-m", "Rename and edit"]);
+        let third = sync(&core, &source.id).await;
+        assert_eq!((third.renamed, third.added, third.removed), (1, 0, 0), "{third:?}");
+        let files = core.list_repo_files(&source.id).await.unwrap();
+        let payout = files.iter().find(|file| file.path == "src/payout.py").unwrap();
+        assert_eq!(payout.artifact_id, renamed_id);
+        let hits = core
+            .search_workspace(repomemo_domain::SearchRequest {
+                workspace_id: workspace.id.clone(),
+                query: "paid".to_owned(),
+                limit: Some(5),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        let hit = hits
+            .iter()
+            .find(|hit| hit.artifact_id == renamed_id)
+            .expect("the renamed file is searchable");
+        let synced = core.repo_source(&source.id).await.unwrap().last_synced_commit.unwrap();
+        assert_eq!(hit.commit.as_deref(), Some(synced.sha.as_str()));
 
         assert!(core.summarize_repo(&source.id, "missing-provider").await.is_err());
         core.remove_repo_source(&source.id).await.unwrap();

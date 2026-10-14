@@ -286,6 +286,39 @@ impl RepoMemoCore {
             .map(|stored| stored.artifact)
     }
 
+    /// Uploads a new version of an existing file into the same artifact, so its
+    /// comments, folder, lifecycle and memory links stay with it. The new file
+    /// must be the same kind of file (same extension).
+    pub async fn replace_artifact_version(
+        &self,
+        artifact_id: &str,
+        filename: &str,
+        bytes: Vec<u8>,
+    ) -> Result<ArtifactSummary> {
+        if bytes.is_empty() {
+            repomemo_domain::bail_invalid!("Uploaded files cannot be empty.");
+        }
+        let current = self.storage.get_artifact_summary(artifact_id).await?;
+        let extension = |name: &str| {
+            Path::new(name)
+                .extension()
+                .and_then(|value| value.to_str())
+                .map(str::to_ascii_lowercase)
+        };
+        if extension(&current.path) != extension(filename) {
+            repomemo_domain::bail_invalid!(
+                "A new version must be the same kind of file as {}. Upload it as a new file instead.",
+                current.path
+            );
+        }
+        let mime_type = served_mime_type(Path::new(&current.path)).to_owned();
+        let content_hash = StorageEngine::content_hash(&bytes);
+        self.storage.store_blob(&content_hash, &bytes, Some(&mime_type)).await?;
+        self.storage
+            .replace_artifact_content(artifact_id, &content_hash, bytes.len() as i64, Some(&mime_type))
+            .await
+    }
+
     pub async fn list_artifacts(&self, workspace_id: String) -> Result<Vec<ArtifactSummary>> {
         self.storage.list_artifacts(&workspace_id).await
     }
@@ -700,6 +733,7 @@ impl RepoMemoCore {
                 start_line: chunk.start_line,
                 end_line: chunk.end_line,
                 confidence: None,
+                commit: None,
             })
             .collect();
         Ok(SummaryResult {
@@ -744,6 +778,7 @@ impl RepoMemoCore {
                     start_line: chunk.start_line,
                     end_line: chunk.end_line,
                     confidence: None,
+                    commit: None,
                 });
             }
         }
@@ -973,6 +1008,7 @@ impl RepoMemoCore {
                 start_line: result.start_line,
                 end_line: result.end_line,
                 confidence: Some(result.score),
+                commit: result.commit.clone(),
             })
             .collect::<Vec<_>>();
         let confidence = retrieved_context.first().map(|result| result.score.clamp(0.0, 1.0));
@@ -1286,6 +1322,7 @@ mod tests {
                     start_line: None,
                     end_line: None,
                     confidence: None,
+                    commit: None,
                 }],
             })
             .await

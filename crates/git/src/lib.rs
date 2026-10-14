@@ -189,6 +189,45 @@ impl GitRepo {
         parse_ls_tree(&output.stdout)
     }
 
+    /// Files renamed between two commits, as `(old path, new path)`, found by
+    /// content similarity (`git diff -M`): a file renamed *and* edited counts
+    /// while about half of it is unchanged, which comparing blob ids cannot see.
+    pub async fn renamed_files(&self, from: &str, to: &str) -> Result<Vec<(String, String)>> {
+        for revision in [from, to] {
+            if revision.is_empty() || !revision.chars().all(|value| value.is_ascii_hexdigit()) {
+                bail!("{revision:?} is not a commit id.");
+            }
+        }
+        let output = git_command(&self.root)
+            .args([
+                "diff",
+                "--name-status",
+                "-z",
+                "-M50%",
+                "--diff-filter=R",
+                from,
+                to,
+                "--",
+            ])
+            .output()
+            .await?;
+        if !output.status.success() {
+            bail!("git diff failed: {}", stderr_text(&output.stderr));
+        }
+        let text = String::from_utf8_lossy(&output.stdout);
+        let mut parts = text.split('\0').filter(|part| !part.is_empty());
+        let mut renames = Vec::new();
+        while let Some(status) = parts.next() {
+            let (Some(old), Some(new)) = (parts.next(), parts.next()) else {
+                break;
+            };
+            if status.starts_with('R') {
+                renames.push((old.to_owned(), new.to_owned()));
+            }
+        }
+        Ok(renames)
+    }
+
     /// Starts a reader that streams blob contents from one long-lived
     /// `git cat-file` process, which is much faster than one process per file.
     pub async fn blob_reader(&self) -> Result<BlobReader> {
@@ -399,6 +438,37 @@ mod tests {
                 },
             ]
         );
+    }
+
+    #[tokio::test]
+    async fn a_file_renamed_and_edited_is_still_found_as_a_rename() {
+        let dir = std::env::temp_dir().join(format!(
+            "repomemo-git-rename-{}",
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        git(&dir, &["init", "--quiet", "--initial-branch=main"]);
+        let body = (0..40)
+            .map(|line| format!("line {line} of the guide\n"))
+            .collect::<String>();
+        std::fs::write(dir.join("guide.md"), &body).unwrap();
+        std::fs::write(dir.join("other.md"), "unrelated\n").unwrap();
+        git(&dir, &["add", "."]);
+        git(&dir, &["commit", "--quiet", "-m", "first"]);
+        let repo = GitRepo::open(&dir).await.unwrap();
+        let first = repo.resolve_commit(None).await.unwrap();
+
+        git(&dir, &["mv", "guide.md", "handbook.md"]);
+        std::fs::write(dir.join("handbook.md"), format!("{body}one more line\n")).unwrap();
+        std::fs::remove_file(dir.join("other.md")).unwrap();
+        git(&dir, &["add", "-A"]);
+        git(&dir, &["commit", "--quiet", "-m", "rename and edit"]);
+        let second = repo.resolve_commit(None).await.unwrap();
+
+        let renames = repo.renamed_files(&first, &second).await.unwrap();
+        assert_eq!(renames, vec![("guide.md".to_owned(), "handbook.md".to_owned())]);
+        assert!(repo.renamed_files("--oops", &second).await.is_err());
+        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]

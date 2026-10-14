@@ -841,6 +841,9 @@ pub struct SearchResult {
     pub end_line: Option<i64>,
     pub score: f64,
     pub source_name: String,
+    /// For a file of a git repository: the commit its text is from.
+    #[serde(default)]
+    pub commit: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -900,6 +903,9 @@ pub struct Citation {
     pub start_line: Option<i64>,
     pub end_line: Option<i64>,
     pub confidence: Option<f64>,
+    /// For a file of a git repository: the commit the cited text is from.
+    #[serde(default)]
+    pub commit: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

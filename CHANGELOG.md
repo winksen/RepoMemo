@@ -2,6 +2,25 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)), then `0.2.1` and so on for fixes. Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.1.73 (2026-10-14)
+
+Evidence, ownership and repositories, phase 1b.
+
+### Added
+- **Ownership transfer.** An owner can hand a workspace (People) or an organization (Organization administration) to another member with **Make owner**; the previous owner stays on as an administrator. Recorded in the workspace activity and the System audit. `POST /v1/workspaces/{ws}/transfer-ownership` and `POST /v1/organizations/{org}/transfer-ownership`, from a signed-in session.
+- **Folders can be moved** (`POST /v1/workspaces/{ws}/folders/{f}/move`, menu *Move to folder…*), not into themselves or below themselves, within the five levels, and not onto a name that is taken.
+- **Several files at once.** *Select files* in the Evidence ledger moves, marks verified, needs review or outdated, or deletes the chosen files together (`POST /v1/workspaces/{ws}/artifacts/bulk`, up to 200). Files that cannot be handled (repository files, files already gone) are reported and do not stop the others.
+- **New version of a file** (`POST /v1/artifacts/{a}/versions`, *New version* on the file page): the content is replaced in place, so comments, folder, state and the memory cards that cite it stay; passages whose text did not change keep their identity and their links. It must be the same kind of file.
+- **Repository renames with edits.** A file renamed and edited in one commit stays the same artifact (git's rename detection, `-M50%`), with its comments, memory links and history.
+- **The commit on results and citations.** Search results, citations and Ask answers for a repository file say which commit their text is from.
+- **Console:** `users reset-link <email> --yes`, `tokens list [--user email]`, and `logs --follow` (also `--after <sequence>`).
+
+### Security
+- **Nobody can leave an organization while owning one of its workspaces (N8):** removing such a member answers `409` and names the workspaces.
+
+### Upgrading
+- No data is changed by this release. A workspace that an earlier removal left without an owner stays as it is: ownership can only be handed over by an owner.
+
 ## V0.1.72 (2026-10-14)
 
 Memory and search you can trust.

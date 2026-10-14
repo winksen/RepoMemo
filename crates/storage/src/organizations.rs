@@ -296,6 +296,24 @@ impl StorageEngine {
         if matches!(role, Some(OrganizationRole::Owner)) {
             repomemo_domain::bail_invalid!("The organization owner cannot be removed.");
         }
+        // Someone who still owns a workspace of the organization cannot leave
+        // it: the workspace would be left with nobody in charge (review N8).
+        let owned = sqlx::query_scalar::<_, String>(
+            "SELECT w.name FROM workspace_memberships wm \
+             JOIN workspace_organizations wo ON wo.workspace_id = wm.workspace_id \
+             JOIN workspaces w ON w.id = wm.workspace_id \
+             WHERE wo.organization_id = ?1 AND wm.user_id = ?2 AND wm.role = 'owner' ORDER BY w.name",
+        )
+        .bind(organization_id)
+        .bind(user_id)
+        .fetch_all(self.reader())
+        .await?;
+        if !owned.is_empty() {
+            repomemo_domain::bail_conflict!(
+                "This person still owns {}. Transfer ownership to someone else first.",
+                owned.join(", ")
+            );
+        }
         let mut tx = self.pool.begin().await?;
         let deleted = sqlx::query("DELETE FROM organization_memberships WHERE organization_id = ?1 AND user_id = ?2")
             .bind(organization_id)
@@ -312,6 +330,70 @@ impl StorageEngine {
             .await?;
         tx.commit().await?;
         Ok(())
+    }
+
+    /// Hands a workspace to another member: they become its owner and the
+    /// previous owner stays on as an administrator. Someone of the workspace's
+    /// organization who has no workspace role yet may receive it too.
+    pub async fn transfer_workspace_ownership(&self, workspace_id: &str, new_owner_id: &str) -> Result<SharedUser> {
+        let Some(user) = self.find_user(new_owner_id).await? else {
+            repomemo_domain::bail_not_found!("User was not found.");
+        };
+        let has_role = self
+            .workspace_role_for_user(new_owner_id, workspace_id)
+            .await?
+            .is_some();
+        if !has_role && !self.user_in_workspace_organization(new_owner_id, workspace_id).await? {
+            repomemo_domain::bail_invalid!("The new owner must be a member of this workspace or its organization.");
+        }
+        let now = Utc::now().to_rfc3339();
+        let mut tx = self.pool.begin().await?;
+        sqlx::query(
+            "UPDATE workspace_memberships SET role = 'admin', updated_at = ?2 WHERE workspace_id = ?1 AND role = 'owner'",
+        )
+        .bind(workspace_id)
+        .bind(&now)
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query(
+            r#"INSERT INTO workspace_memberships (workspace_id, user_id, role, created_at, updated_at)
+               VALUES (?1, ?2, 'owner', ?3, ?3)
+               ON CONFLICT(workspace_id, user_id) DO UPDATE SET role = 'owner', updated_at = excluded.updated_at"#,
+        )
+        .bind(workspace_id)
+        .bind(new_owner_id)
+        .bind(&now)
+        .execute(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        Ok(user)
+    }
+
+    /// Hands an organization to another of its members; the previous owner
+    /// stays on as an administrator.
+    pub async fn transfer_organization_ownership(
+        &self,
+        organization_id: &str,
+        new_owner_id: &str,
+    ) -> Result<SharedUser> {
+        let Some(user) = self.find_user(new_owner_id).await? else {
+            repomemo_domain::bail_not_found!("User was not found.");
+        };
+        if !self.user_belongs_to_organization(new_owner_id, organization_id).await? {
+            repomemo_domain::bail_invalid!("The new owner must be a member of this organization.");
+        }
+        let mut tx = self.pool.begin().await?;
+        sqlx::query("UPDATE organization_memberships SET role = 'admin' WHERE organization_id = ?1 AND role = 'owner'")
+            .bind(organization_id)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("UPDATE organization_memberships SET role = 'owner' WHERE organization_id = ?1 AND user_id = ?2")
+            .bind(organization_id)
+            .bind(new_owner_id)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        Ok(user)
     }
 
     /// Whether the user is a member of the organization the workspace belongs to.

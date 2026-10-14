@@ -160,11 +160,13 @@ impl StorageEngine {
                     end_line: row.end_line,
                     score,
                     source_name: row.source_name,
+                    commit: None,
                 })
             })
             .collect::<Vec<_>>();
         results.sort_by(|left, right| right.score.total_cmp(&left.score));
         results.truncate(limit.clamp(1, 100) as usize);
+        self.attach_commits(&mut results).await?;
         Ok(results)
     }
 
@@ -430,6 +432,35 @@ impl StorageEngine {
             .fetch_all(self.reader())
             .await?;
 
-        Ok(rows.into_iter().map(SearchResult::from).collect())
+        let mut results = rows.into_iter().map(SearchResult::from).collect::<Vec<_>>();
+        self.attach_commits(&mut results).await?;
+        Ok(results)
+    }
+
+    /// Fills in the commit of results that come from a repository file, so a
+    /// reader knows which version of the code a passage is from.
+    async fn attach_commits(&self, results: &mut [SearchResult]) -> Result<()> {
+        if results.is_empty() {
+            return Ok(());
+        }
+        let mut query = QueryBuilder::<Sqlite>::new(
+            "SELECT artifact_id, commit_sha FROM repo_files WHERE removed_at IS NULL AND artifact_id IN (",
+        );
+        let mut separated = query.separated(", ");
+        for result in results.iter() {
+            separated.push_bind(result.artifact_id.clone());
+        }
+        separated.push_unseparated(")");
+        let commits = query
+            .build()
+            .map(|row: SqliteRow| (row.get::<String, _>("artifact_id"), row.get::<String, _>("commit_sha")))
+            .fetch_all(self.reader())
+            .await?
+            .into_iter()
+            .collect::<HashMap<_, _>>();
+        for result in results.iter_mut() {
+            result.commit = commits.get(&result.artifact_id).cloned();
+        }
+        Ok(())
     }
 }

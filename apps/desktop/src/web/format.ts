@@ -89,9 +89,12 @@ export function artifactCitation(artifacts: ArtifactSummary[], artifactId: strin
   }];
 }
 
-export function citationLines(citation: Pick<Citation, "start_line" | "end_line">) {
-  if (!citation.start_line) return "";
-  return citation.end_line && citation.end_line !== citation.start_line ? ` · lines ${citation.start_line}–${citation.end_line}` : ` · line ${citation.start_line}`;
+/** Where in the file a passage is, and for a repository file the commit its text is from. */
+export function citationLines(citation: Pick<Citation, "start_line" | "end_line"> & { commit?: string | null }) {
+  const commit = citation.commit ? ` · commit ${citation.commit.slice(0, 7)}` : "";
+  if (!citation.start_line) return commit;
+  const lines = citation.end_line && citation.end_line !== citation.start_line ? ` · lines ${citation.start_line}–${citation.end_line}` : ` · line ${citation.start_line}`;
+  return `${lines}${commit}`;
 }
 
 export function apiMessage(error: unknown): string {

@@ -809,6 +809,117 @@ impl StorageEngine {
         self.get_folder(folder_id).await
     }
 
+    /// Moves a folder, with everything in it, below another folder of the same
+    /// workspace (or to the top level). A folder cannot move into itself or
+    /// into one of its own subfolders, the nesting limit still holds for the
+    /// deepest folder it contains, and the name must be free in its new place.
+    pub async fn move_folder(&self, folder_id: &str, new_parent_id: Option<&str>) -> Result<Folder> {
+        let folder = self.get_folder(folder_id).await?;
+        let all = self.list_folders(&folder.workspace_id).await?;
+        let by_id: HashMap<&str, &Folder> = all.iter().map(|candidate| (candidate.id.as_str(), candidate)).collect();
+        // Levels above the new place.
+        let mut above = 0;
+        if let Some(parent_id) = new_parent_id {
+            let mut cursor = by_id.get(parent_id).copied();
+            if cursor.is_none() {
+                repomemo_domain::bail_not_found!("Folder was not found.");
+            }
+            while let Some(current) = cursor {
+                if current.id == folder.id {
+                    repomemo_domain::bail_invalid!("A folder cannot be moved into itself or into a folder inside it.");
+                }
+                above += 1;
+                cursor = current.parent_id.as_deref().and_then(|id| by_id.get(id).copied());
+            }
+        }
+        // Levels the moved folder spans, itself included.
+        let mut span = 1;
+        let mut level = vec![folder.id.as_str()];
+        loop {
+            let next = all
+                .iter()
+                .filter(|candidate| {
+                    candidate
+                        .parent_id
+                        .as_deref()
+                        .is_some_and(|parent| level.contains(&parent))
+                })
+                .map(|candidate| candidate.id.as_str())
+                .collect::<Vec<_>>();
+            if next.is_empty() {
+                break;
+            }
+            span += 1;
+            level = next;
+        }
+        if above + span > MAX_FOLDER_DEPTH {
+            repomemo_domain::bail_invalid!("Folders can be nested up to {MAX_FOLDER_DEPTH} levels deep.");
+        }
+        if folder.parent_id.as_deref() == new_parent_id {
+            return Ok(folder);
+        }
+        let duplicate: Option<i64> = sqlx::query_scalar(
+            r#"
+            SELECT 1 FROM folders
+            WHERE workspace_id = ?1 AND COALESCE(parent_id, '') = COALESCE(?2, '')
+              AND name = ?3 COLLATE NOCASE AND id <> ?4
+            "#,
+        )
+        .bind(&folder.workspace_id)
+        .bind(new_parent_id)
+        .bind(&folder.name)
+        .bind(folder_id)
+        .fetch_optional(self.reader())
+        .await?;
+        if duplicate.is_some() {
+            repomemo_domain::bail_conflict!("A folder with this name already exists there.");
+        }
+        sqlx::query("UPDATE folders SET parent_id = ?2 WHERE id = ?1")
+            .bind(folder_id)
+            .bind(new_parent_id)
+            .execute(&self.pool)
+            .await?;
+        self.get_folder(folder_id).await
+    }
+
+    /// Replaces the content of an artifact in place: it keeps its id, folder,
+    /// comments, lifecycle and the memory cards that cite it, and is indexed
+    /// again (passages with unchanged text keep their identity).
+    pub async fn replace_artifact_content(
+        &self,
+        artifact_id: &str,
+        content_hash: &str,
+        size_bytes: i64,
+        mime_type: Option<&str>,
+    ) -> Result<ArtifactSummary> {
+        let current = self.get_artifact_summary(artifact_id).await?;
+        if current.content_hash == content_hash {
+            repomemo_domain::bail_conflict!("This file already holds exactly that content.");
+        }
+        let now = Utc::now().to_rfc3339();
+        let updated = sqlx::query(
+            "UPDATE artifacts SET content_hash = ?2, size_bytes = ?3, mime_type = COALESCE(?4, mime_type), updated_at = ?5, indexed_at = NULL WHERE id = ?1",
+        )
+        .bind(artifact_id)
+        .bind(content_hash)
+        .bind(size_bytes)
+        .bind(mime_type)
+        .bind(&now)
+        .execute(&self.pool)
+        .await;
+        match updated {
+            Ok(_) => {}
+            Err(error) => {
+                let error: anyhow::Error = error.into();
+                if is_unique_violation(&error) {
+                    repomemo_domain::bail_conflict!("Another version of this file already holds that content.");
+                }
+                return Err(error);
+            }
+        }
+        self.get_artifact_summary(artifact_id).await
+    }
+
     /// Ids of a folder, every folder below it, and every artifact inside any of them.
     pub async fn folder_subtree(&self, folder_id: &str) -> Result<(Vec<String>, Vec<String>)> {
         let folder = self.get_folder(folder_id).await?;

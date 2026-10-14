@@ -220,6 +220,7 @@ mod tests {
             end_line: None,
             score: 99.0,
             source_name: "s".to_owned(),
+            commit: None,
         }
     }
 

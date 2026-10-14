@@ -55,8 +55,10 @@ const COMMANDS: &[CommandSpec] = &[
     CommandSpec { name: "settings list", usage: "settings list", summary: "Run-time settings with their value and server default.", changes: false, arguments: 0, flags: &[] },
     CommandSpec { name: "settings set", usage: "settings set <key> <value> --yes", summary: "Changes a run-time setting.", changes: true, arguments: 2, flags: &[] },
     CommandSpec { name: "settings reset", usage: "settings reset <key> --yes", summary: "Restores a setting's server default.", changes: true, arguments: 1, flags: &[] },
-    CommandSpec { name: "logs", usage: "logs [--level warn] [--category security|activity|jobs|http|ai|database|performance|server] [--grep text] [--workspace id] [--day YYYY-MM-DD] [--limit n]", summary: "Log events, newest first: recent ones, or a day's file.", changes: false, arguments: 0, flags: &["level", "category", "grep", "workspace", "day", "limit"] },
+    CommandSpec { name: "logs", usage: "logs [--level warn] [--category security|activity|jobs|http|ai|database|performance|server] [--grep text] [--workspace id] [--day YYYY-MM-DD] [--limit n] [--after sequence] [--follow]", summary: "Log events, newest first: recent ones, or a day's file.", changes: false, arguments: 0, flags: &["level", "category", "grep", "workspace", "day", "limit", "after"] },
     CommandSpec { name: "users list", usage: "users list", summary: "Every account with its roles and sessions.", changes: false, arguments: 0, flags: &[] },
+    CommandSpec { name: "users reset-link", usage: "users reset-link <email> --yes", summary: "Creates a one-time link, valid for 24 hours, that lets the account choose a new password.", changes: true, arguments: 1, flags: &[] },
+    CommandSpec { name: "tokens list", usage: "tokens list [--user email]", summary: "Personal access tokens of your account, or of another account (system administrators).", changes: false, arguments: 0, flags: &["user"] },
     CommandSpec { name: "users unlock", usage: "users unlock <email> --yes", summary: "Lifts the sign-in lockouts of an account.", changes: true, arguments: 1, flags: &[] },
     CommandSpec { name: "users signout", usage: "users signout <email> --yes", summary: "Signs an account out of every device.", changes: true, arguments: 1, flags: &[] },
     CommandSpec { name: "maintenance status", usage: "maintenance status", summary: "The last maintenance run and the next one.", changes: false, arguments: 0, flags: &[] },
@@ -68,6 +70,7 @@ const GROUP_DEFAULTS: &[(&str, &str)] = &[
     ("jobs", "jobs list"),
     ("settings", "settings list"),
     ("users", "users list"),
+    ("tokens", "tokens list"),
     ("maintenance", "maintenance status"),
 ];
 
@@ -761,7 +764,15 @@ async fn execute(
                 category,
                 workspace: line.flag("workspace"),
                 q: line.flag("grep"),
-                after: None,
+                after: match line.flag("after") {
+                    Some(value) => Some(value.parse::<u64>().map_err(|_| {
+                        usage_error(
+                            spec,
+                            "--after is the sequence number of the last event you have.".to_owned(),
+                        )
+                    })?),
+                    None => None,
+                },
                 limit: Some(line.limit(50)? as usize),
                 day: line.flag("day"),
             };
@@ -781,7 +792,15 @@ async fn execute(
                 spec,
                 summary,
                 View::Table {
-                    columns: &["timestamp", "level", "category", "target", "message", "fields"],
+                    columns: &[
+                        "sequence",
+                        "timestamp",
+                        "level",
+                        "category",
+                        "target",
+                        "message",
+                        "fields",
+                    ],
                 },
                 Value::Array(records),
             ))
@@ -805,6 +824,54 @@ async fn execute(
                     ],
                 },
                 to_json(users)?,
+            ))
+        }
+
+        "users reset-link" => {
+            let user = find_account(state, &arguments[0]).await?;
+            let name = user.email.clone().unwrap_or_else(|| user.display_name.clone());
+            if !line.yes {
+                return Ok(dry_run(
+                    spec,
+                    format!("Would create a one-time link, valid for 24 hours, for {name} to choose a new password."),
+                ));
+            }
+            let issued =
+                crate::access::issue_password_reset(as_session(subject.clone())?, state_, Path(user.id)).await?;
+            let issued = to_json(issued.1 .0)?;
+            Ok(applied(
+                spec,
+                format!(
+                    "Reset link for {name}, valid until {}: {}  (add your web address in front of it, and pass it on yourself).",
+                    issued["expires_at"].as_str().unwrap_or("-"),
+                    issued["path"].as_str().unwrap_or("-")
+                ),
+                View::Text,
+                issued,
+            ))
+        }
+
+        "tokens list" => {
+            let owner = match line.flag("user") {
+                Some(email) => {
+                    super::require_full_system_admin(subject)?;
+                    find_account(state, &email).await?.id
+                }
+                None => subject.user_id.clone(),
+            };
+            let tokens = state
+                .storage
+                .list_personal_tokens(&owner)
+                .await
+                .map_err(map_storage_error)?;
+            let summary = format!("{} personal access token(s).", tokens.len());
+            Ok(answer(
+                spec,
+                summary,
+                View::Table {
+                    columns: &["name", "scope", "prefix", "created_at", "expires_at", "last_used_at"],
+                },
+                to_json(tokens)?,
             ))
         }
 

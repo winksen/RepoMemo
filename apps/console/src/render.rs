@@ -91,6 +91,29 @@ pub fn greeting(paint: &Paint, welcome: &Welcome, server: &str) -> String {
 }
 
 /// A command's answer: its summary, then its facts or table.
+/// One log event on one line, for `logs --follow`.
+pub fn log_line(paint: &Paint, record: &Value) -> String {
+    let text = |key: &str| record[key].as_str().unwrap_or_default();
+    let level = match text("level") {
+        "error" => paint.error(text("level")),
+        "warn" => paint.warning(text("level")),
+        other => paint.muted(other),
+    };
+    let fields = text("fields");
+    format!(
+        "{} {:<5} {} {}{}",
+        paint.muted(text("timestamp")),
+        level,
+        paint.accent(text("category")),
+        text("message"),
+        if fields.is_empty() {
+            String::new()
+        } else {
+            format!("  {}", paint.muted(fields))
+        }
+    )
+}
+
 pub fn answer(paint: &Paint, response: &Value) -> String {
     let summary = response["summary"].as_str().unwrap_or_default();
     let mut out = if response["dry_run"] == true {

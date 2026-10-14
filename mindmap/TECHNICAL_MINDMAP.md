@@ -2,7 +2,7 @@
 
 > **Audience:** engineers working on RepoMemo, reviewers, and anyone operating the shared server.
 > **Companion:** [FUNCTIONAL_MINDMAP.md](FUNCTIONAL_MINDMAP.md) covers *what* the product does. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** code at `V0.1.72` (2026-10-14: invitations, reset links and personal access tokens in V0.1.63, migration 0023; security bundle S1 in V0.1.64; the security second pass in V0.1.65; CI, one version source and performance timings in V0.1.66; safe defaults and identity, migration 0024, in V0.1.67; browser hardening in V0.1.68; host exposure in V0.1.69; web client foundation in V0.1.70; server foundation in V0.1.71; memory and search you can trust in V0.1.72). The plan to V0.2.0 is in the [roadmap](ROADMAP.md#-road-to-v020). Aligned on 2026-10-13; sections marked *hardening* came with V0.1.51–V0.1.57. The focus is the **shared web client** (`apps/desktop/src/SharedWebApp.tsx`) and the **HTTP API** (`apps/server`). Desktop and Tauri paths are noted where they share code. Open security findings are in the [security review](security/2026-10-10-security-review.md), and the improvement backlog is in the [enhancement analysis](analysis/2026-10-13-enhancement-analysis.md).
+> **Scope:** code at `V0.1.73` (2026-10-14: invitations, reset links and personal access tokens in V0.1.63, migration 0023; security bundle S1 in V0.1.64; the security second pass in V0.1.65; CI, one version source and performance timings in V0.1.66; safe defaults and identity, migration 0024, in V0.1.67; browser hardening in V0.1.68; host exposure in V0.1.69; web client foundation in V0.1.70; server foundation in V0.1.71; memory and search you can trust in V0.1.72; evidence, ownership and repositories 1b in V0.1.73). The plan to V0.2.0 is in the [roadmap](ROADMAP.md#-road-to-v020). Aligned on 2026-10-13; sections marked *hardening* came with V0.1.51–V0.1.57. The focus is the **shared web client** (`apps/desktop/src/SharedWebApp.tsx`) and the **HTTP API** (`apps/server`). Desktop and Tauri paths are noted where they share code. Open security findings are in the [security review](security/2026-10-10-security-review.md), and the improvement backlog is in the [enhancement analysis](analysis/2026-10-13-enhancement-analysis.md).
 
 ---
 
@@ -385,6 +385,10 @@ Every route requires a system administrator (**S**); changes are recorded in `sy
 |---|---|---|---|
 | GET, POST | `/v1/workspaces/{ws}/folders` | R / W | list / create `{name, parent_id?}`; depth at most 5 |
 | PATCH, DELETE | `/v1/workspaces/{ws}/folders/{f}` | W | rename / delete with every subfolder and file |
+| POST | `/v1/workspaces/{ws}/folders/{f}/move` | W | `{parent_id}` (`null` for the top level); 400 into itself or its subfolders or beyond five levels, 409 when the name is taken there |
+| POST | `/v1/workspaces/{ws}/artifacts/bulk` | W | `{action: move\|delete\|lifecycle, artifact_ids (1–200), folder_id?, status?}` → `{done, failed:[{artifact_id, message}]}`; each file on its own |
+| POST | `/v1/artifacts/{a}/versions` | W | raw body with `X-RepoMemo-Filename`: replaces the content in place (same extension); 409 for identical content |
+| POST | `/v1/workspaces/{ws}/transfer-ownership`, `/v1/organizations/{org}/transfer-ownership` | owner, session only | `{user_id}` → 204; the previous owner becomes administrator; audited |
 | PUT | `/v1/artifacts/{a}/folder` | W | move a file; `folder_id: null` for the top level |
 | GET | `/v1/artifacts/{a}/file` | R | the stored bytes, always as an attachment, sandboxed. *Since V0.1.65:* the `Content-Type` comes from the file name (`served_mime_type`); HTML, scripts and unknown types are `text/plain` |
 | GET | `/v1/artifacts/{a}/document-preview` | R | `DocumentPreview`: text, sheets, slides, email or pdf (§9) |
@@ -760,7 +764,7 @@ Security findings are tracked in the [security review of 2026-10-10](security/20
 
 | # | Area | Issue | Suggested direction |
 |---|---|---|---|
-| 1 | Security | Open review findings (S1 fixed in V0.1.64; second-pass N1–N6 fixed in V0.1.65; S2, with registration closed by default, in V0.1.67; every remaining finding scheduled before V0.2.0; N7 timeouts fixed in V0.1.71, N8 ownership transfer open). The most urgent left: provider URLs and repository links that reach the host (H2, H3) | Roadmap S2–S5 |
+| 1 | Security | Open review findings (S1 fixed in V0.1.64; second-pass N1–N6 fixed in V0.1.65; S2, with registration closed by default, in V0.1.67; every remaining finding scheduled before V0.2.0; N7 timeouts fixed in V0.1.71, N8 ownership in V0.1.73). The most urgent left: provider URLs and repository links that reach the host (H2, H3) | Roadmap S2–S5 |
 | 2 | Process | ✅ *Mostly done (V0.1.66, V0.1.70):* CI runs Rust and web tests, type check, generated-types check, version check and audits. Residual: rustfmt and clippy are advisory | C8 follow-up (V0.1.71) |
 | 3 | Frontend maintainability | ✅ *Foundation done (V0.1.70):* modules under `src/web/`, a typed router, a query cache for the workspace page, generated types and 27 tests. Residual: `WorkspaceDetail.tsx` (about 1,000 lines, 50+ `useState`), `App.tsx` 2,750 (frozen), `styles.css` 6.2k | C11 (V0.3.0) |
 | 4 | Backend maintainability | ✅ *Done (V0.1.71):* no server or storage module over 1,500 lines, rustfmt and clippy blocking in CI, DTO types generated (V0.1.70) | — |

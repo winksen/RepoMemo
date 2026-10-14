@@ -744,6 +744,8 @@ export interface SearchResult {
   end_line: number | null;
   score: number;
   source_name: string;
+  /** For a file of a git repository: the commit its text is from. */
+  commit: string | null;
 }
 
 export interface ProviderSettings {
@@ -772,6 +774,8 @@ export interface Citation {
   start_line: number | null;
   end_line: number | null;
   confidence: number | null;
+  /** For a file of a git repository: the commit the cited text is from. */
+  commit: string | null;
 }
 
 export interface SummaryResult {

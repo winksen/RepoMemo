@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.1.72` (2026-10-14). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
+> **Scope:** reflects the code at `V0.1.73` (2026-10-14). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
 
 ---
 
@@ -214,7 +214,7 @@ A **System** button in the header opens `/system`, with these pages:
 | **Logs** | What is being recorded, then the events: live (recent, following as they arrive) or any earlier day kept in the log files, filtered by kind of log, workspace, level and text. A day's file can be downloaded |
 | **Jobs & maintenance** | Jobs across every workspace, updated live as they start, progress and finish (stop a running one), and maintenance: last run, next run, what it cleaned, and **Run maintenance now** |
 | **Audit trail** | What system administrators did: role changes, settings, ended sessions, maintenance runs |
-| **Console** | A command line to the server for administrators who prefer typing: `status`, `jobs list --status failed`, `logs --category security --level warn`, `settings set log_http_level debug`, `users unlock alice@example.com`, `maintenance run`, and `help` for the rest. Answers show as tables or facts (`--json` for the raw answer). Anything that changes something only says what it **would** do until the line ends with `--yes`; changes are then recorded in the audit trail with the exact line. Up/Down recall earlier lines, Tab completes. The same console opens in a terminal with `repomemo-console` (`npm run console`): same logo, same commands, a hidden password prompt, and single commands for scripts (`repomemo-console jobs list --status failed`). Detaching the environment and granting the system administrator role stay on their pages |
+| **Console** | A command line to the server for administrators who prefer typing: `status`, `jobs list --status failed`, `logs --category security --level warn` (add `--follow` to keep watching), `users reset-link <email> --yes`, `tokens list`, `settings set log_http_level debug`, `users unlock alice@example.com`, `maintenance run`, and `help` for the rest. Answers show as tables or facts (`--json` for the raw answer). Anything that changes something only says what it **would** do until the line ends with `--yes`; changes are then recorded in the audit trail with the exact line. Up/Down recall earlier lines, Tab completes. The same console opens in a terminal with `repomemo-console` (`npm run console`): same logo, same commands, a hidden password prompt, and single commands for scripts (`repomemo-console jobs list --status failed`). Detaching the environment and granting the system administrator role stay on their pages |
 
 ---
 
@@ -513,10 +513,9 @@ These are observed in the code and are useful for prioritizing. The roadmap item
 
 | Gap | Impact |
 |---|---|
-| Repositories must be on the server's disk | No remote URLs, and a file renamed *and* edited in one commit loses its history [F4]. |
+| Repositories must be on the server's disk | No remote URLs (V0.3.0). A file renamed and edited in one commit keeps its history since V0.1.73 when at least about half of it is unchanged. |
 | The assistant does not remember the conversation | Follow-up questions must repeat their context [F5]. |
 | Invitations and reset links are passed on by hand | There is no mail delivery and no email verification; the person whose password is reset is not told [F6]. |
-| Folders cannot be moved; no bulk actions; a re-upload is a new artifact | Comments and memory links stay on the old file [F7]. |
 
 Invitation links and administrator reset links, gaps until V0.1.62, shipped in V0.1.63.
 

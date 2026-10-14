@@ -828,6 +828,72 @@ export async function uploadSharedArtifact(accessToken: string, workspaceId: str
   return payload as ArtifactSummary;
 }
 
+/** A new version of a file, into the same artifact (comments, folder and memory links stay). */
+export async function uploadSharedArtifactVersion(accessToken: string, artifactId: string, file: File): Promise<ArtifactSummary> {
+  const response = await authFetch(`${API_URL}/v1/artifacts/${artifactId}/versions`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": file.type || "application/octet-stream",
+      "X-RepoMemo-Filename": encodeURIComponent(file.name),
+    },
+    body: file,
+  });
+  const payload = await response.json().catch(() => null) as { error?: { message?: string } } | ArtifactSummary | null;
+  if (!response.ok) {
+    const message = payload && typeof payload === "object" && "error" in payload ? payload.error?.message : null;
+    throw new SharedApiError(response.status, message ?? `The shared API returned ${response.status}.`);
+  }
+  return payload as ArtifactSummary;
+}
+
+export function moveSharedFolder(accessToken: string, workspaceId: string, folderId: string, parentId: string | null): Promise<Folder> {
+  return request<Folder>(`/v1/workspaces/${workspaceId}/folders/${folderId}/move`, {
+    method: "POST",
+    body: JSON.stringify({ parent_id: parentId }),
+  }, accessToken);
+}
+
+export interface BulkArtifactsResult {
+  done: string[];
+  failed: Array<{ artifact_id: string; message: string }>;
+}
+
+/** One action over many files; each is handled on its own and the answer lists what was left alone. */
+export function bulkSharedArtifacts(accessToken: string, workspaceId: string, input: {
+  action: "move" | "delete" | "lifecycle";
+  artifactIds: string[];
+  folderId?: string | null;
+  status?: "active" | "needs_review" | "verified" | "outdated";
+}): Promise<BulkArtifactsResult> {
+  return request<BulkArtifactsResult>(`/v1/workspaces/${workspaceId}/artifacts/bulk`, {
+    method: "POST",
+    body: JSON.stringify({
+      action: input.action,
+      artifact_ids: input.artifactIds,
+      folder_id: input.folderId ?? null,
+      status: input.status ?? null,
+    }),
+  }, accessToken);
+}
+
+/** Hands a workspace to another member (owners only). */
+export function transferSharedWorkspaceOwnership(accessToken: string, workspaceId: string, userId: string): Promise<void> {
+  return request<void>(`/v1/workspaces/${workspaceId}/transfer-ownership`, {
+    method: "POST",
+    body: JSON.stringify({ user_id: userId }),
+  }, accessToken);
+}
+
+/** Hands an organization to another member (owners only). */
+export function transferSharedOrganizationOwnership(accessToken: string, organizationId: string, userId: string): Promise<void> {
+  return request<void>(`/v1/organizations/${organizationId}/transfer-ownership`, {
+    method: "POST",
+    body: JSON.stringify({ user_id: userId }),
+  }, accessToken);
+}
+
 export function indexSharedWorkspace(accessToken: string, workspaceId: string): Promise<IndexingJobStatus> {
   return request<IndexingJobStatus>(`/v1/workspaces/${workspaceId}/index`, { method: "POST" }, accessToken);
 }

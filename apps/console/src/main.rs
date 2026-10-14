@@ -210,8 +210,63 @@ enum Outcome {
     Trouble,
 }
 
+/// `logs --follow`: shows the latest events, then new ones as they arrive,
+/// until Ctrl-C. The server hands out only events newer than `--after`.
+async fn follow_logs(client: &mut Client, paint: &Paint, command: &str) -> Outcome {
+    let mut after: Option<u64> = None;
+    loop {
+        let line = match after {
+            Some(sequence) => format!("{command} --after {sequence}"),
+            None if command.split_whitespace().any(|word| word == "--limit") => command.to_owned(),
+            None => format!("{command} --limit 20"),
+        };
+        match client.run(&line).await {
+            Ok(response) => {
+                let mut records = response["data"].as_array().cloned().unwrap_or_default();
+                // Newest first on the wire; a followed log reads downwards.
+                records.reverse();
+                for record in &records {
+                    println!("{}", render::log_line(paint, record));
+                    after = after.max(record["sequence"].as_u64());
+                }
+            }
+            Err(Failure::Refused(message)) => {
+                eprintln!("{}", paint.error(&message));
+                return Outcome::Refused;
+            }
+            Err(Failure::Expired) => return Outcome::Expired,
+            Err(failure) => {
+                eprintln!("{}", paint.error(&describe(&failure, client)));
+                return Outcome::Trouble;
+            }
+        }
+        tokio::select! {
+            _ = tokio::time::sleep(std::time::Duration::from_secs(2)) => {}
+            _ = tokio::signal::ctrl_c() => return Outcome::Done,
+        }
+    }
+}
+
+/// Whether a line is `logs … --follow`, and the line without the flag.
+fn follow_request(line: &str) -> Option<String> {
+    let words = line.split_whitespace().collect::<Vec<_>>();
+    if words.first() != Some(&"logs") || !words.contains(&"--follow") {
+        return None;
+    }
+    Some(
+        words
+            .into_iter()
+            .filter(|word| *word != "--follow")
+            .collect::<Vec<_>>()
+            .join(" "),
+    )
+}
+
 /// Runs one line and prints its answer.
 async fn execute(client: &mut Client, paint: &Paint, line: &str) -> Outcome {
+    if let Some(command) = follow_request(line) {
+        return follow_logs(client, paint, &command).await;
+    }
     let (command, raw) = strip_json(line);
     match client.run(&command).await {
         Ok(response) => {
@@ -362,6 +417,16 @@ mod tests {
 
     fn words(list: &[&str]) -> Vec<String> {
         list.iter().map(|word| (*word).to_owned()).collect()
+    }
+
+    #[test]
+    fn follow_is_recognised_only_for_logs() {
+        assert_eq!(
+            follow_request("logs --level warn --follow"),
+            Some("logs --level warn".to_owned())
+        );
+        assert_eq!(follow_request("logs --limit 5"), None);
+        assert_eq!(follow_request("jobs list --follow"), None);
     }
 
     #[test]

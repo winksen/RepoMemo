@@ -33,7 +33,8 @@
 | N2 residual | ✅ Fixed in V0.1.67 | `system` token scope |
 | N7 | ✅ Fixed in V0.1.71 | Request timeout on every route but the streams, header read timeout, live streams per account |
 | L6 | ✅ Fixed in V0.1.71 | Typed errors; internal errors are generic 500s |
-| N8, N9 | 📝 Documented | See §11 |
+| N8 | ✅ Fixed in V0.1.73 | Removal refused (409) while the person owns a workspace of the organization; ownership transfer for workspaces and organizations |
+| N9 | 📝 Documented | See §11 |
 
 ---
 
@@ -350,7 +351,7 @@ Two crates appear in two major versions: reqwest 0.12 and 0.13, and quick-xml 0.
 | N5 | Low | Using a reset link left the account's personal access tokens working | ✅ Fixed in V0.1.65 |
 | N6 | Low | Any writer could run a synchronous whole-workspace re-index | ✅ Fixed in V0.1.65 |
 | N7 | Medium | No connection or request timeouts on the server | 📝 Documented |
-| N8 | Low | Removing an organization member can leave their workspaces without an owner | 📝 Documented |
+| N8 | Low | Removing an organization member can leave their workspaces without an owner | ✅ Fixed in V0.1.73 |
 | N9 | Info | Hiding index chunks from members is not a confidentiality boundary | 📝 Documented |
 
 ### N1. Stored XSS through image previews (High)

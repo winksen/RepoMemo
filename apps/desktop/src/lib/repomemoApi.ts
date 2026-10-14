@@ -530,6 +530,7 @@ export async function searchWorkspace(
         end_line: chunk.end_line,
         score: 1,
         source_name: artifact.source_name,
+        commit: null,
       }));
   }
 

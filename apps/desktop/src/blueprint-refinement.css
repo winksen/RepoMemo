@@ -1215,3 +1215,6 @@ td > .rm-system-tag { margin-left: 0; }
 .rm-platform-text small { margin-left: 6px; color: var(--color-text-muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
 .rm-platform-create { padding-top: 8px; }
 .rm-platform code, .rm-environment-card code { font-family: var(--font-mono); font-size: 12px; }
+.shared-bulk-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 10px; }
+.shared-bulk-bar > span { color: var(--color-text-muted); font-size: 13px; }
+.shared-select-box { align-self: center; margin-right: 8px; }
