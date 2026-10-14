@@ -51,6 +51,8 @@ jobs:
       - run: npm run typecheck
       - name: Generated types match the Rust domain crate
         run: npm run types:check
+      - name: Stylesheets are small and imported in order
+        run: npm run styles:check
       - name: Web client tests
         run: npm run test:web
       - name: Audit production dependencies

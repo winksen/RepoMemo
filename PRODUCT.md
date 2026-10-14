@@ -52,7 +52,7 @@ The product name is RepoMemo. Its voice is calm, precise, technical, private by 
 - Delivery history and the plan to V0.2.0: `mindmap/ROADMAP.md`
 - Security posture: `mindmap/security/2026-10-10-security-review.md`
 - Implemented web interface: `apps/desktop/src/SharedWebApp.tsx` and `apps/desktop/src/components/`
-- Visual rules and implementation: `DESIGN.md`, `apps/desktop/src/styles.css`
+- Visual rules and implementation: `DESIGN.md`, `apps/desktop/src/styles/`
 
 There are no approved customer logos, testimonials, usage metrics, performance benchmarks, or marketing claims in the repository. Future work must not invent them.
 

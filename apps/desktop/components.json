@@ -5,7 +5,7 @@
   "tsx": true,
   "tailwind": {
     "config": "",
-    "css": "src/styles.css",
+    "css": "src/styles/01-tokens-and-shared-web.css",
     "baseColor": "neutral",
     "cssVariables": false,
     "prefix": ""

@@ -4,8 +4,7 @@ import "@fontsource/fjalla-one/latin-400.css";
 import "@fontsource-variable/plus-jakarta-sans";
 import { App } from "./App";
 import { ToastViewport } from "./components/ui/toast";
-import "./styles.css";
-import "./blueprint-refinement.css";
+import "./styles";
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>

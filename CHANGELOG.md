@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.5 (2026-10-14)
+
+The stylesheets, split.
+
+### Changed
+- **`styles.css` (6,242 lines) and `blueprint-refinement.css` (1,220) are twelve files in `src/styles/`**, none over 900 lines, imported in their original order by `styles/index.ts` (`main.tsx` imports it). The order is the cascade: the files are successive design passes that override one another, so they are split where the passes and their sections already were (tokens and shared web mode, sidebar, workbench, forms, import and search, artifact detail, the three evidence-instrument blocks, the neutral research canvas, the quiet evidence desk, the blueprint refinement).
+- **47 dead rules removed** (about 150 lines): rules whose classes appear nowhere in the web client, the Rust sources or the HTML (old list and member rows, the pipeline marks and recent lists of the retired local screens, a brand mark and a route mark). The content of every other rule and its position are unchanged, so nothing looks different.
+
+### Added
+- `npm run styles:check` (also in CI) fails when a stylesheet passes 1,000 lines or `styles/index.ts` does not import every file once, in order.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.4 (2026-10-14)
 
 Rendering tests for the two pages a person opens from a link.

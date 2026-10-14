@@ -11,6 +11,7 @@
 - [mindmap/FUNCTIONAL_MINDMAP.md](mindmap/FUNCTIONAL_MINDMAP.md): what the product does.
 - [mindmap/TECHNICAL_MINDMAP.md](mindmap/TECHNICAL_MINDMAP.md): how it works.
 - [mindmap/ROADMAP.md](mindmap/ROADMAP.md): what has shipped and what comes next.
+- `mindmap/RELEASES_<minor>.md` ([0.1](mindmap/RELEASES_0.1.md), [0.2](mindmap/RELEASES_0.2.md)): one row per release of a minor line, with its track and type. A release updates its row; a new minor line gets a new file.
 - [docs/DEVELOPMENT_COMMANDS.md](docs/DEVELOPMENT_COMMANDS.md): commands and every server setting.
 
 Keep the mindmaps current when behavior, routes, settings or migrations change.
