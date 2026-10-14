@@ -17,6 +17,10 @@
 | N4 | ✅ Fixed in V0.1.65 | Author edits need a writer role; saved searches are deleted by their author or an administrator |
 | N5 | ✅ Fixed in V0.1.65 | A used reset link also revokes the account's personal access tokens |
 | N6 | ✅ Fixed in V0.1.65 | `POST /v1/workspaces/{ws}/index` is for administrators |
+| H2 | ✅ Fixed in V0.1.69 | Built-in provider host list, checking DNS resolver, no echoed provider bodies |
+| H3 | ✅ Fixed in V0.1.69 | Repository links off without `REPOMEMO_REPO_ROOTS`; uniform refusal outside the roots |
+| L8 | ✅ Fixed in V0.1.69 | `repomemo_git::harden` |
+| M10 | ✅ Mitigated in V0.1.69 | Scrubbed environment and `REPOMEMO_SOFFICE_WRAPPER`; the sandbox is the operator's |
 | M2 | ✅ Fixed in V0.1.68 | `HttpOnly; SameSite=Strict` refresh cookie (`web_session.rs`); CSP meta tag and header file from the web build. Residual: the host serves the header |
 | M5, L9 | ✅ Fixed in V0.1.68 | `SafeMarkdown`: no images, links show their host and open with `noopener noreferrer` |
 | M6 | ✅ Fixed in V0.1.68 | Strict `csp` in `tauri.conf.json` |

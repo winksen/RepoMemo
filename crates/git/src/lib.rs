@@ -5,9 +5,17 @@
 //! index, the work tree or refs. The `git` CLI is used instead of a library so
 //! that the user's own git setup (credential helpers, `safe.directory`, long
 //! paths on Windows) applies unchanged.
+//!
+//! A server runs git on folders that other people chose, so it calls
+//! [`harden`] once: git then ignores the system and global configuration,
+//! allows no transport protocol and never recurses into submodules (review
+//! L8). Only the folders given to `harden` are exempt from git's
+//! `safe.directory` ownership check, which would otherwise have come from the
+//! global configuration.
 
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
+use std::sync::OnceLock;
 
 use anyhow::{anyhow, bail, Context, Result};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
@@ -58,6 +66,12 @@ impl GitRepo {
         if !output.status.success() {
             let detail = stderr_text(&output.stderr);
             if detail.contains("dubious ownership") {
+                if HARDENING.get().is_some() {
+                    bail!(
+                        "git refuses to read {} because it belongs to another user account than the server's. Ask the server operator to list its folder in REPOMEMO_GIT_SAFE_DIRECTORIES, or to give the server's account ownership of it.",
+                        path.display()
+                    );
+                }
                 bail!(
                     "git refuses to read {} because it belongs to another user account than the server's. On the server, run: git config --global --add safe.directory \"{}\"",
                     path.display(),
@@ -238,6 +252,23 @@ impl BlobReader {
     }
 }
 
+/// What a server turns on with [`harden`].
+#[derive(Debug, Clone, Default)]
+pub struct Hardening {
+    /// Folders git may read although another account owns them. Each is given
+    /// to git as `safe.directory`, and with `/*` appended for the folders
+    /// below it (git 2.46 and later).
+    pub safe_directories: Vec<String>,
+}
+
+static HARDENING: OnceLock<Hardening> = OnceLock::new();
+
+/// Isolates git from the account's own configuration for this process (see the
+/// module notes). Returns false when it was already called.
+pub fn harden(hardening: Hardening) -> bool {
+    HARDENING.set(hardening).is_ok()
+}
+
 fn git_command(directory: &Path) -> Command {
     let mut command = Command::new("git");
     command
@@ -249,12 +280,35 @@ fn git_command(directory: &Path) -> Command {
         .env("GIT_TERMINAL_PROMPT", "0")
         .env("GIT_OPTIONAL_LOCKS", "0")
         .stdin(Stdio::null());
+    if let Some(hardening) = HARDENING.get() {
+        // Only reading local objects is ever needed: no transport, no
+        // submodule recursion, and configuration only from the repository
+        // itself (and from here).
+        command
+            .args(["-c", "protocol.allow=never", "-c", "submodule.recurse=false"])
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_CONFIG_GLOBAL", null_device())
+            .env("GIT_ATTR_NOSYSTEM", "1");
+        for directory in &hardening.safe_directories {
+            let directory = directory.replace('\\', "/");
+            command.arg("-c").arg(format!("safe.directory={directory}"));
+            command.arg("-c").arg(format!("safe.directory={}/*", directory.trim_end_matches('/')));
+        }
+    }
     #[cfg(windows)]
     {
         // CREATE_NO_WINDOW: no console window flashes up from the desktop app.
         command.creation_flags(0x0800_0000);
     }
     command
+}
+
+fn null_device() -> &'static str {
+    if cfg!(windows) {
+        "NUL"
+    } else {
+        "/dev/null"
+    }
 }
 
 fn validate_branch_name(branch: &str) -> Result<()> {
@@ -343,6 +397,24 @@ mod tests {
                 },
             ]
         );
+    }
+
+    #[test]
+    fn hardened_commands_ignore_the_account_configuration() {
+        // Process-wide, so this is the only test that calls it.
+        assert!(harden(Hardening { safe_directories: vec!["C:\\repos".to_owned()] }));
+        let command = git_command(Path::new("."));
+        let std_command = command.as_std();
+        let args = std_command.get_args().map(|arg| arg.to_string_lossy().into_owned()).collect::<Vec<_>>();
+        for expected in ["protocol.allow=never", "submodule.recurse=false", "safe.directory=C:/repos", "safe.directory=C:/repos/*"] {
+            assert!(args.iter().any(|arg| arg == expected), "{expected} missing from {args:?}");
+        }
+        let envs = std_command
+            .get_envs()
+            .filter_map(|(key, value)| Some((key.to_string_lossy().into_owned(), value?.to_string_lossy().into_owned())))
+            .collect::<std::collections::HashMap<_, _>>();
+        assert_eq!(envs.get("GIT_CONFIG_NOSYSTEM").map(String::as_str), Some("1"));
+        assert_eq!(envs.get("GIT_CONFIG_GLOBAL").map(String::as_str), Some(null_device()));
     }
 
     #[test]

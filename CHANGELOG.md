@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)), then `0.2.1` and so on for fixes. Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.1.69 (2026-10-14)
+
+Host exposure (bundle S3): the last two high findings.
+
+### Security
+- **AI providers only where the operator allows (H2).** Without `REPOMEMO_AI_ALLOWED_HOSTS`, a provider may sit only on this machine (`127.0.0.1`, `localhost`, `::1`) or on `openrouter.ai`. List your own hosts to allow others, or `*` to allow every host (link-local and cloud-metadata addresses stay refused). Names are resolved by the server and every address is checked at connect time, so a name cannot be re-pointed at the server's own network after it was accepted; with the built-in list a name must resolve to a public address.
+- **Provider error bodies are not echoed (H2).** What a provider answers with stays in the server log (System › Logs, AI category); the message shown has the status and a hint only.
+- **Repository links are off until the operator names folders (H3).** A server without `REPOMEMO_REPO_ROOTS` refuses every link and sync with one message; outside the configured folders the answer is the same whether or not the path exists.
+- **Git runs isolated (L8).** On a server, git ignores the system and global configuration, allows no transport protocol and does not recurse into submodules. The repository folders, and folders in `REPOMEMO_GIT_SAFE_DIRECTORIES`, are exempt from git's ownership check.
+- **LibreOffice runs without the server's secrets (M10).** Every `REPOMEMO_*` variable and anything named like a key, token or password is removed from its environment, and `REPOMEMO_SOFFICE_WRAPPER` runs it inside a sandbox command of the operator's (no network, no data folder). System › Overview and the server check show its version and whether it is sandboxed.
+
+### Upgrading
+- Provider URLs outside this machine and OpenRouter stop working until listed in `REPOMEMO_AI_ALLOWED_HOSTS`. A provider on another machine in your network must be listed by name.
+- Repository links stop working (and linked repositories stop syncing) until `REPOMEMO_REPO_ROOTS` names the folders that hold them.
+- Git no longer reads the service account's `git config --global`: a `safe.directory` set there is ignored. Use `REPOMEMO_GIT_SAFE_DIRECTORIES`. Git 2.32 or later is needed for the isolation to be complete.
+
 ## V0.1.68 (2026-10-14)
 
 Browser hardening (bundle S4).

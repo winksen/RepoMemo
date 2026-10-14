@@ -332,7 +332,14 @@ pub(crate) async fn checks(
     });
 
     checks.push(if state.converter.enabled() {
-        SetupCheck { key: "libreoffice", label: "LibreOffice", status: CheckStatus::Ok, detail: "Word, Excel and PowerPoint files get layout-accurate previews.".to_owned(), advice: None }
+        let sandboxed = state.converter.sandboxed();
+        SetupCheck {
+            key: "libreoffice",
+            label: "LibreOffice",
+            status: if sandboxed { CheckStatus::Ok } else { CheckStatus::Info },
+            detail: if sandboxed { "Word, Excel and PowerPoint files get layout-accurate previews, converted inside the sandbox command.".to_owned() } else { "Word, Excel and PowerPoint files get layout-accurate previews. LibreOffice reads uploaded files on this machine without a sandbox.".to_owned() },
+            advice: (!sandboxed).then_some("Set REPOMEMO_SOFFICE_WRAPPER to a command that runs it without network and without the data folder (see the operations notes)."),
+        }
     } else {
         SetupCheck { key: "libreoffice", label: "LibreOffice", status: CheckStatus::Info, detail: "Not installed: Office files show extracted text and tables.".to_owned(), advice: Some("Optional. Install LibreOffice (or set REPOMEMO_SOFFICE) for faithful previews.") }
     });
@@ -346,7 +353,7 @@ pub(crate) async fn checks(
     });
 
     checks.push(if facts.repo_roots.is_empty() {
-        SetupCheck { key: "repo_roots", label: "Repository folders", status: CheckStatus::Warning, detail: "Any local folder the server can read can be linked as a repository.".to_owned(), advice: Some("Set REPOMEMO_REPO_ROOTS to the folders that hold repositories.") }
+        SetupCheck { key: "repo_roots", label: "Repository folders", status: CheckStatus::Info, detail: "Repository links are turned off.".to_owned(), advice: Some("Optional. Set REPOMEMO_REPO_ROOTS to the folders that hold repositories to link them.") }
     } else {
         SetupCheck { key: "repo_roots", label: "Repository folders", status: CheckStatus::Ok, detail: facts.repo_roots.join(", "), advice: None }
     });
@@ -355,8 +362,8 @@ pub(crate) async fn checks(
         key: "ai_hosts",
         label: "AI provider addresses",
         status: if facts.ai_hosts_restricted { CheckStatus::Ok } else { CheckStatus::Info },
-        detail: if facts.ai_hosts_restricted { "Limited to REPOMEMO_AI_ALLOWED_HOSTS.".to_owned() } else { "Any address except link-local and cloud-metadata ones.".to_owned() },
-        advice: (!facts.ai_hosts_restricted).then_some("Optional. Set REPOMEMO_AI_ALLOWED_HOSTS to the AI services you use."),
+        detail: if facts.ai_hosts_restricted { "This machine and OpenRouter, unless REPOMEMO_AI_ALLOWED_HOSTS lists others.".to_owned() } else { "Any address except link-local and cloud-metadata ones (REPOMEMO_AI_ALLOWED_HOSTS=*).".to_owned() },
+        advice: (!facts.ai_hosts_restricted).then_some("Set REPOMEMO_AI_ALLOWED_HOSTS to the AI services you use instead of *."),
     });
 
     checks.push(SetupCheck {

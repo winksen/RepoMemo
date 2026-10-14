@@ -185,19 +185,19 @@ Each proposal below was accepted as written. They shape the releases named in th
 - [x] **L4** notifications `password_reset_issued` and `password_reset_used`
 - [x] **L7** `validate_password`: common list, at least five different characters, no email name
 
-#### V0.1.68: Browser hardening (built, not yet released)
+#### V0.1.68: Browser hardening
 
 - [x] **M5, L9** `SafeMarkdown` replaces every `react-markdown` use: images become a note with text and address, external links show their host and open with `noopener noreferrer`. The test of the image rule moves to the frontend test suite (C3, V0.1.70), which needs the test runner that release adds
 - [x] **M2** the Vite build injects the policy as a meta tag and writes `content-security-policy.txt` (with `frame-ancestors`) for the host; the refresh token is an `HttpOnly; SameSite=Strict` cookie handled by `web_session.rs` for web clients. The cookie path is `/v1/auth` (not only `/v1/auth/refresh`) so sign-in and sign-out receive it
 - [x] **M6** strict `csp` and a `devCsp` that adds the Vite dev server
 - [x] **L3 follow-up** the web app keeps the secret in memory and replaces the history entry
 
-#### V0.1.69: Host exposure
+#### V0.1.69: Host exposure (built, not yet released)
 
-- [ ] **H2** providers allowed only on the operator's host list, or loopback plus the OpenRouter host by default; resolve and pin addresses (DNS rebinding); never echo provider error bodies
-- [ ] **H3** repository links disabled unless `REPOMEMO_REPO_ROOTS` is set (or default it to `workspace-data/repos`); one generic answer for every refused check
-- [ ] **L8** `protocol.allow=never` with an `https`/`ssh` allowlist, no system or global git config, no submodules
-- [ ] **M10** LibreOffice in a sandbox (separate low-privilege account or container without network), its version in System › Overview
+- [x] **H2** built-in list (`127.0.0.1`, `localhost`, `::1`, `openrouter.ai`) unless `REPOMEMO_AI_ALLOWED_HOSTS` says otherwise (`*` for everything); a checking DNS resolver filters every connection (public addresses only for the built-in list); provider bodies go to the log, not to the user
+- [x] **H3** `RepoLinkPolicy::disabled()` on a server without roots (disabled, not defaulted: an operator opts in by naming folders); the refusal outside the roots does not depend on whether the path exists
+- [x] **L8** `repomemo_git::harden`: `protocol.allow=never` (the https/ssh allowlist arrives with remote repositories), no system or global configuration, no submodule recursion, `safe.directory` only for the configured folders
+- [x] **M10** scrubbed environment, `REPOMEMO_SOFFICE_WRAPPER` for the operator's sandbox command, version and sandbox state in System › Overview and the server check. The sandbox itself is the operator's (recipes follow in the production guide, V0.1.75)
 
 #### V0.1.70: Web client foundation
 
@@ -288,7 +288,7 @@ Every item, with the release it is planned for. The evidence behind each is in t
 | — | Second pass | N1–N6, I3 | ✅ V0.1.65 |
 | S2 | Safe defaults and identity | M1, M3, M4, M8, M9, L4, L7, L10, N2 residual | ✅ V0.1.67 |
 | S4 | Browser hardening | M2, M5, M6, L9 | ✅ V0.1.68 |
-| S3 | Host exposure | H2, H3, L8, M10 | V0.1.69 |
+| S3 | Host exposure | H2, H3, L8, M10 | ✅ V0.1.69 |
 | — | Server timeouts | N7 | V0.1.71 |
 | S5 | Robustness | M11, M12, L1, L5, L6 | V0.1.71, V0.1.74 |
 | — | Integrity | N8 | V0.1.73 |

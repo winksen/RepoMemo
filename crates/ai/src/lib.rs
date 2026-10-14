@@ -1,5 +1,5 @@
-use std::net::IpAddr;
-use std::sync::OnceLock;
+use std::net::{IpAddr, SocketAddr};
+use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
@@ -33,14 +33,34 @@ const METADATA_HOSTS: &[&str] = &[
     "metadata.azure.internal",
 ];
 
+/// The hosts AI providers may be reached at when the operator lists none:
+/// this machine (Ollama) and OpenRouter.
+pub const DEFAULT_ALLOWED_HOSTS: &[&str] = &["127.0.0.1", "localhost", "::1", "openrouter.ai"];
+
 /// Which addresses AI providers may be reached at. The server sets it once at
-/// startup from its configuration; without it every host is allowed except
-/// link-local and cloud-metadata addresses, which are always refused.
+/// startup from its configuration; link-local and cloud-metadata addresses are
+/// always refused, whatever it says.
 #[derive(Debug, Clone, Default)]
 pub struct EndpointPolicy {
     /// When set, a provider's host must equal one of these names, or end with
-    /// one that starts with a dot (`.example.com`).
+    /// one that starts with a dot (`.example.com`). When not set, every host
+    /// is allowed (the operator asked for that explicitly).
     pub allowed_hosts: Option<Vec<String>>,
+    /// Names other than `localhost` must resolve to publicly routable
+    /// addresses, so a name on the list cannot be pointed at the server's own
+    /// network (DNS rebinding). On for the built-in list; an operator's own
+    /// list is trusted to name internal services.
+    pub public_hostnames_only: bool,
+}
+
+impl EndpointPolicy {
+    /// The policy used when the operator lists no hosts.
+    pub fn built_in() -> Self {
+        Self {
+            allowed_hosts: Some(DEFAULT_ALLOWED_HOSTS.iter().map(|host| (*host).to_owned()).collect()),
+            public_hostnames_only: true,
+        }
+    }
 }
 
 static ENDPOINT_POLICY: OnceLock<EndpointPolicy> = OnceLock::new();
@@ -132,14 +152,83 @@ fn is_forbidden_address(address: &IpAddr) -> bool {
     }
 }
 
+/// Addresses that are not on the public internet: this machine, private and
+/// shared ranges, link-local and documentation addresses.
+fn is_non_public(address: &IpAddr) -> bool {
+    match address {
+        IpAddr::V4(v4) => {
+            let octets = v4.octets();
+            v4.is_loopback()
+                || v4.is_private()
+                || v4.is_link_local()
+                || v4.is_unspecified()
+                || v4.is_broadcast()
+                || v4.is_documentation()
+                || v4.is_multicast()
+                || octets[0] == 0
+                // 100.64.0.0/10, carrier-grade NAT.
+                || (octets[0] == 100 && (octets[1] & 0xc0) == 64)
+        }
+        IpAddr::V6(v6) => {
+            if let Some(mapped) = v6.to_ipv4_mapped() {
+                return is_non_public(&IpAddr::V4(mapped));
+            }
+            let first = v6.segments()[0];
+            v6.is_loopback()
+                || v6.is_unspecified()
+                || v6.is_multicast()
+                // fc00::/7 unique local, fe80::/10 link-local.
+                || (first & 0xfe00) == 0xfc00
+                || (first & 0xffc0) == 0xfe80
+        }
+    }
+}
+
+/// Which of `addresses` a provider connection may use (see [`EndpointPolicy`]).
+fn permitted_addresses(host: &str, addresses: Vec<SocketAddr>, public_only: bool) -> Vec<SocketAddr> {
+    let is_localhost = host.eq_ignore_ascii_case("localhost");
+    addresses
+        .into_iter()
+        .filter(|address| !is_forbidden_address(&address.ip()))
+        .filter(|address| is_localhost || !public_only || !is_non_public(&address.ip()))
+        .collect()
+}
+
+/// Looks provider names up itself, so the address that is checked is the
+/// address that is connected to: a name that resolves somewhere forbidden,
+/// now or after the URL was saved, is not reachable.
+struct CheckedResolver {
+    public_only: bool,
+}
+
+impl reqwest::dns::Resolve for CheckedResolver {
+    fn resolve(&self, name: reqwest::dns::Name) -> reqwest::dns::Resolving {
+        let public_only = self.public_only;
+        Box::pin(async move {
+            let host = name.as_str().to_owned();
+            let found: Vec<SocketAddr> = tokio::net::lookup_host((host.as_str(), 0)).await?.collect();
+            let allowed = permitted_addresses(&host, found, public_only);
+            if allowed.is_empty() {
+                let refusal: Box<dyn std::error::Error + Send + Sync> =
+                    "the provider host resolves only to addresses that are not allowed".into();
+                return Err(refusal);
+            }
+            let addresses: reqwest::dns::Addrs = Box::new(allowed.into_iter());
+            Ok(addresses)
+        })
+    }
+}
+
 /// An HTTP client for provider calls. Redirects are not followed: a provider
 /// answering with one could otherwise bounce requests (and API keys) to an
-/// address the URL checks never saw.
+/// address the URL checks never saw. Names are resolved through
+/// [`CheckedResolver`].
 fn provider_client(timeout: Duration) -> reqwest::Result<reqwest::Client> {
     reqwest::Client::builder()
         .timeout(timeout)
         .connect_timeout(CONNECT_TIMEOUT)
         .redirect(reqwest::redirect::Policy::none())
+        .dns_resolver(Arc::new(CheckedResolver { public_only: endpoint_policy().public_hostnames_only }))
         .build()
 }
 
@@ -431,7 +520,8 @@ impl AiProvider for OpenRouterProvider {
         )
         .await?;
         if let Some(message) = error_message(&body) {
-            bail!("OpenRouter could not build embeddings: {message}")
+            tracing::warn!(detail = %message, "OpenRouter could not build embeddings");
+            bail!("OpenRouter could not build embeddings. The server log has the provider's message.")
         }
         let mut rows = body["data"]
             .as_array()
@@ -633,6 +723,9 @@ async fn checked(response: reqwest::Response, action: &str) -> Result<reqwest::R
     if status.is_success() {
         return Ok(response);
     }
+    // The provider's own words stay in the server log: they come from
+    // whatever the configured address answers with, and nobody asked for
+    // them to be shown to whoever triggered the call (review H2).
     let body = read_body_limited(response, MAX_ERROR_BODY_BYTES)
         .await
         .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
@@ -640,7 +733,8 @@ async fn checked(response: reqwest::Response, action: &str) -> Result<reqwest::R
     let detail = serde_json::from_str::<Value>(&body)
         .ok()
         .and_then(|value| error_message(&value))
-        .unwrap_or_else(|| body.trim().chars().take(300).collect());
+        .unwrap_or_else(|| body.trim().chars().take(300).collect::<String>());
+    tracing::warn!(status = status.as_u16(), detail = %detail, "{action}");
     let hint = match status.as_u16() {
         401 | 403 => " Check the API key in the workspace AI settings.",
         402 => " The provider account has run out of credits.",
@@ -649,10 +743,7 @@ async fn checked(response: reqwest::Response, action: &str) -> Result<reqwest::R
         300..=399 => " The provider answered with a redirect, which is not followed; enter the final address as the base URL.",
         _ => "",
     };
-    if detail.is_empty() {
-        bail!("{action} (HTTP {}).{hint}", status.as_u16())
-    }
-    bail!("{action} (HTTP {}): {detail}.{hint}", status.as_u16())
+    bail!("{action} (HTTP {}).{hint}", status.as_u16())
 }
 
 fn error_message(value: &Value) -> Option<String> {
@@ -680,7 +771,8 @@ fn error_message(value: &Value) -> Option<String> {
 async fn openrouter_answer(response: reqwest::Response, empty_message: &str) -> Result<String> {
     let body: Value = read_json(response, "OpenRouter returned an invalid response").await?;
     if let Some(message) = error_message(&body) {
-        bail!("OpenRouter could not complete the request: {message}")
+        tracing::warn!(detail = %message, "OpenRouter could not complete the request");
+        bail!("OpenRouter could not complete the request. The server log has the provider's message.")
     }
     let answer = body
         .pointer("/choices/0/message/content")
@@ -937,12 +1029,41 @@ mod tests {
 
         let restricted = EndpointPolicy {
             allowed_hosts: Some(vec!["127.0.0.1".to_owned(), ".openrouter.ai".to_owned()]),
+            ..EndpointPolicy::default()
         };
         assert!(check_provider_url_with("http://127.0.0.1:11434", &restricted).is_ok());
         assert!(check_provider_url_with("https://openrouter.ai/api/v1", &restricted).is_ok());
         assert!(check_provider_url_with("https://eu.openrouter.ai/api/v1", &restricted).is_ok());
         assert!(check_provider_url_with("https://evil-openrouter.ai/api/v1", &restricted).is_err());
         assert!(check_provider_url_with("http://10.0.0.5:11434", &restricted).is_err());
+    }
+
+    #[test]
+    fn the_built_in_policy_allows_this_machine_and_openrouter_only() {
+        use super::{check_provider_url_with, EndpointPolicy};
+        let built_in = EndpointPolicy::built_in();
+        for allowed in ["http://127.0.0.1:11434", "http://localhost:11434", "http://[::1]:11434", "https://openrouter.ai/api/v1"] {
+            assert!(check_provider_url_with(allowed, &built_in).is_ok(), "{allowed} should be allowed");
+        }
+        for refused in ["http://192.168.1.20:11434", "http://10.0.0.5:11434", "https://api.openai.com/v1", "https://eu.openrouter.ai/api/v1"] {
+            assert!(check_provider_url_with(refused, &built_in).is_err(), "{refused} should be refused");
+        }
+    }
+
+    #[test]
+    fn resolved_addresses_are_filtered_before_connecting() {
+        use super::permitted_addresses;
+        use std::net::SocketAddr;
+        let at = |text: &str| text.parse::<SocketAddr>().unwrap();
+        let mixed = vec![at("10.0.0.5:0"), at("93.184.216.34:0"), at("169.254.169.254:0"), at("[fd00::1]:0")];
+        assert_eq!(permitted_addresses("openrouter.ai", mixed.clone(), true), vec![at("93.184.216.34:0")], "public addresses only");
+        assert_eq!(
+            permitted_addresses("llm.internal", mixed, false),
+            vec![at("10.0.0.5:0"), at("93.184.216.34:0"), at("[fd00::1]:0")],
+            "an operator's own list may name internal hosts, but never metadata addresses"
+        );
+        assert_eq!(permitted_addresses("localhost", vec![at("127.0.0.1:0")], true), vec![at("127.0.0.1:0")]);
+        assert!(permitted_addresses("evil.example", vec![at("127.0.0.1:0")], true).is_empty(), "a name pointed at loopback is refused");
     }
 
     #[test]

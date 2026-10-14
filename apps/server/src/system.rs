@@ -374,7 +374,7 @@ impl InstanceInfo {
                 "Secret key for stored credentials",
                 if config.secret_key.is_some() { "from REPOMEMO_SECRET_KEY".to_owned() } else { "key file in the data folder".to_owned() },
             ),
-            ("AI provider hosts", config.ai_allowed_hosts.as_deref().map_or_else(|| "any (metadata addresses refused)".to_owned(), list)),
+            ("AI provider hosts", config.ai_allowed_hosts.as_deref().map_or_else(|| "any (* set; metadata addresses refused)".to_owned(), list)),
             (
                 "Repository folders",
                 list(&config.repo_roots.iter().map(|root| root.to_string_lossy().into_owned()).collect::<Vec<_>>()),
@@ -706,11 +706,22 @@ struct StorageView {
 }
 
 #[derive(Debug, Serialize)]
+struct OfficePreviewsView {
+    available: bool,
+    /// What `soffice --version` reported, once it has answered.
+    version: Option<String>,
+    /// LibreOffice is started inside `REPOMEMO_SOFFICE_WRAPPER`.
+    sandboxed: bool,
+}
+
+#[derive(Debug, Serialize)]
 struct BackgroundView {
     indexing_queued: usize,
     embedding_workspaces_waiting: usize,
     repository_syncs_running: usize,
     preview_conversions_running: usize,
+    /// Office previews through LibreOffice (review M10).
+    office_previews: OfficePreviewsView,
     event_channels: usize,
     event_subscribers: usize,
     open_event_streams: usize,
@@ -766,6 +777,11 @@ pub(crate) async fn overview(
             embedding_workspaces_waiting: state.embedding_queue.waiting_count(),
             repository_syncs_running: state.repo_sync.running_count(),
             preview_conversions_running: state.converter.running_count(),
+            office_previews: OfficePreviewsView {
+                available: state.converter.enabled(),
+                version: state.converter.version(),
+                sandboxed: state.converter.sandboxed(),
+            },
             event_channels,
             event_subscribers,
             open_event_streams: state.telemetry.open_event_streams.load(Ordering::Relaxed),

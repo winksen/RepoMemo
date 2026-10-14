@@ -300,6 +300,7 @@ function OverviewSection({ accessToken }: { accessToken: string }) {
           ["Workspaces waiting for vectors", count(background.embedding_workspaces_waiting)],
           ["Repository syncs", count(background.repository_syncs_running)],
           ["Preview conversions", count(background.preview_conversions_running)],
+          ["LibreOffice", background.office_previews.available ? `${background.office_previews.version ?? "version not read yet"} · ${background.office_previews.sandboxed ? "in a sandbox" : "no sandbox"}` : "not installed"],
           ["Jobs", statistics.jobs_by_status.map((entry) => `${count(entry.count)} ${entry.label}`).join(" · ") || "none"],
           ["Live event streams", `${count(background.open_event_streams)} open · ${count(background.event_channels)} workspaces watched`],
           ["AI providers", `${count(statistics.enabled_provider_count)} enabled · ${count(statistics.cloud_provider_count)} cloud`],

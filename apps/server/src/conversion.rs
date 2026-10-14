@@ -9,6 +9,15 @@
 //! has a timeout after which the whole process tree is killed, and the output
 //! size is capped. Conversion never executes macros: LibreOffice's default
 //! macro security blocks them in headless mode.
+//!
+//! Sandboxing (review M10): LibreOffice parses files strangers uploaded, on
+//! the server's own host. It runs without the server's secrets (every
+//! `REPOMEMO_*` variable and anything named like a key, token or password is
+//! removed from its environment), in a folder of its own, and, when the
+//! operator sets `REPOMEMO_SOFFICE_WRAPPER`, inside that command (a container
+//! or a namespace without network and without the server's data folder; see
+//! the operations notes). The version it reports is shown in System ›
+//! Overview.
 
 use std::{
     collections::HashSet,
@@ -38,6 +47,10 @@ pub enum RenderState {
 
 struct Inner {
     soffice: Option<PathBuf>,
+    /// A command that LibreOffice is started through (`REPOMEMO_SOFFICE_WRAPPER`),
+    /// with `{work}` and `{profile}` replaced by the folders it needs.
+    wrapper: Vec<String>,
+    version: Mutex<Option<String>>,
     cache_dir: PathBuf,
     profile_dir: PathBuf,
     gate: Semaphore,
@@ -52,12 +65,12 @@ pub struct Converter {
 impl Converter {
     /// Looks for LibreOffice (`REPOMEMO_SOFFICE`, then the usual locations) and
     /// prepares the cache under the server data directory.
-    pub fn detect(data_dir: &Path) -> Self {
+    pub fn detect(data_dir: &Path, wrapper: Vec<String>) -> Self {
         let explicit = std::env::var_os("REPOMEMO_SOFFICE").map(PathBuf::from);
-        Self::with_binary(data_dir, explicit.or_else(find_soffice))
+        Self::with_options(data_dir, explicit.or_else(find_soffice), wrapper)
     }
 
-    pub fn with_binary(data_dir: &Path, soffice: Option<PathBuf>) -> Self {
+    pub fn with_options(data_dir: &Path, soffice: Option<PathBuf>, wrapper: Vec<String>) -> Self {
         let cache_dir = data_dir.join("previews");
         let _ = std::fs::create_dir_all(&cache_dir);
         // A restart is a fresh chance for files that failed before.
@@ -73,12 +86,74 @@ impl Converter {
         Self {
             inner: Arc::new(Inner {
                 soffice: soffice.filter(|path| path.exists() || path.components().count() == 1),
+                wrapper,
+                version: Mutex::new(None),
                 profile_dir: cache_dir.join("profile"),
                 cache_dir,
                 gate: Semaphore::new(1),
                 in_flight: Mutex::new(HashSet::new()),
             }),
         }
+    }
+
+    /// Whether LibreOffice is started inside the operator's sandbox command.
+    pub fn sandboxed(&self) -> bool {
+        !self.inner.wrapper.is_empty()
+    }
+
+    /// The version LibreOffice reported, once [`Converter::probe_version`] has run.
+    pub fn version(&self) -> Option<String> {
+        self.inner.version.lock().ok().and_then(|version| version.clone())
+    }
+
+    /// Asks LibreOffice for its version (for System › Overview). Quiet on
+    /// failure: the converter itself reports what goes wrong.
+    pub async fn probe_version(&self) {
+        let Some(soffice) = self.inner.soffice.clone() else { return };
+        let mut command = self.command(&soffice, &self.inner.cache_dir.join("tmp"));
+        command
+            .arg("--version")
+            .stdin(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .kill_on_drop(true);
+        let output = tokio::time::timeout(Duration::from_secs(30), command.output()).await;
+        if let Ok(Ok(output)) = output {
+            let text = String::from_utf8_lossy(&output.stdout);
+            if let Some(line) = text.lines().map(str::trim).find(|line| !line.is_empty()) {
+                if let Ok(mut version) = self.inner.version.lock() {
+                    *version = Some(line.chars().take(120).collect());
+                }
+            }
+        }
+    }
+
+    /// The command that starts LibreOffice: the wrapper (when set), then the
+    /// binary, with no secrets of the server's in its environment.
+    fn command(&self, soffice: &Path, work: &Path) -> Command {
+        let replace = |argument: &str| {
+            argument
+                .replace("{work}", &work.to_string_lossy())
+                .replace("{profile}", &self.inner.profile_dir.to_string_lossy())
+        };
+        let mut command = match self.inner.wrapper.split_first() {
+            Some((program, arguments)) => {
+                let mut command = Command::new(replace(program));
+                command.args(arguments.iter().map(|argument| replace(argument))).arg(soffice);
+                command
+            }
+            None => Command::new(soffice),
+        };
+        for (name, _) in std::env::vars() {
+            if is_secret_variable(&name) {
+                command.env_remove(name);
+            }
+        }
+        #[cfg(windows)]
+        {
+            // CREATE_NO_WINDOW: LibreOffice's launcher must never open a console.
+            command.creation_flags(0x0800_0000);
+        }
+        command
     }
 
     /// Conversions started and not finished yet.
@@ -269,7 +344,7 @@ impl Converter {
     }
 
     async fn run(&self, soffice: &Path, input: &Path, outdir: &Path) -> Result<(), String> {
-        let mut command = Command::new(soffice);
+        let mut command = self.command(soffice, outdir);
         command
             .arg("--headless")
             .arg("--norestore")
@@ -301,6 +376,17 @@ impl Converter {
             }
         }
     }
+}
+
+/// Variables LibreOffice has no use for and a hostile document must not reach:
+/// the server's own settings and anything that looks like a credential.
+fn is_secret_variable(name: &str) -> bool {
+    let upper = name.to_ascii_uppercase();
+    upper.starts_with("REPOMEMO_")
+        || upper == "RUST_LOG"
+        || ["KEY", "SECRET", "TOKEN", "PASSWORD", "PASSWD", "CREDENTIAL"]
+            .iter()
+            .any(|word| upper.contains(word))
 }
 
 fn safe_hash(value: &str) -> bool {
@@ -400,6 +486,31 @@ mod tests {
         let uri = file_uri(Path::new("C:/Users/A B/profile"));
         assert!(uri.starts_with("file://"));
         assert!(uri.contains("A%20B"));
+    }
+
+    #[test]
+    fn secrets_of_the_server_stay_out_of_libreoffice() {
+        for secret in ["REPOMEMO_SECRET_KEY", "repomemo_setup_code", "AWS_SECRET_ACCESS_KEY", "GITHUB_TOKEN", "DB_PASSWORD", "RUST_LOG"] {
+            assert!(is_secret_variable(secret), "{secret}");
+        }
+        for harmless in ["PATH", "SystemRoot", "TEMP", "HOME", "LANG"] {
+            assert!(!is_secret_variable(harmless), "{harmless}");
+        }
+    }
+
+    #[test]
+    fn the_wrapper_comes_before_the_binary() {
+        let converter = Converter::with_options(
+            &std::env::temp_dir().join("repomemo-wrapper-test"),
+            None,
+            vec!["sandbox".to_owned(), "--bind={work}".to_owned(), "--net=none".to_owned()],
+        );
+        assert!(converter.sandboxed());
+        let command = converter.command(Path::new("/usr/bin/soffice"), Path::new("/work/dir"));
+        let std_command = command.as_std();
+        assert_eq!(std_command.get_program().to_string_lossy(), "sandbox");
+        let arguments = std_command.get_args().map(|argument| argument.to_string_lossy().into_owned()).collect::<Vec<_>>();
+        assert_eq!(arguments, vec!["--bind=/work/dir", "--net=none", "/usr/bin/soffice"]);
     }
 
     #[test]

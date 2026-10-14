@@ -107,6 +107,9 @@ pub struct ServerConfig {
     /// LibreOffice executable used for Office previews. When unset the server
     /// looks for it; without it the extracted previews are used.
     pub soffice: Option<PathBuf>,
+    /// A command LibreOffice is started through (`REPOMEMO_SOFFICE_WRAPPER`),
+    /// split on spaces; `{work}` and `{profile}` stand for the folders it needs.
+    pub soffice_wrapper: Vec<String>,
     /// Key material for encrypting stored secrets (AI provider API keys).
     /// When unset a random key is kept in `secret.key` in the data directory.
     pub secret_key: Option<String>,
@@ -142,6 +145,9 @@ pub struct ServerConfig {
     pub ai_allowed_hosts: Option<Vec<String>>,
     /// Folders repository links must sit inside; empty allows any local folder.
     pub repo_roots: Vec<PathBuf>,
+    /// Folders git may read although another account owns them
+    /// (`REPOMEMO_GIT_SAFE_DIRECTORIES`).
+    pub git_safe_directories: Vec<PathBuf>,
     /// How often linked repositories are checked for new commits; `None`
     /// turns automatic syncing off.
     pub repo_poll_interval: Option<Duration>,
@@ -208,13 +214,19 @@ impl ServerConfig {
                 repomemo_storage::MIN_MASTER_KEY_CHARS
             );
         }
-        let ai_allowed_hosts = env_text("REPOMEMO_AI_ALLOWED_HOSTS").map(|hosts| {
-            hosts
-                .split(',')
-                .map(|host| host.trim().to_ascii_lowercase())
-                .filter(|host| !host.is_empty())
-                .collect::<Vec<_>>()
-        });
+        // Unset: this machine and OpenRouter only. `*` opens every host
+        // (link-local and cloud-metadata addresses stay refused).
+        let ai_allowed_hosts = match env_text("REPOMEMO_AI_ALLOWED_HOSTS") {
+            None => Some(repomemo_ai::DEFAULT_ALLOWED_HOSTS.iter().map(|host| (*host).to_owned()).collect()),
+            Some(hosts) if hosts.trim() == "*" => None,
+            Some(hosts) => Some(
+                hosts
+                    .split(',')
+                    .map(|host| host.trim().to_ascii_lowercase())
+                    .filter(|host| !host.is_empty())
+                    .collect::<Vec<_>>(),
+            ),
+        };
         let repo_roots = std::env::var_os("REPOMEMO_REPO_ROOTS")
             .map(|roots| {
                 std::env::split_paths(&roots)
@@ -251,6 +263,9 @@ impl ServerConfig {
             jwt_secret,
             allowed_origins,
             soffice: std::env::var_os("REPOMEMO_SOFFICE").map(PathBuf::from),
+            soffice_wrapper: env_text("REPOMEMO_SOFFICE_WRAPPER")
+                .map(|command| command.split_whitespace().map(str::to_owned).collect())
+                .unwrap_or_default(),
             secret_key,
             // Closed by default: people join with invitation links (review M1).
             allow_registration: env_flag("REPOMEMO_ALLOW_REGISTRATION", false)?,
@@ -267,6 +282,9 @@ impl ServerConfig {
             ai_quota: Quota::per_hour(env_parse("REPOMEMO_AI_REQUESTS_PER_HOUR", 120)?),
             ai_allowed_hosts,
             repo_roots,
+            git_safe_directories: std::env::var_os("REPOMEMO_GIT_SAFE_DIRECTORIES")
+                .map(|folders| std::env::split_paths(&folders).filter(|folder| !folder.as_os_str().is_empty()).collect())
+                .unwrap_or_default(),
             repo_poll_interval: (repo_poll_seconds > 0)
                 .then(|| Duration::from_secs(repo_poll_seconds.max(30))),
             maintenance: MaintenanceSettings {
@@ -305,6 +323,7 @@ impl ServerConfig {
             jwt_secret: "test-secret-that-is-long-enough-for-jwt-signing".to_owned(),
             allowed_origins: Vec::new(),
             soffice: None,
+            soffice_wrapper: Vec::new(),
             secret_key: None,
             allow_registration: true,
             trust_proxy: false,
@@ -321,6 +340,7 @@ impl ServerConfig {
             ai_quota: Quota::per_hour(0),
             ai_allowed_hosts: None,
             repo_roots: Vec::new(),
+            git_safe_directories: Vec::new(),
             repo_poll_interval: None,
             maintenance: MaintenanceSettings {
                 interval: Duration::ZERO,
@@ -1008,13 +1028,33 @@ async fn build_state(
     .await
     .context("preparing password verification")?;
 
+    let built_in_hosts = config.ai_allowed_hosts.as_deref().is_some_and(|hosts| {
+        hosts.len() == repomemo_ai::DEFAULT_ALLOWED_HOSTS.len()
+            && repomemo_ai::DEFAULT_ALLOWED_HOSTS.iter().all(|host| hosts.iter().any(|listed| listed == host))
+    });
     if !repomemo_ai::set_endpoint_policy(repomemo_ai::EndpointPolicy {
         allowed_hosts: config.ai_allowed_hosts.clone(),
+        // The built-in list stands for the public OpenRouter; an operator's own list may name internal services.
+        public_hostnames_only: built_in_hosts,
     }) {
         tracing::debug!("The AI endpoint policy was already set in this process");
     }
+    // Git runs on folders other people chose: isolate it from the service
+    // account's own configuration (review L8). The configured repository
+    // folders, and the ones the operator lists, are the trusted ones.
+    if !repomemo_git::harden(repomemo_git::Hardening {
+        safe_directories: config
+            .repo_roots
+            .iter()
+            .chain(config.git_safe_directories.iter())
+            .map(|folder| folder.to_string_lossy().replace('\\', "/"))
+            .collect(),
+    }) {
+        tracing::debug!("Git was already hardened in this process");
+    }
     let repo_policy = if config.repo_roots.is_empty() {
-        RepoLinkPolicy::unrestricted()
+        tracing::info!("Repository links are turned off: set REPOMEMO_REPO_ROOTS to the folders that hold repositories to turn them on");
+        RepoLinkPolicy::disabled()
     } else {
         let policy = RepoLinkPolicy::with_allowed_roots(config.repo_roots.clone())
             .context("REPOMEMO_REPO_ROOTS")?;
@@ -1042,11 +1082,16 @@ async fn build_state(
     let polling_task = repo_sync.start_polling(move || polling.current().repo_poll_interval);
 
     let converter = match config.soffice.clone() {
-        Some(path) => Converter::with_binary(&data_dir, Some(path)),
-        None => Converter::detect(&data_dir),
+        Some(path) => Converter::with_options(&data_dir, Some(path), config.soffice_wrapper.clone()),
+        None => Converter::detect(&data_dir, config.soffice_wrapper.clone()),
     };
     if converter.enabled() {
-        tracing::info!("LibreOffice found: Office files get layout-accurate previews");
+        tracing::info!(sandboxed = converter.sandboxed(), "LibreOffice found: Office files get layout-accurate previews");
+        // Not in tests: every test server would start LibreOffice.
+        if !cfg!(test) {
+            let probing = converter.clone();
+            tokio::spawn(async move { probing.probe_version().await });
+        }
     } else {
         tracing::info!("LibreOffice not found: Office previews show extracted text and tables");
     }
@@ -6550,7 +6595,10 @@ mod tests {
         git(&["add", "."]);
         git(&["commit", "--quiet", "-m", "Initial"]);
 
-        let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+        let mut config = ServerConfig::for_test(data_dir.clone());
+        // Links are off until the operator names the folders that hold repositories.
+        config.repo_roots = vec![base.join("repos")];
+        let app = router(config).await.unwrap();
         let read = |response: axum::response::Response| async move {
             serde_json::from_slice::<Value>(&to_bytes(response.into_body(), usize::MAX).await.unwrap())
                 .unwrap_or(Value::Null)
@@ -6618,8 +6666,11 @@ mod tests {
         assert_eq!(app.clone().oneshot(check(member, &repo_dir.display().to_string())).await.unwrap().status(), 403);
         for (link, expected) in [
             ("https://github.com/example/payments.git".to_owned(), "not supported yet"),
-            (base.join("missing").display().to_string(), "does not exist"),
-            (data_dir.display().to_string(), "not inside a git repository"),
+            (base.join("repos").join("missing").display().to_string(), "does not exist"),
+            (base.join("repos").display().to_string(), "not inside a git repository"),
+            // Outside the configured folders the answer is the same whether or not the path exists.
+            (base.join("missing").display().to_string(), "only links repositories inside"),
+            (data_dir.display().to_string(), "only links repositories inside"),
         ] {
             let response = app.clone().oneshot(check(owner, &link)).await.unwrap();
             assert_eq!(response.status(), 400, "{link}");

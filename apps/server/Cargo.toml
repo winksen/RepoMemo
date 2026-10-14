@@ -16,6 +16,7 @@ rand_core.workspace = true
 repomemo-ai.workspace = true
 repomemo-domain.workspace = true
 repomemo-api.workspace = true
+repomemo-git.workspace = true
 repomemo-storage.workspace = true
 serde.workspace = true
 serde_json.workspace = true

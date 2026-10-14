@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.1.68` (2026-10-14). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
+> **Scope:** reflects the code at `V0.1.69` (2026-10-14). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
 
 ---
 
@@ -301,7 +301,7 @@ Evidence can be organised in **nested folders, up to 5 levels**. Writers create,
 
 ### Business documents
 
-Office files, PDFs and emails are previewed in the browser: text and tables for Word and Excel, slides for PowerPoint, the message for Outlook, and the PDF itself. When **LibreOffice** is installed on the server, Word, Excel and PowerPoint files are also shown as a layout-accurate PDF. **Open in Office** opens the file in the desktop Office app through a short-lived link; download is always offered. OneNote text is recovered approximately and labelled so.
+Office files, PDFs and emails are previewed in the browser: text and tables for Word and Excel, slides for PowerPoint, the message for Outlook, and the PDF itself. When **LibreOffice** is installed on the server (System › Overview shows its version and whether it runs in a sandbox), Word, Excel and PowerPoint files are also shown as a layout-accurate PDF. **Open in Office** opens the file in the desktop Office app through a short-lived link; download is always offered. OneNote text is recovered approximately and labelled so.
 
 ### Working with evidence
 
