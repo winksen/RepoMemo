@@ -905,3 +905,116 @@ async fn unverified_accounts_are_held_back_until_an_invitation_or_a_link_proves_
     assert_eq!(taken.status(), 409);
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn a_person_chooses_where_each_kind_of_notice_reaches_them() {
+    let data_dir = temp_data_dir("notification-preferences");
+    let mut config = ServerConfig::for_test(data_dir.clone());
+    config.public_url = Some("https://memo.example.com".to_owned());
+    let app = router(config).await.unwrap();
+    let (admin, _) = register_account(&app, "prefs-admin@example.com").await;
+    let (member, member_body) = register_account(&app, "prefs-member@example.com").await;
+    let member_id = member_body["user"]["id"].as_str().unwrap().to_owned();
+    let workspace_id = create_workspace(&app, &admin).await;
+    join(
+        &app,
+        &admin,
+        "workspaces",
+        &workspace_id,
+        "prefs-member@example.com",
+        "member",
+    )
+    .await;
+    let saved = app
+        .clone()
+        .oneshot(json_request(
+            "PUT",
+            "/v1/system/mail",
+            &admin,
+            json!({"enabled": true, "host": "mail.invalid", "port": 587, "security": "starttls", "username": "",
+                   "from_address": "memo@example.com", "from_name": "RepoMemo"}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(saved.status(), 200);
+    let call = |method: &'static str, uri: &str, who: &str, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, uri, who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+
+    // The defaults, and what cannot be chosen.
+    let preferences =
+        response_json(call("GET", "/v1/profile/notification-preferences", &member, json!({})).await).await;
+    assert!(preferences
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|preference| preference["channel"] == "both"));
+    assert_eq!(
+        call(
+            "PUT",
+            "/v1/profile/notification-preferences",
+            &member,
+            json!({"kind": "password_reset_issued", "channel": "none"})
+        )
+        .await
+        .status(),
+        400,
+        "security notices cannot be turned off"
+    );
+    assert_eq!(
+        call(
+            "PUT",
+            "/v1/profile/notification-preferences",
+            &member,
+            json!({"kind": "task_assigned", "channel": "sometimes"})
+        )
+        .await
+        .status(),
+        400
+    );
+
+    let assign = |title: &'static str| {
+        call(
+            "POST",
+            &format!("/v1/workspaces/{workspace_id}/tasks"),
+            &admin,
+            json!({"title": title, "description": "", "status": "open", "priority": "medium", "assignee_user_id": member_id}),
+        )
+    };
+    let notices = || async {
+        response_json(call("GET", "/v1/notifications", &member, json!({})).await)
+            .await
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|notice| notice["notification_type"] == "task_assigned")
+            .count()
+    };
+    let mails = || async {
+        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+        response_json(call("GET", "/v1/system/mail/outbox", &admin, json!({})).await)
+            .await
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|entry| entry["kind"] == "task_assigned")
+            .count()
+    };
+
+    for (channel, expected_notices, expected_mails) in [("none", 0, 0), ("app", 1, 0), ("mail", 1, 1), ("both", 2, 2)] {
+        let chosen = call(
+            "PUT",
+            "/v1/profile/notification-preferences",
+            &member,
+            json!({"kind": "task_assigned", "channel": channel}),
+        )
+        .await;
+        assert_eq!(chosen.status(), 200);
+        assert_eq!(assign("A task").await.status(), 201);
+        assert_eq!(notices().await, expected_notices, "{channel}: notices");
+        assert_eq!(mails().await, expected_mails, "{channel}: mails");
+    }
+    let _ = std::fs::remove_dir_all(data_dir);
+}

@@ -481,6 +481,10 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route("/v1/session", get(session))
         .route("/v1/profile", get(get_profile).put(update_profile))
         .route("/v1/profile/password", post(change_profile_password))
+        .route(
+            "/v1/profile/notification-preferences",
+            get(profile::get_notification_preferences).put(profile::set_notification_preference),
+        )
         .route("/v1/profile/tasks", get(list_profile_tasks))
         .merge(avatars::routes())
         .route("/v1/notifications", get(list_notifications))

@@ -117,6 +117,78 @@ pub(crate) async fn update_profile(
         .map_err(map_storage_error)
 }
 
+/// The kinds of notice a person chooses a channel for. Security notices
+/// (password resets) always reach the app and the mail: they are not here.
+const CHOOSABLE_KINDS: [(&str, &str); 2] = [
+    ("task_assigned", "A task is assigned to you"),
+    ("evidence_mention", "You are mentioned in a comment"),
+];
+
+/// Where a notice of `kind` goes for this person: `(in the app, by mail)`.
+async fn delivery(state: &AppState, user_id: &str, kind: &str) -> (bool, bool) {
+    if !CHOOSABLE_KINDS.iter().any(|(known, _)| *known == kind) {
+        return (true, true);
+    }
+    match state.storage.notification_channel(user_id, kind).await.as_deref() {
+        Ok("app") => (true, false),
+        Ok("mail") => (false, true),
+        Ok("none") => (false, false),
+        _ => (true, true),
+    }
+}
+
+#[derive(serde::Serialize)]
+pub(crate) struct NotificationPreference {
+    kind: &'static str,
+    label: &'static str,
+    /// `both`, `app`, `mail` or `none`.
+    channel: String,
+}
+
+/// What a person chose for each kind of notice (the default is both).
+pub(crate) async fn get_notification_preferences(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+) -> Result<Json<Vec<NotificationPreference>>, ApiError> {
+    let chosen = state
+        .storage
+        .notification_preferences(&subject.user_id)
+        .await
+        .map_err(map_storage_error)?;
+    Ok(Json(
+        CHOOSABLE_KINDS
+            .iter()
+            .map(|(kind, label)| NotificationPreference {
+                kind,
+                label,
+                channel: chosen.get(*kind).cloned().unwrap_or_else(|| "both".to_owned()),
+            })
+            .collect(),
+    ))
+}
+
+#[derive(serde::Deserialize)]
+pub(crate) struct SetNotificationPreference {
+    kind: String,
+    channel: String,
+}
+
+pub(crate) async fn set_notification_preference(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Json(request): Json<SetNotificationPreference>,
+) -> Result<Json<Vec<NotificationPreference>>, ApiError> {
+    if !CHOOSABLE_KINDS.iter().any(|(kind, _)| *kind == request.kind) {
+        return Err(ApiError::bad_request("That kind of notice cannot be chosen."));
+    }
+    state
+        .storage
+        .set_notification_preference(&subject.user_id, &request.kind, &request.channel)
+        .await
+        .map_err(map_storage_error)?;
+    get_notification_preferences(subject, State(state)).await
+}
+
 pub(crate) async fn notify_task_assignee(state: &AppState, actor_user_id: &str, task: &CollaborationTask) {
     let Some(assignee) = task.assignee.as_ref() else {
         return;
@@ -124,30 +196,35 @@ pub(crate) async fn notify_task_assignee(state: &AppState, actor_user_id: &str, 
     if assignee.id == actor_user_id {
         return;
     }
-    create_notification(
-        state,
-        NewSharedNotification {
-            user_id: assignee.id.clone(),
-            workspace_id: Some(task.workspace_id.clone()),
-            notification_type: "task_assigned".to_owned(),
-            title: "Task assigned to you".to_owned(),
-            body: format!("{} was assigned to you.", task.title),
-            href: format!("/workspaces/{}/tasks", task.workspace_id),
-        },
-    )
-    .await;
-    crate::mail::mail_notification(
-        state,
-        crate::mail::NotificationMail {
-            kind: "task_assigned",
-            actor_id: actor_user_id,
-            recipient_id: &assignee.id,
-            action: "assigned you the task",
-            subject_title: &task.title,
-            path: &format!("/workspaces/{}/tasks", task.workspace_id),
-        },
-    )
-    .await;
+    let (in_app, by_mail) = delivery(state, &assignee.id, "task_assigned").await;
+    if in_app {
+        create_notification(
+            state,
+            NewSharedNotification {
+                user_id: assignee.id.clone(),
+                workspace_id: Some(task.workspace_id.clone()),
+                notification_type: "task_assigned".to_owned(),
+                title: "Task assigned to you".to_owned(),
+                body: format!("{} was assigned to you.", task.title),
+                href: format!("/workspaces/{}/tasks", task.workspace_id),
+            },
+        )
+        .await;
+    }
+    if by_mail {
+        crate::mail::mail_notification(
+            state,
+            crate::mail::NotificationMail {
+                kind: "task_assigned",
+                actor_id: actor_user_id,
+                recipient_id: &assignee.id,
+                action: "assigned you the task",
+                subject_title: &task.title,
+                path: &format!("/workspaces/{}/tasks", task.workspace_id),
+            },
+        )
+        .await;
+    }
 }
 
 pub(crate) async fn notify_artifact_mentions(
@@ -187,30 +264,35 @@ pub(crate) async fn notify_artifact_mentions(
             continue;
         }
         let path = format!("/workspaces/{workspace_id}/artifacts/{artifact_id}");
-        create_notification(
-            state,
-            NewSharedNotification {
-                user_id: member.user.id.clone(),
-                workspace_id: Some(workspace_id.to_owned()),
-                notification_type: "evidence_mention".to_owned(),
-                title: "You were mentioned in evidence discussion".to_owned(),
-                body: format!("You were mentioned on {}.", artifact_title),
-                href: path.clone(),
-            },
-        )
-        .await;
-        crate::mail::mail_notification(
-            state,
-            crate::mail::NotificationMail {
-                kind: "evidence_mention",
-                actor_id: actor_user_id,
-                recipient_id: &member.user.id,
-                action: "mentioned you on",
-                subject_title: artifact_title,
-                path: &path,
-            },
-        )
-        .await;
+        let (in_app, by_mail) = delivery(state, &member.user.id, "evidence_mention").await;
+        if in_app {
+            create_notification(
+                state,
+                NewSharedNotification {
+                    user_id: member.user.id.clone(),
+                    workspace_id: Some(workspace_id.to_owned()),
+                    notification_type: "evidence_mention".to_owned(),
+                    title: "You were mentioned in evidence discussion".to_owned(),
+                    body: format!("You were mentioned on {}.", artifact_title),
+                    href: path.clone(),
+                },
+            )
+            .await;
+        }
+        if by_mail {
+            crate::mail::mail_notification(
+                state,
+                crate::mail::NotificationMail {
+                    kind: "evidence_mention",
+                    actor_id: actor_user_id,
+                    recipient_id: &member.user.id,
+                    action: "mentioned you on",
+                    subject_title: artifact_title,
+                    path: &path,
+                },
+            )
+            .await;
+        }
     }
 }
 

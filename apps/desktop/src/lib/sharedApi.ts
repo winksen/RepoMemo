@@ -1241,6 +1241,21 @@ export function changeEmailAddress(accessToken: string, input: { email: string; 
   return request<SharedUser>("/v1/profile/email", { method: "PUT", body: JSON.stringify({ email: input.email, current_password: input.currentPassword }) }, accessToken);
 }
 
+export interface NotificationPreference {
+  kind: string;
+  label: string;
+  /** `both`, `app`, `mail` or `none`. */
+  channel: string;
+}
+
+export function getNotificationPreferences(accessToken: string): Promise<NotificationPreference[]> {
+  return request<NotificationPreference[]>("/v1/profile/notification-preferences", {}, accessToken);
+}
+
+export function setNotificationPreference(accessToken: string, kind: string, channel: string): Promise<NotificationPreference[]> {
+  return request<NotificationPreference[]>("/v1/profile/notification-preferences", { method: "PUT", body: JSON.stringify({ kind, channel }) }, accessToken);
+}
+
 export function getSystemMail(accessToken: string): Promise<import("../types").MailOverview> {
   return request<import("../types").MailOverview>("/v1/system/mail", {}, accessToken);
 }

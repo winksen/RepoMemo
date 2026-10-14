@@ -370,7 +370,7 @@ pub(crate) fn notification_message(actor: &str, action: &str, title: &str, link:
     let subject = format!("{actor} {action}: {title}");
     let body = format!(
         "{actor} {action} \"{title}\" on RepoMemo.\n\nOpen it here:\n\n{link}\n\n\
-         You get this message because the same notice is waiting for you in RepoMemo.\n"
+         You can choose which notices reach you by mail in your profile, under Notifications.\n"
     );
     (subject, body)
 }

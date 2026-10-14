@@ -604,6 +604,50 @@ impl StorageEngine {
     }
 }
 
+impl StorageEngine {
+    // ------------------------------------------------------ notification preferences
+
+    /// Where a person wants a kind of notice: `both` (the default), `app`, `mail` or `none`.
+    pub async fn notification_channel(&self, user_id: &str, kind: &str) -> Result<String> {
+        Ok(sqlx::query_scalar::<_, String>(
+            "SELECT channel FROM notification_preferences WHERE user_id = ?1 AND kind = ?2",
+        )
+        .bind(user_id)
+        .bind(kind)
+        .fetch_optional(self.reader())
+        .await?
+        .unwrap_or_else(|| "both".to_owned()))
+    }
+
+    /// The choices a person made, by kind.
+    pub async fn notification_preferences(&self, user_id: &str) -> Result<std::collections::HashMap<String, String>> {
+        let rows = sqlx::query_as::<_, (String, String)>(
+            "SELECT kind, channel FROM notification_preferences WHERE user_id = ?1",
+        )
+        .bind(user_id)
+        .fetch_all(self.reader())
+        .await?;
+        Ok(rows.into_iter().collect())
+    }
+
+    pub async fn set_notification_preference(&self, user_id: &str, kind: &str, channel: &str) -> Result<()> {
+        if !matches!(channel, "both" | "app" | "mail" | "none") {
+            repomemo_domain::bail_invalid!("A notice goes to the app, to mail, to both or to none.");
+        }
+        sqlx::query(
+            r#"INSERT INTO notification_preferences (user_id, kind, channel, updated_at) VALUES (?1, ?2, ?3, ?4)
+               ON CONFLICT(user_id, kind) DO UPDATE SET channel = excluded.channel, updated_at = excluded.updated_at"#,
+        )
+        .bind(user_id)
+        .bind(kind)
+        .bind(channel)
+        .bind(Utc::now().to_rfc3339())
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -51,6 +51,7 @@ export const accountKeys = {
   profile: (userId: string) => ["account", userId, "profile"] as const,
   profileTasks: (userId: string) => ["account", userId, "profile-tasks"] as const,
   notifications: (userId: string) => ["account", userId, "notifications"] as const,
+  notificationPreferences: (userId: string) => ["account", userId, "notification-preferences"] as const,
 };
 
 /** What a kind of change makes stale (P7): live events name one of these instead of reloading the page. */

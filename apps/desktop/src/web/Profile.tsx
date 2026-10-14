@@ -1,11 +1,12 @@
 import { type ChangeEvent, type FormEvent, useEffect, useRef, useState } from "react";
 import { IconCamera as Camera, IconChecklist as Checklist, IconChevronRight as ChevronRight, IconKey as Key, IconLoader2 as Loader, IconLogout as Logout, IconPencil as Pencil, IconTrash as Trash, IconUpload as Upload, IconUserCircle as UserCircle } from "@tabler/icons-react";
-import { changeEmailAddress, resendEmailVerification, changeSharedPassword, deleteSharedAvatar, fetchSharedAvatar, getSharedProfile, listSharedProfileTasks, signOutEverywhere, updateSharedProfile, uploadSharedAvatar } from "../lib/sharedApi";
+import { type NotificationPreference, changeEmailAddress, getNotificationPreferences, resendEmailVerification, setNotificationPreference, changeSharedPassword, deleteSharedAvatar, fetchSharedAvatar, getSharedProfile, listSharedProfileTasks, signOutEverywhere, updateSharedProfile, uploadSharedAvatar } from "../lib/sharedApi";
 import { type CollaborationTask, type Organization, type SharedSession, type SharedUser, type SharedWorkspace, type UserProfile } from "../types";
 import { UserAvatar } from "../components/UserAvatar";
 import { AVATAR_INPUT_TYPES, prepareAvatar } from "../lib/avatarImage";
 import { Button } from "../components/ui/button";
 import { Dialog, DialogCancel } from "../components/ui/dialog";
+import { Dropdown } from "../components/ui/dropdown";
 import { Input } from "../components/ui/input";
 import { Toast } from "../components/ui/toast";
 import { ApiTokensPanel } from "../components/ApiTokensPanel";
@@ -43,6 +44,9 @@ export function SharedProfile({
     key: accountKeys.profileTasks(session.user.id), fetch: () => listSharedProfileTasks(accessToken), initial: [], staleTime: 0,
   });
   const [displayName, setDisplayName] = useState(session.user.display_name);
+  const [preferences, setPreferences, preferencesQuery] = useServerState<NotificationPreference[]>({
+    key: accountKeys.notificationPreferences(session.user.id), fetch: () => getNotificationPreferences(accessToken), initial: [], staleTime: 0,
+  });
   const [newEmail, setNewEmail] = useState("");
   const [emailPassword, setEmailPassword] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
@@ -96,6 +100,12 @@ export function SharedProfile({
       setProfile((current) => current ? { ...current, user, updated_at: new Date().toISOString() } : current);
       setNotice("Profile name updated.");
     } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
+  }
+
+  async function chooseChannel(kind: string, channel: string) {
+    try {
+      setPreferences(await setNotificationPreference(accessToken, kind, channel));
+    } catch (requestError) { setError(apiMessage(requestError)); }
   }
 
   async function resendVerification() {
@@ -153,6 +163,10 @@ export function SharedProfile({
           <p className="shared-muted-copy">{profile?.email_verified === false ? (profile.verification_required ? "Confirm your address with the link we sent: until then you cannot create organizations or workspaces." : "This address has not been confirmed.") : `Invitations and notices go to ${profile?.user.email ?? "your address"}.`}</p>
           {profile?.email_verified === false ? <Button disabled={isSubmitting} onClick={() => void resendVerification()} type="button" variant="secondary">Send the link again</Button> : null}
           <form onSubmit={changeEmail}><label>New address<Input autoComplete="email" onChange={(event) => setNewEmail(event.target.value)} required type="email" value={newEmail} /></label><label>Current password<Input autoComplete="current-password" onChange={(event) => setEmailPassword(event.target.value)} required type="password" value={emailPassword} /></label><Button disabled={isSubmitting} type="submit" variant="secondary">Change address</Button></form>
+        </section>
+        <section className="shared-profile-panel"><div className="shared-panel-heading"><div><Checklist size={18} /><h2>Notifications</h2></div></div>
+          <p className="shared-muted-copy">Choose where each kind of notice reaches you. Password reset notices always reach you in the app and by mail.</p>
+          {preferences.map((preference) => <label key={preference.kind}>{preference.label}<Dropdown aria-label={preference.label} disabled={preferencesQuery.isLoading} onValueChange={(value) => void chooseChannel(preference.kind, value)} options={[{ label: "In the app and by mail", value: "both" }, { label: "In the app only", value: "app" }, { label: "By mail only", value: "mail" }, { label: "Nowhere", value: "none" }]} value={preference.channel} /></label>)}
         </section>
         <section className="shared-profile-panel"><div className="shared-panel-heading"><div><Key size={18} /><h2>Password</h2></div></div><form onSubmit={changePassword}><label>Current password<Input autoComplete="current-password" minLength={12} onChange={(event) => setCurrentPassword(event.target.value)} required type="password" value={currentPassword} /></label><label>New password<Input autoComplete="new-password" minLength={12} onChange={(event) => setNewPassword(event.target.value)} placeholder="At least 12 characters" required type="password" value={newPassword} /></label><label>Confirm new password<Input autoComplete="new-password" minLength={12} onChange={(event) => setConfirmPassword(event.target.value)} required type="password" value={confirmPassword} /></label><Button disabled={isSubmitting} type="submit" variant="secondary">{isSubmitting ? <Loader className="spin" size={16} /> : <Key size={16} />} Change password</Button></form></section>
         <section className="shared-profile-panel"><div className="shared-panel-heading"><div><Logout size={18} /><h2>Sessions</h2></div></div><p className="shared-muted-copy">Signed in on a shared or lost device? End every session at once, this one included. Changing your password also ends your sessions on other devices.</p><Button disabled={isSubmitting} onClick={() => setIsConfirmingSignOut(true)} type="button" variant="secondary"><Logout size={16} /> Sign out everywhere</Button></section>

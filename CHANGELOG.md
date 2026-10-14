@@ -2,6 +2,19 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.14 (2026-10-14)
+
+Notification preferences.
+
+### Added
+- **Profile › Notifications:** for each kind of notice a person can choose *in the app and by mail* (the default), *in the app only*, *by mail only* or *nowhere*. The kinds that can be chosen are a task assigned to you and a mention in a comment; both the in-app notice and its mail honour the choice, decided when the event happens.
+- **Security notices cannot be turned off:** password reset notices always reach the app and the mail (`PUT` for them is refused).
+- `GET` and `PUT /v1/profile/notification-preferences`, and migration 0027 (`notification_preferences`; no row means both).
+- Notification mails now point to the profile for the choice.
+
+### Upgrading
+- Nothing to do: everyone starts at *in the app and by mail*, which is what V0.2.12 did.
+
 ## V0.2.13 (2026-10-14)
 
 Email verification.
