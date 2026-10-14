@@ -815,58 +815,107 @@ pub(crate) async fn list_artifact_lifecycle_events(
         .map_err(map_storage_error)
 }
 
+/// Re-indexes one artifact. Answers `202 Accepted` with the running job at
+/// once; the work happens in the background and its progress and result arrive
+/// on the job (`GET /v1/jobs/{id}`, the event streams).
 pub(crate) async fn index_artifact(
     subject: AuthenticatedSubject,
     State(state): State<AppState>,
     Path(artifact_id): Path<String>,
-) -> Result<Json<IndexingJobStatus>, ApiError> {
+) -> Result<(StatusCode, Json<IndexingJobStatus>), ApiError> {
     let artifact = state
         .core
         .get_artifact(artifact_id.clone())
         .await
         .map_err(map_core_error)?;
     require_workspace_write(&state, &subject, &artifact.summary.workspace_id).await?;
-    let job = state.core.index_artifact(artifact_id).await.map_err(map_core_error)?;
-    state.embedding_queue.request(&artifact.summary.workspace_id);
-    record_workspace_activity(
-        &state,
-        &artifact.summary.workspace_id,
-        &subject.user_id,
-        "artifact_indexed",
-        "artifact",
-        Some(&artifact.summary.id),
-        format!("Indexed evidence: {}.", artifact.summary.title),
-    )
-    .await;
-    Ok(Json(job))
+    let pending = state
+        .core
+        .begin_index_artifact(artifact_id)
+        .await
+        .map_err(map_core_error)?;
+    let job = pending.job.clone();
+    let worker = state.clone();
+    let actor = subject.user_id.clone();
+    tokio::spawn(async move {
+        let workspace_id = artifact.summary.workspace_id.clone();
+        match worker.core.finish_index_artifact(pending).await {
+            Ok(_) => {
+                worker.embedding_queue.request(&workspace_id);
+                record_workspace_activity(
+                    &worker,
+                    &workspace_id,
+                    &actor,
+                    "artifact_indexed",
+                    "artifact",
+                    Some(&artifact.summary.id),
+                    format!("Indexed evidence: {}.", artifact.summary.title),
+                )
+                .await;
+            }
+            // The job already carries the reason; the log is for the operator.
+            Err(error) => tracing::warn!(error = %error, artifact_id = %artifact.summary.id, "Manual indexing failed"),
+        }
+    });
+    Ok((StatusCode::ACCEPTED, Json(job)))
 }
 
-/// Re-indexes the whole workspace inside the request. Administrators only:
-/// it holds a connection and the server's indexing work for as long as it
-/// runs, and new evidence is indexed in the background anyway.
+/// Whether a workspace-wide re-index is among these jobs and still running.
+fn workspace_reindex_running(jobs: &[IndexingJobStatus]) -> bool {
+    jobs.iter().any(|job| {
+        job.kind == "indexing"
+            && job.stage == "chunking_workspace"
+            && matches!(job.status.as_str(), "running" | "pending")
+    })
+}
+
+/// Re-indexes the whole workspace. Administrators only. Answers `202 Accepted`
+/// with the running job, whose progress is the number of files done out of the
+/// stale ones; a second request while one runs is a `409`. The job can be
+/// stopped with `POST /v1/jobs/{id}/cancel`.
 pub(crate) async fn index_workspace(
     subject: AuthenticatedSubject,
     State(state): State<AppState>,
     Path(workspace_id): Path<String>,
-) -> Result<Json<IndexingJobStatus>, ApiError> {
+) -> Result<(StatusCode, Json<IndexingJobStatus>), ApiError> {
     require_workspace_admin(&state, &subject, &workspace_id).await?;
-    let job = state
+    let running = state
+        .storage
+        .list_workspace_jobs(&workspace_id, Some("indexing"), Some("running"), 50)
+        .await
+        .map_err(map_storage_error)?;
+    if workspace_reindex_running(&running) {
+        return Err(ApiError::conflict("A re-index of this workspace is already running."));
+    }
+    let pending = state
         .core
-        .index_workspace(workspace_id.clone())
+        .begin_index_workspace(workspace_id.clone())
         .await
         .map_err(map_core_error)?;
-    state.embedding_queue.request(&workspace_id);
-    record_workspace_activity(
-        &state,
-        &workspace_id,
-        &subject.user_id,
-        "workspace_indexed",
-        "workspace",
-        Some(&workspace_id),
-        "Indexed the workspace evidence.".to_owned(),
-    )
-    .await;
-    Ok(Json(job))
+    let job = pending.job.clone();
+    let worker = state.clone();
+    let actor = subject.user_id.clone();
+    tokio::spawn(async move {
+        match worker.core.finish_index_workspace(pending).await {
+            Ok(finished) => {
+                worker.embedding_queue.request(&workspace_id);
+                if finished.status == "completed" {
+                    record_workspace_activity(
+                        &worker,
+                        &workspace_id,
+                        &actor,
+                        "workspace_indexed",
+                        "workspace",
+                        Some(&workspace_id),
+                        "Indexed the workspace evidence.".to_owned(),
+                    )
+                    .await;
+                }
+            }
+            Err(error) => tracing::warn!(error = %error, workspace_id = %workspace_id, "Workspace re-index failed"),
+        }
+    });
+    Ok((StatusCode::ACCEPTED, Json(job)))
 }
 
 pub(crate) async fn list_workspace_jobs(
@@ -1117,4 +1166,52 @@ pub(crate) async fn upload_artifact_version(
         folder_id,
         repository_id: None,
     }))
+}
+
+#[cfg(test)]
+mod reindex_tests {
+    use super::*;
+
+    fn job(kind: &str, status: &str, stage: &str) -> IndexingJobStatus {
+        IndexingJobStatus {
+            id: "j".to_owned(),
+            workspace_id: "w".to_owned(),
+            source_id: None,
+            kind: kind.to_owned(),
+            status: status.to_owned(),
+            stage: stage.to_owned(),
+            progress_current: 0,
+            progress_total: None,
+            error_message: None,
+            cancel_requested: false,
+            created_at: String::new(),
+            updated_at: String::new(),
+        }
+    }
+
+    #[test]
+    fn only_a_running_whole_workspace_pass_blocks_another() {
+        assert!(workspace_reindex_running(&[job(
+            "indexing",
+            "running",
+            "chunking_workspace"
+        )]));
+        // A single file being indexed, a finished pass or another kind of job do not.
+        assert!(!workspace_reindex_running(&[job(
+            "indexing",
+            "running",
+            "extracting_text"
+        )]));
+        assert!(!workspace_reindex_running(&[job(
+            "indexing",
+            "completed",
+            "chunked_workspace"
+        )]));
+        assert!(!workspace_reindex_running(&[job(
+            "embedding",
+            "running",
+            "chunking_workspace"
+        )]));
+        assert!(!workspace_reindex_running(&[]));
+    }
 }

@@ -908,12 +908,34 @@ export function transferSharedOrganizationOwnership(accessToken: string, organiz
   }, accessToken);
 }
 
+/** Starts re-indexing a workspace (administrators). The server answers `202` with the running job: follow it with `getSharedJob`, or on the event stream. */
 export function indexSharedWorkspace(accessToken: string, workspaceId: string): Promise<IndexingJobStatus> {
   return request<IndexingJobStatus>(`/v1/workspaces/${workspaceId}/index`, { method: "POST" }, accessToken);
 }
 
+/** Starts re-indexing one file. Answers `202` with the running job, as `indexSharedWorkspace` does. */
 export function indexSharedArtifact(accessToken: string, artifactId: string): Promise<IndexingJobStatus> {
   return request<IndexingJobStatus>(`/v1/artifacts/${artifactId}/index`, { method: "POST" }, accessToken);
+}
+
+export function getSharedJob(accessToken: string, jobId: string): Promise<IndexingJobStatus> {
+  return request<IndexingJobStatus>(`/v1/jobs/${jobId}`, {}, accessToken);
+}
+
+const JOB_POLL_MS = 800;
+
+/** Waits for a job the server accepted to leave `running`, polling its row. Resolves with the finished job. */
+export async function waitForSharedJob(
+  accessToken: string,
+  job: IndexingJobStatus,
+  isCancelled: () => boolean = () => false,
+): Promise<IndexingJobStatus> {
+  let current = job;
+  while ((current.status === "running" || current.status === "pending") && !isCancelled()) {
+    await new Promise((resolve) => setTimeout(resolve, JOB_POLL_MS));
+    current = await getSharedJob(accessToken, current.id);
+  }
+  return current;
 }
 
 /** Administrator-only view of the stored index chunks of one artifact. */

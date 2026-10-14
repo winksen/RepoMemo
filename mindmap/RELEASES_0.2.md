@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.2 → 0.3
 
-> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.5` (2026-10-14) · **Next:** `V0.2.6`
+> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.6` (2026-10-14) · **Next:** `V0.2.7`
 > **Previous line:** [Releases 0.1 → 0.2](RELEASES_0.1.md) · **Related:** [Roadmap, Road to V0.3.0](ROADMAP.md#-road-to-v030) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
 Every release of the 0.2 line, shipped and planned, one row each. The plan comes from the [Road to V0.3.0](ROADMAP.md#-road-to-v030): **one change per release**, each shippable alone, with the security rules for a new outside connection in the release that opens it. Planned rows are proposals until decisions 7–14 in the roadmap are agreed.
@@ -38,7 +38,7 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | **V0.2.3** | ✅ 2026-10-14 | A. After 0.2.0 | 🔧 Enhancement | Web data | The dashboard, profile, notifications, evidence detail and memory card pages read through the query cache; live events mark them stale, and the memory card page follows the workspace stream; `staleTime` and `accountKeys`; 32 web tests (C13b) | No page loads its own data outside the cache; live events refresh them |
 | **V0.2.4** | ✅ 2026-10-14 | A. After 0.2.0 | 🔧 Enhancement | Web tests | Rendering tests of the invitation page (every link state, with and without an account, signed in as someone else, a failed join) and the password reset page; 51 web tests, no product code changed (C13c) | Each state of both pages (valid, used, expired, signed in as someone else) has a test |
 | **V0.2.5** | ✅ 2026-10-14 | A. After 0.2.0 | 📘 Update | Styles | `styles.css` and `blueprint-refinement.css` became twelve files in `src/styles/` (largest 879 lines) imported in cascade order, 47 dead rules removed, `npm run styles:check` in CI (C11) | No stylesheet over 1,000 lines; no visual change |
-| **V0.2.6** | 🔜 Planned | A. After 0.2.0 | 🔧 Enhancement | Jobs | Manual re-index endpoints answer `202` with the job instead of indexing inside the request (C14) | No request indexes in place; the admin dialog follows the job |
+| **V0.2.6** | ✅ 2026-10-14 | A. After 0.2.0 | 🔧 Enhancement | Jobs | Both manual re-index endpoints answer `202` with the running job and finish in the background; `409` while a workspace pass runs; the chunks dialog follows the job (C14) | No request indexes in place; the admin dialog follows the job |
 | **V0.2.7** | 🔜 Planned | A. After 0.2.0 | ✨ Feature | Console | Workspace commands for system administrators: `workspace reindex`, `repo sync`, `embeddings rebuild` (F9) | Each has a dry run and an audit line |
 | **V0.2.8** | 🔜 Planned | A. After 0.2.0 | 🔧 Enhancement | Map and health | Recompute only what a change touched instead of the whole workspace (P11) | A one-file change recomputes in under 10% of a full run at 50,000 passages |
 | **V0.2.9** | 🔜 Planned | B. Mail | ✨ Feature | System › Settings | SMTP delivery: settings with an encrypted password, an outbox with retries, *Send test mail*, console `mail test` (F6a, decision 7) | A test mail arrives through a TLS server; a slow server never holds a request; the SMTP host follows the outbound address rules |

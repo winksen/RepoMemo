@@ -2,6 +2,18 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.6 (2026-10-14)
+
+Manual re-indexing no longer holds a request open.
+
+### Changed
+- **`POST /v1/artifacts/{id}/index` and `POST /v1/workspaces/{id}/index` answer `202 Accepted`** with the running job instead of waiting for the indexing to finish. The work continues in the background; the job's status, progress (files done out of the stale ones, for a workspace) and failure reason are on `GET /v1/jobs/{id}` and on the event streams, and the embedding and the activity entry follow when it completes. A workspace pass can be stopped with `POST /v1/jobs/{id}/cancel`.
+- **One whole-workspace pass at a time:** starting a second while one runs answers `409` with the reason.
+- The chunks dialog (workspace administrators, on a file's page) follows the job and shows its failure reason, so *Re-index* behaves as before from the person's side.
+
+### Upgrading
+- Scripts that call these two endpoints and read the job in the answer must now expect `status: "running"` and poll `GET /v1/jobs/{id}` until it is `completed`, `failed` or `cancelled`. The desktop app is unaffected.
+
 ## V0.2.5 (2026-10-14)
 
 The stylesheets, split.

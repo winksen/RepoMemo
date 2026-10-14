@@ -84,12 +84,64 @@ async fn indexing_publishes_jobs_that_can_be_listed_and_cancelled() {
         ))
         .await
         .unwrap();
-    assert_eq!(indexed.status(), 200);
+    // A manual re-index is accepted, not done inside the request: the job
+    // comes back running and finishes in the background.
+    assert_eq!(indexed.status(), 202);
     let indexed_job: Value = serde_json::from_slice(&to_bytes(indexed.into_body(), usize::MAX).await.unwrap()).unwrap();
     let job_id = indexed_job["id"].as_str().unwrap().to_owned();
     assert_eq!(indexed_job["kind"], "indexing");
-    assert_eq!(indexed_job["status"], "completed");
+    assert_eq!(indexed_job["status"], "running");
     assert_eq!(indexed_job["cancel_requested"], false);
+    let mut finished = indexed_job.clone();
+    for _ in 0..100 {
+        let polled = app
+            .clone()
+            .oneshot(auth_request("GET", &format!("/v1/jobs/{job_id}"), &authorization))
+            .await
+            .unwrap();
+        assert_eq!(polled.status(), 200);
+        finished = serde_json::from_slice(&to_bytes(polled.into_body(), usize::MAX).await.unwrap()).unwrap();
+        if finished["status"] != "running" {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+    assert_eq!(finished["status"], "completed", "the job ends on its own: {finished}");
+
+    // The whole workspace is re-indexed the same way, with the job as the answer.
+    let workspace_index = app
+        .clone()
+        .oneshot(json_request(
+            "POST",
+            &format!("/v1/workspaces/{workspace_id}/index"),
+            &authorization,
+            json!({}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(workspace_index.status(), 202);
+    let workspace_job: Value =
+        serde_json::from_slice(&to_bytes(workspace_index.into_body(), usize::MAX).await.unwrap()).unwrap();
+    assert_eq!(workspace_job["kind"], "indexing");
+    assert_eq!(workspace_job["stage"], "chunking_workspace");
+    let workspace_job_id = workspace_job["id"].as_str().unwrap().to_owned();
+    for _ in 0..100 {
+        let polled = app
+            .clone()
+            .oneshot(auth_request(
+                "GET",
+                &format!("/v1/jobs/{workspace_job_id}"),
+                &authorization,
+            ))
+            .await
+            .unwrap();
+        let polled: Value = serde_json::from_slice(&to_bytes(polled.into_body(), usize::MAX).await.unwrap()).unwrap();
+        if polled["status"] != "running" {
+            assert_eq!(polled["status"], "completed", "{polled}");
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
 
     let listed = app
         .clone()

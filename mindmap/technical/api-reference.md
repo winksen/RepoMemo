@@ -1,6 +1,6 @@
 # HTTP API reference
 
-> **Branch of:** [TECHNICAL_MINDMAP.md §5](../TECHNICAL_MINDMAP.md#5-http-api-reference-167-operations-under-v1) · **Generated** from the router and the handler signatures by `node scripts/list-routes.mjs --markdown`; the guard column is read from the handler bodies, so check a route's handler before relying on a row · **Status:** V0.1.76
+> **Branch of:** [TECHNICAL_MINDMAP.md §5](../TECHNICAL_MINDMAP.md#5-http-api-reference-167-operations-under-v1) · **Generated** from the router and the handler signatures by `node scripts/list-routes.mjs --markdown`; the guard column is read from the handler bodies, so check a route's handler before relying on a row · **Status:** V0.2.6 (the two index routes edited by hand; regenerate before the next release candidate)
 
 162 routes of the main router, plus the platform routes (`/v1/platform/*`, [environment.rs](../../apps/server/src/environment.rs), served before an environment is attached) and the avatar routes (`/v1/users/{id}/avatar`, `/v1/profile/avatar`, [avatars.rs](../../apps/server/src/avatars.rs)).
 
@@ -143,8 +143,8 @@
 | GET | `/v1/artifacts/{artifact_id}/lifecycle` | auth | require_workspace_read | — | ArtifactLifecycle |
 | PUT | `/v1/artifacts/{artifact_id}/lifecycle` | auth | require_workspace_write | SaveArtifactLifecycleRequest | ArtifactLifecycle |
 | GET | `/v1/artifacts/{artifact_id}/lifecycle/history` | auth | require_workspace_read | — | Vec<ArtifactLifecycleEvent |
-| POST | `/v1/artifacts/{artifact_id}/index` | auth | require_workspace_write | — | IndexingJobStatus |
-| POST | `/v1/workspaces/{workspace_id}/index` | auth | require_workspace_admin | — | IndexingJobStatus |
+| POST | `/v1/artifacts/{artifact_id}/index` | auth | require_workspace_write | — | 202 IndexingJobStatus (running; done in the background) |
+| POST | `/v1/workspaces/{workspace_id}/index` | auth | require_workspace_admin | — | 202 IndexingJobStatus (running; 409 while one runs) |
 | POST | `/v1/workspaces/{workspace_id}/artifacts/bulk` | auth | require_workspace_write | BulkArtifactsRequest | BulkArtifactsResponse |
 | POST | `/v1/workspaces/{workspace_id}/folders/{folder_id}/move` | auth | require_workspace_write | MoveFolderRequest | Folder |
 | POST | `/v1/artifacts/{artifact_id}/versions` | auth | require_workspace_write | — | SharedArtifactSummary |

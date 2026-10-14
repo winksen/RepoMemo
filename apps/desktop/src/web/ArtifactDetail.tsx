@@ -1,7 +1,7 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { SafeMarkdown } from "../components/SafeMarkdown";
 import { IconLoader2 as Loader, IconMessageCircle as MessageCircle, IconPencil as Pencil, IconShieldLock as Shield, IconStack2 as Layers, IconTrash as Trash, IconUpload as Upload } from "@tabler/icons-react";
-import { uploadSharedArtifactVersion, createSharedArtifactComment, deleteSharedArtifact, deleteSharedArtifactComment, getSharedArtifact, getSharedArtifactLifecycle, indexSharedArtifact, listSharedArtifactChunks, listSharedArtifactComments, listSharedArtifactLifecycleEvents, updateSharedArtifact, updateSharedArtifactComment, updateSharedArtifactLifecycle } from "../lib/sharedApi";
+import { uploadSharedArtifactVersion, createSharedArtifactComment, deleteSharedArtifact, deleteSharedArtifactComment, getSharedArtifact, getSharedArtifactLifecycle, indexSharedArtifact, listSharedArtifactChunks, waitForSharedJob, listSharedArtifactComments, listSharedArtifactLifecycleEvents, updateSharedArtifact, updateSharedArtifactComment, updateSharedArtifactLifecycle } from "../lib/sharedApi";
 import { type ArtifactComment, type ArtifactDetail, type ArtifactLifecycle, type ArtifactLifecycleEvent, type ArtifactLifecycleStatus, type ArtifactSummary, type Chunk, type Organization, type SharedSession, type SharedWorkspace } from "../types";
 import { Button } from "../components/ui/button";
 import { Dropdown } from "../components/ui/dropdown";
@@ -261,6 +261,8 @@ export function IndexedChunksDialog({
   const [reindexError, setError] = useState<string | null>(null);
   const error = reindexError ?? (chunksQuery.error ? apiMessage(chunksQuery.error) : null);
   const [isReindexing, setIsReindexing] = useState(false);
+  const mounted = useRef(true);
+  useEffect(() => () => { mounted.current = false; }, []);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -269,7 +271,14 @@ export function IndexedChunksDialog({
 
   async function reindex() {
     setIsReindexing(true); setError(null);
-    try { await indexSharedArtifact(accessToken, artifact.id); await queryClient.invalidateQueries({ queryKey: chunksKey }); onReindexed(); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsReindexing(false); }
+    try {
+      // The server accepts the re-index and does it in the background: follow its job.
+      const job = await waitForSharedJob(accessToken, await indexSharedArtifact(accessToken, artifact.id), () => !mounted.current);
+      if (!mounted.current) return;
+      if (job.status !== "completed") throw new Error(job.error_message ?? "Indexing did not finish.");
+      await queryClient.invalidateQueries({ queryKey: chunksKey });
+      onReindexed();
+    } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsReindexing(false); }
   }
 
   return (

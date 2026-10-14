@@ -373,6 +373,13 @@ impl RepoMemoCore {
     }
 
     pub async fn index_artifact(&self, artifact_id: String) -> Result<IndexingJobStatus> {
+        let pending = self.begin_index_artifact(artifact_id).await?;
+        self.finish_index_artifact(pending).await
+    }
+
+    /// The first half of indexing one artifact: checks it, and records a
+    /// running job so a caller can hand it back before the work is done.
+    pub async fn begin_index_artifact(&self, artifact_id: String) -> Result<PendingArtifactIndex> {
         if artifact_id.trim().is_empty() {
             repomemo_domain::bail_invalid!("Artifact id is required.");
         }
@@ -387,10 +394,15 @@ impl RepoMemoCore {
             .storage
             .create_indexing_job(&summary.workspace_id, Some(&summary.source_id), stage, Some(1))
             .await?;
+        Ok(PendingArtifactIndex { job, summary })
+    }
 
+    /// The second half: does the work and closes the job, completed or failed.
+    pub async fn finish_index_artifact(&self, pending: PendingArtifactIndex) -> Result<IndexingJobStatus> {
+        let PendingArtifactIndex { job, summary } = pending;
         match self.index_artifact_inner(&summary).await {
             Ok(result) => {
-                let _ = self.storage.clear_index_failure(&artifact_id).await;
+                let _ = self.storage.clear_index_failure(&summary.id).await;
                 self.storage
                     .update_indexing_job(&job.id, "completed", &result.stage, 1, None)
                     .await
@@ -406,6 +418,13 @@ impl RepoMemoCore {
     }
 
     pub async fn index_workspace(&self, workspace_id: String) -> Result<IndexingJobStatus> {
+        let pending = self.begin_index_workspace(workspace_id).await?;
+        self.finish_index_workspace(pending).await
+    }
+
+    /// The first half of re-indexing a workspace: finds what is stale and
+    /// records a running job whose total is that number.
+    pub async fn begin_index_workspace(&self, workspace_id: String) -> Result<PendingWorkspaceIndex> {
         if workspace_id.trim().is_empty() {
             repomemo_domain::bail_invalid!("Workspace id is required.");
         }
@@ -424,7 +443,13 @@ impl RepoMemoCore {
             .storage
             .create_job(&workspace_id, None, "indexing", "chunking_workspace", Some(total))
             .await?;
+        Ok(PendingWorkspaceIndex { job, artifacts })
+    }
 
+    /// The second half: indexes one artifact after another, honouring a
+    /// cancel request between them, and closes the job.
+    pub async fn finish_index_workspace(&self, pending: PendingWorkspaceIndex) -> Result<IndexingJobStatus> {
+        let PendingWorkspaceIndex { job, artifacts } = pending;
         let mut indexed = 0_i64;
         for artifact in artifacts {
             if self.storage.is_job_cancel_requested(&job.id).await? {
@@ -1187,6 +1212,20 @@ impl RepoMemoCore {
 
 struct ArtifactIndexResult {
     stage: String,
+}
+
+/// One artifact that has been checked and has a running job, but is not
+/// indexed yet: what a caller holds between `begin_index_artifact` and
+/// `finish_index_artifact` (an HTTP handler answers `202` in between).
+pub struct PendingArtifactIndex {
+    pub job: IndexingJobStatus,
+    summary: ArtifactSummary,
+}
+
+/// A workspace re-index that has found what is stale and has a running job.
+pub struct PendingWorkspaceIndex {
+    pub job: IndexingJobStatus,
+    artifacts: Vec<ArtifactSummary>,
 }
 
 /// Splits consecutive sections into parts of at most `max_chars` (a single
