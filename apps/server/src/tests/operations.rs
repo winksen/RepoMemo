@@ -336,3 +336,126 @@ async fn the_console_lists_backups_and_asks_before_changing_anything() {
     assert_eq!(listed["data"].as_array().unwrap().len(), 1);
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn mail_is_set_up_in_system_settings_and_sent_from_the_outbox() {
+    let data_dir = temp_data_dir("mail");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let (admin, _) = register_account(&app, "mail-admin@example.com").await;
+    let (member, _) = register_account(&app, "mail-member@example.com").await;
+    let call = |method: &'static str, uri: &str, who: &str, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, uri, who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let settings = |host: &str| {
+        json!({"enabled": true, "host": host, "port": 587, "security": "starttls", "username": "memo",
+               "password": "smtp-password-1", "from_address": "memo@example.com", "from_name": "RepoMemo"})
+    };
+
+    // Nothing is set up at first, and only administrators look.
+    let first = response_json(call("GET", "/v1/system/mail", &admin, json!({})).await).await;
+    assert_eq!(first["settings"]["configured"], false);
+    assert_eq!(call("GET", "/v1/system/mail", &member, json!({})).await.status(), 403);
+    assert_eq!(
+        call("PUT", "/v1/system/mail", &member, settings("mail.invalid"))
+            .await
+            .status(),
+        403
+    );
+
+    // The test mail needs mail to be set up.
+    let early = call("POST", "/v1/system/mail/test", &admin, json!({"to": "ada@example.com"})).await;
+    assert_eq!(early.status(), 409);
+
+    // Hosts that must not be called are refused when they are saved.
+    for host in ["169.254.169.254", "metadata.google.internal", "10.0.0.5", "127.0.0.1"] {
+        assert_eq!(
+            call("PUT", "/v1/system/mail", &admin, settings(host)).await.status(),
+            400,
+            "{host}"
+        );
+    }
+    let mut plain = settings("mail.invalid");
+    plain["security"] = json!("none");
+    assert_eq!(call("PUT", "/v1/system/mail", &admin, plain).await.status(), 400);
+
+    // Saved: the password is never given back, only that there is one.
+    let saved = call("PUT", "/v1/system/mail", &admin, settings("mail.invalid")).await;
+    assert_eq!(saved.status(), 200);
+    let saved = response_json(saved).await;
+    assert_eq!(saved["settings"]["password_set"], true);
+    assert_eq!(saved["settings"]["host"], "mail.invalid");
+    assert!(!saved.to_string().contains("smtp-password-1"));
+    let mut keep = settings("mail.invalid");
+    keep.as_object_mut().unwrap().remove("password");
+    let kept = response_json(call("PUT", "/v1/system/mail", &admin, keep.clone()).await).await;
+    assert_eq!(
+        kept["settings"]["password_set"], true,
+        "absent keeps the saved password"
+    );
+    keep["password"] = json!("");
+    let cleared = response_json(call("PUT", "/v1/system/mail", &admin, keep.clone()).await).await;
+    assert_eq!(cleared["settings"]["password_set"], false, "empty removes it");
+    let _ = call("PUT", "/v1/system/mail", &admin, settings("mail.invalid")).await;
+
+    // A test mail is accepted at once, whatever the mail server does. Here the
+    // name never resolves, so the message waits for a retry and says why.
+    assert_eq!(
+        call("POST", "/v1/system/mail/test", &admin, json!({"to": "not an address"}))
+            .await
+            .status(),
+        400
+    );
+    let queued = call("POST", "/v1/system/mail/test", &admin, json!({"to": "ada@example.com"})).await;
+    assert_eq!(queued.status(), 202);
+    let entry = response_json(queued).await;
+    assert_eq!(entry["kind"], "test");
+    assert_eq!(entry["to_address"], "ada@example.com");
+    let id = entry["id"].as_str().unwrap().to_owned();
+    let mut last_error = Value::Null;
+    for _ in 0..100 {
+        let outbox = response_json(call("GET", "/v1/system/mail/outbox", &admin, json!({})).await).await;
+        let found = outbox
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["id"] == id)
+            .cloned()
+            .unwrap();
+        last_error = found["last_error"].clone();
+        if found["attempts"].as_i64().unwrap_or(0) >= 1 {
+            assert_eq!(found["status"], "queued", "a lookup failure is retried");
+            assert!(found["next_attempt_at"].is_string());
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+    assert!(
+        last_error.as_str().is_some_and(|reason| reason.contains("looked up")),
+        "{last_error}"
+    );
+
+    // The console reads the same state and asks before queueing.
+    let run = |command: &str| call("POST", "/v1/system/console", &admin, json!({ "command": command }));
+    let status = response_json(run("mail").await).await;
+    assert_eq!(status["command"], "mail status");
+    let dry = response_json(run("mail test grace@example.com").await).await;
+    assert_eq!(dry["dry_run"], true);
+    assert_eq!(run("mail test nobody").await.status(), 400);
+
+    // The audit trail names the change, never the password.
+    let audit = response_json(call("GET", "/v1/system/audit", &admin, json!({})).await).await;
+    let details = audit
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|event| event["action"] == "mail_settings_changed")
+        .map(|event| event["detail"].as_str().unwrap().to_owned())
+        .collect::<Vec<_>>();
+    assert!(
+        details.len() >= 3 && details.iter().all(|detail| !detail.contains("smtp-password-1")),
+        "{details:?}"
+    );
+    let _ = std::fs::remove_dir_all(data_dir);
+}

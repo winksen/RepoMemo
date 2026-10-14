@@ -127,7 +127,9 @@ fn check_provider_url_with(base_url: &str, policy: &EndpointPolicy) -> Result<()
     Ok(())
 }
 
-fn is_forbidden_address(address: &IpAddr) -> bool {
+/// Addresses nothing of this server may call, whatever an operator allows:
+/// link-local, unspecified, broadcast, multicast and cloud-metadata addresses.
+pub fn is_forbidden_address(address: &IpAddr) -> bool {
     match address {
         IpAddr::V4(v4) => {
             v4.is_link_local()
@@ -154,6 +156,15 @@ fn is_forbidden_address(address: &IpAddr) -> bool {
 
 /// Addresses that are not on the public internet: this machine, private and
 /// shared ranges, link-local and documentation addresses.
+pub fn is_non_public_address(address: &IpAddr) -> bool {
+    is_non_public(address)
+}
+
+/// A host name of a cloud instance-metadata service.
+pub fn is_metadata_host(host: &str) -> bool {
+    METADATA_HOSTS.contains(&host)
+}
+
 fn is_non_public(address: &IpAddr) -> bool {
     match address {
         IpAddr::V4(v4) => {

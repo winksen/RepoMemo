@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { MailSettingsPanel } from "./MailSettingsPanel";
 import type { Dispatch, SetStateAction } from "react";
 import type { ReactNode } from "react";
 import {
@@ -590,6 +591,7 @@ function SettingsSection({ accessToken, session }: { accessToken: string; sessio
         </div>;
       })}</div>
     </section>)}
+    <MailSettingsPanel accessToken={accessToken} canChange={session.is_system_admin === true} />
     {session.is_system_admin ? <EnvironmentGroup accessToken={accessToken} /> : null}
     <section className="shared-settings-group">
       <div className="shared-panel-heading"><div><Server size={18} /><h2>Set by the server environment</h2></div><span>read only</span></div>

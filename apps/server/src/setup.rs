@@ -479,6 +479,20 @@ pub(crate) async fn checks(
         ),
     });
 
+    let mail_ready = state.mail.is_ready().await;
+    checks.push(SetupCheck {
+        key: "mail",
+        label: "Outgoing mail",
+        status: if mail_ready { CheckStatus::Ok } else { CheckStatus::Info },
+        detail: if mail_ready {
+            "A mail server is saved and sending is on.".to_owned()
+        } else {
+            "Not set up: invitations and reset links are passed on by hand.".to_owned()
+        },
+        advice: (!mail_ready)
+            .then_some("Optional. Set up the mail server in System › Settings › Mail, then send a test message."),
+    });
+
     let backup_hours = state.settings().backup_interval_hours;
     checks.push(SetupCheck {
         key: "backups",

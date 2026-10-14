@@ -44,6 +44,8 @@ Set these in the service's environment, not in a file the web server can read.
 
 Leave `REPOMEMO_ALLOW_REGISTRATION` at its default (closed): people join with invitation links.
 
+**Mail** (optional, since V0.2.9) is set up in System › Settings › Mail: the server, port, TLS or STARTTLS, the sign-in and the sender, then *Send test mail*. Mail is only ever sent over TLS, from an outbox that retries (1, 5 and 30 minutes, 2 and 6 hours) so a slow mail server never holds a request. A mail server on a private address needs `REPOMEMO_SMTP_ALLOWED_HOSTS`; one with a private certificate authority needs `REPOMEMO_SMTP_CA_FILE`. Allow the server's outbound connection to the mail port in your firewall.
+
 The setup wizard's **Server checks** report on these: the database and the data folder, the key for stored credentials, the public address (HTTPS), client addresses behind the proxy, automatic backups, browser origins, repository folders, the AI host list and LibreOffice. A warning says what to set.
 
 The server's **working directory** decides where `workspace-data/` is: set it in the service definition to a folder the service account owns, such as `/var/lib/repomemo` or `D:\RepoMemo`.

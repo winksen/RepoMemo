@@ -20,6 +20,7 @@ mod events;
 mod health;
 mod indexing;
 mod logs;
+mod mail;
 mod maintenance;
 mod organizations;
 mod profile;
@@ -140,6 +141,8 @@ struct AppState {
     embedding_queue: EmbeddingQueue,
     converter: Converter,
     repo_sync: RepoSyncRunner,
+    /// Outgoing mail: the outbox and its sender.
+    mail: mail::MailService,
     runtime: Arc<SettingsCell>,
     guards: Arc<Guards>,
     /// Knowledge maps and health reports, kept while a workspace is unchanged.
@@ -352,6 +355,13 @@ async fn build_state(
             data_dir: data_dir.clone(),
         },
     ));
+    let (mail, mail_task) = mail::MailService::start(
+        storage.clone(),
+        repomemo_mail::OutboundPolicy {
+            allowed_hosts: config.smtp_allowed_hosts.clone(),
+            extra_roots: config.smtp_extra_roots.clone(),
+        },
+    );
     let state = AppState {
         storage,
         core,
@@ -361,6 +371,7 @@ async fn build_state(
         embedding_queue,
         converter,
         repo_sync,
+        mail,
         runtime,
         guards: Arc::new(Guards::default()),
         derived: Arc::new(derived::DerivedCache::default()),
@@ -373,7 +384,7 @@ async fn build_state(
         closing: Arc::new(std::sync::atomic::AtomicBool::new(false)),
     };
     let maintenance_task = maintenance::start(state.clone());
-    Ok((state, vec![polling_task, maintenance_task]))
+    Ok((state, vec![polling_task, maintenance_task, mail_task]))
 }
 
 /// Cross-origin rules for the whole application, platform routes included.
@@ -454,6 +465,9 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route("/v1/system/backups/{name}", delete(backup::delete))
         .route("/v1/system/backups/{name}/restore", post(backup::restore))
         .route("/v1/system/metrics", get(system::metrics))
+        .route("/v1/system/mail", get(mail::get_mail).put(mail::put_mail))
+        .route("/v1/system/mail/outbox", get(mail::list_outbox))
+        .route("/v1/system/mail/test", post(mail::test_mail))
         .route(
             "/v1/system/console",
             get(system::console::welcome).post(system::console::run),

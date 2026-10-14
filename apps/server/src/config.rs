@@ -95,6 +95,12 @@ pub struct ServerConfig {
     /// Hosts AI providers may be configured at; `None` allows any host except
     /// link-local and cloud-metadata addresses.
     pub ai_allowed_hosts: Option<Vec<String>>,
+    /// Hosts the mail server may be at although they resolve to private
+    /// addresses (`REPOMEMO_SMTP_ALLOWED_HOSTS`, `*` for any).
+    pub smtp_allowed_hosts: Vec<String>,
+    /// Certificates (DER) trusted for the mail server besides the public
+    /// roots (`REPOMEMO_SMTP_CA_FILE`, a PEM bundle).
+    pub smtp_extra_roots: Vec<Vec<u8>>,
     /// Folders repository links must sit inside; empty allows any local folder.
     pub repo_roots: Vec<PathBuf>,
     /// Folders git may read although another account owns them
@@ -184,6 +190,23 @@ impl ServerConfig {
                     .collect::<Vec<_>>(),
             ),
         };
+        let smtp_allowed_hosts = env_text("REPOMEMO_SMTP_ALLOWED_HOSTS")
+            .map(|list| {
+                list.split(',')
+                    .map(|entry| entry.trim().to_ascii_lowercase())
+                    .filter(|entry| !entry.is_empty())
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        let smtp_extra_roots = match env_text("REPOMEMO_SMTP_CA_FILE") {
+            Some(path) => {
+                let pem = std::fs::read(&path)
+                    .with_context(|| format!("REPOMEMO_SMTP_CA_FILE ({path}) could not be read"))?;
+                repomemo_mail::parse_pem_certificates(&pem)
+                    .map_err(|error| anyhow::anyhow!("REPOMEMO_SMTP_CA_FILE ({path}): {error}"))?
+            }
+            None => Vec::new(),
+        };
         let repo_roots = std::env::var_os("REPOMEMO_REPO_ROOTS")
             .map(|roots| {
                 std::env::split_paths(&roots)
@@ -263,6 +286,8 @@ impl ServerConfig {
             backup_interval_hours: env_parse("REPOMEMO_BACKUP_INTERVAL_HOURS", 0)?,
             backup_keep: env_parse::<u32>("REPOMEMO_BACKUP_KEEP", 7)?.max(1),
             ai_allowed_hosts,
+            smtp_allowed_hosts,
+            smtp_extra_roots,
             repo_roots,
             git_safe_directories: std::env::var_os("REPOMEMO_GIT_SAFE_DIRECTORIES")
                 .map(|folders| {
@@ -340,6 +365,8 @@ impl ServerConfig {
             backup_interval_hours: 0,
             backup_keep: 7,
             ai_allowed_hosts: None,
+            smtp_allowed_hosts: Vec::new(),
+            smtp_extra_roots: Vec::new(),
             repo_roots: Vec::new(),
             git_safe_directories: Vec::new(),
             repo_poll_interval: None,

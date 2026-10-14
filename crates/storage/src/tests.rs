@@ -866,6 +866,71 @@ async fn vector_search_uses_the_index_and_agrees_with_a_scan() {
     let _ = std::fs::remove_dir_all(data_dir);
 }
 
+#[tokio::test]
+async fn mail_settings_keep_the_password_sealed_and_the_outbox_retries_then_gives_up() {
+    let (storage, data_dir) = temp_storage("mail").await;
+    assert!(storage.mail_settings().await.unwrap().is_none());
+    storage
+        .save_mail_settings(
+            crate::MailSettingsUpdate {
+                enabled: true,
+                host: "smtp.example.com".to_owned(),
+                port: 587,
+                security: "starttls".to_owned(),
+                username: "memo".to_owned(),
+                password: Some("smtp-password-1".to_owned()),
+                from_address: "memo@example.com".to_owned(),
+                from_name: "RepoMemo".to_owned(),
+            },
+            None,
+        )
+        .await
+        .unwrap();
+    let raw = sqlx::query_scalar::<_, Option<String>>("SELECT password_sealed FROM mail_settings WHERE id = 1")
+        .fetch_one(&storage.pool)
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(crate::secrets::SecretBox::is_sealed(&raw) && !raw.contains("smtp-password-1"));
+    let stored = storage.mail_settings().await.unwrap().unwrap();
+    assert_eq!(stored.password.as_deref(), Some("smtp-password-1"));
+    let view = storage.mail_settings_view().await.unwrap();
+    assert!(view.configured && view.password_set);
+    assert!(!format!("{view:?}").contains("smtp-password-1"));
+
+    // The outbox: claimed once, retried later, then given up on with the body dropped.
+    let entry = storage
+        .enqueue_mail("ada@example.com", "Hello", "Body with a one-time link", "test")
+        .await
+        .unwrap();
+    assert_eq!(entry.status, "queued");
+    let claimed = storage.claim_due_mail(10).await.unwrap();
+    assert_eq!(claimed.len(), 1);
+    assert_eq!(claimed[0].body, "Body with a one-time link");
+    assert!(
+        storage.claim_due_mail(10).await.unwrap().is_empty(),
+        "a claimed message is not claimed twice"
+    );
+    let later = (chrono::Utc::now() + chrono::Duration::hours(1)).to_rfc3339();
+    storage.retry_mail_later(&entry.id, "busy", &later).await.unwrap();
+    assert!(storage.claim_due_mail(10).await.unwrap().is_empty(), "not due yet");
+    let retried = storage.mail_entry(&entry.id).await.unwrap();
+    assert_eq!((retried.status.as_str(), retried.attempts), ("queued", 1));
+    storage.mark_mail_failed(&entry.id, "gave up").await.unwrap();
+    let body = sqlx::query_scalar::<_, String>("SELECT body FROM mail_outbox WHERE id = ?1")
+        .bind(&entry.id)
+        .fetch_one(&storage.pool)
+        .await
+        .unwrap();
+    assert!(body.is_empty(), "a message that is finished keeps no body");
+    let counts = storage.mail_outbox_counts().await.unwrap();
+    assert_eq!((counts.queued, counts.failed_last_day), (0, 1));
+
+    storage.pool.close().await;
+    drop(storage);
+    let _ = std::fs::remove_dir_all(data_dir);
+}
+
 /// Timings on a large workspace (roadmap V0.1.74 targets). Slow, so it only
 /// runs on request:
 /// `cargo test -p repomemo-storage --release performance_at_scale -- --ignored --nocapture`

@@ -1209,6 +1209,31 @@ export function runSystemMaintenance(accessToken: string): Promise<MaintenanceSt
   return request<MaintenanceStatus>("/v1/system/maintenance/run", { method: "POST" }, accessToken);
 }
 
+/** What the mail page of System › Settings needs to save. `password`: absent keeps it, `""` removes it. */
+export interface MailSettingsInput {
+  enabled: boolean;
+  host: string;
+  port: number;
+  security: string;
+  username: string;
+  password?: string;
+  from_address: string;
+  from_name: string;
+}
+
+export function getSystemMail(accessToken: string): Promise<import("../types").MailOverview> {
+  return request<import("../types").MailOverview>("/v1/system/mail", {}, accessToken);
+}
+
+export function saveSystemMail(accessToken: string, input: MailSettingsInput): Promise<import("../types").MailOverview> {
+  return request<import("../types").MailOverview>("/v1/system/mail", { method: "PUT", body: JSON.stringify(input) }, accessToken);
+}
+
+/** Queues a test message (to the caller when `to` is absent) and answers at once with its outbox entry. */
+export function sendSystemTestMail(accessToken: string, to?: string): Promise<import("../types").MailOutboxEntry> {
+  return request<import("../types").MailOutboxEntry>("/v1/system/mail/test", { method: "POST", body: JSON.stringify(to ? { to } : {}) }, accessToken);
+}
+
 export function getSystemBackups(accessToken: string): Promise<BackupsOverview> {
   return request<BackupsOverview>("/v1/system/backups", {}, accessToken);
 }

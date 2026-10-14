@@ -1192,3 +1192,50 @@ export interface PersonalAccessToken {
   expires_at: string;
   last_used_at: string | null;
 }
+
+/**
+ * How the server reaches its outgoing mail server, as administrators see it.
+ * The password is never part of it: only whether one is saved.
+ */
+export interface MailSettingsView {
+  /** A server and a sender are saved (whether or not sending is switched on). */
+  configured: boolean;
+  enabled: boolean;
+  host: string;
+  port: number;
+  /** `tls` (TLS from the first byte) or `starttls`. */
+  security: string;
+  username: string;
+  password_set: boolean;
+  from_address: string;
+  from_name: string;
+  updated_at: string | null;
+}
+
+/** One message in the outbox, without its body. */
+export interface MailOutboxEntry {
+  id: string;
+  to_address: string;
+  subject: string;
+  /** What the mail is for: `test`, and later `invitation`, `password_reset`, … */
+  kind: string;
+  /** `queued`, `sending`, `sent` or `failed`. */
+  status: string;
+  attempts: number;
+  last_error: string | null;
+  created_at: string;
+  next_attempt_at: string | null;
+  sent_at: string | null;
+}
+
+/**
+ * The mail page of System › Settings: the settings, what the outbox holds and
+ * the latest messages.
+ */
+export interface MailOverview {
+  settings: MailSettingsView;
+  queued_count: number;
+  sent_last_day: number;
+  failed_last_day: number;
+  entries: MailOutboxEntry[];
+}

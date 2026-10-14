@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.2 → 0.3
 
-> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.8` (2026-10-14) · **Next:** `V0.2.9`
+> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.9` (2026-10-14) · **Next:** `V0.2.10`
 > **Previous line:** [Releases 0.1 → 0.2](RELEASES_0.1.md) · **Related:** [Roadmap, Road to V0.3.0](ROADMAP.md#-road-to-v030) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
 Every release of the 0.2 line, shipped and planned, one row each. The plan comes from the [Road to V0.3.0](ROADMAP.md#-road-to-v030): **one change per release**, each shippable alone, with the security rules for a new outside connection in the release that opens it. Planned rows are proposals until decisions 7–14 in the roadmap are agreed.
@@ -41,7 +41,7 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | **V0.2.6** | ✅ 2026-10-14 | A. After 0.2.0 | 🔧 Enhancement | Jobs | Both manual re-index endpoints answer `202` with the running job and finish in the background; `409` while a workspace pass runs; the chunks dialog follows the job (C14) | No request indexes in place; the admin dialog follows the job |
 | **V0.2.7** | ✅ 2026-10-14 | A. After 0.2.0 | ✨ Feature | Console | `workspace reindex`, `repo sync` and `embeddings rebuild` for system administrators, each a dry run until `--yes` and audited, with `workspace list` and `repo list` to find what they take (F9) | Each has a dry run and an audit line |
 | **V0.2.8** | ✅ 2026-10-14 | A. After 0.2.0 | 🔧 Enhancement | Map and health | Per-file centroids and pairwise comparisons kept between requests and redone only for files written since (a journal in storage); one changed file costs 4.6% of a full run at 50,000 passages, debug build (P11) | A one-file change recomputes in under 10% of a full run at 50,000 passages |
-| **V0.2.9** | 🔜 Planned | B. Mail | ✨ Feature | System › Settings | SMTP delivery: settings with an encrypted password, an outbox with retries, *Send test mail*, console `mail test` (F6a, decision 7) | A test mail arrives through a TLS server; a slow server never holds a request; the SMTP host follows the outbound address rules |
+| **V0.2.9** | ✅ 2026-10-14 | B. Mail | ✨ Feature | System › Settings | SMTP over TLS only: settings with a sealed password, an outbox with retries (1, 5, 30 min, 2, 6 h), *Send test mail*, console `mail status` and `mail test`, a `repomemo-mail` crate tested against a scripted TLS server; the host follows the outbound address rules (F6a, decision 7) | A test mail arrives through a TLS server; a slow server never holds a request; the SMTP host follows the outbound address rules |
 | **V0.2.10** | 🔜 Planned | B. Mail | ✨ Feature | People | Invitations sent by email; the link is still shown to copy (F6b) | The invited address receives the link; a crafted name cannot add mail headers |
 | **V0.2.11** | 🔜 Planned | B. Mail | ✨ Feature | Sign-in | "Forgot your password?" by email (F12, decision 8) | The same answer for every address; rate-limited; a one-time link valid 1 hour ends every session |
 | **V0.2.12** | 🔜 Planned | B. Mail | ✨ Feature | Notifications | Mentions and task assignments sent by email (F6c) | Sent once per event, never to the person who caused it |

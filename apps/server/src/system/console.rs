@@ -67,6 +67,8 @@ const COMMANDS: &[CommandSpec] = &[
     CommandSpec { name: "backup delete", usage: "backup delete <backup> --yes", summary: "Deletes one backup.", changes: true, arguments: 1, flags: &[] },
     CommandSpec { name: "maintenance status", usage: "maintenance status", summary: "The last maintenance run and the next one.", changes: false, arguments: 0, flags: &[] },
     CommandSpec { name: "maintenance run", usage: "maintenance run --yes", summary: "Runs a full maintenance pass now.", changes: true, arguments: 0, flags: &[] },
+    CommandSpec { name: "mail status", usage: "mail status", summary: "The mail server in use, whether sending is on, and what the outbox holds.", changes: false, arguments: 0, flags: &[] },
+    CommandSpec { name: "mail test", usage: "mail test <address> --yes", summary: "Queues a test message to an address; its result is on the outbox entry (mail status) (system administrators).", changes: true, arguments: 1, flags: &[] },
     CommandSpec { name: "workspace list", usage: "workspace list", summary: "Every workspace on the server with its id (system administrators).", changes: false, arguments: 0, flags: &[] },
     CommandSpec { name: "workspace reindex", usage: "workspace reindex <workspace> --yes", summary: "Re-indexes the files of a workspace that the current indexer has not indexed, as a background job (system administrators). The workspace is its id or its name.", changes: true, arguments: 1, flags: &[] },
     CommandSpec { name: "repo list", usage: "repo list [--workspace id-or-name]", summary: "Linked repositories across the server, or in one workspace, with their sync state (system administrators).", changes: false, arguments: 0, flags: &["workspace"] },
@@ -82,6 +84,7 @@ const GROUP_DEFAULTS: &[(&str, &str)] = &[
     ("tokens", "tokens list"),
     ("maintenance", "maintenance status"),
     ("backup", "backup list"),
+    ("mail", "mail status"),
     ("workspace", "workspace list"),
     ("repo", "repo list"),
 ];
@@ -1024,6 +1027,60 @@ async fn execute(
                 "Maintenance finished.".to_owned()
             };
             Ok(applied(spec, summary, View::Facts, maintenance_facts(&status)))
+        }
+
+        "mail status" => {
+            let overview = crate::mail::overview(state, 10).await?;
+            let settings = &overview.settings;
+            let summary = if !settings.configured {
+                "Mail is not set up.".to_owned()
+            } else if settings.enabled {
+                format!("Mail is on, through {}:{}.", settings.host, settings.port)
+            } else {
+                "Mail is saved but switched off.".to_owned()
+            };
+            Ok(answer(
+                spec,
+                summary,
+                View::Facts,
+                json!([
+                    [
+                        "Server",
+                        format!("{}:{} ({})", settings.host, settings.port, settings.security)
+                    ],
+                    ["Sender", settings.from_address],
+                    [
+                        "Signs in as",
+                        if settings.username.is_empty() {
+                            "no sign-in".to_owned()
+                        } else {
+                            settings.username.clone()
+                        }
+                    ],
+                    ["Password saved", settings.password_set],
+                    ["Waiting in the outbox", overview.queued_count],
+                    ["Sent in the last day", overview.sent_last_day],
+                    ["Failed in the last day", overview.failed_last_day],
+                ]),
+            ))
+        }
+
+        "mail test" => {
+            super::require_full_system_admin(subject)?;
+            let address = arguments[0].trim().to_owned();
+            if !repomemo_mail::valid_address(&address) {
+                return Err(ApiError::bad_request("That is not a valid email address."));
+            }
+            if !line.yes {
+                return Ok(dry_run(spec, format!("Would queue a test message to {address}.")));
+            }
+            let entry = crate::mail::send_test(state, subject, &address).await?;
+            Ok(applied(
+                spec,
+                format!("Queued a test message to {address}. See its result with mail status or in System › Settings › Mail."),
+                View::Text,
+                to_json(entry)?,
+            ))
         }
 
         "workspace list" => {

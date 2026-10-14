@@ -1411,3 +1411,49 @@ pub struct PersonalAccessToken {
     pub expires_at: String,
     pub last_used_at: Option<String>,
 }
+
+/// How the server reaches its outgoing mail server, as administrators see it.
+/// The password is never part of it: only whether one is saved.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MailSettingsView {
+    /// A server and a sender are saved (whether or not sending is switched on).
+    pub configured: bool,
+    pub enabled: bool,
+    pub host: String,
+    pub port: i64,
+    /// `tls` (TLS from the first byte) or `starttls`.
+    pub security: String,
+    pub username: String,
+    pub password_set: bool,
+    pub from_address: String,
+    pub from_name: String,
+    pub updated_at: Option<String>,
+}
+
+/// One message in the outbox, without its body.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MailOutboxEntry {
+    pub id: String,
+    pub to_address: String,
+    pub subject: String,
+    /// What the mail is for: `test`, and later `invitation`, `password_reset`, …
+    pub kind: String,
+    /// `queued`, `sending`, `sent` or `failed`.
+    pub status: String,
+    pub attempts: i64,
+    pub last_error: Option<String>,
+    pub created_at: String,
+    pub next_attempt_at: Option<String>,
+    pub sent_at: Option<String>,
+}
+
+/// The mail page of System › Settings: the settings, what the outbox holds and
+/// the latest messages.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MailOverview {
+    pub settings: MailSettingsView,
+    pub queued_count: i64,
+    pub sent_last_day: i64,
+    pub failed_last_day: i64,
+    pub entries: Vec<MailOutboxEntry>,
+}

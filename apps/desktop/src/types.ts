@@ -75,6 +75,11 @@ import type {
   WorkspaceUsage,
 } from "./generated/domain";
 export type {
+  MailOutboxEntry,
+  MailOverview,
+  MailSettingsView,
+} from "./generated/domain";
+export type {
   AgentCapability,
   AgentCapabilityInfo,
   AgentConversation,

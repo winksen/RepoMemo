@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.9 (2026-10-14)
+
+Mail delivery: the groundwork every mail feature after it stands on.
+
+### Added
+- **System › Settings › Mail** (system administrators; app administrators read): the mail server, port, connection security (TLS from the first byte, or STARTTLS), user name, password, sender address and name, and a switch. The password is stored sealed like AI provider keys and is never returned: the page only knows that one is saved, and leaving the field empty keeps it. Saving is audited (`mail_settings_changed`, without the password) and needs a signed-in session or a `system` token.
+- **An outbox with retries.** Features put messages in `mail_outbox` and return; one background task hands due messages to the server. A temporary refusal or a network problem is tried again after 1, 5 and 30 minutes, 2 and 6 hours, then the message is marked failed with the reason; a permanent refusal fails at once. A message that was sent or given up on keeps no body (it can hold a one-time link), and finished messages are removed after 30 days. Messages a stopped server was sending are due again at the next start. A slow or dead mail server therefore never holds a request.
+- **Send test mail** (page, `POST /v1/system/mail/test`, console `mail test <address> --yes`): queues a message to yourself or an address and answers at once; the result is on its outbox entry.
+- **Console:** `mail status` (server, sender, outbox counts) and `mail test`.
+- **The new `repomemo-mail` crate**: a plain-text message builder in which no header can carry a line break or other control character (a crafted name or subject is refused, not turned into a header), non-ASCII text is encoded, and an SMTP client that speaks TLS only. It checks the certificate against the public roots plus `REPOMEMO_SMTP_CA_FILE`, resolves the name itself and refuses link-local, cloud-metadata and private addresses unless the host is in `REPOMEMO_SMTP_ALLOWED_HOSTS`, and has a timeout at every step. A server that does not offer STARTTLS is refused rather than used in plain text, and the password is never sent before TLS.
+- A server check *Outgoing mail* in the setup wizard, and migration 0025.
+
+### Upgrading
+- Mail is off until an administrator sets it up. Allow the server's outbound connection to the mail port; a mail server on a private address needs `REPOMEMO_SMTP_ALLOWED_HOSTS`.
+- Nothing sends mail yet: invitations and reset links are still passed on by hand until V0.2.10 and V0.2.11.
+
 ## V0.2.8 (2026-10-14)
 
 The knowledge map and Workspace Health recompute only what a change touched.
