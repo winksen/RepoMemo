@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.1.65` (2026-10-13) · **Next minor:** `V0.2.0`, *Team-ready* (plan agreed 2026-10-13) · **Unreleased on main:** V0.1.66 (CI, one version source, timings, docs)
+> **Current version:** `V0.1.76` (2026-10-14), the release candidate for `V0.2.0` *Team-ready* · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (since V0.1.76):** only fixes from the release candidate go into V0.2.0; new work waits for V0.3.0.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -8,7 +8,9 @@ RepoMemo started as a local-first desktop workbench. It is now a **self-hosted t
 
 Between V0.1.32 and V0.1.62 the work went into **depth and operability**. V0.1.63 added **onboarding without an account** (invitation links, reset links, personal access tokens). V0.1.64 and V0.1.65 fixed the most urgent security findings: bundle S1, and a second pass that included a stored XSS.
 
-**V0.2.0 is proposed as the first *team-ready* release**: a server a team can install, expose and trust with its knowledge. That means secure by default, deployable and recoverable, checked on every commit, and keeping its core promise that memory stays true. The plan to get there is [Road to V0.2.0](#-road-to-v020). Big new surfaces (remote repositories, mail, connectors) wait for V0.3.0.
+**V0.2.0 is proposed as the first *team-ready* release**: a server a team can install, expose and trust with its knowledge. That means secure by default, deployable and recoverable, checked on every commit, and keeping its core promise that memory stays true. The plan to get there is [Road to V0.2.0](#-road-to-v020); every release of it is built and only the clean-machine install (R6) remains before the tag.
+
+**V0.3.0, *Connected*,** is proposed next: remote repositories, mail, issues and pull requests, an assistant that remembers the conversation, portable workspaces and one client. The plan is [Road to V0.3.0](#-road-to-v030).
 
 > **Versions** are set in one place since V0.1.66 (`npm run version:set -- <version>`), checked in CI, and recorded in [CHANGELOG.md](../CHANGELOG.md).
 
@@ -32,11 +34,15 @@ timeline
     Oct 2026 : V0.1.48 Knowledge map : V0.1.50 Health checks : V0.1.52 Repository sync : V0.1.51 to V0.1.57 Security hardening
     Oct 2026 : V0.1.58 System area : V0.1.59 Setup wizard : V0.1.60 Environments : V0.1.61 Admin console : V0.1.62 Live progress
     Oct 2026 : V0.1.63 Invitations and tokens : V0.1.64 Security S1 : V0.1.65 Security second pass
-  section Road to V0.2.0 (proposed)
+  section Road to V0.2.0
     Hardening : V0.1.66 Checkable releases : V0.1.67 Safe defaults : V0.1.68 Browser hardening : V0.1.69 Host exposure
     Foundations : V0.1.70 Web client foundation : V0.1.71 Server foundation
     Product : V0.1.72 Memory and search you can trust : V0.1.73 Evidence, ownership, repositories 1b
     Run it for real : V0.1.74 Performance and robustness : V0.1.75 Operations : V0.1.76 Release candidate : V0.2.0 Team-ready
+  section Road to V0.3.0 (proposed)
+    Groundwork : V0.2.1 Polish after release : V0.2.2 Mail delivery : V0.2.3 Identity and accounts
+    Connected : V0.2.4 Remote repositories : V0.2.5 Repositories that follow pushes : V0.2.6 Issues and pull requests
+    Continuity : V0.2.7 Assistant memory : V0.2.8 Portability and resilience : V0.2.9 One client : V0.2.10 Release candidate : V0.3.0 Connected
 ```
 
 | Stage | Status |
@@ -44,9 +50,10 @@ timeline
 | Phase 1: Local memory loop (1A–1H) | ✅ Complete |
 | Phase S: Shared team mode | ✅ Complete |
 | Phase D: Depth and operability (V0.1.33–V0.1.65) | ✅ Complete |
-| Security review 2026-10-10 + second pass | ✅ S1 (V0.1.64) and N1–N6 (V0.1.65) · 🔜 every remaining finding is scheduled before V0.2.0 |
+| Security review 2026-10-10, second and third passes | ✅ Every finding fixed, mitigated or accepted in writing (V0.1.76); R2-4 and R2-5 scheduled for V0.2.8 |
 | Road to V0.2.0 (V0.1.66–V0.1.76) | 🔄 V0.1.66–V0.1.75 built; V0.1.76 is the release candidate, R6 (clean install) open |
-| V0.3.0 and later: remote repositories, mail, connectors, scale-out | 💭 Direction |
+| Road to V0.3.0 (V0.2.1–V0.2.10) | 🔜 Proposed 2026-10-14; decisions 7–14 to agree |
+| V0.4.0 and later: scale-out, single sign-on, hosted | 💭 Direction |
 
 ---
 
@@ -258,11 +265,133 @@ Each proposal below was accepted as written. They shape the releases named in th
 - [x] **R5** [api-reference](technical/api-reference.md) (generated), [auth-and-authorization](technical/auth-and-authorization.md), [operations](technical/operations.md), both mindmaps, `CHANGELOG.md`, [UPGRADING.md](../UPGRADING.md)
 - [ ] **R6** a clean-machine install following only the production guide. **Needs the maintainer:** it needs a second machine and a running server, which this repository's rules keep from the automated work. `node scripts/smoke-test.mjs` is the checklist's last step; record the result here and fix what the guide got wrong before tagging 0.2.0
 
+#### V0.2.0: Team-ready
+
+- [ ] **R6** the clean-machine install (above), then the fixes it calls for
+- [ ] Tag `v0.2.0`; the changelog's V0.1.66–V0.1.76 entries become the 0.2.0 release notes
+
+---
+
+## 🎯 Road to V0.3.0
+
+> **Status:** proposed on 2026-10-14, not started. Work begins after `v0.2.0` is tagged. The decisions below need agreeing first.
+
+### What V0.3.0 means
+
+V0.2.0 made RepoMemo trustworthy on its own server. **V0.3.0, *Connected*,** promises that it reaches where the team's knowledge already lives, and that people can come and go with their knowledge intact:
+
+| Pillar | Promise | How it is checked |
+|---|---|---|
+| **Reaches remote code** | A repository on GitHub, GitLab or any `https`/`ssh` host is linked by URL, kept current on a schedule or by push, and never needs a checkout on the server's disk | A link to a private repository syncs with a stored credential; a push arrives through a signed webhook; a clone that is too big, too slow or on a host not allowed is refused |
+| **Talks by mail** | Invitations, reset links, mentions and assignments arrive by email; people reset a forgotten password themselves; addresses are verified | A mail sent through a test SMTP server; the "forgot password" answer is the same for every address; an unverified address cannot join |
+| **Links the work around the code** | Issues and pull requests from GitHub and GitLab are evidence: searchable, citable, linked to the files and symbols they mention | A connected project's issues appear, update on change and show on the files they name |
+| **Remembers the conversation** | The assistant answers follow-up questions in context, and people in several workspaces can search them together | A follow-up resolves "it" from the earlier turn; a cross-workspace search returns only what each workspace allows |
+| **Portable** | A workspace moves between servers as an archive, and backups can be encrypted | An exported workspace imports on another server with its memory, citations, tasks and history; an encrypted backup restores only with its key |
+| **One client** | The desktop app opens a RepoMemo server instead of keeping a separate local copy | The desktop shell signs in to a server and shows the same pages as the browser |
+| **Still team-ready** | Everything V0.2.0 promised holds for the new surfaces | A fourth security pass on mail, webhooks, remote clones and connectors finds nothing high or medium; upgrade from 0.2.0 tested in CI |
+
+**Out of scope for V0.3.0**, and kept for later: scale-out (PostgreSQL, object storage, a job queue across processes), single sign-on and enterprise policy controls, hosted deployment, and connectors beyond GitHub and GitLab (Linear, Jira).
+
+### Release plan
+
+As in the 0.1 line, each 0.2.x release is a themed, shippable step, and fixes ride along with the next one (decision 6 named the format, not a fixes-only rule).
+
+| Release | Theme | Contents (IDs from the backlog below) | Why here |
+|---|---|---|---|
+| **V0.2.1** | Polish after release | Fixes reported against 0.2.0, C13, C11, C14, F9 workspace commands | Pays off the frontend residuals while 0.2.0 is fresh, before new surfaces land on the same pages |
+| **V0.2.2** | Mail delivery | F6, F12 | Every later release sends mail (verification, digests, sync alerts) |
+| **V0.2.3** | Identity and accounts | F13, F14, F15 | Verified addresses make registration safe to open; account deletion closes risk 12 |
+| **V0.2.4** | Remote repositories | F4 phase 2, S6 | The largest product step; its security rules (hosts, credentials, sizes) come with it, not after |
+| **V0.2.5** | Repositories that follow pushes | F16 | Webhooks and git awareness need remote repositories first |
+| **V0.2.6** | Issues and pull requests | F17 | Uses the same credential store, host rules and webhook endpoint as V0.2.4–V0.2.5 |
+| **V0.2.7** | Assistant memory | F5, F19 | More evidence (issues, remote code) makes conversations worth continuing |
+| **V0.2.8** | Portability and resilience | O2, O6, P10 | Export must exist before the desktop's local data can move to a server (V0.2.9) |
+| **V0.2.9** | One client | F20 | Retires the local edition once its users can export to a server |
+| **V0.2.10** | Release candidate | R7–R12 | Freeze features; prove the promise |
+| **V0.3.0** | Connected | Fixes from the candidate only | — |
+
+### Decisions to agree before work starts
+
+| # | Decision | Needed by | Proposal |
+|---|---|---|---|
+| 7 | **Mail transport** | V0.2.2 | SMTP only (any provider offers it), TLS required (implicit or STARTTLS), the password encrypted like provider keys; an outbox table with retries so a slow mail server never holds a request |
+| 8 | **Self-service password reset** | V0.2.2 | Yes, by email, alongside the administrator's reset links: the same answer for every address, rate-limited per address and per account, a 1-hour one-time link, and the reset notifications from V0.1.67 |
+| 9 | **Registration with verification** | V0.2.3 | Registration stays closed by default; when an operator opens it, verification is mandatory and an unverified account can sign in but not join or create anything |
+| 10 | **Account deletion** (risk 12) | V0.2.3 | Deactivate, then anonymize: the account's sessions, tokens, avatar and email go; what they wrote stays, credited to "Former member". Only system administrators, audited; an owner must transfer ownership first |
+| 11 | **Who links remote repositories, and where from** | V0.2.4 | Workspace administrators, only to hosts in `REPOMEMO_GIT_ALLOWED_HOSTS` (unset: remote links off, like `REPOMEMO_REPO_ROOTS` for local ones); `https` and `ssh` only; credentials per link (a read-only token or deploy key), encrypted, never shown again |
+| 12 | **First connectors** | V0.2.6 | GitHub (including GitHub Enterprise Server) and GitLab, read-only, issues and pull/merge requests with their discussion; Linear and Jira later |
+| 13 | **The desktop app** (revisits decision 3) | V0.2.9 | The desktop shell becomes a client: it asks for a server address, signs in and shows the web client. The local edition is retired after one release that offers "export to a server" through O2 |
+| 14 | **Backup encryption** | V0.2.8 | AES-256-GCM in streaming chunks, key from `REPOMEMO_BACKUP_KEY` (never stored in the backup); off by default, recommended in the guide; restore refuses a wrong key before writing anything |
+
+### Release checklists
+
+#### V0.2.1: Polish after release
+
+- [ ] Fixes reported against 0.2.0, each with a test
+- [ ] **C13** the workspace page split into one component per section; the dashboard, profile, artifact and memory pages on the query cache; a rendering test of the invitation and reset pages (C1–C3 residuals from V0.1.70)
+- [ ] **C11** `styles.css` split per component and dead rules removed
+- [ ] **C14** asynchronous manual re-index endpoints (`202` with the job), so no request indexes in place
+- [ ] **F9 workspace commands** in the console (`workspace reindex`, `repo sync`, `embeddings rebuild`), for system administrators only (decision 1 settled the rule)
+
+#### V0.2.2: Mail delivery
+
+- [ ] **F6** SMTP settings in System › Settings (host, port, TLS mode, user, encrypted password, sender), a *Send test mail* action and a console `mail test`; an outbox (migration) with retries and a System view of what failed; plain-text and HTML templates for invitations, reset links, mentions, assignments and the reset notifications. Mail headers built by the library, never by string concatenation
+- [ ] **F12** "Forgot your password?" on the sign-in page: the same answer for every address, rate limits per address and account, a one-time link valid 1 hour, every session ended when it is used
+- [ ] Security: the SMTP host goes through the outbound address rules of H2; a test that a crafted display name cannot add mail headers
+
+#### V0.2.3: Identity and accounts
+
+- [ ] **F13** email verification for self-registration and for a changed address (a link, 24 hours); an unverified account cannot accept invitations, join, create or be added; invitations count as verification
+- [ ] **F14** notification preferences per person (in the app, by mail, both, none) and a daily digest
+- [ ] **F15** account lifecycle per decision 10: deactivate and reactivate in System › Users, then anonymize; creator foreign keys move from `RESTRICT` to the anonymized account
+- [ ] Registration can be opened safely: when open, the answer for an address that already has an account is the same as for a new one, and the owner gets a mail instead (closes the M4 residual)
+
+#### V0.2.4: Remote repositories
+
+- [ ] **F4 phase 2** link by URL with a credential (token or deploy key, encrypted), a partial bare clone (`--filter=blob:none`) under the data folder, fetch on the existing poll schedule, the same sync engine and file rules as local repositories
+- [ ] **S6** host allowlist (decision 11), `https`/`ssh` only with `protocol.allow` limited to them, DNS-checked addresses as for providers, clone size and time limits, the clone counted in the workspace's storage allowance, `GIT_TERMINAL_PROMPT=0`, known hosts pinned for `ssh`, credentials passed by environment or askpass, never on the command line
+- [ ] Removing a link deletes its clone; System › Overview shows clone sizes
+
+#### V0.2.5: Repositories that follow pushes
+
+- [ ] **F16** push webhooks for GitHub, GitLab and a generic sender, signed with a per-link secret (HMAC, constant-time check), rate-limited, a sync queued only for the linked branch
+- [ ] Git awareness: last author and date per file from one `git log` pass, `CODEOWNERS` as ownership hints on the artifact page, and "view at this commit" for a citation that names one
+
+#### V0.2.6: Issues and pull requests
+
+- [ ] **F17** a connector per project (GitHub or GitLab, read-only token per decision 12): issues and pull/merge requests with their discussion become evidence of a new kind, synced incrementally and on webhook, searchable and citable, filterable in Retrieval
+- [ ] Links: file paths, symbols and commits mentioned in an issue or pull request link to that evidence and show on the artifact page; closed issues are marked *outdated*
+- [ ] Rate limits of the remote API respected (retry-after), and a connector paused by a revoked token says so
+
+#### V0.2.7: Assistant memory
+
+- [ ] **F5** the last turns of a conversation, bounded by a token budget, go with each question; a follow-up resolves "it" and "that file"; cross-workspace search over the caller's workspaces, merged by score, each result checked against its workspace's role and AI policy
+- [ ] **F19** a keyboard command palette: jump to a workspace, file, memory card or setting, and start the assistant's actions
+
+#### V0.2.8: Portability and resilience
+
+- [ ] **O2** workspace export (an archive with evidence, folders, memory cards and their citations, tasks, comments and lifecycle history) and import into a new workspace on any 0.2.x or later server, with a dry run that reports what would be created
+- [ ] **O6** encrypted backups per decision 14, and an optional second copy to another folder or network share after each backup (closes R2-5)
+- [ ] **P10** document readings in a subprocess with time and memory limits, killed on overrun (closes R2-4 and the P9 residual)
+
+#### V0.2.9: One client
+
+- [ ] **F20** per decision 13: the desktop shell asks for a server address, keeps its session in the operating system's credential store and shows the web client; *Export to a server* moves a local workspace through O2; the local edition is marked retired in the docs and removed in V0.3.x
+
+#### V0.2.10: Release candidate
+
+- [ ] **R7** feature freeze
+- [ ] **R8** fourth security pass over mail, webhooks, remote clones, connectors, export and import, and the desktop client
+- [ ] **R9** upgrade test from 0.2.0 environments in CI
+- [ ] **R10** performance run at 50,000 passages plus a 100,000-file remote repository and 10,000 issues
+- [ ] **R11** documentation: mindmaps, branch pages (`repository-sources`, a new `connectors` page, `operations`), changelog, upgrade notes from 0.2.x
+- [ ] **R12** a clean-machine install with mail and a remote repository, following only the guide
+
 ---
 
 ## 📚 Backlog reference
 
-Every item, with the release it is planned for. The evidence behind each is in the [enhancement analysis](analysis/2026-10-13-enhancement-analysis.md) and the [security review](security/2026-10-10-security-review.md).
+Every item of both roads, with the release it is planned for. The evidence behind each is in the [enhancement analysis](analysis/2026-10-13-enhancement-analysis.md) and the [security review](security/2026-10-10-security-review.md).
 
 ### Product features
 
@@ -272,14 +401,22 @@ Every item, with the release it is planned for. The evidence behind each is in t
 | F2 | **Search by trust.** Lifecycle, folder and date filters; boost verified evidence | S | ✅ V0.1.72 |
 | F3 | **Symbol search on the web** | S | ✅ V0.1.72 |
 | F4 | **Repositories.** Phase 1b (renames with edits, commit on citations) | M | ✅ V0.1.73 |
-| F4 | **Repositories.** Phase 2 (remote by URL, encrypted token, partial clone, scheduled fetch) | L | V0.3.0 |
-| F5 | **Assistant memory.** Earlier turns in context; search across workspaces | M | V0.3.0 |
-| F6 | **Mail delivery** (SMTP) for invitations, resets, mentions; then email verification | M | V0.3.0 (decided, decision 5) |
+| F4 | **Repositories.** Phase 2 (remote by URL, encrypted credential, partial clone, scheduled fetch) | L | V0.2.4 |
+| F5 | **Assistant memory.** Earlier turns in context; search across workspaces | M | V0.2.7 |
+| F6 | **Mail delivery** (SMTP, outbox, templates) for invitations, resets, mentions, assignments | M | V0.2.2 (decisions 5, 7) |
 | F7 | **Evidence ergonomics.** Move folders, multi-select, new version of a file | M | ✅ V0.1.73 |
 | F8 | **Live map and health** | S | ✅ V0.1.72 |
-| F9 | **Console follow-ups.** `logs --follow`, `users reset-link`, `tokens list`, backup commands; workspace commands once the app-admin rule is settled | S–M | ✅ V0.1.73, V0.1.75 (workspace commands wait) |
+| F9 | **Console follow-ups.** `logs --follow`, `users reset-link`, `tokens list`, backup commands; workspace commands for system administrators | S–M | ✅ V0.1.73, V0.1.75; workspace commands V0.2.1 |
 | F10 | **Desktop decision:** frozen as the local edition, security fixes only | Decision | ✅ Decided (decision 3) |
 | F11 | **Ownership transfer** and no removal of a workspace owner (N8) | S | ✅ V0.1.73 |
+| F12 | **Self-service password reset** by email, the same answer for every address | S | V0.2.2 (decision 8) |
+| F13 | **Email verification** for self-registration and changed addresses | S–M | V0.2.3 (decision 9) |
+| F14 | **Notification preferences** and a daily digest | S | V0.2.3 |
+| F15 | **Account lifecycle:** deactivate, reactivate, anonymize (risk 12) | M | V0.2.3 (decision 10) |
+| F16 | **Push webhooks and git awareness:** signed webhooks, last author and date, `CODEOWNERS` hints, view a citation at its commit | M | V0.2.5 |
+| F17 | **Issue and pull request connector** for GitHub and GitLab, read-only | L | V0.2.6 (decision 12) |
+| F19 | **Command palette** | S | V0.2.7 |
+| F20 | **Desktop as a server client;** local edition retired | M | V0.2.9 (decision 13) |
 
 ### Security
 
@@ -294,7 +431,11 @@ Every item, with the release it is planned for. The evidence behind each is in t
 | S5 | Robustness | M11, M12, L1, L5, L6 | ✅ V0.1.71, V0.1.74 |
 | — | Integrity | N8 | ✅ V0.1.73 |
 | — | Supply chain | dependency scanning (review §7) | ✅ V0.1.66 (CI) |
+| — | Third pass | R2-1, R2-2 fixed; R2-3, R2-6 accepted | ✅ V0.1.76 |
+| — | Accepted for later | R2-4 (readings cannot be killed), R2-5 (backups not encrypted) | V0.2.8 (P10, O6) |
 | — | Accepted | N9 (not a boundary, documented), I1, I4 | — |
+| S6 | Remote sources | Host allowlist, protocols, credentials, clone limits for remote repositories; the same rules for webhooks, SMTP and connectors | V0.2.4–V0.2.6 |
+| — | Fourth pass | Mail, webhooks, remote clones, connectors, export and import, desktop client | V0.2.10 (R8) |
 
 ### Platform performance
 
@@ -306,39 +447,44 @@ Every item, with the release it is planned for. The evidence behind each is in t
 | P3 | Workspace metrics as SQL aggregates | S–M | ✅ V0.1.74 |
 | P4 | One dashboard call | S | ✅ V0.1.74 |
 | P5 | Cached map and health | M | ✅ V0.1.74 |
-| P6 | Code splitting of the web bundle | S | V0.1.70 |
-| P7 | Query cache with targeted invalidation | M | V0.1.70 |
+| P6 | Code splitting of the web bundle | S | ✅ V0.1.70 |
+| P7 | Query cache with targeted invalidation | M | ✅ V0.1.70 (remaining pages: C13) |
 | P8 | Writer connection plus read pool; configurable concurrency | M | ✅ V0.1.71 |
 | P9 | Parser time budget (memory caps need a subprocess) | M | ✅ V0.1.74 |
+| P10 | Readings in a subprocess with time and memory limits (R2-4) | M | V0.2.8 |
 
 ### Code health and release engineering
 
 | ID | Item | Size | Target |
 |---|---|---|---|
-| C1 | Split `SharedWebApp.tsx` | M | V0.1.70 |
-| C2 | Router module and TanStack Query | M | V0.1.70 |
-| C3 | Frontend tests | S–M | V0.1.70 |
+| C1 | Split `SharedWebApp.tsx` | M | ✅ V0.1.70 (sections: C13) |
+| C2 | Router module and query cache | M | ✅ V0.1.70 |
+| C3 | Frontend tests | S–M | ✅ V0.1.70 |
 | C4 | Split `apps/server/src/lib.rs` | M | ✅ V0.1.71 |
 | C5 | Split `crates/storage/src/lib.rs` | M | ✅ V0.1.71 |
 | C6 | Typed errors | M | ✅ V0.1.71 |
-| C7 | Generated TypeScript types | S–M | V0.1.70 |
+| C7 | Generated TypeScript types | S–M | ✅ V0.1.70 |
 | C8 | CI | S | ✅ V0.1.66 (rustfmt and clippy blocking since V0.1.71) |
 | C9 | One version source, changelog | S | ✅ V0.1.66 |
-| C10 | Dependency hygiene (Vite, `quick-xml` in ingestion) | S | V0.1.66 (by hand) |
-| C11 | Split `styles.css` per component | M | V0.3.0 |
+| C10 | Dependency hygiene (`quick-xml` in ingestion; Vite 5 kept) | S | ✅ V0.1.71 |
+| C11 | Split `styles.css` per component | M | V0.2.1 |
 | C12 | Remove the worker stub | S | ✅ V0.1.71 (decision 4) |
+| C13 | Workspace page split per section; remaining pages on the query cache; link-page rendering tests | M | V0.2.1 |
+| C14 | Asynchronous manual re-index endpoints | S | V0.2.1 |
 
 ### Operations and documentation
 
 | ID | Item | Size | Target |
 |---|---|---|---|
 | O1 | Backup and restore | M | ✅ V0.1.75 |
-| O2 | Workspace export and import | M | V0.3.0 |
+| O2 | Workspace export and import | M | V0.2.8 |
 | O3 | Production guide | S–M | ✅ V0.1.75 |
 | O4 | Quotas and disk floor | M | ✅ V0.1.75 |
 | O5 | OpenMetrics export | S | ✅ V0.1.75 |
+| O6 | Encrypted backups and a second copy after each backup (R2-5) | S–M | V0.2.8 (decision 14) |
 | D1 | Tracker retired, `PRODUCT.md`, Postman v5 | S | ✅ V0.1.66 |
-| R5 | Mindmaps, branch pages, changelog, upgrade notes | M | V0.1.76 |
+| R5 | Mindmaps, branch pages, changelog, upgrade notes | M | ✅ V0.1.76 |
+| R7–R12 | Release candidate for V0.3.0: freeze, fourth security pass, upgrade from 0.2.0, performance with remote sources, documentation, clean install | M | V0.2.10 |
 
 ### Repository indexing track
 
@@ -346,26 +492,28 @@ Design and limits: [technical/repository-sources.md](technical/repository-source
 
 - [x] **Phase 1:** local repositories, the sync engine, automatic sync when the branch moves, `REPOMEMO_REPO_ROOTS` and the UNC guard.
 - [x] **Phase 1b (V0.1.73):** renames with edits, the commit on results and citations.
-- [ ] **Phase 2 (V0.3.0):** remote repositories by URL, after S3.
-- [ ] **Phase 3 (later):** last author and date per file, `CODEOWNERS` hints, commit-pinned citations, push webhooks, issue and pull-request links.
+- [ ] **Phase 2 (V0.2.4):** remote repositories by URL with an encrypted credential, partial clone and scheduled fetch (S3 done in V0.1.69; S6 lands with it).
+- [ ] **Phase 3a (V0.2.5):** push webhooks, last author and date per file, `CODEOWNERS` hints, view a citation at its commit.
+- [ ] **Phase 3b (V0.2.6):** issue and pull-request links, through the GitHub and GitLab connector.
 
 ### Background jobs track
 
 - [x] Background indexing, embedding and repository-sync queues with restart recovery, retries and failure reasons; incremental re-index; live progress.
-- [ ] Async manual index endpoints: minor, since only administrators use them (the workspace-wide one since V0.1.65).
+- [ ] Async manual index endpoints (C14, V0.2.1).
 - [ ] A durable job queue claimed by a worker: scale-out direction.
 
 ---
 
-## 💭 Later: strategic direction
+## 💭 Later: V0.4.0 and beyond
+
+What V0.3.0 leaves out. The order is not decided.
 
 | Direction | Scope |
 |---|---|
-| **Git awareness** | Repository phase 3: ownership hints, commit-pinned citations, push webhooks, commit and PR relationships |
-| **Issue and PR connectors** | GitHub/GitLab first, then Linear/Jira. Link issues and PRs to artifacts and symbols. Personal access tokens already let CI push ADRs, runbooks and release notes as evidence |
-| **Assistant depth** | Beyond F5: a keyboard command palette, and actions that propose memory cards and tasks for a person to confirm |
-| **Scale-out team server** | PostgreSQL, object storage, a durable job queue claimed by `repomemo-worker`, shared rate-limit counters, and Qdrant when vector search needs a service (see [ADR-0004](../docs/decisions/0004-embedded-vector-storage-before-qdrant.md)) |
-| **Enterprise / hosted** | SSO, permission-aware retrieval, audit export, policy controls and redaction, account deletion policy (creator foreign keys currently block it), hosted and self-hosted deployment |
+| **More connectors** | Linear and Jira, after the GitHub and GitLab connector (F17) proves its model |
+| **Assistant depth** | Beyond F5 and the palette: actions that propose memory cards and tasks for a person to confirm |
+| **Scale-out team server** | PostgreSQL, object storage, a durable job queue claimed by a worker process, shared rate-limit counters, and Qdrant when vector search needs a service (see [ADR-0004](../docs/decisions/0004-embedded-vector-storage-before-qdrant.md)) |
+| **Enterprise / hosted** | Single sign-on (OIDC, SAML), permission-aware retrieval across organizations, audit export, policy controls and redaction, hosted and self-hosted packaging |
 
 ---
 

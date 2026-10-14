@@ -507,15 +507,19 @@ The desktop app and the shared server keep **separate data**.
 
 ---
 
-## 13. Known functional gaps (after V0.1.63)
+## 13. Known functional gaps (at V0.1.76)
 
 These are observed in the code and are useful for prioritizing. The roadmap item that addresses each one is in brackets.
 
 | Gap | Impact |
 |---|---|
-| Repositories must be on the server's disk | No remote URLs (V0.3.0). A file renamed and edited in one commit keeps its history since V0.1.73 when at least about half of it is unchanged. |
-| The assistant does not remember the conversation | Follow-up questions must repeat their context [F5]. |
-| Invitations and reset links are passed on by hand | There is no mail delivery and no email verification; the person whose password is reset is not told [F6]. |
+| Repositories must be on the server's disk | No remote URLs [F4 phase 2, V0.2.4]; pushes are noticed only by polling [F16, V0.2.5]. A file renamed and edited in one commit keeps its history since V0.1.73 when at least about half of it is unchanged. |
+| The assistant does not remember the conversation | Follow-up questions must repeat their context, and each workspace is searched on its own [F5, V0.2.7]. |
+| Invitations and reset links are passed on by hand | There is no mail delivery, no "forgot password" and no email verification, which is why registration is closed by default; the in-app reset notifications exist since V0.1.67 [F6, F12 in V0.2.2; F13 in V0.2.3]. |
+| Issues and pull requests are not evidence | The discussion around the code stays in GitHub or GitLab [F17, V0.2.6]. |
+| Accounts cannot be deleted or deactivated | Creator links block deletion; an administrator can only end sessions [F15, V0.2.3]. |
+| A workspace cannot move to another server | Only whole environments are backed up and restored [O2, V0.2.8]. |
+| The desktop app keeps its own local data | It does not open a RepoMemo server [F20, V0.2.9]. |
 
 Invitation links and administrator reset links, gaps until V0.1.62, shipped in V0.1.63.
 

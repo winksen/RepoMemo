@@ -770,23 +770,23 @@ Run the Rust tests with `cargo test`. See [DEVELOPMENT_COMMANDS.md](../docs/DEVE
 
 ## 11. Risks and technical debt (ranked)
 
-Security findings are tracked in the [security review of 2026-10-10](security/2026-10-10-security-review.md) (4 high, 12 medium, 10 low, none patched on 2026-10-13) and are not repeated here, except where a risk below overlaps. IDs in the last column refer to the [roadmap](ROADMAP.md).
+Security findings are tracked in the [security review of 2026-10-10](security/2026-10-10-security-review.md) (first review, second pass and third pass; at V0.1.76 every finding is fixed, mitigated or accepted in writing) and are not repeated here, except where a risk below overlaps. IDs in the last column refer to the [roadmap](ROADMAP.md), including the proposed [Road to V0.3.0](ROADMAP.md#-road-to-v030).
 
 | # | Area | Issue | Suggested direction |
 |---|---|---|---|
-| 1 | Security | Open review findings (S1 fixed in V0.1.64; second-pass N1–N6 fixed in V0.1.65; S2, with registration closed by default, in V0.1.67; every remaining finding scheduled before V0.2.0; N7 timeouts fixed in V0.1.71, N8 ownership in V0.1.73). The most urgent left: provider URLs and repository links that reach the host (H2, H3) | Roadmap S2–S5 |
+| 1 | Security | ✅ *Closed at V0.1.76:* every finding of the three passes is fixed, mitigated or accepted. Accepted for later: R2-4 (a reading cannot be killed) and R2-5 (backups are not encrypted). New surfaces in the 0.2.x line (mail, webhooks, remote clones, connectors) get their rules with them (S6) and a fourth pass (R8) | P10, O6 (V0.2.8); S6 (V0.2.4–V0.2.6); R8 (V0.2.10) |
 | 2 | Process | ✅ *Mostly done (V0.1.66, V0.1.70):* CI runs Rust and web tests, type check, generated-types check, version check and audits. Residual: rustfmt and clippy are advisory | C8 follow-up (V0.1.71) |
-| 3 | Frontend maintainability | ✅ *Foundation done (V0.1.70):* modules under `src/web/`, a typed router, a query cache for the workspace page, generated types and 27 tests. Residual: `WorkspaceDetail.tsx` (about 1,000 lines, 50+ `useState`), `App.tsx` 2,750 (frozen), `styles.css` 6.2k | C11 (V0.3.0) |
+| 3 | Frontend maintainability | ✅ *Foundation done (V0.1.70):* modules under `src/web/`, a typed router, a query cache for the workspace page, generated types and 27 tests. Residual: `WorkspaceDetail.tsx` (about 1,000 lines, 50+ `useState`), `App.tsx` 2,750 (frozen), `styles.css` 6.2k | C13, C11 (V0.2.1) |
 | 4 | Backend maintainability | ✅ *Done (V0.1.71):* no server or storage module over 1,500 lines, rustfmt and clippy blocking in CI, DTO types generated (V0.1.70) | — |
 | 5 | Correctness | ✅ *Fixed (V0.1.71):* typed errors; internal errors are generic 500s | — |
 | 6 | Performance / scale | ✅ *Done (V0.1.74):* in-memory vector index, SQL figures and file query, one dashboard call, map and health cached. Residual: the targets are measured in a debug build only until R4; the map and health still compute over the whole workspace when it changes | R4 in V0.1.76 |
 | 7 | Release hygiene | ✅ *Version fixed (V0.1.66):* one version source and a changelog. Residual: Vite 5, and `quick-xml` 0.39 in ingestion next to calamine's 0.41. The second `reqwest` and `quick-xml` 0.39 come from Tauri | C10 |
-| 8 | Scalability | In-process queues (indexing and embedding concurrency are settings since V0.1.71; 2 and 1 by default), per-process rate-limit counters, a single writer connection (read pool since V0.1.71) | *Later: scale-out* |
+| 8 | Scalability | In-process queues (indexing and embedding concurrency are settings since V0.1.71; 2 and 1 by default), per-process rate-limit counters, a single writer connection (read pool since V0.1.71) | Scale-out (V0.4.0 and beyond) |
 | 9 | Security | ✅ *Mitigated:* provider API keys are encrypted at rest and never follow a changed endpoint. Residual: without `REPOMEMO_SECRET_KEY` the key file sits next to the database (owner-only since V0.1.74) | Set `REPOMEMO_SECRET_KEY` from a secret store in production |
 | 10 | Auth | ✅ *Mitigated:* rotating refresh tokens, session versions, sign-in throttling and lockout. Since V0.1.68 the refresh token is an `HttpOnly` cookie and the built SPA ships a CSP (review M2). Residual: the host must send the header and keep the app and API on one site | Operations guide (V0.1.75) |
 | 11 | Cost / abuse | ✅ *Mitigated* for interactive AI (policy and hourly quota). Background image descriptions and embeddings have a per-workspace daily allowance since V0.1.74 (review M12) | — |
-| 12 | Data integrity | `ON DELETE RESTRICT` on creator FKs blocks future user deletion | Decide on the account-deletion policy |
-| 13 | Product drift | The desktop app lags far behind the web client and duplicates UI code | Decision F10 |
+| 12 | Data integrity | `ON DELETE RESTRICT` on creator FKs blocks future user deletion | Deactivate and anonymize (F15, decision 10, V0.2.3) |
+| 13 | Product drift | The desktop app lags far behind the web client and duplicates UI code | Desktop as a server client (F20, decision 13, V0.2.9) |
 
 ---
 
