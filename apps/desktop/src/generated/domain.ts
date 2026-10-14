@@ -646,6 +646,24 @@ export interface MemoryCardSummary {
   evidence_count: number;
   created_at: string;
   updated_at: string;
+  /**
+   * Evidence the card cites has changed, disappeared or been retired
+   * since the card was last written (see [`MemoryReviewReason`]).
+   */
+  needs_review: boolean;
+}
+
+/** Why a memory card needs another look. */
+export interface MemoryReviewReason {
+  /**
+   * `missing`: the cited passage or file no longer exists. `retired`: the
+   * cited file is marked outdated or superseded. `changed`: a cited file
+   * was updated after the card was last written.
+   */
+  kind: string;
+  artifact_id: string | null;
+  title: string | null;
+  detail: string;
 }
 
 export interface MemoryEvidence {
@@ -664,6 +682,8 @@ export interface MemoryEvidence {
 export interface MemoryCardDetail {
   card: MemoryCard;
   evidence: MemoryEvidence[];
+  /** Empty when the card is up to date with its evidence. */
+  review: MemoryReviewReason[];
 }
 
 export interface CreateMemoryCardRequest {
@@ -681,6 +701,8 @@ export interface UpdateMemoryCardRequest {
   body_markdown: string;
   source: string;
   confidence: number | null;
+  /** Replaces the cited evidence when given; `None` keeps it. */
+  citations: Citation[] | null;
 }
 
 export interface AppSettings {
@@ -696,6 +718,18 @@ export interface SearchRequest {
   languages: string[];
   source_ids: string[];
   limit: number | null;
+  /**
+   * Lifecycle states to search (`active`, `needs_review`, `verified`,
+   * `outdated`, `superseded`). Empty means every state but `outdated` and
+   * `superseded`, so retired evidence is not served as current.
+   */
+  lifecycle_statuses: string[];
+  /** Only evidence in this folder or below it. */
+  folder_id: string | null;
+  /** Only evidence updated on or after this day (`YYYY-MM-DD`) … */
+  modified_after: string | null;
+  /** … and on or before this one. */
+  modified_before: string | null;
 }
 
 export interface SearchResult {
@@ -847,6 +881,7 @@ export type HealthDetector =
   | "removed_symbol_mentioned"
   | "outdated_evidence_referenced"
   | "index_failed"
+  | "stale_memory_citation"
   | "unconnected";
 
 export type HealthSeverity =
@@ -934,6 +969,7 @@ export interface HealthActionResult {
  */
 export type AgentCapability =
   | "find_files"
+  | "find_symbol"
   | "search_content"
   | "summarize_file"
   | "ask_question"

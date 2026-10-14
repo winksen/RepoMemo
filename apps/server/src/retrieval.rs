@@ -7,6 +7,23 @@ pub(crate) async fn search_workspace(
     Json(request): Json<SearchWorkspaceRequest>,
 ) -> Result<Json<Vec<SearchResult>>, ApiError> {
     require_workspace_read(&state, &subject, &workspace_id).await?;
+    for status in &request.lifecycle_statuses {
+        if !matches!(
+            status.as_str(),
+            "active" | "needs_review" | "verified" | "outdated" | "superseded"
+        ) {
+            return Err(ApiError::bad_request(format!("{status} is not an evidence state.")));
+        }
+    }
+    for day in [&request.modified_after, &request.modified_before]
+        .into_iter()
+        .flatten()
+        .filter(|day| !day.is_empty())
+    {
+        if chrono::NaiveDate::parse_from_str(day, "%Y-%m-%d").is_err() {
+            return Err(ApiError::bad_request("Dates are written YYYY-MM-DD."));
+        }
+    }
     let started = std::time::Instant::now();
     let result = state
         .core
@@ -17,11 +34,41 @@ pub(crate) async fn search_workspace(
             languages: request.languages,
             source_ids: request.source_ids,
             limit: request.limit,
+            lifecycle_statuses: request.lifecycle_statuses,
+            folder_id: request.folder_id,
+            modified_after: request.modified_after,
+            modified_before: request.modified_before,
         })
         .await
         .map_err(map_core_error)?;
     record_timing("search", &workspace_id, started, result.len());
     Ok(Json(result))
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct SymbolSearchQuery {
+    /// Part of a function, class or method name.
+    #[serde(default)]
+    q: String,
+}
+
+/// Where code symbols are defined in the workspace's indexed code: names
+/// that contain `q`, exact matches first.
+pub(crate) async fn search_symbols(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+    Query(query): Query<SymbolSearchQuery>,
+) -> Result<Json<Vec<repomemo_domain::SymbolSearchResult>>, ApiError> {
+    require_workspace_read(&state, &subject, &workspace_id).await?;
+    let started = std::time::Instant::now();
+    let found = state
+        .core
+        .search_symbols(workspace_id.clone(), query.q)
+        .await
+        .map_err(map_core_error)?;
+    record_timing("symbols", &workspace_id, started, found.len());
+    Ok(Json(found))
 }
 
 pub(crate) async fn get_retrieval_facets(
@@ -163,6 +210,7 @@ pub(crate) async fn update_memory_card(
             body_markdown: request.body_markdown,
             source: request.source,
             confidence: request.confidence,
+            citations: request.citations,
         })
         .await
         .map_err(map_core_error)?;

@@ -92,6 +92,7 @@ async fn fts_search_returns_snippet_and_respects_language_filter() {
         languages: vec!["Markdown".to_owned()],
         source_ids: vec![source.id],
         limit: Some(10),
+        ..Default::default()
     };
     let results = storage
         .search_chunks(&request, "\"artifact\"* AND \"retrieval\"*")
@@ -247,6 +248,7 @@ async fn reindexing_keeps_unchanged_chunks_and_their_embeddings() {
         languages: Vec::new(),
         source_ids: Vec::new(),
         limit: Some(10),
+        ..Default::default()
     };
     for (word, expected) in [("delta", 1), ("beta", 1), ("gamma", 0)] {
         let results = storage
@@ -428,6 +430,7 @@ async fn memory_cards_link_evidence_and_are_searchable() {
             "Keep verified evidence",
             "Evidence remains local and inspectable.",
             "manual",
+            None,
             None,
         )
         .await

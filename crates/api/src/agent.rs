@@ -63,6 +63,28 @@ const SEARCH_PREFIXES: &[&str] = &[
     "look for",
     "look up",
 ];
+/// Lookups of where a code symbol is defined. Checked before file lookups,
+/// since "where is" starts both.
+const SYMBOL_PREFIXES: &[&str] = &[
+    "find the symbol",
+    "find symbol",
+    "find the function",
+    "find function",
+    "find the class",
+    "find class",
+    "find the method",
+    "find method",
+    "where is the function",
+    "where is function",
+    "where is the class",
+    "where is class",
+    "where is the method",
+    "where is method",
+    "where is the struct",
+    "where is struct",
+    "definition of",
+    "symbol",
+];
 const FIND_PREFIXES: &[&str] = &[
     "is there a file",
     "which file",
@@ -145,6 +167,13 @@ pub fn agent_capabilities(ai_available: bool) -> Vec<AgentCapabilityInfo> {
             "Find files",
             "Match file names and paths in this workspace.",
             "File name, part of a path, or an extension like .pdf",
+            false,
+        ),
+        (
+            AgentCapability::FindSymbol,
+            "Find a symbol",
+            "Find where a function, class or method is defined in indexed code.",
+            "Function, class or method name",
             false,
         ),
         (
@@ -275,6 +304,7 @@ impl RepoMemoCore {
         } else {
             match capability {
                 AgentCapability::FindFiles => self.agent_find_files(&request.workspace_id, &subject).await,
+                AgentCapability::FindSymbol => self.agent_find_symbol(&request.workspace_id, &subject).await,
                 AgentCapability::SearchContent => self.agent_search(&request.workspace_id, &subject).await,
                 AgentCapability::SummarizeFile => self.agent_summarize(&request, &subject).await,
                 AgentCapability::AskQuestion => self.agent_ask(&request, &subject).await,
@@ -311,7 +341,7 @@ impl RepoMemoCore {
         let raw = provider
             .generate(GenerateRequest {
                 system: Some("You classify requests. You reply with JSON only.".to_owned()),
-                prompt: "You route requests for RepoMemo, a workspace of technical files. Choose the one capability that fits the user's message:\n- find_files: locate files by name, path or type\n- search_content: find passages inside files that mention some words\n- summarize_file: summarize one named file\n- ask_question: answer a question using the workspace content\n- workspace_overview: describe the whole workspace\n- none: anything else, such as chit-chat, writing or editing code, or actions on files\nReply with JSON only, no prose: {\"capability\": \"<id>\", \"subject\": \"<the file name, search words or question, without the instruction>\"}. The user's message is the context below.".to_owned(),
+                prompt: "You route requests for RepoMemo, a workspace of technical files. Choose the one capability that fits the user's message:\n- find_files: locate files by name, path or type\n- find_symbol: locate where a function, class or method is defined in code\n- search_content: find passages inside files that mention some words\n- summarize_file: summarize one named file\n- ask_question: answer a question using the workspace content\n- workspace_overview: describe the whole workspace\n- none: anything else, such as chit-chat, writing or editing code, or actions on files\nReply with JSON only, no prose: {\"capability\": \"<id>\", \"subject\": \"<the file name, search words or question, without the instruction>\"}. The user's message is the context below.".to_owned(),
                 context: message.to_owned(),
                 options: json!({ "temperature": 0.0 }),
             })
@@ -356,6 +386,44 @@ impl RepoMemoCore {
             .take(FILE_RESULT_LIMIT)
             .map(|file| file.artifact)
             .collect();
+        Ok(result)
+    }
+
+    async fn agent_find_symbol(&self, workspace_id: &str, subject: &str) -> Result<AgentReply> {
+        let name = subject.trim_matches(|c: char| c == '`' || c == '(' || c == ')' || c.is_whitespace());
+        if name.is_empty() {
+            return Ok(reply(
+                "Which function, class or method are you looking for? Give its name.",
+            ));
+        }
+        let found = self.search_symbols(workspace_id.to_owned(), name.to_owned()).await?;
+        if found.is_empty() {
+            return Ok(reply(format!(
+                "No indexed code defines a symbol named like “{name}”. Only TypeScript, JavaScript, Python and Rust files are read for symbols, and files still being indexed are not searchable yet."
+            )));
+        }
+        let mut lines = vec![format!(
+            "Found {} {} named like “{name}”:",
+            found.len(),
+            plural(found.len(), "definition", "definitions")
+        )];
+        let mut artifact_ids = Vec::new();
+        for hit in &found {
+            let at = hit.symbol.start_line.map(|line| format!(":{line}")).unwrap_or_default();
+            lines.push(format!(
+                "- `{}` ({:?}) in {}{at}",
+                hit.symbol.name, hit.symbol.kind, hit.path
+            ));
+            if !artifact_ids.contains(&hit.symbol.artifact_id) {
+                artifact_ids.push(hit.symbol.artifact_id.clone());
+            }
+        }
+        let mut result = reply(lines.join("\n"));
+        for artifact_id in artifact_ids.into_iter().take(FILE_CHOICE_LIMIT) {
+            if let Ok(summary) = self.storage.get_artifact_summary(&artifact_id).await {
+                result.files.push(summary);
+            }
+        }
         Ok(result)
     }
 
@@ -465,6 +533,7 @@ impl RepoMemoCore {
             languages: Vec::new(),
             source_ids: Vec::new(),
             limit: Some(SEARCH_RESULT_LIMIT),
+            ..Default::default()
         })
         .await
     }
@@ -589,6 +658,9 @@ pub(crate) fn route_by_rules(message: &str) -> Option<(AgentCapability, String)>
     if OVERVIEW_PHRASES.iter().any(|phrase| contains_phrase(&lower, phrase)) {
         return Some((AgentCapability::WorkspaceOverview, String::new()));
     }
+    if let Some(subject) = symbol_lookup(text, &lower) {
+        return Some((AgentCapability::FindSymbol, subject));
+    }
     if let Some(rest) = after_phrase(text, &lower, SEARCH_PREFIXES, true) {
         return Some((AgentCapability::SearchContent, clean_subject(rest)));
     }
@@ -597,6 +669,24 @@ pub(crate) fn route_by_rules(message: &str) -> Option<(AgentCapability, String)>
     }
     let is_question = lower.ends_with('?') || QUESTION_WORDS.iter().any(|word| starts_with_phrase(&lower, word));
     is_question.then(|| (AgentCapability::AskQuestion, text.trim().to_owned()))
+}
+
+/// "find the function parse_config", "definition of Config", "where is
+/// parse_config defined": the name of the symbol asked for.
+fn symbol_lookup(text: &str, lower: &str) -> Option<String> {
+    if let Some(rest) = after_phrase(text, lower, SYMBOL_PREFIXES, true) {
+        let name = clean_subject(rest);
+        return (!name.is_empty()).then_some(name);
+    }
+    // "where is <name> defined|declared": one word between the two.
+    let trimmed = lower.trim_end_matches(['?', '.', '!', ' ']);
+    let body = trimmed
+        .strip_suffix("defined")
+        .or_else(|| trimmed.strip_suffix("declared"))?
+        .trim_end();
+    let name_start = body.strip_prefix("where is").or_else(|| body.strip_prefix("where's"))?;
+    let name = clean_subject(&text[body.len() - name_start.len()..body.len()]);
+    (!name.is_empty() && !name.contains(' ')).then_some(name)
 }
 
 fn strip_polite_prefix(text: &str) -> &str {
@@ -663,6 +753,7 @@ fn parse_model_route(raw: &str, message: &str) -> Option<(AgentCapability, Strin
     let value: Value = serde_json::from_str(raw.get(start..=end)?).ok()?;
     let capability = match value.get("capability")?.as_str()? {
         "find_files" => AgentCapability::FindFiles,
+        "find_symbol" => AgentCapability::FindSymbol,
         "search_content" => AgentCapability::SearchContent,
         "summarize_file" => AgentCapability::SummarizeFile,
         "ask_question" => AgentCapability::AskQuestion,
@@ -689,6 +780,28 @@ mod tests {
 
     fn route(message: &str) -> Option<(AgentCapability, String)> {
         route_by_rules(message)
+    }
+
+    #[test]
+    fn routes_symbol_lookups_before_file_lookups() {
+        for (message, name) in [
+            ("find the function parse_config", "parse_config"),
+            ("Where is the class UserStore", "UserStore"),
+            ("definition of Config", "Config"),
+            ("where is parse_config defined?", "parse_config"),
+            ("find symbol `load_settings`", "load_settings"),
+        ] {
+            assert_eq!(
+                route(message),
+                Some((AgentCapability::FindSymbol, name.to_owned())),
+                "{message}"
+            );
+        }
+        // A file lookup stays a file lookup.
+        assert_eq!(
+            route("where is the readme"),
+            Some((AgentCapability::FindFiles, "readme".to_owned()))
+        );
     }
 
     #[test]

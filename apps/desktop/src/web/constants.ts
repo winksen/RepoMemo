@@ -4,6 +4,16 @@ import { type ArtifactSummary, type Citation, type CollaborationTaskStatus, type
 export const SYSTEM_SECTIONS = ["overview", "usage", "users", "settings", "logs", "jobs", "audit", "console"] as const;
 export type SystemSection = typeof SYSTEM_SECTIONS[number];
 
+/** What the Retrieval page can limit a search to, by evidence state. */
+export type RetrievalState = "current" | "verified" | "needs_review" | "retired" | "all";
+export const RETRIEVAL_STATES: Record<RetrievalState, { label: string; statuses: string[] }> = {
+  current: { label: "Current evidence", statuses: [] },
+  verified: { label: "Verified only", statuses: ["verified"] },
+  needs_review: { label: "Needing review", statuses: ["needs_review"] },
+  retired: { label: "Outdated and superseded", statuses: ["outdated", "superseded"] },
+  all: { label: "Every state", statuses: ["active", "needs_review", "verified", "outdated", "superseded"] },
+};
+
 export const MAX_FOLDER_DEPTH = 5;
 
 export const INDEX_POLL_INTERVAL_MS = 3000;

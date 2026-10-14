@@ -125,6 +125,7 @@ impl StorageEngine {
         if query.is_empty() {
             return Ok(Vec::new());
         }
+        let folders = self.search_folder_scope(request).await?;
         let mut builder = QueryBuilder::<Sqlite>::new(
             r#"SELECT chunks.id AS chunk_id, chunks.artifact_id, artifacts.title, artifacts.path,
                  artifacts.type AS artifact_type, artifacts.language, chunks.text, chunks.start_line,
@@ -136,7 +137,7 @@ impl StorageEngine {
         builder.push_bind(&request.workspace_id);
         builder.push(" AND chunk_embeddings.model = ");
         builder.push_bind(model);
-        push_search_filters(&mut builder, request);
+        push_search_filters(&mut builder, request, &folders);
         let rows = builder
             .build_query_as::<EmbeddingSearchRow>()
             .fetch_all(self.reader())
@@ -372,7 +373,16 @@ impl StorageEngine {
             .collect())
     }
 
+    /// The folder a search is limited to and every folder below it.
+    async fn search_folder_scope(&self, request: &SearchRequest) -> Result<Vec<String>> {
+        match request.folder_id.as_deref().filter(|id| !id.is_empty()) {
+            Some(folder_id) => Ok(self.folder_subtree(folder_id).await?.0),
+            None => Ok(Vec::new()),
+        }
+    }
+
     pub async fn search_chunks(&self, request: &SearchRequest, fts_query: &str) -> Result<Vec<SearchResult>> {
+        let folders = self.search_folder_scope(request).await?;
         let mut query = QueryBuilder::<Sqlite>::new(
             r#"
             SELECT
@@ -397,7 +407,7 @@ impl StorageEngine {
         query.push_bind(fts_query);
         query.push(" AND chunks.workspace_id = ");
         query.push_bind(&request.workspace_id);
-        push_search_filters(&mut query, request);
+        push_search_filters(&mut query, request, &folders);
 
         query.push(" ORDER BY bm25(chunks_fts) ASC, artifacts.path ASC LIMIT ");
         query.push_bind(request.limit.unwrap_or(40).clamp(1, 100));

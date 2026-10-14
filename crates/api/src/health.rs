@@ -80,6 +80,7 @@ impl RepoMemoCore {
             self.outdated_references(workspace_id, &artifacts, &lifecycle, &retired, &by_id, &mut budget)
                 .await?,
         );
+        findings.extend(self.stale_memory_citations(workspace_id, &by_id).await?);
         findings.extend(self.index_failures(workspace_id, &retired, &by_id).await?);
         let similarity_available = match self.unconnected(workspace_id, &live_items, &folded_into).await? {
             Some(unconnected) => {
@@ -353,6 +354,71 @@ impl RepoMemoCore {
                     HealthAction::CreateTask,
                     HealthAction::Dismiss,
                 ],
+            });
+        }
+        Ok(findings)
+    }
+
+    /// Memory cards whose cited passages changed or disappeared, or whose
+    /// cited files were retired or updated since the card was written. The
+    /// card is the thing to look at, so it is named in the title; the files
+    /// are the evidence that moved.
+    async fn stale_memory_citations(
+        &self,
+        workspace_id: &str,
+        by_id: &HashMap<&str, &ArtifactSummary>,
+    ) -> Result<Vec<HealthFinding>> {
+        let reasons = self.storage.memory_review_reasons(workspace_id, None).await?;
+        if reasons.is_empty() {
+            return Ok(Vec::new());
+        }
+        let titles = self
+            .storage
+            .list_memory_cards(workspace_id)
+            .await?
+            .into_iter()
+            .map(|card| (card.id, card.title))
+            .collect::<HashMap<_, _>>();
+        let mut findings = Vec::new();
+        for (card_id, mut found) in reasons {
+            let Some(title) = titles.get(&card_id) else {
+                continue;
+            };
+            found.sort_by(|a, b| a.kind.cmp(&b.kind).then_with(|| a.detail.cmp(&b.detail)));
+            let mut artifact_ids = found
+                .iter()
+                .filter_map(|reason| reason.artifact_id.as_deref())
+                .collect::<Vec<_>>();
+            artifact_ids.sort_unstable();
+            artifact_ids.dedup();
+            let kinds = found.iter().map(|reason| reason.kind.as_str()).collect::<BTreeSet<_>>();
+            findings.push(HealthFinding {
+                fingerprint: format!(
+                    "{}:{}:{}:{}",
+                    HealthDetector::StaleMemoryCitation.as_str(),
+                    card_id,
+                    kinds.iter().copied().collect::<Vec<_>>().join(","),
+                    artifact_ids.join(",")
+                ),
+                detector: HealthDetector::StaleMemoryCitation,
+                severity: HealthSeverity::Warning,
+                title: format!("Memory card \"{title}\" may be out of date"),
+                detail: format!(
+                    "{} Open the card to check what it says against its evidence, then edit or confirm it.",
+                    found
+                        .iter()
+                        .map(|reason| reason.detail.as_str())
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                ),
+                files: artifact_ids
+                    .iter()
+                    .filter_map(|id| by_id.get(id).copied())
+                    .map(health_file)
+                    .collect(),
+                evidence: Vec::new(),
+                keep_artifact_id: None,
+                actions: vec![HealthAction::CreateTask, HealthAction::Dismiss],
             });
         }
         Ok(findings)

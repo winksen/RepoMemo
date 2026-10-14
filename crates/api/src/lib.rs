@@ -458,6 +458,7 @@ impl RepoMemoCore {
                 &request.body_markdown,
                 &request.source,
                 request.confidence,
+                request.citations.as_deref(),
             )
             .await
     }
@@ -882,6 +883,7 @@ impl RepoMemoCore {
                     languages: Vec::new(),
                     source_ids: Vec::new(),
                     limit: Some(ASK_CANDIDATES),
+                    ..Default::default()
                 },
                 KeywordMode::AnyTerm,
                 query_embedding

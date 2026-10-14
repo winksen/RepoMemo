@@ -7,8 +7,8 @@ use chrono::Utc;
 use repomemo_domain::{
     AgentConversation, AgentMessage, AgentReply, AgentTurn, ArtifactComment, ArtifactDetail, ArtifactIndexFailure,
     ArtifactLifecycle, ArtifactLifecycleEvent, ArtifactSummary, ArtifactType, Chunk, Citation, CollaborationTask,
-    Folder, IndexingJobStatus, MemoryCard, MemoryCardDetail, MemoryCardSummary, MemoryEvidence, Organization,
-    OrganizationMember, OrganizationRole, ProviderSettings, SavedSearch, SearchRequest, SearchResult,
+    Folder, IndexingJobStatus, MemoryCard, MemoryCardDetail, MemoryCardSummary, MemoryEvidence, MemoryReviewReason,
+    Organization, OrganizationMember, OrganizationRole, ProviderSettings, SavedSearch, SearchRequest, SearchResult,
     SharedNotification, SharedUser, SharedWorkspace, Source, SourceType, Symbol, SymbolKind, SymbolSearchResult,
     TaskChecklistItem, Workspace, WorkspaceActivityEvent, WorkspaceMember, WorkspaceMembership, WorkspaceOverview,
     WorkspaceRole, MAX_FOLDER_DEPTH,
@@ -1296,6 +1296,7 @@ impl From<MemoryCardSummaryRow> for MemoryCardSummary {
             evidence_count: row.evidence_count,
             created_at: row.created_at,
             updated_at: row.updated_at,
+            needs_review: false,
         }
     }
 }
@@ -1466,7 +1467,40 @@ pub fn encode_embedding(values: &[f32]) -> Vec<u8> {
 
 /// Appends the optional type, language and source filters of a search, for
 /// queries that join `artifacts`.
-fn push_search_filters<'a>(query: &mut QueryBuilder<'a, Sqlite>, request: &'a SearchRequest) {
+/// The filters every search shares. `folders` is the folder of the request and
+/// the ones below it, already resolved (empty: no folder filter).
+fn push_search_filters<'a>(query: &mut QueryBuilder<'a, Sqlite>, request: &'a SearchRequest, folders: &'a [String]) {
+    // Retired evidence is hidden unless a state is asked for by name: an
+    // outdated or superseded file must not be served as current.
+    query.push(
+        " AND COALESCE((SELECT status FROM artifact_lifecycle WHERE artifact_lifecycle.artifact_id = artifacts.id), 'active')",
+    );
+    if request.lifecycle_statuses.is_empty() {
+        query.push(" NOT IN ('outdated', 'superseded')");
+    } else {
+        query.push(" IN (");
+        let mut separated = query.separated(", ");
+        for status in &request.lifecycle_statuses {
+            separated.push_bind(status);
+        }
+        separated.push_unseparated(")");
+    }
+    if !folders.is_empty() {
+        query.push(" AND artifacts.folder_id IN (");
+        let mut separated = query.separated(", ");
+        for folder_id in folders {
+            separated.push_bind(folder_id);
+        }
+        separated.push_unseparated(")");
+    }
+    if let Some(after) = request.modified_after.as_deref().filter(|day| !day.is_empty()) {
+        query.push(" AND substr(artifacts.updated_at, 1, 10) >= ");
+        query.push_bind(after);
+    }
+    if let Some(before) = request.modified_before.as_deref().filter(|day| !day.is_empty()) {
+        query.push(" AND substr(artifacts.updated_at, 1, 10) <= ");
+        query.push_bind(before);
+    }
     if !request.artifact_types.is_empty() {
         query.push(" AND artifacts.type IN (");
         let mut separated = query.separated(", ");

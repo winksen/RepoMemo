@@ -88,6 +88,29 @@ export function useLiveEvents(listener: Listener, hub?: LiveEventHub | null): bo
   return source?.connected ?? false;
 }
 
+/**
+ * Calls `reload` once a short while after the page's stream reports something
+ * that can change what the page shows: a finished job, a resync after a
+ * reconnect, or workspace activity whose action matches `actions`. A burst of
+ * events costs one reload.
+ */
+export function useLiveRefresh(reload: () => void, actions: RegExp, delayMs = 1500) {
+  const timer = useRef<number | null>(null);
+  const latest = useRef(reload);
+  latest.current = reload;
+  useEffect(() => () => { if (timer.current !== null) window.clearTimeout(timer.current); }, []);
+  useLiveEvents((event) => {
+    const relevant = event.type === "resync"
+      || (event.type === "job" && event.job.status !== "running" && event.job.status !== "pending")
+      || (event.type === "activity" && actions.test(event.event.action));
+    if (!relevant || timer.current !== null) return;
+    timer.current = window.setTimeout(() => {
+      timer.current = null;
+      latest.current();
+    }, delayMs);
+  });
+}
+
 /** Reads `event:`/`data:` blocks until the stream ends. Comments (the
  *  server's keep-alives) and blocks without JSON data are ignored. */
 async function readEventStream(body: ReadableStream<Uint8Array>, dispatch: Listener, signal: AbortSignal) {

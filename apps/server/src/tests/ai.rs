@@ -89,7 +89,7 @@ async fn assistant_routes_messages_and_works_without_ai() {
         .filter(|capability| capability["available"] == true)
         .map(|capability| capability["id"].as_str().unwrap())
         .collect::<Vec<_>>();
-    assert_eq!(available, ["find_files", "search_content"]);
+    assert_eq!(available, ["find_files", "find_symbol", "search_content"]);
 
     let send = |body: Value| {
         let app = app.clone();

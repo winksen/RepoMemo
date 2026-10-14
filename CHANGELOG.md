@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)), then `0.2.1` and so on for fixes. Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.1.72 (2026-10-14)
+
+Memory and search you can trust.
+
+### Added
+- **Memory cards say when their evidence moved.** A card whose cited passage was changed or removed, whose cited file was marked outdated or superseded, or whose cited file was updated after the card was written shows **Needs review** in the list and a panel with the reasons on the card, where it can be confirmed as it is. Workspace Health has a new detector, *Stale memory* (create task, dismiss).
+- **Evidence of a card can be edited.** `PUT /v1/memory-cards/{id}` takes `citations`; the edit form lists what the card cites with remove and add.
+- **Search by trust.** Search takes an evidence state, a folder (and the folders below it) and an updated-between date range. Outdated and superseded evidence is hidden unless asked for, in Search, Ask and the assistant alike, and verified evidence ranks a little higher (10 %, never above 1).
+- **Code symbols on the web.** `GET /v1/workspaces/{ws}/symbols?q=` and a *Code symbols* box on the Retrieval page; the assistant answers "where is parse_config defined" and "find the function …" from the same table.
+- **Live Map and Health.** Both pages refresh themselves, once per burst, when evidence, memory or repositories change or a job finishes.
+
+### Changed
+- `SearchRequest` has `lifecycle_statuses`, `folder_id`, `modified_after` and `modified_before` (all optional); `MemoryCardSummary.needs_review` and `MemoryCardDetail.review` are new fields.
+
+### Upgrading
+- Search no longer returns passages of files marked outdated or superseded by default. Ask for them with the evidence state *Outdated and superseded* or *Every state*.
+
 ## V0.1.71 (2026-10-14)
 
 Server foundation: the base the product work after it builds on. Behaviour changes are limited to the items below.

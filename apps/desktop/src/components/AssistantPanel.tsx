@@ -47,6 +47,7 @@ type ChatDialog = { kind: "rename" | "delete"; conversation: AgentConversation }
 
 const CAPABILITY_ICONS: Record<AgentCapability, typeof Search> = {
   find_files: FileSearch,
+  find_symbol: FileSearch,
   search_content: Search,
   summarize_file: FileText,
   ask_question: Question,

@@ -973,6 +973,7 @@ mod tests {
                 artifact_types: Vec::new(),
                 languages: Vec::new(),
                 source_ids: Vec::new(),
+                ..Default::default()
             })
             .await
             .unwrap();
@@ -1033,6 +1034,7 @@ mod tests {
                 artifact_types: Vec::new(),
                 languages: Vec::new(),
                 source_ids: Vec::new(),
+                ..Default::default()
             })
             .await
             .unwrap();

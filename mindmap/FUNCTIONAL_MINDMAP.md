@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.1.71` (2026-10-14). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
+> **Scope:** reflects the code at `V0.1.72` (2026-10-14). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
 
 ---
 
@@ -260,7 +260,7 @@ A workspace is opened at `/workspaces/:id/<section>` and has **eleven sections**
 | **Retrieval** | Keyword and meaning search, saved searches, "Ask your evidence" | Everyone |
 | **Map** | The knowledge map: indexing pipeline, coverage, and a graph of related files and memory cards (§7b) | Everyone |
 | **Health** | Deterministic checks for drift, duplicates and failures, with actions (§7b) | Everyone (acting on a finding: owner and admin) |
-| **Memory** | Team memory cards: search and create | Everyone |
+| **Memory** | Team memory cards: search and create. A card shows **Needs review** when what it cites changed, disappeared or was retired; its page lists why, lets writers edit the evidence it cites, and confirm it as it is | Everyone |
 | **Tasks** | Team action board | Everyone |
 | **People** | Members, invitations, a summary of *your* capabilities, and the activity feed (user or AI activity) with a 365-day calendar | Owner and admin |
 | **Settings** | Members, AI providers and who may use AI, repository links, rename or delete | Owner and admin (rename and delete are owner only) |
@@ -383,7 +383,7 @@ Re-indexing keeps every passage whose text did not change, so memory cards and a
 - Searches the **indexed passages** of the workspace.
 - Every word must match, and words match as prefixes: `auth tok` finds "authentication token".
 - When the workspace has an embedding provider, search also finds passages **by meaning** and merges both result lists, so a question phrased differently from the text still finds it. If the provider fails, search falls back to keywords.
-- Filters: **file type**, **language**, **source**, and **10 / 20 / 50 results**. Filter options are built from what has actually been indexed. There is no filter by folder, lifecycle status or date yet, and code symbols are not searchable on the web yet (the desktop app has symbol search).
+- Filters: **file type**, **language**, **source**, and **10 / 20 / 50 results**. Filter options are built from what has actually been indexed. Further filters: the **evidence state** (current by default, so outdated and superseded files are left out; verified only, needing review, outdated and superseded, or every state), a **folder** (with the folders below it) and an **updated between** date range. Verified evidence ranks a little higher. A **Code symbols** box finds where a function, class or method is defined, and the assistant answers the same question.
 - Each result shows the title, type, language, source, a snippet with the **matched words highlighted**, the path, and the line range. Clicking a result opens the artifact.
 - Keyword search does **not** use AI and works offline.
 
@@ -499,7 +499,7 @@ Create tasks from findings  ◄──────────────  Save 
 
 ## 12. Local desktop mode
 
-The same application also ships as a **Windows desktop app** built with Tauri. It is fully local: no accounts, no organizations and no collaboration features. It still has two things the web app does not expose: **symbol search** and a per-artifact **AI summary** button (on the web, the assistant summarizes a file). Folder import and search by meaning, once desktop-only, now exist on the web too.
+The same application also ships as a **Windows desktop app** built with Tauri. It is fully local: no accounts, no organizations and no collaboration features. It still has one thing the web app does not expose: a per-artifact **AI summary** button (on the web, the assistant summarizes a file). Symbol search exists on the web too since V0.1.72. Folder import and search by meaning, once desktop-only, now exist on the web too.
 
 It does **not** have the web app's notes, folders, business document previews, repositories, assistant, knowledge map, health checks or System area. Whether the desktop app becomes a client of a server or stays the local-loop edition is an open decision (roadmap F10).
 
@@ -513,15 +513,10 @@ These are observed in the code and are useful for prioritizing. The roadmap item
 
 | Gap | Impact |
 |---|---|
-| Nothing tells you when a memory card goes stale | A card keeps citing passages that changed or were removed by a re-upload or a repository sync [F1]. |
-| A memory card's evidence links are fixed once it is created | Edit changes the title, source and statement only [F1]. |
-| Search cannot filter by lifecycle, folder or date | Outdated and superseded evidence ranks like verified evidence [F2]. |
-| Code symbols are not searchable on the web | They are extracted during indexing but have no search [F3]. |
 | Repositories must be on the server's disk | No remote URLs, and a file renamed *and* edited in one commit loses its history [F4]. |
 | The assistant does not remember the conversation | Follow-up questions must repeat their context [F5]. |
 | Invitations and reset links are passed on by hand | There is no mail delivery and no email verification; the person whose password is reset is not told [F6]. |
 | Folders cannot be moved; no bulk actions; a re-upload is a new artifact | Comments and memory links stay on the old file [F7]. |
-| The map and health pages do not update live | They show the state when the page was opened [F8]. |
 
 Invitation links and administrator reset links, gaps until V0.1.62, shipped in V0.1.63.
 

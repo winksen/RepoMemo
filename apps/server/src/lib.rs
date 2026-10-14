@@ -651,6 +651,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             get(get_retrieval_facets),
         )
         .route("/v1/workspaces/{workspace_id}/search", post(search_workspace))
+        .route("/v1/workspaces/{workspace_id}/symbols", get(search_symbols))
         .route(
             "/v1/workspaces/{workspace_id}/memory-cards",
             get(list_memory_cards).post(create_memory_card),

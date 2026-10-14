@@ -208,7 +208,7 @@ Each proposal below was accepted as written. They shape the releases named in th
 - [x] **C7** `scripts/generate-types.mjs` reads `crates/domain` (a regular subset of Rust, failing loudly on anything else). Server-local response types (token response, setup, System) stay hand-written
 - [x] **C3** 27 tests in `src/test/`: session renewal, live events, Markdown safety, upload filter, routes, image preview rules, query cache. The link pages are covered through the router and session tests; a rendering test of the invitation page needs the page split further
 
-#### V0.1.71: Server foundation (built, not yet released)
+#### V0.1.71: Server foundation
 
 - [x] **C4** 13 modules plus `tests/` (scripted, then compiled and tested unchanged); the largest is `system.rs` at 1,460 lines
 - [x] **C5 + C6** nine storage modules; `repomemo_domain::{not_found, invalid, conflict}` and `classify`; the server maps by kind; unique violations are detected through sqlx, not text; the five handlers that returned storage errors as 400 use the mapping
@@ -217,12 +217,12 @@ Each proposal below was accepted as written. They shape the releases named in th
 - [x] **C12** removed
 - [x] **C8 follow-up** `rustfmt.toml` (`max_width = 120`), every file formatted, clippy clean with `-D warnings`; the lint job and the licenses and bans job are blocking
 
-#### V0.1.72: Memory and search you can trust
+#### V0.1.72: Memory and search you can trust (built, not yet released)
 
-- [ ] **F1** a health detector for memory cards whose cited passages changed or disappeared, *needs review* on the card, and citation editing (`PUT /v1/memory-cards/{id}` takes citations)
-- [ ] **F2** search filters for lifecycle status (outdated and superseded hidden by default), folder and date; a small boost for verified evidence; the same in Ask and the assistant
-- [ ] **F3** symbol search: a route over the `symbols` table, a Retrieval filter, assistant lookups
-- [ ] **F8** live Map and Health pages from the event stream
+- [x] **F1** `StorageEngine::memory_review_reasons` (missing / retired / changed), `needs_review` on summaries, `review` on the detail, the `stale_memory_citation` detector, citations on `PUT /v1/memory-cards/{id}`. Because passages are identified by content, a cited passage that is still there has not changed; whole-file citations also count a later update
+- [x] **F2** filters in `push_search_filters` (keyword and vector search), `favour_verified` in hybrid search (Ask and the assistant use it, and hide retired evidence by default)
+- [x] **F3** `GET /v1/workspaces/{ws}/symbols`, a *Code symbols* box on Retrieval (a symbol search is not a filter of passage search: it answers where a name is defined), the `find_symbol` assistant capability
+- [x] **F8** `useLiveRefresh` in both panels
 
 #### V0.1.73: Evidence, ownership, repositories 1b
 
@@ -267,15 +267,15 @@ Every item, with the release it is planned for. The evidence behind each is in t
 
 | ID | Item | Size | Target |
 |---|---|---|---|
-| F1 | **Memory that stays true.** Stale-citation detector, *needs review* on cards, citation editing | S–M | V0.1.72 |
-| F2 | **Search by trust.** Lifecycle, folder and date filters; boost verified evidence | S | V0.1.72 |
-| F3 | **Symbol search on the web** | S | V0.1.72 |
+| F1 | **Memory that stays true.** Stale-citation detector, *needs review* on cards, citation editing | S–M | ✅ V0.1.72 |
+| F2 | **Search by trust.** Lifecycle, folder and date filters; boost verified evidence | S | ✅ V0.1.72 |
+| F3 | **Symbol search on the web** | S | ✅ V0.1.72 |
 | F4 | **Repositories.** Phase 1b (renames with edits, commit on citations) | M | V0.1.73 |
 | F4 | **Repositories.** Phase 2 (remote by URL, encrypted token, partial clone, scheduled fetch) | L | V0.3.0 |
 | F5 | **Assistant memory.** Earlier turns in context; search across workspaces | M | V0.3.0 |
 | F6 | **Mail delivery** (SMTP) for invitations, resets, mentions; then email verification | M | V0.3.0 (decided, decision 5) |
 | F7 | **Evidence ergonomics.** Move folders, multi-select, new version of a file | M | V0.1.73 |
-| F8 | **Live map and health** | S | V0.1.72 |
+| F8 | **Live map and health** | S | ✅ V0.1.72 |
 | F9 | **Console follow-ups.** `logs --follow`, `users reset-link`, `tokens list`, backup commands; workspace commands once the app-admin rule is settled | S–M | V0.1.73, V0.1.75 |
 | F10 | **Desktop decision:** frozen as the local edition, security fixes only | Decision | ✅ Decided (decision 3) |
 | F11 | **Ownership transfer** and no removal of a workspace owner (N8) | S | V0.1.73 |

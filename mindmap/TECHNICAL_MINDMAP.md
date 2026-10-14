@@ -2,7 +2,7 @@
 
 > **Audience:** engineers working on RepoMemo, reviewers, and anyone operating the shared server.
 > **Companion:** [FUNCTIONAL_MINDMAP.md](FUNCTIONAL_MINDMAP.md) covers *what* the product does. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** code at `V0.1.71` (2026-10-14: invitations, reset links and personal access tokens in V0.1.63, migration 0023; security bundle S1 in V0.1.64; the security second pass in V0.1.65; CI, one version source and performance timings in V0.1.66; safe defaults and identity, migration 0024, in V0.1.67; browser hardening in V0.1.68; host exposure in V0.1.69; web client foundation in V0.1.70; server foundation in V0.1.71). The plan to V0.2.0 is in the [roadmap](ROADMAP.md#-road-to-v020). Aligned on 2026-10-13; sections marked *hardening* came with V0.1.51–V0.1.57. The focus is the **shared web client** (`apps/desktop/src/SharedWebApp.tsx`) and the **HTTP API** (`apps/server`). Desktop and Tauri paths are noted where they share code. Open security findings are in the [security review](security/2026-10-10-security-review.md), and the improvement backlog is in the [enhancement analysis](analysis/2026-10-13-enhancement-analysis.md).
+> **Scope:** code at `V0.1.72` (2026-10-14: invitations, reset links and personal access tokens in V0.1.63, migration 0023; security bundle S1 in V0.1.64; the security second pass in V0.1.65; CI, one version source and performance timings in V0.1.66; safe defaults and identity, migration 0024, in V0.1.67; browser hardening in V0.1.68; host exposure in V0.1.69; web client foundation in V0.1.70; server foundation in V0.1.71; memory and search you can trust in V0.1.72). The plan to V0.2.0 is in the [roadmap](ROADMAP.md#-road-to-v020). Aligned on 2026-10-13; sections marked *hardening* came with V0.1.51–V0.1.57. The focus is the **shared web client** (`apps/desktop/src/SharedWebApp.tsx`) and the **HTTP API** (`apps/server`). Desktop and Tauri paths are noted where they share code. Open security findings are in the [security review](security/2026-10-10-security-review.md), and the improvement backlog is in the [enhancement analysis](analysis/2026-10-13-enhancement-analysis.md).
 
 ---
 
@@ -418,12 +418,13 @@ Details, including what each sync does, are in [technical/repository-sources.md]
 | Method | Path | Guard | Notes |
 |---|---|---|---|
 | GET | `/v1/workspaces/{ws}/retrieval-facets` | R | types, languages and sources of **indexed** artifacts |
-| POST | `/v1/workspaces/{ws}/search` | R | FTS5 search, see §6.3 |
+| POST | `/v1/workspaces/{ws}/search` | R | FTS5 search, see §6.3. Body also takes `lifecycle_statuses` (empty hides `outdated` and `superseded`), `folder_id` (and below), `modified_after`, `modified_before` (`YYYY-MM-DD`); 400 for an unknown state or a bad date |
+| GET | `/v1/workspaces/{ws}/symbols?q=` | R | symbols whose name contains `q`, exact first (`SymbolSearchResult`) |
 | GET, POST | `/v1/workspaces/{ws}/saved-searches` | R / W | name ≤120, query ≤500, limit 1–100 → activity |
 | DELETE | `/v1/saved-searches/{s}` | W: author, or A | Since V0.1.65; was any writer |
 | GET, POST | `/v1/workspaces/{ws}/memory-cards` | R / W | POST validates that each citation belongs to the workspace → activity |
 | POST | `/v1/workspaces/{ws}/memory-cards/search` | R | `LIKE %q%` on the title and body |
-| GET, PUT, DELETE | `/v1/memory-cards/{m}` | R / W / W | → activity |
+| GET, PUT, DELETE | `/v1/memory-cards/{m}` | R / W / W | → activity. GET adds `review` (reasons the card needs another look: `missing`, `retired`, `changed`); PUT may carry `citations`, which replace the cited evidence (each checked against the card's workspace) |
 | GET | `/v1/memory-cards/{m}/export` | R | `text/markdown` |
 
 ### Tasks
@@ -576,6 +577,7 @@ The page (`KnowledgeMapPanel`) lays the graph out in the browser with a determin
 | `duplicate_content` | Files in use share a content hash | supersede (keep the oldest by default), dismiss |
 | `removed_symbol_mentioned` | A symbol of a file's previous version is gone from its latest version and from every other file in use, and a non-code file still names it (whole identifier; a plain word only counts when written like code) | needs review, create task, dismiss |
 | `outdated_evidence_referenced` | A file in use names a retired file, and no file in use carries that name | needs review, create task, dismiss |
+| `stale_memory_citation` | A memory card cites a passage or file that no longer exists, a file marked outdated or superseded, or (whole-file citations) a file updated after the card. Reasons come from `StorageEngine::memory_review_reasons`; passages keep their identity by content, so one that is still there has not changed | create task, dismiss |
 | `index_failed` | `artifact_index_failures` has a row for a file in use | create task, mark outdated, dismiss |
 | `unconnected` (info) | With an embedding provider and 8–2,000 embedded files: no similar link (same adaptive bar as the map) and no memory card citation. Skipped when more than 15% of files would qualify | create task, dismiss |
 

@@ -78,6 +78,7 @@ import type {
   PasswordResetPreview,
   PersonalAccessToken,
   CreatedPersonalToken,
+  SymbolSearchResult,
 } from "../types";
 
 import { queryClient } from "./queryClient";
@@ -850,6 +851,12 @@ export function searchSharedWorkspace(accessToken: string, workspaceId: string, 
   languages?: string[];
   sourceIds?: string[];
   limit?: number;
+  /** Evidence states to search; empty hides outdated and superseded evidence. */
+  lifecycleStatuses?: string[];
+  folderId?: string | null;
+  /** `YYYY-MM-DD` */
+  modifiedAfter?: string | null;
+  modifiedBefore?: string | null;
 }): Promise<SearchResult[]> {
   return request<SearchResult[]>(`/v1/workspaces/${workspaceId}/search`, {
     method: "POST",
@@ -859,8 +866,17 @@ export function searchSharedWorkspace(accessToken: string, workspaceId: string, 
       languages: input.languages ?? [],
       source_ids: input.sourceIds ?? [],
       limit: input.limit ?? 20,
+      lifecycle_statuses: input.lifecycleStatuses ?? [],
+      folder_id: input.folderId || null,
+      modified_after: input.modifiedAfter || null,
+      modified_before: input.modifiedBefore || null,
     }),
   }, accessToken);
+}
+
+/** Where code symbols whose name contains `query` are defined. */
+export function searchSharedSymbols(accessToken: string, workspaceId: string, query: string): Promise<SymbolSearchResult[]> {
+  return request<SymbolSearchResult[]>(`/v1/workspaces/${workspaceId}/symbols?q=${encodeURIComponent(query)}`, {}, accessToken);
 }
 
 export function listSharedMemoryCards(accessToken: string, workspaceId: string): Promise<MemoryCardSummary[]> {
@@ -909,6 +925,16 @@ export function updateSharedMemoryCard(accessToken: string, cardId: string, inpu
   bodyMarkdown: string;
   source: string;
   confidence?: number | null;
+  /** Replaces the cited evidence; leave out to keep it. */
+  citations?: Array<{
+    artifact_id: string;
+    chunk_id: string | null;
+    title: string;
+    path: string;
+    start_line: number | null;
+    end_line: number | null;
+    confidence: number | null;
+  }>;
 }): Promise<MemoryCard> {
   return request<MemoryCard>(`/v1/memory-cards/${cardId}`, {
     method: "PUT",
@@ -917,6 +943,7 @@ export function updateSharedMemoryCard(accessToken: string, cardId: string, inpu
       body_markdown: input.bodyMarkdown,
       source: input.source,
       confidence: input.confidence ?? null,
+      ...(input.citations ? { citations: input.citations } : {}),
     }),
   }, accessToken);
 }

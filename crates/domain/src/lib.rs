@@ -736,6 +736,21 @@ pub struct MemoryCardSummary {
     pub evidence_count: i64,
     pub created_at: String,
     pub updated_at: String,
+    /// Evidence the card cites has changed, disappeared or been retired
+    /// since the card was last written (see [`MemoryReviewReason`]).
+    pub needs_review: bool,
+}
+
+/// Why a memory card needs another look.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryReviewReason {
+    /// `missing`: the cited passage or file no longer exists. `retired`: the
+    /// cited file is marked outdated or superseded. `changed`: a cited file
+    /// was updated after the card was last written.
+    pub kind: String,
+    pub artifact_id: Option<String>,
+    pub title: Option<String>,
+    pub detail: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -756,6 +771,8 @@ pub struct MemoryEvidence {
 pub struct MemoryCardDetail {
     pub card: MemoryCard,
     pub evidence: Vec<MemoryEvidence>,
+    /// Empty when the card is up to date with its evidence.
+    pub review: Vec<MemoryReviewReason>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -775,6 +792,9 @@ pub struct UpdateMemoryCardRequest {
     pub body_markdown: String,
     pub source: String,
     pub confidence: Option<f64>,
+    /// Replaces the cited evidence when given; `None` keeps it.
+    #[serde(default)]
+    pub citations: Option<Vec<Citation>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -784,7 +804,7 @@ pub struct AppSettings {
     pub active_provider: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SearchRequest {
     pub workspace_id: String,
     pub query: String,
@@ -792,6 +812,20 @@ pub struct SearchRequest {
     pub languages: Vec<String>,
     pub source_ids: Vec<String>,
     pub limit: Option<i64>,
+    /// Lifecycle states to search (`active`, `needs_review`, `verified`,
+    /// `outdated`, `superseded`). Empty means every state but `outdated` and
+    /// `superseded`, so retired evidence is not served as current.
+    #[serde(default)]
+    pub lifecycle_statuses: Vec<String>,
+    /// Only evidence in this folder or below it.
+    #[serde(default)]
+    pub folder_id: Option<String>,
+    /// Only evidence updated on or after this day (`YYYY-MM-DD`) …
+    #[serde(default)]
+    pub modified_after: Option<String>,
+    /// … and on or before this one.
+    #[serde(default)]
+    pub modified_before: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -995,6 +1029,8 @@ pub enum HealthDetector {
     OutdatedEvidenceReferenced,
     /// A file that could not be indexed, so search never sees it.
     IndexFailed,
+    /// A memory card cites evidence that changed, disappeared or was retired.
+    StaleMemoryCitation,
     /// A file with no close neighbour by meaning and no memory citing it.
     /// A weak signal: shown as information, never as a removal.
     Unconnected,
@@ -1040,15 +1076,17 @@ impl HealthDetector {
             Self::RemovedSymbolMentioned => "removed_symbol_mentioned",
             Self::OutdatedEvidenceReferenced => "outdated_evidence_referenced",
             Self::IndexFailed => "index_failed",
+            Self::StaleMemoryCitation => "stale_memory_citation",
             Self::Unconnected => "unconnected",
         }
     }
 
-    pub const ALL: [HealthDetector; 6] = [
+    pub const ALL: [HealthDetector; 7] = [
         Self::OlderVersionActive,
         Self::DuplicateContent,
         Self::RemovedSymbolMentioned,
         Self::OutdatedEvidenceReferenced,
+        Self::StaleMemoryCitation,
         Self::IndexFailed,
         Self::Unconnected,
     ];
@@ -1129,6 +1167,8 @@ pub struct HealthActionResult {
 #[serde(rename_all = "snake_case")]
 pub enum AgentCapability {
     FindFiles,
+    /// Where a function, class or other code symbol is defined.
+    FindSymbol,
     SearchContent,
     SummarizeFile,
     AskQuestion,

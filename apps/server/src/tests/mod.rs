@@ -11,6 +11,7 @@ use tower::ServiceExt;
 mod ai;
 mod auth;
 mod evidence;
+mod memory;
 mod system;
 mod workspaces;
 

@@ -1,5 +1,9 @@
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useLiveRefresh } from "../lib/liveEvents";
+
+/** Activity that can change the map. */
+const MAP_ACTIONS = /^(evidence_|artifact_|memory_|repository_|folder_)/;
 import {
   IconAlertTriangle as AlertTriangle,
   IconArrowRight as ArrowRight,
@@ -93,6 +97,8 @@ export function KnowledgeMapPanel({
   }
 
   useEffect(() => { setMap(null); void load(); }, [accessToken, workspaceId]);
+  // New, changed and removed evidence and memory redraw the map as they happen.
+  useLiveRefresh(() => void load(), MAP_ACTIONS);
 
   // Indexing and embedding run in the background; keep the picture current
   // while they do, holding the previous render instead of flashing.

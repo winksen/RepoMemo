@@ -34,6 +34,7 @@ import type {
   KnowledgePipeline,
   MemoryCardSummary,
   MemoryEvidence,
+  MemoryReviewReason,
   OrganizationMember,
   OrganizationRole,
   ProviderTestResult,
@@ -106,6 +107,7 @@ export type {
   KnowledgePipeline,
   MemoryCardSummary,
   MemoryEvidence,
+  MemoryReviewReason,
   OrganizationMember,
   OrganizationRole,
   ProviderTestResult,
@@ -468,6 +470,8 @@ export interface MemoryCard {
 export interface MemoryCardDetail {
   card: MemoryCard;
   evidence: MemoryEvidence[];
+  /** Why the card needs another look; empty when it is up to date. */
+  review: MemoryReviewReason[];
 }
 
 export interface RepoSource {

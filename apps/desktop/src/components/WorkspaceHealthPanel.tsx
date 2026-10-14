@@ -13,6 +13,7 @@ import {
 import { applySharedHealthAction, getSharedWorkspaceHealth, SharedApiError } from "../lib/sharedApi";
 import type { HealthAction, HealthDetector, HealthEvidence, HealthFinding, WorkspaceHealth } from "../types";
 import { Button } from "./ui/button";
+import { useLiveRefresh } from "../lib/liveEvents";
 import { showToast } from "./ui/toast";
 
 const DETECTORS: Record<HealthDetector, { label: string; looksFor: string; icon: ReactNode }> = {
@@ -20,9 +21,13 @@ const DETECTORS: Record<HealthDetector, { label: string; looksFor: string; icon:
   duplicate_content: { label: "Duplicates", looksFor: "Files with byte-for-byte identical content.", icon: <Copy size={16} /> },
   removed_symbol_mentioned: { label: "Removed code", looksFor: "Documents naming a function or type the latest version of its file no longer defines.", icon: <Code size={16} /> },
   outdated_evidence_referenced: { label: "Outdated references", looksFor: "Files naming a file marked outdated or superseded.", icon: <LinkOff size={16} /> },
+  stale_memory_citation: { label: "Stale memory", looksFor: "Memory cards whose cited passages changed, disappeared or were retired.", icon: <LinkOff size={16} /> },
   index_failed: { label: "Indexing failures", looksFor: "Files search cannot see because indexing failed.", icon: <FileAlert size={16} /> },
   unconnected: { label: "Unconnected", looksFor: "Files close in meaning to nothing else and cited by no memory. Information only.", icon: <Unconnected size={16} /> },
 };
+
+/** Activity that can change what Health reports. */
+const HEALTH_ACTIONS = /^(evidence_|artifact_|memory_|repository_|workspace_health_|folder_)/;
 
 const ACTION_LABEL: Record<HealthAction, string> = {
   supersede: "Supersede the others",
@@ -87,6 +92,8 @@ export function WorkspaceHealthPanel({
   }
 
   useEffect(() => { setHealth(null); void load(); }, [accessToken, workspaceId]);
+  // Evidence, memory and lifecycle changes by anyone move the findings.
+  useLiveRefresh(() => void load(), HEALTH_ACTIONS);
 
   async function act(finding: HealthFinding, action: HealthAction, keepArtifactId?: string) {
     setPending(finding.fingerprint);

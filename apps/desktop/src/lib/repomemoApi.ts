@@ -100,6 +100,7 @@ function toMemorySummary(card: MemoryCard): MemoryCardSummary {
     body_excerpt: card.body_markdown.slice(0, 220),
     source: card.source,
     evidence_count: mockMemoryEvidence.get(card.id)?.length ?? 0,
+    needs_review: false,
     created_at: card.created_at,
     updated_at: card.updated_at,
   };
@@ -151,7 +152,7 @@ export async function getMemoryCard(cardId: string): Promise<MemoryCardDetail> {
   if (!isTauriRuntime) {
     const card = Array.from(mockMemoryCards.values()).flat().find((item) => item.id === cardId);
     if (!card) throw new Error("Memory card was not found.");
-    return { card, evidence: mockMemoryEvidence.get(cardId) ?? [] };
+    return { card, evidence: mockMemoryEvidence.get(cardId) ?? [], review: [] };
   }
   return invoke<MemoryCardDetail>("get_memory_card", { cardId });
 }

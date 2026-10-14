@@ -154,6 +154,16 @@ pub(crate) struct SearchWorkspaceRequest {
     #[serde(default)]
     pub(crate) source_ids: Vec<String>,
     pub(crate) limit: Option<i64>,
+    /// Lifecycle states to search; empty hides outdated and superseded evidence.
+    #[serde(default)]
+    pub(crate) lifecycle_statuses: Vec<String>,
+    #[serde(default)]
+    pub(crate) folder_id: Option<String>,
+    /// `YYYY-MM-DD`.
+    #[serde(default)]
+    pub(crate) modified_after: Option<String>,
+    #[serde(default)]
+    pub(crate) modified_before: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -254,6 +264,9 @@ pub(crate) struct UpdateMemoryCardBody {
     pub(crate) body_markdown: String,
     pub(crate) source: String,
     pub(crate) confidence: Option<f64>,
+    /// Replaces the cited evidence when given.
+    #[serde(default)]
+    pub(crate) citations: Option<Vec<repomemo_domain::Citation>>,
 }
 
 #[derive(Debug, Deserialize)]

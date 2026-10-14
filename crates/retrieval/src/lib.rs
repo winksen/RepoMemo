@@ -55,10 +55,52 @@ impl RetrievalService {
         };
         let used_embeddings = !semantic.is_empty();
         let mut fused = fuse_by_rank(keyword, semantic);
+        self.favour_verified(&request.workspace_id, &mut fused).await;
         fused.truncate(limit as usize);
         Ok((fused, used_embeddings))
     }
 }
+
+impl RetrievalService {
+    /// Evidence a person marked verified ranks a little above equally
+    /// relevant passages: the boost is small enough that a clearly better
+    /// match from an unverified file still wins.
+    async fn favour_verified(&self, workspace_id: &str, results: &mut [SearchResult]) {
+        if results.is_empty() {
+            return;
+        }
+        let Ok(states) = self.storage.workspace_lifecycle_states(workspace_id).await else {
+            return;
+        };
+        let verified = states
+            .iter()
+            .filter(|(_, (status, _))| status == "verified")
+            .map(|(artifact_id, _)| artifact_id.as_str())
+            .collect::<std::collections::HashSet<_>>();
+        apply_verified_boost(results, &verified);
+    }
+}
+
+/// Multiplies the score of verified passages by [`VERIFIED_BOOST`], then
+/// rescales so no score passes 1 and the order of the rest is kept.
+pub fn apply_verified_boost(results: &mut [SearchResult], verified: &std::collections::HashSet<&str>) {
+    if verified.is_empty() {
+        return;
+    }
+    for result in results.iter_mut() {
+        if verified.contains(result.artifact_id.as_str()) {
+            result.score *= VERIFIED_BOOST;
+        }
+    }
+    let best = results.iter().map(|result| result.score).fold(1.0_f64, f64::max);
+    for result in results.iter_mut() {
+        result.score /= best;
+    }
+    results.sort_by(|left, right| right.score.total_cmp(&left.score));
+}
+
+/// How much a verified file's passages are favoured (10 %).
+pub const VERIFIED_BOOST: f64 = 1.1;
 
 /// Smoothing constant of reciprocal rank fusion; 60 is the usual choice and
 /// keeps a single top rank from dominating agreement between the lists.
@@ -212,5 +254,29 @@ mod tests {
     fn strips_fts_operators_and_empty_input() {
         assert_eq!(prepare_fts_query(" OR *** "), Some("\"OR\"*".to_owned()));
         assert_eq!(prepare_fts_query(" -- "), None);
+    }
+
+    #[test]
+    fn verified_passages_get_a_small_boost_that_keeps_scores_within_one() {
+        use super::apply_verified_boost;
+        use std::collections::HashSet;
+        let result = |artifact: &str, chunk: &str, score: f64| SearchResult {
+            artifact_id: artifact.to_owned(),
+            score,
+            ..hit(chunk)
+        };
+        // Close scores: the verified file moves ahead.
+        let mut close = vec![result("plain", "p", 0.80), result("checked", "v", 0.76)];
+        apply_verified_boost(&mut close, &HashSet::from(["checked"]));
+        assert_eq!(close[0].chunk_id, "v");
+        assert!(close.iter().all(|r| r.score <= 1.0));
+        // A clearly better unverified match still wins.
+        let mut far = vec![result("plain", "p", 1.0), result("checked", "v", 0.5)];
+        apply_verified_boost(&mut far, &HashSet::from(["checked"]));
+        assert_eq!(far[0].chunk_id, "p");
+        // Nothing verified: untouched.
+        let mut none = vec![result("plain", "p", 0.4)];
+        apply_verified_boost(&mut none, &HashSet::new());
+        assert_eq!(none[0].score, 0.4);
     }
 }

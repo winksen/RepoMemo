@@ -43,3 +43,29 @@ describe("live events", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
+
+describe("live refresh", () => {
+  it("reloads once after a burst of relevant events and ignores the rest", async () => {
+    const { useLiveRefresh } = await import("../lib/liveEvents");
+    const { LiveEventsContext } = await import("../lib/liveEvents");
+    let listener: ((event: LiveEvent) => void) | null = null;
+    const hub = {
+      connected: true,
+      subscribe: (next: (event: LiveEvent) => void) => {
+        listener = next;
+        return () => { listener = null; };
+      },
+    };
+    const reload = vi.fn();
+    const wrapper = ({ children }: { children: React.ReactNode }) => <LiveEventsContext.Provider value={hub}>{children}</LiveEventsContext.Provider>;
+    renderHook(() => useLiveRefresh(reload, /^evidence_/, 20), { wrapper });
+    const activity = (action: string) => ({ type: "activity", event: { id: "1", workspace_id: "w", actor: null, action, subject_type: "x", subject_id: null, summary: "", created_at: "" } }) as LiveEvent;
+    listener!(activity("comment_created"));
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    expect(reload).not.toHaveBeenCalled();
+    listener!(activity("evidence_stored"));
+    listener!(activity("evidence_uploaded"));
+    listener!({ type: "job", job: { status: "completed" } } as unknown as LiveEvent);
+    await waitFor(() => expect(reload).toHaveBeenCalledTimes(1));
+  });
+});
