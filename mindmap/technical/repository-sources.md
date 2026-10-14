@@ -1,6 +1,6 @@
 # Repository sources (git)
 
-> **Branch of:** [TECHNICAL_MINDMAP.md](../TECHNICAL_MINDMAP.md) · **Functional view:** [FUNCTIONAL_MINDMAP.md §5b](../FUNCTIONAL_MINDMAP.md#5b-repositories) · **Status:** phase 1 (local path, automatic sync when the branch moves) shipped; phase 1b shipped in V0.1.73; phase 2 (remote repositories) is planned for V0.2.4 and phase 3a (push webhooks, git awareness) for V0.2.5 (roadmap F4, F16), see [ROADMAP.md](../ROADMAP.md#repository-indexing-track)
+> **Branch of:** [TECHNICAL_MINDMAP.md](../TECHNICAL_MINDMAP.md) · **Functional view:** [FUNCTIONAL_MINDMAP.md §5b](../FUNCTIONAL_MINDMAP.md#5b-repositories) · **Status:** phase 1 (local path, automatic sync when the branch moves) shipped; phase 1b shipped in V0.1.73; phase 2 (remote repositories) is planned for V0.2.19–V0.2.22 and phase 3a (push webhooks, git awareness) for V0.2.23–V0.2.26 (roadmap F4, F16), see [ROADMAP.md](../ROADMAP.md#repository-indexing-track)
 
 A repository is not a batch of uploads. It already holds many files, it keeps changing, and git records exactly what changed. RepoMemo therefore treats a repository as a **living source**: it is linked once, and each **sync** brings the workspace in step with what the chosen branch has **committed**.
 
@@ -190,6 +190,6 @@ Tests: `repomemo-git` (tree parsing, reading a real repository), `repomemo-inges
 Automatic sync when the branch moves, first listed under phase 1b, has shipped (see *Known limits* above).
 
 1. **Phase 1b, polish (shipped in V0.1.73):** similarity-based renames via `git diff -M`, the commit on search results and citations. The desktop app does not get the section (decision 3).
-2. **Phase 2, remote repositories (V0.2.4):** connect by URL with an encrypted credential (token or deploy key), a bare partial clone (`--filter=blob:none`) under the data directory, fetch on the poll schedule, `https`/`ssh` only, hosts limited by `REPOMEMO_GIT_ALLOWED_HOSTS` (remote links off when unset), clone size and time limits counted in the storage allowance (roadmap S6, decision 11).
-3. **Phase 3a, git awareness (V0.2.5):** signed push webhooks, last author and date per file from one `git log` pass, `CODEOWNERS` as ownership hints, and viewing a citation at its commit.
-4. **Phase 3b (V0.2.6):** links to issues and pull requests, through the GitHub and GitLab connector (roadmap F17).
+2. **Phase 2, remote repositories (V0.2.19–V0.2.22):** connect by URL with an encrypted credential (token or deploy key), a bare partial clone (`--filter=blob:none`) under the data directory, fetch on the poll schedule, `https`/`ssh` only, hosts limited by `REPOMEMO_GIT_ALLOWED_HOSTS` (remote links off when unset), clone size and time limits counted in the storage allowance (roadmap S6, decision 11).
+3. **Phase 3a, git awareness (V0.2.23–V0.2.26):** signed push webhooks, last author and date per file from one `git log` pass, `CODEOWNERS` as ownership hints, and viewing a citation at its commit.
+4. **Phase 3b (V0.2.27–V0.2.31):** links to issues and pull requests, through the GitHub and GitLab connector (roadmap F17).

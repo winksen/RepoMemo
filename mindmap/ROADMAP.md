@@ -10,7 +10,7 @@ Between V0.1.32 and V0.1.62 the work went into **depth and operability**. V0.1.6
 
 **V0.2.0 is proposed as the first *team-ready* release**: a server a team can install, expose and trust with its knowledge. That means secure by default, deployable and recoverable, checked on every commit, and keeping its core promise that memory stays true. The plan to get there is [Road to V0.2.0](#-road-to-v020); every release of it is built and only the clean-machine install (R6) remains before the tag.
 
-**V0.3.0, *Connected*,** is proposed next: remote repositories, mail, issues and pull requests, an assistant that remembers the conversation, portable workspaces and one client. The plan is [Road to V0.3.0](#-road-to-v030).
+**V0.3.0, *Connected*,** is proposed next: remote repositories, mail, issues and pull requests, an assistant that remembers the conversation, portable workspaces and one client, reached through 56 single-purpose releases (V0.2.1–V0.2.56). The plan is [Road to V0.3.0](#-road-to-v030).
 
 > **Versions** are set in one place since V0.1.66 (`npm run version:set -- <version>`), checked in CI, and recorded in [CHANGELOG.md](../CHANGELOG.md).
 
@@ -39,10 +39,13 @@ timeline
     Foundations : V0.1.70 Web client foundation : V0.1.71 Server foundation
     Product : V0.1.72 Memory and search you can trust : V0.1.73 Evidence, ownership, repositories 1b
     Run it for real : V0.1.74 Performance and robustness : V0.1.75 Operations : V0.1.76 Release candidate : V0.2.0 Team-ready
-  section Road to V0.3.0 (proposed)
-    Groundwork : V0.2.1 Polish after release : V0.2.2 Mail delivery : V0.2.3 Identity and accounts
-    Connected : V0.2.4 Remote repositories : V0.2.5 Repositories that follow pushes : V0.2.6 Issues and pull requests
-    Continuity : V0.2.7 Assistant memory : V0.2.8 Portability and resilience : V0.2.9 One client : V0.2.10 Release candidate : V0.3.0 Connected
+  section Road to V0.3.0 (proposed, one change per release)
+    V0.2.1 to V0.2.8 : After 0.2.0 (web residuals, jobs, console, incremental map)
+    V0.2.9 to V0.2.18 : Mail, verification, notifications, accounts
+    V0.2.19 to V0.2.31 : Remote repositories, pushes, issues and pull requests
+    V0.2.32 to V0.2.39 : Assistant memory, cross-workspace search, palette, languages, review queue
+    V0.2.40 to V0.2.48 : Export and import, encrypted backups, container, accessibility
+    V0.2.49 to V0.2.56 : One client, release candidate : V0.3.0 Connected
 ```
 
 | Stage | Status |
@@ -52,7 +55,7 @@ timeline
 | Phase D: Depth and operability (V0.1.33–V0.1.65) | ✅ Complete |
 | Security review 2026-10-10, second and third passes | ✅ Every finding fixed, mitigated or accepted in writing (V0.1.76); R2-4 and R2-5 scheduled for V0.2.8 |
 | Road to V0.2.0 (V0.1.66–V0.1.76) | 🔄 V0.1.66–V0.1.75 built; V0.1.76 is the release candidate, R6 (clean install) open |
-| Road to V0.3.0 (V0.2.1–V0.2.10) | 🔜 Proposed 2026-10-14; decisions 7–14 to agree |
+| Road to V0.3.0 (V0.2.1–V0.2.56, one change each) | 🔜 Proposed 2026-10-14; decisions 7–14 to agree |
 | V0.4.0 and later: scale-out, single sign-on, hosted | 💭 Direction |
 
 ---
@@ -274,7 +277,7 @@ Each proposal below was accepted as written. They shape the releases named in th
 
 ## 🎯 Road to V0.3.0
 
-> **Status:** proposed on 2026-10-14, not started. Work begins after `v0.2.0` is tagged. The decisions below need agreeing first.
+> **Status:** proposed on 2026-10-14, revised the same day into single-purpose releases; not started. Work begins after `v0.2.0` is tagged. Decisions 7–14 below need agreeing first.
 
 ### What V0.3.0 means
 
@@ -282,7 +285,7 @@ V0.2.0 made RepoMemo trustworthy on its own server. **V0.3.0, *Connected*,** pro
 
 | Pillar | Promise | How it is checked |
 |---|---|---|
-| **Reaches remote code** | A repository on GitHub, GitLab or any `https`/`ssh` host is linked by URL, kept current on a schedule or by push, and never needs a checkout on the server's disk | A link to a private repository syncs with a stored credential; a push arrives through a signed webhook; a clone that is too big, too slow or on a host not allowed is refused |
+| **Reaches remote code** | A repository on GitHub, GitLab or any `https`/`ssh` host is linked by URL, kept current on a schedule or by push, and never needs a checkout on the server's disk | A private repository syncs with a stored credential; a push arrives through a signed webhook; a clone that is too big, too slow or on a host not allowed is refused |
 | **Talks by mail** | Invitations, reset links, mentions and assignments arrive by email; people reset a forgotten password themselves; addresses are verified | A mail sent through a test SMTP server; the "forgot password" answer is the same for every address; an unverified address cannot join |
 | **Links the work around the code** | Issues and pull requests from GitHub and GitLab are evidence: searchable, citable, linked to the files and symbols they mention | A connected project's issues appear, update on change and show on the files they name |
 | **Remembers the conversation** | The assistant answers follow-up questions in context, and people in several workspaces can search them together | A follow-up resolves "it" from the earlier turn; a cross-workspace search returns only what each workspace allows |
@@ -292,100 +295,139 @@ V0.2.0 made RepoMemo trustworthy on its own server. **V0.3.0, *Connected*,** pro
 
 **Out of scope for V0.3.0**, and kept for later: scale-out (PostgreSQL, object storage, a job queue across processes), single sign-on and enterprise policy controls, hosted deployment, and connectors beyond GitHub and GitLab (Linear, Jira).
 
+### How the 0.2.x releases are cut
+
+- **One change per release:** one fix, one feature, or one enhancement or update of one section. A release that would need "and" in its title is two releases.
+- **Shippable alone:** each release passes CI, carries its tests, updates the mindmaps and the changelog, and is committed as `Update V0.2.N` with a short list.
+- **Security comes with the surface:** the rules for a new outside connection (mail, remote git, webhooks, connectors) are part of the release that opens it, never a later one.
+- **Fixes ride along** with the next release when they are small; a fix that needs its own release gets one (decision 6 named the format, not a fixes-only rule).
+- **Feature freeze from V0.2.52:** only the release candidate's checks and their fixes until V0.3.0.
+
 ### Release plan
 
-As in the 0.1 line, each 0.2.x release is a themed, shippable step, and fixes ride along with the next one (decision 6 named the format, not a fixes-only rule).
+**Type:** 🐞 fix · ✨ feature · 🔧 enhancement · 📘 update (docs, process, dependencies)
 
-| Release | Theme | Contents (IDs from the backlog below) | Why here |
-|---|---|---|---|
-| **V0.2.1** | Polish after release | Fixes reported against 0.2.0, C13, C11, C14, F9 workspace commands | Pays off the frontend residuals while 0.2.0 is fresh, before new surfaces land on the same pages |
-| **V0.2.2** | Mail delivery | F6, F12 | Every later release sends mail (verification, digests, sync alerts) |
-| **V0.2.3** | Identity and accounts | F13, F14, F15 | Verified addresses make registration safe to open; account deletion closes risk 12 |
-| **V0.2.4** | Remote repositories | F4 phase 2, S6 | The largest product step; its security rules (hosts, credentials, sizes) come with it, not after |
-| **V0.2.5** | Repositories that follow pushes | F16 | Webhooks and git awareness need remote repositories first |
-| **V0.2.6** | Issues and pull requests | F17 | Uses the same credential store, host rules and webhook endpoint as V0.2.4–V0.2.5 |
-| **V0.2.7** | Assistant memory | F5, F19 | More evidence (issues, remote code) makes conversations worth continuing |
-| **V0.2.8** | Portability and resilience | O2, O6, P10 | Export must exist before the desktop's local data can move to a server (V0.2.9) |
-| **V0.2.9** | One client | F20 | Retires the local edition once its users can export to a server |
-| **V0.2.10** | Release candidate | R7–R12 | Freeze features; prove the promise |
-| **V0.3.0** | Connected | Fixes from the candidate only | — |
+#### Track A: After 0.2.0 (V0.2.1–V0.2.8)
+
+Pays off what V0.2.0 left in the web client and the background work, while it is fresh and before new surfaces land on the same pages.
+
+| Release | Type | Section | The one change | IDs | Done when |
+|---|---|---|---|---|---|
+| **V0.2.1** | 🐞 | Operations | Corrections the clean-machine install (R6) found in the production guide and the server checks | R6 follow-up | A second clean install follows the guide with no workaround |
+| **V0.2.2** | 🔧 | Workspace page | The workspace page split into one component per section | C13a | No section component over 500 lines; behaviour unchanged, tests green |
+| **V0.2.3** | 🔧 | Web data | The dashboard, profile, artifact and memory pages on the query cache | C13b | No page loads its own data outside the cache; live events refresh them |
+| **V0.2.4** | 🔧 | Web tests | Rendering tests of the invitation and reset pages | C13c | Each state of both pages (valid, used, expired, signed in as someone else) has a test |
+| **V0.2.5** | 📘 | Styles | `styles.css` split per component, dead rules removed | C11 | No stylesheet over 1,000 lines; no visual change |
+| **V0.2.6** | 🔧 | Jobs | Manual re-index endpoints answer `202` with the job instead of indexing in the request | C14 | No request indexes in place; the admin dialog follows the job |
+| **V0.2.7** | ✨ | Console | Workspace commands: `workspace reindex`, `repo sync`, `embeddings rebuild` (system administrators) | F9 | Each has a dry run and an audit line |
+| **V0.2.8** | 🔧 | Map and health | Recompute only what a change touched, instead of the whole workspace | P11 | A one-file change recomputes in under 10% of a full run at 50,000 passages |
+
+#### Track B: Mail (V0.2.9–V0.2.15)
+
+| Release | Type | Section | The one change | IDs | Done when |
+|---|---|---|---|---|---|
+| **V0.2.9** | ✨ | System › Settings | SMTP delivery: settings with an encrypted password, an outbox with retries, *Send test mail*, console `mail test` | F6a, decision 7 | A test mail arrives through a TLS server; a slow server never holds a request; the SMTP host follows the outbound address rules |
+| **V0.2.10** | ✨ | People | Invitations sent by email (the link is still shown to copy) | F6b | The invited address receives the link; a crafted name cannot add mail headers |
+| **V0.2.11** | ✨ | Sign-in | "Forgot your password?" by email | F12, decision 8 | The same answer for every address; rate-limited; a one-time link valid 1 hour ends every session |
+| **V0.2.12** | ✨ | Notifications | Mentions and task assignments sent by email | F6c | Sent once per event, never to the person who caused it |
+| **V0.2.13** | ✨ | Accounts | Email verification on registration and on a changed address | F13, decision 9 | An unverified account cannot join, create or be added; invitations count as verification |
+| **V0.2.14** | ✨ | Profile | Notification preferences: in the app, by mail, both or none, per kind | F14a | Each kind of notification honours the choice |
+| **V0.2.15** | ✨ | Notifications | A daily digest by email | F14b | One mail a day at most, only when something happened |
+
+#### Track C: Accounts (V0.2.16–V0.2.18)
+
+| Release | Type | Section | The one change | IDs | Done when |
+|---|---|---|---|---|---|
+| **V0.2.16** | ✨ | System › Users | Deactivate and reactivate an account | F15a, decision 10 | A deactivated account cannot sign in or use tokens; owners must transfer first |
+| **V0.2.17** | ✨ | System › Users | Anonymize a deactivated account | F15b, decision 10 | Personal data gone; what they wrote stays, credited to "Former member"; creator links no longer block (risk 12 closed) |
+| **V0.2.18** | 🐞 | Registration | Open registration answers the same for a known address and mails its owner instead | M4 residual | Registration can be opened without revealing who has an account |
+
+#### Track D: Remote repositories (V0.2.19–V0.2.26)
+
+| Release | Type | Section | The one change | IDs | Done when |
+|---|---|---|---|---|---|
+| **V0.2.19** | 🔧 | Security | Groundwork for remote sources: an encrypted credential store per link and `REPOMEMO_GIT_ALLOWED_HOSTS` (remote links off when unset) | S6a, decision 11 | Credentials are never returned or logged; the host list is checked before any network call |
+| **V0.2.20** | ✨ | Repositories | Link a remote repository over `https` with a token: partial bare clone, fetch on the poll schedule | F4 phase 2a | A private GitHub or GitLab repository syncs through the existing engine |
+| **V0.2.21** | ✨ | Repositories | Remote repositories over `ssh` with a deploy key and pinned host keys | F4 phase 2b | An unknown host key is refused; the key never reaches the command line |
+| **V0.2.22** | 🔧 | Repositories | Clone limits: size and time caps, the clone counted in the storage allowance, clone sizes in System › Overview | S6b | A clone over its limit stops and says why |
+| **V0.2.23** | ✨ | Repositories | Push webhooks from GitHub, GitLab and a generic sender | F16a | An unsigned or wrongly signed call is refused (HMAC, constant time); a push queues one sync |
+| **V0.2.24** | ✨ | Artifact page | Last author and date per repository file | F16b | Shown on the file and in search results, from one `git log` pass per sync |
+| **V0.2.25** | ✨ | Artifact page | `CODEOWNERS` as ownership hints | F16c | The matching owners show on the file, as hints next to its lifecycle owner |
+| **V0.2.26** | ✨ | Citations | View a cited passage at the commit it names | F16d | A citation opens the text as it was at that commit, labelled as such |
+
+#### Track E: Issues and pull requests (V0.2.27–V0.2.31)
+
+| Release | Type | Section | The one change | IDs | Done when |
+|---|---|---|---|---|---|
+| **V0.2.27** | ✨ | Connectors | GitHub issues as evidence (read-only token, incremental sync) | F17a, decision 12 | Issues and their comments are searchable and citable; closed issues are *outdated* |
+| **V0.2.28** | ✨ | Connectors | GitHub pull requests as evidence | F17b | Pull requests with their review discussion, linked to their commits |
+| **V0.2.29** | ✨ | Connectors | GitLab issues and merge requests | F17c | The same model as GitHub, including self-hosted GitLab |
+| **V0.2.30** | 🔧 | Artifact page | Links from issues and pull requests to the files, symbols and commits they mention | F17d | A file shows the issues that name it |
+| **V0.2.31** | 🔧 | Connectors | Connector webhooks and remote rate limits | F17e | Updates arrive on webhook; `Retry-After` is honoured; a revoked token pauses the connector and says so |
+
+#### Track F: Search, assistant and review (V0.2.32–V0.2.39)
+
+| Release | Type | Section | The one change | IDs | Done when |
+|---|---|---|---|---|---|
+| **V0.2.32** | ✨ | Assistant | Earlier turns go with each question, within a token budget | F5a | A follow-up resolves "it" and "that file" |
+| **V0.2.33** | ✨ | Retrieval | Search across all of the caller's workspaces | F5b | Results merged by score, each checked against its workspace's role and AI policy |
+| **V0.2.34** | ✨ | Web shell | A keyboard command palette | F19 | Jump to a workspace, file, memory card or setting, and start assistant actions, without the mouse |
+| **V0.2.35** | ✨ | Indexing | Code symbols and structure-aware chunks for Go and Java | F21a | Both languages chunk by declaration and their symbols are searchable |
+| **V0.2.36** | ✨ | Indexing | Code symbols and structure-aware chunks for C# and PHP | F21b | Same as V0.2.35 |
+| **V0.2.37** | ✨ | Review | A review queue: evidence *needing review*, stale memory cards and open health findings in one list | F23 | Each item opens where it is resolved; the queue empties as they are |
+| **V0.2.38** | ✨ | Artifact page | Version history of a file: earlier versions kept when a new one is uploaded, viewable and comparable | F24 | Uploading a new version keeps the old text readable |
+| **V0.2.39** | 🔧 | Discussion | `@mention` suggestions while typing in comments | F25 | Only workspace members are suggested |
+
+#### Track G: Portability and operations (V0.2.40–V0.2.46)
+
+| Release | Type | Section | The one change | IDs | Done when |
+|---|---|---|---|---|---|
+| **V0.2.40** | ✨ | Workspace settings | Export a workspace as an archive | O2a | Evidence, folders, memory cards with citations, tasks, comments and lifecycle history in one file with a manifest |
+| **V0.2.41** | ✨ | Workspaces | Import an archive into a new workspace, with a dry run | O2b | An export imports on another 0.2.x server with everything linked as before |
+| **V0.2.42** | ✨ | Backups | Encrypted backups | O6a, decision 14 | A backup restores only with `REPOMEMO_BACKUP_KEY`; a wrong key is refused before anything is written (R2-5 closed) |
+| **V0.2.43** | ✨ | Backups | A second copy of each backup to another folder or network share | O6b | The copy is verified against the manifest |
+| **V0.2.44** | 🐞 | Indexing | Document readings in a subprocess with time and memory limits | P10 | An overrunning reading is killed, not abandoned (R2-4 closed) |
+| **V0.2.45** | ✨ | Operations | A container image and a compose file with the proxy | O7 | `docker compose up` gives a working server behind TLS, with data in a volume |
+| **V0.2.46** | ✨ | System › Audit | Export of the audit trail (JSON lines, CSV) | O8 | A date range downloads; the download itself is audited |
+
+#### Track H: Experience (V0.2.47–V0.2.48)
+
+| Release | Type | Section | The one change | IDs | Done when |
+|---|---|---|---|---|---|
+| **V0.2.47** | 🔧 | Web client | Accessibility pass: keyboard paths, focus, labels, contrast | X1 | Every page usable by keyboard alone; automated checks find no serious issue |
+| **V0.2.48** | 🔧 | Web client | Narrow screens: the workspace pages and the assistant usable on a tablet or phone | X2 | No horizontal scrolling at 375 px; the dock becomes a sheet |
+
+#### Track I: One client (V0.2.49–V0.2.51)
+
+| Release | Type | Section | The one change | IDs | Done when |
+|---|---|---|---|---|---|
+| **V0.2.49** | ✨ | Desktop | The desktop app connects to a server: asks for its address, keeps the session in the operating system's credential store, shows the web client | F20a, decision 13 | The desktop window and the browser show the same pages for the same account |
+| **V0.2.50** | ✨ | Desktop | *Export to a server*: a local workspace moves to a server through the archive format | F20b | A local workspace appears on the server with its memory and citations |
+| **V0.2.51** | 📘 | Desktop | The local edition retired: labelled in the app and the docs, removal planned for V0.3.x | F20c | The docs no longer describe the local edition as current |
+
+#### Track J: Release candidate (V0.2.52–V0.2.56)
+
+| Release | Type | Section | The one change | IDs | Done when |
+|---|---|---|---|---|---|
+| **V0.2.52** | 📘 | Security | Feature freeze and the fourth security pass over mail, webhooks, remote clones, connectors, export and import, and the desktop client, with its fixes | R7, R8 | No high or medium finding open |
+| **V0.2.53** | 📘 | Release | Upgrade test from 0.2.0 environments in CI | R9 | Stored 0.2.0 schemas upgrade in place and pass |
+| **V0.2.54** | 📘 | Performance | Performance run at 50,000 passages plus a 100,000-file remote repository and 10,000 issues | R10 | The V0.2.0 targets still hold; results in the release notes |
+| **V0.2.55** | 📘 | Documentation | Mindmaps, branch pages (`repository-sources`, a new `connectors` page, `operations`), changelog and upgrade notes from 0.2.x | R11 | Every page matches the code |
+| **V0.2.56** | 📘 | Release | Clean-machine install with mail and a remote repository, following only the guide | R12 | Installed without a workaround; ready to tag |
+| **V0.3.0** | — | — | *Connected* | — | Tag `v0.3.0` |
 
 ### Decisions to agree before work starts
 
 | # | Decision | Needed by | Proposal |
 |---|---|---|---|
-| 7 | **Mail transport** | V0.2.2 | SMTP only (any provider offers it), TLS required (implicit or STARTTLS), the password encrypted like provider keys; an outbox table with retries so a slow mail server never holds a request |
-| 8 | **Self-service password reset** | V0.2.2 | Yes, by email, alongside the administrator's reset links: the same answer for every address, rate-limited per address and per account, a 1-hour one-time link, and the reset notifications from V0.1.67 |
-| 9 | **Registration with verification** | V0.2.3 | Registration stays closed by default; when an operator opens it, verification is mandatory and an unverified account can sign in but not join or create anything |
-| 10 | **Account deletion** (risk 12) | V0.2.3 | Deactivate, then anonymize: the account's sessions, tokens, avatar and email go; what they wrote stays, credited to "Former member". Only system administrators, audited; an owner must transfer ownership first |
-| 11 | **Who links remote repositories, and where from** | V0.2.4 | Workspace administrators, only to hosts in `REPOMEMO_GIT_ALLOWED_HOSTS` (unset: remote links off, like `REPOMEMO_REPO_ROOTS` for local ones); `https` and `ssh` only; credentials per link (a read-only token or deploy key), encrypted, never shown again |
-| 12 | **First connectors** | V0.2.6 | GitHub (including GitHub Enterprise Server) and GitLab, read-only, issues and pull/merge requests with their discussion; Linear and Jira later |
-| 13 | **The desktop app** (revisits decision 3) | V0.2.9 | The desktop shell becomes a client: it asks for a server address, signs in and shows the web client. The local edition is retired after one release that offers "export to a server" through O2 |
-| 14 | **Backup encryption** | V0.2.8 | AES-256-GCM in streaming chunks, key from `REPOMEMO_BACKUP_KEY` (never stored in the backup); off by default, recommended in the guide; restore refuses a wrong key before writing anything |
-
-### Release checklists
-
-#### V0.2.1: Polish after release
-
-- [ ] Fixes reported against 0.2.0, each with a test
-- [ ] **C13** the workspace page split into one component per section; the dashboard, profile, artifact and memory pages on the query cache; a rendering test of the invitation and reset pages (C1–C3 residuals from V0.1.70)
-- [ ] **C11** `styles.css` split per component and dead rules removed
-- [ ] **C14** asynchronous manual re-index endpoints (`202` with the job), so no request indexes in place
-- [ ] **F9 workspace commands** in the console (`workspace reindex`, `repo sync`, `embeddings rebuild`), for system administrators only (decision 1 settled the rule)
-
-#### V0.2.2: Mail delivery
-
-- [ ] **F6** SMTP settings in System › Settings (host, port, TLS mode, user, encrypted password, sender), a *Send test mail* action and a console `mail test`; an outbox (migration) with retries and a System view of what failed; plain-text and HTML templates for invitations, reset links, mentions, assignments and the reset notifications. Mail headers built by the library, never by string concatenation
-- [ ] **F12** "Forgot your password?" on the sign-in page: the same answer for every address, rate limits per address and account, a one-time link valid 1 hour, every session ended when it is used
-- [ ] Security: the SMTP host goes through the outbound address rules of H2; a test that a crafted display name cannot add mail headers
-
-#### V0.2.3: Identity and accounts
-
-- [ ] **F13** email verification for self-registration and for a changed address (a link, 24 hours); an unverified account cannot accept invitations, join, create or be added; invitations count as verification
-- [ ] **F14** notification preferences per person (in the app, by mail, both, none) and a daily digest
-- [ ] **F15** account lifecycle per decision 10: deactivate and reactivate in System › Users, then anonymize; creator foreign keys move from `RESTRICT` to the anonymized account
-- [ ] Registration can be opened safely: when open, the answer for an address that already has an account is the same as for a new one, and the owner gets a mail instead (closes the M4 residual)
-
-#### V0.2.4: Remote repositories
-
-- [ ] **F4 phase 2** link by URL with a credential (token or deploy key, encrypted), a partial bare clone (`--filter=blob:none`) under the data folder, fetch on the existing poll schedule, the same sync engine and file rules as local repositories
-- [ ] **S6** host allowlist (decision 11), `https`/`ssh` only with `protocol.allow` limited to them, DNS-checked addresses as for providers, clone size and time limits, the clone counted in the workspace's storage allowance, `GIT_TERMINAL_PROMPT=0`, known hosts pinned for `ssh`, credentials passed by environment or askpass, never on the command line
-- [ ] Removing a link deletes its clone; System › Overview shows clone sizes
-
-#### V0.2.5: Repositories that follow pushes
-
-- [ ] **F16** push webhooks for GitHub, GitLab and a generic sender, signed with a per-link secret (HMAC, constant-time check), rate-limited, a sync queued only for the linked branch
-- [ ] Git awareness: last author and date per file from one `git log` pass, `CODEOWNERS` as ownership hints on the artifact page, and "view at this commit" for a citation that names one
-
-#### V0.2.6: Issues and pull requests
-
-- [ ] **F17** a connector per project (GitHub or GitLab, read-only token per decision 12): issues and pull/merge requests with their discussion become evidence of a new kind, synced incrementally and on webhook, searchable and citable, filterable in Retrieval
-- [ ] Links: file paths, symbols and commits mentioned in an issue or pull request link to that evidence and show on the artifact page; closed issues are marked *outdated*
-- [ ] Rate limits of the remote API respected (retry-after), and a connector paused by a revoked token says so
-
-#### V0.2.7: Assistant memory
-
-- [ ] **F5** the last turns of a conversation, bounded by a token budget, go with each question; a follow-up resolves "it" and "that file"; cross-workspace search over the caller's workspaces, merged by score, each result checked against its workspace's role and AI policy
-- [ ] **F19** a keyboard command palette: jump to a workspace, file, memory card or setting, and start the assistant's actions
-
-#### V0.2.8: Portability and resilience
-
-- [ ] **O2** workspace export (an archive with evidence, folders, memory cards and their citations, tasks, comments and lifecycle history) and import into a new workspace on any 0.2.x or later server, with a dry run that reports what would be created
-- [ ] **O6** encrypted backups per decision 14, and an optional second copy to another folder or network share after each backup (closes R2-5)
-- [ ] **P10** document readings in a subprocess with time and memory limits, killed on overrun (closes R2-4 and the P9 residual)
-
-#### V0.2.9: One client
-
-- [ ] **F20** per decision 13: the desktop shell asks for a server address, keeps its session in the operating system's credential store and shows the web client; *Export to a server* moves a local workspace through O2; the local edition is marked retired in the docs and removed in V0.3.x
-
-#### V0.2.10: Release candidate
-
-- [ ] **R7** feature freeze
-- [ ] **R8** fourth security pass over mail, webhooks, remote clones, connectors, export and import, and the desktop client
-- [ ] **R9** upgrade test from 0.2.0 environments in CI
-- [ ] **R10** performance run at 50,000 passages plus a 100,000-file remote repository and 10,000 issues
-- [ ] **R11** documentation: mindmaps, branch pages (`repository-sources`, a new `connectors` page, `operations`), changelog, upgrade notes from 0.2.x
-- [ ] **R12** a clean-machine install with mail and a remote repository, following only the guide
+| 7 | **Mail transport** | V0.2.9 | SMTP only (any provider offers it), TLS required (implicit or STARTTLS), the password encrypted like provider keys; an outbox table with retries so a slow mail server never holds a request |
+| 8 | **Self-service password reset** | V0.2.11 | Yes, by email, alongside the administrator's reset links: the same answer for every address, rate-limited per address and per account, a 1-hour one-time link, and the reset notifications from V0.1.67 |
+| 9 | **Registration with verification** | V0.2.13 | Registration stays closed by default; when an operator opens it, verification is mandatory and an unverified account can sign in but not join or create anything |
+| 10 | **Account deletion** (risk 12) | V0.2.16 | Deactivate, then anonymize: the account's sessions, tokens, avatar and email go; what they wrote stays, credited to "Former member". Only system administrators, audited; an owner must transfer ownership first |
+| 11 | **Who links remote repositories, and where from** | V0.2.19 | Workspace administrators, only to hosts in `REPOMEMO_GIT_ALLOWED_HOSTS` (unset: remote links off, like `REPOMEMO_REPO_ROOTS` for local ones); `https` and `ssh` only; credentials per link (a read-only token or deploy key), encrypted, never shown again |
+| 12 | **First connectors** | V0.2.27 | GitHub (including GitHub Enterprise Server) and GitLab, read-only, issues and pull/merge requests with their discussion; Linear and Jira later |
+| 13 | **The desktop app** (revisits decision 3) | V0.2.49 | The desktop shell becomes a client: it asks for a server address, signs in and shows the web client. The local edition is retired after one release that offers "export to a server" |
+| 14 | **Backup encryption** | V0.2.42 | AES-256-GCM in streaming chunks, key from `REPOMEMO_BACKUP_KEY` (never stored in the backup); off by default, recommended in the guide; restore refuses a wrong key before writing anything |
 
 ---
 
@@ -401,22 +443,26 @@ Every item of both roads, with the release it is planned for. The evidence behin
 | F2 | **Search by trust.** Lifecycle, folder and date filters; boost verified evidence | S | ✅ V0.1.72 |
 | F3 | **Symbol search on the web** | S | ✅ V0.1.72 |
 | F4 | **Repositories.** Phase 1b (renames with edits, commit on citations) | M | ✅ V0.1.73 |
-| F4 | **Repositories.** Phase 2 (remote by URL, encrypted credential, partial clone, scheduled fetch) | L | V0.2.4 |
-| F5 | **Assistant memory.** Earlier turns in context; search across workspaces | M | V0.2.7 |
-| F6 | **Mail delivery** (SMTP, outbox, templates) for invitations, resets, mentions, assignments | M | V0.2.2 (decisions 5, 7) |
+| F4 | **Repositories.** Phase 2: remote by URL over `https` (2a) and `ssh` (2b) | L | V0.2.20, V0.2.21 |
+| F5 | **Assistant memory** (5a) and **cross-workspace search** (5b) | M | V0.2.32, V0.2.33 |
+| F6 | **Mail delivery:** SMTP and outbox (6a), invitations (6b), mentions and assignments (6c) | M | V0.2.9, V0.2.10, V0.2.12 (decisions 5, 7) |
 | F7 | **Evidence ergonomics.** Move folders, multi-select, new version of a file | M | ✅ V0.1.73 |
 | F8 | **Live map and health** | S | ✅ V0.1.72 |
-| F9 | **Console follow-ups.** `logs --follow`, `users reset-link`, `tokens list`, backup commands; workspace commands for system administrators | S–M | ✅ V0.1.73, V0.1.75; workspace commands V0.2.1 |
+| F9 | **Console follow-ups.** `logs --follow`, `users reset-link`, `tokens list`, backup commands; workspace commands for system administrators | S–M | ✅ V0.1.73, V0.1.75; workspace commands V0.2.7 |
 | F10 | **Desktop decision:** frozen as the local edition, security fixes only | Decision | ✅ Decided (decision 3) |
 | F11 | **Ownership transfer** and no removal of a workspace owner (N8) | S | ✅ V0.1.73 |
-| F12 | **Self-service password reset** by email, the same answer for every address | S | V0.2.2 (decision 8) |
-| F13 | **Email verification** for self-registration and changed addresses | S–M | V0.2.3 (decision 9) |
-| F14 | **Notification preferences** and a daily digest | S | V0.2.3 |
-| F15 | **Account lifecycle:** deactivate, reactivate, anonymize (risk 12) | M | V0.2.3 (decision 10) |
-| F16 | **Push webhooks and git awareness:** signed webhooks, last author and date, `CODEOWNERS` hints, view a citation at its commit | M | V0.2.5 |
-| F17 | **Issue and pull request connector** for GitHub and GitLab, read-only | L | V0.2.6 (decision 12) |
-| F19 | **Command palette** | S | V0.2.7 |
-| F20 | **Desktop as a server client;** local edition retired | M | V0.2.9 (decision 13) |
+| F12 | **Self-service password reset** by email, the same answer for every address | S | V0.2.11 (decision 8) |
+| F13 | **Email verification** for self-registration and changed addresses | S–M | V0.2.13 (decision 9) |
+| F14 | **Notification preferences** (14a) and a **daily digest** (14b) | S | V0.2.14, V0.2.15 |
+| F15 | **Account lifecycle:** deactivate and reactivate (15a), anonymize (15b) (risk 12) | M | V0.2.16, V0.2.17 (decision 10) |
+| F16 | **Push webhooks and git awareness:** signed webhooks (16a), last author and date (16b), `CODEOWNERS` hints (16c), a citation at its commit (16d) | M | V0.2.23–V0.2.26 |
+| F17 | **Issues and pull requests:** GitHub issues (17a), GitHub pull requests (17b), GitLab (17c), links to files and symbols (17d), webhooks and rate limits (17e) | L | V0.2.27–V0.2.31 (decision 12) |
+| F19 | **Command palette** | S | V0.2.34 |
+| F21 | **More languages:** symbols and structure-aware chunks for Go and Java (21a), C# and PHP (21b) | S–M | V0.2.35, V0.2.36 |
+| F23 | **Review queue:** evidence needing review, stale memory cards and open health findings in one list | S–M | V0.2.37 |
+| F24 | **Version history** of a file, viewable and comparable | M | V0.2.38 |
+| F25 | **`@mention` suggestions** in comments | S | V0.2.39 |
+| F20 | **Desktop as a server client** (20a), export to a server (20b), local edition retired (20c) | M | V0.2.49–V0.2.51 (decision 13) |
 
 ### Security
 
@@ -432,10 +478,11 @@ Every item of both roads, with the release it is planned for. The evidence behin
 | — | Integrity | N8 | ✅ V0.1.73 |
 | — | Supply chain | dependency scanning (review §7) | ✅ V0.1.66 (CI) |
 | — | Third pass | R2-1, R2-2 fixed; R2-3, R2-6 accepted | ✅ V0.1.76 |
-| — | Accepted for later | R2-4 (readings cannot be killed), R2-5 (backups not encrypted) | V0.2.8 (P10, O6) |
+| — | Accepted for later | R2-4 (readings cannot be killed), R2-5 (backups not encrypted) | V0.2.44 (P10), V0.2.42 (O6) |
 | — | Accepted | N9 (not a boundary, documented), I1, I4 | — |
-| S6 | Remote sources | Host allowlist, protocols, credentials, clone limits for remote repositories; the same rules for webhooks, SMTP and connectors | V0.2.4–V0.2.6 |
-| — | Fourth pass | Mail, webhooks, remote clones, connectors, export and import, desktop client | V0.2.10 (R8) |
+| S6 | Remote sources | Credential store and host allowlist (6a), clone limits (6b); each later surface (SMTP, webhooks, connectors) brings its own rules | V0.2.19, V0.2.22 |
+| — | Registration without enumeration | M4 residual | V0.2.18 |
+| — | Fourth pass | Mail, webhooks, remote clones, connectors, export and import, desktop client | V0.2.52 (R8) |
 
 ### Platform performance
 
@@ -451,7 +498,8 @@ Every item of both roads, with the release it is planned for. The evidence behin
 | P7 | Query cache with targeted invalidation | M | ✅ V0.1.70 (remaining pages: C13) |
 | P8 | Writer connection plus read pool; configurable concurrency | M | ✅ V0.1.71 |
 | P9 | Parser time budget (memory caps need a subprocess) | M | ✅ V0.1.74 |
-| P10 | Readings in a subprocess with time and memory limits (R2-4) | M | V0.2.8 |
+| P10 | Readings in a subprocess with time and memory limits (R2-4) | M | V0.2.44 |
+| P11 | Map and health recomputed only where a change touched | M | V0.2.8 |
 
 ### Code health and release engineering
 
@@ -467,24 +515,34 @@ Every item of both roads, with the release it is planned for. The evidence behin
 | C8 | CI | S | ✅ V0.1.66 (rustfmt and clippy blocking since V0.1.71) |
 | C9 | One version source, changelog | S | ✅ V0.1.66 |
 | C10 | Dependency hygiene (`quick-xml` in ingestion; Vite 5 kept) | S | ✅ V0.1.71 |
-| C11 | Split `styles.css` per component | M | V0.2.1 |
+| C11 | Split `styles.css` per component | M | V0.2.5 |
 | C12 | Remove the worker stub | S | ✅ V0.1.71 (decision 4) |
-| C13 | Workspace page split per section; remaining pages on the query cache; link-page rendering tests | M | V0.2.1 |
-| C14 | Asynchronous manual re-index endpoints | S | V0.2.1 |
+| C13 | Workspace page split per section (13a), remaining pages on the query cache (13b), link-page rendering tests (13c) | M | V0.2.2–V0.2.4 |
+| C14 | Asynchronous manual re-index endpoints | S | V0.2.6 |
 
 ### Operations and documentation
 
 | ID | Item | Size | Target |
 |---|---|---|---|
 | O1 | Backup and restore | M | ✅ V0.1.75 |
-| O2 | Workspace export and import | M | V0.2.8 |
+| O2 | Workspace export (2a) and import (2b) | M | V0.2.40, V0.2.41 |
 | O3 | Production guide | S–M | ✅ V0.1.75 |
 | O4 | Quotas and disk floor | M | ✅ V0.1.75 |
 | O5 | OpenMetrics export | S | ✅ V0.1.75 |
-| O6 | Encrypted backups and a second copy after each backup (R2-5) | S–M | V0.2.8 (decision 14) |
+| O6 | Encrypted backups (6a, R2-5) and a second copy after each backup (6b) | S–M | V0.2.42, V0.2.43 (decision 14) |
+| O7 | Container image and compose file with the proxy | S–M | V0.2.45 |
+| O8 | Audit trail export | S | V0.2.46 |
 | D1 | Tracker retired, `PRODUCT.md`, Postman v5 | S | ✅ V0.1.66 |
 | R5 | Mindmaps, branch pages, changelog, upgrade notes | M | ✅ V0.1.76 |
-| R7–R12 | Release candidate for V0.3.0: freeze, fourth security pass, upgrade from 0.2.0, performance with remote sources, documentation, clean install | M | V0.2.10 |
+| R6 follow-up | Corrections from the clean-machine install | S | V0.2.1 |
+| R7–R12 | Release candidate for V0.3.0: freeze and fourth security pass (R7, R8), upgrade from 0.2.0 (R9), performance with remote sources (R10), documentation (R11), clean install (R12) | M | V0.2.52–V0.2.56 |
+
+### Experience
+
+| ID | Item | Size | Target |
+|---|---|---|---|
+| X1 | Accessibility pass: keyboard paths, focus, labels, contrast | M | V0.2.47 |
+| X2 | Narrow screens: workspace pages and the assistant usable at 375 px | M | V0.2.48 |
 
 ### Repository indexing track
 
@@ -492,14 +550,14 @@ Design and limits: [technical/repository-sources.md](technical/repository-source
 
 - [x] **Phase 1:** local repositories, the sync engine, automatic sync when the branch moves, `REPOMEMO_REPO_ROOTS` and the UNC guard.
 - [x] **Phase 1b (V0.1.73):** renames with edits, the commit on results and citations.
-- [ ] **Phase 2 (V0.2.4):** remote repositories by URL with an encrypted credential, partial clone and scheduled fetch (S3 done in V0.1.69; S6 lands with it).
-- [ ] **Phase 3a (V0.2.5):** push webhooks, last author and date per file, `CODEOWNERS` hints, view a citation at its commit.
-- [ ] **Phase 3b (V0.2.6):** issue and pull-request links, through the GitHub and GitLab connector.
+- [ ] **Phase 2 (V0.2.19–V0.2.22):** credential store and allowed hosts, then remote repositories over `https` and `ssh`, then clone limits.
+- [ ] **Phase 3a (V0.2.23–V0.2.26):** push webhooks, last author and date per file, `CODEOWNERS` hints, a citation at its commit.
+- [ ] **Phase 3b (V0.2.27–V0.2.31):** issues and pull requests, through the GitHub and GitLab connector.
 
 ### Background jobs track
 
 - [x] Background indexing, embedding and repository-sync queues with restart recovery, retries and failure reasons; incremental re-index; live progress.
-- [ ] Async manual index endpoints (C14, V0.2.1).
+- [ ] Async manual index endpoints (C14, V0.2.6).
 - [ ] A durable job queue claimed by a worker: scale-out direction.
 
 ---

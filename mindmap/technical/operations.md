@@ -212,7 +212,7 @@ Plan disk as: stored files + database (roughly a tenth of the text) + the cached
 
 ### What a backup is
 
-A folder in `<data folder>/backups/`: a consistent snapshot of the database (taken while the server runs), a copy of the stored files, the key file when there is one, and a manifest. A backup reuses the files of the one before it through hard links, so only new files cost space. Nothing is compressed or encrypted (encryption is planned for V0.2.8): **copy backups to another machine, and protect them like the data**: they contain `secret.key`. When you use `REPOMEMO_SECRET_KEY`, keep that value with your other secrets: a restore needs the same one to read the provider keys.
+A folder in `<data folder>/backups/`: a consistent snapshot of the database (taken while the server runs), a copy of the stored files, the key file when there is one, and a manifest. A backup reuses the files of the one before it through hard links, so only new files cost space. Nothing is compressed or encrypted (encryption is planned for V0.2.42): **copy backups to another machine, and protect them like the data**: they contain `secret.key`. When you use `REPOMEMO_SECRET_KEY`, keep that value with your other secrets: a restore needs the same one to read the provider keys.
 
 ### Making them
 
