@@ -123,6 +123,8 @@ pub struct StorageEngine {
     blob_lock: Arc<tokio::sync::Mutex<()>>,
     /// Passage vectors held in memory for meaning search.
     vectors: Arc<vectors::VectorCache>,
+    /// What was written to passages and vectors, for derived results.
+    vector_changes: Arc<vectors::VectorChanges>,
     job_observer: Arc<RwLock<Option<Arc<dyn JobObserver>>>>,
     activity_observer: Arc<RwLock<Option<Arc<dyn ActivityObserver>>>>,
 }
@@ -708,6 +710,7 @@ impl StorageEngine {
             secrets,
             blob_lock: Arc::new(tokio::sync::Mutex::new(())),
             vectors: Arc::new(vectors::VectorCache::new(config.vector_index_mb)),
+            vector_changes: Arc::new(vectors::VectorChanges::default()),
             job_observer: Arc::new(RwLock::new(None)),
             activity_observer: Arc::new(RwLock::new(None)),
         };

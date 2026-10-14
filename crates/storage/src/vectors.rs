@@ -100,6 +100,72 @@ pub(crate) fn normalised(vector: &[f32]) -> Option<Vec<f32>> {
     Some(vector.iter().map(|value| value / norm).collect())
 }
 
+/// Which files had their passages or vectors written, in order of a counter
+/// that only goes up. Derived results that are expensive to make (the
+/// knowledge map and Workspace Health read every vector) keep the number they
+/// were made at per file and redo only the files written since (roadmap P11).
+///
+/// It lives in memory, like what it is compared with: after a restart both
+/// start empty together.
+#[derive(Default)]
+pub(crate) struct VectorChanges {
+    counter: std::sync::atomic::AtomicU64,
+    workspaces: Mutex<HashMap<String, WorkspaceChanges>>,
+}
+
+#[derive(Default)]
+struct WorkspaceChanges {
+    /// Everything was written at once (vectors cleared, say).
+    everything: u64,
+    files: HashMap<String, u64>,
+}
+
+/// A copy of one workspace's journal, to ask "when was this file last written".
+#[derive(Debug, Clone, Default)]
+pub struct VectorStamps {
+    everything: u64,
+    files: HashMap<String, u64>,
+}
+
+impl VectorStamps {
+    /// The counter value of the file's last write; changes whenever the file's passages or vectors do.
+    pub fn of(&self, artifact_id: &str) -> u64 {
+        self.files.get(artifact_id).copied().unwrap_or(0).max(self.everything)
+    }
+}
+
+impl VectorChanges {
+    pub(crate) fn touch<'a>(&self, workspace_id: &str, artifact_ids: impl IntoIterator<Item = &'a str>) {
+        let value = self.counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+        if let Ok(mut workspaces) = self.workspaces.lock() {
+            let changes = workspaces.entry(workspace_id.to_owned()).or_default();
+            for artifact_id in artifact_ids {
+                changes.files.insert(artifact_id.to_owned(), value);
+            }
+        }
+    }
+
+    pub(crate) fn touch_everything(&self, workspace_id: &str) {
+        let value = self.counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+        if let Ok(mut workspaces) = self.workspaces.lock() {
+            workspaces.entry(workspace_id.to_owned()).or_default().everything = value;
+        }
+    }
+
+    fn stamps(&self, workspace_id: &str) -> VectorStamps {
+        self.workspaces
+            .lock()
+            .ok()
+            .and_then(|workspaces| {
+                workspaces.get(workspace_id).map(|changes| VectorStamps {
+                    everything: changes.everything,
+                    files: changes.files.clone(),
+                })
+            })
+            .unwrap_or_default()
+    }
+}
+
 /// What the engine keeps: one index per workspace, within one memory budget.
 pub(crate) struct VectorCache {
     budget_bytes: usize,
@@ -175,6 +241,12 @@ impl VectorCache {
 }
 
 impl StorageEngine {
+    /// When each file of a workspace last had its passages or vectors written
+    /// (in this process: see `VectorChanges`).
+    pub fn vector_stamps(&self, workspace_id: &str) -> VectorStamps {
+        self.vector_changes.stamps(workspace_id)
+    }
+
     /// The in-memory index of a workspace's vectors from `model`, built when
     /// missing or out of date. `None` when there are no vectors, the index is
     /// turned off, or the vectors would not fit the budget: the caller then

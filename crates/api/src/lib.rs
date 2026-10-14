@@ -22,6 +22,7 @@ mod budget;
 mod embeddings;
 mod health;
 mod knowledge_map;
+mod meaning;
 mod repo_overview;
 mod repo_policy;
 mod repo_stack;
@@ -52,6 +53,8 @@ pub struct RepoMemoCore {
     retrieval: RetrievalService,
     repo_policy: std::sync::Arc<RepoLinkPolicy>,
     ai_budget: BackgroundAiBudget,
+    /// Per-file results of the knowledge map and health, kept between requests.
+    meaning: meaning::MeaningCache,
 }
 
 impl RepoMemoCore {
@@ -70,6 +73,7 @@ impl RepoMemoCore {
             retrieval,
             repo_policy: std::sync::Arc::new(RepoLinkPolicy::unrestricted()),
             ai_budget: BackgroundAiBudget::default(),
+            meaning: meaning::MeaningCache::default(),
         }
     }
 
@@ -1428,6 +1432,7 @@ Document {file} section {index} covers topic{} and the deploy_{} function.
             .unwrap();
         println!("built {passages} passages in {:?}", started.elapsed());
 
+        let mut full_run = std::time::Duration::ZERO;
         for round in ["first", "second"] {
             let started = Instant::now();
             let map = core.knowledge_map(&workspace.id).await.unwrap();
@@ -1437,6 +1442,9 @@ Document {file} section {index} covers topic{} and the deploy_{} function.
                 map.nodes.len(),
                 map.edges.len()
             );
+            if round == "first" {
+                full_run = started.elapsed();
+            }
             let started = Instant::now();
             let health = core.workspace_health(&workspace.id).await.unwrap();
             println!(
@@ -1444,7 +1452,189 @@ Document {file} section {index} covers topic{} and the deploy_{} function.
                 started.elapsed(),
                 health.findings.len()
             );
+            if round == "first" {
+                full_run += started.elapsed();
+            }
         }
+
+        // One file changes: its passages are re-indexed and re-embedded, and the
+        // map and health are asked for again. The target is under a tenth of
+        // the first, full run (V0.2.8).
+        let listed = core.storage().list_artifacts(&workspace.id).await.unwrap();
+        let changed = &listed[listed.len() / 2];
+        let chunks = core.storage().list_chunks_for_artifact(&changed.id).await.unwrap();
+        core.storage()
+            .upsert_embeddings(
+                &workspace.id,
+                "perf",
+                chunks
+                    .into_iter()
+                    .map(|chunk| (chunk.id, (0..dims).map(|_| next()).collect::<Vec<f32>>()))
+                    .collect(),
+            )
+            .await
+            .unwrap();
+        let started = Instant::now();
+        core.knowledge_map(&workspace.id).await.unwrap();
+        core.workspace_health(&workspace.id).await.unwrap();
+        let incremental = started.elapsed();
+        println!(
+            "map and health after one changed file: {incremental:?} ({:.1}% of the full run {full_run:?})",
+            incremental.as_secs_f64() / full_run.as_secs_f64() * 100.0
+        );
+        assert!(
+            incremental * 10 < full_run,
+            "a one-file change must cost under 10% of a full run"
+        );
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    /// The knowledge map and Workspace Health keep per-file results between
+    /// requests (roadmap P11). Whatever was kept, they must answer exactly what
+    /// a cold computation answers, and a one-file change must read one file.
+    #[tokio::test]
+    async fn the_map_and_health_after_a_change_match_a_cold_computation() {
+        let data_dir = std::env::temp_dir().join(format!(
+            "repomemo-incremental-{}",
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+        ));
+        let core = RepoMemoCore::boot(data_dir.clone()).await.unwrap();
+        let workspace = core.create_workspace("Incremental".to_owned()).await.unwrap();
+        core.storage()
+            .save_provider_settings(repomemo_domain::ProviderSettings {
+                id: String::new(),
+                workspace_id: Some(workspace.id.clone()),
+                provider_type: "ollama".to_owned(),
+                name: "Embeddings".to_owned(),
+                base_url: Some("http://127.0.0.1:11434".to_owned()),
+                model: None,
+                embedding_model: Some("test-embed".to_owned()),
+                enabled: true,
+                metadata: serde_json::json!({ "purpose": "embedding" }),
+                api_key: None,
+            })
+            .await
+            .unwrap();
+        // Twelve files in three topics, each embedded along its topic with a
+        // small per-file variation.
+        let vector = |file: usize, wobble: f32| -> Vec<f32> {
+            let topic = file % 3;
+            let mut vector = vec![0.05_f32; 6];
+            vector[topic * 2] = 1.0;
+            vector[topic * 2 + 1] = 0.3 + file as f32 * 0.02 + wobble;
+            vector
+        };
+        let mut artifacts = Vec::new();
+        for file in 0..12 {
+            let artifact = core
+                .import_text(
+                    workspace.id.clone(),
+                    format!("Note {file}"),
+                    format!(
+                        "# Note {file}\n\nTopic {} paragraph {file}.\n\n## More\n\nSecond part of note {file}.",
+                        file % 3
+                    ),
+                    Some("Markdown".to_owned()),
+                )
+                .await
+                .unwrap();
+            core.index_artifact(artifact.id.clone()).await.unwrap();
+            let chunks = core.storage().list_chunks_for_artifact(&artifact.id).await.unwrap();
+            core.storage()
+                .upsert_embeddings(
+                    &workspace.id,
+                    "test-embed",
+                    chunks.into_iter().map(|chunk| (chunk.id, vector(file, 0.0))).collect(),
+                )
+                .await
+                .unwrap();
+            artifacts.push(artifact);
+        }
+        let ws = workspace.id.as_str();
+
+        let first_map = serde_json::to_value(core.knowledge_map(ws).await.unwrap()).unwrap();
+        let first_health = serde_json::to_value(core.workspace_health(ws).await.unwrap()).unwrap();
+        assert_eq!(first_map["similarity_available"], true);
+        // Nothing changed: the next request reads no file again.
+        let listed = core.storage().list_artifacts(ws).await.unwrap();
+        assert_eq!(
+            core.file_meanings(ws, Some("test-embed"), &listed)
+                .await
+                .unwrap()
+                .refreshed,
+            0
+        );
+
+        // One file gets new vectors (it moved to another topic).
+        let moved = &artifacts[4];
+        let chunks = core.storage().list_chunks_for_artifact(&moved.id).await.unwrap();
+        core.storage()
+            .upsert_embeddings(
+                ws,
+                "test-embed",
+                chunks
+                    .into_iter()
+                    .map(|chunk| {
+                        let mut other = vec![0.05_f32; 6];
+                        other[4] = 1.0;
+                        other[5] = 0.9;
+                        (chunk.id, other)
+                    })
+                    .collect(),
+            )
+            .await
+            .unwrap();
+        let listed = core.storage().list_artifacts(ws).await.unwrap();
+        // Exactly the one file written is read again, and then it is current.
+        assert_eq!(
+            core.file_meanings(ws, Some("test-embed"), &listed)
+                .await
+                .unwrap()
+                .refreshed,
+            1
+        );
+        assert_eq!(
+            core.file_meanings(ws, Some("test-embed"), &listed)
+                .await
+                .unwrap()
+                .refreshed,
+            0,
+            "and then it is current"
+        );
+
+        let warm_map = serde_json::to_value(core.knowledge_map(ws).await.unwrap()).unwrap();
+        let warm_health = serde_json::to_value(core.workspace_health(ws).await.unwrap()).unwrap();
+        core.meaning.clear();
+        let cold_map = serde_json::to_value(core.knowledge_map(ws).await.unwrap()).unwrap();
+        let cold_health = serde_json::to_value(core.workspace_health(ws).await.unwrap()).unwrap();
+        assert_eq!(
+            warm_map, cold_map,
+            "the map after a change is the map of a cold computation"
+        );
+        assert_eq!(warm_health, cold_health);
+        assert_ne!(
+            warm_map["edges"], first_map["edges"],
+            "the moved file is linked elsewhere now"
+        );
+        let _ = first_health;
+
+        // A new file is read, and only it.
+        let extra = core
+            .import_text(
+                ws.to_owned(),
+                "Late note".to_owned(),
+                "# Late\n\nTopic 1.".to_owned(),
+                None,
+            )
+            .await
+            .unwrap();
+        core.index_artifact(extra.id.clone()).await.unwrap();
+        let listed = core.storage().list_artifacts(ws).await.unwrap();
+        let meanings = core.file_meanings(ws, Some("test-embed"), &listed).await.unwrap();
+        assert_eq!(meanings.refreshed, 1, "only the new file was read");
+        assert_eq!(meanings.counts[&extra.id].0, 1, "its passages are counted");
+
+        drop(core);
         let _ = std::fs::remove_dir_all(data_dir);
     }
 

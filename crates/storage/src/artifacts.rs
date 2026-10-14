@@ -689,8 +689,15 @@ impl StorageEngine {
         .bind(index_version)
         .execute(&mut *tx)
         .await?;
+        let workspace_id = sqlx::query_scalar::<_, String>("SELECT workspace_id FROM artifacts WHERE id = ?1")
+            .bind(artifact_id)
+            .fetch_optional(&mut *tx)
+            .await?;
 
         tx.commit().await?;
+        if let Some(workspace_id) = workspace_id {
+            self.vector_changes.touch(&workspace_id, [artifact_id]);
+        }
 
         Ok(())
     }

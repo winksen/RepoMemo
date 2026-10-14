@@ -775,6 +775,10 @@ async fn vector_search_uses_the_index_and_agrees_with_a_scan() {
         .unwrap();
     let chunks = storage.list_chunks_for_artifact(&artifact.id).await.unwrap();
     let id_of = |text: &str| chunks.iter().find(|chunk| chunk.text == text).unwrap().id.clone();
+    // Every write to a file's passages or vectors moves its number in the journal
+    // that derived results (the knowledge map, health) compare against.
+    let after_indexing = storage.vector_stamps(&workspace.id).of(&artifact.id);
+    assert!(after_indexing > 0, "indexing is journalled");
     storage
         .upsert_embeddings(
             &workspace.id,
@@ -787,6 +791,23 @@ async fn vector_search_uses_the_index_and_agrees_with_a_scan() {
         )
         .await
         .unwrap();
+    let after_embedding = storage.vector_stamps(&workspace.id).of(&artifact.id);
+    assert!(after_embedding > after_indexing, "embedding is journalled");
+    assert_eq!(storage.vector_stamps("another").of(&artifact.id), 0, "per workspace");
+    let counts = storage
+        .chunk_counts_for_artifacts(Some("m"), std::slice::from_ref(&artifact.id))
+        .await
+        .unwrap();
+    assert_eq!(counts[&artifact.id], (4, 3), "four passages, three with a vector");
+    let centroids = storage
+        .artifact_embedding_centroids_for("m", std::slice::from_ref(&artifact.id))
+        .await
+        .unwrap();
+    let everywhere = storage.artifact_embedding_centroids(&workspace.id, "m").await.unwrap();
+    assert_eq!(
+        centroids, everywhere,
+        "reading one file is reading the workspace, for that file"
+    );
 
     let request = SearchRequest {
         workspace_id: workspace.id.clone(),
@@ -827,6 +848,18 @@ async fn vector_search_uses_the_index_and_agrees_with_a_scan() {
         .await
         .unwrap()
         .is_empty());
+
+    // Clearing a workspace's vectors is journalled for every file, and the
+    // search index forgets them.
+    let before_clear = storage.vector_stamps(&workspace.id).of(&artifact.id);
+    assert!(storage.clear_workspace_embeddings(&workspace.id).await.unwrap() >= 4);
+    assert!(storage.vector_stamps(&workspace.id).of(&artifact.id) > before_clear);
+    assert!(storage
+        .search_chunks_by_embedding(&request, "m", &query)
+        .await
+        .unwrap()
+        .is_empty());
+    assert_eq!(storage.embedding_count(&workspace.id).await.unwrap(), 0);
 
     storage.pool.close().await;
     drop(storage);

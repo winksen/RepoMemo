@@ -12,7 +12,8 @@ use repomemo_domain::{
 };
 use repomemo_storage::ChunkMention;
 
-use crate::knowledge_map::{fold_repository_centroids, folded_repository_files, similarity_edges};
+use crate::knowledge_map::folded_repository_files;
+use crate::meaning::Comparison;
 use crate::RepoMemoCore;
 
 /// Full-text lookups one health check may run, across all detectors.
@@ -82,7 +83,10 @@ impl RepoMemoCore {
         );
         findings.extend(self.stale_memory_citations(workspace_id, &by_id).await?);
         findings.extend(self.index_failures(workspace_id, &retired, &by_id).await?);
-        let similarity_available = match self.unconnected(workspace_id, &live_items, &folded_into).await? {
+        let similarity_available = match self
+            .unconnected(workspace_id, &artifacts, &live_items, &folded_into)
+            .await?
+        {
             Some(unconnected) => {
                 findings.extend(unconnected);
                 true
@@ -460,6 +464,7 @@ impl RepoMemoCore {
     async fn unconnected(
         &self,
         workspace_id: &str,
+        artifacts: &[ArtifactSummary],
         live: &[&ArtifactSummary],
         folded_into: &HashMap<String, String>,
     ) -> Result<Option<Vec<HealthFinding>>> {
@@ -470,22 +475,17 @@ impl RepoMemoCore {
         else {
             return Ok(None);
         };
-        let mut centroids = self.storage.artifact_embedding_centroids(workspace_id, &model).await?;
-        fold_repository_centroids(&mut centroids, folded_into);
-        let files = live
-            .iter()
-            .filter_map(|artifact| {
-                centroids
-                    .get(&artifact.id)
-                    .map(|vector| (artifact.id.as_str(), vector.as_slice()))
-            })
-            .collect::<Vec<_>>();
+        // Read only for the files written since the last request, and shared
+        // with the knowledge map (see `meaning.rs`).
+        let mut meanings = self.file_meanings(workspace_id, Some(&model), artifacts).await?;
+        meanings.fold_repositories(folded_into);
+        let files = meanings.files(live.iter().map(|artifact| artifact.id.as_str()));
         if files.len() < UNCONNECTED_MIN_FILES || files.len() > UNCONNECTED_MAX_FILES {
             return Ok(Some(Vec::new()));
         }
 
         let mut connected = HashSet::new();
-        for edge in similarity_edges(&files) {
+        for edge in self.similarity_edges_cached(workspace_id, Comparison::Health, &files).0 {
             connected.insert(edge.source);
             connected.insert(edge.target);
         }
@@ -494,7 +494,7 @@ impl RepoMemoCore {
         }
         let lonely = live
             .iter()
-            .filter(|artifact| centroids.contains_key(&artifact.id) && !connected.contains(&artifact.id))
+            .filter(|artifact| meanings.centroids.contains_key(&artifact.id) && !connected.contains(&artifact.id))
             .collect::<Vec<_>>();
         if lonely.len() as f64 > files.len() as f64 * UNCONNECTED_MAX_SHARE {
             return Ok(Some(Vec::new()));

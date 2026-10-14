@@ -3,6 +3,7 @@
 > **Scope:** the shared server (`apps/server`, `crates/*`), the web client (`apps/desktop/src`), the desktop shell (`apps/desktop/src-tauri`) and the terminal console (`apps/console`), at V0.1.61 plus the unreleased work on main (live progress, environment memory, invitations, password reset links, personal access tokens).
 > **Method:** static review of the code and configuration. Nothing was run, built or attacked, and no dependency scanner was run (see [§7](#7-dependencies)). Each finding below was checked in the code; line numbers are as of this date.
 > **Status:** bundle **S1 is fixed and released in V0.1.64**: H1, H4, L2, L3 and M7. A **second pass** on the same day ([§11](#11-second-pass-2026-10-13)) found nine more issues, including one high (stored XSS through image previews). Six of them and I3 are fixed in V0.1.65, and three are documented for later. Every remaining finding has a target release before V0.2.0 in the [roadmap](../ROADMAP.md#security).
+> **Next review:** [2026-10-14, at V0.2.6](2026-10-14-security-review.md), a full review with new findings E1–E22. M10 and H2 return there in a new form (E1, E2).
 
 | ID | Status | Fix |
 |---|---|---|

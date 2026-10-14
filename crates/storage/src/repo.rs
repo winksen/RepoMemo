@@ -406,6 +406,8 @@ impl StorageEngine {
         )
         .await?;
         tx.commit().await?;
+        // Its passages are gone: derived results must not keep counting them.
+        self.vector_changes.touch(&workspace_id, [artifact_id.as_str()]);
         Ok(())
     }
 

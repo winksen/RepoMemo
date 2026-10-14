@@ -15,6 +15,36 @@ struct EmbeddingCandidateRow {
     source_name: String,
 }
 
+/// Adds one stored vector, scaled to length one, to its file's running sum.
+fn add_unit_vector(sums: &mut HashMap<String, Vec<f32>>, row: &sqlx::sqlite::SqliteRow) {
+    let Some(vector) = decode_embedding(&row.get::<Vec<u8>, _>("vector_blob")) else {
+        return;
+    };
+    let norm = vector.iter().map(|value| value * value).sum::<f32>().sqrt();
+    if norm == 0.0 {
+        return;
+    }
+    let sum = sums
+        .entry(row.get::<String, _>("artifact_id"))
+        .or_insert_with(|| vec![0.0; vector.len()]);
+    if sum.len() != vector.len() {
+        return;
+    }
+    for (total, value) in sum.iter_mut().zip(&vector) {
+        *total += value / norm;
+    }
+}
+
+/// Scales each running sum to length one: the file's direction in meaning space.
+fn normalise_sums(sums: &mut HashMap<String, Vec<f32>>) {
+    for sum in sums.values_mut() {
+        let norm = sum.iter().map(|value| value * value).sum::<f32>().sqrt();
+        if norm > 0.0 {
+            sum.iter_mut().for_each(|value| *value /= norm);
+        }
+    }
+}
+
 impl StorageEngine {
     pub async fn list_symbols(&self, artifact_id: &str) -> Result<Vec<Symbol>> {
         let rows = sqlx::query_as::<_, SymbolRow>(
@@ -124,7 +154,22 @@ impl StorageEngine {
                 .execute(&mut *tx)
                 .await?;
         }
+        // Which files these passages belong to, so derived results redo only those.
+        let mut touched = std::collections::HashSet::new();
+        for batch in embeddings.chunks(400) {
+            let mut query = QueryBuilder::<Sqlite>::new("SELECT DISTINCT artifact_id FROM chunks WHERE id IN (");
+            let mut ids = query.separated(", ");
+            for (chunk_id, _) in batch {
+                ids.push_bind(chunk_id);
+            }
+            query.push(")");
+            for (artifact_id,) in query.build_query_as::<(String,)>().fetch_all(&mut *tx).await? {
+                touched.insert(artifact_id);
+            }
+        }
         tx.commit().await?;
+        self.vector_changes
+            .touch(workspace_id, touched.iter().map(String::as_str));
         // A search index that exists is brought along, not rebuilt.
         self.vectors.apply(workspace_id, model, &embeddings);
         Ok(())
@@ -375,6 +420,66 @@ impl StorageEngine {
             .collect())
     }
 
+    /// `chunk_counts_by_artifact` for the named files only.
+    pub async fn chunk_counts_for_artifacts(
+        &self,
+        model: Option<&str>,
+        artifact_ids: &[String],
+    ) -> Result<HashMap<String, (i64, i64)>> {
+        let mut counts = HashMap::new();
+        for batch in artifact_ids.chunks(400) {
+            let mut query = QueryBuilder::<Sqlite>::new(
+                "SELECT chunks.artifact_id, COUNT(*) AS passages, COUNT(chunk_embeddings.chunk_id) AS embedded \
+                 FROM chunks LEFT JOIN chunk_embeddings \
+                   ON chunk_embeddings.chunk_id = chunks.id AND chunk_embeddings.model = ",
+            );
+            query.push_bind(model.unwrap_or(""));
+            // Driven by the files' own passages (an index on `artifact_id`), not by the workspace.
+            query.push(" WHERE chunks.artifact_id IN (");
+            let mut ids = query.separated(", ");
+            for artifact_id in batch {
+                ids.push_bind(artifact_id);
+            }
+            query.push(") GROUP BY chunks.artifact_id");
+            for row in query.build().fetch_all(self.reader()).await? {
+                counts.insert(
+                    row.get::<String, _>("artifact_id"),
+                    (row.get::<i64, _>("passages"), row.get::<i64, _>("embedded")),
+                );
+            }
+        }
+        Ok(counts)
+    }
+
+    /// `artifact_embedding_centroids` for the named files only.
+    pub async fn artifact_embedding_centroids_for(
+        &self,
+        model: &str,
+        artifact_ids: &[String],
+    ) -> Result<HashMap<String, Vec<f32>>> {
+        let mut sums: HashMap<String, Vec<f32>> = HashMap::new();
+        for batch in artifact_ids.chunks(200) {
+            // Driven by the files' own passages, then one lookup of each vector by its id.
+            let mut query = QueryBuilder::<Sqlite>::new(
+                "SELECT chunks.artifact_id, chunk_embeddings.vector_blob \
+                 FROM chunks JOIN chunk_embeddings ON chunk_embeddings.chunk_id = chunks.id \
+                 WHERE chunk_embeddings.model = ",
+            );
+            query.push_bind(model);
+            query.push(" AND chunks.artifact_id IN (");
+            let mut ids = query.separated(", ");
+            for artifact_id in batch {
+                ids.push_bind(artifact_id);
+            }
+            query.push(")");
+            for row in query.build().fetch_all(self.reader()).await? {
+                add_unit_vector(&mut sums, &row);
+            }
+        }
+        normalise_sums(&mut sums);
+        Ok(sums)
+    }
+
     /// The average direction of each artifact's passage vectors from `model`
     /// (unit-normalised), which places a whole file in meaning space.
     pub async fn artifact_embedding_centroids(
@@ -392,30 +497,10 @@ impl StorageEngine {
         .fetch_all(self.reader())
         .await?;
         let mut sums: HashMap<String, Vec<f32>> = HashMap::new();
-        for row in rows {
-            let Some(vector) = decode_embedding(&row.get::<Vec<u8>, _>("vector_blob")) else {
-                continue;
-            };
-            let norm = vector.iter().map(|value| value * value).sum::<f32>().sqrt();
-            if norm == 0.0 {
-                continue;
-            }
-            let sum = sums
-                .entry(row.get::<String, _>("artifact_id"))
-                .or_insert_with(|| vec![0.0; vector.len()]);
-            if sum.len() != vector.len() {
-                continue;
-            }
-            for (total, value) in sum.iter_mut().zip(&vector) {
-                *total += value / norm;
-            }
+        for row in &rows {
+            add_unit_vector(&mut sums, row);
         }
-        for sum in sums.values_mut() {
-            let norm = sum.iter().map(|value| value * value).sum::<f32>().sqrt();
-            if norm > 0.0 {
-                sum.iter_mut().for_each(|value| *value /= norm);
-            }
-        }
+        normalise_sums(&mut sums);
         Ok(sums)
     }
 
@@ -471,6 +556,7 @@ impl StorageEngine {
             .await?;
         tx.commit().await?;
         self.vectors.forget(workspace_id);
+        self.vector_changes.touch_everything(workspace_id);
         Ok(removed)
     }
 

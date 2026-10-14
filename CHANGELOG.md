@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.8 (2026-10-14)
+
+The knowledge map and Workspace Health recompute only what a change touched.
+
+### Changed
+- **A change to one file no longer recomputes the workspace.** The map and the health check used to read every vector of the workspace again whenever anything in it changed. They now keep, in memory, each file's passage counts and its direction in meaning space, and each comparison of files, and redo only the files written since: one edited file costs its own passages and one row of comparisons. The two share what they read, so opening the map warms the health check.
+- At 50,000 passages (a debug build, so every figure is an upper bound): a full computation of the map and health took 5.0 s, the same after one file changed took 233 ms (4.6%), and asking again with nothing changed took 0.2 s. `cargo test -p repomemo-api --release map_and_health_at_scale -- --ignored --nocapture` now prints the third figure and fails when a one-file change costs a tenth or more of the full run.
+- The answers are unchanged: a test compares the map and the health after a change with those of a cold computation. The similarity threshold is found by selection instead of sorting every pair.
+
+### Added
+- `StorageEngine::vector_stamps`, a journal of which file's passages or vectors were written, and targeted reads of passage counts and centroids for named files. Nothing is stored: after a restart, with another embedding model, or for a workspace whose centroids would take over 64 MiB, the first request simply does the whole work once.
+
+### Upgrading
+- Nothing to do. No migration.
+
 ## V0.2.7 (2026-10-14)
 
 Workspace commands in the admin console.

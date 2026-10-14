@@ -16,18 +16,12 @@ use repomemo_domain::{
     KnowledgeNodeKind, KnowledgePipeline,
 };
 
+use crate::meaning::Comparison;
 use crate::RepoMemoCore;
 
 /// Files drawn in the graph. Past this the graph is unreadable and the
 /// pairwise similarity grows quadratically, so the smallest files are left out.
 const MAX_FILE_NODES: usize = 250;
-/// Similar-content links kept per file: its closest neighbours only, so the
-/// graph shows structure instead of a hairball.
-const NEIGHBOURS_PER_FILE: usize = 3;
-/// With few files there is no distribution to judge "unusually similar"
-/// against, so a fixed cosine floor is used instead.
-const SMALL_WORKSPACE_PAIRS: usize = 10;
-const SMALL_WORKSPACE_MIN_SIMILARITY: f64 = 0.5;
 
 impl RepoMemoCore {
     pub async fn knowledge_map(&self, workspace_id: &str) -> Result<KnowledgeMap> {
@@ -43,9 +37,10 @@ impl RepoMemoCore {
             .embedding_provider_for_workspace(workspace_id)
             .await?
             .map(|settings| settings.embedding_model_name().to_owned());
-        let counts = self
-            .storage
-            .chunk_counts_by_artifact(workspace_id, embedding_model.as_deref())
+        // Passage counts and meaning per file, read only for the files
+        // written since the last request (see `meaning.rs`).
+        let mut meanings = self
+            .file_meanings(workspace_id, embedding_model.as_deref(), &artifacts)
             .await?;
         let state_of = |artifact: &repomemo_domain::ArtifactSummary| {
             if artifact.indexed_at.is_some() {
@@ -56,7 +51,7 @@ impl RepoMemoCore {
                 IndexState::Pending
             }
         };
-        let counts_of = |artifact_id: &str| counts.get(artifact_id).copied().unwrap_or((0, 0));
+        let counts_of = |artifact_id: &str| meanings.counts.get(artifact_id).copied().unwrap_or((0, 0));
 
         let repo_file_sources = self.storage.repo_artifact_sources(workspace_id).await?;
         let folded_into = folded_repository_files(&artifacts, &repo_file_sources);
@@ -158,19 +153,12 @@ impl RepoMemoCore {
 
         let mut edges = Vec::new();
         let mut similarity_available = false;
-        if let Some(model) = embedding_model.as_deref() {
-            let mut centroids = self.storage.artifact_embedding_centroids(workspace_id, model).await?;
-            fold_repository_centroids(&mut centroids, &folded_into);
-            let files = nodes
-                .iter()
-                .filter_map(|node| {
-                    centroids
-                        .get(&node.id)
-                        .map(|vector| (node.id.as_str(), vector.as_slice()))
-                })
-                .collect::<Vec<_>>();
+        if embedding_model.is_some() {
+            meanings.fold_repositories(&folded_into);
+            let files = meanings.files(nodes.iter().map(|node| node.id.as_str()));
             similarity_available = !files.is_empty();
-            edges.extend(similarity_edges(&files));
+            // Only the pairs that involve a file written since last time are compared.
+            edges.extend(self.similarity_edges_cached(workspace_id, Comparison::Map, &files).0);
         }
 
         let mut cards: HashMap<String, String> = HashMap::new();
@@ -273,124 +261,48 @@ pub(crate) fn folded_repository_files(
         .collect()
 }
 
-/// Gives each repository item the meaning of its files together: the
-/// normalised mean of their vectors and its own.
-pub(crate) fn fold_repository_centroids(
-    centroids: &mut HashMap<String, Vec<f32>>,
-    folded_into: &HashMap<String, String>,
-) {
-    let mut members: HashMap<&str, Vec<&str>> = HashMap::new();
-    for (file_id, item_id) in folded_into {
-        members.entry(item_id.as_str()).or_default().push(file_id.as_str());
-    }
-    let mut combined = Vec::new();
-    for (item_id, files) in members {
-        let vectors = files
-            .into_iter()
-            .chain(std::iter::once(item_id))
-            .filter_map(|id| centroids.get(id))
-            .collect::<Vec<_>>();
-        if let Some(vector) = mean_unit_vector(&vectors) {
-            combined.push((item_id.to_owned(), vector));
-        }
-    }
-    centroids.extend(combined);
-}
-
-/// The normalised mean of unit vectors of the same length, if any.
-fn mean_unit_vector(vectors: &[&Vec<f32>]) -> Option<Vec<f32>> {
-    let length = vectors.first()?.len();
-    let mut sum = vec![0.0_f32; length];
-    for vector in vectors.iter().filter(|vector| vector.len() == length) {
-        for (total, value) in sum.iter_mut().zip(vector.iter()) {
-            *total += value;
-        }
-    }
-    let norm = sum.iter().map(|value| value * value).sum::<f32>().sqrt();
-    (norm > 0.0).then(|| sum.into_iter().map(|value| value / norm).collect())
-}
-
-/// Links each file to its closest neighbours by meaning. Only pairs that are
-/// unusually similar for this workspace count: at least the mean plus a
-/// quarter standard deviation of all pairs, which adapts to embedding models
-/// whose cosines sit in different ranges. The bar never rises above the 75th
-/// percentile, so a workspace about one topic still shows its closest pairs.
-/// Vectors must be unit length.
-pub(crate) fn similarity_edges(files: &[(&str, &[f32])]) -> Vec<KnowledgeEdge> {
-    let count = files.len();
-    if count < 2 {
-        return Vec::new();
-    }
-    let mut similarity = vec![vec![0.0_f64; count]; count];
-    let mut all = Vec::with_capacity(count * (count - 1) / 2);
-    for i in 0..count {
-        for j in (i + 1)..count {
-            let (left, right) = (files[i].1, files[j].1);
-            let value = if left.len() == right.len() {
-                left.iter().zip(right).map(|(a, b)| f64::from(*a) * f64::from(*b)).sum()
-            } else {
-                0.0
-            };
-            similarity[i][j] = value;
-            similarity[j][i] = value;
-            all.push(value);
-        }
-    }
-    let threshold = if all.len() < SMALL_WORKSPACE_PAIRS {
-        SMALL_WORKSPACE_MIN_SIMILARITY
-    } else {
-        let mean = all.iter().sum::<f64>() / all.len() as f64;
-        let variance = all.iter().map(|value| (value - mean).powi(2)).sum::<f64>() / all.len() as f64;
-        let mut sorted = all.clone();
-        sorted.sort_by(f64::total_cmp);
-        let upper_quartile = sorted[sorted.len() * 3 / 4];
-        (mean + variance.sqrt() / 4.0).min(upper_quartile)
-    };
-
-    let mut kept = HashSet::new();
-    let mut edges = Vec::new();
-    for i in 0..count {
-        let mut neighbours = (0..count)
-            .filter(|&j| j != i && similarity[i][j] > 0.0 && similarity[i][j] >= threshold)
-            .collect::<Vec<_>>();
-        neighbours.sort_by(|&a, &b| similarity[i][b].total_cmp(&similarity[i][a]));
-        for j in neighbours.into_iter().take(NEIGHBOURS_PER_FILE) {
-            if kept.insert((i.min(j), i.max(j))) {
-                edges.push(KnowledgeEdge {
-                    source: files[i.min(j)].0.to_owned(),
-                    target: files[i.max(j)].0.to_owned(),
-                    kind: KnowledgeEdgeKind::Similar,
-                    weight: similarity[i][j],
-                });
-            }
-        }
-    }
-    edges
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{fold_repository_centroids, similarity_edges};
+    use crate::meaning::{edges_from_similarity, FileMeanings, PairFile, PairSimilarity};
     use std::collections::HashMap;
+    use std::sync::Arc;
+
+    fn similarity_edges(files: &[(&str, &[f32])]) -> Vec<repomemo_domain::KnowledgeEdge> {
+        let files = files
+            .iter()
+            .map(|(id, vector)| PairFile { id, stamp: "", vector })
+            .collect::<Vec<_>>();
+        edges_from_similarity(&PairSimilarity::build(None, &files).0)
+    }
 
     #[test]
     fn a_repository_means_what_its_files_mean_together() {
-        let mut centroids = HashMap::from([
-            ("file-a".to_owned(), vec![1.0_f32, 0.0]),
-            ("file-b".to_owned(), vec![0.0_f32, 1.0]),
-            ("other".to_owned(), vec![1.0_f32, 0.0]),
-        ]);
+        let stamped = |id: &str| (id.to_owned(), "1".to_owned());
+        let mut meanings = FileMeanings {
+            counts: HashMap::new(),
+            centroids: HashMap::from([
+                ("file-a".to_owned(), Arc::new(vec![1.0_f32, 0.0])),
+                ("file-b".to_owned(), Arc::new(vec![0.0_f32, 1.0])),
+                ("other".to_owned(), Arc::new(vec![1.0_f32, 0.0])),
+            ]),
+            stamps: HashMap::from([stamped("file-a"), stamped("file-b"), stamped("other")]),
+            refreshed: 0,
+        };
         let folded = HashMap::from([
             ("file-a".to_owned(), "repo".to_owned()),
             ("file-b".to_owned(), "repo".to_owned()),
         ]);
-        fold_repository_centroids(&mut centroids, &folded);
-        let repo = &centroids["repo"];
+        meanings.fold_repositories(&folded);
+        let repo = &meanings.centroids["repo"];
         assert!((repo[0] - repo[1]).abs() < 1e-6);
         assert!((repo[0] * repo[0] + repo[1] * repo[1] - 1.0).abs() < 1e-6);
-        assert_eq!(centroids["other"], vec![1.0, 0.0]);
+        assert_eq!(*meanings.centroids["other"], vec![1.0, 0.0]);
+        // The repository's stamp follows its files': a changed file changes it.
+        let before = meanings.stamps["repo"].clone();
+        meanings.stamps.insert("file-b".to_owned(), "2".to_owned());
+        meanings.fold_repositories(&folded);
+        assert_ne!(meanings.stamps["repo"], before);
     }
-
     #[test]
     fn small_workspaces_link_only_clearly_similar_files() {
         let deploy = [1.0_f32, 0.0];
