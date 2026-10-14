@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)), then `0.2.1` and so on for fixes. Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.1.76 (2026-10-14)
+
+Release candidate for 0.2.0. **Feature freeze:** from here to 0.2.0 only fixes from this candidate go in.
+
+### Security
+- **Third security pass** over everything changed since V0.1.65 ([review §12](mindmap/security/2026-10-10-security-review.md#12-third-pass-2026-10-14-release-candidate-v0176)): no high and no medium finding. Two low findings are fixed: **repository syncs obey the storage allowance and the disk floor** (a linked repository could grow a workspace past them), and **the key file in a backup is owner-only on Windows**. Four low-impact items are accepted in writing.
+- The review's status table is closed: every finding is fixed, mitigated or accepted.
+
+### Added
+- **An upgrade test.** The schemas of V0.1.40, V0.1.52 and V0.1.65 are rebuilt from the migration files, filled with data, and opened by the current engine: migrations apply, data and full-text search survive, and the integrity and foreign key checks pass. It runs with `cargo test`, so CI runs it.
+- **Performance runs** for the map and health (`cargo test -p repomemo-api --release at_scale -- --ignored --nocapture`) next to the storage one. Results at 50,000 passages, release build: meaning search p95 112 ms (first search, which builds the index, 6.0 s), keyword search p95 63 ms, figures p95 6 ms, file query 1.4 ms, knowledge map 0.5 s and health 0.4 s on first load.
+- **Documentation:** [UPGRADING.md](UPGRADING.md), the generated [API reference](mindmap/technical/api-reference.md) (`node scripts/list-routes.mjs`) and the [authentication and authorization](mindmap/technical/auth-and-authorization.md) page.
+- `node scripts/smoke-test.mjs <address>` checks a running server the way a clean install should behave (health, headers, the web app, and with an administrator's credentials the overview, metrics and a backup).
+
+### Upgrading
+- Nothing to do beyond [UPGRADING.md](UPGRADING.md). Repository syncs are refused, with the reason in the repository's activity, while the workspace is at its storage allowance or the disk is under its floor.
+
 ## V0.1.75 (2026-10-14)
 
 Operations: what an operator needs before trusting the server.

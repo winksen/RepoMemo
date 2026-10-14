@@ -1000,3 +1000,97 @@ async fn performance_at_scale() {
     drop(storage);
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+/// Environments written by older versions open in place. The schemas of
+/// V0.1.40 (migration 13), V0.1.52 (17) and V0.1.65 (23) are rebuilt from the
+/// migration files up to that number, filled with data the way those versions
+/// stored it, and then opened by the current engine.
+#[tokio::test]
+async fn environments_from_older_versions_upgrade_in_place() {
+    use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
+    let migrations = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("migrations");
+    for (version, last_migration) in [("0.1.40", 13), ("0.1.52", 17), ("0.1.65", 23)] {
+        let data_dir = std::env::temp_dir().join(format!("repomemo-upgrade-{version}-{}", uuid::Uuid::new_v4()));
+        let old_schema = data_dir.join("old-migrations");
+        std::fs::create_dir_all(&old_schema).unwrap();
+        for entry in std::fs::read_dir(&migrations).unwrap().flatten() {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let number = name.split('_').next().and_then(|digits| digits.parse::<u32>().ok());
+            if number.is_some_and(|number| number <= last_migration) {
+                std::fs::copy(entry.path(), old_schema.join(&name)).unwrap();
+            }
+        }
+        let options = SqliteConnectOptions::new()
+            .filename(data_dir.join("repomemo.sqlite"))
+            .create_if_missing(true)
+            .foreign_keys(true);
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(options)
+            .await
+            .unwrap();
+        sqlx::migrate::Migrator::new(old_schema.as_path())
+            .await
+            .unwrap()
+            .run(&pool)
+            .await
+            .unwrap();
+        let hash = StorageEngine::content_hash(version.as_bytes());
+        for statement in [
+            "INSERT INTO workspaces (id, name, created_at, updated_at) VALUES ('w1', 'Old workspace', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
+            "INSERT INTO sources (id, workspace_id, type, name, created_at, updated_at) VALUES ('s1', 'w1', 'folder', 'docs', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
+            "INSERT INTO artifacts (id, workspace_id, source_id, type, title, path, content_hash, size_bytes, created_at, updated_at) VALUES ('a1', 'w1', 's1', 'markdown_doc', 'Runbook', 'runbook.md', ?1, 10, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
+            "INSERT INTO chunks (id, artifact_id, workspace_id, chunk_index, text, content_hash) VALUES ('c1', 'a1', 'w1', 0, 'Restart the ingestion worker after a deploy', 'h1')",
+        ] {
+            if statement.contains("INTO artifacts") {
+                sqlx::query("INSERT INTO blobs (hash, storage_uri, size_bytes, created_at) VALUES (?1, 'blobs/x', 10, '2026-01-01T00:00:00Z')")
+                    .bind(&hash)
+                    .execute(&pool)
+                    .await
+                    .unwrap();
+            }
+            let query = sqlx::query(statement);
+            let query = if statement.contains("?1") { query.bind(&hash) } else { query };
+            query.execute(&pool).await.unwrap_or_else(|error| panic!("{version}: {statement}: {error}"));
+        }
+        pool.close().await;
+
+        // The current engine migrates the rest and serves the old data.
+        let storage = StorageEngine::open(StorageConfig::new(data_dir.clone()))
+            .await
+            .unwrap_or_else(|error| {
+                panic!("{version} did not upgrade: {error:#}");
+            });
+        let workspaces = storage.list_workspaces().await.unwrap();
+        assert_eq!(workspaces.len(), 1, "{version}");
+        let artifacts = storage.list_artifacts("w1").await.unwrap();
+        assert_eq!(artifacts.len(), 1, "{version}");
+        assert_eq!(artifacts[0].title, "Runbook");
+        let found = storage
+            .search_chunks(
+                &SearchRequest {
+                    workspace_id: "w1".to_owned(),
+                    query: "ingestion".to_owned(),
+                    limit: Some(5),
+                    ..Default::default()
+                },
+                "\"ingestion\"*",
+            )
+            .await
+            .unwrap();
+        assert_eq!(found.len(), 1, "{version}: full-text search follows the upgrade");
+        let integrity: String = sqlx::query_scalar("PRAGMA integrity_check")
+            .fetch_one(&storage.pool)
+            .await
+            .unwrap();
+        assert_eq!(integrity, "ok", "{version}");
+        let broken: Vec<_> = sqlx::query("PRAGMA foreign_key_check")
+            .fetch_all(&storage.pool)
+            .await
+            .unwrap();
+        assert!(broken.is_empty(), "{version}: foreign keys hold after the upgrade");
+        storage.pool.close().await;
+        drop(storage);
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+}

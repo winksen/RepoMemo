@@ -39,6 +39,7 @@
 | L5 | ✅ Fixed in V0.1.74 | `icacls` owner-only on Windows, `0600` enforced on Unix |
 | N8 | ✅ Fixed in V0.1.73 | Removal refused (409) while the person owns a workspace of the organization; ownership transfer for workspaces and organizations |
 | N9 | 📝 Documented | See §11 |
+| R2-1, R2-2 | ✅ Fixed in V0.1.76 | Third pass (§12): repository syncs obey the quotas; the key file in a backup is owner-only |
 
 ---
 
@@ -421,3 +422,42 @@ Two crates appear in two major versions: reqwest 0.12 and 0.13, and quick-xml 0.
 ### N9. Hiding index chunks is not a confidentiality boundary (Info)
 
 `GET /v1/artifacts/{a}` strips chunks for members, and only administrators open the chunks dialog. Members still read the whole file (`/file`, previews) and its passages through search snippets. This is fine as a UI choice, but no feature should rely on it to hide content from members.
+
+
+---
+
+## 12. Third pass (2026-10-14, release candidate V0.1.76)
+
+> **Scope:** everything that changed in `apps/` and `crates/` since V0.1.65 (143 files): checkable releases, safe defaults, browser hardening, host exposure, the web and server foundations, memory and search, evidence and ownership, performance and operations.
+> **Method:** static review of the code, plus three mechanical checks: (1) `scripts/list-routes.mjs` lists every route with its extractor and the guard calls in its handler (162 routes in the main router); (2) `cargo deny check` (advisories, sources, bans, licenses) and `npm audit --omit=dev`; (3) the test suites. Nothing was run against a live server, attacked or fuzzed.
+> **Result:** no high and no medium finding. Two low findings, both fixed in V0.1.76, and four items accepted in writing.
+
+### What was checked
+
+| Area | Checked | Outcome |
+|---|---|---|
+| Every route | Each handler takes an authentication extractor, or is one of the 13 public routes (health, setup, sign-in, registration, refresh, sign-out, password-reset and invitation preview and completion, file links). Handlers with no authorization call are the person's own data (profile, notifications, tokens, organizations and workspaces lists, the dashboard) or the finishing administrator of the setup | ✔ |
+| Account security | The handlers that change who can get in (`logout-all`, `profile/password`, tokens, `invitations/accept`, grants, reset links, settings, detach, ownership transfer) take `SessionSubject` | ✔ |
+| System administration | App administrators read and run jobs and maintenance; backups, metrics with a token and everything that changes access need a full system administrator and, for changes, a session or `system` token | ✔ |
+| Web session (V0.1.68) | The refresh token is `HttpOnly; SameSite=Strict; Path=/v1/auth`; only requests that send `X-RepoMemo-Client: web` are touched, so a cross-site form cannot trigger it; CORS allows the configured origins only, with credentials | ✔ |
+| Search and filters | Every filter, folder and lifecycle value is bound, never written into SQL; the vector index returns only passages of the requested workspace (the database lookup filters by `workspace_id`) | ✔ |
+| Bulk, move and version routes | Each file is checked against the workspace of the request; repository files cannot be moved, deleted or replaced | ✔ |
+| Ownership | Only a session, only by the owner, only to a current member; the previous owner stays administrator; removal of an owner is refused | ✔ |
+| Caches (V0.1.74) | The map, health and vector index are keyed by workspace and read only after the caller's role is checked; the content version is not user input | ✔ |
+| Backups (V0.1.75) | Backup names are checked to be what the server writes; a restore can only create a new folder under `workspace-data/` with a validated name and never overwrites; paths come from the server, not the request | ✔ |
+| Dependencies | `cargo deny`: advisories, sources, bans and licenses ok; `npm audit --omit=dev`: 0 vulnerabilities | ✔ |
+
+### Findings
+
+| ID | Severity | Finding | Status |
+|---|---|---|---|
+| R2-1 | Low | Repository syncs ignored the new storage allowance and disk floor: a linked repository could keep growing a workspace, and the disk, after uploads were refused | ✅ Fixed in V0.1.76: a sync is refused while the workspace is at its allowance or the disk is under its floor (`quotas::room_for_sync`) |
+| R2-2 | Low | The copy of `secret.key` inside a backup took the folder's permissions on Windows, so the owner-only protection of the original (L5) did not carry over | ✅ Fixed in V0.1.76: `restrict_to_owner` is applied to the copy in a backup and in a restored environment |
+| R2-3 | Info | A file link belongs to its first client, which is the client's address. Behind a proxy that is not trusted, every client has the proxy's address and the rule has no effect (the 60-second limit still holds) | 📝 Accepted: `REPOMEMO_TRUST_PROXY` is in the production guide's required settings |
+| R2-4 | Info | A document reader that overruns its time is abandoned, not killed, and has no memory cap (M11 residual) | 📝 Accepted: the number of abandoned readings is bounded (4), shown as a metric, and a subprocess with limits belongs to a later release |
+| R2-5 | Info | Backups are not encrypted and hold `secret.key` | 📝 Accepted and documented: they must be protected like the data folder; encrypting them is a V0.3.0 candidate |
+| R2-6 | Info | Quota checks are not atomic: concurrent uploads can pass the check together and overshoot a workspace's allowance by a few files | 📝 Accepted: the next upload is refused; the disk floor protects the disk |
+
+### Closing out the table
+
+Every finding of the first review (H1–H4, M1–M12, L1–L10, I1–I4), the second pass (N1–N9) and this pass is fixed, mitigated or accepted in writing, and none of the first two groups is open. The residual risks the operator should know are collected in the production guide ([§6, §8](../technical/operations.md)): LibreOffice's sandbox is the operator's, backups are not encrypted, a reading cannot be killed.

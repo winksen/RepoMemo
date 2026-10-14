@@ -1305,6 +1305,110 @@ mod tests {
         assert_eq!(evenly_spaced(vec![1, 2], 4), vec![1, 2]);
     }
 
+    /// Timings of the knowledge map and Workspace Health on a large workspace
+    /// (V0.1.74 targets: under 2 s on first load). Slow, so on request only:
+    /// `cargo test -p repomemo-api --release map_and_health_at_scale -- --ignored --nocapture`
+    /// `REPOMEMO_PERF_PASSAGES` sets the size (default 50,000).
+    #[tokio::test]
+    #[ignore = "a performance run, not a check"]
+    async fn map_and_health_at_scale() {
+        use std::time::Instant;
+        let passages: usize = std::env::var("REPOMEMO_PERF_PASSAGES")
+            .ok()
+            .and_then(|value| value.parse().ok())
+            .unwrap_or(50_000);
+        let per_file = 100;
+        let dims = 384;
+        let data_dir = std::env::temp_dir().join(format!(
+            "repomemo-api-scale-{}",
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+        ));
+        let core = RepoMemoCore::boot(data_dir.clone()).await.unwrap();
+        let workspace = core.create_workspace("Scale".to_owned()).await.unwrap();
+        core.storage()
+            .save_provider_settings(repomemo_domain::ProviderSettings {
+                id: String::new(),
+                workspace_id: Some(workspace.id.clone()),
+                provider_type: "ollama".to_owned(),
+                name: "Embeddings".to_owned(),
+                base_url: Some("http://127.0.0.1:11434".to_owned()),
+                model: None,
+                embedding_model: Some("perf".to_owned()),
+                enabled: true,
+                metadata: serde_json::json!({ "purpose": "embedding" }),
+                api_key: None,
+            })
+            .await
+            .unwrap();
+        let mut seed = 0x9e37_79b9_u64;
+        let mut next = move || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            (seed % 10_000) as f32 / 10_000.0 - 0.5
+        };
+        let started = Instant::now();
+        let mut batch = Vec::new();
+        for file in 0..passages.div_ceil(per_file) {
+            let count = per_file.min(passages - file * per_file);
+            let text = (0..count)
+                .map(|index| {
+                    format!(
+                        "## Section {index}
+
+Document {file} section {index} covers topic{} and the deploy_{} function.
+",
+                        (file + index) % 97,
+                        (file * 7 + index) % 211
+                    )
+                })
+                .collect::<String>();
+            let artifact = core
+                .import_text(
+                    workspace.id.clone(),
+                    format!("Document {file}"),
+                    text,
+                    Some("Markdown".to_owned()),
+                )
+                .await
+                .unwrap();
+            core.index_artifact(artifact.id.clone()).await.unwrap();
+            for chunk in core.storage().list_chunks_for_artifact(&artifact.id).await.unwrap() {
+                batch.push((chunk.id, (0..dims).map(|_| next()).collect::<Vec<f32>>()));
+            }
+            if batch.len() >= 2_000 {
+                core.storage()
+                    .upsert_embeddings(&workspace.id, "perf", std::mem::take(&mut batch))
+                    .await
+                    .unwrap();
+            }
+        }
+        core.storage()
+            .upsert_embeddings(&workspace.id, "perf", batch)
+            .await
+            .unwrap();
+        println!("built {passages} passages in {:?}", started.elapsed());
+
+        for round in ["first", "second"] {
+            let started = Instant::now();
+            let map = core.knowledge_map(&workspace.id).await.unwrap();
+            println!(
+                "knowledge map, {round}: {:?} ({} nodes, {} edges)",
+                started.elapsed(),
+                map.nodes.len(),
+                map.edges.len()
+            );
+            let started = Instant::now();
+            let health = core.workspace_health(&workspace.id).await.unwrap();
+            println!(
+                "health, {round}: {:?} ({} findings)",
+                started.elapsed(),
+                health.findings.len()
+            );
+        }
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
     #[tokio::test]
     async fn memory_card_export_includes_the_linked_evidence() {
         let data_dir = std::env::temp_dir().join(format!(

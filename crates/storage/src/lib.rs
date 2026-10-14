@@ -40,7 +40,7 @@ pub use access::{PasswordReset, PersonalTokenGrant, StoredInvitation, PERSONAL_T
 pub use environment::{inspect_environment, EnvironmentState};
 pub use repo::{RepoFileRecord, RepoFileWrite};
 use secrets::SecretBox;
-pub use secrets::{KEY_FILE_NAME as SECRET_KEY_FILE_NAME, MIN_MASTER_KEY_CHARS};
+pub use secrets::{restrict_to_owner, KEY_FILE_NAME as SECRET_KEY_FILE_NAME, MIN_MASTER_KEY_CHARS};
 pub use setup::SetupState;
 pub use stats::{ArtifactQuery, ArtifactStats, DashboardCounts};
 pub use system::{StoredSystemSetting, UserAccess};

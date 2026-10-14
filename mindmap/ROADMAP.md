@@ -1,6 +1,7 @@
 # RepoMemo Roadmap
 
 > **Current version:** `V0.1.65` (2026-10-13) · **Next minor:** `V0.2.0`, *Team-ready* (plan agreed 2026-10-13) · **Unreleased on main:** V0.1.66 (CI, one version source, timings, docs)
+> **Feature freeze (since V0.1.76):** only fixes from the release candidate go into V0.2.0; new work waits for V0.3.0.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
 RepoMemo started as a local-first desktop workbench. It is now a **self-hosted team product**: a shared API server with a web client, organizations and roles, collaboration, git repositories as living sources, business documents, and optional AI grounded in cited evidence. A server can be installed and administered entirely from the browser (environment menu, first-run setup, System area, admin console).
@@ -44,7 +45,7 @@ timeline
 | Phase S: Shared team mode | ✅ Complete |
 | Phase D: Depth and operability (V0.1.33–V0.1.65) | ✅ Complete |
 | Security review 2026-10-10 + second pass | ✅ S1 (V0.1.64) and N1–N6 (V0.1.65) · 🔜 every remaining finding is scheduled before V0.2.0 |
-| Road to V0.2.0 (V0.1.66–V0.1.76) | 🔄 V0.1.66 built, not yet released · plan and decisions agreed 2026-10-13 |
+| Road to V0.2.0 (V0.1.66–V0.1.76) | 🔄 V0.1.66–V0.1.75 built; V0.1.76 is the release candidate, R6 (clean install) open |
 | V0.3.0 and later: remote repositories, mail, connectors, scale-out | 💭 Direction |
 
 ---
@@ -241,21 +242,21 @@ Each proposal below was accepted as written. They shape the releases named in th
 - [x] **M12** `BackgroundAiBudget` in `RepoMemoCore`, spent per embedding batch and per image description; the limit follows the run-time setting
 - [x] **L1** 60-second links with a `jti`, `FileLinkUses` (first client, 30 s grace), `redacted_span` for request logs; **L5** `restrict_to_owner` in `secrets.rs`
 
-#### V0.1.75: Operations (built, not yet released)
+#### V0.1.75: Operations
 
 - [x] **O1** `apps/server/src/backup.rs`: `StorageEngine::snapshot_database` (`VACUUM INTO` on a read connection, so writers carry on), blobs copied with hard links to the previous backup's files, manifest written last and the folder renamed into place, `BackupStatus` polled by the page; restore into a new `workspace-data/<name>` folder (staged, then renamed) and verified by opening it; scheduled from the maintenance loop (`REPOMEMO_BACKUP_INTERVAL_HOURS`, `REPOMEMO_BACKUP_KEEP`). Console `backup list|create|restore|delete`. Not done: compressing or encrypting a backup, an offsite target (the guide shows rsync and robocopy)
 - [x] **O3** [technical/operations.md](technical/operations.md): settings that must be right, nginx and Caddy with timeouts and unbuffered event streams, systemd and NSSM, readiness checks, limits, backup and restore drill, Prometheus scrape and alerts, the LibreOffice wrapper, upgrade and rollback, troubleshooting. Followed on a clean machine in V0.1.76 (R6)
 - [x] **O4** `quotas.rs`: `check_incoming` (disk floor, storage per workspace, uploads per hour) on uploads, new versions and notes; `check_new_workspace`; `free_disk_bytes` (`GetDiskFreeSpaceExW` on Windows, `df` elsewhere) shown in System › Overview. Settings in the *Limits* group
 - [x] **O5** `GET /v1/system/metrics`, an `Exposition` writer for the OpenMetrics text format; system administrators or a `system` token
 
-#### V0.1.76: Release candidate
+#### V0.1.76: Release candidate (built, not yet released)
 
-- [ ] **R1** feature freeze: fixes only until V0.2.0
-- [ ] **R2** third security pass over everything changed since V0.1.65; the review's status table closed out
-- [ ] **R3** upgrade test: stored environments from V0.1.40, V0.1.52 and V0.1.65 upgraded in CI
-- [ ] **R4** performance run against the V0.1.74 targets, results in the release notes
-- [ ] **R5** documentation: both mindmaps and their branch pages (`auth-and-authorization`, `operations`, `api-reference`), `CHANGELOG.md`, `UPGRADING.md` from V0.1.x
-- [ ] **R6** a clean-machine install following only the production guide
+- [x] **R1** feature freeze: fixes only until V0.2.0 (see the note at the top)
+- [x] **R2** third security pass: [review §12](security/2026-10-10-security-review.md#12-third-pass-2026-10-14-release-candidate-v0176). No high or medium; R2-1 (repository syncs ignored quotas) and R2-2 (key file copy in a backup) fixed; the status table is closed
+- [x] **R3** `environments_from_older_versions_upgrade_in_place` (storage tests): V0.1.40, V0.1.52 and V0.1.65 schemas rebuilt from the migration files up to 13, 17 and 23, filled, upgraded and checked. The fixtures are synthesized from the migrations, not captured from old binaries
+- [x] **R4** release-build run at 50,000 passages: meaning search p95 112 ms, keyword search p95 63 ms (target 300 ms), figures p95 6 ms and the dashboard's three grouped queries (target 500 ms), map 0.5 s and health 0.4 s on first load (target 2 s). Debug-build numbers (V0.1.74) were 10 times slower, which is why they were not the verdict
+- [x] **R5** [api-reference](technical/api-reference.md) (generated), [auth-and-authorization](technical/auth-and-authorization.md), [operations](technical/operations.md), both mindmaps, `CHANGELOG.md`, [UPGRADING.md](../UPGRADING.md)
+- [ ] **R6** a clean-machine install following only the production guide. **Needs the maintainer:** it needs a second machine and a running server, which this repository's rules keep from the automated work. `node scripts/smoke-test.mjs` is the checklist's last step; record the result here and fix what the guide got wrong before tagging 0.2.0
 
 ---
 

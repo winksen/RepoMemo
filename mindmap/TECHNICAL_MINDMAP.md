@@ -2,7 +2,7 @@
 
 > **Audience:** engineers working on RepoMemo, reviewers, and anyone operating the shared server.
 > **Companion:** [FUNCTIONAL_MINDMAP.md](FUNCTIONAL_MINDMAP.md) covers *what* the product does. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** code at `V0.1.75` (2026-10-14: invitations, reset links and personal access tokens in V0.1.63, migration 0023; security bundle S1 in V0.1.64; the security second pass in V0.1.65; CI, one version source and performance timings in V0.1.66; safe defaults and identity, migration 0024, in V0.1.67; browser hardening in V0.1.68; host exposure in V0.1.69; web client foundation in V0.1.70; server foundation in V0.1.71; memory and search you can trust in V0.1.72; evidence, ownership and repositories 1b in V0.1.73; performance and robustness in V0.1.74; operations in V0.1.75, with the [production guide](technical/operations.md)). The plan to V0.2.0 is in the [roadmap](ROADMAP.md#-road-to-v020). Aligned on 2026-10-13; sections marked *hardening* came with V0.1.51–V0.1.57. The focus is the **shared web client** (`apps/desktop/src/SharedWebApp.tsx`) and the **HTTP API** (`apps/server`). Desktop and Tauri paths are noted where they share code. Open security findings are in the [security review](security/2026-10-10-security-review.md), and the improvement backlog is in the [enhancement analysis](analysis/2026-10-13-enhancement-analysis.md).
+> **Scope:** code at `V0.1.76` (2026-10-14: invitations, reset links and personal access tokens in V0.1.63, migration 0023; security bundle S1 in V0.1.64; the security second pass in V0.1.65; CI, one version source and performance timings in V0.1.66; safe defaults and identity, migration 0024, in V0.1.67; browser hardening in V0.1.68; host exposure in V0.1.69; web client foundation in V0.1.70; server foundation in V0.1.71; memory and search you can trust in V0.1.72; evidence, ownership and repositories 1b in V0.1.73; performance and robustness in V0.1.74; operations in V0.1.75, with the [production guide](technical/operations.md); the release candidate in V0.1.76: third security pass, upgrade test, generated [API reference](technical/api-reference.md)). The plan to V0.2.0 is in the [roadmap](ROADMAP.md#-road-to-v020). Aligned on 2026-10-13; sections marked *hardening* came with V0.1.51–V0.1.57. The focus is the **shared web client** (`apps/desktop/src/SharedWebApp.tsx`) and the **HTTP API** (`apps/server`). Desktop and Tauri paths are noted where they share code. Open security findings are in the [security review](security/2026-10-10-security-review.md), and the improvement backlog is in the [enhancement analysis](analysis/2026-10-13-enhancement-analysis.md).
 
 ---
 
@@ -249,9 +249,9 @@ Other rules:
 
 ---
 
-## 5. HTTP API reference (163 operations under `/v1`)
+## 5. HTTP API reference (167 operations under `/v1`)
 
-Counted as method and path pairs: 156 in the main router (`routes()` in [lib.rs](../apps/server/src/lib.rs)), 4 platform routes ([environment.rs](../apps/server/src/environment.rs)) and 3 avatar routes ([avatars.rs](../apps/server/src/avatars.rs)), plus `/health` and `/health/ready`.
+Counted as method and path pairs (`node scripts/list-routes.mjs`): 162 in the main router (`routes()` in [lib.rs](../apps/server/src/lib.rs), the two health routes included), 4 platform routes ([environment.rs](../apps/server/src/environment.rs)) and 3 avatar routes ([avatars.rs](../apps/server/src/avatars.rs)), plus nothing else. Every route with its guard and request and response types is in the generated [api-reference.md](technical/api-reference.md).
 
 Guard legend: **pub** = no auth, **auth** = any valid JWT or personal access token, **R/W/A/O** = workspace read / write / admin / owner, **oR/oA/oO** = organization read / admin / owner. "→ activity" means the call records a `workspace_activity` row and so emits an SSE `activity` event. **F** = system administrators only (`require_full_system_admin`), and *change* = a session or a `system` token (`require_system_change`).
 
@@ -817,8 +817,8 @@ This file is the root of the technical mindmap. Each branch can grow into its ow
 
 | Branch | Planned page |
 |---|---|
-| API reference, with request/response schemas | `technical/api-reference.md` |
-| Auth and authorization model | `technical/auth-and-authorization.md` |
+| API reference, with request/response schemas | ✅ [technical/api-reference.md](technical/api-reference.md) (generated; schemas are the type names) |
+| Auth and authorization model | ✅ [technical/auth-and-authorization.md](technical/auth-and-authorization.md) |
 | Ingestion and indexing pipeline | `technical/indexing-pipeline.md` |
 | Retrieval and Ask internals | `technical/retrieval-and-ask.md` |
 | AI provider layer | `technical/ai-providers.md` |

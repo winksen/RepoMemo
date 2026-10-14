@@ -307,7 +307,7 @@ async fn build_state(
     let index_queue = IndexQueue::start(core.clone(), embedding_queue.clone(), config.index_concurrency);
     index_queue.resume_pending().await;
     embedding_queue.resume_pending().await;
-    let repo_sync = RepoSyncRunner::new(core.clone(), embedding_queue.clone());
+    let repo_sync = RepoSyncRunner::new(core.clone(), embedding_queue.clone(), runtime.clone());
     repo_sync.resume_all().await;
     let polling = runtime.clone();
     let polling_task = repo_sync.start_polling(move || polling.current().repo_poll_interval);

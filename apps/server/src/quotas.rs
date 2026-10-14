@@ -28,7 +28,12 @@ pub(crate) fn free_disk_bytes(path: &Path) -> Option<u64> {
     }
     #[cfg(unix)]
     {
-        let output = std::process::Command::new("df").arg("-Pk").arg(path).output().ok()?;
+        let output = std::process::Command::new("df")
+            .arg("-Pk")
+            .arg("--")
+            .arg(path)
+            .output()
+            .ok()?;
         let text = String::from_utf8(output.stdout).ok()?;
         let kilobytes = text.lines().nth(1)?.split_whitespace().nth(3)?.parse::<u64>().ok()?;
         Some(kilobytes.saturating_mul(1024))
@@ -99,6 +104,39 @@ pub(crate) async fn check_incoming(
                     wait,
                 )
             })?;
+    }
+    Ok(())
+}
+
+/// Whether a repository sync may start: the disk has its floor of free space
+/// and the workspace is under its storage allowance. The size of what a sync
+/// will add is not known in advance, so a sync can go past the allowance by
+/// one repository; the next one is refused (review third pass, R2-1).
+pub(crate) async fn room_for_sync(
+    storage: &repomemo_storage::StorageEngine,
+    settings: &RuntimeSettings,
+    workspace_id: &str,
+) -> Result<(), String> {
+    if settings.disk_floor_mb > 0 {
+        let free = free_disk_bytes(storage.data_dir());
+        if free.is_some_and(|free| free < settings.disk_floor_mb * MIB) {
+            return Err("The server is nearly out of disk space, so repositories are not synced right now.".to_owned());
+        }
+    }
+    if settings.workspace_storage_mb > 0 {
+        let used = storage
+            .workspace_stored_bytes(workspace_id)
+            .await
+            .map_err(|error| format!("The workspace's storage could not be measured: {error}"))?
+            .max(0) as u64;
+        let allowance = settings.workspace_storage_mb * MIB;
+        if used >= allowance {
+            return Err(format!(
+                "This workspace holds {} of its {} allowance, so its repositories are not synced.",
+                format_bytes(used),
+                format_bytes(allowance)
+            ));
+        }
     }
     Ok(())
 }

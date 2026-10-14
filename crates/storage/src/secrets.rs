@@ -169,7 +169,7 @@ fn create_key_file(path: &Path) -> Result<Vec<u8>> {
 /// Windows the folder's inherited permissions are removed and only the
 /// current account is granted access. Failing is logged, not fatal: the
 /// operator can set `REPOMEMO_SECRET_KEY` instead.
-fn restrict_to_owner(path: &Path) {
+pub fn restrict_to_owner(path: &Path) {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;

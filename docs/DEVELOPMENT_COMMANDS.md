@@ -84,6 +84,22 @@ is left out), the web type check, the web client tests, the generated-types chec
 (policy in `deny.toml`), `cargo fmt --all --check` and clippy with `-D warnings`.
 Licenses and banned crates are checked as well; duplicate versions only warn.
 
+## Check A Running Server
+
+```powershell
+node scripts/smoke-test.mjs https://memo.example.com
+```
+
+Why: health, readiness, security headers and the web app of a server you just installed; with `REPOMEMO_SMOKE_EMAIL` and `REPOMEMO_SMOKE_PASSWORD` it also reads the overview and metrics (and makes a backup with `REPOMEMO_SMOKE_BACKUP=1`).
+
+## List The API Routes
+
+```powershell
+node scripts/list-routes.mjs
+```
+
+Why: every route with its authentication extractor and the guard calls in its handler; `--markdown` writes the table behind `mindmap/technical/api-reference.md`. A route marked `check` has no guard call, which is right only for a person's own data.
+
 ## Run Rust Tests
 
 ```powershell

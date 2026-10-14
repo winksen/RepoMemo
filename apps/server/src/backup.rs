@@ -245,7 +245,7 @@ async fn make_backup(state: &AppState, trigger: &str) -> anyhow::Result<BackupMa
     let outcome = fill_backup(state, &root, &partial, &name, trigger).await;
     match outcome {
         Ok(manifest) => {
-            tokio::fs::rename(&partial, root.join(&name))
+            rename_with_retries(&partial, &root.join(&name))
                 .await
                 .context("the finished backup could not be put in place")?;
             prune(state, &root).await;
@@ -284,6 +284,10 @@ async fn fill_backup(
 
     let key = state.storage.data_dir().join(SECRET_KEY_FILE_NAME);
     let includes_key = tokio::fs::copy(&key, partial.join(SECRET_KEY_FILE_NAME)).await.is_ok();
+    if includes_key {
+        // A copy takes the folder's permissions on Windows: make it owner only, like the original.
+        repomemo_storage::restrict_to_owner(&partial.join(SECRET_KEY_FILE_NAME));
+    }
 
     let manifest = BackupManifest {
         name: name.to_owned(),
@@ -299,6 +303,24 @@ async fn fill_backup(
     };
     tokio::fs::write(partial.join(MANIFEST_FILE), serde_json::to_vec_pretty(&manifest)?).await?;
     Ok(manifest)
+}
+
+/// Renames a folder, trying again for a few seconds: on Windows a virus
+/// scanner or the search indexer may hold the files of a folder that was just
+/// written, and the rename is refused until they let go.
+async fn rename_with_retries(from: &Path, to: &Path) -> std::io::Result<()> {
+    let mut attempt = 0;
+    loop {
+        match tokio::fs::rename(from, to).await {
+            Ok(()) => return Ok(()),
+            Err(error) if attempt < 25 => {
+                tracing::debug!(error = %error, attempt, "A folder could not be renamed yet");
+                attempt += 1;
+                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+            }
+            Err(error) => return Err(error),
+        }
+    }
 }
 
 /// Deletes the oldest backups beyond the number to keep, and leftovers of
@@ -378,7 +400,7 @@ async fn restore_backup(state: &AppState, name: &str, environment: &str) -> anyh
         let _ = tokio::fs::remove_dir_all(&staging).await;
         return Err(error);
     }
-    tokio::fs::rename(&staging, &target)
+    rename_with_retries(&staging, &target)
         .await
         .context("the restored environment could not be put in place")?;
 
@@ -415,6 +437,7 @@ async fn copy_into(source: &Path, staging: &Path) -> anyhow::Result<()> {
         tokio::fs::copy(source.join(SECRET_KEY_FILE_NAME), staging.join(SECRET_KEY_FILE_NAME))
             .await
             .context("the key file could not be copied")?;
+        repomemo_storage::restrict_to_owner(&staging.join(SECRET_KEY_FILE_NAME));
     }
     let (from, to) = (source.join("blobs"), staging.join("blobs"));
     tokio::task::spawn_blocking(move || copy_files(&from, &to, None))

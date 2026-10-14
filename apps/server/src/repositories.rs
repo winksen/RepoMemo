@@ -27,7 +27,7 @@ use tokio::sync::Semaphore;
 
 use crate::{
     ai_access, embedding::EmbeddingQueue, record_workspace_activity, require_workspace_admin, require_workspace_read,
-    require_workspace_write, ApiError, AppState, AuthenticatedSubject,
+    require_workspace_write, system::SettingsCell, ApiError, AppState, AuthenticatedSubject,
 };
 
 /// An automatic sync towards the same commit is not tried again sooner than
@@ -45,11 +45,14 @@ pub(crate) struct RepoSyncRunner {
     /// The commit each repository was last synced towards automatically, and
     /// when.
     auto_attempts: Arc<Mutex<HashMap<String, (String, Instant)>>>,
+    /// The run-time settings, for the storage allowance and disk floor.
+    runtime: Arc<SettingsCell>,
 }
 
 impl RepoSyncRunner {
-    pub(crate) fn new(core: RepoMemoCore, embeddings: EmbeddingQueue) -> Self {
+    pub(crate) fn new(core: RepoMemoCore, embeddings: EmbeddingQueue, runtime: Arc<SettingsCell>) -> Self {
         Self {
+            runtime,
             core,
             embeddings,
             running: Arc::new(Mutex::new(HashSet::new())),
@@ -168,6 +171,12 @@ impl RepoSyncRunner {
             .unwrap_or(false);
         if !newly_running {
             return Ok(None);
+        }
+        if let Err(reason) =
+            crate::quotas::room_for_sync(self.core.storage(), &self.runtime.current(), &source.workspace_id).await
+        {
+            self.forget(&source.id);
+            repomemo_domain::bail_conflict!("{reason}");
         }
         let job = match self.core.begin_repo_sync(&source.id).await {
             Ok(job) => job,
