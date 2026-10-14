@@ -1221,6 +1221,11 @@ export interface MailSettingsInput {
   from_name: string;
 }
 
+/** "Forgot your password?": the answer is the same for every address, so it says nothing about who has an account. */
+export function requestPasswordResetMail(email: string): Promise<{ message: string }> {
+  return request<{ message: string }>("/v1/auth/forgot-password", { method: "POST", body: JSON.stringify({ email }) });
+}
+
 export function getSystemMail(accessToken: string): Promise<import("../types").MailOverview> {
   return request<import("../types").MailOverview>("/v1/system/mail", {}, accessToken);
 }

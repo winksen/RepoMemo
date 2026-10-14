@@ -846,3 +846,104 @@ mod tests {
         assert!(parse_organization_role("viewer").is_err());
     }
 }
+
+/// How long a link asked for by email works: the owner of the address is the
+/// one who asked, so it is much shorter than an administrator's 24 hours.
+const SELF_SERVICE_RESET_TTL_HOURS: i64 = 1;
+/// Requests for one address per hour. Past it nothing more is sent, and the
+/// answer does not change.
+const FORGOT_PER_ADDRESS_PER_HOUR: u32 = 3;
+
+#[derive(Deserialize)]
+pub(crate) struct ForgotPasswordRequest {
+    email: String,
+}
+
+#[derive(Serialize)]
+pub(crate) struct ForgotPasswordAnswer {
+    message: &'static str,
+}
+
+/// Public: "Forgot your password?". The answer is the same for every address
+/// (known or not, mail set up or not, limit reached or not) and comes back
+/// before anything is looked up, so neither its words nor its timing say who
+/// has an account. Only the sign-in limits of the client address can refuse
+/// (`429`). When the address belongs to an account and mail is set up, a link
+/// valid for one hour (which ends every session when used) goes to it through
+/// the outbox.
+pub(crate) async fn forgot_password(
+    State(state): State<AppState>,
+    client: ClientIp,
+    Json(request): Json<ForgotPasswordRequest>,
+) -> Result<(StatusCode, Json<ForgotPasswordAnswer>), ApiError> {
+    check_auth_quota(&state, &client, AuthAction::SignIn)?;
+    let email = request.email.trim().to_lowercase();
+    let within_limit = state
+        .guards
+        .auth
+        .check(
+            &format!("forgot:{email}"),
+            crate::Quota::per_hour(FORGOT_PER_ADDRESS_PER_HOUR),
+        )
+        .is_ok();
+    if within_limit && repomemo_mail::valid_address(&email) {
+        let worker = state.clone();
+        tokio::spawn(async move { send_reset_link(&worker, &email).await });
+    }
+    Ok((
+        StatusCode::ACCEPTED,
+        Json(ForgotPasswordAnswer {
+            message: "If an account uses that address and this server sends mail, a link to choose a new password is on its way. It works once, for one hour.",
+        }),
+    ))
+}
+
+async fn send_reset_link(state: &AppState, email: &str) {
+    if !state.mail.is_ready().await {
+        return;
+    }
+    let Ok(Some(user)) = state.storage.find_user_by_email(email).await else {
+        return;
+    };
+    let Ok((token, expires_at)) = state
+        .storage
+        .create_password_reset(&user.id, &user.id, SELF_SERVICE_RESET_TTL_HOURS)
+        .await
+    else {
+        return;
+    };
+    let Some(link) = state.mail.link(&format!("/reset-password#{token}")) else {
+        tracing::warn!(
+            "A password reset was asked for by mail, but REPOMEMO_PUBLIC_URL is not set, so the link cannot be sent"
+        );
+        return;
+    };
+    let body = format!(
+        "Someone asked to choose a new password for the RepoMemo account of this address.\n\n\
+         Open this link to choose one. It works once and for one hour (until {expires_at}); using it signs the account out everywhere:\n\n\
+         {link}\n\n\
+         If you did not ask for this, ignore this message: your password has not changed.\n"
+    );
+    if state
+        .mail
+        .send_to(email, "Choose a new RepoMemo password", &body, "password_reset")
+        .await
+        .is_ok()
+    {
+        tracing::info!(target: "audit", user_id = %user.id, "A password reset link was sent by mail on request");
+        create_notification(
+            state,
+            NewSharedNotification {
+                user_id: user.id.clone(),
+                workspace_id: None,
+                notification_type: "password_reset_issued".to_owned(),
+                title: "A password reset link was sent to your email".to_owned(),
+                body: format!(
+                    "A link that sets your password was sent to your address, valid until {expires_at}. If you did not ask for it, tell an administrator."
+                ),
+                href: "/profile".to_owned(),
+            },
+        )
+        .await;
+    }
+}

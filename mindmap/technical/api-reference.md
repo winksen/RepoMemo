@@ -38,6 +38,7 @@
 | POST | `/v1/auth/refresh` | public | — | RefreshRequest | TokenResponse |
 | POST | `/v1/auth/logout` | public | — | RefreshRequest | status |
 | POST | `/v1/auth/logout-all` | session | — | — | status |
+| POST | `/v1/auth/forgot-password` | public | — | ForgotPasswordRequest | 202 ForgotPasswordAnswer (the same for every address) |
 | POST | `/v1/auth/password-reset/preview` | public | — | TokenBody | PasswordResetPreview |
 | POST | `/v1/auth/password-reset` | public | — | CompletePasswordReset | TokenResponse |
 | POST | `/v1/invitations/preview` | public | — | TokenBody | InvitationPreview |

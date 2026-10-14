@@ -2,6 +2,18 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.11 (2026-10-14)
+
+"Forgot your password?" by email.
+
+### Added
+- **Get a link by email** on the sign-in page, and `POST /v1/auth/forgot-password {email}`. The answer is the same for every address: the same status (`202`) and the same words whether the address has an account or not, whether mail is set up or not, and whether the address's limit was reached; the work happens after the answer, so the time it takes says nothing either. Only the sign-in limits of the client address can refuse (`429`).
+- **When the address belongs to an account and mail is set up**, a link goes through the outbox: one-time, valid for **1 hour** (administrators' links stay at 24 hours), and using it ends every session of the account, lifts lockouts and revokes personal access tokens, as every reset link does. An earlier unused link of the account stops working. The account also gets an in-app notification (`password_reset_issued`).
+- **Limits:** at most three mails an hour per address (past it, nothing is sent and the answer does not change), on top of the per-client-address sign-in limits.
+
+### Upgrading
+- Nothing to do. Without mail set up (System › Settings › Mail) and `REPOMEMO_PUBLIC_URL`, nothing is sent and the page still says an administrator can issue a link in System › Users.
+
 ## V0.2.10 (2026-10-14)
 
 Invitations are sent by email.

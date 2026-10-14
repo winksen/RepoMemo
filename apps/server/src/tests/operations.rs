@@ -524,3 +524,79 @@ async fn an_invitation_is_mailed_through_the_outbox_when_mail_is_set_up() {
     );
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn forgot_password_answers_the_same_for_every_address_and_mails_only_a_real_one() {
+    let data_dir = temp_data_dir("forgot-password");
+    let mut config = ServerConfig::for_test(data_dir.clone());
+    config.public_url = Some("https://memo.example.com".to_owned());
+    let app = router(config).await.unwrap();
+    let (admin, _) = register_account(&app, "forgot-admin@example.com").await;
+    let (_, _) = register_account(&app, "forgot-person@example.com").await;
+    let saved = app
+        .clone()
+        .oneshot(json_request(
+            "PUT",
+            "/v1/system/mail",
+            &admin,
+            json!({"enabled": true, "host": "mail.invalid", "port": 587, "security": "starttls", "username": "",
+                   "from_address": "memo@example.com", "from_name": "RepoMemo"}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(saved.status(), 200);
+    let ask = |email: &str| {
+        let app = app.clone();
+        let request = public_post("/v1/auth/forgot-password", json!({ "email": email }));
+        async move {
+            let response = app.oneshot(request).await.unwrap();
+            (response.status(), response_json(response).await)
+        }
+    };
+
+    let known = ask("forgot-person@example.com").await;
+    let unknown = ask("nobody-here@example.com").await;
+    let malformed = ask("not an address").await;
+    assert_eq!(known.0, 202);
+    assert_eq!(known, unknown, "a known and an unknown address are answered alike");
+    assert_eq!(known, malformed, "so is something that is not an address");
+
+    // The mail for the known address reaches the outbox; none for the others.
+    let outbox = |app: axum::Router, admin: String| async move {
+        response_json(
+            app.oneshot(auth_request("GET", "/v1/system/mail/outbox", &admin))
+                .await
+                .unwrap(),
+        )
+        .await
+    };
+    let mut listed = Vec::new();
+    for _ in 0..50 {
+        listed = outbox(app.clone(), admin.clone()).await.as_array().unwrap().clone();
+        if listed.iter().any(|entry| entry["kind"] == "password_reset") {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+    let resets = listed
+        .iter()
+        .filter(|entry| entry["kind"] == "password_reset")
+        .collect::<Vec<_>>();
+    assert_eq!(resets.len(), 1, "{listed:?}");
+    assert_eq!(resets[0]["to_address"], "forgot-person@example.com");
+
+    // Asking again and again is limited per address, with the same answer.
+    for _ in 0..4 {
+        assert_eq!(ask("forgot-person@example.com").await, known);
+    }
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    let after = outbox(app.clone(), admin.clone()).await;
+    let count = after
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|entry| entry["kind"] == "password_reset")
+        .count();
+    assert!(count <= 3, "at most three mails an hour per address, got {count}");
+    let _ = std::fs::remove_dir_all(data_dir);
+}

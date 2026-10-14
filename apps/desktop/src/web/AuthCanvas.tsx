@@ -1,9 +1,9 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { IconArrowRight as ArrowRight, IconKey as Key, IconLoader2 as Loader, IconShieldLock as Shield, IconUsers as Users } from "@tabler/icons-react";
-import { loginSharedUser, registerSharedUser, sharedApiUrl } from "../lib/sharedApi";
+import { loginSharedUser, registerSharedUser, requestPasswordResetMail, sharedApiUrl } from "../lib/sharedApi";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-import { Toast } from "../components/ui/toast";
+import { Toast, showToast } from "../components/ui/toast";
 import { ThemeToggle } from "../components/SharedLayout";
 import { type AuthMode } from "./constants";
 import { apiMessage } from "./format";
@@ -29,6 +29,7 @@ export function AuthCanvas({
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(initialError);
+  const [forgotOpen, setForgotOpen] = useState(false);
 
   useEffect(() => {
     setMode(setupPending ? "sign-in" : initialMode);
@@ -44,6 +45,21 @@ export function AuthCanvas({
         ? await registerSharedUser({ email, displayName, password })
         : await loginSharedUser({ email, password });
       onAuthenticated(response.access_token);
+    } catch (requestError) {
+      setError(apiMessage(requestError));
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function forgot() {
+    if (!email.trim()) { setError("Enter your email address first."); return; }
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      const answer = await requestPasswordResetMail(email.trim());
+      showToast("success", answer.message);
+      setForgotOpen(false);
     } catch (requestError) {
       setError(apiMessage(requestError));
     } finally {
@@ -91,7 +107,11 @@ export function AuthCanvas({
               {mode === "sign-in" ? "Sign in to shared mode" : "Create account and continue"}
             </Button>
           </form>
-          {mode === "sign-in" ? <p className="shared-auth-hint">Forgot your password? Ask a system administrator of this server for a reset link (System › Users).</p> : <p className="shared-auth-hint">Invited by a teammate? Open the invitation link you received instead: it creates the account with the right access.</p>}
+          {mode === "sign-in" ? <div className="shared-auth-hint">
+            {forgotOpen
+              ? <p>We will send a link to <strong>{email.trim() || "the address above"}</strong> if an account uses it and this server sends mail. It works once, for one hour. <Button disabled={isSubmitting} onClick={() => void forgot()} type="button" variant="secondary">Send the link</Button> <Button onClick={() => setForgotOpen(false)} type="button" variant="secondary">Cancel</Button></p>
+              : <p>Forgot your password? <Button onClick={() => setForgotOpen(true)} type="button" variant="secondary">Get a link by email</Button>, or ask a system administrator of this server for a reset link (System › Users).</p>}
+          </div> : <p className="shared-auth-hint">Invited by a teammate? Open the invitation link you received instead: it creates the account with the right access.</p>}
           <p className="shared-api-note">API {apiAvailable === true ? "healthy" : apiAvailable === false ? "unreachable" : "checking"} · <code>{sharedApiUrl}</code></p>
         </div>
       </section>
