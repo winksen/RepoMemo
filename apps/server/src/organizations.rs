@@ -5,6 +5,7 @@ pub(crate) async fn create_organization(
     State(state): State<AppState>,
     Json(request): Json<CreateOrganizationRequest>,
 ) -> Result<(StatusCode, Json<Organization>), ApiError> {
+    crate::verification::require_verified(&state, &subject.user_id).await?;
     let organization = state
         .storage
         .create_organization(&subject.user_id, &request.name)

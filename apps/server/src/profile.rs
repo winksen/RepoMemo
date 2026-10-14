@@ -31,8 +31,16 @@ pub(crate) async fn get_profile(
         }
     }
     let recent_activity_count = activity_by_day.values().sum();
+    let email_verified = state
+        .storage
+        .email_is_verified(&subject.user_id)
+        .await
+        .map_err(map_storage_error)?;
+    let verification_required = !email_verified && crate::verification::enforced(&state).await;
     Ok(Json(UserProfileResponse {
         user: profile.user,
+        email_verified,
+        verification_required,
         created_at: profile.created_at,
         updated_at: profile.updated_at,
         last_connected_at: profile.last_connected_at,

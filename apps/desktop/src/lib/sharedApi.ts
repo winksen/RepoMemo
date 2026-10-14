@@ -1226,6 +1226,21 @@ export function requestPasswordResetMail(email: string): Promise<{ message: stri
   return request<{ message: string }>("/v1/auth/forgot-password", { method: "POST", body: JSON.stringify({ email }) });
 }
 
+/** Uses the link mailed to an address; works signed in or not. */
+export function verifyEmailLink(token: string): Promise<{ email: string }> {
+  return request<{ email: string }>("/v1/auth/verify-email", { method: "POST", body: JSON.stringify({ token }) });
+}
+
+/** Sends the verification link of the signed-in account's address again. */
+export function resendEmailVerification(accessToken: string): Promise<{ verified: boolean; sent: boolean }> {
+  return request<{ verified: boolean; sent: boolean }>("/v1/profile/email/verify", { method: "POST", body: "{}" }, accessToken);
+}
+
+/** Changes the account's address (the password is asked again); it starts unverified. */
+export function changeEmailAddress(accessToken: string, input: { email: string; currentPassword: string }): Promise<SharedUser> {
+  return request<SharedUser>("/v1/profile/email", { method: "PUT", body: JSON.stringify({ email: input.email, current_password: input.currentPassword }) }, accessToken);
+}
+
 export function getSystemMail(accessToken: string): Promise<import("../types").MailOverview> {
   return request<import("../types").MailOverview>("/v1/system/mail", {}, accessToken);
 }

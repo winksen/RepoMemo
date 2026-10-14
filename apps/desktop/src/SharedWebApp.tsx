@@ -15,6 +15,7 @@ import { PlatformSetup } from "./components/PlatformSetup";
 import { ServerSetup, ServerSetupWaiting } from "./components/ServerSetup";
 import { InvitePage } from "./components/InvitePage";
 import { PasswordResetPage } from "./components/PasswordResetPage";
+import { VerifyEmailPage } from "./components/VerifyEmailPage";
 import { SharedLayout, initialSharedTheme } from "./components/SharedLayout";
 import { type PageState } from "./web/constants";
 import { apiMessage } from "./web/format";
@@ -223,6 +224,9 @@ function SharedWebAppContent() {
       session={signedIn ? session : null}
       token={linkSecret}
     />;
+  }
+  if (pathname === "/verify-email" && linkSecret) {
+    return <VerifyEmailPage onContinue={() => { window.location.assign(accessToken ? "/profile" : "/login"); }} token={linkSecret} />;
   }
   if (pathname === "/reset-password" && linkSecret) {
     return <PasswordResetPage onAuthenticated={(token) => handleAuthenticated(token)} token={linkSecret} />;

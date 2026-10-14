@@ -33,6 +33,7 @@ mod serve;
 mod setup;
 mod streams;
 mod system;
+mod verification;
 mod web_session;
 mod workspaces;
 
@@ -426,6 +427,9 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route("/v1/auth/logout", post(logout))
         .route("/v1/auth/logout-all", post(logout_everywhere))
         .route("/v1/auth/forgot-password", post(access::forgot_password))
+        .route("/v1/auth/verify-email", post(verification::verify_email))
+        .route("/v1/profile/email/verify", post(verification::resend))
+        .route("/v1/profile/email", put(verification::change_email))
         .route("/v1/auth/password-reset/preview", post(access::preview_password_reset))
         .route("/v1/auth/password-reset", post(access::complete_password_reset))
         .route("/v1/invitations/preview", post(access::preview_invitation))

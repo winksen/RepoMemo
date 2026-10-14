@@ -9,17 +9,19 @@ vi.mock("../lib/sharedApi", () => ({
   previewSharedInvitation: vi.fn(),
   previewSharedPasswordReset: vi.fn(),
   registerSharedUser: vi.fn(),
+  verifyEmailLink: vi.fn(),
 }));
 vi.mock("../components/ui/toast", () => ({ showToast: vi.fn() }));
 vi.mock("../components/SharedLayout", () => ({ ThemeToggle: () => null }));
 
 import {
   acceptSharedInvitation, completeSharedPasswordReset, loginSharedUser, previewSharedInvitation,
-  previewSharedPasswordReset, registerSharedUser,
+  previewSharedPasswordReset, registerSharedUser, verifyEmailLink,
 } from "../lib/sharedApi";
 import { showToast } from "../components/ui/toast";
 import { InvitePage, invitationDestination } from "../components/InvitePage";
 import { PasswordResetPage } from "../components/PasswordResetPage";
+import { VerifyEmailPage } from "../components/VerifyEmailPage";
 import type { InvitationPreview, PasswordResetPreview, SharedSession } from "../types";
 
 const invitation = (overrides: Partial<InvitationPreview> = {}): InvitationPreview => ({
@@ -236,5 +238,28 @@ describe("password reset page", () => {
     vi.mocked(previewSharedPasswordReset).mockRejectedValue("offline");
     render(<PasswordResetPage onAuthenticated={vi.fn()} token="secret" />);
     await screen.findByText("This link could not be checked.");
+  });
+});
+
+describe("email verification page", () => {
+  it("confirms the address the link was made for and offers to continue", async () => {
+    vi.mocked(verifyEmailLink).mockResolvedValue({ email: "ada@example.com" });
+    const onContinue = vi.fn();
+    render(<VerifyEmailPage onContinue={onContinue} token="secret" />);
+    expect(screen.getByText("Checking the link…")).toBeTruthy();
+    await screen.findByRole("heading", { name: "ada@example.com is confirmed" });
+    expect(verifyEmailLink).toHaveBeenCalledWith("secret");
+    fireEvent.click(screen.getByRole("button", { name: "Continue to RepoMemo" }));
+    expect(onContinue).toHaveBeenCalled();
+  });
+
+  it.each([
+    ["used", "This link cannot be used: it was used already."],
+    ["expired", "This link cannot be used: it has expired."],
+  ])("shows a %s link as unusable with the server's reason", async (_state, message) => {
+    vi.mocked(verifyEmailLink).mockRejectedValue(new Error(message));
+    render(<VerifyEmailPage onContinue={vi.fn()} token="secret" />);
+    await screen.findByRole("heading", { name: "This link cannot be used" });
+    expect(screen.getByText(message)).toBeTruthy();
   });
 });

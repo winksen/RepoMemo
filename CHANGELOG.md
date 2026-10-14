@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.13 (2026-10-14)
+
+Email verification.
+
+### Added
+- **Unverified accounts are held back.** When registration is open and mail is set up, an account made without an invitation can sign in but cannot create an organization or a workspace until it has used the link mailed to its address (`403` with the reason). The link works once and for 24 hours; the profile page can send another (three an hour). Registration stays closed by default, so this only applies once an operator opens it.
+- **What proves an address:** a verification link, or accepting an invitation sent to it (an invitation counts as verification, also for people who register from one). The first account of a server is verified.
+- **Changing the address** (Profile › Email address, `PUT /v1/profile/email`) asks for the current password, refuses an address another account uses, and starts the new address unverified with a link sent to it. A link made for the old address stops working.
+- **Nothing is withheld without mail:** when mail is not set up nobody could verify, so accounts keep working as they did; the profile still shows whether the address is confirmed.
+- The page `/verify-email#<token>`, `POST /v1/auth/verify-email`, `POST /v1/profile/email/verify`, and migration 0026 (`users.email_unverified_at`, `email_verifications`). Every account that exists stays verified.
+
+### Upgrading
+- Nothing to do. If you open registration and set up mail, people who register get a confirmation mail and are held back from creating things until they confirm.
+
 ## V0.2.12 (2026-10-14)
 
 Mentions and task assignments are mailed.

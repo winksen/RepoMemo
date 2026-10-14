@@ -477,6 +477,133 @@ impl StorageEngine {
     }
 }
 
+impl StorageEngine {
+    // ------------------------------------------------------ email verification
+
+    /// The account's address counts as verified: it is, unless something marked it otherwise.
+    pub async fn email_is_verified(&self, user_id: &str) -> Result<bool> {
+        let unverified = sqlx::query_scalar::<_, Option<String>>("SELECT email_unverified_at FROM users WHERE id = ?1")
+            .bind(user_id)
+            .fetch_optional(self.reader())
+            .await?
+            .flatten();
+        Ok(unverified.is_none())
+    }
+
+    pub async fn mark_email_unverified(&self, user_id: &str) -> Result<()> {
+        sqlx::query("UPDATE users SET email_unverified_at = ?2 WHERE id = ?1 AND email_unverified_at IS NULL")
+            .bind(user_id)
+            .bind(Utc::now().to_rfc3339())
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn mark_email_verified(&self, user_id: &str) -> Result<()> {
+        sqlx::query("UPDATE users SET email_unverified_at = NULL WHERE id = ?1")
+            .bind(user_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// A link for the account's address. Earlier unused links of the account stop working.
+    pub async fn create_email_verification(
+        &self,
+        user_id: &str,
+        email: &str,
+        ttl_hours: i64,
+    ) -> Result<(String, String)> {
+        let raw = new_secret();
+        let now = Utc::now();
+        let expires_at = (now + Duration::hours(ttl_hours)).to_rfc3339();
+        let mut tx = self.pool.begin().await?;
+        sqlx::query("DELETE FROM email_verifications WHERE user_id = ?1 AND used_at IS NULL")
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query(
+            "INSERT INTO email_verifications (token_hash, user_id, email, created_at, expires_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+        )
+        .bind(hash_secret(&raw))
+        .bind(user_id)
+        .bind(email)
+        .bind(now.to_rfc3339())
+        .bind(&expires_at)
+        .execute(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        Ok((raw, expires_at))
+    }
+
+    /// Uses a link, once: the account whose address it was made for is
+    /// verified. `None` when the link is unknown, used, expired, or the
+    /// account's address is no longer the one it was sent to.
+    pub async fn consume_email_verification(&self, raw: &str) -> Result<Option<(String, String)>> {
+        let now = Utc::now().to_rfc3339();
+        let mut tx = self.pool.begin().await?;
+        let found = sqlx::query_as::<_, (String, String)>(
+            "UPDATE email_verifications SET used_at = ?1 WHERE token_hash = ?2 AND used_at IS NULL AND expires_at > ?1 RETURNING user_id, email",
+        )
+        .bind(&now)
+        .bind(hash_secret(raw.trim()))
+        .fetch_optional(&mut *tx)
+        .await?;
+        let Some((user_id, email)) = found else {
+            return Ok(None);
+        };
+        let current = sqlx::query_scalar::<_, String>("SELECT email FROM users WHERE id = ?1")
+            .bind(&user_id)
+            .fetch_optional(&mut *tx)
+            .await?;
+        if current.as_deref() != Some(email.as_str()) {
+            tx.commit().await?;
+            return Ok(None);
+        }
+        sqlx::query("UPDATE users SET email_unverified_at = NULL WHERE id = ?1")
+            .bind(&user_id)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        Ok(Some((user_id, email)))
+    }
+
+    /// Gives the account another address, unverified. Pending links stop working.
+    pub async fn change_user_email(&self, user_id: &str, email: &str) -> Result<SharedUser> {
+        let email = normalize_email(email)?;
+        let taken = sqlx::query_scalar::<_, String>("SELECT id FROM users WHERE email = ?1 AND id != ?2")
+            .bind(&email)
+            .bind(user_id)
+            .fetch_optional(&self.pool)
+            .await?;
+        if taken.is_some() {
+            repomemo_domain::bail_conflict!("An account already uses that email address.");
+        }
+        let now = Utc::now().to_rfc3339();
+        let mut tx = self.pool.begin().await?;
+        sqlx::query("UPDATE users SET email = ?2, email_unverified_at = ?3, updated_at = ?3 WHERE id = ?1")
+            .bind(user_id)
+            .bind(&email)
+            .bind(&now)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("DELETE FROM email_verifications WHERE user_id = ?1")
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await?;
+        let display_name = sqlx::query_scalar::<_, String>("SELECT display_name FROM users WHERE id = ?1")
+            .bind(user_id)
+            .fetch_one(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        Ok(SharedUser {
+            id: user_id.to_owned(),
+            email: Some(email),
+            display_name,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -577,6 +704,53 @@ mod tests {
         assert!(storage.authenticate_personal_token(&raw).await.unwrap().is_none());
         assert!(storage.create_personal_token(&user.id, " ", "read", 30).await.is_err());
         assert!(storage.create_personal_token(&user.id, "x", "admin", 30).await.is_err());
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn an_address_is_verified_once_by_a_link_made_for_it() {
+        let (storage, dir) = storage().await;
+        let user = storage
+            .create_user("verify@example.com", "Verify", "hash")
+            .await
+            .unwrap();
+        assert!(
+            storage.email_is_verified(&user.id).await.unwrap(),
+            "accounts are verified unless marked"
+        );
+        storage.mark_email_unverified(&user.id).await.unwrap();
+        assert!(!storage.email_is_verified(&user.id).await.unwrap());
+
+        let (first, _) = storage
+            .create_email_verification(&user.id, "verify@example.com", 24)
+            .await
+            .unwrap();
+        let (second, _) = storage
+            .create_email_verification(&user.id, "verify@example.com", 24)
+            .await
+            .unwrap();
+        assert!(
+            storage.consume_email_verification(&first).await.unwrap().is_none(),
+            "a newer link replaces it"
+        );
+        assert_eq!(
+            storage.consume_email_verification(&second).await.unwrap().unwrap().1,
+            "verify@example.com"
+        );
+        assert!(storage.email_is_verified(&user.id).await.unwrap());
+        assert!(
+            storage.consume_email_verification(&second).await.unwrap().is_none(),
+            "once"
+        );
+
+        // A link made for the old address does nothing after the address changed.
+        let (old, _) = storage
+            .create_email_verification(&user.id, "verify@example.com", 24)
+            .await
+            .unwrap();
+        storage.change_user_email(&user.id, "other@example.com").await.unwrap();
+        assert!(!storage.email_is_verified(&user.id).await.unwrap());
+        assert!(storage.consume_email_verification(&old).await.unwrap().is_none());
         let _ = std::fs::remove_dir_all(dir);
     }
 }

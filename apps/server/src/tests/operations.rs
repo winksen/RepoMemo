@@ -734,3 +734,174 @@ async fn assignments_and_mentions_are_mailed_once_and_never_to_the_person_who_ca
     );
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn unverified_accounts_are_held_back_until_an_invitation_or_a_link_proves_the_address() {
+    let data_dir = temp_data_dir("email-verification");
+    let mut config = ServerConfig::for_test(data_dir.clone());
+    config.public_url = Some("https://memo.example.com".to_owned());
+    let app = router(config).await.unwrap();
+    let (admin, _) = register_account(&app, "verify-admin@example.com").await;
+    let workspace_id = create_workspace(&app, &admin).await;
+
+    // Mail is not set up yet: nothing is withheld, since nobody could verify.
+    let (early, _) = register_account(&app, "verify-early@example.com").await;
+    let created = app
+        .clone()
+        .oneshot(json_request(
+            "POST",
+            "/v1/organizations",
+            &early,
+            json!({"name": "Early"}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(created.status(), 201);
+
+    let saved = app
+        .clone()
+        .oneshot(json_request(
+            "PUT",
+            "/v1/system/mail",
+            &admin,
+            json!({"enabled": true, "host": "mail.invalid", "port": 587, "security": "starttls", "username": "",
+                   "from_address": "memo@example.com", "from_name": "RepoMemo"}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(saved.status(), 200);
+
+    // Registered on an open server with mail on: held back from creating anything.
+    let (person, _) = register_account(&app, "verify-person@example.com").await;
+    let profile = |who: String| {
+        let app = app.clone();
+        async move { response_json(app.oneshot(auth_request("GET", "/v1/profile", &who)).await.unwrap()).await }
+    };
+    let before = profile(person.clone()).await;
+    assert_eq!(before["email_verified"], false);
+    assert_eq!(before["verification_required"], true);
+    let refused = app
+        .clone()
+        .oneshot(json_request(
+            "POST",
+            "/v1/organizations",
+            &person,
+            json!({"name": "Mine"}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(refused.status(), 403);
+
+    // A link was mailed, and another can be asked for, three an hour.
+    let outbox = response_json(
+        app.clone()
+            .oneshot(auth_request("GET", "/v1/system/mail/outbox", &admin))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let mut mailed = false;
+    for _ in 0..30 {
+        let listed = response_json(
+            app.clone()
+                .oneshot(auth_request("GET", "/v1/system/mail/outbox", &admin))
+                .await
+                .unwrap(),
+        )
+        .await;
+        if listed
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| entry["kind"] == "email_verification" && entry["to_address"] == "verify-person@example.com")
+        {
+            mailed = true;
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+    assert!(mailed, "{outbox}");
+    let resend = |who: String| {
+        let app = app.clone();
+        async move {
+            app.oneshot(json_request("POST", "/v1/profile/email/verify", &who, json!({})))
+                .await
+                .unwrap()
+                .status()
+        }
+    };
+    assert_eq!(resend(person.clone()).await, 200);
+    assert_eq!(resend(person.clone()).await, 200);
+    assert_eq!(resend(person.clone()).await, 200);
+    assert_eq!(resend(person.clone()).await, 429);
+
+    // An unknown link is refused the same way as a used one.
+    let unknown = app
+        .clone()
+        .oneshot(public_post("/v1/auth/verify-email", json!({"token": "nope"})))
+        .await
+        .unwrap();
+    assert_eq!(unknown.status(), 410);
+
+    // Accepting an invitation sent to the address proves it.
+    join(
+        &app,
+        &admin,
+        "workspaces",
+        &workspace_id,
+        "verify-person@example.com",
+        "member",
+    )
+    .await;
+    assert_eq!(profile(person.clone()).await["email_verified"], true);
+    let allowed = app
+        .clone()
+        .oneshot(json_request(
+            "POST",
+            "/v1/organizations",
+            &person,
+            json!({"name": "Mine"}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(allowed.status(), 201);
+
+    // Changing the address asks for the password and starts unverified again.
+    let wrong = app
+        .clone()
+        .oneshot(json_request(
+            "PUT",
+            "/v1/profile/email",
+            &person,
+            json!({"email": "verify-new@example.com", "current_password": "wrong password!!"}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(wrong.status(), 403);
+    let changed = app
+        .clone()
+        .oneshot(json_request(
+            "PUT",
+            "/v1/profile/email",
+            &person,
+            json!({"email": "verify-new@example.com", "current_password": "not-a-real-password"}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(changed.status(), 200);
+    let after = profile(person.clone()).await;
+    assert_eq!(after["user"]["email"], "verify-new@example.com");
+    assert_eq!(after["email_verified"], false);
+    let taken = app
+        .clone()
+        .oneshot(json_request(
+            "PUT",
+            "/v1/profile/email",
+            &person,
+            json!({"email": "verify-admin@example.com", "current_password": "not-a-real-password"}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(taken.status(), 409);
+    let _ = std::fs::remove_dir_all(data_dir);
+}

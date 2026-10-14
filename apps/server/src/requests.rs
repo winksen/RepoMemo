@@ -220,6 +220,10 @@ pub(crate) struct WorkspaceMetricBreakdown {
 #[derive(Debug, Serialize)]
 pub(crate) struct UserProfileResponse {
     pub(crate) user: SharedUser,
+    /// The address was confirmed (or came with an invitation).
+    pub(crate) email_verified: bool,
+    /// Unverified accounts are held back on this server (registration is open and mail is set up).
+    pub(crate) verification_required: bool,
     pub(crate) created_at: String,
     pub(crate) updated_at: String,
     pub(crate) last_connected_at: Option<String>,

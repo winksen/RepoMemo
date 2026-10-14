@@ -490,6 +490,8 @@ pub(crate) async fn accept_invitation(
             return Err(error);
         }
     };
+    // The invitation was sent to this address and its owner used it.
+    let _ = state.storage.mark_email_verified(&user.id).await;
     tracing::info!(target: "audit", user_id = %user.id, invitation_id = %invitation.id, target_type = %invitation.target_type, target_id = %invitation.target_id, "Invitation accepted");
     if invitation.target_type == "workspace" {
         record_workspace_activity(

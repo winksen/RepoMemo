@@ -219,6 +219,10 @@ export interface SharedSession {
 
 export interface UserProfile {
   user: SharedUser;
+  /** The address was confirmed, or came with an invitation. */
+  email_verified?: boolean;
+  /** Unverified accounts are held back on this server: registration is open and mail is set up. */
+  verification_required?: boolean;
   created_at: string;
   updated_at: string;
   last_connected_at: string | null;

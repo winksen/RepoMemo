@@ -5,6 +5,7 @@ pub(crate) async fn create_workspace(
     State(state): State<AppState>,
     Json(request): Json<CreateWorkspaceRequest>,
 ) -> Result<(StatusCode, Json<SharedWorkspace>), ApiError> {
+    crate::verification::require_verified(&state, &subject.user_id).await?;
     quotas::check_new_workspace(&state, &subject).await?;
     let workspace = state
         .storage

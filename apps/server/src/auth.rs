@@ -133,6 +133,20 @@ pub(crate) async fn register(
     }) {
         tracing::warn!(target: "audit", user_id = %user.id, "An account registered with an address listed in REPOMEMO_SYSTEM_ADMIN_EMAILS. It was not made a system administrator; if it belongs to the intended person, grant the role in System › Users.");
     }
+    // An invitation was sent to this address, and the first account administers
+    // the server: both are known. Anyone else proves the address with a link.
+    let invited = request
+        .invitation_token
+        .as_deref()
+        .is_some_and(|token| !token.trim().is_empty());
+    if !first_account && !invited {
+        if let Err(error) = state.storage.mark_email_unverified(&user.id).await {
+            tracing::error!(error = %error, "Failed to mark an address as unverified");
+        }
+        if crate::verification::enforced(&state).await {
+            crate::verification::send_link(&state, &user).await;
+        }
+    }
     let response = issue_session(&state, user).await?;
     Ok((StatusCode::CREATED, Json(response)))
 }
