@@ -1172,6 +1172,32 @@ export interface AgentRequest {
    * place of the "no provider" reply when an AI capability is asked for.
    */
   ai_unavailable_reason: string | null;
+  /**
+   * Earlier turns of the same conversation, oldest first, so a follow-up
+   * such as "and what about its retries?" can be understood. The server
+   * fills this from the stored conversation, never from the client; the
+   * core keeps the newest ones that fit its token budget.
+   */
+  history: AgentHistoryTurn[];
+}
+
+/**
+ * One earlier exchange as the assistant is reminded of it: what was asked,
+ * what was answered and which files the answer was about.
+ */
+export interface AgentHistoryTurn {
+  question: string;
+  answer: string;
+  /**
+   * The files the answer was about: those it listed or summarized, else
+   * those it cited.
+   */
+  files: AgentHistoryFile[];
+}
+
+export interface AgentHistoryFile {
+  id: string;
+  title: string;
 }
 
 export interface AgentReply {
@@ -1189,6 +1215,11 @@ export interface AgentReply {
   matches: SearchResult[];
   citations: Citation[];
   warnings: string[];
+  /**
+   * How many earlier turns went with this question (0 for the first one,
+   * and for lookups that never read them).
+   */
+  context_turns: number;
 }
 
 /** An account as system administrators see it. */

@@ -474,6 +474,8 @@ export interface AgentReply {
   matches: SearchResult[];
   citations: Citation[];
   warnings: string[];
+  /** Earlier turns of the chat that went with the question. */
+  context_turns?: number;
 }
 
 export interface MemoryCard {

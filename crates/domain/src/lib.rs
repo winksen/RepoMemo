@@ -1394,6 +1394,30 @@ pub struct AgentRequest {
     /// place of the "no provider" reply when an AI capability is asked for.
     #[serde(default)]
     pub ai_unavailable_reason: Option<String>,
+    /// Earlier turns of the same conversation, oldest first, so a follow-up
+    /// such as "and what about its retries?" can be understood. The server
+    /// fills this from the stored conversation, never from the client; the
+    /// core keeps the newest ones that fit its token budget.
+    #[serde(default)]
+    pub history: Vec<AgentHistoryTurn>,
+}
+
+/// One earlier exchange as the assistant is reminded of it: what was asked,
+/// what was answered and which files the answer was about.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentHistoryTurn {
+    pub question: String,
+    pub answer: String,
+    /// The files the answer was about: those it listed or summarized, else
+    /// those it cited.
+    #[serde(default)]
+    pub files: Vec<AgentHistoryFile>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentHistoryFile {
+    pub id: String,
+    pub title: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1410,6 +1434,10 @@ pub struct AgentReply {
     pub matches: Vec<SearchResult>,
     pub citations: Vec<Citation>,
     pub warnings: Vec<String>,
+    /// How many earlier turns went with this question (0 for the first one,
+    /// and for lookups that never read them).
+    #[serde(default)]
+    pub context_turns: i64,
 }
 
 /// An account as system administrators see it.

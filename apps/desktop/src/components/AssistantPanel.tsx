@@ -340,11 +340,12 @@ function Evidence({ accessToken, citations, isQuestion, onOpenArtifact }: { acce
 
 function Reply({ accessToken, canSummarize, capabilities, isBusy, onOpenArtifact, onSummarize, reply }: { accessToken: string; canSummarize: boolean; capabilities: AgentCapabilities | null; isBusy: boolean; onOpenArtifact: (artifactId: string) => void; onSummarize: (artifactId: string, title: string) => void; reply: AgentReply }) {
   const note = routingNote(reply, capabilities);
+  const earlier = reply.context_turns ?? 0;
   // Found files, or the choices offered when a file name was ambiguous.
   const offerSummary = canSummarize && !(reply.capability === "summarize_file" && reply.generated);
   return <div className="shared-assistant-reply">
     <div className="shared-assistant-reply-meta">
-      <span><Sparkles size={14} /> Assistant{note ? ` · ${note}` : ""}</span>
+      <span><Sparkles size={14} /> Assistant{note ? ` · ${note}` : ""}{earlier > 0 ? ` · read ${earlier} earlier ${earlier === 1 ? "message" : "messages"}` : ""}</span>
       {reply.generated ? <span className="shared-assistant-generated">AI-generated · verify against the cited sources</span> : null}
     </div>
     <div className="shared-markdown"><SafeMarkdown>{reply.reply_markdown}</SafeMarkdown></div>

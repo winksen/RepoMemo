@@ -3,10 +3,10 @@ use std::path::{Path, PathBuf};
 use anyhow::{bail, Context, Result};
 use repomemo_ai::{provider_from_settings, validate_settings, AiProvider, GenerateRequest, ImageAnalysisRequest};
 use repomemo_domain::{
-    AppSettings, ArtifactDetail, ArtifactSummary, ArtifactType, AskAnswer, AskRequest, CreateMemoryCardRequest,
-    DocumentPreview, ImportReport, ImportRequest, IndexingJobStatus, MemoryCard, MemoryCardDetail, MemoryCardSummary,
-    ProviderSettings, ProviderTestResult, SearchRequest, SearchResult, SourceType, SummaryResult, Symbol,
-    SymbolSearchResult, UpdateMemoryCardRequest, Workspace, WorkspaceOverview,
+    AgentHistoryTurn, AppSettings, ArtifactDetail, ArtifactSummary, ArtifactType, AskAnswer, AskRequest,
+    CreateMemoryCardRequest, DocumentPreview, ImportReport, ImportRequest, IndexingJobStatus, MemoryCard,
+    MemoryCardDetail, MemoryCardSummary, ProviderSettings, ProviderTestResult, SearchRequest, SearchResult, SourceType,
+    SummaryResult, Symbol, SymbolSearchResult, UpdateMemoryCardRequest, Workspace, WorkspaceOverview,
 };
 use repomemo_indexer::{index_artifact, index_image_description, INDEXER_VERSION};
 use repomemo_ingestion::{
@@ -33,7 +33,9 @@ mod repo_policy;
 mod repo_stack;
 mod repo_sync;
 
-pub use agent::{agent_capabilities, agent_conversation_title, agent_turn_label};
+pub use agent::{
+    agent_capabilities, agent_conversation_title, agent_turn_label, HISTORY_MAX_TURNS, HISTORY_TOKEN_BUDGET,
+};
 pub use budget::BackgroundAiBudget;
 pub use embeddings::{EmbeddingRebuildPlan, EmbeddingRun};
 pub use remote_policy::{RemoteGitPolicy, RemoteRepository, RemoteScheme};
@@ -936,6 +938,18 @@ impl RepoMemoCore {
     }
 
     pub async fn ask_workspace(&self, request: AskRequest) -> Result<AskAnswer> {
+        self.ask_workspace_in_conversation(request, &[]).await
+    }
+
+    /// Ask with the earlier turns of a conversation (already fitted to the
+    /// token budget). They are searched with, so a follow-up finds what it is
+    /// about, and shown to the model only to resolve what "it" and "that file"
+    /// mean; the answer still rests on the numbered passages.
+    pub async fn ask_workspace_in_conversation(
+        &self,
+        request: AskRequest,
+        history: &[AgentHistoryTurn],
+    ) -> Result<AskAnswer> {
         if request.workspace_id.trim().is_empty() || request.question.trim().is_empty() {
             repomemo_domain::bail_invalid!("A workspace and question are required.");
         }
@@ -951,13 +965,14 @@ impl RepoMemoCore {
             repomemo_domain::bail_invalid!("The selected provider belongs to a different workspace.");
         }
         let provider = provider_from_settings(settings)?;
+        let search_query = agent::follow_up_query(&request.question, history);
         let mut warnings = Vec::new();
         let semantic_configured = self
             .embedding_provider_for_workspace(&request.workspace_id)
             .await?
             .is_some();
         let query_embedding = match self
-            .query_embedding(&request.workspace_id, Some(provider_id), &request.question)
+            .query_embedding(&request.workspace_id, Some(provider_id), &search_query)
             .await
         {
             Ok(embedding) => embedding,
@@ -973,7 +988,7 @@ impl RepoMemoCore {
             .hybrid_search(
                 SearchRequest {
                     workspace_id: request.workspace_id.clone(),
-                    query: request.question.clone(),
+                    query: search_query.clone(),
                     artifact_types: Vec::new(),
                     languages: Vec::new(),
                     source_ids: Vec::new(),
@@ -1023,7 +1038,7 @@ impl RepoMemoCore {
                 .iter()
                 .map(|result| format!("{} ({})\n{}", result.title, result.path, passage(result)))
                 .collect::<Vec<_>>();
-            match provider.rerank(request.question.clone(), listing).await {
+            match provider.rerank(search_query.clone(), listing).await {
                 Ok(order) => {
                     let mut slots = ranked.into_iter().map(Some).collect::<Vec<_>>();
                     ranked = order
@@ -1052,8 +1067,8 @@ impl RepoMemoCore {
             .join("\n\n");
         let answer_markdown = provider
             .generate(GenerateRequest {
-                system: Some("You answer questions about a workspace of technical material using only the numbered passages supplied. Cite the passages you rely on as [1], [2] and so on. If the passages do not answer the question, say that the indexed context is insufficient instead of guessing.".to_owned()),
-                prompt: format!("Question: {}", request.question),
+                system: Some("You answer questions about a workspace of technical material using only the numbered passages supplied. Cite the passages you rely on as [1], [2] and so on. If the passages do not answer the question, say that the indexed context is insufficient instead of guessing. Earlier turns of the conversation may be shown before the question; they only tell what words such as \"it\" or \"that file\" refer to and are never evidence.".to_owned()),
+                prompt: format!("{}Question: {}", agent::render_history(history), request.question),
                 context,
                 options: json!({ "temperature": 0.1 }),
             })

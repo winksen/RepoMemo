@@ -6,8 +6,8 @@
 use anyhow::Result;
 use repomemo_ai::{provider_from_settings, AiProvider, GenerateRequest};
 use repomemo_domain::{
-    AgentCapability, AgentCapabilityInfo, AgentMessage, AgentReply, AgentRequest, AgentRouting, ArtifactSummary,
-    AskRequest, SearchRequest,
+    AgentCapability, AgentCapabilityInfo, AgentHistoryFile, AgentHistoryTurn, AgentMessage, AgentReply, AgentRequest,
+    AgentRouting, ArtifactSummary, AskRequest, SearchRequest,
 };
 use serde_json::{json, Value};
 
@@ -17,6 +17,15 @@ const MAX_MESSAGE_CHARS: usize = 2_000;
 const FILE_RESULT_LIMIT: usize = 20;
 const FILE_CHOICE_LIMIT: usize = 8;
 const SEARCH_RESULT_LIMIT: i64 = 10;
+/// Earlier turns that go with a question: the newest ones that fit this many
+/// estimated tokens (about four characters each), at most `HISTORY_MAX_TURNS`.
+/// The room left in the model's window stays for the numbered passages.
+pub const HISTORY_TOKEN_BUDGET: usize = 1_500;
+pub const HISTORY_MAX_TURNS: usize = 8;
+/// An earlier answer is cut to this many characters, a question to a third.
+const HISTORY_ANSWER_CHARS: usize = 700;
+/// Extra words added to the search for a follow-up, from the turn before.
+const HISTORY_QUERY_CHARS: usize = 300;
 
 /// Phrases that ask for a summary anywhere in the message, longest first.
 const SUMMARY_TRIGGERS: &[&str] = &[
@@ -63,6 +72,13 @@ const SEARCH_PREFIXES: &[&str] = &[
     "look for",
     "look up",
 ];
+/// Words that point back at something said or listed earlier.
+const REFERENCE_WORDS: &[&str] = &[
+    "it", "its", "this", "that", "these", "those", "they", "them", "their", "there", "same", "above", "earlier",
+    "previous", "former", "latter", "also", "again", "one", "ones",
+];
+/// What may follow "summarize" when it means the file talked about before.
+const REFERENCE_FILLERS: &[&str] = &["the", "file", "document", "doc", "one", "same", "again", "please", "of"];
 /// Lookups of where a code symbol is defined. Checked before file lookups,
 /// since "where is" starts both.
 const SYMBOL_PREFIXES: &[&str] = &[
@@ -260,7 +276,8 @@ impl RepoMemoCore {
         if request.workspace_id.trim().is_empty() {
             repomemo_domain::bail_invalid!("Workspace id is required.");
         }
-        let message = request.message.trim();
+        let message_text = request.message.trim().to_owned();
+        let message = message_text.as_str();
         if message.is_empty() && request.capability.is_none() {
             repomemo_domain::bail_invalid!("A message is required.");
         }
@@ -268,8 +285,19 @@ impl RepoMemoCore {
             repomemo_domain::bail_invalid!("Messages must be between 1 and {MAX_MESSAGE_CHARS} characters.");
         }
 
+        let history = fit_history(&request.history);
+        // "Summarize it" and "summarize that file" mean the file just discussed.
+        let earlier_file = if request.capability.is_none() && request.artifact_id.is_none() {
+            last_file(&history).filter(|_| asks_for_earlier_file(message))
+        } else {
+            None
+        };
+        let mut request = request;
         let mut warnings = Vec::new();
-        let routed = if let Some(capability) = request.capability {
+        let routed = if let Some(file) = earlier_file {
+            request.artifact_id = Some(file.id);
+            Some((AgentCapability::SummarizeFile, AgentRouting::Rules, file.title))
+        } else if let Some(capability) = request.capability {
             let subject = if capability == AgentCapability::AskQuestion {
                 message.to_owned()
             } else {
@@ -307,7 +335,7 @@ impl RepoMemoCore {
                 AgentCapability::FindSymbol => self.agent_find_symbol(&request.workspace_id, &subject).await,
                 AgentCapability::SearchContent => self.agent_search(&request.workspace_id, &subject).await,
                 AgentCapability::SummarizeFile => self.agent_summarize(&request, &subject).await,
-                AgentCapability::AskQuestion => self.agent_ask(&request, &subject).await,
+                AgentCapability::AskQuestion => self.agent_ask(&request, &subject, &history).await,
                 AgentCapability::WorkspaceOverview => self.agent_overview(&request).await,
             }
         };
@@ -491,21 +519,32 @@ impl RepoMemoCore {
         Ok(result)
     }
 
-    async fn agent_ask(&self, request: &AgentRequest, question: &str) -> Result<AgentReply> {
+    async fn agent_ask(
+        &self,
+        request: &AgentRequest,
+        question: &str,
+        history: &[AgentHistoryTurn],
+    ) -> Result<AgentReply> {
         if question.is_empty() {
             return Ok(reply("What would you like to know?"));
         }
         let answer = self
-            .ask_workspace(AskRequest {
-                workspace_id: request.workspace_id.clone(),
-                question: question.to_owned(),
-                provider_id: request.provider_id.clone(),
-                limit: Some(8),
-            })
+            .ask_workspace_in_conversation(
+                AskRequest {
+                    workspace_id: request.workspace_id.clone(),
+                    question: question.to_owned(),
+                    provider_id: request.provider_id.clone(),
+                    limit: Some(8),
+                },
+                history,
+            )
             .await?;
         let mut result = reply(answer.answer_markdown);
         // With no matching context the core answers without calling the provider.
         result.generated = !answer.retrieved_context.is_empty();
+        if result.generated {
+            result.context_turns = history.len() as i64;
+        }
         result.citations = answer.citations;
         result.warnings = answer.warnings;
         Ok(result)
@@ -626,6 +665,7 @@ fn reply(markdown: impl Into<String>) -> AgentReply {
         matches: Vec::new(),
         citations: Vec::new(),
         warnings: Vec::new(),
+        context_turns: 0,
     }
 }
 
@@ -635,6 +675,115 @@ fn plural<'a>(count: usize, one: &'a str, many: &'a str) -> &'a str {
     } else {
         many
     }
+}
+
+/// Rough size of a text in model tokens: four characters each, rounded up.
+fn estimate_tokens(text: &str) -> usize {
+    text.chars().count().div_ceil(4)
+}
+
+fn shorten(text: &str, limit: usize) -> String {
+    let flat = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    if flat.chars().count() <= limit {
+        return flat;
+    }
+    let cut = flat.chars().take(limit.saturating_sub(1)).collect::<String>();
+    format!("{}…", cut.trim_end())
+}
+
+/// The earlier turns that go with a question, oldest first: the newest ones
+/// whose questions and (shortened) answers fit `HISTORY_TOKEN_BUDGET`. A turn
+/// is kept whole or left out, so the model never reads half an exchange.
+pub fn fit_history(history: &[AgentHistoryTurn]) -> Vec<AgentHistoryTurn> {
+    let mut kept = Vec::new();
+    let mut spent = 0;
+    for turn in history.iter().rev().take(HISTORY_MAX_TURNS) {
+        let question = shorten(&turn.question, HISTORY_ANSWER_CHARS / 3);
+        let answer = shorten(&turn.answer, HISTORY_ANSWER_CHARS);
+        let cost = estimate_tokens(&question) + estimate_tokens(&answer);
+        if spent + cost > HISTORY_TOKEN_BUDGET {
+            break;
+        }
+        spent += cost;
+        kept.push(AgentHistoryTurn {
+            question,
+            answer,
+            files: turn.files.clone(),
+        });
+    }
+    kept.reverse();
+    kept
+}
+
+/// The one file the latest turn that had any was about. None when that turn
+/// listed several, since "it" would not say which.
+fn last_file(history: &[AgentHistoryTurn]) -> Option<AgentHistoryFile> {
+    let turn = history.iter().rev().find(|turn| !turn.files.is_empty())?;
+    (turn.files.len() == 1).then(|| turn.files[0].clone())
+}
+
+fn words_of(text: &str) -> Vec<String> {
+    text.to_lowercase()
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .map(str::to_owned)
+        .collect()
+}
+
+/// "Summarize it", "summarize that file", "give me a summary of this": a
+/// summary request whose only subject is a reference.
+fn asks_for_earlier_file(message: &str) -> bool {
+    let text = strip_polite_prefix(message.trim());
+    let lower = text.to_ascii_lowercase();
+    let Some(rest) = after_phrase(text, &lower, SUMMARY_TRIGGERS, false) else {
+        return false;
+    };
+    let words = words_of(rest);
+    let has_reference = words
+        .iter()
+        .any(|word| matches!(word.as_str(), "it" | "this" | "that" | "same"));
+    has_reference
+        && words
+            .iter()
+            .all(|word| REFERENCE_WORDS.contains(&word.as_str()) || REFERENCE_FILLERS.contains(&word.as_str()))
+}
+
+/// Whether a question leans on what was said before: it is short or it uses
+/// a word such as "it", "that" or "those".
+fn looks_like_follow_up(question: &str) -> bool {
+    let words = words_of(question);
+    words.len() < 6 || words.iter().any(|word| REFERENCE_WORDS.contains(&word.as_str()))
+}
+
+/// What to search for: the question, with the words that tell what a
+/// follow-up is about (the turn before and the files it named) added to it.
+/// A question that stands on its own is searched as asked.
+pub(crate) fn follow_up_query(question: &str, history: &[AgentHistoryTurn]) -> String {
+    let Some(last) = history.last() else {
+        return question.to_owned();
+    };
+    if !looks_like_follow_up(question) {
+        return question.to_owned();
+    }
+    let mut extra = vec![shorten(&last.question, HISTORY_QUERY_CHARS)];
+    extra.extend(last.files.iter().map(|file| file.title.clone()));
+    let extra = shorten(&extra.join(" "), HISTORY_QUERY_CHARS);
+    format!("{question} {extra}")
+}
+
+/// The earlier turns as the model is shown them, ahead of the question.
+pub(crate) fn render_history(history: &[AgentHistoryTurn]) -> String {
+    if history.is_empty() {
+        return String::new();
+    }
+    let turns = history
+        .iter()
+        .map(|turn| format!("User: {}\nAssistant: {}", turn.question, turn.answer))
+        .collect::<Vec<_>>()
+        .join("\n\n");
+    format!(
+        "Earlier in this conversation (it only tells what the question refers to; it is not evidence):\n{turns}\n\n"
+    )
 }
 
 /// Recognises the common phrasings of each capability without any AI. Returns
@@ -931,6 +1080,106 @@ mod tests {
         let long = agent_conversation_title(&"é".repeat(200));
         assert_eq!(long.chars().count(), MAX_TITLE_CHARS);
         assert!(long.ends_with('…'));
+    }
+
+    fn turn(question: &str, answer: &str, files: &[(&str, &str)]) -> AgentHistoryTurn {
+        AgentHistoryTurn {
+            question: question.to_owned(),
+            answer: answer.to_owned(),
+            files: files
+                .iter()
+                .map(|(id, title)| AgentHistoryFile {
+                    id: (*id).to_owned(),
+                    title: (*title).to_owned(),
+                })
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn history_keeps_the_newest_turns_that_fit_the_budget() {
+        assert!(fit_history(&[]).is_empty());
+        let turns = (0..20)
+            .map(|index| turn(&format!("question {index}"), &"a long answer ".repeat(200), &[]))
+            .collect::<Vec<_>>();
+        let kept = fit_history(&turns);
+        assert!(!kept.is_empty() && kept.len() <= HISTORY_MAX_TURNS);
+        // The newest turn is the last one kept, in the order it was said.
+        assert_eq!(kept.last().map(|turn| turn.question.as_str()), Some("question 19"));
+        let spent: usize = kept
+            .iter()
+            .map(|turn| estimate_tokens(&turn.question) + estimate_tokens(&turn.answer))
+            .sum();
+        assert!(spent <= HISTORY_TOKEN_BUDGET);
+        assert!(kept
+            .iter()
+            .all(|turn| turn.answer.chars().count() <= HISTORY_ANSWER_CHARS));
+    }
+
+    #[test]
+    fn short_turns_all_go_along_up_to_the_turn_limit() {
+        let turns = (0..12)
+            .map(|index| turn(&format!("q{index}"), "ok", &[]))
+            .collect::<Vec<_>>();
+        let kept = fit_history(&turns);
+        assert_eq!(kept.len(), HISTORY_MAX_TURNS);
+        assert_eq!(kept[0].question, "q4");
+    }
+
+    #[test]
+    fn it_and_that_file_mean_the_file_just_discussed() {
+        for message in [
+            "summarize it",
+            "Summarize that file",
+            "can you summarize this?",
+            "give me a summary of the same file",
+            "tl;dr of that",
+        ] {
+            assert!(asks_for_earlier_file(message), "{message}");
+        }
+        for message in [
+            "summarize ARCHITECTURE.md",
+            "summarize this project",
+            "summarize",
+            "tl;dr",
+            "why does it fail?",
+        ] {
+            assert!(!asks_for_earlier_file(message), "{message}");
+        }
+        let one = [turn("find readme", "Found 1 file", &[("a1", "README.md")])];
+        assert_eq!(last_file(&one).map(|file| file.id), Some("a1".to_owned()));
+        let several = [turn("find docs", "Found 2 files", &[("a1", "a.md"), ("a2", "b.md")])];
+        assert!(last_file(&several).is_none());
+        // The latest turn that had files decides, even after plain turns.
+        let later = [
+            turn("find readme", "Found 1 file", &[("a1", "README.md")]),
+            turn("hello", "I can't help with that yet.", &[]),
+        ];
+        assert_eq!(last_file(&later).map(|file| file.id), Some("a1".to_owned()));
+    }
+
+    #[test]
+    fn a_follow_up_is_searched_with_what_it_is_about() {
+        let history = [turn(
+            "How is the retry budget configured?",
+            "Set it in config.",
+            &[("a1", "retry.md")],
+        )];
+        let query = follow_up_query("and what about its timeout?", &history);
+        assert!(query.starts_with("and what about its timeout?"), "{query}");
+        assert!(query.contains("retry budget") && query.contains("retry.md"), "{query}");
+        // A question that stands on its own is searched as asked.
+        let standalone = "Why do uploads over ten megabytes fail on the shared server?";
+        assert_eq!(follow_up_query(standalone, &history), standalone);
+        assert_eq!(follow_up_query("and its timeout?", &[]), "and its timeout?");
+    }
+
+    #[test]
+    fn history_is_shown_to_the_model_as_context_not_evidence() {
+        assert_eq!(render_history(&[]), "");
+        let shown = render_history(&[turn("What is X?", "X is a thing [1].", &[])]);
+        assert!(shown.contains("User: What is X?") && shown.contains("Assistant: X is a thing [1]."));
+        assert!(shown.contains("not evidence"));
     }
 
     #[test]

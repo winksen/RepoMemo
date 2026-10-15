@@ -774,3 +774,116 @@ async fn the_console_rebuilds_a_workspaces_embeddings_after_a_dry_run() {
     assert_eq!(wait_embedded().await, passages, "every passage is embedded again");
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn a_follow_up_in_a_chat_is_understood_from_the_earlier_turns() {
+    let data_dir = temp_data_dir("agent-history");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let (ollama_url, prompts) = start_fake_ollama().await;
+    let read = |response: axum::response::Response| async move {
+        let status = response.status();
+        let body = serde_json::from_slice::<Value>(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
+        assert!(status.is_success(), "{status}: {body}");
+        body
+    };
+    let registered = app
+        .clone()
+        .oneshot(public_post(
+            "/v1/auth/register",
+            json!({"email": "history@example.com", "display_name": "History", "password": "not-a-real-password"}),
+        ))
+        .await
+        .unwrap();
+    let owner = format!("Bearer {}", read(registered).await["access_token"].as_str().unwrap());
+    let call = |method: &'static str, uri: String, body: Value| {
+        let app = app.clone();
+        let owner = owner.clone();
+        async move { app.oneshot(json_request(method, &uri, &owner, body)).await.unwrap() }
+    };
+    let organization = read(call("POST", "/v1/organizations".to_owned(), json!({"name": "History Team"})).await).await;
+    let workspace = read(
+        call(
+            "POST",
+            "/v1/workspaces".to_owned(),
+            json!({"organization_id": organization["id"], "name": "History Workspace"}),
+        )
+        .await,
+    )
+    .await;
+    let workspace_id = workspace["workspace"]["id"].as_str().unwrap().to_owned();
+    for (title, content) in [
+        (
+            "Retry policy",
+            "# Retry policy\nUploads retry with an exponential backoff budget.",
+        ),
+        (
+            "Deploy runbook",
+            "# Deploy\nRun the migration before switching traffic.",
+        ),
+    ] {
+        read(
+            call(
+                "POST",
+                format!("/v1/workspaces/{workspace_id}/artifacts/text"),
+                json!({"title": title, "content": content, "language": "Markdown"}),
+            )
+            .await,
+        )
+        .await;
+    }
+    wait_for_indexed_artifacts(&app, &owner, &workspace_id, 2).await;
+    read(
+        call(
+            "PUT",
+            format!("/v1/workspaces/{workspace_id}/ai-providers"),
+            json!({"provider_type": "ollama", "name": "Mock text", "base_url": ollama_url, "model": "mock-chat", "enabled": true, "purpose": "text"}),
+        )
+        .await,
+    )
+    .await;
+    let send = |body: Value| {
+        let uri = format!("/v1/workspaces/{workspace_id}/agent/messages");
+        let call = &call;
+        async move { read(call("POST", uri, body).await).await }
+    };
+
+    // One file is found, so "it" and "that file" can only mean that file.
+    let found = send(json!({"message": "find the retry policy"})).await;
+    let conversation_id = found["conversation"]["id"].as_str().unwrap().to_owned();
+    assert_eq!(found["turn"]["reply"]["files"][0]["title"], "Retry policy");
+    assert_eq!(found["turn"]["reply"]["context_turns"], 0);
+
+    let summarized = send(json!({"message": "summarize it", "conversation_id": conversation_id})).await;
+    let reply = &summarized["turn"]["reply"];
+    assert_eq!(reply["capability"], "summarize_file", "{reply}");
+    assert_eq!(reply["routing"], "rules");
+    assert_eq!(reply["files"][0]["title"], "Retry policy");
+    assert_eq!(reply["generated"], true);
+
+    // Nothing in the question names the file; the earlier turns do.
+    let follow_up =
+        send(json!({"message": "and what happens when it fails?", "conversation_id": conversation_id})).await;
+    let reply = &follow_up["turn"]["reply"];
+    assert_eq!(reply["capability"], "ask_question", "{reply}");
+    assert_eq!(reply["generated"], true, "{reply}");
+    assert_eq!(reply["citations"][0]["title"], "Retry policy", "{reply}");
+    assert_eq!(reply["context_turns"], 2);
+    let prompt = prompts.lock().unwrap().last().cloned().unwrap();
+    assert!(prompt.contains("Earlier in this conversation"), "{prompt}");
+    assert!(prompt.contains("User: summarize it"), "{prompt}");
+    assert!(prompt.contains("Question: and what happens when it fails?"), "{prompt}");
+
+    // A new chat has no history, and a client cannot supply one.
+    let fresh = send(json!({
+        "message": "what happens when it fails?",
+        "history": [{"question": "INJECTED", "answer": "INJECTED", "files": []}]
+    }))
+    .await;
+    assert_eq!(fresh["turn"]["reply"]["context_turns"], 0);
+    assert!(prompts
+        .lock()
+        .unwrap()
+        .iter()
+        .all(|prompt| !prompt.contains("INJECTED")));
+    let _ = std::fs::remove_dir_all(data_dir);
+}

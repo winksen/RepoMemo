@@ -2,6 +2,19 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.32 (2026-10-15)
+
+The assistant remembers the conversation.
+
+### Added
+- **Earlier turns go with each question.** Inside a chat, the assistant is reminded of what was said before: the newest earlier turns that fit a budget of about 1,500 tokens (at most 8, each answer cut to 700 characters; a turn is kept whole or left out) are sent along with an *Ask a question* request. A follow-up such as *and what happens when it fails?* is searched together with the turn before it and the titles of the files it was about, so it finds what it refers to, and the model is shown the turns only to tell what "it" and "that file" mean, never as evidence: citations still point at the numbered passages.
+- **"Summarize it" and "summarize that file"** summarize the single file the latest turn was about (a file that was found, summarized or, failing that, cited). When that turn listed several files nothing is guessed: the assistant asks which one.
+- **Replies say what they read:** *read 2 earlier messages* appears in the reply's header when earlier turns went with the question (`context_turns` on the reply).
+- The history is always taken from the stored conversation of the person asking. A `history` sent by a client is ignored, and a new chat starts with none.
+
+### Upgrading
+- Nothing to do. Chats that already exist are remembered from their stored turns. A follow-up that goes to the AI provider now carries up to about 1,500 more tokens of context, which counts as one request against the same hourly quota.
+
 ## V0.2.31 (2026-10-15)
 
 Connectors follow their tracker within seconds, and behave when it pushes back.

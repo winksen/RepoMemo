@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.2.31` (2026-10-15). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
+> **Scope:** reflects the code at `V0.2.32` (2026-10-15). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
 
 ---
 
@@ -406,7 +406,7 @@ Writers can save a named search that includes its filters. Anyone can re-run it 
 
 ### Assistant
 
-A chat panel **docked on the right of every workspace section**. It can be widened, narrowed to a slim rail, or stacked under the page on small screens. Each message does exactly one of five things: **find files**, **search content**, **summarize a file**, **ask a question** (the same cited Ask as Retrieval), or give a **workspace overview**. Common phrasings are recognised without AI; otherwise the AI provider picks the action, and without one the assistant lists what it can do. Finding and searching work without AI. Chats are kept per person and can be renamed and deleted. Text written by AI is labelled as such. The assistant does **not** yet see earlier messages of a chat: each message is answered on its own.
+A chat panel **docked on the right of every workspace section**. It can be widened, narrowed to a slim rail, or stacked under the page on small screens. Each message does exactly one of five things: **find files**, **search content**, **summarize a file**, **ask a question** (the same cited Ask as Retrieval), or give a **workspace overview**. Common phrasings are recognised without AI; otherwise the AI provider picks the action, and without one the assistant lists what it can do. Finding and searching work without AI. Chats are kept per person and can be renamed and deleted. Text written by AI is labelled as such. Inside a chat the assistant **remembers the conversation**: the newest earlier messages that fit a token budget go with each question, so a follow-up such as *and what about its timeout?* finds what it is about and *summarize it* means the file just discussed. A reply says how many earlier messages it read. Lookups and searches run on what was typed.
 
 ### Knowledge map (Map)
 
@@ -508,7 +508,7 @@ The desktop app and the shared server keep **separate data**.
 
 ---
 
-## 13. Known functional gaps (at V0.2.31)
+## 13. Known functional gaps (at V0.2.32)
 
 These are observed in the code and are useful for prioritizing. The roadmap item that addresses each one is in brackets.
 
@@ -520,7 +520,7 @@ These are observed in the code and are useful for prioritizing. The roadmap item
 | Assistant answers and citations do not name the last author | The last author and date of a repository file show on its page, in the file list and in search results since V0.2.24 [F16b]. |
 | Pushes are noticed by polling unless a webhook is set up | Since V0.2.23 a repository can have a push webhook (GitHub, GitLab or a signed generic call) that queues a sync at once; without one the server polls [F16a]. |
 | Repositories on a host need an allowed host | `https` links work since V0.2.20 (a read-only token for private ones) and `ssh` links since V0.2.21 (a deploy key and the pinned host key); each clone has a size and a time cap since V0.2.22 and counts in the workspace's storage allowance [F4 phase 2]; pushes are noticed only by polling [F16, V0.2.23]. A file renamed and edited in one commit keeps its history since V0.1.73 when at least about half of it is unchanged. |
-| The assistant does not remember the conversation | Follow-up questions must repeat their context [F5a, V0.2.32], and each workspace is searched on its own [F5b, V0.2.33]. |
+| Each workspace is searched on its own | The assistant remembers a chat since V0.2.32, for questions and summaries; a search across all of a person's workspaces comes in V0.2.33 [F5b]. |
 | Invitations and reset links are passed on by hand | Mail delivery exists since V0.2.9 (System › Settings › Mail); invitations are mailed since V0.2.10, "Forgot your password?" works by mail since V0.2.11 and task assignments and mentions are mailed since V0.2.12, and addresses are verified since V0.2.13 (an account that registered on an open server waits for its link before creating organizations or workspaces; an invitation counts), which is why registration is closed by default; the in-app reset notifications exist since V0.1.67 [F6 in V0.2.9–V0.2.12, F12 in V0.2.11, F13 in V0.2.13]. |
 | Issues and pull requests are not evidence | The discussion around the code stays in GitHub or GitLab [F17, V0.2.27–V0.2.31]. |
 | Accounts are never deleted | They are deactivated (V0.2.16) and anonymized (V0.2.17); the account row stays as *Former member*. Log files and earlier backups keep the old address until they age out. |

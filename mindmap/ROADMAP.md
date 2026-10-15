@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.31` (2026-10-15), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.32` (2026-10-15), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -371,7 +371,7 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 
 | Release | Type | Section | The one change | IDs | Done when |
 |---|---|---|---|---|---|
-| **V0.2.32** | ✨ | Assistant | Earlier turns go with each question, within a token budget | F5a | A follow-up resolves "it" and "that file" |
+| **V0.2.32** ✅ | ✨ | Assistant | Earlier turns go with each question, within a token budget | F5a | A follow-up resolves "it" and "that file" |
 | **V0.2.33** | ✨ | Retrieval | Search across all of the caller's workspaces | F5b | Results merged by score, each checked against its workspace's role and AI policy |
 | **V0.2.34** | ✨ | Web shell | A keyboard command palette | F19 | Jump to a workspace, file, memory card or setting, and start assistant actions, without the mouse |
 | **V0.2.35** | ✨ | Indexing | Code symbols and structure-aware chunks for Go and Java | F21a | Both languages chunk by declaration and their symbols are searchable |
@@ -643,6 +643,16 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 - [x] Tests: connector webhook events per sender; `a_tracker_that_asks_to_wait_or_refuses_the_token_pauses_the_connector` (a short limit waited out, a long one paused and refused, a refused token, a new token, webhook calls signed and unsigned, removal)
 - [ ] Webhook deliveries are not listed or redelivered from RepoMemo
 
+#### V0.2.32: Earlier turns with each question
+
+- [x] **F5a** `AgentRequest.history` (`AgentHistoryTurn {question, answer, files}`), filled by the server from the stored conversation only (its last 8 turns; a `history` sent by a client is not read); `AgentReply.context_turns`
+- [x] `fit_history`: newest turns first, each answer cut to 700 characters, kept whole while within `HISTORY_TOKEN_BUDGET` (1,500 estimated tokens at four characters each)
+- [x] "Summarize it" and "summarize that file" resolve to the one file the latest turn was about (listed or summarized, else cited); several files leave the choice to the user
+- [x] `ask_workspace_in_conversation`: a short or pronoun question is searched with the turn before it and its files' titles (`follow_up_query`); the model reads the turns as context that is never evidence (`render_history`)
+- [x] Web: a reply says how many earlier messages it read
+- [x] Tests: budget and turn limit, reference detection, follow-up query, `a_follow_up_in_a_chat_is_understood_from_the_earlier_turns` (find, then "summarize it", then a question that names nothing; the prompt carries the earlier turns; a new chat and an injected `history` carry none)
+- [ ] Lookups and searches do not read earlier turns ("search for it" is searched as typed), a message routed by the model is classified without them, and long histories are cut, not summarized
+
 ### Decisions to agree before work starts
 
 | # | Decision | Needed by | Proposal |
@@ -671,7 +681,7 @@ Every item of both roads, with the release it is planned for. The evidence behin
 | F3 | **Symbol search on the web** | S | ✅ V0.1.72 |
 | F4 | **Repositories.** Phase 1b (renames with edits, commit on citations) | M | ✅ V0.1.73 |
 | F4 | **Repositories.** Phase 2: remote by URL over `https` (2a) and `ssh` (2b) | L | V0.2.20, V0.2.21 |
-| F5 | **Assistant memory** (5a) and **cross-workspace search** (5b) | M | V0.2.32, V0.2.33 |
+| F5 | **Assistant memory** (5a ✅ V0.2.32) and **cross-workspace search** (5b) | M | V0.2.32, V0.2.33 |
 | F6 | **Mail delivery:** SMTP and outbox (6a ✅ V0.2.9), invitations (6b ✅ V0.2.10), mentions and assignments (6c ✅ V0.2.12) | M | V0.2.9, V0.2.10, V0.2.12 (decisions 5, 7) |
 | F7 | **Evidence ergonomics.** Move folders, multi-select, new version of a file | M | ✅ V0.1.73 |
 | F8 | **Live map and health** | S | ✅ V0.1.72 |

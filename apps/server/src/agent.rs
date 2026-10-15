@@ -8,10 +8,10 @@ use axum::{
     http::StatusCode,
     Json,
 };
-use repomemo_api::{agent_capabilities, agent_conversation_title, agent_turn_label};
+use repomemo_api::{agent_capabilities, agent_conversation_title, agent_turn_label, HISTORY_MAX_TURNS};
 use repomemo_domain::{
-    AgentCapability, AgentCapabilityInfo, AgentConversation, AgentConversationDetail, AgentMessage, AgentRequest,
-    AgentTurn, ProviderSettings,
+    AgentCapability, AgentCapabilityInfo, AgentConversation, AgentConversationDetail, AgentHistoryFile,
+    AgentHistoryTurn, AgentMessage, AgentRequest, AgentTurn, ProviderSettings,
 };
 use serde::{Deserialize, Serialize};
 
@@ -89,6 +89,19 @@ pub(crate) async fn send_agent_message(
         capability: request.capability,
         artifact_id: request.artifact_id,
     };
+    // What goes with the question comes from the stored conversation, never
+    // from the request, so a client cannot make the assistant "remember" text.
+    let history = match &existing {
+        Some(conversation) => {
+            let turns = state
+                .storage
+                .list_agent_turns(&conversation.id)
+                .await
+                .map_err(map_storage_error)?;
+            history_of(&turns)
+        }
+        None => Vec::new(),
+    };
     let provider = text_provider(&state, &workspace_id).await?;
     let (provider_id, ai_unavailable_reason) = match provider {
         Some(provider) => {
@@ -121,6 +134,7 @@ pub(crate) async fn send_agent_message(
             artifact_id: message.artifact_id.clone(),
             provider_id,
             ai_unavailable_reason,
+            history,
         })
         .await
         .map_err(map_core_error)?;
@@ -229,6 +243,42 @@ pub(crate) async fn delete_agent_conversation(
         .await
         .map_err(map_storage_error)?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// The newest turns of a conversation as the assistant is reminded of them.
+/// A turn is about the files its reply listed or summarized, else those it
+/// cited; the core trims the lot to its token budget.
+fn history_of(turns: &[AgentTurn]) -> Vec<AgentHistoryTurn> {
+    let start = turns.len().saturating_sub(HISTORY_MAX_TURNS);
+    turns[start..]
+        .iter()
+        .map(|turn| {
+            let mut files = turn
+                .reply
+                .files
+                .iter()
+                .map(|file| AgentHistoryFile {
+                    id: file.id.clone(),
+                    title: file.title.clone(),
+                })
+                .collect::<Vec<_>>();
+            if files.is_empty() {
+                for citation in &turn.reply.citations {
+                    if !files.iter().any(|file| file.id == citation.artifact_id) {
+                        files.push(AgentHistoryFile {
+                            id: citation.artifact_id.clone(),
+                            title: citation.title.clone(),
+                        });
+                    }
+                }
+            }
+            AgentHistoryTurn {
+                question: turn.label.clone(),
+                answer: turn.reply.reply_markdown.clone(),
+                files,
+            }
+        })
+        .collect()
 }
 
 /// The caller's own conversation. Someone else's is reported as missing so
