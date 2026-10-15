@@ -1154,6 +1154,10 @@ export function deactivateSystemUser(accessToken: string, userId: string): Promi
   return request<{ personal_tokens_revoked: number; invitations_withdrawn: number }>(`/v1/system/users/${encodeURIComponent(userId)}/deactivate`, { method: "POST" }, accessToken);
 }
 
+export function anonymizeSystemUser(accessToken: string, userId: string, confirm: string): Promise<{ memberships_removed: number; notices_removed: number; conversations_removed: number; summaries_rewritten: number }> {
+  return request<{ memberships_removed: number; notices_removed: number; conversations_removed: number; summaries_rewritten: number }>(`/v1/system/users/${encodeURIComponent(userId)}/anonymize`, { method: "POST", body: JSON.stringify({ confirm }) }, accessToken);
+}
+
 export function reactivateSystemUser(accessToken: string, userId: string): Promise<void> {
   return request<void>(`/v1/system/users/${encodeURIComponent(userId)}/reactivate`, { method: "POST" }, accessToken);
 }

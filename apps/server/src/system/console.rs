@@ -63,6 +63,7 @@ const COMMANDS: &[CommandSpec] = &[
     CommandSpec { name: "users signout", usage: "users signout <email> --yes", summary: "Signs an account out of every device.", changes: true, arguments: 1, flags: &[] },
     CommandSpec { name: "users deactivate", usage: "users deactivate <email> --yes", summary: "Deactivates an account: it cannot sign in or use a token, its sessions, tokens and sent invitations end, and what it wrote stays. Owners transfer first (system administrators).", changes: true, arguments: 1, flags: &[] },
     CommandSpec { name: "users reactivate", usage: "users reactivate <email> --yes", summary: "Lets a deactivated account sign in again with its password (system administrators).", changes: true, arguments: 1, flags: &[] },
+    CommandSpec { name: "users anonymize", usage: "users anonymize <email> --yes", summary: "Removes the personal data of a deactivated account for good: address, name, password, picture, memberships, notices and conversations. What it wrote stays, credited to \"Former member\" (system administrators).", changes: true, arguments: 1, flags: &[] },
     CommandSpec { name: "backup list", usage: "backup list", summary: "Backups kept in the data folder, with the state of the last backup or restore.", changes: false, arguments: 0, flags: &[] },
     CommandSpec { name: "backup create", usage: "backup create --yes", summary: "Starts a backup of the database, stored files and key file; watch it with backup list.", changes: true, arguments: 0, flags: &[] },
     CommandSpec { name: "backup restore", usage: "backup restore <backup> <environment> --yes", summary: "Restores a backup into a new environment folder (it never touches the running one) and checks that it opens.", changes: true, arguments: 2, flags: &[] },
@@ -969,6 +970,36 @@ async fn execute(
                 format!("Reactivated {name}. They sign in again with their password."),
                 View::Text,
                 Value::Null,
+            ))
+        }
+
+        "users anonymize" => {
+            let user = find_account(state, &arguments[0]).await?;
+            let name = user.email.clone().unwrap_or_else(|| user.display_name.clone());
+            if !line.yes {
+                return Ok(dry_run(
+                    spec,
+                    format!(
+                        "Would remove the address, name, password, picture, memberships, notices and conversations of {name} for good. What they wrote would stay, credited to \"Former member\". This cannot be undone."
+                    ),
+                ));
+            }
+            let removed = super::anonymize_user(
+                who,
+                state_,
+                Path(user.id),
+                Json(super::AnonymizeRequest { confirm: name.clone() }),
+            )
+            .await?
+            .0;
+            Ok(applied(
+                spec,
+                format!(
+                    "Anonymized {name}: removed {} membership(s), {} notice(s) and {} conversation(s).",
+                    removed["memberships_removed"], removed["notices_removed"], removed["conversations_removed"]
+                ),
+                View::Text,
+                removed,
             ))
         }
 

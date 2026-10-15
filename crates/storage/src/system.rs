@@ -175,7 +175,7 @@ impl StorageEngine {
         let rows = sqlx::query(
             r#"
             SELECT u.id, u.email, u.display_name, u.created_at, u.last_connected_at, u.is_system_admin, u.is_app_admin,
-              u.deactivated_at,
+              u.deactivated_at, u.anonymized_at,
               (SELECT COUNT(*) FROM organization_memberships m WHERE m.user_id = u.id) AS organization_count,
               (SELECT COUNT(*) FROM workspace_memberships m WHERE m.user_id = u.id) AS workspace_count,
               (SELECT COUNT(*) FROM refresh_tokens t WHERE t.user_id = u.id AND t.revoked_at IS NULL AND t.expires_at > ?1) AS active_sessions
@@ -231,6 +231,7 @@ impl StorageEngine {
                 is_system_admin: row.get::<i64, _>("is_system_admin") != 0,
                 is_app_admin: row.get::<i64, _>("is_app_admin") != 0,
                 deactivated_at: row.get("deactivated_at"),
+                anonymized_at: row.get("anonymized_at"),
                 organization_count: row.get("organization_count"),
                 workspace_count: row.get("workspace_count"),
                 active_sessions: row.get("active_sessions"),

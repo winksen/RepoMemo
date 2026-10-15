@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.17 (2026-10-15)
+
+Anonymizing a deactivated account.
+
+### Added
+- **System › Users › Anonymize account** for a deactivated account (system administrators), and `users anonymize <email> --yes` in the console; `POST /v1/system/users/{id}/anonymize` with `{confirm}`, the account's address typed to confirm. It cannot be undone, and is audited as `user_anonymized` by the account's id.
+- **What goes, for good:** the address, the name, the password, the profile picture, every membership, the notices, notification preferences, the digest record, assistant conversations, the mail waiting for the address (sent ones lose the address and subject) and the invitations made out to it. Tasks assigned to it become unassigned.
+- **What stays:** everything it wrote (comments, tasks, notes, lifecycle changes), credited to **Former member**. The account row stays, so nothing that points at it blocks anything (risk 12 closed). Its address becomes an unreachable placeholder.
+- **Summaries and audit details** that name the address, or the name on the account's own actions, are rewritten (*a former member*, *Former member*).
+- An anonymized account is shown as *Anonymized* in System › Users and cannot be reactivated.
+- Migration 0030 (`users.anonymized_at`).
+
+### Upgrading
+- Nothing to do.
+- **What anonymizing does not reach:** log files and backups made earlier keep the address, as do other people's words and documents that mention the person. Log files age out with their retention setting.
+
 ## V0.2.16 (2026-10-15)
 
 A deactivated account cannot sign in or use a token, and comes back when reactivated.

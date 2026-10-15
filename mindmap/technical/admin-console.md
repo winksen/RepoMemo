@@ -98,6 +98,7 @@ flowchart LR
 | `users signout <email>` | **yes** | `POST /v1/system/users/{u}/sessions/end` |
 | `users deactivate <email>` | **yes** | `POST /v1/system/users/{u}/deactivate` |
 | `users reactivate <email>` | **yes** | `POST /v1/system/users/{u}/reactivate` |
+| `users anonymize <email>` | **yes** | `POST /v1/system/users/{u}/anonymize` |
 | `maintenance status` | no | `GET /v1/system/maintenance` |
 | `maintenance run` | **yes** | `POST /v1/system/maintenance/run` |
 | `backup list` | no | `GET /v1/system/backups` |

@@ -459,6 +459,10 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             post(system::reactivate_user),
         )
         .route(
+            "/v1/system/users/{user_id}/anonymize",
+            post(system::anonymize_user),
+        )
+        .route(
             "/v1/system/users/{user_id}/password-reset",
             post(access::issue_password_reset),
         )

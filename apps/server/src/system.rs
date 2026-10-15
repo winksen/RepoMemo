@@ -1271,6 +1271,75 @@ pub(crate) async fn deactivate_user(
     })))
 }
 
+#[derive(Debug, Deserialize)]
+pub(crate) struct AnonymizeRequest {
+    /// The account's email address, typed to confirm: this cannot be undone.
+    confirm: String,
+}
+
+/// Removes the personal data of a deactivated account for good: its address,
+/// name, password, picture, memberships, notices and conversations. What it
+/// wrote stays, credited to "Former member". It cannot be undone.
+pub(crate) async fn anonymize_user(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(user_id): Path<String>,
+    Json(request): Json<AnonymizeRequest>,
+) -> Result<Json<Value>, ApiError> {
+    require_full_system_admin(&subject)?;
+    require_system_change(&subject)?;
+    let user = state
+        .storage
+        .find_user(&user_id)
+        .await
+        .map_err(ApiError::internal)?
+        .ok_or_else(|| ApiError::not_found("User was not found."))?;
+    if state
+        .storage
+        .is_anonymized(&user_id)
+        .await
+        .map_err(ApiError::internal)?
+    {
+        return Err(ApiError::conflict("This account is already anonymized."));
+    }
+    if !state
+        .storage
+        .is_deactivated(&user_id)
+        .await
+        .map_err(ApiError::internal)?
+    {
+        return Err(ApiError::conflict("Deactivate the account before anonymizing it."));
+    }
+    let email = user.email.clone().unwrap_or_default();
+    if request.confirm.trim().to_lowercase() != email.to_lowercase() {
+        return Err(ApiError::bad_request(
+            "Type the account's email address to confirm: anonymizing cannot be undone.",
+        ));
+    }
+    let removed = state
+        .storage
+        .anonymize_user(&user_id)
+        .await
+        .map_err(map_storage_error)?;
+    // The record names the account by its id: its address is gone.
+    audit(
+        &state,
+        &subject,
+        "user_anonymized",
+        format!(
+            "Anonymized the account {user_id}: removed {} membership(s), {} notice(s) and {} conversation(s), and rewrote {} summary line(s).",
+            removed.memberships, removed.notifications, removed.conversations, removed.summaries_rewritten
+        ),
+    )
+    .await;
+    Ok(Json(json!({
+        "memberships_removed": removed.memberships,
+        "notices_removed": removed.notifications,
+        "conversations_removed": removed.conversations,
+        "summaries_rewritten": removed.summaries_rewritten,
+    })))
+}
+
 /// Lets a deactivated account sign in again, with the password it had.
 pub(crate) async fn reactivate_user(
     subject: AuthenticatedSubject,
@@ -1285,6 +1354,16 @@ pub(crate) async fn reactivate_user(
         .await
         .map_err(ApiError::internal)?
         .ok_or_else(|| ApiError::not_found("User was not found."))?;
+    if state
+        .storage
+        .is_anonymized(&user_id)
+        .await
+        .map_err(ApiError::internal)?
+    {
+        return Err(ApiError::conflict(
+            "An anonymized account cannot be reactivated: its password and address are gone.",
+        ));
+    }
     let who = user.email.unwrap_or(user.display_name);
     if !state
         .storage

@@ -829,3 +829,124 @@ async fn a_deactivated_account_is_shut_out_everywhere_and_comes_back_when_reacti
     assert!(actions.contains(&"user_reactivated".to_owned()));
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn an_anonymized_account_loses_its_personal_data_and_what_it_wrote_stays() {
+    let data_dir = temp_data_dir("anonymize");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let call = |method: &'static str, uri: String, who: String, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, &who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let (admin, _) = register_account(&app, "anonymize-admin@example.com").await;
+    let (owner, _) = register_account(&app, "anonymize-owner@example.com").await;
+    let (member, member_body) = register_account(&app, "anonymize-member@example.com").await;
+    let member_id = member_body["user"]["id"].as_str().unwrap().to_owned();
+    let workspace_id = create_workspace(&app, &owner).await;
+    join(
+        &app,
+        &owner,
+        "workspaces",
+        &workspace_id,
+        "anonymize-member@example.com",
+        "member",
+    )
+    .await;
+    let comment_target = response_json(
+        call(
+            "POST",
+            format!("/v1/workspaces/{workspace_id}/tasks"),
+            member.clone(),
+            json!({"title": "Written by the member", "description": "", "status": "open", "priority": "medium"}),
+        )
+        .await,
+    )
+    .await;
+    assert!(comment_target["id"].is_string(), "{comment_target}");
+
+    // Only a deactivated account, and only with its address typed.
+    let anonymize = |confirm: &str| json!({"confirm": confirm});
+    let path = format!("/v1/system/users/{member_id}/anonymize");
+    assert_eq!(
+        call("POST", path.clone(), admin.clone(), anonymize("anonymize-member@example.com"))
+            .await
+            .status(),
+        409,
+        "deactivate first"
+    );
+    assert_eq!(
+        call("POST", format!("/v1/system/users/{member_id}/deactivate"), admin.clone(), json!({}))
+            .await
+            .status(),
+        200
+    );
+    assert_eq!(
+        call("POST", path.clone(), admin.clone(), anonymize("someone-else@example.com"))
+            .await
+            .status(),
+        400,
+        "the address is typed to confirm"
+    );
+    assert_eq!(
+        call("POST", path.clone(), owner.clone(), anonymize("anonymize-member@example.com"))
+            .await
+            .status(),
+        403
+    );
+    let done = call("POST", path.clone(), admin.clone(), anonymize("Anonymize-Member@example.com")).await;
+    assert_eq!(done.status(), 200);
+    let done = response_json(done).await;
+    assert_eq!(done["memberships_removed"], 1);
+
+    // The account is a former member: no address, no sign-in, no way back.
+    let users = response_json(call("GET", "/v1/system/users".to_owned(), admin.clone(), json!({})).await).await;
+    let listed = users
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|user| user["id"] == member_id.as_str())
+        .unwrap();
+    assert_eq!(listed["display_name"], "Former member");
+    assert!(listed["email"].as_str().unwrap().starts_with("former-member-"));
+    assert!(listed["anonymized_at"].is_string());
+    assert_eq!(listed["workspace_count"], 0);
+    let signed_in = app
+        .clone()
+        .oneshot(public_post(
+            "/v1/auth/login",
+            json!({"email": "anonymize-member@example.com", "password": "not-a-real-password"}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(signed_in.status(), 401);
+    assert_eq!(
+        call("POST", format!("/v1/system/users/{member_id}/reactivate"), admin.clone(), json!({}))
+            .await
+            .status(),
+        409
+    );
+    assert_eq!(
+        call("POST", path, admin.clone(), anonymize("anonymize-member@example.com"))
+            .await
+            .status(),
+        409,
+        "once"
+    );
+
+    // What they wrote stays, and nothing names them any more.
+    let tasks = response_json(
+        call("GET", format!("/v1/workspaces/{workspace_id}/tasks"), owner.clone(), json!({})).await,
+    )
+    .await;
+    assert!(tasks.to_string().contains("Written by the member"));
+    assert!(!tasks.to_string().contains("anonymize-member@example.com"));
+    let activity = response_json(
+        call("GET", format!("/v1/workspaces/{workspace_id}/activity"), owner.clone(), json!({})).await,
+    )
+    .await;
+    let text = activity.to_string();
+    assert!(!text.contains("anonymize-member@example.com"), "{text}");
+    assert!(text.contains("Former member"), "{text}");
+    let _ = std::fs::remove_dir_all(data_dir);
+}

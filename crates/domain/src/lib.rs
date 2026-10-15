@@ -1289,6 +1289,10 @@ pub struct SystemUser {
     /// tokens until it is reactivated.
     #[serde(default)]
     pub deactivated_at: Option<String>,
+    /// When the account's personal data was removed, if it was. The account
+    /// then shows as "Former member" and cannot be reactivated.
+    #[serde(default)]
+    pub anonymized_at: Option<String>,
     pub organization_count: i64,
     pub workspace_count: i64,
     /// Refresh tokens that are neither revoked nor expired.
