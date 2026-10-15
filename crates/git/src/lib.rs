@@ -23,6 +23,15 @@ use anyhow::{anyhow, bail, Context, Result};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, ChildStdin, ChildStdout, Command};
 
+/// The commit that last changed a file.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LastChange {
+    pub sha: String,
+    pub author_name: String,
+    /// The author date in strict ISO 8601.
+    pub authored_at: String,
+}
+
 /// A file tracked in a commit's tree.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TreeFile {
@@ -291,6 +300,37 @@ impl GitRepo {
         Ok(files)
     }
 
+    /// Who last changed each file, from one `git log` pass over the latest
+    /// `max_commits` commits reachable from `commit`: the newest commit that
+    /// lists a path wins. Files untouched in that window are not in the map.
+    /// Renames count as a change of the new path (no similarity detection).
+    pub async fn last_changes(
+        &self,
+        commit: &str,
+        max_commits: usize,
+    ) -> Result<std::collections::HashMap<String, LastChange>> {
+        if commit.is_empty() || !commit.chars().all(|value| value.is_ascii_hexdigit()) {
+            bail!("{commit:?} is not a commit id.");
+        }
+        let output = git_command(&self.root)
+            .args([
+                "log",
+                "--name-only",
+                "--no-renames",
+                "--no-color",
+                &format!("--max-count={max_commits}"),
+                "--format=%x1e%H%x1f%an%x1f%aI",
+                commit,
+                "--",
+            ])
+            .output()
+            .await?;
+        if !output.status.success() {
+            bail!("git log failed: {}", stderr_text(&output.stderr));
+        }
+        Ok(parse_last_changes(&String::from_utf8_lossy(&output.stdout)))
+    }
+
     /// Files renamed between two commits, as `(old path, new path)`, found by
     /// content similarity (`git diff -M`): a file renamed *and* edited counts
     /// while about half of it is unchanged, which comparing blob ids cannot see.
@@ -469,6 +509,32 @@ fn validate_branch_name(branch: &str) -> Result<()> {
     Ok(())
 }
 
+/// Reads the output of the `last_changes` log: records start at `\x1e` with
+/// `sha \x1f author \x1f date`, followed by the paths the commit touched.
+/// The log is newest first, so the first record to list a path is its last
+/// change.
+fn parse_last_changes(output: &str) -> std::collections::HashMap<String, LastChange> {
+    let mut changes = std::collections::HashMap::new();
+    for record in output.split('\u{1e}').filter(|record| !record.trim().is_empty()) {
+        let mut lines = record.lines();
+        let Some(header) = lines.next() else {
+            continue;
+        };
+        let mut parts = header.split('\u{1f}');
+        let (Some(sha), Some(author), Some(date)) = (parts.next(), parts.next(), parts.next()) else {
+            continue;
+        };
+        for path in lines.map(str::trim_end).filter(|line| !line.is_empty()) {
+            changes.entry(path.to_owned()).or_insert_with(|| LastChange {
+                sha: sha.to_owned(),
+                author_name: author.to_owned(),
+                authored_at: date.to_owned(),
+            });
+        }
+    }
+    changes
+}
+
 fn parse_ls_tree(output: &[u8]) -> Result<Vec<TreeFile>> {
     let mut files = Vec::new();
     for record in output.split(|byte| *byte == 0) {
@@ -521,6 +587,20 @@ mod tests {
             .status()
             .unwrap();
         assert!(status.success(), "git {args:?} failed");
+    }
+
+    #[test]
+    fn the_newest_commit_that_lists_a_path_is_its_last_change() {
+        let log = "\u{1e}ccc\u{1f}Ana\u{1f}2026-03-03T10:00:00+00:00\n\nsrc/a.rs\nREADME.md\n\
+                   \u{1e}bbb\u{1f}Bo Li\u{1f}2026-02-02T10:00:00+00:00\n\nsrc/a.rs\nsrc/b.rs\n\
+                   \u{1e}aaa\u{1f}Cy\u{1f}2026-01-01T10:00:00+00:00\n\nsrc/b.rs\ndocs/d.md\n";
+        let changes = parse_last_changes(log);
+        assert_eq!(changes.len(), 4);
+        assert_eq!(changes["src/a.rs"].sha, "ccc");
+        assert_eq!(changes["src/a.rs"].author_name, "Ana");
+        assert_eq!(changes["src/b.rs"].author_name, "Bo Li");
+        assert_eq!(changes["docs/d.md"].authored_at, "2026-01-01T10:00:00+00:00");
+        assert!(parse_last_changes("").is_empty());
     }
 
     #[test]
@@ -691,6 +771,11 @@ mod tests {
         assert_eq!(info.sha, head);
         assert_eq!(info.summary, "Initial commit");
         assert_eq!(repo.recent_commits(&head, 5).await.unwrap(), vec![info]);
+        let last = repo.last_changes(&head, 100).await.unwrap();
+        assert_eq!(last["README.md"].sha, head);
+        assert_eq!(last["docs/guide.md"].author_name, "Test");
+        assert!(!last.contains_key("untracked.txt"));
+        assert!(repo.last_changes("--oops", 10).await.is_err());
 
         let files = repo.list_files(&head).await.unwrap();
         let paths = files.iter().map(|file| file.path.as_str()).collect::<Vec<_>>();

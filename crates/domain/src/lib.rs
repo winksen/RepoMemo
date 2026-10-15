@@ -677,6 +677,15 @@ pub struct RepoFile {
     pub indexed: bool,
     pub index_failure: Option<String>,
     pub commit_sha: String,
+    /// Who last changed the file, from the repository's history.
+    #[serde(default)]
+    pub last_author: Option<String>,
+    /// When that change was authored.
+    #[serde(default)]
+    pub last_changed_at: Option<String>,
+    /// The commit of that change.
+    #[serde(default)]
+    pub last_change_commit: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -862,6 +871,12 @@ pub struct SearchResult {
     /// For a file of a git repository: the commit its text is from.
     #[serde(default)]
     pub commit: Option<String>,
+    /// For a file of a git repository: who last changed it.
+    #[serde(default)]
+    pub last_author: Option<String>,
+    /// For a file of a git repository: when that change was authored.
+    #[serde(default)]
+    pub last_changed_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -32,6 +32,7 @@ import {
   updateSharedRepository,
 } from "../lib/sharedApi";
 import type { RepoAccessCheck, RepoFile, RepoSource, RepoSyncReport, RepositoryDetailResponse } from "../types";
+import { lastChangeLabel } from "../web/format";
 import { LanguageChart } from "./LanguageChart";
 import { Button } from "./ui/button";
 import { Dialog, DialogCancel } from "./ui/dialog";
@@ -682,6 +683,7 @@ function RepositoryFiles({
     <ul>
       {matching.slice(0, FILE_LIST_LIMIT).map((file) => <li key={file.artifact_id}>
         <button className="rm-map-link" onClick={() => onOpenArtifact(file.artifact_id)} type="button">{file.path}</button>
+        {file.last_author ? <span className="rm-map-muted"> · {lastChangeLabel(file.last_author, file.last_changed_at)}</span> : null}
         <span className="rm-map-muted">{file.language ?? ""}</span>
         {file.indexed ? null : <span className="rm-map-muted" title={file.index_failure ?? undefined}>{file.index_failure ? "Not indexed" : "Indexing…"}</span>}
       </li>)}

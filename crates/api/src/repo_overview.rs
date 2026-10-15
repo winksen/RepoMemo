@@ -415,6 +415,9 @@ mod tests {
             indexed: true,
             index_failure: None,
             commit_sha: "abc".to_owned(),
+            last_author: None,
+            last_changed_at: None,
+            last_change_commit: None,
         }
     }
 

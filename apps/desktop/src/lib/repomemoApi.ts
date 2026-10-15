@@ -531,6 +531,8 @@ export async function searchWorkspace(
         score: 1,
         source_name: artifact.source_name,
         commit: null,
+        last_author: null,
+        last_changed_at: null,
       }));
   }
 

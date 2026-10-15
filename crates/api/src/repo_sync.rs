@@ -16,10 +16,10 @@ use repomemo_domain::{
     IndexingJobStatus, RepoAccessCheck, RepoCommit, RepoDetail, RepoFile, RepoOverview, RepoSettings, RepoSkipCount,
     RepoSource, RepoSummary, RepoSyncReport, Source, SourceType, REPO_SYNC_JOB_KIND,
 };
-use repomemo_git::{GitRepo, TreeFile};
+use repomemo_git::{GitRepo, LastChange, TreeFile};
 use repomemo_indexer::INDEXER_VERSION;
 use repomemo_ingestion::repo::{classify_repo_file, is_indexable_text, RepoFileKind, RepoFileRules};
-use repomemo_storage::{RepoFileRecord, RepoFileWrite, StorageEngine};
+use repomemo_storage::{RepoFileRecord, RepoFileWrite, RepoLastChange, StorageEngine};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -29,6 +29,9 @@ use crate::RepoMemoCore;
 
 /// Skipped paths kept per reason in a sync report.
 const SKIP_EXAMPLES: usize = 5;
+/// How many of the latest commits are read to find who last changed each
+/// file. Files untouched for longer than that show no author.
+const LAST_CHANGE_COMMITS: usize = 20_000;
 /// Job progress is written every this many files, not after each one.
 const PROGRESS_EVERY: usize = 20;
 const MAX_PATTERNS: usize = 50;
@@ -458,6 +461,15 @@ impl RepoMemoCore {
             None => repo.current_branch().await?,
         };
         let tree = repo.list_files(&commit).await?;
+        // One pass over the history for the whole sync. Without it the files
+        // are indexed all the same, only without an author.
+        let last_changes = match repo.last_changes(&commit, LAST_CHANGE_COMMITS).await {
+            Ok(changes) => changes,
+            Err(error) => {
+                tracing::warn!(repository = %source_id, error = %format!("{error:#}"), "Who last changed each file could not be read");
+                Default::default()
+            }
+        };
         let rules = RepoFileRules {
             include: metadata.settings.include.clone(),
             exclude: metadata.settings.exclude.clone(),
@@ -575,7 +587,9 @@ impl RepoMemoCore {
                 progress += 1;
                 continue;
             }
-            let write = self.store_repo_blob(&root, &commit, file, kind, &bytes).await?;
+            let write = self
+                .store_repo_blob(&root, &commit, file, kind, &bytes, last_changes.get(&file.path))
+                .await?;
             match change {
                 Change::Add => {
                     self.storage
@@ -623,6 +637,21 @@ impl RepoMemoCore {
                 progress += 1;
             }
         }
+        // Who last changed each tracked file (a revert changes the author
+        // without changing the content, so every file is looked at).
+        let last_rows = wanted
+            .iter()
+            .filter_map(|(file, _)| {
+                last_changes.get(&file.path).map(|change| RepoLastChange {
+                    path: file.path.clone(),
+                    author_name: change.author_name.clone(),
+                    authored_at: change.authored_at.clone(),
+                    commit_sha: change.sha.clone(),
+                })
+            })
+            .collect::<Vec<_>>();
+        self.storage.set_repo_file_last_changes(source_id, &last_rows).await?;
+
         report.skipped = skips.total;
         report.skipped_by_reason = skips.into_counts();
 
@@ -808,8 +837,20 @@ impl RepoMemoCore {
         file: &TreeFile,
         kind: &RepoFileKind,
         bytes: &[u8],
+        last: Option<&LastChange>,
     ) -> Result<RepoFileWrite> {
         let content_hash = StorageEngine::content_hash(bytes);
+        let mut metadata = json!({
+            "origin": "git_repo",
+            "repo_root": root,
+            "commit": commit,
+            "blob_sha": file.blob_sha,
+        });
+        if let Some(last) = last {
+            metadata["last_author"] = json!(last.author_name);
+            metadata["last_changed_at"] = json!(last.authored_at);
+            metadata["last_change_commit"] = json!(last.sha);
+        }
         self.storage
             .store_blob(&content_hash, bytes, kind.mime_type.as_deref())
             .await?;
@@ -823,12 +864,7 @@ impl RepoMemoCore {
             size_bytes: bytes.len() as i64,
             blob_sha: file.blob_sha.clone(),
             commit_sha: commit.to_owned(),
-            metadata: json!({
-                "origin": "git_repo",
-                "repo_root": root,
-                "commit": commit,
-                "blob_sha": file.blob_sha,
-            }),
+            metadata,
         })
     }
 
@@ -1032,6 +1068,10 @@ mod tests {
         let paths = files.iter().map(|file| file.path.as_str()).collect::<Vec<_>>();
         assert_eq!(paths, vec!["README.md", "src/old_name.py", "src/refund.rs"]);
         assert!(files.iter().all(|file| file.indexed));
+        // Who last changed each file comes from one pass over the history.
+        assert!(files.iter().all(|file| file.last_author.as_deref() == Some("Test")));
+        assert!(files.iter().all(|file| file.last_change_commit.is_some() && file.last_changed_at.is_some()));
+        let first_change = files[2].last_change_commit.clone();
         let refund_id = files[2].artifact_id.clone();
         let renamed_id = files[1].artifact_id.clone();
 
@@ -1089,6 +1129,9 @@ mod tests {
         let files = core.list_repo_files(&source.id).await.unwrap();
         let paths = files.iter().map(|file| file.path.as_str()).collect::<Vec<_>>();
         assert_eq!(paths, vec!["src/refund.rs", "src/settlement.py"]);
+        assert_ne!(files[0].last_change_commit, first_change, "the edited file names its new last change");
+        let artifact = core.storage().get_artifact(&files[0].artifact_id).await.unwrap();
+        assert_eq!(artifact.metadata["last_author"], "Test");
         assert_eq!(files[0].artifact_id, refund_id);
         assert_eq!(files[1].artifact_id, renamed_id);
 

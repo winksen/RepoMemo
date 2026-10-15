@@ -290,6 +290,8 @@ impl StorageEngine {
                     score: f64::from(*score),
                     source_name: row.source_name,
                     commit: None,
+                    last_author: None,
+                    last_changed_at: None,
                 })
             })
             .collect())
@@ -337,6 +339,8 @@ impl StorageEngine {
                     score,
                     source_name: row.source_name,
                     commit: None,
+                    last_author: None,
+                    last_changed_at: None,
                 })
             })
             .collect::<Vec<_>>();
@@ -679,7 +683,7 @@ impl StorageEngine {
             return Ok(());
         }
         let mut query = QueryBuilder::<Sqlite>::new(
-            "SELECT artifact_id, commit_sha FROM repo_files WHERE removed_at IS NULL AND artifact_id IN (",
+            "SELECT artifact_id, commit_sha, last_author, last_authored_at FROM repo_files WHERE removed_at IS NULL AND artifact_id IN ("
         );
         let mut separated = query.separated(", ");
         for result in results.iter() {
@@ -688,13 +692,26 @@ impl StorageEngine {
         separated.push_unseparated(")");
         let commits = query
             .build()
-            .map(|row: SqliteRow| (row.get::<String, _>("artifact_id"), row.get::<String, _>("commit_sha")))
+            .map(|row: SqliteRow| {
+                (
+                    row.get::<String, _>("artifact_id"),
+                    (
+                        row.get::<String, _>("commit_sha"),
+                        row.get::<Option<String>, _>("last_author"),
+                        row.get::<Option<String>, _>("last_authored_at"),
+                    ),
+                )
+            })
             .fetch_all(self.reader())
             .await?
             .into_iter()
             .collect::<HashMap<_, _>>();
         for result in results.iter_mut() {
-            result.commit = commits.get(&result.artifact_id).cloned();
+            if let Some((commit, author, at)) = commits.get(&result.artifact_id) {
+                result.commit = Some(commit.clone());
+                result.last_author = author.clone();
+                result.last_changed_at = at.clone();
+            }
         }
         Ok(())
     }

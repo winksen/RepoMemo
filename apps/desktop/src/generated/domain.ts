@@ -596,6 +596,12 @@ export interface RepoFile {
   indexed: boolean;
   index_failure: string | null;
   commit_sha: string;
+  /** Who last changed the file, from the repository's history. */
+  last_author: string | null;
+  /** When that change was authored. */
+  last_changed_at: string | null;
+  /** The commit of that change. */
+  last_change_commit: string | null;
 }
 
 export interface IndexingJobStatus {
@@ -765,6 +771,10 @@ export interface SearchResult {
   source_name: string;
   /** For a file of a git repository: the commit its text is from. */
   commit: string | null;
+  /** For a file of a git repository: who last changed it. */
+  last_author: string | null;
+  /** For a file of a git repository: when that change was authored. */
+  last_changed_at: string | null;
 }
 
 export interface ProviderSettings {

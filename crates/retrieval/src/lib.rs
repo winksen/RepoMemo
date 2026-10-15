@@ -221,6 +221,8 @@ mod tests {
             score: 99.0,
             source_name: "s".to_owned(),
             commit: None,
+            last_author: None,
+            last_changed_at: None,
         }
     }
 

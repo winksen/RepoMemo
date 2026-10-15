@@ -25,6 +25,15 @@ pub struct RepoFileRecord {
     pub removed: bool,
 }
 
+/// Who last changed a repository file, as the repository's history says.
+#[derive(Debug, Clone)]
+pub struct RepoLastChange {
+    pub path: String,
+    pub author_name: String,
+    pub authored_at: String,
+    pub commit_sha: String,
+}
+
 /// The stored state of one repository file after a sync wrote it.
 #[derive(Debug, Clone)]
 pub struct RepoFileWrite {
@@ -467,10 +476,55 @@ impl StorageEngine {
     }
 
     /// The files of a repository source currently in its tree, by path.
+    /// Records who last changed each file, on the file's row and in its
+    /// artifact's metadata (so its page and search results show it). Rows that
+    /// already say so are left alone. Returns how many changed.
+    pub async fn set_repo_file_last_changes(&self, source_id: &str, changes: &[RepoLastChange]) -> Result<usize> {
+        if changes.is_empty() {
+            return Ok(0);
+        }
+        let mut tx = self.pool.begin().await?;
+        let mut changed = 0;
+        for change in changes {
+            let updated = sqlx::query(
+                r#"UPDATE repo_files SET last_author = ?1, last_authored_at = ?2, last_change_commit = ?3
+                   WHERE source_id = ?4 AND path = ?5 AND removed_at IS NULL
+                     AND COALESCE(last_change_commit, '') != ?3"#,
+            )
+            .bind(&change.author_name)
+            .bind(&change.authored_at)
+            .bind(&change.commit_sha)
+            .bind(source_id)
+            .bind(&change.path)
+            .execute(&mut *tx)
+            .await?
+            .rows_affected();
+            if updated == 0 {
+                continue;
+            }
+            changed += 1;
+            sqlx::query(
+                r#"UPDATE artifacts SET metadata_json = json_set(metadata_json,
+                       '$.last_author', ?1, '$.last_changed_at', ?2, '$.last_change_commit', ?3)
+                   WHERE id = (SELECT artifact_id FROM repo_files WHERE source_id = ?4 AND path = ?5)"#,
+            )
+            .bind(&change.author_name)
+            .bind(&change.authored_at)
+            .bind(&change.commit_sha)
+            .bind(source_id)
+            .bind(&change.path)
+            .execute(&mut *tx)
+            .await?;
+        }
+        tx.commit().await?;
+        Ok(changed)
+    }
+
     pub async fn list_repo_file_entries(&self, source_id: &str) -> Result<Vec<RepoFile>> {
         let rows = sqlx::query(
             r#"
             SELECT repo_files.path, repo_files.artifact_id, repo_files.commit_sha,
+                   repo_files.last_author, repo_files.last_authored_at, repo_files.last_change_commit,
                    artifacts.type AS artifact_type, artifacts.language, artifacts.size_bytes,
                    artifacts.indexed_at, failures.message AS failure
             FROM repo_files
@@ -496,6 +550,9 @@ impl StorageEngine {
                     index_failure: if indexed { None } else { row.get("failure") },
                     indexed,
                     commit_sha: row.get("commit_sha"),
+                    last_author: row.get("last_author"),
+                    last_changed_at: row.get("last_authored_at"),
+                    last_change_commit: row.get("last_change_commit"),
                 }
             })
             .collect())

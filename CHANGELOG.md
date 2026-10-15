@@ -2,6 +2,18 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.24 (2026-10-15)
+
+Who last changed a file, and when.
+
+### Added
+- **Last author and date for every repository file**, taken from the repository's history. They show on the file's page (*last changed by Ana · 3 Mar 2026 in 1a2b3c4*), in the repository's file list and under each search result that comes from a repository file.
+- **One `git log` pass per sync** over the latest 20,000 commits finds the newest commit that touched each path; it also corrects the author after a revert, which changes the author without changing the file. Files untouched for more than 20,000 commits show no author. Renames count as a change of the new path.
+- The author is the commit's *author* (not the committer) and is kept with the file (migration 0033: `last_author`, `last_authored_at`, `last_change_commit` on `repo_files`, and in the artifact's metadata). It is filled in by the first sync after upgrading.
+
+### Upgrading
+- Nothing to do. Run a sync (or wait for the next poll) to fill in authors for repositories linked before.
+
 ## V0.2.23 (2026-10-15)
 
 A push can ask for a sync at once.

@@ -42,6 +42,7 @@ mod vectors;
 pub use access::{PasswordReset, PersonalTokenGrant, StoredInvitation, PERSONAL_TOKEN_PREFIX};
 pub use accounts::{Anonymization, Deactivation, OwnedPlace, FORMER_MEMBER};
 pub use credentials::{RepoCredentialInfo, RepoSecret, RepoWebhookInfo};
+pub use repo::RepoLastChange;
 pub use environment::{inspect_environment, EnvironmentState};
 pub use mail::{DigestCandidate, DigestNotice, MailOutboxCounts, MailSettingsUpdate, QueuedMail, StoredMailSettings};
 pub use repo::{RepoFileRecord, RepoFileWrite};
@@ -1288,6 +1289,8 @@ impl From<SearchResultRow> for SearchResult {
             score: row.score,
             source_name: row.source_name,
             commit: None,
+            last_author: None,
+            last_changed_at: None,
         }
     }
 }

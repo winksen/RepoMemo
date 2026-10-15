@@ -101,3 +101,11 @@ export function apiMessage(error: unknown): string {
   if (error && typeof error === "object" && "message" in error) return String((error as SharedApiError).message);
   return "The shared API could not be reached. Confirm that the server is running and try again.";
 }
+
+/** "Ana · 3 Mar 2026": who last changed a repository file, and when. */
+export function lastChangeLabel(author: string | null | undefined, at: string | null | undefined): string {
+  if (!author) return "";
+  const date = at ? new Date(at) : null;
+  const when = date && !Number.isNaN(date.getTime()) ? date.toLocaleDateString(undefined, { dateStyle: "medium" }) : "";
+  return when ? `${author} · ${when}` : author;
+}
