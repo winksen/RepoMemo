@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.2.24` (2026-10-15). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
+> **Scope:** reflects the code at `V0.2.25` (2026-10-15). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
 
 ---
 
@@ -508,12 +508,13 @@ The desktop app and the shared server keep **separate data**.
 
 ---
 
-## 13. Known functional gaps (at V0.2.24)
+## 13. Known functional gaps (at V0.2.25)
 
 These are observed in the code and are useful for prioritizing. The roadmap item that addresses each one is in brackets.
 
 | Gap | Impact |
 |---|---|
+| `CODEOWNERS` owners are hints only | They show on a repository file's page since V0.2.25 but are not matched to workspace members, assigned or notified [F16c]. |
 | Assistant answers and citations do not name the last author | The last author and date of a repository file show on its page, in the file list and in search results since V0.2.24 [F16b]. |
 | Pushes are noticed by polling unless a webhook is set up | Since V0.2.23 a repository can have a push webhook (GitHub, GitLab or a signed generic call) that queues a sync at once; without one the server polls [F16a]. |
 | Repositories on a host need an allowed host | `https` links work since V0.2.20 (a read-only token for private ones) and `ssh` links since V0.2.21 (a deploy key and the pinned host key); each clone has a size and a time cap since V0.2.22 and counts in the workspace's storage allowance [F4 phase 2]; pushes are noticed only by polling [F16, V0.2.23]. A file renamed and edited in one commit keeps its history since V0.1.73 when at least about half of it is unchanged. |

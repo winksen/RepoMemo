@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.2 → 0.3
 
-> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.24` (2026-10-15) · **Next:** `V0.2.25`
+> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.25` (2026-10-15) · **Next:** `V0.2.26`
 > **Previous line:** [Releases 0.1 → 0.2](RELEASES_0.1.md) · **Related:** [Roadmap, Road to V0.3.0](ROADMAP.md#-road-to-v030) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
 Every release of the 0.2 line, shipped and planned, one row each. The plan comes from the [Road to V0.3.0](ROADMAP.md#-road-to-v030): **one change per release**, each shippable alone, with the security rules for a new outside connection in the release that opens it. Planned rows are proposals until decisions 7–14 in the roadmap are agreed.
@@ -57,7 +57,7 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | **V0.2.22** | ✅ 2026-10-15 | D. Remote repositories | 🔒 Security | Repositories | Clone limits: a size cap and a time cap on every clone and fetch, the copies counted in the workspace's storage allowance, copy sizes in System › Overview (S6b) | A clone over its limit stops and says why |
 | **V0.2.23** | ✅ 2026-10-15 | D. Remote repositories | ✨ Feature | Repositories | Push webhooks from GitHub, GitLab and a generic sender: a per-repository secret shown once, signatures checked in constant time, one sync queued per push (F16a) | An unsigned or wrongly signed call is refused (HMAC, constant time); a push queues one sync |
 | **V0.2.24** | ✅ 2026-10-15 | D. Remote repositories | ✨ Feature | Artifact page | Last author and date per repository file, shown on the file, in the repository's file list and in search results, from one `git log` pass per sync (F16b) | Shown on the file and in search results, from one `git log` pass per sync |
-| **V0.2.25** | 🔜 Planned | D. Remote repositories | ✨ Feature | Artifact page | `CODEOWNERS` as ownership hints (F16c) | The matching owners show on the file, as hints next to its lifecycle owner |
+| **V0.2.25** | ✅ 2026-10-15 | D. Remote repositories | ✨ Feature | Artifact page | `CODEOWNERS` as ownership hints: the owners a repository's `CODEOWNERS` names for a file show on it, next to the review owner and never assigned from it (F16c) | The matching owners show on the file, as hints next to its lifecycle owner |
 | **V0.2.26** | 🔜 Planned | D. Remote repositories | ✨ Feature | Citations | View a cited passage at the commit it names (F16d) | A citation opens the text as it was at that commit, labelled as such |
 | **V0.2.27** | 🔜 Planned | E. Issues and pull requests | ✨ Feature | Connectors | GitHub issues as evidence, read-only token, incremental sync (F17a, decision 12) | Issues and their comments are searchable and citable; closed issues are *outdated* |
 | **V0.2.28** | 🔜 Planned | E. Issues and pull requests | ✨ Feature | Connectors | GitHub pull requests as evidence (F17b) | Pull requests with their review discussion, linked to their commits |

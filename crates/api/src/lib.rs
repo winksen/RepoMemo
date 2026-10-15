@@ -19,6 +19,7 @@ use serde_json::json;
 
 mod agent;
 mod budget;
+mod codeowners;
 mod embeddings;
 mod health;
 mod knowledge_map;

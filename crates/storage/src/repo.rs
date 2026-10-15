@@ -520,6 +520,47 @@ impl StorageEngine {
         Ok(changed)
     }
 
+    /// Records which owners `CODEOWNERS` names for each file, in its
+    /// artifact's metadata (`code_owners`). Rows that already say so are left
+    /// alone. Returns how many changed.
+    pub async fn set_repo_file_code_owners(&self, source_id: &str, owners: &[(String, Vec<String>)]) -> Result<usize> {
+        if owners.is_empty() {
+            return Ok(0);
+        }
+        let mut tx = self.pool.begin().await?;
+        let mut changed = 0;
+        for (path, names) in owners {
+            let value = serde_json::to_string(names)?;
+            changed += sqlx::query(
+                r#"UPDATE artifacts SET metadata_json = json_set(metadata_json, '$.code_owners', json(?1))
+                   WHERE id = (SELECT artifact_id FROM repo_files
+                               WHERE source_id = ?2 AND path = ?3 AND removed_at IS NULL)
+                     AND COALESCE(json_extract(metadata_json, '$.code_owners'), '[]') != ?1"#,
+            )
+            .bind(value)
+            .bind(source_id)
+            .bind(path)
+            .execute(&mut *tx)
+            .await?
+            .rows_affected() as usize;
+        }
+        tx.commit().await?;
+        Ok(changed)
+    }
+
+    /// Forgets every file's owners (the repository has no `CODEOWNERS`).
+    pub async fn clear_repo_file_code_owners(&self, source_id: &str) -> Result<u64> {
+        Ok(sqlx::query(
+            r#"UPDATE artifacts SET metadata_json = json_remove(metadata_json, '$.code_owners')
+               WHERE id IN (SELECT artifact_id FROM repo_files WHERE source_id = ?1)
+                 AND json_extract(metadata_json, '$.code_owners') IS NOT NULL"#,
+        )
+        .bind(source_id)
+        .execute(&self.pool)
+        .await?
+        .rows_affected())
+    }
+
     pub async fn list_repo_file_entries(&self, source_id: &str) -> Result<Vec<RepoFile>> {
         let rows = sqlx::query(
             r#"

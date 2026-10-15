@@ -2,6 +2,18 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.25 (2026-10-15)
+
+A repository's `CODEOWNERS` shows on its files.
+
+### Added
+- **Owner hints from `CODEOWNERS`.** Each sync reads the repository's `CODEOWNERS` (`.github/CODEOWNERS`, `CODEOWNERS`, `docs/CODEOWNERS` or `.gitlab/CODEOWNERS`, the first found) and shows the owners it names for a file on the file's page: *CODEOWNERS suggests @payments, lead@example.com*, next to where the review owner is set. It is a hint only: the handles are names on the host, not people of the workspace, and nothing is assigned or notified from it.
+- **Matching follows what GitHub and GitLab document:** the last matching pattern wins; `*` and `?` stay inside one path segment and `**` crosses them; a pattern with a `/` in front or in the middle is anchored to the root and one without matches at any depth; a pattern ending in `/` (or in a plain name) covers the directory it names; a pattern with no owners clears ownership; GitLab `[Section]` lines and their default owners are understood. Negation and escapes are not.
+- Files whose owners change are updated on the next sync, including when `CODEOWNERS` is edited or removed. Files over 3 MiB of `CODEOWNERS` are ignored.
+
+### Upgrading
+- Nothing to do. Owners appear after the next sync of each repository.
+
 ## V0.2.24 (2026-10-15)
 
 Who last changed a file, and when.

@@ -23,6 +23,7 @@ use repomemo_storage::{RepoFileRecord, RepoFileWrite, RepoLastChange, StorageEng
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
+use crate::codeowners::{CodeOwners, CODEOWNERS_PATHS, MAX_CODEOWNERS_BYTES};
 use crate::repo_overview::{compute_overview, key_file_role, overview_markdown, readme_excerpt, RECENT_COMMITS};
 use crate::repo_stack::{detect_stack, MAX_MANIFEST_BYTES, MAX_STACK_MANIFESTS, STACK_MANIFESTS};
 use crate::RepoMemoCore;
@@ -470,6 +471,7 @@ impl RepoMemoCore {
                 Default::default()
             }
         };
+        let code_owners = read_code_owners(&repo, &tree).await;
         let rules = RepoFileRules {
             include: metadata.settings.include.clone(),
             exclude: metadata.settings.exclude.clone(),
@@ -588,7 +590,15 @@ impl RepoMemoCore {
                 continue;
             }
             let write = self
-                .store_repo_blob(&root, &commit, file, kind, &bytes, last_changes.get(&file.path))
+                .store_repo_blob(
+                    &root,
+                    &commit,
+                    file,
+                    kind,
+                    &bytes,
+                    last_changes.get(&file.path),
+                    &code_owners.owners_of(&file.path),
+                )
                 .await?;
             match change {
                 Change::Add => {
@@ -651,6 +661,16 @@ impl RepoMemoCore {
             })
             .collect::<Vec<_>>();
         self.storage.set_repo_file_last_changes(source_id, &last_rows).await?;
+        // The owners `CODEOWNERS` names, as hints (nothing is assigned).
+        if code_owners.is_empty() {
+            self.storage.clear_repo_file_code_owners(source_id).await?;
+        } else {
+            let owner_rows = wanted
+                .iter()
+                .map(|(file, _)| (file.path.clone(), code_owners.owners_of(&file.path)))
+                .collect::<Vec<_>>();
+            self.storage.set_repo_file_code_owners(source_id, &owner_rows).await?;
+        }
 
         report.skipped = skips.total;
         report.skipped_by_reason = skips.into_counts();
@@ -838,6 +858,7 @@ impl RepoMemoCore {
         kind: &RepoFileKind,
         bytes: &[u8],
         last: Option<&LastChange>,
+        owners: &[String],
     ) -> Result<RepoFileWrite> {
         let content_hash = StorageEngine::content_hash(bytes);
         let mut metadata = json!({
@@ -846,6 +867,9 @@ impl RepoMemoCore {
             "commit": commit,
             "blob_sha": file.blob_sha,
         });
+        if !owners.is_empty() {
+            metadata["code_owners"] = json!(owners);
+        }
         if let Some(last) = last {
             metadata["last_author"] = json!(last.author_name);
             metadata["last_changed_at"] = json!(last.authored_at);
@@ -944,6 +968,26 @@ impl SkipTally {
     }
 }
 
+/// The repository's `CODEOWNERS`, if it has one a sync can read.
+async fn read_code_owners(repo: &GitRepo, tree: &[TreeFile]) -> CodeOwners {
+    for path in CODEOWNERS_PATHS {
+        let Some(file) = tree.iter().find(|file| file.path == *path) else {
+            continue;
+        };
+        if file.size_bytes > MAX_CODEOWNERS_BYTES {
+            continue;
+        }
+        let Ok(mut reader) = repo.blob_reader().await else {
+            return CodeOwners::default();
+        };
+        return match reader.read(&file.blob_sha).await {
+            Ok(bytes) => CodeOwners::parse(&String::from_utf8_lossy(&bytes)),
+            Err(_) => CodeOwners::default(),
+        };
+    }
+    CodeOwners::default()
+}
+
 fn repo_name(root: &Path) -> String {
     root.file_name()
         .and_then(|value| value.to_str())
@@ -1029,6 +1073,9 @@ mod tests {
         write(&repo_dir, "src/old_name.py", "def settle():\n    return 1\n");
         write(&repo_dir, "package-lock.json", "{}");
         write(&repo_dir, "notes.txt", "kept out by the exclude pattern");
+        write(&repo_dir, "CODEOWNERS", "* @docs-team
+/src/ @payments lead@example.com
+");
         git(&repo_dir, &["add", "."]);
         git(&repo_dir, &["commit", "--quiet", "-m", "Initial"]);
 
@@ -1040,7 +1087,7 @@ mod tests {
                 &repo_dir.join("src").to_string_lossy(),
                 None,
                 RepoSettings {
-                    exclude: vec!["notes.txt".to_owned()],
+                    exclude: vec!["notes.txt".to_owned(), "CODEOWNERS".to_owned()],
                     ..Default::default()
                 },
             )
@@ -1060,14 +1107,19 @@ mod tests {
 
         let first = sync(&core, &source.id).await;
         assert!(!core.repo_head(&source.id).await.unwrap().moved());
-        assert_eq!(first.files_in_tree, 5);
+        assert_eq!(first.files_in_tree, 6);
         assert_eq!(first.added, 3);
-        assert_eq!(first.skipped, 2);
+        assert_eq!(first.skipped, 3);
         assert_eq!(first.indexed, 3);
         let files = core.list_repo_files(&source.id).await.unwrap();
         let paths = files.iter().map(|file| file.path.as_str()).collect::<Vec<_>>();
         assert_eq!(paths, vec!["README.md", "src/old_name.py", "src/refund.rs"]);
         assert!(files.iter().all(|file| file.indexed));
+        // `CODEOWNERS` names owners as hints on the files it covers.
+        let readme = core.storage().get_artifact(&files[0].artifact_id).await.unwrap();
+        assert_eq!(readme.metadata["code_owners"], serde_json::json!(["@docs-team"]));
+        let refund = core.storage().get_artifact(&files[2].artifact_id).await.unwrap();
+        assert_eq!(refund.metadata["code_owners"], serde_json::json!(["@payments", "lead@example.com"]));
         // Who last changed each file comes from one pass over the history.
         assert!(files.iter().all(|file| file.last_author.as_deref() == Some("Test")));
         assert!(files.iter().all(|file| file.last_change_commit.is_some() && file.last_changed_at.is_some()));

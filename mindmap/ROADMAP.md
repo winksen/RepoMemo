@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.24` (2026-10-15), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.25` (2026-10-15), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -354,7 +354,7 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 | **V0.2.22** ✅ | 🔧 | Repositories | Clone limits: size and time caps, the clone counted in the storage allowance, clone sizes in System › Overview | S6b | A clone over its limit stops and says why |
 | **V0.2.23** ✅ | ✨ | Repositories | Push webhooks from GitHub, GitLab and a generic sender | F16a | An unsigned or wrongly signed call is refused (HMAC, constant time); a push queues one sync |
 | **V0.2.24** ✅ | ✨ | Artifact page | Last author and date per repository file | F16b | Shown on the file and in search results, from one `git log` pass per sync |
-| **V0.2.25** | ✨ | Artifact page | `CODEOWNERS` as ownership hints | F16c | The matching owners show on the file, as hints next to its lifecycle owner |
+| **V0.2.25** ✅ | ✨ | Artifact page | `CODEOWNERS` as ownership hints | F16c | The matching owners show on the file, as hints next to its lifecycle owner |
 | **V0.2.26** | ✨ | Citations | View a cited passage at the commit it names | F16d | A citation opens the text as it was at that commit, labelled as such |
 
 #### Track E: Issues and pull requests (V0.2.27–V0.2.31)
@@ -585,6 +585,14 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 - [x] `RepoFile` and `SearchResult` carry `last_author`, `last_changed_at` (and `last_change_commit` on files); web: file page, file list, search results
 - [x] Tests: the log parser, `last_changes` on a real repository, the sync test (every file named, the edited file's last change moves, metadata carries it)
 - [ ] Assistant answers and citations do not show it yet
+
+#### V0.2.25: CODEOWNERS as ownership hints
+
+- [x] **F16c** `crates/api/src/codeowners.rs`: parser and matcher (last match wins, anchoring, `**`, directory coverage, owner-less clearing, GitLab sections)
+- [x] The sync reads `CODEOWNERS` once from the tree, writes `code_owners` into the metadata of files it writes, then updates every tracked file whose owners differ (`set_repo_file_code_owners`), or clears them when there is no `CODEOWNERS`
+- [x] Web: *CODEOWNERS suggests …* on the file's page
+- [x] Tests: the matcher (forms, sections, wildcards) and the sync test (README and `src/` files carry their owners)
+- [ ] Owners are not matched to workspace members, and are not shown in the file list or search results
 
 ### Decisions to agree before work starts
 
