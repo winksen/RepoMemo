@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.21 (2026-10-15)
+
+Link a repository by its `ssh` address, with a deploy key.
+
+### Added
+- **Repository links accept `ssh://git@host/owner/repo.git` and `git@host:owner/repo.git`**, on a host listed in `REPOMEMO_GIT_ALLOWED_HOSTS` (`host:port` for a port other than 22). The link needs a **deploy key** (a private key without a passphrase, read-only on the host) and the **host's public key**, as printed by `ssh-keyscan -t ed25519 host`.
+- **The host key is pinned:** the connection only goes through to a host that presents exactly the pasted key. An unknown or changed key is refused, with a message that says so; nothing is trusted on first use, and the server's own `known_hosts` and `ssh` configuration are not read.
+- **The deploy key never reaches a command line or the log:** it is stored sealed (like tokens), written to a private file that exists only for the length of one git command and is then removed, and passed to `ssh` as `-i`. `ssh` runs with the agent, passwords, forwarding and the user's configuration off. The host key is public and kept with the link.
+- `PUT /v1/repositories/{id}/deploy-key` replaces the key (and, when given, the pinned host key); the new key is tried against the host before it replaces the old one. A key cannot be removed from an `ssh` link, only replaced. The change is recorded in the workspace activity.
+- Clone, fetch, polling for new commits and everything after them work as for `https`.
+
+### Upgrading
+- Nothing to do. `ssh` links need an `ssh` client on the server's `PATH` (it comes with git on Windows and with OpenSSH elsewhere).
+
 ## V0.2.20 (2026-10-15)
 
 Link a repository by its `https` address.

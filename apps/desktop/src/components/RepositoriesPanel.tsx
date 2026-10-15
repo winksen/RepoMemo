@@ -23,6 +23,7 @@ import {
   getSharedRepositoryDetail,
   listSharedRepositories,
   listSharedRepositoryFiles,
+  setSharedRepositoryDeployKey,
   setSharedRepositoryToken,
   summarizeSharedRepository,
   syncSharedRepository,
@@ -61,9 +62,17 @@ const STATUS_LABEL: Record<RepoSource["status"], string> = {
   error: "Sync failed",
 };
 
-type RepoForm = { link: string; name: string; branch: string; include: string; exclude: string; token: string; tokenUsername: string };
+type RepoForm = {
+  link: string; name: string; branch: string; include: string; exclude: string;
+  token: string; tokenUsername: string; deployKey: string; hostKey: string;
+};
 
-const EMPTY_FORM: RepoForm = { link: "", name: "", branch: "", include: "", exclude: "", token: "", tokenUsername: "" };
+const EMPTY_FORM: RepoForm = { link: "", name: "", branch: "", include: "", exclude: "", token: "", tokenUsername: "", deployKey: "", hostKey: "" };
+
+/** An ssh address: `ssh://…` or the `git@host:owner/repo` form. */
+function isSshLink(link: string) {
+  return /^ssh:\/\//i.test(link.trim()) || /^[^\s\\/]+@[^\s/]+:/.test(link.trim());
+}
 
 /** An address of a repository on a host, as opposed to a folder on the server. */
 function isRemoteLink(link: string) {
@@ -72,6 +81,10 @@ function isRemoteLink(link: string) {
 
 /** What the server is given for a token: nothing when none was typed. */
 function formToken(form: RepoForm) {
+  if (isSshLink(form.link)) {
+    const deployKey = form.deployKey.trim();
+    return deployKey ? { deploy_key: deployKey, host_key: form.hostKey.trim() || undefined } : {};
+  }
   const token = form.token.trim();
   return token ? { token, token_username: form.tokenUsername.trim() || undefined } : {};
 }
@@ -282,7 +295,7 @@ export function RepositorySettings({
   const [editForm, setEditForm] = useState<RepoForm>(EMPTY_FORM);
   const [removing, setRemoving] = useState<RepoSource | null>(null);
 
-  const formKey = JSON.stringify([form.link.trim(), formSettings(form), form.token, form.tokenUsername]);
+  const formKey = JSON.stringify([form.link.trim(), formSettings(form), form.token, form.tokenUsername, form.deployKey, form.hostKey]);
   const checkIsCurrent = check !== null && checkedFor === formKey;
 
   async function runCheck(event: FormEvent) {
@@ -330,6 +343,8 @@ export function RepositorySettings({
       exclude: repository.settings.exclude.join("\n"),
       token: "",
       tokenUsername: "",
+      deployKey: "",
+      hostKey: "",
     });
     setEditing(repository);
   }
@@ -339,7 +354,11 @@ export function RepositorySettings({
     if (!editing) return;
     setBusy(true);
     try {
-      if (editing.remote && editForm.token.trim()) {
+      if (editing.remote && isSshLink(editing.root_path)) {
+        if (editForm.deployKey.trim() || editForm.hostKey.trim()) {
+          await setSharedRepositoryDeployKey(accessToken, editing.id, { deploy_key: editForm.deployKey.trim(), host_key: editForm.hostKey.trim() || undefined });
+        }
+      } else if (editing.remote && editForm.token.trim()) {
         await setSharedRepositoryToken(accessToken, editing.id, { token: editForm.token.trim(), username: editForm.tokenUsername.trim() || undefined });
       }
       await updateSharedRepository(accessToken, editing.id, { name: editForm.name.trim() || undefined, ...formSettings(editForm) });
@@ -391,7 +410,7 @@ export function RepositorySettings({
         <div>
           <strong>{repository.name}</strong>
           <code className="rm-repo-path">{repository.root_path}</code>
-          <span className="rm-map-muted">{repository.remote ? (repository.has_credential ? "Remote · with a token · " : "Remote · no token · ") : ""}{repository.settings.branch ? `Branch ${repository.settings.branch}` : repository.remote ? "Follows the default branch" : "Follows the checked-out branch"}{repository.settings.include.length ? ` · ${repository.settings.include.length} include` : ""}{repository.settings.exclude.length ? ` · ${repository.settings.exclude.length} exclude` : ""} · {STATUS_LABEL[repository.active_job ? "syncing" : repository.status]}</span>
+          <span className="rm-map-muted">{repository.remote ? (isSshLink(repository.root_path) ? "Remote · deploy key · " : repository.has_credential ? "Remote · with a token · " : "Remote · no token · ") : ""}{repository.settings.branch ? `Branch ${repository.settings.branch}` : repository.remote ? "Follows the default branch" : "Follows the checked-out branch"}{repository.settings.include.length ? ` · ${repository.settings.include.length} include` : ""}{repository.settings.exclude.length ? ` · ${repository.settings.exclude.length} exclude` : ""} · {STATUS_LABEL[repository.active_job ? "syncing" : repository.status]}</span>
         </div>
         <div className="rm-health-actions">
           <Button disabled={Boolean(repository.active_job)} onClick={() => startEditing(repository)} type="button" variant="secondary"><Pencil size={15} /> Edit</Button>
@@ -419,8 +438,8 @@ export function RepositorySettings({
       title={`Edit ${editing.name}`}
     >
       <form className="rm-repo-form" id="rm-repo-edit-form" onSubmit={saveEdit}>
-        <RepositoryFields form={editForm} onChange={setEditForm} remote={editing.remote} replacingToken showLink={false} />
-        {editing.remote && editing.has_credential ? <div><Button disabled={busy} onClick={() => void removeToken(editing)} type="button" variant="secondary">Remove the token</Button></div> : null}
+        <RepositoryFields form={{ ...editForm, link: editing.root_path }} onChange={(next) => setEditForm({ ...next, link: editForm.link })} remote={editing.remote} replacingToken showLink={false} />
+        {editing.remote && editing.has_credential && !isSshLink(editing.root_path) ? <div><Button disabled={busy} onClick={() => void removeToken(editing)} type="button" variant="secondary">Remove the token</Button></div> : null}
       </form>
     </Dialog> : null}
 
@@ -466,12 +485,23 @@ function RepositoryFields({
   replacingToken?: boolean;
 }) {
   const set = (key: keyof RepoForm) => (event: { target: { value: string } }) => onChange({ ...form, [key]: event.target.value });
-  const asksForToken = showLink ? isRemoteLink(form.link) : remote;
+  const sshLink = showLink ? isSshLink(form.link) : replacingToken && isSshLink(form.link);
+  const asksForToken = showLink ? isRemoteLink(form.link) && !sshLink : remote && !sshLink;
   return <>
     {showLink ? <label>Repository link
       <Input onChange={set("link")} placeholder="C:\code\my-repo, /srv/code/my-repo or https://github.com/acme/app.git" value={form.link} />
       <span className="rm-map-muted">A folder on the server, anywhere inside the repository, or the https address of a repository on a host the server operator allows.</span>
     </label> : null}
+    {sshLink ? <>
+      <label>{replacingToken ? "New deploy key" : "Deploy key"}
+        <Textarea autoComplete="off" onChange={set("deployKey")} placeholder={replacingToken ? "Leave empty to keep the current key" : "-----BEGIN OPENSSH PRIVATE KEY-----"} rows={4} value={form.deployKey} />
+        <span className="rm-map-muted">A read-only deploy key without a passphrase. It is stored encrypted and never shown again.</span>
+      </label>
+      <label>Host key
+        <Textarea autoComplete="off" onChange={set("hostKey")} placeholder="ssh-ed25519 AAAA…" rows={2} value={form.hostKey} />
+        <span className="rm-map-muted">The host's public key, as printed by <code>ssh-keyscan -t ed25519 host</code>. The connection only goes through to a host that presents exactly this key.</span>
+      </label>
+    </> : null}
     {asksForToken ? <div className="rm-repo-form-row">
       <label>{replacingToken ? "New access token" : "Access token"}
         <Input autoComplete="off" onChange={set("token")} placeholder={replacingToken ? "Leave empty to keep the current token" : "Only for a private repository"} type="password" value={form.token} />

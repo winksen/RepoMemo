@@ -1,21 +1,23 @@
-//! Remote repository links (roadmap F4 phase 2a, V0.2.20).
+//! Remote repository links (roadmap F4 phase 2, V0.2.20 and V0.2.21).
 //!
 //! A remote link is an `https` address (a token optional, for a private
-//! repository) that a workspace administrator typed. The server checks the
+//! repository) or an `ssh` address (a deploy key and the host's key, both
+//! required) that a workspace administrator typed. The server checks the
 //! address against `REPOMEMO_GIT_ALLOWED_HOSTS` before any network call, keeps
-//! the token sealed in the credential store, and keeps a bare, partial clone of
-//! the branch under its data folder. The sync engine then reads that clone like
-//! any local repository, so the files, renames, overview and indexing are the
-//! same; only getting the commits is different (`refresh_remote_clone`).
+//! the token or key sealed in the credential store, and keeps a bare, partial
+//! clone of the branch under its data folder. The sync engine then reads that
+//! clone like any local repository, so the files, renames, overview and
+//! indexing are the same; only getting the commits is different
+//! (`refresh_remote_clone`).
 
 use std::path::PathBuf;
 
 use anyhow::Result;
 use repomemo_domain::{RepoAccessCheck, RepoCommit, RepoSettings, RepoSource, SourceType};
-use repomemo_git::remote::{self, RemoteCredential, RemoteTarget};
+use repomemo_git::remote::{self, RemoteCredential, RemoteTarget, SshAuth};
 use repomemo_git::GitRepo;
 
-use crate::remote_policy::RemoteScheme;
+use crate::remote_policy::{RemoteRepository, RemoteScheme};
 use crate::repo_sync::{normalize_settings, RemoteLink, RepoSourceMetadata};
 use crate::RepoMemoCore;
 
@@ -54,6 +56,41 @@ impl std::fmt::Debug for RemoteToken {
     }
 }
 
+/// A deploy key (a private key in PEM or OpenSSH form) with the public key of
+/// the host it is used against.
+#[derive(Clone)]
+pub struct RemoteDeployKey {
+    private_key: String,
+    /// What was pasted: the host's key as `ssh-keyscan` prints it.
+    pub host_key: String,
+}
+
+impl RemoteDeployKey {
+    pub fn new(private_key: String, host_key: String) -> Option<Self> {
+        let private_key = private_key.trim().to_owned();
+        (!private_key.is_empty()).then_some(Self {
+            private_key,
+            host_key: host_key.trim().to_owned(),
+        })
+    }
+}
+
+impl std::fmt::Debug for RemoteDeployKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RemoteDeployKey")
+            .field("private_key", &"<hidden>")
+            .field("host_key", &self.host_key)
+            .finish()
+    }
+}
+
+/// What was typed with a link to sign in to it.
+#[derive(Debug, Clone, Default)]
+pub struct RemoteAuth {
+    pub token: Option<RemoteToken>,
+    pub deploy_key: Option<RemoteDeployKey>,
+}
+
 /// The name a remote repository gets unless another is chosen: its last path
 /// segment without `.git`.
 fn name_from_path(path: &str) -> String {
@@ -64,6 +101,11 @@ fn name_from_path(path: &str) -> String {
     } else {
         name.to_owned()
     }
+}
+
+/// The `known_hosts` lines for a link's host from what was pasted.
+fn pinned_host_keys(repository: &RemoteRepository, pasted: &str) -> Result<String> {
+    remote::known_hosts_lines(&repository.host, repository.port.unwrap_or(22), pasted)
 }
 
 impl RepoMemoCore {
@@ -78,17 +120,33 @@ impl RepoMemoCore {
     /// Where to fetch a linked repository from and how to sign in. The address
     /// goes through the host policy every time, so narrowing
     /// `REPOMEMO_GIT_ALLOWED_HOSTS` also stops syncs of older links.
-    pub(crate) async fn remote_target(&self, source_id: &str, url: &str) -> Result<RemoteTarget> {
-        let repository = self.remote_git_policy.check(url)?;
-        let credential = self
-            .storage
-            .open_repo_credential(source_id)
-            .await?
-            .map(|secret| RemoteCredential::token(secret.username.as_deref(), secret.expose()));
-        Ok(RemoteTarget {
-            url: repository.url(),
-            credential,
-        })
+    pub(crate) async fn remote_target(&self, source_id: &str, link: &RemoteLink) -> Result<RemoteTarget> {
+        let repository = self.remote_git_policy.check(&link.url)?;
+        let stored = self.storage.open_repo_credential(source_id).await?;
+        match repository.scheme {
+            RemoteScheme::Https => Ok(RemoteTarget {
+                url: repository.url(),
+                credential: stored
+                    .filter(|secret| secret.kind == "token")
+                    .map(|secret| RemoteCredential::token(secret.username.as_deref(), secret.expose())),
+                ssh: None,
+            }),
+            RemoteScheme::Ssh => {
+                let Some(key) = stored.filter(|secret| secret.kind == "deploy_key") else {
+                    repomemo_domain::bail_invalid!(
+                        "This repository has no deploy key (or it could not be read). Enter it again in its settings."
+                    );
+                };
+                let Some(host_key) = link.host_key.as_deref() else {
+                    repomemo_domain::bail_invalid!("This repository has no pinned host key. Enter it in its settings.");
+                };
+                Ok(RemoteTarget {
+                    url: repository.url(),
+                    credential: None,
+                    ssh: Some(SshAuth::new(key.expose(), pinned_host_keys(&repository, host_key)?)),
+                })
+            }
+        }
     }
 
     /// Brings the server's copy of a branch up to date (cloning it the first
@@ -96,10 +154,10 @@ impl RepoMemoCore {
     pub(crate) async fn refresh_remote_clone(
         &self,
         source: &repomemo_domain::Source,
-        url: &str,
+        link: &RemoteLink,
         branch: Option<&str>,
     ) -> Result<GitRepo> {
-        let target = self.remote_target(&source.id, url).await?;
+        let target = self.remote_target(&source.id, link).await?;
         let head = remote::remote_head(&target, branch).await?;
         let directory = self.remote_clone_dir(&source.id);
         if directory.is_dir() {
@@ -110,31 +168,50 @@ impl RepoMemoCore {
         GitRepo::open_bare(&directory).await
     }
 
+    /// The target for a link that has not been stored yet, from what was typed.
+    fn target_from_input(repository: &RemoteRepository, auth: &RemoteAuth) -> Result<RemoteTarget> {
+        match repository.scheme {
+            RemoteScheme::Https => Ok(RemoteTarget {
+                url: repository.url(),
+                credential: auth
+                    .token
+                    .as_ref()
+                    .map(|token| RemoteCredential::token(token.username.as_deref(), &token.secret)),
+                ssh: None,
+            }),
+            RemoteScheme::Ssh => {
+                let Some(key) = &auth.deploy_key else {
+                    repomemo_domain::bail_invalid!(
+                        "An ssh address needs a deploy key and the host's public key (ssh-keyscan -t ed25519 {}).",
+                        repository.host
+                    );
+                };
+                Ok(RemoteTarget {
+                    url: repository.url(),
+                    credential: None,
+                    ssh: Some(SshAuth::new(&key.private_key, pinned_host_keys(repository, &key.host_key)?)),
+                })
+            }
+        }
+    }
+
     /// Looks at a remote link before it is connected: whether the host knows
-    /// the repository and the token can read it, and which commit the branch
-    /// is at. Nothing is stored and nothing is cloned.
+    /// the repository and the token or key can read it, and which commit the
+    /// branch is at. Nothing is stored and nothing is cloned.
     pub async fn check_remote_repo_link(
         &self,
         workspace_id: &str,
         link: &str,
         settings: RepoSettings,
-        token: Option<RemoteToken>,
+        auth: RemoteAuth,
     ) -> Result<RepoAccessCheck> {
         if !self.storage.workspace_exists(workspace_id).await? {
             repomemo_domain::bail_not_found!("Workspace was not found.");
         }
         let settings = normalize_settings(settings)?;
         let repository = self.remote_git_policy.check(link)?;
-        if repository.scheme != RemoteScheme::Https {
-            repomemo_domain::bail_invalid!("Only https addresses can be linked for now; ssh comes in a later release.");
-        }
-        let url = repository.url();
-        let target = RemoteTarget {
-            url: url.clone(),
-            credential: token
-                .as_ref()
-                .map(|token| RemoteCredential::token(token.username.as_deref(), &token.secret)),
-        };
+        let target = Self::target_from_input(&repository, &auth)?;
+        let url = target.url.clone();
         let head = remote::remote_head(&target, settings.branch.as_deref()).await?;
         let already_connected = self
             .storage
@@ -160,19 +237,19 @@ impl RepoMemoCore {
     }
 
     /// Connects a remote repository to a workspace. The host is asked once, so
-    /// a wrong address, branch or token fails now and not on the first sync;
-    /// nothing is cloned until a sync runs.
+    /// a wrong address, branch, token or key fails now and not on the first
+    /// sync; nothing is cloned until a sync runs.
     pub async fn connect_remote_repo(
         &self,
         workspace_id: &str,
         link: &str,
         name: Option<String>,
         settings: RepoSettings,
-        token: Option<RemoteToken>,
+        auth: RemoteAuth,
         actor_user_id: Option<&str>,
     ) -> Result<RepoSource> {
         let check = self
-            .check_remote_repo_link(workspace_id, link, settings.clone(), token.clone())
+            .check_remote_repo_link(workspace_id, link, settings.clone(), auth.clone())
             .await?;
         let settings = normalize_settings(settings)?;
         let name = name
@@ -183,6 +260,7 @@ impl RepoMemoCore {
             settings,
             remote: Some(RemoteLink {
                 url: check.root_path.clone(),
+                host_key: auth.deploy_key.as_ref().map(|key| key.host_key.clone()),
             }),
             ..Default::default()
         };
@@ -190,16 +268,25 @@ impl RepoMemoCore {
             .storage
             .create_repo_source(workspace_id, &name, &check.root_path, &metadata.to_value())
             .await?;
-        if let Some(token) = token {
-            if let Err(error) = self
-                .storage
-                .set_repo_credential(&source.id, "token", token.username.as_deref(), &token.secret, actor_user_id)
-                .await
-            {
-                // A link without the token it was given would only fail later.
-                let _ = self.storage.delete_source(&source.id).await;
-                return Err(error);
-            }
+        let stored = if let Some(key) = &auth.deploy_key {
+            Some(
+                self.storage
+                    .set_repo_credential(&source.id, "deploy_key", None, &key.private_key, actor_user_id)
+                    .await,
+            )
+        } else if let Some(token) = &auth.token {
+            Some(
+                self.storage
+                    .set_repo_credential(&source.id, "token", token.username.as_deref(), &token.secret, actor_user_id)
+                    .await,
+            )
+        } else {
+            None
+        };
+        if let Some(Err(error)) = stored {
+            // A link without the credential it was given would only fail later.
+            let _ = self.storage.delete_source(&source.id).await;
+            return Err(error);
         }
         self.repo_source(&source.id).await
     }
@@ -211,11 +298,15 @@ impl RepoMemoCore {
         let Some(remote) = metadata.remote else {
             repomemo_domain::bail_invalid!("Only a remote repository has a token.");
         };
-        // The new token has to work before it replaces the old one.
         let repository = self.remote_git_policy.check(&remote.url)?;
+        if repository.scheme != RemoteScheme::Https {
+            repomemo_domain::bail_invalid!("An ssh repository uses a deploy key, not a token.");
+        }
+        // The new token has to work before it replaces the old one.
         let target = RemoteTarget {
             url: repository.url(),
             credential: Some(RemoteCredential::token(token.username.as_deref(), &token.secret)),
+            ssh: None,
         };
         remote::remote_head(&target, metadata.settings.branch.as_deref()).await?;
         self.storage
@@ -224,12 +315,59 @@ impl RepoMemoCore {
         Ok(())
     }
 
+    /// Replaces the deploy key of an `ssh` repository, and its pinned host key
+    /// when one is given. The new key has to work before it replaces the old.
+    pub async fn set_repo_deploy_key(
+        &self,
+        source_id: &str,
+        key: RemoteDeployKey,
+        actor_user_id: Option<&str>,
+    ) -> Result<()> {
+        let source = self.repo_source_row(source_id).await?;
+        let mut metadata = RepoSourceMetadata::of(&source);
+        let Some(mut remote) = metadata.remote.clone() else {
+            repomemo_domain::bail_invalid!("Only a remote repository has a deploy key.");
+        };
+        let repository = self.remote_git_policy.check(&remote.url)?;
+        if repository.scheme != RemoteScheme::Ssh {
+            repomemo_domain::bail_invalid!("An https repository uses a token, not a deploy key.");
+        }
+        let host_key = if key.host_key.is_empty() {
+            remote.host_key.clone().unwrap_or_default()
+        } else {
+            key.host_key.clone()
+        };
+        let auth = RemoteAuth {
+            token: None,
+            deploy_key: Some(RemoteDeployKey {
+                private_key: key.private_key.clone(),
+                host_key: host_key.clone(),
+            }),
+        };
+        let target = Self::target_from_input(&repository, &auth)?;
+        remote::remote_head(&target, metadata.settings.branch.as_deref()).await?;
+        self.storage
+            .set_repo_credential(source_id, "deploy_key", None, &key.private_key, actor_user_id)
+            .await?;
+        if remote.host_key.as_deref() != Some(host_key.as_str()) {
+            remote.host_key = Some(host_key);
+            metadata.remote = Some(remote);
+            self.storage
+                .update_source(source_id, &source.name, &source.status, &metadata.to_value(), false)
+                .await?;
+        }
+        Ok(())
+    }
+
     /// Removes the token of a remote repository (it is then fetched without
     /// signing in).
     pub async fn clear_repo_token(&self, source_id: &str) -> Result<bool> {
         let source = self.repo_source_row(source_id).await?;
-        if RepoSourceMetadata::of(&source).remote.is_none() {
+        let Some(remote) = RepoSourceMetadata::of(&source).remote else {
             repomemo_domain::bail_invalid!("Only a remote repository has a token.");
+        };
+        if self.remote_git_policy.check(&remote.url)?.scheme != RemoteScheme::Https {
+            repomemo_domain::bail_invalid!("An ssh repository needs its deploy key: replace it instead of removing it.");
         }
         self.storage.clear_repo_credential(source_id).await
     }
@@ -258,9 +396,12 @@ mod tests {
     }
 
     #[test]
-    fn a_token_is_hidden_in_debug_output_and_empty_ones_are_none() {
+    fn secrets_are_hidden_in_debug_output_and_empty_ones_are_none() {
         let token = RemoteToken::new(Some("oauth2".to_owned()), " glpat-secret ".to_owned()).unwrap();
         assert!(!format!("{token:?}").contains("glpat-secret"));
         assert!(RemoteToken::new(None, "   ".to_owned()).is_none());
+        let key = RemoteDeployKey::new("-----BEGIN KEY-----\nPRIVATEBITS".to_owned(), "ssh-ed25519 AAAA".to_owned()).unwrap();
+        assert!(!format!("{key:?}").contains("PRIVATEBITS"));
+        assert!(RemoteDeployKey::new("  ".to_owned(), String::new()).is_none());
     }
 }

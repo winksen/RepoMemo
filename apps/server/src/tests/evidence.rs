@@ -1426,7 +1426,7 @@ async fn remote_links_are_off_until_hosts_are_named_and_a_token_is_never_echoed(
         ("https://gitlab.com/acme/app.git", "github.com"),
         ("http://github.com/acme/app.git", "https and ssh"),
         ("https://user:secret@github.com/acme/app.git", "credentials"),
-        ("ssh://git@github.com/acme/app.git", "https addresses"),
+        ("ssh://git@github.com/acme/app.git", "needs a deploy key"),
     ] {
         let refused = call(
             &app,

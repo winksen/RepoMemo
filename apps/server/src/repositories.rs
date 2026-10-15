@@ -321,14 +321,34 @@ pub(crate) struct RepositoryLinkRequest {
     /// The account name that goes with the token, when the host wants one.
     #[serde(default)]
     token_username: Option<String>,
+    /// A deploy key (private key text) for an `ssh` address.
+    #[serde(default)]
+    deploy_key: Option<SecretText>,
+    /// The host's public key an `ssh` link is pinned to (`ssh-keyscan` output).
+    #[serde(default)]
+    host_key: Option<String>,
 }
 
 impl RepositoryLinkRequest {
-    fn token(&self) -> Option<repomemo_api::RemoteToken> {
-        self.token
-            .as_ref()
-            .and_then(|token| repomemo_api::RemoteToken::new(self.token_username.clone(), token.0.clone()))
+    fn auth(&self) -> repomemo_api::RemoteAuth {
+        repomemo_api::RemoteAuth {
+            token: self
+                .token
+                .as_ref()
+                .and_then(|token| repomemo_api::RemoteToken::new(self.token_username.clone(), token.0.clone())),
+            deploy_key: self.deploy_key.as_ref().and_then(|key| {
+                repomemo_api::RemoteDeployKey::new(key.0.clone(), self.host_key.clone().unwrap_or_default())
+            }),
+        }
     }
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct RepositoryDeployKeyRequest {
+    deploy_key: SecretText,
+    /// Leave out to keep the pinned host key the link has.
+    #[serde(default)]
+    host_key: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -385,7 +405,7 @@ pub(crate) async fn check_repository(
     if repomemo_api::looks_remote(&request.link) {
         return state
             .core
-            .check_remote_repo_link(&workspace_id, &request.link, settings, request.token())
+            .check_remote_repo_link(&workspace_id, &request.link, settings, request.auth())
             .await
             .map(Json)
             .map_err(map_repo_error);
@@ -418,7 +438,7 @@ pub(crate) async fn connect_repository(
                 &request.link,
                 request.name.clone(),
                 settings,
-                request.token(),
+                request.auth(),
                 Some(&subject.user_id),
             )
             .await
@@ -551,6 +571,41 @@ pub(crate) async fn set_repository_token(
         "repository",
         Some(&source_id),
         format!("Replaced the access token of repository {}.", repository.name),
+    )
+    .await;
+    state
+        .core
+        .repo_source(&source_id)
+        .await
+        .map(Json)
+        .map_err(map_repo_error)
+}
+
+/// Replaces the deploy key (and, when given, the pinned host key) of an
+/// `ssh` repository. The new key is tried against the host first.
+pub(crate) async fn set_repository_deploy_key(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(source_id): Path<String>,
+    Json(request): Json<RepositoryDeployKeyRequest>,
+) -> Result<Json<RepoSource>, ApiError> {
+    let repository = load_repository(&state, &source_id).await?;
+    require_workspace_admin(&state, &subject, &repository.workspace_id).await?;
+    let key = repomemo_api::RemoteDeployKey::new(request.deploy_key.0, request.host_key.unwrap_or_default())
+        .ok_or_else(|| ApiError::bad_request("Enter the deploy key."))?;
+    state
+        .core
+        .set_repo_deploy_key(&source_id, key, Some(&subject.user_id))
+        .await
+        .map_err(map_repo_error)?;
+    record_workspace_activity(
+        &state,
+        &repository.workspace_id,
+        &subject.user_id,
+        "repository_deploy_key_changed",
+        "repository",
+        Some(&source_id),
+        format!("Replaced the deploy key of repository {}.", repository.name),
     )
     .await;
     state

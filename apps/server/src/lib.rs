@@ -699,6 +699,10 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             put(repositories::set_repository_token).delete(repositories::clear_repository_token),
         )
         .route(
+            "/v1/repositories/{source_id}/deploy-key",
+            put(repositories::set_repository_deploy_key),
+        )
+        .route(
             "/v1/repositories/{source_id}/files",
             get(repositories::list_repository_files),
         )

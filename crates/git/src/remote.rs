@@ -9,16 +9,21 @@
 //!
 //! - git is started with a **cleared environment**, so the server's secrets
 //!   (`REPOMEMO_JWT_SECRET`, `REPOMEMO_SECRET_KEY`, ...) never reach it;
-//! - only `https` is allowed (`protocol.allow=never`, then `https` alone),
-//!   redirects are not followed, and every object is checked
-//!   (`transfer.fsckObjects`);
+//! - only the protocol of the link is allowed (`protocol.allow=never`, then
+//!   `https` or `ssh` alone), redirects are not followed, and every object is
+//!   checked (`transfer.fsckObjects`);
+//! - over `ssh` the deploy key is written to a private file that exists only
+//!   while the command runs, the host's key is the one pinned on the link and
+//!   nothing else (`StrictHostKeyChecking=yes`, an empty `known_hosts` apart
+//!   from it), agents and passwords are off, and the key's contents never
+//!   appear on a command line;
 //! - a token travels through `GIT_ASKPASS` (this program, run again, see
 //!   [`run_as_askpass_if_requested`]) and the environment of that one git
 //!   process, never in the address or in the arguments;
 //! - nothing is checked out, no hook runs, submodules are not fetched;
 //! - a git that is older than the patched releases is refused.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::OnceLock;
 use std::time::Duration;
@@ -71,12 +76,161 @@ impl std::fmt::Debug for RemoteCredential {
     }
 }
 
+/// How to sign in to an `ssh` repository: a deploy key and the one host key
+/// the connection may end at.
+#[derive(Clone)]
+pub struct SshAuth {
+    private_key: String,
+    /// One or more complete `known_hosts` lines (see [`known_hosts_lines`]).
+    known_hosts: String,
+}
+
+impl SshAuth {
+    pub fn new(private_key: &str, known_hosts: String) -> Self {
+        Self {
+            private_key: private_key.to_owned(),
+            known_hosts,
+        }
+    }
+}
+
+impl std::fmt::Debug for SshAuth {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SshAuth")
+            .field("private_key", &"<hidden>")
+            .field("known_hosts", &self.known_hosts)
+            .finish()
+    }
+}
+
 /// Where a remote repository is and how to sign in to it.
 #[derive(Debug, Clone)]
 pub struct RemoteTarget {
     /// An address that already passed the host policy, with no credentials.
     pub url: String,
+    /// A token, for an `https` address.
     pub credential: Option<RemoteCredential>,
+    /// A deploy key and pinned host key, for an `ssh` address.
+    pub ssh: Option<SshAuth>,
+}
+
+/// The `known_hosts` lines that pin a host to the key (or keys) the person
+/// pasted: either the key as `ssh-keyscan` prints it (`host ssh-ed25519
+/// AAAA...`), a `known_hosts` line, or just `ssh-ed25519 AAAA...`. The host
+/// and port come from the link, never from the pasted text, so a line cannot
+/// pin another host.
+pub fn known_hosts_lines(host: &str, port: u16, pasted: &str) -> Result<String> {
+    let pattern = match (host.contains(':'), port) {
+        (true, 22) => host.to_owned(),
+        (true, port) => format!("[{host}]:{port}"),
+        (false, 22) => host.to_owned(),
+        (false, port) => format!("[{host}]:{port}"),
+    };
+    let mut lines = Vec::new();
+    for line in pasted.lines().map(str::trim).filter(|line| !line.is_empty() && !line.starts_with('#')) {
+        let tokens = line.split_whitespace().collect::<Vec<_>>();
+        if tokens.first().is_some_and(|token| token.starts_with('@')) {
+            repomemo_domain::bail_invalid!("A certificate authority or revoked key cannot be used as the host key.");
+        }
+        let Some(at) = tokens.iter().position(|token| {
+            token.starts_with("ssh-") || token.starts_with("ecdsa-sha2-") || token.starts_with("sk-")
+        }) else {
+            repomemo_domain::bail_invalid!(
+                "That is not a host key. Paste the line printed by: ssh-keyscan -t ed25519 {host}"
+            );
+        };
+        let Some(key) = tokens.get(at + 1) else {
+            repomemo_domain::bail_invalid!("The host key is missing its key data.");
+        };
+        let valid = key.len() >= 20
+            && key.len() <= 4096
+            && key
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '/' | '='));
+        if !valid {
+            repomemo_domain::bail_invalid!("That host key is not valid.");
+        }
+        lines.push(format!("{pattern} {} {key}", tokens[at]));
+    }
+    if lines.is_empty() {
+        repomemo_domain::bail_invalid!(
+            "Enter the host's public key, as printed by: ssh-keyscan -t ed25519 {host}"
+        );
+    }
+    if lines.len() > 4 {
+        repomemo_domain::bail_invalid!("Give at most four host keys.");
+    }
+    Ok(lines.join("\n") + "\n")
+}
+
+/// Files written for one `ssh` command, removed when it is over.
+pub struct SshFiles {
+    directory: Option<PathBuf>,
+}
+
+impl Drop for SshFiles {
+    fn drop(&mut self) {
+        if let Some(directory) = self.directory.take() {
+            let _ = std::fs::remove_dir_all(directory);
+        }
+    }
+}
+
+static SSH_FILE_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+impl SshFiles {
+    fn none() -> Self {
+        Self { directory: None }
+    }
+
+    /// A private folder with the key and the pinned host keys in it.
+    fn write(auth: &SshAuth) -> Result<(Self, PathBuf, PathBuf)> {
+        let unique = format!(
+            "repomemo-ssh-{}-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|elapsed| elapsed.as_nanos())
+                .unwrap_or_default(),
+            SSH_FILE_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        );
+        let directory = std::env::temp_dir().join(unique);
+        std::fs::create_dir(&directory).context("a private folder for the deploy key could not be created")?;
+        let files = Self {
+            directory: Some(directory.clone()),
+        };
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&directory, std::fs::Permissions::from_mode(0o700))?;
+        }
+        let key_path = directory.join("id");
+        let mut key = auth.private_key.trim().to_owned();
+        key.push('\n');
+        write_private(&key_path, key.as_bytes())?;
+        let hosts_path = directory.join("known_hosts");
+        write_private(&hosts_path, auth.known_hosts.as_bytes())?;
+        Ok((files, key_path, hosts_path))
+    }
+}
+
+fn write_private(path: &Path, content: &[u8]) -> Result<()> {
+    use std::io::Write;
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let mut file = options.open(path).context("the deploy key could not be written")?;
+    file.write_all(content)?;
+    Ok(())
+}
+
+/// A path as `ssh -o` options and `-i` take it: forward slashes, and quoted.
+fn ssh_path(path: &Path) -> String {
+    format!("\"{}\"", path.to_string_lossy().replace('\\', "/"))
 }
 
 /// Where a branch of the remote points.
@@ -172,9 +326,10 @@ fn check_version(version: &str) -> Result<()> {
     }
 }
 
-/// A git process for the network: a cleared environment, https only, and the
-/// credential, if any, reachable through this program's askpass mode.
-fn remote_command(target: &RemoteTarget) -> Result<Command> {
+/// A git process for the network: a cleared environment, one protocol, and
+/// the credential, if any, reachable through this program's askpass mode (a
+/// token) or in files that live as long as the returned guard (a deploy key).
+fn remote_command(target: &RemoteTarget) -> Result<(Command, SshFiles)> {
     let mut command = Command::new("git");
     command.env_clear();
     // The few things a process needs to run at all.
@@ -201,13 +356,17 @@ fn remote_command(target: &RemoteTarget) -> Result<Command> {
         .env("GIT_CONFIG_NOSYSTEM", "1")
         .env("GIT_CONFIG_GLOBAL", null_device())
         .env("GIT_ATTR_NOSYSTEM", "1")
-        .env("GIT_ALLOW_PROTOCOL", "https")
+        .env("GIT_ALLOW_PROTOCOL", if target.ssh.is_some() { "ssh" } else { "https" })
         .env("GIT_NO_LAZY_FETCH", "1")
         .args([
             "-c",
             "protocol.allow=never",
             "-c",
-            "protocol.https.allow=always",
+            if target.ssh.is_some() {
+                "protocol.ssh.allow=always"
+            } else {
+                "protocol.https.allow=always"
+            },
             "-c",
             "http.followRedirects=false",
             "-c",
@@ -235,11 +394,28 @@ fn remote_command(target: &RemoteTarget) -> Result<Command> {
             .env(ASKPASS_USERNAME, &credential.username)
             .env(ASKPASS_SECRET, &credential.secret);
     }
+    let mut files = SshFiles::none();
+    if let Some(auth) = &target.ssh {
+        let (written, key_path, hosts_path) = SshFiles::write(auth)?;
+        files = written;
+        // Only the pinned key may end the connection; nothing else on this
+        // machine (agent, config, other known hosts, password prompts) counts.
+        let ssh = format!(
+            "ssh -i {key} -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes \
+             -o UserKnownHostsFile={hosts} -o GlobalKnownHostsFile={null} -o IdentityAgent=none \
+             -o ForwardAgent=no -o ClearAllForwardings=yes -o PasswordAuthentication=no \
+             -o KbdInteractiveAuthentication=no -o ConnectTimeout=30 -F {null}",
+            key = ssh_path(&key_path),
+            hosts = ssh_path(&hosts_path),
+            null = "/dev/null",
+        );
+        command.env("GIT_SSH_COMMAND", ssh).env("GIT_SSH_VARIANT", "ssh");
+    }
     #[cfg(windows)]
     {
         command.creation_flags(0x0800_0000);
     }
-    Ok(command)
+    Ok((command, files))
 }
 
 fn null_device() -> &'static str {
@@ -293,6 +469,10 @@ fn explain(stderr: &[u8], target: &RemoteTarget) -> String {
         || lower.contains("returned error: 403")
     {
         Some("The host refused the token, or the repository needs one: check that it is valid, not expired, and can read this repository.")
+    } else if lower.contains("host key verification failed") || lower.contains("remote host identification has changed") {
+        Some("The host's key is not the one pinned on this link. Check it with the host's operator and paste the right one.")
+    } else if lower.contains("permission denied (publickey") || lower.contains("permission denied, please try again") {
+        Some("The host refused the deploy key: check that it is added to the repository (or the account) and has read access.")
     } else if lower.contains("not found") || lower.contains("returned error: 404") {
         Some("The host does not know this repository, or the token cannot see it.")
     } else if lower.contains("redirect") {
@@ -324,7 +504,7 @@ pub async fn remote_head(target: &RemoteTarget, branch: Option<&str>) -> Result<
     if let Some(branch) = branch {
         validate_branch(branch)?;
     }
-    let mut command = remote_command(target)?;
+    let (mut command, _files) = remote_command(target)?;
     command.args(["ls-remote", "--symref", "--"]).arg(&target.url);
     match branch {
         Some(branch) => {
@@ -389,7 +569,7 @@ pub async fn clone_bare(target: &RemoteTarget, directory: &Path, branch: &str) -
             .await
             .context("the folder for remote repositories could not be created")?;
     }
-    let mut command = remote_command(target)?;
+    let (mut command, _files) = remote_command(target)?;
     command
         .args([
             "clone",
@@ -419,7 +599,7 @@ pub async fn clone_bare(target: &RemoteTarget, directory: &Path, branch: &str) -
 pub async fn fetch_branch(target: &RemoteTarget, directory: &Path, branch: &str) -> Result<()> {
     require_patched_git().await?;
     validate_branch(branch)?;
-    let mut command = remote_command(target)?;
+    let (mut command, _files) = remote_command(target)?;
     command
         .arg("-C")
         .arg(directory)
@@ -520,12 +700,78 @@ mod tests {
     }
 
     #[test]
+    fn host_keys_are_pinned_to_the_host_and_port_of_the_link() {
+        let key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl";
+        assert_eq!(
+            known_hosts_lines("github.com", 22, key).unwrap(),
+            format!("github.com {key}\n")
+        );
+        // ssh-keyscan output and comments name the host being scanned: ignored.
+        let scanned = format!("# github.com:22 SSH-2.0-x\nother.example {key} comment\n");
+        assert_eq!(
+            known_hosts_lines("git.corp.example", 2222, &scanned).unwrap(),
+            format!("[git.corp.example]:2222 {key}\n")
+        );
+        assert_eq!(known_hosts_lines("::1", 22, key).unwrap(), format!("::1 {key}\n"));
+        for refused in [
+            "",
+            "github.com",
+            "@cert-authority * ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl",
+            "ssh-ed25519",
+            "ssh-ed25519 not base64 !!",
+            "ssh-ed25519 short",
+        ] {
+            assert!(known_hosts_lines("github.com", 22, refused).is_err(), "{refused:?}");
+        }
+    }
+
+    #[test]
+    fn a_deploy_key_lives_in_a_private_file_and_never_on_the_command_line() {
+        let key = "-----BEGIN OPENSSH PRIVATE KEY-----\nSECRETKEYMATERIAL\n-----END OPENSSH PRIVATE KEY-----";
+        let target = RemoteTarget {
+            url: "ssh://git@github.com/acme/app.git".to_owned(),
+            credential: None,
+            ssh: Some(SshAuth::new(
+                key,
+                "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl\n".to_owned(),
+            )),
+        };
+        let directory;
+        {
+            let (command, files) = remote_command(&target).unwrap();
+            directory = files.directory.clone().unwrap();
+            let std_command = command.as_std();
+            let environment = std_command
+                .get_envs()
+                .filter_map(|(name, value)| Some((name.to_string_lossy().into_owned(), value?.to_string_lossy().into_owned())))
+                .collect::<std::collections::HashMap<_, _>>();
+            let ssh = environment.get("GIT_SSH_COMMAND").unwrap();
+            assert!(!ssh.contains("SECRETKEYMATERIAL"));
+            assert!(ssh.contains("StrictHostKeyChecking=yes") && ssh.contains("IdentitiesOnly=yes"));
+            assert!(ssh.contains("BatchMode=yes") && ssh.contains("PasswordAuthentication=no"));
+            assert_eq!(environment.get("GIT_ALLOW_PROTOCOL").map(String::as_str), Some("ssh"));
+            let arguments = std_command
+                .get_args()
+                .map(|argument| argument.to_string_lossy().into_owned())
+                .collect::<Vec<_>>();
+            assert!(arguments.iter().any(|argument| argument == "protocol.ssh.allow=always"));
+            assert!(!arguments.iter().any(|argument| argument == "protocol.https.allow=always"));
+            let written = std::fs::read_to_string(directory.join("id")).unwrap();
+            assert!(written.contains("SECRETKEYMATERIAL") && written.ends_with("-----\n"));
+            assert!(directory.join("known_hosts").is_file());
+            assert!(!format!("{target:?}").contains("SECRETKEYMATERIAL"));
+        }
+        assert!(!directory.exists(), "the files are removed when the command is over");
+    }
+
+    #[test]
     fn a_credential_stays_out_of_arguments_and_messages() {
         let target = RemoteTarget {
             url: "https://github.com/acme/app.git".to_owned(),
             credential: Some(RemoteCredential::token(Some("x-access-token"), "ghp_supersecret")),
+            ssh: None,
         };
-        let command = remote_command(&target).unwrap();
+        let (command, _files) = remote_command(&target).unwrap();
         let std_command = command.as_std();
         let arguments = std_command
             .get_args()

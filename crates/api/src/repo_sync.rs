@@ -38,6 +38,10 @@ const MAX_PATTERNS: usize = 50;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct RemoteLink {
     pub(crate) url: String,
+    /// For an `ssh` address: the host's public key the connection is pinned
+    /// to, as pasted. Public, so it is kept here and not with the secret.
+    #[serde(default)]
+    pub(crate) host_key: Option<String>,
 }
 
 /// What a repository source keeps in `sources.metadata_json`.
@@ -230,7 +234,7 @@ impl RepoMemoCore {
         if settings.branch != current.settings.branch {
             match &current.remote {
                 Some(remote) => {
-                    let target = self.remote_target(source_id, &remote.url).await?;
+                    let target = self.remote_target(source_id, remote).await?;
                     repomemo_git::remote::remote_head(&target, settings.branch.as_deref()).await?;
                 }
                 None => {
@@ -305,7 +309,7 @@ impl RepoMemoCore {
         let metadata = RepoSourceMetadata::of(&source);
         if let Some(remote) = &metadata.remote {
             // One question to the host, no fetch: where the branch is now.
-            let target = self.remote_target(source_id, &remote.url).await?;
+            let target = self.remote_target(source_id, remote).await?;
             let head = repomemo_git::remote::remote_head(&target, metadata.settings.branch.as_deref()).await?;
             return Ok(RepoHead {
                 current: head.commit,
@@ -437,7 +441,7 @@ impl RepoMemoCore {
                 self.storage
                     .update_indexing_job(job_id, "running", "fetching_repository", 0, None)
                     .await?;
-                self.refresh_remote_clone(&source, &remote.url, metadata.settings.branch.as_deref())
+                self.refresh_remote_clone(&source, remote, metadata.settings.branch.as_deref())
                     .await
                     .with_context(|| format!("the repository at {root} could not be fetched"))?
             }

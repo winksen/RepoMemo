@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.2.20` (2026-10-15). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
+> **Scope:** reflects the code at `V0.2.21` (2026-10-15). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
 
 ---
 
@@ -508,13 +508,13 @@ The desktop app and the shared server keep **separate data**.
 
 ---
 
-## 13. Known functional gaps (at V0.2.20)
+## 13. Known functional gaps (at V0.2.21)
 
 These are observed in the code and are useful for prioritizing. The roadmap item that addresses each one is in brackets.
 
 | Gap | Impact |
 |---|---|
-| Repositories on a host need `https` and an allowed host | `https` links work since V0.2.20 (a read-only token for private ones); `ssh` and deploy keys come in V0.2.21 and clone limits in V0.2.22 [F4 phase 2]; pushes are noticed only by polling [F16, V0.2.23]. A file renamed and edited in one commit keeps its history since V0.1.73 when at least about half of it is unchanged. |
+| Repositories on a host need an allowed host | `https` links work since V0.2.20 (a read-only token for private ones) and `ssh` links since V0.2.21 (a deploy key and the pinned host key); clone limits come in V0.2.22 [F4 phase 2]; pushes are noticed only by polling [F16, V0.2.23]. A file renamed and edited in one commit keeps its history since V0.1.73 when at least about half of it is unchanged. |
 | The assistant does not remember the conversation | Follow-up questions must repeat their context [F5a, V0.2.32], and each workspace is searched on its own [F5b, V0.2.33]. |
 | Invitations and reset links are passed on by hand | Mail delivery exists since V0.2.9 (System › Settings › Mail); invitations are mailed since V0.2.10, "Forgot your password?" works by mail since V0.2.11 and task assignments and mentions are mailed since V0.2.12, and addresses are verified since V0.2.13 (an account that registered on an open server waits for its link before creating organizations or workspaces; an invitation counts), which is why registration is closed by default; the in-app reset notifications exist since V0.1.67 [F6 in V0.2.9–V0.2.12, F12 in V0.2.11, F13 in V0.2.13]. |
 | Issues and pull requests are not evidence | The discussion around the code stays in GitHub or GitLab [F17, V0.2.27–V0.2.31]. |

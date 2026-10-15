@@ -1084,7 +1084,7 @@ export function listSharedRepositories(accessToken: string, workspaceId: string)
 }
 
 /** A token for a private remote repository, sent once with the link and never returned. */
-export type RepositoryToken = { token?: string; token_username?: string };
+export type RepositoryToken = { token?: string; token_username?: string; deploy_key?: string; host_key?: string };
 
 export function checkSharedRepository(accessToken: string, workspaceId: string, input: { link: string } & RepositoryToken & RepoSettings): Promise<RepoAccessCheck> {
   return request<RepoAccessCheck>(`/v1/workspaces/${workspaceId}/repositories/check`, { method: "POST", body: JSON.stringify(input) }, accessToken);
@@ -1100,6 +1100,10 @@ export function updateSharedRepository(accessToken: string, repositoryId: string
 
 export function setSharedRepositoryToken(accessToken: string, repositoryId: string, input: { token: string; username?: string }): Promise<RepoSource> {
   return request<RepoSource>(`/v1/repositories/${repositoryId}/token`, { method: "PUT", body: JSON.stringify(input) }, accessToken);
+}
+
+export function setSharedRepositoryDeployKey(accessToken: string, repositoryId: string, input: { deploy_key: string; host_key?: string }): Promise<RepoSource> {
+  return request<RepoSource>(`/v1/repositories/${repositoryId}/deploy-key`, { method: "PUT", body: JSON.stringify(input) }, accessToken);
 }
 
 export function clearSharedRepositoryToken(accessToken: string, repositoryId: string): Promise<void> {
