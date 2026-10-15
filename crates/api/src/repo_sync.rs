@@ -33,36 +33,46 @@ const SKIP_EXAMPLES: usize = 5;
 const PROGRESS_EVERY: usize = 20;
 const MAX_PATTERNS: usize = 50;
 
+/// The address of a remote repository (V0.2.20). Its token, if it has one, is
+/// in the credential store, never here.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct RemoteLink {
+    pub(crate) url: String,
+}
+
 /// What a repository source keeps in `sources.metadata_json`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-struct RepoSourceMetadata {
+pub(crate) struct RepoSourceMetadata {
     #[serde(default)]
-    settings: RepoSettings,
+    pub(crate) settings: RepoSettings,
     #[serde(default)]
-    last_synced_commit: Option<RepoCommit>,
+    pub(crate) last_synced_commit: Option<RepoCommit>,
     #[serde(default)]
-    last_synced_at: Option<String>,
+    pub(crate) last_synced_at: Option<String>,
     #[serde(default)]
-    last_error: Option<String>,
+    pub(crate) last_error: Option<String>,
     #[serde(default)]
-    last_report: Option<RepoSyncReport>,
+    pub(crate) last_report: Option<RepoSyncReport>,
     /// What the repository held at the last complete sync.
     #[serde(default)]
-    overview: Option<RepoOverview>,
+    pub(crate) overview: Option<RepoOverview>,
     /// The artifact that stands for the whole repository.
     #[serde(default)]
-    overview_artifact_id: Option<String>,
+    pub(crate) overview_artifact_id: Option<String>,
     /// The last AI summary, kept until it is regenerated.
     #[serde(default)]
-    summary: Option<RepoSummary>,
+    pub(crate) summary: Option<RepoSummary>,
+    /// Set for a repository fetched from a host.
+    #[serde(default)]
+    pub(crate) remote: Option<RemoteLink>,
 }
 
 impl RepoSourceMetadata {
-    fn of(source: &Source) -> Self {
+    pub(crate) fn of(source: &Source) -> Self {
         serde_json::from_value(source.metadata.clone()).unwrap_or_default()
     }
 
-    fn to_value(&self) -> serde_json::Value {
+    pub(crate) fn to_value(&self) -> serde_json::Value {
         serde_json::to_value(self).unwrap_or_else(|_| json!({}))
     }
 }
@@ -128,6 +138,7 @@ impl RepoMemoCore {
         Ok(RepoAccessCheck {
             name: repo_name(repo.root()),
             root_path,
+            remote: false,
             commit: RepoCommit {
                 sha: info.sha,
                 summary: info.summary,
@@ -215,11 +226,20 @@ impl RepoMemoCore {
     ) -> Result<RepoSource> {
         let source = self.repo_source_row(source_id).await?;
         let settings = normalize_settings(settings)?;
-        if settings.branch != RepoSourceMetadata::of(&source).settings.branch {
-            let repo = self
-                .open_linked_repo(Path::new(source.root_uri.as_deref().unwrap_or_default()))
-                .await?;
-            repo.resolve_commit(settings.branch.as_deref()).await?;
+        let current = RepoSourceMetadata::of(&source);
+        if settings.branch != current.settings.branch {
+            match &current.remote {
+                Some(remote) => {
+                    let target = self.remote_target(source_id, &remote.url).await?;
+                    repomemo_git::remote::remote_head(&target, settings.branch.as_deref()).await?;
+                }
+                None => {
+                    let repo = self
+                        .open_linked_repo(Path::new(source.root_uri.as_deref().unwrap_or_default()))
+                        .await?;
+                    repo.resolve_commit(settings.branch.as_deref()).await?;
+                }
+            }
         }
         let name = name
             .map(|value| value.trim().to_owned())
@@ -266,7 +286,10 @@ impl RepoMemoCore {
     /// Disconnects a repository and deletes every file stored from it.
     pub async fn remove_repo_source(&self, source_id: &str) -> Result<()> {
         self.repo_source_row(source_id).await?;
-        self.storage.delete_source(source_id).await
+        self.storage.delete_source(source_id).await?;
+        // The server's copy of a remote repository goes with its link.
+        let _ = tokio::fs::remove_dir_all(self.remote_clone_dir(source_id)).await;
+        Ok(())
     }
 
     pub async fn list_repo_files(&self, source_id: &str) -> Result<Vec<RepoFile>> {
@@ -280,6 +303,15 @@ impl RepoMemoCore {
     pub async fn repo_head(&self, source_id: &str) -> Result<RepoHead> {
         let source = self.repo_source_row(source_id).await?;
         let metadata = RepoSourceMetadata::of(&source);
+        if let Some(remote) = &metadata.remote {
+            // One question to the host, no fetch: where the branch is now.
+            let target = self.remote_target(source_id, &remote.url).await?;
+            let head = repomemo_git::remote::remote_head(&target, metadata.settings.branch.as_deref()).await?;
+            return Ok(RepoHead {
+                current: head.commit,
+                last_synced: metadata.last_synced_commit.map(|commit| commit.sha),
+            });
+        }
         let repo = self
             .open_linked_repo(Path::new(source.root_uri.as_deref().unwrap_or_default()))
             .await?;
@@ -304,7 +336,7 @@ impl RepoMemoCore {
             .any(|prefix| lower.starts_with(prefix));
         if is_url {
             repomemo_domain::bail_invalid!(
-                "Remote repository links are not supported yet. Enter the folder of a checkout on the server, such as C:\\code\\my-repo or /srv/code/my-repo."
+                "This is the address of a remote repository. Enter the folder of a checkout on the server, such as C:\\code\\my-repo or /srv/code/my-repo."
             );
         }
         let path = PathBuf::from(link.strip_prefix("file://").unwrap_or(link));
@@ -400,10 +432,20 @@ impl RepoMemoCore {
             .update_indexing_job(job_id, "running", "reading_repository", 0, None)
             .await?;
 
-        let repo = self
-            .open_linked_repo(Path::new(&root))
-            .await
-            .with_context(|| format!("the repository at {root} could not be opened"))?;
+        let repo = match &metadata.remote {
+            Some(remote) => {
+                self.storage
+                    .update_indexing_job(job_id, "running", "fetching_repository", 0, None)
+                    .await?;
+                self.refresh_remote_clone(&source, &remote.url, metadata.settings.branch.as_deref())
+                    .await
+                    .with_context(|| format!("the repository at {root} could not be fetched"))?
+            }
+            None => self
+                .open_linked_repo(Path::new(&root))
+                .await
+                .with_context(|| format!("the repository at {root} could not be opened"))?,
+        };
         let branch = metadata.settings.branch.clone();
         let commit = repo.resolve_commit(branch.as_deref()).await?;
         let info = repo.commit_info(&commit).await?;
@@ -786,7 +828,7 @@ impl RepoMemoCore {
         })
     }
 
-    async fn repo_source_row(&self, source_id: &str) -> Result<Source> {
+    pub(crate) async fn repo_source_row(&self, source_id: &str) -> Result<Source> {
         let source = self.storage.get_source(source_id).await?;
         if !matches!(source.source_type, SourceType::GitRepo) {
             repomemo_domain::bail_not_found!("Source was not found.");
@@ -802,11 +844,22 @@ impl RepoMemoCore {
             .latest_source_job(&source.id, REPO_SYNC_JOB_KIND)
             .await?
             .filter(|job| job.status == "running");
+        let remote = metadata.remote.is_some();
+        let has_credential = remote
+            && self
+                .storage
+                .repo_credential_info(&source.id)
+                .await
+                .ok()
+                .flatten()
+                .is_some();
         Ok(RepoSource {
             id: source.id,
             workspace_id: source.workspace_id,
             name: source.name,
             root_path: source.root_uri.unwrap_or_default(),
+            remote,
+            has_credential,
             settings: metadata.settings,
             status: source.status,
             last_synced_commit: metadata.last_synced_commit,
@@ -855,7 +908,7 @@ fn repo_name(root: &Path) -> String {
         .to_owned()
 }
 
-fn normalize_settings(settings: RepoSettings) -> Result<RepoSettings> {
+pub(crate) fn normalize_settings(settings: RepoSettings) -> Result<RepoSettings> {
     let clean = |patterns: Vec<String>| -> Result<Vec<String>> {
         let patterns = patterns
             .into_iter()

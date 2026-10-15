@@ -457,8 +457,18 @@ export interface RepoSource {
   id: string;
   workspace_id: string;
   name: string;
-  /** Repository root on the server's disk. */
+  /**
+   * Repository root on the server's disk, or the address of a remote
+   * repository.
+   */
   root_path: string;
+  /**
+   * The repository is fetched from a host over `https`: `root_path` is its
+   * address, and the server keeps a partial clone of it.
+   */
+  remote: boolean;
+  /** A remote repository has a token stored (never shown). */
+  has_credential: boolean;
   settings: RepoSettings;
   /** `pending` (never synced), `syncing`, `ready` or `error`. */
   status: string;
@@ -555,6 +565,11 @@ export interface RepoDetail {
 export interface RepoAccessCheck {
   /** The repository root the link resolves to. */
   root_path: string;
+  /**
+   * The link is a remote repository: nothing was fetched, so the commit
+   * has only its id and the file counts are zero until the first sync.
+   */
+  remote: boolean;
   /** The name the repository gets unless another is chosen. */
   name: string;
   /** The commit a sync would read. */

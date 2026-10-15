@@ -2,8 +2,17 @@ use repomemo_server::{init_logging, router, serve, ServerConfig};
 use tokio::net::TcpListener;
 use tracing::info;
 
+fn main() {
+    // git runs this program as its credential helper when it fetches a remote
+    // repository with a token: answer it and leave, without starting a server.
+    if repomemo_git::remote::run_as_askpass_if_requested() {
+        return;
+    }
+    run();
+}
+
 #[tokio::main]
-async fn main() {
+async fn run() {
     // Console, in-memory buffer for System › Logs and optional daily files;
     // levels and format follow the environment until a system administrator
     // changes them in System › Settings.

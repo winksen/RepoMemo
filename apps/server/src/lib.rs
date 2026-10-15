@@ -695,6 +695,10 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         )
         .route("/v1/repositories/{source_id}/sync", post(repositories::sync_repository))
         .route(
+            "/v1/repositories/{source_id}/token",
+            put(repositories::set_repository_token).delete(repositories::clear_repository_token),
+        )
+        .route(
             "/v1/repositories/{source_id}/files",
             get(repositories::list_repository_files),
         )

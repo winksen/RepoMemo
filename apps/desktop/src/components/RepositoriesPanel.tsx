@@ -17,11 +17,13 @@ import {
 import {
   cancelSharedJob,
   checkSharedRepository,
+  clearSharedRepositoryToken,
   connectSharedRepository,
   deleteSharedRepository,
   getSharedRepositoryDetail,
   listSharedRepositories,
   listSharedRepositoryFiles,
+  setSharedRepositoryToken,
   summarizeSharedRepository,
   syncSharedRepository,
   updateSharedRepository,
@@ -46,6 +48,7 @@ const FILE_LIST_LIMIT = 300;
 
 const STAGE_LABEL: Record<string, string> = {
   queued: "Waiting for another sync to finish",
+  fetching_repository: "Fetching from the host",
   reading_repository: "Reading the repository",
   storing_files: "Storing changed files",
   indexing: "Indexing",
@@ -58,9 +61,20 @@ const STATUS_LABEL: Record<RepoSource["status"], string> = {
   error: "Sync failed",
 };
 
-type RepoForm = { link: string; name: string; branch: string; include: string; exclude: string };
+type RepoForm = { link: string; name: string; branch: string; include: string; exclude: string; token: string; tokenUsername: string };
 
-const EMPTY_FORM: RepoForm = { link: "", name: "", branch: "", include: "", exclude: "" };
+const EMPTY_FORM: RepoForm = { link: "", name: "", branch: "", include: "", exclude: "", token: "", tokenUsername: "" };
+
+/** An address of a repository on a host, as opposed to a folder on the server. */
+function isRemoteLink(link: string) {
+  return /^(https?|ssh|git):\/\//i.test(link.trim()) || /^[^\s\\/]+@[^\s/]+:/.test(link.trim());
+}
+
+/** What the server is given for a token: nothing when none was typed. */
+function formToken(form: RepoForm) {
+  const token = form.token.trim();
+  return token ? { token, token_username: form.tokenUsername.trim() || undefined } : {};
+}
 
 function formatDate(value: string) {
   const date = new Date(value);
@@ -268,14 +282,14 @@ export function RepositorySettings({
   const [editForm, setEditForm] = useState<RepoForm>(EMPTY_FORM);
   const [removing, setRemoving] = useState<RepoSource | null>(null);
 
-  const formKey = JSON.stringify([form.link.trim(), formSettings(form)]);
+  const formKey = JSON.stringify([form.link.trim(), formSettings(form), form.token, form.tokenUsername]);
   const checkIsCurrent = check !== null && checkedFor === formKey;
 
   async function runCheck(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
     try {
-      const result = await checkSharedRepository(accessToken, workspaceId, { link: form.link.trim(), ...formSettings(form) });
+      const result = await checkSharedRepository(accessToken, workspaceId, { link: form.link.trim(), ...formToken(form), ...formSettings(form) });
       setCheck(result);
       setCheckedFor(formKey);
     } catch (error) {
@@ -292,6 +306,7 @@ export function RepositorySettings({
       const { repository, job } = await connectSharedRepository(accessToken, workspaceId, {
         link: form.link.trim(),
         name: form.name.trim() || undefined,
+        ...formToken(form),
         ...formSettings(form),
       });
       track(repository.id, job?.id);
@@ -313,6 +328,8 @@ export function RepositorySettings({
       branch: repository.settings.branch ?? "",
       include: repository.settings.include.join("\n"),
       exclude: repository.settings.exclude.join("\n"),
+      token: "",
+      tokenUsername: "",
     });
     setEditing(repository);
   }
@@ -322,12 +339,29 @@ export function RepositorySettings({
     if (!editing) return;
     setBusy(true);
     try {
+      if (editing.remote && editForm.token.trim()) {
+        await setSharedRepositoryToken(accessToken, editing.id, { token: editForm.token.trim(), username: editForm.tokenUsername.trim() || undefined });
+      }
       await updateSharedRepository(accessToken, editing.id, { name: editForm.name.trim() || undefined, ...formSettings(editForm) });
       setEditing(null);
       showToast("success", "Settings saved. They apply from the next sync.");
       await load();
     } catch (error) {
       showToast("error", errorMessage(error, "The settings could not be saved."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removeToken(repository: RepoSource) {
+    setBusy(true);
+    try {
+      await clearSharedRepositoryToken(accessToken, repository.id);
+      setEditing(null);
+      showToast("success", `The token of ${repository.name} was removed. It is fetched without signing in from the next sync.`);
+      await load();
+    } catch (error) {
+      showToast("error", errorMessage(error, "The token could not be removed."));
     } finally {
       setBusy(false);
     }
@@ -357,7 +391,7 @@ export function RepositorySettings({
         <div>
           <strong>{repository.name}</strong>
           <code className="rm-repo-path">{repository.root_path}</code>
-          <span className="rm-map-muted">{repository.settings.branch ? `Branch ${repository.settings.branch}` : "Follows the checked-out branch"}{repository.settings.include.length ? ` · ${repository.settings.include.length} include` : ""}{repository.settings.exclude.length ? ` · ${repository.settings.exclude.length} exclude` : ""} · {STATUS_LABEL[repository.active_job ? "syncing" : repository.status]}</span>
+          <span className="rm-map-muted">{repository.remote ? (repository.has_credential ? "Remote · with a token · " : "Remote · no token · ") : ""}{repository.settings.branch ? `Branch ${repository.settings.branch}` : repository.remote ? "Follows the default branch" : "Follows the checked-out branch"}{repository.settings.include.length ? ` · ${repository.settings.include.length} include` : ""}{repository.settings.exclude.length ? ` · ${repository.settings.exclude.length} exclude` : ""} · {STATUS_LABEL[repository.active_job ? "syncing" : repository.status]}</span>
         </div>
         <div className="rm-health-actions">
           <Button disabled={Boolean(repository.active_job)} onClick={() => startEditing(repository)} type="button" variant="secondary"><Pencil size={15} /> Edit</Button>
@@ -385,7 +419,8 @@ export function RepositorySettings({
       title={`Edit ${editing.name}`}
     >
       <form className="rm-repo-form" id="rm-repo-edit-form" onSubmit={saveEdit}>
-        <RepositoryFields form={editForm} onChange={setEditForm} showLink={false} />
+        <RepositoryFields form={editForm} onChange={setEditForm} remote={editing.remote} replacingToken showLink={false} />
+        {editing.remote && editing.has_credential ? <div><Button disabled={busy} onClick={() => void removeToken(editing)} type="button" variant="secondary">Remove the token</Button></div> : null}
       </form>
     </Dialog> : null}
 
@@ -401,12 +436,16 @@ export function RepositorySettings({
 
 function RepositoryCheckResult({ check }: { check: RepoAccessCheck }) {
   return <div className="rm-repo-check">
-    <strong><CircleCheck size={16} /> The server can read this repository</strong>
+    <strong><CircleCheck size={16} /> {check.remote ? "The host answered: the server can reach this repository" : "The server can read this repository"}</strong>
     <dl className="rm-repo-facts">
       <div><dt>Repository</dt><dd>{check.name} <code className="rm-repo-path">{check.root_path}</code></dd></div>
       <div><dt><GitBranch size={14} /> Branch</dt><dd>{check.commit.branch ?? <span className="rm-map-muted">Detached HEAD</span>}</dd></div>
-      <div><dt><GitCommit size={14} /> Commit</dt><dd><code>{check.commit.sha.slice(0, 7)}</code> {check.commit.summary} <span className="rm-map-muted">· {check.commit.author_name} · {formatDate(check.commit.committed_at)}</span></dd></div>
-      <div><dt>Files</dt><dd>About {check.indexable_files.toLocaleString()} of {check.tracked_files.toLocaleString()} committed files will be indexed</dd></div>
+      {check.remote
+        ? <div><dt><GitCommit size={14} /> Commit</dt><dd><code>{check.commit.sha.slice(0, 7)}</code> <span className="rm-map-muted">· the files are counted after the first sync, which clones the repository</span></dd></div>
+        : <>
+          <div><dt><GitCommit size={14} /> Commit</dt><dd><code>{check.commit.sha.slice(0, 7)}</code> {check.commit.summary} <span className="rm-map-muted">· {check.commit.author_name} · {formatDate(check.commit.committed_at)}</span></dd></div>
+          <div><dt>Files</dt><dd>About {check.indexable_files.toLocaleString()} of {check.tracked_files.toLocaleString()} committed files will be indexed</dd></div>
+        </>}
     </dl>
     {check.already_connected ? <span className="rm-map-muted">This repository is already linked to the workspace.</span> : null}
   </div>;
@@ -416,17 +455,33 @@ function RepositoryFields({
   form,
   onChange,
   showLink,
+  remote = false,
+  replacingToken = false,
 }: {
   form: RepoForm;
   onChange: (form: RepoForm) => void;
   showLink: boolean;
+  /** The repository is a remote one (an existing link, in the edit form). */
+  remote?: boolean;
+  replacingToken?: boolean;
 }) {
   const set = (key: keyof RepoForm) => (event: { target: { value: string } }) => onChange({ ...form, [key]: event.target.value });
+  const asksForToken = showLink ? isRemoteLink(form.link) : remote;
   return <>
     {showLink ? <label>Repository link
-      <Input onChange={set("link")} placeholder="C:\code\my-repo or /srv/code/my-repo" value={form.link} />
-      <span className="rm-map-muted">A folder on the server, anywhere inside the repository. Remote URLs are not supported yet.</span>
+      <Input onChange={set("link")} placeholder="C:\code\my-repo, /srv/code/my-repo or https://github.com/acme/app.git" value={form.link} />
+      <span className="rm-map-muted">A folder on the server, anywhere inside the repository, or the https address of a repository on a host the server operator allows.</span>
     </label> : null}
+    {asksForToken ? <div className="rm-repo-form-row">
+      <label>{replacingToken ? "New access token" : "Access token"}
+        <Input autoComplete="off" onChange={set("token")} placeholder={replacingToken ? "Leave empty to keep the current token" : "Only for a private repository"} type="password" value={form.token} />
+        <span className="rm-map-muted">A read-only token. It is stored encrypted and never shown again.</span>
+      </label>
+      <label>Token account name
+        <Input autoComplete="off" onChange={set("tokenUsername")} placeholder="x-access-token" value={form.tokenUsername} />
+        <span className="rm-map-muted">Optional; <code>oauth2</code> for GitLab.</span>
+      </label>
+    </div> : null}
     <div className="rm-repo-form-row">
       <label>Name<Input onChange={set("name")} placeholder={showLink ? "The folder name" : ""} value={form.name} /></label>
       <label>Branch<Input onChange={set("branch")} placeholder="The checked-out branch" value={form.branch} /></label>

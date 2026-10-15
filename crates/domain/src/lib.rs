@@ -532,8 +532,16 @@ pub struct RepoSource {
     pub id: String,
     pub workspace_id: String,
     pub name: String,
-    /// Repository root on the server's disk.
+    /// Repository root on the server's disk, or the address of a remote
+    /// repository.
     pub root_path: String,
+    /// The repository is fetched from a host over `https`: `root_path` is its
+    /// address, and the server keeps a partial clone of it.
+    #[serde(default)]
+    pub remote: bool,
+    /// A remote repository has a token stored (never shown).
+    #[serde(default)]
+    pub has_credential: bool,
     pub settings: RepoSettings,
     /// `pending` (never synced), `syncing`, `ready` or `error`.
     pub status: String,
@@ -636,6 +644,10 @@ pub struct RepoDetail {
 pub struct RepoAccessCheck {
     /// The repository root the link resolves to.
     pub root_path: String,
+    /// The link is a remote repository: nothing was fetched, so the commit
+    /// has only its id and the file counts are zero until the first sync.
+    #[serde(default)]
+    pub remote: bool,
     /// The name the repository gets unless another is chosen.
     pub name: String,
     /// The commit a sync would read.

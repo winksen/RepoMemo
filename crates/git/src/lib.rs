@@ -13,6 +13,8 @@
 //! `safe.directory` ownership check, which would otherwise have come from the
 //! global configuration.
 
+pub mod remote;
+
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::OnceLock;
@@ -43,6 +45,9 @@ pub struct CommitInfo {
 #[derive(Debug, Clone)]
 pub struct GitRepo {
     root: PathBuf,
+    /// A bare, partial clone of a remote repository (see [`remote`]): blobs
+    /// over the limit are not here, and sizes are read without fetching them.
+    partial: bool,
 }
 
 impl GitRepo {
@@ -89,6 +94,32 @@ impl GitRepo {
         }
         Ok(Self {
             root: PathBuf::from(root),
+            partial: false,
+        })
+    }
+
+    /// Opens the bare, partial clone the server keeps for a remote link. It is
+    /// read like any other repository, but never reaches the network: the
+    /// objects it needs are there, and sizes of the ones that are not are
+    /// reported as unknown.
+    pub async fn open_bare(path: &Path) -> Result<Self> {
+        if !path.is_dir() {
+            repomemo_domain::bail_not_found!("The server's copy of this repository is not there yet.");
+        }
+        let output = git_command(path)
+            .args(["rev-parse", "--is-bare-repository"])
+            .output()
+            .await
+            .context("git could not be started")?;
+        if !output.status.success() || String::from_utf8_lossy(&output.stdout).trim() != "true" {
+            bail!(
+                "the server's copy of this repository is not usable: {}",
+                stderr_text(&output.stderr)
+            );
+        }
+        Ok(Self {
+            root: path.to_path_buf(),
+            partial: true,
         })
     }
 
@@ -179,6 +210,9 @@ impl GitRepo {
     /// Every regular file in the commit's tree. Symbolic links and submodules
     /// are left out because they have no content of their own to index.
     pub async fn list_files(&self, commit: &str) -> Result<Vec<TreeFile>> {
+        if self.partial {
+            return self.list_files_partial(commit).await;
+        }
         let output = git_command(&self.root)
             .args(["ls-tree", "-r", "-z", "-l", "--full-tree", commit])
             .output()
@@ -187,6 +221,74 @@ impl GitRepo {
             bail!("git ls-tree failed: {}", stderr_text(&output.stderr));
         }
         parse_ls_tree(&output.stdout)
+    }
+
+    /// The same for a partial clone: names first, then sizes from the object
+    /// store with no fetching. A blob that was left on the host has an unknown
+    /// size, reported as the largest possible so the sync skips it as too big.
+    async fn list_files_partial(&self, commit: &str) -> Result<Vec<TreeFile>> {
+        let output = git_command(&self.root)
+            .args(["ls-tree", "-r", "-z", "--full-tree", commit])
+            .output()
+            .await?;
+        if !output.status.success() {
+            bail!("git ls-tree failed: {}", stderr_text(&output.stderr));
+        }
+        let mut entries = Vec::new();
+        for record in output.stdout.split(|byte| *byte == 0).filter(|record| !record.is_empty()) {
+            let record = std::str::from_utf8(record).context("git returned a non UTF-8 path")?;
+            // "<mode> <type> <object>\t<path>"
+            let (meta, path) = record
+                .split_once('\t')
+                .ok_or_else(|| anyhow!("unexpected git ls-tree line: {record}"))?;
+            let fields = meta.split_whitespace().collect::<Vec<_>>();
+            let [mode, kind, object] = fields.as_slice() else {
+                bail!("unexpected git ls-tree line: {record}");
+            };
+            if *kind == "blob" && matches!(*mode, "100644" | "100755") {
+                entries.push((path.to_owned(), (*object).to_owned()));
+            }
+        }
+        if entries.is_empty() {
+            return Ok(Vec::new());
+        }
+        let mut child = git_command(&self.root)
+            .args(["cat-file", "--batch-check"])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .kill_on_drop(true)
+            .spawn()
+            .context("failed to start git cat-file")?;
+        let mut stdin = child.stdin.take().context("git cat-file has no stdin")?;
+        let objects = entries.iter().map(|(_, object)| object.clone()).collect::<Vec<_>>();
+        let writer = tokio::spawn(async move {
+            for object in objects {
+                if stdin.write_all(format!("{object}\n").as_bytes()).await.is_err() {
+                    break;
+                }
+            }
+            let _ = stdin.shutdown().await;
+        });
+        let mut reader = BufReader::new(child.stdout.take().context("git cat-file has no stdout")?);
+        let mut files = Vec::with_capacity(entries.len());
+        for (path, object) in entries {
+            let mut line = String::new();
+            reader.read_line(&mut line).await?;
+            // "<sha> <type> <size>" or "<sha> missing"
+            let size = match line.split_whitespace().collect::<Vec<_>>().as_slice() {
+                [_, "blob", size] => size.parse().unwrap_or(u64::MAX),
+                _ => u64::MAX,
+            };
+            files.push(TreeFile {
+                path,
+                blob_sha: object,
+                size_bytes: size,
+            });
+        }
+        let _ = writer.await;
+        let _ = child.wait().await;
+        Ok(files)
     }
 
     /// Files renamed between two commits, as `(old path, new path)`, found by
@@ -318,6 +420,8 @@ fn git_command(directory: &Path) -> Command {
         .args(["-c", "core.fsmonitor=false", "-c", "core.quotepath=off"])
         .env("GIT_TERMINAL_PROMPT", "0")
         .env("GIT_OPTIONAL_LOCKS", "0")
+        // Reading a partial clone never goes to the network on its own.
+        .env("GIT_NO_LAZY_FETCH", "1")
         .stdin(Stdio::null());
     if let Some(hardening) = HARDENING.get() {
         // Only reading local objects is ever needed: no transport, no
@@ -505,6 +609,53 @@ mod tests {
             .collect::<std::collections::HashMap<_, _>>();
         assert_eq!(envs.get("GIT_CONFIG_NOSYSTEM").map(String::as_str), Some("1"));
         assert_eq!(envs.get("GIT_CONFIG_GLOBAL").map(String::as_str), Some(null_device()));
+    }
+
+    #[tokio::test]
+    async fn a_bare_partial_clone_is_read_like_any_repository() {
+        let base = std::env::temp_dir().join(format!(
+            "repomemo-git-partial-{}",
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+        ));
+        let source = base.join("source");
+        let clone = base.join("clone.git");
+        std::fs::create_dir_all(&source).unwrap();
+        git(&source, &["init", "--quiet", "--initial-branch=main"]);
+        git(&source, &["config", "uploadpack.allowFilter", "true"]);
+        git(&source, &["config", "uploadpack.allowAnySHA1InWant", "true"]);
+        std::fs::write(source.join("small.md"), "# Small\n").unwrap();
+        std::fs::write(source.join("big.txt"), "x".repeat(4096)).unwrap();
+        git(&source, &["add", "."]);
+        git(&source, &["commit", "--quiet", "-m", "Initial commit"]);
+
+        // A blobless-over-a-limit clone, the shape the server keeps.
+        let status = std::process::Command::new("git")
+            .args(["clone", "--quiet", "--bare", "--no-local", "--filter=blob:limit=100", "--"])
+            .arg(format!("file://{}", source.to_string_lossy().replace('\\', "/")))
+            .arg(&clone)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .unwrap();
+        if !status.success() {
+            // A git too old for partial clones: nothing to check here.
+            let _ = std::fs::remove_dir_all(base);
+            return;
+        }
+
+        assert!(GitRepo::open(&clone).await.is_err(), "a bare repository is not a checkout");
+        let repo = GitRepo::open_bare(&clone).await.unwrap();
+        assert_eq!(repo.current_branch().await.unwrap().as_deref(), Some("main"));
+        let head = repo.resolve_commit(Some("main")).await.unwrap();
+        let files = repo.list_files(&head).await.unwrap();
+        let paths = files.iter().map(|file| file.path.as_str()).collect::<Vec<_>>();
+        assert_eq!(paths, vec!["big.txt", "small.md"]);
+        let small = files.iter().find(|file| file.path == "small.md").unwrap();
+        assert_eq!(small.size_bytes, 8);
+        let mut reader = repo.blob_reader().await.unwrap();
+        assert_eq!(reader.read(&small.blob_sha).await.unwrap(), b"# Small\n");
+        assert!(GitRepo::open_bare(&base.join("missing.git")).await.is_err());
+        let _ = std::fs::remove_dir_all(base);
     }
 
     #[test]

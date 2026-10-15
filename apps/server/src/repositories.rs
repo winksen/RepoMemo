@@ -290,10 +290,23 @@ pub(crate) struct RepositoriesResponse {
     repositories: Vec<RepoSource>,
 }
 
+/// A token as it arrives: it prints as nothing, so a request that is logged
+/// or put in an error cannot show it.
+#[derive(Deserialize)]
+#[serde(transparent)]
+pub(crate) struct SecretText(String);
+
+impl std::fmt::Debug for SecretText {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("<hidden>")
+    }
+}
+
 /// A repository link with the settings it would be indexed with.
 #[derive(Debug, Deserialize)]
 pub(crate) struct RepositoryLinkRequest {
-    /// A folder on the server, anywhere inside the repository.
+    /// A folder on the server, anywhere inside the repository, or the
+    /// `https` address of a repository on a host.
     #[serde(alias = "path")]
     link: String,
     name: Option<String>,
@@ -302,6 +315,27 @@ pub(crate) struct RepositoryLinkRequest {
     include: Vec<String>,
     #[serde(default)]
     exclude: Vec<String>,
+    /// A read-only token for a private remote repository.
+    #[serde(default)]
+    token: Option<SecretText>,
+    /// The account name that goes with the token, when the host wants one.
+    #[serde(default)]
+    token_username: Option<String>,
+}
+
+impl RepositoryLinkRequest {
+    fn token(&self) -> Option<repomemo_api::RemoteToken> {
+        self.token
+            .as_ref()
+            .and_then(|token| repomemo_api::RemoteToken::new(self.token_username.clone(), token.0.clone()))
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct RepositoryTokenRequest {
+    token: SecretText,
+    #[serde(default)]
+    username: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -343,17 +377,22 @@ pub(crate) async fn check_repository(
     Json(request): Json<RepositoryLinkRequest>,
 ) -> Result<Json<RepoAccessCheck>, ApiError> {
     require_workspace_admin(&state, &subject, &workspace_id).await?;
+    let settings = RepoSettings {
+        branch: request.branch.clone(),
+        include: request.include.clone(),
+        exclude: request.exclude.clone(),
+    };
+    if repomemo_api::looks_remote(&request.link) {
+        return state
+            .core
+            .check_remote_repo_link(&workspace_id, &request.link, settings, request.token())
+            .await
+            .map(Json)
+            .map_err(map_repo_error);
+    }
     state
         .core
-        .check_repo_link(
-            &workspace_id,
-            &request.link,
-            RepoSettings {
-                branch: request.branch,
-                include: request.include,
-                exclude: request.exclude,
-            },
-        )
+        .check_repo_link(&workspace_id, &request.link, settings)
         .await
         .map(Json)
         .map_err(map_repo_error)
@@ -366,20 +405,31 @@ pub(crate) async fn connect_repository(
     Json(request): Json<RepositoryLinkRequest>,
 ) -> Result<(StatusCode, Json<RepositorySyncResponse>), ApiError> {
     require_workspace_admin(&state, &subject, &workspace_id).await?;
-    let repository = state
-        .core
-        .connect_local_repo(
-            &workspace_id,
-            &request.link,
-            request.name,
-            RepoSettings {
-                branch: request.branch,
-                include: request.include,
-                exclude: request.exclude,
-            },
-        )
-        .await
-        .map_err(map_repo_error)?;
+    let settings = RepoSettings {
+        branch: request.branch.clone(),
+        include: request.include.clone(),
+        exclude: request.exclude.clone(),
+    };
+    let repository = if repomemo_api::looks_remote(&request.link) {
+        state
+            .core
+            .connect_remote_repo(
+                &workspace_id,
+                &request.link,
+                request.name.clone(),
+                settings,
+                request.token(),
+                Some(&subject.user_id),
+            )
+            .await
+            .map_err(map_repo_error)?
+    } else {
+        state
+            .core
+            .connect_local_repo(&workspace_id, &request.link, request.name.clone(), settings)
+            .await
+            .map_err(map_repo_error)?
+    };
     record_workspace_activity(
         &state,
         &workspace_id,
@@ -471,6 +521,64 @@ pub(crate) async fn delete_repository(
             "Removed repository {} and its {} files.",
             repository.name, repository.file_count
         ),
+    )
+    .await;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// Replaces the token of a remote repository. The new one is tried against
+/// the host first, and nothing about it is ever returned.
+pub(crate) async fn set_repository_token(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(source_id): Path<String>,
+    Json(request): Json<RepositoryTokenRequest>,
+) -> Result<Json<RepoSource>, ApiError> {
+    let repository = load_repository(&state, &source_id).await?;
+    require_workspace_admin(&state, &subject, &repository.workspace_id).await?;
+    let token = repomemo_api::RemoteToken::new(request.username, request.token.0)
+        .ok_or_else(|| ApiError::bad_request("Enter the token."))?;
+    state
+        .core
+        .set_repo_token(&source_id, token, Some(&subject.user_id))
+        .await
+        .map_err(map_repo_error)?;
+    record_workspace_activity(
+        &state,
+        &repository.workspace_id,
+        &subject.user_id,
+        "repository_token_changed",
+        "repository",
+        Some(&source_id),
+        format!("Replaced the access token of repository {}.", repository.name),
+    )
+    .await;
+    state
+        .core
+        .repo_source(&source_id)
+        .await
+        .map(Json)
+        .map_err(map_repo_error)
+}
+
+pub(crate) async fn clear_repository_token(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(source_id): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    let repository = load_repository(&state, &source_id).await?;
+    require_workspace_admin(&state, &subject, &repository.workspace_id).await?;
+    if !state.core.clear_repo_token(&source_id).await.map_err(map_repo_error)? {
+        return Err(ApiError::not_found("This repository has no token."));
+    }
+    record_workspace_activity(
+        &state,
+        &repository.workspace_id,
+        &subject.user_id,
+        "repository_token_removed",
+        "repository",
+        Some(&source_id),
+        format!("Removed the access token of repository {}.", repository.name),
     )
     .await;
     Ok(StatusCode::NO_CONTENT)

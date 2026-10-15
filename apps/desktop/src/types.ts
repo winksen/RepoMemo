@@ -487,7 +487,12 @@ export interface RepoSource {
   id: string;
   workspace_id: string;
   name: string;
+  /** A folder on the server, or the address of a remote repository. */
   root_path: string;
+  /** Fetched from a host over https; the server keeps a partial clone. */
+  remote: boolean;
+  /** A remote repository has a token stored (never shown). */
+  has_credential: boolean;
   settings: RepoSettings;
   status: "pending" | "syncing" | "ready" | "error";
   last_synced_commit: RepoCommit | null;

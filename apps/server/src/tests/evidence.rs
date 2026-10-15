@@ -326,7 +326,7 @@ async fn workspace_repository_links_are_checked_then_synced_in_the_background() 
     for (link, expected) in [
         (
             "https://github.com/example/payments.git".to_owned(),
-            "not supported yet",
+            "REPOMEMO_GIT_ALLOWED_HOSTS",
         ),
         (
             base.join("repos").join("missing").display().to_string(),
@@ -1387,4 +1387,84 @@ async fn office_files_are_rendered_to_a_cached_pdf() {
         to_bytes(pdf.into_body(), usize::MAX).await.unwrap(),
         "pretend this is a Word file".as_bytes()
     );
+}
+
+#[tokio::test]
+async fn remote_links_are_off_until_hosts_are_named_and_a_token_is_never_echoed() {
+    let data_dir = temp_data_dir("remote-links");
+    let call = |app: &axum::Router, method: &'static str, uri: String, who: String, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, &who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+
+    // Off by default: the answer names the setting that turns it on.
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let (owner, _) = register_account(&app, "remote-owner@example.com").await;
+    let workspace_id = create_workspace(&app, &owner).await;
+    let off = call(
+        &app,
+        "POST",
+        format!("/v1/workspaces/{workspace_id}/repositories/check"),
+        owner.clone(),
+        json!({"link": "https://github.com/acme/app.git", "token": "ghp_neverechoed"}),
+    )
+    .await;
+    assert_eq!(off.status(), 400);
+    let body = response_json(off).await.to_string();
+    assert!(body.contains("REPOMEMO_GIT_ALLOWED_HOSTS"), "{body}");
+    assert!(!body.contains("ghp_neverechoed"));
+    drop(app);
+
+    // With hosts named, anything else is refused before the network is touched.
+    let mut config = ServerConfig::for_test(data_dir.clone());
+    config.git_allowed_hosts = vec!["github.com".to_owned(), "127.0.0.1".to_owned()];
+    let app = router(config).await.unwrap();
+    let (owner, _) = register_account(&app, "remote-owner2@example.com").await;
+    let workspace_id = create_workspace(&app, &owner).await;
+    for (link, expected) in [
+        ("https://gitlab.com/acme/app.git", "github.com"),
+        ("http://github.com/acme/app.git", "https and ssh"),
+        ("https://user:secret@github.com/acme/app.git", "credentials"),
+        ("ssh://git@github.com/acme/app.git", "https addresses"),
+    ] {
+        let refused = call(
+            &app,
+            "POST",
+            format!("/v1/workspaces/{workspace_id}/repositories/check"),
+            owner.clone(),
+            json!({"link": link}),
+        )
+        .await;
+        assert_eq!(refused.status(), 400, "{link}");
+        let message = response_json(refused).await.to_string();
+        assert!(message.contains(expected), "{link}: {message}");
+    }
+
+    // An allowed host that does not answer: the link is not stored and the
+    // token appears nowhere in the answer.
+    let unreachable = call(
+        &app,
+        "POST",
+        format!("/v1/workspaces/{workspace_id}/repositories"),
+        owner.clone(),
+        json!({"link": "https://127.0.0.1:9/acme/app.git", "token": "ghp_neverechoed", "token_username": "oauth2"}),
+    )
+    .await;
+    assert_eq!(unreachable.status(), 400);
+    let message = response_json(unreachable).await.to_string();
+    assert!(!message.contains("ghp_neverechoed"), "{message}");
+    let listed = response_json(
+        call(
+            &app,
+            "GET",
+            format!("/v1/workspaces/{workspace_id}/repositories"),
+            owner.clone(),
+            json!({}),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(listed["repositories"].as_array().unwrap().len(), 0);
+    let _ = std::fs::remove_dir_all(data_dir);
 }

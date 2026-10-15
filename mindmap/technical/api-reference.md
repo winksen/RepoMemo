@@ -189,6 +189,8 @@
 | GET | `/v1/repositories/{source_id}` | auth | require_workspace_read | — | RepoSource |
 | PUT | `/v1/repositories/{source_id}` | auth | require_workspace_admin | UpdateRepositoryRequest | RepoSource |
 | DELETE | `/v1/repositories/{source_id}` | auth | require_workspace_admin | — | status |
+| PUT | `/v1/repositories/{source_id}/token` | auth | require_workspace_admin | RepositoryTokenRequest | RepoSource |
+| DELETE | `/v1/repositories/{source_id}/token` | auth | require_workspace_admin | — | status |
 | POST | `/v1/repositories/{source_id}/sync` | auth | require_workspace_write | — | RepositorySyncResponse |
 | GET | `/v1/repositories/{source_id}/files` | auth | require_workspace_read | — | Vec<RepoFile |
 | GET | `/v1/repositories/{source_id}/detail` | auth | require_workspace_read | — | RepositoryDetailResponse |

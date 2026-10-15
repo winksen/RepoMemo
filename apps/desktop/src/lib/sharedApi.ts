@@ -1083,16 +1083,27 @@ export function listSharedRepositories(accessToken: string, workspaceId: string)
   return request<RepositoryList>(`/v1/workspaces/${workspaceId}/repositories`, {}, accessToken);
 }
 
-export function checkSharedRepository(accessToken: string, workspaceId: string, input: { link: string } & RepoSettings): Promise<RepoAccessCheck> {
+/** A token for a private remote repository, sent once with the link and never returned. */
+export type RepositoryToken = { token?: string; token_username?: string };
+
+export function checkSharedRepository(accessToken: string, workspaceId: string, input: { link: string } & RepositoryToken & RepoSettings): Promise<RepoAccessCheck> {
   return request<RepoAccessCheck>(`/v1/workspaces/${workspaceId}/repositories/check`, { method: "POST", body: JSON.stringify(input) }, accessToken);
 }
 
-export function connectSharedRepository(accessToken: string, workspaceId: string, input: { link: string; name?: string } & RepoSettings): Promise<{ repository: RepoSource; job: IndexingJobStatus | null }> {
+export function connectSharedRepository(accessToken: string, workspaceId: string, input: { link: string; name?: string } & RepositoryToken & RepoSettings): Promise<{ repository: RepoSource; job: IndexingJobStatus | null }> {
   return request(`/v1/workspaces/${workspaceId}/repositories`, { method: "POST", body: JSON.stringify(input) }, accessToken);
 }
 
 export function updateSharedRepository(accessToken: string, repositoryId: string, input: { name?: string } & RepoSettings): Promise<RepoSource> {
   return request<RepoSource>(`/v1/repositories/${repositoryId}`, { method: "PUT", body: JSON.stringify(input) }, accessToken);
+}
+
+export function setSharedRepositoryToken(accessToken: string, repositoryId: string, input: { token: string; username?: string }): Promise<RepoSource> {
+  return request<RepoSource>(`/v1/repositories/${repositoryId}/token`, { method: "PUT", body: JSON.stringify(input) }, accessToken);
+}
+
+export function clearSharedRepositoryToken(accessToken: string, repositoryId: string): Promise<void> {
+  return request<void>(`/v1/repositories/${repositoryId}/token`, { method: "DELETE" }, accessToken);
 }
 
 export function deleteSharedRepository(accessToken: string, repositoryId: string): Promise<void> {

@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.20 (2026-10-15)
+
+Link a repository by its `https` address.
+
+### Added
+- **Repository links accept an `https` address** (such as `https://github.com/acme/app.git`) next to a folder on the server, in Settings › Repositories and in `POST /v1/workspaces/{id}/repositories` and `/check`. The host must be on `REPOMEMO_GIT_ALLOWED_HOSTS` (V0.2.19). *Check access* asks the host once (`git ls-remote`) and shows the branch and commit; nothing is cloned until the first sync.
+- **An optional read-only token** for a private repository (`token`, and `token_username` when the host wants an account name). It is stored sealed, bound to its link, and never returned: the repository only shows *with a token* or *no token*. `PUT` and `DELETE /v1/repositories/{id}/token` replace or remove it; a new token is tried against the host before it replaces the old one. Both are recorded in the workspace activity.
+- **How it is fetched:** the server keeps a bare, partial clone of the branch under `remote-repos/` in its data folder (blobs over 1 MiB, which are never indexed, stay on the host). git runs with an empty environment, `https` only, no redirects, object checks on, no submodules and no hooks; the token reaches it through the server's own program as `GIT_ASKPASS`, never in an address or an argument, and git's messages are shown with it removed. Fetching, sync, renames, overview, indexing and polling for new commits (one `ls-remote`, no fetch) work as for a local repository.
+- **git must be patched** (2.50.1 or later, or a fixed maintenance release) for the CVE-2025-48384 submodule flaw; an older git is refused with that message.
+- Removing a link removes the server's copy.
+
+### Not yet
+- `ssh` addresses are refused with a message: deploy keys come in V0.2.21. Clone size and time limits are V0.2.22; until then a transfer is stopped after 30 minutes.
+
+### Upgrading
+- Nothing to do. Remote links need `REPOMEMO_GIT_ALLOWED_HOSTS`. The server's own program doubles as git's credential helper, so no extra file is installed.
+
 ## V0.2.19 (2026-10-15)
 
 Groundwork for linking remote repositories. Nothing is linked yet: that is V0.2.20.
