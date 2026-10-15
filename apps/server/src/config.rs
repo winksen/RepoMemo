@@ -112,6 +112,10 @@ pub struct ServerConfig {
     /// How often linked repositories are checked for new commits; `None`
     /// turns automatic syncing off.
     pub repo_poll_interval: Option<Duration>,
+    /// The most a remote repository's copy may grow to, in MiB (0: no cap).
+    pub repo_clone_max_mb: u64,
+    /// The longest one clone or fetch may run, in minutes.
+    pub repo_clone_timeout_minutes: u64,
     pub maintenance: MaintenanceSettings,
     /// Accounts made system administrators at startup and when they
     /// register. The first account on a new server always becomes one.
@@ -309,6 +313,8 @@ impl ServerConfig {
                 })
                 .unwrap_or_default(),
             repo_poll_interval: (repo_poll_seconds > 0).then(|| Duration::from_secs(repo_poll_seconds.max(30))),
+            repo_clone_max_mb: env_parse("REPOMEMO_REPO_CLONE_MAX_MB", 2048)?,
+            repo_clone_timeout_minutes: env_parse::<u64>("REPOMEMO_REPO_CLONE_TIMEOUT_MINUTES", 30)?.max(1),
             maintenance: MaintenanceSettings {
                 interval: Duration::from_secs(60 * maintenance_minutes),
                 blob_gc: env_flag("REPOMEMO_BLOB_GC", true)?,
@@ -383,6 +389,8 @@ impl ServerConfig {
             git_allowed_hosts: Vec::new(),
             git_safe_directories: Vec::new(),
             repo_poll_interval: None,
+            repo_clone_max_mb: 2048,
+            repo_clone_timeout_minutes: 30,
             maintenance: MaintenanceSettings {
                 interval: Duration::ZERO,
                 ..MaintenanceSettings::default()
@@ -481,6 +489,8 @@ pub(crate) struct RuntimeSettings {
     pub(crate) backup_interval_hours: u64,
     pub(crate) backup_keep: u32,
     pub(crate) repo_poll_interval: Option<Duration>,
+    pub(crate) repo_clone_max_mb: u64,
+    pub(crate) repo_clone_timeout_minutes: u64,
     pub(crate) maintenance: MaintenanceSettings,
     pub(crate) system_audit_retention_days: i64,
     pub(crate) system_admin_emails: Vec<String>,
@@ -515,6 +525,8 @@ impl RuntimeSettings {
             backup_interval_hours: config.backup_interval_hours,
             backup_keep: config.backup_keep,
             repo_poll_interval: config.repo_poll_interval,
+            repo_clone_max_mb: config.repo_clone_max_mb,
+            repo_clone_timeout_minutes: config.repo_clone_timeout_minutes,
             maintenance: config.maintenance.clone(),
             system_audit_retention_days: config.system_audit_retention_days,
             system_admin_emails: config.system_admin_emails.clone(),

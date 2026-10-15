@@ -11,10 +11,13 @@
 //! (`refresh_remote_clone`).
 
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::Result;
 use repomemo_domain::{RepoAccessCheck, RepoCommit, RepoSettings, RepoSource, SourceType};
-use repomemo_git::remote::{self, RemoteCredential, RemoteTarget, SshAuth};
+use repomemo_git::remote::{self, RemoteCredential, RemoteTarget, SshAuth, TransferLimits};
 use repomemo_git::GitRepo;
 
 use crate::remote_policy::{RemoteRepository, RemoteScheme};
@@ -82,6 +85,44 @@ impl std::fmt::Debug for RemoteDeployKey {
             .field("host_key", &self.host_key)
             .finish()
     }
+}
+
+/// The limits on what one clone or fetch may use, shared with the server so
+/// its run-time settings can change them (roadmap S6b, V0.2.22).
+#[derive(Debug, Clone)]
+pub struct CloneLimitHandles {
+    /// The most a repository's copy may grow to, in MiB; 0 is no cap.
+    pub max_mb: Arc<AtomicU64>,
+    /// The longest a transfer may run, in minutes.
+    pub timeout_minutes: Arc<AtomicU64>,
+}
+
+impl Default for CloneLimitHandles {
+    fn default() -> Self {
+        let defaults = TransferLimits::default();
+        Self {
+            max_mb: Arc::new(AtomicU64::new(defaults.max_bytes / (1024 * 1024))),
+            timeout_minutes: Arc::new(AtomicU64::new(defaults.timeout.as_secs() / 60)),
+        }
+    }
+}
+
+impl CloneLimitHandles {
+    pub(crate) fn current(&self) -> TransferLimits {
+        TransferLimits {
+            max_bytes: self.max_mb.load(Ordering::Relaxed).saturating_mul(1024 * 1024),
+            timeout: Duration::from_secs(self.timeout_minutes.load(Ordering::Relaxed).max(1) * 60),
+        }
+    }
+}
+
+/// How much room the server's copy of a remote repository takes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CloneSize {
+    pub source_id: String,
+    pub workspace_id: String,
+    pub name: String,
+    pub bytes: u64,
 }
 
 /// What was typed with a link to sign in to it.
@@ -160,12 +201,55 @@ impl RepoMemoCore {
         let target = self.remote_target(&source.id, link).await?;
         let head = remote::remote_head(&target, branch).await?;
         let directory = self.remote_clone_dir(&source.id);
+        let limits = self.clone_limits.current();
         if directory.is_dir() {
-            remote::fetch_branch(&target, &directory, &head.branch).await?;
+            remote::fetch_branch(&target, &directory, &head.branch, limits).await?;
         } else {
-            remote::clone_bare(&target, &directory, &head.branch).await?;
+            remote::clone_bare(&target, &directory, &head.branch, limits).await?;
         }
         GitRepo::open_bare(&directory).await
+    }
+
+    /// The size of the server's copy of every remote repository, largest first.
+    pub async fn remote_clone_sizes(&self, workspace_id: Option<&str>) -> Result<Vec<CloneSize>> {
+        let mut sizes = Vec::new();
+        for source in self
+            .storage
+            .list_sources_of_type(workspace_id, SourceType::GitRepo)
+            .await?
+        {
+            if RepoSourceMetadata::of(&source).remote.is_none() {
+                continue;
+            }
+            let directory = self.remote_clone_dir(&source.id);
+            let bytes = tokio::task::spawn_blocking(move || remote::directory_size(&directory))
+                .await
+                .unwrap_or(0);
+            sizes.push(CloneSize {
+                source_id: source.id,
+                workspace_id: source.workspace_id,
+                name: source.name,
+                bytes,
+            });
+        }
+        sizes.sort_by_key(|size| std::cmp::Reverse(size.bytes));
+        Ok(sizes)
+    }
+
+    /// What a workspace's remote repositories take on the server's disk. It
+    /// counts against the workspace's storage allowance like its files do.
+    pub async fn workspace_clone_bytes(&self, workspace_id: &str) -> Result<u64> {
+        Ok(self
+            .remote_clone_sizes(Some(workspace_id))
+            .await?
+            .iter()
+            .map(|size| size.bytes)
+            .sum())
+    }
+
+    /// The handles that set the clone size and time limits.
+    pub fn clone_limit_handles(&self) -> CloneLimitHandles {
+        self.clone_limits.clone()
     }
 
     /// The target for a link that has not been stored yet, from what was typed.

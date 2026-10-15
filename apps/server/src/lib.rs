@@ -311,6 +311,7 @@ async fn build_state(
         .with_repo_link_policy(repo_policy)
         .with_remote_git_policy(remote_git_policy);
     runtime.share_background_limit(core.background_ai_budget().limit_handle());
+    runtime.share_clone_limits(core.clone_limit_handles());
 
     let event_bus = WorkspaceEventBus::new();
     storage.set_job_observer(Arc::new(BusJobObserver::new(event_bus.clone())));

@@ -301,6 +301,8 @@ function OverviewSection({ accessToken }: { accessToken: string }) {
           ["Cached previews", `${count(storage.preview_count)} · ${formatBytes(storage.preview_bytes)}`],
           ["Free disk", storage.disk_free_bytes == null ? "unknown" : `${formatBytes(storage.disk_free_bytes)}${storage.disk_floor_bytes ? ` · uploads stop below ${formatBytes(storage.disk_floor_bytes)}` : ""}`],
           ["Storage per workspace", storage.workspace_storage_bytes ? formatBytes(storage.workspace_storage_bytes) : "unlimited"],
+          ["Remote repository copies", `${count(storage.remote_clones.length)} · ${formatBytes(storage.remote_clone_bytes)}${storage.remote_clone_limit_bytes ? ` · each stops at ${formatBytes(storage.remote_clone_limit_bytes)}` : ""}`],
+          ...storage.remote_clones.slice(0, 5).map((clone): [string, string] => [`  ${clone.name}`, formatBytes(clone.bytes)]),
           ["Passages", count(statistics.chunk_count)],
           ["Search vectors", count(statistics.embedding_count)],
           ["Memory cards · tasks · comments", `${count(statistics.memory_card_count)} · ${count(statistics.task_count)} · ${count(statistics.comment_count)}`],

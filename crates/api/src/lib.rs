@@ -34,7 +34,7 @@ pub use agent::{agent_capabilities, agent_conversation_title, agent_turn_label};
 pub use budget::BackgroundAiBudget;
 pub use embeddings::{EmbeddingRebuildPlan, EmbeddingRun};
 pub use remote_policy::{RemoteGitPolicy, RemoteRepository, RemoteScheme};
-pub use remote_repo::{looks_remote, RemoteAuth, RemoteDeployKey, RemoteToken};
+pub use remote_repo::{looks_remote, CloneLimitHandles, CloneSize, RemoteAuth, RemoteDeployKey, RemoteToken};
 pub use repo_policy::{is_network_path, RepoLinkPolicy};
 pub use repo_sync::RepoHead;
 pub use repomemo_ingestion::{abandoned_readings, served_mime_type, set_document_time_limit};
@@ -57,6 +57,7 @@ pub struct RepoMemoCore {
     retrieval: RetrievalService,
     repo_policy: std::sync::Arc<RepoLinkPolicy>,
     remote_git_policy: std::sync::Arc<RemoteGitPolicy>,
+    clone_limits: CloneLimitHandles,
     ai_budget: BackgroundAiBudget,
     /// Per-file results of the knowledge map and health, kept between requests.
     meaning: meaning::MeaningCache,
@@ -78,6 +79,7 @@ impl RepoMemoCore {
             retrieval,
             repo_policy: std::sync::Arc::new(RepoLinkPolicy::unrestricted()),
             remote_git_policy: std::sync::Arc::new(RemoteGitPolicy::disabled()),
+            clone_limits: CloneLimitHandles::default(),
             ai_budget: BackgroundAiBudget::default(),
             meaning: meaning::MeaningCache::default(),
         }

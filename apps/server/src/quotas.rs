@@ -70,12 +70,18 @@ pub(crate) async fn check_incoming(
         }
     }
     if settings.workspace_storage_mb > 0 {
+        // The server's copies of remote repositories count like files do.
         let used = state
             .storage
             .workspace_stored_bytes(workspace_id)
             .await
             .map_err(map_storage_error)?
-            .max(0) as u64;
+            .max(0) as u64
+            + state
+                .core
+                .workspace_clone_bytes(workspace_id)
+                .await
+                .map_err(map_storage_error)?;
         let allowance = settings.workspace_storage_mb * MIB;
         if used + incoming > allowance {
             return Err(ApiError::new(
@@ -113,10 +119,11 @@ pub(crate) async fn check_incoming(
 /// will add is not known in advance, so a sync can go past the allowance by
 /// one repository; the next one is refused (review third pass, R2-1).
 pub(crate) async fn room_for_sync(
-    storage: &repomemo_storage::StorageEngine,
+    core: &repomemo_api::RepoMemoCore,
     settings: &RuntimeSettings,
     workspace_id: &str,
 ) -> Result<(), String> {
+    let storage = core.storage();
     if settings.disk_floor_mb > 0 {
         let free = free_disk_bytes(storage.data_dir());
         if free.is_some_and(|free| free < settings.disk_floor_mb * MIB) {
@@ -128,7 +135,11 @@ pub(crate) async fn room_for_sync(
             .workspace_stored_bytes(workspace_id)
             .await
             .map_err(|error| format!("The workspace's storage could not be measured: {error}"))?
-            .max(0) as u64;
+            .max(0) as u64
+            + core
+                .workspace_clone_bytes(workspace_id)
+                .await
+                .map_err(|error| format!("The workspace's repository copies could not be measured: {error}"))?;
         let allowance = settings.workspace_storage_mb * MIB;
         if used >= allowance {
             return Err(format!(

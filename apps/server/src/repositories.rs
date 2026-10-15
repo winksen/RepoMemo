@@ -173,7 +173,7 @@ impl RepoSyncRunner {
             return Ok(None);
         }
         if let Err(reason) =
-            crate::quotas::room_for_sync(self.core.storage(), &self.runtime.current(), &source.workspace_id).await
+            crate::quotas::room_for_sync(&self.core, &self.runtime.current(), &source.workspace_id).await
         {
             self.forget(&source.id);
             repomemo_domain::bail_conflict!("{reason}");

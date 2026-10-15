@@ -2,6 +2,19 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.22 (2026-10-15)
+
+A remote clone can no longer take unbounded room or time.
+
+### Added
+- **A size cap and a time cap on every clone and fetch of a remote repository.** The size of the server's copy is measured twice a second while git runs; a transfer that goes over the cap, or past the time limit, is stopped at once and the person is told which limit it hit. A stopped clone is removed; a stopped fetch leaves the previous copy in place and removes its half-written packs.
+- **Two settings** in System › Settings › Limits, changeable while the server runs: *Repository clone size* (`REPOMEMO_REPO_CLONE_MAX_MB`, 2048 MiB by default, `0` for no cap) and *Repository clone time* (`REPOMEMO_REPO_CLONE_TIMEOUT_MINUTES`, 30 by default). Before, the time cap was a fixed 30 minutes and there was no size cap.
+- **The copies count in the workspace's storage allowance** like its files do: uploads and new notes are refused when files and copies together would go over, and a sync is not started once they are at the allowance.
+- **System › Overview › Storage** shows how many remote copies the server keeps, their total size, the cap each one stops at, and the five largest.
+
+### Upgrading
+- Nothing to do. A workspace with large remote repositories may now be at its allowance: raise *Storage per workspace* or the repositories' branch rules, or remove a link (its copy is deleted with it).
+
 ## V0.2.21 (2026-10-15)
 
 Link a repository by its `ssh` address, with a deploy key.

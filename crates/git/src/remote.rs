@@ -41,9 +41,61 @@ const ASKPASS_SECRET: &str = "REPOMEMO_GIT_SECRET";
 /// engine skips files over a mebibyte).
 pub const PARTIAL_CLONE_BLOB_LIMIT: &str = "1m";
 
-/// How long one network operation may take before it is stopped.
+/// How long a lookup of where a branch is may take before it is stopped.
 const LOOKUP_TIMEOUT: Duration = Duration::from_secs(60);
-const TRANSFER_TIMEOUT: Duration = Duration::from_secs(30 * 60);
+
+/// What one clone or fetch may use (roadmap S6b, V0.2.22). The server's
+/// settings give both; a transfer that goes over either is stopped, and what
+/// it had written is removed (a clone) or left as it was (a fetch).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TransferLimits {
+    /// The most the server's copy of the repository may grow to; 0 is no cap.
+    pub max_bytes: u64,
+    /// The longest a transfer may run.
+    pub timeout: Duration,
+}
+
+impl Default for TransferLimits {
+    fn default() -> Self {
+        Self {
+            max_bytes: 2 * 1024 * 1024 * 1024,
+            timeout: Duration::from_secs(30 * 60),
+        }
+    }
+}
+
+/// How often a running transfer's folder is measured.
+const WATCH_EVERY: Duration = Duration::from_millis(500);
+
+/// The size of everything under a folder, without following links.
+pub fn directory_size(path: &Path) -> u64 {
+    let mut total = 0_u64;
+    let mut pending = vec![path.to_path_buf()];
+    while let Some(directory) = pending.pop() {
+        let Ok(entries) = std::fs::read_dir(&directory) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let Ok(metadata) = entry.metadata() else {
+                continue;
+            };
+            if metadata.is_dir() {
+                pending.push(entry.path());
+            } else if metadata.is_file() {
+                total = total.saturating_add(metadata.len());
+            }
+        }
+    }
+    total
+}
+
+fn megabytes(bytes: u64) -> String {
+    if bytes >= 1024 * 1024 * 1024 {
+        format!("{:.1} GiB", bytes as f64 / (1024.0 * 1024.0 * 1024.0))
+    } else {
+        format!("{} MiB", bytes / (1024 * 1024))
+    }
+}
 
 /// A token for one repository, with the account name that goes with it.
 #[derive(Clone)]
@@ -428,22 +480,75 @@ fn null_device() -> &'static str {
 
 /// Runs a prepared command with a time limit and returns its output, or a
 /// message that never contains the token.
-async fn run(mut command: Command, limit: Duration, what: &str, target: &RemoteTarget) -> Result<std::process::Output> {
-    let child = command.spawn().map_err(|error| {
+///
+/// `watch` is a folder and the size it may not grow past: the transfer is
+/// stopped as soon as it does, and so is one that runs past `limit`.
+async fn run(
+    mut command: Command,
+    limit: Duration,
+    what: &str,
+    target: &RemoteTarget,
+    watch: Option<(&Path, u64)>,
+) -> Result<std::process::Output> {
+    use tokio::io::AsyncReadExt;
+    let mut child = command.spawn().map_err(|error| {
         if error.kind() == std::io::ErrorKind::NotFound {
             repomemo_domain::not_found!("git was not found. Install git and make sure it is on the PATH.")
         } else {
             anyhow!("git could not be started: {error}")
         }
     })?;
-    let output = match tokio::time::timeout(limit, child.wait_with_output()).await {
-        Ok(result) => result.context("git did not finish")?,
-        Err(_) => {
-            repomemo_domain::bail_invalid!(
-                "{what} did not finish within {} minutes and was stopped.",
-                limit.as_secs() / 60
-            );
+    let mut stdout = child.stdout.take();
+    let mut stderr = child.stderr.take();
+    let out_task = tokio::spawn(async move {
+        let mut buffer = Vec::new();
+        if let Some(stream) = stdout.as_mut() {
+            let _ = stream.read_to_end(&mut buffer).await;
         }
+        buffer
+    });
+    let err_task = tokio::spawn(async move {
+        let mut buffer = Vec::new();
+        if let Some(stream) = stderr.as_mut() {
+            let _ = stream.read_to_end(&mut buffer).await;
+        }
+        buffer
+    });
+    let started = std::time::Instant::now();
+    let mut ticker = tokio::time::interval(WATCH_EVERY);
+    let status = loop {
+        tokio::select! {
+            status = child.wait() => break status.context("git did not finish")?,
+            _ = ticker.tick() => {
+                if started.elapsed() >= limit {
+                    let _ = child.kill().await;
+                    repomemo_domain::bail_invalid!(
+                        "{what} did not finish within {} and was stopped (System › Settings › Repository clone time).",
+                        if limit.as_secs() >= 60 {
+                            format!("{} minutes", limit.as_secs() / 60)
+                        } else {
+                            format!("{} seconds", limit.as_secs())
+                        }
+                    );
+                }
+                if let Some((folder, max_bytes)) = watch.filter(|(_, max)| *max > 0) {
+                    let folder = folder.to_path_buf();
+                    let size = tokio::task::spawn_blocking(move || directory_size(&folder)).await.unwrap_or(0);
+                    if size > max_bytes {
+                        let _ = child.kill().await;
+                        repomemo_domain::bail_invalid!(
+                            "{what} was stopped: the repository is larger than the {} allowed for a remote repository (System › Settings › Repository clone size).",
+                            megabytes(max_bytes)
+                        );
+                    }
+                }
+            }
+        }
+    };
+    let output = std::process::Output {
+        status,
+        stdout: out_task.await.unwrap_or_default(),
+        stderr: err_task.await.unwrap_or_default(),
     };
     if !output.status.success() {
         // What git said, with the token taken out, is the person's to read.
@@ -514,7 +619,7 @@ pub async fn remote_head(target: &RemoteTarget, branch: Option<&str>) -> Result<
             command.arg("HEAD");
         }
     }
-    let output = run(command, LOOKUP_TIMEOUT, "Looking the repository up", target).await?;
+    let output = run(command, LOOKUP_TIMEOUT, "Looking the repository up", target, None).await?;
     parse_ls_remote(&String::from_utf8_lossy(&output.stdout), branch)
 }
 
@@ -561,7 +666,7 @@ fn parse_ls_remote(text: &str, branch: Option<&str>) -> Result<RemoteHead> {
 
 /// Makes a bare, partial clone of one branch in `directory` (which must not
 /// exist yet).
-pub async fn clone_bare(target: &RemoteTarget, directory: &Path, branch: &str) -> Result<()> {
+pub async fn clone_bare(target: &RemoteTarget, directory: &Path, branch: &str, limits: TransferLimits) -> Result<()> {
     require_patched_git().await?;
     validate_branch(branch)?;
     if let Some(parent) = directory.parent() {
@@ -584,7 +689,15 @@ pub async fn clone_bare(target: &RemoteTarget, directory: &Path, branch: &str) -
         ])
         .arg(&target.url)
         .arg(directory);
-    match run(command, TRANSFER_TIMEOUT, "Cloning the repository", target).await {
+    match run(
+        command,
+        limits.timeout,
+        "Cloning the repository",
+        target,
+        Some((directory, limits.max_bytes)),
+    )
+    .await
+    {
         Ok(_) => Ok(()),
         Err(error) => {
             // Whatever a failed clone left is not a repository.
@@ -596,7 +709,7 @@ pub async fn clone_bare(target: &RemoteTarget, directory: &Path, branch: &str) -
 
 /// Brings one branch of an existing clone up to date, discarding what the
 /// local branch had (it only ever mirrors the remote's).
-pub async fn fetch_branch(target: &RemoteTarget, directory: &Path, branch: &str) -> Result<()> {
+pub async fn fetch_branch(target: &RemoteTarget, directory: &Path, branch: &str, limits: TransferLimits) -> Result<()> {
     require_patched_git().await?;
     validate_branch(branch)?;
     let (mut command, _files) = remote_command(target)?;
@@ -614,7 +727,20 @@ pub async fn fetch_branch(target: &RemoteTarget, directory: &Path, branch: &str)
             "origin",
         ])
         .arg(format!("+refs/heads/{branch}:refs/heads/{branch}"));
-    run(command, TRANSFER_TIMEOUT, "Fetching the repository", target).await?;
+    if let Err(error) = run(
+        command,
+        limits.timeout,
+        "Fetching the repository",
+        target,
+        Some((directory, limits.max_bytes)),
+    )
+    .await
+    {
+        // A stopped fetch leaves its half-written packs behind: they would
+        // count against the limit for good.
+        remove_unfinished_packs(directory);
+        return Err(error);
+    }
     // Follow a changed default branch when no branch was chosen.
     let mut head = Command::new("git");
     head.arg("-C")
@@ -625,6 +751,18 @@ pub async fn fetch_branch(target: &RemoteTarget, directory: &Path, branch: &str)
         .stderr(Stdio::null());
     let _ = head.status().await;
     Ok(())
+}
+
+/// Removes `tmp_pack_*` files a stopped transfer left in a clone.
+fn remove_unfinished_packs(directory: &Path) {
+    let Ok(entries) = std::fs::read_dir(directory.join("objects").join("pack")) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        if entry.file_name().to_string_lossy().starts_with("tmp_pack_") {
+            let _ = std::fs::remove_file(entry.path());
+        }
+    }
 }
 
 fn validate_branch(branch: &str) -> Result<()> {
@@ -646,6 +784,83 @@ fn validate_branch(branch: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn nothing_to_sign_in_to() -> RemoteTarget {
+        RemoteTarget {
+            url: "https://example.invalid/acme/app.git".to_owned(),
+            credential: None,
+            ssh: None,
+        }
+    }
+
+    fn folder(label: &str) -> PathBuf {
+        let path = std::env::temp_dir().join(format!(
+            "repomemo-transfer-{label}-{}-{}",
+            std::process::id(),
+            SSH_FILE_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        ));
+        std::fs::create_dir_all(&path).unwrap();
+        path
+    }
+
+    #[tokio::test]
+    async fn a_transfer_over_its_time_or_size_limit_is_stopped_and_says_why() {
+        // A shell alias that takes its time, standing in for a slow host.
+        let slow = |directory: &Path, script: &str| {
+            let mut command = Command::new("git");
+            command
+                .args(["-c", &format!("alias.nap=!{script}"), "nap"])
+                .current_dir(directory)
+                .stdin(Stdio::null())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .kill_on_drop(true);
+            command
+        };
+
+        let directory = folder("time");
+        let started = std::time::Instant::now();
+        let error = run(
+            slow(&directory, "sleep 30"),
+            Duration::from_secs(1),
+            "Cloning the repository",
+            &nothing_to_sign_in_to(),
+            None,
+        )
+        .await
+        .unwrap_err()
+        .to_string();
+        assert!(error.contains("did not finish within 1 seconds"), "{error}");
+        assert!(started.elapsed() < Duration::from_secs(20));
+
+        let directory_for_size = folder("size");
+        let error = run(
+            slow(&directory_for_size, "head -c 3000000 /dev/zero > big.bin; sleep 30"),
+            Duration::from_secs(60),
+            "Cloning the repository",
+            &nothing_to_sign_in_to(),
+            Some((&directory_for_size, 1024 * 1024)),
+        )
+        .await
+        .unwrap_err()
+        .to_string();
+        assert!(error.contains("larger than the 1 MiB allowed"), "{error}");
+        assert!(directory_size(&directory_for_size) >= 3_000_000);
+
+        // Within its limits a transfer simply finishes.
+        let finished = run(
+            slow(&directory, "echo done"),
+            Duration::from_secs(30),
+            "Fetching the repository",
+            &nothing_to_sign_in_to(),
+            Some((&directory, 1024 * 1024)),
+        )
+        .await
+        .unwrap();
+        assert!(String::from_utf8_lossy(&finished.stdout).contains("done"));
+        let _ = std::fs::remove_dir_all(directory);
+        let _ = std::fs::remove_dir_all(directory_for_size);
+    }
 
     #[test]
     fn only_patched_git_releases_are_accepted() {

@@ -625,6 +625,12 @@ export interface SystemOverview {
     disk_floor_bytes: number;
     /** Storage one workspace may hold; 0 is unlimited. */
     workspace_storage_bytes: number;
+    /** What the server's copies of remote repositories take. */
+    remote_clone_bytes: number;
+    /** The copies, largest first. */
+    remote_clones: { source_id: string; workspace_id: string; name: string; bytes: number }[];
+    /** The most one copy may grow to; 0 is no cap. */
+    remote_clone_limit_bytes: number;
   };
   background: {
     indexing_queued: number;

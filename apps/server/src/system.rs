@@ -52,6 +52,8 @@ pub(crate) struct SettingsCell {
     data_dir: PathBuf,
     /// The daily allowance of background AI calls the core spends from.
     background_limit: std::sync::OnceLock<Arc<std::sync::atomic::AtomicU32>>,
+    /// The clone size and time limits the core reads.
+    clone_limits: std::sync::OnceLock<repomemo_api::CloneLimitHandles>,
 }
 
 impl SettingsCell {
@@ -61,6 +63,7 @@ impl SettingsCell {
             defaults,
             data_dir,
             background_limit: std::sync::OnceLock::new(),
+            clone_limits: std::sync::OnceLock::new(),
         }
     }
 
@@ -72,6 +75,18 @@ impl SettingsCell {
             std::sync::atomic::Ordering::Relaxed,
         );
         let _ = self.background_limit.set(limit);
+    }
+
+    /// Keeps the core's clone limits equal to the settings in force.
+    pub(crate) fn share_clone_limits(&self, handles: repomemo_api::CloneLimitHandles) {
+        let settings = self.current();
+        handles
+            .max_mb
+            .store(settings.repo_clone_max_mb, std::sync::atomic::Ordering::Relaxed);
+        handles
+            .timeout_minutes
+            .store(settings.repo_clone_timeout_minutes, std::sync::atomic::Ordering::Relaxed);
+        let _ = self.clone_limits.set(handles);
     }
 
     pub(crate) fn current(&self) -> Arc<RuntimeSettings> {
@@ -89,6 +104,14 @@ impl SettingsCell {
         }
         if let Some(limit) = self.background_limit.get() {
             limit.store(settings.background_ai_per_day, std::sync::atomic::Ordering::Relaxed);
+        }
+        if let Some(handles) = self.clone_limits.get() {
+            handles
+                .max_mb
+                .store(settings.repo_clone_max_mb, std::sync::atomic::Ordering::Relaxed);
+            handles
+                .timeout_minutes
+                .store(settings.repo_clone_timeout_minutes, std::sync::atomic::Ordering::Relaxed);
         }
         let mut current = self.current.write().unwrap_or_else(|poisoned| poisoned.into_inner());
         *current = Arc::new(settings);
@@ -167,6 +190,8 @@ const SETTINGS: &[SettingSpec] = &[
     SettingSpec { key: "backup_interval_hours", group: "Background", label: "Automatic backups", description: "How often the server backs up the environment by itself (see Maintenance). 0 turns automatic backups off.", kind: SettingKind::Integer, min: 0, max: 8_760, unit: "hours", options: &[] },
     SettingSpec { key: "backup_keep", group: "Background", label: "Backups kept", description: "How many backups are kept; older ones are deleted after a new one is made.", kind: SettingKind::Integer, min: 1, max: 1_000, unit: "backups", options: &[] },
     SettingSpec { key: "repo_poll_seconds", group: "Background", label: "Repository check interval", description: "How often linked repositories are checked for new commits and synced. 0 turns automatic syncing off; otherwise at least 30 seconds.", kind: SettingKind::Integer, min: 0, max: 86_400, unit: "seconds", options: &[] },
+    SettingSpec { key: "repo_clone_max_mb", group: "Limits", label: "Repository clone size", description: "The most the server's copy of one remote repository may grow to. A clone or fetch that goes over is stopped. Files over 1 MiB are never copied. 0 is no cap.", kind: SettingKind::Integer, min: 0, max: 1_048_576, unit: "MiB", options: &[] },
+    SettingSpec { key: "repo_clone_timeout_minutes", group: "Limits", label: "Repository clone time", description: "The longest one clone or fetch of a remote repository may take before it is stopped.", kind: SettingKind::Integer, min: 1, max: 1_440, unit: "minutes", options: &[] },
     SettingSpec { key: "maintenance_interval_minutes", group: "Background", label: "Maintenance interval", description: "How often background maintenance runs (cleanup, garbage collection, retries, database checkpoint). 0 turns it off.", kind: SettingKind::Integer, min: 0, max: 10_080, unit: "minutes", options: &[] },
     SettingSpec { key: "blob_gc", group: "Background", label: "Delete unused stored files", description: "Maintenance deletes stored files that no evidence references any more, and their cached previews.", kind: SettingKind::Boolean, min: 0, max: 1, unit: "", options: &[] },
     SettingSpec { key: "job_retention_days", group: "Background", label: "Job history", description: "Finished jobs are kept this long. 0 keeps them forever.", kind: SettingKind::Integer, min: 0, max: 3_650, unit: "days", options: &[] },
@@ -208,6 +233,8 @@ fn read_setting(settings: &RuntimeSettings, key: &str) -> Value {
         "backup_interval_hours" => json!(settings.backup_interval_hours),
         "backup_keep" => json!(settings.backup_keep),
         "repo_poll_seconds" => json!(settings.repo_poll_interval.map_or(0, |interval| interval.as_secs())),
+        "repo_clone_max_mb" => json!(settings.repo_clone_max_mb),
+        "repo_clone_timeout_minutes" => json!(settings.repo_clone_timeout_minutes),
         "maintenance_interval_minutes" => json!(maintenance.interval.as_secs() / 60),
         "blob_gc" => json!(maintenance.blob_gc),
         "job_retention_days" => json!(maintenance.job_retention_days),
@@ -310,6 +337,8 @@ fn apply_setting(settings: &mut RuntimeSettings, key: &str, value: &Value) -> Re
                 "disk_floor_mb" => settings.disk_floor_mb = seconds,
                 "backup_interval_hours" => settings.backup_interval_hours = seconds,
                 "backup_keep" => settings.backup_keep = count,
+                "repo_clone_max_mb" => settings.repo_clone_max_mb = seconds,
+                "repo_clone_timeout_minutes" => settings.repo_clone_timeout_minutes = seconds,
                 "repo_poll_seconds" => {
                     if number > 0 && number < 30 {
                         return Err(format!("{} must be 0 (off) or at least 30 seconds.", spec.label));
@@ -879,6 +908,20 @@ struct StorageView {
     disk_floor_bytes: u64,
     /// Storage one workspace may hold; 0 is unlimited.
     workspace_storage_bytes: u64,
+    /// What the server's copies of remote repositories take (V0.2.22).
+    remote_clone_bytes: u64,
+    /// The copies, largest first.
+    remote_clones: Vec<CloneView>,
+    /// The most one copy may grow to (a run-time setting); 0 is no cap.
+    remote_clone_limit_bytes: u64,
+}
+
+#[derive(Debug, Serialize)]
+struct CloneView {
+    source_id: String,
+    workspace_id: String,
+    name: String,
+    bytes: u64,
 }
 
 #[derive(Debug, Serialize)]
@@ -932,6 +975,11 @@ pub(crate) async fn overview(
                 .fold((0, 0), |(count, bytes), metadata| (count + 1, bytes + metadata.len()))
         })
         .unwrap_or((0, 0));
+    let remote_clones = state
+        .core
+        .remote_clone_sizes(None)
+        .await
+        .map_err(map_storage_error)?;
     let (event_channels, event_subscribers) = state.event_bus.stats();
     let (tracked_rate_limit_keys, locked_sign_in_keys) = state.guards.stats();
     Ok(Json(OverviewResponse {
@@ -949,6 +997,17 @@ pub(crate) async fn overview(
             disk_free_bytes: crate::quotas::free_disk_bytes(&data_dir),
             disk_floor_bytes: state.settings().disk_floor_mb * 1024 * 1024,
             workspace_storage_bytes: state.settings().workspace_storage_mb * 1024 * 1024,
+            remote_clone_bytes: remote_clones.iter().map(|clone| clone.bytes).sum(),
+            remote_clone_limit_bytes: state.settings().repo_clone_max_mb * 1024 * 1024,
+            remote_clones: remote_clones
+                .into_iter()
+                .map(|clone| CloneView {
+                    source_id: clone.source_id,
+                    workspace_id: clone.workspace_id,
+                    name: clone.name,
+                    bytes: clone.bytes,
+                })
+                .collect(),
         },
         statistics,
         background: BackgroundView {
