@@ -887,3 +887,183 @@ async fn a_follow_up_in_a_chat_is_understood_from_the_earlier_turns() {
         .all(|prompt| !prompt.contains("INJECTED")));
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn a_search_across_workspaces_reads_only_what_each_workspace_allows() {
+    let data_dir = temp_data_dir("search-all");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let (ollama_url, _prompts) = start_fake_ollama().await;
+    // The first account is the system administrator, who reads everything.
+    let _ = register_account(&app, "all-admin@example.com").await;
+    let (owner, _) = register_account(&app, "all-owner@example.com").await;
+    let (viewer, _) = register_account(&app, "all-viewer@example.com").await;
+    let (stranger, _) = register_account(&app, "all-stranger@example.com").await;
+    let alpha = create_workspace(&app, &owner).await;
+    let beta = create_workspace(&app, &owner).await;
+    let hidden = create_workspace(&app, &stranger).await;
+    let call = |method: &'static str, uri: String, who: &str, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    for (workspace, who, title, content) in [
+        (
+            &alpha,
+            &owner,
+            "Deploy runbook",
+            "# Deploy\nRun the migration before switching traffic.",
+        ),
+        (
+            &beta,
+            &owner,
+            "Release checklist",
+            "# Release\nTag the build and announce the window.",
+        ),
+        (
+            &hidden,
+            &stranger,
+            "Deploy secrets",
+            "# Deploy\nThe deploy keys live in the vault.",
+        ),
+    ] {
+        let created = call(
+            "POST",
+            format!("/v1/workspaces/{workspace}/artifacts/text"),
+            who,
+            json!({"title": title, "content": content, "language": "Markdown"}),
+        )
+        .await;
+        assert_eq!(created.status(), 201);
+        wait_for_indexed_artifacts(&app, who, workspace, 1).await;
+    }
+    // Both of the owner's workspaces match by meaning; only beta's policy will
+    // keep that from a viewer.
+    for workspace in [&alpha, &beta] {
+        let saved = call(
+            "PUT",
+            format!("/v1/workspaces/{workspace}/ai-providers"),
+            &owner,
+            json!({"provider_type": "ollama", "name": "Mock embeddings", "base_url": ollama_url, "model": "mock-embed", "enabled": true, "purpose": "embedding"}),
+        )
+        .await;
+        assert_eq!(saved.status(), 200);
+        let mut embedded = false;
+        for _ in 0..100 {
+            let metrics =
+                response_json(call("GET", format!("/v1/workspaces/{workspace}/metrics"), &owner, json!({})).await)
+                    .await;
+            if metrics["embedded_chunk_count"]
+                .as_i64()
+                .is_some_and(|count| count > 0 && Some(count) == metrics["chunk_count"].as_i64())
+            {
+                embedded = true;
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+        assert!(embedded, "chunks were not embedded in time");
+    }
+    for workspace in [&alpha, &beta] {
+        join(
+            &app,
+            &owner,
+            "workspaces",
+            workspace,
+            "all-viewer@example.com",
+            "viewer",
+        )
+        .await;
+    }
+    let policy = call(
+        "PUT",
+        format!("/v1/workspaces/{beta}/ai-policy"),
+        &owner,
+        json!({"min_role": "admin"}),
+    )
+    .await;
+    assert_eq!(policy.status(), 200);
+    let titles = |found: &Value| {
+        found["results"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|entry| entry["result"]["title"].as_str().unwrap().to_owned())
+            .collect::<Vec<_>>()
+    };
+    let workspace_entry = |found: &Value, id: &str| {
+        found["workspaces"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|entry| entry["workspace_id"] == id)
+            .cloned()
+            .unwrap_or(Value::Null)
+    };
+
+    // The owner's two workspaces are searched, the stranger's is not, and
+    // "shipping" is found in both by meaning although no file says it.
+    let found = response_json(call("POST", "/v1/search".to_owned(), &owner, json!({"query": "shipping"})).await).await;
+    let mut names = titles(&found);
+    names.sort();
+    assert_eq!(names, ["Deploy runbook", "Release checklist"], "{found}");
+    assert_eq!(found["workspaces"].as_array().unwrap().len(), 2);
+    assert_eq!(workspace_entry(&found, &alpha)["by_meaning"], true);
+    assert_eq!(workspace_entry(&found, &beta)["by_meaning"], true);
+    assert_eq!(found["results"][0]["workspace_name"].is_string(), true);
+    assert!(found["results"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|entry| entry["workspace_id"] != json!(hidden)));
+
+    // A viewer is a member of both, but beta keeps AI to administrators: its
+    // query is matched by keywords only, and says so.
+    let found = response_json(call("POST", "/v1/search".to_owned(), &viewer, json!({"query": "shipping"})).await).await;
+    assert_eq!(titles(&found), ["Deploy runbook"], "{found}");
+    assert_eq!(workspace_entry(&found, &alpha)["by_meaning"], true);
+    let kept = workspace_entry(&found, &beta);
+    assert_eq!(kept["by_meaning"], false);
+    assert!(kept["note"].as_str().unwrap().contains("keywords only"), "{kept}");
+    // Keywords still work there.
+    let found = response_json(call("POST", "/v1/search".to_owned(), &viewer, json!({"query": "announce"})).await).await;
+    assert!(titles(&found).contains(&"Release checklist".to_owned()), "{found}");
+    assert_eq!(workspace_entry(&found, &beta)["result_count"], 1);
+
+    // A workspace the caller cannot read is left out even when asked for.
+    let found = response_json(
+        call(
+            "POST",
+            "/v1/search".to_owned(),
+            &viewer,
+            json!({"query": "deploy", "workspace_ids": [hidden]}),
+        )
+        .await,
+    )
+    .await;
+    assert!(found["results"].as_array().unwrap().is_empty());
+    assert!(found["workspaces"].as_array().unwrap().is_empty());
+
+    // Limit, empty queries and unknown states.
+    let found = response_json(
+        call(
+            "POST",
+            "/v1/search".to_owned(),
+            &owner,
+            json!({"query": "shipping", "limit": 1}),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(found["results"].as_array().unwrap().len(), 1);
+    let empty = response_json(call("POST", "/v1/search".to_owned(), &owner, json!({"query": "  "})).await).await;
+    assert!(empty["results"].as_array().unwrap().is_empty());
+    let refused = call(
+        "POST",
+        "/v1/search".to_owned(),
+        &owner,
+        json!({"query": "deploy", "lifecycle_statuses": ["fresh"]}),
+    )
+    .await;
+    assert_eq!(refused.status(), 400);
+    let _ = std::fs::remove_dir_all(data_dir);
+}

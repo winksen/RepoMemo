@@ -272,6 +272,7 @@ textarea:focus-visible {
 .shared-dashboard-summary dd { margin: 0; color: var(--color-text); font-size: 26px; font-weight: 700; letter-spacing: -0.03em; }
 .shared-dashboard-summary span { color: var(--color-text-subtle); font-size: 11px; line-height: 1.4; }
 .shared-dashboard-ledger { display: grid; gap: 28px; margin-top: 32px; }
+.shared-cross-search { display: grid; gap: 12px; margin-top: 32px; }
 .shared-dashboard-organization { padding-top: 24px; border-top: 1px solid var(--color-border); }
 .shared-dashboard-organization-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .shared-dashboard-organization-heading > div { display: flex; align-items: center; gap: 10px; min-width: 0; }

@@ -1,5 +1,145 @@
 use crate::*;
 
+/// Workspaces one search across workspaces will read; the rest are counted
+/// in `not_searched`.
+const CROSS_SEARCH_MAX_WORKSPACES: usize = 30;
+const CROSS_SEARCH_DEFAULT_LIMIT: i64 = 20;
+const CROSS_SEARCH_MAX_LIMIT: i64 = 50;
+
+fn check_lifecycle_statuses(statuses: &[String]) -> Result<(), ApiError> {
+    for status in statuses {
+        if !matches!(
+            status.as_str(),
+            "active" | "needs_review" | "verified" | "outdated" | "superseded"
+        ) {
+            return Err(ApiError::bad_request(format!("{status} is not an evidence state.")));
+        }
+    }
+    Ok(())
+}
+
+/// Searches every workspace the caller can read and merges what they find.
+///
+/// Each workspace is searched on its own, with its own role check and its own
+/// AI policy: where the policy keeps AI from the caller's role the query is
+/// matched by keywords only and never sent to that workspace's embedding
+/// provider. A workspace's scores are relative to its own best match, so every
+/// workspace's best result ties at the top and the rest follow by score, then
+/// by rank in their workspace.
+pub(crate) async fn search_all_workspaces(
+    ReadingSubject(subject): ReadingSubject,
+    State(state): State<AppState>,
+    Json(request): Json<SearchAllRequest>,
+) -> Result<Json<CrossSearchResponse>, ApiError> {
+    consume_heavy_quota(&state, &subject)?;
+    check_lifecycle_statuses(&request.lifecycle_statuses)?;
+    let mut response = CrossSearchResponse {
+        results: Vec::new(),
+        workspaces: Vec::new(),
+        not_searched: 0,
+    };
+    let query = request.query.trim().to_owned();
+    if query.is_empty() {
+        return Ok(Json(response));
+    }
+    let limit = request
+        .limit
+        .unwrap_or(CROSS_SEARCH_DEFAULT_LIMIT)
+        .clamp(1, CROSS_SEARCH_MAX_LIMIT);
+    let listing = if subject.is_system_admin {
+        state
+            .storage
+            .list_shared_workspaces_for_system_admin(&subject.user_id)
+            .await
+    } else {
+        state.storage.list_shared_workspaces_for_user(&subject.user_id).await
+    }
+    .map_err(ApiError::internal)?;
+
+    let started = std::time::Instant::now();
+    // (score, rank in its workspace, workspace name) order the merged list.
+    let mut merged: Vec<(f64, usize, String, CrossSearchResult)> = Vec::new();
+    for entry in listing {
+        let workspace = entry.workspace;
+        if !request.workspace_ids.is_empty() && !request.workspace_ids.contains(&workspace.id) {
+            continue;
+        }
+        let Some(role) =
+            effective_workspace_role(&state, &subject.user_id, subject.is_system_admin, &workspace.id).await?
+        else {
+            continue;
+        };
+        if response.workspaces.len() >= CROSS_SEARCH_MAX_WORKSPACES {
+            response.not_searched += 1;
+            continue;
+        }
+        let min_role = ai_access::workspace_ai_min_role(&state, &workspace.id).await?;
+        let by_meaning_allowed = min_role.allows(&role);
+        let searched = state
+            .core
+            .search_workspace_detailed(
+                SearchRequest {
+                    workspace_id: workspace.id.clone(),
+                    query: query.clone(),
+                    limit: Some(limit),
+                    lifecycle_statuses: request.lifecycle_statuses.clone(),
+                    ..Default::default()
+                },
+                by_meaning_allowed,
+            )
+            .await;
+        let (results, by_meaning, note) = match searched {
+            Ok((results, by_meaning)) => {
+                let note = (!by_meaning_allowed).then(|| {
+                    "Searched by keywords only: in this workspace AI features are kept to other roles, so the query was not sent to its AI provider.".to_owned()
+                });
+                (results, by_meaning, note)
+            }
+            Err(error) => {
+                tracing::warn!(workspace_id = %workspace.id, "search across workspaces skipped one: {error:#}");
+                (
+                    Vec::new(),
+                    false,
+                    Some("This workspace could not be searched just now.".to_owned()),
+                )
+            }
+        };
+        response.workspaces.push(CrossSearchWorkspace {
+            workspace_id: workspace.id.clone(),
+            name: workspace.name.clone(),
+            result_count: results.len() as i64,
+            by_meaning,
+            note,
+        });
+        for (rank, result) in results.into_iter().enumerate() {
+            merged.push((
+                result.score,
+                rank,
+                workspace.name.to_lowercase(),
+                CrossSearchResult {
+                    workspace_id: workspace.id.clone(),
+                    workspace_name: workspace.name.clone(),
+                    result,
+                },
+            ));
+        }
+    }
+    merged.sort_by(|left, right| {
+        right
+            .0
+            .total_cmp(&left.0)
+            .then_with(|| left.1.cmp(&right.1))
+            .then_with(|| left.2.cmp(&right.2))
+    });
+    response.results = merged
+        .into_iter()
+        .take(limit as usize)
+        .map(|(_, _, _, result)| result)
+        .collect();
+    record_timing("search_all", "all", started, response.results.len());
+    Ok(Json(response))
+}
+
 pub(crate) async fn search_workspace(
     ReadingSubject(subject): ReadingSubject,
     State(state): State<AppState>,
@@ -8,14 +148,7 @@ pub(crate) async fn search_workspace(
 ) -> Result<Json<Vec<SearchResult>>, ApiError> {
     require_workspace_read(&state, &subject, &workspace_id).await?;
     consume_heavy_quota(&state, &subject)?;
-    for status in &request.lifecycle_statuses {
-        if !matches!(
-            status.as_str(),
-            "active" | "needs_review" | "verified" | "outdated" | "superseded"
-        ) {
-            return Err(ApiError::bad_request(format!("{status} is not an evidence state.")));
-        }
-    }
+    check_lifecycle_statuses(&request.lifecycle_statuses)?;
     for day in [&request.modified_after, &request.modified_before]
         .into_iter()
         .flatten()

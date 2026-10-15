@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.32` (2026-10-15), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.33` (2026-10-15), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -372,7 +372,7 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 | Release | Type | Section | The one change | IDs | Done when |
 |---|---|---|---|---|---|
 | **V0.2.32** ✅ | ✨ | Assistant | Earlier turns go with each question, within a token budget | F5a | A follow-up resolves "it" and "that file" |
-| **V0.2.33** | ✨ | Retrieval | Search across all of the caller's workspaces | F5b | Results merged by score, each checked against its workspace's role and AI policy |
+| **V0.2.33** ✅ | ✨ | Retrieval | Search across all of the caller's workspaces | F5b | Results merged by score, each checked against its workspace's role and AI policy |
 | **V0.2.34** | ✨ | Web shell | A keyboard command palette | F19 | Jump to a workspace, file, memory card or setting, and start assistant actions, without the mouse |
 | **V0.2.35** | ✨ | Indexing | Code symbols and structure-aware chunks for Go and Java | F21a | Both languages chunk by declaration and their symbols are searchable |
 | **V0.2.36** | ✨ | Indexing | Code symbols and structure-aware chunks for C# and PHP | F21b | Same as V0.2.35 |
@@ -653,6 +653,15 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 - [x] Tests: budget and turn limit, reference detection, follow-up query, `a_follow_up_in_a_chat_is_understood_from_the_earlier_turns` (find, then "summarize it", then a question that names nothing; the prompt carries the earlier turns; a new chat and an injected `history` carry none)
 - [ ] Lookups and searches do not read earlier turns ("search for it" is searched as typed), a message routed by the model is classified without them, and long histories are cut, not summarized
 
+#### V0.2.33: Search across workspaces
+
+- [x] **F5b** `POST /v1/search` (`SearchAllRequest {query, workspace_ids, lifecycle_statuses, limit}`, 20 results by default, at most 50): the caller's workspaces (every workspace for a system administrator), each read with `effective_workspace_role`; `CrossSearchResponse {results, workspaces, not_searched}`
+- [x] The AI policy decides per workspace whether the query is matched by meaning (`RepoMemoCore::search_workspace_detailed(request, by_meaning)`): where `ai_min_role` keeps AI from the caller's role the search is by keywords only, the query is never sent to that workspace's embedding provider, and its entry says so
+- [x] Merged by score, then rank in its workspace, then workspace name (scores are relative to each workspace's best match); at most 30 workspaces per search, a failing one skipped with a note; one heavy-request quota unit per search
+- [x] Web: *Search all workspaces* on the dashboard (`CrossWorkspaceSearch`), each result naming its workspace and opening the file there
+- [x] Tests: `a_search_across_workspaces_reads_only_what_each_workspace_allows` (the owner's two workspaces and not a stranger's, a viewer kept to keywords by one workspace's policy, an unreadable workspace named explicitly, limit, empty query, unknown state)
+- [ ] No type, language, folder or date filters, no symbol or memory-card search and no Ask across workspaces; the list is not paged
+
 ### Decisions to agree before work starts
 
 | # | Decision | Needed by | Proposal |
@@ -681,7 +690,7 @@ Every item of both roads, with the release it is planned for. The evidence behin
 | F3 | **Symbol search on the web** | S | ✅ V0.1.72 |
 | F4 | **Repositories.** Phase 1b (renames with edits, commit on citations) | M | ✅ V0.1.73 |
 | F4 | **Repositories.** Phase 2: remote by URL over `https` (2a) and `ssh` (2b) | L | V0.2.20, V0.2.21 |
-| F5 | **Assistant memory** (5a ✅ V0.2.32) and **cross-workspace search** (5b) | M | V0.2.32, V0.2.33 |
+| F5 | **Assistant memory** (5a ✅ V0.2.32) and **cross-workspace search** (5b ✅ V0.2.33) | M | ✅ V0.2.32, V0.2.33 |
 | F6 | **Mail delivery:** SMTP and outbox (6a ✅ V0.2.9), invitations (6b ✅ V0.2.10), mentions and assignments (6c ✅ V0.2.12) | M | V0.2.9, V0.2.10, V0.2.12 (decisions 5, 7) |
 | F7 | **Evidence ergonomics.** Move folders, multi-select, new version of a file | M | ✅ V0.1.73 |
 | F8 | **Live map and health** | S | ✅ V0.1.72 |

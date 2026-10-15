@@ -1,8 +1,8 @@
 # HTTP API reference
 
-> **Branch of:** [TECHNICAL_MINDMAP.md §5](../TECHNICAL_MINDMAP.md#5-http-api-reference-167-operations-under-v1) · **Generated** from the router and the handler signatures by `node scripts/list-routes.mjs --markdown`; the guard column is read from the handler bodies, so check a route's handler before relying on a row · **Status:** V0.2.6 (the two index routes edited by hand; regenerate before the next release candidate)
+> **Branch of:** [TECHNICAL_MINDMAP.md §5](../TECHNICAL_MINDMAP.md#5-http-api-reference-168-operations-under-v1) · **Generated** from the router and the handler signatures by `node scripts/list-routes.mjs --markdown`; the guard column is read from the handler bodies, so check a route's handler before relying on a row · **Status:** V0.2.6 (the two index routes edited by hand; regenerate before the next release candidate)
 
-162 routes of the main router, plus the platform routes (`/v1/platform/*`, [environment.rs](../../apps/server/src/environment.rs), served before an environment is attached) and the avatar routes (`/v1/users/{id}/avatar`, `/v1/profile/avatar`, [avatars.rs](../../apps/server/src/avatars.rs)).
+163 routes of the main router, plus the platform routes (`/v1/platform/*`, [environment.rs](../../apps/server/src/environment.rs), served before an environment is attached) and the avatar routes (`/v1/users/{id}/avatar`, `/v1/profile/avatar`, [avatars.rs](../../apps/server/src/avatars.rs)).
 
 ## Conventions
 
@@ -170,6 +170,7 @@
 | PUT | `/v1/agent/conversations/{conversation_id}` | auth | require_workspace_read | RenameConversationRequest | AgentConversation |
 | DELETE | `/v1/agent/conversations/{conversation_id}` | auth | require_workspace_read | — | status |
 | GET | `/v1/workspaces/{workspace_id}/retrieval-facets` | auth | require_workspace_read | — | RetrievalFacetsResponse |
+| POST | `/v1/search` | reading | effective_workspace_role (per workspace) | SearchAllRequest | CrossSearchResponse |
 | POST | `/v1/workspaces/{workspace_id}/search` | reading | require_workspace_read | SearchWorkspaceRequest | Vec<SearchResult |
 | GET | `/v1/workspaces/{workspace_id}/symbols` | auth | require_workspace_read | — | Vec<repomemo_domain::SymbolSearchResult |
 | GET | `/v1/workspaces/{workspace_id}/memory-cards` | auth | require_workspace_read | — | Vec<MemoryCardSummary |

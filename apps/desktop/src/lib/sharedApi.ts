@@ -1011,6 +1011,14 @@ export function searchSharedWorkspace(accessToken: string, workspaceId: string, 
   }, accessToken);
 }
 
+/** Searches every workspace the account can read; results are merged by score and name their workspace. */
+export function searchAllWorkspaces(accessToken: string, input: { query: string; workspaceIds?: string[]; limit?: number }): Promise<import("../types").CrossSearchResponse> {
+  return request<import("../types").CrossSearchResponse>("/v1/search", {
+    method: "POST",
+    body: JSON.stringify({ query: input.query, workspace_ids: input.workspaceIds ?? [], limit: input.limit ?? 20 }),
+  }, accessToken);
+}
+
 /** Where code symbols whose name contains `query` are defined. */
 export function searchSharedSymbols(accessToken: string, workspaceId: string, query: string): Promise<SymbolSearchResult[]> {
   return request<SymbolSearchResult[]>(`/v1/workspaces/${workspaceId}/symbols?q=${encodeURIComponent(query)}`, {}, accessToken);

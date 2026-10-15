@@ -2,6 +2,19 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.33 (2026-10-15)
+
+Search reaches every workspace you can read.
+
+### Added
+- **Search all workspaces** on the dashboard: one box searches the evidence of every workspace the account can read. Each result names its workspace, shows the snippet with the matched words highlighted, and opens the file in its own workspace.
+- **`POST /v1/search`** (`{query, workspace_ids?, lifecycle_statuses?, limit?}`; 20 results by default, at most 50). Each workspace is searched on its own: its role check is made for the caller, outdated and superseded evidence is left out unless asked for, and a workspace the caller cannot read is left out without being named, even when asked for.
+- **Each workspace's AI policy decides whether the query is matched by meaning.** Where *AI features* are kept to other roles, that workspace is searched by keywords only and the query is never sent to its embedding provider; the answer says so for that workspace (`by_meaning`, `note`).
+- **Merged by score.** A workspace's scores are relative to its own best match, so every workspace's best result ties at the top and the others follow by score, then by their rank in their workspace. At most 30 workspaces are read per search (`not_searched` counts the rest); one that cannot be searched is skipped with a note instead of failing the search.
+
+### Upgrading
+- Nothing to do. The search counts as one heavy request against the account's quota, not one request per workspace.
+
 ## V0.2.32 (2026-10-15)
 
 The assistant remembers the conversation.

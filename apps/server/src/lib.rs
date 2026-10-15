@@ -91,12 +91,13 @@ use rand_core::OsRng;
 use repomemo_api::{served_mime_type, RemoteGitPolicy, RepoLinkPolicy, RepoMemoCore};
 use repomemo_domain::{
     ArtifactComment, ArtifactDetail, ArtifactIndexFailure, ArtifactLifecycle, ArtifactLifecycleEvent, ArtifactSummary,
-    ArtifactType, AskAnswer, AskRequest, Chunk, Citation, CollaborationTask, CreateMemoryCardRequest, DocumentPreview,
-    ErrorKind, Folder, IndexingJobStatus, KnowledgeMap, MemoryCard, MemoryCardDetail, MemoryCardSummary, Organization,
-    OrganizationMember, OrganizationRole, ProviderSettings, ProviderTestResult, SavedSearch, SearchRequest,
-    SearchResult, SharedAiProviderSettings, SharedNotification, SharedSession, SharedUser, SharedWorkspace,
-    TaskChecklistItem, UpdateMemoryCardRequest, Workspace, WorkspaceActivityEvent, WorkspaceAiOverview,
-    WorkspaceCapabilities, WorkspaceMember, WorkspaceOverview, WorkspaceRole,
+    ArtifactType, AskAnswer, AskRequest, Chunk, Citation, CollaborationTask, CreateMemoryCardRequest,
+    CrossSearchResponse, CrossSearchResult, CrossSearchWorkspace, DocumentPreview, ErrorKind, Folder,
+    IndexingJobStatus, KnowledgeMap, MemoryCard, MemoryCardDetail, MemoryCardSummary, Organization, OrganizationMember,
+    OrganizationRole, ProviderSettings, ProviderTestResult, SavedSearch, SearchRequest, SearchResult,
+    SharedAiProviderSettings, SharedNotification, SharedSession, SharedUser, SharedWorkspace, TaskChecklistItem,
+    UpdateMemoryCardRequest, Workspace, WorkspaceActivityEvent, WorkspaceAiOverview, WorkspaceCapabilities,
+    WorkspaceMember, WorkspaceOverview, WorkspaceRole,
 };
 use repomemo_storage::{
     ArtifactQuery, NewCollaborationTask, NewSavedSearch, NewSharedNotification, NewTaskChecklistItem,
@@ -763,6 +764,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             "/v1/workspaces/{workspace_id}/retrieval-facets",
             get(get_retrieval_facets),
         )
+        .route("/v1/search", post(search_all_workspaces))
         .route("/v1/workspaces/{workspace_id}/search", post(search_workspace))
         .route("/v1/workspaces/{workspace_id}/artifacts/bulk", post(bulk_artifacts))
         .route(

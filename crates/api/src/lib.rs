@@ -623,13 +623,28 @@ impl RepoMemoCore {
     /// an embedding provider. A provider failure falls back to keywords so
     /// search keeps working when the embedding model is unreachable.
     pub async fn search_workspace(&self, request: SearchRequest) -> Result<Vec<SearchResult>> {
+        Ok(self.search_workspace_detailed(request, true).await?.0)
+    }
+
+    /// Search, saying whether the query was also matched by meaning. With
+    /// `by_meaning` false the query is never sent to the workspace's embedding
+    /// provider: the search is by keywords only. A search across workspaces
+    /// uses this for those where the AI policy keeps AI from the caller.
+    pub async fn search_workspace_detailed(
+        &self,
+        request: SearchRequest,
+        by_meaning: bool,
+    ) -> Result<(Vec<SearchResult>, bool)> {
         if request.query.trim().is_empty() {
-            return Ok(Vec::new());
+            return Ok((Vec::new(), false));
         }
-        let embedding = self
-            .query_embedding(&request.workspace_id, None, &request.query)
-            .await
-            .unwrap_or(None);
+        let embedding = if by_meaning {
+            self.query_embedding(&request.workspace_id, None, &request.query)
+                .await
+                .unwrap_or(None)
+        } else {
+            None
+        };
         let (results, _) = self
             .retrieval
             .hybrid_search(
@@ -640,7 +655,7 @@ impl RepoMemoCore {
                     .map(|(model, vector)| (model.as_str(), vector.as_slice())),
             )
             .await?;
-        Ok(results)
+        Ok((results, embedding.is_some()))
     }
 
     pub async fn list_symbols(&self, artifact_id: String) -> Result<Vec<Symbol>> {

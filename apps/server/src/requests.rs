@@ -198,6 +198,20 @@ pub(crate) struct SearchWorkspaceRequest {
     pub(crate) modified_before: Option<String>,
 }
 
+/// A search over every workspace the caller can read (or those named).
+#[derive(Debug, Deserialize)]
+pub(crate) struct SearchAllRequest {
+    pub(crate) query: String,
+    /// Only these workspaces; empty searches them all. Ones the caller
+    /// cannot read are left out without saying so.
+    #[serde(default)]
+    pub(crate) workspace_ids: Vec<String>,
+    #[serde(default)]
+    pub(crate) lifecycle_statuses: Vec<String>,
+    /// Results in the merged list (20 by default, at most 50).
+    pub(crate) limit: Option<i64>,
+}
+
 #[derive(Debug, Serialize)]
 pub(crate) struct RetrievalSourceFacet {
     pub(crate) id: String,

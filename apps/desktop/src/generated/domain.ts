@@ -878,6 +878,37 @@ export interface SearchResult {
   last_changed_at: string | null;
 }
 
+/** A search result from one of several workspaces searched together. */
+export interface CrossSearchResult {
+  workspace_id: string;
+  workspace_name: string;
+  result: SearchResult;
+}
+
+/** How one workspace took part in a search across workspaces. */
+export interface CrossSearchWorkspace {
+  workspace_id: string;
+  name: string;
+  /** Results this workspace contributed before the merged list was cut. */
+  result_count: number;
+  /**
+   * True when the query was also matched by meaning, which sends it to
+   * the workspace's embedding provider.
+   */
+  by_meaning: boolean;
+  /** Why this workspace was searched by keywords only, or not at all. */
+  note: string | null;
+}
+
+/** A search over every workspace the caller can read. */
+export interface CrossSearchResponse {
+  /** Merged by score, best first. */
+  results: CrossSearchResult[];
+  workspaces: CrossSearchWorkspace[];
+  /** Workspaces left out because the search is capped. */
+  not_searched: number;
+}
+
 export interface ProviderSettings {
   id: string;
   workspace_id: string | null;

@@ -984,6 +984,38 @@ pub struct SearchResult {
     pub last_changed_at: Option<String>,
 }
 
+/// A search result from one of several workspaces searched together.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CrossSearchResult {
+    pub workspace_id: String,
+    pub workspace_name: String,
+    pub result: SearchResult,
+}
+
+/// How one workspace took part in a search across workspaces.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CrossSearchWorkspace {
+    pub workspace_id: String,
+    pub name: String,
+    /// Results this workspace contributed before the merged list was cut.
+    pub result_count: i64,
+    /// True when the query was also matched by meaning, which sends it to
+    /// the workspace's embedding provider.
+    pub by_meaning: bool,
+    /// Why this workspace was searched by keywords only, or not at all.
+    pub note: Option<String>,
+}
+
+/// A search over every workspace the caller can read.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CrossSearchResponse {
+    /// Merged by score, best first.
+    pub results: Vec<CrossSearchResult>,
+    pub workspaces: Vec<CrossSearchWorkspace>,
+    /// Workspaces left out because the search is capped.
+    pub not_searched: i64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProviderSettings {
     pub id: String,

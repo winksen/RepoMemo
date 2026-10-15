@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.2 → 0.3
 
-> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.32` (2026-10-15) · **Next:** `V0.2.33`
+> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.33` (2026-10-15) · **Next:** `V0.2.34`
 > **Previous line:** [Releases 0.1 → 0.2](RELEASES_0.1.md) · **Related:** [Roadmap, Road to V0.3.0](ROADMAP.md#-road-to-v030) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
 Every release of the 0.2 line, shipped and planned, one row each. The plan comes from the [Road to V0.3.0](ROADMAP.md#-road-to-v030): **one change per release**, each shippable alone, with the security rules for a new outside connection in the release that opens it. Planned rows are proposals until decisions 7–14 in the roadmap are agreed.
@@ -65,7 +65,7 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | **V0.2.30** | ✅ 2026-10-15 | E. Issues and pull requests | 🔧 Enhancement | Artifact page | Links from issues and pull requests to the files, symbols and commits they mention: a file lists the items that name it, an item the files it names (F17d) | A file shows the issues that name it |
 | **V0.2.31** | ✅ 2026-10-15 | E. Issues and pull requests | 🔧 Enhancement | Connectors | Connector webhooks and remote rate limits: updates arrive on webhook, `Retry-After` is honoured, and a refused token pauses the connector and says so (F17e) | Updates arrive on webhook; `Retry-After` is honoured; a revoked token pauses the connector and says so |
 | **V0.2.32** | ✅ 2026-10-15 | F. Search, assistant, review | ✨ Feature | Assistant | Earlier turns go with each question within a token budget (about 1,500 tokens, at most 8 turns): a follow-up is searched with what it is about, "summarize it" means the file just discussed, and the reply says how many earlier messages it read (F5a) | A follow-up resolves "it" and "that file" |
-| **V0.2.33** | 🔜 Planned | F. Search, assistant, review | ✨ Feature | Retrieval | Search across all of the caller's workspaces (F5b) | Results merged by score, each checked against its workspace's role and AI policy |
+| **V0.2.33** | ✅ 2026-10-15 | F. Search, assistant, review | ✨ Feature | Retrieval | Search across all of the caller's workspaces from the dashboard (`POST /v1/search`): each workspace is searched with its own role check, matched by meaning only where its AI policy allows the caller, and the results are merged by score and name their workspace (F5b) | Results merged by score, each checked against its workspace's role and AI policy |
 | **V0.2.34** | 🔜 Planned | F. Search, assistant, review | ✨ Feature | Web shell | A keyboard command palette (F19) | Jump to a workspace, file, memory card or setting, and start assistant actions, without the mouse |
 | **V0.2.35** | 🔜 Planned | F. Search, assistant, review | ✨ Feature | Indexing | Code symbols and structure-aware chunks for Go and Java (F21a) | Both languages chunk by declaration and their symbols are searchable |
 | **V0.2.36** | 🔜 Planned | F. Search, assistant, review | ✨ Feature | Indexing | Code symbols and structure-aware chunks for C# and PHP (F21b) | Same as V0.2.35 |

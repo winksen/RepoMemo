@@ -11,6 +11,7 @@ import { SharedLayout } from "../components/SharedLayout";
 import { apiMessage } from "./format";
 import { navigate } from "./router";
 import { useOrganizationNavigation } from "./navigation";
+import { CrossWorkspaceSearch } from "./CrossSearch";
 import { OrganizationAdministration, OrganizationRail } from "./Organization";
 
 export function SharedDashboard({
@@ -60,6 +61,7 @@ export function SharedDashboard({
         <div><dt>Evidence</dt><dd>{isLoading ? "—" : summary.artifacts}</dd><span>stored artifacts</span></div>
         <div><dt>Memory</dt><dd>{isLoading ? "—" : summary.memory}</dd><span>durable team records</span></div>
       </dl>
+      {workspaces.length ? <CrossWorkspaceSearch accessToken={accessToken} /> : null}
       <section className="shared-dashboard-ledger" aria-label="Organization workspaces">
         {organizations.length ? organizations.map((organization) => {
           const organizationWorkspaces = workspaces.filter((entry) => entry.organization_id === organization.id);
