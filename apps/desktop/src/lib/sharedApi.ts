@@ -1091,11 +1091,11 @@ export function listSharedConnectors(accessToken: string, workspaceId: string): 
   return request(`/v1/workspaces/${workspaceId}/connectors`, {}, accessToken);
 }
 
-export function checkSharedConnector(accessToken: string, workspaceId: string, input: { link: string; token?: string }): Promise<ConnectorAccessCheck> {
+export function checkSharedConnector(accessToken: string, workspaceId: string, input: { link: string; provider?: string; token?: string }): Promise<ConnectorAccessCheck> {
   return request<ConnectorAccessCheck>(`/v1/workspaces/${workspaceId}/connectors/check`, { method: "POST", body: JSON.stringify(input) }, accessToken);
 }
 
-export function connectSharedConnector(accessToken: string, workspaceId: string, input: { link: string; name?: string; token?: string }): Promise<{ connector: ConnectorSource; job: IndexingJobStatus | null }> {
+export function connectSharedConnector(accessToken: string, workspaceId: string, input: { link: string; provider?: string; name?: string; token?: string }): Promise<{ connector: ConnectorSource; job: IndexingJobStatus | null }> {
   return request(`/v1/workspaces/${workspaceId}/connectors`, { method: "POST", body: JSON.stringify(input) }, accessToken);
 }
 

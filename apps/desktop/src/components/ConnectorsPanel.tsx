@@ -18,6 +18,7 @@ import {
 import type { ConnectorAccessCheck, ConnectorSource } from "../types";
 import { Button } from "./ui/button";
 import { Dialog, DialogCancel } from "./ui/dialog";
+import { Dropdown } from "./ui/dropdown";
 import { Input } from "./ui/input";
 import { showToast } from "./ui/toast";
 
@@ -51,6 +52,8 @@ export function ConnectorSettings({
 }) {
   const [connectors, setConnectors] = useState<ConnectorSource[] | null>(null);
   const [link, setLink] = useState("");
+  // "" lets the address tell GitHub from GitLab.
+  const [provider, setProvider] = useState("");
   const [token, setToken] = useState("");
   const [check, setCheck] = useState<ConnectorAccessCheck | null>(null);
   const [checkedFor, setCheckedFor] = useState("");
@@ -85,14 +88,14 @@ export function ConnectorSettings({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [syncing]);
 
-  const formKey = JSON.stringify([link.trim(), token]);
+  const formKey = JSON.stringify([link.trim(), provider, token]);
   const checkIsCurrent = check !== null && checkedFor === formKey;
 
   async function runCheck(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
     try {
-      const result = await checkSharedConnector(accessToken, workspaceId, { link: link.trim(), token: token.trim() || undefined });
+      const result = await checkSharedConnector(accessToken, workspaceId, { link: link.trim(), provider: provider || undefined, token: token.trim() || undefined });
       setCheck(result);
       setCheckedFor(formKey);
     } catch (error) {
@@ -106,7 +109,7 @@ export function ConnectorSettings({
   async function connect() {
     setBusy(true);
     try {
-      const { connector } = await connectSharedConnector(accessToken, workspaceId, { link: link.trim(), token: token.trim() || undefined });
+      const { connector } = await connectSharedConnector(accessToken, workspaceId, { link: link.trim(), provider: provider || undefined, token: token.trim() || undefined });
       setLink("");
       setToken("");
       setCheck(null);
@@ -160,7 +163,7 @@ export function ConnectorSettings({
 
   return <section className="shared-settings-group">
     <div className="shared-panel-heading"><div><GitHub size={18} /><h2>Issues and pull requests</h2></div><span>{connectors?.length ?? 0} connected</span></div>
-    <p className="shared-muted-copy">Keep a GitHub repository's issues and pull requests, with their comments, reviews and commits, as searchable and citable evidence. Closed issues and abandoned pull requests are marked outdated and come back when reopened; merged pull requests stay. A read-only token is only needed for a private repository or a higher rate limit.</p>
+    <p className="shared-muted-copy">Keep a GitHub repository's or GitLab project's issues and pull (merge) requests, with their comments, reviews and commits, as searchable and citable evidence. Closed issues and abandoned requests are marked outdated and come back when reopened; merged ones stay. A read-only token is only needed for a private repository or a higher rate limit.</p>
 
     {connectors?.length ? <ul className="rm-repo-links">
       {connectors.map((connector) => {
@@ -190,15 +193,19 @@ export function ConnectorSettings({
     <form className="rm-repo-form" onSubmit={runCheck}>
       <h3>Connect a repository's issues</h3>
       <label>Repository address
-        <Input onChange={(event) => setLink(event.target.value)} placeholder="https://github.com/acme/app" value={link} />
-        <span className="rm-map-muted">A github.com repository, or a GitHub Enterprise Server one. The server's operator names the hosts a tracker may be on.</span>
+        <Input onChange={(event) => setLink(event.target.value)} placeholder="https://github.com/acme/app or https://gitlab.com/group/project" value={link} />
+        <span className="rm-map-muted">A github.com or gitlab.com repository, or a self-hosted GitHub Enterprise Server or GitLab one. The server's operator names the hosts a tracker may be on.</span>
+      </label>
+      <label>Tracker
+        <Dropdown aria-label="Tracker" onValueChange={(value) => setProvider(value === "__detect__" ? "" : value)} options={[{ label: "Detect from the address", value: "__detect__" }, { label: "GitHub", value: "github" }, { label: "GitLab", value: "gitlab" }]} value={provider || "__detect__"} />
+        <span className="rm-map-muted">Needed only for a self-hosted address whose name does not say which it is.</span>
       </label>
       <label>Access token
         <Input autoComplete="off" onChange={(event) => setToken(event.target.value)} placeholder="Only for a private repository" type="password" value={token} />
         <span className="rm-map-muted">A read-only token with access to issues. It is stored encrypted and never shown again.</span>
       </label>
       {checkIsCurrent && check ? <div className="rm-repo-check">
-        <strong><CircleCheck size={16} /> The server can read this repository's issues</strong>
+        <strong><CircleCheck size={16} /> The server can read this {check.provider === "gitlab" ? "project" : "repository"}'s issues</strong>
         <dl className="rm-repo-facts">
           <div><dt>Repository</dt><dd>{check.name} <span className="rm-map-muted">{check.private ? "private" : "public"}</span></dd></div>
           <div><dt>Open issues</dt><dd>{check.open_issues.toLocaleString()}</dd></div>

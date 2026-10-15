@@ -204,8 +204,12 @@ impl std::fmt::Debug for SecretText {
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct ConnectorLinkRequest {
-    /// The tracker's address, such as `https://github.com/acme/app`.
+    /// The tracker's address, such as `https://github.com/acme/app` or
+    /// `https://gitlab.com/group/project`.
     link: String,
+    /// `github` or `gitlab`; without it the address tells.
+    #[serde(default)]
+    provider: Option<String>,
     name: Option<String>,
     /// A read-only token, for a private repository or a higher rate limit.
     #[serde(default)]
@@ -250,9 +254,10 @@ pub(crate) async fn check_connector(
     require_workspace_admin(&state, &subject, &workspace_id).await?;
     state
         .core
-        .check_github_issues_link(
+        .check_tracker_link(
             &workspace_id,
             &request.link,
+            request.provider.as_deref(),
             request.token.as_ref().map(|token| token.0.as_str()),
         )
         .await
@@ -269,9 +274,10 @@ pub(crate) async fn connect_connector(
     require_workspace_admin(&state, &subject, &workspace_id).await?;
     let connector = state
         .core
-        .connect_github_issues(
+        .connect_tracker(
             &workspace_id,
             &request.link,
+            request.provider.as_deref(),
             request.name,
             request.token.map(|token| token.0),
             Some(&subject.user_id),

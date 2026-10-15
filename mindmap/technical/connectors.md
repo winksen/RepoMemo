@@ -1,6 +1,6 @@
 # Connectors (issues and pull requests)
 
-> **Branch of:** [TECHNICAL_MINDMAP.md](../TECHNICAL_MINDMAP.md) · **Roadmap:** F17, decision 12 · **Status:** GitHub issues (V0.2.27) and pull requests (V0.2.28)
+> **Branch of:** [TECHNICAL_MINDMAP.md](../TECHNICAL_MINDMAP.md) · **Roadmap:** F17, decision 12 · **Status:** GitHub issues (V0.2.27) and pull requests (V0.2.28), GitLab issues and merge requests (V0.2.29)
 
 A connector keeps a tracker's items as evidence. It is a source of `type = 'connector'`: each item (an issue, or a pull request) becomes one markdown artifact, indexed like any file, so it is searchable, citable and linkable to memory cards. The tracker stays the source of truth: nothing is ever written to it.
 
@@ -13,6 +13,10 @@ A connector keeps a tracker's items as evidence. It is a source of `type = 'conn
 5. Changed artifacts are indexed in the same job, then the workspace's embeddings are requested.
 
 Syncs run in the background through a runner of their own (one at a time, never two for the same connector), on demand (*Sync now*) and on the repository polling interval. A connector that failed waits for a person.
+
+## GitLab (V0.2.29)
+
+`connectors/gitlab.rs` reads a project's `issues` and `merge_requests` (and their `notes`, `commits`) with `updated_after`, each with its own cursor (`cursor` and `pulls_cursor`). The project is addressed by its path with `/` as `%2F`, so groups and subgroups work, on gitlab.com or a self-hosted address. GitLab's records are reshaped into the GitHub-shaped ones that `render_issue` and `render_pull` read, so both providers give the same text, metadata and lifecycle; system notes are dropped and `DiffNote`s become review comments. The provider is chosen when connecting or told by the address (`gitlab` in the host name). The token goes in `PRIVATE-TOKEN`.
 
 ## Rules for the outside connection (S6)
 
@@ -44,4 +48,4 @@ Syncs run in the background through a runner of their own (one at a time, never 
 
 ## Not yet
 
-GitLab (V0.2.29), links from items to files, symbols and commits (V0.2.30), webhooks and a rate-limit pause (V0.2.31). A rate limit today fails the sync with a message and the next try resumes.
+Links from items to files, symbols and commits (V0.2.30), webhooks and a rate-limit pause (V0.2.31). A rate limit today fails the sync with a message and the next try resumes.

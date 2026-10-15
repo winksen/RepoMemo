@@ -10,6 +10,9 @@
 //! sync resumes). A closed issue or an abandoned pull request becomes
 //! *outdated* and a reopened one active again; a merged pull request stays.
 //!
+//! GitLab (V0.2.29) lives in [`gitlab`]: the same model, reshaped to the
+//! records the renderers here read.
+//!
 //! Outside rules (S6): the API host must be on `REPOMEMO_GIT_ALLOWED_HOSTS`
 //! like repository hosts, only `https` is spoken (plain `http` only to this
 //! machine, for a tracker running beside the server), redirects are not
@@ -31,6 +34,9 @@ use serde_json::{json, Value};
 
 use crate::RepoMemoCore;
 
+mod gitlab;
+use gitlab::{parse_gitlab_link, project_id};
+
 /// Issues read in one sync before it stops and resumes at the next.
 const MAX_PAGES_PER_SYNC: usize = 30;
 const PER_PAGE: usize = 100;
@@ -49,8 +55,11 @@ const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Where a tracker is: derived from the link a person typed.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct GitHubTarget {
-    /// `https://api.github.com`, or `https://host/api/v3` for Enterprise.
+pub(crate) struct TrackerTarget {
+    /// `github` or `gitlab`.
+    pub provider: String,
+    /// `https://api.github.com`, `https://host/api/v3` for Enterprise, or
+    /// `https://host/api/v4` for GitLab.
     pub api_base: String,
     pub owner: String,
     pub repo: String,
@@ -72,9 +81,12 @@ struct ConnectorMetadata {
     #[serde(default)]
     repo: String,
     /// The tracker's update time of the last item stored: the next sync asks
-    /// for what changed since.
+    /// for what changed since. GitHub has one feed for issues and pull
+    /// requests; GitLab has two, and merge requests use `pulls_cursor`.
     #[serde(default)]
     cursor: Option<String>,
+    #[serde(default)]
+    pulls_cursor: Option<String>,
     #[serde(default)]
     last_synced_at: Option<String>,
     #[serde(default)]
@@ -95,7 +107,7 @@ impl ConnectorMetadata {
 
 /// `https://github.com/acme/app(.git)` or an Enterprise address of the same
 /// shape. `http` is accepted for `localhost` and loopback addresses only.
-pub(crate) fn parse_github_link(link: &str) -> Result<GitHubTarget> {
+pub(crate) fn parse_github_link(link: &str) -> Result<TrackerTarget> {
     let text = link.trim().trim_end_matches('/');
     let (scheme, rest) = text
         .split_once("://")
@@ -148,7 +160,8 @@ pub(crate) fn parse_github_link(link: &str) -> Result<GitHubTarget> {
     } else {
         format!("{scheme}://{host_port}/api/v3")
     };
-    Ok(GitHubTarget {
+    Ok(TrackerTarget {
+        provider: "github".to_owned(),
         api_base,
         owner: (*owner).to_owned(),
         repo: repo.to_owned(),
@@ -166,11 +179,50 @@ fn host_is_github(authority: &str) -> bool {
     authority == "github.com" || authority == "www.github.com"
 }
 
+/// `github` or `gitlab`, told by the person's choice or by the address: a
+/// host with `gitlab` in its name is GitLab, and any other is GitHub (or
+/// GitHub Enterprise Server).
+pub(crate) fn parse_tracker_link(link: &str, provider: Option<&str>) -> Result<TrackerTarget> {
+    let provider = match provider.map(str::trim).filter(|value| !value.is_empty()) {
+        Some("github") => "github",
+        Some("gitlab") => "gitlab",
+        Some(_) => repomemo_domain::bail_invalid!("The tracker is GitHub or GitLab."),
+        None => {
+            let host = link
+                .split_once("://")
+                .map(|(_, rest)| rest.split('/').next().unwrap_or_default().to_ascii_lowercase())
+                .unwrap_or_default();
+            if host.contains("gitlab") {
+                "gitlab"
+            } else {
+                "github"
+            }
+        }
+    };
+    if provider == "gitlab" {
+        parse_gitlab_link(link)
+    } else {
+        parse_github_link(link)
+    }
+}
+
+/// The address that describes a project (repository) and answers whether the
+/// token can see it.
+fn project_url(target: &TrackerTarget) -> String {
+    if target.provider == "gitlab" {
+        format!("{}/projects/{}", target.api_base, project_id(target))
+    } else {
+        format!("{}/repos/{}/{}", target.api_base, target.owner, target.repo)
+    }
+}
+
 /// A GitHub REST client for one target.
 struct GitHub {
     http: reqwest::Client,
     api_base: String,
     token: Option<String>,
+    /// GitLab: the token goes in `PRIVATE-TOKEN` and no GitHub headers are sent.
+    gitlab: bool,
     /// Requests made so far.
     calls: AtomicUsize,
 }
@@ -187,6 +239,7 @@ impl GitHub {
             http,
             api_base: api_base.trim_end_matches('/').to_owned(),
             token,
+            gitlab: false,
             calls: AtomicUsize::new(0),
         })
     }
@@ -203,13 +256,19 @@ impl GitHub {
             repomemo_domain::bail_invalid!("The tracker pointed to an address outside its own API.");
         }
         self.calls.fetch_add(1, Ordering::Relaxed);
-        let mut request = self
-            .http
-            .get(url)
-            .header("Accept", "application/vnd.github+json")
-            .header("X-GitHub-Api-Version", "2022-11-28");
-        if let Some(token) = &self.token {
-            request = request.bearer_auth(token);
+        let mut request = self.http.get(url);
+        if self.gitlab {
+            request = request.header("Accept", "application/json");
+            if let Some(token) = &self.token {
+                request = request.header("PRIVATE-TOKEN", token);
+            }
+        } else {
+            request = request
+                .header("Accept", "application/vnd.github+json")
+                .header("X-GitHub-Api-Version", "2022-11-28");
+            if let Some(token) = &self.token {
+                request = request.bearer_auth(token);
+            }
         }
         let response = request.send().await.map_err(|error| {
             // The error text can carry the address, never the token.
@@ -487,7 +546,7 @@ pub(crate) fn render_pull(owner: &str, repo: &str, issue: &Value, detail: &PullD
 }
 
 impl RepoMemoCore {
-    async fn github_for(&self, source_id: Option<&str>, target: &GitHubTarget) -> Result<GitHub> {
+    async fn github_for(&self, source_id: Option<&str>, target: &TrackerTarget) -> Result<GitHub> {
         self.remote_git_policy.check_api_host(&target.host, target.port)?;
         let token = match source_id {
             Some(id) => self
@@ -498,21 +557,29 @@ impl RepoMemoCore {
                 .map(|secret| secret.expose().to_owned()),
             None => None,
         };
-        GitHub::new(&target.api_base, token)
+        let mut client = GitHub::new(&target.api_base, token)?;
+        client.gitlab = target.provider == "gitlab";
+        Ok(client)
     }
 
     /// Looks at a tracker link before it is connected, with the token that
-    /// would be used. Nothing is stored.
-    pub async fn check_github_issues_link(
+    /// would be used. Nothing is stored. `provider` is `github` or `gitlab`;
+    /// without it a host with `gitlab` in its name is GitLab and any other is
+    /// GitHub.
+    pub async fn check_tracker_link(
         &self,
         workspace_id: &str,
         link: &str,
+        provider: Option<&str>,
         token: Option<&str>,
     ) -> Result<ConnectorAccessCheck> {
         if !self.storage.workspace_exists(workspace_id).await? {
             repomemo_domain::bail_not_found!("Workspace was not found.");
         }
-        let target = parse_github_link(link)?;
+        let target = parse_tracker_link(link, provider)?;
+        if target.provider == "gitlab" {
+            return self.check_gitlab(workspace_id, &target, token).await;
+        }
         let mut client = self.github_for(None, &target).await?;
         client.token = token.map(str::trim).filter(|token| !token.is_empty()).map(str::to_owned);
         let (repository, _) = client
@@ -534,26 +601,27 @@ impl RepoMemoCore {
         })
     }
 
-    /// Connects a repository's GitHub issues to a workspace. Nothing is read
-    /// until a sync runs.
-    pub async fn connect_github_issues(
+    /// Connects a repository's (or project's) issues and pull requests to a
+    /// workspace. Nothing is read until a sync runs.
+    pub async fn connect_tracker(
         &self,
         workspace_id: &str,
         link: &str,
+        provider: Option<&str>,
         name: Option<String>,
         token: Option<String>,
         actor_user_id: Option<&str>,
     ) -> Result<ConnectorSource> {
         let check = self
-            .check_github_issues_link(workspace_id, link, token.as_deref())
+            .check_tracker_link(workspace_id, link, provider, token.as_deref())
             .await?;
-        let target = parse_github_link(link)?;
+        let target = parse_tracker_link(link, provider)?;
         let name = name
             .map(|value| value.trim().to_owned())
             .filter(|value| !value.is_empty())
             .unwrap_or_else(|| format!("{} issues", check.name));
         let metadata = ConnectorMetadata {
-            provider: "github".to_owned(),
+            provider: target.provider.clone(),
             api_base: target.api_base.clone(),
             owner: target.owner.clone(),
             repo: target.repo.clone(),
@@ -643,12 +711,14 @@ impl RepoMemoCore {
     pub async fn set_connector_token(&self, source_id: &str, token: &str, actor_user_id: Option<&str>) -> Result<()> {
         let source = self.connector_source_row(source_id).await?;
         let metadata = ConnectorMetadata::of(&source);
-        let target = parse_github_link(source.root_uri.as_deref().unwrap_or_default())?;
+        let target = if metadata.provider == "gitlab" {
+            parse_gitlab_link(source.root_uri.as_deref().unwrap_or_default())?
+        } else {
+            parse_github_link(source.root_uri.as_deref().unwrap_or_default())?
+        };
         let mut client = self.github_for(None, &target).await?;
         client.token = Some(token.trim().to_owned());
-        client
-            .get(&format!("{}/repos/{}/{}", metadata.api_base, metadata.owner, metadata.repo))
-            .await?;
+        client.get(&project_url(&target)).await?;
         self.storage
             .set_repo_credential(source_id, "token", None, token, actor_user_id)
             .await?;
@@ -703,6 +773,9 @@ impl RepoMemoCore {
     async fn sync_connector(&self, source_id: &str, job_id: &str) -> Result<ConnectorSyncReport> {
         let source = self.connector_source_row(source_id).await?;
         let mut metadata = ConnectorMetadata::of(&source);
+        if metadata.provider == "gitlab" {
+            return self.sync_gitlab(&source, metadata, job_id).await;
+        }
         let target = parse_github_link(source.root_uri.as_deref().unwrap_or_default())?;
         let client = self.github_for(Some(source_id), &target).await?;
         self.storage
@@ -822,7 +895,19 @@ impl RepoMemoCore {
             url = next;
         }
 
-        // Indexed in the same job, like a repository's files.
+        self.finish_connector_sync(&source, metadata, report, job_id).await
+    }
+
+    /// Indexes what a sync stored, in the same job like a repository's files,
+    /// and records the outcome on the source.
+    async fn finish_connector_sync(
+        &self,
+        source: &Source,
+        mut metadata: ConnectorMetadata,
+        mut report: ConnectorSyncReport,
+        job_id: &str,
+    ) -> Result<ConnectorSyncReport> {
+        let source_id = source.id.as_str();
         let pending = self
             .storage
             .list_connector_artifacts_needing_index(source_id, INDEXER_VERSION)
@@ -862,7 +947,7 @@ impl RepoMemoCore {
         Ok(report)
     }
 
-    async fn github_comments(&self, client: &GitHub, target: &GitHubTarget, number: i64) -> Result<Vec<Value>> {
+    async fn github_comments(&self, client: &GitHub, target: &TrackerTarget, number: i64) -> Result<Vec<Value>> {
         self.github_list(
             client,
             format!(
@@ -893,7 +978,7 @@ impl RepoMemoCore {
 
     /// A pull request's own record, commits, reviews, inline review comments
     /// and conversation.
-    async fn github_pull(&self, client: &GitHub, target: &GitHubTarget, number: i64, _issue: &Value) -> Result<PullDetail> {
+    async fn github_pull(&self, client: &GitHub, target: &TrackerTarget, number: i64, _issue: &Value) -> Result<PullDetail> {
         let base = format!("{}/repos/{}/{}", client.api_base, target.owner, target.repo);
         let (pull, _) = client.get(&format!("{base}/pulls/{number}")).await?;
         let commit_pages = MAX_PULL_COMMITS.div_ceil(PER_PAGE);

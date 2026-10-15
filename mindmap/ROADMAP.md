@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.28` (2026-10-15), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.29` (2026-10-15), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -363,7 +363,7 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 |---|---|---|---|---|---|
 | **V0.2.27** ✅ | ✨ | Connectors | GitHub issues as evidence (read-only token, incremental sync) | F17a, decision 12 | Issues and their comments are searchable and citable; closed issues are *outdated* |
 | **V0.2.28** ✅ | ✨ | Connectors | GitHub pull requests as evidence | F17b | Pull requests with their review discussion, linked to their commits |
-| **V0.2.29** | ✨ | Connectors | GitLab issues and merge requests | F17c | The same model as GitHub, including self-hosted GitLab |
+| **V0.2.29** ✅ | ✨ | Connectors | GitLab issues and merge requests | F17c | The same model as GitHub, including self-hosted GitLab |
 | **V0.2.30** | 🔧 | Artifact page | Links from issues and pull requests to the files, symbols and commits they mention | F17d | A file shows the issues that name it |
 | **V0.2.31** | 🔧 | Connectors | Connector webhooks and remote rate limits | F17e | Updates arrive on webhook; `Retry-After` is honoured; a revoked token pauses the connector and says so |
 
@@ -617,6 +617,14 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 - [x] A budget of 500 requests per sync, resumed from the cursor (`more_to_fetch`)
 - [x] Tests: `a_pull_request_becomes_markdown_with_its_commits_and_reviews`, the connector test with a pull request (opened, then merged, commits kept, still active)
 - [ ] Links from pull requests to files and symbols are V0.2.30
+
+#### V0.2.29: GitLab issues and merge requests
+
+- [x] **F17c** `crates/api/src/connectors/gitlab.rs`: link parsing (groups and subgroups, `%2F` project id), GitLab records reshaped into the GitHub-shaped ones the renderers read, notes split into discussion and `DiffNote` review comments, merge request detail, commits and notes, `updated_after` cursors for issues and merge requests, the same budget and indexing
+- [x] `parse_tracker_link` (provider by choice or by address), `check_tracker_link`, `connect_tracker`; the client sends `PRIVATE-TOKEN` and no GitHub headers for GitLab; `finish_connector_sync` shared
+- [x] Routes take `provider`; web: *Tracker* field and wording
+- [x] Tests: project addresses and record reshaping, `gitlab_issues_and_merge_requests_follow_the_same_model` against a stand-in GitLab (needs the provider chosen, PRIVATE-TOKEN only, closed issue outdated, merged request active with its commits, `updated_after` on the next sync)
+- [ ] Approvals are not read; links from items to files are V0.2.30
 
 ### Decisions to agree before work starts
 

@@ -11,6 +11,7 @@ use tower::ServiceExt;
 mod ai;
 mod auth;
 mod connectors;
+mod connectors_gitlab;
 mod evidence;
 mod evidence_tools;
 mod memory;

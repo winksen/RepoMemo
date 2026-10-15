@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.2 → 0.3
 
-> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.28` (2026-10-15) · **Next:** `V0.2.29`
+> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.29` (2026-10-15) · **Next:** `V0.2.30`
 > **Previous line:** [Releases 0.1 → 0.2](RELEASES_0.1.md) · **Related:** [Roadmap, Road to V0.3.0](ROADMAP.md#-road-to-v030) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
 Every release of the 0.2 line, shipped and planned, one row each. The plan comes from the [Road to V0.3.0](ROADMAP.md#-road-to-v030): **one change per release**, each shippable alone, with the security rules for a new outside connection in the release that opens it. Planned rows are proposals until decisions 7–14 in the roadmap are agreed.
@@ -61,7 +61,7 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | **V0.2.26** | ✅ 2026-10-15 | D. Remote repositories | ✨ Feature | Citations | View a cited passage at the commit it names: the file's text as it was then, labelled as such, with the cited lines marked (F16d) | A citation opens the text as it was at that commit, labelled as such |
 | **V0.2.27** | ✅ 2026-10-15 | E. Issues and pull requests | ✨ Feature | Connectors | GitHub issues as evidence: a read-only token, incremental syncs, issues with their comments searchable and citable, closed issues marked outdated (F17a, decision 12) | Issues and their comments are searchable and citable; closed issues are *outdated* |
 | **V0.2.28** | ✅ 2026-10-15 | E. Issues and pull requests | ✨ Feature | Connectors | GitHub pull requests as evidence: description, commits, reviews, inline review comments and discussion in one searchable, citable item, with its commit ids kept for links (F17b) | Pull requests with their review discussion, linked to their commits |
-| **V0.2.29** | 🔜 Planned | E. Issues and pull requests | ✨ Feature | Connectors | GitLab issues and merge requests, self-hosted included (F17c) | The same model as GitHub, including self-hosted GitLab |
+| **V0.2.29** | ✅ 2026-10-15 | E. Issues and pull requests | ✨ Feature | Connectors | GitLab issues and merge requests, self-hosted included: the same model as GitHub, with the token in `PRIVATE-TOKEN` (F17c) | The same model as GitHub, including self-hosted GitLab |
 | **V0.2.30** | 🔜 Planned | E. Issues and pull requests | 🔧 Enhancement | Artifact page | Links from issues and pull requests to the files, symbols and commits they mention (F17d) | A file shows the issues that name it |
 | **V0.2.31** | 🔜 Planned | E. Issues and pull requests | 🔧 Enhancement | Connectors | Connector webhooks and remote rate limits (F17e) | Updates arrive on webhook; `Retry-After` is honoured; a revoked token pauses the connector and says so |
 | **V0.2.32** | 🔜 Planned | F. Search, assistant, review | ✨ Feature | Assistant | Earlier turns go with each question, within a token budget (F5a) | A follow-up resolves "it" and "that file" |

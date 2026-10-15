@@ -2,6 +2,19 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.29 (2026-10-15)
+
+GitLab joins GitHub.
+
+### Added
+- **GitLab projects** (gitlab.com or self-hosted) connect from the same place as GitHub repositories: Settings › Issues and pull requests, with the project's address (groups and subgroups included, such as `https://gitlab.example.com/platform/ledger/api`). The tracker is told by the address (a host with `gitlab` in its name is GitLab) or chosen in the new *Tracker* field.
+- **The same model as GitHub:** each issue, with its notes, and each **merge request**, with its commits, inline review comments and discussion, is one searchable, citable artifact. System notes ("changed the description") are left out. Closed issues and closed merge requests are *outdated*, reopened ones active, merged ones stay active.
+- **Incremental:** issues and merge requests each have their own `updated_after` cursor, oldest update first, with the same request budget per sync as GitHub.
+- **The token goes in `PRIVATE-TOKEN`,** to the project's own host only; the host must be on `REPOMEMO_GIT_ALLOWED_HOSTS` like GitHub's. Routes accept an optional `provider` (`github` or `gitlab`).
+
+### Upgrading
+- Nothing to do. For GitLab, name its host in `REPOMEMO_GIT_ALLOWED_HOSTS`. A token with the `read_api` scope is enough.
+
 ## V0.2.28 (2026-10-15)
 
 GitHub pull requests become evidence, next to the issues.

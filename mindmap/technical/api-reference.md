@@ -191,7 +191,7 @@
 | PUT | `/v1/repositories/{source_id}` | auth | require_workspace_admin | UpdateRepositoryRequest | RepoSource |
 | DELETE | `/v1/repositories/{source_id}` | auth | require_workspace_admin | — | status |
 | GET | `/v1/workspaces/{workspace_id}/connectors` | auth | require_workspace_read | — | ConnectorsResponse |
-| POST | `/v1/workspaces/{workspace_id}/connectors` | auth | require_workspace_admin | ConnectorLinkRequest | ConnectorSyncResponse (201) |
+| POST | `/v1/workspaces/{workspace_id}/connectors` | auth | require_workspace_admin | ConnectorLinkRequest (`link`, `provider?`, `name?`, `token?`) | ConnectorSyncResponse (201) |
 | POST | `/v1/workspaces/{workspace_id}/connectors/check` | auth | require_workspace_admin | ConnectorLinkRequest | ConnectorAccessCheck |
 | GET | `/v1/connectors/{source_id}` | auth | require_workspace_read | — | ConnectorSource |
 | DELETE | `/v1/connectors/{source_id}` | auth | require_workspace_admin | — | status |
