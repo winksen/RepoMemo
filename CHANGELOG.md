@@ -2,6 +2,19 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.19 (2026-10-15)
+
+Groundwork for linking remote repositories. Nothing is linked yet: that is V0.2.20.
+
+### Added
+- **`REPOMEMO_GIT_ALLOWED_HOSTS`**: the hosts remote repository links may use, comma separated (`github.com`, `git.example.com:2222`, `*.corp.example`, or `*`). **Unset turns remote links off**, like `REPOMEMO_REPO_ROOTS` does for local ones. It shows in the server checks (*Remote repository hosts*) and in System › Overview.
+- **One address check, before any network call:** only `https` and `ssh` (including the `git@host:owner/repo` form); no credentials in the address (a token or key is entered separately); no `git://`, `http://`, `file://`, local paths, git transports such as `ext::`, options, whitespace or control characters; a valid host that is on the list. Link-local and cloud-metadata addresses are never allowed, and a private address must be named in the list. A refusal says which hosts the server allows, whether or not the address exists.
+- **A credential store for each repository link**, for a read-only token (`https`) or a deploy key (`ssh`): sealed with the same key as AI provider keys, bound to its link (a sealed value copied onto another link does not open), removed with the link. It is never returned by the API or written to the log, and the opened value cannot be printed by accident.
+- Migration 0031 (`repo_credentials`).
+
+### Upgrading
+- Nothing to do. Remote links stay off until `REPOMEMO_GIT_ALLOWED_HOSTS` is set. git resolves host names itself, so for names that point at private addresses the list is advisory: enforce it with an egress rule or a proxy on the server.
+
 ## V0.2.18 (2026-10-15)
 
 Open registration no longer reveals who has an account.

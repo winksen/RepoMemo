@@ -478,6 +478,14 @@ impl InstanceInfo {
                 ),
             ),
             (
+                "Remote repository hosts",
+                if config.git_allowed_hosts.is_empty() {
+                    "none (remote links are off)".to_owned()
+                } else {
+                    config.git_allowed_hosts.join(", ")
+                },
+            ),
+            (
                 "System administrators from the environment",
                 config.system_admin_emails.len().to_string(),
             ),

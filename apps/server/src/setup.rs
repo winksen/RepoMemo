@@ -52,6 +52,8 @@ pub(crate) struct SetupFacts {
     pub secret_key_from_env: bool,
     pub allowed_origins: Vec<String>,
     pub repo_roots: Vec<String>,
+    /// The hosts remote repository links may use; empty means they are off.
+    pub git_hosts: Vec<String>,
     pub ai_hosts_restricted: bool,
     pub trust_proxy: bool,
     pub public_url: Option<String>,
@@ -426,6 +428,24 @@ pub(crate) async fn checks(
         }
     });
 
+    checks.push(if facts.git_hosts.is_empty() {
+        SetupCheck {
+            key: "git_hosts",
+            label: "Remote repository hosts",
+            status: CheckStatus::Info,
+            detail: "Links to remote repositories are turned off.".to_owned(),
+            advice: Some("Optional. Set REPOMEMO_GIT_ALLOWED_HOSTS to the hosts repositories may be fetched from, such as github.com."),
+        }
+    } else {
+        SetupCheck {
+            key: "git_hosts",
+            label: "Remote repository hosts",
+            status: CheckStatus::Ok,
+            detail: facts.git_hosts.join(", "),
+            advice: None,
+        }
+    });
+
     checks.push(SetupCheck {
         key: "ai_hosts",
         label: "AI provider addresses",
@@ -582,6 +602,7 @@ mod tests {
                 secret_key_from_env: false,
                 allowed_origins: Vec::new(),
                 repo_roots: Vec::new(),
+                git_hosts: Vec::new(),
                 ai_hosts_restricted: false,
                 trust_proxy: false,
                 public_url: None,

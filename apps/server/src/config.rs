@@ -103,6 +103,9 @@ pub struct ServerConfig {
     pub smtp_extra_roots: Vec<Vec<u8>>,
     /// Folders repository links must sit inside; empty allows any local folder.
     pub repo_roots: Vec<PathBuf>,
+    /// Hosts remote repository links may use (`REPOMEMO_GIT_ALLOWED_HOSTS`:
+    /// `host`, `host:port`, `*.suffix` or `*`). Empty turns remote links off.
+    pub git_allowed_hosts: Vec<String>,
     /// Folders git may read although another account owns them
     /// (`REPOMEMO_GIT_SAFE_DIRECTORIES`).
     pub git_safe_directories: Vec<PathBuf>,
@@ -207,6 +210,14 @@ impl ServerConfig {
             }
             None => Vec::new(),
         };
+        let git_allowed_hosts = env_text("REPOMEMO_GIT_ALLOWED_HOSTS")
+            .map(|list| {
+                list.split(',')
+                    .map(|entry| entry.trim().to_ascii_lowercase())
+                    .filter(|entry| !entry.is_empty())
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
         let repo_roots = std::env::var_os("REPOMEMO_REPO_ROOTS")
             .map(|roots| {
                 std::env::split_paths(&roots)
@@ -289,6 +300,7 @@ impl ServerConfig {
             smtp_allowed_hosts,
             smtp_extra_roots,
             repo_roots,
+            git_allowed_hosts,
             git_safe_directories: std::env::var_os("REPOMEMO_GIT_SAFE_DIRECTORIES")
                 .map(|folders| {
                     std::env::split_paths(&folders)
@@ -368,6 +380,7 @@ impl ServerConfig {
             smtp_allowed_hosts: Vec::new(),
             smtp_extra_roots: Vec::new(),
             repo_roots: Vec::new(),
+            git_allowed_hosts: Vec::new(),
             git_safe_directories: Vec::new(),
             repo_poll_interval: None,
             maintenance: MaintenanceSettings {

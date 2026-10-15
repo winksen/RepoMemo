@@ -86,7 +86,7 @@ use axum::{
 use chrono::{Duration as ChronoDuration, Utc};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use rand_core::OsRng;
-use repomemo_api::{served_mime_type, RepoLinkPolicy, RepoMemoCore};
+use repomemo_api::{served_mime_type, RemoteGitPolicy, RepoLinkPolicy, RepoMemoCore};
 use repomemo_domain::{
     ArtifactComment, ArtifactDetail, ArtifactIndexFailure, ArtifactLifecycle, ArtifactLifecycleEvent, ArtifactSummary,
     ArtifactType, AskAnswer, AskRequest, Chunk, Citation, CollaborationTask, CreateMemoryCardRequest, DocumentPreview,
@@ -296,11 +296,20 @@ async fn build_state(
         policy
     };
 
+    let remote_git_policy = RemoteGitPolicy::with_allowed_hosts(config.git_allowed_hosts.clone());
+    if remote_git_policy.is_enabled() {
+        tracing::info!(hosts = ?remote_git_policy.allowed_hosts(), "Remote repository links are restricted to these hosts");
+    } else {
+        tracing::info!("Remote repository links are turned off: set REPOMEMO_GIT_ALLOWED_HOSTS to the hosts they may use to turn them on");
+    }
+
     // Share the same storage handle with the API core so job and activity
     // observers registered here also fire for writes that happen inside
     // `RepoMemoCore`. Without this the two halves would each hold their own
     // pool and SSE would only see writes the server layer performed directly.
-    let core = RepoMemoCore::from_storage(storage.clone()).with_repo_link_policy(repo_policy);
+    let core = RepoMemoCore::from_storage(storage.clone())
+        .with_repo_link_policy(repo_policy)
+        .with_remote_git_policy(remote_git_policy);
     runtime.share_background_limit(core.background_ai_budget().limit_handle());
 
     let event_bus = WorkspaceEventBus::new();
@@ -350,6 +359,7 @@ async fn build_state(
                 .iter()
                 .map(|root| root.to_string_lossy().into_owned())
                 .collect(),
+            git_hosts: config.git_allowed_hosts.clone(),
             ai_hosts_restricted: config.ai_allowed_hosts.is_some(),
             trust_proxy: config.trust_proxy,
             public_url: config.public_url.clone(),

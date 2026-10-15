@@ -24,6 +24,7 @@ mod health;
 mod knowledge_map;
 mod meaning;
 mod repo_overview;
+mod remote_policy;
 mod repo_policy;
 mod repo_stack;
 mod repo_sync;
@@ -31,6 +32,7 @@ mod repo_sync;
 pub use agent::{agent_capabilities, agent_conversation_title, agent_turn_label};
 pub use budget::BackgroundAiBudget;
 pub use embeddings::{EmbeddingRebuildPlan, EmbeddingRun};
+pub use remote_policy::{RemoteGitPolicy, RemoteRepository, RemoteScheme};
 pub use repo_policy::{is_network_path, RepoLinkPolicy};
 pub use repo_sync::RepoHead;
 pub use repomemo_ingestion::{abandoned_readings, served_mime_type, set_document_time_limit};
@@ -52,6 +54,7 @@ pub struct RepoMemoCore {
     storage: StorageEngine,
     retrieval: RetrievalService,
     repo_policy: std::sync::Arc<RepoLinkPolicy>,
+    remote_git_policy: std::sync::Arc<RemoteGitPolicy>,
     ai_budget: BackgroundAiBudget,
     /// Per-file results of the knowledge map and health, kept between requests.
     meaning: meaning::MeaningCache,
@@ -72,6 +75,7 @@ impl RepoMemoCore {
             storage,
             retrieval,
             repo_policy: std::sync::Arc::new(RepoLinkPolicy::unrestricted()),
+            remote_git_policy: std::sync::Arc::new(RemoteGitPolicy::disabled()),
             ai_budget: BackgroundAiBudget::default(),
             meaning: meaning::MeaningCache::default(),
         }
@@ -91,6 +95,17 @@ impl RepoMemoCore {
 
     pub fn repo_link_policy(&self) -> &RepoLinkPolicy {
         &self.repo_policy
+    }
+
+    /// Sets the hosts remote repository links may use. Without any, remote
+    /// links are off (also the default of a core with no policy given).
+    pub fn with_remote_git_policy(mut self, policy: RemoteGitPolicy) -> Self {
+        self.remote_git_policy = std::sync::Arc::new(policy);
+        self
+    }
+
+    pub fn remote_git_policy(&self) -> &RemoteGitPolicy {
+        &self.remote_git_policy
     }
 
     pub fn storage(&self) -> &StorageEngine {
