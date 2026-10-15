@@ -29,7 +29,9 @@ import {
   IconTerminal2 as Terminal,
   IconTool as Tool,
   IconUser as UserIcon,
+  IconUserCheck as UserCheck,
   IconUserCog as UserCog,
+  IconUserOff as UserOff,
   IconUsers as Users,
   IconWorld as World,
 } from "@tabler/icons-react";
@@ -38,6 +40,7 @@ import { UserAvatar } from "./UserAvatar";
 import {
   cancelSharedJob,
   createSystemBackup,
+  deactivateSystemUser,
   deleteSystemBackup,
   detachEnvironment,
   downloadSystemLogFile,
@@ -54,6 +57,7 @@ import {
   listSystemAuditEvents,
   listSystemJobs,
   listSystemUsers,
+  reactivateSystemUser,
   resetSystemSetting,
   restoreSystemBackup,
   runSystemMaintenance,
@@ -407,7 +411,7 @@ function AccessTree({ user }: { user: SystemUser }) {
   </ul>;
 }
 
-type UserAction = { kind: "grant" | "revoke" | "grant-app" | "revoke-app" | "sign-out" | "reset"; user: SystemUser };
+type UserAction = { kind: "grant" | "revoke" | "grant-app" | "revoke-app" | "sign-out" | "reset" | "deactivate" | "reactivate"; user: SystemUser };
 
 function UsersSection({ accessToken, session }: { accessToken: string; session: SharedSession }) {
   const [users, isLoading, reload] = useSystemData<SystemUser[]>(() => listSystemUsers(accessToken), [accessToken]);
@@ -433,6 +437,12 @@ function UsersSection({ accessToken, session }: { accessToken: string; session: 
       if (pending.kind === "sign-out") {
         await endSystemUserSessions(accessToken, pending.user.id);
         showToast("success", `${pending.user.display_name} was signed out of every device and their API tokens were revoked.`);
+      } else if (pending.kind === "deactivate") {
+        const ended = await deactivateSystemUser(accessToken, pending.user.id);
+        showToast("success", `${pending.user.display_name} is deactivated: signed out everywhere, ${ended.personal_tokens_revoked} API token${ended.personal_tokens_revoked === 1 ? "" : "s"} revoked, ${ended.invitations_withdrawn} invitation${ended.invitations_withdrawn === 1 ? "" : "s"} withdrawn.`);
+      } else if (pending.kind === "reactivate") {
+        await reactivateSystemUser(accessToken, pending.user.id);
+        showToast("success", `${pending.user.display_name} can sign in again with their password.`);
       } else if (pending.kind === "grant-app" || pending.kind === "revoke-app") {
         await setAppAdmin(accessToken, pending.user.id, pending.kind === "grant-app");
         showToast("success", pending.kind === "grant-app" ? `${pending.user.display_name} is now an app administrator.` : `${pending.user.display_name} is no longer an app administrator.`);
@@ -459,6 +469,8 @@ function UsersSection({ accessToken, session }: { accessToken: string; session: 
     "grant-app": { title: `Make ${pending.user.display_name} an app administrator?`, description: "They can manage users, settings, logs and maintenance for the whole server, but are not an administrator of every organization and workspace: they only reach the ones they belong to.", action: "Make app administrator" },
     "revoke-app": { title: `Remove ${pending.user.display_name} from the app administrators?`, description: pending.user.id === session.user.id ? "You will lose access to the System pages." : "They keep their own organization and workspace memberships.", action: "Remove role" },
     "sign-out": { title: `Sign ${pending.user.display_name} out everywhere?`, description: "Every device signed in to this account is signed out at once, and its personal access tokens are revoked, so scripts using them stop too. Their password is not changed.", action: "Sign out everywhere" },
+    deactivate: { title: `Deactivate ${pending.user.display_name}?`, description: "They can no longer sign in or use a token. Their sessions end now, their API tokens are revoked and the invitations they sent are withdrawn. Everything they wrote stays, and so do their memberships. An owner must transfer what they own first. You can reactivate the account later.", action: "Deactivate account" },
+    reactivate: { title: `Reactivate ${pending.user.display_name}?`, description: "They can sign in again with the password they had. Sessions, tokens and invitations that ended when the account was deactivated are not brought back.", action: "Reactivate account" },
     reset: { title: `Create a password reset link for ${pending.user.display_name}?`, description: "You get a one-time link to pass on to them. It works for 24 hours; a newer link replaces it. Their current password keeps working until the link is used; then every device of the account is signed out and sign-in lockouts are lifted.", action: "Create link" },
   }[pending.kind] : null;
 
@@ -469,8 +481,8 @@ function UsersSection({ accessToken, session }: { accessToken: string; session: 
     </div>
     {users ? <div className="rm-map-coverage"><table>
       <thead><tr><th scope="col">Person</th><th scope="col">Role</th><th scope="col">Organizations and workspaces</th><th scope="col">Sessions</th><th scope="col">Last connected</th><th scope="col">Joined</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
-      <tbody>{visible.map((user) => <tr key={user.id}>
-        <th scope="row"><span className="rm-system-person"><UserAvatar name={user.display_name} size={32} userId={user.id} /><span><strong>{user.display_name}{user.id === session.user.id ? " (you)" : ""}</strong><small>{user.email}</small></span></span></th>
+      <tbody>{visible.map((user) => <tr className={user.deactivated_at ? "rm-system-row-inactive" : undefined} key={user.id}>
+        <th scope="row"><span className="rm-system-person"><UserAvatar name={user.display_name} size={32} userId={user.id} /><span><strong>{user.display_name}{user.id === session.user.id ? " (you)" : ""}</strong><small>{user.email}</small>{user.deactivated_at ? <small><span className="rm-system-tag" title={`Deactivated ${formatTime(user.deactivated_at)}`}><UserOff size={12} /> Deactivated</span></small> : null}</span></span></th>
         <td>{user.is_system_admin ? <span className="rm-system-tag rm-system-role" title="Administers the server and every organization and workspace"><ServerCog size={13} /> Sys Admin</span> : user.is_app_admin ? <span className="rm-system-tag rm-system-role" title="Uses the System pages, without access to every organization and workspace"><UserCog size={13} /> App Admin</span> : <span className="rm-system-tag rm-system-role"><UserIcon size={13} /> User</span>}</td>
         <td><AccessTree user={user} /></td><td>{count(user.active_sessions)}</td><td>{formatTime(user.last_connected_at)}</td><td>{formatTime(user.created_at)}</td>
         <td>{session.is_system_admin ? <ActionMenu items={[
@@ -483,6 +495,9 @@ function UsersSection({ accessToken, session }: { accessToken: string; session: 
           { label: "Create password reset link", icon: <Key size={15} />, onSelect: () => setPending({ kind: "reset", user }) },
           { label: "Sign out everywhere", icon: <Logout size={15} />, onSelect: () => setPending({ kind: "sign-out", user }), destructive: true },
           { label: "Lift sign-in lockout", icon: <LockOpen size={15} />, onSelect: () => void unlock(user) },
+          user.deactivated_at
+            ? { label: "Reactivate account", icon: <UserCheck size={15} />, onSelect: () => setPending({ kind: "reactivate", user }) }
+            : { label: "Deactivate account", icon: <UserOff size={15} />, onSelect: () => setPending({ kind: "deactivate", user }), destructive: true },
         ]} label={`Actions for ${user.display_name}`} /> : null}</td>
       </tr>)}</tbody>
     </table></div> : <p className="shared-muted-copy">{isLoading ? "Loading users…" : "Users are not available."}</p>}

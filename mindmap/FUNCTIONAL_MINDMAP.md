@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.2.15` (2026-10-14). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
+> **Scope:** reflects the code at `V0.2.16` (2026-10-15). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
 
 ---
 
@@ -209,7 +209,7 @@ A **System** button in the header opens `/system`, with these pages:
 |---|---|
 | **Overview** | The back end (version, host, process, address, data folder, uptime), storage (database, log, stored files, previews), background work (indexing and embedding queues, repository syncs, conversions, live event streams), traffic since start with requests per minute for the last hour, refused and rate-limited requests, locked sign-ins, and the **front-end clients** seen in the last 24 hours (browser and system, origin, address, requests). Refreshes every 30 seconds |
 | **Usage** | Activity per day and by kind, the most active people, and every workspace with its members, files, size, passages, activity, AI requests and last activity, over 7 to 365 days |
-| **Users** | Every account with its role, a tree of its organizations (one line each, with its role) and under each the workspaces it belongs to with its role in each (owner, admin, member, viewer); system administrators show as **Admin of all organizations and workspaces** by inheritance, plus what they own, signed-in sessions and last connection. Make or remove system administrators (system administrators only) and **app administrators** (same System pages, but no automatic access to every organization and workspace), sign someone out everywhere, lift a sign-in lockout |
+| **Users** | Every account with its role, a tree of its organizations (one line each, with its role) and under each the workspaces it belongs to with its role in each (owner, admin, member, viewer); system administrators show as **Admin of all organizations and workspaces** by inheritance, plus what they own, signed-in sessions and last connection. Make or remove system administrators (system administrators only) and **app administrators** (same System pages, but no automatic access to every organization and workspace), sign someone out everywhere, lift a sign-in lockout, and **deactivate** an account (it cannot sign in or use a token, its sessions, tokens and sent invitations end, what it wrote stays; owners transfer what they own first) or **reactivate** it |
 | **Settings** | Registration, token lifetimes, sign-in protection, AI requests per person, heavy requests per person (searches and reports per minute), background AI calls per workspace, **limits** (storage per workspace, uploads per person per hour, workspaces per person, a free-disk floor below which uploads stop), automatic backups, repository check interval, maintenance and **logging**, changed at run time and kept until reset to the server default. Logging sets a level (off to trace) for each kind of log (security, workspace activity, background jobs, HTTP requests, AI providers, database, performance (how long searches, questions, metrics, the knowledge map and health checks take, at debug), and everything else), the console format (readable text, compact text or JSON lines), whether logs are kept in daily files, and how many days those files are kept. Settings only the server's environment controls are listed read-only |
 | **Mail** (inside Settings) | The mail server the server sends through: server, port, TLS or STARTTLS, sign-in (the password is never shown, only that one is saved), sender, *Send test mail* to yourself or an address, and the outbox with each message's result and retries. Mail is only sent over TLS and never holds a request. Without it, invitation and reset links are passed on by hand |
 | **Logs** | What is being recorded, then the events: live (recent, following as they arrive) or any earlier day kept in the log files, filtered by kind of log, workspace, level and text. A day's file can be downloaded |
@@ -508,7 +508,7 @@ The desktop app and the shared server keep **separate data**.
 
 ---
 
-## 13. Known functional gaps (at V0.2.15)
+## 13. Known functional gaps (at V0.2.16)
 
 These are observed in the code and are useful for prioritizing. The roadmap item that addresses each one is in brackets.
 
@@ -518,7 +518,7 @@ These are observed in the code and are useful for prioritizing. The roadmap item
 | The assistant does not remember the conversation | Follow-up questions must repeat their context [F5a, V0.2.32], and each workspace is searched on its own [F5b, V0.2.33]. |
 | Invitations and reset links are passed on by hand | Mail delivery exists since V0.2.9 (System › Settings › Mail); invitations are mailed since V0.2.10, "Forgot your password?" works by mail since V0.2.11 and task assignments and mentions are mailed since V0.2.12, and addresses are verified since V0.2.13 (an account that registered on an open server waits for its link before creating organizations or workspaces; an invitation counts), which is why registration is closed by default; the in-app reset notifications exist since V0.1.67 [F6 in V0.2.9–V0.2.12, F12 in V0.2.11, F13 in V0.2.13]. |
 | Issues and pull requests are not evidence | The discussion around the code stays in GitHub or GitLab [F17, V0.2.27–V0.2.31]. |
-| Accounts cannot be deleted or deactivated | Creator links block deletion; an administrator can only end sessions [F15, V0.2.16–V0.2.17]. |
+| Accounts cannot be deleted or anonymized | Accounts can be deactivated since V0.2.16, but their personal data stays until they can be anonymized [F15b, V0.2.17]; creator links still block deletion. |
 | A workspace cannot move to another server | Only whole environments are backed up and restored [O2, V0.2.40–V0.2.41]. |
 | The desktop app keeps its own local data | It does not open a RepoMemo server [F20, V0.2.49–V0.2.51]. |
 

@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.16 (2026-10-15)
+
+A deactivated account cannot sign in or use a token, and comes back when reactivated.
+
+### Added
+- **System › Users › Deactivate account / Reactivate account** (system administrators), and the console commands `users deactivate <email> --yes` and `users reactivate <email> --yes`; `POST /v1/system/users/{id}/deactivate` and `/reactivate` (a session or a `system` token). Both are audited as `user_deactivated` and `user_reactivated`.
+- **What deactivating ends, in one step:** every session and refresh token, every personal access token, the open event streams of the account, its pending file links, the password reset and verification links waiting for it, and the invitations it sent. Access tokens already issued stop working at once.
+- **What stays:** everything the account wrote and every membership. It shows in System › Users as *Deactivated*, with no active sessions.
+- **Refused:** deactivating your own account, the last active system administrator, and an account that still owns an organization or a workspace (the answer names them: transfer the ownership first).
+- **Sign-in says why**, but only after the right password was given: *This account has been deactivated*. A wrong password answers as for any account, so nothing is revealed about who has one. No password reset link is created or mailed for a deactivated account, and it gets no notification mail or digest.
+- A deactivated account cannot be added to an organization or a workspace until it is reactivated.
+- Migration 0029 (`users.deactivated_at`).
+
+### Upgrading
+- Nothing to do. Every account stays active. Reactivating does not bring back the sessions, tokens or invitations that ended.
+
 ## V0.2.15 (2026-10-14)
 
 A daily digest by email.

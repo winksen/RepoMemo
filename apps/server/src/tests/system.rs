@@ -657,3 +657,175 @@ async fn system_administrators_control_logging() {
     );
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn a_deactivated_account_is_shut_out_everywhere_and_comes_back_when_reactivated() {
+    let data_dir = temp_data_dir("deactivation");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let call = |method: &'static str, uri: String, who: String, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, &who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let (admin, admin_body) = register_account(&app, "deactivate-admin@example.com").await;
+    let admin_id = admin_body["user"]["id"].as_str().unwrap().to_owned();
+    let (owner, owner_body) = register_account(&app, "deactivate-owner@example.com").await;
+    let owner_id = owner_body["user"]["id"].as_str().unwrap().to_owned();
+    let (member, member_body) = register_account(&app, "deactivate-member@example.com").await;
+    let member_id = member_body["user"]["id"].as_str().unwrap().to_owned();
+    let member_refresh = member_body["refresh_token"].as_str().unwrap().to_owned();
+    let workspace_id = create_workspace(&app, &owner).await;
+    join(
+        &app,
+        &owner,
+        "workspaces",
+        &workspace_id,
+        "deactivate-member@example.com",
+        "admin",
+    )
+    .await;
+
+    // The member has a script's token and an invitation out.
+    let token = response_json(
+        call(
+            "POST",
+            "/v1/profile/tokens".to_owned(),
+            member.clone(),
+            json!({"name": "script", "scope": "read", "expires_in_days": 7}),
+        )
+        .await,
+    )
+    .await;
+    let secret = format!("Bearer {}", token["secret"].as_str().unwrap());
+    let invitation = response_json(
+        call(
+            "POST",
+            format!("/v1/workspaces/{workspace_id}/invitations"),
+            member.clone(),
+            json!({"email": "someone-new@example.com", "role": "viewer"}),
+        )
+        .await,
+    )
+    .await;
+    let invitation_token = invitation["token"].as_str().unwrap().to_owned();
+    assert_eq!(call("GET", "/v1/session".to_owned(), secret.clone(), json!({})).await.status(), 200);
+
+    // Only a system administrator, never oneself, and an owner transfers first.
+    let deactivate = |id: &str| format!("/v1/system/users/{id}/deactivate");
+    assert_eq!(
+        call("POST", deactivate(&member_id), owner.clone(), json!({})).await.status(),
+        403
+    );
+    assert_eq!(
+        call("POST", deactivate(&admin_id), admin.clone(), json!({})).await.status(),
+        409,
+        "not oneself"
+    );
+    let blocked = call("POST", deactivate(&owner_id), admin.clone(), json!({})).await;
+    assert_eq!(blocked.status(), 409, "an owner transfers what they own first");
+    assert!(response_json(blocked).await["error"]["message"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("Transfer the ownership"));
+
+    // Deactivating ends everything of the member's at once.
+    let ended = call("POST", deactivate(&member_id), admin.clone(), json!({})).await;
+    assert_eq!(ended.status(), 200);
+    let ended = response_json(ended).await;
+    assert_eq!(ended["personal_tokens_revoked"], 1);
+    assert_eq!(ended["invitations_withdrawn"], 1);
+    assert_eq!(call("GET", "/v1/session".to_owned(), member.clone(), json!({})).await.status(), 401);
+    assert_eq!(call("GET", "/v1/session".to_owned(), secret.clone(), json!({})).await.status(), 401);
+    let refreshed = app
+        .clone()
+        .oneshot(public_post("/v1/auth/refresh", json!({"refresh_token": member_refresh})))
+        .await
+        .unwrap();
+    assert_eq!(refreshed.status(), 401);
+    let signed_in = app
+        .clone()
+        .oneshot(public_post(
+            "/v1/auth/login",
+            json!({"email": "deactivate-member@example.com", "password": "not-a-real-password"}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(signed_in.status(), 403, "said once the password is right");
+    let wrong = app
+        .clone()
+        .oneshot(public_post(
+            "/v1/auth/login",
+            json!({"email": "deactivate-member@example.com", "password": "not-the-right-password"}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(wrong.status(), 401, "a wrong password says nothing about the account");
+    let preview = app
+        .clone()
+        .oneshot(public_post("/v1/invitations/preview", json!({"token": invitation_token})))
+        .await
+        .unwrap();
+    assert_eq!(preview.status(), 410, "the invitation they sent is withdrawn");
+    assert_eq!(
+        call("POST", deactivate(&member_id), admin.clone(), json!({})).await.status(),
+        409,
+        "already deactivated"
+    );
+    assert_eq!(
+        call("POST", format!("/v1/system/users/{member_id}/password-reset"), admin.clone(), json!({}))
+            .await
+            .status(),
+        409,
+        "no reset link for a deactivated account"
+    );
+
+    // The list says so, and what they wrote and belong to stays.
+    let users = response_json(call("GET", "/v1/system/users".to_owned(), admin.clone(), json!({})).await).await;
+    let listed = users
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|user| user["id"] == member_id.as_str())
+        .unwrap();
+    assert!(listed["deactivated_at"].is_string());
+    assert_eq!(listed["workspace_count"], 1);
+
+    // Reactivated, they sign in again with the same password.
+    assert_eq!(
+        call("POST", format!("/v1/system/users/{owner_id}/reactivate"), admin.clone(), json!({}))
+            .await
+            .status(),
+        409,
+        "an active account is not reactivated"
+    );
+    assert_eq!(
+        call("POST", format!("/v1/system/users/{member_id}/reactivate"), admin.clone(), json!({}))
+            .await
+            .status(),
+        204
+    );
+    let back = app
+        .clone()
+        .oneshot(public_post(
+            "/v1/auth/login",
+            json!({"email": "deactivate-member@example.com", "password": "not-a-real-password"}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(back.status(), 200);
+    assert_eq!(
+        call("GET", "/v1/session".to_owned(), member.clone(), json!({})).await.status(),
+        401,
+        "the sessions that ended stay ended"
+    );
+    let audit = response_json(call("GET", "/v1/system/audit".to_owned(), admin.clone(), json!({})).await).await;
+    let actions = audit
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|event| event["action"].as_str().unwrap().to_owned())
+        .collect::<Vec<_>>();
+    assert!(actions.contains(&"user_deactivated".to_owned()));
+    assert!(actions.contains(&"user_reactivated".to_owned()));
+    let _ = std::fs::remove_dir_all(data_dir);
+}

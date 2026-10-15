@@ -451,6 +451,14 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         )
         .route("/v1/system/users/{user_id}/unlock", post(system::unlock_user))
         .route(
+            "/v1/system/users/{user_id}/deactivate",
+            post(system::deactivate_user),
+        )
+        .route(
+            "/v1/system/users/{user_id}/reactivate",
+            post(system::reactivate_user),
+        )
+        .route(
             "/v1/system/users/{user_id}/password-reset",
             post(access::issue_password_reset),
         )

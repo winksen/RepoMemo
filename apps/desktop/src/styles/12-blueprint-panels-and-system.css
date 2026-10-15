@@ -294,6 +294,9 @@ td > .rm-system-tag { margin-left: 0; }
 .rm-system-access ul li { display: flex; align-items: center; gap: 8px; }
 .rm-system-tag.rm-system-role { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; }
 .rm-system-person small { color: var(--color-text-muted); font-weight: 400; }
+.rm-system-person .rm-system-tag { display: inline-flex; align-items: center; gap: 4px; margin-left: 0; }
+tr.rm-system-row-inactive > td, tr.rm-system-row-inactive > th { color: var(--color-text-muted); }
+tr.rm-system-row-inactive .rm-system-person img, tr.rm-system-row-inactive .rm-system-person > :first-child { opacity: 0.6; }
 .rm-system-link { padding: 0; border: 0; background: none; color: var(--color-text); font: inherit; font-weight: 600; text-align: left; text-decoration: underline; text-decoration-color: var(--color-border-strong); text-underline-offset: 3px; cursor: pointer; }
 .rm-system-link:hover { text-decoration-color: currentColor; }
 .rm-system-link:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }

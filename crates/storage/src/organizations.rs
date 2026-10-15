@@ -246,6 +246,9 @@ impl StorageEngine {
             .find_user_by_email(email)
             .await?
             .ok_or_else(|| repomemo_domain::invalid!("No RepoMemo account exists for this email address."))?;
+        if self.is_deactivated(&user.id).await? {
+            repomemo_domain::bail_invalid!("This account is deactivated. Ask a system administrator to reactivate it.");
+        }
         let now = Utc::now().to_rfc3339();
         let mut tx = self.pool.begin().await?;
         let organization_exists = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM organizations WHERE id = ?1")
@@ -555,6 +558,9 @@ impl StorageEngine {
             .find_user_by_email(email)
             .await?
             .ok_or_else(|| repomemo_domain::invalid!("No RepoMemo account exists for this email address."))?;
+        if self.is_deactivated(&user.id).await? {
+            repomemo_domain::bail_invalid!("This account is deactivated. Ask a system administrator to reactivate it.");
+        }
         // Membership of one workspace is just that: the person does not join
         // the organization, so nothing flows to its other workspaces (they
         // see the organization as a guest). Organization membership, which

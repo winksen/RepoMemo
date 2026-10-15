@@ -463,6 +463,10 @@ pub(crate) struct FileLinkClaims {
     /// Identifies the link, so its use can be remembered.
     #[serde(default)]
     pub(crate) jti: String,
+    /// Who asked for the link. A link outlives its person for no longer than
+    /// its minute: it stops working when the account is deactivated.
+    #[serde(default)]
+    pub(crate) uid: String,
 }
 
 #[derive(Debug, Serialize)]

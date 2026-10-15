@@ -663,6 +663,7 @@ export interface SystemUser {
   last_connected_at: string | null;
   is_system_admin: boolean;
   is_app_admin: boolean;
+  deactivated_at: string | null;
   organization_count: number;
   workspace_count: number;
   active_sessions: number;

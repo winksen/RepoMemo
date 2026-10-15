@@ -234,10 +234,10 @@ impl StorageEngine {
     }
 
     /// The version stamped on the user's access tokens, or `None` when the
-    /// user no longer exists.
+    /// user no longer exists or is deactivated.
     pub async fn user_session_version(&self, user_id: &str) -> Result<Option<i64>> {
         Ok(
-            sqlx::query_scalar::<_, i64>("SELECT session_version FROM users WHERE id = ?1")
+            sqlx::query_scalar::<_, i64>("SELECT session_version FROM users WHERE id = ?1 AND deactivated_at IS NULL")
                 .bind(user_id)
                 .fetch_optional(self.reader())
                 .await?,

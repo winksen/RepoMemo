@@ -72,6 +72,8 @@
 | PUT | `/v1/system/users/{user_id}/app-admin` | session | require_full_system_admin | SystemAdminRequest | status |
 | POST | `/v1/system/users/{user_id}/sessions/end` | auth | require_full_system_admin, require_system_change | — | status |
 | POST | `/v1/system/users/{user_id}/unlock` | auth | require_full_system_admin, require_system_change | — | Value |
+| POST | `/v1/system/users/{user_id}/deactivate` | auth | require_full_system_admin, require_system_change | — | Value |
+| POST | `/v1/system/users/{user_id}/reactivate` | auth | require_full_system_admin, require_system_change | — | status |
 | POST | `/v1/system/users/{user_id}/password-reset` | session | require_full_system_admin | — | IssuedPasswordReset |
 | GET | `/v1/system/settings` | auth | require_system_admin | — | SettingsResponse |
 | PUT | `/v1/system/settings` | session | require_full_system_admin | UpdateSettingsRequest | SettingsResponse |

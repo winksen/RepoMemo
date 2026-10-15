@@ -20,6 +20,7 @@ use sqlx::{QueryBuilder, Row, Sqlite, SqlitePool};
 use uuid::Uuid;
 
 mod access;
+mod accounts;
 mod activity;
 mod artifacts;
 mod collaboration;
@@ -38,6 +39,7 @@ mod system;
 mod users;
 mod vectors;
 pub use access::{PasswordReset, PersonalTokenGrant, StoredInvitation, PERSONAL_TOKEN_PREFIX};
+pub use accounts::{Deactivation, OwnedPlace};
 pub use environment::{inspect_environment, EnvironmentState};
 pub use mail::{DigestCandidate, DigestNotice, MailOutboxCounts, MailSettingsUpdate, QueuedMail, StoredMailSettings};
 pub use repo::{RepoFileRecord, RepoFileWrite};

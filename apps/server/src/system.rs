@@ -1197,6 +1197,113 @@ pub(crate) async fn unlock_user(
     Ok(Json(json!({ "cleared": cleared })))
 }
 
+/// Lists the organizations and workspaces that must change hands before an
+/// account can be deactivated, as a sentence.
+fn owned_places_text(places: &[repomemo_storage::OwnedPlace]) -> String {
+    let shown: Vec<String> = places
+        .iter()
+        .take(5)
+        .map(|place| format!("{} “{}”", place.kind, place.name))
+        .collect();
+    let more = places.len().saturating_sub(shown.len());
+    if more > 0 {
+        format!("{} and {more} more", shown.join(", "))
+    } else {
+        shown.join(", ")
+    }
+}
+
+/// Deactivates an account: it cannot sign in or use a token, its sessions,
+/// tokens and the invitations it sent end, and what it wrote stays. Owners
+/// transfer what they own first, and the last system administrator and the
+/// caller's own account are refused.
+pub(crate) async fn deactivate_user(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(user_id): Path<String>,
+) -> Result<Json<Value>, ApiError> {
+    require_full_system_admin(&subject)?;
+    require_system_change(&subject)?;
+    let user = state
+        .storage
+        .find_user(&user_id)
+        .await
+        .map_err(ApiError::internal)?
+        .ok_or_else(|| ApiError::not_found("User was not found."))?;
+    if user.id == subject.user_id {
+        return Err(ApiError::conflict(
+            "You cannot deactivate your own account. Ask another system administrator.",
+        ));
+    }
+    let owned = state
+        .storage
+        .owned_places(&user_id)
+        .await
+        .map_err(map_storage_error)?;
+    if !owned.is_empty() {
+        return Err(ApiError::conflict(format!(
+            "This account owns {}. Transfer the ownership first, then deactivate it.",
+            owned_places_text(&owned)
+        )));
+    }
+    let who = user.email.unwrap_or(user.display_name);
+    let Some(ended) = state
+        .storage
+        .deactivate_user(&user_id)
+        .await
+        .map_err(map_storage_error)?
+    else {
+        return Err(ApiError::conflict(format!("{who} is already deactivated.")));
+    };
+    audit(
+        &state,
+        &subject,
+        "user_deactivated",
+        format!(
+            "Deactivated {who}: ended their sessions, revoked {} personal access token(s) and withdrew {} invitation(s) they sent.",
+            ended.personal_tokens, ended.invitations
+        ),
+    )
+    .await;
+    Ok(Json(json!({
+        "personal_tokens_revoked": ended.personal_tokens,
+        "invitations_withdrawn": ended.invitations,
+    })))
+}
+
+/// Lets a deactivated account sign in again, with the password it had.
+pub(crate) async fn reactivate_user(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(user_id): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    require_full_system_admin(&subject)?;
+    require_system_change(&subject)?;
+    let user = state
+        .storage
+        .find_user(&user_id)
+        .await
+        .map_err(ApiError::internal)?
+        .ok_or_else(|| ApiError::not_found("User was not found."))?;
+    let who = user.email.unwrap_or(user.display_name);
+    if !state
+        .storage
+        .reactivate_user(&user_id)
+        .await
+        .map_err(map_storage_error)?
+    {
+        return Err(ApiError::conflict(format!("{who} is not deactivated.")));
+    }
+    audit(
+        &state,
+        &subject,
+        "user_reactivated",
+        format!("Reactivated {who}. They sign in again with their password."),
+    )
+    .await;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 pub(crate) async fn get_settings(
     subject: AuthenticatedSubject,
     State(state): State<AppState>,

@@ -1285,6 +1285,10 @@ pub struct SystemUser {
     pub is_system_admin: bool,
     #[serde(default)]
     pub is_app_admin: bool,
+    /// When the account was deactivated, if it is. It cannot sign in or use
+    /// tokens until it is reactivated.
+    #[serde(default)]
+    pub deactivated_at: Option<String>,
     pub organization_count: i64,
     pub workspace_count: i64,
     /// Refresh tokens that are neither revoked nor expired.

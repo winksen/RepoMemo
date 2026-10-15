@@ -1070,6 +1070,11 @@ export interface SystemUser {
   last_connected_at: string | null;
   is_system_admin: boolean;
   is_app_admin: boolean;
+  /**
+   * When the account was deactivated, if it is. It cannot sign in or use
+   * tokens until it is reactivated.
+   */
+  deactivated_at: string | null;
   organization_count: number;
   workspace_count: number;
   /** Refresh tokens that are neither revoked nor expired. */

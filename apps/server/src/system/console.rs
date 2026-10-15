@@ -61,6 +61,8 @@ const COMMANDS: &[CommandSpec] = &[
     CommandSpec { name: "tokens list", usage: "tokens list [--user email]", summary: "Personal access tokens of your account, or of another account (system administrators).", changes: false, arguments: 0, flags: &["user"] },
     CommandSpec { name: "users unlock", usage: "users unlock <email> --yes", summary: "Lifts the sign-in lockouts of an account.", changes: true, arguments: 1, flags: &[] },
     CommandSpec { name: "users signout", usage: "users signout <email> --yes", summary: "Signs an account out of every device.", changes: true, arguments: 1, flags: &[] },
+    CommandSpec { name: "users deactivate", usage: "users deactivate <email> --yes", summary: "Deactivates an account: it cannot sign in or use a token, its sessions, tokens and sent invitations end, and what it wrote stays. Owners transfer first (system administrators).", changes: true, arguments: 1, flags: &[] },
+    CommandSpec { name: "users reactivate", usage: "users reactivate <email> --yes", summary: "Lets a deactivated account sign in again with its password (system administrators).", changes: true, arguments: 1, flags: &[] },
     CommandSpec { name: "backup list", usage: "backup list", summary: "Backups kept in the data folder, with the state of the last backup or restore.", changes: false, arguments: 0, flags: &[] },
     CommandSpec { name: "backup create", usage: "backup create --yes", summary: "Starts a backup of the database, stored files and key file; watch it with backup list.", changes: true, arguments: 0, flags: &[] },
     CommandSpec { name: "backup restore", usage: "backup restore <backup> <environment> --yes", summary: "Restores a backup into a new environment folder (it never touches the running one) and checks that it opens.", changes: true, arguments: 2, flags: &[] },
@@ -834,6 +836,7 @@ async fn execute(
                         "is_system_admin",
                         "is_app_admin",
                         "active_sessions",
+                        "deactivated_at",
                         "last_connected_at",
                         "id",
                     ],
@@ -923,6 +926,47 @@ async fn execute(
             Ok(applied(
                 spec,
                 format!("Signed {name} out of every device."),
+                View::Text,
+                Value::Null,
+            ))
+        }
+
+        "users deactivate" => {
+            let user = find_account(state, &arguments[0]).await?;
+            let name = user.email.clone().unwrap_or_else(|| user.display_name.clone());
+            if !line.yes {
+                return Ok(dry_run(
+                    spec,
+                    format!(
+                        "Would deactivate {name}: they could no longer sign in or use a token, their sessions and tokens would end and the invitations they sent would be withdrawn. What they wrote stays."
+                    ),
+                ));
+            }
+            let ended = super::deactivate_user(who, state_, Path(user.id)).await?.0;
+            Ok(applied(
+                spec,
+                format!(
+                    "Deactivated {name}: revoked {} personal access token(s) and withdrew {} invitation(s).",
+                    ended["personal_tokens_revoked"], ended["invitations_withdrawn"]
+                ),
+                View::Text,
+                ended,
+            ))
+        }
+
+        "users reactivate" => {
+            let user = find_account(state, &arguments[0]).await?;
+            let name = user.email.clone().unwrap_or_else(|| user.display_name.clone());
+            if !line.yes {
+                return Ok(dry_run(
+                    spec,
+                    format!("Would let {name} sign in again with their password."),
+                ));
+            }
+            super::reactivate_user(who, state_, Path(user.id)).await?;
+            Ok(applied(
+                spec,
+                format!("Reactivated {name}. They sign in again with their password."),
                 View::Text,
                 Value::Null,
             ))

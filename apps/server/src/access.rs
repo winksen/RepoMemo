@@ -580,6 +580,16 @@ pub(crate) async fn issue_password_reset(
     Path(user_id): Path<String>,
 ) -> Result<(StatusCode, Json<IssuedPasswordReset>), ApiError> {
     crate::system::require_full_system_admin(&subject)?;
+    if state
+        .storage
+        .is_deactivated(&user_id)
+        .await
+        .map_err(ApiError::internal)?
+    {
+        return Err(ApiError::conflict(
+            "This account is deactivated. Reactivate it before creating a password reset link.",
+        ));
+    }
     let target = state
         .storage
         .user_access(&user_id)
@@ -907,6 +917,9 @@ async fn send_reset_link(state: &AppState, email: &str) {
     let Ok(Some(user)) = state.storage.find_user_by_email(email).await else {
         return;
     };
+    if state.storage.is_deactivated(&user.id).await.unwrap_or(true) {
+        return;
+    }
     let Ok((token, expires_at)) = state
         .storage
         .create_password_reset(&user.id, &user.id, SELF_SERVICE_RESET_TTL_HOURS)

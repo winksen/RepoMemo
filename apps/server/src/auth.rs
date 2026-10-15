@@ -208,6 +208,19 @@ pub(crate) async fn login(
         tracing::warn!(target: "audit", email = %email, client = %client.0, locked, "Sign-in failed");
         return Err(invalid_credentials());
     };
+    // Said only after the password is right, so it does not tell anyone
+    // else which addresses have accounts.
+    if state
+        .storage
+        .is_deactivated(&user.id)
+        .await
+        .map_err(ApiError::internal)?
+    {
+        tracing::warn!(target: "audit", user_id = %user.id, client = %client.0, "Sign-in refused: account deactivated");
+        return Err(ApiError::forbidden_because(
+            "This account has been deactivated. Ask a system administrator to reactivate it.",
+        ));
+    }
     state.guards.logins.clear(&pair_key);
     state
         .storage

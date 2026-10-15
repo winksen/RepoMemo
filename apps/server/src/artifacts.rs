@@ -236,6 +236,7 @@ pub(crate) async fn create_file_link(
         iss: FILE_LINK_ISSUER.to_owned(),
         exp: jsonwebtoken::get_current_timestamp() + FILE_LINK_TTL_SECONDS,
         jti: random_secret(),
+        uid: subject.user_id.clone(),
     };
     let token = encode(
         &Header::new(Algorithm::HS256),
@@ -276,6 +277,17 @@ pub(crate) async fn shared_file_by_link(
             Duration::from_secs(FILE_LINK_TTL_SECONDS + 5),
         );
     if !may_fetch {
+        return Err(ApiError::unauthorized());
+    }
+    // A link made for someone whose account has since been deactivated.
+    if !claims.uid.is_empty()
+        && state
+            .storage
+            .user_access(&claims.uid)
+            .await
+            .map_err(ApiError::internal)?
+            .is_none()
+    {
         return Err(ApiError::unauthorized());
     }
     let summary = state

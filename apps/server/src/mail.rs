@@ -476,6 +476,9 @@ pub(crate) async fn mail_notification(state: &AppState, mail: NotificationMail<'
     let Some(address) = recipient.email else {
         return;
     };
+    if state.storage.is_deactivated(&recipient.id).await.unwrap_or(true) {
+        return;
+    }
     let actor_name = actor
         .ok()
         .flatten()

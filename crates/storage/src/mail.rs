@@ -364,7 +364,7 @@ impl StorageEngine {
                JOIN users u ON u.id = p.user_id
                LEFT JOIN mail_digests d ON d.user_id = u.id
                WHERE p.kind = 'daily_digest' AND p.channel = 'mail'
-                 AND u.email_unverified_at IS NULL
+                 AND u.email_unverified_at IS NULL AND u.deactivated_at IS NULL
                  AND (d.last_sent_at IS NULL OR d.last_sent_at <= ?1)"#,
         )
         .bind(day_ago)
