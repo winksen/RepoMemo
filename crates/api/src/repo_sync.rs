@@ -672,6 +672,14 @@ impl RepoMemoCore {
             self.storage.set_repo_file_code_owners(source_id, &owner_rows).await?;
         }
 
+        // Items that name these files (or their commits) may be older than
+        // the files: look again at what the workspace's trackers mention.
+        if !report.cancelled {
+            if let Err(error) = self.refresh_workspace_mentions(&source.workspace_id).await {
+                tracing::warn!(repository = %source_id, error = %format!("{error:#}"), "Mentions could not be refreshed");
+            }
+        }
+
         report.skipped = skips.total;
         report.skipped_by_reason = skips.into_counts();
 

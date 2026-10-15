@@ -666,6 +666,27 @@ pub struct RepoAccessCheck {
     pub already_connected: bool,
 }
 
+/// One end of a mention: an issue or pull request that names a file, or a
+/// file that an item names.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArtifactMention {
+    pub artifact_id: String,
+    pub title: String,
+    pub artifact_type: ArtifactType,
+    pub path: String,
+    /// `file`, `symbol` or `commit`: what the text named.
+    pub kind: String,
+    /// The path, symbol or commit id as named.
+    pub label: String,
+}
+
+/// What names an artifact, and what it names (roadmap F17d).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ArtifactMentions {
+    pub mentioned_in: Vec<ArtifactMention>,
+    pub mentions: Vec<ArtifactMention>,
+}
+
 /// The job kind of a connector's sync.
 pub const CONNECTOR_SYNC_JOB_KIND: &str = "connector_sync";
 

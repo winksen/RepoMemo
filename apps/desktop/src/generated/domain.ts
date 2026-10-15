@@ -587,6 +587,27 @@ export interface RepoAccessCheck {
 }
 
 /**
+ * One end of a mention: an issue or pull request that names a file, or a
+ * file that an item names.
+ */
+export interface ArtifactMention {
+  artifact_id: string;
+  title: string;
+  artifact_type: ArtifactType;
+  path: string;
+  /** `file`, `symbol` or `commit`: what the text named. */
+  kind: string;
+  /** The path, symbol or commit id as named. */
+  label: string;
+}
+
+/** What names an artifact, and what it names (roadmap F17d). */
+export interface ArtifactMentions {
+  mentioned_in: ArtifactMention[];
+  mentions: ArtifactMention[];
+}
+
+/**
  * A tracker connected to a workspace: its issues (and later pull requests)
  * are kept as evidence (roadmap F17).
  */

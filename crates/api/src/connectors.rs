@@ -908,6 +908,13 @@ impl RepoMemoCore {
         job_id: &str,
     ) -> Result<ConnectorSyncReport> {
         let source_id = source.id.as_str();
+        // What the items name (files, symbols, commits), so a file's page can
+        // list the items that mention it.
+        if report.added + report.updated > 0 {
+            if let Err(error) = self.refresh_workspace_mentions(&source.workspace_id).await {
+                tracing::warn!(connector = %source.name, error = %format!("{error:#}"), "Mentions could not be refreshed");
+            }
+        }
         let pending = self
             .storage
             .list_connector_artifacts_needing_index(source_id, INDEXER_VERSION)

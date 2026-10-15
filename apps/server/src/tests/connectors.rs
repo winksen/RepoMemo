@@ -38,7 +38,7 @@ async fn start_fake_github(state: FakeGitHub) -> String {
                     axum::Json(json!([
                         {"number": 1, "title": "Refunds double post", "state": "open", "comments": 1,
                          "user": {"login": "ana"}, "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-02T00:00:00Z",
-                         "html_url": "https://github.com/acme/app/issues/1", "body": "Seen on staging with the ledger.",
+                         "html_url": "https://github.com/acme/app/issues/1", "body": "Seen on staging: the bug is in src/ledger.rs, where `post_refund` posts twice.",
                          "labels": [{"name": "bug"}], "assignees": []},
                         {"number": 2, "title": "Old rounding rule", "state": "closed", "comments": 0,
                          "user": {"login": "bo"}, "created_at": "2025-12-01T00:00:00Z", "updated_at": "2026-01-03T00:00:00Z",
@@ -323,4 +323,132 @@ async fn github_issues_become_evidence_that_follows_the_tracker() {
     .await;
     assert_eq!(left.as_array().unwrap().len(), 0);
     let _ = std::fs::remove_dir_all(data_dir);
+}
+
+#[tokio::test]
+async fn a_file_lists_the_issues_that_name_it() {
+    let fake = FakeGitHub::default();
+    *fake.version.lock().unwrap() = 1;
+    let base = start_fake_github(fake.clone()).await;
+
+    // A repository with the file and symbol the first issue names.
+    let root = std::env::temp_dir().join(format!("repomemo-server-mentions-{}", uuid::Uuid::new_v4()));
+    let repo_dir = root.join("repos").join("app");
+    std::fs::create_dir_all(repo_dir.join("src")).unwrap();
+    let git = |args: &[&str]| {
+        let status = std::process::Command::new("git")
+            .arg("-C")
+            .arg(&repo_dir)
+            .args(["-c", "user.name=Test", "-c", "user.email=test@example.com"])
+            .args(args)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .unwrap();
+        assert!(status.success());
+    };
+    git(&["init", "--quiet", "--initial-branch=main"]);
+    std::fs::write(
+        repo_dir.join("src/ledger.rs"),
+        "pub fn post_refund(amount: u64) -> u64 {\n    amount\n}\n",
+    )
+    .unwrap();
+    git(&["add", "."]);
+    git(&["commit", "--quiet", "-m", "Initial"]);
+
+    let mut config = ServerConfig::for_test(root.join("data"));
+    config.git_allowed_hosts = vec!["127.0.0.1".to_owned()];
+    config.repo_roots = vec![root.join("repos")];
+    let app = router(config).await.unwrap();
+    let (owner, _) = register_account(&app, "mention-owner@example.com").await;
+    let workspace_id = create_workspace(&app, &owner).await;
+    let call = |method: &'static str, uri: String, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, &owner, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let repository = response_json(
+        call(
+            "POST",
+            format!("/v1/workspaces/{workspace_id}/repositories"),
+            json!({"link": repo_dir.display().to_string()}),
+        )
+        .await,
+    )
+    .await;
+    let repository_id = repository["repository"]["id"].as_str().unwrap().to_owned();
+    for _ in 0..150 {
+        let state = response_json(call("GET", format!("/v1/repositories/{repository_id}"), json!({})).await).await;
+        if state["status"] == "ready" && state["active_job"].is_null() && state["indexed_file_count"] == 1 {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+    let files = response_json(call("GET", format!("/v1/repositories/{repository_id}/files"), json!({})).await).await;
+    let file_id = files[0]["artifact_id"].as_str().unwrap().to_owned();
+
+    // The tracker's first issue says where the bug is.
+    let connected = response_json(
+        call(
+            "POST",
+            format!("/v1/workspaces/{workspace_id}/connectors"),
+            json!({"link": format!("{base}/acme/app")}),
+        )
+        .await,
+    )
+    .await;
+    let source_id = connected["connector"]["id"].as_str().unwrap().to_owned();
+    for _ in 0..150 {
+        let connector = response_json(call("GET", format!("/v1/connectors/{source_id}"), json!({})).await).await;
+        if connector["status"] == "ready" && connector["active_job"].is_null() && connector["last_report"]["added"] == 3 {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+
+    let mentions = response_json(call("GET", format!("/v1/artifacts/{file_id}/mentions"), json!({})).await).await;
+    let named_in = mentions["mentioned_in"].as_array().unwrap();
+    assert!(
+        named_in
+            .iter()
+            .any(|mention| mention["kind"] == "file" && mention["title"].as_str().unwrap().contains("Refunds double post")),
+        "{mentions}"
+    );
+    assert!(
+        named_in
+            .iter()
+            .any(|mention| mention["kind"] == "symbol" && mention["label"] == "post_refund"),
+        "{mentions}"
+    );
+
+    // And the item lists what it names.
+    let artifacts = response_json(
+        call("GET", format!("/v1/workspaces/{workspace_id}/artifacts"), json!({})).await,
+    )
+    .await;
+    let issue = artifacts
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|artifact| artifact["title"].as_str().unwrap().contains("Refunds double post"))
+        .unwrap();
+    let from_issue = response_json(
+        call("GET", format!("/v1/artifacts/{}/mentions", issue["id"].as_str().unwrap()), json!({})).await,
+    )
+    .await;
+    assert!(from_issue["mentions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|mention| mention["artifact_id"] == file_id.as_str()));
+
+    // Outsiders cannot read them.
+    let (outsider, _) = register_account(&app, "mention-outsider@example.com").await;
+    let refused = app
+        .clone()
+        .oneshot(auth_request("GET", &format!("/v1/artifacts/{file_id}/mentions"), &outsider))
+        .await
+        .unwrap();
+    assert_eq!(refused.status(), 403);
+    let _ = std::fs::remove_dir_all(root);
 }

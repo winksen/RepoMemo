@@ -26,6 +26,7 @@ import type {
   HealthActionResult,
   WorkspaceHealth,
   ArtifactDetail,
+  ArtifactMentions,
   ConnectorAccessCheck,
   ConnectorSource,
   RepoFileAtCommit,
@@ -699,6 +700,11 @@ export function querySharedArtifacts(accessToken: string, workspaceId: string, i
 /** A repository file's text as it was at a commit (what a citation names). */
 export function getSharedArtifactAtCommit(accessToken: string, artifactId: string, commit: string): Promise<RepoFileAtCommit> {
   return request<RepoFileAtCommit>(`/v1/artifacts/${artifactId}/at/${encodeURIComponent(commit)}`, {}, accessToken);
+}
+
+/** The items that name an artifact, and what it names (roadmap F17d). */
+export function getSharedArtifactMentions(accessToken: string, artifactId: string): Promise<ArtifactMentions> {
+  return request<ArtifactMentions>(`/v1/artifacts/${artifactId}/mentions`, {}, accessToken);
 }
 
 export function getSharedArtifact(accessToken: string, artifactId: string): Promise<ArtifactDetail> {

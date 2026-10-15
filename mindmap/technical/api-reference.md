@@ -197,6 +197,7 @@
 | DELETE | `/v1/connectors/{source_id}` | auth | require_workspace_admin | — | status |
 | POST | `/v1/connectors/{source_id}/sync` | auth | require_workspace_write | — | ConnectorSyncResponse |
 | PUT | `/v1/connectors/{source_id}/token` | auth | require_workspace_admin | ConnectorTokenRequest | ConnectorSource |
+| GET | `/v1/artifacts/{artifact_id}/mentions` | auth | require_workspace_read | — | ArtifactMentions |
 | GET | `/v1/artifacts/{artifact_id}/at/{commit}` | auth | require_workspace_read | — | RepoFileAtCommit |
 | POST | `/v1/repositories/{source_id}/webhook` | auth | require_workspace_admin | — | WebhookCreated |
 | DELETE | `/v1/repositories/{source_id}/webhook` | auth | require_workspace_admin | — | status |

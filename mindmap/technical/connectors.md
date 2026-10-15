@@ -14,6 +14,10 @@ A connector keeps a tracker's items as evidence. It is a source of `type = 'conn
 
 Syncs run in the background through a runner of their own (one at a time, never two for the same connector), on demand (*Sync now*) and on the repository polling interval. A connector that failed waits for a person.
 
+## Links to code (V0.2.30)
+
+`artifact_mentions` (migration 0035) records which file artifact an item's text names: a path (or a file name only one file has), a backticked symbol with at most three definitions, or a commit that is the last change of a file (by hash prefix of 7+ characters, or one of a pull request's own commits). `MentionIndex` is built from `repo_files` (path suffixes, `last_change_commit`) and `symbols`; `find_mentions` is a pure function. Mentions are recomputed for the workspace's items after a connector sync that changed something and after every repository sync, so order does not matter. `GET /v1/artifacts/{id}/mentions` returns `mentioned_in` and `mentions`.
+
 ## GitLab (V0.2.29)
 
 `connectors/gitlab.rs` reads a project's `issues` and `merge_requests` (and their `notes`, `commits`) with `updated_after`, each with its own cursor (`cursor` and `pulls_cursor`). The project is addressed by its path with `/` as `%2F`, so groups and subgroups work, on gitlab.com or a self-hosted address. GitLab's records are reshaped into the GitHub-shaped ones that `render_issue` and `render_pull` read, so both providers give the same text, metadata and lifecycle; system notes are dropped and `DiffNote`s become review comments. The provider is chosen when connecting or told by the address (`gitlab` in the host name). The token goes in `PRIVATE-TOKEN`.
@@ -48,4 +52,4 @@ Syncs run in the background through a runner of their own (one at a time, never 
 
 ## Not yet
 
-Links from items to files, symbols and commits (V0.2.30), webhooks and a rate-limit pause (V0.2.31). A rate limit today fails the sync with a message and the next try resumes.
+Webhooks and a rate-limit pause (V0.2.31). A rate limit today fails the sync with a message and the next try resumes.

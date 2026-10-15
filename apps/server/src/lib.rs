@@ -642,6 +642,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         )
         .route("/v1/artifacts/{artifact_id}/folder", put(move_artifact))
         .route("/v1/artifacts/{artifact_id}/at/{commit}", get(get_artifact_at_commit))
+        .route("/v1/artifacts/{artifact_id}/mentions", get(get_artifact_mentions))
         .route("/v1/artifacts/{artifact_id}/file", get(download_artifact_file))
         .route(
             "/v1/artifacts/{artifact_id}/document-preview",

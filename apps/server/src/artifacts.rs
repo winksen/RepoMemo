@@ -619,6 +619,27 @@ pub(crate) async fn get_artifact(
     Ok(Json(artifact))
 }
 
+/// The items that name an artifact (issues, pull requests), and what the
+/// artifact itself names.
+pub(crate) async fn get_artifact_mentions(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(artifact_id): Path<String>,
+) -> Result<Json<repomemo_domain::ArtifactMentions>, ApiError> {
+    let summary = state
+        .storage
+        .get_artifact_summary(&artifact_id)
+        .await
+        .map_err(map_storage_error)?;
+    require_workspace_read(&state, &subject, &summary.workspace_id).await?;
+    state
+        .core
+        .artifact_mentions(&artifact_id)
+        .await
+        .map(Json)
+        .map_err(map_core_error)
+}
+
 /// A repository file as it was at a commit (the one a citation names).
 pub(crate) async fn get_artifact_at_commit(
     subject: AuthenticatedSubject,

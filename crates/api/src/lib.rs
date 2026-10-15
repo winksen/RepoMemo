@@ -25,6 +25,7 @@ mod embeddings;
 mod health;
 mod knowledge_map;
 mod meaning;
+mod mentions;
 mod repo_overview;
 mod remote_policy;
 mod remote_repo;

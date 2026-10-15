@@ -2,6 +2,19 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.30 (2026-10-15)
+
+A file shows the issues and pull requests that name it.
+
+### Added
+- **Mentioned in / Mentions** on the page of a repository file, an issue and a pull request. A file lists the issues and pull requests whose text names it, one of its symbols, or the commit that last changed it; an issue or pull request lists the files it names.
+- **What counts as a mention:** a **path** (`src/ledger.rs`, or `ledger.rs` when only one file in the workspace has that name), a **symbol in backticks** (`` `post_refund()` ``, `` `Ledger::post_refund` ``; one with more than three definitions is too common to link), and a **commit** (a hash of 7 characters or more, or a pull request's own commits) that is the last change of a file. A name that could mean several files is left alone: nothing is guessed.
+- **Kept current:** mentions are recomputed when a connector syncs something and when a repository syncs, so a file added after the issue was written still gets linked. `GET /v1/artifacts/{id}/mentions` (members of the workspace) returns both directions.
+- Migration 0035 (`artifact_mentions`).
+
+### Upgrading
+- Nothing to do. Links appear after the next sync of a connector that changed something or of a repository.
+
 ## V0.2.29 (2026-10-15)
 
 GitLab joins GitHub.
