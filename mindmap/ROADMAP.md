@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.25` (2026-10-15), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.26` (2026-10-15), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -355,7 +355,7 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 | **V0.2.23** ✅ | ✨ | Repositories | Push webhooks from GitHub, GitLab and a generic sender | F16a | An unsigned or wrongly signed call is refused (HMAC, constant time); a push queues one sync |
 | **V0.2.24** ✅ | ✨ | Artifact page | Last author and date per repository file | F16b | Shown on the file and in search results, from one `git log` pass per sync |
 | **V0.2.25** ✅ | ✨ | Artifact page | `CODEOWNERS` as ownership hints | F16c | The matching owners show on the file, as hints next to its lifecycle owner |
-| **V0.2.26** | ✨ | Citations | View a cited passage at the commit it names | F16d | A citation opens the text as it was at that commit, labelled as such |
+| **V0.2.26** ✅ | ✨ | Citations | View a cited passage at the commit it names | F16d | A citation opens the text as it was at that commit, labelled as such |
 
 #### Track E: Issues and pull requests (V0.2.27–V0.2.31)
 
@@ -593,6 +593,13 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 - [x] Web: *CODEOWNERS suggests …* on the file's page
 - [x] Tests: the matcher (forms, sections, wildcards) and the sync test (README and `src/` files carry their owners)
 - [ ] Owners are not matched to workspace members, and are not shown in the file list or search results
+
+#### V0.2.26: A citation at its commit
+
+- [x] **F16d** `GitRepo::file_at` (hex commit check, `cat-file -s` then `blob`, 1 MiB cap, plain messages for a missing commit, file or blob); `RepoMemoCore::repo_file_at_commit` (local folder or the bare clone); `GET /v1/artifacts/{id}/at/{commit}` with `require_workspace_read`
+- [x] Web: `ViewAtCommit` beside citations in Ask answers, AI overviews and the assistant; the dialog labels the commit and whether it is current, and marks the cited lines
+- [x] Tests: `file_at` on a real repository, `a_citation_opens_the_file_as_it_was_at_the_commit_it_names` (old text, current commit named, unknown and odd commits refused, outsiders refused)
+- [ ] Memory-card evidence links and the repository summary's citations do not offer it yet
 
 ### Decisions to agree before work starts
 

@@ -210,6 +210,44 @@ impl RepoMemoCore {
         GitRepo::open_bare(&directory).await
     }
 
+    /// A repository file's text as it was at the commit a citation names.
+    pub async fn repo_file_at_commit(&self, artifact_id: &str, commit: &str) -> Result<repomemo_domain::RepoFileAtCommit> {
+        const MAX_BYTES: u64 = 1024 * 1024;
+        let Some((source_id, path)) = self.storage.repo_file_of_artifact(artifact_id).await? else {
+            repomemo_domain::bail_not_found!("This is not a repository file.");
+        };
+        let source = self.repo_source_row(&source_id).await?;
+        let metadata = RepoSourceMetadata::of(&source);
+        let repo = if metadata.remote.is_some() {
+            GitRepo::open_bare(&self.remote_clone_dir(&source_id)).await?
+        } else {
+            self.open_linked_repo(std::path::Path::new(source.root_uri.as_deref().unwrap_or_default()))
+                .await?
+        };
+        let bytes = repo.file_at(commit, &path, MAX_BYTES).await?;
+        if bytes.contains(&0) {
+            repomemo_domain::bail_invalid!("This file is not text, so it cannot be shown at a commit.");
+        }
+        let info = repo.commit_info(commit).await?;
+        let current = self.storage.get_artifact(artifact_id).await?;
+        let current_commit = current
+            .metadata
+            .get("commit")
+            .and_then(|value| value.as_str())
+            .filter(|current| *current != info.sha)
+            .map(str::to_owned);
+        Ok(repomemo_domain::RepoFileAtCommit {
+            artifact_id: artifact_id.to_owned(),
+            path,
+            commit: info.sha,
+            summary: info.summary,
+            author_name: info.author_name,
+            committed_at: info.committed_at,
+            current_commit,
+            text: String::from_utf8_lossy(&bytes).into_owned(),
+        })
+    }
+
     /// The size of the server's copy of every remote repository, largest first.
     pub async fn remote_clone_sizes(&self, workspace_id: Option<&str>) -> Result<Vec<CloneSize>> {
         let mut sizes = Vec::new();

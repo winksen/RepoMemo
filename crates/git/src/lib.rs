@@ -331,6 +331,41 @@ impl GitRepo {
         Ok(parse_last_changes(&String::from_utf8_lossy(&output.stdout)))
     }
 
+    /// The content of `path` as it was at `commit`, without reading the work
+    /// tree. Fails with a plain message when the commit or the file is not
+    /// there (a force-push can drop commits, and a partial clone does not hold
+    /// blobs over its size limit).
+    pub async fn file_at(&self, commit: &str, path: &str, max_bytes: u64) -> Result<Vec<u8>> {
+        if commit.len() < 7 || commit.len() > 64 || !commit.chars().all(|value| value.is_ascii_hexdigit()) {
+            repomemo_domain::bail_invalid!("{commit:?} is not a commit id.");
+        }
+        if path.is_empty() || path.contains(['\0', '\n', '\r']) {
+            repomemo_domain::bail_invalid!("That is not a file path.");
+        }
+        let spec = format!("{commit}:{path}");
+        let size = git_command(&self.root).args(["cat-file", "-s", &spec]).output().await?;
+        if !size.status.success() {
+            let detail = stderr_text(&size.stderr);
+            if detail.contains("exists on disk") || detail.contains("does not exist") || detail.contains("not in") {
+                repomemo_domain::bail_not_found!("This file did not exist at that commit.");
+            }
+            repomemo_domain::bail_not_found!(
+                "That commit is not in the server's copy of the repository any more (it may have been force-pushed away)."
+            );
+        }
+        let size = String::from_utf8_lossy(&size.stdout).trim().parse::<u64>().unwrap_or(u64::MAX);
+        if size > max_bytes {
+            repomemo_domain::bail_invalid!("This file is too large to show at a commit.");
+        }
+        let content = git_command(&self.root).args(["cat-file", "blob", &spec]).output().await?;
+        if !content.status.success() {
+            repomemo_domain::bail_not_found!(
+                "The content of this file at that commit is not held by the server (it was too large to copy)."
+            );
+        }
+        Ok(content.stdout)
+    }
+
     /// Files renamed between two commits, as `(old path, new path)`, found by
     /// content similarity (`git diff -M`): a file renamed *and* edited counts
     /// while about half of it is unchanged, which comparing blob ids cannot see.
@@ -771,6 +806,11 @@ mod tests {
         assert_eq!(info.sha, head);
         assert_eq!(info.summary, "Initial commit");
         assert_eq!(repo.recent_commits(&head, 5).await.unwrap(), vec![info]);
+        assert_eq!(repo.file_at(&head, "README.md", 1024).await.unwrap(), b"# Hello\n");
+        assert!(repo.file_at(&head, "missing.md", 1024).await.is_err());
+        assert!(repo.file_at(&head, "README.md", 3).await.is_err(), "over the size limit");
+        assert!(repo.file_at("deadbeefdeadbeef", "README.md", 1024).await.is_err());
+        assert!(repo.file_at("--oops", "README.md", 1024).await.is_err());
         let last = repo.last_changes(&head, 100).await.unwrap();
         assert_eq!(last["README.md"].sha, head);
         assert_eq!(last["docs/guide.md"].author_name, "Test");

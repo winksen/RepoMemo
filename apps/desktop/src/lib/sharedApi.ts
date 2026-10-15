@@ -26,6 +26,7 @@ import type {
   HealthActionResult,
   WorkspaceHealth,
   ArtifactDetail,
+  RepoFileAtCommit,
   ArtifactComment,
   ArtifactLifecycle,
   ArtifactLifecycleEvent,
@@ -691,6 +692,11 @@ export function querySharedArtifacts(accessToken: string, workspaceId: string, i
       indexed: input.indexed ?? null,
     }),
   }, accessToken);
+}
+
+/** A repository file's text as it was at a commit (what a citation names). */
+export function getSharedArtifactAtCommit(accessToken: string, artifactId: string, commit: string): Promise<RepoFileAtCommit> {
+  return request<RepoFileAtCommit>(`/v1/artifacts/${artifactId}/at/${encodeURIComponent(commit)}`, {}, accessToken);
 }
 
 export function getSharedArtifact(accessToken: string, artifactId: string): Promise<ArtifactDetail> {

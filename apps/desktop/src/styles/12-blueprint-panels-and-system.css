@@ -419,3 +419,10 @@ tr.rm-system-row-inactive .rm-system-person img, tr.rm-system-row-inactive .rm-s
 .shared-bulk-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 10px; }
 .shared-bulk-bar > span { color: var(--color-text-muted); font-size: 13px; }
 .shared-select-box { align-self: center; margin-right: 8px; }
+
+/* A citation that names a commit: the open button and "View at <commit>" side by side. */
+.shared-assistant-citation-row { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.shared-assistant-citation-row .shared-assistant-citation { min-width: 0; }
+.shared-assistant-citation-commit { flex: none; min-height: 0; padding: 1px 8px; font-size: 11px; }
+.shared-commit-text { max-height: 60vh; margin: 0; padding: 12px; overflow: auto; font-family: var(--font-mono); font-size: 12px; line-height: 1.5; white-space: pre; border: 1px solid var(--color-border); border-radius: 6px; }
+.shared-commit-text mark { display: inline-block; min-width: 100%; }

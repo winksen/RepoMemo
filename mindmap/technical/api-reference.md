@@ -190,6 +190,7 @@
 | GET | `/v1/repositories/{source_id}` | auth | require_workspace_read | — | RepoSource |
 | PUT | `/v1/repositories/{source_id}` | auth | require_workspace_admin | UpdateRepositoryRequest | RepoSource |
 | DELETE | `/v1/repositories/{source_id}` | auth | require_workspace_admin | — | status |
+| GET | `/v1/artifacts/{artifact_id}/at/{commit}` | auth | require_workspace_read | — | RepoFileAtCommit |
 | POST | `/v1/repositories/{source_id}/webhook` | auth | require_workspace_admin | — | WebhookCreated |
 | DELETE | `/v1/repositories/{source_id}/webhook` | auth | require_workspace_admin | — | status |
 | PUT | `/v1/repositories/{source_id}/deploy-key` | auth | require_workspace_admin | RepositoryDeployKeyRequest | RepoSource |

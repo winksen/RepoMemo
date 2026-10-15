@@ -634,6 +634,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             axum::routing::patch(rename_folder).delete(delete_folder),
         )
         .route("/v1/artifacts/{artifact_id}/folder", put(move_artifact))
+        .route("/v1/artifacts/{artifact_id}/at/{commit}", get(get_artifact_at_commit))
         .route("/v1/artifacts/{artifact_id}/file", get(download_artifact_file))
         .route(
             "/v1/artifacts/{artifact_id}/document-preview",

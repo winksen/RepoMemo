@@ -666,6 +666,22 @@ pub struct RepoAccessCheck {
     pub already_connected: bool,
 }
 
+/// A repository file's text as it was at a commit, for a citation that names
+/// one. It is not the file's current content.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RepoFileAtCommit {
+    pub artifact_id: String,
+    pub path: String,
+    /// The full commit id.
+    pub commit: String,
+    pub summary: String,
+    pub author_name: String,
+    pub committed_at: String,
+    /// The commit the workspace's current copy is from, when it differs.
+    pub current_commit: Option<String>,
+    pub text: String,
+}
+
 /// A file of a repository source that is currently in its tree.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RepoFile {

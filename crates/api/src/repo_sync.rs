@@ -371,7 +371,7 @@ impl RepoMemoCore {
 
     /// Opens a repository that is already linked, re-checking the link policy
     /// so a narrowed policy also stops syncs of older links.
-    async fn open_linked_repo(&self, root: &Path) -> Result<GitRepo> {
+    pub(crate) async fn open_linked_repo(&self, root: &Path) -> Result<GitRepo> {
         self.repo_policy.check(root)?;
         let repo = GitRepo::open(root).await?;
         self.repo_policy.check(repo.root())?;

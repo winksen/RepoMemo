@@ -619,6 +619,26 @@ pub(crate) async fn get_artifact(
     Ok(Json(artifact))
 }
 
+/// A repository file as it was at a commit (the one a citation names).
+pub(crate) async fn get_artifact_at_commit(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path((artifact_id, commit)): Path<(String, String)>,
+) -> Result<Json<repomemo_domain::RepoFileAtCommit>, ApiError> {
+    let summary = state
+        .storage
+        .get_artifact_summary(&artifact_id)
+        .await
+        .map_err(map_storage_error)?;
+    require_workspace_read(&state, &subject, &summary.workspace_id).await?;
+    state
+        .core
+        .repo_file_at_commit(&artifact_id, &commit)
+        .await
+        .map(Json)
+        .map_err(map_core_error)
+}
+
 pub(crate) async fn list_artifact_chunks(
     subject: AuthenticatedSubject,
     State(state): State<AppState>,

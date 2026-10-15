@@ -2,6 +2,17 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.26 (2026-10-15)
+
+A citation can open the text it was made from.
+
+### Added
+- **View at commit.** A citation of a repository file names the commit its text is from. Next to it, in Ask answers, AI overviews and the assistant's evidence, *View at 1a2b3c4* opens the file as it was at that commit, labelled with the commit, its summary, author and date, and says whether it is **not the current version** (and which commit the workspace holds now). The cited lines are marked.
+- **`GET /v1/artifacts/{id}/at/{commit}`** (any member of the workspace) returns that text with the commit's details. It reads the server's copy of the repository (the folder, or the partial clone of a remote one) with `git cat-file`: the commit must be a hex id of 7 to 64 characters, files over 1 MiB and files that are not text are refused, and a commit that is no longer in the copy (a force-push) or a file over the clone's size limit says so.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.25 (2026-10-15)
 
 A repository's `CODEOWNERS` shows on its files.

@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.2.25` (2026-10-15). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
+> **Scope:** reflects the code at `V0.2.26` (2026-10-15). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
 
 ---
 
@@ -508,12 +508,13 @@ The desktop app and the shared server keep **separate data**.
 
 ---
 
-## 13. Known functional gaps (at V0.2.25)
+## 13. Known functional gaps (at V0.2.26)
 
 These are observed in the code and are useful for prioritizing. The roadmap item that addresses each one is in brackets.
 
 | Gap | Impact |
 |---|---|
+| A citation's old text is opened from the server's copy | *View at commit* (V0.2.26) shows a cited file as it was at the commit it names, while that commit is still in the repository's copy; memory-card links and repository summaries do not offer it yet [F16d]. |
 | `CODEOWNERS` owners are hints only | They show on a repository file's page since V0.2.25 but are not matched to workspace members, assigned or notified [F16c]. |
 | Assistant answers and citations do not name the last author | The last author and date of a repository file show on its page, in the file list and in search results since V0.2.24 [F16b]. |
 | Pushes are noticed by polling unless a webhook is set up | Since V0.2.23 a repository can have a push webhook (GitHub, GitLab or a signed generic call) that queues a sync at once; without one the server polls [F16a]. |

@@ -586,6 +586,23 @@ export interface RepoAccessCheck {
   already_connected: boolean;
 }
 
+/**
+ * A repository file's text as it was at a commit, for a citation that names
+ * one. It is not the file's current content.
+ */
+export interface RepoFileAtCommit {
+  artifact_id: string;
+  path: string;
+  /** The full commit id. */
+  commit: string;
+  summary: string;
+  author_name: string;
+  committed_at: string;
+  /** The commit the workspace's current copy is from, when it differs. */
+  current_commit: string | null;
+  text: string;
+}
+
 /** A file of a repository source that is currently in its tree. */
 export interface RepoFile {
   path: string;

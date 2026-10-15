@@ -1628,3 +1628,118 @@ async fn push_webhooks_queue_a_sync_only_when_they_are_signed_right() {
     assert_eq!(status, 401);
     let _ = std::fs::remove_dir_all(base);
 }
+
+#[tokio::test]
+async fn a_citation_opens_the_file_as_it_was_at_the_commit_it_names() {
+    let base = std::env::temp_dir().join(format!("repomemo-server-atcommit-{}", uuid::Uuid::new_v4()));
+    let repo_dir = base.join("repos").join("notes");
+    let data_dir = base.join("data");
+    std::fs::create_dir_all(&repo_dir).unwrap();
+    let git = |args: &[&str]| {
+        let output = std::process::Command::new("git")
+            .arg("-C")
+            .arg(&repo_dir)
+            .args(["-c", "user.name=Test", "-c", "user.email=test@example.com"])
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(output.status.success());
+        String::from_utf8_lossy(&output.stdout).trim().to_owned()
+    };
+    git(&["init", "--quiet", "--initial-branch=main"]);
+    std::fs::write(repo_dir.join("guide.md"), "# Guide\nfirst version\n").unwrap();
+    git(&["add", "."]);
+    git(&["commit", "--quiet", "-m", "First"]);
+    let first = git(&["rev-parse", "HEAD"]);
+
+    let mut config = ServerConfig::for_test(data_dir.clone());
+    config.repo_roots = vec![base.join("repos")];
+    let app = router(config).await.unwrap();
+    let (owner, _) = register_account(&app, "at-owner@example.com").await;
+    let (outsider, _) = register_account(&app, "at-outsider@example.com").await;
+    let workspace_id = create_workspace(&app, &owner).await;
+    let call = |method: &'static str, uri: String, who: String, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, &who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let wait_ready = |source_id: String, commit: String| {
+        let app = app.clone();
+        let owner = owner.clone();
+        async move {
+            for _ in 0..150 {
+                let repository = response_json(
+                    app.clone()
+                        .oneshot(auth_request("GET", &format!("/v1/repositories/{source_id}"), &owner))
+                        .await
+                        .unwrap(),
+                )
+                .await;
+                if repository["status"] == "ready"
+                    && repository["active_job"].is_null()
+                    && repository["last_synced_commit"]["sha"] == commit.as_str()
+                {
+                    return;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            }
+            panic!("the repository was not synced to {commit}");
+        }
+    };
+    let connected = response_json(
+        call(
+            "POST",
+            format!("/v1/workspaces/{workspace_id}/repositories"),
+            owner.clone(),
+            json!({"link": repo_dir.display().to_string()}),
+        )
+        .await,
+    )
+    .await;
+    let source_id = connected["repository"]["id"].as_str().unwrap().to_owned();
+    wait_ready(source_id.clone(), first.clone()).await;
+    let files = response_json(call("GET", format!("/v1/repositories/{source_id}/files"), owner.clone(), json!({})).await).await;
+    let artifact_id = files[0]["artifact_id"].as_str().unwrap().to_owned();
+
+    std::fs::write(repo_dir.join("guide.md"), "# Guide\nsecond version\n").unwrap();
+    git(&["commit", "--quiet", "-am", "Second"]);
+    let second = git(&["rev-parse", "HEAD"]);
+    assert_eq!(
+        call("POST", format!("/v1/repositories/{source_id}/sync"), owner.clone(), json!({}))
+            .await
+            .status(),
+        200
+    );
+    wait_ready(source_id.clone(), second.clone()).await;
+
+    // The old text, labelled with its commit, and the commit the workspace holds now.
+    let old = call("GET", format!("/v1/artifacts/{artifact_id}/at/{}", &first[..12]), owner.clone(), json!({})).await;
+    assert_eq!(old.status(), 200);
+    let old = response_json(old).await;
+    assert_eq!(old["commit"], first.as_str());
+    assert_eq!(old["summary"], "First");
+    assert_eq!(old["current_commit"], second.as_str());
+    assert!(old["text"].as_str().unwrap().contains("first version"));
+    assert_eq!(old["path"], "guide.md");
+
+    // The current commit names no other version.
+    let current = response_json(
+        call("GET", format!("/v1/artifacts/{artifact_id}/at/{second}"), owner.clone(), json!({})).await,
+    )
+    .await;
+    assert!(current["current_commit"].is_null());
+    assert!(current["text"].as_str().unwrap().contains("second version"));
+
+    // Unknown commits, odd input and people outside the workspace are refused.
+    for commit in ["deadbeefdeadbeef", "zzzzzzzz", "--oops"] {
+        let refused = call("GET", format!("/v1/artifacts/{artifact_id}/at/{commit}"), owner.clone(), json!({})).await;
+        assert!(refused.status() == 404 || refused.status() == 400, "{commit}: {}", refused.status());
+    }
+    assert_eq!(
+        call("GET", format!("/v1/artifacts/{artifact_id}/at/{first}"), outsider, json!({}))
+            .await
+            .status(),
+        403
+    );
+    let _ = std::fs::remove_dir_all(base);
+}

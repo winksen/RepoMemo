@@ -1,8 +1,12 @@
-import { type ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { IconCode as Code, IconFileSpreadsheet as ExcelFile, IconFileText as FileText, IconFileTypePdf as PdfFile, IconFileWord as WordFile, IconGitBranch as RepositoryIcon, IconLoader2 as Loader, IconMail as MailIcon, IconMarkdown as Markdown, IconNote as Note, IconNotebook as OneNoteIcon, IconPhoto as Photo, IconPresentation as Presentation, IconSearch as Search } from "@tabler/icons-react";
-import { type ArtifactType, type Citation, type WorkspaceMetricBreakdown } from "../types";
+import { type ArtifactType, type Citation, type RepoFileAtCommit, type WorkspaceMetricBreakdown } from "../types";
+import { Button } from "../components/ui/button";
+import { Dialog, DialogCancel } from "../components/ui/dialog";
+import { showToast } from "../components/ui/toast";
+import { getSharedArtifactAtCommit } from "../lib/sharedApi";
 import { type FileCategory } from "./constants";
-import { citationLines, formatMetricDay } from "./format";
+import { apiMessage, citationLines, formatMetricDay } from "./format";
 
 export function fileCategoryIcon(category: FileCategory, size: number) {
   if (category === "repository") return <RepositoryIcon size={size} />;
@@ -65,8 +69,55 @@ export function artifactTypeIcon(type: ArtifactType, size: number) {
 
 /** The sources behind an AI answer, each opening its file. Ask answers cite
  *  their passages as [1], [2]… in this order, so those are numbered. */
-export function EvidenceUsed({ citations, numbered = false, onOpenArtifact }: { citations: Citation[]; numbered?: boolean; onOpenArtifact: (artifactId: string) => void }) {
-  return <div className="shared-ai-citations"><strong>Evidence used</strong>{citations.map((citation, index) => <button className="shared-assistant-citation" key={`${citation.artifact_id}-${citation.chunk_id ?? "artifact"}-${index}`} onClick={() => onOpenArtifact(citation.artifact_id)} title={`Open ${citation.path}`} type="button">{numbered ? `[${index + 1}] ` : ""}{citation.title} · {citation.path}{citationLines(citation)}</button>)}</div>;
+export function EvidenceUsed({ accessToken, citations, numbered = false, onOpenArtifact }: { accessToken?: string; citations: Citation[]; numbered?: boolean; onOpenArtifact: (artifactId: string) => void }) {
+  return <div className="shared-ai-citations"><strong>Evidence used</strong>{citations.map((citation, index) => <span className="shared-assistant-citation-row" key={`${citation.artifact_id}-${citation.chunk_id ?? "artifact"}-${index}`}>
+    <button className="shared-assistant-citation" onClick={() => onOpenArtifact(citation.artifact_id)} title={`Open ${citation.path}`} type="button">{numbered ? `[${index + 1}] ` : ""}{citation.title} · {citation.path}{citationLines(citation)}</button>
+    {accessToken ? <ViewAtCommit accessToken={accessToken} citation={citation} /> : null}
+  </span>)}</div>;
+}
+
+/** For a citation that names a commit of a repository file: a button that opens
+ *  the file's text as it was at that commit, labelled as such, with the cited
+ *  lines marked. */
+export function ViewAtCommit({ accessToken, citation }: { accessToken: string; citation: Pick<Citation, "artifact_id" | "path" | "start_line" | "end_line"> & { commit?: string | null } }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [file, setFile] = useState<RepoFileAtCommit | null>(null);
+  if (!citation.commit) return null;
+  const commit = citation.commit;
+
+  async function show() {
+    setBusy(true);
+    try {
+      setFile(await getSharedArtifactAtCommit(accessToken, citation.artifact_id, commit));
+      setOpen(true);
+    } catch (error) {
+      showToast("error", apiMessage(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const lines = file ? file.text.split("\n") : [];
+  const from = citation.start_line ?? 0;
+  const to = citation.end_line ?? from;
+  return <>
+    <Button className="shared-assistant-citation-commit" disabled={busy} onClick={() => void show()} title={`Show ${citation.path} as it was at commit ${commit.slice(0, 7)}`} type="button" variant="secondary">View at {commit.slice(0, 7)}</Button>
+    {open && file ? <Dialog
+      className="rm-dialog-wide"
+      description={<>As it was at commit <code>{file.commit.slice(0, 7)}</code>: {file.summary} · {file.author_name} · {new Date(file.committed_at).toLocaleDateString()}. {file.current_commit ? <>This is <strong>not the current version</strong>: the workspace holds <code>{file.current_commit.slice(0, 7)}</code>.</> : "This is also the current version."}</>}
+      footer={<DialogCancel label="Close" onClick={() => setOpen(false)} />}
+      onClose={() => setOpen(false)}
+      open
+      title={file.path}
+    >
+      <pre className="shared-commit-text">{lines.map((line, index) => {
+        const number = index + 1;
+        const cited = from > 0 && number >= from && number <= to;
+        return <div key={number}><span className="rm-map-muted">{String(number).padStart(4, " ")}  </span>{cited ? <mark>{line || " "}</mark> : line}</div>;
+      })}</pre>
+    </Dialog> : null}
+  </>;
 }
 
 /** Search snippets mark matches with `<mark>` (from SQLite's `snippet()`).

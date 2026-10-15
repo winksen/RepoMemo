@@ -27,6 +27,7 @@ import {
   sendSharedAgentMessage,
 } from "../lib/sharedApi";
 import type { AgentCapabilities, AgentCapability, AgentConversation, AgentMessage, AgentReply, AgentTurn } from "../types";
+import { ViewAtCommit } from "../web/common";
 import { ActionMenu } from "./ui/action-menu";
 import { Button } from "./ui/button";
 import { Dialog, DialogCancel } from "./ui/dialog";
@@ -270,7 +271,7 @@ export function AssistantPanel({ accessToken, onOpenArtifact, workspaceId }: { a
           <div className="shared-assistant-request"><p>{turn.label}</p>{turn.request.capability ? <span>{capabilityLabel(capabilities, turn.request.capability)}</span> : null}</div>
           {turn.status === "pending" ? <p className="shared-assistant-pending"><Loader className="spin" size={16} /> Working on it…</p> : null}
           {turn.status === "failed" ? <div className="shared-assistant-failed"><span>No reply. The request did not complete and was not saved.</span><Button disabled={isBusy} onClick={() => void run(turn)} type="button" variant="secondary"><Refresh size={15} /> Retry</Button></div> : null}
-          {turn.reply ? <Reply canSummarize={canSummarize} capabilities={capabilities} isBusy={isBusy} onOpenArtifact={onOpenArtifact} onSummarize={summarize} reply={turn.reply} /> : null}
+          {turn.reply ? <Reply accessToken={accessToken} canSummarize={canSummarize} capabilities={capabilities} isBusy={isBusy} onOpenArtifact={onOpenArtifact} onSummarize={summarize} reply={turn.reply} /> : null}
         </article>) : <div className="shared-assistant-intro">
           <Sparkles size={22} />
           <strong>What do you need from this workspace?</strong>
@@ -320,10 +321,13 @@ function routingNote(reply: AgentReply, capabilities: AgentCapabilities | null) 
 
 const EVIDENCE_PREVIEW_LIMIT = 5;
 
-function Evidence({ citations, isQuestion, onOpenArtifact }: { citations: AgentReply["citations"]; isQuestion: boolean; onOpenArtifact: (artifactId: string) => void }) {
+function Evidence({ accessToken, citations, isQuestion, onOpenArtifact }: { accessToken: string; citations: AgentReply["citations"]; isQuestion: boolean; onOpenArtifact: (artifactId: string) => void }) {
   const [showAll, setShowAll] = useState(false);
   const hidden = citations.length - EVIDENCE_PREVIEW_LIMIT;
-  const renderCitation = (citation: AgentReply["citations"][number], index: number, onOpen: (artifactId: string) => void) => <button className="shared-assistant-citation" key={`${citation.artifact_id}-${citation.chunk_id ?? "artifact"}`} onClick={() => onOpen(citation.artifact_id)} type="button">{/* Answers cite their passages as [1], [2]… in this order. */}{isQuestion ? `[${index + 1}] ` : ""}{citation.title} · {citation.path}{citation.start_line ? ` · line ${citation.start_line}` : ""}</button>;
+  const renderCitation = (citation: AgentReply["citations"][number], index: number, onOpen: (artifactId: string) => void) => <span className="shared-assistant-citation-row" key={`${citation.artifact_id}-${citation.chunk_id ?? "artifact"}`}>
+    <button className="shared-assistant-citation" onClick={() => onOpen(citation.artifact_id)} type="button">{/* Answers cite their passages as [1], [2]… in this order. */}{isQuestion ? `[${index + 1}] ` : ""}{citation.title} · {citation.path}{citation.start_line ? ` · line ${citation.start_line}` : ""}</button>
+    <ViewAtCommit accessToken={accessToken} citation={citation} />
+  </span>;
   return <div className="shared-ai-citations">
     <strong>Evidence used</strong>
     {citations.slice(0, EVIDENCE_PREVIEW_LIMIT).map((citation, index) => renderCitation(citation, index, onOpenArtifact))}
@@ -334,7 +338,7 @@ function Evidence({ citations, isQuestion, onOpenArtifact }: { citations: AgentR
   </div>;
 }
 
-function Reply({ canSummarize, capabilities, isBusy, onOpenArtifact, onSummarize, reply }: { canSummarize: boolean; capabilities: AgentCapabilities | null; isBusy: boolean; onOpenArtifact: (artifactId: string) => void; onSummarize: (artifactId: string, title: string) => void; reply: AgentReply }) {
+function Reply({ accessToken, canSummarize, capabilities, isBusy, onOpenArtifact, onSummarize, reply }: { accessToken: string; canSummarize: boolean; capabilities: AgentCapabilities | null; isBusy: boolean; onOpenArtifact: (artifactId: string) => void; onSummarize: (artifactId: string, title: string) => void; reply: AgentReply }) {
   const note = routingNote(reply, capabilities);
   // Found files, or the choices offered when a file name was ambiguous.
   const offerSummary = canSummarize && !(reply.capability === "summarize_file" && reply.generated);
@@ -350,6 +354,6 @@ function Reply({ canSummarize, capabilities, isBusy, onOpenArtifact, onSummarize
       {offerSummary ? <Button disabled={isBusy || !file.indexed_at} onClick={() => onSummarize(file.id, file.title)} title={file.indexed_at ? `Summarize ${file.title}` : "This file is not indexed yet"} type="button" variant="secondary">Summarize</Button> : null}
     </li>)}</ul> : null}
     {reply.matches.length ? <div className="shared-search-results">{reply.matches.map((match) => <article key={match.chunk_id}><Button className="shared-search-result" onClick={() => onOpenArtifact(match.artifact_id)} type="button" variant="secondary"><span className="shared-search-result-heading"><strong>{match.title}</strong><span>{match.source_name}</span></span><p>{match.snippet}</p><span className="shared-search-result-path">{match.path}{match.start_line ? ` · line ${match.start_line}` : ""}</span></Button></article>)}</div> : null}
-    {reply.citations.length ? <Evidence isQuestion={reply.capability === "ask_question"} citations={reply.citations} onOpenArtifact={onOpenArtifact} /> : null}
+    {reply.citations.length ? <Evidence accessToken={accessToken} isQuestion={reply.capability === "ask_question"} citations={reply.citations} onOpenArtifact={onOpenArtifact} /> : null}
   </div>;
 }

@@ -476,6 +476,16 @@ impl StorageEngine {
     }
 
     /// The files of a repository source currently in its tree, by path.
+    /// The repository and path a repository file's artifact stands for.
+    pub async fn repo_file_of_artifact(&self, artifact_id: &str) -> Result<Option<(String, String)>> {
+        Ok(sqlx::query_as::<_, (String, String)>(
+            "SELECT source_id, path FROM repo_files WHERE artifact_id = ?1",
+        )
+        .bind(artifact_id)
+        .fetch_optional(self.reader())
+        .await?)
+    }
+
     /// Records who last changed each file, on the file's row and in its
     /// artifact's metadata (so its page and search results show it). Rows that
     /// already say so are left alone. Returns how many changed.
