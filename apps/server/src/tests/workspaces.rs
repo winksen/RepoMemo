@@ -1478,3 +1478,73 @@ async fn event_streams_end_when_the_member_is_removed() {
     assert!(ended.is_ok(), "the stream should close once the member is removed");
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn mention_suggestions_are_the_workspaces_members_for_people_who_can_comment() {
+    let data_dir = temp_data_dir("mention-suggestions");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let (_, _) = register_account(&app, "mentions-admin@example.com").await;
+    let (owner, _) = register_account(&app, "mentions-owner@example.com").await;
+    let (writer, _) = register_account(&app, "mentions-ada@example.com").await;
+    let (viewer, _) = register_account(&app, "mentions-grace@example.com").await;
+    let (outsider, _) = register_account(&app, "mentions-eve@example.com").await;
+    let workspace_id = create_workspace(&app, &owner).await;
+    join(
+        &app,
+        &owner,
+        "workspaces",
+        &workspace_id,
+        "mentions-ada@example.com",
+        "member",
+    )
+    .await;
+    join(
+        &app,
+        &owner,
+        "workspaces",
+        &workspace_id,
+        "mentions-grace@example.com",
+        "viewer",
+    )
+    .await;
+    let suggest = |who: &str, query: &str| {
+        let app = app.clone();
+        let request = auth_request(
+            "GET",
+            &format!("/v1/workspaces/{workspace_id}/mention-suggestions?q={query}"),
+            who,
+        );
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let emails = |found: &Value| {
+        let mut emails = found
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|user| user["email"].as_str().unwrap().to_owned())
+            .collect::<Vec<_>>();
+        emails.sort();
+        emails
+    };
+
+    // A writer is offered the other members, not themselves and not strangers.
+    let all = response_json(suggest(&writer, "").await).await;
+    assert_eq!(
+        emails(&all),
+        ["mentions-grace@example.com", "mentions-owner@example.com"]
+    );
+    let typed = response_json(suggest(&writer, "gra").await).await;
+    assert_eq!(emails(&typed), ["mentions-grace@example.com"]);
+    let by_address = response_json(suggest(&owner, "mentions-ad").await).await;
+    assert_eq!(emails(&by_address), ["mentions-ada@example.com"]);
+    assert!(response_json(suggest(&owner, "eve").await)
+        .await
+        .as_array()
+        .unwrap()
+        .is_empty());
+
+    // Viewers cannot comment, so they are not offered anyone; outsiders see nothing of the workspace.
+    assert_eq!(suggest(&viewer, "").await.status(), 403);
+    assert_eq!(suggest(&outsider, "").await.status(), 403);
+    let _ = std::fs::remove_dir_all(data_dir);
+}

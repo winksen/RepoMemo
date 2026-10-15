@@ -1,8 +1,8 @@
 # HTTP API reference
 
-> **Branch of:** [TECHNICAL_MINDMAP.md §5](../TECHNICAL_MINDMAP.md#5-http-api-reference-172-operations-under-v1) · **Generated** from the router and the handler signatures by `node scripts/list-routes.mjs --markdown`; the guard column is read from the handler bodies, so check a route's handler before relying on a row · **Status:** V0.2.6 (the two index routes edited by hand; regenerate before the next release candidate)
+> **Branch of:** [TECHNICAL_MINDMAP.md §5](../TECHNICAL_MINDMAP.md#5-http-api-reference-173-operations-under-v1) · **Generated** from the router and the handler signatures by `node scripts/list-routes.mjs --markdown`; the guard column is read from the handler bodies, so check a route's handler before relying on a row · **Status:** V0.2.6 (the two index routes edited by hand; regenerate before the next release candidate)
 
-167 routes of the main router, plus the platform routes (`/v1/platform/*`, [environment.rs](../../apps/server/src/environment.rs), served before an environment is attached) and the avatar routes (`/v1/users/{id}/avatar`, `/v1/profile/avatar`, [avatars.rs](../../apps/server/src/avatars.rs)).
+168 routes of the main router, plus the platform routes (`/v1/platform/*`, [environment.rs](../../apps/server/src/environment.rs), served before an environment is attached) and the avatar routes (`/v1/users/{id}/avatar`, `/v1/profile/avatar`, [avatars.rs](../../apps/server/src/avatars.rs)).
 
 ## Conventions
 
@@ -145,6 +145,7 @@
 | GET | `/v1/artifacts/{artifact_id}/chunks` | auth | require_workspace_admin | — | Vec<Chunk |
 | GET | `/v1/artifacts/{artifact_id}/comments` | auth | require_workspace_read | — | Vec<ArtifactComment |
 | POST | `/v1/artifacts/{artifact_id}/comments` | auth | require_workspace_write | SaveArtifactCommentRequest | ArtifactComment |
+| GET | `/v1/workspaces/{workspace_id}/mention-suggestions` | auth | require_workspace_write | `q` query | Vec<SharedUser> |
 | GET | `/v1/artifacts/{artifact_id}/lifecycle` | auth | require_workspace_read | — | ArtifactLifecycle |
 | PUT | `/v1/artifacts/{artifact_id}/lifecycle` | auth | require_workspace_write | SaveArtifactLifecycleRequest | ArtifactLifecycle |
 | GET | `/v1/artifacts/{artifact_id}/lifecycle/history` | auth | require_workspace_read | — | Vec<ArtifactLifecycleEvent |

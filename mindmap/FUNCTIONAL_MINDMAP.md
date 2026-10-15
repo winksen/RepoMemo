@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.2.38` (2026-10-15). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
+> **Scope:** reflects the code at `V0.2.39` (2026-10-15). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
 
 ---
 
@@ -319,7 +319,7 @@ Office files, PDFs and emails are previewed in the browser: text and tables for 
 - **Lifecycle review**: every artifact has a status:
   `active` → `needs_review` → `verified` / `outdated` / `superseded`
   Each artifact can also have an **owner** (a workspace member) and a **review note**. `superseded` requires choosing the replacement artifact. Every change is kept in a **lifecycle history**.
-- **Discussion**: threaded comments of up to 5,000 characters. Typing `@someone@example.com` **notifies that workspace member**. Authors edit or delete their own comments, and admins and owners can moderate any comment.
+- **Discussion**: threaded comments of up to 5,000 characters. Typing `@` **suggests the workspace's members** (narrowed as you type; choose with the arrow keys and Enter), and a typed `@someone@example.com` **notifies that workspace member**. Authors edit or delete their own comments, and admins and owners can moderate any comment.
 
 ---
 
@@ -527,7 +527,7 @@ The desktop app and the shared server keep **separate data**.
 
 ---
 
-## 13. Known functional gaps (at V0.2.38)
+## 13. Known functional gaps (at V0.2.39)
 
 These are observed in the code and are useful for prioritizing. The roadmap item that addresses each one is in brackets.
 

@@ -2,6 +2,18 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.39 (2026-10-15)
+
+Mentions are suggested as you type them.
+
+### Added
+- **`@` suggestions in comments.** Typing `@` in the discussion of a file offers the workspace's members; typing more narrows them (by the start of a name, of one of its words or of the address, then anywhere in either). Arrow keys move, Enter or Tab chooses, Esc closes. Choosing one writes their address after the `@`, which is what a mention has always been, so they are notified when the comment is saved.
+- **Only members of the workspace are suggested,** and only to people who can comment (members, administrators and owners; viewers see no suggestions). Yourself, people whose account was deactivated and anonymized accounts are left out, and at most eight are offered at a time.
+- **`GET /v1/workspaces/{id}/mention-suggestions?q=`** answers with `{id, display_name, email}` for each.
+
+### Upgrading
+- Nothing to do. Comments written with a typed `@address` work as before.
+
 ## V0.2.38 (2026-10-15)
 
 Earlier versions of a file stay readable.

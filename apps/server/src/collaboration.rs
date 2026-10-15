@@ -496,3 +496,163 @@ pub(crate) fn validate_comment_body(body: &str) -> Result<String, ApiError> {
     }
     Ok(body)
 }
+
+/// People suggested while typing `@` in a comment.
+const MENTION_SUGGESTION_LIMIT: usize = 8;
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct MentionSuggestionQuery {
+    /// What was typed after the `@`.
+    #[serde(default)]
+    q: String,
+}
+
+/// Members of the workspace a comment can mention, best match first:
+/// whose name or address starts with what was typed, then whose name has a
+/// word that does, then whose name or address contains it. The person asking
+/// is left out, and so is anyone without an address (an anonymized account).
+pub(crate) fn rank_mention_candidates(
+    members: &[WorkspaceMember],
+    typed: &str,
+    asking_user_id: &str,
+) -> Vec<SharedUser> {
+    let typed = typed.trim().trim_start_matches('@').to_lowercase();
+    let mut ranked = members
+        .iter()
+        .filter(|member| member.user.id != asking_user_id)
+        .filter_map(|member| {
+            let email = member
+                .user
+                .email
+                .as_deref()
+                .filter(|email| !email.is_empty())?
+                .to_lowercase();
+            let name = member.user.display_name.to_lowercase();
+            let local = email.split('@').next().unwrap_or_default().to_owned();
+            let score = if typed.is_empty() {
+                2
+            } else if name.starts_with(&typed) || local.starts_with(&typed) || email.starts_with(&typed) {
+                0
+            } else if name.split_whitespace().any(|word| word.starts_with(&typed)) {
+                1
+            } else if name.contains(&typed) || email.contains(&typed) {
+                2
+            } else {
+                return None;
+            };
+            Some((score, name, member.user.clone()))
+        })
+        .collect::<Vec<_>>();
+    ranked.sort_by(|left, right| left.0.cmp(&right.0).then_with(|| left.1.cmp(&right.1)));
+    ranked.into_iter().map(|(_, _, user)| user).collect()
+}
+
+/// Suggestions for an `@mention` in a comment: members of this workspace
+/// only, for the people who can comment, a few at a time.
+pub(crate) async fn suggest_mentions(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+    Query(query): Query<MentionSuggestionQuery>,
+) -> Result<Json<Vec<SharedUser>>, ApiError> {
+    require_workspace_write(&state, &subject, &workspace_id).await?;
+    let members = state
+        .storage
+        .list_workspace_members(&workspace_id)
+        .await
+        .map_err(map_storage_error)?;
+    let mut suggestions = Vec::new();
+    for user in rank_mention_candidates(&members, &query.q, &subject.user_id) {
+        // Someone who is deactivated would never see the mention.
+        if state.storage.is_deactivated(&user.id).await.unwrap_or(true) {
+            continue;
+        }
+        suggestions.push(user);
+        if suggestions.len() == MENTION_SUGGESTION_LIMIT {
+            break;
+        }
+    }
+    Ok(Json(suggestions))
+}
+
+#[cfg(test)]
+mod mention_tests {
+    use super::*;
+    use repomemo_domain::WorkspaceRole;
+
+    fn member(id: &str, name: &str, email: Option<&str>) -> WorkspaceMember {
+        WorkspaceMember {
+            user: SharedUser {
+                id: id.to_owned(),
+                display_name: name.to_owned(),
+                email: email.map(str::to_owned),
+            },
+            role: WorkspaceRole::Member,
+            joined_at: String::new(),
+            updated_at: String::new(),
+        }
+    }
+
+    fn names(users: &[SharedUser]) -> Vec<&str> {
+        users.iter().map(|user| user.display_name.as_str()).collect()
+    }
+
+    #[test]
+    fn what_is_typed_ranks_names_then_words_then_anywhere() {
+        let members = [
+            member("1", "Grace Hopper", Some("grace@example.com")),
+            member("2", "Ada Lovelace", Some("ada@example.com")),
+            member("3", "Margaret Hamilton", Some("mh@example.com")),
+            member("4", "Gracie Allen", Some("allen@example.com")),
+        ];
+        // "gra": two names start with it, nobody else matches.
+        assert_eq!(
+            names(&rank_mention_candidates(&members, "gra", "")),
+            ["Grace Hopper", "Gracie Allen"]
+        );
+        // A later word of the name, and the address.
+        assert_eq!(
+            names(&rank_mention_candidates(&members, "ham", "")),
+            ["Margaret Hamilton"]
+        );
+        assert_eq!(
+            names(&rank_mention_candidates(&members, "@MH", "")),
+            ["Margaret Hamilton"]
+        );
+        // Anywhere in the name or address, last.
+        assert_eq!(
+            names(&rank_mention_candidates(&members, "ace", "")),
+            ["Ada Lovelace", "Grace Hopper"]
+        );
+        // Nothing typed yet: everyone, by name.
+        assert_eq!(
+            names(&rank_mention_candidates(&members, "", "")),
+            ["Ada Lovelace", "Grace Hopper", "Gracie Allen", "Margaret Hamilton"]
+        );
+    }
+
+    #[test]
+    fn a_name_that_starts_with_it_comes_before_a_later_word_and_before_an_inner_match() {
+        let members = [
+            member("1", "Anna Karamazov", Some("anna@example.com")),
+            member("2", "Thomas Mann", Some("tmann@example.com")),
+            member("3", "Max Planck", Some("max@example.com")),
+            member("4", "Samantha Reed", Some("sreed@example.com")),
+        ];
+        assert_eq!(
+            names(&rank_mention_candidates(&members, "ma", "")),
+            ["Max Planck", "Thomas Mann", "Anna Karamazov", "Samantha Reed"]
+        );
+    }
+
+    #[test]
+    fn the_asker_and_people_without_an_address_are_never_suggested() {
+        let members = [
+            member("1", "Ada Lovelace", Some("ada@example.com")),
+            member("2", "Former member", None),
+            member("3", "Adam Smith", Some("adam@example.com")),
+        ];
+        assert_eq!(names(&rank_mention_candidates(&members, "ad", "1")), ["Adam Smith"]);
+        assert!(names(&rank_mention_candidates(&members, "former", "")).is_empty());
+    }
+}

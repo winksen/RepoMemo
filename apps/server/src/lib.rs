@@ -558,6 +558,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             "/v1/workspaces/{workspace_id}/knowledge-map",
             get(workspace_knowledge_map),
         )
+        .route("/v1/workspaces/{workspace_id}/mention-suggestions", get(suggest_mentions))
         .route("/v1/workspaces/{workspace_id}/review", get(review::review_queue))
         .route("/v1/workspaces/{workspace_id}/health", get(health::workspace_health))
         .route(

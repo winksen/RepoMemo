@@ -642,6 +642,11 @@ export function createSharedTaskChecklistItem(accessToken: string, taskId: strin
 export function toggleSharedTaskChecklistItem(accessToken: string, itemId: string, completed: boolean): Promise<TaskChecklistItem> { return request<TaskChecklistItem>(`/v1/task-checklist/${itemId}`, { method: "PUT", body: JSON.stringify({ completed }) }, accessToken); }
 export function deleteSharedTaskChecklistItem(accessToken: string, itemId: string): Promise<void> { return request<void>(`/v1/task-checklist/${itemId}`, { method: "DELETE" }, accessToken); }
 
+/** Members of the workspace a comment can mention that match what was typed after the `@` (people who can comment only). */
+export function listSharedMentionSuggestions(accessToken: string, workspaceId: string, typed: string): Promise<SharedUser[]> {
+  return request<SharedUser[]>(`/v1/workspaces/${workspaceId}/mention-suggestions?q=${encodeURIComponent(typed)}`, {}, accessToken);
+}
+
 export function listSharedWorkspaceMembers(accessToken: string, workspaceId: string): Promise<WorkspaceMember[]> {
   return request<WorkspaceMember[]>(`/v1/workspaces/${workspaceId}/members`, {}, accessToken);
 }
