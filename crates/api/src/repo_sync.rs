@@ -857,6 +857,7 @@ impl RepoMemoCore {
                 .ok()
                 .flatten()
                 .is_some();
+        let webhook = self.storage.repo_webhook_info(&source.id).await.ok().flatten();
         Ok(RepoSource {
             id: source.id,
             workspace_id: source.workspace_id,
@@ -864,6 +865,8 @@ impl RepoMemoCore {
             root_path: source.root_uri.unwrap_or_default(),
             remote,
             has_credential,
+            has_webhook: webhook.is_some(),
+            webhook_last_received_at: webhook.and_then(|webhook| webhook.last_received_at),
             settings: metadata.settings,
             status: source.status,
             last_synced_commit: metadata.last_synced_commit,

@@ -542,6 +542,12 @@ pub struct RepoSource {
     /// A remote repository has a token stored (never shown).
     #[serde(default)]
     pub has_credential: bool,
+    /// Push webhooks are set up for this repository.
+    #[serde(default)]
+    pub has_webhook: bool,
+    /// When a correctly signed webhook call last arrived.
+    #[serde(default)]
+    pub webhook_last_received_at: Option<String>,
     pub settings: RepoSettings,
     /// `pending` (never synced), `syncing`, `ready` or `error`.
     pub status: String,

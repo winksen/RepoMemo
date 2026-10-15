@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.23 (2026-10-15)
+
+A push can ask for a sync at once.
+
+### Added
+- **Push webhooks** for any linked repository (local or remote). A workspace administrator sets one up in Settings › Repositories › Edit › *Push webhooks*; the payload address and a secret are shown once (*Make a new secret* retires the old one, *Turn off* removes it). Hosts call `POST /v1/webhooks/repositories/{id}` when someone pushes, and the repository is synced within seconds instead of at the next poll.
+- **Three senders are understood:** GitHub (`X-Hub-Signature-256`, an HMAC-SHA256 of the body; `ping` is answered, `push` syncs), GitLab (`X-Gitlab-Token`, the secret itself, with *Push Hook* events) and any other sender that signs the body with HMAC-SHA256 in `X-RepoMemo-Signature: sha256=<hex>`.
+- **What makes a call count:** it must be signed right. Every comparison is constant time; a call that is unsigned, signed wrongly or for another body, or for a repository that does not exist or has no webhook, is answered `401` the same way. Failed calls are limited per client address (20 a minute) and verified ones per repository (60 a minute). Pushes to tags, to a branch the link does not follow, and events that are not pushes are accepted and ignored. One push queues one sync; a sync already running absorbs it.
+- The repository shows whether a webhook is on and when a signed call last arrived. Polling stays on as a safety net.
+- The secret is stored sealed like provider keys (migration 0032, `repo_webhooks`) and is never returned again.
+
+### Upgrading
+- Nothing to do. The server must be reachable from the host that sends the webhooks (`REPOMEMO_PUBLIC_URL` gives the full payload address).
+
 ## V0.2.22 (2026-10-15)
 
 A remote clone can no longer take unbounded room or time.

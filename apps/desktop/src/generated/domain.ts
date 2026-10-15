@@ -469,6 +469,10 @@ export interface RepoSource {
   remote: boolean;
   /** A remote repository has a token stored (never shown). */
   has_credential: boolean;
+  /** Push webhooks are set up for this repository. */
+  has_webhook: boolean;
+  /** When a correctly signed webhook call last arrived. */
+  webhook_last_received_at: string | null;
   settings: RepoSettings;
   /** `pending` (never synced), `syncing`, `ready` or `error`. */
   status: string;

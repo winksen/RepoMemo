@@ -18,8 +18,10 @@ import {
   cancelSharedJob,
   checkSharedRepository,
   clearSharedRepositoryToken,
+  createSharedRepositoryWebhook,
   connectSharedRepository,
   deleteSharedRepository,
+  deleteSharedRepositoryWebhook,
   getSharedRepositoryDetail,
   listSharedRepositories,
   listSharedRepositoryFiles,
@@ -294,9 +296,14 @@ export function RepositorySettings({
   const [editing, setEditing] = useState<RepoSource | null>(null);
   const [editForm, setEditForm] = useState<RepoForm>(EMPTY_FORM);
   const [removing, setRemoving] = useState<RepoSource | null>(null);
+  // Shown once, when a webhook is made or renewed.
+  const [webhookSecret, setWebhookSecret] = useState<{ secret: string; address: string } | null>(null);
 
   const formKey = JSON.stringify([form.link.trim(), formSettings(form), form.token, form.tokenUsername, form.deployKey, form.hostKey]);
   const checkIsCurrent = check !== null && checkedFor === formKey;
+  // The repository being edited as the list holds it now (a webhook made in
+  // the dialog changes it).
+  const liveEditing = editing ? (repositories?.find((item) => item.id === editing.id) ?? editing) : null;
 
   async function runCheck(event: FormEvent) {
     event.preventDefault();
@@ -335,6 +342,7 @@ export function RepositorySettings({
   }
 
   function startEditing(repository: RepoSource) {
+    setWebhookSecret(null);
     setEditForm({
       link: repository.root_path,
       name: repository.name,
@@ -367,6 +375,34 @@ export function RepositorySettings({
       await load();
     } catch (error) {
       showToast("error", errorMessage(error, "The settings could not be saved."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function makeWebhook(repository: RepoSource) {
+    setBusy(true);
+    try {
+      const made = await createSharedRepositoryWebhook(accessToken, repository.id);
+      setWebhookSecret({ secret: made.secret, address: made.url ?? `${window.location.origin}${made.path}` });
+      showToast("success", "The webhook secret is shown below. Copy it now: it is not shown again.");
+      await load();
+    } catch (error) {
+      showToast("error", errorMessage(error, "The webhook could not be set up."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removeWebhook(repository: RepoSource) {
+    setBusy(true);
+    try {
+      await deleteSharedRepositoryWebhook(accessToken, repository.id);
+      setWebhookSecret(null);
+      showToast("success", "Push webhooks were turned off for this repository.");
+      await load();
+    } catch (error) {
+      showToast("error", errorMessage(error, "The webhook could not be removed."));
     } finally {
       setBusy(false);
     }
@@ -439,6 +475,26 @@ export function RepositorySettings({
     >
       <form className="rm-repo-form" id="rm-repo-edit-form" onSubmit={saveEdit}>
         <RepositoryFields form={{ ...editForm, link: editing.root_path }} onChange={(next) => setEditForm({ ...next, link: editForm.link })} remote={editing.remote} replacingToken showLink={false} />
+        <div className="rm-repo-webhook">
+          <strong>Push webhooks</strong>
+          <span className="rm-map-muted">
+            {liveEditing?.has_webhook
+              ? `On${liveEditing?.webhook_last_received_at ? ` · last call ${formatDate(liveEditing?.webhook_last_received_at)}` : " · no call yet"}.`
+              : "Off. The repository is checked for new commits on a schedule."}
+            {" "}GitHub, GitLab or any sender that signs with HMAC-SHA256 (<code>X-RepoMemo-Signature</code>) can ask for a sync as soon as someone pushes.
+          </span>
+          {webhookSecret ? <div className="rm-repo-check">
+            <dl className="rm-repo-facts">
+              <div><dt>Payload URL</dt><dd><code className="rm-repo-path">{webhookSecret.address}</code></dd></div>
+              <div><dt>Secret</dt><dd><code className="rm-repo-path">{webhookSecret.secret}</code></dd></div>
+            </dl>
+            <span className="rm-map-muted">Content type JSON, push events only. Shown once: renewing it ends the old one.</span>
+          </div> : null}
+          <div className="rm-health-actions">
+            <Button disabled={busy} onClick={() => void makeWebhook(editing)} type="button" variant="secondary">{liveEditing?.has_webhook ? "Make a new secret" : "Set up a webhook"}</Button>
+            {liveEditing?.has_webhook ? <Button className="rm-button-danger" disabled={busy} onClick={() => void removeWebhook(editing)} type="button" variant="secondary">Turn off</Button> : null}
+          </div>
+        </div>
         {editing.remote && editing.has_credential && !isSshLink(editing.root_path) ? <div><Button disabled={busy} onClick={() => void removeToken(editing)} type="button" variant="secondary">Remove the token</Button></div> : null}
       </form>
     </Dialog> : null}

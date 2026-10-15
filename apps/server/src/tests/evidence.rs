@@ -1468,3 +1468,163 @@ async fn remote_links_are_off_until_hosts_are_named_and_a_token_is_never_echoed(
     assert_eq!(listed["repositories"].as_array().unwrap().len(), 0);
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn push_webhooks_queue_a_sync_only_when_they_are_signed_right() {
+    let base = std::env::temp_dir().join(format!("repomemo-server-hooks-{}", uuid::Uuid::new_v4()));
+    let repo_dir = base.join("repos").join("ledger");
+    let data_dir = base.join("data");
+    std::fs::create_dir_all(&repo_dir).unwrap();
+    let git = |args: &[&str]| {
+        let status = std::process::Command::new("git")
+            .arg("-C")
+            .arg(&repo_dir)
+            .args(["-c", "user.name=Test", "-c", "user.email=test@example.com"])
+            .args(args)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .unwrap();
+        assert!(status.success());
+    };
+    git(&["init", "--quiet", "--initial-branch=main"]);
+    std::fs::write(repo_dir.join("README.md"), "# Ledger\n").unwrap();
+    git(&["add", "."]);
+    git(&["commit", "--quiet", "-m", "Initial"]);
+
+    let mut config = ServerConfig::for_test(data_dir.clone());
+    config.repo_roots = vec![base.join("repos")];
+    let app = router(config).await.unwrap();
+    let (owner, _) = register_account(&app, "hook-owner@example.com").await;
+    let (member, _) = register_account(&app, "hook-member@example.com").await;
+    let workspace_id = create_workspace(&app, &owner).await;
+    join(&app, &owner, "workspaces", &workspace_id, "hook-member@example.com", "member").await;
+    let call = |method: &'static str, uri: String, who: String, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, &who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let connected = response_json(
+        call(
+            "POST",
+            format!("/v1/workspaces/{workspace_id}/repositories"),
+            owner.clone(),
+            json!({"link": repo_dir.display().to_string()}),
+        )
+        .await,
+    )
+    .await;
+    let source_id = connected["repository"]["id"].as_str().unwrap().to_owned();
+    let hook_path = format!("/v1/webhooks/repositories/{source_id}");
+    let send = |path: String, headers: Vec<(&'static str, String)>, body: &'static str| {
+        let app = app.clone();
+        async move {
+            let mut request = Request::builder().method("POST").uri(path);
+            for (name, value) in headers {
+                request = request.header(name, value);
+            }
+            let response = app.oneshot(request.body(Body::from(body)).unwrap()).await.unwrap();
+            (response.status().as_u16(), response_json(response).await)
+        }
+    };
+    let signature = |secret: &str, body: &str| {
+        let key = ring::hmac::Key::new(ring::hmac::HMAC_SHA256, secret.as_bytes());
+        format!("sha256={}", hex::encode(ring::hmac::sign(&key, body.as_bytes()).as_ref()))
+    };
+    let push = r#"{"ref":"refs/heads/main"}"#;
+
+    // Without a webhook nothing can be verified: the same answer as for a
+    // repository that does not exist.
+    let (status, _) = send(hook_path.clone(), vec![("x-gitlab-token", "guess".to_owned())], push).await;
+    assert_eq!(status, 401);
+    let (status, _) = send(
+        "/v1/webhooks/repositories/missing".to_owned(),
+        vec![("x-gitlab-token", "guess".to_owned())],
+        push,
+    )
+    .await;
+    assert_eq!(status, 401);
+
+    // Only an administrator sets one up, and the secret is shown once.
+    assert_eq!(
+        call("POST", format!("/v1/repositories/{source_id}/webhook"), member.clone(), json!({}))
+            .await
+            .status(),
+        403
+    );
+    let created = call("POST", format!("/v1/repositories/{source_id}/webhook"), owner.clone(), json!({})).await;
+    assert_eq!(created.status(), 201);
+    let created = response_json(created).await;
+    let secret = created["secret"].as_str().unwrap().to_owned();
+    assert_eq!(created["path"], hook_path.as_str());
+    let shown = response_json(call("GET", format!("/v1/repositories/{source_id}"), owner.clone(), json!({})).await).await;
+    assert_eq!(shown["has_webhook"], true);
+    assert!(!shown.to_string().contains(&secret));
+
+    // Unsigned, wrongly signed, signed for other content: refused.
+    for headers in [
+        vec![],
+        vec![("x-hub-signature-256", signature("wrong", push)), ("x-github-event", "push".to_owned())],
+        vec![("x-hub-signature-256", signature(&secret, "{}")), ("x-github-event", "push".to_owned())],
+        vec![("x-gitlab-token", "wrong".to_owned()), ("x-gitlab-event", "Push Hook".to_owned())],
+    ] {
+        let (status, _) = send(hook_path.clone(), headers, push).await;
+        assert_eq!(status, 401);
+    }
+
+    // GitHub: a ping answers, a push queues a sync (or is absorbed by one).
+    let github = |event: &str| {
+        vec![
+            ("x-hub-signature-256", signature(&secret, push)),
+            ("x-github-event", event.to_owned()),
+        ]
+    };
+    let (status, body) = send(hook_path.clone(), github("ping"), push).await;
+    assert_eq!((status, body["note"].as_str()), (200, Some("pong")));
+    let (status, body) = send(hook_path.clone(), github("push"), push).await;
+    assert_eq!(status, 202);
+    assert!(body["queued"].is_boolean());
+    let (status, body) = send(hook_path.clone(), github("issues"), push).await;
+    assert_eq!((status, body["queued"].as_bool()), (202, Some(false)));
+
+    // GitLab sends the secret itself; a generic sender signs like GitHub.
+    let (status, _) = send(
+        hook_path.clone(),
+        vec![("x-gitlab-token", secret.clone()), ("x-gitlab-event", "Push Hook".to_owned())],
+        push,
+    )
+    .await;
+    assert_eq!(status, 202);
+    let (status, _) = send(
+        hook_path.clone(),
+        vec![("x-repomemo-signature", signature(&secret, push))],
+        push,
+    )
+    .await;
+    assert_eq!(status, 202);
+    let shown = response_json(call("GET", format!("/v1/repositories/{source_id}"), owner.clone(), json!({})).await).await;
+    assert!(shown["webhook_last_received_at"].is_string());
+
+    // A new secret retires the old one; removing it ends the webhook.
+    let renewed = response_json(
+        call("POST", format!("/v1/repositories/{source_id}/webhook"), owner.clone(), json!({})).await,
+    )
+    .await;
+    assert_ne!(renewed["secret"].as_str().unwrap(), secret);
+    let (status, _) = send(hook_path.clone(), github("push"), push).await;
+    assert_eq!(status, 401);
+    assert_eq!(
+        call("DELETE", format!("/v1/repositories/{source_id}/webhook"), owner.clone(), json!({}))
+            .await
+            .status(),
+        204
+    );
+    let (status, _) = send(
+        hook_path,
+        vec![("x-gitlab-token", renewed["secret"].as_str().unwrap().to_owned())],
+        push,
+    )
+    .await;
+    assert_eq!(status, 401);
+    let _ = std::fs::remove_dir_all(base);
+}

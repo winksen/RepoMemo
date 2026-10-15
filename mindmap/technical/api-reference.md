@@ -38,6 +38,7 @@
 | POST | `/v1/auth/refresh` | public | — | RefreshRequest | TokenResponse |
 | POST | `/v1/auth/logout` | public | — | RefreshRequest | status |
 | POST | `/v1/auth/logout-all` | session | — | — | status |
+| POST | `/v1/webhooks/repositories/{source_id}` | public | — | raw body, signed | 200 or 202 `{queued, note}`, else 401 |
 | POST | `/v1/auth/forgot-password` | public | — | ForgotPasswordRequest | 202 ForgotPasswordAnswer (the same for every address) |
 | POST | `/v1/auth/password-reset/preview` | public | — | TokenBody | PasswordResetPreview |
 | POST | `/v1/auth/password-reset` | public | — | CompletePasswordReset | TokenResponse |
@@ -189,6 +190,8 @@
 | GET | `/v1/repositories/{source_id}` | auth | require_workspace_read | — | RepoSource |
 | PUT | `/v1/repositories/{source_id}` | auth | require_workspace_admin | UpdateRepositoryRequest | RepoSource |
 | DELETE | `/v1/repositories/{source_id}` | auth | require_workspace_admin | — | status |
+| POST | `/v1/repositories/{source_id}/webhook` | auth | require_workspace_admin | — | WebhookCreated |
+| DELETE | `/v1/repositories/{source_id}/webhook` | auth | require_workspace_admin | — | status |
 | PUT | `/v1/repositories/{source_id}/deploy-key` | auth | require_workspace_admin | RepositoryDeployKeyRequest | RepoSource |
 | PUT | `/v1/repositories/{source_id}/token` | auth | require_workspace_admin | RepositoryTokenRequest | RepoSource |
 | DELETE | `/v1/repositories/{source_id}/token` | auth | require_workspace_admin | — | status |

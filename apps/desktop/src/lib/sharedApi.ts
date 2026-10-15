@@ -1106,6 +1106,15 @@ export function setSharedRepositoryDeployKey(accessToken: string, repositoryId: 
   return request<RepoSource>(`/v1/repositories/${repositoryId}/deploy-key`, { method: "PUT", body: JSON.stringify(input) }, accessToken);
 }
 
+/** The secret is returned once, when the webhook is made or renewed. */
+export function createSharedRepositoryWebhook(accessToken: string, repositoryId: string): Promise<{ secret: string; path: string; url: string | null }> {
+  return request(`/v1/repositories/${repositoryId}/webhook`, { method: "POST", body: JSON.stringify({}) }, accessToken);
+}
+
+export function deleteSharedRepositoryWebhook(accessToken: string, repositoryId: string): Promise<void> {
+  return request<void>(`/v1/repositories/${repositoryId}/webhook`, { method: "DELETE" }, accessToken);
+}
+
 export function clearSharedRepositoryToken(accessToken: string, repositoryId: string): Promise<void> {
   return request<void>(`/v1/repositories/${repositoryId}/token`, { method: "DELETE" }, accessToken);
 }

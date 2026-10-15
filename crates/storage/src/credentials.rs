@@ -50,6 +50,17 @@ fn credential_context(source_id: &str) -> String {
     format!("repo_credentials:{source_id}:secret")
 }
 
+fn webhook_context(source_id: &str) -> String {
+    format!("repo_webhooks:{source_id}:secret")
+}
+
+/// What can be said about a repository's webhook without its secret.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RepoWebhookInfo {
+    pub created_at: String,
+    pub last_received_at: Option<String>,
+}
+
 impl StorageEngine {
     /// Saves (or replaces) the credential of a repository link.
     pub async fn set_repo_credential(
@@ -151,6 +162,90 @@ impl StorageEngine {
         }
     }
 
+    /// Makes (or replaces) the secret that signs a repository's push
+    /// webhooks and returns it. This is the only time it is shown.
+    pub async fn create_repo_webhook(&self, source_id: &str, actor_user_id: Option<&str>) -> Result<String> {
+        use ring::rand::{SecureRandom, SystemRandom};
+        let exists = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM sources WHERE id = ?1 AND type = 'git_repo'")
+            .bind(source_id)
+            .fetch_one(self.reader())
+            .await?;
+        if exists == 0 {
+            repomemo_domain::bail_not_found!("Repository was not found.");
+        }
+        let mut bytes = [0_u8; 32];
+        SystemRandom::new()
+            .fill(&mut bytes)
+            .map_err(|_| anyhow::anyhow!("a webhook secret could not be generated"))?;
+        let secret = hex::encode(bytes);
+        let sealed = self.secrets.seal(&secret, &webhook_context(source_id))?;
+        sqlx::query(
+            r#"INSERT INTO repo_webhooks (source_id, sealed_secret, created_by_user_id, created_at, last_received_at)
+               VALUES (?1, ?2, ?3, ?4, NULL)
+               ON CONFLICT(source_id) DO UPDATE SET sealed_secret = excluded.sealed_secret,
+                 created_by_user_id = excluded.created_by_user_id, created_at = excluded.created_at,
+                 last_received_at = NULL"#,
+        )
+        .bind(source_id)
+        .bind(sealed)
+        .bind(actor_user_id)
+        .bind(Utc::now().to_rfc3339())
+        .execute(&self.pool)
+        .await?;
+        Ok(secret)
+    }
+
+    /// The secret to check a webhook's signature with.
+    pub async fn open_repo_webhook_secret(&self, source_id: &str) -> Result<Option<String>> {
+        let sealed = sqlx::query_scalar::<_, String>("SELECT sealed_secret FROM repo_webhooks WHERE source_id = ?1")
+            .bind(source_id)
+            .fetch_optional(self.reader())
+            .await?;
+        Ok(match sealed {
+            Some(sealed) => match self.secrets.open(&sealed, &webhook_context(source_id)) {
+                Ok(secret) => Some(secret),
+                Err(error) => {
+                    tracing::warn!(repository = %source_id, error = %error, "A webhook secret could not be decrypted");
+                    None
+                }
+            },
+            None => None,
+        })
+    }
+
+    pub async fn repo_webhook_info(&self, source_id: &str) -> Result<Option<RepoWebhookInfo>> {
+        let row = sqlx::query_as::<_, (String, Option<String>)>(
+            "SELECT created_at, last_received_at FROM repo_webhooks WHERE source_id = ?1",
+        )
+        .bind(source_id)
+        .fetch_optional(self.reader())
+        .await?;
+        Ok(row.map(|(created_at, last_received_at)| RepoWebhookInfo {
+            created_at,
+            last_received_at,
+        }))
+    }
+
+    /// Notes that a correctly signed call arrived.
+    pub async fn touch_repo_webhook(&self, source_id: &str) -> Result<()> {
+        sqlx::query("UPDATE repo_webhooks SET last_received_at = ?1 WHERE source_id = ?2")
+            .bind(Utc::now().to_rfc3339())
+            .bind(source_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// Removes a repository's webhook secret. Returns whether there was one.
+    pub async fn clear_repo_webhook(&self, source_id: &str) -> Result<bool> {
+        Ok(sqlx::query("DELETE FROM repo_webhooks WHERE source_id = ?1")
+            .bind(source_id)
+            .execute(&self.pool)
+            .await?
+            .rows_affected()
+            > 0)
+    }
+
     /// Removes a link's credential. Returns whether there was one.
     pub async fn clear_repo_credential(&self, source_id: &str) -> Result<bool> {
         Ok(sqlx::query("DELETE FROM repo_credentials WHERE source_id = ?1")
@@ -226,6 +321,26 @@ mod tests {
 
         assert!(storage.clear_repo_credential(&source_id).await.unwrap());
         assert!(storage.open_repo_credential(&source_id).await.unwrap().is_none());
+
+        // A webhook secret is made once, stored sealed, and dies with its link.
+        assert!(storage.create_repo_webhook("missing", None).await.is_err());
+        let secret = storage.create_repo_webhook(&source_id, Some(&owner.id)).await.unwrap();
+        assert_eq!(secret.len(), 64);
+        let stored: String = sqlx::query_scalar("SELECT sealed_secret FROM repo_webhooks WHERE source_id = ?1")
+            .bind(&source_id)
+            .fetch_one(&storage.pool)
+            .await
+            .unwrap();
+        assert!(!stored.contains(&secret));
+        assert_eq!(storage.open_repo_webhook_secret(&source_id).await.unwrap().as_deref(), Some(secret.as_str()));
+        assert!(storage.repo_webhook_info(&source_id).await.unwrap().unwrap().last_received_at.is_none());
+        storage.touch_repo_webhook(&source_id).await.unwrap();
+        assert!(storage.repo_webhook_info(&source_id).await.unwrap().unwrap().last_received_at.is_some());
+        let renewed = storage.create_repo_webhook(&source_id, None).await.unwrap();
+        assert_ne!(renewed, secret);
+        assert!(storage.repo_webhook_info(&source_id).await.unwrap().unwrap().last_received_at.is_none());
+        assert!(storage.clear_repo_webhook(&source_id).await.unwrap());
+        assert!(storage.open_repo_webhook_secret(&source_id).await.unwrap().is_none());
         storage.pool.close().await;
         let _ = std::fs::remove_dir_all(data_dir);
     }

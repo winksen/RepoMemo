@@ -35,6 +35,7 @@ mod streams;
 mod system;
 mod verification;
 mod web_session;
+mod webhooks;
 mod workspaces;
 
 use access_control::*;
@@ -702,6 +703,14 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route(
             "/v1/repositories/{source_id}/deploy-key",
             put(repositories::set_repository_deploy_key),
+        )
+        .route(
+            "/v1/repositories/{source_id}/webhook",
+            post(webhooks::create_repository_webhook).delete(webhooks::delete_repository_webhook),
+        )
+        .route(
+            "/v1/webhooks/repositories/{source_id}",
+            post(webhooks::receive_repository_webhook),
         )
         .route(
             "/v1/repositories/{source_id}/files",
