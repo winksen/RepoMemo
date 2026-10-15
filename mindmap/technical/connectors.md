@@ -1,15 +1,15 @@
 # Connectors (issues and pull requests)
 
-> **Branch of:** [TECHNICAL_MINDMAP.md](../TECHNICAL_MINDMAP.md) · **Roadmap:** F17, decision 12 · **Status:** GitHub issues (V0.2.27)
+> **Branch of:** [TECHNICAL_MINDMAP.md](../TECHNICAL_MINDMAP.md) · **Roadmap:** F17, decision 12 · **Status:** GitHub issues (V0.2.27) and pull requests (V0.2.28)
 
-A connector keeps a tracker's items as evidence. It is a source of `type = 'connector'`: each item (an issue now, a pull request in V0.2.28) becomes one markdown artifact, indexed like any file, so it is searchable, citable and linkable to memory cards. The tracker stays the source of truth: nothing is ever written to it.
+A connector keeps a tracker's items as evidence. It is a source of `type = 'connector'`: each item (an issue, or a pull request) becomes one markdown artifact, indexed like any file, so it is searchable, citable and linkable to memory cards. The tracker stays the source of truth: nothing is ever written to it.
 
 ## How a sync works
 
 1. The connector asks the tracker for items **updated since the last one** (`since`, oldest update first), so an interrupted sync resumes where it stopped. At most 30 pages of 100 are read per sync; the report says when more is waiting.
-2. For each item the comments are read (up to 500), the item is rendered as markdown (title, state, author, labels, assignees, link, body, discussion) and stored as a blob.
+2. For each item the comments are read (up to 500), the item is rendered as markdown (title, state, author, labels, assignees, link, body, discussion) and stored as a blob. A **pull request** also reads its own record, commits (up to 250), reviews and inline review comments (`render_pull`: branches, figures, commits, reviews, review comments, discussion); the commit ids go to the item's metadata. A sync stops after 500 requests and resumes from its cursor.
 3. `connector_items` (migration 0034) maps the tracker's id to the artifact. **New** → a new artifact; **changed** → the same artifact with new content, queued for re-indexing (a *verified* one is flagged *needs review*); **unchanged** → nothing.
-4. State drives the lifecycle: a **closed** item becomes *outdated*, a **reopened** one *active* again.
+4. State drives the lifecycle: a **closed** item (an issue, or a pull request closed without merging) becomes *outdated*, a **reopened** one *active* again; a **merged** pull request stays active.
 5. Changed artifacts are indexed in the same job, then the workspace's embeddings are requested.
 
 Syncs run in the background through a runner of their own (one at a time, never two for the same connector), on demand (*Sync now*) and on the repository polling interval. A connector that failed waits for a person.
@@ -44,4 +44,4 @@ Syncs run in the background through a runner of their own (one at a time, never 
 
 ## Not yet
 
-Pull requests (V0.2.28), GitLab (V0.2.29), links from items to files, symbols and commits (V0.2.30), webhooks and a rate-limit pause (V0.2.31). A rate limit today fails the sync with a message and the next try resumes.
+GitLab (V0.2.29), links from items to files, symbols and commits (V0.2.30), webhooks and a rate-limit pause (V0.2.31). A rate limit today fails the sync with a message and the next try resumes.

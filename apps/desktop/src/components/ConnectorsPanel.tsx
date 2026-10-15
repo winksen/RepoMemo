@@ -159,8 +159,8 @@ export function ConnectorSettings({
   }
 
   return <section className="shared-settings-group">
-    <div className="shared-panel-heading"><div><GitHub size={18} /><h2>Issues</h2></div><span>{connectors?.length ?? 0} connected</span></div>
-    <p className="shared-muted-copy">Keep a GitHub repository's issues, with their comments, as searchable and citable evidence. Closed issues are marked outdated and come back when reopened. A read-only token is only needed for a private repository or a higher rate limit.</p>
+    <div className="shared-panel-heading"><div><GitHub size={18} /><h2>Issues and pull requests</h2></div><span>{connectors?.length ?? 0} connected</span></div>
+    <p className="shared-muted-copy">Keep a GitHub repository's issues and pull requests, with their comments, reviews and commits, as searchable and citable evidence. Closed issues and abandoned pull requests are marked outdated and come back when reopened; merged pull requests stay. A read-only token is only needed for a private repository or a higher rate limit.</p>
 
     {connectors?.length ? <ul className="rm-repo-links">
       {connectors.map((connector) => {

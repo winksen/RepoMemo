@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.28 (2026-10-15)
+
+GitHub pull requests become evidence, next to the issues.
+
+### Added
+- **Pull requests are kept by the same connector** as the repository's issues (Settings › Issues and pull requests). Each one, with its description, **commits** (id, first line, author), **reviews** (reviewer, verdict, text), **inline review comments** (file and line) and conversation, is one artifact (type *pr*): searchable, citable and linkable to memory cards.
+- **State:** an open pull request is active, a **merged** one stays active (it describes what is in the code), and one **closed without merging** is *outdated*, like a closed issue; a reopened one is active again. The connector counts a merged pull request with the closed items.
+- **The commit ids are kept** in the item's metadata (`commits`), which is what V0.2.30 links to files and commits.
+- **A request budget per sync (500).** A pull request takes five requests, so a large tracker is read over several syncs: the sync stops, says *more to fetch*, and resumes from where it stopped.
+- Existing connectors read pull requests from the next sync on; the first one may need several syncs on a large tracker.
+
+### Upgrading
+- Nothing to do. A token that could read issues reads pull requests too (a fine-grained token also needs *Pull requests: read*).
+
 ## V0.2.27 (2026-10-15)
 
 GitHub issues become evidence.

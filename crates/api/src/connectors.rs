@@ -2,11 +2,13 @@
 //! decision 12).
 //!
 //! A connector is a source of type `connector`. The first one reads GitHub
-//! issues (github.com or GitHub Enterprise Server) with an optional read-only
-//! token: each issue, with its comments, becomes one markdown artifact that is
-//! indexed like any file, searchable and citable. Syncs are incremental (the
-//! tracker's `since`, oldest update first, so an interrupted sync resumes),
-//! a closed issue becomes *outdated* and a reopened one active again.
+//! issues and pull requests (github.com or GitHub Enterprise Server) with an
+//! optional read-only token: each issue, with its comments, and each pull
+//! request, with its commits, reviews and discussion, becomes one markdown
+//! artifact that is indexed like any file, searchable and citable. Syncs are
+//! incremental (the tracker's `since`, oldest update first, so an interrupted
+//! sync resumes). A closed issue or an abandoned pull request becomes
+//! *outdated* and a reopened one active again; a merged pull request stays.
 //!
 //! Outside rules (S6): the API host must be on `REPOMEMO_GIT_ALLOWED_HOSTS`
 //! like repository hosts, only `https` is spoken (plain `http` only to this
@@ -14,6 +16,7 @@
 //! followed, the token only ever goes to the host it was entered for, and a
 //! response over 20 MiB is refused.
 
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use anyhow::{Context, Result};
@@ -36,6 +39,12 @@ const MAX_COMMENT_PAGES: usize = 5;
 const MAX_BODY_CHARS: usize = 100_000;
 const MAX_COMMENT_CHARS: usize = 20_000;
 const MAX_RESPONSE_BYTES: usize = 20 * 1024 * 1024;
+/// Requests one sync makes before it stops and resumes at the next (a pull
+/// request alone takes five), so a large tracker cannot use up the token's
+/// hourly allowance in one go.
+const MAX_REQUESTS_PER_SYNC: usize = 500;
+/// Commits listed for one pull request.
+const MAX_PULL_COMMITS: usize = 250;
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Where a tracker is: derived from the link a person typed.
@@ -162,6 +171,8 @@ struct GitHub {
     http: reqwest::Client,
     api_base: String,
     token: Option<String>,
+    /// Requests made so far.
+    calls: AtomicUsize,
 }
 
 impl GitHub {
@@ -176,7 +187,12 @@ impl GitHub {
             http,
             api_base: api_base.trim_end_matches('/').to_owned(),
             token,
+            calls: AtomicUsize::new(0),
         })
+    }
+
+    fn calls(&self) -> usize {
+        self.calls.load(Ordering::Relaxed)
     }
 
     /// One GET, as JSON, and the address of the next page when there is one.
@@ -186,6 +202,7 @@ impl GitHub {
         if !url.starts_with(&self.api_base) {
             repomemo_domain::bail_invalid!("The tracker pointed to an address outside its own API.");
         }
+        self.calls.fetch_add(1, Ordering::Relaxed);
         let mut request = self
             .http
             .get(url)
@@ -325,6 +342,139 @@ pub(crate) fn render_issue(owner: &str, repo: &str, issue: &Value, comments: &[V
     if !comments.is_empty() {
         out.push_str("\n## Discussion\n");
         for comment in comments {
+            out.push_str(&format!(
+                "\n### @{} · {}\n\n{}\n",
+                user_of(comment, "user"),
+                text_of(comment, "created_at"),
+                clip(text_of(comment, "body").trim(), MAX_COMMENT_CHARS)
+            ));
+        }
+    }
+    out
+}
+
+/// Everything a pull request is made of beyond its description.
+pub(crate) struct PullDetail {
+    pull: Value,
+    commits: Vec<Value>,
+    reviews: Vec<Value>,
+    review_comments: Vec<Value>,
+    comments: Vec<Value>,
+}
+
+impl PullDetail {
+    fn merged(&self) -> bool {
+        self.pull.get("merged").and_then(Value::as_bool).unwrap_or(false)
+            || self.pull.get("merged_at").is_some_and(|value| !value.is_null())
+    }
+
+    /// The full commit ids, oldest first as the tracker lists them.
+    fn commit_ids(&self) -> Vec<String> {
+        self.commits
+            .iter()
+            .filter_map(|commit| commit.get("sha").and_then(Value::as_str).map(str::to_owned))
+            .collect()
+    }
+}
+
+/// The markdown a pull request becomes: its details, description, commits,
+/// reviews, inline review comments and discussion.
+pub(crate) fn render_pull(owner: &str, repo: &str, issue: &Value, detail: &PullDetail) -> String {
+    let pull = &detail.pull;
+    let number = issue.get("number").and_then(Value::as_i64).unwrap_or(0);
+    let state = if detail.merged() { "merged".to_owned() } else { text_of(issue, "state") };
+    let branch = |side: &str| {
+        pull.get(side)
+            .and_then(|value| value.get("ref"))
+            .and_then(Value::as_str)
+            .unwrap_or("?")
+            .to_owned()
+    };
+    let mut out = format!("# {}\n\n", text_of(issue, "title"));
+    out.push_str(&format!(
+        "Pull request #{number} in {owner}/{repo} · {state} · opened by @{} on {} · {} ← {}",
+        user_of(issue, "user"),
+        text_of(issue, "created_at"),
+        branch("base"),
+        branch("head")
+    ));
+    if let Some(merged) = pull.get("merged_at").and_then(Value::as_str) {
+        out.push_str(&format!(" · merged {merged}"));
+    }
+    out.push('\n');
+    let figure = |key: &str| pull.get(key).and_then(Value::as_i64).unwrap_or(0);
+    out.push_str(&format!(
+        "\n{} commits · {} files changed · +{} −{}\n",
+        figure("commits"),
+        figure("changed_files"),
+        figure("additions"),
+        figure("deletions")
+    ));
+    let url = text_of(issue, "html_url");
+    if !url.is_empty() {
+        out.push_str(&format!("\n{url}\n"));
+    }
+    let body = text_of(issue, "body");
+    if !body.trim().is_empty() {
+        out.push_str(&format!("\n{}\n", clip(body.trim(), MAX_BODY_CHARS)));
+    }
+    if !detail.commits.is_empty() {
+        out.push_str("\n## Commits\n\n");
+        for commit in &detail.commits {
+            let sha = text_of(commit, "sha");
+            let message = commit
+                .get("commit")
+                .and_then(|inner| inner.get("message"))
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .lines()
+                .next()
+                .unwrap_or_default();
+            let author = commit
+                .get("commit")
+                .and_then(|inner| inner.get("author"))
+                .and_then(|author| author.get("name"))
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            out.push_str(&format!("- {} {message} ({author})\n", &sha[..sha.len().min(12)]));
+        }
+    }
+    if !detail.reviews.is_empty() {
+        out.push_str("\n## Reviews\n");
+        for review in &detail.reviews {
+            let body = text_of(review, "body");
+            out.push_str(&format!(
+                "\n### @{} · {} · {}\n",
+                user_of(review, "user"),
+                text_of(review, "state").to_lowercase().replace('_', " "),
+                text_of(review, "submitted_at")
+            ));
+            if !body.trim().is_empty() {
+                out.push_str(&format!("\n{}\n", clip(body.trim(), MAX_COMMENT_CHARS)));
+            }
+        }
+    }
+    if !detail.review_comments.is_empty() {
+        out.push_str("\n## Review comments\n");
+        for comment in &detail.review_comments {
+            let line = comment
+                .get("line")
+                .or_else(|| comment.get("original_line"))
+                .and_then(Value::as_i64)
+                .map(|line| format!(":{line}"))
+                .unwrap_or_default();
+            out.push_str(&format!(
+                "\n### @{} on {}{line} · {}\n\n{}\n",
+                user_of(comment, "user"),
+                text_of(comment, "path"),
+                text_of(comment, "created_at"),
+                clip(text_of(comment, "body").trim(), MAX_COMMENT_CHARS)
+            ));
+        }
+    }
+    if !detail.comments.is_empty() {
+        out.push_str("\n## Discussion\n");
+        for comment in &detail.comments {
             out.push_str(&format!(
                 "\n### @{} · {}\n\n{}\n",
                 user_of(comment, "user"),
@@ -571,7 +721,7 @@ impl RepoMemoCore {
             Some(url)
         };
         let mut pages = 0;
-        while let Some(page_url) = url.take() {
+        'pages: while let Some(page_url) = url.take() {
             if pages >= MAX_PAGES_PER_SYNC {
                 report.more_to_fetch = true;
                 break;
@@ -579,36 +729,71 @@ impl RepoMemoCore {
             pages += 1;
             let (page, next) = client.get(&page_url).await?;
             for issue in page.as_array().cloned().unwrap_or_default() {
-                // The issues list also holds pull requests; those are V0.2.28.
-                if issue.get("pull_request").is_some() {
-                    continue;
+                // A pull request costs several requests: stop before the
+                // allowance goes, and resume from the cursor next time.
+                if client.calls() >= MAX_REQUESTS_PER_SYNC {
+                    report.more_to_fetch = true;
+                    break 'pages;
                 }
+                // The issues feed also lists pull requests, with the same
+                // number space.
+                let is_pull = issue.get("pull_request").is_some();
                 report.items_seen += 1;
                 let number = issue.get("number").and_then(Value::as_i64).unwrap_or(0);
                 let updated = text_of(&issue, "updated_at");
-                let comments = if issue.get("comments").and_then(Value::as_i64).unwrap_or(0) > 0 {
-                    self.github_comments(&client, &target, number).await?
+                let (content, state, artifact_type, kind, path, origin, commits) = if is_pull {
+                    report.pull_requests_seen += 1;
+                    let detail = self.github_pull(&client, &target, number, &issue).await?;
+                    let state = if detail.merged() {
+                        "merged".to_owned()
+                    } else if text_of(&issue, "state") == "closed" {
+                        "closed".to_owned()
+                    } else {
+                        "open".to_owned()
+                    };
+                    (
+                        render_pull(&target.owner, &target.repo, &issue, &detail),
+                        state,
+                        ArtifactType::Pr,
+                        "pull_request",
+                        format!("pulls/{number}"),
+                        "github_pull_request",
+                        detail.commit_ids(),
+                    )
                 } else {
-                    Vec::new()
+                    let comments = if issue.get("comments").and_then(Value::as_i64).unwrap_or(0) > 0 {
+                        self.github_comments(&client, &target, number).await?
+                    } else {
+                        Vec::new()
+                    };
+                    let state = if text_of(&issue, "state") == "closed" { "closed" } else { "open" };
+                    (
+                        render_issue(&target.owner, &target.repo, &issue, &comments),
+                        state.to_owned(),
+                        ArtifactType::Issue,
+                        "issue",
+                        format!("issues/{number}"),
+                        "github_issue",
+                        Vec::new(),
+                    )
                 };
-                let content = render_issue(&target.owner, &target.repo, &issue, &comments).into_bytes();
+                let content = content.into_bytes();
                 let content_hash = StorageEngine::content_hash(&content);
                 self.storage
                     .store_blob(&content_hash, &content, Some("text/markdown"))
                     .await?;
-                let state = if text_of(&issue, "state") == "closed" { "closed" } else { "open" };
                 let item = ConnectorItemWrite {
-                    external_id: format!("issue:{number}"),
-                    kind: "issue".to_owned(),
-                    artifact_type: ArtifactType::Issue,
+                    external_id: format!("{}:{number}", if is_pull { "pr" } else { "issue" }),
+                    kind: kind.to_owned(),
+                    artifact_type,
                     title: format!("#{number} {}", text_of(&issue, "title")),
-                    path: format!("issues/{number}"),
+                    path,
                     content_hash,
                     size_bytes: content.len() as i64,
-                    state: state.to_owned(),
+                    state: state.clone(),
                     remote_updated_at: updated.clone(),
                     metadata: json!({
-                        "origin": "github_issue",
+                        "origin": origin,
                         "provider": "github",
                         "repository": format!("{}/{}", target.owner, target.repo),
                         "number": number,
@@ -618,6 +803,7 @@ impl RepoMemoCore {
                         "opened_at": text_of(&issue, "created_at"),
                         "closed_at": issue.get("closed_at").cloned().unwrap_or(Value::Null),
                         "remote_updated_at": updated,
+                        "commits": commits,
                     }),
                 };
                 let (_, outcome) = self
@@ -677,22 +863,57 @@ impl RepoMemoCore {
     }
 
     async fn github_comments(&self, client: &GitHub, target: &GitHubTarget, number: i64) -> Result<Vec<Value>> {
-        let mut comments = Vec::new();
-        let mut url = Some(format!(
-            "{}/repos/{}/{}/issues/{number}/comments?per_page={PER_PAGE}",
-            client.api_base, target.owner, target.repo
-        ));
+        self.github_list(
+            client,
+            format!(
+                "{}/repos/{}/{}/issues/{number}/comments?per_page={PER_PAGE}",
+                client.api_base, target.owner, target.repo
+            ),
+            MAX_COMMENT_PAGES,
+        )
+        .await
+    }
+
+    /// Up to `max_pages` pages of one list, as one list.
+    async fn github_list(&self, client: &GitHub, first: String, max_pages: usize) -> Result<Vec<Value>> {
+        let mut items = Vec::new();
+        let mut url = Some(first);
         let mut pages = 0;
         while let Some(page_url) = url.take() {
-            if pages >= MAX_COMMENT_PAGES {
+            if pages >= max_pages {
                 break;
             }
             pages += 1;
             let (page, next) = client.get(&page_url).await?;
-            comments.extend(page.as_array().cloned().unwrap_or_default());
+            items.extend(page.as_array().cloned().unwrap_or_default());
             url = next;
         }
-        Ok(comments)
+        Ok(items)
+    }
+
+    /// A pull request's own record, commits, reviews, inline review comments
+    /// and conversation.
+    async fn github_pull(&self, client: &GitHub, target: &GitHubTarget, number: i64, _issue: &Value) -> Result<PullDetail> {
+        let base = format!("{}/repos/{}/{}", client.api_base, target.owner, target.repo);
+        let (pull, _) = client.get(&format!("{base}/pulls/{number}")).await?;
+        let commit_pages = MAX_PULL_COMMITS.div_ceil(PER_PAGE);
+        let commits = self
+            .github_list(client, format!("{base}/pulls/{number}/commits?per_page={PER_PAGE}"), commit_pages)
+            .await?;
+        let reviews = self
+            .github_list(client, format!("{base}/pulls/{number}/reviews?per_page={PER_PAGE}"), MAX_COMMENT_PAGES)
+            .await?;
+        let review_comments = self
+            .github_list(client, format!("{base}/pulls/{number}/comments?per_page={PER_PAGE}"), MAX_COMMENT_PAGES)
+            .await?;
+        let comments = self.github_comments(client, target, number).await?;
+        Ok(PullDetail {
+            pull,
+            commits: commits.into_iter().take(MAX_PULL_COMMITS).collect(),
+            reviews,
+            review_comments,
+            comments,
+        })
     }
 }
 
@@ -747,6 +968,35 @@ mod tests {
         assert!(text.contains("Seen on staging."));
         assert!(text.contains("## Discussion"));
         assert!(text.contains("### @bo · 2026-01-03T00:00:00Z\n\nFixed in #8."));
+    }
+
+    #[test]
+    fn a_pull_request_becomes_markdown_with_its_commits_and_reviews() {
+        let issue = json!({
+            "number": 8, "title": "Fix double posting", "state": "closed", "user": {"login": "bo"},
+            "created_at": "2026-01-05T00:00:00Z", "html_url": "https://github.com/acme/app/pull/8",
+            "body": "Posts once per refund."
+        });
+        let detail = PullDetail {
+            pull: json!({"merged": true, "merged_at": "2026-01-07T00:00:00Z", "base": {"ref": "main"},
+                         "head": {"ref": "fix-double"}, "commits": 2, "changed_files": 3, "additions": 40, "deletions": 5}),
+            commits: vec![
+                json!({"sha": "0123456789abcdef0123456789abcdef01234567", "commit": {"message": "Guard the ledger\n\nlong", "author": {"name": "Bo"}}}),
+            ],
+            reviews: vec![json!({"user": {"login": "ana"}, "state": "CHANGES_REQUESTED", "submitted_at": "2026-01-06T00:00:00Z", "body": "Add a test."})],
+            review_comments: vec![json!({"user": {"login": "ana"}, "path": "src/ledger.rs", "line": 42, "created_at": "2026-01-06T00:00:00Z", "body": "Why twice?"})],
+            comments: vec![json!({"user": {"login": "bo"}, "created_at": "2026-01-06T01:00:00Z", "body": "Done."})],
+        };
+        assert!(detail.merged());
+        assert_eq!(detail.commit_ids(), vec!["0123456789abcdef0123456789abcdef01234567".to_owned()]);
+        let text = render_pull("acme", "app", &issue, &detail);
+        assert!(text.contains("Pull request #8 in acme/app · merged · opened by @bo"));
+        assert!(text.contains("main ← fix-double · merged 2026-01-07T00:00:00Z"));
+        assert!(text.contains("2 commits · 3 files changed · +40 −5"));
+        assert!(text.contains("- 0123456789ab Guard the ledger (Bo)"));
+        assert!(text.contains("### @ana · changes requested · 2026-01-06T00:00:00Z\n\nAdd a test."));
+        assert!(text.contains("### @ana on src/ledger.rs:42"));
+        assert!(text.contains("## Discussion"));
     }
 
     #[test]

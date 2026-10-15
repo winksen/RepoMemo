@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.27` (2026-10-15), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.28` (2026-10-15), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -362,7 +362,7 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 | Release | Type | Section | The one change | IDs | Done when |
 |---|---|---|---|---|---|
 | **V0.2.27** ✅ | ✨ | Connectors | GitHub issues as evidence (read-only token, incremental sync) | F17a, decision 12 | Issues and their comments are searchable and citable; closed issues are *outdated* |
-| **V0.2.28** | ✨ | Connectors | GitHub pull requests as evidence | F17b | Pull requests with their review discussion, linked to their commits |
+| **V0.2.28** ✅ | ✨ | Connectors | GitHub pull requests as evidence | F17b | Pull requests with their review discussion, linked to their commits |
 | **V0.2.29** | ✨ | Connectors | GitLab issues and merge requests | F17c | The same model as GitHub, including self-hosted GitLab |
 | **V0.2.30** | 🔧 | Artifact page | Links from issues and pull requests to the files, symbols and commits they mention | F17d | A file shows the issues that name it |
 | **V0.2.31** | 🔧 | Connectors | Connector webhooks and remote rate limits | F17e | Updates arrive on webhook; `Retry-After` is honoured; a revoked token pauses the connector and says so |
@@ -609,6 +609,14 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 - [x] Web: Settings › Issues (check, connect, sync now, replace token, remove)
 - [x] Tests: link forms, markdown rendering, `Link` header, and `github_issues_become_evidence_that_follows_the_tracker` against a stand-in GitHub (pull request skipped, closed → outdated, bearer token only, `since` asked, reopen → active, removal)
 - [ ] Pull requests are V0.2.28; webhooks and rate-limit pauses V0.2.31
+
+#### V0.2.28: GitHub pull requests as evidence
+
+- [x] **F17b** the issues feed's pull requests are read in full: `/pulls/{n}`, `/commits`, `/reviews`, `/comments` and the issue comments; `render_pull` (details, branches, commits, reviews, review comments, discussion); `PullDetail::{merged, commit_ids}`
+- [x] `ArtifactType::Pr`, path `pulls/{n}`, state `open`, `closed` or `merged`; merged stays active, closed → *outdated*; counts treat merged as closed
+- [x] A budget of 500 requests per sync, resumed from the cursor (`more_to_fetch`)
+- [x] Tests: `a_pull_request_becomes_markdown_with_its_commits_and_reviews`, the connector test with a pull request (opened, then merged, commits kept, still active)
+- [ ] Links from pull requests to files and symbols are V0.2.30
 
 ### Decisions to agree before work starts
 

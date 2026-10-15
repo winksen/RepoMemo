@@ -685,7 +685,8 @@ pub struct ConnectorSource {
     pub last_synced_at: Option<String>,
     pub last_error: Option<String>,
     pub last_report: Option<ConnectorSyncReport>,
-    /// Items kept, by the state the tracker reports.
+    /// Items kept, by the state the tracker reports (a merged pull request
+    /// counts as closed).
     pub open_items: i64,
     pub closed_items: i64,
     /// A token is stored (never shown).
@@ -698,6 +699,9 @@ pub struct ConnectorSource {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ConnectorSyncReport {
     pub items_seen: usize,
+    /// Of those, pull requests.
+    #[serde(default)]
+    pub pull_requests_seen: usize,
     pub added: usize,
     pub updated: usize,
     pub unchanged: usize,

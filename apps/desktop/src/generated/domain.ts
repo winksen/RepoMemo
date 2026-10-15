@@ -603,7 +603,10 @@ export interface ConnectorSource {
   last_synced_at: string | null;
   last_error: string | null;
   last_report: ConnectorSyncReport | null;
-  /** Items kept, by the state the tracker reports. */
+  /**
+   * Items kept, by the state the tracker reports (a merged pull request
+   * counts as closed).
+   */
   open_items: number;
   closed_items: number;
   /** A token is stored (never shown). */
@@ -615,6 +618,8 @@ export interface ConnectorSource {
 /** What one connector sync did. */
 export interface ConnectorSyncReport {
   items_seen: number;
+  /** Of those, pull requests. */
+  pull_requests_seen: number;
   added: number;
   updated: number;
   unchanged: number;

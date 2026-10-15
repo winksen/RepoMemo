@@ -2,7 +2,7 @@ use super::*;
 use std::sync::{Arc, Mutex};
 
 /// A stand-in for GitHub's REST API with two versions of the same two issues
-/// (and one pull request, which a connector leaves alone).
+/// and one pull request (open, then merged).
 #[derive(Clone, Default)]
 struct FakeGitHub {
     version: Arc<Mutex<u32>>,
@@ -44,18 +44,58 @@ async fn start_fake_github(state: FakeGitHub) -> String {
                          "user": {"login": "bo"}, "created_at": "2025-12-01T00:00:00Z", "updated_at": "2026-01-03T00:00:00Z",
                          "closed_at": "2026-01-03T00:00:00Z", "html_url": "https://github.com/acme/app/issues/2",
                          "body": "Round half up.", "labels": [], "assignees": []},
-                        {"number": 3, "title": "A pull request", "state": "open", "comments": 0, "pull_request": {"url": "x"},
+                        {"number": 3, "title": "Guard the ledger", "state": "open", "comments": 1, "pull_request": {"url": "x"},
                          "user": {"login": "cy"}, "created_at": "2026-01-04T00:00:00Z", "updated_at": "2026-01-04T00:00:00Z",
-                         "body": "not an issue", "labels": [], "assignees": []}
+                         "html_url": "https://github.com/acme/app/pull/3", "body": "Posts a refund once.",
+                         "labels": [], "assignees": []}
                     ]))
                 } else {
                     axum::Json(json!([
                         {"number": 2, "title": "Old rounding rule", "state": "open", "comments": 0,
                          "user": {"login": "bo"}, "created_at": "2025-12-01T00:00:00Z", "updated_at": "2026-02-01T00:00:00Z",
                          "html_url": "https://github.com/acme/app/issues/2", "body": "Round half up, again.",
+                         "labels": [], "assignees": []},
+                        {"number": 3, "title": "Guard the ledger", "state": "closed", "comments": 1, "pull_request": {"url": "x"},
+                         "user": {"login": "cy"}, "created_at": "2026-01-04T00:00:00Z", "updated_at": "2026-02-02T00:00:00Z",
+                         "html_url": "https://github.com/acme/app/pull/3", "body": "Posts a refund once.",
                          "labels": [], "assignees": []}
                     ]))
                 }
+            }),
+        )
+        .route(
+            "/api/v3/repos/acme/app/pulls/3",
+            get(|State(state): State<FakeGitHub>| async move {
+                let merged = *state.version.lock().unwrap() != 1;
+                axum::Json(json!({"merged": merged, "merged_at": if merged { json!("2026-02-02T00:00:00Z") } else { Value::Null },
+                    "base": {"ref": "main"}, "head": {"ref": "guard-ledger"},
+                    "commits": 1, "changed_files": 2, "additions": 12, "deletions": 1}))
+            }),
+        )
+        .route(
+            "/api/v3/repos/acme/app/pulls/3/commits",
+            get(|| async {
+                axum::Json(json!([{"sha": "abc1230000000000000000000000000000000def",
+                    "commit": {"message": "Guard the ledger against double posts", "author": {"name": "Cy"}}}]))
+            }),
+        )
+        .route(
+            "/api/v3/repos/acme/app/pulls/3/reviews",
+            get(|| async {
+                axum::Json(json!([{"user": {"login": "ana"}, "state": "APPROVED", "submitted_at": "2026-01-05T00:00:00Z", "body": "Looks right."}]))
+            }),
+        )
+        .route(
+            "/api/v3/repos/acme/app/pulls/3/comments",
+            get(|| async {
+                axum::Json(json!([{"user": {"login": "ana"}, "path": "src/ledger.rs", "line": 7,
+                    "created_at": "2026-01-05T00:00:00Z", "body": "Idempotency key?"}]))
+            }),
+        )
+        .route(
+            "/api/v3/repos/acme/app/issues/3/comments",
+            get(|| async {
+                axum::Json(json!([{"user": {"login": "cy"}, "created_at": "2026-01-05T01:00:00Z", "body": "Added one."}]))
             }),
         )
         .route(
@@ -176,10 +216,11 @@ async fn github_issues_become_evidence_that_follows_the_tracker() {
         }
     };
 
-    // First sync: two issues, the pull request left alone; the closed one is outdated.
-    let first = wait(|connector| connector["last_report"]["added"] == 2).await;
-    assert_eq!((first["open_items"].as_i64(), first["closed_items"].as_i64()), (Some(1), Some(1)));
-    wait_for_indexed_artifacts(&app, &owner, &workspace_id, 2).await;
+    // First sync: two issues and a pull request; the closed issue is outdated.
+    let first = wait(|connector| connector["last_report"]["added"] == 3).await;
+    assert_eq!(first["last_report"]["pull_requests_seen"], 1);
+    assert_eq!((first["open_items"].as_i64(), first["closed_items"].as_i64()), (Some(2), Some(1)));
+    wait_for_indexed_artifacts(&app, &owner, &workspace_id, 3).await;
     let artifacts = response_json(
         call(&app, "GET", format!("/v1/workspaces/{workspace_id}/artifacts"), owner.clone(), json!({})).await,
     )
@@ -195,7 +236,16 @@ async fn github_issues_become_evidence_that_follows_the_tracker() {
     };
     let double = artifact("Refunds double post");
     let rounding = artifact("Old rounding rule");
+    let pull = artifact("Guard the ledger");
     assert_eq!(double["artifact_type"], "issue");
+    assert_eq!(pull["artifact_type"], "pr");
+    let pull_detail = response_json(
+        call(&app, "GET", format!("/v1/artifacts/{}", pull["id"].as_str().unwrap()), owner.clone(), json!({})).await,
+    )
+    .await;
+    assert_eq!(pull_detail["metadata"]["origin"], "github_pull_request");
+    assert_eq!(pull_detail["metadata"]["state"], "open");
+    assert_eq!(pull_detail["metadata"]["commits"][0], "abc1230000000000000000000000000000000def");
     let detail = response_json(
         call(&app, "GET", format!("/v1/artifacts/{}", double["id"].as_str().unwrap()), owner.clone(), json!({})).await,
     )
@@ -229,10 +279,21 @@ async fn github_issues_become_evidence_that_follows_the_tracker() {
     *fake.version.lock().unwrap() = 2;
     let synced = call(&app, "POST", format!("/v1/connectors/{source_id}/sync"), owner.clone(), json!({})).await;
     assert_eq!(synced.status(), 200);
-    let second = wait(|connector| connector["last_report"]["updated"] == 1).await;
-    assert_eq!((second["open_items"].as_i64(), second["closed_items"].as_i64()), (Some(2), Some(0)));
+    let second = wait(|connector| connector["last_report"]["updated"] == 2).await;
+    // The reopened issue is open; the merged pull request counts as closed but stays active.
+    assert_eq!((second["open_items"].as_i64(), second["closed_items"].as_i64()), (Some(2), Some(1)));
+    let merged = response_json(
+        call(&app, "GET", format!("/v1/artifacts/{}", pull["id"].as_str().unwrap()), owner.clone(), json!({})).await,
+    )
+    .await;
+    assert_eq!(merged["metadata"]["state"], "merged");
+    let merged_lifecycle = response_json(
+        call(&app, "GET", format!("/v1/artifacts/{}/lifecycle", pull["id"].as_str().unwrap()), owner.clone(), json!({})).await,
+    )
+    .await;
+    assert_eq!(merged_lifecycle["status"], "active");
     assert!(
-        fake.queries.lock().unwrap().iter().any(|query| query.contains("since=2026-01-03")),
+        fake.queries.lock().unwrap().iter().any(|query| query.contains("since=2026-01-04")),
         "{:?}",
         fake.queries.lock().unwrap()
     );

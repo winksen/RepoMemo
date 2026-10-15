@@ -15,7 +15,7 @@ use super::{artifact_type_to_db, source_type_to_db, ArtifactSummaryRow, StorageE
 pub struct ConnectorItemWrite {
     /// Stable within the source, such as `issue:123`.
     pub external_id: String,
-    /// `issue`, and later `pull_request`.
+    /// `issue` or `pull_request`.
     pub kind: String,
     pub artifact_type: ArtifactType,
     pub title: String,
@@ -23,7 +23,7 @@ pub struct ConnectorItemWrite {
     /// The text of the item, whose blob is already stored.
     pub content_hash: String,
     pub size_bytes: i64,
-    /// `open` or `closed`.
+    /// `open`, `closed`, or `merged` (a pull request that was merged).
     pub state: String,
     /// The tracker's own update time.
     pub remote_updated_at: String,
@@ -82,7 +82,7 @@ impl StorageEngine {
     pub async fn connector_item_counts(&self, source_id: &str) -> Result<(i64, i64)> {
         let row = sqlx::query(
             r#"SELECT COALESCE(SUM(CASE WHEN state = 'open' THEN 1 ELSE 0 END), 0) AS open,
-                      COALESCE(SUM(CASE WHEN state = 'closed' THEN 1 ELSE 0 END), 0) AS closed
+                      COALESCE(SUM(CASE WHEN state != 'open' THEN 1 ELSE 0 END), 0) AS closed
                FROM connector_items WHERE source_id = ?1"#,
         )
         .bind(source_id)
@@ -222,14 +222,14 @@ impl StorageEngine {
                         &now,
                     )
                     .await?;
-                } else if item.state == "open" && state_changed {
+                } else if item.state != "closed" && state_changed {
                     super::repo::set_system_lifecycle(
                         &mut tx,
                         &artifact_id,
                         workspace_id,
                         &["outdated"],
                         "active",
-                        "Reopened in the tracker.",
+                        "Open or merged in the tracker again.",
                         "connector_item_reopened",
                         &now,
                     )
