@@ -26,6 +26,7 @@ import {
   renameSharedAgentConversation,
   sendSharedAgentMessage,
 } from "../lib/sharedApi";
+import { onAssistantCommand, takeAssistantCommand, type AssistantCommand } from "../lib/assistantBridge";
 import type { AgentCapabilities, AgentCapability, AgentConversation, AgentMessage, AgentReply, AgentTurn } from "../types";
 import { ViewAtCommit } from "../web/common";
 import { ActionMenu } from "./ui/action-menu";
@@ -118,6 +119,27 @@ export function AssistantPanel({ accessToken, onOpenArtifact, workspaceId }: { a
     return () => { cancelled = true; };
   }, [accessToken, workspaceId]);
   useEffect(() => { threadEnd.current?.scrollIntoView({ block: "end", behavior: "smooth" }); }, [turns.length, isBusy]);
+
+  // Commands from the command palette wait here until the chat is loaded and idle.
+  const [queued, setQueued] = useState<AssistantCommand | null>(null);
+  useEffect(() => {
+    const take = () => { const command = takeAssistantCommand(); if (command) setQueued(command); };
+    take();
+    return onAssistantCommand(take);
+  }, []);
+  useEffect(() => {
+    if (!queued || !capabilities || isBusy || isLoadingChat) return;
+    setQueued(null);
+    const label = queued.message.trim() || (queued.capability ? capabilityLabel(capabilities, queued.capability) : "");
+    if (queued.capability === "workspace_overview" || (queued.message.trim() && label)) {
+      send({ message: queued.message.trim(), capability: queued.capability }, label);
+      setSelected(null);
+    } else if (queued.capability) {
+      // Only the action was chosen: select it and let the person type.
+      setSelected(queued.capability);
+      input.current?.focus();
+    }
+  }, [queued, capabilities, isBusy, isLoadingChat]);
 
   async function openChat(conversationId: string) {
     const token = ++view.current;

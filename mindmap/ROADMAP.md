@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.33` (2026-10-15), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.34` (2026-10-15), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -373,7 +373,7 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 |---|---|---|---|---|---|
 | **V0.2.32** ✅ | ✨ | Assistant | Earlier turns go with each question, within a token budget | F5a | A follow-up resolves "it" and "that file" |
 | **V0.2.33** ✅ | ✨ | Retrieval | Search across all of the caller's workspaces | F5b | Results merged by score, each checked against its workspace's role and AI policy |
-| **V0.2.34** | ✨ | Web shell | A keyboard command palette | F19 | Jump to a workspace, file, memory card or setting, and start assistant actions, without the mouse |
+| **V0.2.34** ✅ | ✨ | Web shell | A keyboard command palette | F19 | Jump to a workspace, file, memory card or setting, and start assistant actions, without the mouse |
 | **V0.2.35** | ✨ | Indexing | Code symbols and structure-aware chunks for Go and Java | F21a | Both languages chunk by declaration and their symbols are searchable |
 | **V0.2.36** | ✨ | Indexing | Code symbols and structure-aware chunks for C# and PHP | F21b | Same as V0.2.35 |
 | **V0.2.37** | ✨ | Review | A review queue: evidence *needing review*, stale memory cards and open health findings in one list | F23 | Each item opens where it is resolved; the queue empties as they are |
@@ -662,6 +662,14 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 - [x] Tests: `a_search_across_workspaces_reads_only_what_each_workspace_allows` (the owner's two workspaces and not a stranger's, a viewer kept to keywords by one workspace's policy, an unreadable workspace named explicitly, limit, empty query, unknown state)
 - [ ] No type, language, folder or date filters, no symbol or memory-card search and no Ask across workspaces; the list is not paged
 
+#### V0.2.34: Command palette
+
+- [x] **F19** `CommandPalette` (`web/CommandPalette.tsx`): Ctrl or ⌘ K and a header button open it from every signed-in page; a combobox with a listbox of results, arrows, Home, End, Enter and Esc
+- [x] `paletteEntries` (`web/paletteEntries.ts`, pure): workspaces, the open workspace's sections (administration only for owners and admins), pages, System pages for administrators, files filtered by every typed word in title or path, memory cards from `searchSharedMemoryCards`, and assistant actions where the dock is
+- [x] `lib/assistantBridge.ts`: a command waits until the assistant takes it; `AssistantDock` opens for it and `AssistantPanel` runs it once its chat is loaded and idle (an action with no text is only selected)
+- [x] Tests: `paletteEntries` (pages, sections by role, files and cards, assistant only where docked, System only for administrators) and the component (Ctrl K, filtering, Enter navigates, arrows, Esc, hand-off to the assistant)
+- [ ] Files are the open workspace's only (no search across workspaces from the palette); no recent items, and no actions that change data (creating or uploading)
+
 ### Decisions to agree before work starts
 
 | # | Decision | Needed by | Proposal |
@@ -703,7 +711,7 @@ Every item of both roads, with the release it is planned for. The evidence behin
 | F15 | **Account lifecycle:** deactivate and reactivate (15a ✅ V0.2.16), anonymize (15b ✅ V0.2.17) (risk 12) | M | V0.2.16, V0.2.17 (decision 10) |
 | F16 | **Push webhooks and git awareness:** signed webhooks (16a), last author and date (16b), `CODEOWNERS` hints (16c), a citation at its commit (16d) | M | V0.2.23–V0.2.26 |
 | F17 | **Issues and pull requests:** GitHub issues (17a), GitHub pull requests (17b), GitLab (17c), links to files and symbols (17d), webhooks and rate limits (17e) | L | V0.2.27–V0.2.31 (decision 12) |
-| F19 | **Command palette** | S | V0.2.34 |
+| F19 | **Command palette** | S | ✅ V0.2.34 |
 | F21 | **More languages:** symbols and structure-aware chunks for Go and Java (21a), C# and PHP (21b) | S–M | V0.2.35, V0.2.36 |
 | F23 | **Review queue:** evidence needing review, stale memory cards and open health findings in one list | S–M | V0.2.37 |
 | F24 | **Version history** of a file, viewable and comparable | M | V0.2.38 |

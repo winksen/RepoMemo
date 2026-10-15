@@ -5,6 +5,7 @@ import {
   IconLayoutSidebarRightExpand as Expand,
   IconSparkles as Sparkles,
 } from "@tabler/icons-react";
+import { onAssistantCommand } from "../lib/assistantBridge";
 import { AssistantPanel } from "./AssistantPanel";
 import { Button } from "./ui/button";
 
@@ -50,6 +51,9 @@ export function AssistantDock({ accessToken, onOpenArtifact, workspaceId }: { ac
     setOpen(next);
     if (next) setHasOpened(true);
   }
+
+  // A command from the palette opens the dock so the assistant can take it.
+  useEffect(() => onAssistantCommand(() => { setOpen(true); setHasOpened(true); }), []);
 
   function startResize(event: PointerEvent<HTMLDivElement>) {
     event.preventDefault();

@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import {
   IconBell as Bell,
+  IconSearch as Search,
   IconLogout as Logout,
   IconMoon as Moon,
   IconServer as Server,
@@ -10,6 +11,7 @@ import {
   IconUserCircle as UserCircle,
 } from "@tabler/icons-react";
 import type { SharedSession } from "../types";
+import { openCommandPalette } from "../lib/assistantBridge";
 import { Button } from "./ui/button";
 
 const THEME_STORAGE_KEY = "repomemo.theme";
@@ -78,6 +80,7 @@ export function SharedLayout({
         <div className="shared-user-menu" aria-label="Account controls">
           <div className="shared-account-controls">
             <ThemeToggle />
+            <Button aria-label="Open command palette" className="shared-palette-link" onClick={openCommandPalette} title="Command palette (Ctrl K)" type="button" variant="secondary"><Search size={16} /></Button>
             <Button aria-label="Open notifications" className="shared-notifications-link" onClick={() => onNavigate("/notifications")} title="Notifications" type="button" variant="secondary"><Bell size={16} /></Button>
             <Button className="shared-profile-link" onClick={() => onNavigate("/profile")} type="button" variant="secondary"><UserCircle size={16} /> Profile</Button>
           </div>

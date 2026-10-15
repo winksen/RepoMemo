@@ -1,0 +1,135 @@
+import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { IconSearch as Search } from "@tabler/icons-react";
+import { listSharedArtifacts, searchSharedMemoryCards } from "../lib/sharedApi";
+import { onOpenCommandPalette, sendToAssistant } from "../lib/assistantBridge";
+import { type ArtifactSummary, type MemoryCardSummary, type SharedWorkspace } from "../types";
+import { Dialog, DialogCancel } from "../components/ui/dialog";
+import { Input } from "../components/ui/input";
+import { navigate } from "./router";
+import { paletteEntries, type PaletteEntry } from "./paletteEntries";
+
+const CARD_SEARCH_DELAY_MS = 200;
+
+/**
+ * A keyboard command palette (Ctrl or Cmd with K): jump to a workspace, one of
+ * its sections, a file, a memory card or a system page, or start an assistant
+ * action, without the mouse. Files come from the open workspace's list and
+ * memory cards from its search, both read with the person's own access.
+ */
+export function CommandPalette({ accessToken, assistantWorkspaceId, canAdministerSystem, currentWorkspaceId, workspaces }: {
+  accessToken: string;
+  /** The workspace whose page has the assistant docked, if the open page is one. */
+  assistantWorkspaceId: string | null;
+  canAdministerSystem: boolean;
+  /** The workspace the open page belongs to, if any. */
+  currentWorkspaceId: string | null;
+  workspaces: SharedWorkspace[];
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [active, setActive] = useState(0);
+  const [files, setFiles] = useState<ArtifactSummary[]>([]);
+  const [cards, setCards] = useState<MemoryCardSummary[]>([]);
+  const list = useRef<HTMLUListElement>(null);
+  const currentWorkspace = workspaces.find((entry) => entry.workspace.id === currentWorkspaceId);
+  const assistantWorkspace = workspaces.find((entry) => entry.workspace.id === assistantWorkspaceId);
+
+  useEffect(() => {
+    function onKey(event: globalThis.KeyboardEvent) {
+      if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setOpen((current) => !current);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    const stopListening = onOpenCommandPalette(() => setOpen(true));
+    return () => { window.removeEventListener("keydown", onKey); stopListening(); };
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    setQuery("");
+    setActive(0);
+    setCards([]);
+  }, [open]);
+
+  // The open workspace's files, read each time the palette opens so the list is current.
+  useEffect(() => {
+    if (!open || !currentWorkspaceId) { setFiles([]); return; }
+    let cancelled = false;
+    listSharedArtifacts(accessToken, currentWorkspaceId)
+      .then((next) => { if (!cancelled) setFiles(next); })
+      .catch(() => { if (!cancelled) setFiles([]); });
+    return () => { cancelled = true; };
+  }, [accessToken, currentWorkspaceId, open]);
+
+  useEffect(() => {
+    const text = query.trim();
+    if (!open || !currentWorkspaceId || text.length < 2) { setCards([]); return; }
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      searchSharedMemoryCards(accessToken, currentWorkspaceId, text)
+        .then((next) => { if (!cancelled) setCards(next); })
+        .catch(() => { if (!cancelled) setCards([]); });
+    }, CARD_SEARCH_DELAY_MS);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [accessToken, currentWorkspaceId, open, query]);
+
+  const entries = useMemo(
+    () => paletteEntries({ query, workspaces, assistantWorkspace, currentWorkspace, files, cards, canAdministerSystem }),
+    [query, workspaces, assistantWorkspace, currentWorkspace, files, cards, canAdministerSystem],
+  );
+  const activeIndex = Math.min(active, Math.max(entries.length - 1, 0));
+
+  useEffect(() => {
+    list.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView?.({ block: "nearest" });
+  }, [activeIndex, entries]);
+
+  function run(entry: PaletteEntry | undefined) {
+    if (!entry) return;
+    setOpen(false);
+    if (entry.action.kind === "navigate") navigate(entry.action.to);
+    else sendToAssistant({ capability: entry.action.capability, message: entry.action.message });
+  }
+
+  function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    const count = Math.max(entries.length, 1);
+    if (event.key === "ArrowDown") { event.preventDefault(); setActive((activeIndex + 1) % count); }
+    else if (event.key === "ArrowUp") { event.preventDefault(); setActive((activeIndex - 1 + count) % count); }
+    else if (event.key === "Home") { event.preventDefault(); setActive(0); }
+    else if (event.key === "End") { event.preventDefault(); setActive(count - 1); }
+    else if (event.key === "Enter" && !event.nativeEvent.isComposing) { event.preventDefault(); run(entries[activeIndex]); }
+  }
+
+  if (!open) return null;
+  let lastGroup = "";
+  return <Dialog className="rm-dialog-wide shared-palette" footer={<><span className="shared-palette-hint">Ctrl K opens this anywhere · ↑ ↓ move · Enter runs · Esc closes</span><DialogCancel label="Close" onClick={() => setOpen(false)} /></>} onClose={() => setOpen(false)} open title="Command palette">
+    <div className="shared-palette-field"><Search size={16} />
+      <Input
+        aria-activedescendant={entries[activeIndex] ? `palette-${entries[activeIndex].id}` : undefined}
+        aria-autocomplete="list"
+        aria-controls="palette-results"
+        aria-expanded
+        aria-label="Type a command, a workspace, a file or a memory card"
+        autoFocus
+        onChange={(event) => { setQuery(event.target.value); setActive(0); }}
+        onKeyDown={onKeyDown}
+        placeholder={assistantWorkspaceId ? "Go to, search, or ask the assistant…" : "Go to a workspace, file or page…"}
+        role="combobox"
+        value={query}
+      />
+    </div>
+    {entries.length ? <ul aria-label="Results" className="shared-palette-list" id="palette-results" ref={list} role="listbox">
+      {entries.map((entry, index) => {
+        const heading = entry.group !== lastGroup ? entry.group : null;
+        lastGroup = entry.group;
+        return <li key={entry.id} role="presentation">
+          {heading ? <span className="shared-palette-group">{heading}</span> : null}
+          <button aria-selected={index === activeIndex} className={index === activeIndex ? "active" : ""} id={`palette-${entry.id}`} onClick={() => run(entry)} onMouseMove={() => setActive(index)} role="option" tabIndex={-1} type="button">
+            <strong>{entry.label}</strong>{entry.hint ? <small>{entry.hint}</small> : null}
+          </button>
+        </li>;
+      })}
+    </ul> : <p className="shared-muted-copy">Nothing matches “{query.trim()}”.</p>}
+  </Dialog>;
+}

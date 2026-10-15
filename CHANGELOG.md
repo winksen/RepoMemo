@@ -2,6 +2,18 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.34 (2026-10-15)
+
+A keyboard command palette.
+
+### Added
+- **Command palette:** press **Ctrl K** (or **⌘ K**) on any signed-in page, or use the search button in the header. Type to jump to a workspace, one of the open workspace's sections (People and Workspace settings only for those who administer it), a file by its title or path, a memory card, the dashboard, notifications, your profile or, for system administrators, a System page. Arrow keys move, Enter runs, Esc closes.
+- **Assistant actions from the palette:** on a workspace page the typed text can be sent as *Ask the assistant*, *Find files*, *Search content* or *Find the symbol*, or the assistant can be asked for a workspace overview. The assistant dock opens, runs the request in the current chat and shows the reply; with nothing typed the action is only selected, ready for the question.
+- Files come from the open workspace's list (read when the palette opens) and memory cards from its search, both with your own access: nothing is listed that the page itself would not show you.
+
+### Upgrading
+- Nothing to do. No server change.
+
 ## V0.2.33 (2026-10-15)
 
 Search reaches every workspace you can read.

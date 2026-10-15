@@ -30,6 +30,7 @@ import { SharedDashboard, SharedWorkspaceHome } from "./web/Dashboard";
 import { SharedWorkspaceDetail } from "./web/WorkspaceDetail";
 import { SharedArtifactDetail } from "./web/ArtifactDetail";
 import { SharedMemoryCardDetail, SharedRouteNotFound } from "./web/MemoryCardDetail";
+import { CommandPalette } from "./web/CommandPalette";
 
 export function SharedWebApp() {
   return (
@@ -264,6 +265,7 @@ function SharedWebAppContent() {
     <SharedRouteNotFound apiAvailable={apiAvailable} onBack={() => navigate(backTo)} organization={scope.organization} organizations={organizations} session={session} signOut={signOut} workspace={scope.workspace} workspaces={workspaces} />
   );
 
+  const renderPage = () => {
   switch (route.name) {
     case "profile":
       return <SharedProfile accessToken={accessToken} apiAvailable={apiAvailable} organizations={organizations} onSessionUserUpdated={(user) => setSession((current) => current ? { ...current, user } : current)} session={session} signOut={signOut} workspaces={workspaces} />;
@@ -334,4 +336,11 @@ function SharedWebAppContent() {
         />
       );
   }
+  };
+
+  // The palette is on every signed-in page; the assistant can be started from it where one is docked.
+  return <>
+    {renderPage()}
+    <CommandPalette accessToken={accessToken} assistantWorkspaceId={route.name === "workspace" ? route.workspaceId : null} canAdministerSystem={Boolean(session.is_system_admin || session.is_app_admin)} currentWorkspaceId={workspace ? workspace.workspace.id : null} workspaces={workspaces} />
+  </>;
 }
