@@ -1,6 +1,6 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { IconArrowRight as ArrowRight, IconKey as Key, IconLoader2 as Loader, IconShieldLock as Shield, IconUsers as Users } from "@tabler/icons-react";
-import { loginSharedUser, registerSharedUser, requestPasswordResetMail, sharedApiUrl } from "../lib/sharedApi";
+import { loginSharedUser, requestPasswordResetMail, sharedApiUrl, signUpSharedUser } from "../lib/sharedApi";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Toast, showToast } from "../components/ui/toast";
@@ -41,9 +41,20 @@ export function AuthCanvas({
     setIsSubmitting(true);
     setError(null);
     try {
-      const response = mode === "sign-up"
-        ? await registerSharedUser({ email, displayName, password })
-        : await loginSharedUser({ email, password });
+      if (mode === "sign-up") {
+        const answer = await signUpSharedUser({ email, displayName, password });
+        if ("session" in answer) {
+          onAuthenticated(answer.session.access_token);
+        } else {
+          // The server answers the same for every address: sign in next.
+          showToast("success", answer.message);
+          setPassword("");
+          navigate("/login");
+          setMode("sign-in");
+        }
+        return;
+      }
+      const response = await loginSharedUser({ email, password });
       onAuthenticated(response.access_token);
     } catch (requestError) {
       setError(apiMessage(requestError));

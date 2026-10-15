@@ -27,7 +27,7 @@
 | M6 | ✅ Fixed in V0.1.68 | Strict `csp` in `tauri.conf.json` |
 | M1 | ✅ Fixed in V0.1.67 | Registration closed by default; quotas (storage per workspace, uploads per hour, workspaces per person, free-disk floor) in V0.1.75 |
 | M3 | ✅ Fixed in V0.1.67 | Forwarding headers only from a trusted peer, read from the right |
-| M4 | ✅ Mitigated in V0.1.67 | Member forms answer `invitation_required` for everyone not in; open registration still reveals an existing address until mail exists |
+| M4 | ✅ Mitigated in V0.1.67, closed in V0.2.18 | Member forms answer `invitation_required` for everyone not in; open registration answers the same for every address once mail is set up (V0.2.18) |
 | M8 | ✅ Fixed in V0.1.67 | `require_full_system_admin`; app administrators read and run jobs and maintenance |
 | M9 | ✅ Fixed in V0.1.67 | `check_transport`, HSTS, console warning |
 | L4, L7, L10 | ✅ Fixed in V0.1.67 | Reset notifications, common-password list, known-device lockout bypass |

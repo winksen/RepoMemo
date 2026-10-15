@@ -297,6 +297,27 @@ export async function registerSharedUser(input: {
   return response;
 }
 
+/**
+ * Creating an account from the sign-up form. A server that sends mail answers
+ * the same for every address (no session, a message to show); one that does
+ * not answers with a session.
+ */
+export async function signUpSharedUser(input: {
+  email: string;
+  displayName: string;
+  password: string;
+}): Promise<{ session: TokenResponse } | { message: string }> {
+  const response = await request<TokenResponse | { message: string }>("/v1/auth/register", {
+    method: "POST",
+    body: JSON.stringify({ email: input.email, display_name: input.displayName, password: input.password }),
+  });
+  if ("access_token" in response) {
+    storeTokens(response);
+    return { session: response };
+  }
+  return { message: response.message };
+}
+
 export async function loginSharedUser(input: {
   email: string;
   password: string;

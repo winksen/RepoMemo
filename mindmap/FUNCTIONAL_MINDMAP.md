@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.2.17` (2026-10-15). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
+> **Scope:** reflects the code at `V0.2.18` (2026-10-15). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
 
 ---
 
@@ -223,7 +223,7 @@ A **System** button in the header opens `/system`, with these pages:
 
 | Feature | What the user experiences |
 |---|---|
-| **Register** (`/register`) | Email, display name (1–120 characters), password (12–1024 characters, not a well-known password, at least five different characters, not containing the email name). The user is signed in immediately. Registration is **closed by default**: people join with invitation links, and only the first account of a new server can register without one. The server operator can open it. |
+| **Register** (`/register`) | Email, display name (1–120 characters), password (12–1024 characters, not a well-known password, at least five different characters, not containing the email name). The user is signed in immediately; when mail is set up the answer is the same for every address (since V0.2.18): the account is ready to sign in to and a link confirms the address, while the owner of an address that already has an account gets a message instead. Registration is **closed by default**: people join with invitation links, and only the first account of a new server can register without one. The server operator can open it. |
 | **Sign in** (`/login`) | Email and password. A wrong email and a wrong password produce the same message. After 10 failed attempts in a row the account is locked for 15 minutes from that address (both configurable), and too many attempts from one address are slowed down. A browser that still holds a session of the account gets past a lockout other people caused. The session itself is kept in a cookie scripts cannot read. |
 | **Session** | Renewed silently in the background for up to 30 days of inactivity, so nobody is signed out mid-work. |
 | **Profile** (`/profile`) | Upload or remove a **profile picture** (PNG, JPEG or WebP; cropped square and shrunk to 256 px in the browser; server limit 512 KiB, 64–1024 px square). It also shows in workspace members, organization members and System › Users, and falls back to initials. Rename yourself, change your password (the current password is required; **every other device is signed out**, this one stays signed in), **sign out everywhere** (every device, this one included), see last connection time, workspace count, a **365-day contribution calendar**, and **tasks assigned to you**. |
@@ -508,7 +508,7 @@ The desktop app and the shared server keep **separate data**.
 
 ---
 
-## 13. Known functional gaps (at V0.2.17)
+## 13. Known functional gaps (at V0.2.18)
 
 These are observed in the code and are useful for prioritizing. The roadmap item that addresses each one is in brackets.
 

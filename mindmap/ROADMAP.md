@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.17` (2026-10-15), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.18` (2026-10-15), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -342,7 +342,7 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 |---|---|---|---|---|---|
 | **V0.2.16** ✅ | ✨ | System › Users | Deactivate and reactivate an account | F15a, decision 10 | A deactivated account cannot sign in or use tokens; owners must transfer first |
 | **V0.2.17** ✅ | ✨ | System › Users | Anonymize a deactivated account | F15b, decision 10 | Personal data gone; what they wrote stays, credited to "Former member"; creator links no longer block (risk 12 closed) |
-| **V0.2.18** | 🐞 | Registration | Open registration answers the same for a known address and mails its owner instead | M4 residual | Registration can be opened without revealing who has an account |
+| **V0.2.18** ✅ | 🐞 | Registration | Open registration answers the same for a known address and mails its owner instead | M4 residual | Registration can be opened without revealing who has an account |
 
 #### Track D: Remote repositories (V0.2.19–V0.2.26)
 
@@ -531,6 +531,13 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 - [x] Test: `an_anonymized_account_loses_its_personal_data_and_what_it_wrote_stays`
 - [x] Risk 12 (creator links block deletion) closed: nothing deletes the row
 
+#### V0.2.18: Registration without revealing who has an account
+
+- [x] **M4 residual** `auth::register_without_revealing` (used when registration is open, mail is ready, the public address is known, and the request has no invitation and is not the first account): `202` with one message for every address; the account of a new address is created unverified with its link mailed; a known address mails its owner (`registration_attempt`, 2 an hour through `guards.auth`, none for a deactivated account)
+- [x] The password is hashed on every path; response times are close, not identical (documented)
+- [x] Web: `signUpSharedUser`; the sign-up form shows the message and switches to sign in
+- [x] Tests: `open_registration_answers_the_same_for_a_known_address_and_mails_its_owner` (same status and body, the known account untouched, two notices for three attempts); the email-verification test signs in after registering
+
 ### Decisions to agree before work starts
 
 | # | Decision | Needed by | Proposal |
@@ -596,7 +603,7 @@ Every item of both roads, with the release it is planned for. The evidence behin
 | — | Accepted for later | R2-4 (readings cannot be killed), R2-5 (backups not encrypted) | V0.2.44 (P10), V0.2.42 (O6) |
 | — | Accepted | N9 (not a boundary, documented), I1, I4 | — |
 | S6 | Remote sources | Credential store and host allowlist (6a), clone limits (6b); each later surface (SMTP, webhooks, connectors) brings its own rules | V0.2.19, V0.2.22 |
-| — | Registration without enumeration | M4 residual | V0.2.18 |
+| — | Registration without enumeration | M4 residual | ✅ V0.2.18 |
 | — | Fourth pass | Mail, webhooks, remote clones, connectors, export and import, desktop client | V0.2.52 (R8) |
 
 ### Platform performance

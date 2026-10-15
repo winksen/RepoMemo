@@ -33,7 +33,7 @@
 
 | Method | Path | Authentication | Guards | Request body | Response |
 |---|---|---|---|---|---|
-| POST | `/v1/auth/register` | public | — | RegisterRequest | TokenResponse |
+| POST | `/v1/auth/register` | public | — | RegisterRequest | TokenResponse (201), or `RegistrationNotice` (202, the same for every address, when mail is set up) |
 | POST | `/v1/auth/login` | public | — | LoginRequest | TokenResponse |
 | POST | `/v1/auth/refresh` | public | — | RefreshRequest | TokenResponse |
 | POST | `/v1/auth/logout` | public | — | RefreshRequest | status |

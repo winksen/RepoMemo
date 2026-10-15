@@ -771,8 +771,29 @@ async fn unverified_accounts_are_held_back_until_an_invitation_or_a_link_proves_
         .unwrap();
     assert_eq!(saved.status(), 200);
 
-    // Registered on an open server with mail on: held back from creating anything.
-    let (person, _) = register_account(&app, "verify-person@example.com").await;
+    // Registered on an open server with mail on: held back from creating
+    // anything. With mail on the answer is the same for every address (V0.2.18),
+    // so the person signs in with the password they chose.
+    let accepted = app
+        .clone()
+        .oneshot(public_post(
+            "/v1/auth/register",
+            json!({"email": "verify-person@example.com", "display_name": "Person", "password": "not-a-real-password"}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(accepted.status(), 202);
+    let signed_in = response_json(
+        app.clone()
+            .oneshot(public_post(
+                "/v1/auth/login",
+                json!({"email": "verify-person@example.com", "password": "not-a-real-password"}),
+            ))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let person = format!("Bearer {}", signed_in["access_token"].as_str().unwrap());
     let profile = |who: String| {
         let app = app.clone();
         async move { response_json(app.oneshot(auth_request("GET", "/v1/profile", &who)).await.unwrap()).await }
@@ -1134,5 +1155,84 @@ async fn the_daily_digest_is_asked_for_and_sent_once_when_something_is_unread() 
         201
     );
     assert_eq!(digests().await, 1, "at most one a day");
+    let _ = std::fs::remove_dir_all(data_dir);
+}
+
+#[tokio::test]
+async fn open_registration_answers_the_same_for_a_known_address_and_mails_its_owner() {
+    let data_dir = temp_data_dir("registration-same-answer");
+    let mut config = ServerConfig::for_test(data_dir.clone());
+    config.public_url = Some("https://memo.example.com".to_owned());
+    let app = router(config).await.unwrap();
+    let (admin, _) = register_account(&app, "same-admin@example.com").await;
+    let register = |email: &str, password: &str| {
+        let app = app.clone();
+        let request = public_post(
+            "/v1/auth/register",
+            json!({"email": email, "display_name": "Person", "password": password}),
+        );
+        async move {
+            let response = app.oneshot(request).await.unwrap();
+            (response.status().as_u16(), response_json(response).await)
+        }
+    };
+    let login = |email: &str, password: &str| {
+        let app = app.clone();
+        let request = public_post("/v1/auth/login", json!({"email": email, "password": password}));
+        async move { app.oneshot(request).await.unwrap().status().as_u16() }
+    };
+
+    // Without mail the old answers stand: a session, and a refusal for a known address.
+    assert_eq!(register("same-early@example.com", "not-a-real-password").await.0, 201);
+    assert_eq!(register("same-early@example.com", "not-a-real-password").await.0, 409);
+
+    let saved = app
+        .clone()
+        .oneshot(json_request(
+            "PUT",
+            "/v1/system/mail",
+            &admin,
+            json!({"enabled": true, "host": "mail.invalid", "port": 587, "security": "starttls", "username": "",
+                   "from_address": "memo@example.com", "from_name": "RepoMemo"}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(saved.status(), 200);
+
+    // With mail on, a new address and a known one get the very same answer.
+    let fresh = register("same-new@example.com", "a-password-just-chosen").await;
+    let known = register("same-admin@example.com", "another-password-chosen").await;
+    assert_eq!(fresh.0, 202);
+    assert_eq!(fresh, known, "status and body do not tell the two apart");
+    assert!(fresh.1["access_token"].is_null());
+
+    // The new account exists and works; the known one is untouched.
+    assert_eq!(login("same-new@example.com", "a-password-just-chosen").await, 200);
+    assert_eq!(login("same-admin@example.com", "another-password-chosen").await, 401);
+    assert_eq!(login("same-admin@example.com", "not-a-real-password").await, 200);
+
+    // The owner of a known address is told, at most twice an hour.
+    assert_eq!(register("same-admin@example.com", "yet-another-password").await.0, 202);
+    assert_eq!(register("same-admin@example.com", "and-one-more-password").await.0, 202);
+    tokio::time::sleep(std::time::Duration::from_millis(400)).await;
+    let outbox = response_json(
+        app.clone()
+            .oneshot(auth_request("GET", "/v1/system/mail/outbox", &admin))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let entries = outbox.as_array().unwrap();
+    let notices = entries
+        .iter()
+        .filter(|entry| entry["kind"] == "registration_attempt" && entry["to_address"] == "same-admin@example.com")
+        .count();
+    assert_eq!(notices, 2);
+    assert!(entries
+        .iter()
+        .any(|entry| entry["kind"] == "email_verification" && entry["to_address"] == "same-new@example.com"));
+    assert!(!entries
+        .iter()
+        .any(|entry| entry["kind"] == "email_verification" && entry["to_address"] == "same-admin@example.com"));
     let _ = std::fs::remove_dir_all(data_dir);
 }

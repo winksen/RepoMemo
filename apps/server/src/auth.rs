@@ -47,11 +47,104 @@ pub(crate) fn check_auth_quota(state: &AppState, client: &ClientIp, action: Auth
         })
 }
 
+/// Registration attempts for an address that already has an account, which
+/// each mail its owner, per address per hour.
+const KNOWN_ADDRESS_NOTICES_PER_HOUR: u32 = 2;
+
+#[derive(Debug, Serialize)]
+pub(crate) struct RegistrationNotice {
+    message: &'static str,
+}
+
+/// An open registration without an invitation answers the same for an address
+/// that is new and for one that has an account, when mail can carry the
+/// difference: a new address gets its account (to sign in to, with the
+/// password just chosen) and a confirmation link; a known one gets a message
+/// to its owner and nothing changes. Without mail, or without the public
+/// address, it keeps answering `201` with a session, and `409` for a known
+/// address.
+async fn registers_without_revealing(state: &AppState) -> bool {
+    state.mail.is_ready().await
+        && state.mail.link("/login").is_some()
+        && state.storage.count_users().await.is_ok_and(|users| users > 0)
+}
+
+async fn register_without_revealing(state: &AppState, client: &ClientIp, request: RegisterRequest) -> Result<Response, ApiError> {
+    validate_registration(&request)?;
+    let address = request.email.trim().to_lowercase();
+    if !repomemo_mail::valid_address(&address) {
+        return Err(ApiError::bad_request("That is not a valid email address."));
+    }
+    // The password is hashed whatever the address, so the time taken does
+    // not tell the two cases apart.
+    let password_hash = hash_password(&request.password).await?;
+    let existing = state
+        .storage
+        .find_user_for_auth(&address)
+        .await
+        .map_err(ApiError::internal)?;
+    match existing {
+        Some(account) => {
+            tracing::info!(target: "audit", user_id = %account.user.id, client = %client.0, "Registration attempted for an address that has an account");
+            let within_limit = state
+                .guards
+                .auth
+                .check(
+                    &format!("registered:{address}"),
+                    crate::Quota::per_hour(KNOWN_ADDRESS_NOTICES_PER_HOUR),
+                )
+                .is_ok();
+            let deactivated = state
+                .storage
+                .is_deactivated(&account.user.id)
+                .await
+                .unwrap_or(true);
+            if within_limit && !deactivated {
+                let link = state.mail.link("/login").unwrap_or_default();
+                let body = format!(
+                    "Someone tried to create a RepoMemo account with this email address, which already has one.\n\n\
+                     Nothing changed. If it was you, sign in here, or choose \"Forgot your password?\" on that page:\n\n\
+                     {link}\n\n\
+                     If it was not you, you can ignore this message.\n"
+                );
+                let _ = state
+                    .mail
+                    .send_to(&address, "Someone tried to register with your address", &body, "registration_attempt")
+                    .await;
+            }
+        }
+        None => {
+            let user = state
+                .storage
+                .create_user(&address, &request.display_name, &password_hash)
+                .await
+                .map_err(ApiError::internal)?;
+            state
+                .storage
+                .touch_user_connection(&user.id)
+                .await
+                .map_err(ApiError::internal)?;
+            tracing::info!(target: "audit", user_id = %user.id, client = %client.0, "Account registered");
+            if let Err(error) = state.storage.mark_email_unverified(&user.id).await {
+                tracing::error!(error = %error, "Failed to mark an address as unverified");
+            }
+            crate::verification::send_link(state, &user).await;
+        }
+    }
+    Ok((
+        StatusCode::ACCEPTED,
+        Json(RegistrationNotice {
+            message: "If this address can be used, the account is ready: sign in with the email and password you just chose. An address that already has an account gets a message instead, and nothing changes for it.",
+        }),
+    )
+        .into_response())
+}
+
 pub(crate) async fn register(
     State(state): State<AppState>,
     client: ClientIp,
     Json(request): Json<RegisterRequest>,
-) -> Result<(StatusCode, Json<TokenResponse>), ApiError> {
+) -> Result<Response, ApiError> {
     check_auth_quota(&state, &client, AuthAction::SignIn)?;
     if setup::setup_pending(&state).await? {
         return Err(ApiError::forbidden_because(
@@ -69,6 +162,9 @@ pub(crate) async fn register(
                 return Err(ApiError::forbidden_because(
                     "Registration is closed on this server. Ask an administrator for an account.",
                 ));
+            }
+            if registers_without_revealing(&state).await {
+                return register_without_revealing(&state, &client, request).await;
             }
         }
     }
@@ -148,7 +244,7 @@ pub(crate) async fn register(
         }
     }
     let response = issue_session(&state, user).await?;
-    Ok((StatusCode::CREATED, Json(response)))
+    Ok((StatusCode::CREATED, Json(response)).into_response())
 }
 
 pub(crate) async fn login(

@@ -2,6 +2,19 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.18 (2026-10-15)
+
+Open registration no longer reveals who has an account.
+
+### Fixed
+- **Creating an account from the sign-up form answers `202` with the same words for a new address and for one that already has an account**, when registration is open, mail is set up and `REPOMEMO_PUBLIC_URL` is known. Before, a known address was refused with `409`, which told anyone which addresses had accounts (review M4, residual).
+- **A new address** gets its account, created with the password just chosen, and a confirmation link by mail; the person then signs in (the sign-up form switches to sign in and shows the message). **A known address** is not touched: its owner gets a message that someone tried to register with it, at most twice an hour, with a link to sign in or to *Forgot your password?*. Deactivated accounts get no message.
+- The password is hashed in both cases, so the time taken is close; it is not made identical.
+- Registrations with an invitation, the first account of a server, and servers where mail is not set up (or has no public address) are unchanged: they answer `201` with a session, and `409` for a known address, since nothing else can carry the difference.
+
+### Upgrading
+- Nothing to do. A script that registers accounts on an open server with mail on now gets `202` and no session: it signs in afterwards. Registration stays closed by default.
+
 ## V0.2.17 (2026-10-15)
 
 Anonymizing a deactivated account.
