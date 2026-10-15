@@ -1128,6 +1128,68 @@ export interface HealthActionResult {
   task_id: string | null;
 }
 
+/**
+ * One version of an uploaded file. Uploading a new version keeps the one it
+ * replaces, so earlier text stays readable and can be compared.
+ */
+export interface ArtifactVersion {
+  /** 1 is the first upload; the current version has the highest number. */
+  version: number;
+  content_hash: string;
+  size_bytes: number;
+  /** When this content became the file's current content. */
+  created_at: string;
+  /** Who uploaded it; the first upload's author is not recorded. */
+  uploaded_by: string | null;
+  /** When a newer version replaced it; none for the current one. */
+  replaced_at: string | null;
+  is_current: boolean;
+}
+
+/**
+ * The text of one version, as search would read it: the file's own text, or
+ * what is extracted from a business document.
+ */
+export interface ArtifactVersionText {
+  version: number;
+  /** None when the version has no text to show (an image, or a binary file). */
+  text: string | null;
+  truncated: boolean;
+  /** Why there is no text. */
+  note: string | null;
+}
+
+export type DiffKind =
+  | "same"
+  | "added"
+  | "removed"
+  | "gap";
+
+export interface VersionDiffLine {
+  kind: DiffKind;
+  text: string;
+  /** The line's number in the older version; none for an added line. */
+  old_line: number | null;
+  /** The line's number in the newer version; none for a removed line. */
+  new_line: number | null;
+}
+
+/**
+ * Two versions of a file compared line by line, with a few unchanged lines
+ * around each change.
+ */
+export interface VersionComparison {
+  from_version: number;
+  to_version: number;
+  lines: VersionDiffLine[];
+  added: number;
+  removed: number;
+  /** The files were long: only the first lines of each were compared. */
+  truncated: boolean;
+  /** Why nothing is shown (a version has no text, or the two are the same). */
+  note: string | null;
+}
+
 /** What is waiting in a review queue. */
 export type ReviewItemKind =
   | "evidence"

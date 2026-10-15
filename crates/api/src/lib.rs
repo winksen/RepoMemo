@@ -32,6 +32,7 @@ mod remote_repo;
 mod repo_policy;
 mod repo_stack;
 mod repo_sync;
+mod versions;
 
 pub use agent::{
     agent_capabilities, agent_conversation_title, agent_turn_label, HISTORY_MAX_TURNS, HISTORY_TOKEN_BUDGET,
@@ -331,6 +332,7 @@ impl RepoMemoCore {
         artifact_id: &str,
         filename: &str,
         bytes: Vec<u8>,
+        uploaded_by: Option<&str>,
     ) -> Result<ArtifactSummary> {
         if bytes.is_empty() {
             repomemo_domain::bail_invalid!("Uploaded files cannot be empty.");
@@ -352,7 +354,13 @@ impl RepoMemoCore {
         let content_hash = StorageEngine::content_hash(&bytes);
         self.storage.store_blob(&content_hash, &bytes, Some(&mime_type)).await?;
         self.storage
-            .replace_artifact_content(artifact_id, &content_hash, bytes.len() as i64, Some(&mime_type))
+            .replace_artifact_content(
+                artifact_id,
+                &content_hash,
+                bytes.len() as i64,
+                Some(&mime_type),
+                uploaded_by,
+            )
             .await
     }
 

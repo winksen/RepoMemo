@@ -6,7 +6,8 @@ use anyhow::{bail, Context, Result};
 use chrono::Utc;
 use repomemo_domain::{
     AgentConversation, AgentMessage, AgentReply, AgentTurn, ArtifactComment, ArtifactDetail, ArtifactIndexFailure,
-    ArtifactLifecycle, ArtifactLifecycleEvent, ArtifactSummary, ArtifactType, Chunk, Citation, CollaborationTask,
+    ArtifactLifecycle, ArtifactLifecycleEvent, ArtifactSummary, ArtifactType, ArtifactVersion, Chunk, Citation,
+    CollaborationTask,
     Folder, IndexingJobStatus, MemoryCard, MemoryCardDetail, MemoryCardSummary, MemoryEvidence, MemoryReviewReason,
     Organization, OrganizationMember, OrganizationRole, ProviderSettings, SavedSearch, SearchRequest, SearchResult,
     SharedNotification, SharedUser, SharedWorkspace, Source, SourceType, Symbol, SymbolKind, SymbolSearchResult,

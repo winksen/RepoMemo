@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.37` (2026-10-15), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.38` (2026-10-15), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -377,7 +377,7 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 | **V0.2.35** ✅ | ✨ | Indexing | Code symbols and structure-aware chunks for Go and Java | F21a | Both languages chunk by declaration and their symbols are searchable |
 | **V0.2.36** ✅ | ✨ | Indexing | Code symbols and structure-aware chunks for C# and PHP | F21b | Same as V0.2.35 |
 | **V0.2.37** ✅ | ✨ | Review | A review queue: evidence *needing review*, stale memory cards and open health findings in one list | F23 | Each item opens where it is resolved; the queue empties as they are |
-| **V0.2.38** | ✨ | Artifact page | Version history of a file: earlier versions kept when a new one is uploaded, viewable and comparable | F24 | Uploading a new version keeps the old text readable |
+| **V0.2.38** ✅ | ✨ | Artifact page | Version history of a file: earlier versions kept when a new one is uploaded, viewable and comparable | F24 | Uploading a new version keeps the old text readable |
 | **V0.2.39** | 🔧 | Discussion | `@mention` suggestions while typing in comments | F25 | Only workspace members are suggested |
 
 #### Track G: Portability and operations (V0.2.40–V0.2.46)
@@ -696,6 +696,16 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 - [x] Tests: `the_review_queue_lists_what_waits_and_empties_as_it_is_resolved` (a duplicate finding for the owner, a marked file and a card retired with its evidence, order, one item for a stale card, an outsider refused, resolved in place until the queue is empty) and the panel (kinds, opening, who can resolve, empty, the address)
 - [ ] No assignment or snooze of an item, no count in the section tab, and the queue does not notify; tasks and comments needing a reply are not part of it
 
+#### V0.2.38: Version history of a file
+
+- [x] **F24** migration 0036 `artifact_versions` (`artifact_id`, `version`, `content_hash`, `size_bytes`, `became_current_at`, `replaced_at`, `replaced_by_user_id`); `replace_artifact_content` keeps the replaced content in the same transaction (a refused duplicate leaves no row); `list_artifact_versions` (newest first, the uploader of version n being whoever replaced n−1), `read_blob`
+- [x] `collect_orphan_blobs` and its re-check treat a blob an earlier version holds as referenced; deleting the artifact cascades the rows and the blobs are collected after the grace period; `workspace_stored_bytes` counts the earlier versions against the workspace's allowance
+- [x] `crates/api/src/versions.rs`: `artifact_version_text` (the file's text, or `extract_document_text` for business documents; none for images and binary files; 400,000 characters at most) and `compare_artifact_versions` (common head and tail trimmed, longest common subsequence of the middle up to 4 million cells, three lines of context, `Gap` lines for the rest; the first 4,000 lines of each)
+- [x] `GET /v1/artifacts/{id}/versions`, `GET …/versions/{n}`, `GET …/compare?from=&to=` with `require_workspace_read`; the upload route records who uploaded
+- [x] Web: *Version history* panel on the artifact page (`ArtifactVersionsPanel`): *View text*, *What changed*, *Compare with current*, with removed and added lines marked in colour and by sign
+- [x] Tests: the storage test (three versions, authors, a refused duplicate, blobs kept through collection and released with the file), the API test (list, text of the first edition, comparison, 404 and 403), the diff unit tests and the panel
+- [ ] No restore of an earlier version (download and upload it as a new version), no limit on how many versions are kept, no history for repository files (their history is git's), and edits of a note's text are not versions
+
 ### Decisions to agree before work starts
 
 | # | Decision | Needed by | Proposal |
@@ -740,7 +750,7 @@ Every item of both roads, with the release it is planned for. The evidence behin
 | F19 | **Command palette** | S | ✅ V0.2.34 |
 | F21 | **More languages:** symbols and structure-aware chunks for Go and Java (21a ✅ V0.2.35), C# and PHP (21b ✅ V0.2.36) | S–M | ✅ V0.2.35, V0.2.36 |
 | F23 | **Review queue:** evidence needing review, stale memory cards and open health findings in one list | S–M | ✅ V0.2.37 |
-| F24 | **Version history** of a file, viewable and comparable | M | V0.2.38 |
+| F24 | **Version history** of a file, viewable and comparable | M | ✅ V0.2.38 |
 | F25 | **`@mention` suggestions** in comments | S | V0.2.39 |
 | F20 | **Desktop as a server client** (20a), export to a server (20b), local edition retired (20c) | M | V0.2.49–V0.2.51 (decision 13) |
 

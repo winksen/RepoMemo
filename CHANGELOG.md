@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.38 (2026-10-15)
+
+Earlier versions of a file stay readable.
+
+### Added
+- **Version history.** Uploading a new version of a file (the *New version* action on its page) keeps the content it replaces. A file with more than one version shows a *Version history* panel: each version with who uploaded it, when it became current and its size. The first upload's author is not recorded.
+- **Read any version.** *View text* shows what a version said, as search reads it: the file's own text, or the text extracted from a Word, Excel, PowerPoint, PDF, OneNote or Outlook file. An image or a binary file says it has no text to show.
+- **Compare versions.** *What changed* compares a version with the one before it, and *Compare with current* compares an earlier one with the latest. The comparison is line by line, with removed and added lines marked and a few unchanged lines around each change; long unchanged stretches are folded. Only the first 4,000 lines of each version are compared.
+- **API:** `GET /v1/artifacts/{id}/versions` (the list, newest first), `GET /v1/artifacts/{id}/versions/{n}` (the text of version n), `GET /v1/artifacts/{id}/compare?from=&to=` (members of the workspace; the comparison counts as a heavy request).
+- Migration 0036 (`artifact_versions`).
+
+### Changed
+- Earlier versions' stored content is no longer collected as unreferenced: it is kept for as long as the file exists, and counts in the workspace's storage use. Deleting the file lets it go.
+
+### Upgrading
+- Nothing to do. Files uploaded as new versions before this release have no history: their next new version starts it (the version before it is kept from then on).
+
 ## V0.2.37 (2026-10-15)
 
 One list of what waits for a person.

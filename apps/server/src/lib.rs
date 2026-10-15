@@ -773,7 +773,15 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             "/v1/workspaces/{workspace_id}/folders/{folder_id}/move",
             post(move_folder),
         )
-        .route("/v1/artifacts/{artifact_id}/versions", post(upload_artifact_version))
+        .route(
+            "/v1/artifacts/{artifact_id}/versions",
+            get(list_artifact_versions).post(upload_artifact_version),
+        )
+        .route(
+            "/v1/artifacts/{artifact_id}/versions/{version}",
+            get(get_artifact_version_text),
+        )
+        .route("/v1/artifacts/{artifact_id}/compare", get(compare_artifact_versions))
         .route(
             "/v1/workspaces/{workspace_id}/transfer-ownership",
             post(transfer_workspace_ownership),

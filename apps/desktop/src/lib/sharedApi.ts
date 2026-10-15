@@ -883,6 +883,21 @@ export async function uploadSharedArtifact(accessToken: string, workspaceId: str
 }
 
 /** A new version of a file, into the same artifact (comments, folder and memory links stay). */
+/** Every version of an uploaded file, the current one first. */
+export function listSharedArtifactVersions(accessToken: string, artifactId: string): Promise<import("../types").ArtifactVersion[]> {
+  return request<import("../types").ArtifactVersion[]>(`/v1/artifacts/${artifactId}/versions`, {}, accessToken);
+}
+
+/** The text of one version, current or earlier. */
+export function getSharedArtifactVersionText(accessToken: string, artifactId: string, version: number): Promise<import("../types").ArtifactVersionText> {
+  return request<import("../types").ArtifactVersionText>(`/v1/artifacts/${artifactId}/versions/${version}`, {}, accessToken);
+}
+
+/** Two versions of a file compared line by line. */
+export function compareSharedArtifactVersions(accessToken: string, artifactId: string, from: number, to: number): Promise<import("../types").VersionComparison> {
+  return request<import("../types").VersionComparison>(`/v1/artifacts/${artifactId}/compare?from=${from}&to=${to}`, {}, accessToken);
+}
+
 export async function uploadSharedArtifactVersion(accessToken: string, artifactId: string, file: File): Promise<ArtifactSummary> {
   const response = await authFetch(`${API_URL}/v1/artifacts/${artifactId}/versions`, {
     method: "POST",

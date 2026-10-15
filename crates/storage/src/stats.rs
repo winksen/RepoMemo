@@ -220,14 +220,18 @@ impl StorageEngine {
         Ok(workspace_ids.iter().filter_map(|id| by_workspace.remove(id)).collect())
     }
 
-    /// Bytes of evidence a workspace holds (the sum of its files' sizes).
+    /// Bytes of evidence a workspace holds: its files' sizes, and the earlier
+    /// versions kept of files that were uploaded again.
     pub async fn workspace_stored_bytes(&self, workspace_id: &str) -> Result<i64> {
-        Ok(
-            sqlx::query_scalar::<_, i64>("SELECT COALESCE(SUM(size_bytes), 0) FROM artifacts WHERE workspace_id = ?1")
-                .bind(workspace_id)
-                .fetch_one(self.reader())
-                .await?,
+        Ok(sqlx::query_scalar::<_, i64>(
+            r#"
+            SELECT (SELECT COALESCE(SUM(size_bytes), 0) FROM artifacts WHERE workspace_id = ?1)
+                 + (SELECT COALESCE(SUM(size_bytes), 0) FROM artifact_versions WHERE workspace_id = ?1)
+            "#,
         )
+        .bind(workspace_id)
+        .fetch_one(self.reader())
+        .await?)
     }
 
     /// Workspaces the person owns.

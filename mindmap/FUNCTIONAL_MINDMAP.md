@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.2.37` (2026-10-15). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
+> **Scope:** reflects the code at `V0.2.38` (2026-10-15). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
 
 ---
 
@@ -315,6 +315,7 @@ Office files, PDFs and emails are previewed in the browser: text and tables for 
   - **indexing status**: *Indexing…* right after saving, then *Indexed*
   - for owners and admins only, an **Indexed chunks** button that opens a dialog with the stored passages, their line ranges, and a **Re-index** action
   - **rename** and **delete**, for writers
+  - **Version history** for an uploaded file that has taken a new version: each version with who uploaded it and when; its text can be read, and any version compared line by line with the one before it or with the current one. Earlier text stays readable for as long as the file exists
 - **Lifecycle review**: every artifact has a status:
   `active` → `needs_review` → `verified` / `outdated` / `superseded`
   Each artifact can also have an **owner** (a workspace member) and a **review note**. `superseded` requires choosing the replacement artifact. Every change is kept in a **lifecycle history**.
@@ -526,7 +527,7 @@ The desktop app and the shared server keep **separate data**.
 
 ---
 
-## 13. Known functional gaps (at V0.2.37)
+## 13. Known functional gaps (at V0.2.38)
 
 These are observed in the code and are useful for prioritizing. The roadmap item that addresses each one is in brackets.
 

@@ -1192,3 +1192,114 @@ async fn environments_from_older_versions_upgrade_in_place() {
         let _ = std::fs::remove_dir_all(data_dir);
     }
 }
+
+#[tokio::test]
+async fn earlier_versions_are_kept_and_their_blobs_survive_collection() {
+    let (storage, data_dir) = temp_storage("versions").await;
+    let workspace = storage.create_workspace("Versions").await.unwrap();
+    let source = storage
+        .create_or_get_source(&workspace.id, SourceType::Upload, "Uploads", None)
+        .await
+        .unwrap();
+    let first = b"first text";
+    let first_hash = StorageEngine::content_hash(first);
+    storage
+        .store_blob(&first_hash, first, Some("text/plain"))
+        .await
+        .unwrap();
+    let artifact = storage
+        .store_artifact(NewArtifact {
+            workspace_id: workspace.id.clone(),
+            source_id: source.id.clone(),
+            artifact_type: ArtifactType::File,
+            title: "notes".to_owned(),
+            path: "notes.txt".to_owned(),
+            content_hash: first_hash.clone(),
+            mime_type: Some("text/plain".to_owned()),
+            language: None,
+            size_bytes: first.len() as i64,
+            metadata: json!({}),
+        })
+        .await
+        .unwrap()
+        .artifact;
+    let user = storage
+        .create_user("versions@example.com", "Versions", "hash")
+        .await
+        .unwrap();
+
+    // Never replaced: one version, the current one.
+    let alone = storage.list_artifact_versions(&artifact.id).await.unwrap();
+    assert_eq!(alone.len(), 1);
+    assert!(alone[0].is_current && alone[0].version == 1 && alone[0].uploaded_by.is_none());
+
+    let mut hashes = vec![first_hash.clone()];
+    for text in ["second text", "third text, longer"] {
+        let hash = StorageEngine::content_hash(text.as_bytes());
+        storage
+            .store_blob(&hash, text.as_bytes(), Some("text/plain"))
+            .await
+            .unwrap();
+        storage
+            .replace_artifact_content(
+                &artifact.id,
+                &hash,
+                text.len() as i64,
+                Some("text/plain"),
+                Some(&user.id),
+            )
+            .await
+            .unwrap();
+        hashes.push(hash);
+    }
+    // The same content again is refused and leaves no version behind.
+    assert!(storage
+        .replace_artifact_content(&artifact.id, &hashes[2], 1, None, Some(&user.id))
+        .await
+        .is_err());
+
+    let versions = storage.list_artifact_versions(&artifact.id).await.unwrap();
+    assert_eq!(
+        versions.iter().map(|version| version.version).collect::<Vec<_>>(),
+        [3, 2, 1]
+    );
+    assert_eq!(
+        versions
+            .iter()
+            .map(|version| version.content_hash.clone())
+            .collect::<Vec<_>>(),
+        [hashes[2].clone(), hashes[1].clone(), hashes[0].clone()]
+    );
+    assert!(versions[0].is_current && !versions[1].is_current && versions[0].replaced_at.is_none());
+    // Version 1 has no recorded author; the others were uploaded by the user.
+    assert_eq!(versions[2].uploaded_by, None);
+    assert_eq!(versions[1].uploaded_by.as_deref(), Some("Versions"));
+    assert_eq!(versions[0].uploaded_by.as_deref(), Some("Versions"));
+    assert_eq!(versions[0].created_at, versions[1].replaced_at.clone().unwrap());
+
+    // Earlier content is not unreferenced: collecting leaves every blob.
+    let collected = storage
+        .collect_orphan_blobs(chrono::Duration::seconds(-1), 100)
+        .await
+        .unwrap();
+    assert!(collected.removed.is_empty(), "{:?}", collected.removed);
+    assert_eq!(storage.read_blob(&hashes[0]).await.unwrap(), first);
+
+    // They count in what the workspace holds, until the file goes.
+    assert_eq!(
+        storage.workspace_stored_bytes(&workspace.id).await.unwrap(),
+        (first.len() + "second text".len() + "third text, longer".len()) as i64
+    );
+
+    // Deleting the file lets them go.
+    storage.delete_artifact(&artifact.id).await.unwrap();
+    let collected = storage
+        .collect_orphan_blobs(chrono::Duration::seconds(-1), 100)
+        .await
+        .unwrap();
+    assert_eq!(collected.removed.len(), 3);
+
+    storage.pool.close().await;
+    drop(storage);
+    let _ = std::fs::remove_dir_all(data_dir);
+}

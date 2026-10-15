@@ -141,6 +141,7 @@ impl StorageEngine {
             SELECT hash, size_bytes FROM blobs
             WHERE created_at < ?1
               AND NOT EXISTS (SELECT 1 FROM artifacts WHERE artifacts.content_hash = blobs.hash)
+              AND NOT EXISTS (SELECT 1 FROM artifact_versions WHERE artifact_versions.content_hash = blobs.hash)
             LIMIT ?2
             "#,
         )
@@ -159,6 +160,7 @@ impl StorageEngine {
                 DELETE FROM blobs
                 WHERE hash = ?1 AND created_at < ?2
                   AND NOT EXISTS (SELECT 1 FROM artifacts WHERE artifacts.content_hash = ?1)
+                  AND NOT EXISTS (SELECT 1 FROM artifact_versions WHERE artifact_versions.content_hash = ?1)
                 "#,
             )
             .bind(&hash)
@@ -891,19 +893,25 @@ impl StorageEngine {
 
     /// Replaces the content of an artifact in place: it keeps its id, folder,
     /// comments, lifecycle and the memory cards that cite it, and is indexed
-    /// again (passages with unchanged text keep their identity).
+    /// again (passages with unchanged text keep their identity). The content
+    /// it had is kept as an earlier version (`artifact_versions`), uploaded by
+    /// `uploaded_by`.
     pub async fn replace_artifact_content(
         &self,
         artifact_id: &str,
         content_hash: &str,
         size_bytes: i64,
         mime_type: Option<&str>,
+        uploaded_by: Option<&str>,
     ) -> Result<ArtifactSummary> {
         let current = self.get_artifact_summary(artifact_id).await?;
         if current.content_hash == content_hash {
             repomemo_domain::bail_conflict!("This file already holds exactly that content.");
         }
         let now = Utc::now().to_rfc3339();
+        // One transaction: the update comes first, so the write lock is taken
+        // at once and a duplicate content leaves no version row behind.
+        let mut tx = self.pool.begin().await?;
         let updated = sqlx::query(
             "UPDATE artifacts SET content_hash = ?2, size_bytes = ?3, mime_type = COALESCE(?4, mime_type), updated_at = ?5, indexed_at = NULL WHERE id = ?1",
         )
@@ -912,19 +920,107 @@ impl StorageEngine {
         .bind(size_bytes)
         .bind(mime_type)
         .bind(&now)
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await;
-        match updated {
-            Ok(_) => {}
-            Err(error) => {
-                let error: anyhow::Error = error.into();
-                if is_unique_violation(&error) {
-                    repomemo_domain::bail_conflict!("Another version of this file already holds that content.");
-                }
-                return Err(error);
+        if let Err(error) = updated {
+            let error: anyhow::Error = error.into();
+            if is_unique_violation(&error) {
+                repomemo_domain::bail_conflict!("Another version of this file already holds that content.");
             }
+            return Err(error);
         }
+        let last = sqlx::query_as::<_, (i64, String)>(
+            "SELECT version, replaced_at FROM artifact_versions WHERE artifact_id = ?1 ORDER BY version DESC LIMIT 1",
+        )
+        .bind(artifact_id)
+        .fetch_optional(&mut *tx)
+        .await?;
+        let (version, became_current_at) = match last {
+            Some((version, replaced_at)) => (version + 1, replaced_at),
+            None => (1, current.created_at.clone()),
+        };
+        sqlx::query(
+            r#"
+            INSERT INTO artifact_versions (
+              id, artifact_id, workspace_id, version, content_hash, size_bytes, mime_type,
+              became_current_at, replaced_at, replaced_by_user_id
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+            "#,
+        )
+        .bind(Uuid::new_v4().to_string())
+        .bind(artifact_id)
+        .bind(&current.workspace_id)
+        .bind(version)
+        .bind(&current.content_hash)
+        .bind(current.size_bytes)
+        .bind(&current.mime_type)
+        .bind(&became_current_at)
+        .bind(&now)
+        .bind(uploaded_by)
+        .execute(&mut *tx)
+        .await?;
+        tx.commit().await?;
         self.get_artifact_summary(artifact_id).await
+    }
+
+    /// Every version of an uploaded file, the current one first. A file that
+    /// was never replaced has just its current version.
+    pub async fn list_artifact_versions(&self, artifact_id: &str) -> Result<Vec<ArtifactVersion>> {
+        let current = self.get_artifact_summary(artifact_id).await?;
+        let rows = sqlx::query(
+            r#"
+            SELECT artifact_versions.version, artifact_versions.content_hash, artifact_versions.size_bytes,
+                   artifact_versions.became_current_at, artifact_versions.replaced_at,
+                   users.display_name AS replaced_by
+            FROM artifact_versions
+            LEFT JOIN users ON users.id = artifact_versions.replaced_by_user_id
+            WHERE artifact_versions.artifact_id = ?1
+            ORDER BY artifact_versions.version ASC
+            "#,
+        )
+        .bind(artifact_id)
+        .fetch_all(self.reader())
+        .await?;
+        let mut versions = Vec::with_capacity(rows.len() + 1);
+        // Whoever replaced version n uploaded version n + 1.
+        let mut uploaded_by: Option<String> = None;
+        let mut became_current_at = current.created_at.clone();
+        for row in rows {
+            let version: i64 = row.get("version");
+            let replaced_at: String = row.get("replaced_at");
+            versions.push(ArtifactVersion {
+                version,
+                content_hash: row.get("content_hash"),
+                size_bytes: row.get("size_bytes"),
+                created_at: row.get("became_current_at"),
+                uploaded_by: uploaded_by.take(),
+                replaced_at: Some(replaced_at.clone()),
+                is_current: false,
+            });
+            uploaded_by = row.get("replaced_by");
+            became_current_at = replaced_at;
+        }
+        versions.push(ArtifactVersion {
+            version: versions.len() as i64 + 1,
+            content_hash: current.content_hash,
+            size_bytes: current.size_bytes,
+            created_at: became_current_at,
+            uploaded_by,
+            replaced_at: None,
+            is_current: true,
+        });
+        versions.reverse();
+        Ok(versions)
+    }
+
+    /// The stored bytes behind a content hash (a version's content).
+    pub async fn read_blob(&self, content_hash: &str) -> Result<Vec<u8>> {
+        if content_hash.len() < 4 || !content_hash.chars().all(|character| character.is_ascii_hexdigit()) {
+            anyhow::bail!("not a content hash");
+        }
+        tokio::fs::read(self.blob_path(content_hash))
+            .await
+            .with_context(|| format!("failed to read blob {content_hash}"))
     }
 
     /// Ids of a folder, every folder below it, and every artifact inside any of them.

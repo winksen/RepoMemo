@@ -1337,6 +1337,70 @@ pub struct HealthActionResult {
     pub task_id: Option<String>,
 }
 
+/// One version of an uploaded file. Uploading a new version keeps the one it
+/// replaces, so earlier text stays readable and can be compared.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArtifactVersion {
+    /// 1 is the first upload; the current version has the highest number.
+    pub version: i64,
+    pub content_hash: String,
+    pub size_bytes: i64,
+    /// When this content became the file's current content.
+    pub created_at: String,
+    /// Who uploaded it; the first upload's author is not recorded.
+    pub uploaded_by: Option<String>,
+    /// When a newer version replaced it; none for the current one.
+    pub replaced_at: Option<String>,
+    pub is_current: bool,
+}
+
+/// The text of one version, as search would read it: the file's own text, or
+/// what is extracted from a business document.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArtifactVersionText {
+    pub version: i64,
+    /// None when the version has no text to show (an image, or a binary file).
+    pub text: Option<String>,
+    pub truncated: bool,
+    /// Why there is no text.
+    pub note: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DiffKind {
+    Same,
+    Added,
+    Removed,
+    /// Unchanged lines left out of the comparison; `text` says how many.
+    Gap,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VersionDiffLine {
+    pub kind: DiffKind,
+    pub text: String,
+    /// The line's number in the older version; none for an added line.
+    pub old_line: Option<i64>,
+    /// The line's number in the newer version; none for a removed line.
+    pub new_line: Option<i64>,
+}
+
+/// Two versions of a file compared line by line, with a few unchanged lines
+/// around each change.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VersionComparison {
+    pub from_version: i64,
+    pub to_version: i64,
+    pub lines: Vec<VersionDiffLine>,
+    pub added: i64,
+    pub removed: i64,
+    /// The files were long: only the first lines of each were compared.
+    pub truncated: bool,
+    /// Why nothing is shown (a version has no text, or the two are the same).
+    pub note: Option<String>,
+}
+
 /// What is waiting in a review queue.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

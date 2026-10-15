@@ -1198,7 +1198,7 @@ pub(crate) async fn upload_artifact_version(
     quotas::check_incoming(&state, &subject, &workspace_id, body.len() as u64, true).await?;
     let artifact = state
         .core
-        .replace_artifact_version(&artifact_id, &filename, body.to_vec())
+        .replace_artifact_version(&artifact_id, &filename, body.to_vec(), Some(&subject.user_id))
         .await
         .map_err(map_core_error)?;
     state.converter.ensure(state.storage.clone(), artifact.clone());
@@ -1219,6 +1219,74 @@ pub(crate) async fn upload_artifact_version(
         folder_id,
         repository_id: None,
     }))
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct CompareVersionsQuery {
+    from: i64,
+    to: i64,
+}
+
+/// The workspace of an artifact the caller may read.
+async fn readable_artifact_workspace(
+    state: &AppState,
+    subject: &AuthenticatedSubject,
+    artifact_id: &str,
+) -> Result<String, ApiError> {
+    let summary = state
+        .storage
+        .get_artifact_summary(artifact_id)
+        .await
+        .map_err(map_storage_error)?;
+    require_workspace_read(state, subject, &summary.workspace_id).await?;
+    Ok(summary.workspace_id)
+}
+
+/// Every version of an uploaded file, the current one first.
+pub(crate) async fn list_artifact_versions(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(artifact_id): Path<String>,
+) -> Result<Json<Vec<repomemo_domain::ArtifactVersion>>, ApiError> {
+    readable_artifact_workspace(&state, &subject, &artifact_id).await?;
+    state
+        .core
+        .list_artifact_versions(&artifact_id)
+        .await
+        .map(Json)
+        .map_err(map_core_error)
+}
+
+/// The text of one version, current or earlier.
+pub(crate) async fn get_artifact_version_text(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path((artifact_id, version)): Path<(String, i64)>,
+) -> Result<Json<repomemo_domain::ArtifactVersionText>, ApiError> {
+    readable_artifact_workspace(&state, &subject, &artifact_id).await?;
+    state
+        .core
+        .artifact_version_text(&artifact_id, version)
+        .await
+        .map(Json)
+        .map_err(map_core_error)
+}
+
+/// Two versions of a file compared line by line.
+pub(crate) async fn compare_artifact_versions(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(artifact_id): Path<String>,
+    Query(query): Query<CompareVersionsQuery>,
+) -> Result<Json<repomemo_domain::VersionComparison>, ApiError> {
+    readable_artifact_workspace(&state, &subject, &artifact_id).await?;
+    consume_heavy_quota(&state, &subject)?;
+    state
+        .core
+        .compare_artifact_versions(&artifact_id, query.from, query.to)
+        .await
+        .map(Json)
+        .map_err(map_core_error)
 }
 
 #[cfg(test)]

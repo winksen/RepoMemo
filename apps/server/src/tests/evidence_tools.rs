@@ -359,6 +359,105 @@ async fn folders_move_files_are_handled_in_bulk_and_files_take_new_versions() {
             .status(),
         409
     );
+    // The first edition is kept: its text stays readable and the two compare.
+    let history = response_json(
+        call(
+            &app,
+            "GET",
+            &format!("/v1/artifacts/{guide_id}/versions"),
+            &owner,
+            json!({}),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(history.as_array().unwrap().len(), 2, "{history}");
+    assert_eq!(history[0]["version"], 2);
+    assert_eq!(history[0]["is_current"], true);
+    assert_eq!(history[1]["version"], 1);
+    assert_eq!(history[1]["is_current"], false);
+    assert_eq!(history[0]["uploaded_by"], "Person");
+    assert_eq!(history[0]["created_at"], history[1]["replaced_at"]);
+    let first_text = response_json(
+        call(
+            &app,
+            "GET",
+            &format!("/v1/artifacts/{guide_id}/versions/1"),
+            &owner,
+            json!({}),
+        )
+        .await,
+    )
+    .await;
+    assert!(
+        first_text["text"].as_str().unwrap().contains("First edition."),
+        "{first_text}"
+    );
+    let second_text = response_json(
+        call(
+            &app,
+            "GET",
+            &format!("/v1/artifacts/{guide_id}/versions/2"),
+            &owner,
+            json!({}),
+        )
+        .await,
+    )
+    .await;
+    assert!(second_text["text"]
+        .as_str()
+        .unwrap()
+        .contains("Second edition, with more."));
+    let changes = response_json(
+        call(
+            &app,
+            "GET",
+            &format!("/v1/artifacts/{guide_id}/compare?from=1&to=2"),
+            &owner,
+            json!({}),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(
+        (changes["added"].as_i64(), changes["removed"].as_i64()),
+        (Some(1), Some(1)),
+        "{changes}"
+    );
+    let line = |kind: &str| {
+        changes["lines"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|line| line["kind"] == kind)
+            .map(|line| line["text"].as_str().unwrap().to_owned())
+    };
+    assert_eq!(line("removed").as_deref(), Some("First edition."));
+    assert_eq!(line("added").as_deref(), Some("Second edition, with more."));
+    assert_eq!(
+        call(
+            &app,
+            "GET",
+            &format!("/v1/artifacts/{guide_id}/versions/9"),
+            &owner,
+            json!({})
+        )
+        .await
+        .status(),
+        404
+    );
+    let (outsider, _) = register_account(&app, "versions-outsider@example.com").await;
+    for uri in [
+        format!("/v1/artifacts/{guide_id}/versions"),
+        format!("/v1/artifacts/{guide_id}/versions/1"),
+        format!("/v1/artifacts/{guide_id}/compare?from=1&to=2"),
+    ] {
+        assert_eq!(
+            call(&app, "GET", &uri, &outsider, json!({})).await.status(),
+            403,
+            "{uri}"
+        );
+    }
     wait_for_indexed_artifacts(&app, &owner, &workspace_id, 3).await;
     let hits = response_json(
         call(
