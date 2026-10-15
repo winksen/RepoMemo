@@ -633,6 +633,16 @@ export interface ConnectorSource {
   /** A token is stored (never shown). */
   has_credential: boolean;
   active_job: IndexingJobStatus | null;
+  /** Webhooks are set up for this connector. */
+  has_webhook: boolean;
+  /** When a correctly signed webhook call last arrived. */
+  webhook_last_received_at: string | null;
+  /**
+   * Why the connector stopped syncing by itself: the tracker's rate limit
+   * (until `paused_until`) or a token it refused (until it is replaced).
+   */
+  paused_reason: string | null;
+  paused_until: string | null;
   created_at: string;
 }
 

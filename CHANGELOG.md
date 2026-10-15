@@ -2,6 +2,19 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.31 (2026-10-15)
+
+Connectors follow their tracker within seconds, and behave when it pushes back.
+
+### Added
+- **Webhooks for connectors.** A workspace administrator sets one up from a connector's *Webhook* button in Settings › Issues and pull requests: the payload address and a secret are shown once. `POST /v1/webhooks/connectors/{id}` takes GitHub (`X-Hub-Signature-256`, events `issues`, `issue_comment`, `pull_request`, `pull_request_review`, `pull_request_review_comment`), GitLab (`X-Gitlab-Token`, *Issue*, *Note* and *Merge Request* hooks) and any sender that signs with HMAC-SHA256 (`X-RepoMemo-Signature`). The rules are the repository webhooks': constant-time checks, the same `401` for anything unverifiable, limits per address and per connector, one sync queued per call.
+- **`Retry-After` is honoured.** A tracker that asks to wait up to 30 seconds is waited out inside the sync (twice at most). A longer wait (`Retry-After`, GitHub's `X-RateLimit-Reset`, GitLab's `RateLimit-Reset`) **pauses the connector** until then: it shows *Paused until …* with the tracker's reason, is not asked again before that (manual syncs answer `409`), and resumes by itself.
+- **A refused token pauses the connector** and says so: *Paused until the token is replaced*. Background syncs stop; *Sync now* may still try once; replacing the token (tried against the tracker first) clears the pause.
+- The repository webhooks now share this code and its limits; their behaviour is unchanged.
+
+### Upgrading
+- Nothing to do. The server must be reachable from the tracker for webhooks to arrive; polling stays on as a safety net.
+
 ## V0.2.30 (2026-10-15)
 
 A file shows the issues and pull requests that name it.

@@ -1,6 +1,6 @@
 # Connectors (issues and pull requests)
 
-> **Branch of:** [TECHNICAL_MINDMAP.md](../TECHNICAL_MINDMAP.md) · **Roadmap:** F17, decision 12 · **Status:** GitHub issues (V0.2.27) and pull requests (V0.2.28), GitLab issues and merge requests (V0.2.29)
+> **Branch of:** [TECHNICAL_MINDMAP.md](../TECHNICAL_MINDMAP.md) · **Roadmap:** F17, decision 12 · **Status:** GitHub issues (V0.2.27) and pull requests (V0.2.28), GitLab issues and merge requests (V0.2.29), links to code (V0.2.30), webhooks and rate limits (V0.2.31)
 
 A connector keeps a tracker's items as evidence. It is a source of `type = 'connector'`: each item (an issue, or a pull request) becomes one markdown artifact, indexed like any file, so it is searchable, citable and linkable to memory cards. The tracker stays the source of truth: nothing is ever written to it.
 
@@ -21,6 +21,12 @@ Syncs run in the background through a runner of their own (one at a time, never 
 ## GitLab (V0.2.29)
 
 `connectors/gitlab.rs` reads a project's `issues` and `merge_requests` (and their `notes`, `commits`) with `updated_after`, each with its own cursor (`cursor` and `pulls_cursor`). The project is addressed by its path with `/` as `%2F`, so groups and subgroups work, on gitlab.com or a self-hosted address. GitLab's records are reshaped into the GitHub-shaped ones that `render_issue` and `render_pull` read, so both providers give the same text, metadata and lifecycle; system notes are dropped and `DiffNote`s become review comments. The provider is chosen when connecting or told by the address (`gitlab` in the host name). The token goes in `PRIVATE-TOKEN`.
+
+## Webhooks and rate limits (V0.2.31)
+
+**Webhooks.** `repo_webhooks` serves repositories and connectors (its source id points at `sources`). `apps/server/src/webhooks.rs` has one `authenticate` (sender by header, constant-time signature or token check, one `401` for anything unverifiable, 20 failures a minute per address, 60 calls a minute per source, 1 MiB) and two receivers: `POST /v1/webhooks/repositories/{id}` (push events) and `POST /v1/webhooks/connectors/{id}` (GitHub `issues`, `issue_comment`, `pull_request*`; GitLab *Issue*, *Note* and *Merge Request* hooks; generic always). A verified call queues one sync.
+
+**Pauses.** The client treats `429`, and `403` with no requests remaining, as a rate limit and reads `Retry-After`, `X-RateLimit-Reset` or `RateLimit-Reset`. A wait of 30 s or less is slept inside the request (twice at most); a longer one ends the sync with `Pause::RateLimited { seconds }` as the error's context, and the connector records `paused { reason, until }` and status `paused` (until capped at 24 h). A `401` is `Pause::TokenRefused`: paused with no end until the token is replaced. Background polling skips paused connectors (a rate-limit pause ends by itself when `until` passes), manual and webhook starts answer `409` while a rate-limit pause is in the future, and a successful sync or a new token clears the pause.
 
 ## Rules for the outside connection (S6)
 
@@ -48,8 +54,10 @@ Syncs run in the background through a runner of their own (one at a time, never 
 | POST | `/v1/workspaces/{id}/connectors/check` | A | what the tracker answers for a link and token; nothing stored |
 | GET, DELETE | `/v1/connectors/{id}` | R / A | detail; remove with its items |
 | POST | `/v1/connectors/{id}/sync` | W | queue a sync; 409 if one runs |
-| PUT | `/v1/connectors/{id}/token` | A | replace the token, tried against the tracker first |
+| PUT | `/v1/connectors/{id}/token` | A | replace the token, tried against the tracker first; clears a pause |
+| POST, DELETE | `/v1/connectors/{id}/webhook` | A | make or renew (secret shown once) or remove the webhook secret |
+| POST | `/v1/webhooks/connectors/{id}` | pub | a signed tracker event queues one sync (`202 {queued, note}`; `ping` `200`), anything else `401` |
 
 ## Not yet
 
-Webhooks and a rate-limit pause (V0.2.31). A rate limit today fails the sync with a message and the next try resumes.
+Delivery logs and redelivery for webhooks, approvals on pull and merge requests, and tokens other than a personal one (a GitHub App).

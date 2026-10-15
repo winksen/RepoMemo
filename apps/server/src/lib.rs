@@ -736,6 +736,14 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             post(webhooks::receive_repository_webhook),
         )
         .route(
+            "/v1/connectors/{source_id}/webhook",
+            post(webhooks::create_connector_webhook).delete(webhooks::delete_connector_webhook),
+        )
+        .route(
+            "/v1/webhooks/connectors/{source_id}",
+            post(webhooks::receive_connector_webhook),
+        )
+        .route(
             "/v1/repositories/{source_id}/files",
             get(repositories::list_repository_files),
         )

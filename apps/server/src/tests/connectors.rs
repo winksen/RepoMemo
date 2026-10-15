@@ -8,6 +8,11 @@ struct FakeGitHub {
     version: Arc<Mutex<u32>>,
     authorizations: Arc<Mutex<Vec<String>>>,
     queries: Arc<Mutex<Vec<String>>>,
+    /// What the issues list answers instead of its data: 0 nothing special,
+    /// 1 a short rate limit for the next `limited_calls` calls, 2 a long rate
+    /// limit, 3 a refused token.
+    mode: Arc<Mutex<u32>>,
+    limited_calls: Arc<Mutex<u32>>,
 }
 
 async fn start_fake_github(state: FakeGitHub) -> String {
@@ -104,6 +109,35 @@ async fn start_fake_github(state: FakeGitHub) -> String {
                 axum::Json(json!([{"user": {"login": "bo"}, "created_at": "2026-01-02T00:00:00Z", "body": "Reproduced with refund 42."}]))
             }),
         )
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            |State(state): State<FakeGitHub>, request: axum::extract::Request, next: axum::middleware::Next| async move {
+                use axum::response::IntoResponse;
+                if request.uri().path().ends_with("/issues") {
+                    let mode = *state.mode.lock().unwrap();
+                    let answer = |status: u16, retry_after: Option<&str>| {
+                        let mut response = (axum::http::StatusCode::from_u16(status).unwrap(), "{}").into_response();
+                        if let Some(value) = retry_after {
+                            response.headers_mut().insert("retry-after", value.parse().unwrap());
+                        }
+                        response
+                    };
+                    match mode {
+                        1 => {
+                            let mut left = state.limited_calls.lock().unwrap();
+                            if *left > 0 {
+                                *left -= 1;
+                                return answer(429, Some("1"));
+                            }
+                        }
+                        2 => return answer(429, Some("3600")),
+                        3 => return answer(401, None),
+                        _ => {}
+                    }
+                }
+                next.run(request).await
+            },
+        ))
         .with_state(state);
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
@@ -451,4 +485,151 @@ async fn a_file_lists_the_issues_that_name_it() {
         .unwrap();
     assert_eq!(refused.status(), 403);
     let _ = std::fs::remove_dir_all(root);
+}
+
+#[tokio::test]
+async fn a_tracker_that_asks_to_wait_or_refuses_the_token_pauses_the_connector() {
+    let fake = FakeGitHub::default();
+    *fake.version.lock().unwrap() = 1;
+    let base = start_fake_github(fake.clone()).await;
+    let data_dir = temp_data_dir("connector-pauses");
+    let mut config = ServerConfig::for_test(data_dir.clone());
+    config.git_allowed_hosts = vec!["127.0.0.1".to_owned()];
+    let app = router(config).await.unwrap();
+    let (owner, _) = register_account(&app, "pause-owner@example.com").await;
+    let workspace_id = create_workspace(&app, &owner).await;
+    let call = |method: &'static str, uri: String, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, &owner, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let wait_for = |status: &'static str| {
+        let app = app.clone();
+        let owner = owner.clone();
+        async move {
+            move |source_id: String| {
+                let app = app.clone();
+                let owner = owner.clone();
+                async move {
+                    for _ in 0..150 {
+                        let connector = response_json(
+                            app.clone()
+                                .oneshot(auth_request("GET", &format!("/v1/connectors/{source_id}"), &owner))
+                                .await
+                                .unwrap(),
+                        )
+                        .await;
+                        if connector["status"] == status && connector["active_job"].is_null() {
+                            return connector;
+                        }
+                        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                    }
+                    panic!("the connector never became {status}");
+                }
+            }
+        }
+    };
+    let ready = wait_for("ready").await;
+    let paused = wait_for("paused").await;
+
+    // A short rate limit is waited out inside the request: nothing pauses.
+    *fake.mode.lock().unwrap() = 1;
+    *fake.limited_calls.lock().unwrap() = 1;
+    let connected = response_json(
+        call(
+            "POST",
+            format!("/v1/workspaces/{workspace_id}/connectors"),
+            json!({"link": format!("{base}/acme/app"), "token": "ghp_first"}),
+        )
+        .await,
+    )
+    .await;
+    let source_id = connected["connector"]["id"].as_str().unwrap().to_owned();
+    let first = ready(source_id.clone()).await;
+    assert_eq!(first["last_report"]["added"], 3, "{first}");
+    assert!(first["paused_reason"].is_null());
+
+    // A long one pauses it, says why and until when, and is not asked again.
+    *fake.mode.lock().unwrap() = 2;
+    *fake.version.lock().unwrap() = 2;
+    assert_eq!(
+        call("POST", format!("/v1/connectors/{source_id}/sync"), json!({})).await.status(),
+        200
+    );
+    let limited = paused(source_id.clone()).await;
+    assert!(limited["paused_reason"].as_str().unwrap().contains("rate limit"), "{limited}");
+    assert!(limited["paused_until"].is_string());
+    let again = call("POST", format!("/v1/connectors/{source_id}/sync"), json!({})).await;
+    assert_eq!(again.status(), 409);
+    assert!(response_json(again).await.to_string().contains("paused until"));
+
+    // A refused token pauses it until the token is replaced.
+    *fake.mode.lock().unwrap() = 3;
+    // Replacing the token tried against the tracker clears an earlier pause.
+    let replaced = call(
+        "PUT",
+        format!("/v1/connectors/{source_id}/token"),
+        json!({"token": "ghp_second"}),
+    )
+    .await;
+    assert_eq!(replaced.status(), 200);
+    let replaced = response_json(replaced).await;
+    assert!(replaced["paused_reason"].is_null(), "{replaced}");
+    assert_eq!(
+        call("POST", format!("/v1/connectors/{source_id}/sync"), json!({})).await.status(),
+        200
+    );
+    let refused = paused(source_id.clone()).await;
+    assert!(refused["paused_reason"].as_str().unwrap().contains("refused the token"), "{refused}");
+    assert!(refused["paused_until"].is_null());
+
+    // Webhooks: signed calls sync, others are refused alike.
+    *fake.mode.lock().unwrap() = 0;
+    let created = response_json(
+        call("POST", format!("/v1/connectors/{source_id}/webhook"), json!({})).await,
+    )
+    .await;
+    let secret = created["secret"].as_str().unwrap().to_owned();
+    assert_eq!(created["path"], format!("/v1/webhooks/connectors/{source_id}"));
+    let signature = |body: &str| {
+        let key = ring::hmac::Key::new(ring::hmac::HMAC_SHA256, secret.as_bytes());
+        format!("sha256={}", hex::encode(ring::hmac::sign(&key, body.as_bytes()).as_ref()))
+    };
+    let send = |event: &'static str, signature: String| {
+        let app = app.clone();
+        let path = format!("/v1/webhooks/connectors/{source_id}");
+        async move {
+            let request = Request::builder()
+                .method("POST")
+                .uri(path)
+                .header("x-hub-signature-256", signature)
+                .header("x-github-event", event)
+                .body(Body::from("{}"))
+                .unwrap();
+            let response = app.oneshot(request).await.unwrap();
+            (response.status().as_u16(), response_json(response).await)
+        }
+    };
+    assert_eq!(send("issues", "sha256=00".to_owned()).await.0, 401);
+    let (status, body) = send("ping", signature("{}")).await;
+    assert_eq!((status, body["note"].as_str()), (200, Some("pong")));
+    let (status, body) = send("push", signature("{}")).await;
+    assert_eq!((status, body["queued"].as_bool()), (202, Some(false)));
+    let (status, body) = send("issues", signature("{}")).await;
+    assert_eq!((status, body["queued"].as_bool()), (202, Some(true)), "{body}");
+    let after = ready(source_id.clone()).await;
+    assert!(after["paused_reason"].is_null(), "{after}");
+    assert!(after["last_report"]["updated"].as_u64().unwrap_or(0) >= 1, "{after}");
+    let shown = response_json(call("GET", format!("/v1/connectors/{source_id}"), json!({})).await).await;
+    assert_eq!(shown["has_webhook"], true);
+    assert!(shown["webhook_last_received_at"].is_string());
+    assert!(!shown.to_string().contains(&secret));
+    assert_eq!(
+        call("DELETE", format!("/v1/connectors/{source_id}/webhook"), json!({}))
+            .await
+            .status(),
+        204
+    );
+    assert_eq!(send("issues", signature("{}")).await.0, 401);
+    let _ = std::fs::remove_dir_all(data_dir);
 }

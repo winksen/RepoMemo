@@ -67,6 +67,16 @@ impl ConnectorRunner {
         source: &ConnectorSource,
         actor_user_id: Option<String>,
     ) -> anyhow::Result<Option<IndexingJobStatus>> {
+        // A tracker that asked to wait is not asked again before it is over.
+        if let Some(until) = source.paused_until.as_deref() {
+            if chrono::DateTime::parse_from_rfc3339(until).is_ok_and(|until| until > chrono::Utc::now()) {
+                repomemo_domain::bail_conflict!(
+                    "{} is paused until {until}: {}",
+                    source.name,
+                    source.paused_reason.as_deref().unwrap_or("the tracker's rate limit")
+                );
+            }
+        }
         let newly_running = self
             .running
             .lock()
@@ -173,8 +183,12 @@ impl ConnectorRunner {
                     let Ok(source) = runner.core.connector_source(&id).await else {
                         continue;
                     };
-                    // One that failed is left for a person to look at.
+                    // One that failed is left for a person to look at, and
+                    // one that was refused waits for a new token.
                     if source.status == "error" || source.last_synced_at.is_none() {
+                        continue;
+                    }
+                    if source.status == "paused" && source.paused_until.is_none() {
                         continue;
                     }
                     if let Err(error) = runner.start(&source, None).await {

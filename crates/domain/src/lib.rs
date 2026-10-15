@@ -713,6 +713,18 @@ pub struct ConnectorSource {
     /// A token is stored (never shown).
     pub has_credential: bool,
     pub active_job: Option<IndexingJobStatus>,
+    /// Webhooks are set up for this connector.
+    #[serde(default)]
+    pub has_webhook: bool,
+    /// When a correctly signed webhook call last arrived.
+    #[serde(default)]
+    pub webhook_last_received_at: Option<String>,
+    /// Why the connector stopped syncing by itself: the tracker's rate limit
+    /// (until `paused_until`) or a token it refused (until it is replaced).
+    #[serde(default)]
+    pub paused_reason: Option<String>,
+    #[serde(default)]
+    pub paused_until: Option<String>,
     pub created_at: String,
 }
 

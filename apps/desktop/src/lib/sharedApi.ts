@@ -1113,6 +1113,15 @@ export function setSharedConnectorToken(accessToken: string, connectorId: string
   return request<ConnectorSource>(`/v1/connectors/${connectorId}/token`, { method: "PUT", body: JSON.stringify({ token }) }, accessToken);
 }
 
+/** The secret is returned once, when the webhook is made or renewed. */
+export function createSharedConnectorWebhook(accessToken: string, connectorId: string): Promise<{ secret: string; path: string; url: string | null }> {
+  return request(`/v1/connectors/${connectorId}/webhook`, { method: "POST", body: JSON.stringify({}) }, accessToken);
+}
+
+export function deleteSharedConnectorWebhook(accessToken: string, connectorId: string): Promise<void> {
+  return request<void>(`/v1/connectors/${connectorId}/webhook`, { method: "DELETE" }, accessToken);
+}
+
 export function deleteSharedConnector(accessToken: string, connectorId: string): Promise<void> {
   return request<void>(`/v1/connectors/${connectorId}`, { method: "DELETE" }, accessToken);
 }

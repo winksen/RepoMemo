@@ -1,19 +1,23 @@
-//! Push webhooks for repository links (roadmap F16a, V0.2.23).
+//! Push webhooks for repository links (roadmap F16a, V0.2.23) and connector
+//! webhooks (F17e, V0.2.31).
 //!
-//! A repository has one webhook secret, made by a workspace administrator and
-//! shown once. Hosts call `POST /v1/webhooks/repositories/{id}` when someone
-//! pushes, and a correctly signed call queues one sync (a sync that is already
-//! running absorbs it), so a workspace follows its repository within seconds
-//! instead of at the next poll. Three senders are understood:
+//! A repository or connector has one webhook secret, made by a workspace
+//! administrator and shown once. Hosts call `POST /v1/webhooks/repositories/{id}`
+//! when someone pushes, or `POST /v1/webhooks/connectors/{id}` when an issue,
+//! a comment or a pull request changes, and a correctly signed call queues
+//! one sync (a sync that is already running absorbs it), so a workspace
+//! follows its sources within seconds instead of at the next poll. Three
+//! senders are understood:
 //!
 //! - **GitHub**: `X-Hub-Signature-256: sha256=<hex>`, an HMAC-SHA256 of the
-//!   body, and `X-GitHub-Event` (`ping` answers, `push` syncs);
+//!   body, and `X-GitHub-Event` (`ping` answers, the events of the source
+//!   sync);
 //! - **GitLab**: `X-Gitlab-Token`, the secret itself (GitLab sends no
-//!   signature), and `X-Gitlab-Event: Push Hook`;
+//!   signature), and `X-Gitlab-Event`;
 //! - **anything else**: `X-RepoMemo-Signature: sha256=<hex>`, the same HMAC.
 //!
 //! Every comparison is constant time. A call that cannot be verified is
-//! answered `401` the same way whether or not the repository exists, and
+//! answered `401` the same way whether or not the source exists, and
 //! failures are limited per client address so the endpoint cannot be used to
 //! guess or to flood.
 
@@ -28,7 +32,7 @@ use crate::*;
 const MAX_BODY_BYTES: usize = 1024 * 1024;
 /// Failed calls per client address per minute.
 const FAILURES_PER_MINUTE: u32 = 20;
-/// Verified calls per repository per minute.
+/// Verified calls per source per minute.
 const CALLS_PER_MINUTE: u32 = 60;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -69,9 +73,7 @@ fn header<'a>(headers: &'a HeaderMap, name: &str) -> &'a str {
 /// Whether the call is signed with `secret`, in the way its sender signs.
 fn verified(sender: &Sender, headers: &HeaderMap, body: &[u8], secret: &str) -> bool {
     match sender {
-        Sender::GitLab => {
-            same_secret(header(headers, "x-gitlab-token").as_bytes(), secret.as_bytes())
-        }
+        Sender::GitLab => same_secret(header(headers, "x-gitlab-token").as_bytes(), secret.as_bytes()),
         Sender::GitHub | Sender::Generic => {
             let name = if *sender == Sender::GitHub {
                 "x-hub-signature-256"
@@ -125,15 +127,39 @@ fn wish_of(sender: &Sender, headers: &HeaderMap, body: &[u8], followed_branch: O
     }
 }
 
-/// Public. The same `401` for an unknown repository, one without a webhook
-/// and a call that is not signed right.
-pub(crate) async fn receive_repository_webhook(
-    State(state): State<AppState>,
-    client: ClientIp,
-    Path(source_id): Path<String>,
-    headers: HeaderMap,
-    body: Bytes,
-) -> Result<(StatusCode, Json<Value>), ApiError> {
+/// What a verified call to a connector's webhook asks for: any change to an
+/// issue, a pull or merge request, or their discussion.
+fn connector_wish_of(sender: &Sender, headers: &HeaderMap) -> Wish {
+    match sender {
+        Sender::GitHub => match header(headers, "x-github-event") {
+            "ping" => Wish::Pong,
+            "issues" | "issue_comment" | "pull_request" | "pull_request_review" | "pull_request_review_comment" => {
+                Wish::Sync
+            }
+            _ => Wish::Ignore("not an issue or pull request event"),
+        },
+        Sender::GitLab => match header(headers, "x-gitlab-event") {
+            "Issue Hook" | "Confidential Issue Hook" | "Note Hook" | "Confidential Note Hook" | "Merge Request Hook" => {
+                Wish::Sync
+            }
+            _ => Wish::Ignore("not an issue or merge request event"),
+        },
+        Sender::Generic => Wish::Sync,
+    }
+}
+
+/// Checks that a call is signed right for `source_id` and within the limits,
+/// and notes that it arrived. `exists` is whether the source is one this
+/// endpoint serves; the answer is the same `401` when it is not, when it has
+/// no webhook and when the signature is wrong.
+async fn authenticate(
+    state: &AppState,
+    client: &ClientIp,
+    source_id: &str,
+    exists: bool,
+    headers: &HeaderMap,
+    body: &[u8],
+) -> Result<Sender, ApiError> {
     let fail = |state: &AppState| -> ApiError {
         // Only failures are counted against the address, so a host that
         // pushes a lot is never slowed by its own successes.
@@ -159,41 +185,58 @@ pub(crate) async fn receive_repository_webhook(
             "That payload is too large for a webhook.",
         ));
     }
-    let Some(sender) = sender_of(&headers) else {
-        return Err(fail(&state));
+    let Some(sender) = sender_of(headers) else {
+        return Err(fail(state));
     };
-    let repository = state.core.repo_source(&source_id).await.ok();
-    let secret = match &repository {
-        Some(_) => state
+    let secret = if exists {
+        state
             .storage
-            .open_repo_webhook_secret(&source_id)
+            .open_repo_webhook_secret(source_id)
             .await
-            .map_err(ApiError::internal)?,
-        None => None,
+            .map_err(ApiError::internal)?
+    } else {
+        None
     };
     // Verify against *something* even when there is no secret to compare, so
     // the time taken does not tell the cases apart.
     let candidate = secret.clone().unwrap_or_else(|| "-".repeat(64));
-    let signed = verified(&sender, &headers, &body, &candidate);
-    let (Some(repository), Some(_), true) = (repository, secret, signed) else {
-        return Err(fail(&state));
-    };
-
+    let signed = verified(&sender, headers, body, &candidate);
+    if !(exists && secret.is_some() && signed) {
+        return Err(fail(state));
+    }
     state
         .guards
         .auth
         .check(&format!("webhook:{source_id}"), Quota::per_minute(CALLS_PER_MINUTE))
         .map_err(|wait| {
             crate::security::too_many_requests(
-                format!("This repository gets webhook calls too fast. Try again in {}.", crate::security::wait_text(wait)),
+                format!("This source gets webhook calls too fast. Try again in {}.", crate::security::wait_text(wait)),
                 wait,
             )
         })?;
-    if let Err(error) = state.storage.touch_repo_webhook(&source_id).await {
+    if let Err(error) = state.storage.touch_repo_webhook(source_id).await {
         tracing::warn!(error = %format!("{error:#}"), "A webhook's last call could not be noted");
     }
-    let answer = |status: StatusCode, queued: bool, note: &str| {
-        (status, Json(json!({"queued": queued, "note": note})))
+    Ok(sender)
+}
+
+fn answer(status: StatusCode, queued: bool, note: &str) -> (StatusCode, Json<Value>) {
+    (status, Json(json!({"queued": queued, "note": note})))
+}
+
+/// Public. The same `401` for an unknown repository, one without a webhook
+/// and a call that is not signed right.
+pub(crate) async fn receive_repository_webhook(
+    State(state): State<AppState>,
+    client: ClientIp,
+    Path(source_id): Path<String>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<(StatusCode, Json<Value>), ApiError> {
+    let repository = state.core.repo_source(&source_id).await.ok();
+    let sender = authenticate(&state, &client, &source_id, repository.is_some(), &headers, &body).await?;
+    let Some(repository) = repository else {
+        return Err(ApiError::unauthorized());
     };
     match wish_of(&sender, &headers, &body, repository.settings.branch.as_deref()) {
         Wish::Pong => Ok(answer(StatusCode::OK, false, "pong")),
@@ -211,6 +254,35 @@ pub(crate) async fn receive_repository_webhook(
     }
 }
 
+/// Public. A tracker's webhook: any change to an issue or a pull request
+/// queues one sync of the connector.
+pub(crate) async fn receive_connector_webhook(
+    State(state): State<AppState>,
+    client: ClientIp,
+    Path(source_id): Path<String>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<(StatusCode, Json<Value>), ApiError> {
+    let connector = state.core.connector_source(&source_id).await.ok();
+    let sender = authenticate(&state, &client, &source_id, connector.is_some(), &headers, &body).await?;
+    let Some(connector) = connector else {
+        return Err(ApiError::unauthorized());
+    };
+    match connector_wish_of(&sender, &headers) {
+        Wish::Pong => Ok(answer(StatusCode::OK, false, "pong")),
+        Wish::Ignore(reason) => Ok(answer(StatusCode::ACCEPTED, false, reason)),
+        Wish::Sync => {
+            tracing::info!(target: "audit", connector = %source_id, "A webhook asked for a connector sync");
+            match state.connector_sync.start(&connector, None).await {
+                Ok(Some(_)) => Ok(answer(StatusCode::ACCEPTED, true, "sync queued")),
+                Ok(None) => Ok(answer(StatusCode::ACCEPTED, false, "already syncing")),
+                // Paused for the tracker's rate limit, or no room: told so.
+                Err(error) => Ok(answer(StatusCode::ACCEPTED, false, &format!("{error:#}"))),
+            }
+        }
+    }
+}
+
 #[derive(serde::Serialize)]
 pub(crate) struct WebhookCreated {
     /// Shown once: the secret the sender signs with.
@@ -218,6 +290,74 @@ pub(crate) struct WebhookCreated {
     /// The path to call, and the full address when the server knows its own.
     path: String,
     url: Option<String>,
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn create_webhook(
+    state: &AppState,
+    subject: &AuthenticatedSubject,
+    source_id: &str,
+    workspace_id: &str,
+    name: &str,
+    what: &str,
+    path: String,
+    action: &str,
+) -> Result<(StatusCode, Json<WebhookCreated>), ApiError> {
+    require_workspace_admin(state, subject, workspace_id).await?;
+    let secret = state
+        .storage
+        .create_repo_webhook(source_id, Some(&subject.user_id))
+        .await
+        .map_err(map_storage_error)?;
+    record_workspace_activity(
+        state,
+        workspace_id,
+        &subject.user_id,
+        action,
+        what,
+        Some(source_id),
+        format!("Set up webhooks for {name}."),
+    )
+    .await;
+    Ok((
+        StatusCode::CREATED,
+        Json(WebhookCreated {
+            url: state.mail.link(&path),
+            path,
+            secret,
+        }),
+    ))
+}
+
+async fn delete_webhook(
+    state: &AppState,
+    subject: &AuthenticatedSubject,
+    source_id: &str,
+    workspace_id: &str,
+    name: &str,
+    what: &str,
+    action: &str,
+) -> Result<StatusCode, ApiError> {
+    require_workspace_admin(state, subject, workspace_id).await?;
+    if !state
+        .storage
+        .clear_repo_webhook(source_id)
+        .await
+        .map_err(map_storage_error)?
+    {
+        return Err(ApiError::not_found("This source has no webhook."));
+    }
+    record_workspace_activity(
+        state,
+        workspace_id,
+        &subject.user_id,
+        action,
+        what,
+        Some(source_id),
+        format!("Removed the webhooks of {name}."),
+    )
+    .await;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// Makes or replaces a repository's webhook secret (workspace administrators).
@@ -231,31 +371,17 @@ pub(crate) async fn create_repository_webhook(
         .repo_source(&source_id)
         .await
         .map_err(map_storage_error)?;
-    require_workspace_admin(&state, &subject, &repository.workspace_id).await?;
-    let secret = state
-        .storage
-        .create_repo_webhook(&source_id, Some(&subject.user_id))
-        .await
-        .map_err(map_storage_error)?;
-    record_workspace_activity(
+    create_webhook(
         &state,
+        &subject,
+        &source_id,
         &repository.workspace_id,
-        &subject.user_id,
-        "repository_webhook_created",
+        &format!("repository {}", repository.name),
         "repository",
-        Some(&source_id),
-        format!("Set up push webhooks for repository {}.", repository.name),
+        format!("/v1/webhooks/repositories/{source_id}"),
+        "repository_webhook_created",
     )
-    .await;
-    let path = format!("/v1/webhooks/repositories/{source_id}");
-    Ok((
-        StatusCode::CREATED,
-        Json(WebhookCreated {
-            url: state.mail.link(&path),
-            path,
-            secret,
-        }),
-    ))
+    .await
 }
 
 pub(crate) async fn delete_repository_webhook(
@@ -268,26 +394,62 @@ pub(crate) async fn delete_repository_webhook(
         .repo_source(&source_id)
         .await
         .map_err(map_storage_error)?;
-    require_workspace_admin(&state, &subject, &repository.workspace_id).await?;
-    if !state
-        .storage
-        .clear_repo_webhook(&source_id)
-        .await
-        .map_err(map_storage_error)?
-    {
-        return Err(ApiError::not_found("This repository has no webhook."));
-    }
-    record_workspace_activity(
+    delete_webhook(
         &state,
+        &subject,
+        &source_id,
         &repository.workspace_id,
-        &subject.user_id,
-        "repository_webhook_removed",
+        &format!("repository {}", repository.name),
         "repository",
-        Some(&source_id),
-        format!("Removed the push webhooks of repository {}.", repository.name),
+        "repository_webhook_removed",
     )
-    .await;
-    Ok(StatusCode::NO_CONTENT)
+    .await
+}
+
+/// Makes or replaces a connector's webhook secret (workspace administrators).
+pub(crate) async fn create_connector_webhook(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(source_id): Path<String>,
+) -> Result<(StatusCode, Json<WebhookCreated>), ApiError> {
+    let connector = state
+        .core
+        .connector_source(&source_id)
+        .await
+        .map_err(map_storage_error)?;
+    create_webhook(
+        &state,
+        &subject,
+        &source_id,
+        &connector.workspace_id,
+        &connector.name,
+        "connector",
+        format!("/v1/webhooks/connectors/{source_id}"),
+        "connector_webhook_created",
+    )
+    .await
+}
+
+pub(crate) async fn delete_connector_webhook(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(source_id): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    let connector = state
+        .core
+        .connector_source(&source_id)
+        .await
+        .map_err(map_storage_error)?;
+    delete_webhook(
+        &state,
+        &subject,
+        &source_id,
+        &connector.workspace_id,
+        &connector.name,
+        "connector",
+        "connector_webhook_removed",
+    )
+    .await
 }
 
 #[cfg(test)]
@@ -353,5 +515,21 @@ mod tests {
         assert_eq!(wish_of(&Sender::GitLab, &tag, main, None), Wish::Ignore("not a push"));
         // A generic sender needs no payload at all.
         assert_eq!(wish_of(&Sender::Generic, &HeaderMap::new(), b"", None), Wish::Sync);
+    }
+
+    #[test]
+    fn a_connector_webhook_syncs_on_item_events_only() {
+        let github = |event: &str| headers(&[("x-github-event", event.to_owned())]);
+        for event in ["issues", "issue_comment", "pull_request", "pull_request_review", "pull_request_review_comment"] {
+            assert_eq!(connector_wish_of(&Sender::GitHub, &github(event)), Wish::Sync, "{event}");
+        }
+        assert_eq!(connector_wish_of(&Sender::GitHub, &github("ping")), Wish::Pong);
+        assert!(matches!(connector_wish_of(&Sender::GitHub, &github("push")), Wish::Ignore(_)));
+        let gitlab = |event: &str| headers(&[("x-gitlab-event", event.to_owned())]);
+        for event in ["Issue Hook", "Note Hook", "Merge Request Hook"] {
+            assert_eq!(connector_wish_of(&Sender::GitLab, &gitlab(event)), Wish::Sync, "{event}");
+        }
+        assert!(matches!(connector_wish_of(&Sender::GitLab, &gitlab("Push Hook")), Wish::Ignore(_)));
+        assert_eq!(connector_wish_of(&Sender::Generic, &HeaderMap::new()), Wish::Sync);
     }
 }

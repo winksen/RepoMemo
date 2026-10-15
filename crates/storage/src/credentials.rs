@@ -168,7 +168,9 @@ impl StorageEngine {
     /// webhooks and returns it. This is the only time it is shown.
     pub async fn create_repo_webhook(&self, source_id: &str, actor_user_id: Option<&str>) -> Result<String> {
         use ring::rand::{SecureRandom, SystemRandom};
-        let exists = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM sources WHERE id = ?1 AND type = 'git_repo'")
+        let exists = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM sources WHERE id = ?1 AND type IN ('git_repo', 'connector')",
+        )
             .bind(source_id)
             .fetch_one(self.reader())
             .await?;

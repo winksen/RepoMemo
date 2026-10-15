@@ -190,6 +190,9 @@
 | GET | `/v1/repositories/{source_id}` | auth | require_workspace_read | — | RepoSource |
 | PUT | `/v1/repositories/{source_id}` | auth | require_workspace_admin | UpdateRepositoryRequest | RepoSource |
 | DELETE | `/v1/repositories/{source_id}` | auth | require_workspace_admin | — | status |
+| POST | `/v1/connectors/{source_id}/webhook` | auth | require_workspace_admin | — | WebhookCreated |
+| DELETE | `/v1/connectors/{source_id}/webhook` | auth | require_workspace_admin | — | status |
+| POST | `/v1/webhooks/connectors/{source_id}` | public | — | raw body, signed | 200 or 202 `{queued, note}`, else 401 |
 | GET | `/v1/workspaces/{workspace_id}/connectors` | auth | require_workspace_read | — | ConnectorsResponse |
 | POST | `/v1/workspaces/{workspace_id}/connectors` | auth | require_workspace_admin | ConnectorLinkRequest (`link`, `provider?`, `name?`, `token?`) | ConnectorSyncResponse (201) |
 | POST | `/v1/workspaces/{workspace_id}/connectors/check` | auth | require_workspace_admin | ConnectorLinkRequest | ConnectorAccessCheck |

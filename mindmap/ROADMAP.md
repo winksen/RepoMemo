@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.30` (2026-10-15), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.31` (2026-10-15), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -365,7 +365,7 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 | **V0.2.28** ✅ | ✨ | Connectors | GitHub pull requests as evidence | F17b | Pull requests with their review discussion, linked to their commits |
 | **V0.2.29** ✅ | ✨ | Connectors | GitLab issues and merge requests | F17c | The same model as GitHub, including self-hosted GitLab |
 | **V0.2.30** ✅ | 🔧 | Artifact page | Links from issues and pull requests to the files, symbols and commits they mention | F17d | A file shows the issues that name it |
-| **V0.2.31** | 🔧 | Connectors | Connector webhooks and remote rate limits | F17e | Updates arrive on webhook; `Retry-After` is honoured; a revoked token pauses the connector and says so |
+| **V0.2.31** ✅ | 🔧 | Connectors | Connector webhooks and remote rate limits | F17e | Updates arrive on webhook; `Retry-After` is honoured; a revoked token pauses the connector and says so |
 
 #### Track F: Search, assistant and review (V0.2.32–V0.2.39)
 
@@ -633,6 +633,15 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 - [x] `GET /v1/artifacts/{id}/mentions` with `require_workspace_read`; web: *Mentioned in* and *Mentions* on file, issue and pull request pages
 - [x] Tests: files by path or unique name, symbols, commits, empty cases, and `a_file_lists_the_issues_that_name_it` (a real repository and a stand-in tracker, both directions, outsiders refused)
 - [ ] Mentions in comments written inside RepoMemo are not read; neither are issue links such as `#12` between items
+
+#### V0.2.31: Connector webhooks and remote rate limits
+
+- [x] **F17e** `Pause` (token refused, rate limited with seconds) carried as the error's context; `get` waits out up to 30 s twice, a longer wait or a refused token ends the sync with a typed pause; metadata `paused {reason, until}`, status `paused`; `ConnectorSource.{has_webhook, webhook_last_received_at, paused_reason, paused_until}`
+- [x] `retry_after_seconds` (`Retry-After`, `X-RateLimit-Reset`, `RateLimit-Reset`), pause capped at 24 h; polling skips paused connectors (a rate-limit pause ends by itself); manual starts refuse while the pause is in the future; a new token clears a pause
+- [x] `webhooks.rs`: one `authenticate` for repositories and connectors; `POST/DELETE /v1/connectors/{id}/webhook`, public `POST /v1/webhooks/connectors/{id}`; `repo_webhooks` serves both (checks `git_repo` or `connector`)
+- [x] Web: *Webhook* dialog and the pause shown on each connector
+- [x] Tests: connector webhook events per sender; `a_tracker_that_asks_to_wait_or_refuses_the_token_pauses_the_connector` (a short limit waited out, a long one paused and refused, a refused token, a new token, webhook calls signed and unsigned, removal)
+- [ ] Webhook deliveries are not listed or redelivered from RepoMemo
 
 ### Decisions to agree before work starts
 

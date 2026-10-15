@@ -6,11 +6,14 @@ import {
   IconPlus as Plus,
   IconRefresh as Refresh,
   IconTrash as Trash,
+  IconWebhook as Webhook,
 } from "@tabler/icons-react";
 import {
   checkSharedConnector,
   connectSharedConnector,
+  createSharedConnectorWebhook,
   deleteSharedConnector,
+  deleteSharedConnectorWebhook,
   listSharedConnectors,
   setSharedConnectorToken,
   syncSharedConnector,
@@ -36,6 +39,7 @@ const STATUS_LABEL: Record<string, string> = {
   syncing: "Syncing",
   ready: "Up to date",
   error: "Sync failed",
+  paused: "Paused",
 };
 
 /** Workspace Settings › Issues: trackers whose issues are kept as evidence.
@@ -61,6 +65,9 @@ export function ConnectorSettings({
   const [removing, setRemoving] = useState<ConnectorSource | null>(null);
   const [replacing, setReplacing] = useState<ConnectorSource | null>(null);
   const [newToken, setNewToken] = useState("");
+  // The webhook dialog; the secret is shown once, when it is made.
+  const [hooking, setHooking] = useState<ConnectorSource | null>(null);
+  const [hookSecret, setHookSecret] = useState<{ secret: string; address: string } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -146,6 +153,34 @@ export function ConnectorSettings({
     }
   }
 
+  async function makeWebhook(connector: ConnectorSource) {
+    setBusy(true);
+    try {
+      const made = await createSharedConnectorWebhook(accessToken, connector.id);
+      setHookSecret({ secret: made.secret, address: made.url ?? `${window.location.origin}${made.path}` });
+      showToast("success", "The webhook secret is shown below. Copy it now: it is not shown again.");
+      await load();
+    } catch (error) {
+      showToast("error", errorMessage(error, "The webhook could not be set up."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removeWebhook(connector: ConnectorSource) {
+    setBusy(true);
+    try {
+      await deleteSharedConnectorWebhook(accessToken, connector.id);
+      setHookSecret(null);
+      showToast("success", "Webhooks were turned off for this connector.");
+      await load();
+    } catch (error) {
+      showToast("error", errorMessage(error, "The webhook could not be removed."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function remove(connector: ConnectorSource) {
     setBusy(true);
     try {
@@ -180,10 +215,15 @@ export function ConnectorSettings({
               {connector.last_report?.more_to_fetch ? " · more to fetch on the next sync" : ""}
             </span>
             {!running && connector.status === "error" && connector.last_error ? <span className="rm-map-muted">{connector.last_error}</span> : null}
+            {!running && connector.status === "paused" ? <span className="rm-map-muted">
+              Paused{connector.paused_until ? ` until ${formatDate(connector.paused_until)}` : " until the token is replaced"}: {connector.paused_reason}
+            </span> : null}
+            {connector.has_webhook ? <span className="rm-map-muted">Webhook on{connector.webhook_last_received_at ? ` · last call ${formatDate(connector.webhook_last_received_at)}` : " · no call yet"}</span> : null}
           </div>
           <div className="rm-health-actions">
             <Button disabled={running} onClick={() => void sync(connector)} type="button" variant="secondary"><Refresh size={15} /> Sync now</Button>
             <Button disabled={running} onClick={() => { setNewToken(""); setReplacing(connector); }} type="button" variant="secondary"><Key size={15} /> Token</Button>
+            <Button disabled={running} onClick={() => { setHookSecret(null); setHooking(connector); }} type="button" variant="secondary"><Webhook size={15} /> Webhook</Button>
             <Button className="rm-button-danger" disabled={running} onClick={() => setRemoving(connector)} type="button" variant="secondary"><Trash size={15} /> Remove</Button>
           </div>
         </li>;
@@ -228,6 +268,32 @@ export function ConnectorSettings({
       <label>New access token
         <Input autoComplete="off" onChange={(event) => setNewToken(event.target.value)} type="password" value={newToken} />
       </label>
+    </Dialog> : null}
+
+    {hooking ? <Dialog
+      description={<>Webhooks make <strong>{hooking.name}</strong> follow the tracker within seconds instead of at the next scheduled check. Add one in the tracker's settings for issue, comment and pull or merge request events, with content type JSON.</>}
+      footer={<DialogCancel label="Close" onClick={() => { setHooking(null); setHookSecret(null); }} />}
+      onClose={() => { setHooking(null); setHookSecret(null); }}
+      open
+      title="Webhook"
+    >
+      {(() => {
+        const live = connectors?.find((connector) => connector.id === hooking.id) ?? hooking;
+        return <div className="rm-repo-form">
+          <span className="rm-map-muted">{live.has_webhook ? `On${live.webhook_last_received_at ? ` · last call ${formatDate(live.webhook_last_received_at)}` : " · no call yet"}.` : "Off: the connector is checked on a schedule."}</span>
+          {hookSecret ? <div className="rm-repo-check">
+            <dl className="rm-repo-facts">
+              <div><dt>Payload URL</dt><dd><code className="rm-repo-path">{hookSecret.address}</code></dd></div>
+              <div><dt>Secret</dt><dd><code className="rm-repo-path">{hookSecret.secret}</code></dd></div>
+            </dl>
+            <span className="rm-map-muted">Shown once: renewing it ends the old one. GitHub signs with it; for GitLab paste it as the secret token.</span>
+          </div> : null}
+          <div className="rm-health-actions">
+            <Button disabled={busy} onClick={() => void makeWebhook(live)} type="button" variant="secondary">{live.has_webhook ? "Make a new secret" : "Set up a webhook"}</Button>
+            {live.has_webhook ? <Button className="rm-button-danger" disabled={busy} onClick={() => void removeWebhook(live)} type="button" variant="secondary">Turn off</Button> : null}
+          </div>
+        </div>;
+      })()}
     </Dialog> : null}
 
     {removing ? <Dialog

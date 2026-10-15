@@ -53,6 +53,28 @@ const MAX_REQUESTS_PER_SYNC: usize = 500;
 const MAX_PULL_COMMITS: usize = 250;
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 
+/// Why a tracker asked a connector to stop. It rides on the error as its
+/// context, so the message a person reads stays the error's own.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Pause {
+    /// The token was refused: syncing resumes when it is replaced.
+    TokenRefused,
+    /// The rate limit is reached: syncing resumes after this many seconds.
+    RateLimited { seconds: u64 },
+}
+
+impl std::fmt::Display for Pause {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("the tracker asked for a pause")
+    }
+}
+
+/// A wait of at most this is made inside the request; a longer one pauses the
+/// connector.
+const MAX_INLINE_WAIT_SECS: u64 = 30;
+/// The longest pause taken from a tracker's answer.
+const MAX_PAUSE_SECS: u64 = 24 * 60 * 60;
+
 /// Where a tracker is: derived from the link a person typed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TrackerTarget {
@@ -93,6 +115,18 @@ struct ConnectorMetadata {
     last_error: Option<String>,
     #[serde(default)]
     last_report: Option<ConnectorSyncReport>,
+    /// Set while the connector has stopped by itself.
+    #[serde(default)]
+    paused: Option<PausedInfo>,
+}
+
+/// A connector the tracker asked to stop (see [`Pause`]).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct PausedInfo {
+    reason: String,
+    /// When syncing may resume by itself; none for a refused token.
+    #[serde(default)]
+    until: Option<String>,
 }
 
 impl ConnectorMetadata {
@@ -252,6 +286,24 @@ impl GitHub {
     /// A next page on another host is never followed, so the token cannot be
     /// sent there.
     async fn get(&self, url: &str) -> Result<(Value, Option<String>)> {
+        let mut attempt = 0;
+        loop {
+            match self.get_once(url).await {
+                Err(error) => match error.downcast_ref::<Pause>() {
+                    // A short wait is honoured here; a long one pauses the
+                    // connector for its caller.
+                    Some(Pause::RateLimited { seconds }) if *seconds <= MAX_INLINE_WAIT_SECS && attempt < 2 => {
+                        attempt += 1;
+                        tokio::time::sleep(Duration::from_secs((*seconds).max(1))).await;
+                    }
+                    _ => return Err(error),
+                },
+                found => return found,
+            }
+        }
+    }
+
+    async fn get_once(&self, url: &str) -> Result<(Value, Option<String>)> {
         if !url.starts_with(&self.api_base) {
             repomemo_domain::bail_invalid!("The tracker pointed to an address outside its own API.");
         }
@@ -278,8 +330,10 @@ impl GitHub {
         let remaining = response
             .headers()
             .get("x-ratelimit-remaining")
+            .or_else(|| response.headers().get("ratelimit-remaining"))
             .and_then(|value| value.to_str().ok())
             .map(str::to_owned);
+        let retry_after = retry_after_seconds(response.headers());
         let next = response
             .headers()
             .get("link")
@@ -287,14 +341,18 @@ impl GitHub {
             .and_then(next_link);
         if !status.is_success() {
             if status.as_u16() == 401 {
-                repomemo_domain::bail_invalid!(
+                return Err(repomemo_domain::invalid!(
                     "The tracker refused the token. Check that it is valid, not expired, and can read issues."
-                );
+                )
+                .context(Pause::TokenRefused));
             }
             if status.as_u16() == 429 || (status.as_u16() == 403 && remaining.as_deref() == Some("0")) {
-                repomemo_domain::bail_invalid!(
-                    "The tracker's rate limit is reached. The sync resumes at the next try."
-                );
+                let seconds = retry_after.unwrap_or(60).clamp(1, MAX_PAUSE_SECS);
+                return Err(repomemo_domain::invalid!(
+                    "The tracker's rate limit is reached. Syncing resumes in {}.",
+                    if seconds >= 120 { format!("{} minutes", seconds.div_ceil(60)) } else { format!("{seconds} seconds") }
+                )
+                .context(Pause::RateLimited { seconds }));
             }
             if status.as_u16() == 403 {
                 repomemo_domain::bail_invalid!("The tracker refused the request: the token cannot read this repository's issues.");
@@ -313,6 +371,28 @@ impl GitHub {
         let value = serde_json::from_slice::<Value>(&bytes).context("the tracker's answer is not JSON")?;
         Ok((value, next))
     }
+}
+
+/// How long a tracker asks to wait: `Retry-After` in seconds, or the time its
+/// limit resets (`X-RateLimit-Reset` for GitHub, `RateLimit-Reset` for GitLab,
+/// both in epoch seconds).
+fn retry_after_seconds(headers: &reqwest::header::HeaderMap) -> Option<u64> {
+    let number = |name: &str| {
+        headers
+            .get(name)
+            .and_then(|value| value.to_str().ok())
+            .and_then(|value| value.trim().parse::<u64>().ok())
+    };
+    if let Some(seconds) = number("retry-after") {
+        return Some(seconds);
+    }
+    let reset = number("x-ratelimit-reset").or_else(|| number("ratelimit-reset"))?;
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_secs())
+        .unwrap_or(0);
+    // A reset that is already behind us still asks for a moment.
+    Some(reset.saturating_sub(now).max(1))
 }
 
 /// The `rel="next"` address of a `Link` header.
@@ -688,6 +768,7 @@ impl RepoMemoCore {
             .await?
             .filter(|job| job.status == "running");
         let has_credential = self.storage.repo_credential_info(&source.id).await?.is_some();
+        let webhook = self.storage.repo_webhook_info(&source.id).await.ok().flatten();
         Ok(ConnectorSource {
             id: source.id,
             workspace_id: source.workspace_id,
@@ -702,6 +783,10 @@ impl RepoMemoCore {
             closed_items,
             has_credential,
             active_job,
+            has_webhook: webhook.is_some(),
+            webhook_last_received_at: webhook.and_then(|webhook| webhook.last_received_at),
+            paused_reason: metadata.paused.as_ref().map(|paused| paused.reason.clone()),
+            paused_until: metadata.paused.as_ref().and_then(|paused| paused.until.clone()),
             created_at: source.created_at,
         })
     }
@@ -722,6 +807,15 @@ impl RepoMemoCore {
         self.storage
             .set_repo_credential(source_id, "token", None, token, actor_user_id)
             .await?;
+        // A connector that was waiting for a token is ready to try again.
+        let mut metadata = ConnectorMetadata::of(&source);
+        if metadata.paused.take().is_some() || source.status == "error" {
+            metadata.last_error = None;
+            let status = if metadata.last_synced_at.is_some() { "ready" } else { "pending" };
+            self.storage
+                .update_source(source_id, &source.name, status, &metadata.to_value(), false)
+                .await?;
+        }
         Ok(())
     }
 
@@ -752,13 +846,33 @@ impl RepoMemoCore {
                 Ok(report)
             }
             Err(error) => {
-                let message = format!("{error:#}");
+                let message = repomemo_domain::classify(&error)
+                    .map(|(_, message)| message.to_owned())
+                    .unwrap_or_else(|| format!("{error:#}"));
+                let pause = error.downcast_ref::<Pause>().copied();
                 if let Ok(source) = self.storage.get_source(source_id).await {
                     let mut metadata = ConnectorMetadata::of(&source);
                     metadata.last_error = Some(message.clone());
+                    // A tracker that asked for a pause is not a failure to
+                    // look at: the connector waits, and says why.
+                    let status = match pause {
+                        Some(pause) => {
+                            metadata.paused = Some(PausedInfo {
+                                reason: message.clone(),
+                                until: match pause {
+                                    Pause::RateLimited { seconds } => Some(
+                                        (chrono::Utc::now() + chrono::Duration::seconds(seconds as i64)).to_rfc3339(),
+                                    ),
+                                    Pause::TokenRefused => None,
+                                },
+                            });
+                            "paused"
+                        }
+                        None => "error",
+                    };
                     let _ = self
                         .storage
-                        .update_source(source_id, &source.name, "error", &metadata.to_value(), false)
+                        .update_source(source_id, &source.name, status, &metadata.to_value(), false)
                         .await;
                 }
                 let _ = self
@@ -947,6 +1061,7 @@ impl RepoMemoCore {
 
         metadata.last_report = Some(report.clone());
         metadata.last_error = None;
+        metadata.paused = None;
         metadata.last_synced_at = Some(chrono::Utc::now().to_rfc3339());
         self.storage
             .update_source(source_id, &source.name, "ready", &metadata.to_value(), true)
