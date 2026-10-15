@@ -16,7 +16,7 @@ const CODE_MAX_NESTING: usize = 3;
 /// Version of the chunking and symbol logic. Bump it whenever a change would
 /// produce different chunks, so stored indexes are refreshed in the background.
 /// Chunks whose text is unchanged keep their identity when re-indexed.
-pub const INDEXER_VERSION: i64 = 2;
+pub const INDEXER_VERSION: i64 = 3;
 
 #[derive(Debug, Clone)]
 pub struct IndexArtifactOutput {
@@ -157,6 +157,8 @@ fn tree_sitter_language(summary: &ArtifactSummary) -> Option<Language> {
         Some("TypeScript") | Some("JavaScript") => tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into(),
         Some("Python") => tree_sitter_python::LANGUAGE.into(),
         Some("Rust") => tree_sitter_rust::LANGUAGE.into(),
+        Some("Go") => tree_sitter_go::LANGUAGE.into(),
+        Some("Java") => tree_sitter_java::LANGUAGE.into(),
         _ => return None,
     })
 }
@@ -220,6 +222,18 @@ fn symbol_descriptor<'a>(node: Node<'a>, language: Option<&str>) -> Option<(Symb
         (Some("Rust"), "enum_item") => SymbolKind::Enum,
         (Some("Rust"), "struct_item") => SymbolKind::Class,
         (Some("Rust"), "trait_item") => SymbolKind::Interface,
+        (Some("Go"), "function_declaration") => SymbolKind::Function,
+        (Some("Go"), "method_declaration") => SymbolKind::Method,
+        // Only structs and interfaces are types worth finding; `type ID int` is not.
+        (Some("Go"), "type_spec") => match node.child_by_field_name("type").map(|node| node.kind()) {
+            Some("struct_type") => SymbolKind::Class,
+            Some("interface_type") => SymbolKind::Interface,
+            _ => return None,
+        },
+        (Some("Java"), "class_declaration" | "record_declaration") => SymbolKind::Class,
+        (Some("Java"), "interface_declaration" | "annotation_type_declaration") => SymbolKind::Interface,
+        (Some("Java"), "enum_declaration") => SymbolKind::Enum,
+        (Some("Java"), "method_declaration" | "constructor_declaration") => SymbolKind::Method,
         _ => return None,
     };
     Some((kind, name))
@@ -408,6 +422,19 @@ fn declaration_target(node: Node<'_>) -> Node<'_> {
     match node.kind() {
         "export_statement" => node.child_by_field_name("declaration").unwrap_or(node),
         "decorated_definition" => node.child_by_field_name("definition").unwrap_or(node),
+        // Go: `type Store struct {…}` is a declaration holding one `type_spec`.
+        "type_declaration" => {
+            let mut cursor = node.walk();
+            let specs = node
+                .named_children(&mut cursor)
+                .filter(|child| child.kind() == "type_spec")
+                .collect::<Vec<_>>();
+            if specs.len() == 1 {
+                specs[0]
+            } else {
+                node
+            }
+        }
         _ => node,
     }
 }
@@ -427,6 +454,17 @@ fn unit_label(node: Node<'_>, text: &str) -> Option<String> {
                 None => format!("impl {type_name}"),
             })
         }
+        // Go methods are named after their receiver: `Store.Get`.
+        "method_declaration" => {
+            let name = read(node.child_by_field_name("name")?)?;
+            let receiver = node
+                .child_by_field_name("receiver")
+                .and_then(|receiver| receiver_type_name(receiver, text));
+            Some(match receiver {
+                Some(receiver) => format!("{receiver}.{name}"),
+                None => name,
+            })
+        }
         "lexical_declaration" | "variable_declaration" => {
             let mut cursor = node.walk();
             let declarator = node
@@ -438,6 +476,22 @@ fn unit_label(node: Node<'_>, text: &str) -> Option<String> {
         }
         _ => read(node.child_by_field_name("name")?),
     }
+}
+
+/// The type a Go method belongs to: `(s *Store)` gives `Store`.
+fn receiver_type_name(receiver: Node<'_>, text: &str) -> Option<String> {
+    let mut cursor = receiver.walk();
+    let parameter = receiver
+        .named_children(&mut cursor)
+        .find(|child| child.kind() == "parameter_declaration")?;
+    let written = parameter.child_by_field_name("type")?.utf8_text(text.as_bytes()).ok()?;
+    let name = written
+        .trim_start_matches('*')
+        .split('[')
+        .next()
+        .unwrap_or_default()
+        .trim();
+    (!name.is_empty()).then(|| name.to_owned())
 }
 
 /// Makes the units cover every row exactly once: blank lines and gaps join the
@@ -687,9 +741,9 @@ mod tests {
 
     #[test]
     fn unsupported_languages_use_line_windows() {
-        let summary = artifact_summary(ArtifactType::CodeFile, Some("Go"));
+        let summary = artifact_summary(ArtifactType::CodeFile, Some("Ruby"));
         let text = (1..=205)
-            .map(|index| format!("func line{index}() {{}}"))
+            .map(|index| format!("def line{index}; end"))
             .collect::<Vec<_>>()
             .join("\n");
 
@@ -846,6 +900,100 @@ mod tests {
         assert!(has_symbol(&output, "Index", SymbolKind::Class, 2));
         assert!(has_symbol(&output, "search", SymbolKind::Method, 3));
         assert!(has_symbol(&output, "build", SymbolKind::Function, 4));
+    }
+
+    #[test]
+    fn go_symbols_include_structs_interfaces_functions_and_methods() {
+        let summary = artifact_summary(ArtifactType::CodeFile, Some("Go"));
+        let text = "package store\n\ntype Store struct{}\n\ntype Reader interface {\n\tRead() string\n}\n\ntype ID int\n\nfunc New() *Store { return &Store{} }\n\nfunc (s *Store) Get(key string) string { return key }\n";
+        let output = index_artifact(&summary, text.as_bytes()).unwrap();
+
+        assert!(has_symbol(&output, "Store", SymbolKind::Class, 3));
+        assert!(has_symbol(&output, "Reader", SymbolKind::Interface, 5));
+        assert!(has_symbol(&output, "New", SymbolKind::Function, 11));
+        assert!(has_symbol(&output, "Get", SymbolKind::Method, 13));
+        assert!(output.symbols.iter().all(|symbol| symbol.name != "ID"));
+    }
+
+    #[test]
+    fn go_declarations_are_packed_and_methods_named_after_their_type() {
+        let summary = artifact_summary(ArtifactType::CodeFile, Some("Go"));
+        let text = "package store\n\n// Store keeps values.\ntype Store struct{}\n\n// Get reads one.\nfunc (s *Store) Get(key string) string {\n\treturn key\n}\n\nfunc New() *Store {\n\treturn &Store{}\n}\n";
+
+        let output = index_artifact(&summary, text.as_bytes()).unwrap();
+
+        assert_eq!(output.chunks.len(), 1);
+        assert_eq!(output.chunks[0].heading_path.as_deref(), Some("Store, Store.Get, New"));
+        assert_covers_all_lines(&output.chunks, text);
+    }
+
+    #[test]
+    fn go_files_split_between_functions_not_inside_them() {
+        let summary = artifact_summary(ArtifactType::CodeFile, Some("Go"));
+        let padding = "\tvalue := \"....................................\"\n".repeat(20);
+        let functions = (1..=10)
+            .map(|index| format!("func step{index}() int {{\n{padding}\treturn {index}\n}}\n"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let text = format!("package steps\n\n{functions}");
+
+        let output = index_artifact(&summary, text.as_bytes()).unwrap();
+
+        assert!(output.chunks.len() > 3);
+        for chunk in &output.chunks {
+            let opens = chunk.text.matches("func step").count();
+            let closes = chunk.text.matches("\n}").count();
+            assert!(closes >= opens, "chunk cut a function: {}", chunk.text);
+        }
+        assert!(output
+            .chunks
+            .iter()
+            .any(|chunk| chunk.heading_path.as_deref().is_some_and(|path| path.contains("step1"))));
+        assert_covers_all_lines(&output.chunks, &text);
+    }
+
+    #[test]
+    fn java_symbols_include_classes_interfaces_enums_records_and_methods() {
+        let summary = artifact_summary(ArtifactType::CodeFile, Some("Java"));
+        let text = "package app;\n\npublic interface Reader { String read(); }\n\nenum State { READY }\n\nrecord Point(int x, int y) {}\n\npublic class Store implements Reader {\n    public Store() {}\n    public String read() { return \"ok\"; }\n}\n";
+        let output = index_artifact(&summary, text.as_bytes()).unwrap();
+
+        assert!(has_symbol(&output, "Reader", SymbolKind::Interface, 3));
+        assert!(has_symbol(&output, "State", SymbolKind::Enum, 5));
+        assert!(has_symbol(&output, "Point", SymbolKind::Class, 7));
+        assert!(has_symbol(&output, "Store", SymbolKind::Class, 9));
+        assert!(has_symbol(&output, "Store", SymbolKind::Method, 10));
+        assert!(has_symbol(&output, "read", SymbolKind::Method, 11));
+    }
+
+    #[test]
+    fn large_java_classes_are_split_by_method_with_the_class_in_the_heading() {
+        let summary = artifact_summary(ArtifactType::CodeFile, Some("Java"));
+        let padding = "        String padding = \"........................................\";\n".repeat(8);
+        let methods = (1..=12)
+            .map(|index| {
+                format!(
+                    "    /** Method {index}. */\n    public int method{index}() {{\n{padding}        return {index};\n    }}\n"
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        let text = format!("package app;\n\npublic class Store {{\n{methods}}}\n");
+
+        let output = index_artifact(&summary, text.as_bytes()).unwrap();
+
+        assert!(output.chunks.len() > 3);
+        assert!(output
+            .chunks
+            .iter()
+            .skip(1)
+            .all(|chunk| chunk.heading_path.as_deref().unwrap().starts_with("Store")));
+        for chunk in &output.chunks {
+            let opens = chunk.text.matches("public int method").count();
+            let closes = chunk.text.matches("\n    }").count();
+            assert!(closes >= opens, "chunk cut a method: {}", chunk.text);
+        }
+        assert_covers_all_lines(&output.chunks, &text);
     }
 
     #[test]

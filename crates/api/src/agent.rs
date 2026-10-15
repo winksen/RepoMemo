@@ -427,7 +427,7 @@ impl RepoMemoCore {
         let found = self.search_symbols(workspace_id.to_owned(), name.to_owned()).await?;
         if found.is_empty() {
             return Ok(reply(format!(
-                "No indexed code defines a symbol named like “{name}”. Only TypeScript, JavaScript, Python and Rust files are read for symbols, and files still being indexed are not searchable yet."
+                "No indexed code defines a symbol named like “{name}”. Only TypeScript, JavaScript, Python, Rust, Go and Java files are read for symbols, and files still being indexed are not searchable yet."
             )));
         }
         let mut lines = vec![format!(

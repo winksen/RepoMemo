@@ -3619,7 +3619,7 @@ checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
 name = "repomemo-ai"
-version = "0.2.34"
+version = "0.2.35"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -3633,7 +3633,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-api"
-version = "0.2.34"
+version = "0.2.35"
 dependencies = [
  "anyhow",
  "chrono",
@@ -3653,7 +3653,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-console"
-version = "0.2.34"
+version = "0.2.35"
 dependencies = [
  "nu-ansi-term",
  "repomemo-domain",
@@ -3667,7 +3667,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-desktop"
-version = "0.2.34"
+version = "0.2.35"
 dependencies = [
  "repomemo-api",
  "repomemo-domain",
@@ -3680,7 +3680,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-domain"
-version = "0.2.34"
+version = "0.2.35"
 dependencies = [
  "anyhow",
  "serde",
@@ -3689,7 +3689,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-git"
-version = "0.2.34"
+version = "0.2.35"
 dependencies = [
  "anyhow",
  "repomemo-domain",
@@ -3698,7 +3698,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-indexer"
-version = "0.2.34"
+version = "0.2.35"
 dependencies = [
  "anyhow",
  "hex",
@@ -3707,6 +3707,8 @@ dependencies = [
  "serde_json",
  "sha2",
  "tree-sitter",
+ "tree-sitter-go",
+ "tree-sitter-java",
  "tree-sitter-python",
  "tree-sitter-rust",
  "tree-sitter-typescript",
@@ -3714,7 +3716,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-ingestion"
-version = "0.2.34"
+version = "0.2.35"
 dependencies = [
  "anyhow",
  "calamine",
@@ -3728,7 +3730,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-mail"
-version = "0.2.34"
+version = "0.2.35"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -3744,7 +3746,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-retrieval"
-version = "0.2.34"
+version = "0.2.35"
 dependencies = [
  "anyhow",
  "repomemo-domain",
@@ -3753,7 +3755,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-server"
-version = "0.2.34"
+version = "0.2.35"
 dependencies = [
  "anyhow",
  "argon2",
@@ -3783,7 +3785,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-storage"
-version = "0.2.34"
+version = "0.2.35"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -5585,6 +5587,26 @@ dependencies = [
  "regex-syntax",
  "serde_json",
  "streaming-iterator",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "tree-sitter-go"
+version = "0.23.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b13d476345220dbe600147dd444165c5791bf85ef53e28acbedd46112ee18431"
+dependencies = [
+ "cc",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "tree-sitter-java"
+version = "0.23.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0aa6cbcdc8c679b214e616fd3300da67da0e492e066df01bcf5a5921a71e90d6"
+dependencies = [
+ "cc",
  "tree-sitter-language",
 ]
 

@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.35 (2026-10-15)
+
+Go and Java are read like Rust and Python.
+
+### Added
+- **Go and Java files are split along their declarations.** A function, a method, a struct, an interface, a class or a record is not cut in half: small neighbours are grouped, a large class is split by method, and each passage records its scope in its heading (`Store.Get` for a Go method, `Store > lookupEntry` for a Java class). Comments stay attached to the declaration below them.
+- **Their symbols are searchable.** Go functions, methods (named after their receiver type), structs and interfaces; Java classes, records, interfaces, annotation types, enums, methods and constructors. They appear in *Code symbols* in Retrieval, on the file's page and in the assistant's *Find a symbol*.
+- **`.go` and `.java` files can be uploaded** (the file picker and folder uploads accept them) and are indexed as Go and Java. Repositories already read them as such.
+
+### Changed
+- The indexer version is 3, so every file already indexed is indexed once more in the background after the upgrade. Passages whose text is unchanged keep their identity, their embeddings and the links that point at them.
+
+### Upgrading
+- Nothing to do. Go and Java files already in a workspace through a repository are re-indexed in the background and gain their symbols.
+
 ## V0.2.34 (2026-10-15)
 
 A keyboard command palette.

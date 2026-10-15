@@ -188,6 +188,77 @@ async fn memory_cards_say_when_their_evidence_changed_and_citations_can_be_edite
 }
 
 #[tokio::test]
+async fn go_and_java_files_have_searchable_symbols_and_declaration_chunks() {
+    let data_dir = temp_data_dir("go-java-symbols");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let (_, _) = register_account(&app, "gojava-admin@example.com").await;
+    let (owner, _) = register_account(&app, "gojava-owner@example.com").await;
+    let workspace_id = create_workspace(&app, &owner).await;
+    for (name, mime, body) in [
+        (
+            "store.go",
+            "text/x-go",
+            "package store\n\n// Store keeps values.\ntype Store struct{}\n\nfunc (s *Store) FetchValue(key string) string {\n\treturn key\n}\n",
+        ),
+        (
+            "Registry.java",
+            "text/x-java-source",
+            "package app;\n\npublic class Registry {\n    public String lookupEntry(String key) {\n        return key;\n    }\n}\n",
+        ),
+    ] {
+        let upload = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/v1/workspaces/{workspace_id}/artifacts/upload"))
+                    .header("authorization", &owner)
+                    .header("content-type", mime)
+                    .header("x-repomemo-filename", name)
+                    .body(Body::from(body))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(upload.status(), 201, "{name}");
+    }
+    wait_for_indexed_artifacts(&app, &owner, &workspace_id, 2).await;
+    for (query, symbol, path) in [
+        ("FetchVal", "FetchValue", "store.go"),
+        ("lookupEn", "lookupEntry", "Registry.java"),
+    ] {
+        let found = response_json(
+            app.clone()
+                .oneshot(auth_request(
+                    "GET",
+                    &format!("/v1/workspaces/{workspace_id}/symbols?q={query}"),
+                    &owner,
+                ))
+                .await
+                .unwrap(),
+        )
+        .await;
+        assert_eq!(found[0]["symbol"]["name"], symbol, "{found}");
+        assert_eq!(found[0]["symbol"]["kind"], "method", "{found}");
+        assert_eq!(found[0]["path"], path);
+    }
+    // The type is a symbol of its own, named by the declaration's chunk.
+    let types = response_json(
+        app.clone()
+            .oneshot(auth_request(
+                "GET",
+                &format!("/v1/workspaces/{workspace_id}/symbols?q=Registry"),
+                &owner,
+            ))
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(types[0]["symbol"]["kind"], "class");
+    let _ = std::fs::remove_dir_all(data_dir);
+}
+
+#[tokio::test]
 async fn code_symbols_are_searchable_over_the_api() {
     let data_dir = temp_data_dir("symbols");
     let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();

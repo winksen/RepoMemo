@@ -236,9 +236,15 @@ mod tests {
         assert_eq!(rust.artifact_type, ArtifactType::CodeFile);
         assert!(!rust.needs_text_check);
 
+        // Go and Java are read for symbols, like Rust, so they need no text check.
         let go = classify_repo_file("cmd/server/main.go", 100, &rules).unwrap();
         assert_eq!(go.language.as_deref(), Some("Go"));
-        assert!(go.needs_text_check);
+        assert_eq!(go.artifact_type, ArtifactType::CodeFile);
+        assert!(!go.needs_text_check);
+
+        let ruby = classify_repo_file("lib/app.rb", 100, &rules).unwrap();
+        assert_eq!(ruby.language.as_deref(), Some("Ruby"));
+        assert!(ruby.needs_text_check);
 
         assert!(classify_repo_file("package-lock.json", 100, &rules).is_err());
         assert!(classify_repo_file("assets/logo.png", 100, &rules).is_err());

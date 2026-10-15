@@ -45,7 +45,7 @@ export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 export const UPLOAD_CONCURRENCY = 3;
 
 /** File types the shared upload accepts, besides business documents. */
-export const UPLOAD_EXTENSIONS = ["md", "mdx", "txt", "rs", "ts", "tsx", "js", "jsx", "py", "json", "toml", "yaml", "yml", "sql", "html", "css", "sh", "ps1", "png", "jpg", "jpeg", "gif", "webp", "svg", "bmp"];
+export const UPLOAD_EXTENSIONS = ["md", "mdx", "txt", "rs", "ts", "tsx", "js", "jsx", "py", "go", "java", "json", "toml", "yaml", "yml", "sql", "html", "css", "sh", "ps1", "png", "jpg", "jpeg", "gif", "webp", "svg", "bmp"];
 
 /** Folders skipped when a whole folder is uploaded, as in desktop folder import. */
 export const SKIPPED_UPLOAD_FOLDERS = new Set([".git", "node_modules", "target", "dist", "build", ".next", ".vite"]);

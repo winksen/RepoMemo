@@ -215,6 +215,8 @@ export const ACCEPTED_TEXT_EXTENSIONS = [
   "js",
   "jsx",
   "py",
+  "go",
+  "java",
   "json",
   "toml",
   "yaml",

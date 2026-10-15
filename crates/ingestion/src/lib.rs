@@ -21,9 +21,9 @@ const DEFAULT_MAX_FILE_BYTES: u64 = 5 * 1024 * 1024;
 const BINARY_SAMPLE_BYTES: usize = 8192;
 
 const ACCEPTED_EXTENSIONS: &[&str] = &[
-    "md", "mdx", "txt", "rs", "ts", "tsx", "js", "jsx", "py", "json", "toml", "yaml", "yml", "sql", "html", "css",
-    "sh", "ps1", "doc", "docx", "xlsx", "xlsm", "xls", "pptx", "ppt", "pdf", "one", "eml", "msg", "png", "jpg", "jpeg",
-    "gif", "webp", "svg", "bmp",
+    "md", "mdx", "txt", "rs", "ts", "tsx", "js", "jsx", "py", "go", "java", "json", "toml", "yaml", "yml", "sql",
+    "html", "css", "sh", "ps1", "doc", "docx", "xlsx", "xlsm", "xls", "pptx", "ppt", "pdf", "one", "eml", "msg", "png",
+    "jpg", "jpeg", "gif", "webp", "svg", "bmp",
 ];
 
 const IMAGE_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp"];
@@ -140,6 +140,8 @@ pub fn detect_language(path: &Path) -> Option<String> {
         "ts" | "tsx" => "TypeScript",
         "js" | "jsx" => "JavaScript",
         "py" => "Python",
+        "go" => "Go",
+        "java" => "Java",
         "json" => "JSON",
         "toml" => "TOML",
         "yaml" | "yml" => "YAML",
