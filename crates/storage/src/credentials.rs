@@ -93,8 +93,10 @@ impl StorageEngine {
                 repomemo_domain::bail_invalid!("That account name is not valid.");
             }
         }
-        let is_repository = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM sources WHERE id = ?1 AND type = 'git_repo'")
-            .bind(source_id)
+        let is_repository = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM sources WHERE id = ?1 AND type IN ('git_repo', 'connector')",
+        )
+        .bind(source_id)
             .fetch_one(self.reader())
             .await?;
         if is_repository == 0 {

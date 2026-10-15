@@ -587,6 +587,54 @@ export interface RepoAccessCheck {
 }
 
 /**
+ * A tracker connected to a workspace: its issues (and later pull requests)
+ * are kept as evidence (roadmap F17).
+ */
+export interface ConnectorSource {
+  id: string;
+  workspace_id: string;
+  name: string;
+  /** `github`. */
+  provider: string;
+  /** What it reads, such as `https://github.com/acme/app`. */
+  location: string;
+  /** `pending`, `syncing`, `ready` or `error`. */
+  status: string;
+  last_synced_at: string | null;
+  last_error: string | null;
+  last_report: ConnectorSyncReport | null;
+  /** Items kept, by the state the tracker reports. */
+  open_items: number;
+  closed_items: number;
+  /** A token is stored (never shown). */
+  has_credential: boolean;
+  active_job: IndexingJobStatus | null;
+  created_at: string;
+}
+
+/** What one connector sync did. */
+export interface ConnectorSyncReport {
+  items_seen: number;
+  added: number;
+  updated: number;
+  unchanged: number;
+  indexed: number;
+  index_failed: number;
+  /** The sync stopped at its page limit; the next one carries on. */
+  more_to_fetch: boolean;
+}
+
+/** What the tracker answered for a link, before it is connected. */
+export interface ConnectorAccessCheck {
+  provider: string;
+  name: string;
+  location: string;
+  open_issues: number;
+  private: boolean;
+  already_connected: boolean;
+}
+
+/**
  * A repository file's text as it was at a commit, for a citation that names
  * one. It is not the file's current content.
  */

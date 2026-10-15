@@ -11,6 +11,7 @@ mod avatars;
 mod backup;
 mod collaboration;
 mod config;
+mod connectors;
 mod conversion;
 mod derived;
 mod embedding;
@@ -110,6 +111,7 @@ use crate::conversion::{Converter, RenderState};
 use crate::embedding::EmbeddingQueue;
 use crate::events::{BusActivityObserver, BusJobObserver, WorkspaceEventBus};
 use crate::indexing::IndexQueue;
+use crate::connectors::ConnectorRunner;
 use crate::repositories::RepoSyncRunner;
 use crate::security::{consume_heavy_quota, too_many_requests, wait_text, ClientIp, Guards};
 use crate::system::{InstanceInfo, MaintenanceStatus, SettingsCell, Telemetry};
@@ -143,6 +145,7 @@ struct AppState {
     embedding_queue: EmbeddingQueue,
     converter: Converter,
     repo_sync: RepoSyncRunner,
+    connector_sync: ConnectorRunner,
     /// Outgoing mail: the outbox and its sender.
     mail: mail::MailService,
     runtime: Arc<SettingsCell>,
@@ -326,6 +329,9 @@ async fn build_state(
     repo_sync.resume_all().await;
     let polling = runtime.clone();
     let polling_task = repo_sync.start_polling(move || polling.current().repo_poll_interval);
+    let connector_sync = ConnectorRunner::new(core.clone(), embedding_queue.clone(), runtime.clone());
+    let connector_polling = runtime.clone();
+    let connector_task = connector_sync.start_polling(move || connector_polling.current().repo_poll_interval);
 
     let converter = match config.soffice.clone() {
         Some(path) => Converter::with_options(&data_dir, Some(path), config.soffice_wrapper.clone()),
@@ -385,6 +391,7 @@ async fn build_state(
         embedding_queue,
         converter,
         repo_sync,
+        connector_sync,
         mail,
         runtime,
         guards: Arc::new(Guards::default()),
@@ -398,7 +405,7 @@ async fn build_state(
         closing: Arc::new(std::sync::atomic::AtomicBool::new(false)),
     };
     let maintenance_task = maintenance::start(state.clone());
-    Ok((state, vec![polling_task, maintenance_task, mail_task]))
+    Ok((state, vec![polling_task, connector_task, maintenance_task, mail_task]))
 }
 
 /// Cross-origin rules for the whole application, platform routes included.
@@ -696,6 +703,20 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
                 .put(repositories::update_repository)
                 .delete(repositories::delete_repository),
         )
+        .route(
+            "/v1/workspaces/{workspace_id}/connectors",
+            get(connectors::list_connectors).post(connectors::connect_connector),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/connectors/check",
+            post(connectors::check_connector),
+        )
+        .route(
+            "/v1/connectors/{source_id}",
+            get(connectors::get_connector).delete(connectors::delete_connector),
+        )
+        .route("/v1/connectors/{source_id}/sync", post(connectors::sync_connector))
+        .route("/v1/connectors/{source_id}/token", put(connectors::set_connector_token))
         .route("/v1/repositories/{source_id}/sync", post(repositories::sync_repository))
         .route(
             "/v1/repositories/{source_id}/token",

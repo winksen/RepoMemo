@@ -26,6 +26,8 @@ import type {
   HealthActionResult,
   WorkspaceHealth,
   ArtifactDetail,
+  ConnectorAccessCheck,
+  ConnectorSource,
   RepoFileAtCommit,
   ArtifactComment,
   ArtifactLifecycle,
@@ -1083,6 +1085,30 @@ export function deleteSharedMemoryCard(accessToken: string, cardId: string): Pro
 
 export function exportSharedMemoryCard(accessToken: string, cardId: string): Promise<string> {
   return requestText(`/v1/memory-cards/${cardId}/export`, accessToken);
+}
+
+export function listSharedConnectors(accessToken: string, workspaceId: string): Promise<{ connectors: ConnectorSource[] }> {
+  return request(`/v1/workspaces/${workspaceId}/connectors`, {}, accessToken);
+}
+
+export function checkSharedConnector(accessToken: string, workspaceId: string, input: { link: string; token?: string }): Promise<ConnectorAccessCheck> {
+  return request<ConnectorAccessCheck>(`/v1/workspaces/${workspaceId}/connectors/check`, { method: "POST", body: JSON.stringify(input) }, accessToken);
+}
+
+export function connectSharedConnector(accessToken: string, workspaceId: string, input: { link: string; name?: string; token?: string }): Promise<{ connector: ConnectorSource; job: IndexingJobStatus | null }> {
+  return request(`/v1/workspaces/${workspaceId}/connectors`, { method: "POST", body: JSON.stringify(input) }, accessToken);
+}
+
+export function syncSharedConnector(accessToken: string, connectorId: string): Promise<{ connector: ConnectorSource; job: IndexingJobStatus | null }> {
+  return request(`/v1/connectors/${connectorId}/sync`, { method: "POST", body: JSON.stringify({}) }, accessToken);
+}
+
+export function setSharedConnectorToken(accessToken: string, connectorId: string, token: string): Promise<ConnectorSource> {
+  return request<ConnectorSource>(`/v1/connectors/${connectorId}/token`, { method: "PUT", body: JSON.stringify({ token }) }, accessToken);
+}
+
+export function deleteSharedConnector(accessToken: string, connectorId: string): Promise<void> {
+  return request<void>(`/v1/connectors/${connectorId}`, { method: "DELETE" }, accessToken);
 }
 
 export function listSharedRepositories(accessToken: string, workspaceId: string): Promise<RepositoryList> {

@@ -666,6 +666,58 @@ pub struct RepoAccessCheck {
     pub already_connected: bool,
 }
 
+/// The job kind of a connector's sync.
+pub const CONNECTOR_SYNC_JOB_KIND: &str = "connector_sync";
+
+/// A tracker connected to a workspace: its issues (and later pull requests)
+/// are kept as evidence (roadmap F17).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConnectorSource {
+    pub id: String,
+    pub workspace_id: String,
+    pub name: String,
+    /// `github`.
+    pub provider: String,
+    /// What it reads, such as `https://github.com/acme/app`.
+    pub location: String,
+    /// `pending`, `syncing`, `ready` or `error`.
+    pub status: String,
+    pub last_synced_at: Option<String>,
+    pub last_error: Option<String>,
+    pub last_report: Option<ConnectorSyncReport>,
+    /// Items kept, by the state the tracker reports.
+    pub open_items: i64,
+    pub closed_items: i64,
+    /// A token is stored (never shown).
+    pub has_credential: bool,
+    pub active_job: Option<IndexingJobStatus>,
+    pub created_at: String,
+}
+
+/// What one connector sync did.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ConnectorSyncReport {
+    pub items_seen: usize,
+    pub added: usize,
+    pub updated: usize,
+    pub unchanged: usize,
+    pub indexed: usize,
+    pub index_failed: usize,
+    /// The sync stopped at its page limit; the next one carries on.
+    pub more_to_fetch: bool,
+}
+
+/// What the tracker answered for a link, before it is connected.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConnectorAccessCheck {
+    pub provider: String,
+    pub name: String,
+    pub location: String,
+    pub open_issues: i64,
+    pub private: bool,
+    pub already_connected: bool,
+}
+
 /// A repository file's text as it was at a commit, for a citation that names
 /// one. It is not the file's current content.
 #[derive(Debug, Clone, Serialize, Deserialize)]

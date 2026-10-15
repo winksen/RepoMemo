@@ -129,6 +129,36 @@ impl RemoteGitPolicy {
         Ok(repository)
     }
 
+    /// Checks the host of a tracker's API the way a repository host is
+    /// checked: the list must name it, and link-local and metadata addresses
+    /// are never allowed.
+    pub fn check_api_host(&self, host: &str, port: Option<u16>) -> Result<()> {
+        if !self.is_enabled() {
+            repomemo_domain::bail_invalid!("Connectors are turned off on this server. Its operator turns them on by setting REPOMEMO_GIT_ALLOWED_HOSTS to the hosts they may use (api.github.com for GitHub).");
+        }
+        if let Ok(address) = host.parse::<IpAddr>() {
+            if repomemo_ai::is_forbidden_address(&address) {
+                repomemo_domain::bail_invalid!("This address is never allowed as a tracker host.");
+            }
+        } else if repomemo_ai::is_metadata_host(host) {
+            repomemo_domain::bail_invalid!("This address is never allowed as a tracker host.");
+        }
+        let probe = RemoteRepository {
+            scheme: RemoteScheme::Https,
+            host: host.to_ascii_lowercase(),
+            port,
+            user: None,
+            path: "x".to_owned(),
+        };
+        if !self.allows(&probe) {
+            repomemo_domain::bail_invalid!(
+                "This server only connects trackers on: {}.",
+                self.allowed.join(", ")
+            );
+        }
+        Ok(())
+    }
+
     fn allows(&self, repository: &RemoteRepository) -> bool {
         let port = repository.port.unwrap_or_else(|| repository.scheme.default_port());
         self.allowed.iter().any(|entry| {

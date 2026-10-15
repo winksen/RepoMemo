@@ -751,7 +751,7 @@ impl StorageEngine {
 /// but only from one of the `from` statuses, so a reviewer's decision is not
 /// overwritten. Files without a lifecycle row count as active.
 #[allow(clippy::too_many_arguments)]
-async fn set_system_lifecycle(
+pub(super) async fn set_system_lifecycle(
     tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
     artifact_id: &str,
     workspace_id: &str,

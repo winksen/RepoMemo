@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.27 (2026-10-15)
+
+GitHub issues become evidence.
+
+### Added
+- **Settings › Issues**: connect a GitHub repository's issues (github.com or GitHub Enterprise Server) to a workspace, with an optional read-only token (needed for a private repository or a higher rate limit). *Check access* shows the repository and its open issues before anything is stored.
+- **Each issue, with its comments, is one artifact** (type *issue*): title, state, author, labels, assignees, link, body and discussion as markdown. It is indexed like any file, so it is searchable, citable in Ask answers and linkable to memory cards.
+- **Incremental syncs:** each sync asks the tracker only for what changed since the last one, oldest first, so an interrupted sync resumes. It runs when connected, on *Sync now*, and on the repository polling interval. Pull requests listed among the issues are left alone for now.
+- **Closed issues are *outdated*;** a reopened one is active again; a *verified* issue that changed is flagged *needs review*.
+- Routes `GET/POST /v1/workspaces/{id}/connectors`, `POST …/connectors/check`, `GET/DELETE /v1/connectors/{id}`, `POST …/sync`, `PUT …/token`. The token is stored sealed with the repository tokens and never returned.
+- **Outside rules:** the API host must be on `REPOMEMO_GIT_ALLOWED_HOSTS` (add `api.github.com`, or the Enterprise host; unset, connectors are off), `https` only (plain `http` for this machine only), redirects and next-page links to other hosts are not followed, answers are limited in size and time.
+- Migration 0034 (`connector_items`).
+
+### Upgrading
+- Nothing to do. To use connectors, add `api.github.com` (or the Enterprise host) to `REPOMEMO_GIT_ALLOWED_HOSTS`.
+
 ## V0.2.26 (2026-10-15)
 
 A citation can open the text it was made from.
