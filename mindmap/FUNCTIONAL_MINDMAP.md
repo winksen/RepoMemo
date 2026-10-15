@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.2.35` (2026-10-15). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
+> **Scope:** reflects the code at `V0.2.36` (2026-10-15). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
 
 ---
 
@@ -365,8 +365,8 @@ The stored passages are an administrative detail. Regular members see search res
 In plain terms, indexing does the following:
 
 1. **Reads the text.** Office documents, PDFs and emails are converted to text on the server, with no outside service.
-2. **Splits it into passages.** Markdown is split by heading. TypeScript, JavaScript, Python, Rust, Go and Java are split along their structure, so a function, class or impl block is not cut in half: small neighbours are grouped, and large classes are split by method. Each passage records its scope (for example `impl Store > save`), which is also searchable. Other text and code files are split into windows of about 100 lines. Every passage keeps its line range so citations point to exact lines.
-3. **Extracts code symbols** from TypeScript, JavaScript, Python, Rust, Go and Java: functions, classes (structs, records), methods, interfaces and enums.
+2. **Splits it into passages.** Markdown is split by heading. TypeScript, JavaScript, Python, Rust, Go, Java, C# and PHP are split along their structure, so a function, class or impl block is not cut in half: small neighbours are grouped, and large classes are split by method. Each passage records its scope (for example `impl Store > save`), which is also searchable. Other text and code files are split into windows of about 100 lines. Every passage keeps its line range so citations point to exact lines.
+3. **Extracts code symbols** from TypeScript, JavaScript, Python, Rust, Go, Java, C# and PHP: functions, classes (structs, records), methods, interfaces (traits) and enums.
 4. **Handles images differently.** The image is sent to the workspace's image (vision) provider and a **text description** is stored and made searchable, including any text visible in the image. Without such a provider, image uploads are refused with a message saying an administrator can set one up.
 5. **Makes passages searchable by meaning** when the workspace has an embedding provider: a background queue turns each passage into a vector, and Settings shows the progress.
 
@@ -513,7 +513,7 @@ The desktop app and the shared server keep **separate data**.
 
 ---
 
-## 13. Known functional gaps (at V0.2.35)
+## 13. Known functional gaps (at V0.2.36)
 
 These are observed in the code and are useful for prioritizing. The roadmap item that addresses each one is in brackets.
 

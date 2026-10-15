@@ -16,7 +16,7 @@ const CODE_MAX_NESTING: usize = 3;
 /// Version of the chunking and symbol logic. Bump it whenever a change would
 /// produce different chunks, so stored indexes are refreshed in the background.
 /// Chunks whose text is unchanged keep their identity when re-indexed.
-pub const INDEXER_VERSION: i64 = 3;
+pub const INDEXER_VERSION: i64 = 4;
 
 #[derive(Debug, Clone)]
 pub struct IndexArtifactOutput {
@@ -159,6 +159,9 @@ fn tree_sitter_language(summary: &ArtifactSummary) -> Option<Language> {
         Some("Rust") => tree_sitter_rust::LANGUAGE.into(),
         Some("Go") => tree_sitter_go::LANGUAGE.into(),
         Some("Java") => tree_sitter_java::LANGUAGE.into(),
+        Some("C#") => tree_sitter_c_sharp::LANGUAGE.into(),
+        // The PHP grammar that also reads the HTML around `<?php … ?>` tags.
+        Some("PHP") => tree_sitter_php::LANGUAGE_PHP.into(),
         _ => return None,
     })
 }
@@ -234,6 +237,15 @@ fn symbol_descriptor<'a>(node: Node<'a>, language: Option<&str>) -> Option<(Symb
         (Some("Java"), "interface_declaration" | "annotation_type_declaration") => SymbolKind::Interface,
         (Some("Java"), "enum_declaration") => SymbolKind::Enum,
         (Some("Java"), "method_declaration" | "constructor_declaration") => SymbolKind::Method,
+        (Some("C#"), "class_declaration" | "record_declaration" | "struct_declaration") => SymbolKind::Class,
+        (Some("C#"), "interface_declaration") => SymbolKind::Interface,
+        (Some("C#"), "enum_declaration") => SymbolKind::Enum,
+        (Some("C#"), "method_declaration" | "constructor_declaration") => SymbolKind::Method,
+        (Some("PHP"), "class_declaration") => SymbolKind::Class,
+        (Some("PHP"), "interface_declaration" | "trait_declaration") => SymbolKind::Interface,
+        (Some("PHP"), "enum_declaration") => SymbolKind::Enum,
+        (Some("PHP"), "function_definition") => SymbolKind::Function,
+        (Some("PHP"), "method_declaration") => SymbolKind::Method,
         _ => return None,
     };
     Some((kind, name))
@@ -381,7 +393,14 @@ fn collect_code_units(container: Node<'_>, text: &str, context: &[String], depth
                     .named_child(0)
                     .map(|member| member.start_position().row)
                     .unwrap_or(start_row);
-                if body.named_child_count() > 1 && first_member_row > start_row {
+                // A body of one member is worth splitting only when that member is itself large:
+                // a namespace holding one big class.
+                let members = body.named_child_count();
+                let only_member_is_large = members == 1
+                    && body
+                        .named_child(0)
+                        .is_some_and(|member| member.end_byte().saturating_sub(member.start_byte()) > CODE_SPLIT_CHARS);
+                if (members > 1 || only_member_is_large) && first_member_row > start_row {
                     let header_index = out.len();
                     out.push(CodeUnit {
                         start_row,
@@ -990,6 +1009,108 @@ mod tests {
             .all(|chunk| chunk.heading_path.as_deref().unwrap().starts_with("Store")));
         for chunk in &output.chunks {
             let opens = chunk.text.matches("public int method").count();
+            let closes = chunk.text.matches("\n    }").count();
+            assert!(closes >= opens, "chunk cut a method: {}", chunk.text);
+        }
+        assert_covers_all_lines(&output.chunks, &text);
+    }
+
+    #[test]
+    fn csharp_symbols_include_types_enums_methods_and_constructors() {
+        let summary = artifact_summary(ArtifactType::CodeFile, Some("C#"));
+        let text = "using System;\n\nnamespace App;\n\npublic interface IReader { string Read(); }\n\npublic enum State { Ready }\n\npublic struct Point { public int X; }\n\npublic class Store : IReader\n{\n    public Store() { }\n    public string Read() { return \"ok\"; }\n}\n";
+        let output = index_artifact(&summary, text.as_bytes()).unwrap();
+
+        assert!(has_symbol(&output, "IReader", SymbolKind::Interface, 5));
+        assert!(has_symbol(&output, "State", SymbolKind::Enum, 7));
+        assert!(has_symbol(&output, "Point", SymbolKind::Class, 9));
+        assert!(has_symbol(&output, "Store", SymbolKind::Class, 11));
+        assert!(has_symbol(&output, "Store", SymbolKind::Method, 13));
+        assert!(has_symbol(&output, "Read", SymbolKind::Method, 14));
+        assert_covers_all_lines(&output.chunks, text);
+    }
+
+    #[test]
+    fn large_csharp_classes_inside_a_namespace_are_split_by_method() {
+        let summary = artifact_summary(ArtifactType::CodeFile, Some("C#"));
+        let padding = "            var padding = \"........................................\";\n".repeat(8);
+        let methods = (1..=12)
+            .map(|index| {
+                format!(
+                    "        /// <summary>Method {index}.</summary>\n        public int Method{index}()\n        {{\n{padding}            return {index};\n        }}\n"
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        let text = format!("namespace App\n{{\n    public class Store\n    {{\n{methods}    }}\n}}\n");
+
+        let output = index_artifact(&summary, text.as_bytes()).unwrap();
+
+        assert!(output.chunks.len() > 3);
+        assert!(output.chunks.iter().skip(1).all(|chunk| chunk
+            .heading_path
+            .as_deref()
+            .unwrap()
+            .starts_with("App > Store")));
+        for chunk in &output.chunks {
+            let opens = chunk.text.matches("public int Method").count();
+            let closes = chunk.text.matches("\n        }").count();
+            assert!(closes >= opens, "chunk cut a method: {}", chunk.text);
+        }
+        assert_covers_all_lines(&output.chunks, &text);
+    }
+
+    #[test]
+    fn php_symbols_include_classes_traits_enums_functions_and_methods() {
+        let summary = artifact_summary(ArtifactType::CodeFile, Some("PHP"));
+        let text = "<?php\n\nnamespace App;\n\ninterface Reader { public function read(): string; }\n\ntrait Loggable { public function log(): void {} }\n\nenum State { case Ready; }\n\nfunction build_store(): Store { return new Store(); }\n\nclass Store implements Reader\n{\n    public function read(): string { return 'ok'; }\n}\n";
+        let output = index_artifact(&summary, text.as_bytes()).unwrap();
+
+        assert!(has_symbol(&output, "Reader", SymbolKind::Interface, 5));
+        assert!(has_symbol(&output, "Loggable", SymbolKind::Interface, 7));
+        assert!(has_symbol(&output, "State", SymbolKind::Enum, 9));
+        assert!(has_symbol(&output, "build_store", SymbolKind::Function, 11));
+        assert!(has_symbol(&output, "Store", SymbolKind::Class, 13));
+        assert!(has_symbol(&output, "read", SymbolKind::Method, 15));
+        assert_covers_all_lines(&output.chunks, text);
+    }
+
+    #[test]
+    fn php_files_are_packed_by_declaration_and_named() {
+        let summary = artifact_summary(ArtifactType::CodeFile, Some("PHP"));
+        let text = "<?php\n\n/** Adds. */\nfunction add($a, $b) {\n    return $a + $b;\n}\n\nfunction sub($a, $b) {\n    return $a - $b;\n}\n";
+
+        let output = index_artifact(&summary, text.as_bytes()).unwrap();
+
+        assert_eq!(output.chunks.len(), 1);
+        assert_eq!(output.chunks[0].heading_path.as_deref(), Some("add, sub"));
+        assert_covers_all_lines(&output.chunks, text);
+    }
+
+    #[test]
+    fn large_php_classes_are_split_by_method_with_the_class_in_the_heading() {
+        let summary = artifact_summary(ArtifactType::CodeFile, Some("PHP"));
+        let padding = "        $padding = \"........................................\";\n".repeat(8);
+        let methods = (1..=12)
+            .map(|index| {
+                format!(
+                    "    /** Method {index}. */\n    public function method{index}(): int\n    {{\n{padding}        return {index};\n    }}\n"
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        let text = format!("<?php\n\nclass Store\n{{\n{methods}}}\n");
+
+        let output = index_artifact(&summary, text.as_bytes()).unwrap();
+
+        assert!(output.chunks.len() > 3);
+        assert!(output
+            .chunks
+            .iter()
+            .skip(1)
+            .all(|chunk| chunk.heading_path.as_deref().unwrap().starts_with("Store")));
+        for chunk in &output.chunks {
+            let opens = chunk.text.matches("public function method").count();
             let closes = chunk.text.matches("\n    }").count();
             assert!(closes >= opens, "chunk cut a method: {}", chunk.text);
         }

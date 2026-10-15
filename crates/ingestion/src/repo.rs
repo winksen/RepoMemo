@@ -242,6 +242,11 @@ mod tests {
         assert_eq!(go.artifact_type, ArtifactType::CodeFile);
         assert!(!go.needs_text_check);
 
+        let csharp = classify_repo_file("src/Program.cs", 100, &rules).unwrap();
+        assert_eq!(csharp.language.as_deref(), Some("C#"));
+        assert_eq!(csharp.artifact_type, ArtifactType::CodeFile);
+        assert!(!csharp.needs_text_check);
+
         let ruby = classify_repo_file("lib/app.rb", 100, &rules).unwrap();
         assert_eq!(ruby.language.as_deref(), Some("Ruby"));
         assert!(ruby.needs_text_check);

@@ -19,7 +19,7 @@ resolver = "2"
 # The product version: the server reports it (System › Overview, the console).
 # Set it everywhere at once with `npm run version:set -- <version>`; CI checks
 # that Cargo.toml, Cargo.lock, package.json and tauri.conf.json agree.
-version = "0.2.35"
+version = "0.2.36"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/repomemo/repomemo"
@@ -47,8 +47,10 @@ serde_json = "1"
 sha2 = "0.10"
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "sqlite", "macros", "migrate", "chrono", "json", "uuid"] }
 tree-sitter = "0.25"
+tree-sitter-c-sharp = "0.23"
 tree-sitter-go = "0.23"
 tree-sitter-java = "0.23"
+tree-sitter-php = "0.23"
 tree-sitter-python = "0.23"
 tree-sitter-rust = "0.24"
 tree-sitter-typescript = "0.23"

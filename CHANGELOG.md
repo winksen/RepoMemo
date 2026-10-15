@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.36 (2026-10-15)
+
+C# and PHP are read like the other languages.
+
+### Added
+- **C# and PHP files are split along their declarations.** A class, struct, record, interface, enum, function or method is not cut in half; a large class is split by method, and a namespace that holds one large class is split inside it. Each passage records its scope in its heading (`App > Store`).
+- **Their symbols are searchable.** C# classes, structs, records, interfaces, enums, methods and constructors; PHP classes, interfaces, traits, enums, functions and methods. They appear in *Code symbols* in Retrieval, on the file's page and in the assistant's *Find a symbol*.
+- **`.cs` and `.php` files can be uploaded** and are indexed as C# and PHP. PHP files are read with the grammar that also understands the HTML around `<?php … ?>`.
+
+### Changed
+- Namespaces, classes and other containers that hold a single, large member are now split along that member too (before, such a container was cut by size). Every language benefits.
+- The indexer version is 4, so every file already indexed is indexed once more in the background after the upgrade. Passages whose text is unchanged keep their identity, their embeddings and the links that point at them.
+
+### Upgrading
+- Nothing to do. C# and PHP files already in a workspace through a repository are re-indexed in the background and gain their symbols.
+
 ## V0.2.35 (2026-10-15)
 
 Go and Java are read like Rust and Python.

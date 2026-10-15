@@ -217,6 +217,8 @@ export const ACCEPTED_TEXT_EXTENSIONS = [
   "py",
   "go",
   "java",
+  "cs",
+  "php",
   "json",
   "toml",
   "yaml",

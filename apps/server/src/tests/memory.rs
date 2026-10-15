@@ -188,8 +188,8 @@ async fn memory_cards_say_when_their_evidence_changed_and_citations_can_be_edite
 }
 
 #[tokio::test]
-async fn go_and_java_files_have_searchable_symbols_and_declaration_chunks() {
-    let data_dir = temp_data_dir("go-java-symbols");
+async fn go_java_csharp_and_php_files_have_searchable_symbols() {
+    let data_dir = temp_data_dir("language-symbols");
     let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
     let (_, _) = register_account(&app, "gojava-admin@example.com").await;
     let (owner, _) = register_account(&app, "gojava-owner@example.com").await;
@@ -204,6 +204,16 @@ async fn go_and_java_files_have_searchable_symbols_and_declaration_chunks() {
             "Registry.java",
             "text/x-java-source",
             "package app;\n\npublic class Registry {\n    public String lookupEntry(String key) {\n        return key;\n    }\n}\n",
+        ),
+        (
+            "Ledger.cs",
+            "text/plain",
+            "namespace App;\n\npublic class Ledger\n{\n    public int PostEntry(int amount) { return amount; }\n}\n",
+        ),
+        (
+            "audit.php",
+            "text/x-php",
+            "<?php\n\nclass Audit\n{\n    public function recordEvent(string $name): string { return $name; }\n}\n",
         ),
     ] {
         let upload = app
@@ -222,10 +232,12 @@ async fn go_and_java_files_have_searchable_symbols_and_declaration_chunks() {
             .unwrap();
         assert_eq!(upload.status(), 201, "{name}");
     }
-    wait_for_indexed_artifacts(&app, &owner, &workspace_id, 2).await;
+    wait_for_indexed_artifacts(&app, &owner, &workspace_id, 4).await;
     for (query, symbol, path) in [
         ("FetchVal", "FetchValue", "store.go"),
         ("lookupEn", "lookupEntry", "Registry.java"),
+        ("PostEnt", "PostEntry", "Ledger.cs"),
+        ("recordEv", "recordEvent", "audit.php"),
     ] {
         let found = response_json(
             app.clone()

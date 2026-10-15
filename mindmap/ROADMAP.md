@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.35` (2026-10-15), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.36` (2026-10-15), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -375,7 +375,7 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 | **V0.2.33** ✅ | ✨ | Retrieval | Search across all of the caller's workspaces | F5b | Results merged by score, each checked against its workspace's role and AI policy |
 | **V0.2.34** ✅ | ✨ | Web shell | A keyboard command palette | F19 | Jump to a workspace, file, memory card or setting, and start assistant actions, without the mouse |
 | **V0.2.35** ✅ | ✨ | Indexing | Code symbols and structure-aware chunks for Go and Java | F21a | Both languages chunk by declaration and their symbols are searchable |
-| **V0.2.36** | ✨ | Indexing | Code symbols and structure-aware chunks for C# and PHP | F21b | Same as V0.2.35 |
+| **V0.2.36** ✅ | ✨ | Indexing | Code symbols and structure-aware chunks for C# and PHP | F21b | Same as V0.2.35 |
 | **V0.2.37** | ✨ | Review | A review queue: evidence *needing review*, stale memory cards and open health findings in one list | F23 | Each item opens where it is resolved; the queue empties as they are |
 | **V0.2.38** | ✨ | Artifact page | Version history of a file: earlier versions kept when a new one is uploaded, viewable and comparable | F24 | Uploading a new version keeps the old text readable |
 | **V0.2.39** | 🔧 | Discussion | `@mention` suggestions while typing in comments | F25 | Only workspace members are suggested |
@@ -679,6 +679,15 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 - [x] Tests: Go and Java symbols, packing and labels, splitting between functions and by method (no declaration cut), `go_and_java_files_have_searchable_symbols_and_declaration_chunks` over the API; the unsupported-language fallback test now uses Ruby
 - [ ] Go `const` and `var` blocks, type aliases and named non-struct types (`type ID int`) are chunked but not symbols; Java fields and nested types of a method body are not symbols
 
+#### V0.2.36: C# and PHP
+
+- [x] **F21b** `tree-sitter-c-sharp` and `tree-sitter-php` (MIT, `LANGUAGE_PHP`) as workspace dependencies; `tree_sitter_language` maps `C#` and `PHP`; `INDEXER_VERSION` 4
+- [x] Symbols: C# classes, structs and records (class), interfaces, enums, methods and constructors; PHP classes (class), interfaces and traits (interface), enums, functions and methods
+- [x] The splitting engine now also splits a container whose only member is large (a namespace holding one big class), for every language
+- [x] `.cs` and `.php` accepted for upload and local import and in the web client's upload list; repository files of both are classified as code with no text check
+- [x] Tests: C# and PHP symbols, packing, splitting by method inside a namespace and a class (no method cut, scope in the heading), and `go_java_csharp_and_php_files_have_searchable_symbols` over the API
+- [ ] C# properties, fields, local functions and delegates, and PHP properties and constants, are chunked but not symbols; Razor (`.cshtml`) and Blade templates are plain text
+
 ### Decisions to agree before work starts
 
 | # | Decision | Needed by | Proposal |
@@ -721,7 +730,7 @@ Every item of both roads, with the release it is planned for. The evidence behin
 | F16 | **Push webhooks and git awareness:** signed webhooks (16a), last author and date (16b), `CODEOWNERS` hints (16c), a citation at its commit (16d) | M | V0.2.23–V0.2.26 |
 | F17 | **Issues and pull requests:** GitHub issues (17a), GitHub pull requests (17b), GitLab (17c), links to files and symbols (17d), webhooks and rate limits (17e) | L | V0.2.27–V0.2.31 (decision 12) |
 | F19 | **Command palette** | S | ✅ V0.2.34 |
-| F21 | **More languages:** symbols and structure-aware chunks for Go and Java (21a ✅ V0.2.35), C# and PHP (21b) | S–M | V0.2.35, V0.2.36 |
+| F21 | **More languages:** symbols and structure-aware chunks for Go and Java (21a ✅ V0.2.35), C# and PHP (21b ✅ V0.2.36) | S–M | ✅ V0.2.35, V0.2.36 |
 | F23 | **Review queue:** evidence needing review, stale memory cards and open health findings in one list | S–M | V0.2.37 |
 | F24 | **Version history** of a file, viewable and comparable | M | V0.2.38 |
 | F25 | **`@mention` suggestions** in comments | S | V0.2.39 |
