@@ -75,7 +75,7 @@ export type AuthMode = "sign-in" | "sign-up";
 
 export type PageState = "restoring" | "unauthenticated" | "ready" | "error";
 
-export type WorkspaceSection = "overview" | "evidence" | "documents" | "repositories" | "retrieval" | "map" | "health" | "memory" | "tasks" | "people" | "settings";
+export type WorkspaceSection = "overview" | "evidence" | "documents" | "repositories" | "retrieval" | "map" | "health" | "review" | "memory" | "tasks" | "people" | "settings";
 
 export type ArtifactViewMode = "grid" | "list";
 
@@ -87,7 +87,7 @@ export type OrganizationNavigation = {
   cancelOrganizationCreation: () => void;
 };
 
-export const WORKSPACE_SECTIONS: WorkspaceSection[] = ["overview", "evidence", "documents", "repositories", "retrieval", "map", "health", "memory", "tasks", "people", "settings"];
+export const WORKSPACE_SECTIONS: WorkspaceSection[] = ["overview", "evidence", "documents", "repositories", "retrieval", "map", "health", "review", "memory", "tasks", "people", "settings"];
 
 export const ADMIN_WORKSPACE_SECTIONS = new Set<WorkspaceSection>(["people", "settings"]);
 

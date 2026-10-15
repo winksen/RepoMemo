@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.2.36` (2026-10-15). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
+> **Scope:** reflects the code at `V0.2.37` (2026-10-15). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
 
 ---
 
@@ -251,7 +251,7 @@ A **System** button in the header opens `/system`, with these pages:
 
 ## 4. Workspaces
 
-A workspace is opened at `/workspaces/:id/<section>` and has **eleven sections**. The **assistant** (§7b) is docked on the right of every section page.
+A workspace is opened at `/workspaces/:id/<section>` and has **twelve sections**. The **assistant** (§7b) is docked on the right of every section page.
 
 | Section | Purpose | Who sees it |
 |---|---|---|
@@ -262,6 +262,7 @@ A workspace is opened at `/workspaces/:id/<section>` and has **eleven sections**
 | **Retrieval** | Keyword and meaning search, saved searches, "Ask your evidence" | Everyone |
 | **Map** | The knowledge map: indexing pipeline, coverage, and a graph of related files and memory cards (§7b) | Everyone |
 | **Health** | Deterministic checks for drift, duplicates and failures, with actions (§7b) | Everyone (acting on a finding: owner and admin) |
+| **Review** | One list of what waits for a person: files marked *needs review*, memory cards whose evidence changed and open health findings, each opening where it is resolved (§7b) | Everyone (resolving: writers; findings: owner and admin) |
 | **Memory** | Team memory cards: search and create. A card shows **Needs review** when what it cites changed, disappeared or was retired; its page lists why, lets writers edit the evidence it cites, and confirm it as it is | Everyone |
 | **Tasks** | Team action board | Everyone |
 | **People** | Members, invitations, a summary of *your* capabilities, and the activity feed (user or AI activity) with a 365-day calendar | Owner and admin |
@@ -421,6 +422,18 @@ Shows how much of the workspace is usable and how it connects, with no AI call:
 - **Coverage** by kind of file.
 - **Graph**: the files with the most passages, linked to **similar files** (when an embedding provider exists) and to the **memory cards that cite them**. A repository is drawn as one ringed node. A table view lists every link.
 
+### Review queue (Review)
+
+Everything in the workspace that waits for a person, in one list, without an AI call:
+
+| Item | Where it comes from | Opens |
+|---|---|---|
+| **File marked for review** | A file whose state is *needs review* (set by a person or by a health action), with the note left | The file's page |
+| **Memory card gone stale** | A card whose cited file changed after the card was written, was retired, or whose cited passage is gone | The card's page |
+| **Health finding** | An open finding that was neither acted on nor dismissed (a stale-memory finding is shown as its card instead) | Health |
+
+Each shows why it is waiting and since when, oldest first (findings have no date and follow). An item leaves the list when it is resolved where it is worked on: the file marked verified or active again, the card confirmed or edited, the finding acted on or dismissed. Members see the list; each item says who can resolve it.
+
 ### Health checks (Health)
 
 Deterministic checks of what has drifted, with no AI call:
@@ -513,7 +526,7 @@ The desktop app and the shared server keep **separate data**.
 
 ---
 
-## 13. Known functional gaps (at V0.2.36)
+## 13. Known functional gaps (at V0.2.37)
 
 These are observed in the code and are useful for prioritizing. The roadmap item that addresses each one is in brackets.
 

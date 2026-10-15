@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.37 (2026-10-15)
+
+One list of what waits for a person.
+
+### Added
+- **Review queue:** a new *Review* section in every workspace lists, in one place, the files marked *needs review*, the memory cards whose evidence changed, disappeared or was retired, and the open health findings. Each item says why it is waiting and since when, and opens where it is resolved: the file's page, the card's page or Health. The oldest wait first; findings, which have no date, follow.
+- **It empties as things are resolved:** the list is computed from those places each time, so marking a file verified or active again, confirming or editing the card, or acting on or dismissing the finding takes it off. It refreshes by itself when workspace activity changes it.
+- **`GET /v1/workspaces/{id}/review`** (members of the workspace): `{items, evidence_count, memory_card_count, finding_count}`. Each item has a `kind` (`evidence`, `memory_card`, `health_finding`), a title, the reason, where it lives, the file to open, when it started waiting and who can resolve it (`writer` or `admin`).
+- A stale memory card is listed once, as the card, and not again as a *Stale memory* finding. Findings a person has dismissed or acted on stay out, as on the Health page.
+- The command palette lists the new section.
+
+### Upgrading
+- Nothing to do. No migration; nothing is stored for the queue.
+
 ## V0.2.36 (2026-10-15)
 
 C# and PHP are read like the other languages.

@@ -335,3 +335,146 @@ async fn code_symbols_are_searchable_over_the_api() {
     assert!(text.contains("find_symbol") && text.contains("parse_config"), "{text}");
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn the_review_queue_lists_what_waits_and_empties_as_it_is_resolved() {
+    let data_dir = temp_data_dir("review-queue");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let (_, _) = register_account(&app, "review-admin@example.com").await;
+    let (owner, _) = register_account(&app, "review-owner@example.com").await;
+    let (outsider, _) = register_account(&app, "review-outsider@example.com").await;
+    let workspace_id = create_workspace(&app, &owner).await;
+    let call = |method: &'static str, uri: String, who: &str, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let mut ids = Vec::new();
+    for (title, content) in [
+        ("Runbook", "# Runbook\nRun the migration first."),
+        ("Retry notes", "# Retry\nUploads use a backoff budget."),
+        ("Copy one", "# Same\nIdentical text in two files."),
+        ("Copy two", "# Same\nIdentical text in two files."),
+    ] {
+        let created = response_json(
+            call(
+                "POST",
+                format!("/v1/workspaces/{workspace_id}/artifacts/text"),
+                &owner,
+                json!({"title": title, "content": content, "language": "Markdown"}),
+            )
+            .await,
+        )
+        .await;
+        ids.push(created["id"].as_str().unwrap().to_owned());
+    }
+    wait_for_indexed_artifacts(&app, &owner, &workspace_id, 4).await;
+    let card = call(
+        "POST",
+        format!("/v1/workspaces/{workspace_id}/memory-cards"),
+        &owner,
+        json!({
+            "title": "Uploads back off",
+            "body_markdown": "Decided in the retry review.",
+            "source": "manual",
+            "citations": [{"artifact_id": ids[1], "chunk_id": null, "title": "Retry notes", "path": "Retry notes", "start_line": null, "end_line": null, "confidence": null}]
+        }),
+    )
+    .await;
+    assert_eq!(card.status(), 201);
+    let queue = |who: &str| {
+        let uri = format!("/v1/workspaces/{workspace_id}/review");
+        let request = auth_request("GET", &uri, who);
+        let app = app.clone();
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let kinds = |queue: &Value| {
+        queue["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|item| item["kind"].as_str().unwrap().to_owned())
+            .collect::<Vec<_>>()
+    };
+
+    // Only the duplicate waits at first, and only for an administrator.
+    let first = response_json(queue(&owner).await).await;
+    assert_eq!(kinds(&first), ["health_finding"], "{first}");
+    assert_eq!(first["finding_count"], 1);
+    assert_eq!(first["items"][0]["resolver"], "admin");
+    assert!(first["items"][0]["detail"].as_str().unwrap().contains("Copy"));
+
+    // A file marked for review, and a card whose evidence was retired.
+    let marked = call(
+        "PUT",
+        format!("/v1/artifacts/{}/lifecycle", ids[0]),
+        &owner,
+        json!({"status": "needs_review", "review_note": "Steps changed in 2.1"}),
+    )
+    .await;
+    assert_eq!(marked.status(), 200);
+    let retired = call(
+        "PUT",
+        format!("/v1/artifacts/{}/lifecycle", ids[1]),
+        &owner,
+        json!({"status": "outdated", "review_note": ""}),
+    )
+    .await;
+    assert_eq!(retired.status(), 200);
+    let waiting = response_json(queue(&owner).await).await;
+    assert_eq!(waiting["evidence_count"], 1, "{waiting}");
+    assert_eq!(waiting["memory_card_count"], 1, "{waiting}");
+    let items = waiting["items"].as_array().unwrap();
+    let evidence = items.iter().find(|item| item["kind"] == "evidence").unwrap();
+    assert_eq!(evidence["title"], "Runbook");
+    assert_eq!(evidence["reason"], "Steps changed in 2.1");
+    assert_eq!(evidence["resolver"], "writer");
+    assert_eq!(evidence["artifact_id"], json!(ids[0]));
+    let stale = items.iter().find(|item| item["kind"] == "memory_card").unwrap();
+    assert_eq!(stale["title"], "Uploads back off");
+    assert!(stale["reason"].as_str().unwrap().contains("outdated"), "{stale}");
+    // What has waited comes first; the finding, which has no date, last.
+    assert_eq!(items.last().unwrap()["kind"], "health_finding");
+    // The stale card is one item, not also a health finding.
+    assert_eq!(waiting["finding_count"], 1, "{waiting}");
+
+    // Someone outside the workspace sees nothing of it.
+    assert_eq!(queue(&outsider).await.status(), 403);
+
+    // Resolved where each is worked on, the queue empties.
+    for id in [&ids[0], &ids[1]] {
+        let restored = call(
+            "PUT",
+            format!("/v1/artifacts/{id}/lifecycle"),
+            &owner,
+            json!({"status": "verified", "review_note": ""}),
+        )
+        .await;
+        assert_eq!(restored.status(), 200);
+    }
+    let health = response_json(
+        call(
+            "GET",
+            format!("/v1/workspaces/{workspace_id}/health"),
+            &owner,
+            json!({}),
+        )
+        .await,
+    )
+    .await;
+    let fingerprint = health["findings"][0]["fingerprint"].as_str().unwrap().to_owned();
+    let dismissed = call(
+        "POST",
+        format!("/v1/workspaces/{workspace_id}/health/actions"),
+        &owner,
+        json!({"fingerprint": fingerprint, "action": "dismiss"}),
+    )
+    .await;
+    assert_eq!(dismissed.status(), 200);
+    let empty = response_json(queue(&owner).await).await;
+    assert!(empty["items"].as_array().unwrap().is_empty(), "{empty}");
+    assert_eq!(empty["evidence_count"], 0);
+    assert_eq!(empty["memory_card_count"], 0);
+    assert_eq!(empty["finding_count"], 0);
+    let _ = std::fs::remove_dir_all(data_dir);
+}

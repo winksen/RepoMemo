@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.2 → 0.3
 
-> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.36` (2026-10-15) · **Next:** `V0.2.37`
+> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.37` (2026-10-15) · **Next:** `V0.2.38`
 > **Previous line:** [Releases 0.1 → 0.2](RELEASES_0.1.md) · **Related:** [Roadmap, Road to V0.3.0](ROADMAP.md#-road-to-v030) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
 Every release of the 0.2 line, shipped and planned, one row each. The plan comes from the [Road to V0.3.0](ROADMAP.md#-road-to-v030): **one change per release**, each shippable alone, with the security rules for a new outside connection in the release that opens it. Planned rows are proposals until decisions 7–14 in the roadmap are agreed.
@@ -69,7 +69,7 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | **V0.2.34** | ✅ 2026-10-15 | F. Search, assistant, review | ✨ Feature | Web shell | A keyboard command palette (Ctrl or ⌘ K): jump to a workspace, a section, a file, a memory card or a page, and start assistant actions with what was typed, without the mouse (F19) | Jump to a workspace, file, memory card or setting, and start assistant actions, without the mouse |
 | **V0.2.35** | ✅ 2026-10-15 | F. Search, assistant, review | ✨ Feature | Indexing | Code symbols and structure-aware chunks for Go and Java: functions, methods, structs, interfaces, classes, records and enums are searchable and a declaration is not cut in half; `.go` and `.java` can be uploaded (F21a) | Both languages chunk by declaration and their symbols are searchable |
 | **V0.2.36** | ✅ 2026-10-15 | F. Search, assistant, review | ✨ Feature | Indexing | Code symbols and structure-aware chunks for C# and PHP: classes, structs, records, interfaces, traits, enums, functions and methods are searchable and a declaration is not cut in half; `.cs` and `.php` can be uploaded (F21b) | Same as V0.2.35 |
-| **V0.2.37** | 🔜 Planned | F. Search, assistant, review | ✨ Feature | Review | A review queue: evidence needing review, stale memory cards and open health findings in one list (F23) | Each item opens where it is resolved; the queue empties as they are |
+| **V0.2.37** | ✅ 2026-10-15 | F. Search, assistant, review | ✨ Feature | Review | A review queue: files marked *needs review*, stale memory cards and open health findings in one list, each opening where it is resolved and leaving as it is (F23) | Each item opens where it is resolved; the queue empties as they are |
 | **V0.2.38** | 🔜 Planned | F. Search, assistant, review | ✨ Feature | Artifact page | Version history of a file: earlier versions kept, viewable and comparable (F24) | Uploading a new version keeps the old text readable |
 | **V0.2.39** | 🔜 Planned | F. Search, assistant, review | 🔧 Enhancement | Discussion | `@mention` suggestions while typing in comments (F25) | Only workspace members are suggested |
 | **V0.2.40** | 🔜 Planned | G. Portability and operations | ✨ Feature | Workspace settings | Export a workspace as an archive (O2a) | Evidence, folders, memory cards with citations, tasks, comments and lifecycle history in one file with a manifest |

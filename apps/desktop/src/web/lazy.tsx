@@ -25,6 +25,9 @@ export const KnowledgeMapPanel = lazily<Module<"KnowledgeMapPanel", typeof impor
 export const WorkspaceHealthPanel = lazily<Module<"WorkspaceHealthPanel", typeof import("../components/WorkspaceHealthPanel")>>(
   () => import("../components/WorkspaceHealthPanel").then((module) => ({ default: module.WorkspaceHealthPanel })),
 );
+export const ReviewQueuePanel = lazily<Module<"ReviewQueuePanel", typeof import("../components/ReviewQueuePanel")>>(
+  () => import("../components/ReviewQueuePanel").then((module) => ({ default: module.ReviewQueuePanel })),
+);
 export const DocumentViewer = lazily<Module<"DocumentViewer", typeof import("../components/DocumentViewer")>>(
   () => import("../components/DocumentViewer").then((module) => ({ default: module.DocumentViewer })),
 );

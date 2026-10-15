@@ -223,6 +223,29 @@ impl StorageEngine {
             .collect())
     }
 
+    /// Memory cards whose evidence changed, with why, the longest-waiting
+    /// first (by when the card was last written).
+    pub async fn memory_cards_needing_review(
+        &self,
+        workspace_id: &str,
+    ) -> Result<Vec<(MemoryCardSummary, Vec<MemoryReviewReason>)>> {
+        let mut reasons = self.memory_review_reasons(workspace_id, None).await?;
+        reasons.retain(|_, list| !list.is_empty());
+        if reasons.is_empty() {
+            return Ok(Vec::new());
+        }
+        let mut cards = self.query_memory_cards(workspace_id, None).await?;
+        cards.retain(|card| reasons.contains_key(&card.id));
+        cards.sort_by(|left, right| left.updated_at.cmp(&right.updated_at));
+        Ok(cards
+            .into_iter()
+            .map(|card| {
+                let list = reasons.remove(&card.id).unwrap_or_default();
+                (card, list)
+            })
+            .collect())
+    }
+
     /// Why memory cards need another look, by card id: a cited passage or file
     /// that no longer exists, a cited file marked outdated or superseded, or a
     /// cited file updated after the card was last written. Cards whose

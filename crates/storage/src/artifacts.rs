@@ -1044,6 +1044,39 @@ impl StorageEngine {
             .collect())
     }
 
+    /// Files marked *needs review*, with the note left when they were, the
+    /// longest-waiting first: `(artifact id, title, path, note, since)`.
+    pub async fn artifacts_needing_review(
+        &self,
+        workspace_id: &str,
+    ) -> Result<Vec<(String, String, String, String, String)>> {
+        let rows = sqlx::query(
+            r#"
+            SELECT artifacts.id, artifacts.title, artifacts.path,
+                   artifact_lifecycle.review_note, artifact_lifecycle.updated_at
+            FROM artifact_lifecycle
+            JOIN artifacts ON artifacts.id = artifact_lifecycle.artifact_id
+            WHERE artifact_lifecycle.workspace_id = ?1 AND artifact_lifecycle.status = 'needs_review'
+            ORDER BY artifact_lifecycle.updated_at ASC, artifacts.title ASC
+            "#,
+        )
+        .bind(workspace_id)
+        .fetch_all(self.reader())
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|row| {
+                (
+                    row.get("id"),
+                    row.get("title"),
+                    row.get("path"),
+                    row.get("review_note"),
+                    row.get("updated_at"),
+                )
+            })
+            .collect())
+    }
+
     pub async fn clear_index_failure(&self, artifact_id: &str) -> Result<()> {
         sqlx::query("DELETE FROM artifact_index_failures WHERE artifact_id = ?1")
             .bind(artifact_id)

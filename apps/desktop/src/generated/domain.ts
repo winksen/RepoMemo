@@ -1128,6 +1128,47 @@ export interface HealthActionResult {
   task_id: string | null;
 }
 
+/** What is waiting in a review queue. */
+export type ReviewItemKind =
+  | "evidence"
+  | "memory_card"
+  | "health_finding";
+
+/** Who can resolve a review item. */
+export type ReviewResolver =
+  | "writer"
+  | "admin";
+
+export interface ReviewItem {
+  kind: ReviewItemKind;
+  /** The file's or memory card's id, or the finding's fingerprint. */
+  id: string;
+  title: string;
+  /** Why it is waiting, in a sentence. */
+  reason: string;
+  /** Where it lives: a file's path, a card's evidence, a finding's files. */
+  detail: string;
+  /** The file to open: the file itself, or the first file of a finding. */
+  artifact_id: string | null;
+  /** When it started waiting; open findings have no date. */
+  since: string | null;
+  resolver: ReviewResolver;
+}
+
+/**
+ * Everything in a workspace that needs a person's attention, in one list:
+ * evidence marked *needs review*, memory cards that went stale and open
+ * health findings. An item leaves the list when it is resolved where it is
+ * worked on.
+ */
+export interface ReviewQueue {
+  /** The oldest first; items without a date last. */
+  items: ReviewItem[];
+  evidence_count: number;
+  memory_card_count: number;
+  finding_count: number;
+}
+
 /**
  * A job the workspace assistant knows how to do. The assistant only ever runs
  * one of these; a message that matches none of them gets a plain reply.

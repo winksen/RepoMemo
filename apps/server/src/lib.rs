@@ -29,6 +29,7 @@ mod quotas;
 mod repositories;
 mod requests;
 mod retrieval;
+mod review;
 mod security;
 mod serve;
 mod setup;
@@ -557,6 +558,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             "/v1/workspaces/{workspace_id}/knowledge-map",
             get(workspace_knowledge_map),
         )
+        .route("/v1/workspaces/{workspace_id}/review", get(review::review_queue))
         .route("/v1/workspaces/{workspace_id}/health", get(health::workspace_health))
         .route(
             "/v1/workspaces/{workspace_id}/health/actions",

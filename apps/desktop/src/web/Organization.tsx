@@ -1,5 +1,5 @@
 import { type FormEvent, type ReactNode, useEffect, useState } from "react";
-import { IconBook2 as Book, IconBuildingCommunity as Building, IconChartDots3 as MapIcon, IconChecklist as Checklist, IconFileText as FileText, IconGitBranch as RepositoryIcon, IconLayoutDashboard as Dashboard, IconPlus as Plus, IconSearch as Search, IconSettings as Settings, IconStack2 as Layers, IconStethoscope as HealthIcon, IconTrash as Trash, IconUsers as Users } from "@tabler/icons-react";
+import { IconBook2 as Book, IconBuildingCommunity as Building, IconChartDots3 as MapIcon, IconChecklist as Checklist, IconEyeCheck as ReviewIcon, IconFileText as FileText, IconGitBranch as RepositoryIcon, IconLayoutDashboard as Dashboard, IconPlus as Plus, IconSearch as Search, IconSettings as Settings, IconStack2 as Layers, IconStethoscope as HealthIcon, IconTrash as Trash, IconUsers as Users } from "@tabler/icons-react";
 import { SharedApiError, listSharedOrganizationMembers, removeSharedOrganizationMember, transferSharedOrganizationOwnership, updateSharedOrganization, upsertSharedOrganizationMember } from "../lib/sharedApi";
 import { type Organization, type OrganizationMember, type OrganizationRole, type SharedWorkspace } from "../types";
 import { UserAvatar } from "../components/UserAvatar";
@@ -153,6 +153,7 @@ export function WorkspaceTopbar({
       {workspaceTab("retrieval", "Retrieval", <Search size={16} />)}
       {workspaceTab("map", "Map", <MapIcon size={16} />)}
       {workspaceTab("health", "Health", <HealthIcon size={16} />)}
+      {workspaceTab("review", "Review", <ReviewIcon size={16} />)}
       {workspaceTab("memory", "Memory", <Book size={16} />)}
       {workspaceTab("tasks", "Tasks", <Checklist size={16} />)}
       {workspaceTab("people", "People & Activity", <Users size={16} />)}

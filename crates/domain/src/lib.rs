@@ -1337,6 +1337,58 @@ pub struct HealthActionResult {
     pub task_id: Option<String>,
 }
 
+/// What is waiting in a review queue.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReviewItemKind {
+    /// A file someone marked as needing review.
+    Evidence,
+    /// A memory card whose cited evidence changed, disappeared or was retired.
+    MemoryCard,
+    /// An open Workspace Health finding.
+    HealthFinding,
+}
+
+/// Who can resolve a review item.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReviewResolver {
+    /// Anyone who can change the workspace's content.
+    Writer,
+    /// Workspace owners and administrators.
+    Admin,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReviewItem {
+    pub kind: ReviewItemKind,
+    /// The file's or memory card's id, or the finding's fingerprint.
+    pub id: String,
+    pub title: String,
+    /// Why it is waiting, in a sentence.
+    pub reason: String,
+    /// Where it lives: a file's path, a card's evidence, a finding's files.
+    pub detail: String,
+    /// The file to open: the file itself, or the first file of a finding.
+    pub artifact_id: Option<String>,
+    /// When it started waiting; open findings have no date.
+    pub since: Option<String>,
+    pub resolver: ReviewResolver,
+}
+
+/// Everything in a workspace that needs a person's attention, in one list:
+/// evidence marked *needs review*, memory cards that went stale and open
+/// health findings. An item leaves the list when it is resolved where it is
+/// worked on.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReviewQueue {
+    /// The oldest first; items without a date last.
+    pub items: Vec<ReviewItem>,
+    pub evidence_count: i64,
+    pub memory_card_count: i64,
+    pub finding_count: i64,
+}
+
 /// A job the workspace assistant knows how to do. The assistant only ever runs
 /// one of these; a message that matches none of them gets a plain reply.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

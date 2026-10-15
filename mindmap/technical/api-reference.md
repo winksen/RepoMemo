@@ -1,8 +1,8 @@
 # HTTP API reference
 
-> **Branch of:** [TECHNICAL_MINDMAP.md §5](../TECHNICAL_MINDMAP.md#5-http-api-reference-168-operations-under-v1) · **Generated** from the router and the handler signatures by `node scripts/list-routes.mjs --markdown`; the guard column is read from the handler bodies, so check a route's handler before relying on a row · **Status:** V0.2.6 (the two index routes edited by hand; regenerate before the next release candidate)
+> **Branch of:** [TECHNICAL_MINDMAP.md §5](../TECHNICAL_MINDMAP.md#5-http-api-reference-169-operations-under-v1) · **Generated** from the router and the handler signatures by `node scripts/list-routes.mjs --markdown`; the guard column is read from the handler bodies, so check a route's handler before relying on a row · **Status:** V0.2.6 (the two index routes edited by hand; regenerate before the next release candidate)
 
-163 routes of the main router, plus the platform routes (`/v1/platform/*`, [environment.rs](../../apps/server/src/environment.rs), served before an environment is attached) and the avatar routes (`/v1/users/{id}/avatar`, `/v1/profile/avatar`, [avatars.rs](../../apps/server/src/avatars.rs)).
+164 routes of the main router, plus the platform routes (`/v1/platform/*`, [environment.rs](../../apps/server/src/environment.rs), served before an environment is attached) and the avatar routes (`/v1/users/{id}/avatar`, `/v1/profile/avatar`, [avatars.rs](../../apps/server/src/avatars.rs)).
 
 ## Conventions
 
@@ -161,6 +161,7 @@
 | POST | `/v1/workspaces/{workspace_id}/ai-overview` | auth | require_workspace_read, authorize_ai_use | — | WorkspaceAiOverview |
 | POST | `/v1/workspaces/{workspace_id}/ask` | reading | require_workspace_read, authorize_ai_use | AskWorkspaceRequest | AskAnswer |
 | GET | `/v1/workspaces/{workspace_id}/knowledge-map` | auth | require_workspace_read | — | KnowledgeMap |
+| GET | `/v1/workspaces/{workspace_id}/review` | auth | require_workspace_read | — | ReviewQueue |
 | GET | `/v1/workspaces/{workspace_id}/health` | auth | require_workspace_read | — | WorkspaceHealth |
 | POST | `/v1/workspaces/{workspace_id}/health/actions` | auth | require_workspace_admin | HealthActionRequest | HealthActionResult |
 | GET | `/v1/workspaces/{workspace_id}/agent/capabilities` | auth | require_workspace_read | — | AgentCapabilitiesResponse |

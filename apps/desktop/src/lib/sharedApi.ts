@@ -485,6 +485,11 @@ export function getSharedKnowledgeMap(accessToken: string, workspaceId: string):
   return request<KnowledgeMap>(`/v1/workspaces/${workspaceId}/knowledge-map`, {}, accessToken);
 }
 
+/** What waits for a person in the workspace: files to review, stale memory cards and open health findings. */
+export function getSharedReviewQueue(accessToken: string, workspaceId: string): Promise<import("../types").ReviewQueue> {
+  return request<import("../types").ReviewQueue>(`/v1/workspaces/${workspaceId}/review`, {}, accessToken);
+}
+
 export function getSharedWorkspaceHealth(accessToken: string, workspaceId: string): Promise<WorkspaceHealth> {
   return request<WorkspaceHealth>(`/v1/workspaces/${workspaceId}/health`, {}, accessToken);
 }

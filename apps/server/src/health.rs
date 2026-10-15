@@ -26,34 +26,40 @@ pub(crate) async fn workspace_health(
 ) -> Result<Json<WorkspaceHealth>, ApiError> {
     require_workspace_read(&state, &subject, &workspace_id).await?;
     crate::consume_heavy_quota(&state, &subject)?;
+    Ok(Json(cached_workspace_health(&state, &workspace_id).await?))
+}
+
+/// The workspace's health, from the cache while its content is unchanged.
+/// The caller has checked access and counted the request.
+pub(crate) async fn cached_workspace_health(state: &AppState, workspace_id: &str) -> Result<WorkspaceHealth, ApiError> {
     let started = std::time::Instant::now();
     let version = state
         .storage
-        .workspace_content_version(&workspace_id)
+        .workspace_content_version(workspace_id)
         .await
         .map_err(map_storage_error)?;
-    if let Some(health) = state.derived.health(&workspace_id, &version) {
+    if let Some(health) = state.derived.health(workspace_id, &version) {
         crate::record_timing(
             "health_cached",
-            &workspace_id,
+            workspace_id,
             started,
             health.checked_file_count.max(0) as usize,
         );
-        return Ok(Json(health));
+        return Ok(health);
     }
     let health = state
         .core
-        .workspace_health(&workspace_id)
+        .workspace_health(workspace_id)
         .await
         .map_err(map_core_error)?;
-    state.derived.keep_health(&workspace_id, version, health.clone());
+    state.derived.keep_health(workspace_id, version, health.clone());
     crate::record_timing(
         "health",
-        &workspace_id,
+        workspace_id,
         started,
         health.checked_file_count.max(0) as usize,
     );
-    Ok(Json(health))
+    Ok(health)
 }
 
 pub(crate) async fn apply_health_action(

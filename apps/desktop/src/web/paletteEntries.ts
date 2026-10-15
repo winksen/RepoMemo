@@ -18,6 +18,7 @@ export const SECTION_LABELS: Record<WorkspaceSection, string> = {
   retrieval: "Retrieval",
   map: "Map",
   health: "Health",
+  review: "Review queue",
   memory: "Memory",
   tasks: "Tasks",
   people: "People",
