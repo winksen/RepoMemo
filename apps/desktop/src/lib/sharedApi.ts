@@ -1367,6 +1367,32 @@ export async function downloadSystemLogFile(accessToken: string, day: string): P
   return response.blob();
 }
 
+/** The audit trail of a date range as a file (full system administrators). The download is itself audited. */
+export async function downloadSystemAuditExport(accessToken: string, input: {
+  format: "jsonl" | "csv";
+  /** A day such as 2026-10-01; empty for the start of the trail. */
+  from?: string;
+  /** The last day to include; empty for now. */
+  to?: string;
+}): Promise<{ blob: Blob; filename: string; count: number }> {
+  const query = new URLSearchParams({ format: input.format });
+  if (input.from) query.set("from", input.from);
+  if (input.to) query.set("to", input.to);
+  const response = await authFetch(`${API_URL}/v1/system/audit/export?${query}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null) as { error?: { message?: string } } | null;
+    throw new SharedApiError(response.status, payload?.error?.message ?? `The shared API returned ${response.status}.`);
+  }
+  const named = /filename="([^"]+)"/.exec(response.headers.get("Content-Disposition") ?? "");
+  return {
+    blob: await response.blob(),
+    filename: named?.[1] ?? `repomemo-audit.${input.format}`,
+    count: Number(response.headers.get("X-Total-Count") ?? 0),
+  };
+}
+
 export function listSystemAuditEvents(accessToken: string): Promise<SystemAuditEvent[]> {
   return request<SystemAuditEvent[]>("/v1/system/audit?limit=200", {}, accessToken);
 }

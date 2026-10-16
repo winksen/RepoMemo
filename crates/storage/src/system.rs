@@ -504,6 +504,60 @@ impl StorageEngine {
             .collect())
     }
 
+    /// A page of audit events, oldest first, for an export: those recorded
+    /// from `from` (inclusive) until `until` (exclusive), as RFC 3339 times, after
+    /// the event at `after` (its time and id) when the previous page ended there.
+    pub async fn list_system_events_page(
+        &self,
+        from: Option<&str>,
+        until: Option<&str>,
+        after: Option<(&str, &str)>,
+        limit: i64,
+    ) -> Result<Vec<SystemAuditEvent>> {
+        let rows = sqlx::query(
+            r#"
+            SELECT e.id, e.created_at, e.action, e.detail, u.id AS user_id, u.email, u.display_name
+            FROM system_audit_events e LEFT JOIN users u ON u.id = e.actor_user_id
+            WHERE (?1 IS NULL OR e.created_at >= ?1)
+              AND (?2 IS NULL OR e.created_at < ?2)
+              AND (?3 IS NULL OR e.created_at > ?3 OR (e.created_at = ?3 AND e.id > ?4))
+            ORDER BY e.created_at ASC, e.id ASC LIMIT ?5
+            "#,
+        )
+        .bind(from)
+        .bind(until)
+        .bind(after.map(|(at, _)| at))
+        .bind(after.map(|(_, id)| id))
+        .bind(limit.clamp(1, 5000))
+        .fetch_all(self.reader())
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|row| SystemAuditEvent {
+                id: row.get("id"),
+                created_at: row.get("created_at"),
+                action: row.get("action"),
+                detail: row.get("detail"),
+                actor: row.get::<Option<String>, _>("user_id").map(|id| SharedUser {
+                    id,
+                    email: row.get("email"),
+                    display_name: row.get::<Option<String>, _>("display_name").unwrap_or_default(),
+                }),
+            })
+            .collect())
+    }
+
+    /// How many audit events fall in the same range.
+    pub async fn count_system_events(&self, from: Option<&str>, until: Option<&str>) -> Result<i64> {
+        Ok(sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM system_audit_events e WHERE (?1 IS NULL OR e.created_at >= ?1) AND (?2 IS NULL OR e.created_at < ?2)",
+        )
+        .bind(from)
+        .bind(until)
+        .fetch_one(self.reader())
+        .await?)
+    }
+
     /// Deletes system audit events recorded before `cutoff`.
     pub async fn prune_system_events(&self, cutoff: &str) -> Result<u64> {
         Ok(sqlx::query("DELETE FROM system_audit_events WHERE created_at < ?1")
@@ -518,6 +572,63 @@ impl StorageEngine {
 mod tests {
     use crate::{StorageConfig, StorageEngine};
     use serde_json::json;
+
+    /// Every event of a range, read the way an export reads them: pages of a thousand.
+    async fn read_pages(
+        storage: &StorageEngine,
+        from: Option<&str>,
+        until: Option<&str>,
+    ) -> Vec<repomemo_domain::SystemAuditEvent> {
+        let mut seen = Vec::new();
+        let mut after: Option<(String, String)> = None;
+        loop {
+            let page = storage
+                .list_system_events_page(from, until, after.as_ref().map(|(at, id)| (at.as_str(), id.as_str())), 1000)
+                .await
+                .unwrap();
+            let Some(last) = page.last() else { break };
+            after = Some((last.created_at.clone(), last.id.clone()));
+            let full = page.len() == 1000;
+            seen.extend(page);
+            if !full {
+                break;
+            }
+        }
+        seen
+    }
+
+    #[tokio::test]
+    async fn the_audit_trail_is_read_in_pages_oldest_first_within_a_range() {
+        let data_dir = std::env::temp_dir().join(format!("repomemo-audit-pages-{}", uuid::Uuid::new_v4()));
+        let storage = StorageEngine::open(StorageConfig::new(data_dir.clone())).await.unwrap();
+        for index in 0..2_300 {
+            storage
+                .record_system_event(None, "test", &format!("Event {index}"))
+                .await
+                .unwrap();
+        }
+        let everything = read_pages(&storage, None, None).await;
+        assert_eq!(everything.len(), 2_300);
+        assert_eq!(storage.count_system_events(None, None).await.unwrap(), 2_300);
+        let ids = everything.iter().map(|event| event.id.clone()).collect::<std::collections::HashSet<_>>();
+        assert_eq!(ids.len(), 2_300, "no event is read twice");
+        assert!(
+            everything.windows(2).all(|pair| (&pair[0].created_at, &pair[0].id) <= (&pair[1].created_at, &pair[1].id)),
+            "oldest first"
+        );
+
+        // A range keeps its start and leaves its end out.
+        let middle = &everything[1_000];
+        let from_middle = read_pages(&storage, Some(&middle.created_at), None).await;
+        assert_eq!(from_middle.first().unwrap().id, middle.id, "the start is included");
+        assert_eq!(storage.count_system_events(Some(&middle.created_at), None).await.unwrap() as usize, from_middle.len());
+        let before_middle = read_pages(&storage, None, Some(&middle.created_at)).await;
+        assert!(before_middle.iter().all(|event| event.created_at < middle.created_at), "the end is left out");
+        assert_eq!(before_middle.len() + from_middle.len(), 2_300);
+        assert!(read_pages(&storage, Some("2999-01-01T00:00:00+00:00"), None).await.is_empty());
+        storage.close().await;
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
 
     #[tokio::test]
     async fn system_admins_see_everything_and_the_last_one_stays() {

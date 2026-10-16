@@ -330,6 +330,8 @@ Set `REPOMEMO_BACKUP_KEY` to a passphrase of 16 or more characters and every fil
 
 ## 7. Monitoring
 
+**The audit trail** (what system administrators did) is kept in the database and trimmed by `REPOMEMO_SYSTEM_AUDIT_RETENTION_DAYS`. To keep it longer, or to hand it to an auditor or a log store, download it from System › Audit trail › *Export the audit trail* (JSON lines or CSV, by range of days), with `GET /v1/system/audit/export?format=csv&from=2026-10-01&to=2026-10-31` and a system administrator's session or token, or on a schedule with a `system`-scope token: `curl -H "Authorization: Bearer $TOKEN" "https://memo.example.com/v1/system/audit/export?from=2026-10-01&to=2026-10-31" -o audit-2026-10.jsonl`. Every export is itself an event (*audit exported*).
+
 `GET /v1/system/metrics` answers in the OpenMetrics text format. It needs a system administrator's session or a **personal access token with the system scope** (Profile › Tokens; only system administrators can create one).
 
 ```yaml

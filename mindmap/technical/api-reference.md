@@ -1,8 +1,8 @@
 # HTTP API reference
 
-> **Branch of:** [TECHNICAL_MINDMAP.md §5](../TECHNICAL_MINDMAP.md#5-http-api-reference-176-operations-under-v1) · **Generated** from the router and the handler signatures by `node scripts/list-routes.mjs --markdown`; the guard column is read from the handler bodies, so check a route's handler before relying on a row · **Status:** V0.2.6 (the two index routes edited by hand; regenerate before the next release candidate)
+> **Branch of:** [TECHNICAL_MINDMAP.md §5](../TECHNICAL_MINDMAP.md#5-http-api-reference-177-operations-under-v1) · **Generated** from the router and the handler signatures by `node scripts/list-routes.mjs --markdown`; the guard column is read from the handler bodies, so check a route's handler before relying on a row · **Status:** V0.2.6 (the two index routes edited by hand; regenerate before the next release candidate)
 
-170 routes of the main router, plus the platform routes (`/v1/platform/*`, [environment.rs](../../apps/server/src/environment.rs), served before an environment is attached) and the avatar routes (`/v1/users/{id}/avatar`, `/v1/profile/avatar`, [avatars.rs](../../apps/server/src/avatars.rs)).
+171 routes of the main router, plus the platform routes (`/v1/platform/*`, [environment.rs](../../apps/server/src/environment.rs), served before an environment is attached) and the avatar routes (`/v1/users/{id}/avatar`, `/v1/profile/avatar`, [avatars.rs](../../apps/server/src/avatars.rs)).
 
 ## Conventions
 
@@ -85,6 +85,7 @@
 | GET | `/v1/system/logs/files` | auth | require_system_admin | — | LogFilesResponse |
 | GET | `/v1/system/logs/files/{day}` | auth | require_full_system_admin | — | — |
 | GET | `/v1/system/audit` | auth | require_system_admin | — | Vec<SystemAuditEvent |
+| GET | `/v1/system/audit/export` | auth | require_full_system_admin, require_system_change | `format`, `from`, `to` query | file stream |
 | GET | `/v1/system/jobs` | auth | require_system_admin | — | Vec<SystemJob |
 | GET | `/v1/system/maintenance` | auth | require_system_admin | — | MaintenanceStatus |
 | POST | `/v1/system/maintenance/run` | auth | require_system_admin, require_system_change | — | MaintenanceStatus |

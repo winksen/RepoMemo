@@ -7,6 +7,7 @@ mod ai;
 mod ai_access;
 mod artifacts;
 mod auth;
+mod audit_export;
 mod avatars;
 mod backup;
 mod backup_copy;
@@ -525,6 +526,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route("/v1/system/logs/files", get(system::log_files))
         .route("/v1/system/logs/files/{day}", get(system::download_log_file))
         .route("/v1/system/audit", get(system::audit_events))
+        .route("/v1/system/audit/export", get(audit_export::export_audit))
         .route("/v1/system/jobs", get(system::jobs))
         .route("/v1/system/maintenance", get(system::get_maintenance))
         .route("/v1/system/maintenance/run", post(system::run_maintenance))

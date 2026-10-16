@@ -2,6 +2,19 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.46 (2026-10-16)
+
+The audit trail can be downloaded.
+
+### Added
+- **Export the audit trail** (System › Audit trail, full system administrators). Choose JSON lines or CSV and a range of days, or none for the whole trail, and download every event of it, oldest first: its id, time, who did it (id, address and name), the action and the detail. It is for an auditor, or for keeping the trail longer than the server does.
+- **The download is itself audited.** An *audit exported* event, with the range and format, is recorded before the first byte is sent, so even a download that is cut short is on record. The file stops at the moment the export began, so it does not contain its own record; the next export does.
+- **`GET /v1/system/audit/export?format=jsonl|csv&from=&to=`.** `from` and `to` are days (UTC, both included) or times such as `2026-10-15T09:30:00Z` (`to` excluded). The file is streamed in pages, so a long trail does not sit in memory, and `X-Total-Count` gives the number of events. A bad format or date, or a range that ends before it starts, is refused.
+- **Spreadsheet-safe CSV.** A cell that starts with `=`, `+`, `-`, `@`, a tab or a return (event details can hold text people typed) is prefixed with an apostrophe so a spreadsheet shows it instead of running it. Cells with commas, quotes or line breaks are quoted.
+
+### Upgrading
+- Nothing to do. The trail is still trimmed by `REPOMEMO_SYSTEM_AUDIT_RETENTION_DAYS`; export before it ages out if you need it longer. The production guide shows a `curl` line for a scheduled export with a `system`-scope token.
+
 ## V0.2.45 (2026-10-16)
 
 RepoMemo can be run with `docker compose up`.

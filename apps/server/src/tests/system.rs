@@ -950,3 +950,95 @@ async fn an_anonymized_account_loses_its_personal_data_and_what_it_wrote_stays()
     assert!(text.contains("Former member"), "{text}");
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn the_audit_trail_downloads_for_a_date_range_and_the_download_is_audited() {
+    let data_dir = temp_data_dir("audit-export");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let (admin, _) = register_account(&app, "audit-admin@example.com").await;
+    let (member, _) = register_account(&app, "audit-member@example.com").await;
+    let get = |uri: String, who: &str| {
+        let app = app.clone();
+        let request = auth_request("GET", &uri, who);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    for _ in 0..3 {
+        let run = app
+            .clone()
+            .oneshot(json_request("POST", "/v1/system/maintenance/run", &admin, json!({})))
+            .await
+            .unwrap();
+        assert_eq!(run.status(), 200);
+    }
+    let text = |response: axum::response::Response| async move {
+        let status = response.status();
+        let headers = response.headers().clone();
+        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        (status, headers, String::from_utf8(body.to_vec()).unwrap())
+    };
+
+    // JSON lines, the default: one event per line, oldest first.
+    let (status, headers, body) = text(get("/v1/system/audit/export".to_owned(), &admin).await).await;
+    assert_eq!(status, 200);
+    assert_eq!(headers["content-type"], "application/x-ndjson");
+    assert_eq!(headers["content-disposition"], "attachment; filename=\"repomemo-audit-start-now.jsonl\"");
+    let lines = body.lines().collect::<Vec<_>>();
+    assert_eq!(lines.len().to_string(), headers["x-total-count"].to_str().unwrap());
+    let events = lines
+        .iter()
+        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(events.iter().filter(|event| event["action"] == "maintenance_run").count(), 3);
+    assert!(events.windows(2).all(|pair| pair[0]["time"].as_str() <= pair[1]["time"].as_str()));
+    let run = events.iter().find(|event| event["action"] == "maintenance_run").unwrap();
+    assert_eq!(run["actor"]["email"], "audit-admin@example.com");
+    assert!(run["detail"].as_str().is_some_and(|detail| !detail.is_empty()));
+
+    // The download is on the record, and the next export holds it.
+    let trail = response_json(get("/v1/system/audit".to_owned(), &admin).await).await;
+    let recorded = trail
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|event| event["action"] == "audit_exported")
+        .expect("the export is audited");
+    assert!(recorded["detail"].as_str().unwrap().contains("from the start to now as jsonl"), "{recorded}");
+    assert_eq!(recorded["actor"]["email"], "audit-admin@example.com");
+    let (_, _, again) = text(get("/v1/system/audit/export?format=jsonl".to_owned(), &admin).await).await;
+    assert!(again.lines().any(|line| line.contains("\"audit_exported\"")));
+
+    // CSV: a header, then a row per event, with the same count.
+    let (status, headers, csv) = text(get("/v1/system/audit/export?format=csv".to_owned(), &admin).await).await;
+    assert_eq!(status, 200);
+    assert_eq!(headers["content-type"], "text/csv; charset=utf-8");
+    assert!(headers["content-disposition"].to_str().unwrap().ends_with(".csv\""));
+    let rows = csv.split("\r\n").filter(|row| !row.is_empty()).collect::<Vec<_>>();
+    assert_eq!(rows[0], "id,time,actor_id,actor_email,actor_name,action,detail");
+    assert_eq!(rows.len() - 1, headers["x-total-count"].to_str().unwrap().parse::<usize>().unwrap());
+    assert!(rows.iter().any(|row| row.contains(",maintenance_run,")));
+
+    // A date range: today's events by day, none for a day long ago, and refusals.
+    let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+    let (status, headers, body) = text(get(format!("/v1/system/audit/export?from={today}&to={today}"), &admin).await).await;
+    assert_eq!(status, 200);
+    assert_eq!(headers["content-disposition"].to_str().unwrap(), format!("attachment; filename=\"repomemo-audit-{today}-{today}.jsonl\""));
+    assert!(body.lines().count() >= 3);
+    let (status, headers, body) = text(get("/v1/system/audit/export?from=2000-01-01&to=2000-01-31&format=csv".to_owned(), &admin).await).await;
+    assert_eq!(status, 200);
+    assert_eq!(headers["x-total-count"], "0");
+    assert_eq!(body, "id,time,actor_id,actor_email,actor_name,action,detail\r\n");
+    for refused in [
+        "format=xml",
+        "from=yesterday",
+        "to=2026-13-40",
+        "from=2999-01-01",
+        "from=2026-10-20&to=2026-10-01",
+    ] {
+        let response = get(format!("/v1/system/audit/export?{refused}"), &admin).await;
+        assert_eq!(response.status(), 400, "{refused}");
+    }
+
+    // Only a system administrator may.
+    assert_eq!(get("/v1/system/audit/export".to_owned(), &member).await.status(), 403);
+    let _ = std::fs::remove_dir_all(data_dir);
+}

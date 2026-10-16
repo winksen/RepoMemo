@@ -56,6 +56,7 @@ import {
   getSystemSettings,
   getSystemUsage,
   clearSharedSession,
+  downloadSystemAuditExport,
   listSystemAuditEvents,
   listSystemJobs,
   listSystemUsers,
@@ -151,7 +152,7 @@ export function SystemAdminPanel({ accessToken, onNavigateSection, onOpenWorkspa
     {section === "settings" ? <SettingsSection accessToken={accessToken} session={session} /> : null}
     {section === "logs" ? <LogsSection accessToken={accessToken} canDownload={session.is_system_admin === true} onOpenSettings={() => onNavigateSection("settings")} workspaces={workspaces} /> : null}
     {section === "jobs" ? <JobsSection accessToken={accessToken} canChange={session.is_system_admin === true} /> : null}
-    {section === "audit" ? <AuditSection accessToken={accessToken} /> : null}
+    {section === "audit" ? <AuditSection accessToken={accessToken} canExport={session.is_system_admin === true} /> : null}
     {section === "console" ? <SystemConsole accessToken={accessToken} /> : null}
   </section>;
 }
@@ -858,9 +859,42 @@ function JobsSection({ accessToken, canChange }: { accessToken: string; canChang
   </>;
 }
 
-function AuditSection({ accessToken }: { accessToken: string }) {
+function AuditSection({ accessToken, canExport }: { accessToken: string; canExport: boolean }) {
   const [events, isLoading, reload] = useSystemData<SystemAuditEvent[]>(() => listSystemAuditEvents(accessToken), [accessToken]);
+  const [format, setFormat] = useState<"jsonl" | "csv">("jsonl");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [isExporting, setIsExporting] = useState(false);
+
+  async function exportTrail() {
+    setIsExporting(true);
+    try {
+      const { blob, filename, count } = await downloadSystemAuditExport(accessToken, { format, from, to });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      showToast("success", `Downloaded ${count.toLocaleString()} audit event${count === 1 ? "" : "s"}. The download is recorded in the trail.`);
+      void reload();
+    } catch (error) { showToast("error", errorMessage(error, "The audit trail could not be exported.")); }
+    finally { setIsExporting(false); }
+  }
+
   return <>
+    {canExport ? <section className="shared-settings-group rm-audit-export">
+      <div className="shared-panel-heading"><div><Download size={18} /><h2>Export the audit trail</h2></div><span>JSON lines or CSV</span></div>
+      <p className="shared-muted-copy">Every event of a range of days (UTC), oldest first, for an auditor or a log store. Leave both days empty for the whole trail. The export is recorded here, and a CSV cell that a spreadsheet could run as a formula is marked with an apostrophe.</p>
+      <div className="rm-system-toolbar">
+        <label className="rm-system-inline">Format<Dropdown aria-label="Export format" onValueChange={(value) => setFormat(value === "csv" ? "csv" : "jsonl")} options={[{ label: "JSON lines", value: "jsonl" }, { label: "CSV", value: "csv" }]} value={format} /></label>
+        <label className="rm-system-inline">From<Input aria-label="From day" max={to || undefined} onChange={(event) => setFrom(event.target.value)} type="date" value={from} /></label>
+        <label className="rm-system-inline">To<Input aria-label="To day" min={from || undefined} onChange={(event) => setTo(event.target.value)} type="date" value={to} /></label>
+        <Button disabled={isExporting} onClick={() => void exportTrail()} type="button" variant="secondary">{isExporting ? <Loader className="spin" size={16} /> : <Download size={16} />} Download</Button>
+      </div>
+    </section> : null}
     <div className="rm-system-toolbar"><span className="shared-muted-copy">The 200 most recent events. Sign-in and other security events are under Logs › Security events only.</span><RefreshButton isLoading={isLoading} onClick={() => void reload()} /></div>
     {events?.length ? <div className="rm-map-coverage"><table>
       <thead><tr><th scope="col">When</th><th scope="col">Who</th><th scope="col">Action</th><th scope="col">Detail</th></tr></thead>

@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.45` (2026-10-16), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.46` (2026-10-16), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -390,7 +390,7 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 | **V0.2.43** ✅ | ✨ | Backups | A second copy of each backup to another folder or network share | O6b | The copy is verified against the manifest |
 | **V0.2.44** ✅ | 🐞 | Indexing | Document readings in a subprocess with time and memory limits | P10 | An overrunning reading is killed, not abandoned (R2-4 closed) |
 | **V0.2.45** ✅ | ✨ | Operations | A container image and a compose file with the proxy | O7 | `docker compose up` gives a working server behind TLS, with data in a volume |
-| **V0.2.46** | ✨ | System › Audit | Export of the audit trail (JSON lines, CSV) | O8 | A date range downloads; the download itself is audited |
+| **V0.2.46** ✅ | ✨ | System › Audit | Export of the audit trail (JSON lines, CSV) | O8 | A date range downloads; the download itself is audited |
 
 #### Track H: Experience (V0.2.47–V0.2.48)
 
@@ -770,6 +770,16 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 - [x] Production guide: "In containers" (what runs, first start, what the compose file settles, backup copy and repositories on mounts, upgrading, a proxy of your own)
 - [ ] The images were not built or started in this release (the checks read the files only), so the first `docker compose up` is the maintainer's to try; no published image or registry, no `arm64` job, no `docker compose` test in CI, no Kubernetes manifests, and Caddy's certificate for a real name needs the ports reachable from the internet
 
+
+#### V0.2.46: Audit trail export
+
+- [x] **O8** `GET /v1/system/audit/export?format=&from=&to=` (`apps/server/src/audit_export.rs`, full system administrators like log files): JSON lines (default) or CSV, a range of days in UTC (both included) or RFC 3339 times, oldest first, streamed in pages of 1,000 (`StorageEngine::list_system_events_page` by `(created_at, id)`, `count_system_events`); the file stops at the moment the export began; `X-Total-Count` carries the number of events; a bad format or date, or an empty range, is a `400`
+- [x] **The download itself is audited**: `audit_exported` (range and format) is recorded before the first byte, so a download cut short is on record; the file does not contain its own record, the next export does
+- [x] CSV: quoted when needed (RFC 4180, CRLF) and every cell that starts with `=`, `+`, `-`, `@`, a tab or a return is prefixed with an apostrophe so a spreadsheet does not run it
+- [x] Web: *Export the audit trail* in System › Audit trail (format, from, to, *Download*), the toast gives the count and the list refreshes to show the new event
+- [x] Tests: cells, rows and lines, the range parser (units), the paging over 2,300 events with a range (storage), `the_audit_trail_downloads_for_a_date_range_and_the_download_is_audited` (JSON lines and CSV, order and count, the export on the record and in the next export, a range by day, an empty range, refusals, a non-administrator) and `downloadSystemAuditExport`
+- [ ] Only the system audit trail: workspace activity, security events and logs have their own places (activity feed, Logs); no signed or hash-chained export, and no export on a schedule from the server itself (use a token and `curl`, see the production guide)
+
 ### Decisions to agree before work starts
 
 | # | Decision | Needed by | Proposal |
@@ -885,7 +895,7 @@ Every item of both roads, with the release it is planned for. The evidence behin
 | O5 | OpenMetrics export | S | ✅ V0.1.75 |
 | O6 | Encrypted backups (6a, R2-5) and a second copy after each backup (6b) | S–M | ✅ V0.2.42, V0.2.43 (decision 14) |
 | O7 | Container image and compose file with the proxy | S–M | ✅ V0.2.45 |
-| O8 | Audit trail export | S | V0.2.46 |
+| O8 | Audit trail export | S | ✅ V0.2.46 |
 | D1 | Tracker retired, `PRODUCT.md`, Postman v5 | S | ✅ V0.1.66 |
 | R5 | Mindmaps, branch pages, changelog, upgrade notes | M | ✅ V0.1.76 |
 | R6 follow-up | Corrections from the clean-machine install | S | V0.2.1 |
