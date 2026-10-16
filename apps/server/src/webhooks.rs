@@ -19,7 +19,10 @@
 //! Every comparison is constant time. A call that cannot be verified is
 //! answered `401` the same way whether or not the source exists, and
 //! failures are limited per client address so the endpoint cannot be used to
-//! guess or to flood.
+//! guess or to flood. A delivery id a source has already been sent (GitHub's
+//! `X-GitHub-Delivery`, GitLab's `X-Gitlab-Event-UUID`, a generic sender's
+//! `X-RepoMemo-Delivery`) is not acted on twice within the hour, so a signed
+//! call that was captured cannot be replayed to keep a source syncing.
 
 use axum::{body::Bytes, http::HeaderMap};
 use ring::hmac;
@@ -29,7 +32,7 @@ use crate::*;
 
 /// The largest body accepted: push payloads are a few KiB, and a sync never
 /// needs more than the branch name from them.
-const MAX_BODY_BYTES: usize = 1024 * 1024;
+pub(crate) const MAX_BODY_BYTES: usize = 1024 * 1024;
 /// Failed calls per client address per minute.
 const FAILURES_PER_MINUTE: u32 = 20;
 /// Verified calls per source per minute.
@@ -60,6 +63,25 @@ fn sender_of(headers: &HeaderMap) -> Option<Sender> {
 fn same_secret(left: &[u8], right: &[u8]) -> bool {
     let key = hmac::Key::new(hmac::HMAC_SHA256, b"repomemo webhook comparison");
     hmac::verify(&key, left, hmac::sign(&key, right).as_ref()).is_ok()
+}
+
+/// The id a sender gives this delivery, or empty when it gives none.
+fn delivery_id<'a>(sender: &Sender, headers: &'a HeaderMap) -> &'a str {
+    header(
+        headers,
+        match sender {
+            Sender::GitHub => "x-github-delivery",
+            Sender::GitLab => "x-gitlab-event-uuid",
+            Sender::Generic => "x-repomemo-delivery",
+        },
+    )
+}
+
+/// What `authenticate` made of a call that is signed right.
+enum Delivery {
+    Fresh(Sender),
+    /// The delivery id was already received in the last hour.
+    Repeated,
 }
 
 fn header<'a>(headers: &'a HeaderMap, name: &str) -> &'a str {
@@ -159,7 +181,7 @@ async fn authenticate(
     exists: bool,
     headers: &HeaderMap,
     body: &[u8],
-) -> Result<Sender, ApiError> {
+) -> Result<Delivery, ApiError> {
     let fail = |state: &AppState| -> ApiError {
         // Only failures are counted against the address, so a host that
         // pushes a lot is never slowed by its own successes.
@@ -204,6 +226,19 @@ async fn authenticate(
     if !(exists && secret.is_some() && signed) {
         return Err(fail(state));
     }
+    // A repeat is answered without counting against the source's calls, so replaying a captured
+    // call cannot use up the quota the real sender needs.
+    let delivery = delivery_id(&sender, headers);
+    if !delivery.is_empty()
+        && delivery.len() <= 128
+        && state
+            .guards
+            .auth
+            .check(&format!("delivery:{source_id}:{delivery}"), Quota::per_hour(1))
+            .is_err()
+    {
+        return Ok(Delivery::Repeated);
+    }
     state
         .guards
         .auth
@@ -217,7 +252,7 @@ async fn authenticate(
     if let Err(error) = state.storage.touch_repo_webhook(source_id).await {
         tracing::warn!(error = %format!("{error:#}"), "A webhook's last call could not be noted");
     }
-    Ok(sender)
+    Ok(Delivery::Fresh(sender))
 }
 
 fn answer(status: StatusCode, queued: bool, note: &str) -> (StatusCode, Json<Value>) {
@@ -234,7 +269,10 @@ pub(crate) async fn receive_repository_webhook(
     body: Bytes,
 ) -> Result<(StatusCode, Json<Value>), ApiError> {
     let repository = state.core.repo_source(&source_id).await.ok();
-    let sender = authenticate(&state, &client, &source_id, repository.is_some(), &headers, &body).await?;
+    let sender = match authenticate(&state, &client, &source_id, repository.is_some(), &headers, &body).await? {
+        Delivery::Fresh(sender) => sender,
+        Delivery::Repeated => return Ok(answer(StatusCode::ACCEPTED, false, "already received")),
+    };
     let Some(repository) = repository else {
         return Err(ApiError::unauthorized());
     };
@@ -264,7 +302,10 @@ pub(crate) async fn receive_connector_webhook(
     body: Bytes,
 ) -> Result<(StatusCode, Json<Value>), ApiError> {
     let connector = state.core.connector_source(&source_id).await.ok();
-    let sender = authenticate(&state, &client, &source_id, connector.is_some(), &headers, &body).await?;
+    let sender = match authenticate(&state, &client, &source_id, connector.is_some(), &headers, &body).await? {
+        Delivery::Fresh(sender) => sender,
+        Delivery::Repeated => return Ok(answer(StatusCode::ACCEPTED, false, "already received")),
+    };
     let Some(connector) = connector else {
         return Err(ApiError::unauthorized());
     };

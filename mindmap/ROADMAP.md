@@ -1,8 +1,8 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.51` (2026-10-16), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.52` (2026-10-16), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
-> **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
+> **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Security review 2026-10-16 (V0.2.52)](security/2026-10-16-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
 RepoMemo started as a local-first desktop workbench. It is now a **self-hosted team product**: a shared API server with a web client, organizations and roles, collaboration, git repositories as living sources, business documents, and optional AI grounded in cited evidence. A server can be installed and administered entirely from the browser (environment menu, first-run setup, System area, admin console).
 
@@ -411,7 +411,7 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 
 | Release | Type | Section | The one change | IDs | Done when |
 |---|---|---|---|---|---|
-| **V0.2.52** | 📘 | Security | Feature freeze and the fourth security pass over mail, webhooks, remote clones, connectors, export and import, and the desktop client, with its fixes | R7, R8 | No high or medium finding open |
+| **V0.2.52** ✅ | 📘 | Security | Feature freeze and the fourth security pass over mail, webhooks, remote clones, connectors, export and import, and the desktop client, with its fixes | R7, R8 | No high or medium finding open |
 | **V0.2.53** | 📘 | Release | Upgrade test from 0.2.0 environments in CI | R9 | Stored 0.2.0 schemas upgrade in place and pass |
 | **V0.2.54** | 📘 | Performance | Performance run at 50,000 passages plus a 100,000-file remote repository and 10,000 issues | R10 | The V0.2.0 targets still hold; results in the release notes |
 | **V0.2.55** | 📘 | Documentation | Mindmaps, branch pages (`repository-sources`, a new `connectors` page, `operations`), changelog and upgrade notes from 0.2.x | R11 | Every page matches the code |
@@ -831,6 +831,17 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 - [ ] **Left for the removal release (V0.3.x):** delete `LocalDesktopApp` (`App.tsx`, about 2,700 lines), `lib/repomemoApi.ts`, the 26 local Tauri commands and `RepoMemoCore::boot` in the shell, the local-only styles, the Tauri commands of the move (`handoff.rs`) and `DesktopApp`'s local branch; the shell then needs no `repomemo-api` dependency but the move's archive writer, if it is kept for the web client
 - [ ] Not run: the app was not started; the banner's layout is unchecked on screen
 
+#### V0.2.52: Feature freeze and the fourth security pass
+
+- [x] **R7** From this release only the release candidate's checks and their fixes go in until V0.3.0 (the freeze of "How the 0.2.x releases are cut")
+- [x] **R8** The fourth pass: [mindmap/security/2026-10-16-security-review.md](security/2026-10-16-security-review.md). Every requirement of §8 of the previous review was looked up in the code (mail, remote clones, webhooks, connectors, export and import, the desktop client); the report has the table, the findings and what was found sound. **0 high, 3 medium, 4 low, 5 informational; no high or medium finding is open**
+- [x] **S4-1 (medium)** Mail: 12 messages an hour to one address, 60 an hour caused by one person, nothing queued while 1,000 wait; the invitation is still made and its link returned with `mail: "rate_limited"` (`mail.rs`, `InviteMembers.tsx`)
+- [x] **S4-2 (medium)** The twelve public endpoints take 64 KiB, the webhook receivers 1 MiB, instead of the upload limit (`lib.rs`, `PUBLIC_BODY_BYTES`)
+- [x] **S4-3 (medium)** Import: the declared total saturates (`blob_bytes`), an archive that claims more than 100 times its size (and over 64 MiB) is refused before it is unpacked, and each entry is read only up to what the manifest declares (`workspace_import.rs`)
+- [x] **S4-4 to S4-7 (low)** Webhook delivery ids remembered for an hour (`already received`); connector answers read up to their cap; the desktop client follows no redirects; `ProxyCommand=none` for `ssh` clones
+- [x] Tests: `an_address_cannot_be_flooded_with_invitations_through_the_server`, `anonymous_endpoints_take_small_bodies_whatever_the_upload_limit_is`, `an_archive_that_claims_far_more_than_it_is_made_of_is_refused_before_it_is_unpacked`, `the_total_of_declared_sizes_saturates_instead_of_wrapping`, and the delivery-id steps of the repository webhook test
+- [ ] **Not run:** the review is a reading of the code and nothing was run or attacked; the new tests compile (`cargo check --tests`) but were not executed. `cargo deny` and `npm audit` (CI) are the check of record for the new crates of V0.2.49. The 2026-10-14 review's open items (E3: who may create an organization, among them) are tracked in their own report and were not re-read
+
 ### Decisions to agree before work starts
 
 | # | Decision | Needed by | Proposal |
@@ -897,7 +908,7 @@ Every item of both roads, with the release it is planned for. The evidence behin
 | — | Accepted | N9 (not a boundary, documented), I1, I4 | — |
 | S6 | Remote sources | Credential store and host allowlist (6a ✅ V0.2.19), clone limits (6b); each later surface (SMTP, webhooks, connectors) brings its own rules | V0.2.19, V0.2.22 |
 | — | Registration without enumeration | M4 residual | ✅ V0.2.18 |
-| — | Fourth pass | Mail, webhooks, remote clones, connectors, export and import, desktop client | V0.2.52 (R8) |
+| — | Fourth pass | Mail, webhooks, remote clones, connectors, export and import, desktop client | ✅ V0.2.52 (R8): [review of 2026-10-16](security/2026-10-16-security-review.md), 3 medium and 4 low fixed, 5 informational |
 
 ### Platform performance
 
@@ -950,7 +961,7 @@ Every item of both roads, with the release it is planned for. The evidence behin
 | D1 | Tracker retired, `PRODUCT.md`, Postman v5 | S | ✅ V0.1.66 |
 | R5 | Mindmaps, branch pages, changelog, upgrade notes | M | ✅ V0.1.76 |
 | R6 follow-up | Corrections from the clean-machine install | S | V0.2.1 |
-| R7–R12 | Release candidate for V0.3.0: freeze and fourth security pass (R7, R8), upgrade from 0.2.0 (R9), performance with remote sources (R10), documentation (R11), clean install (R12) | M | V0.2.52–V0.2.56 |
+| R7–R12 | Release candidate for V0.3.0: freeze and fourth security pass (R7 ✅, R8 ✅ V0.2.52), upgrade from 0.2.0 (R9), performance with remote sources (R10), documentation (R11), clean install (R12) | M | V0.2.52–V0.2.56 |
 
 ### Experience
 

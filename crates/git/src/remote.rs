@@ -455,7 +455,7 @@ fn remote_command(target: &RemoteTarget) -> Result<(Command, SshFiles)> {
         let ssh = format!(
             "ssh -i {key} -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes \
              -o UserKnownHostsFile={hosts} -o GlobalKnownHostsFile={null} -o IdentityAgent=none \
-             -o ForwardAgent=no -o ClearAllForwardings=yes -o PasswordAuthentication=no \
+             -o ForwardAgent=no -o ClearAllForwardings=yes -o PasswordAuthentication=no -o ProxyCommand=none \
              -o KbdInteractiveAuthentication=no -o ConnectTimeout=30 -F {null}",
             key = ssh_path(&key_path),
             hosts = ssh_path(&hosts_path),

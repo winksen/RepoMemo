@@ -1587,6 +1587,22 @@ async fn push_webhooks_queue_a_sync_only_when_they_are_signed_right() {
     let (status, body) = send(hook_path.clone(), github("issues"), push).await;
     assert_eq!((status, body["queued"].as_bool()), (202, Some(false)));
 
+    // A delivery id is acted on once: the same call again, signed right, is only noted as received.
+    let mut delivered = github("push");
+    delivered.push(("x-github-delivery", "delivery-1".to_owned()));
+    let (status, first) = send(hook_path.clone(), delivered.clone(), push).await;
+    assert_eq!(status, 202);
+    assert_ne!(first["note"].as_str(), Some("already received"));
+    let (status, again) = send(hook_path.clone(), delivered, push).await;
+    assert_eq!(
+        (status, again["queued"].as_bool(), again["note"].as_str()),
+        (202, Some(false), Some("already received"))
+    );
+    let mut other = github("push");
+    other.push(("x-github-delivery", "delivery-2".to_owned()));
+    let (_, next) = send(hook_path.clone(), other, push).await;
+    assert_ne!(next["note"].as_str(), Some("already received"), "a new delivery is a new call");
+
     // GitLab sends the secret itself; a generic sender signs like GitHub.
     let (status, _) = send(
         hook_path.clone(),

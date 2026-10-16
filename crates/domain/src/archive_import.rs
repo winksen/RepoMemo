@@ -51,9 +51,43 @@ impl ArchiveManifest {
         check
     }
 
-    /// Total bytes of the stored files the archive holds.
+    /// Total bytes of the stored files the archive holds. Sizes are the archive's own claim, so the
+    /// sum saturates instead of wrapping around to a small number.
     pub fn blob_bytes(&self) -> u64 {
-        self.blobs.iter().map(|blob| blob.size_bytes).sum()
+        self.blobs
+            .iter()
+            .fold(0_u64, |total, blob| total.saturating_add(blob.size_bytes))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{ArchiveBlob, ArchiveCounts};
+
+    fn manifest(sizes: &[u64]) -> ArchiveManifest {
+        ArchiveManifest {
+            format: ARCHIVE_FORMAT.to_owned(),
+            format_version: ARCHIVE_FORMAT_VERSION,
+            created_at: String::new(),
+            app_version: "test".to_owned(),
+            workspace_name: "Test".to_owned(),
+            counts: ArchiveCounts::default(),
+            data_sha256: String::new(),
+            data_bytes: 0,
+            blobs: sizes
+                .iter()
+                .enumerate()
+                .map(|(index, size)| ArchiveBlob { hash: format!("{index:064x}"), size_bytes: *size })
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn the_total_of_declared_sizes_saturates_instead_of_wrapping() {
+        assert_eq!(manifest(&[10, 20]).blob_bytes(), 30);
+        assert_eq!(manifest(&[u64::MAX / 2 + 1, u64::MAX / 2 + 1]).blob_bytes(), u64::MAX);
+        assert_eq!(manifest(&[u64::MAX, 5]).blob_bytes(), u64::MAX);
     }
 }
 

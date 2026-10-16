@@ -1467,3 +1467,58 @@ async fn open_registration_answers_the_same_for_a_known_address_and_mails_its_ow
         .any(|entry| entry["kind"] == "email_verification" && entry["to_address"] == "same-admin@example.com"));
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn an_address_cannot_be_flooded_with_invitations_through_the_server() {
+    let data_dir = temp_data_dir("mail-flood");
+    let mut config = ServerConfig::for_test(data_dir.clone());
+    config.public_url = Some("https://memo.example.com".to_owned());
+    let app = router(config).await.unwrap();
+    let (admin, _) = register_account(&app, "flood-admin@example.com").await;
+    let workspace_id = create_workspace(&app, &admin).await;
+    let call = |method: &'static str, uri: String, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, &admin, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let saved = call(
+        "PUT",
+        "/v1/system/mail".to_owned(),
+        json!({"enabled": true, "host": "mail.invalid", "port": 587, "security": "starttls", "username": "",
+               "from_address": "memo@example.com", "from_name": "RepoMemo"}),
+    )
+    .await;
+    assert_eq!(saved.status(), 200);
+
+    let mut answers = Vec::new();
+    for _ in 0..14 {
+        let invited = call(
+            "POST",
+            format!("/v1/workspaces/{workspace_id}/invitations"),
+            json!({"email": "victim@example.com", "role": "viewer"}),
+        )
+        .await;
+        assert_eq!(invited.status(), 201, "the invitation itself is still made, with its link");
+        answers.push(response_json(invited).await["mail"].as_str().unwrap().to_owned());
+    }
+    assert_eq!(answers.iter().filter(|answer| *answer == "queued").count(), 12, "{answers:?}");
+    assert!(answers[12..].iter().all(|answer| answer == "rate_limited"), "{answers:?}");
+
+    // Only twelve are in the outbox, and another address is not affected.
+    let outbox = response_json(call("GET", "/v1/system/mail/outbox?limit=100".to_owned(), json!({})).await).await;
+    let to_victim = outbox
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|entry| entry["to_address"] == "victim@example.com")
+        .count();
+    assert_eq!(to_victim, 12);
+    let other = call(
+        "POST",
+        format!("/v1/workspaces/{workspace_id}/invitations"),
+        json!({"email": "someone-else@example.com", "role": "viewer"}),
+    )
+    .await;
+    assert_eq!(response_json(other).await["mail"], "queued");
+    let _ = std::fs::remove_dir_all(data_dir);
+}

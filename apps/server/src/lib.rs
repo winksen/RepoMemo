@@ -462,28 +462,33 @@ fn cors_layer(config: &ServerConfig) -> CorsLayer {
 
 /// The routes of one attached environment. Cross-origin handling is done by
 /// the host in front of it.
+/// The body an anonymous caller may send to the sign-in, registration, reset, invitation and setup
+/// endpoints (small JSON documents). The upload limit (`REPOMEMO_MAX_UPLOAD_MB`, up to 1 GiB) is
+/// for signed-in callers: without this, anyone could make the server hold that much per request.
+const PUBLIC_BODY_BYTES: usize = 64 * 1024;
+
 fn routes(state: AppState, config: &ServerConfig) -> Router {
     Router::new()
         .route("/health", get(health))
         .route("/health/ready", get(readiness))
         .route("/v1/setup", get(setup::get_status))
-        .route("/v1/setup/verify-code", post(setup::verify_code))
-        .route("/v1/setup/admin", post(setup::create_admin))
+        .route("/v1/setup/verify-code", post(setup::verify_code).layer(DefaultBodyLimit::max(PUBLIC_BODY_BYTES)))
+        .route("/v1/setup/admin", post(setup::create_admin).layer(DefaultBodyLimit::max(PUBLIC_BODY_BYTES)))
         .route("/v1/setup/checks", get(setup::checks))
         .route("/v1/setup/complete", post(setup::complete))
-        .route("/v1/auth/register", post(register))
-        .route("/v1/auth/login", post(login))
-        .route("/v1/auth/refresh", post(refresh_session))
-        .route("/v1/auth/logout", post(logout))
+        .route("/v1/auth/register", post(register).layer(DefaultBodyLimit::max(PUBLIC_BODY_BYTES)))
+        .route("/v1/auth/login", post(login).layer(DefaultBodyLimit::max(PUBLIC_BODY_BYTES)))
+        .route("/v1/auth/refresh", post(refresh_session).layer(DefaultBodyLimit::max(PUBLIC_BODY_BYTES)))
+        .route("/v1/auth/logout", post(logout).layer(DefaultBodyLimit::max(PUBLIC_BODY_BYTES)))
         .route("/v1/auth/logout-all", post(logout_everywhere))
-        .route("/v1/auth/forgot-password", post(access::forgot_password))
-        .route("/v1/auth/verify-email", post(verification::verify_email))
+        .route("/v1/auth/forgot-password", post(access::forgot_password).layer(DefaultBodyLimit::max(PUBLIC_BODY_BYTES)))
+        .route("/v1/auth/verify-email", post(verification::verify_email).layer(DefaultBodyLimit::max(PUBLIC_BODY_BYTES)))
         .route("/v1/profile/email/verify", post(verification::resend))
         .route("/v1/profile/email", put(verification::change_email))
-        .route("/v1/auth/password-reset/preview", post(access::preview_password_reset))
-        .route("/v1/auth/password-reset", post(access::complete_password_reset))
-        .route("/v1/invitations/preview", post(access::preview_invitation))
-        .route("/v1/invitations/accept", post(access::accept_invitation))
+        .route("/v1/auth/password-reset/preview", post(access::preview_password_reset).layer(DefaultBodyLimit::max(PUBLIC_BODY_BYTES)))
+        .route("/v1/auth/password-reset", post(access::complete_password_reset).layer(DefaultBodyLimit::max(PUBLIC_BODY_BYTES)))
+        .route("/v1/invitations/preview", post(access::preview_invitation).layer(DefaultBodyLimit::max(PUBLIC_BODY_BYTES)))
+        .route("/v1/invitations/accept", post(access::accept_invitation).layer(DefaultBodyLimit::max(PUBLIC_BODY_BYTES)))
         .route("/v1/invitations/{invitation_id}", delete(access::revoke_invitation))
         .route(
             "/v1/profile/tokens",
@@ -769,7 +774,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         )
         .route(
             "/v1/webhooks/repositories/{source_id}",
-            post(webhooks::receive_repository_webhook),
+            post(webhooks::receive_repository_webhook).layer(DefaultBodyLimit::max(webhooks::MAX_BODY_BYTES)),
         )
         .route(
             "/v1/connectors/{source_id}/webhook",
@@ -777,7 +782,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         )
         .route(
             "/v1/webhooks/connectors/{source_id}",
-            post(webhooks::receive_connector_webhook),
+            post(webhooks::receive_connector_webhook).layer(DefaultBodyLimit::max(webhooks::MAX_BODY_BYTES)),
         )
         .route(
             "/v1/repositories/{source_id}/files",

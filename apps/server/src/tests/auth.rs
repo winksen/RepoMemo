@@ -1051,3 +1051,38 @@ async fn a_new_server_is_set_up_once_through_the_onboarding() {
     assert_eq!(status["onboarding"], false);
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn anonymous_endpoints_take_small_bodies_whatever_the_upload_limit_is() {
+    let data_dir = temp_data_dir("small-bodies");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let padding = "x".repeat(200 * 1024);
+    for uri in [
+        "/v1/auth/login",
+        "/v1/auth/register",
+        "/v1/auth/refresh",
+        "/v1/auth/forgot-password",
+        "/v1/auth/password-reset",
+        "/v1/invitations/accept",
+        "/v1/setup/verify-code",
+    ] {
+        let response = app
+            .clone()
+            .oneshot(public_post(uri, json!({ "email": "a@example.com", "password": padding })))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), 413, "{uri} accepted a body of 200 KiB from nobody");
+    }
+    // A webhook takes up to a mebibyte, and not a body above it.
+    let big = Request::builder()
+        .method("POST")
+        .uri("/v1/webhooks/repositories/anything")
+        .header("x-gitlab-token", "guess")
+        .body(Body::from(vec![b'x'; 2 * 1024 * 1024]))
+        .unwrap();
+    assert_eq!(app.clone().oneshot(big).await.unwrap().status(), 413);
+    // Ordinary calls are not affected.
+    let (_, tokens) = register_account(&app, "small-bodies@example.com").await;
+    assert!(tokens["access_token"].is_string());
+    let _ = std::fs::remove_dir_all(data_dir);
+}

@@ -48,6 +48,11 @@ const BLOB_MAX_BYTES: u64 = 1024 * MIB;
 /// Passages of at most this many files are found again during the import
 /// (they have to be indexed to be found); the rest widen to their file.
 const INLINE_INDEX_FILES: usize = 100;
+/// An archive may unpack to this many times its own size at the most. Text compresses ten to
+/// thirty times; a file that claims more is a compression bomb.
+const MAX_EXPANSION: u64 = 100;
+/// Whatever the ratio, an archive may always unpack to this much.
+const EXPANSION_ALLOWANCE: u64 = 64 * MIB;
 /// Temporary files older than this are leftovers of an interrupted import.
 const STALE_AFTER: std::time::Duration = std::time::Duration::from_secs(24 * 60 * 60);
 
@@ -188,8 +193,27 @@ async fn read_archive(
         return Ok(report(&manifest, None, problems, Vec::new(), query.dry_run));
     }
 
+    // A small file that claims to hold something huge is refused before any of it is unpacked, and
+    // what the manifest claims is also the most any entry may unpack to.
+    let compressed = std::fs::metadata(path).map(|metadata| metadata.len()).unwrap_or(0);
+    let declared = manifest.data_bytes.saturating_add(manifest.blob_bytes());
+    let allowed = compressed.saturating_mul(MAX_EXPANSION).max(EXPANSION_ALLOWANCE);
+    if declared > allowed {
+        return Ok(report(
+            &manifest,
+            None,
+            vec![format!(
+                "The file is {} but claims to hold {} once unpacked, more than the {MAX_EXPANSION} to 1 a real archive reaches. It was refused as a possible compression bomb.",
+                format_bytes(compressed),
+                format_bytes(declared)
+            )],
+            Vec::new(),
+            query.dry_run,
+        ));
+    }
+
     let (name, bytes) = reader
-        .next_entry(DATA_MAX_BYTES)
+        .next_entry(manifest.data_bytes.min(DATA_MAX_BYTES))
         .map_err(damaged)?
         .ok_or_else(|| damaged("its data is missing"))?;
     if name != ARCHIVE_DATA_ENTRY {
@@ -235,7 +259,7 @@ async fn read_archive(
     let mut seen = HashSet::new();
     let mut read = 0_u64;
     let budget = manifest.blob_bytes();
-    while let Some((name, bytes)) = reader.next_entry(BLOB_MAX_BYTES).map_err(damaged)? {
+    while let Some((name, bytes)) = reader.next_entry(budget.min(BLOB_MAX_BYTES)).map_err(damaged)? {
         let Some(hash) = name.strip_prefix(ARCHIVE_BLOB_PREFIX) else {
             warnings.push(format!("{name} is not something this server knows and was skipped."));
             continue;

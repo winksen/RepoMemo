@@ -2136,3 +2136,53 @@ async fn a_local_workspace_archived_by_the_desktop_app_imports_with_its_memory_a
     let _ = std::fs::remove_dir_all(local_dir);
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+
+#[tokio::test]
+async fn an_archive_that_claims_far_more_than_it_is_made_of_is_refused_before_it_is_unpacked() {
+    let data_dir = temp_data_dir("import-bomb");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let (_, _) = register_account(&app, "bomb-admin@example.com").await;
+    let (owner, _) = register_account(&app, "bomb-owner@example.com").await;
+    let _ = create_workspace(&app, &owner).await;
+    let listed = response_json(app.clone().oneshot(auth_request("GET", "/v1/workspaces", &owner)).await.unwrap()).await;
+    let organization_id = listed[0]["organization_id"].as_str().unwrap().to_owned();
+
+    // A few hundred bytes of archive whose manifest lists a file of 300 MiB.
+    let manifest = repomemo_domain::ArchiveManifest {
+        format: repomemo_domain::ARCHIVE_FORMAT.to_owned(),
+        format_version: repomemo_domain::ARCHIVE_FORMAT_VERSION,
+        created_at: "2026-10-16T10:00:00Z".to_owned(),
+        app_version: "0.2.52".to_owned(),
+        workspace_name: "Bomb".to_owned(),
+        counts: repomemo_domain::ArchiveCounts::default(),
+        data_sha256: String::new(),
+        data_bytes: 10,
+        blobs: vec![repomemo_domain::ArchiveBlob { hash: "0".repeat(64), size_bytes: 300 * 1024 * 1024 }],
+    };
+    let mut encoder = repomemo_api::ArchiveEncoder::new();
+    encoder
+        .add("manifest.json", &serde_json::to_vec(&manifest).unwrap(), 0)
+        .unwrap();
+    let archive = encoder.finish().unwrap();
+    assert!(archive.len() < 2_000);
+
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/v1/workspaces/import?organization_id={organization_id}&dry_run=true"))
+                .header("authorization", &owner)
+                .header("content-type", "application/gzip")
+                .body(Body::from(archive))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 200);
+    let report = response_json(response).await;
+    assert_eq!(report["ok"], false, "{report}");
+    assert!(report["problems"][0].as_str().unwrap().contains("compression bomb"), "{report}");
+    let _ = std::fs::remove_dir_all(data_dir);
+}

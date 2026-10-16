@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.52 (2026-10-16)
+
+Feature freeze, and the fourth security pass.
+
+### Security
+- **The fourth security pass** is in [mindmap/security/2026-10-16-security-review.md](mindmap/security/2026-10-16-security-review.md). It checked mail, webhooks, remote clones, connectors, export and import, and the desktop client against the requirements set before they were built. It found no high-severity problem; three medium and four low ones are fixed in this release, and five informational notes are recorded. No high or medium finding is open.
+- **Mail cannot be used to flood a mailbox.** One address is sent at most 12 messages an hour (invitations, mentions, assignments, verification links), one person causes at most 60 an hour, and nothing is queued while 1,000 messages are waiting. An invitation over the limit is still created, with its link to pass on by hand.
+- **Anonymous requests are small.** Sign-in, registration, refresh, password reset, invitations, first-run setup and the two webhook receivers now take 64 KiB (webhooks 1 MiB) instead of the upload limit, which an operator can raise to 1 GiB.
+- **Imports cannot be used as a bomb.** An archive that claims to unpack to more than 100 times its own size (and over 64 MiB) is refused before anything is unpacked, each file is read only up to what the archive says it holds, and the total of the sizes it declares can no longer wrap around to a small number.
+- **A webhook delivery is acted on once.** A delivery id (`X-GitHub-Delivery`, `X-Gitlab-Event-UUID`, or `X-RepoMemo-Delivery` for your own sender) received in the last hour is answered `202` with `already received`, so a captured call cannot be replayed to keep a repository syncing.
+- Smaller: a tracker's answer is read only up to its 20 MiB cap, the desktop app follows no redirects away from its server, and `ssh` clones set `ProxyCommand=none`.
+
+### Changed
+- The feature freeze starts: until `V0.3.0`, releases carry only the release candidate's checks and their fixes.
+
+### Upgrading
+- Nothing to do. If a script posts large bodies to sign-in or the webhooks, it now gets `413`. Generic webhook senders should send a unique `X-RepoMemo-Delivery` header per call. The fixes were compiled and their tests written, not executed or attacked; run `cargo test` and try a flood of invitations before relying on them.
+
 ## V0.2.51 (2026-10-16)
 
 The local desktop workspace is retired.

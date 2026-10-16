@@ -364,13 +364,29 @@ impl GitHub {
             }
             repomemo_domain::bail_invalid!("The tracker answered {status}.");
         }
-        let bytes = response.bytes().await.context("the tracker's answer could not be read")?;
-        if bytes.len() > MAX_RESPONSE_BYTES {
-            repomemo_domain::bail_invalid!("The tracker's answer is too large.");
-        }
+        let bytes = read_capped(response).await?;
         let value = serde_json::from_slice::<Value>(&bytes).context("the tracker's answer is not JSON")?;
         Ok((value, next))
     }
+}
+
+/// The body of an answer, read piece by piece so a tracker that sends without end is stopped at
+/// the cap instead of filling memory (review S4-5).
+async fn read_capped(mut response: reqwest::Response) -> Result<Vec<u8>> {
+    if response
+        .content_length()
+        .is_some_and(|length| length > MAX_RESPONSE_BYTES as u64)
+    {
+        repomemo_domain::bail_invalid!("The tracker's answer is too large.");
+    }
+    let mut bytes = Vec::new();
+    while let Some(chunk) = response.chunk().await.context("the tracker's answer could not be read")? {
+        if bytes.len() + chunk.len() > MAX_RESPONSE_BYTES {
+            repomemo_domain::bail_invalid!("The tracker's answer is too large.");
+        }
+        bytes.extend_from_slice(&chunk);
+    }
+    Ok(bytes)
 }
 
 /// How long a tracker asks to wait: `Retry-After` in seconds, or the time its

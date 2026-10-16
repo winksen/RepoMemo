@@ -13,7 +13,8 @@ import { showToast } from "./ui/toast";
 /** Points this client at a server the shell has allowed, and checks that a RepoMemo server answers there. */
 export async function pointAtServer(origin: string) {
   const { fetch: desktopFetch } = await import("@tauri-apps/plugin-http");
-  configureDesktopApi(origin, desktopFetch as typeof fetch);
+  // The shell allows the chosen server's address only; a redirect to anywhere else is not followed.
+  configureDesktopApi(origin, ((input: RequestInfo | URL, init?: RequestInit) => desktopFetch(input, { ...init, maxRedirections: 0 })) as typeof fetch);
 }
 
 function reason(error: unknown): string {

@@ -38,6 +38,14 @@ const POLL: Duration = Duration::from_secs(30);
 const KEEP_DAYS: i64 = 30;
 /// A person asking for test mails cannot fill the outbox.
 const MAX_WAITING_FOR_TEST: i64 = 50;
+/// Messages one address may be sent per hour, whoever asks for them (invitations, mentions,
+/// assignments, verification links): a mailbox cannot be flooded through this server (review S4-1).
+pub(crate) const PER_RECIPIENT_PER_HOUR: u32 = 12;
+/// Messages one person may cause per hour (invitations they send, notices their actions trigger).
+pub(crate) const PER_SENDER_PER_HOUR: u32 = 60;
+/// Messages waiting in the outbox beyond which nothing more is queued, so the server cannot be
+/// turned into a bulk mailer.
+const MAX_WAITING: i64 = 1_000;
 
 /// Why a mail was not queued.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -46,6 +54,10 @@ pub(crate) enum NotQueued {
     NotSetUp,
     /// The address is not one this server will send to.
     BadAddress,
+    /// This address was sent too much in the last hour.
+    RateLimited,
+    /// The outbox is full of messages the mail server has not taken yet.
+    Busy,
     /// The outbox itself failed.
     Storage(String),
 }
@@ -58,6 +70,8 @@ pub(crate) struct MailService {
     wake: Arc<Notify>,
     /// The address people use (`REPOMEMO_PUBLIC_URL`): links in mail are made from it.
     public_url: Option<String>,
+    /// Counts of what each address received and each person caused in the last hour.
+    limits: Arc<crate::security::RateLimiter>,
 }
 
 impl MailService {
@@ -73,6 +87,7 @@ impl MailService {
             policy: Arc::new(policy),
             wake: Arc::new(Notify::new()),
             public_url,
+            limits: Arc::new(crate::security::RateLimiter::default()),
         };
         let worker = service.clone();
         let task = tokio::spawn(async move { worker.run().await });
@@ -104,8 +119,19 @@ impl MailService {
         }
     }
 
+    /// Whether `sender` (the person whose action causes a message) may cause another one this
+    /// hour. Counts the question, so ask once per message.
+    pub(crate) fn allow_sender(&self, sender: &str) -> bool {
+        self.limits
+            .check(&format!("from:{sender}"), Quota::per_hour(PER_SENDER_PER_HOUR))
+            .is_ok()
+    }
+
     /// Puts a message in the outbox and wakes the worker. Does no network
     /// work: a slow or broken mail server cannot hold the caller.
+    ///
+    /// An address is sent at most [`PER_RECIPIENT_PER_HOUR`] messages an hour and nothing is
+    /// queued while [`MAX_WAITING`] are waiting; test messages have their own cap.
     pub(crate) async fn send_to(
         &self,
         to: &str,
@@ -119,6 +145,24 @@ impl MailService {
         }
         if !self.is_ready().await {
             return Err(NotQueued::NotSetUp);
+        }
+        if kind != "test" {
+            if self
+                .limits
+                .check(&format!("to:{}", to.to_ascii_lowercase()), Quota::per_hour(PER_RECIPIENT_PER_HOUR))
+                .is_err()
+            {
+                return Err(NotQueued::RateLimited);
+            }
+            let waiting = self
+                .storage
+                .mail_outbox_counts()
+                .await
+                .map_err(|error| NotQueued::Storage(format!("{error:#}")))?
+                .queued;
+            if waiting >= MAX_WAITING {
+                return Err(NotQueued::Busy);
+            }
         }
         let entry = self
             .storage
@@ -375,6 +419,9 @@ pub(crate) async fn mail_invitation(
             "not_set_up"
         };
     };
+    if !state.mail.allow_sender(inviter_id) {
+        return "rate_limited";
+    }
     let inviter = match state.storage.find_user(inviter_id).await {
         Ok(Some(user)) => user.display_name,
         _ => "Someone".to_owned(),
@@ -399,6 +446,7 @@ pub(crate) async fn mail_invitation(
     {
         Ok(_) => "queued",
         Err(NotQueued::NotSetUp) => "not_set_up",
+        Err(NotQueued::RateLimited | NotQueued::Busy) => "rate_limited",
         Err(_) => "failed",
     }
 }
@@ -477,6 +525,10 @@ pub(crate) async fn mail_notification(state: &AppState, mail: NotificationMail<'
         return;
     };
     if state.storage.is_deactivated(&recipient.id).await.unwrap_or(true) {
+        return;
+    }
+    if !state.mail.allow_sender(mail.actor_id) {
+        tracing::warn!(target: "mail", kind = mail.kind, "A notification mail was not queued: its cause sent too much this hour");
         return;
     }
     let actor_name = actor
@@ -690,6 +742,9 @@ pub(crate) async fn send_test(
             NotQueued::NotSetUp => ApiError::conflict(
                 "Mail is not set up: save the mail server and the sender, and switch mail on, then try again.",
             ),
+            NotQueued::RateLimited | NotQueued::Busy => {
+                ApiError::conflict("Too much mail was sent lately. Try again later.")
+            }
             NotQueued::Storage(message) => ApiError::internal(message),
         })?;
     audit(
