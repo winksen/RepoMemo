@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.50` (2026-10-16), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.51` (2026-10-16), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -405,7 +405,7 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 |---|---|---|---|---|---|
 | **V0.2.49** ✅ | ✨ | Desktop | The desktop app connects to a server: asks for its address, keeps the session in the operating system's credential store, shows the web client | F20a, decision 13 | The desktop window and the browser show the same pages for the same account |
 | **V0.2.50** ✅ | ✨ | Desktop | *Export to a server*: a local workspace moves to a server through the archive format | F20b | A local workspace appears on the server with its memory and citations |
-| **V0.2.51** | 📘 | Desktop | The local edition retired: labelled in the app and the docs, removal planned for V0.3.x | F20c | The docs no longer describe the local edition as current |
+| **V0.2.51** ✅ | 📘 | Desktop | The local edition retired: labelled in the app and the docs, removal planned for V0.3.x | F20c | The docs no longer describe the local edition as current |
 
 #### Track J: Release candidate (V0.2.52–V0.2.56)
 
@@ -823,6 +823,14 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 - [ ] **Not run:** all of it compiles (`cargo check -p repomemo-api -p repomemo-server -p repomemo-desktop --tests`, `npm run typecheck`) but no test was executed and the app was not started. To try: in the local edition, *Move a workspace to a server*, prepare, go to the server, sign in as an organization administrator, check the dashboard's import panel
 - [ ] Not moved: AI provider settings and keys, saved searches, assistant chats, the activity feed, earlier versions of a file and repository links (the same list as any archive, see V0.2.40); the server indexes the files again and embeds only if its workspace has a provider. The local workspace is not changed or deleted by the move. A workspace over the server's upload limit is refused by the server with its reason
 
+#### V0.2.51: The local edition retired
+
+- [x] **F20c** Labelled in the app: the local workspace sits under a standing notice (*The local workspace is retired. It stays available for now, receives security fixes only and will be removed in a 0.3.x release*) with *Move a workspace to a server* and *Connect to a server*; the first screen's *Use the local workspace* says the same. Nothing is removed in this release: removal is planned for a V0.3.x release, once nobody needs the move
+- [x] Labelled in the docs: `PRODUCT.md`, the README, the functional mindmap (§12 now describes the desktop app as a client and the local workspace as retired), the technical mindmap and the decisions table no longer describe the local edition as current
+- [x] **E10 (desktop part):** the local edition rendered AI answers, summaries and memory cards with a bare `react-markdown`; it now uses `SafeMarkdown` like the web client (no images, links labelled with their host and sent to the system browser), so the "desktop Markdown has no link rules" clause of review E10 is closed until the edition is removed
+- [ ] **Left for the removal release (V0.3.x):** delete `LocalDesktopApp` (`App.tsx`, about 2,700 lines), `lib/repomemoApi.ts`, the 26 local Tauri commands and `RepoMemoCore::boot` in the shell, the local-only styles, the Tauri commands of the move (`handoff.rs`) and `DesktopApp`'s local branch; the shell then needs no `repomemo-api` dependency but the move's archive writer, if it is kept for the web client
+- [ ] Not run: the app was not started; the banner's layout is unchecked on screen
+
 ### Decisions to agree before work starts
 
 | # | Decision | Needed by | Proposal |
@@ -833,7 +841,7 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 | 10 | **Account deletion** (risk 12) | V0.2.16 | Deactivate, then anonymize: the account's sessions, tokens, avatar and email go; what they wrote stays, credited to "Former member". Only system administrators, audited; an owner must transfer ownership first |
 | 11 | **Who links remote repositories, and where from** | V0.2.19 | Workspace administrators, only to hosts in `REPOMEMO_GIT_ALLOWED_HOSTS` (unset: remote links off, like `REPOMEMO_REPO_ROOTS` for local ones); `https` and `ssh` only; credentials per link (a read-only token or deploy key), encrypted, never shown again |
 | 12 | **First connectors** | V0.2.27 | GitHub (including GitHub Enterprise Server) and GitLab, read-only, issues and pull/merge requests with their discussion; Linear and Jira later |
-| 13 | **The desktop app** (revisits decision 3) | V0.2.49 | The desktop shell becomes a client: it asks for a server address, signs in and shows the web client. The local edition is retired after one release that offers "export to a server" |
+| 13 | **The desktop app** (revisits decision 3) | V0.2.49 | ✅ Done in V0.2.49–V0.2.51. The desktop shell becomes a client: it asks for a server address, signs in and shows the web client. The local edition is retired after one release that offers "export to a server" (V0.2.50); it is labelled retired in V0.2.51 and removed in a 0.3.x release |
 | 14 | **Backup encryption** | V0.2.42 | AES-256-GCM in streaming chunks, key from `REPOMEMO_BACKUP_KEY` (never stored in the backup); off by default, recommended in the guide; restore refuses a wrong key before writing anything |
 
 ---
@@ -856,7 +864,7 @@ Every item of both roads, with the release it is planned for. The evidence behin
 | F7 | **Evidence ergonomics.** Move folders, multi-select, new version of a file | M | ✅ V0.1.73 |
 | F8 | **Live map and health** | S | ✅ V0.1.72 |
 | F9 | **Console follow-ups.** `logs --follow`, `users reset-link`, `tokens list`, backup commands; workspace commands for system administrators | S–M | ✅ V0.1.73, V0.1.75, V0.2.7 |
-| F10 | **Desktop decision:** frozen as the local edition, security fixes only | Decision | ✅ Decided (decision 3) |
+| F10 | **Desktop decision:** frozen as the local edition, security fixes only | Decision | ✅ Decided (decision 3), superseded by decision 13: retired in V0.2.51 |
 | F11 | **Ownership transfer** and no removal of a workspace owner (N8) | S | ✅ V0.1.73 |
 | F12 | **Self-service password reset** by email, the same answer for every address | S | ✅ V0.2.11 (decision 8) |
 | F13 | **Email verification** for self-registration and changed addresses | S–M | ✅ V0.2.13 (decision 9) |
@@ -869,7 +877,7 @@ Every item of both roads, with the release it is planned for. The evidence behin
 | F23 | **Review queue:** evidence needing review, stale memory cards and open health findings in one list | S–M | ✅ V0.2.37 |
 | F24 | **Version history** of a file, viewable and comparable | M | ✅ V0.2.38 |
 | F25 | **`@mention` suggestions** in comments | S | ✅ V0.2.39 |
-| F20 | **Desktop as a server client** (20a ✅ V0.2.49), export to a server (20b ✅ V0.2.50), local edition retired (20c) | M | V0.2.49–V0.2.51 (decision 13) |
+| F20 | **Desktop as a server client** (20a ✅ V0.2.49), export to a server (20b ✅ V0.2.50), local edition retired (20c ✅ V0.2.51) | M | ✅ V0.2.49–V0.2.51 (decision 13) |
 
 ### Security
 

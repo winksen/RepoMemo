@@ -25,7 +25,8 @@ type Phase = "starting" | "connect" | "server" | "local";
 /**
  * What the desktop window shows (V0.2.49). With a server chosen it shows the web client against that
  * server, the same pages the browser shows; without one it asks for an address. The local workspace of
- * the earlier desktop app stays reachable until it is retired, and is only chosen on purpose.
+ * the earlier desktop app is retired (V0.2.51): it stays reachable, labelled as retired, until it is
+ * removed in a 0.3.x release, and is only chosen on purpose.
  */
 export function DesktopApp({ local }: { local: ReactNode }) {
   const [phase, setPhase] = useState<Phase>("starting");
@@ -61,13 +62,14 @@ export function DesktopApp({ local }: { local: ReactNode }) {
       } catch { /* the first screen asks again */ }
       setPhase("connect");
     };
-    return <>
-      {local}
-      <div className="rm-desktop-local-actions">
+    return <div className="rm-desktop-local">
+      <div className="rm-desktop-retired" role="note">
+        <p><strong>The local workspace is retired.</strong> It stays available for now, receives security fixes only and will be removed in a 0.3.x release. Move your workspaces to a server.</p>
         <LocalMoveToServer onGoToServer={() => void goToServer()} />
         <Button className="rm-desktop-switch" onClick={() => void goToServer()} type="button" variant="secondary"><Server size={15} /> Connect to a server</Button>
       </div>
-    </>;
+      <div className="rm-desktop-local-body">{local}</div>
+    </div>;
   }
   return <DesktopConnect onConnected={() => setPhase("server")} onUseLocal={() => { rememberMode(true); setPhase("local"); }} />;
 }

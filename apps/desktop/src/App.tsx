@@ -8,10 +8,9 @@ FORM: The user-pinned Rox productivity composition, translated to local project 
 
 import type { CSSProperties, FormEvent, ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { SharedWebApp } from "./SharedWebApp";
 import { DesktopApp } from "./components/DesktopApp";
+import { SafeMarkdown } from "./components/SafeMarkdown";
 import { Toast } from "./components/ui/toast";
 import {
   IconArchive as Archive,
@@ -2304,7 +2303,7 @@ function MemoryCardsView({
         </PanelHeader>
         {detail ? <>
           <div className="memory-card-meta"><StatusBadge tone="neutral">{formatMemorySource(detail.card.source)}</StatusBadge><span>Updated {formatRelativeDate(detail.card.updated_at)}</span></div>
-          <div className="markdown-content memory-markdown"><ReactMarkdown remarkPlugins={[remarkGfm]}>{detail.card.body_markdown}</ReactMarkdown></div>
+          <div className="markdown-content memory-markdown"><SafeMarkdown>{detail.card.body_markdown}</SafeMarkdown></div>
           <section className="memory-evidence-list">
             <div className="chunk-panel-header"><strong>Linked evidence</strong><StatusBadge tone={detail.evidence.every((item) => item.exists) ? "success" : "warning"}>{detail.evidence.length} link{detail.evidence.length === 1 ? "" : "s"}</StatusBadge></div>
             {detail.evidence.length > 0 ? detail.evidence.map((evidence) => <div className={evidence.exists ? "memory-evidence-row" : "memory-evidence-row missing"} key={evidence.link_id}><span className={evidence.exists ? "state-dot ready" : "state-dot"} /><div><strong>{evidence.title ?? "Missing evidence"}</strong><code>{evidence.path ?? evidence.target_id}{evidence.start_line ? ` · ${formatLineRange(evidence.start_line, evidence.end_line)}` : ""}</code></div></div>) : <p className="rail-empty">This manual card has no linked source evidence.</p>}
@@ -2438,7 +2437,7 @@ function SummaryPanel({ summary, onSave }: { summary: SummaryResult; onSave?: ()
     <section className="summary-panel">
       <div className="chunk-panel-header"><strong>Local AI summary</strong><div>{onSave ? <button className="button secondary compact" type="button" onClick={onSave}><Bookmark size={15} /> Save memory</button> : null}<StatusBadge tone="neutral">Cited</StatusBadge></div></div>
       <div className="markdown-content">
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{summary.summary_markdown}</ReactMarkdown>
+        <SafeMarkdown>{summary.summary_markdown}</SafeMarkdown>
       </div>
       <div className="citation-list">
         {summary.citations.map((citation) => <span key={citation.chunk_id ?? citation.artifact_id}>{formatLineRange(citation.start_line, citation.end_line)}</span>)}
@@ -2522,7 +2521,7 @@ function AskView({
       </div>
       {askAnswer ? <div className="ask-answer">
         <div className="chunk-panel-header"><strong>Answer</strong><div><button className="button secondary compact" type="button" onClick={() => onSaveMemory(`Answer: ${question.trim().slice(0, 72)}`, askAnswer.answer_markdown, "answer", askAnswer.citations, askAnswer.confidence)}><Bookmark size={15} /> Save memory</button><StatusBadge tone={askAnswer.confidence && askAnswer.confidence > 0.15 ? "success" : "warning"}>{askAnswer.confidence && askAnswer.confidence > 0.15 ? "Evidence found" : "Low confidence"}</StatusBadge></div></div>
-        <div className="markdown-content"><ReactMarkdown remarkPlugins={[remarkGfm]}>{askAnswer.answer_markdown}</ReactMarkdown></div>
+        <div className="markdown-content"><SafeMarkdown>{askAnswer.answer_markdown}</SafeMarkdown></div>
         <div className="citation-list">{askAnswer.citations.map((citation) => <span key={citation.chunk_id ?? citation.artifact_id}>{citation.title} · {formatLineRange(citation.start_line, citation.end_line)}</span>)}</div>
         {askAnswer.warnings.map((warning) => <p className="evidence-note" key={warning}>{warning}</p>)}
         <div className="retrieved-evidence answer-evidence"><p className="result-group-label">Retrieved context</p>{askAnswer.retrieved_context.map((result) => <div key={result.chunk_id}><strong>{result.title}</strong><span>{formatLineRange(result.start_line, result.end_line)}</span><p>{result.snippet}</p></div>)}</div>

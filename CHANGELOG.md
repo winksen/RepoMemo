@@ -2,6 +2,18 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.51 (2026-10-16)
+
+The local desktop workspace is retired.
+
+### Changed
+- **The local workspace is labelled as retired.** In the desktop app it now sits under a standing notice: it stays available for now, receives security fixes only and will be removed in a 0.3.x release. The notice offers *Move a workspace to a server* and *Connect to a server*, and the first screen says the same next to *Use the local workspace*. Nothing is removed in this release.
+- **The docs describe the desktop app as a window onto a server.** `PRODUCT.md`, the README and the mindmaps no longer present the local edition as a current mode of the product.
+- **Safer Markdown in the retired edition.** AI answers, summaries and memory cards in the local workspace are shown with the same Markdown rules as the web client: no images are loaded, and links name their host and open in your system browser.
+
+### Upgrading
+- Nothing to do. Move any local workspace you still need to a server with *Move a workspace to a server* (V0.2.50) before the removal release.
+
 ## V0.2.50 (2026-10-16)
 
 A workspace from the local desktop edition can be moved to a server.

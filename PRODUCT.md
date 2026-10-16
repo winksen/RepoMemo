@@ -24,7 +24,7 @@ RepoMemo is structured memory first and an AI interface second. Its source of tr
 
 The primary product is a shared server (Rust, SQLite) with a React web client. Teams work in organizations and workspaces with roles; they add evidence, review it (lifecycle status), discuss it, track work on a task board, search and ask with citations, explore a knowledge map and health checks, and use a docked assistant. Administrators set the server up in the browser, manage it in the System area and from a command console, and invite people by link.
 
-A Tauri desktop app with the same React code base remains as a fully local edition (no accounts or collaboration). It is frozen: it receives security fixes, not new features.
+A Tauri desktop app with the same React code base is a window onto a server: it asks for the server's address and shows the web client. The fully local edition it replaced (no accounts or collaboration) is retired: it is labelled as such in the app, receives security fixes only, and is removed in a 0.3.x release.
 
 The application is used as a focused technical workbench on desktop displays. Interaction should support dense scanning, keyboard-friendly operation, long paths, code-oriented content, large result sets, live progress, and both light and dark environments.
 
@@ -36,7 +36,7 @@ The application is used as a focused technical workbench on desktop displays. In
 - AI providers are optional and configured per workspace; sending content to a cloud provider requires explicit configuration and acknowledgement.
 - Answers and summaries must remain tied to inspectable source evidence and citations, and are labelled as AI-generated.
 - The server is the authority on access: the client only hides what a role cannot do.
-- The implementation uses Rust (Axum, sqlx), React, TypeScript, and Tauri for the local edition.
+- The implementation uses Rust (Axum, sqlx), React, TypeScript, and Tauri for the desktop window.
 - Product copy must not fabricate customers, benchmarks, deployment claims, pricing, or completed capabilities.
 - Remote repositories, mail delivery, connectors, single sign-on, scale-out and hosted deployment remain roadmap items rather than present-tense product claims (see `mindmap/ROADMAP.md`).
 

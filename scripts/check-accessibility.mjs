@@ -155,7 +155,7 @@ function* sources(directory) {
   }
 }
 
-// App.tsx is the local desktop edition (retired in V0.2.51); the web client is everything else.
+// App.tsx is the local desktop edition (retired in V0.2.51, to be removed in a 0.3.x release); the web client is everything else.
 const LOCAL_EDITION = new Set(["App.tsx", "main.tsx"]);
 
 const FIELDS = new Set(["input", "select", "textarea", "Input", "Textarea"]);

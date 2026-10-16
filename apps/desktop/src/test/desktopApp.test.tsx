@@ -93,6 +93,9 @@ describe("the desktop app", () => {
     start();
     fireEvent.click(await screen.findByRole("button", { name: /Use the local workspace/ }));
     expect(screen.getByText("the local workspace")).toBeTruthy();
+    // It is labelled as retired, with the way out beside the notice.
+    expect(screen.getByRole("note").textContent).toContain("The local workspace is retired.");
+    expect(screen.getByRole("note").textContent).toContain("0.3.x");
     expect(window.localStorage.getItem("repomemo.desktop.mode")).toBe("local");
 
     cleanup();

@@ -91,7 +91,7 @@ export function DesktopConnect({ onConnected, onUseLocal }: { onConnected: () =>
             </Button>
           </form>
           <p className="shared-auth-hint">
-            Just looking around? <Button onClick={onUseLocal} type="button" variant="secondary"><Server size={15} /> Use the local workspace</Button> The local workspace stays on this computer only and is being retired in favour of a server.
+            Just looking around? <Button onClick={onUseLocal} type="button" variant="secondary"><Server size={15} /> Use the local workspace</Button> It stays on this computer only. It is retired: it gets security fixes only and will be removed in a 0.3.x release, so move your work to a server.
           </p>
         </div>
       </section>
