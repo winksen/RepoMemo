@@ -2037,3 +2037,102 @@ async fn an_archive_imports_into_a_new_workspace_after_a_dry_run_that_writes_not
         .any(|event| event["action"] == "workspace_imported"));
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn a_local_workspace_archived_by_the_desktop_app_imports_with_its_memory_and_citations() {
+    // The desktop app's local workspace: one file, indexed, and a memory card citing a passage of it.
+    let local_dir = temp_data_dir("local-workspace");
+    let core = repomemo_api::RepoMemoCore::boot(local_dir.clone()).await.unwrap();
+    let local = core.create_workspace("On my laptop".to_owned()).await.unwrap();
+    let note = core
+        .import_text(
+            local.id.clone(),
+            "Runbook".to_owned(),
+            "Restart the worker before the queue is drained.".to_owned(),
+            Some("Markdown".to_owned()),
+        )
+        .await
+        .unwrap();
+    core.index_workspace(local.id.clone()).await.unwrap();
+    let chunk_id = core.get_artifact(note.id.clone()).await.unwrap().chunks[0].id.clone();
+    core.create_memory_card(repomemo_domain::CreateMemoryCardRequest {
+        workspace_id: local.id.clone(),
+        title: "Worker restarts".to_owned(),
+        body_markdown: "Restart the worker first.".to_owned(),
+        source: "manual".to_owned(),
+        confidence: None,
+        citations: vec![repomemo_domain::Citation {
+            artifact_id: note.id.clone(),
+            chunk_id: Some(chunk_id),
+            title: note.title.clone(),
+            path: note.path.clone(),
+            start_line: None,
+            end_line: None,
+            confidence: None,
+            commit: None,
+        }],
+    })
+    .await
+    .unwrap();
+    let archive_path = local_dir.join("laptop.tar.gz");
+    core.export_workspace_archive(&local.id, &archive_path).await.unwrap();
+    let archive = std::fs::read(&archive_path).unwrap();
+    drop(core);
+
+    let data_dir = temp_data_dir("local-import");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let (_, _) = register_account(&app, "laptop-admin@example.com").await;
+    let (owner, _) = register_account(&app, "laptop-owner@example.com").await;
+    let existing = create_workspace(&app, &owner).await;
+    let listed = response_json(app.clone().oneshot(auth_request("GET", "/v1/workspaces", &owner)).await.unwrap()).await;
+    let organization_id = listed[0]["organization_id"].as_str().unwrap().to_owned();
+    assert!(!existing.is_empty());
+
+    let import = |query: &'static str| {
+        let app = app.clone();
+        let request = Request::builder()
+            .method("POST")
+            .uri(format!("/v1/workspaces/import?organization_id={organization_id}{query}"))
+            .header("authorization", &owner)
+            .header("content-type", "application/gzip")
+            .body(Body::from(archive.clone()))
+            .unwrap();
+        async move { app.oneshot(request).await.unwrap() }
+    };
+
+    // The server reads it like any other archive: checked first, nothing written.
+    let dry = response_json(import("&dry_run=true").await).await;
+    assert_eq!(dry["ok"], true, "{dry}");
+    assert_eq!(dry["workspace_name"], "On my laptop");
+    assert_eq!(dry["counts"]["artifacts"], 1);
+    assert_eq!(dry["counts"]["memory_cards"], 1);
+    assert_eq!(dry["counts"]["citations"], 1);
+    assert_eq!(dry["problems"].as_array().unwrap().len(), 0);
+
+    let imported = import("&name=From%20my%20laptop").await;
+    assert_eq!(imported.status(), 201);
+    let report = response_json(imported).await;
+    assert_eq!(report["ok"], true, "{report}");
+    assert_eq!(report["widened_citations"], 0, "the cited passage was found again");
+    let new_id = report["workspace"]["workspace"]["id"].as_str().unwrap().to_owned();
+    wait_for_indexed_artifacts(&app, &owner, &new_id, 1).await;
+
+    let get = |uri: String| {
+        let app = app.clone();
+        let request = auth_request("GET", &uri, &owner);
+        async move { response_json(app.oneshot(request).await.unwrap()).await }
+    };
+    let files = get(format!("/v1/workspaces/{new_id}/artifacts")).await;
+    assert_eq!(files[0]["title"], "Runbook");
+    let cards = get(format!("/v1/workspaces/{new_id}/memory-cards")).await;
+    assert_eq!(cards[0]["title"], "Worker restarts");
+    assert_eq!(cards[0]["evidence_count"], 1);
+    assert_eq!(cards[0]["needs_review"], false);
+    let card = get(format!("/v1/memory-cards/{}", cards[0]["id"].as_str().unwrap())).await;
+    let evidence = card["evidence"].as_array().unwrap();
+    assert!(evidence
+        .iter()
+        .any(|item| item["target_type"] == "chunk" && item["artifact_id"] == files[0]["id"] && item["exists"] == true));
+    let _ = std::fs::remove_dir_all(local_dir);
+    let _ = std::fs::remove_dir_all(data_dir);
+}

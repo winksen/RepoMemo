@@ -4,6 +4,7 @@ import { SharedWebApp } from "../SharedWebApp";
 import { LoadingCanvas } from "../web/common";
 import { desktopServer, installExternalLinkHandler } from "../lib/desktop";
 import { DesktopConnect, pointAtServer } from "./DesktopConnect";
+import { LocalMoveToServer } from "./LocalMoveToServer";
 import { Button } from "./ui/button";
 
 const MODE_KEY = "repomemo.desktop.mode";
@@ -51,9 +52,21 @@ export function DesktopApp({ local }: { local: ReactNode }) {
   if (phase === "starting") return <LoadingCanvas label="Starting RepoMemo" />;
   if (phase === "server") return <SharedWebApp />;
   if (phase === "local") {
+    // Leaves the local workspace for the server: the saved one, or the first screen when there is none yet.
+    const goToServer = async () => {
+      rememberMode(false);
+      try {
+        const origin = await desktopServer.current();
+        if (origin) { await pointAtServer(origin); setPhase("server"); return; }
+      } catch { /* the first screen asks again */ }
+      setPhase("connect");
+    };
     return <>
       {local}
-      <Button className="rm-desktop-switch" onClick={() => { rememberMode(false); setPhase("connect"); }} type="button" variant="secondary"><Server size={15} /> Connect to a server</Button>
+      <div className="rm-desktop-local-actions">
+        <LocalMoveToServer onGoToServer={() => void goToServer()} />
+        <Button className="rm-desktop-switch" onClick={() => void goToServer()} type="button" variant="secondary"><Server size={15} /> Connect to a server</Button>
+      </div>
     </>;
   }
   return <DesktopConnect onConnected={() => setPhase("server")} onUseLocal={() => { rememberMode(true); setPhase("local"); }} />;

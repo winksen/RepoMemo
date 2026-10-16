@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.2.49` (2026-10-16). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
+> **Scope:** reflects the code at `V0.2.50` (2026-10-16). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
 
 ---
 
@@ -540,7 +540,7 @@ Create tasks from findings  ◄──────────────  Save 
 
 Since V0.2.49 the **desktop app is a window onto a server.** On first start it asks for the address of a RepoMemo server (`https://...`; plain `http://` only for a server on your own network), checks that a RepoMemo server answers there, and then shows exactly the pages the browser shows, after you sign in. The app talks to that server only and cannot be sent to another site (links to the outside open in your system browser). Your session is kept in the computer's credential store (Windows Credential Manager, macOS Keychain), so a restart does not ask for the password again; *Change server* in the left rail forgets the server and the session. Pages that open in a new tab or hand a file to Word in a browser save the file instead.
 
-The **local workspace** of the earlier desktop app is still there until it is retired (V0.2.51): *Use the local workspace* on the first screen. Moving it to a server arrives with V0.2.50.
+The **local workspace** of the earlier desktop app is still there until it is retired (V0.2.51): *Use the local workspace* on the first screen. **Move a workspace to a server** (V0.2.50, bottom-left in the local workspace) writes the chosen workspace as a workspace archive, the same file a server exports, and takes you to your server: after you sign in, the dashboard's *Import a workspace* opens with it already checked, shows what is in it (files, folders, memory cards with their citations, tasks, comments) and imports it as a new workspace when you confirm. You can also save a copy of the archive or discard it. Your local copy is left as it was.
 
 ### The local workspace (being retired)
 
@@ -552,7 +552,7 @@ The local workspace and a server keep **separate data**.
 
 ---
 
-## 13. Known functional gaps (at V0.2.49)
+## 13. Known functional gaps (at V0.2.50)
 
 These are observed in the code and are useful for prioritizing. The roadmap item that addresses each one is in brackets.
 
@@ -569,7 +569,7 @@ These are observed in the code and are useful for prioritizing. The roadmap item
 | Issues and pull requests are not evidence | The discussion around the code stays in GitHub or GitLab [F17, V0.2.27–V0.2.31]. |
 | Accounts are never deleted | They are deactivated (V0.2.16) and anonymized (V0.2.17); the account row stays as *Former member*. Log files and earlier backups keep the old address until they age out. |
 | Archives are not a sync | A workspace exports (V0.2.40, Settings) and imports as a new workspace (V0.2.41, dashboard); it is a copy, not a link: nothing keeps the two in step, and importing the same archive twice makes two workspaces. Earlier versions of a file, saved searches, assistant chats and the activity feed are not in the archive; the local desktop edition cannot send its workspace to a server yet [F20b, V0.2.50]. |
-| The local workspace stays on one computer | The desktop app opens a server since V0.2.49 [F20a]; its older local workspace is not on any server and has no way to move there yet (an export to a server arrives in V0.2.50 [F20b]), and it is retired in V0.2.51 [F20c]. |
+| The local workspace is a copy on one computer | It moves to a server as an archive since V0.2.50 [F20b]: the move is a copy, not a link, and the local workspace is not removed; it is retired in V0.2.51 [F20c]. Only an organization owner or administrator can import it. |
 
 Invitation links and administrator reset links, gaps until V0.1.62, shipped in V0.1.63.
 

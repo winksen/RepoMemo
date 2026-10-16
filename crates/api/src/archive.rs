@@ -6,10 +6,18 @@
 //! large workspace is never held in memory twice. What goes in it, and what
 //! it means, is described in `repomemo_domain::archive`.
 
+use std::collections::BTreeMap;
 use std::io::{Read, Write};
+use std::path::Path;
 
 use anyhow::{bail, Context, Result};
+use chrono::Utc;
 use flate2::{read::GzDecoder, write::GzEncoder, Compression};
+use repomemo_domain::{
+    ArchiveBlob, ArchiveManifest, ARCHIVE_BLOB_PREFIX, ARCHIVE_DATA_ENTRY, ARCHIVE_FORMAT, ARCHIVE_FORMAT_VERSION,
+    ARCHIVE_MANIFEST_ENTRY,
+};
+use repomemo_storage::StorageEngine;
 
 const BLOCK: usize = 512;
 const NAME_BYTES: usize = 100;
@@ -205,6 +213,107 @@ pub fn read_archive_entries<R: Read>(reader: R, max_entry_bytes: u64) -> Result<
         entries.push(entry);
     }
     Ok(entries)
+}
+
+/// Bytes of a stored file handed to the compressor at a time.
+const SLICE_BYTES: usize = 256 * 1024;
+
+/// Writes a workspace as an archive file (V0.2.50), for the desktop app's local workspace to be
+/// imported on a server. It is the format the server's export streams
+/// (`GET /v1/workspaces/{id}/export`): the same manifest, `workspace.json` and `blobs/<hash>`
+/// entries, so the server's import reads it like any other archive.
+///
+/// The file is written under another name and moved into place when whole, so a failure leaves
+/// no archive that only looks complete. An archive that cannot hold every stored file is not
+/// written at all.
+pub async fn write_workspace_archive(
+    storage: &StorageEngine,
+    workspace_id: &str,
+    app_version: &str,
+    destination: &Path,
+) -> Result<ArchiveManifest> {
+    let data = storage.export_workspace_data(workspace_id).await?;
+
+    // The distinct stored files with their sizes on disk.
+    let mut sizes: BTreeMap<String, u64> = BTreeMap::new();
+    let mut missing = Vec::new();
+    for artifact in &data.artifacts {
+        if sizes.contains_key(&artifact.content_hash) {
+            continue;
+        }
+        match tokio::fs::metadata(storage.blob_path_for_hash(&artifact.content_hash)).await {
+            Ok(metadata) if metadata.is_file() => {
+                sizes.insert(artifact.content_hash.clone(), metadata.len());
+            }
+            _ => missing.push(artifact.path.clone()),
+        }
+    }
+    if let Some(first) = missing.first() {
+        bail!(
+            "{} file(s) of this workspace have no stored content, so it cannot be exported whole (first: {first}).",
+            missing.len()
+        );
+    }
+    let blobs: Vec<ArchiveBlob> = sizes
+        .into_iter()
+        .map(|(hash, size_bytes)| ArchiveBlob { hash, size_bytes })
+        .collect();
+
+    let data_bytes = serde_json::to_vec_pretty(&data)?;
+    let manifest = ArchiveManifest {
+        format: ARCHIVE_FORMAT.to_owned(),
+        format_version: ARCHIVE_FORMAT_VERSION,
+        created_at: Utc::now().to_rfc3339(),
+        app_version: app_version.to_owned(),
+        workspace_name: data.workspace.name.clone(),
+        counts: data.counts(blobs.len() as u64),
+        data_sha256: StorageEngine::content_hash(&data_bytes),
+        data_bytes: data_bytes.len() as u64,
+        blobs,
+    };
+    let manifest_bytes = serde_json::to_vec_pretty(&manifest)?;
+
+    let partial = destination.with_extension("part");
+    let written = write_entries(storage, &manifest, &manifest_bytes, &data_bytes, &partial).await;
+    match written {
+        Ok(()) => std::fs::rename(&partial, destination)
+            .with_context(|| format!("the archive could not be moved to {}", destination.display()))?,
+        Err(error) => {
+            let _ = std::fs::remove_file(&partial);
+            return Err(error);
+        }
+    }
+    Ok(manifest)
+}
+
+async fn write_entries(
+    storage: &StorageEngine,
+    manifest: &ArchiveManifest,
+    manifest_bytes: &[u8],
+    data_bytes: &[u8],
+    path: &Path,
+) -> Result<()> {
+    let mut file = std::fs::File::create(path).with_context(|| format!("{} could not be created", path.display()))?;
+    let now = Utc::now().timestamp();
+    let mut encoder = ArchiveEncoder::new();
+    encoder.add(ARCHIVE_MANIFEST_ENTRY, manifest_bytes, now)?;
+    encoder.add(ARCHIVE_DATA_ENTRY, data_bytes, now)?;
+    file.write_all(&encoder.drain())?;
+    for blob in &manifest.blobs {
+        let bytes = storage.read_blob(&blob.hash).await?;
+        if bytes.len() as u64 != blob.size_bytes {
+            bail!("the stored file {} changed while it was exported", blob.hash);
+        }
+        encoder.start(&format!("{ARCHIVE_BLOB_PREFIX}{}", blob.hash), blob.size_bytes, now)?;
+        for slice in bytes.chunks(SLICE_BYTES) {
+            encoder.write(slice)?;
+            file.write_all(&encoder.drain())?;
+        }
+        encoder.end()?;
+    }
+    file.write_all(&encoder.finish()?)?;
+    file.flush()?;
+    Ok(())
 }
 
 #[cfg(test)]

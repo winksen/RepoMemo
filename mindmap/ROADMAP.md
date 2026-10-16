@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.49` (2026-10-16), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.50` (2026-10-16), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -404,7 +404,7 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 | Release | Type | Section | The one change | IDs | Done when |
 |---|---|---|---|---|---|
 | **V0.2.49** ✅ | ✨ | Desktop | The desktop app connects to a server: asks for its address, keeps the session in the operating system's credential store, shows the web client | F20a, decision 13 | The desktop window and the browser show the same pages for the same account |
-| **V0.2.50** | ✨ | Desktop | *Export to a server*: a local workspace moves to a server through the archive format | F20b | A local workspace appears on the server with its memory and citations |
+| **V0.2.50** ✅ | ✨ | Desktop | *Export to a server*: a local workspace moves to a server through the archive format | F20b | A local workspace appears on the server with its memory and citations |
 | **V0.2.51** | 📘 | Desktop | The local edition retired: labelled in the app and the docs, removal planned for V0.3.x | F20c | The docs no longer describe the local edition as current |
 
 #### Track J: Release candidate (V0.2.52–V0.2.56)
@@ -813,6 +813,16 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 - [ ] **Not run:** `cargo check -p repomemo-desktop --tests` and `npm run typecheck` pass, but the app was not started. To try: `npm run dev`, enter the server's address, sign in, quit and start again (no sign-in, no password in `localStorage`; the entry *RepoMemo* is in the credential manager), upload a file, open a PDF, open a link in a markdown answer (system browser), *Change server*
 - [ ] Known: *Change server* restarts the whole app; the live event stream relies on the plugin streaming a response body (the client falls back to polling if not); the HTTP plugin and `keyring` bring new crates (`cargo deny` was not run); drag-and-drop folder upload and the native file picker of the local edition are not part of the web client; Linux needs a running Secret Service for the credential store; no signing key or updater is added (review M7)
 
+#### V0.2.50: Move a local workspace to a server
+
+- [x] **F20b** *Move a workspace to a server* in the local edition (bottom-left of the desktop window): pick a workspace, **Prepare the archive**, then **Go to the server to import it**, **Save a copy…** or **Discard the archive**. No new server route: the archive is the one `GET /v1/workspaces/{id}/export` makes, so the existing import (V0.2.41: dry run, checks, fresh ids, quotas) is the way in
+- [x] `repomemo_api::write_workspace_archive` / `RepoMemoCore::export_workspace_archive` write the same manifest, `workspace.json` and `blobs/<hash>` entries from the local storage (`StorageEngine::export_workspace_data` is shared with the server): the file is written as `.part` and renamed when whole, and a workspace with a file whose stored content is missing is refused up front. People are carried by name and address only, as in every archive, so nothing refers to a local account
+- [x] **Shell (`src-tauri/src/handoff.rs`):** `export_workspace_archive` (into `exports/` in the app's data folder, files older than 7 days removed first), `read_export` (raw bytes through `tauri::ipc::Response`, no JSON copy), `copy_export` (to the place a save dialog chose), `discard_export`. Every command resolves its `path` to a file directly inside `exports/` (canonicalized, so `..` and links cannot leave it) and refuses anything else
+- [x] **On the server side of the desktop window:** the prepared archive is remembered (`repomemo.desktop.handoff`), the first screen says one is waiting, and the dashboard's *Import a workspace* panel (organization owners and administrators) loads it, runs the check at once, shows what is in it and imports only on the person's confirmation under the name they give; after the import (or *Discard it*) the file is deleted
+- [x] Tests: `write_workspace_archive` (a local workspace with a file, a card and a cited passage reads back with the right manifest, checksum and blob, no `.part` is left, a missing stored file refuses and leaves nothing: `crates/api`), the server importing that very archive with the card's passage found again and `needs_review` false (`apps/server/src/tests/workspaces.rs`), `resolve_in` and the file name (`handoff.rs`), `desktopHandoff.test.tsx`
+- [ ] **Not run:** all of it compiles (`cargo check -p repomemo-api -p repomemo-server -p repomemo-desktop --tests`, `npm run typecheck`) but no test was executed and the app was not started. To try: in the local edition, *Move a workspace to a server*, prepare, go to the server, sign in as an organization administrator, check the dashboard's import panel
+- [ ] Not moved: AI provider settings and keys, saved searches, assistant chats, the activity feed, earlier versions of a file and repository links (the same list as any archive, see V0.2.40); the server indexes the files again and embeds only if its workspace has a provider. The local workspace is not changed or deleted by the move. A workspace over the server's upload limit is refused by the server with its reason
+
 ### Decisions to agree before work starts
 
 | # | Decision | Needed by | Proposal |
@@ -859,7 +869,7 @@ Every item of both roads, with the release it is planned for. The evidence behin
 | F23 | **Review queue:** evidence needing review, stale memory cards and open health findings in one list | S–M | ✅ V0.2.37 |
 | F24 | **Version history** of a file, viewable and comparable | M | ✅ V0.2.38 |
 | F25 | **`@mention` suggestions** in comments | S | ✅ V0.2.39 |
-| F20 | **Desktop as a server client** (20a ✅ V0.2.49), export to a server (20b), local edition retired (20c) | M | V0.2.49–V0.2.51 (decision 13) |
+| F20 | **Desktop as a server client** (20a ✅ V0.2.49), export to a server (20b ✅ V0.2.50), local edition retired (20c) | M | V0.2.49–V0.2.51 (decision 13) |
 
 ### Security
 

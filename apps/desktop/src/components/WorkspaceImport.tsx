@@ -1,6 +1,8 @@
-import { type ChangeEvent, useRef, useState } from "react";
+import { type ChangeEvent, useEffect, useRef, useState } from "react";
 import { IconPackageImport as PackageImport } from "@tabler/icons-react";
 import { importSharedWorkspaceArchive } from "../lib/sharedApi";
+import { isDesktopRuntime } from "../lib/desktop";
+import { discardPreparedArchive, loadPreparedArchive, pendingHandoff, type PreparedArchive, rememberHandoff } from "../lib/handoff";
 import type { ArchiveImportReport, SharedWorkspace } from "../types";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -43,6 +45,35 @@ export function WorkspaceImport({ accessToken, onImported, organizationId }: {
   const [name, setName] = useState("");
   const [report, setReport] = useState<ArchiveImportReport | null>(null);
   const [isBusy, setIsBusy] = useState(false);
+  // In the desktop app: a local workspace prepared as an archive, waiting for a server (V0.2.50). It is checked as soon as this page shows.
+  const [handoff, setHandoff] = useState<PreparedArchive | null>(() => (isDesktopRuntime ? pendingHandoff() : null));
+
+  useEffect(() => {
+    if (!handoff) return;
+    let cancelled = false;
+    (async () => {
+      setIsBusy(true);
+      try {
+        const prepared = await loadPreparedArchive(handoff);
+        if (cancelled) return;
+        setFile(prepared);
+        const answer = await importSharedWorkspaceArchive(accessToken, { organizationId, archive: prepared, dryRun: true, name: "" });
+        if (cancelled) return;
+        setReport(answer);
+        setName(answer.workspace_name);
+      } catch (error) {
+        if (!cancelled) showToast("error", typeof error === "string" ? error : error instanceof Error ? error.message : "The prepared archive could not be read.");
+      } finally { if (!cancelled) setIsBusy(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [handoff, accessToken, organizationId]);
+
+  async function forgetHandoff() {
+    if (handoff) await discardPreparedArchive(handoff).catch(() => undefined);
+    rememberHandoff(null);
+    setHandoff(null);
+    reset();
+  }
 
   function choose(event: ChangeEvent<HTMLInputElement>) {
     setFile(event.target.files?.[0] ?? null);
@@ -66,6 +97,12 @@ export function WorkspaceImport({ accessToken, onImported, organizationId }: {
       } else if (answer.workspace) {
         showToast("success", `Imported ${answer.workspace.workspace.name}.`);
         onImported(answer.workspace);
+        if (handoff) {
+          // The archive has done its work: it is not kept on this computer.
+          await discardPreparedArchive(handoff).catch(() => undefined);
+          rememberHandoff(null);
+          setHandoff(null);
+        }
         reset();
       }
     } catch (error) {
@@ -77,6 +114,7 @@ export function WorkspaceImport({ accessToken, onImported, organizationId }: {
     <section className="shared-settings-group shared-import-workspace">
       <div className="shared-panel-heading"><div><PackageImport size={18} /><h2>Import a workspace</h2></div><span>from an archive</span></div>
       <p className="shared-muted-copy">Bring in a workspace exported from RepoMemo as a new workspace. The archive is checked first and nothing is written until you confirm. Comments, tasks and history are credited to you, with the original names kept in the text.</p>
+      {handoff ? <p className="shared-import-handoff" role="status">Prepared on this computer: <strong>{handoff.workspace_name}</strong>. It is being checked below; nothing is written until you import it. <Button onClick={() => void forgetHandoff()} type="button" variant="secondary">Discard it</Button></p> : null}
       <div className="shared-import-row">
         <input accept=".gz,.tgz,application/gzip" aria-label="Workspace archive" disabled={isBusy} onChange={choose} ref={input} type="file" />
         <Button disabled={!file || isBusy} onClick={() => void run(true)} type="button" variant="secondary">{isBusy && !report ? "Checking…" : "Check the archive"}</Button>

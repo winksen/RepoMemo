@@ -38,7 +38,7 @@ mod versions;
 pub use agent::{
     agent_capabilities, agent_conversation_title, agent_turn_label, HISTORY_MAX_TURNS, HISTORY_TOKEN_BUDGET,
 };
-pub use archive::{read_archive_entries, ArchiveEncoder, ArchiveReader};
+pub use archive::{read_archive_entries, write_workspace_archive, ArchiveEncoder, ArchiveReader};
 pub use budget::BackgroundAiBudget;
 pub use embeddings::{EmbeddingRebuildPlan, EmbeddingRun};
 pub use remote_policy::{RemoteGitPolicy, RemoteRepository, RemoteScheme};
@@ -130,6 +130,19 @@ impl RepoMemoCore {
 
     pub async fn create_workspace(&self, name: String) -> Result<Workspace> {
         self.storage.create_workspace(&name).await
+    }
+
+    /// Writes a workspace as an archive file a server can import (V0.2.50, the desktop app's
+    /// "move to a server"). The file is complete or not there.
+    pub async fn export_workspace_archive(
+        &self,
+        workspace_id: &str,
+        destination: &Path,
+    ) -> Result<repomemo_domain::ArchiveManifest> {
+        if !self.storage.workspace_exists(workspace_id).await? {
+            repomemo_domain::bail_not_found!("Workspace was not found.");
+        }
+        write_workspace_archive(&self.storage, workspace_id, env!("CARGO_PKG_VERSION"), destination).await
     }
 
     pub async fn list_workspaces(&self) -> Result<Vec<Workspace>> {
@@ -1402,7 +1415,7 @@ fn sanitize_filename(title: &str, extension: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{evenly_spaced, group_sections, RepoMemoCore};
+    use super::{evenly_spaced, group_sections, read_archive_entries, RepoMemoCore};
     use repomemo_domain::{Citation, CreateMemoryCardRequest};
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -1745,6 +1758,108 @@ Document {file} section {index} covers topic{} and the deploy_{} function.
         assert!(exported.contains("# Local-first decision"));
         assert!(exported.contains("## Evidence"));
         assert!(exported.contains(&artifact.path));
+
+        drop(core);
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn a_local_workspace_is_written_as_an_archive_with_its_memory_and_citations() {
+        let data_dir = std::env::temp_dir().join(format!(
+            "repomemo-local-archive-test-{}",
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+        ));
+        let core = RepoMemoCore::boot(data_dir.clone()).await.unwrap();
+        let workspace = core.create_workspace("Local notes".to_owned()).await.unwrap();
+        let artifact = core
+            .import_text(
+                workspace.id.clone(),
+                "Decision note".to_owned(),
+                "Keep the evidence local.".to_owned(),
+                Some("Markdown".to_owned()),
+            )
+            .await
+            .unwrap();
+        core.index_workspace(workspace.id.clone()).await.unwrap();
+        let chunk_id = core.get_artifact(artifact.id.clone()).await.unwrap().chunks[0].id.clone();
+        core.create_memory_card(CreateMemoryCardRequest {
+            workspace_id: workspace.id.clone(),
+            title: "Local-first decision".to_owned(),
+            body_markdown: "The source of truth remains local.".to_owned(),
+            source: "manual".to_owned(),
+            confidence: None,
+            citations: vec![Citation {
+                artifact_id: artifact.id.clone(),
+                chunk_id: Some(chunk_id),
+                title: artifact.title.clone(),
+                path: artifact.path.clone(),
+                start_line: None,
+                end_line: None,
+                confidence: None,
+                commit: None,
+            }],
+        })
+        .await
+        .unwrap();
+
+        let exports = data_dir.join("exports");
+        std::fs::create_dir_all(&exports).unwrap();
+        let destination = exports.join("local-notes.tar.gz");
+        let manifest = core.export_workspace_archive(&workspace.id, &destination).await.unwrap();
+        assert!(destination.is_file());
+        assert!(!destination.with_extension("part").exists(), "no half-written file is left");
+        assert_eq!(manifest.workspace_name, "Local notes");
+        assert_eq!(manifest.counts.artifacts, 1);
+        assert_eq!(manifest.counts.blobs, 1);
+        assert_eq!(manifest.counts.memory_cards, 1);
+        assert_eq!(manifest.counts.citations, 1);
+
+        // What the server reads: the manifest, the data with its checksum, and the stored file under its hash.
+        let entries: std::collections::BTreeMap<String, Vec<u8>> =
+            read_archive_entries(std::fs::File::open(&destination).unwrap(), 1 << 26)
+                .unwrap()
+                .into_iter()
+                .collect();
+        assert_eq!(entries.len(), 3);
+        let written: repomemo_domain::ArchiveManifest = serde_json::from_slice(&entries["manifest.json"]).unwrap();
+        assert_eq!(written.format, repomemo_domain::ARCHIVE_FORMAT);
+        assert_eq!(repomemo_storage::StorageEngine::content_hash(&entries["workspace.json"]), written.data_sha256);
+        let blob = &written.blobs[0];
+        assert_eq!(entries[&format!("blobs/{}", blob.hash)], b"Keep the evidence local.");
+        let data: repomemo_domain::WorkspaceArchiveData = serde_json::from_slice(&entries["workspace.json"]).unwrap();
+        assert_eq!(data.memory_cards[0].title, "Local-first decision");
+        assert!(data.memory_cards[0].citations[0].chunk.is_some(), "the cited passage is named");
+
+        drop(core);
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn a_workspace_missing_stored_content_is_not_written_and_leaves_nothing_behind() {
+        let data_dir = std::env::temp_dir().join(format!(
+            "repomemo-local-archive-missing-test-{}",
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+        ));
+        let core = RepoMemoCore::boot(data_dir.clone()).await.unwrap();
+        let workspace = core.create_workspace("Damaged".to_owned()).await.unwrap();
+        let artifact = core
+            .import_text(
+                workspace.id.clone(),
+                "Note".to_owned(),
+                "Some text.".to_owned(),
+                Some("Markdown".to_owned()),
+            )
+            .await
+            .unwrap();
+        let hash = core.get_artifact(artifact.id.clone()).await.unwrap().summary.content_hash;
+        std::fs::remove_file(core.storage().blob_path_for_hash(&hash)).unwrap();
+
+        let destination = data_dir.join("damaged.tar.gz");
+        let error = core.export_workspace_archive(&workspace.id, &destination).await.unwrap_err();
+        assert!(error.to_string().contains("no stored content"), "{error}");
+        assert!(!destination.exists());
+        assert!(!destination.with_extension("part").exists());
+        assert!(core.export_workspace_archive("no-such-workspace", &destination).await.is_err());
 
         drop(core);
         let _ = std::fs::remove_dir_all(data_dir);

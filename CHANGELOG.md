@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.50 (2026-10-16)
+
+A workspace from the local desktop edition can be moved to a server.
+
+### Added
+- **Move a workspace to a server.** In the local workspace of the desktop app (bottom-left), choose a workspace and *Prepare the archive*. It is written as a workspace archive, the same file a server exports, so the server's import reads it as it reads any other. Then *Go to the server to import it* (connect and sign in), *Save a copy…* or *Discard the archive*.
+- **The import is checked first.** On the server side of the app the dashboard's *Import a workspace* opens with the prepared archive already checked: it shows the files, folders, memory cards with their citations, tasks and comments it holds, and writes nothing until you confirm, under the name you give. The prepared file is deleted afterwards. Your local workspace is not changed or removed.
+- The archive is complete or not there: it is written under another name and renamed when whole, and a workspace with a file whose stored content is missing is refused with the first file named.
+
+### Not moved
+- AI provider settings and keys, saved searches, assistant chats, the activity feed, earlier versions of a file and repository links, as in every archive. The server indexes the files again.
+
+### Upgrading
+- Nothing to do on servers: the import is the one from V0.2.41. Importing needs an organization owner or administrator. Prepared archives older than seven days are removed from the app's data folder when a new one is made.
+
 ## V0.2.49 (2026-10-16)
 
 The desktop app opens a RepoMemo server.

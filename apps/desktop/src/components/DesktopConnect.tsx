@@ -4,6 +4,7 @@ import { IconArrowRight as ArrowRight, IconKey as Key, IconLoader2 as Loader, Ic
 import { configureDesktopApi, getSharedHealth } from "../lib/sharedApi";
 import { desktopServer } from "../lib/desktop";
 import { normalizeServerAddress } from "../lib/serverAddress";
+import { pendingHandoff } from "../lib/handoff";
 import { ThemeToggle } from "./SharedLayout";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -28,6 +29,7 @@ function reason(error: unknown): string {
 export function DesktopConnect({ onConnected, onUseLocal }: { onConnected: () => void; onUseLocal: () => void }) {
   const [address, setAddress] = useState("");
   const [isConnecting, setIsConnecting] = useState(false);
+  const waiting = pendingHandoff();
 
   async function connect(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -80,6 +82,7 @@ export function DesktopConnect({ onConnected, onUseLocal }: { onConnected: () =>
             <h2>Which server?</h2>
             <p>Enter the address your administrator gave you, such as <code>repomemo.example.com</code>. Use <code>https://</code>; plain <code>http://</code> is only accepted for a server on your own network.</p>
           </div>
+          {waiting ? <p className="shared-auth-hint" role="status">Your workspace <strong>{waiting.workspace_name}</strong> is ready to move. Connect to the server you want it on, sign in, and the dashboard's <em>Import a workspace</em> checks it for you.</p> : null}
           <form className="shared-auth-form" onSubmit={connect}>
             <label>Server address<Input autoCapitalize="none" autoComplete="url" autoCorrect="off" autoFocus inputMode="url" onChange={(event) => setAddress(event.target.value)} placeholder="https://repomemo.example.com" required spellCheck={false} type="text" value={address} /></label>
             <Button disabled={isConnecting} type="submit" variant="main">

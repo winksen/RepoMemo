@@ -1,4 +1,5 @@
 mod connection;
+mod handoff;
 
 use std::path::PathBuf;
 
@@ -15,8 +16,8 @@ use tauri::{Manager, State};
 use crate::connection::Connection;
 
 #[derive(Clone)]
-struct AppState {
-    core: RepoMemoCore,
+pub(crate) struct AppState {
+    pub(crate) core: RepoMemoCore,
 }
 
 #[tauri::command]
@@ -279,6 +280,10 @@ pub fn run() {
             connection::load_session,
             connection::clear_session,
             connection::open_external,
+            handoff::export_workspace_archive,
+            handoff::read_export,
+            handoff::copy_export,
+            handoff::discard_export,
             list_workspaces,
             create_workspace,
             get_app_settings,
