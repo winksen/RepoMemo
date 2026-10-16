@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.39` (2026-10-15), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.40` (2026-10-16), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -384,7 +384,7 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 
 | Release | Type | Section | The one change | IDs | Done when |
 |---|---|---|---|---|---|
-| **V0.2.40** | ✨ | Workspace settings | Export a workspace as an archive | O2a | Evidence, folders, memory cards with citations, tasks, comments and lifecycle history in one file with a manifest |
+| **V0.2.40** ✅ | ✨ | Workspace settings | Export a workspace as an archive | O2a | Evidence, folders, memory cards with citations, tasks, comments and lifecycle history in one file with a manifest |
 | **V0.2.41** | ✨ | Workspaces | Import an archive into a new workspace, with a dry run | O2b | An export imports on another 0.2.x server with everything linked as before |
 | **V0.2.42** | ✨ | Backups | Encrypted backups | O6a, decision 14 | A backup restores only with `REPOMEMO_BACKUP_KEY`; a wrong key is refused before anything is written (R2-5 closed) |
 | **V0.2.43** | ✨ | Backups | A second copy of each backup to another folder or network share | O6b | The copy is verified against the manifest |
@@ -713,6 +713,14 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 - [x] Tests: ranking, exclusions, the route for a writer, viewer, outsider and a stranger's address, and the field (finding the `@word`, choosing, Esc, no request without an `@`, nobody suggested)
 - [ ] Comments only: task descriptions and memory cards take no mentions; a mention is still matched by address, so a name typed after `@` by hand notifies nobody; organization members who are not direct members of the workspace are not suggested (nor notified)
 
+#### V0.2.40: Workspace export
+
+- [x] **O2a** `GET /v1/workspaces/{id}/export` (`require_workspace_admin`, one heavy-request unit): a gzip-compressed tar with `manifest.json` (`ArchiveManifest`: format and version, counts, `data_sha256`, every stored file's hash and size), `workspace.json` (`WorkspaceArchiveData`) and `blobs/<sha-256>` once per distinct file; produced while it is sent (`ArchiveEncoder` into a bounded channel), a stored file missing from disk is a `409` before anything is sent
+- [x] `StorageEngine::export_workspace_data`: workspace settings, sources (name and type, no server path), folders, artifacts with metadata, lifecycle states and events, memory cards with citations (a passage by index, line range and text hash; links to something gone counted as omitted), tasks with checklists, comments; people as `{name, email}`, anonymized accounts as "Former member" with no address
+- [x] Recorded as the workspace activity `workspace_exported` and an `audit` log line; web: *Export this workspace* in Settings (`WorkspaceExportSettings`) for owners and administrators
+- [x] Tests: the tar container (header checksum, pieces round-trip, size mismatches, truncation, oversized entry), the file name, `a_workspace_exports_as_an_archive_that_holds_everything_it_has` (every record kind and count, one stored file for two identical files, hashes and the data checksum, no account id, refused for a member, viewer and outsider, the activity line) and the button
+- [ ] No import yet (V0.2.41); not carried: earlier file versions, saved searches, assistant chats, notifications, the activity feed, secrets and repository or tracker links (their files arrive as plain evidence); the web client holds the whole archive in the browser before saving it
+
 ### Decisions to agree before work starts
 
 | # | Decision | Needed by | Proposal |
@@ -822,7 +830,7 @@ Every item of both roads, with the release it is planned for. The evidence behin
 | ID | Item | Size | Target |
 |---|---|---|---|
 | O1 | Backup and restore | M | ✅ V0.1.75 |
-| O2 | Workspace export (2a) and import (2b) | M | V0.2.40, V0.2.41 |
+| O2 | Workspace export (2a) and import (2b) | M | 2a ✅ V0.2.40, 2b V0.2.41 |
 | O3 | Production guide | S–M | ✅ V0.1.75 |
 | O4 | Quotas and disk floor | M | ✅ V0.1.75 |
 | O5 | OpenMetrics export | S | ✅ V0.1.75 |

@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.40 (2026-10-16)
+
+A workspace can be exported as one file.
+
+### Added
+- **Export this workspace** (Settings, for owners and administrators). It downloads a compressed archive (`repomemo-<name>-<date>.tar.gz`, readable with any archive tool) holding a `manifest.json`, a `workspace.json` and the original files.
+- **What is in it:** the evidence with its original files (a file stored once is in the archive once), folders, each file's lifecycle state, owner, review note and history, memory cards with their citations, tasks with their checklists, comments, and the workspace's own settings. The manifest lists the counts, every file's checksum and a checksum of the data.
+- **Citations travel with the card.** A citation names its file and, for a passage, its place and a fingerprint of its text, so the passage can be found again after the file is indexed on another server. Citations whose passage or file no longer exists are left out and counted in the manifest.
+- **People are a name and an address,** never an account of this server. Anonymized accounts stay "Former member" with no address.
+- **Nothing secret leaves.** AI provider keys, repository and tracker tokens and webhook secrets are not in the archive, and links to a repository or tracker are not carried (their files arrive as plain evidence).
+- **`GET /v1/workspaces/{id}/export`** streams the archive while it is built, so a large workspace does not fill the server's memory. A workspace with a stored file missing from the server's disk is refused with a plain message (`409`) instead of being exported incomplete. The export is recorded in the workspace's activity (`workspace_exported`).
+
+### Upgrading
+- Nothing to do. Importing an archive into a new workspace comes in V0.2.41; earlier versions of a file, saved searches, assistant chats and the activity feed are not part of the archive.
+
 ## V0.2.39 (2026-10-15)
 
 Mentions are suggested as you type them.

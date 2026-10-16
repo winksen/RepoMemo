@@ -18,6 +18,7 @@ use repomemo_storage::{NewArtifact, StorageConfig, StorageEngine};
 use serde_json::json;
 
 mod agent;
+mod archive;
 mod budget;
 mod codeowners;
 mod connectors;
@@ -37,6 +38,7 @@ mod versions;
 pub use agent::{
     agent_capabilities, agent_conversation_title, agent_turn_label, HISTORY_MAX_TURNS, HISTORY_TOKEN_BUDGET,
 };
+pub use archive::{read_archive_entries, ArchiveEncoder};
 pub use budget::BackgroundAiBudget;
 pub use embeddings::{EmbeddingRebuildPlan, EmbeddingRun};
 pub use remote_policy::{RemoteGitPolicy, RemoteRepository, RemoteScheme};

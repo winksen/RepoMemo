@@ -820,6 +820,19 @@ export async function downloadSharedArtifactFile(accessToken: string, artifactId
   return response.blob();
 }
 
+/** The workspace as one archive file (owners and administrators). The name comes from the server's `Content-Disposition`. */
+export async function downloadSharedWorkspaceArchive(accessToken: string, workspaceId: string): Promise<{ blob: Blob; filename: string }> {
+  const response = await authFetch(`${API_URL}/v1/workspaces/${workspaceId}/export`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null) as { error?: { message?: string } } | null;
+    throw new SharedApiError(response.status, payload?.error?.message ?? `The shared API returned ${response.status}.`);
+  }
+  const named = /filename="([^"]+)"/.exec(response.headers.get("Content-Disposition") ?? "");
+  return { blob: await response.blob(), filename: named?.[1] ?? "repomemo-workspace.tar.gz" };
+}
+
 export function listSharedFolders(accessToken: string, workspaceId: string): Promise<Folder[]> {
   return request<Folder[]>(`/v1/workspaces/${workspaceId}/folders`, {}, accessToken);
 }

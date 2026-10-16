@@ -1548,3 +1548,243 @@ async fn mention_suggestions_are_the_workspaces_members_for_people_who_can_comme
     assert_eq!(suggest(&outsider, "").await.status(), 403);
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn a_workspace_exports_as_an_archive_that_holds_everything_it_has() {
+    let data_dir = temp_data_dir("workspace-export");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let send = |method: &'static str, uri: String, who: &str, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let (_, _) = register_account(&app, "export-admin@example.com").await;
+    let (owner, _) = register_account(&app, "export-owner@example.com").await;
+    let (writer, _) = register_account(&app, "export-ada@example.com").await;
+    let (viewer, _) = register_account(&app, "export-grace@example.com").await;
+    let (outsider, _) = register_account(&app, "export-eve@example.com").await;
+    let workspace_id = create_workspace(&app, &owner).await;
+    for (email, role) in [("export-ada@example.com", "member"), ("export-grace@example.com", "viewer")] {
+        join(&app, &owner, "workspaces", &workspace_id, email, role).await;
+    }
+
+    // A folder, three files (two with the same text), a memory card citing a
+    // passage and a whole file, a lifecycle change, a task and a comment.
+    let folder = response_json(
+        send(
+            "POST",
+            format!("/v1/workspaces/{workspace_id}/folders"),
+            &owner,
+            json!({"name": "Policies", "parent_id": null}),
+        )
+        .await,
+    )
+    .await;
+    let folder_id = folder["id"].as_str().unwrap().to_owned();
+    let mut ids = Vec::new();
+    for (title, content) in [
+        ("Refund policy", "Refunds are issued within fourteen days of purchase."),
+        ("Shipping notes", "Parcels leave the warehouse every weekday."),
+        ("Refund policy copy", "Refunds are issued within fourteen days of purchase."),
+    ] {
+        let created = send(
+            "POST",
+            format!("/v1/workspaces/{workspace_id}/artifacts/text"),
+            &owner,
+            json!({"title": title, "content": content}),
+        )
+        .await;
+        ids.push(response_json(created).await["id"].as_str().unwrap().to_owned());
+    }
+    wait_for_indexed_artifacts(&app, &owner, &workspace_id, 3).await;
+    let moved = send(
+        "POST",
+        format!("/v1/workspaces/{workspace_id}/artifacts/bulk"),
+        &owner,
+        json!({"action": "move", "artifact_ids": [ids[0], ids[1]], "folder_id": folder_id}),
+    )
+    .await;
+    assert_eq!(moved.status(), 200);
+    let hits = response_json(
+        send(
+            "POST",
+            format!("/v1/workspaces/{workspace_id}/search"),
+            &owner,
+            json!({"query": "parcels"}),
+        )
+        .await,
+    )
+    .await;
+    let chunk_id = hits[0]["chunk_id"].as_str().unwrap().to_owned();
+    let card = send(
+        "POST",
+        format!("/v1/workspaces/{workspace_id}/memory-cards"),
+        &owner,
+        json!({
+            "title": "Dispatch rhythm", "body_markdown": "Parcels leave every weekday.", "source": "test",
+            "citations": [
+                {"artifact_id": ids[1], "chunk_id": chunk_id, "title": "Shipping notes", "path": "x", "start_line": null, "end_line": null, "confidence": null},
+                {"artifact_id": ids[0], "chunk_id": null, "title": "Refund policy", "path": "x", "start_line": null, "end_line": null, "confidence": null},
+            ],
+        }),
+    )
+    .await;
+    assert_eq!(card.status(), 201);
+    assert_eq!(
+        send(
+            "PUT",
+            format!("/v1/artifacts/{}/lifecycle", ids[2]),
+            &owner,
+            json!({"status": "outdated", "review_note": "A copy."}),
+        )
+        .await
+        .status(),
+        200
+    );
+    let task = send(
+        "POST",
+        format!("/v1/workspaces/{workspace_id}/tasks"),
+        &owner,
+        json!({"title": "Check the policy", "status": "open", "priority": "high", "artifact_id": ids[0]}),
+    )
+    .await;
+    assert_eq!(task.status(), 201);
+    let task_id = response_json(task).await["id"].as_str().unwrap().to_owned();
+    assert_eq!(
+        send(
+            "POST",
+            format!("/v1/tasks/{task_id}/checklist"),
+            &owner,
+            json!({"body": "Read it twice"}),
+        )
+        .await
+        .status(),
+        201
+    );
+    assert_eq!(
+        send(
+            "POST",
+            format!("/v1/artifacts/{}/comments", ids[0]),
+            &writer,
+            json!({"body": "Looks right to me."}),
+        )
+        .await
+        .status(),
+        201
+    );
+
+    // Only owners and administrators export.
+    let export_uri = format!("/v1/workspaces/{workspace_id}/export");
+    for who in [&writer, &viewer, &outsider] {
+        let denied = app.clone().oneshot(auth_request("GET", &export_uri, who)).await.unwrap();
+        assert_eq!(denied.status(), 403);
+    }
+
+    let response = app
+        .clone()
+        .oneshot(auth_request("GET", &export_uri, &owner))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 200);
+    assert_eq!(response.headers()["content-type"], "application/gzip");
+    let disposition = response.headers()["content-disposition"].to_str().unwrap().to_owned();
+    assert!(
+        disposition.contains("repomemo-workspace-") && disposition.ends_with(".tar.gz\""),
+        "{disposition}"
+    );
+    let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let entries: std::collections::HashMap<String, Vec<u8>> =
+        repomemo_api::read_archive_entries(bytes.as_ref(), 1 << 26)
+            .unwrap()
+            .into_iter()
+            .collect();
+
+    let manifest: Value = serde_json::from_slice(&entries["manifest.json"]).unwrap();
+    assert_eq!(manifest["format"], "repomemo-workspace-archive");
+    assert_eq!(manifest["format_version"], 1);
+    let counts = &manifest["counts"];
+    assert_eq!(counts["artifacts"], 3);
+    assert_eq!(counts["blobs"], 2, "two files share their text, so one stored file");
+    assert_eq!(counts["folders"], 1);
+    assert_eq!(counts["memory_cards"], 1);
+    assert_eq!(counts["citations"], 2);
+    assert_eq!(counts["tasks"], 1);
+    assert_eq!(counts["checklist_items"], 1);
+    assert_eq!(counts["comments"], 1);
+    assert_eq!(counts["lifecycle_events"], 1);
+    // Every stored file is there under its hash, and the data matches its checksum.
+    assert_eq!(entries.len(), 2 + 2);
+    for blob in manifest["blobs"].as_array().unwrap() {
+        let hash = blob["hash"].as_str().unwrap();
+        let bytes = &entries[&format!("blobs/{hash}")];
+        assert_eq!(repomemo_storage::StorageEngine::content_hash(bytes), hash);
+        assert_eq!(bytes.len() as u64, blob["size_bytes"].as_u64().unwrap());
+    }
+    let data_bytes = &entries["workspace.json"];
+    assert_eq!(
+        repomemo_storage::StorageEngine::content_hash(data_bytes),
+        manifest["data_sha256"].as_str().unwrap()
+    );
+
+    let data: Value = serde_json::from_slice(data_bytes).unwrap();
+    assert_eq!(data["workspace"]["name"], "Workspace");
+    let artifacts = data["artifacts"].as_array().unwrap();
+    assert_eq!(artifacts.len(), 3);
+    let in_folder = artifacts
+        .iter()
+        .filter(|artifact| artifact["folder_id"] == folder_id)
+        .count();
+    assert_eq!(in_folder, 2);
+    assert_eq!(data["folders"][0]["name"], "Policies");
+    let outdated = data["lifecycle"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|entry| entry["artifact_id"] == ids[2])
+        .expect("the changed file has its lifecycle");
+    assert_eq!(outdated["status"], "outdated");
+    assert_eq!(outdated["review_note"], "A copy.");
+    assert_eq!(outdated["events"].as_array().unwrap().len(), 1);
+    assert_eq!(outdated["events"][0]["actor"]["email"], "export-owner@example.com");
+
+    let citations = data["memory_cards"][0]["citations"].as_array().unwrap();
+    let passage = citations
+        .iter()
+        .find(|citation| !citation["chunk"].is_null())
+        .unwrap();
+    assert_eq!(passage["artifact_id"], ids[1]);
+    assert!(passage["chunk"]["content_hash"].as_str().unwrap().len() >= 32);
+    let whole_file = citations
+        .iter()
+        .find(|citation| citation["chunk"].is_null())
+        .unwrap();
+    assert_eq!(whole_file["artifact_id"], ids[0]);
+
+    assert_eq!(data["tasks"][0]["title"], "Check the policy");
+    assert_eq!(data["tasks"][0]["created_by"]["email"], "export-owner@example.com");
+    assert_eq!(data["tasks"][0]["artifact_id"], ids[0]);
+    assert_eq!(data["tasks"][0]["checklist"][0]["body"], "Read it twice");
+    assert_eq!(data["comments"][0]["author"]["email"], "export-ada@example.com");
+    assert_eq!(data["comments"][0]["body"], "Looks right to me.");
+    // No account id of this server is in the archive.
+    assert!(!String::from_utf8_lossy(data_bytes).contains("user_id"));
+
+    // The export leaves a line in the workspace's activity.
+    let activity = response_json(
+        app.clone()
+            .oneshot(auth_request(
+                "GET",
+                &format!("/v1/workspaces/{workspace_id}/activity"),
+                &owner,
+            ))
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert!(activity
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|event| event["action"] == "workspace_exported"));
+    let _ = std::fs::remove_dir_all(data_dir);
+}

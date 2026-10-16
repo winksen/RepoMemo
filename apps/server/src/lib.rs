@@ -38,6 +38,7 @@ mod system;
 mod verification;
 mod web_session;
 mod webhooks;
+mod workspace_export;
 mod workspaces;
 
 use access_control::*;
@@ -560,6 +561,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         )
         .route("/v1/workspaces/{workspace_id}/mention-suggestions", get(suggest_mentions))
         .route("/v1/workspaces/{workspace_id}/review", get(review::review_queue))
+        .route("/v1/workspaces/{workspace_id}/export", get(workspace_export::export_workspace))
         .route("/v1/workspaces/{workspace_id}/health", get(health::workspace_health))
         .route(
             "/v1/workspaces/{workspace_id}/health/actions",

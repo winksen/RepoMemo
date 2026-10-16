@@ -1,0 +1,36 @@
+import { useState } from "react";
+import { IconDownload as Download, IconPackageExport as PackageExport } from "@tabler/icons-react";
+import { downloadSharedWorkspaceArchive } from "../lib/sharedApi";
+import { Button } from "./ui/button";
+import { showToast } from "./ui/toast";
+
+/** Downloads the workspace as one archive file. Shown to owners and administrators. */
+export function WorkspaceExportSettings({ accessToken, workspaceId }: { accessToken: string; workspaceId: string }) {
+  const [isExporting, setIsExporting] = useState(false);
+
+  async function exportWorkspace() {
+    setIsExporting(true);
+    try {
+      const { blob, filename } = await downloadSharedWorkspaceArchive(accessToken, workspaceId);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      showToast("success", "The workspace archive was downloaded.");
+    } catch (error) {
+      showToast("error", error instanceof Error ? error.message : "The workspace could not be exported.");
+    } finally { setIsExporting(false); }
+  }
+
+  return (
+    <section className="shared-settings-group">
+      <div className="shared-panel-heading"><div><PackageExport size={18} /><h2>Export this workspace</h2></div><span>owners and administrators</span></div>
+      <p className="shared-muted-copy">One file with the evidence and its original files, folders, memory cards with their citations, tasks, comments and each file's lifecycle history, plus a manifest. People are carried by name and address, never by account. Settings that hold secrets (AI provider keys, repository and tracker tokens) are not included.</p>
+      <div><Button disabled={isExporting} onClick={() => void exportWorkspace()} type="button" variant="secondary"><Download size={16} /> {isExporting ? "Preparing the archive…" : "Download archive"}</Button></div>
+    </section>
+  );
+}

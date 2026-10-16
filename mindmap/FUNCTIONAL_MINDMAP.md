@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.2.39` (2026-10-15). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
+> **Scope:** reflects the code at `V0.2.40` (2026-10-16). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
 
 ---
 
@@ -266,7 +266,7 @@ A workspace is opened at `/workspaces/:id/<section>` and has **twelve sections**
 | **Memory** | Team memory cards: search and create. A card shows **Needs review** when what it cites changed, disappeared or was retired; its page lists why, lets writers edit the evidence it cites, and confirm it as it is | Everyone |
 | **Tasks** | Team action board | Everyone |
 | **People** | Members, invitations, a summary of *your* capabilities, and the activity feed (user or AI activity) with a 365-day calendar | Owner and admin |
-| **Settings** | Members, AI providers and who may use AI, repository links, rename or delete | Owner and admin (rename and delete are owner only) |
+| **Settings** | Members, AI providers and who may use AI, repository links, **export as an archive**, rename or delete | Owner and admin (rename and delete are owner only) |
 
 ### Workspace pulse (Overview)
 
@@ -498,6 +498,17 @@ A memory card is a **short, durable statement the team wants to keep**. Examples
 - **People** lists the members and explains what your role lets you do.
 - **Activity** shows the last 100 workspace actions and a 365-day calendar. Recorded actions include evidence stored or uploaded, indexing, lifecycle changes, comments, tasks, memory, member changes, AI use and provider changes.
 
+### Exporting a workspace
+
+Owners and administrators can download a workspace as **one archive file** from *Settings › Export this workspace* (V0.2.40). It is a compressed `.tar.gz` that any archive tool opens, holding a **manifest** (what is inside, with counts, sizes and checksums), one data document and the original files:
+
+- **Evidence** with its folders, source names, type, language and each file's original bytes (a file stored once is in the archive once).
+- **Lifecycle**: each file's state, owner, review note and its whole history.
+- **Memory cards** with their citations. A citation names the file and, for a passage, its place and a fingerprint of its text, so it can be pointed at the same passage after the file is indexed again. Citations whose target is already gone are left out and counted in the manifest.
+- **Tasks** with their checklists, and **comments**.
+
+People appear as a name and an address, never as an account of this server; an anonymized account stays "Former member". Credentials never leave: AI provider keys, repository and tracker tokens and webhook secrets are not part of it, and links to a repository or a tracker are carried only as the files they brought. The export is recorded in the workspace's activity, and a workspace missing a stored file is refused with a plain message rather than exported incomplete.
+
 ---
 
 ## 11. Typical team journey
@@ -527,7 +538,7 @@ The desktop app and the shared server keep **separate data**.
 
 ---
 
-## 13. Known functional gaps (at V0.2.39)
+## 13. Known functional gaps (at V0.2.40)
 
 These are observed in the code and are useful for prioritizing. The roadmap item that addresses each one is in brackets.
 
@@ -543,7 +554,7 @@ These are observed in the code and are useful for prioritizing. The roadmap item
 | Invitations and reset links are passed on by hand | Mail delivery exists since V0.2.9 (System › Settings › Mail); invitations are mailed since V0.2.10, "Forgot your password?" works by mail since V0.2.11 and task assignments and mentions are mailed since V0.2.12, and addresses are verified since V0.2.13 (an account that registered on an open server waits for its link before creating organizations or workspaces; an invitation counts), which is why registration is closed by default; the in-app reset notifications exist since V0.1.67 [F6 in V0.2.9–V0.2.12, F12 in V0.2.11, F13 in V0.2.13]. |
 | Issues and pull requests are not evidence | The discussion around the code stays in GitHub or GitLab [F17, V0.2.27–V0.2.31]. |
 | Accounts are never deleted | They are deactivated (V0.2.16) and anonymized (V0.2.17); the account row stays as *Former member*. Log files and earlier backups keep the old address until they age out. |
-| A workspace cannot move to another server | Only whole environments are backed up and restored [O2, V0.2.40–V0.2.41]. |
+| A workspace cannot be imported on another server yet | Since V0.2.40 a workspace exports as one archive file (Settings › Export this workspace) holding its evidence, folders, memory cards with citations, tasks, comments and lifecycle history; importing it into a new workspace is [O2b, V0.2.41]. Earlier versions of a file, saved searches, assistant chats and the activity feed are not in the archive. |
 | The desktop app keeps its own local data | It does not open a RepoMemo server [F20, V0.2.49–V0.2.51]. |
 
 Invitation links and administrator reset links, gaps until V0.1.62, shipped in V0.1.63.

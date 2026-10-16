@@ -23,6 +23,7 @@ use uuid::Uuid;
 mod access;
 mod accounts;
 mod activity;
+mod archive;
 mod artifacts;
 mod collaboration;
 mod connectors;
