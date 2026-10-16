@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.2.40` (2026-10-16). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
+> **Scope:** reflects the code at `V0.2.41` (2026-10-16). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
 
 ---
 
@@ -244,7 +244,7 @@ A **System** button in the header opens `/system`, with these pages:
 ## 3. Organizations and the dashboard
 
 - **Dashboard** (`/dashboard`): every organization you belong to, its workspaces, and aggregate totals (artifacts, active tasks, memory cards), loaded in one request.
-- **Workspace directory** (`/workspaces`): pick an organization, create workspaces (owner or admin), and create a new organization.
+- **Workspace directory** (`/workspaces`): pick an organization, create workspaces (owner or admin), **import a workspace from an archive** (owner or admin, checked first; see §10), and create a new organization.
 - **Organization administration**: list members, add a registered user by email with a role, and remove members, subject to the rules in §1.
 
 ---
@@ -498,7 +498,7 @@ A memory card is a **short, durable statement the team wants to keep**. Examples
 - **People** lists the members and explains what your role lets you do.
 - **Activity** shows the last 100 workspace actions and a 365-day calendar. Recorded actions include evidence stored or uploaded, indexing, lifecycle changes, comments, tasks, memory, member changes, AI use and provider changes.
 
-### Exporting a workspace
+### Exporting and importing a workspace
 
 Owners and administrators can download a workspace as **one archive file** from *Settings › Export this workspace* (V0.2.40). It is a compressed `.tar.gz` that any archive tool opens, holding a **manifest** (what is inside, with counts, sizes and checksums), one data document and the original files:
 
@@ -508,6 +508,12 @@ Owners and administrators can download a workspace as **one archive file** from 
 - **Tasks** with their checklists, and **comments**.
 
 People appear as a name and an address, never as an account of this server; an anonymized account stays "Former member". Credentials never leave: AI provider keys, repository and tracker tokens and webhook secrets are not part of it, and links to a repository or a tracker are carried only as the files they brought. The export is recorded in the workspace's activity, and a workspace missing a stored file is refused with a plain message rather than exported incomplete.
+
+**Importing** (V0.2.41) is the way back in: on the dashboard, owners and administrators of an organization choose an archive under *Import a workspace* and **check it first**. The check reads the whole file, verifies every checksum and every link between records, and says what it holds (files, folders, memory cards, tasks, comments), how big it is, which RepoMemo wrote it, and any warning, without writing anything. Only then does *Import workspace* create a **new workspace** (named as the archive or as you choose) with you as its owner.
+
+- Everything arrives as it was: folders, lifecycle states and history, memory cards with their citations (a cited passage is found again once its file is indexed; if it cannot be, the citation points at the whole file and the report says how many), tasks with checklists, comments and the workspace's AI policy. Dates are kept; files are searchable as soon as they are indexed in the background.
+- **Nobody is credited by account.** An archive can be written by anyone, so its authors are not believed: comments, tasks and history belong to you, and the original name is kept in the text ("Originally written by Ada on 2026-10-14"). Owners, reviewers and assignees become notes for the same reason.
+- An archive that is damaged, from a newer RepoMemo, too large for the server (`REPOMEMO_MAX_IMPORT_MB`) or for a workspace's storage allowance, or whose records disagree, is refused with the reason, and a failed import leaves no workspace behind.
 
 ---
 
@@ -538,7 +544,7 @@ The desktop app and the shared server keep **separate data**.
 
 ---
 
-## 13. Known functional gaps (at V0.2.40)
+## 13. Known functional gaps (at V0.2.41)
 
 These are observed in the code and are useful for prioritizing. The roadmap item that addresses each one is in brackets.
 
@@ -554,7 +560,7 @@ These are observed in the code and are useful for prioritizing. The roadmap item
 | Invitations and reset links are passed on by hand | Mail delivery exists since V0.2.9 (System › Settings › Mail); invitations are mailed since V0.2.10, "Forgot your password?" works by mail since V0.2.11 and task assignments and mentions are mailed since V0.2.12, and addresses are verified since V0.2.13 (an account that registered on an open server waits for its link before creating organizations or workspaces; an invitation counts), which is why registration is closed by default; the in-app reset notifications exist since V0.1.67 [F6 in V0.2.9–V0.2.12, F12 in V0.2.11, F13 in V0.2.13]. |
 | Issues and pull requests are not evidence | The discussion around the code stays in GitHub or GitLab [F17, V0.2.27–V0.2.31]. |
 | Accounts are never deleted | They are deactivated (V0.2.16) and anonymized (V0.2.17); the account row stays as *Former member*. Log files and earlier backups keep the old address until they age out. |
-| A workspace cannot be imported on another server yet | Since V0.2.40 a workspace exports as one archive file (Settings › Export this workspace) holding its evidence, folders, memory cards with citations, tasks, comments and lifecycle history; importing it into a new workspace is [O2b, V0.2.41]. Earlier versions of a file, saved searches, assistant chats and the activity feed are not in the archive. |
+| Archives are not a sync | A workspace exports (V0.2.40, Settings) and imports as a new workspace (V0.2.41, dashboard); it is a copy, not a link: nothing keeps the two in step, and importing the same archive twice makes two workspaces. Earlier versions of a file, saved searches, assistant chats and the activity feed are not in the archive; the local desktop edition cannot send its workspace to a server yet [F20b, V0.2.50]. |
 | The desktop app keeps its own local data | It does not open a RepoMemo server [F20, V0.2.49–V0.2.51]. |
 
 Invitation links and administrator reset links, gaps until V0.1.62, shipped in V0.1.63.

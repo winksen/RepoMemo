@@ -39,6 +39,7 @@ mod verification;
 mod web_session;
 mod webhooks;
 mod workspace_export;
+mod workspace_import;
 mod workspaces;
 
 use access_control::*;
@@ -143,6 +144,8 @@ struct AppState {
     storage: StorageEngine,
     core: RepoMemoCore,
     jwt_secret: String,
+    /// The largest workspace archive an import accepts.
+    max_import_bytes: u64,
     event_bus: WorkspaceEventBus,
     index_queue: IndexQueue,
     embedding_queue: EmbeddingQueue,
@@ -389,6 +392,7 @@ async fn build_state(
         storage,
         core,
         jwt_secret: config.jwt_secret.clone(),
+        max_import_bytes: config.max_import_bytes,
         event_bus,
         index_queue,
         embedding_queue,
@@ -817,6 +821,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
                 config.request_timeout
             },
         ))
+        .route("/v1/workspaces/import", post(workspace_import::import_workspace))
         .route("/v1/workspaces/{workspace_id}/events", get(workspace_events))
         .route("/v1/system/events", get(system_events))
         .layer(middleware::from_fn_with_state(state.clone(), web_session::web_session))

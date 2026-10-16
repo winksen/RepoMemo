@@ -2,10 +2,12 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 mod archive;
+mod archive_import;
 pub mod console;
 mod error;
 
 pub use archive::*;
+pub use archive_import::*;
 pub use error::{classify, DomainError, ErrorKind};
 
 /// Temporary server-side identity shape. Production authentication replaces

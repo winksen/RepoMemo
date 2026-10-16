@@ -914,3 +914,39 @@ export interface CreatedPersonalToken {
   /** The token itself, shown once. */
   secret: string;
 }
+
+export interface ArchivePerson {
+  name: string;
+  email: string | null;
+}
+
+export interface ArchiveCounts {
+  sources: number;
+  folders: number;
+  artifacts: number;
+  blobs: number;
+  memory_cards: number;
+  citations: number;
+  tasks: number;
+  checklist_items: number;
+  comments: number;
+  lifecycle_events: number;
+  omitted_citations: number;
+}
+
+/** The answer to importing a workspace archive, or to checking one first (`dry_run`). */
+export interface ArchiveImportReport {
+  dry_run: boolean;
+  ok: boolean;
+  workspace_name: string;
+  archive_format_version: number;
+  source_version: string;
+  exported_at: string;
+  counts: ArchiveCounts;
+  total_bytes: number;
+  people: ArchivePerson[];
+  problems: string[];
+  warnings: string[];
+  widened_citations: number;
+  workspace: SharedWorkspace | null;
+}

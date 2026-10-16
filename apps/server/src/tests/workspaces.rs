@@ -1788,3 +1788,252 @@ async fn a_workspace_exports_as_an_archive_that_holds_everything_it_has() {
         .any(|event| event["action"] == "workspace_exported"));
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn an_archive_imports_into_a_new_workspace_after_a_dry_run_that_writes_nothing() {
+    let data_dir = temp_data_dir("workspace-import");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let send = |method: &'static str, uri: String, who: &str, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let (_, _) = register_account(&app, "import-admin@example.com").await;
+    let (owner, _) = register_account(&app, "import-owner@example.com").await;
+    let (member, _) = register_account(&app, "import-ada@example.com").await;
+    let workspace_id = create_workspace(&app, &owner).await;
+    let listed = response_json(app.clone().oneshot(auth_request("GET", "/v1/workspaces", &owner)).await.unwrap()).await;
+    let organization_id = listed[0]["organization_id"].as_str().unwrap().to_owned();
+    join(&app, &owner, "organizations", &organization_id, "import-ada@example.com", "member").await;
+
+    // A workspace worth moving: a folder, two files, a card citing a passage
+    // and a whole file, a lifecycle change, a task with a checklist, a comment.
+    let folder = response_json(
+        send(
+            "POST",
+            format!("/v1/workspaces/{workspace_id}/folders"),
+            &owner,
+            json!({"name": "Policies", "parent_id": null}),
+        )
+        .await,
+    )
+    .await;
+    let mut ids = Vec::new();
+    for (title, content) in [
+        ("Refund policy", "Refunds are issued within fourteen days of purchase."),
+        ("Shipping notes", "Parcels leave the warehouse every weekday."),
+    ] {
+        let created = send(
+            "POST",
+            format!("/v1/workspaces/{workspace_id}/artifacts/text"),
+            &owner,
+            json!({"title": title, "content": content}),
+        )
+        .await;
+        ids.push(response_json(created).await["id"].as_str().unwrap().to_owned());
+    }
+    wait_for_indexed_artifacts(&app, &owner, &workspace_id, 2).await;
+    send(
+        "POST",
+        format!("/v1/workspaces/{workspace_id}/artifacts/bulk"),
+        &owner,
+        json!({"action": "move", "artifact_ids": [ids[0]], "folder_id": folder["id"]}),
+    )
+    .await;
+    let hits = response_json(
+        send(
+            "POST",
+            format!("/v1/workspaces/{workspace_id}/search"),
+            &owner,
+            json!({"query": "parcels"}),
+        )
+        .await,
+    )
+    .await;
+    let chunk_id = hits[0]["chunk_id"].as_str().unwrap().to_owned();
+    let card = send(
+        "POST",
+        format!("/v1/workspaces/{workspace_id}/memory-cards"),
+        &owner,
+        json!({
+            "title": "Dispatch rhythm", "body_markdown": "Parcels leave every weekday.", "source": "test",
+            "citations": [
+                {"artifact_id": ids[1], "chunk_id": chunk_id, "title": "Shipping notes", "path": "x", "start_line": null, "end_line": null, "confidence": null},
+                {"artifact_id": ids[0], "chunk_id": null, "title": "Refund policy", "path": "x", "start_line": null, "end_line": null, "confidence": null},
+            ],
+        }),
+    )
+    .await;
+    assert_eq!(card.status(), 201);
+    send(
+        "PUT",
+        format!("/v1/artifacts/{}/lifecycle", ids[0]),
+        &owner,
+        json!({"status": "verified", "review_note": "Checked."}),
+    )
+    .await;
+    let task = send(
+        "POST",
+        format!("/v1/workspaces/{workspace_id}/tasks"),
+        &owner,
+        json!({"title": "Check the policy", "description": "Read it.", "status": "open", "priority": "high", "artifact_id": ids[0]}),
+    )
+    .await;
+    let task_id = response_json(task).await["id"].as_str().unwrap().to_owned();
+    send(
+        "POST",
+        format!("/v1/tasks/{task_id}/checklist"),
+        &owner,
+        json!({"body": "Read it twice"}),
+    )
+    .await;
+    send(
+        "POST",
+        format!("/v1/artifacts/{}/comments", ids[0]),
+        &owner,
+        json!({"body": "Looks right to me."}),
+    )
+    .await;
+
+    let archive = to_bytes(
+        app.clone()
+            .oneshot(auth_request("GET", &format!("/v1/workspaces/{workspace_id}/export"), &owner))
+            .await
+            .unwrap()
+            .into_body(),
+        usize::MAX,
+    )
+    .await
+    .unwrap()
+    .to_vec();
+
+    let import = |archive: Vec<u8>, who: &str, query: &str| {
+        let app = app.clone();
+        let request = Request::builder()
+            .method("POST")
+            .uri(format!("/v1/workspaces/import?organization_id={organization_id}{query}"))
+            .header("authorization", who)
+            .header("content-type", "application/gzip")
+            .body(Body::from(archive))
+            .unwrap();
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let workspace_count = || {
+        let app = app.clone();
+        let request = auth_request("GET", "/v1/workspaces", &owner);
+        async move { response_json(app.oneshot(request).await.unwrap()).await.as_array().unwrap().len() }
+    };
+    assert_eq!(workspace_count().await, 1);
+
+    // A dry run reports what is in the archive and writes nothing.
+    let dry = import(archive.clone(), &owner, "&dry_run=true").await;
+    assert_eq!(dry.status(), 200);
+    let dry = response_json(dry).await;
+    assert_eq!(dry["dry_run"], true);
+    assert_eq!(dry["ok"], true);
+    assert_eq!(dry["workspace_name"], "Workspace");
+    assert_eq!(dry["counts"]["artifacts"], 2);
+    assert_eq!(dry["counts"]["memory_cards"], 1);
+    assert_eq!(dry["problems"].as_array().unwrap().len(), 0);
+    assert!(dry["workspace"].is_null());
+    assert_eq!(workspace_count().await, 1, "a dry run creates no workspace");
+
+    // Not an archive, a damaged one, and someone who may not create workspaces.
+    assert_eq!(import(b"hello".to_vec(), &owner, "").await.status(), 400);
+    let mut damaged = repomemo_api::read_archive_entries(archive.as_slice(), 1 << 26).unwrap();
+    for (name, bytes) in damaged.iter_mut() {
+        if name == "workspace.json" {
+            let text = String::from_utf8(bytes.clone()).unwrap().replace("Dispatch rhythm", "Dispatch Rhythm");
+            *bytes = text.into_bytes();
+        }
+    }
+    let mut encoder = repomemo_api::ArchiveEncoder::new();
+    for (name, bytes) in &damaged {
+        encoder.add(name, bytes, 0).unwrap();
+    }
+    let tampered = encoder.finish().unwrap();
+    let refused = import(tampered, &owner, "").await;
+    assert_eq!(refused.status(), 400);
+    assert!(response_json(refused).await["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("checksum"));
+    assert_eq!(import(archive.clone(), &member, "").await.status(), 400);
+    assert_eq!(workspace_count().await, 1, "nothing was left by the refusals");
+
+    // The import itself.
+    let imported = import(archive.clone(), &owner, "&name=Moved").await;
+    assert_eq!(imported.status(), 201);
+    let report = response_json(imported).await;
+    assert_eq!(report["ok"], true);
+    assert_eq!(report["workspace"]["workspace"]["name"], "Moved");
+    assert_eq!(report["widened_citations"], 0, "the passage was found again");
+    let new_id = report["workspace"]["workspace"]["id"].as_str().unwrap().to_owned();
+    assert_ne!(new_id, workspace_id);
+    assert_eq!(workspace_count().await, 2);
+
+    let get = |uri: String| {
+        let app = app.clone();
+        let request = auth_request("GET", &uri, &owner);
+        async move { response_json(app.oneshot(request).await.unwrap()).await }
+    };
+    wait_for_indexed_artifacts(&app, &owner, &new_id, 2).await;
+    let files = get(format!("/v1/workspaces/{new_id}/artifacts")).await;
+    let files = files.as_array().unwrap();
+    assert_eq!(files.len(), 2);
+    let refund = files.iter().find(|file| file["title"] == "Refund policy").unwrap();
+    let shipping = files.iter().find(|file| file["title"] == "Shipping notes").unwrap();
+    assert_ne!(refund["id"], ids[0], "records get new ids");
+    let folders = get(format!("/v1/workspaces/{new_id}/folders")).await;
+    assert_eq!(folders[0]["name"], "Policies");
+    assert_eq!(refund["folder_id"], folders[0]["id"]);
+    assert!(shipping["folder_id"].is_null());
+    let text = get(format!("/v1/artifacts/{}", refund["id"].as_str().unwrap())).await;
+    assert!(text["content_preview"].as_str().unwrap().contains("fourteen days"));
+
+    let lifecycle = get(format!("/v1/artifacts/{}/lifecycle", refund["id"].as_str().unwrap())).await;
+    assert_eq!(lifecycle["status"], "verified");
+    let history = get(format!("/v1/artifacts/{}/lifecycle/history", refund["id"].as_str().unwrap())).await;
+    assert_eq!(history.as_array().unwrap().len(), 1);
+    let comments = get(format!("/v1/artifacts/{}/comments", refund["id"].as_str().unwrap())).await;
+    let body = comments[0]["body"].as_str().unwrap();
+    assert!(body.starts_with("Originally written by Person on "), "{body}");
+    assert!(body.ends_with("Looks right to me."), "{body}");
+    assert_eq!(comments[0]["author"]["email"], "import-owner@example.com", "credited to the importer");
+    let tasks = get(format!("/v1/workspaces/{new_id}/tasks")).await;
+    assert_eq!(tasks[0]["title"], "Check the policy");
+    assert_eq!(tasks[0]["artifact_id"], refund["id"]);
+    assert!(tasks[0]["description"].as_str().unwrap().contains("Created by Person in the exported workspace."));
+    let checklist = get(format!("/v1/tasks/{}/checklist", tasks[0]["id"].as_str().unwrap())).await;
+    assert_eq!(checklist[0]["body"], "Read it twice");
+
+    let cards = get(format!("/v1/workspaces/{new_id}/memory-cards")).await;
+    assert_eq!(cards[0]["title"], "Dispatch rhythm");
+    assert_eq!(cards[0]["evidence_count"], 2);
+    assert_eq!(cards[0]["needs_review"], false);
+    let card = get(format!("/v1/memory-cards/{}", cards[0]["id"].as_str().unwrap())).await;
+    let evidence = card["evidence"].as_array().unwrap();
+    assert!(evidence.iter().any(|item| item["target_type"] == "chunk" && item["artifact_id"] == shipping["id"] && item["exists"] == true));
+    assert!(evidence.iter().any(|item| item["target_type"] == "artifact" && item["artifact_id"] == refund["id"]));
+
+    // The new workspace answers searches, and the old one is untouched.
+    let found = response_json(
+        send(
+            "POST",
+            format!("/v1/workspaces/{new_id}/search"),
+            &owner,
+            json!({"query": "parcels"}),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(found[0]["title"], "Shipping notes");
+    assert_eq!(get(format!("/v1/workspaces/{workspace_id}/artifacts")).await.as_array().unwrap().len(), 2);
+    let activity = get(format!("/v1/workspaces/{new_id}/activity")).await;
+    assert!(activity
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|event| event["action"] == "workspace_imported"));
+    let _ = std::fs::remove_dir_all(data_dir);
+}

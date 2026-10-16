@@ -38,7 +38,7 @@ mod versions;
 pub use agent::{
     agent_capabilities, agent_conversation_title, agent_turn_label, HISTORY_MAX_TURNS, HISTORY_TOKEN_BUDGET,
 };
-pub use archive::{read_archive_entries, ArchiveEncoder};
+pub use archive::{read_archive_entries, ArchiveEncoder, ArchiveReader};
 pub use budget::BackgroundAiBudget;
 pub use embeddings::{EmbeddingRebuildPlan, EmbeddingRun};
 pub use remote_policy::{RemoteGitPolicy, RemoteRepository, RemoteScheme};

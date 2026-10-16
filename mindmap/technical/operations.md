@@ -68,6 +68,16 @@ server {
 
     client_max_body_size 64m;          # at least REPOMEMO_MAX_UPLOAD_MB
 
+    # Importing a workspace archive (POST /v1/workspaces/import) sends one body
+    # as large as REPOMEMO_MAX_IMPORT_MB. Give that path its own limit and let
+    # nginx stream it instead of buffering it:
+    #   location = /v1/workspaces/import {
+    #       client_max_body_size 2048m;
+    #       proxy_request_buffering off;
+    #       proxy_read_timeout 3600s;
+    #       proxy_pass http://127.0.0.1:3020;
+    #   }
+
     # Live events are long-lived: no buffering, no timeout. This block comes
     # first because nginx uses the first regular expression that matches.
     location ~ ^/v1/(workspaces/[^/]+/events|system/events)$ {
@@ -204,6 +214,7 @@ All are run-time settings (System › Settings) with an environment default; `0`
 | `REPOMEMO_WORKSPACES_PER_PERSON` | 25 | Workspaces created without end (`409 workspace_limit`) |
 | `REPOMEMO_DISK_FLOOR_MB` | 1,024 | A full disk: uploads stop (`507 disk_low`) while less than this is free. The overview shows free space |
 | `REPOMEMO_MAX_UPLOAD_MB` | 10 | The size of one upload (environment only) |
+| `REPOMEMO_MAX_IMPORT_MB` | 2,048 | The size of one workspace archive to import (environment only); read from a temporary file, never held in memory |
 | `REPOMEMO_HEAVY_REQUESTS_PER_MINUTE` | 240 | Searches and reports, per person |
 | `REPOMEMO_AI_REQUESTS_PER_HOUR` | 120 | Interactive AI, per person |
 | `REPOMEMO_BACKGROUND_AI_PER_DAY` | 2,000 | Image descriptions and embedding batches, per workspace |

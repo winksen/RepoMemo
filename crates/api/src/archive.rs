@@ -140,37 +140,69 @@ impl ArchiveEncoder {
     }
 }
 
+/// Reads the entries of an archive one at a time, so a large archive is never
+/// held whole: each call decompresses only the next entry.
+pub struct ArchiveReader<R: Read> {
+    decoder: GzDecoder<R>,
+    finished: bool,
+}
+
+impl<R: Read> ArchiveReader<R> {
+    pub fn new(reader: R) -> Self {
+        Self {
+            decoder: GzDecoder::new(reader),
+            finished: false,
+        }
+    }
+
+    /// The next file entry and its bytes, or `None` at the end marker. An
+    /// entry larger than `max_entry_bytes` is refused before it is read.
+    /// Directories and other non-file entries are skipped.
+    pub fn next_entry(&mut self, max_entry_bytes: u64) -> Result<Option<(String, Vec<u8>)>> {
+        while !self.finished {
+            let mut block = [0u8; BLOCK];
+            self.decoder
+                .read_exact(&mut block)
+                .context("the archive ends before its end marker")?;
+            if block.iter().all(|byte| *byte == 0) {
+                self.finished = true;
+                break;
+            }
+            let name_end = block[..NAME_BYTES].iter().position(|byte| *byte == 0).unwrap_or(NAME_BYTES);
+            let name = String::from_utf8_lossy(&block[..name_end]).into_owned();
+            let size_text = String::from_utf8_lossy(&block[124..135]).into_owned();
+            let size = u64::from_str_radix(size_text.trim_matches('\0').trim(), 8)
+                .with_context(|| format!("{name} has an unreadable size"))?;
+            if size > max_entry_bytes {
+                bail!("{name} is larger than the {max_entry_bytes} bytes an entry may have");
+            }
+            // Grown as the bytes arrive, so a header that claims more than
+            // the archive holds costs nothing.
+            let mut bytes = Vec::new();
+            (&mut self.decoder)
+                .take(size)
+                .read_to_end(&mut bytes)
+                .with_context(|| format!("the archive is damaged inside {name}"))?;
+            if bytes.len() as u64 != size {
+                bail!("the archive ends inside {name}");
+            }
+            let padding = (BLOCK - (size as usize % BLOCK)) % BLOCK;
+            let mut skipped = [0u8; BLOCK];
+            self.decoder.read_exact(&mut skipped[..padding])?;
+            if matches!(block[156], b'0' | 0) {
+                return Ok(Some((name, bytes)));
+            }
+        }
+        Ok(None)
+    }
+}
+
 /// Reads every entry of an archive, refusing one larger than `max_entry_bytes`.
-/// Directories and other non-file entries are skipped.
 pub fn read_archive_entries<R: Read>(reader: R, max_entry_bytes: u64) -> Result<Vec<(String, Vec<u8>)>> {
-    let mut decoder = GzDecoder::new(reader);
+    let mut reader = ArchiveReader::new(reader);
     let mut entries = Vec::new();
-    loop {
-        let mut block = [0u8; BLOCK];
-        decoder
-            .read_exact(&mut block)
-            .context("the archive ends before its end marker")?;
-        if block.iter().all(|byte| *byte == 0) {
-            break;
-        }
-        let name_end = block[..NAME_BYTES].iter().position(|byte| *byte == 0).unwrap_or(NAME_BYTES);
-        let name = String::from_utf8_lossy(&block[..name_end]).into_owned();
-        let size_text = String::from_utf8_lossy(&block[124..135]).trim().to_owned();
-        let size = u64::from_str_radix(size_text.trim_matches('\0').trim(), 8)
-            .with_context(|| format!("{name} has an unreadable size"))?;
-        if size > max_entry_bytes {
-            bail!("{name} is larger than the {max_entry_bytes} bytes an entry may have");
-        }
-        let mut bytes = vec![0u8; size as usize];
-        decoder
-            .read_exact(&mut bytes)
-            .with_context(|| format!("the archive ends inside {name}"))?;
-        let padding = (BLOCK - (size as usize % BLOCK)) % BLOCK;
-        let mut skipped = [0u8; BLOCK];
-        decoder.read_exact(&mut skipped[..padding])?;
-        if matches!(block[156], b'0' | 0) {
-            entries.push((name, bytes));
-        }
+    while let Some(entry) = reader.next_entry(max_entry_bytes)? {
+        entries.push(entry);
     }
     Ok(entries)
 }

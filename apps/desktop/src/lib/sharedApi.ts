@@ -1,4 +1,5 @@
 import type {
+  ArchiveImportReport,
   ServerSetupStatus,
   SetupCheck,
   AiMinRole,
@@ -831,6 +832,30 @@ export async function downloadSharedWorkspaceArchive(accessToken: string, worksp
   }
   const named = /filename="([^"]+)"/.exec(response.headers.get("Content-Disposition") ?? "");
   return { blob: await response.blob(), filename: named?.[1] ?? "repomemo-workspace.tar.gz" };
+}
+
+/** Reads a workspace archive into a new workspace of the organization, or only checks it (`dryRun`). */
+export async function importSharedWorkspaceArchive(accessToken: string, input: {
+  organizationId: string;
+  archive: Blob;
+  dryRun: boolean;
+  name?: string;
+}): Promise<ArchiveImportReport> {
+  const query = new URLSearchParams({ organization_id: input.organizationId });
+  if (input.dryRun) query.set("dry_run", "true");
+  if (input.name?.trim()) query.set("name", input.name.trim());
+  const response = await authFetch(`${API_URL}/v1/workspaces/import?${query}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/gzip", Accept: "application/json" },
+    body: input.archive,
+    credentials: "include",
+  });
+  const payload = await response.json().catch(() => null) as { error?: { message?: string } } | ArchiveImportReport | null;
+  if (!response.ok) {
+    const message = payload && "error" in payload ? payload.error?.message : null;
+    throw new SharedApiError(response.status, message ?? `The shared API returned ${response.status}.`);
+  }
+  return payload as ArchiveImportReport;
 }
 
 export function listSharedFolders(accessToken: string, workspaceId: string): Promise<Folder[]> {

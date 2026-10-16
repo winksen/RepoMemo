@@ -422,12 +422,9 @@ impl StorageEngine {
         Ok(count > 0)
     }
 
-    pub async fn create_shared_workspace(
-        &self,
-        creator_id: &str,
-        organization_id: &str,
-        name: &str,
-    ) -> Result<SharedWorkspace> {
+    /// Fails unless `creator_id` may create workspaces in the organization:
+    /// owners and administrators, and system administrators anywhere.
+    pub(crate) async fn require_workspace_creator(&self, creator_id: &str, organization_id: &str) -> Result<OrganizationRole> {
         let membership = self.organization_role_for_user(creator_id, organization_id).await?;
         let is_system_admin = self
             .user_access(creator_id)
@@ -448,6 +445,16 @@ impl StorageEngine {
         if matches!(creator_role, OrganizationRole::Member) {
             repomemo_domain::bail_invalid!("Only organization owners and admins can create workspaces.");
         }
+        Ok(creator_role)
+    }
+
+    pub async fn create_shared_workspace(
+        &self,
+        creator_id: &str,
+        organization_id: &str,
+        name: &str,
+    ) -> Result<SharedWorkspace> {
+        let creator_role = self.require_workspace_creator(creator_id, organization_id).await?;
         let id = Uuid::new_v4().to_string();
         let now = Utc::now().to_rfc3339();
         let name = require_name(name, "Workspace name")?;

@@ -708,6 +708,11 @@ textarea:focus-visible {
 .shared-settings-group > .shared-muted-copy { max-width: 72ch; margin: -3px 0 0; }
 .shared-workspace-rename { display: flex; gap: 8px; max-width: 560px; }
 .shared-workspace-rename .rm-input { min-width: 0; }
+.shared-import-workspace { margin-top: 18px; }
+.shared-import-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.shared-import-report { display: grid; gap: 8px; max-width: 680px; padding: 14px 16px; background: var(--color-surface-2); border-radius: 10px; font-size: 13px; }
+.shared-import-report ul { margin: 0; padding-left: 18px; color: var(--color-text-muted); }
+.shared-import-report label { display: grid; gap: 4px; max-width: 360px; }
 .shared-ai-provider-form { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px !important; max-width: 680px; padding: 16px; background: var(--color-surface-2); border-radius: 10px; }
 .shared-ai-provider-form > div,
 .shared-ai-provider-form > button,

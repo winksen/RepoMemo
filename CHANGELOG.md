@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.41 (2026-10-16)
+
+A workspace archive can be imported as a new workspace.
+
+### Added
+- **Import a workspace** on the dashboard, for owners and administrators of an organization. Choose an archive made by *Export this workspace*, **check it first** (it is read completely and nothing is written), see what it holds and any warning, name the new workspace and import it. You become its owner.
+- **The check** verifies the manifest and format version, the data against its checksum, every stored file against its hash and size, and that the records agree with each other (references, folder tree, states). It also tells you if the archive is too large for the server or for a workspace's storage allowance. A damaged archive, one from a newer RepoMemo or one whose records disagree is refused with the reason, and a failed import leaves no workspace behind.
+- **Everything is linked as before:** folders, each file's lifecycle and history, memory cards with their citations, tasks with checklists, comments and the workspace's AI policy, with their dates. A cited passage is found again once its file is indexed; if it cannot be found, the citation points at the whole file and the report says how many. Searching works as soon as a file is indexed, in the background.
+- **Nobody is credited by account.** An archive can be written by anyone, so its authors are not believed: comments, tasks and history belong to the person who imports, and the original name is kept in the text. Links to a folder, repository or tracker are not recreated; their files arrive as plain evidence.
+- **`POST /v1/workspaces/import?organization_id=&dry_run=&name=`** takes the archive as the request body. It is received into a temporary file in the data folder (not into memory) and is not subject to the request timeout.
+- **`REPOMEMO_MAX_IMPORT_MB`** (default 2048) is the largest archive accepted.
+
+### Upgrading
+- Nothing to do. If a reverse proxy sits in front of the server, allow `POST /v1/workspaces/import` a body as large as your biggest archive and do not buffer it (the production guide shows the nginx location).
+- Importing makes a copy; importing the same archive twice makes two workspaces.
+
 ## V0.2.40 (2026-10-16)
 
 A workspace can be exported as one file.

@@ -38,6 +38,8 @@ pub struct ServerConfig {
     /// (`REPOMEMO_ALLOW_INSECURE_HTTP`), for a trusted network only.
     pub allow_insecure_http: bool,
     pub max_upload_bytes: usize,
+    /// The largest workspace archive that can be imported (`REPOMEMO_MAX_IMPORT_MB`).
+    pub max_import_bytes: u64,
     /// How long a request may take, event streams excepted
     /// (`REPOMEMO_REQUEST_TIMEOUT_SECONDS`, 0 turns it off).
     pub request_timeout: Duration,
@@ -275,6 +277,7 @@ impl ServerConfig {
             public_url,
             allow_insecure_http,
             max_upload_bytes: env_parse::<usize>("REPOMEMO_MAX_UPLOAD_MB", 10)?.clamp(1, 1024) * 1024 * 1024,
+            max_import_bytes: env_parse::<u64>("REPOMEMO_MAX_IMPORT_MB", 2048)?.clamp(1, 1_048_576) * 1024 * 1024,
             request_timeout: Duration::from_secs(env_parse("REPOMEMO_REQUEST_TIMEOUT_SECONDS", 120)?),
             header_read_timeout: Duration::from_secs(env_parse("REPOMEMO_HEADER_TIMEOUT_SECONDS", 30)?),
             max_event_streams_per_user: env_parse::<usize>("REPOMEMO_MAX_EVENT_STREAMS_PER_USER", 10)?.clamp(1, 1000),
@@ -359,6 +362,7 @@ impl ServerConfig {
             public_url: None,
             allow_insecure_http: false,
             max_upload_bytes: 10 * 1024 * 1024,
+            max_import_bytes: 64 * 1024 * 1024,
             request_timeout: Duration::from_secs(120),
             header_read_timeout: Duration::from_secs(30),
             max_event_streams_per_user: 10,
