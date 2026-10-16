@@ -480,3 +480,11 @@ tr.rm-system-row-inactive .rm-system-person img, tr.rm-system-row-inactive .rm-s
 @media (forced-colors: active) {
   button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px solid Highlight; }
 }
+
+/* ===== Desktop app (V0.2.49) ===== */
+.rm-desktop-server { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; padding-top: 10px; color: var(--color-text-muted); border-top: 1px solid var(--color-border); font-size: 12px; }
+.rm-desktop-server > span { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.rm-desktop-server-host { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rm-desktop-server .rm-button { min-height: 28px; padding: 0 8px; font-size: 12px; }
+.shared-api-note + .rm-desktop-server { margin-top: 14px; }
+.rm-button.rm-desktop-switch { position: fixed; bottom: 14px; left: 14px; z-index: 40; min-height: 34px; box-shadow: var(--shadow-floating); }

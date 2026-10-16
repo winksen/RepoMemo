@@ -88,13 +88,34 @@ import type {
 } from "../types";
 
 import { queryClient } from "./queryClient";
+import { sessionStore } from "./desktop";
 
-const API_URL = (import.meta.env.VITE_REPOMEMO_API_URL ?? "http://127.0.0.1:3020").replace(/\/$/, "");
+let API_URL = (import.meta.env.VITE_REPOMEMO_API_URL ?? "http://127.0.0.1:3020").replace(/\/$/, "");
 
 /** Identifies this client to the server, which lists it under System › Overview. */
-const CLIENT_HEADER = ["X-RepoMemo-Client", "web"] as const;
+let clientName = "web";
+const clientHeader = (): [string, string] => ["X-RepoMemo-Client", clientName];
 
-export const sharedApiUrl = API_URL;
+/** The address of the server this client talks to (a live binding: the desktop app sets it once the person has chosen a server). */
+export let sharedApiUrl = API_URL;
+
+// Where requests go out: the browser's own `fetch`, or in the desktop app the shell's HTTP client,
+// which is limited to the chosen server and has no cookies.
+let httpFetch: typeof fetch = (input, init) => fetch(input, init);
+let desktopSession = false;
+
+/**
+ * Points this client at a server chosen in the desktop app (V0.2.49). There is no cookie jar there,
+ * so the client does not say it is the web app: the server then returns the refresh token in the
+ * response, and it is kept in the operating system's credential store instead of the page.
+ */
+export function configureDesktopApi(serverUrl: string, desktopFetch: typeof fetch) {
+  API_URL = serverUrl.replace(/\/$/, "");
+  sharedApiUrl = API_URL;
+  clientName = "desktop";
+  httpFetch = desktopFetch;
+  desktopSession = true;
+}
 
 export function getSharedHealth(): Promise<{ service: string; status: string; authentication: string; setup_required?: boolean }> {
   return request<{ service: string; status: string; authentication: string; setup_required?: boolean }>("/health");
@@ -125,32 +146,42 @@ function writeStorage(storage: "sessionStorage" | "localStorage", key: string, v
   }
 }
 
-function storeTokens(response: { access_token: string }) {
+function storeTokens(response: { access_token: string; refresh_token?: string }) {
   writeStorage("sessionStorage", SHARED_SESSION_STORAGE_KEY, response.access_token);
   writeStorage("localStorage", SESSION_MARKER_KEY, "1");
   writeStorage("localStorage", REFRESH_STORAGE_KEY, null);
+  // The desktop app has no cookie: the refresh token goes to the operating system's credential store.
+  if (desktopSession && response.refresh_token) void sessionStore.save(response.refresh_token).catch(() => undefined);
 }
 
-function forgetSession() {
+function forgetSession(keepStoredToken = false) {
   // Nothing of the account may outlive its session in this tab.
   queryClient.clear();
   writeStorage("sessionStorage", SHARED_SESSION_STORAGE_KEY, null);
   writeStorage("localStorage", SESSION_MARKER_KEY, null);
   writeStorage("localStorage", REFRESH_STORAGE_KEY, null);
+  if (desktopSession && !keepStoredToken) void sessionStore.clear().catch(() => undefined);
 }
 
-/** Forgets the local session. Best-effort revokes the refresh token on the server, which also clears the cookie. */
+/** Forgets the local session. Best-effort revokes the refresh token on the server, which also clears the cookie (in the desktop app, the credential store entry). */
 export function clearSharedSession() {
   const hadSession = readStorage("localStorage", SESSION_MARKER_KEY) !== null || readStorage("localStorage", REFRESH_STORAGE_KEY) !== null;
   const legacyToken = readStorage("localStorage", REFRESH_STORAGE_KEY);
-  forgetSession();
-  if (hadSession) {
-    fetch(`${API_URL}/v1/auth/logout`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json", ...Object.fromEntries([CLIENT_HEADER]) },
-      body: JSON.stringify(legacyToken ? { refresh_token: legacyToken } : {}),
-    }).catch(() => undefined);
+  // The stored token is read before it is forgotten, so the server can be told to end that session.
+  const stored = desktopSession ? sessionStore.load().catch(() => null) : Promise.resolve(null);
+  forgetSession(true);
+  if (hadSession || desktopSession) {
+    void stored
+      .then((storedToken) => {
+        const token = storedToken ?? legacyToken;
+        return httpFetch(`${API_URL}/v1/auth/logout`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json", ...Object.fromEntries([clientHeader()]) },
+          body: JSON.stringify(token ? { refresh_token: token } : {}),
+        }).catch(() => undefined);
+      })
+      .finally(() => { if (desktopSession) void sessionStore.clear().catch(() => undefined); });
   }
 }
 
@@ -168,15 +199,18 @@ function latestToken(token: string): string {
 export function refreshSharedSession(staleAccessToken?: string): Promise<string | null> {
   if (refreshInFlight) return refreshInFlight;
   // A token kept by an earlier version is sent once, so the server can move it into the cookie.
-  const legacyToken = readStorage("localStorage", REFRESH_STORAGE_KEY);
-  if (!legacyToken && readStorage("localStorage", SESSION_MARKER_KEY) === null) return Promise.resolve(null);
+  const legacyToken = desktopSession ? null : readStorage("localStorage", REFRESH_STORAGE_KEY);
+  if (!desktopSession && !legacyToken && readStorage("localStorage", SESSION_MARKER_KEY) === null) return Promise.resolve(null);
   refreshInFlight = (async () => {
     try {
-      const response = await fetch(`${API_URL}/v1/auth/refresh`, {
+      // In the desktop app the credential store is the only place a session is kept between runs.
+      const token = desktopSession ? await sessionStore.load().catch(() => null) : legacyToken;
+      if (desktopSession && !token) return null;
+      const response = await httpFetch(`${API_URL}/v1/auth/refresh`, {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json", Accept: "application/json", ...Object.fromEntries([CLIENT_HEADER]) },
-        body: JSON.stringify(legacyToken ? { refresh_token: legacyToken } : {}),
+        headers: { "Content-Type": "application/json", Accept: "application/json", ...Object.fromEntries([clientHeader()]) },
+        body: JSON.stringify(token ? { refresh_token: token } : {}),
       });
       if (!response.ok) {
         // Only a definitive rejection ends the session; a flaky network keeps it.
@@ -207,12 +241,12 @@ function redirectToSignIn() {
 async function authFetch(input: string, init: RequestInit): Promise<Response> {
   const headers = new Headers(init.headers);
   const bearer = headers.get("Authorization")?.replace(/^Bearer /, "");
-  if (!bearer) return fetch(input, init);
+  if (!bearer) return httpFetch(input, init);
 
   const token = latestToken(bearer);
   headers.set("Authorization", `Bearer ${token}`);
-  headers.set(...CLIENT_HEADER);
-  const response = await fetch(input, { ...init, headers });
+  headers.set(...clientHeader());
+  const response = await httpFetch(input, { ...init, headers });
   if (response.status !== 401) return response;
 
   const refreshed = await refreshSharedSession(token);
@@ -221,7 +255,7 @@ async function authFetch(input: string, init: RequestInit): Promise<Response> {
     return response;
   }
   headers.set("Authorization", `Bearer ${refreshed}`);
-  const retry = await fetch(input, { ...init, headers });
+  const retry = await httpFetch(input, { ...init, headers });
   if (retry.status === 401) redirectToSignIn();
   return retry;
 }
@@ -251,7 +285,7 @@ async function request<T>(
 ): Promise<T> {
   const headers = new Headers(options.headers);
   headers.set("Accept", "application/json");
-  headers.set(...CLIENT_HEADER);
+  headers.set(...clientHeader());
   if (options.body) {
     headers.set("Content-Type", "application/json");
   }

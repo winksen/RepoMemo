@@ -1,5 +1,6 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { IconArrowRight as ArrowRight, IconKey as Key, IconLoader2 as Loader, IconShieldLock as Shield, IconUsers as Users } from "@tabler/icons-react";
+import { DesktopServerNote } from "../components/DesktopServerNote";
 import { loginSharedUser, requestPasswordResetMail, sharedApiUrl, signUpSharedUser } from "../lib/sharedApi";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -124,6 +125,7 @@ export function AuthCanvas({
               : <p>Forgot your password? <Button onClick={() => setForgotOpen(true)} type="button" variant="secondary">Get a link by email</Button>, or ask a system administrator of this server for a reset link (System › Users).</p>}
           </div> : <p className="shared-auth-hint">Invited by a teammate? Open the invitation link you received instead: it creates the account with the right access.</p>}
           <p className="shared-api-note">API {apiAvailable === true ? "healthy" : apiAvailable === false ? "unreachable" : "checking"} · <code>{sharedApiUrl || "this address"}</code></p>
+          <DesktopServerNote signedIn={false} />
         </div>
       </section>
     </main>

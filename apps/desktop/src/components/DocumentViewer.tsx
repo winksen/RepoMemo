@@ -14,6 +14,7 @@ import {
   sharedApiUrl,
 } from "../lib/sharedApi";
 import { columnLetters, documentKindOf, OPEN_IN_APP } from "../lib/documents";
+import { isDesktopRuntime } from "../lib/desktop";
 import type { ArtifactSummary, DocumentPreview, SheetPreview } from "../types";
 import type { RenderStatus } from "../lib/sharedApi";
 import { Button } from "./ui/button";
@@ -127,14 +128,15 @@ export function DocumentViewer({ accessToken, artifact }: { accessToken: string;
     const target = OPEN_IN_APP[kind];
     setIsBusy(true);
     try {
-      if (kind === "pdf") {
+      // The desktop window has no tabs and cannot hand a link to Word: the file is saved to open from there.
+      if (kind === "pdf" && !isDesktopRuntime) {
         // Open the tab first so the browser treats it as a user action.
         const tab = window.open("", "_blank");
         const blob = await downloadSharedArtifactFile(accessToken, artifact.id);
         const url = URL.createObjectURL(new Blob([blob], { type: "application/pdf" }));
         if (tab) tab.location.href = url; else window.location.href = url;
         window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      } else if (target.scheme) {
+      } else if (target.scheme && !isDesktopRuntime) {
         const link = await createSharedFileLink(accessToken, artifact.id);
         const fileUrl = `${sharedApiUrl}/v1/shared-files/${link.token}/${encodeURIComponent(link.filename)}`;
         window.location.href = `${target.scheme}${fileUrl}`;

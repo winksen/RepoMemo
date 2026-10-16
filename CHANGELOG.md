@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.49 (2026-10-16)
+
+The desktop app opens a RepoMemo server.
+
+### Added
+- **The desktop app is a client of a server.** On first start it asks for the server's address and shows the same pages as the browser once you sign in. `https://` is assumed; plain `http://` is accepted only for a server on your own network (this computer, a private address, `.local` or a single-word name). The app keeps the address, and only a server that answered like RepoMemo is kept.
+- **Your session is kept in the system credential store** (Windows Credential Manager, macOS Keychain, the Secret Service on Linux) and nowhere else, so restarting the app does not ask for the password again. Signing out ends the session on the server and deletes the entry.
+- **The app can only go where it should.** Its window can show only the bundled app, so a link or a script cannot take it to another site, and it may call only the server you chose. Links to the outside open in your system browser.
+- **Change server** (in the left rail, and on the sign-in page) forgets the server and the session and restarts the app.
+- **The local workspace is still there**, behind *Use the local workspace* on the first screen, until it is retired. Moving it to a server comes next.
+
+### Changed
+- In the desktop app, *Open in Word* and *Open in PDF viewer* save the file instead of opening a browser tab. The desktop app is listed as a `desktop` client under System › Overview.
+
+### Upgrading
+- Servers need nothing: they already return the refresh token in the response to clients that are not the web app.
+- Developers: `cargo check -p repomemo-desktop` pulls `tauri-plugin-http` and `keyring`; `npm install` adds `@tauri-apps/plugin-http`. The app was not started in this release: try it against `cargo run -p repomemo-server`.
+
 ## V0.2.48 (2026-10-16)
 
 The web client works on a tablet and a phone.

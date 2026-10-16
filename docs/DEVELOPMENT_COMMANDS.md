@@ -127,9 +127,11 @@ Why: runs unit tests for ingestion rules, content hashing, and future Rust core 
 npm.cmd run dev
 ```
 
-Why: launches the Tauri desktop app with the React dev server and Rust backend command bridge.
+Why: launches the Tauri desktop app with the React dev server and the Rust shell.
 
-This requires Rust/Cargo and the platform dependencies required by Tauri.
+On first start the app asks for the address of a RepoMemo server (run one with the next section: `http://127.0.0.1:3020` is accepted because it is on your own machine) and keeps it in `server.json` in the app's config folder. The session is kept in the system credential store (entry *RepoMemo*); *Change server* in the left rail forgets both and restarts the app. The window can only show the bundled client, and it can only call the server you chose.
+
+This requires Rust/Cargo and the platform dependencies required by Tauri. The Rust tests of the shell (address rules, which pages the window may show) run with `cargo test -p repomemo-desktop`; CI leaves that crate out because it needs the system web view libraries.
 
 ## Run The Shared API
 

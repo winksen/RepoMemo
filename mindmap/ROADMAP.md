@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.48` (2026-10-16), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.49` (2026-10-16), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -403,7 +403,7 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 
 | Release | Type | Section | The one change | IDs | Done when |
 |---|---|---|---|---|---|
-| **V0.2.49** | ✨ | Desktop | The desktop app connects to a server: asks for its address, keeps the session in the operating system's credential store, shows the web client | F20a, decision 13 | The desktop window and the browser show the same pages for the same account |
+| **V0.2.49** ✅ | ✨ | Desktop | The desktop app connects to a server: asks for its address, keeps the session in the operating system's credential store, shows the web client | F20a, decision 13 | The desktop window and the browser show the same pages for the same account |
 | **V0.2.50** | ✨ | Desktop | *Export to a server*: a local workspace moves to a server through the archive format | F20b | A local workspace appears on the server with its memory and citations |
 | **V0.2.51** | 📘 | Desktop | The local edition retired: labelled in the app and the docs, removal planned for V0.3.x | F20c | The docs no longer describe the local edition as current |
 
@@ -800,6 +800,19 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 - [x] Tests: `src/test/narrowScreens.test.tsx` (the sheet's open, close and focus, the wide dock unchanged, the folded rail, header names, the stylesheet's width and place in the cascade)
 - [ ] **Not seen on a screen:** nothing was rendered here, so the 375 px claim rests on reading the stylesheets and tracing each fixed width; the maintainer's pass at 375 px and 768 px (browser device mode) is the real test. Known to look at: the knowledge map graph (it pans inside its box), the contribution calendar (scrolls inside its box), the evidence file grid, the System tables (scroll inside their boxes) and the Settings forms. The retired local edition (`App.tsx`) is not touched
 
+#### V0.2.49: The desktop app connects to a server
+
+- [x] **F20a** The desktop window always shows the bundled web client (the same code as the browser) and the client calls the server through the shell: `@tauri-apps/plugin-http`'s `fetch` is installed as the client's transport (`configureDesktopApi` in `sharedApi.ts`), so the window's content security policy does not need the server's address and no CORS or cookie rule is involved. Everything else of the client (pages, live events, uploads, downloads) is unchanged
+- [x] **First screen** (`DesktopConnect`): the address of the server; checked on the page (`serverAddress.ts`) and by the shell (`normalize_server_url`, the one that decides): `https` is assumed, plain `http` only for loopback, private and link-local addresses, `localhost`, `.local` and single-word names, and no login, path, query or fragment; the page then asks `/health` and keeps the server (`server.json` in the app's config folder) only when a RepoMemo server answered
+- [x] **Navigation (review §8, track I):** the window is created in Rust with `on_navigation(is_app_url)`: only the bundled client (and the Vite port in a debug build) may be in it, so a link, a redirect or a script cannot take it, and the session, to another site. Links that open a new tab (`target="_blank"`) go to the system browser through `open_external` (http and https only). No capability lists a remote URL, so no other origin has any IPC
+- [x] **The window may call one server:** `tauri.conf.json` no longer lets the HTTP plugin call anything; when a server is chosen (`prepare_server`, or at start from `server.json`) the shell adds a capability for `http:default` scoped to `<origin>/*` for the `main` window. *Change server* forgets the server and restarts the app, so no earlier scope outlives the choice
+- [x] **The session is in the credential store:** the desktop client does not send `X-RepoMemo-Client: web` (it sends `desktop`, listed under System › Overview), so the server returns the refresh token in the response instead of a cookie; `save_session`, `load_session` and `clear_session` keep it with the `keyring` crate (Windows Credential Manager, macOS Keychain, the Secret Service on Linux) under the service *RepoMemo* and the server's origin, never in a file or the page's storage. A refresh reads it from there, a rotated one replaces it, a refusal (401) deletes it, a network failure keeps it, and signing out tells the server which session to end before deleting it
+- [x] The window's content security policy now allows `blob:` frames (document previews); *Open in Word/PDF* downloads the file in the desktop window (no tabs, no `ms-word:` links)
+- [x] The local workspace of the earlier desktop app stays reachable until V0.2.51: *Use the local workspace* on the first screen (remembered), *Connect to a server* to come back; its Tauri commands and data are untouched
+- [x] Tests: `serverAddress.test.ts`, `desktopSession.test.ts` (transport, header, credential store, rotation, refusal, sign-out), `desktopApp.test.tsx` (saved server, connecting, refusals, not RepoMemo, the local way and back) and, in `connection.rs`, the address rules and `is_app_url` (run with `cargo test -p repomemo-desktop`; CI leaves the desktop crate out)
+- [ ] **Not run:** `cargo check -p repomemo-desktop --tests` and `npm run typecheck` pass, but the app was not started. To try: `npm run dev`, enter the server's address, sign in, quit and start again (no sign-in, no password in `localStorage`; the entry *RepoMemo* is in the credential manager), upload a file, open a PDF, open a link in a markdown answer (system browser), *Change server*
+- [ ] Known: *Change server* restarts the whole app; the live event stream relies on the plugin streaming a response body (the client falls back to polling if not); the HTTP plugin and `keyring` bring new crates (`cargo deny` was not run); drag-and-drop folder upload and the native file picker of the local edition are not part of the web client; Linux needs a running Secret Service for the credential store; no signing key or updater is added (review M7)
+
 ### Decisions to agree before work starts
 
 | # | Decision | Needed by | Proposal |
@@ -846,7 +859,7 @@ Every item of both roads, with the release it is planned for. The evidence behin
 | F23 | **Review queue:** evidence needing review, stale memory cards and open health findings in one list | S–M | ✅ V0.2.37 |
 | F24 | **Version history** of a file, viewable and comparable | M | ✅ V0.2.38 |
 | F25 | **`@mention` suggestions** in comments | S | ✅ V0.2.39 |
-| F20 | **Desktop as a server client** (20a), export to a server (20b), local edition retired (20c) | M | V0.2.49–V0.2.51 (decision 13) |
+| F20 | **Desktop as a server client** (20a ✅ V0.2.49), export to a server (20b), local edition retired (20c) | M | V0.2.49–V0.2.51 (decision 13) |
 
 ### Security
 

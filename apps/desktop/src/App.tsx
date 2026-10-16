@@ -11,6 +11,7 @@ import { useEffect, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { SharedWebApp } from "./SharedWebApp";
+import { DesktopApp } from "./components/DesktopApp";
 import { Toast } from "./components/ui/toast";
 import {
   IconArchive as Archive,
@@ -137,7 +138,8 @@ function isWordArtifact(artifact: Pick<ArtifactSummary, "language" | "path">) {
 }
 
 export function App() {
-  return isTauriRuntime ? <LocalDesktopApp /> : <SharedWebApp />;
+  // The desktop window is a client of a server (V0.2.49); the local workspace stays reachable until it is retired.
+  return isTauriRuntime ? <DesktopApp local={<LocalDesktopApp />} /> : <SharedWebApp />;
 }
 
 function LocalDesktopApp() {

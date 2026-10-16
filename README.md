@@ -38,7 +38,7 @@ It is **evidence-first**. Storing, browsing, indexing and searching all work wit
 RepoMemo can be run two ways:
 
 - **Shared mode (primary).** A self-hosted API server and a web client for teams.
-- **Desktop mode.** A local-only Tauri app for Windows that uses the same React UI and Rust core.
+- **Desktop app.** A Tauri window onto a server (since V0.2.49): it asks for the server's address, keeps the session in the system credential store and shows the same pages as the browser. The earlier local-only workspace is kept until it is retired.
 
 ## Quick start (shared mode)
 
@@ -64,7 +64,7 @@ npm run web:dev
 
 Open <http://127.0.0.1:3021>, create an account, create an organization and a workspace, and add some evidence.
 
-**Desktop mode:**
+**Desktop app** (asks for your server's address on first start):
 
 ```bash
 npm run dev
