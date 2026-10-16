@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.56 (2026-10-16)
+
+The clean-machine install is prepared. `V0.3.0` is not tagged.
+
+### Added
+- **A runbook for the run before the tag** ([mindmap/technical/clean-install.md](mindmap/technical/clean-install.md)): fourteen steps from getting the server to the desktop app, each with the guide section it follows and what you should see, a list of what has to be done before the tag, and a table for the result. A workaround is anything the guide does not say; each becomes a fix and the run is made again.
+- **A smoke test that covers the new surfaces.** `scripts/smoke-test.mjs` also checks that sign-in refuses a 200 KiB body and that an unverifiable webhook answers `401`, and with an administrator reads the mail settings, sends a test mail to the address in `REPOMEMO_SMOKE_MAIL` and waits for it to leave the outbox, and checks that a remote repository can be linked (`REPOMEMO_SMOKE_REMOTE_REPO`, nothing is stored).
+
+### Not done
+- **The install itself.** It needs a second machine, a mail account and a running server. Until it passes with no workaround, and until the tests written since V0.2.46 have been run, the performance runs made and the browser passes done, `V0.3.0` should not be tagged. The page lists each of them.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.55 (2026-10-16)
 
 The documentation matches the code, and a check keeps it so.

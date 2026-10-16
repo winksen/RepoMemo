@@ -109,7 +109,7 @@ Licenses and banned crates are checked as well; duplicate versions only warn.
 node scripts/smoke-test.mjs https://memo.example.com
 ```
 
-Why: health, readiness, security headers and the web app of a server you just installed; with `REPOMEMO_SMOKE_EMAIL` and `REPOMEMO_SMOKE_PASSWORD` it also reads the overview and metrics (and makes a backup with `REPOMEMO_SMOKE_BACKUP=1`).
+Why: health, readiness, security headers, the body limit and the webhook answer, and the web app of a server you just installed; `REPOMEMO_SMOKE_MAIL` (an address) also sends a test mail and waits for it, and `REPOMEMO_SMOKE_REMOTE_REPO` with `REPOMEMO_SMOKE_WORKSPACE` (and `REPOMEMO_SMOKE_REMOTE_TOKEN`) checks that a remote repository can be linked (the run before the tag is [mindmap/technical/clean-install.md](../mindmap/technical/clean-install.md)); with `REPOMEMO_SMOKE_EMAIL` and `REPOMEMO_SMOKE_PASSWORD` it also reads the overview and metrics (and makes a backup with `REPOMEMO_SMOKE_BACKUP=1`).
 
 ## List The API Routes
 
