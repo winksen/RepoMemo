@@ -445,3 +445,38 @@ tr.rm-system-row-inactive .rm-system-person img, tr.rm-system-row-inactive .rm-s
 .shared-assistant-citation-commit { flex: none; min-height: 0; padding: 1px 8px; font-size: 11px; }
 .shared-commit-text { max-height: 60vh; margin: 0; padding: 12px; overflow: auto; font-family: var(--font-mono); font-size: 12px; line-height: 1.5; white-space: pre; border: 1px solid var(--color-border); border-radius: 6px; }
 .shared-commit-text mark { display: inline-block; min-width: 100%; }
+
+/* ===== Accessibility (V0.2.47) ===== */
+.rm-skip-link {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 1000;
+  padding: 8px 14px;
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transform: translateY(-200%);
+}
+.rm-skip-link:focus-visible {
+  transform: none;
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 5px var(--color-surface);
+}
+/* The page is focused by script after a move (a heading target, not a control): no ring around the whole page. */
+#main-content:focus { outline: none; }
+
+/* People who ask their system for less motion get none, except the spinner that says work is going on. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+  .spin { animation-duration: 1.6s !important; animation-iteration-count: infinite !important; }
+}
+
+/* In forced-colors (high contrast) modes the focus ring is the system's. */
+@media (forced-colors: active) {
+  button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px solid Highlight; }
+}

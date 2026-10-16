@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.2.46` (2026-10-16). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
+> **Scope:** reflects the code at `V0.2.47` (2026-10-16). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
 
 ---
 
@@ -51,6 +51,7 @@ The voice is **calm, precise, technical, private by default, and evidence-orient
 
 - The product is used as a **focused technical workbench**. It must support dense scanning, keyboard-friendly operation, long paths and identifiers, code-oriented content, large result sets, and both light and dark themes.
 - It must be **fully usable by keyboard** with visible focus states, respect **reduced-motion** preferences, keep **readable contrast** in both themes, and accommodate long technical identifiers without hiding critical context.
+- Since V0.2.47 every signed-in page starts with a **Skip to the page** link, has one main area and a labelled side rail, and is named in the browser tab (*Atlas · Evidence*, *System · Audit trail*). After a move to another page, keyboard focus goes to the start of the page and a screen reader hears the page's name; changing a tab inside a workspace keeps focus on the tab. Every field has a label and every button a name, charts state their figures in words, notifications wait while a control inside them has focus (*Esc* dismisses one), motion stops when the system asks for less, and each colour pair used for text reaches 4.5:1 in both themes. A check for these rules runs in CI.
 
 > The visual system (colors, type, components) is defined separately in [DESIGN.md](../DESIGN.md).
 
@@ -544,7 +545,7 @@ The desktop app and the shared server keep **separate data**.
 
 ---
 
-## 13. Known functional gaps (at V0.2.46)
+## 13. Known functional gaps (at V0.2.47)
 
 These are observed in the code and are useful for prioritizing. The roadmap item that addresses each one is in brackets.
 

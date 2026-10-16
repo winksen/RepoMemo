@@ -68,7 +68,7 @@ export function PeopleSection({ page }: { page: WorkspacePage }) {
             <div className="shared-members-section">
               <div className="shared-panel-heading"><div><Users size={18} /><h2>Workspace team</h2></div><span>{members.length}</span></div>
               <p className="shared-muted-copy">{canManageMembers ? "Add people and manage their access to this workspace." : "Your workspace role does not allow membership changes."}</p>
-              <div className="shared-capabilities" aria-label="Your workspace capabilities">
+              <div className="shared-capabilities" aria-label="Your workspace capabilities" role="group">
                 <strong>Your {capabilities?.role ?? workspace.role} access</strong>
                 <span>Read evidence, retrieval, memory, exports, and activity.</span>
                 <span>{canWrite ? "Create, edit, delete, and index shared evidence and memory." : "View-only: shared content cannot be changed."}</span>

@@ -95,9 +95,9 @@ export function AuthCanvas({
 
       <section className="shared-auth-form-region" aria-label="Account access">
         <div className="shared-auth-form-shell">
-          {setupPending ? null : <div className="shared-auth-switch" role="tablist" aria-label="Account action">
-            <Button className={mode === "sign-in" ? "active" : ""} onClick={() => { navigate("/login"); setMode("sign-in"); setError(null); }} role="tab" type="button" variant="secondary">Sign in</Button>
-            <Button className={mode === "sign-up" ? "active" : ""} onClick={() => { navigate("/register"); setMode("sign-up"); setError(null); }} role="tab" type="button" variant="secondary">Create account</Button>
+          {setupPending ? null : <div className="shared-auth-switch" role="group" aria-label="Account action">
+            <Button aria-pressed={mode === "sign-in"} className={mode === "sign-in" ? "active" : ""} onClick={() => { navigate("/login"); setMode("sign-in"); setError(null); }} type="button" variant="secondary">Sign in</Button>
+            <Button aria-pressed={mode === "sign-up"} className={mode === "sign-up" ? "active" : ""} onClick={() => { navigate("/register"); setMode("sign-up"); setError(null); }} type="button" variant="secondary">Create account</Button>
           </div>}
           {setupPending ? <div className="shared-auth-heading">
             <p className="shared-eyebrow">Server setup</p>

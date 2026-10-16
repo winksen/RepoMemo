@@ -1,7 +1,7 @@
 # Every push to main and every pull request (roadmap C8).
 #
 # Blocking: versions agree, Rust tests on Linux and Windows, the web type
-# check, web tests and generated types, rustfmt and clippy, and security
+# check, web tests, accessibility rules and generated types, rustfmt and clippy, and security
 # advisories for the server's dependencies and the web client's production
 # dependencies.
 # Advisory (reported, not blocking): duplicate crate versions.
@@ -55,6 +55,8 @@ jobs:
         run: npm run types:check
       - name: Stylesheets are small and imported in order
         run: npm run styles:check
+      - name: Accessibility rules and colour contrast
+        run: npm run a11y:check
       - name: Web client tests
         run: npm run test:web
       - name: Audit production dependencies

@@ -12,6 +12,7 @@ import {
 } from "@tabler/icons-react";
 import type { SharedSession } from "../types";
 import { openCommandPalette } from "../lib/assistantBridge";
+import { MAIN_CONTENT_ID } from "../web/RouteAnnouncer";
 import { Button } from "./ui/button";
 
 const THEME_STORAGE_KEY = "repomemo.theme";
@@ -73,11 +74,12 @@ export function SharedLayout({
   onNavigate: (to: string) => void;
   workspaceNavigation?: ReactNode;
 }) {
-  return <main className="shared-home">
+  return <div className="shared-home">
+    <a className="rm-skip-link" href={`#${MAIN_CONTENT_ID}`} onClick={(event) => { event.preventDefault(); document.getElementById(MAIN_CONTENT_ID)?.focus(); }}>Skip to the page</a>
     <header className="shared-home-header">
       <Button aria-label="Go to dashboard" className="shared-brand" onClick={() => onNavigate("/dashboard")} type="button" variant="secondary"><img alt="RepoMemo" className="shared-brand-full" src="/RM-logofull.svg" /></Button>
       <div className="shared-header-actions">
-        <div className="shared-user-menu" aria-label="Account controls">
+        <div className="shared-user-menu" aria-label="Account controls" role="group">
           <div className="shared-account-controls">
             <ThemeToggle />
             <Button aria-label="Open command palette" className="shared-palette-link" onClick={openCommandPalette} title="Command palette (Ctrl K)" type="button" variant="secondary"><Search size={16} /></Button>
@@ -89,16 +91,16 @@ export function SharedLayout({
       </div>
     </header>
     <div className="shared-home-frame">
-      <aside className="shared-home-rail">{sidebar}{session.is_system_admin || session.is_app_admin ? <SystemRailEntry onNavigate={onNavigate} /> : null}<div className="shared-rail-footer"><Shield size={15} /><span>JWT active · API {apiAvailable === true ? "healthy" : apiAvailable === false ? "offline" : "checking"}</span></div></aside>
-      <section className="shared-home-content">
+      <aside aria-label="Workspaces and organizations" className="shared-home-rail">{sidebar}{session.is_system_admin || session.is_app_admin ? <SystemRailEntry onNavigate={onNavigate} /> : null}<div className="shared-rail-footer"><Shield size={15} /><span>JWT active · API {apiAvailable === true ? "healthy" : apiAvailable === false ? "offline" : "checking"}</span></div></aside>
+      <main className="shared-home-content" id={MAIN_CONTENT_ID} tabIndex={-1}>
         {workspaceNavigation}
         <div className="shared-layout-body">
           <div className="shared-layout-content">{children}</div>
           {aside}
         </div>
-      </section>
+      </main>
     </div>
-  </main>;
+  </div>;
 }
 
 /** The System entry at the bottom of the rail, for system administrators. Highlighted on every System page. */

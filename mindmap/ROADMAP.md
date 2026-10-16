@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.46` (2026-10-16), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.47` (2026-10-16), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -396,7 +396,7 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 
 | Release | Type | Section | The one change | IDs | Done when |
 |---|---|---|---|---|---|
-| **V0.2.47** | 🔧 | Web client | Accessibility pass: keyboard paths, focus, labels, contrast | X1 | Every page usable by keyboard alone; automated checks find no serious issue |
+| **V0.2.47** ✅ | 🔧 | Web client | Accessibility pass: keyboard paths, focus, labels, contrast | X1 | Every page usable by keyboard alone; automated checks find no serious issue |
 | **V0.2.48** | 🔧 | Web client | Narrow screens: the workspace pages and the assistant usable on a tablet or phone | X2 | No horizontal scrolling at 375 px; the dock becomes a sheet |
 
 #### Track I: One client (V0.2.49–V0.2.51)
@@ -780,6 +780,17 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 - [x] Tests: cells, rows and lines, the range parser (units), the paging over 2,300 events with a range (storage), `the_audit_trail_downloads_for_a_date_range_and_the_download_is_audited` (JSON lines and CSV, order and count, the export on the record and in the next export, a range by day, an empty range, refusals, a non-administrator) and `downloadSystemAuditExport`
 - [ ] Only the system audit trail: workspace activity, security events and logs have their own places (activity feed, Logs); no signed or hash-chained export, and no export on a schedule from the server itself (use a token and `curl`, see the production guide)
 
+#### V0.2.47: Accessibility pass
+
+- [x] **X1** Frame: `SharedLayout` is a `div` with a skip link (*Skip to the page*), a `header`, a labelled `aside` rail and one `main#main-content` (`tabIndex={-1}`); a click on the skip link focuses the page
+- [x] Every move to another page sets the tab title (`pageTitle.ts`: `<workspace> · <section>`), says it in a polite status region and puts focus on the page (`RouteAnnouncer`); a change of section inside a workspace is announced but keeps focus on the pressed tab; the first page after sign-in or reload keeps the browser's starting point
+- [x] Names and roles: every field has a label (the notes, memory, retrieval, checklist and saved-search fields had only a placeholder), graphs and bars that only had a `title` are `role="img"` with the figures in their name (the activity timeline lists its days), `aria-label` only on elements that expose it, the sign-in / create account switch is a pair of toggle buttons (it claimed to be tabs and was not), workbook sheet tabs follow the tabs pattern (arrows, Home, End, one tab stop, a labelled panel) and the sheet table has `scope`d headers
+- [x] Toasts stay while a control inside has focus (not only the pointer) and *Esc* dismisses one; `prefers-reduced-motion` stops transitions and animations except the working spinner; a forced-colors rule keeps the focus ring
+- [x] Contrast: the light and dark tokens that win the cascade were measured; `--color-text-muted`, `--color-text-subtle`, `--color-success` and `--color-warning` (light) and `--color-text-subtle` and the dark button hover (`--color-accent-hover`) now reach 4.5:1 on every surface they are used on
+- [x] `scripts/check-accessibility.mjs` (`npm run a11y:check`, in CI): reads the syntax tree of every component of the web client for images without `alt`, fields and buttons without a name, click handlers on elements that are not controls, `aria-label` where it is not read, headers without `scope` and positive `tabIndex`, and measures 94 colour pairs in both themes. A deliberate exception is written next to the element (`a11y-allow: <rule> <why>`); the two in use are pointer conveniences with a keyboard path
+- [x] Tests: `src/test/accessibility.test.tsx` (frame landmarks and skip link, titles and page keys, the announcer, toasts, sheet tabs)
+- [ ] Not run in a browser or with a screen reader here: the check is static and the tests were compiled, not executed; an axe or Lighthouse run and a pass with NVDA or VoiceOver are the maintainer's to do. Not covered: a skip link inside dialogs, the rich note editor's toolbar roles, the target size of small icon buttons (24 px minimum), and the retired local edition (`App.tsx`)
+
 ### Decisions to agree before work starts
 
 | # | Decision | Needed by | Proposal |
@@ -905,7 +916,7 @@ Every item of both roads, with the release it is planned for. The evidence behin
 
 | ID | Item | Size | Target |
 |---|---|---|---|
-| X1 | Accessibility pass: keyboard paths, focus, labels, contrast | M | V0.2.47 |
+| X1 | Accessibility pass: keyboard paths, focus, labels, contrast | M | ✅ V0.2.47 |
 | X2 | Narrow screens: workspace pages and the assistant usable at 375 px | M | V0.2.48 |
 
 ### Repository indexing track

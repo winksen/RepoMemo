@@ -72,6 +72,9 @@ export function ToastViewport() {
           <div
             className={`rm-toast rm-toast-${item.kind}`}
             key={item.id}
+            onBlur={() => startTimer(item.id, 2500)}
+            onFocus={() => window.clearTimeout(timers.get(item.id))}
+            onKeyDown={(event) => { if (event.key === "Escape") dismissToast(item.id); }}
             onMouseEnter={() => window.clearTimeout(timers.get(item.id))}
             onMouseLeave={() => startTimer(item.id, 2500)}
             role={item.kind === "error" ? "alert" : "status"}

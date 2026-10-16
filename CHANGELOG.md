@@ -2,6 +2,26 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.47 (2026-10-16)
+
+The web client can be used by keyboard and screen reader.
+
+### Added
+- **A frame that can be navigated.** Every signed-in page starts with a *Skip to the page* link, then the header, a labelled side rail and one main area. The browser tab names the page (*Atlas · Evidence*, *System · Audit trail*).
+- **Moving to another page is announced.** A screen reader hears the page's name and keyboard focus goes to the start of the page, so it is not left on a control that is gone. Changing a tab inside a workspace keeps focus on the tab, and the first page after signing in or reloading keeps the browser's starting point.
+- **A check for the rules, in CI.** `npm run a11y:check` reads every component for images without `alt`, fields and buttons without a name, click handlers on elements that are not controls, `aria-label` where it is not read, table headers without `scope` and positive `tabIndex`, and measures the contrast of the colour pairs used for text in both themes (4.5:1) and of the focus ring (3:1). It reads files only.
+
+### Changed
+- **Every field has a label and every button a name.** The note title and text, memory title and text, memory and evidence search, retrieval question, saved-search name and checklist step fields had only a placeholder.
+- **Charts say what they show.** The activity timeline lists its days and figures, bars and the indexing coverage are images with their values in the name, and legends are groups.
+- **The sign-in / create account switch is a pair of toggle buttons**, not tabs that did not behave like tabs. The workbook sheet tabs now follow the tabs pattern: arrow keys, Home and End, one tab stop, a labelled panel, and `scope`d table headers.
+- **Notifications wait for the keyboard too.** A notification stays while a control inside it has focus, and *Esc* dismisses it.
+- **Less motion on request.** With the system setting for reduced motion, transitions and animations stop (the working spinner turns slowly), and in high-contrast modes the focus ring is the system's.
+- **Readable greys and status colours.** In the light theme the muted and subtle text greys and the success and warning text colours were darkened, and in the dark theme the subtle grey was lightened and the primary button's hover darkened, so each reaches 4.5:1 on every surface it is used on.
+
+### Upgrading
+- Nothing to do. This release was checked by reading files; it was not run in a browser or with a screen reader, so an axe or Lighthouse run and a pass with NVDA or VoiceOver are still worth doing.
+
 ## V0.2.46 (2026-10-16)
 
 The audit trail can be downloaded.

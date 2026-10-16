@@ -18,8 +18,8 @@
   --color-code-surface: hsl(220 16% 98%);
 
   --color-text: hsl(220 15% 15%);
-  --color-text-muted: hsl(220 10% 42%);
-  --color-text-subtle: hsl(220 10% 55%);
+  --color-text-muted: hsl(220 10% 38%);
+  --color-text-subtle: hsl(220 9% 43%);
   --color-border: hsl(220 12% 90%);
   --color-border-strong: hsl(220 10% 80%);
 
@@ -32,9 +32,9 @@
 
   --color-info: hsl(215 78% 43%);
   --color-info-soft: hsl(214 95% 93%);
-  --color-success: hsl(152 58% 35%);
+  --color-success: hsl(152 62% 29%);
   --color-success-soft: hsl(149 55% 93%);
-  --color-warning: hsl(38 91% 36%);
+  --color-warning: hsl(36 92% 28%);
   --color-warning-soft: hsl(45 93% 91%);
   --color-danger: hsl(0 70% 45%);
   --color-danger-soft: hsl(0 86% 95%);
@@ -62,12 +62,12 @@
 
   --color-text: hsl(0 0% 93%);
   --color-text-muted: hsl(0 0% 66%);
-  --color-text-subtle: hsl(0 0% 54%);
+  --color-text-subtle: hsl(0 0% 62%);
   --color-border: hsl(0 0% 17%);
   --color-border-strong: hsl(0 0% 26%);
 
   --color-accent: hsl(230 82% 62%);
-  --color-accent-hover: hsl(230 88% 74%);
+  --color-accent-hover: hsl(230 78% 55%);
   --color-accent-soft: hsl(233 62% 17%);
   --color-accent-text: hsl(230 88% 74%);
   --color-on-accent: #ffffff;

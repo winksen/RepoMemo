@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { type KeyboardEvent, useEffect, useState } from "react";
 import {
   IconDownload as Download,
   IconExternalLink as ExternalLink,
@@ -216,22 +216,31 @@ function PreviewBody({ pdfUrl, preview }: { pdfUrl: string | null; preview: Docu
   }
 }
 
-function SheetsPreview({ sheets, totalSheets }: { sheets: SheetPreview[]; totalSheets: number }) {
+export function SheetsPreview({ sheets, totalSheets }: { sheets: SheetPreview[]; totalSheets: number }) {
   const [active, setActive] = useState(0);
   const sheet = sheets[Math.min(active, sheets.length - 1)];
   if (!sheet) return <p className="shared-muted-copy">This workbook has no sheets.</p>;
   const columns = Math.min(sheet.total_columns, sheet.rows[0]?.length ?? sheet.total_columns);
+  // Arrow keys move between the sheets, Home and End go to the first and last; only the chosen tab is in the tab order.
+  function moveBetweenSheets(event: KeyboardEvent<HTMLDivElement>) {
+    const keys: Record<string, number> = { ArrowRight: active + 1, ArrowLeft: active - 1, Home: 0, End: sheets.length - 1 };
+    if (!(event.key in keys)) return;
+    event.preventDefault();
+    const next = (keys[event.key] + sheets.length) % sheets.length;
+    setActive(next);
+    (event.currentTarget.querySelectorAll<HTMLElement>('[role="tab"]')[next])?.focus();
+  }
   return (
     <div className="shared-sheet">
-      <div className="shared-sheet-tabs" role="tablist">
-        {sheets.map((entry, index) => <button aria-selected={index === active} className={index === active ? "active" : ""} key={`${entry.name}-${index}`} onClick={() => setActive(index)} role="tab" type="button">{entry.name}</button>)}
+      <div aria-label="Sheets" className="shared-sheet-tabs" onKeyDown={moveBetweenSheets} role="tablist">
+        {sheets.map((entry, index) => <button aria-controls="shared-sheet-panel" aria-selected={index === active} className={index === active ? "active" : ""} id={`shared-sheet-tab-${index}`} key={`${entry.name}-${index}`} onClick={() => setActive(index)} role="tab" tabIndex={index === active ? 0 : -1} type="button">{entry.name}</button>)}
         {totalSheets > sheets.length ? <span className="shared-muted-copy">+{totalSheets - sheets.length} more sheets</span> : null}
       </div>
       {sheet.rows.length ? (
-        <div className="shared-sheet-scroll">
+        <div aria-labelledby={`shared-sheet-tab-${Math.min(active, sheets.length - 1)}`} className="shared-sheet-scroll" id="shared-sheet-panel" role="tabpanel" tabIndex={0}>
           <table>
-            <thead><tr><th />{Array.from({ length: columns }, (_, index) => <th key={index}>{columnLetters(index)}</th>)}</tr></thead>
-            <tbody>{sheet.rows.map((row, rowIndex) => <tr key={rowIndex}><th>{rowIndex + 1}</th>{Array.from({ length: columns }, (_, columnIndex) => <td key={columnIndex}>{row[columnIndex] ?? ""}</td>)}</tr>)}</tbody>
+            <thead><tr><th scope="col"><span className="sr-only">Row</span></th>{Array.from({ length: columns }, (_, index) => <th key={index} scope="col">{columnLetters(index)}</th>)}</tr></thead>
+            <tbody>{sheet.rows.map((row, rowIndex) => <tr key={rowIndex}><th scope="row">{rowIndex + 1}</th>{Array.from({ length: columns }, (_, columnIndex) => <td key={columnIndex}>{row[columnIndex] ?? ""}</td>)}</tr>)}</tbody>
           </table>
         </div>
       ) : <p className="shared-muted-copy">This sheet is empty.</p>}

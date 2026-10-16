@@ -84,6 +84,7 @@ Why: this is the way to run RepoMemo for a team without building anything by han
 npm run test:web          # Vitest + Testing Library (apps/desktop/src/test)
 npm run types:generate    # rewrite apps/desktop/src/generated/domain.ts from crates/domain
 npm run types:check       # fail when that file is out of date (CI runs this)
+npm run a11y:check        # accessibility rules and colour contrast, reading files only (CI runs this)
 ```
 
 After changing a data transfer object in `crates/domain/src/lib.rs`, run
@@ -92,7 +93,7 @@ types that match; only types the client shapes differently are written by hand.
 
 CI (`.github/workflows/ci.yml`) runs on every push to `main` and every pull
 request: the version check, Rust tests on Linux and Windows (the desktop crate
-is left out), the web type check, the web client tests, the generated-types check, `npm audit --omit=dev`, `cargo deny`
+is left out), the web type check, the web client tests, the accessibility check, the generated-types check, `npm audit --omit=dev`, `cargo deny`
 (policy in `deny.toml`), `cargo fmt --all --check` and clippy with `-D warnings`.
 Licenses and banned crates are checked as well; duplicate versions only warn.
 

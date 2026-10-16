@@ -192,7 +192,7 @@ function Coverage({ map }: { map: KnowledgeMap }) {
 
   return <section className="rm-map-section" aria-labelledby="rm-map-coverage-title">
     <div className="shared-panel-heading"><div><FileText size={18} /><h2 id="rm-map-coverage-title">Coverage by kind of file</h2></div></div>
-    <div className="rm-map-legend" aria-label="Indexing states">
+    <div className="rm-map-legend" aria-label="Indexing states" role="group">
       <span><i className="rm-map-swatch indexed" /> Indexed</span>
       <span><i className="rm-map-swatch pending" /> Waiting</span>
       <span><i className="rm-map-swatch failed" /><AlertTriangle size={13} /> Failed</span>
@@ -395,7 +395,7 @@ function RelationGraph({ canConfigure, map, onOpenArtifact, onOpenMemoryCard, on
     </div>
     {!map.similarity_available ? <p className="rm-map-notice">Lines between similar files appear once AI for search is set up and passages are embedded.{canConfigure ? <> <button onClick={onOpenSettings} type="button">Open Settings</button></> : null}</p> : null}
     {map.hidden_file_count ? <p className="rm-map-notice">Showing the {fileCount} largest files; {map.hidden_file_count} smaller ones are left out to keep the map readable.</p> : null}
-    <div className="rm-map-legend" aria-label="Graph legend">
+    <div className="rm-map-legend" aria-label="Graph legend" role="group">
       {(Object.keys(GROUP_LABEL) as FileGroup[]).map((group) => <span key={group}><i className={`rm-map-dot ${group}`} /> {GROUP_LABEL[group]}</span>)}
       <span><i className="rm-map-dot code repository" /> Repository</span>
       <span><i className="rm-map-diamond" /> Memory card</span>
@@ -410,6 +410,7 @@ function RelationGraph({ canConfigure, map, onOpenArtifact, onOpenMemoryCard, on
             <Button aria-label="Zoom out" onClick={() => zoomBy(1 / 1.4)} type="button" variant="secondary"><Minus size={15} /></Button>
             <Button aria-label="Fit all dots" onClick={() => fitView()} type="button" variant="secondary"><Recenter size={15} /></Button>
           </div>
+          {/* a11y-allow: click a click on the empty canvas only clears the selection; the dots and the table view are the keyboard paths */}
           <svg
             aria-label={`Graph of ${fileCount} files and ${edges.length} links. Scroll to zoom, drag to move. Use the table view for a text version.`}
             className={drag.current?.moved && drag.current.active ? "panning" : ""}

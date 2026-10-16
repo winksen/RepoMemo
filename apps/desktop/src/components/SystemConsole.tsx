@@ -170,6 +170,7 @@ export function SystemConsole({ accessToken }: { accessToken: string }) {
       <span className="shared-muted-copy">Commands run on the server with your rights. Changes are dry runs until you add <code>--yes</code>; add <code>--json</code> to see the raw answer.</span>
       <Button disabled={!entries.length} onClick={() => setEntries([])} type="button" variant="secondary"><Eraser size={16} /> Clear</Button>
     </div>
+    {/* a11y-allow: click a click on the screen only moves the caret to the input, which the keyboard already holds */}
     <div aria-label="Console output" aria-live="polite" className="rm-console-screen" onClick={() => inputRef.current?.focus()} role="log">
       {welcome ? <div className="rm-console-welcome">
         <pre aria-label="RepoMemo" className="rm-console-banner" role="img">{welcome.banner}</pre>
