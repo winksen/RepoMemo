@@ -304,6 +304,101 @@ async fn an_encrypted_backup_holds_nothing_readable_and_restores_only_with_its_k
 }
 
 #[tokio::test]
+async fn each_backup_is_copied_to_a_second_place_and_checked() {
+    let data_dir = temp_data_dir("backup-copy");
+    let copies = temp_data_dir("backup-copy-elsewhere").join("share");
+    let mut config = ServerConfig::for_test(data_dir.clone());
+    config.backup_copy_dir = Some(copies.clone());
+    let app = router(config).await.unwrap();
+    let (admin, _) = register_account(&app, "copy-admin@example.com").await;
+    let workspace_id = create_workspace(&app, &admin).await;
+    for (name, text) in [("plan.txt", "Ship on Friday"), ("notes.txt", "Rollback plan")] {
+        assert_eq!(upload(&app, &admin, &workspace_id, name, text.as_bytes().to_vec()).await, 201);
+    }
+    let start = |path: &'static str| {
+        let app = app.clone();
+        let request = json_request("POST", path, &admin, json!({}));
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    assert_eq!(start("/v1/system/backups").await.status(), 202);
+    let overview = wait_for_backup_work(&app, &admin).await;
+    assert_eq!(overview["status"]["succeeded"], true, "{overview}");
+    let message = overview["status"]["message"].as_str().unwrap();
+    assert!(message.contains("Copied 1 backup to") && message.contains("and checked it"), "{message}");
+    assert!(overview["copy_directory"].as_str().unwrap().contains("share"));
+    let backup = &overview["backups"][0];
+    let name = backup["name"].as_str().unwrap().to_owned();
+    assert!(backup["files"].as_u64().unwrap() >= 4, "database, key and two files");
+    assert_eq!(backup["copy"]["files"], backup["files"]);
+    assert_eq!(backup["copy"]["bytes"], backup["bytes"]);
+
+    // The copy is whole: the same files, their checksums and the manifest.
+    let copy = copies.join(&name);
+    assert!(copy.join("manifest.json").is_file());
+    assert!(copy.join("repomemo.sqlite").is_file());
+    let sums = std::fs::read_to_string(copy.join("SHA256SUMS")).unwrap();
+    assert_eq!(sums.lines().count() as u64, backup["files"].as_u64().unwrap());
+    assert!(sums.lines().all(|line| line.split_once("  ").is_some_and(|(hash, _)| hash.len() == 64)));
+    assert_eq!(
+        std::fs::read(copy.join("repomemo.sqlite")).unwrap(),
+        std::fs::read(data_dir.join("backups").join(&name).join("repomemo.sqlite")).unwrap()
+    );
+
+    // The next one links what has not changed to the first copy.
+    tokio::time::sleep(std::time::Duration::from_millis(1_100)).await;
+    start("/v1/system/backups").await;
+    let overview = {
+        let mut latest = Value::Null;
+        for _ in 0..200 {
+            latest = wait_for_backup_work(&app, &admin).await;
+            if latest["backups"].as_array().unwrap().len() == 2 && latest["backups"][0]["copy"].is_object() {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+        latest
+    };
+    assert_eq!(overview["status"]["succeeded"], true, "{overview}");
+    assert!(overview["backups"][0]["copy"]["linked"].as_u64().unwrap() >= 2, "{overview}");
+    assert_eq!(std::fs::read_dir(&copies).unwrap().count(), 2);
+
+    // A destination that cannot be used is a failure to see, and the backup stays.
+    let blocked = temp_data_dir("backup-copy-blocked");
+    let blocker = blocked.join("not-a-folder");
+    std::fs::write(&blocker, b"a file").unwrap();
+    let broken_data = temp_data_dir("backup-copy-broken");
+    let mut broken = ServerConfig::for_test(broken_data.clone());
+    broken.backup_copy_dir = Some(blocker.join("share"));
+    let broken_app = router(broken).await.unwrap();
+    let (broken_admin, _) = register_account(&broken_app, "copy-broken@example.com").await;
+    broken_app
+        .clone()
+        .oneshot(json_request("POST", "/v1/system/backups", &broken_admin, json!({})))
+        .await
+        .unwrap();
+    let failed = wait_for_backup_work(&broken_app, &broken_admin).await;
+    assert_eq!(failed["status"]["succeeded"], false, "{failed}");
+    assert!(failed["status"]["message"].as_str().unwrap().contains("Backed up to backup-"), "{failed}");
+    assert!(failed["status"]["message"].as_str().unwrap().contains("The copy to"), "{failed}");
+    assert_eq!(failed["backups"].as_array().unwrap().len(), 1, "the backup itself is kept");
+    assert!(failed["backups"][0].get("copy").is_none());
+
+    // A second copy that is not set up cannot be asked for.
+    let plain_data = temp_data_dir("backup-copy-off");
+    let plain_app = router(ServerConfig::for_test(plain_data.clone())).await.unwrap();
+    let (plain_admin, _) = register_account(&plain_app, "copy-off@example.com").await;
+    let refused = plain_app
+        .clone()
+        .oneshot(json_request("POST", "/v1/system/backups/copy", &plain_admin, json!({})))
+        .await
+        .unwrap();
+    assert_eq!(refused.status(), 400);
+    for path in [data_dir, copies.parent().unwrap().to_path_buf(), blocked, broken_data, plain_data] {
+        let _ = std::fs::remove_dir_all(path);
+    }
+}
+
+#[tokio::test]
 async fn quotas_protect_the_disk_and_the_server() {
     let data_dir = temp_data_dir("quotas");
     let mut config = ServerConfig::for_test(data_dir.clone());

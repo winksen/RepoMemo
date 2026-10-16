@@ -2105,6 +2105,19 @@ pub(crate) async fn metrics(
         "When the newest backup was made (0 when there is none).",
         last_backup,
     );
+    let last_copy = backups
+        .backups
+        .iter()
+        .filter_map(|backup| backup.copy.as_ref())
+        .filter_map(|copy| chrono::DateTime::parse_from_rfc3339(&copy.copied_at).ok())
+        .map(|copied| copied.timestamp())
+        .max()
+        .unwrap_or(0);
+    out.gauge(
+        "repomemo_backup_copy_last_timestamp_seconds",
+        "When a backup was last copied to the second location and checked (0 when never; only meaningful when REPOMEMO_BACKUP_COPY_DIR is set).",
+        last_copy,
+    );
 
     Ok((
         [(

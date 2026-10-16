@@ -532,6 +532,20 @@ pub(crate) async fn checks(
         ),
     });
 
+    let copy_dir = state.backup_copy_dir.as_ref().map(|folder| folder.display().to_string());
+    checks.push(SetupCheck {
+        key: "backup_copy",
+        label: "Second copy of backups",
+        status: if copy_dir.is_some() { CheckStatus::Ok } else { CheckStatus::Info },
+        detail: match &copy_dir {
+            Some(folder) => format!("Each backup is copied to {folder} and checked there."),
+            None => "Off: backups stay on the disk that holds the data.".to_owned(),
+        },
+        advice: copy_dir.is_none().then_some(
+            "Recommended: set REPOMEMO_BACKUP_COPY_DIR to a folder on another disk or a mounted share, so a lost disk does not take the backups with it.",
+        ),
+    });
+
     let sealed = state.backup_key.is_some();
     checks.push(SetupCheck {
         key: "backup_encryption",

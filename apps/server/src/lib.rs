@@ -9,6 +9,7 @@ mod artifacts;
 mod auth;
 mod avatars;
 mod backup;
+mod backup_copy;
 mod backup_crypto;
 mod collaboration;
 mod config;
@@ -149,6 +150,8 @@ struct AppState {
     max_import_bytes: u64,
     /// The passphrase backups are sealed with, when one is set.
     backup_key: Option<Arc<str>>,
+    /// Where each backup is copied to and checked, when set.
+    backup_copy_dir: Option<PathBuf>,
     event_bus: WorkspaceEventBus,
     index_queue: IndexQueue,
     embedding_queue: EmbeddingQueue,
@@ -397,6 +400,7 @@ async fn build_state(
         jwt_secret: config.jwt_secret.clone(),
         max_import_bytes: config.max_import_bytes,
         backup_key: config.backup_key.as_deref().map(Arc::from),
+        backup_copy_dir: config.backup_copy_dir.clone(),
         event_bus,
         index_queue,
         embedding_queue,
@@ -510,6 +514,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route("/v1/system/maintenance", get(system::get_maintenance))
         .route("/v1/system/maintenance/run", post(system::run_maintenance))
         .route("/v1/system/backups", get(backup::list).post(backup::create))
+        .route("/v1/system/backups/copy", post(backup::copy_now))
         .route("/v1/system/backups/{name}", delete(backup::delete))
         .route("/v1/system/backups/{name}/restore", post(backup::restore))
         .route("/v1/system/metrics", get(system::metrics))

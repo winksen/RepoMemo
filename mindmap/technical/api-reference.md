@@ -1,8 +1,8 @@
 # HTTP API reference
 
-> **Branch of:** [TECHNICAL_MINDMAP.md §5](../TECHNICAL_MINDMAP.md#5-http-api-reference-175-operations-under-v1) · **Generated** from the router and the handler signatures by `node scripts/list-routes.mjs --markdown`; the guard column is read from the handler bodies, so check a route's handler before relying on a row · **Status:** V0.2.6 (the two index routes edited by hand; regenerate before the next release candidate)
+> **Branch of:** [TECHNICAL_MINDMAP.md §5](../TECHNICAL_MINDMAP.md#5-http-api-reference-176-operations-under-v1) · **Generated** from the router and the handler signatures by `node scripts/list-routes.mjs --markdown`; the guard column is read from the handler bodies, so check a route's handler before relying on a row · **Status:** V0.2.6 (the two index routes edited by hand; regenerate before the next release candidate)
 
-169 routes of the main router, plus the platform routes (`/v1/platform/*`, [environment.rs](../../apps/server/src/environment.rs), served before an environment is attached) and the avatar routes (`/v1/users/{id}/avatar`, `/v1/profile/avatar`, [avatars.rs](../../apps/server/src/avatars.rs)).
+170 routes of the main router, plus the platform routes (`/v1/platform/*`, [environment.rs](../../apps/server/src/environment.rs), served before an environment is attached) and the avatar routes (`/v1/users/{id}/avatar`, `/v1/profile/avatar`, [avatars.rs](../../apps/server/src/avatars.rs)).
 
 ## Conventions
 
@@ -90,6 +90,7 @@
 | POST | `/v1/system/maintenance/run` | auth | require_system_admin, require_system_change | — | MaintenanceStatus |
 | GET | `/v1/system/backups` | auth | require_system_admin | — | BackupsResponse |
 | POST | `/v1/system/backups` | auth | require_full_system_admin, require_system_change | — | BackupsResponse |
+| POST | `/v1/system/backups/copy` | auth | require_full_system_admin, require_system_change | — | BackupsResponse |
 | DELETE | `/v1/system/backups/{name}` | auth | require_full_system_admin, require_system_change | — | status |
 | POST | `/v1/system/backups/{name}/restore` | auth | require_full_system_admin, require_system_change | RestoreRequest | BackupsResponse |
 | GET | `/v1/system/metrics` | auth | require_full_system_admin | — | — |

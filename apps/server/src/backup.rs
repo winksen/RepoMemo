@@ -32,6 +32,7 @@ use crate::{ApiError, AppState, AuthenticatedSubject};
 /// The folder inside the data folder that holds backups.
 pub(crate) const BACKUPS_DIR: &str = "backups";
 const MANIFEST_FILE: &str = "manifest.json";
+const COPY_RECORD_FILE: &str = "copy.json";
 const DATABASE_FILE: &str = "repomemo.sqlite";
 const PARTIAL_SUFFIX: &str = ".partial";
 const BACKUP_PREFIX: &str = "backup-";
@@ -56,6 +57,27 @@ pub(crate) struct BackupManifest {
     /// How the files were sealed; absent for a plain backup. Holds nothing that can open the backup.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub encryption: Option<BackupEncryption>,
+    /// Files in the backup folder (the manifest excepted) and their total size:
+    /// what a second copy must add up to. Zero for backups made before V0.2.43.
+    #[serde(default)]
+    pub files: u64,
+    #[serde(default)]
+    pub bytes: u64,
+    /// Where the second copy went, once it was made and checked. Read from the
+    /// backup's `copy.json` when listing; never part of the manifest file.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub copy: Option<BackupCopyRecord>,
+}
+
+/// Written beside a backup (`copy.json`) when its second copy was made and checked.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct BackupCopyRecord {
+    pub destination: String,
+    pub copied_at: String,
+    pub files: u64,
+    pub bytes: u64,
+    /// Files linked to the previous copy instead of sent again.
+    pub linked: u64,
 }
 
 /// What the last backup or restore did, for the page and the console.
@@ -81,6 +103,8 @@ pub(crate) struct BackupsResponse {
     pub disk_free_bytes: Option<u64>,
     /// Whether new backups are sealed (`REPOMEMO_BACKUP_KEY` is set).
     pub encryption_enabled: bool,
+    /// The folder every backup is copied to, when one is set.
+    pub copy_directory: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -236,8 +260,14 @@ fn list_backups(root: &Path) -> Vec<BackupManifest> {
         .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_dir()))
         .filter_map(|entry| {
             let manifest = read_manifest(&entry.path())?;
-            (entry.file_name().to_string_lossy() == manifest.name && valid_backup_name(&manifest.name))
-                .then_some(manifest)
+            if !(entry.file_name().to_string_lossy() == manifest.name && valid_backup_name(&manifest.name)) {
+                return None;
+            }
+            let mut manifest = manifest;
+            manifest.copy = std::fs::read_to_string(entry.path().join(COPY_RECORD_FILE))
+                .ok()
+                .and_then(|text| serde_json::from_str(&text).ok());
+            Some(manifest)
         })
         .collect::<Vec<_>>();
     backups.sort_by(|left, right| right.created_at.cmp(&left.created_at).then(right.name.cmp(&left.name)));
@@ -413,6 +443,7 @@ async fn fill_backup(
         }
     };
 
+    let (files, bytes) = crate::backup_copy::folder_totals(partial)?;
     let manifest = BackupManifest {
         name: name.to_owned(),
         created_at: Utc::now().to_rfc3339(),
@@ -425,6 +456,9 @@ async fn fill_backup(
         reused_blobs: stats.reused,
         includes_key,
         encryption: description,
+        files,
+        bytes,
+        copy: None,
     };
     tokio::fs::write(partial.join(MANIFEST_FILE), serde_json::to_vec_pretty(&manifest)?).await?;
     Ok(manifest)
@@ -476,10 +510,16 @@ pub(crate) fn start_backup(state: &AppState, trigger: &'static str) -> Result<()
         let result = match make_backup(&state, trigger).await {
             Ok(manifest) => {
                 tracing::info!(target: "audit", backup = %manifest.name, trigger, "Backup finished");
-                Ok(format!(
+                let message = format!(
                     "Backed up to {} ({} files, {} reused).",
                     manifest.name, manifest.blob_count, manifest.reused_blobs
-                ))
+                );
+                // The second copy is part of the job: a share that is down is a failure to see.
+                match copy_pending(&state).await {
+                    None => Ok(message),
+                    Some(Ok(copied)) => Ok(format!("{message} {copied}")),
+                    Some(Err(failed)) => Err(format!("{message} {failed}")),
+                }
             }
             Err(error) => {
                 tracing::error!(error = %format!("{error:#}"), "Backup failed");
@@ -494,6 +534,10 @@ pub(crate) fn start_backup(state: &AppState, trigger: &'static str) -> Result<()
 /// Runs a backup when automatic backups are on and the last one is older than
 /// the interval. Called from the maintenance loop.
 pub(crate) fn run_scheduled(state: &AppState) {
+    // A copy that failed (the share was down) is tried again on each pass.
+    if state.backup_copy_dir.is_some() && copies_waiting(state) {
+        let _ = start_copy(state);
+    }
     let hours = state.settings().backup_interval_hours;
     if hours == 0 {
         return;
@@ -507,6 +551,86 @@ pub(crate) fn run_scheduled(state: &AppState) {
     if due && start_backup(state, "scheduled").is_err() {
         tracing::debug!("A scheduled backup waits for the one that is running");
     }
+}
+
+/// Whether a backup within the number kept has no checked second copy yet.
+fn copies_waiting(state: &AppState) -> bool {
+    let keep = state.settings().backup_keep.max(1) as usize;
+    list_backups(&backups_root(state)).iter().take(keep).any(|backup| backup.copy.is_none())
+}
+
+/// Copies the backups that have no checked second copy yet (oldest first, so
+/// each can share files with the one before), then trims the destination to
+/// the number kept. `None` when no second copy is set up.
+async fn copy_pending(state: &AppState) -> Option<Result<String, String>> {
+    let destination = state.backup_copy_dir.clone()?;
+    let root = backups_root(state);
+    let keep = state.settings().backup_keep.max(1) as usize;
+    let mut waiting = list_backups(&root)
+        .into_iter()
+        .take(keep)
+        .filter(|backup| backup.copy.is_none())
+        .collect::<Vec<_>>();
+    waiting.reverse();
+    let shown = destination.to_string_lossy().trim_start_matches(r"\\?\").to_owned();
+    if waiting.is_empty() {
+        return Some(Ok(format!("The second copy in {shown} is up to date.")));
+    }
+    let mut copied = 0;
+    for backup in waiting {
+        let (source, target) = (root.join(&backup.name), destination.clone());
+        let expected = (backup.files > 0).then_some((backup.files, backup.bytes));
+        let outcome = tokio::task::spawn_blocking(move || crate::backup_copy::copy_backup(&source, &target, expected)).await;
+        let report = match outcome {
+            Ok(Ok(report)) => report,
+            Ok(Err(error)) => {
+                tracing::error!(backup = %backup.name, error = %format!("{error:#}"), "A second copy failed");
+                return Some(Err(format!("The copy to {shown} failed: {error:#}")));
+            }
+            Err(error) => return Some(Err(format!("The copy to {shown} stopped unexpectedly: {error}"))),
+        };
+        let record = BackupCopyRecord {
+            destination: shown.clone(),
+            copied_at: Utc::now().to_rfc3339(),
+            files: report.files,
+            bytes: report.bytes,
+            linked: report.linked,
+        };
+        let written = match serde_json::to_vec_pretty(&record) {
+            Ok(bytes) => tokio::fs::write(root.join(&backup.name).join(COPY_RECORD_FILE), bytes).await,
+            Err(error) => Err(std::io::Error::other(error)),
+        };
+        if let Err(error) = written {
+            return Some(Err(format!("The copy to {shown} was made but could not be recorded: {error}")));
+        }
+        tracing::info!(target: "audit", backup = %backup.name, destination = %shown, files = report.files, "Backup copied and checked");
+        copied += 1;
+    }
+    let trimmed = destination.clone();
+    let _ = tokio::task::spawn_blocking(move || crate::backup_copy::prune_copies(&trimmed, keep)).await;
+    Some(Ok(format!(
+        "Copied {copied} backup{} to {shown} and checked {}.",
+        if copied == 1 { "" } else { "s" },
+        if copied == 1 { "it" } else { "them" }
+    )))
+}
+
+/// Starts copying the backups that wait for their second copy.
+pub(crate) fn start_copy(state: &AppState) -> Result<(), ApiError> {
+    if state.backup_copy_dir.is_none() {
+        return Err(ApiError::bad_request(
+            "No second copy is set up. Set REPOMEMO_BACKUP_COPY_DIR to a folder on another disk or a share.",
+        ));
+    }
+    if !begin(state, "copy") {
+        return Err(ApiError::conflict("A backup or restore is already running."));
+    }
+    let state = state.clone();
+    tokio::spawn(async move {
+        let result = copy_pending(&state).await.unwrap_or_else(|| Ok(String::new()));
+        finish(&state, &result);
+    });
+    Ok(())
 }
 
 async fn restore_backup(state: &AppState, name: &str, environment: &str) -> anyhow::Result<String> {
@@ -671,6 +795,10 @@ pub(crate) fn overview(state: &AppState) -> BackupsResponse {
         interval_hours: settings.backup_interval_hours,
         disk_free_bytes: free_disk_bytes(state.storage.data_dir()),
         encryption_enabled: state.backup_key.is_some(),
+        copy_directory: state
+            .backup_copy_dir
+            .as_ref()
+            .map(|folder| folder.to_string_lossy().trim_start_matches(r"\\?\").to_owned()),
     }
 }
 
@@ -693,6 +821,18 @@ pub(crate) async fn create(
     require_system_change(&subject)?;
     start_backup(&state, "manual")?;
     audit(&state, &subject, "backup_started", "Started a backup.".to_owned()).await;
+    Ok((axum::http::StatusCode::ACCEPTED, Json(overview(&state))))
+}
+
+/// Copies the backups that have no checked second copy yet, now.
+pub(crate) async fn copy_now(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+) -> Result<(axum::http::StatusCode, Json<BackupsResponse>), ApiError> {
+    require_full_system_admin(&subject)?;
+    require_system_change(&subject)?;
+    start_copy(&state)?;
+    audit(&state, &subject, "backup_copy_started", "Started copying the backups to the second location.".to_owned()).await;
     Ok((axum::http::StatusCode::ACCEPTED, Json(overview(&state))))
 }
 
@@ -839,6 +979,9 @@ mod tests {
             reused_blobs: 0,
             includes_key: false,
             encryption: None,
+            files: 0,
+            bytes: 0,
+            copy: None,
         };
         for (name, at) in [
             ("backup-20261001-000000", "2026-10-01T00:00:00Z"),

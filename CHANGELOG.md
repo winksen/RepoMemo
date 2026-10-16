@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.43 (2026-10-16)
+
+Each backup can be copied somewhere else, and the copy is checked.
+
+### Added
+- **`REPOMEMO_BACKUP_COPY_DIR`.** Set it to a folder on another disk or a mounted network share and the server copies every backup there once it is made. The copy is written as `<name>.partial` and renamed only when it is whole.
+- **The copy is verified.** Every file is hashed as it is read, written and read back from the destination; the hashes are saved as `SHA256SUMS` (`sha256sum -c SHA256SUMS` repeats the check), and the number of files and their total size must equal the backup's manifest. A copy that does not add up is removed and reported.
+- **Unchanged files are not sent again.** A file whose hash matches the previous copy is linked to it, so the second location grows like the first. It keeps the same number of backups (`REPOMEMO_BACKUP_KEEP`). A sealed backup is copied sealed.
+- **Failures are seen and retried.** If the share is down, the backup is kept, the job shows as failed with the reason, and the copy is tried again on every maintenance pass. System › Backups shows the second location, when each backup was checked there (or *waiting*) and a *Copy to the second location now* button (`POST /v1/system/backups/copy`). The new metric `repomemo_backup_copy_last_timestamp_seconds` can be alerted on, and the setup checks have a *Second copy of backups* line.
+- Backup manifests now record `files` and `bytes`.
+
+### Upgrading
+- Nothing to do. Without `REPOMEMO_BACKUP_COPY_DIR` nothing changes. Mount the share before the server starts and give the account that runs the server write access; the folder must not be inside the backups folder. Backups made before this version have no totals in their manifest and are checked file by file only.
+
 ## V0.2.42 (2026-10-16)
 
 Backups can be encrypted.

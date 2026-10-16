@@ -1452,6 +1452,11 @@ export function createSystemBackup(accessToken: string): Promise<BackupsOverview
   return request<BackupsOverview>("/v1/system/backups", { method: "POST", body: JSON.stringify({}) }, accessToken);
 }
 
+/** Copies the backups that have no checked second copy yet. */
+export function copySystemBackups(accessToken: string): Promise<BackupsOverview> {
+  return request<BackupsOverview>("/v1/system/backups/copy", { method: "POST", body: JSON.stringify({}) }, accessToken);
+}
+
 export function deleteSystemBackup(accessToken: string, name: string): Promise<void> {
   return request<void>(`/v1/system/backups/${encodeURIComponent(name)}`, { method: "DELETE" }, accessToken);
 }

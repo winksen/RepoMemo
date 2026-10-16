@@ -597,11 +597,16 @@ export interface BackupManifest {
   includes_key: boolean;
   /** Present when the backup is sealed; holds nothing that can open it. */
   encryption?: { cipher: string; kdf: string; iterations: number; salt: string; key_check: string; chunk_bytes: number } | null;
+  /** Files in the backup and their size; what a second copy must add up to. */
+  files?: number;
+  bytes?: number;
+  /** Present once the backup was copied to the second location and checked. */
+  copy?: { destination: string; copied_at: string; files: number; bytes: number; linked: number } | null;
 }
 
 export interface BackupStatus {
   running: boolean;
-  operation: "backup" | "restore" | null;
+  operation: "backup" | "restore" | "copy" | null;
   started_at: string | null;
   finished_at: string | null;
   succeeded: boolean | null;
@@ -617,6 +622,8 @@ export interface BackupsOverview {
   disk_free_bytes: number | null;
   /** Whether new backups are sealed (REPOMEMO_BACKUP_KEY is set). */
   encryption_enabled: boolean;
+  /** The folder every backup is copied to, when one is set. */
+  copy_directory?: string | null;
 }
 
 export interface MaintenanceStatus {

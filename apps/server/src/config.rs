@@ -23,6 +23,9 @@ pub struct ServerConfig {
     pub secret_key: Option<String>,
     /// Seals backups when set (`REPOMEMO_BACKUP_KEY`, at least 16 characters).
     pub backup_key: Option<String>,
+    /// Another folder (a network share, say) every backup is copied to and checked in
+    /// (`REPOMEMO_BACKUP_COPY_DIR`).
+    pub backup_copy_dir: Option<std::path::PathBuf>,
     /// Anyone may create an account. When false, only the very first account
     /// can be registered; everyone else is added by an administrator after
     /// registering while it was open, or by the operator.
@@ -277,6 +280,7 @@ impl ServerConfig {
                 .unwrap_or_default(),
             secret_key,
             backup_key,
+            backup_copy_dir: env_text("REPOMEMO_BACKUP_COPY_DIR").map(std::path::PathBuf::from),
             // Closed by default: people join with invitation links (review M1).
             allow_registration: env_flag("REPOMEMO_ALLOW_REGISTRATION", false)?,
             trust_proxy,
@@ -364,6 +368,7 @@ impl ServerConfig {
             soffice_wrapper: Vec::new(),
             secret_key: None,
             backup_key: None,
+            backup_copy_dir: None,
             allow_registration: true,
             trust_proxy: false,
             trusted_proxies: Vec::new(),

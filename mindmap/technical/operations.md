@@ -36,6 +36,7 @@ Set these in the service's environment, not in a file the web server can read.
 | `REPOMEMO_PUBLIC_URL` | `https://memo.example.com` | Turns HSTS on, makes the refresh cookie `Secure` |
 | `REPOMEMO_TRUST_PROXY` | `true` | Read the client address from the proxy, so rate limits and lockouts are per person and not per proxy. Only the loopback address (or `REPOMEMO_TRUSTED_PROXIES`) is believed |
 | `REPOMEMO_ALLOWED_ORIGIN` | `https://memo.example.com` | Browser origins allowed to call the API |
+| `REPOMEMO_BACKUP_COPY_DIR` | unset | Another folder or share every backup is copied to and checked in (see §6) |
 | `REPOMEMO_BACKUP_KEY` | unset | Seals new backups (16 or more characters; see §6) and is needed to restore them |
 | `REPOMEMO_BACKUP_INTERVAL_HOURS` | `24` | Backs up by itself (see §6); off by default, and the server check warns until it is set |
 | `REPOMEMO_SERVER_DATA_DIR` | `main` | Pins the environment (`workspace-data/main`). Without it a restart attaches whichever one was chosen last |
@@ -240,9 +241,23 @@ A folder in `<data folder>/backups/`: a consistent snapshot of the database (tak
 | `repomemo-console backup create --yes` | the same, from a terminal or a script (needs a session or a `system` token) |
 | `REPOMEMO_BACKUP_INTERVAL_HOURS` (or Settings › Automatic backups) | the server backs up by itself when the newest backup is older than this; it runs from the maintenance loop, so maintenance must be on. `REPOMEMO_BACKUP_KEEP` (default 7) bounds how many are kept |
 
-Check that they happen: System › Overview shows the last, the console's `backup list` prints them, and the metric `repomemo_backup_last_timestamp_seconds` can be alerted on.
+Check that they happen: System › Overview shows the last, the console's `backup list` prints them, and the metrics `repomemo_backup_last_timestamp_seconds` and `repomemo_backup_copy_last_timestamp_seconds` can be alerted on.
 
-### Taking them off the machine
+### A second copy, made for you
+
+Set `REPOMEMO_BACKUP_COPY_DIR` to a folder on another disk or a mounted network share and the server copies every backup there once it is made, **and checks the copy**:
+
+- the copy is written as `<name>.partial` and renamed only when it is whole;
+- every file is hashed as it is read, written, and read back from the destination; the hashes are saved as `SHA256SUMS` in the destination folder (`sha256sum -c SHA256SUMS` repeats the check at any time), and the totals must equal the file count and size in the backup's manifest;
+- unchanged files are linked to the previous copy instead of sent again (a share that cannot link gets a normal copy), so the second location grows like the first;
+- the destination keeps the same number of backups as the server (`REPOMEMO_BACKUP_KEEP`);
+- if the share is down or the check fails, the backup stays, the job is shown as failed with the reason (System › Backups, `backup list`), and the copy is tried again on the next maintenance pass or with *Copy to the second location now*. The metric `repomemo_backup_copy_last_timestamp_seconds` says when a backup was last copied and checked.
+
+Mount the share before the server starts and give the account that runs it write access. The folder must not be inside the backups folder. A sealed backup (`REPOMEMO_BACKUP_KEY`) is copied sealed, so the share never holds anything readable.
+
+### Taking them off the machine by hand
+
+If you prefer your own tool, or want a third copy:
 
 ```bash
 # a nightly copy, after the 02:00 automatic backup
@@ -310,6 +325,7 @@ What is worth an alert:
 | `up` | 0 for two minutes |
 | `repomemo_disk_free_bytes` | below twice the disk floor |
 | `repomemo_backup_last_timestamp_seconds` | older than a day and a half (`time() - … > 129600`) |
+| `repomemo_backup_copy_last_timestamp_seconds` | with a second copy set up, older than a day and a half: the share was down or a check failed |
 | `rate(repomemo_http_server_errors_total[5m])` | above 0 for ten minutes |
 | `repomemo_jobs{status="failed"}` | rising |
 | `repomemo_indexing_queued` | not falling for an hour |

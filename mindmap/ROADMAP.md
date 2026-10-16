@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.42` (2026-10-16), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.43` (2026-10-16), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -387,7 +387,7 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 | **V0.2.40** ✅ | ✨ | Workspace settings | Export a workspace as an archive | O2a | Evidence, folders, memory cards with citations, tasks, comments and lifecycle history in one file with a manifest |
 | **V0.2.41** ✅ | ✨ | Workspaces | Import an archive into a new workspace, with a dry run | O2b | An export imports on another 0.2.x server with everything linked as before |
 | **V0.2.42** ✅ | ✨ | Backups | Encrypted backups | O6a, decision 14 | A backup restores only with `REPOMEMO_BACKUP_KEY`; a wrong key is refused before anything is written (R2-5 closed) |
-| **V0.2.43** | ✨ | Backups | A second copy of each backup to another folder or network share | O6b | The copy is verified against the manifest |
+| **V0.2.43** ✅ | ✨ | Backups | A second copy of each backup to another folder or network share | O6b | The copy is verified against the manifest |
 | **V0.2.44** | 🐞 | Indexing | Document readings in a subprocess with time and memory limits | P10 | An overrunning reading is killed, not abandoned (R2-4 closed) |
 | **V0.2.45** | ✨ | Operations | A container image and a compose file with the proxy | O7 | `docker compose up` gives a working server behind TLS, with data in a volume |
 | **V0.2.46** | ✨ | System › Audit | Export of the audit trail (JSON lines, CSV) | O8 | A date range downloads; the download itself is audited |
@@ -739,7 +739,17 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 - [x] Restore reads the manifest and opens the cipher **before making any folder**: no key set, or a key that does not match, is refused with a plain message and nothing is written; a file that fails to open removes the staging folder
 - [x] System › Backups: an *Encryption* line, an *encrypted* tag on each sealed backup; `GET /v1/system/backups` returns `encryption_enabled` and each manifest's `encryption`; a *Backup encryption* server check (info, with advice, until the key is set)
 - [x] Tests: the cipher (sizes from 0 to several chunks, predicted length, nothing readable in a sealed file, a changed byte, a cut end, swapped chunks, another key, the manifest check value, short passphrases), sealed and linked copies (`sealed_copies_open_back_to_the_same_files_and_unchanged_ones_are_linked`) and `an_encrypted_backup_holds_nothing_readable_and_restores_only_with_its_key` (no plain database or key file, no text in any file, shared salt and linked files in the second backup, a mismatching key refused with no folder made, then a restore that opens)
-- [ ] The passphrase is the only way back: there is no recovery and no rotation of old backups (a new passphrase seals new backups only); the plain database snapshot exists in the `.partial` folder for the moment before it is sealed; `secret.key` is sealed with the rest, so the `REPOMEMO_SECRET_KEY` guidance is unchanged; copies to another place (V0.2.43) are not checked for encryption
+- [ ] (V0.2.42) The passphrase is the only way back: there is no recovery and no rotation of old backups (a new passphrase seals new backups only); the plain database snapshot exists in the `.partial` folder for the moment before it is sealed; `secret.key` is sealed with the rest, so the `REPOMEMO_SECRET_KEY` guidance is unchanged; a sealed backup is copied sealed (V0.2.43)
+
+
+#### V0.2.43: A second copy of each backup
+
+- [x] **O6b** `REPOMEMO_BACKUP_COPY_DIR` (`ServerConfig.backup_copy_dir`, `AppState.backup_copy_dir`): after each backup `copy_pending` copies the newest `backup_keep` backups without a `copy.json` there, oldest first, and trims the destination to the number kept; a failure makes the job `succeeded: false` with the reason and the backup stays
+- [x] `apps/server/src/backup_copy.rs`: `copy_backup` writes `<name>.partial`, hashes each file with SHA-256 as it is read (`copy_hashing`), reads it back from the destination and compares, links a file to the previous copy when its hash equals the one in that copy's `SHA256SUMS`, checks the totals against the manifest's new `files` and `bytes`, writes `SHA256SUMS` (the `sha256sum -c` format) and the manifest, then renames; `verify_copy` repeats the check and replaces a copy that fails it; a destination inside the backups folder is refused
+- [x] `BackupManifest` gains `files`, `bytes` and `copy` (read from `copy.json`); `run_scheduled` retries pending copies on each maintenance pass; `POST /v1/system/backups/copy` retries now (full system administrators, audited as `backup_copy_started`); `BackupsResponse.copy_directory`
+- [x] System › Backups: a *Second copy* line, a column with when each backup was checked or *waiting*, *Copy to the second location now*; the setup check *Second copy of backups*; the gauge `repomemo_backup_copy_last_timestamp_seconds`
+- [x] Tests: the copy (whole, checksums, totals against the manifest, re-check finds a changed file, a copy that does not add up leaves nothing, hard links to the previous copy, a destination inside the backups refused, pruning) and `each_backup_is_copied_to_a_second_place_and_checked` (copy and record, same bytes as the original, linked files in the second, a destination that cannot be used fails the job but keeps the backup, no copy asked for when none is set up)
+- [ ] The destination is trusted to be mounted and writable by the server's account; there is no copy of a backup older than the number kept; a restore still reads from the local backups folder (copy a second-location folder back by hand first); a backup made before V0.2.43 has no totals in its manifest and is checked file by file only
 
 ### Decisions to agree before work starts
 
@@ -854,7 +864,7 @@ Every item of both roads, with the release it is planned for. The evidence behin
 | O3 | Production guide | S–M | ✅ V0.1.75 |
 | O4 | Quotas and disk floor | M | ✅ V0.1.75 |
 | O5 | OpenMetrics export | S | ✅ V0.1.75 |
-| O6 | Encrypted backups (6a, R2-5) and a second copy after each backup (6b) | S–M | 6a ✅ V0.2.42, 6b V0.2.43 (decision 14) |
+| O6 | Encrypted backups (6a, R2-5) and a second copy after each backup (6b) | S–M | ✅ V0.2.42, V0.2.43 (decision 14) |
 | O7 | Container image and compose file with the proxy | S–M | V0.2.45 |
 | O8 | Audit trail export | S | V0.2.46 |
 | D1 | Tracker retired, `PRODUCT.md`, Postman v5 | S | ✅ V0.1.66 |
