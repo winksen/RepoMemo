@@ -1303,3 +1303,118 @@ async fn earlier_versions_are_kept_and_their_blobs_survive_collection() {
     drop(storage);
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+/// The last migration of RepoMemo 0.2.0 (the tag `RM-V0.2.0`). Every release after it only adds migrations.
+const V0_2_0_LAST_MIGRATION: i64 = 24;
+
+/// Roadmap R9 (V0.2.53). The environment folder of a server made by 0.2.0 (its schema, the rows it wrote
+/// and the files it stored) is opened by the current code, which migrates it in place, and everything in it
+/// is still there and still works: the people, the workspace, its files and their text, the memory card
+/// with the passage and the file it cites, the task, the comment, the lifecycle and the system setting.
+/// What 0.2.0 wrote is kept in `tests/fixtures/v0.2.0-seed.sql`; the migrations are the ones of the code
+/// itself, cut at 0.2.0 (`scripts/check-migrations.mjs` keeps a released migration from being edited).
+#[tokio::test]
+async fn an_environment_made_by_v0_2_0_upgrades_in_place_and_keeps_its_data() {
+    use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions};
+
+    const REFUNDS: &[u8] = b"Refunds are issued within fourteen days of purchase.";
+    const SHIPPING: &[u8] = b"Parcels leave the warehouse every weekday.";
+    let data_dir = std::env::temp_dir().join(format!(
+        "repomemo-upgrade-test-{}",
+        SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+    ));
+    std::fs::create_dir_all(&data_dir).unwrap();
+
+    // The environment as 0.2.0 left it: its migrations only, the rows it wrote, the files it stored.
+    let options = SqliteConnectOptions::new()
+        .filename(data_dir.join("repomemo.sqlite"))
+        .create_if_missing(true)
+        .foreign_keys(true)
+        .journal_mode(SqliteJournalMode::Wal);
+    let pool = SqlitePoolOptions::new().max_connections(1).connect_with(options).await.unwrap();
+    let mut released = sqlx::migrate::Migrator::DEFAULT;
+    released.migrations = std::borrow::Cow::Owned(
+        super::MIGRATOR
+            .migrations
+            .iter()
+            .filter(|migration| migration.version <= V0_2_0_LAST_MIGRATION)
+            .cloned()
+            .collect(),
+    );
+    assert_eq!(released.migrations.len() as i64, V0_2_0_LAST_MIGRATION, "no migration is missing or renumbered");
+    released.run(&pool).await.unwrap();
+    sqlx::raw_sql(include_str!("../tests/fixtures/v0.2.0-seed.sql")).execute(&pool).await.unwrap();
+    pool.close().await;
+    for (bytes, hash) in [(REFUNDS, "25b9033a79705adbe5e5e258fee1e70adab08041373f9b0078fc0b9c3ffbe561"), (SHIPPING, "5eb51d20b9012cdff150b9825024a9ae9514028e20e158524e8e0861020df504")] {
+        assert_eq!(StorageEngine::content_hash(bytes), hash, "the seed names the file it holds");
+        let place = data_dir.join("blobs").join(&hash[0..2]).join(&hash[2..4]);
+        std::fs::create_dir_all(&place).unwrap();
+        std::fs::write(place.join(hash), bytes).unwrap();
+    }
+
+    // The current code opens it: the migrations after 0.2.0 run in place.
+    let storage = StorageEngine::open(StorageConfig::new(data_dir.clone())).await.unwrap();
+    let (applied, failed): (i64, i64) = sqlx::query_as(
+        "SELECT COUNT(*), COALESCE(SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END), 0) FROM _sqlx_migrations",
+    )
+    .fetch_one(storage.reader())
+    .await
+    .unwrap();
+    assert_eq!(applied as usize, super::MIGRATOR.migrations.len());
+    assert_eq!(failed, 0);
+    assert!(applied > V0_2_0_LAST_MIGRATION, "the migrations after 0.2.0 were applied");
+
+    // People, organization and workspace.
+    let grace = storage.find_user_by_email("grace@example.com").await.unwrap().expect("an account is kept");
+    assert_eq!(grace.display_name, "Grace");
+    let workspaces = storage.list_workspaces().await.unwrap();
+    assert_eq!(workspaces.len(), 1);
+    assert_eq!(workspaces[0].name, "Atlas");
+
+    // The workspace as the current export reads it: every record, with what the new migrations added.
+    let data = storage.export_workspace_data("w-atlas").await.unwrap();
+    assert_eq!(data.folders.len(), 1);
+    assert_eq!(data.artifacts.len(), 2);
+    let refunds = data.artifacts.iter().find(|artifact| artifact.title == "Refund policy").unwrap();
+    assert_eq!(refunds.folder_id.as_deref(), Some("f-policies"));
+    assert_eq!(data.lifecycle.len(), 1);
+    assert_eq!(data.lifecycle[0].status, "verified");
+    assert_eq!(data.lifecycle[0].events.len(), 1);
+    assert_eq!(data.memory_cards.len(), 1);
+    assert_eq!(data.memory_cards[0].citations.len(), 2, "the passage and the file it cites");
+    assert_eq!(data.omitted_citations, 0);
+    assert_eq!(data.tasks.len(), 1);
+    assert_eq!(data.tasks[0].checklist.len(), 1);
+    assert_eq!(data.comments.len(), 1);
+    assert_eq!(data.comments[0].body, "Looks right to me.");
+
+    // The stored files and the text search.
+    assert_eq!(storage.read_blob(&refunds.content_hash).await.unwrap(), REFUNDS);
+    let request = SearchRequest {
+        workspace_id: "w-atlas".to_owned(),
+        query: "parcels".to_owned(),
+        limit: Some(5),
+        ..Default::default()
+    };
+    let found = storage.search_chunks(&request, "\"parcels\"*").await.unwrap();
+    assert_eq!(found.len(), 1);
+    assert_eq!(found[0].title, "Shipping notes");
+
+    // The system setting and a first write after the upgrade.
+    let settings = storage.list_system_settings().await.unwrap();
+    assert!(settings.iter().any(|setting| setting.key == "log_http_level" && setting.value == json!("debug")));
+    let added = storage.create_workspace("Added after the upgrade").await.unwrap();
+    assert_eq!(storage.list_workspaces().await.unwrap().len(), 2);
+    assert!(storage.workspace_exists(&added.id).await.unwrap());
+
+    // And the folder opens again: nothing is migrated twice.
+    storage.close().await;
+    let again = StorageEngine::open(StorageConfig::new(data_dir.clone())).await.unwrap();
+    let (reapplied,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM _sqlx_migrations")
+        .fetch_one(again.reader())
+        .await
+        .unwrap();
+    assert_eq!(reapplied, applied);
+    drop(again);
+    let _ = std::fs::remove_dir_all(data_dir);
+}

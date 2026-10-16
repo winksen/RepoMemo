@@ -85,7 +85,10 @@ npm run test:web          # Vitest + Testing Library (apps/desktop/src/test)
 npm run types:generate    # rewrite apps/desktop/src/generated/domain.ts from crates/domain
 npm run types:check       # fail when that file is out of date (CI runs this)
 npm run a11y:check        # accessibility rules and colour contrast, reading files only (CI runs this)
+npm run migrations:check  # no released database migration was edited or removed, every one is locked (CI runs this)
 ```
+
+A **database migration** that has shipped is never edited: a change goes into a new numbered file in `crates/storage/migrations/`, and `node scripts/check-migrations.mjs --lock` records it in `crates/storage/migrations.lock` with the release that ships it. `cargo test -p repomemo-storage an_environment_made_by_v0_2_0` runs the upgrade test (a 0.2.0 environment opened by the current code).
 
 After changing a data transfer object in `crates/domain/src/lib.rs`, run
 `types:generate` and commit the result. `src/types.ts` re-exports the generated

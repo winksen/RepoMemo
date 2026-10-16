@@ -1,0 +1,42 @@
+# The released migrations of RepoMemo: the SHA-256 of each file (line ends as LF) as it shipped.
+# A migration that has run in someone's environment must never change: `node scripts/check-migrations.mjs`
+# fails when a line here no longer matches its file, or a file in between is missing. A new migration is
+# added with `node scripts/check-migrations.mjs --lock` once its release is ready.
+#
+# release  migration  sha256
+0.2.0  0001_init.sql  ca6e10e22d4a0d07b826185dd997d3ecf6347bec9d0e4e8d11811a242eb85f64
+0.2.0  0002_chunk_embeddings.sql  88d93703d48f74bae1c659dd6c40f8d938d09d3e6a782b84febea8355d4784cc
+0.2.0  0003_shared_auth.sql  09cbfa021e80423d88fe1001581e263a8e1ad51782f4c3b95a3274a26c923e53
+0.2.0  0004_workspace_activity.sql  bd7a37f4408488ecc2e787de7c13fcf9ed25ee7d4265f0cbd8a58d554f7b6f03
+0.2.0  0005_user_profiles.sql  a60b5dfa0a92589d53b772342b60677e47db060d01ac1554c2e0f516a55bdbdd
+0.2.0  0006_collaboration.sql  5a9c33ea6ffc4332d44954882c8930f5b336353a601c11734fa934d2acbbc639
+0.2.0  0007_evidence_lifecycle.sql  3cdd139d5374b114caeb9a597fd5f60ce7a7de4da7fba519ea26bd6dddb29774
+0.2.0  0008_notifications.sql  285afe7fb301bd545fb9c0eb904dce6913ebf77220a4c271d22121ed760f4083
+0.2.0  0009_workflow_depth.sql  be368bbf0a11b872930ad3cef2219fd085a3ff47699f5bd40272d0754a8043f0
+0.2.0  0010_jobs_kind_cancel.sql  3ceee8f582661484a924652324565cf044e31e7c11e3d5ddc527f5f0de4827e2
+0.2.0  0011_index_version.sql  6528ad028c95be5d1d99bb13bd603da13f5eb7e8028b28cf5a5d0d5288ee3513
+0.2.0  0012_index_failures.sql  cce59e8a9c5806ba5bb82bba47f3ad90d2f1959f5b1a758362ca1d74d4c89219
+0.2.0  0013_folders.sql  b14bce393868b5e02029f36060ad3a9e871e47269fb721a5e8809cc01c2aa9a2
+0.2.0  0014_assistant_conversations.sql  64d01c203c6a2f75473122196c7a94ded38420bb51418329f07b8427474ca8fa
+0.2.0  0015_workspace_health.sql  d3dc6d30b636792281549c2ec3dc75c9cc24ab3ffe44621486edf127a0729429
+0.2.0  0016_refresh_tokens.sql  ae19ced4315442e5e5bd03e24b1e4acf81472ae6f050db10c90d706bf769a97e
+0.2.0  0017_repo_files.sql  a3475d5720faea6cb76f7497fc30d3d5b81ab82f82eff361ff9d2f5f98f058b5
+0.2.0  0018_session_security.sql  9652786300252c3b6b60e256453b9103e9b80b9b3cec7e5f68dc19af4e756894
+0.2.0  0019_system_administration.sql  5accbfaca6a5203f56a8458dd33dfaf46b505a9d14c3a91a0256b8443e630944
+0.2.0  0020_user_avatars.sql  2ba4040959950f9aa9a2ab124bfe3cad0dc519f7711bf936c246cf99cd7f856e
+0.2.0  0021_app_admin.sql  fc3dc0d97507d3651033ef05fac9f17e7c0f8d0e5cce2f8b4c0283c5699a6c1a
+0.2.0  0022_server_setup.sql  9fb05f920b863b4b331ff743e4d8b9dfa954d301aae5889e03f56ff5579a19d3
+0.2.0  0023_access_links_and_tokens.sql  ade7db91b3fd9bbf9035511a2e8aa1f7e93fbd1d876b0fec6ba239bba814e2b4
+0.2.0  0024_system_token_scope.sql  ac494739f88a417e003e9ecfb142fa7b8b120cf804dbfcbd53afc17f301ea0a3
+0.2.x  0025_mail.sql  f5836ce8dec9b3b40998dec43f5916c9bea7535026500e9c041f38746fb62800
+0.2.x  0026_email_verification.sql  e26ef86779eea8ef4e79c790c405c2e42f2660c854f178e7633c873b29006301
+0.2.x  0027_notification_preferences.sql  63d58c012d7d902942878465111954cb21298391f40a77907437e323fd614fd4
+0.2.x  0028_mail_digests.sql  2e46509a8e443c54936c4bddbd10af396a8aeb02101bf61f36e5edd212994327
+0.2.x  0029_account_deactivation.sql  202c73c19c8e6765b61d8b9b67dca2f20365071b2847a0e44a5d803cdf13bb1f
+0.2.x  0030_account_anonymization.sql  abfd6ad868becc429cd03df64b12b66f3b64c7e1504df1339c8131af702b7098
+0.2.x  0031_repo_credentials.sql  f8bb9e275b6fe33c885f3b9e5921e4a25edbe321b327e95da67d300c55a42bfb
+0.2.x  0032_repo_webhooks.sql  9b00b857d246b5f3676608207c952c168d6857817463a58e87fb8192322b4bfb
+0.2.x  0033_repo_file_last_change.sql  8e3fb5e5f361e8a281a599db109fdff15dc9625a50e389cb85ffceb56bec5bb0
+0.2.x  0034_connector_items.sql  9323c8a68839343a1d812a5e87925d001a18118dcf14f1df2f5d61d6eebca0b9
+0.2.x  0035_artifact_mentions.sql  c75936997e840b6dfafea735ec8cac3a1d7b88e5a165d3568a0d13fbfd2861af
+0.2.x  0036_artifact_versions.sql  245fef0fc304a1695e933e0de36cbe9ded62ddf4e7c0761cbb5717d7913a2d20

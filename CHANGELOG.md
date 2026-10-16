@@ -2,6 +2,17 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.53 (2026-10-16)
+
+Upgrading from 0.2.0 is tested.
+
+### Added
+- **An upgrade test in CI.** A server environment made by 0.2.0 (its database schema, the rows it wrote and the files it stored) is opened by the current code, which migrates it in place, and everything in it is read back: the people, the workspace, its folder, files and their text, the memory card with the passage and the file it cites, the verified file with its history, the task with its checklist, the comment and the system setting. Text search still finds the passage, a new workspace can be written, and opening the folder again changes nothing.
+- **Released migrations are locked.** `crates/storage/migrations.lock` holds the checksum of every database migration that has shipped, and `npm run migrations:check` (in CI) fails if one is edited, removed, renumbered or left out of the lock. The server refuses an environment whose recorded checksum differs from its file, so a change belongs in a new migration.
+
+### Upgrading
+- Nothing to do. If you build the server yourself, build from a checkout with LF line endings, as CI does: a build with other line ends computes other checksums and refuses an environment another build made. The test was compiled, not run here; its data was run through all 36 migrations in SQLite.
+
 ## V0.2.52 (2026-10-16)
 
 Feature freeze, and the fourth security pass.

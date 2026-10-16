@@ -1,6 +1,6 @@
 # Every push to main and every pull request (roadmap C8).
 #
-# Blocking: versions agree, Rust tests on Linux and Windows, the web type
+# Blocking: versions agree, released migrations unchanged, a 0.2.0 environment upgrades, Rust tests on Linux and Windows, the web type
 # check, web tests, accessibility rules and generated types, rustfmt and clippy, and security
 # advisories for the server's dependencies and the web client's production
 # dependencies.
@@ -39,6 +39,8 @@ jobs:
       - run: node scripts/set-version.mjs --check
       - name: Container files agree
         run: node scripts/check-container.mjs
+      - name: Released migrations are unchanged
+        run: node scripts/check-migrations.mjs
 
   web:
     name: Web client
@@ -61,6 +63,21 @@ jobs:
         run: npm run test:web
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
+
+  # An environment folder made by 0.2.0 (its schema, rows and files) is opened by the current code and
+  # migrated in place with its data intact (roadmap R9). The same test also runs in the job below; it has
+  # its own job so a failure says what broke.
+  upgrade:
+    name: Upgrade from 0.2.0
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Released migrations are unchanged
+        run: node scripts/check-migrations.mjs
+      - name: A 0.2.0 environment upgrades in place
+        run: cargo test -p repomemo-storage --locked an_environment_made_by_v0_2_0_upgrades_in_place_and_keeps_its_data
 
   rust-tests:
     name: Rust tests (${{ matrix.os }})

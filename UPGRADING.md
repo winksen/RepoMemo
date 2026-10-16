@@ -12,7 +12,7 @@ How to move an existing server from any V0.1.x release (V0.1.40 and later) to **
 
 1. Stop the service (a graceful stop: SIGTERM, Ctrl-C or a normal service stop).
 2. Replace the server binary and the web app (`dist/`).
-3. Start it. Database migrations run on their own and the server refuses to start on a failed or newer one, so a failed upgrade leaves your data as it was: put the old binary back.
+3. Start it (an environment made by 0.2.0 is opened in place; this is tested in CI). Database migrations run on their own and the server refuses to start on a failed or newer one, so a failed upgrade leaves your data as it was: put the old binary back.
 4. Open System › Overview and check the version, the free disk space and that a search returns results.
 
 Environments from V0.1.40 and later upgrade in place. An older one: open it first with V0.1.40.
