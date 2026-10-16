@@ -532,6 +532,21 @@ pub(crate) async fn checks(
         ),
     });
 
+    let sealed = state.backup_key.is_some();
+    checks.push(SetupCheck {
+        key: "backup_encryption",
+        label: "Backup encryption",
+        status: if sealed { CheckStatus::Ok } else { CheckStatus::Info },
+        detail: if sealed {
+            "Backups are sealed with REPOMEMO_BACKUP_KEY. Keep that key somewhere other than the backups: without it they cannot be restored.".to_owned()
+        } else {
+            "Off: backups are copies of the data folder, including the key to the saved secrets.".to_owned()
+        },
+        advice: (!sealed).then_some(
+            "Recommended when backups leave this machine: set REPOMEMO_BACKUP_KEY (16 or more characters) and store it apart from the backups.",
+        ),
+    });
+
     checks.push(SetupCheck {
         key: "log_files",
         label: "Log files",

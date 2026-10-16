@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.2 → 0.3
 
-> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.41` (2026-10-16) · **Next:** `V0.2.42`
+> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.42` (2026-10-16) · **Next:** `V0.2.43`
 > **Previous line:** [Releases 0.1 → 0.2](RELEASES_0.1.md) · **Related:** [Roadmap, Road to V0.3.0](ROADMAP.md#-road-to-v030) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
 Every release of the 0.2 line, shipped and planned, one row each. The plan comes from the [Road to V0.3.0](ROADMAP.md#-road-to-v030): **one change per release**, each shippable alone, with the security rules for a new outside connection in the release that opens it. Planned rows are proposals until decisions 7–14 in the roadmap are agreed.
@@ -74,7 +74,7 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | **V0.2.39** | ✅ 2026-10-15 | F. Search, assistant, review | 🔧 Enhancement | Discussion | `@mention` suggestions while typing in comments: the workspace's members, narrowed as you type, for people who can comment (F25) | Only workspace members are suggested |
 | **V0.2.40** | ✅ 2026-10-16 | G. Portability and operations | ✨ Feature | Workspace settings | Export a workspace as one archive (a compressed tar with a manifest): evidence with its original files, folders, memory cards with citations, tasks, comments and lifecycle history, for owners and administrators; people by name and address, no secrets (O2a) | Evidence, folders, memory cards with citations, tasks, comments and lifecycle history in one file with a manifest |
 | **V0.2.41** | ✅ 2026-10-16 | G. Portability and operations | ✨ Feature | Workspaces | Import an archive into a new workspace, with a check first that reads it all and writes nothing; records get new ids, dates and links are kept, and nobody is credited by account (O2b) | An export imports on another 0.2.x server with everything linked as before |
-| **V0.2.42** | 🔜 Planned | G. Portability and operations | 🔒 Security | Backups | Encrypted backups, AES-256-GCM with `REPOMEMO_BACKUP_KEY` (O6a, decision 14) | A backup restores only with its key; a wrong key is refused before anything is written (R2-5 closed) |
+| **V0.2.42** | ✅ 2026-10-16 | G. Portability and operations | 🔒 Security | Backups | Encrypted backups: with `REPOMEMO_BACKUP_KEY` set every backup file is sealed with AES-256-GCM (PBKDF2 key, 64 KiB authenticated chunks), unchanged files stay shared, restore needs the same key and refuses a wrong one before writing anything (O6a, decision 14) | A backup restores only with its key; a wrong key is refused before anything is written (R2-5 closed) |
 | **V0.2.43** | 🔜 Planned | G. Portability and operations | ✨ Feature | Backups | A second copy of each backup to another folder or network share (O6b) | The copy is verified against the manifest |
 | **V0.2.44** | 🔜 Planned | G. Portability and operations | 🐞 Fix | Indexing | Document readings in a subprocess with time and memory limits (P10) | An overrunning reading is killed, not abandoned (R2-4 closed) |
 | **V0.2.45** | 🔜 Planned | G. Portability and operations | ✨ Feature | Operations | A container image and a compose file with the proxy (O7) | `docker compose up` gives a working server behind TLS, with data in a volume |

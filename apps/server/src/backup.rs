@@ -24,6 +24,7 @@ use chrono::Utc;
 use repomemo_storage::{StorageConfig, StorageEngine, SECRET_KEY_FILE_NAME};
 use serde::{Deserialize, Serialize};
 
+use crate::backup_crypto::{BackupCipher, BackupEncryption, KeyError, SEALED_SUFFIX};
 use crate::quotas::free_disk_bytes;
 use crate::system::{audit, require_full_system_admin, require_system_admin, require_system_change};
 use crate::{ApiError, AppState, AuthenticatedSubject};
@@ -52,6 +53,9 @@ pub(crate) struct BackupManifest {
     /// Files that cost no space because the previous backup had them.
     pub reused_blobs: u64,
     pub includes_key: bool,
+    /// How the files were sealed; absent for a plain backup. Holds nothing that can open the backup.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub encryption: Option<BackupEncryption>,
 }
 
 /// What the last backup or restore did, for the page and the console.
@@ -75,6 +79,8 @@ pub(crate) struct BackupsResponse {
     pub keep: u32,
     pub interval_hours: u64,
     pub disk_free_bytes: Option<u64>,
+    /// Whether new backups are sealed (`REPOMEMO_BACKUP_KEY` is set).
+    pub encryption_enabled: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -108,10 +114,29 @@ struct CopyStats {
     reused: u64,
 }
 
+/// How [`copy_files`] treats the bytes it moves.
+#[derive(Clone, Copy)]
+enum CopyMode<'a> {
+    /// A plain copy.
+    Plain,
+    /// Seals each file into `<name>.enc`.
+    Seal(&'a BackupCipher),
+    /// Opens each `<name>.enc` into `<name>`.
+    Open(&'a BackupCipher),
+}
+
+/// A path with `suffix` added to its file name.
+fn with_suffix(path: &Path, suffix: &str) -> PathBuf {
+    let mut name = path.file_name().map(|name| name.to_os_string()).unwrap_or_default();
+    name.push(suffix);
+    path.with_file_name(name)
+}
+
 /// Copies the files under `from` into `to`. A file that `reuse_from` has at
-/// the same place and size is linked to it instead of copied. A file that
+/// the same place and size is linked to it instead of copied (a sealed copy
+/// is linked only to a sealed file of the size it would have). A file that
 /// vanishes while the copy runs (deleted by garbage collection) is counted.
-fn copy_files(from: &Path, to: &Path, reuse_from: Option<&Path>) -> std::io::Result<CopyStats> {
+fn copy_files(from: &Path, to: &Path, reuse_from: Option<&Path>, mode: CopyMode<'_>) -> std::io::Result<CopyStats> {
     let mut stats = CopyStats::default();
     if !from.is_dir() {
         return Ok(stats);
@@ -137,14 +162,27 @@ fn copy_files(from: &Path, to: &Path, reuse_from: Option<&Path>) -> std::io::Res
                 continue;
             }
             let source = from.join(&child);
-            let target = to.join(&child);
+            // Where the copy goes, and (for a sealed copy) the size it will have.
+            let target_child = match mode {
+                CopyMode::Plain => child.clone(),
+                CopyMode::Seal(_) => with_suffix(&child, SEALED_SUFFIX),
+                CopyMode::Open(_) => match child.to_string_lossy().strip_suffix(SEALED_SUFFIX) {
+                    Some(plain) => PathBuf::from(plain),
+                    None => continue,
+                },
+            };
+            let target = to.join(&target_child);
             let Ok(size) = std::fs::metadata(&source).map(|metadata| metadata.len()) else {
                 stats.missing += 1;
                 continue;
             };
+            let expected_len = match mode {
+                CopyMode::Seal(_) => BackupCipher::sealed_len(size),
+                _ => size,
+            };
             let reusable = reuse_from
-                .map(|previous| previous.join(&child))
-                .filter(|previous| std::fs::metadata(previous).is_ok_and(|metadata| metadata.len() == size));
+                .map(|previous| previous.join(&target_child))
+                .filter(|previous| std::fs::metadata(previous).is_ok_and(|metadata| metadata.len() == expected_len));
             if let Some(previous) = reusable {
                 if std::fs::hard_link(&previous, &target).is_ok() {
                     stats.files += 1;
@@ -153,7 +191,15 @@ fn copy_files(from: &Path, to: &Path, reuse_from: Option<&Path>) -> std::io::Res
                     continue;
                 }
             }
-            match std::fs::copy(&source, &target) {
+            let copied = match mode {
+                CopyMode::Plain => std::fs::copy(&source, &target),
+                CopyMode::Seal(cipher) => cipher.seal_file(&source, &target).map_err(into_io_error),
+                CopyMode::Open(cipher) => cipher
+                    .open_file(&source, &target)
+                    .map(|()| size)
+                    .map_err(into_io_error),
+            };
+            match copied {
                 Ok(copied) => {
                     stats.files += 1;
                     stats.bytes += copied;
@@ -164,6 +210,15 @@ fn copy_files(from: &Path, to: &Path, reuse_from: Option<&Path>) -> std::io::Res
         }
     }
     Ok(stats)
+}
+
+/// An error from sealing or opening, as an I/O error that keeps "not found"
+/// (a file deleted while the copy ran) apart from the rest.
+fn into_io_error(error: anyhow::Error) -> std::io::Error {
+    match error.downcast_ref::<std::io::Error>() {
+        Some(io) if io.kind() == std::io::ErrorKind::NotFound => std::io::Error::from(std::io::ErrorKind::NotFound),
+        _ => std::io::Error::other(format!("{error:#}")),
+    }
 }
 
 fn read_manifest(folder: &Path) -> Option<BackupManifest> {
@@ -241,8 +296,10 @@ async fn make_backup(state: &AppState, trigger: &str) -> anyhow::Result<BackupMa
     if partial.exists() {
         let _ = tokio::fs::remove_dir_all(&partial).await;
     }
+    // Chosen first, so a bad key fails the backup before any file is copied.
+    let cipher = choose_cipher(state, &root).await?;
     tokio::fs::create_dir_all(&partial).await?;
-    let outcome = fill_backup(state, &root, &partial, &name, trigger).await;
+    let outcome = fill_backup(state, &root, &partial, &name, trigger, cipher).await;
     match outcome {
         Ok(manifest) => {
             rename_with_retries(&partial, &root.join(&name))
@@ -258,36 +315,103 @@ async fn make_backup(state: &AppState, trigger: &str) -> anyhow::Result<BackupMa
     }
 }
 
+/// The cipher new backups are sealed with: none when `REPOMEMO_BACKUP_KEY` is
+/// not set. The salt of the newest backup is kept while the passphrase still
+/// opens it, so unchanged files keep sealing to the same bytes.
+async fn choose_cipher(state: &AppState, root: &Path) -> anyhow::Result<Option<std::sync::Arc<BackupCipher>>> {
+    use anyhow::Context;
+    let Some(passphrase) = state.backup_key.clone() else {
+        return Ok(None);
+    };
+    let previous = list_backups(root).into_iter().next().and_then(|backup| backup.encryption);
+    let cipher = tokio::task::spawn_blocking(move || {
+        if let Some(previous) = previous {
+            if let Ok(cipher) = BackupCipher::open(&passphrase, &previous) {
+                return Ok(cipher);
+            }
+        }
+        BackupCipher::create(&passphrase)
+    })
+    .await
+    .context("the backup key could not be prepared")?
+    .map_err(|error| anyhow::anyhow!("{error}"))?;
+    Ok(Some(std::sync::Arc::new(cipher)))
+}
+
 async fn fill_backup(
     state: &AppState,
     root: &Path,
     partial: &Path,
     name: &str,
     trigger: &str,
+    cipher: Option<std::sync::Arc<BackupCipher>>,
 ) -> anyhow::Result<BackupManifest> {
     use anyhow::Context;
     // Taken first: every stored file the snapshot names exists by then.
     state.storage.snapshot_database(&partial.join(DATABASE_FILE)).await?;
     let database_bytes = tokio::fs::metadata(partial.join(DATABASE_FILE)).await?.len();
+    if let Some(cipher) = cipher.clone() {
+        // The plain snapshot is sealed and removed at once.
+        let plain = partial.join(DATABASE_FILE);
+        let sealed = partial.join(format!("{DATABASE_FILE}{SEALED_SUFFIX}"));
+        tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
+            cipher.seal_file(&plain, &sealed)?;
+            std::fs::remove_file(&plain)?;
+            Ok(())
+        })
+        .await
+        .context("the sealing stopped unexpectedly")?
+        .context("the database could not be sealed")?;
+    }
 
+    // Unchanged files are shared with the backup before, but only one sealed
+    // the same way (the same salt makes the same key).
+    let description = cipher.as_ref().map(|cipher| cipher.description());
     let previous = list_backups(root)
         .into_iter()
         .next()
+        .filter(|backup| {
+            backup.encryption.as_ref().map(|sealed| &sealed.salt) == description.as_ref().map(|sealed| &sealed.salt)
+        })
         .map(|backup| root.join(backup.name));
     let (source, target) = (state.storage.blob_dir().to_path_buf(), partial.join("blobs"));
+    let blob_cipher = cipher.clone();
     let stats = tokio::task::spawn_blocking(move || {
-        copy_files(&source, &target, previous.map(|folder| folder.join("blobs")).as_deref())
+        let mode = match blob_cipher.as_deref() {
+            Some(cipher) => CopyMode::Seal(cipher),
+            None => CopyMode::Plain,
+        };
+        copy_files(&source, &target, previous.map(|folder| folder.join("blobs")).as_deref(), mode)
     })
     .await
     .context("the file copy stopped unexpectedly")?
     .context("the stored files could not be copied")?;
 
     let key = state.storage.data_dir().join(SECRET_KEY_FILE_NAME);
-    let includes_key = tokio::fs::copy(&key, partial.join(SECRET_KEY_FILE_NAME)).await.is_ok();
-    if includes_key {
-        // A copy takes the folder's permissions on Windows: make it owner only, like the original.
-        repomemo_storage::restrict_to_owner(&partial.join(SECRET_KEY_FILE_NAME));
-    }
+    let includes_key = match cipher.clone() {
+        Some(cipher) => {
+            let sealed = partial.join(format!("{SECRET_KEY_FILE_NAME}{SEALED_SUFFIX}"));
+            let sealed_to = sealed.clone();
+            let present = key.exists()
+                && tokio::task::spawn_blocking(move || cipher.seal_file(&key, &sealed_to))
+                    .await
+                    .context("the sealing stopped unexpectedly")?
+                    .context("the key file could not be sealed")
+                    .is_ok();
+            if present {
+                repomemo_storage::restrict_to_owner(&sealed);
+            }
+            present
+        }
+        None => {
+            let copied = tokio::fs::copy(&key, partial.join(SECRET_KEY_FILE_NAME)).await.is_ok();
+            if copied {
+                // A copy takes the folder's permissions on Windows: make it owner only, like the original.
+                repomemo_storage::restrict_to_owner(&partial.join(SECRET_KEY_FILE_NAME));
+            }
+            copied
+        }
+    };
 
     let manifest = BackupManifest {
         name: name.to_owned(),
@@ -300,6 +424,7 @@ async fn fill_backup(
         missing_blobs: stats.missing,
         reused_blobs: stats.reused,
         includes_key,
+        encryption: description,
     };
     tokio::fs::write(partial.join(MANIFEST_FILE), serde_json::to_vec_pretty(&manifest)?).await?;
     Ok(manifest)
@@ -388,6 +513,21 @@ async fn restore_backup(state: &AppState, name: &str, environment: &str) -> anyh
     use anyhow::Context;
     let source = backups_root(state).join(name);
     let manifest = read_manifest(&source).context("The backup is incomplete or its manifest cannot be read.")?;
+    // A sealed backup needs its key, and the key is checked first: a wrong
+    // one is refused before any folder is made.
+    let cipher = match manifest.encryption.clone() {
+        None => None,
+        Some(description) => {
+            let passphrase = state.backup_key.clone().context(
+                "This backup is encrypted. Set REPOMEMO_BACKUP_KEY to the key it was made with and restart the server.",
+            )?;
+            let opened = tokio::task::spawn_blocking(move || BackupCipher::open(&passphrase, &description))
+                .await
+                .context("the backup key could not be prepared")?
+                .map_err(|error: KeyError| anyhow::anyhow!("{error}"))?;
+            Some(std::sync::Arc::new(opened))
+        }
+    };
     let root = crate::environment::environments_root()?;
     let target = root.join(environment);
     let staging = root.join(format!("{environment}.restoring"));
@@ -395,7 +535,7 @@ async fn restore_backup(state: &AppState, name: &str, environment: &str) -> anyh
         anyhow::bail!("An environment named {environment} exists already; choose another name.");
     }
     tokio::fs::create_dir_all(&staging).await?;
-    let copied = copy_into(&source, &staging).await;
+    let copied = copy_into(&source, &staging, cipher).await;
     if let Err(error) = copied {
         let _ = tokio::fs::remove_dir_all(&staging).await;
         return Err(error);
@@ -428,22 +568,54 @@ async fn restore_backup(state: &AppState, name: &str, environment: &str) -> anyh
     ))
 }
 
-async fn copy_into(source: &Path, staging: &Path) -> anyhow::Result<()> {
+async fn copy_into(
+    source: &Path,
+    staging: &Path,
+    cipher: Option<std::sync::Arc<BackupCipher>>,
+) -> anyhow::Result<()> {
     use anyhow::Context;
-    tokio::fs::copy(source.join(DATABASE_FILE), staging.join(DATABASE_FILE))
-        .await
-        .context("the database could not be copied")?;
-    if source.join(SECRET_KEY_FILE_NAME).exists() {
-        tokio::fs::copy(source.join(SECRET_KEY_FILE_NAME), staging.join(SECRET_KEY_FILE_NAME))
+    match cipher.clone() {
+        None => {
+            tokio::fs::copy(source.join(DATABASE_FILE), staging.join(DATABASE_FILE))
+                .await
+                .context("the database could not be copied")?;
+            if source.join(SECRET_KEY_FILE_NAME).exists() {
+                tokio::fs::copy(source.join(SECRET_KEY_FILE_NAME), staging.join(SECRET_KEY_FILE_NAME))
+                    .await
+                    .context("the key file could not be copied")?;
+                repomemo_storage::restrict_to_owner(&staging.join(SECRET_KEY_FILE_NAME));
+            }
+        }
+        Some(cipher) => {
+            let (from, to) = (source.to_path_buf(), staging.to_path_buf());
+            tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
+                cipher.open_file(
+                    &from.join(format!("{DATABASE_FILE}{SEALED_SUFFIX}")),
+                    &to.join(DATABASE_FILE),
+                )?;
+                let sealed_key = from.join(format!("{SECRET_KEY_FILE_NAME}{SEALED_SUFFIX}"));
+                if sealed_key.exists() {
+                    cipher.open_file(&sealed_key, &to.join(SECRET_KEY_FILE_NAME))?;
+                    repomemo_storage::restrict_to_owner(&to.join(SECRET_KEY_FILE_NAME));
+                }
+                Ok(())
+            })
             .await
-            .context("the key file could not be copied")?;
-        repomemo_storage::restrict_to_owner(&staging.join(SECRET_KEY_FILE_NAME));
+            .context("the opening stopped unexpectedly")?
+            .context("the database could not be opened")?;
+        }
     }
     let (from, to) = (source.join("blobs"), staging.join("blobs"));
-    tokio::task::spawn_blocking(move || copy_files(&from, &to, None))
-        .await
-        .context("the file copy stopped unexpectedly")?
-        .context("the stored files could not be copied")?;
+    tokio::task::spawn_blocking(move || {
+        let mode = match cipher.as_deref() {
+            Some(cipher) => CopyMode::Open(cipher),
+            None => CopyMode::Plain,
+        };
+        copy_files(&from, &to, None, mode)
+    })
+    .await
+    .context("the file copy stopped unexpectedly")?
+    .context("the stored files could not be copied")?;
     Ok(())
 }
 
@@ -498,6 +670,7 @@ pub(crate) fn overview(state: &AppState) -> BackupsResponse {
         keep: settings.backup_keep,
         interval_hours: settings.backup_interval_hours,
         disk_free_bytes: free_disk_bytes(state.storage.data_dir()),
+        encryption_enabled: state.backup_key.is_some(),
     }
 }
 
@@ -588,7 +761,7 @@ mod tests {
         std::fs::create_dir_all(previous.join("ab").join("cd")).unwrap();
         std::fs::write(previous.join("ab").join("cd").join("same"), b"unchanged").unwrap();
 
-        let stats = copy_files(&live, &target, Some(&previous)).unwrap();
+        let stats = copy_files(&live, &target, Some(&previous), CopyMode::Plain).unwrap();
         assert_eq!(
             stats,
             CopyStats {
@@ -608,10 +781,45 @@ mod tests {
         );
         // A folder that does not exist is an empty copy.
         assert_eq!(
-            copy_files(&live.join("none"), &folder("none"), None).unwrap(),
+            copy_files(&live.join("none"), &folder("none"), None, CopyMode::Plain).unwrap(),
             CopyStats::default()
         );
         for path in [live, previous, target] {
+            let _ = std::fs::remove_dir_all(path);
+        }
+    }
+
+    #[test]
+    fn sealed_copies_open_back_to_the_same_files_and_unchanged_ones_are_linked() {
+        let (live, first, second, opened) = (folder("seal-live"), folder("seal-first"), folder("seal-second"), folder("seal-opened"));
+        std::fs::create_dir_all(live.join("ab")).unwrap();
+        std::fs::write(live.join("ab").join("same"), b"unchanged content").unwrap();
+        std::fs::write(live.join("ab").join("empty"), b"").unwrap();
+        let cipher = BackupCipher::create("a long enough passphrase for tests").unwrap();
+
+        let stats = copy_files(&live, &first, None, CopyMode::Seal(&cipher)).unwrap();
+        assert_eq!((stats.files, stats.bytes, stats.reused), (2, 17, 0));
+        assert!(first.join("ab").join("same.enc").is_file());
+        assert!(!first.join("ab").join("same").exists(), "no plain copy is left beside the sealed one");
+        assert!(!std::fs::read(first.join("ab").join("same.enc"))
+            .unwrap()
+            .windows(9)
+            .any(|window| window == b"unchanged"));
+
+        // The next backup, sealed the same way, shares what has not changed.
+        let stats = copy_files(&live, &second, Some(&first), CopyMode::Seal(&cipher)).unwrap();
+        assert_eq!((stats.files, stats.reused), (2, 2));
+
+        let stats = copy_files(&first, &opened, None, CopyMode::Open(&cipher)).unwrap();
+        assert_eq!(stats.files, 2);
+        assert_eq!(std::fs::read(opened.join("ab").join("same")).unwrap(), b"unchanged content");
+        assert_eq!(std::fs::read(opened.join("ab").join("empty")).unwrap(), b"");
+
+        // Another key opens nothing.
+        let other = BackupCipher::create("another passphrase that is long").unwrap();
+        let wrong = folder("seal-wrong");
+        assert!(copy_files(&first, &wrong, None, CopyMode::Open(&other)).is_err());
+        for path in [live, first, second, opened, wrong] {
             let _ = std::fs::remove_dir_all(path);
         }
     }
@@ -630,6 +838,7 @@ mod tests {
             missing_blobs: 0,
             reused_blobs: 0,
             includes_key: false,
+            encryption: None,
         };
         for (name, at) in [
             ("backup-20261001-000000", "2026-10-01T00:00:00Z"),

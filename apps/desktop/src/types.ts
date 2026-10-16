@@ -595,6 +595,8 @@ export interface BackupManifest {
   missing_blobs: number;
   reused_blobs: number;
   includes_key: boolean;
+  /** Present when the backup is sealed; holds nothing that can open it. */
+  encryption?: { cipher: string; kdf: string; iterations: number; salt: string; key_check: string; chunk_bytes: number } | null;
 }
 
 export interface BackupStatus {
@@ -613,6 +615,8 @@ export interface BackupsOverview {
   keep: number;
   interval_hours: number;
   disk_free_bytes: number | null;
+  /** Whether new backups are sealed (REPOMEMO_BACKUP_KEY is set). */
+  encryption_enabled: boolean;
 }
 
 export interface MaintenanceStatus {

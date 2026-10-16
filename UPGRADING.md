@@ -5,7 +5,7 @@ How to move an existing server from any V0.1.x release (V0.1.40 and later) to **
 ## Before
 
 1. **Back up.** Back up from System › Jobs & maintenance, or `repomemo-console backup create --yes` (V0.1.75 and later). From an older version, stop the server and copy the whole environment folder (`workspace-data/<name>`, including `secret.key`).
-2. **Copy the backup to another machine.** A backup sits in the data folder.
+2. **Copy the backup to another machine.** A backup sits in the data folder. If you seal backups (`REPOMEMO_BACKUP_KEY`, V0.2.42 and later), keep that passphrase apart from them: restoring needs it.
 3. Note your environment variables. The ones that changed meaning are below.
 
 ## The upgrade

@@ -21,6 +21,8 @@ pub struct ServerConfig {
     /// Key material for encrypting stored secrets (AI provider API keys).
     /// When unset a random key is kept in `secret.key` in the data directory.
     pub secret_key: Option<String>,
+    /// Seals backups when set (`REPOMEMO_BACKUP_KEY`, at least 16 characters).
+    pub backup_key: Option<String>,
     /// Anyone may create an account. When false, only the very first account
     /// can be registered; everyone else is added by an administrator after
     /// registering while it was open, or by the operator.
@@ -181,6 +183,10 @@ impl ServerConfig {
                 repomemo_storage::MIN_MASTER_KEY_CHARS
             );
         }
+        let backup_key = env_text("REPOMEMO_BACKUP_KEY");
+        if let Some(Err(message)) = backup_key.as_deref().map(crate::backup_crypto::validate_passphrase) {
+            bail!("{message}");
+        }
         // Unset: this machine and OpenRouter only. `*` opens every host
         // (link-local and cloud-metadata addresses stay refused).
         let ai_allowed_hosts = match env_text("REPOMEMO_AI_ALLOWED_HOSTS") {
@@ -270,6 +276,7 @@ impl ServerConfig {
                 .map(|command| command.split_whitespace().map(str::to_owned).collect())
                 .unwrap_or_default(),
             secret_key,
+            backup_key,
             // Closed by default: people join with invitation links (review M1).
             allow_registration: env_flag("REPOMEMO_ALLOW_REGISTRATION", false)?,
             trust_proxy,
@@ -356,6 +363,7 @@ impl ServerConfig {
             soffice: None,
             soffice_wrapper: Vec::new(),
             secret_key: None,
+            backup_key: None,
             allow_registration: true,
             trust_proxy: false,
             trusted_proxies: Vec::new(),

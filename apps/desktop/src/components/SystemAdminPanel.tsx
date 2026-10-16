@@ -765,10 +765,11 @@ function BackupsPanel({ accessToken, canChange }: { accessToken: string; canChan
   const status = overview?.status;
   return <section className="shared-settings-group">
     <div className="shared-panel-heading"><div><Database size={18} /><h2>Backups</h2></div><span>{running ? `${status?.operation ?? "backup"} running…` : overview ? `${overview.backups.length} kept` : "loading"}</span></div>
-    <p className="shared-muted-copy">A backup holds a consistent copy of the database, the stored files and the key file, made while the server runs. It sits in the data folder, so copy it to another machine for it to survive a lost disk, and protect it like the data. Restoring never touches the running environment: it creates a new one, which you attach from the environment menu.</p>
+    <p className="shared-muted-copy">A backup holds a consistent copy of the database, the stored files and the key file, made while the server runs. It sits in the data folder, so copy it to another machine for it to survive a lost disk. Unless it is encrypted, protect it like the data; with REPOMEMO_BACKUP_KEY set, every file in it is sealed and restoring needs that same key, which is kept nowhere in the backup. Restoring never touches the running environment: it creates a new one, which you attach from the environment menu.</p>
     <Facts items={[
       ["Folder", <code key="dir">{overview?.directory ?? "—"}</code>],
       ["Automatic backups", overview ? (overview.interval_hours ? `every ${overview.interval_hours} h, ${overview.keep} kept` : `off, ${overview.keep} kept (Settings › Automatic backups)`) : "—"],
+      ["Encryption", overview ? (overview.encryption_enabled ? "on: new backups are sealed with REPOMEMO_BACKUP_KEY" : "off: set REPOMEMO_BACKUP_KEY to seal new backups") : "—"],
       ["Free disk", overview?.disk_free_bytes != null ? formatBytes(overview.disk_free_bytes) : "unknown"],
       ["Last backup or restore", status?.finished_at ? `${formatTime(status.finished_at)} · ${status.message ?? ""}` : "none since the server started"],
     ]} />
@@ -776,7 +777,7 @@ function BackupsPanel({ accessToken, canChange }: { accessToken: string; canChan
     {overview?.backups.length ? <div className="rm-map-coverage"><table>
       <thead><tr><th scope="col">Backup</th><th scope="col">Made</th><th scope="col">Version</th><th scope="col">Files</th><th scope="col">Database</th><th scope="col">Key</th>{canChange ? <th scope="col"><span className="sr-only">Actions</span></th> : null}</tr></thead>
       <tbody>{overview.backups.map((backup) => <tr key={backup.name}>
-        <th scope="row">{backup.name}<small className="rm-system-tag">{backup.trigger}</small></th>
+        <th scope="row">{backup.name}<small className="rm-system-tag">{backup.trigger}</small>{backup.encryption ? <small className="rm-system-tag">encrypted</small> : null}</th>
         <td>{formatTime(backup.created_at)}</td><td>{backup.version}</td>
         <td>{count(backup.blob_count)} · {formatBytes(backup.blob_bytes)}{backup.missing_blobs ? ` · ${count(backup.missing_blobs)} missing` : ""}</td>
         <td>{formatBytes(backup.database_bytes)}</td><td>{backup.includes_key ? "included" : "not in it"}</td>

@@ -167,6 +167,142 @@ async fn a_backup_restores_into_a_new_environment_that_opens() {
     let _ = std::fs::remove_dir_all(data_dir);
 }
 
+fn files_under(root: &std::path::Path) -> Vec<std::path::PathBuf> {
+    let mut found = Vec::new();
+    let mut pending = vec![root.to_path_buf()];
+    while let Some(folder) = pending.pop() {
+        for entry in std::fs::read_dir(&folder).unwrap().flatten() {
+            if entry.file_type().unwrap().is_dir() {
+                pending.push(entry.path());
+            } else {
+                found.push(entry.path());
+            }
+        }
+    }
+    found
+}
+
+#[tokio::test]
+async fn an_encrypted_backup_holds_nothing_readable_and_restores_only_with_its_key() {
+    let data_dir = temp_data_dir("backup-sealed");
+    let mut config = ServerConfig::for_test(data_dir.clone());
+    config.backup_key = Some("a backup passphrase that is long enough".to_owned());
+    let app = router(config).await.unwrap();
+    let (admin, _) = register_account(&app, "sealed-admin@example.com").await;
+    let workspace_id = create_workspace(&app, &admin).await;
+    for (name, text) in [("plan.txt", "Ship on Friday, quietly"), ("notes.txt", "Rollback plan for the release")] {
+        assert_eq!(
+            upload(&app, &admin, &workspace_id, name, text.as_bytes().to_vec()).await,
+            201
+        );
+    }
+    let start = || {
+        let app = app.clone();
+        let request = json_request("POST", "/v1/system/backups", &admin, json!({}));
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    assert_eq!(start().await.status(), 202);
+    let overview = wait_for_backup_work(&app, &admin).await;
+    assert_eq!(overview["status"]["succeeded"], true, "{overview}");
+    assert_eq!(overview["encryption_enabled"], true);
+    let backup = &overview["backups"][0];
+    let name = backup["name"].as_str().unwrap().to_owned();
+    assert_eq!(backup["encryption"]["cipher"], "aes-256-gcm");
+    assert_eq!(backup["encryption"]["kdf"], "pbkdf2-hmac-sha256");
+    assert_eq!(backup["includes_key"], true);
+    assert!(!backup.to_string().contains("passphrase"), "the manifest never holds the key");
+
+    // Every file but the manifest is sealed: names say so and no text shows.
+    let folder = data_dir.join("backups").join(&name);
+    assert!(folder.join("repomemo.sqlite.enc").is_file());
+    assert!(folder.join("secret.key.enc").is_file());
+    assert!(!folder.join("repomemo.sqlite").exists());
+    assert!(!folder.join("secret.key").exists());
+    let files = files_under(&folder);
+    for file in files.iter().filter(|file| file.file_name().unwrap() != "manifest.json") {
+        assert!(file.to_string_lossy().ends_with(".enc"), "{}", file.display());
+        let bytes = std::fs::read(file).unwrap();
+        for secret in ["Ship on Friday", "Rollback plan", "SQLite format 3"] {
+            assert!(
+                !bytes.windows(secret.len()).any(|window| window == secret.as_bytes()),
+                "{} shows {secret}",
+                file.display()
+            );
+        }
+    }
+
+    // The next backup keeps the same key material, so unchanged files are shared.
+    tokio::time::sleep(std::time::Duration::from_millis(1_100)).await;
+    start().await;
+    let overview = {
+        let mut latest = Value::Null;
+        for _ in 0..200 {
+            latest = wait_for_backup_work(&app, &admin).await;
+            if latest["backups"].as_array().unwrap().len() == 2 {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+        latest
+    };
+    assert_eq!(overview["backups"][0]["reused_blobs"], 2);
+    assert_eq!(
+        overview["backups"][0]["encryption"]["salt"],
+        overview["backups"][1]["encryption"]["salt"]
+    );
+
+    // A key that does not match is refused before any folder is made.
+    let restore = |environment: String| {
+        let app = app.clone();
+        let request = json_request(
+            "POST",
+            &format!("/v1/system/backups/{name}/restore"),
+            &admin,
+            json!({"environment": environment}),
+        );
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let manifest_path = folder.join("manifest.json");
+    let genuine = std::fs::read_to_string(&manifest_path).unwrap();
+    let mut forged: Value = serde_json::from_str(&genuine).unwrap();
+    forged["encryption"]["key_check"] = json!("0".repeat(64));
+    std::fs::write(&manifest_path, serde_json::to_vec(&forged).unwrap()).unwrap();
+    let environment = format!("sealed-test-{}", &uuid::Uuid::new_v4().simple().to_string()[..8]);
+    assert_eq!(restore(environment.clone()).await.status(), 202);
+    let refused = loop {
+        let overview = wait_for_backup_work(&app, &admin).await;
+        if overview["status"]["operation"] == "restore" {
+            break overview;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    };
+    assert_eq!(refused["status"]["succeeded"], false, "{refused}");
+    assert!(refused["status"]["message"].as_str().unwrap().contains("different key"), "{refused}");
+    let root = crate::environment::environments_root().unwrap();
+    assert!(!root.join(&environment).exists());
+    assert!(!root.join(format!("{environment}.restoring")).exists());
+
+    // The right key restores it into an environment that opens.
+    std::fs::write(&manifest_path, genuine).unwrap();
+    assert_eq!(restore(environment.clone()).await.status(), 202);
+    let restored = loop {
+        let overview = wait_for_backup_work(&app, &admin).await;
+        if overview["status"]["operation"] == "restore" && overview["status"]["succeeded"] == true {
+            break overview;
+        }
+        assert_ne!(overview["status"]["succeeded"], false, "{overview}");
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    };
+    let message = restored["status"]["message"].as_str().unwrap();
+    assert!(message.contains("1 workspaces, 2 files, 1 people"), "{message}");
+    let environment_folder = root.join(&environment);
+    assert!(environment_folder.join("repomemo.sqlite").is_file());
+    assert!(environment_folder.join("secret.key").is_file());
+    let _ = std::fs::remove_dir_all(&environment_folder);
+    let _ = std::fs::remove_dir(&root);
+    let _ = std::fs::remove_dir_all(data_dir);
+}
+
 #[tokio::test]
 async fn quotas_protect_the_disk_and_the_server() {
     let data_dir = temp_data_dir("quotas");

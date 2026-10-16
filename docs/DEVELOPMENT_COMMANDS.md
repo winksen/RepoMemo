@@ -215,6 +215,7 @@ stored in the database and override the values below until reset.
 | `REPOMEMO_WORKSPACES_PER_PERSON` | `25` | Workspaces one person may own; `0` is unlimited. Also a run-time setting. |
 | `REPOMEMO_DISK_FLOOR_MB` | `1024` | Uploads answer `507` while less than this is free on the disk of the data folder; `0` turns the check off. Also a run-time setting. |
 | `REPOMEMO_BACKUP_INTERVAL_HOURS` | `0` | The server backs up by itself when the newest backup is older than this (checked by the maintenance loop); `0` is off. Also a run-time setting. |
+| `REPOMEMO_BACKUP_KEY` | unset | Passphrase (16+ characters) that seals every new backup with AES-256-GCM; restoring a sealed backup needs the same value, and a wrong one is refused before anything is written. Keep it apart from the backups: it is stored nowhere in them. |
 | `REPOMEMO_BACKUP_KEEP` | `7` | Backups kept; older ones are deleted after a new one. Also a run-time setting. |
 | `REPOMEMO_VECTOR_INDEX_MB` | `512` | Memory for in-memory vector indexes of meaning search, in MiB. A workspace of 50,000 passages with 768-dimensional vectors takes about 150 MiB. `0` turns the indexes off (the database is scanned). A workspace that does not fit is scanned. |
 | `REPOMEMO_DOCUMENT_TIMEOUT_SECONDS` | `60` | How long reading one document may take before it is skipped. `0` for no limit. |

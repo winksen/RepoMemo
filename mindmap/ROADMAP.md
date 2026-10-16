@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.41` (2026-10-16), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.42` (2026-10-16), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -386,7 +386,7 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 |---|---|---|---|---|---|
 | **V0.2.40** ✅ | ✨ | Workspace settings | Export a workspace as an archive | O2a | Evidence, folders, memory cards with citations, tasks, comments and lifecycle history in one file with a manifest |
 | **V0.2.41** ✅ | ✨ | Workspaces | Import an archive into a new workspace, with a dry run | O2b | An export imports on another 0.2.x server with everything linked as before |
-| **V0.2.42** | ✨ | Backups | Encrypted backups | O6a, decision 14 | A backup restores only with `REPOMEMO_BACKUP_KEY`; a wrong key is refused before anything is written (R2-5 closed) |
+| **V0.2.42** ✅ | ✨ | Backups | Encrypted backups | O6a, decision 14 | A backup restores only with `REPOMEMO_BACKUP_KEY`; a wrong key is refused before anything is written (R2-5 closed) |
 | **V0.2.43** | ✨ | Backups | A second copy of each backup to another folder or network share | O6b | The copy is verified against the manifest |
 | **V0.2.44** | 🐞 | Indexing | Document readings in a subprocess with time and memory limits | P10 | An overrunning reading is killed, not abandoned (R2-4 closed) |
 | **V0.2.45** | ✨ | Operations | A container image and a compose file with the proxy | O7 | `docker compose up` gives a working server behind TLS, with data in a volume |
@@ -731,6 +731,16 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 - [x] Tests: `an_archive_imports_into_a_new_workspace_after_a_dry_run_that_writes_nothing` (dry run writes nothing, not an archive, a tampered one, a member who may not create, then the import: files, folder, lifecycle and history, comment credit, task and checklist, card with a found passage, search, activity), the streaming reader, and the import panel
 - [ ] A copy, not a sync (importing twice makes two workspaces); no progress while a large archive uploads; archives are read in one request (no background import job); members are not matched or invited; earlier file versions, saved searches and chats are not in the archive; the web client holds the exported archive in the browser before saving it
 
+#### V0.2.42: Encrypted backups
+
+- [x] **O6a** (decision 14, R2-5) `apps/server/src/backup_crypto.rs`: `BackupCipher` (PBKDF2-HMAC-SHA-256, 600,000 rounds, 16-byte salt → AES-256-GCM key), files sealed in 64 KiB chunks (`RMBK` header, random 8-byte nonce prefix plus a counter, header and a last-chunk flag as associated data, so a changed, moved, repeated or cut file fails), `sealed_len` predicts the size
+- [x] `REPOMEMO_BACKUP_KEY` (16+ characters, checked at start; `ServerConfig.backup_key`, `AppState.backup_key`): with it set the database, `secret.key` and each stored file are written as `*.enc`; only `manifest.json` stays readable and carries `encryption {cipher, kdf, iterations, salt, key_check, chunk_bytes}`; the passphrase is stored nowhere. Off by default
+- [x] `copy_files` has `CopyMode::{Plain, Seal, Open}`; unchanged files are still hard-linked because a new backup keeps the salt of the newest one while the passphrase opens it (`choose_cipher`); a backup sealed differently from the one before shares nothing with it
+- [x] Restore reads the manifest and opens the cipher **before making any folder**: no key set, or a key that does not match, is refused with a plain message and nothing is written; a file that fails to open removes the staging folder
+- [x] System › Backups: an *Encryption* line, an *encrypted* tag on each sealed backup; `GET /v1/system/backups` returns `encryption_enabled` and each manifest's `encryption`; a *Backup encryption* server check (info, with advice, until the key is set)
+- [x] Tests: the cipher (sizes from 0 to several chunks, predicted length, nothing readable in a sealed file, a changed byte, a cut end, swapped chunks, another key, the manifest check value, short passphrases), sealed and linked copies (`sealed_copies_open_back_to_the_same_files_and_unchanged_ones_are_linked`) and `an_encrypted_backup_holds_nothing_readable_and_restores_only_with_its_key` (no plain database or key file, no text in any file, shared salt and linked files in the second backup, a mismatching key refused with no folder made, then a restore that opens)
+- [ ] The passphrase is the only way back: there is no recovery and no rotation of old backups (a new passphrase seals new backups only); the plain database snapshot exists in the `.partial` folder for the moment before it is sealed; `secret.key` is sealed with the rest, so the `REPOMEMO_SECRET_KEY` guidance is unchanged; copies to another place (V0.2.43) are not checked for encryption
+
 ### Decisions to agree before work starts
 
 | # | Decision | Needed by | Proposal |
@@ -793,7 +803,7 @@ Every item of both roads, with the release it is planned for. The evidence behin
 | — | Integrity | N8 | ✅ V0.1.73 |
 | — | Supply chain | dependency scanning (review §7) | ✅ V0.1.66 (CI) |
 | — | Third pass | R2-1, R2-2 fixed; R2-3, R2-6 accepted | ✅ V0.1.76 |
-| — | Accepted for later | R2-4 (readings cannot be killed), R2-5 (backups not encrypted) | V0.2.44 (P10), V0.2.42 (O6) |
+| — | Accepted for later | R2-4 (readings cannot be killed); R2-5 (backups not encrypted) ✅ closed by V0.2.42 (O6a) | V0.2.44 (P10) |
 | — | Accepted | N9 (not a boundary, documented), I1, I4 | — |
 | S6 | Remote sources | Credential store and host allowlist (6a ✅ V0.2.19), clone limits (6b); each later surface (SMTP, webhooks, connectors) brings its own rules | V0.2.19, V0.2.22 |
 | — | Registration without enumeration | M4 residual | ✅ V0.2.18 |
@@ -844,7 +854,7 @@ Every item of both roads, with the release it is planned for. The evidence behin
 | O3 | Production guide | S–M | ✅ V0.1.75 |
 | O4 | Quotas and disk floor | M | ✅ V0.1.75 |
 | O5 | OpenMetrics export | S | ✅ V0.1.75 |
-| O6 | Encrypted backups (6a, R2-5) and a second copy after each backup (6b) | S–M | V0.2.42, V0.2.43 (decision 14) |
+| O6 | Encrypted backups (6a, R2-5) and a second copy after each backup (6b) | S–M | 6a ✅ V0.2.42, 6b V0.2.43 (decision 14) |
 | O7 | Container image and compose file with the proxy | S–M | V0.2.45 |
 | O8 | Audit trail export | S | V0.2.46 |
 | D1 | Tracker retired, `PRODUCT.md`, Postman v5 | S | ✅ V0.1.66 |

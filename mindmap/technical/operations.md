@@ -36,6 +36,7 @@ Set these in the service's environment, not in a file the web server can read.
 | `REPOMEMO_PUBLIC_URL` | `https://memo.example.com` | Turns HSTS on, makes the refresh cookie `Secure` |
 | `REPOMEMO_TRUST_PROXY` | `true` | Read the client address from the proxy, so rate limits and lockouts are per person and not per proxy. Only the loopback address (or `REPOMEMO_TRUSTED_PROXIES`) is believed |
 | `REPOMEMO_ALLOWED_ORIGIN` | `https://memo.example.com` | Browser origins allowed to call the API |
+| `REPOMEMO_BACKUP_KEY` | unset | Seals new backups (16 or more characters; see §6) and is needed to restore them |
 | `REPOMEMO_BACKUP_INTERVAL_HOURS` | `24` | Backs up by itself (see §6); off by default, and the server check warns until it is set |
 | `REPOMEMO_SERVER_DATA_DIR` | `main` | Pins the environment (`workspace-data/main`). Without it a restart attaches whichever one was chosen last |
 | `REPOMEMO_SYSTEM_ADMIN_EMAILS` | the operators' addresses | Accounts promoted to system administrators at startup |
@@ -229,7 +230,7 @@ Plan disk as: stored files + database (roughly a tenth of the text) + the cached
 
 ### What a backup is
 
-A folder in `<data folder>/backups/`: a consistent snapshot of the database (taken while the server runs), a copy of the stored files, the key file when there is one, and a manifest. A backup reuses the files of the one before it through hard links, so only new files cost space. Nothing is compressed or encrypted (encryption is planned for V0.2.42): **copy backups to another machine, and protect them like the data**: they contain `secret.key`. When you use `REPOMEMO_SECRET_KEY`, keep that value with your other secrets: a restore needs the same one to read the provider keys.
+A folder in `<data folder>/backups/`: a consistent snapshot of the database (taken while the server runs), a copy of the stored files, the key file when there is one, and a manifest. A backup reuses the files of the one before it through hard links, so only new files cost space. Nothing is compressed. By default nothing is encrypted either: **copy backups to another machine, and protect them like the data**, since they contain `secret.key`. Set `REPOMEMO_BACKUP_KEY` (16 or more characters) to seal them (see *Encrypting backups* below). When you use `REPOMEMO_SECRET_KEY`, keep that value with your other secrets: a restore needs the same one to read the provider keys.
 
 ### Making them
 
@@ -265,6 +266,17 @@ A restore **never overwrites the running environment**. It makes a new one next 
 5. Sign in, open System › Overview, and look at the counts.
 
 **Practise this once, on a spare machine, before you need it.** A backup nobody has restored is a hope.
+
+### Encrypting backups
+
+Set `REPOMEMO_BACKUP_KEY` to a passphrase of 16 or more characters and every file of every new backup is sealed with AES-256-GCM before it is written: the database (`repomemo.sqlite.enc`), the key file (`secret.key.enc`) and each stored file (`blobs/…/<name>.enc`). Only `manifest.json` stays readable; it names the cipher, a random salt and a check value, and nothing that can open the backup.
+
+- **Keep the passphrase apart from the backups**, in a password manager or a secret store. It is not in the backup, in the database or in the data folder, and **without it a sealed backup cannot be restored**. There is no recovery.
+- **Restoring needs the same passphrase.** The server checks it against the manifest first; a wrong one is refused with "made with a different key" before any folder is made. Set `REPOMEMO_BACKUP_KEY` before restoring (the console and the page both use the server's value).
+- **Changing the passphrase** applies to the next backup, which starts a new set of sealed files (nothing is shared with backups made under the old one). Older backups still need the old passphrase; keep it as long as you keep them.
+- A sealed backup costs about the same space as a plain one (16 bytes per 64 KiB), and unchanged files are still shared between backups made with the same passphrase.
+- The key is derived with PBKDF2-HMAC-SHA-256 (600,000 rounds) and the files are sealed in 64 KiB chunks, each bound to its place, so a changed, moved or cut file fails to open instead of restoring wrong data. Opening takes a moment longer for large workspaces.
+- System › Overview and the setup checks show whether encryption is on, and each sealed backup carries an *encrypted* tag. `repomemo-console` backups made by a server with the key set are sealed too.
 
 ### What a backup does not hold
 

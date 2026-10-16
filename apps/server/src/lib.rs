@@ -9,6 +9,7 @@ mod artifacts;
 mod auth;
 mod avatars;
 mod backup;
+mod backup_crypto;
 mod collaboration;
 mod config;
 mod connectors;
@@ -146,6 +147,8 @@ struct AppState {
     jwt_secret: String,
     /// The largest workspace archive an import accepts.
     max_import_bytes: u64,
+    /// The passphrase backups are sealed with, when one is set.
+    backup_key: Option<Arc<str>>,
     event_bus: WorkspaceEventBus,
     index_queue: IndexQueue,
     embedding_queue: EmbeddingQueue,
@@ -393,6 +396,7 @@ async fn build_state(
         core,
         jwt_secret: config.jwt_secret.clone(),
         max_import_bytes: config.max_import_bytes,
+        backup_key: config.backup_key.as_deref().map(Arc::from),
         event_bus,
         index_queue,
         embedding_queue,

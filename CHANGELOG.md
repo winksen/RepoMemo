@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.42 (2026-10-16)
+
+Backups can be encrypted.
+
+### Added
+- **`REPOMEMO_BACKUP_KEY`** (16 or more characters). When it is set, every file of every new backup is sealed with AES-256-GCM before it is written: the database, the key file and each stored file (`*.enc`). Only `manifest.json` stays readable, and it holds nothing that can open the backup. Off by default.
+- **A wrong key is refused before anything is written.** Restoring a sealed backup needs the same `REPOMEMO_BACKUP_KEY`. The server checks it against the manifest first, and says so plainly when it does not match or is not set; a file that was changed, moved or cut fails to open instead of restoring wrong data.
+- **Backups stay small.** Unchanged files are still shared between backups made with the same key (a new backup keeps the salt of the one before it). A sealed file is 16 bytes larger per 64 KiB.
+- **Visible in System.** Backups shows whether encryption is on and tags each sealed backup; `GET /v1/system/backups` returns `encryption_enabled` and each backup's `encryption`; the setup checks have a *Backup encryption* line that suggests the key until it is set.
+
+### Security
+- Closes the accepted review finding **R2-5** (backups were not encrypted and held `secret.key`).
+
+### Upgrading
+- Nothing to do: without the key, backups are made as before. To turn it on, set `REPOMEMO_BACKUP_KEY` and restart; the next backup is sealed, older ones stay plain until they are deleted.
+- **Keep the passphrase apart from the backups, in a password manager.** It is stored nowhere in them, and without it a sealed backup cannot be restored. Changing it seals new backups only; keep the old one for as long as you keep the old backups.
+
 ## V0.2.41 (2026-10-16)
 
 A workspace archive can be imported as a new workspace.

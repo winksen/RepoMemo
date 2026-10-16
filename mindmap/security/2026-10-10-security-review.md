@@ -456,7 +456,7 @@ Two crates appear in two major versions: reqwest 0.12 and 0.13, and quick-xml 0.
 | R2-2 | Low | The copy of `secret.key` inside a backup took the folder's permissions on Windows, so the owner-only protection of the original (L5) did not carry over | ✅ Fixed in V0.1.76: `restrict_to_owner` is applied to the copy in a backup and in a restored environment |
 | R2-3 | Info | A file link belongs to its first client, which is the client's address. Behind a proxy that is not trusted, every client has the proxy's address and the rule has no effect (the 60-second limit still holds) | 📝 Accepted: `REPOMEMO_TRUST_PROXY` is in the production guide's required settings |
 | R2-4 | Info | A document reader that overruns its time is abandoned, not killed, and has no memory cap (M11 residual) | 📝 Accepted: the number of abandoned readings is bounded (4), shown as a metric. A subprocess with limits is planned for V0.2.44 (roadmap P10) |
-| R2-5 | Info | Backups are not encrypted and hold `secret.key` | 📝 Accepted and documented: they must be protected like the data folder; encryption is planned for V0.2.42 (roadmap O6, decision 14) |
+| R2-5 | Info | Backups are not encrypted and hold `secret.key` | ✅ Closed in V0.2.42: with `REPOMEMO_BACKUP_KEY` set every backup file is sealed with AES-256-GCM (PBKDF2-derived key, chunked, authenticated) and a restore refuses a wrong key before writing anything. Off by default; without the key, backups must still be protected like the data folder (roadmap O6a, decision 14) |
 | R2-6 | Info | Quota checks are not atomic: concurrent uploads can pass the check together and overshoot a workspace's allowance by a few files | 📝 Accepted: the next upload is refused; the disk floor protects the disk |
 
 ### Closing out the table
