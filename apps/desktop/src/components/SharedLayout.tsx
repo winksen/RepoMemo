@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import {
   IconBell as Bell,
+  IconChevronDown as ChevronDown,
   IconSearch as Search,
   IconLogout as Logout,
   IconMoon as Moon,
@@ -74,6 +75,8 @@ export function SharedLayout({
   onNavigate: (to: string) => void;
   workspaceNavigation?: ReactNode;
 }) {
+  // On a narrow screen the rail folds away behind a button so the page starts at the top; wide screens always show it.
+  const [railOpen, setRailOpen] = useState(false);
   return <div className="shared-home">
     <a className="rm-skip-link" href={`#${MAIN_CONTENT_ID}`} onClick={(event) => { event.preventDefault(); document.getElementById(MAIN_CONTENT_ID)?.focus(); }}>Skip to the page</a>
     <header className="shared-home-header">
@@ -84,14 +87,17 @@ export function SharedLayout({
             <ThemeToggle />
             <Button aria-label="Open command palette" className="shared-palette-link" onClick={openCommandPalette} title="Command palette (Ctrl K)" type="button" variant="secondary"><Search size={16} /></Button>
             <Button aria-label="Open notifications" className="shared-notifications-link" onClick={() => onNavigate("/notifications")} title="Notifications" type="button" variant="secondary"><Bell size={16} /></Button>
-            <Button className="shared-profile-link" onClick={() => onNavigate("/profile")} type="button" variant="secondary"><UserCircle size={16} /> Profile</Button>
+            <Button className="shared-profile-link" onClick={() => onNavigate("/profile")} type="button" variant="secondary"><UserCircle size={16} /> <span className="shared-button-label">Profile</span></Button>
           </div>
-          <Button className="shared-user-signout" onClick={signOut} type="button" variant="secondary"><Logout size={16} /> Sign out</Button>
+          <Button className="shared-user-signout" onClick={signOut} type="button" variant="secondary"><Logout size={16} /> <span className="shared-button-label">Sign out</span></Button>
         </div>
       </div>
     </header>
     <div className="shared-home-frame">
-      <aside aria-label="Workspaces and organizations" className="shared-home-rail">{sidebar}{session.is_system_admin || session.is_app_admin ? <SystemRailEntry onNavigate={onNavigate} /> : null}<div className="shared-rail-footer"><Shield size={15} /><span>JWT active · API {apiAvailable === true ? "healthy" : apiAvailable === false ? "offline" : "checking"}</span></div></aside>
+      <aside aria-label="Workspaces and organizations" className="shared-home-rail" data-open={railOpen}>
+        <Button aria-controls="shared-rail-body" aria-expanded={railOpen} className="shared-rail-toggle" onClick={() => setRailOpen((open) => !open)} type="button" variant="secondary"><span>Workspaces and organizations</span><ChevronDown size={16} /></Button>
+        <div className="shared-rail-body" id="shared-rail-body">{sidebar}{session.is_system_admin || session.is_app_admin ? <SystemRailEntry onNavigate={onNavigate} /> : null}<div className="shared-rail-footer"><Shield size={15} /><span>JWT active · API {apiAvailable === true ? "healthy" : apiAvailable === false ? "offline" : "checking"}</span></div></div>
+      </aside>
       <main className="shared-home-content" id={MAIN_CONTENT_ID} tabIndex={-1}>
         {workspaceNavigation}
         <div className="shared-layout-body">

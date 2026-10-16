@@ -1,0 +1,85 @@
+/*
+ * Narrow screens (V0.2.48). This file is last in the cascade on purpose: it only adds, and only
+ * below the widths named here (the 900px of `NARROW_QUERY` in lib/useMediaQuery.ts for tablets,
+ * 640px for phones), so the wide layout is whatever the files before it say.
+ *
+ * What it settles, down to 375px:
+ *  - the page scrolls (the earlier files clip the page to the window, which suits the wide
+ *    layout where each pane scrolls on its own, and leaves a stacked page unreachable);
+ *  - nothing makes the page wider than the window: grids fall to one column, long names and
+ *    paths wrap, tables scroll inside their own box;
+ *  - the header keeps its buttons as icons, the rail folds behind a button, the assistant is a
+ *    sheet opened from a floating button, and controls are at least 40px high.
+ */
+
+/* ===== The folded rail: the wrapper keeps the wide layout as it was ===== */
+.shared-rail-toggle { display: none; }
+.shared-rail-body { display: flex; flex: 1; flex-direction: column; min-height: 0; }
+.shared-assistant-fab-label { display: none; }
+.shared-assistant-backdrop { display: none; }
+
+/* ===== Tablets and below ===== */
+@media (max-width: 900px) {
+  html, body, #root { height: auto; min-height: 100%; overflow: visible; overflow-x: clip; }
+  body, .shared-home { min-width: 0; }
+  .shared-home { height: auto; min-height: 100dvh; overflow: visible; overflow-x: clip; }
+  .shared-home-content, .shared-layout-content, .shared-layout-body { min-width: 0; max-width: 100%; }
+  .shared-home-content { --shared-content-inset: 20px; }
+
+  .shared-home-rail { padding: 8px 12px; }
+  .shared-rail-toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 44px; padding: 0 8px; font-size: 13px; font-weight: 700; }
+  .shared-rail-toggle svg { transition: transform 120ms var(--ease-standard); }
+  .shared-home-rail[data-open="true"] .shared-rail-toggle svg { transform: rotate(180deg); }
+  .shared-home-rail[data-open="false"] .shared-rail-body { display: none; }
+  .shared-home-rail[data-open="true"] .shared-rail-body { padding-top: 10px; }
+
+  /* The assistant: a floating button, and a sheet over the bottom of the page. */
+  .shared-assistant-dock.sheet.collapsed { position: fixed; right: 16px; bottom: max(16px, env(safe-area-inset-bottom)); z-index: 30; width: auto !important; padding: 0; background: transparent; border: 0; }
+  .shared-assistant-dock.sheet.collapsed .rm-button { flex-direction: row; gap: 8px; width: auto; height: 46px; padding: 0 18px; background: var(--color-surface); border: 1px solid var(--color-border-strong); border-radius: 999px; box-shadow: var(--shadow-floating); }
+  .shared-assistant-dock.sheet.collapsed .shared-assistant-fab-label { display: inline; font-size: 13px; font-weight: 700; }
+  .shared-assistant-dock.sheet:not(.collapsed) { position: fixed; right: 0; bottom: 0; left: 0; z-index: 45; width: 100% !important; height: min(88dvh, 760px); padding-bottom: env(safe-area-inset-bottom); border: 0; border-radius: 16px 16px 0 0; box-shadow: var(--shadow-floating); outline: none; }
+  .shared-assistant-dock.sheet:not(.collapsed)::before { content: ""; align-self: center; flex: none; width: 36px; height: 4px; margin-top: 8px; background: var(--color-border-strong); border-radius: 999px; }
+  .shared-assistant-dock.sheet .shared-assistant-dock-body { flex: 1; height: auto; min-height: 0; }
+  .shared-assistant-backdrop { position: fixed; inset: 0; z-index: 40; display: block; padding: 0; background: rgb(0 0 0 / 45%); border: 0; cursor: default; }
+
+  /* Wrapping rather than widening. */
+  .shared-detail-shell, .shared-detail-panel, .shared-artifact-entry, .shared-search-result, .shared-person, .rm-system-facts, .shared-doc-title { overflow-wrap: anywhere; }
+  .shared-detail-shell pre, .shared-markdown pre, .shared-commit-text { max-width: 100%; overflow-x: auto; }
+  .shared-detail-shell img, .shared-detail-shell video, .shared-detail-shell canvas { max-width: 100%; height: auto; }
+  .rm-system-toolbar, .shared-doc-toolbar, .shared-artifact-filters, .shared-task-toolbar { flex-wrap: wrap; }
+  .shared-task-toolbar { grid-template-columns: minmax(0, 1fr); }
+  .rm-map-graph { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ===== Phones ===== */
+@media (max-width: 640px) {
+  .shared-home { padding: 6px; }
+  .shared-home-frame { gap: 6px; padding-top: 6px; }
+  .shared-home-content { --shared-content-inset: 14px; }
+
+  /* The header keeps its buttons as icons (their names stay for screen readers). */
+  .shared-home-header { gap: 6px; padding: 0 8px; }
+  .shared-brand-full { height: 28px; max-width: 128px; object-fit: contain; object-position: left center; }
+  .shared-header-actions, .shared-user-menu, .shared-account-controls { gap: 4px; min-width: 0; }
+  .shared-button-label { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+  .shared-account-controls button, .rm-button.shared-user-signout { justify-content: center; min-width: 40px; min-height: 40px; padding: 0 !important; }
+
+  /* One column. */
+  .shared-page-heading h1, .shared-detail-heading h1 { max-width: none; font-size: 30px; overflow-wrap: anywhere; }
+  .shared-page-heading, .shared-detail-heading { gap: 12px; }
+  .shared-page-content > .shared-page-heading, .shared-page-content > .shared-detail-heading, .shared-detail-shell > .shared-detail-heading { margin-bottom: 20px; }
+  .shared-metric-visuals, .shared-task-create-fields, .shared-task-board, .shared-retrieval-filter-row, .shared-profile-identity dl, .shared-member-list:has(.shared-member-card), .shared-artifact-manager.grid { grid-template-columns: minmax(0, 1fr); }
+  .shared-create-workspace > div { min-width: 0; }
+  .shared-organization-member-form label:first-child { flex-basis: 100%; }
+  .shared-detail-heading .rm-button, .shared-page-heading .rm-button { align-self: stretch; }
+
+  /* Touch: controls are at least 40px high. */
+  .rm-button, .rm-input, .rm-dropdown-trigger { min-height: 40px; }
+  .rm-textarea { min-height: 88px; }
+  .rm-dropdown-item { min-height: 40px; }
+
+  /* Dialogs, the palette and notifications use the window. */
+  .rm-dialog { padding: 16px; max-height: calc(100dvh - 24px); }
+  .shared-palette { top: 8vh; }
+  .rm-toast-viewport { right: 12px; bottom: 76px; left: 12px; width: auto; }
+}

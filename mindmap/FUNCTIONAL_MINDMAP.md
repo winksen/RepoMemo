@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.2.47` (2026-10-16). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
+> **Scope:** reflects the code at `V0.2.48` (2026-10-16). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The local desktop app is described briefly in [§12](#12-local-desktop-mode).
 
 ---
 
@@ -52,6 +52,7 @@ The voice is **calm, precise, technical, private by default, and evidence-orient
 - The product is used as a **focused technical workbench**. It must support dense scanning, keyboard-friendly operation, long paths and identifiers, code-oriented content, large result sets, and both light and dark themes.
 - It must be **fully usable by keyboard** with visible focus states, respect **reduced-motion** preferences, keep **readable contrast** in both themes, and accommodate long technical identifiers without hiding critical context.
 - Since V0.2.47 every signed-in page starts with a **Skip to the page** link, has one main area and a labelled side rail, and is named in the browser tab (*Atlas · Evidence*, *System · Audit trail*). After a move to another page, keyboard focus goes to the start of the page and a screen reader hears the page's name; changing a tab inside a workspace keeps focus on the tab. Every field has a label and every button a name, charts state their figures in words, notifications wait while a control inside them has focus (*Esc* dismisses one), motion stops when the system asks for less, and each colour pair used for text reaches 4.5:1 in both themes. A check for these rules runs in CI.
+- Since V0.2.48 the web client works down to a phone's width (375 px): the page scrolls and never grows sideways, the side rail folds behind a *Workspaces and organizations* button, the header's buttons become icons, lists and forms fall to one column, tables and the knowledge map scroll inside their own box, and controls are at least 40 px high.
 
 > The visual system (colors, type, components) is defined separately in [DESIGN.md](../DESIGN.md).
 
@@ -414,7 +415,7 @@ Writers can save a named search that includes its filters. Anyone can re-run it 
 
 ### Assistant
 
-A chat panel **docked on the right of every workspace section**. It can be widened, narrowed to a slim rail, or stacked under the page on small screens. Each message does exactly one of five things: **find files**, **search content**, **summarize a file**, **ask a question** (the same cited Ask as Retrieval), or give a **workspace overview**. Common phrasings are recognised without AI; otherwise the AI provider picks the action, and without one the assistant lists what it can do. Finding and searching work without AI. Chats are kept per person and can be renamed and deleted. Text written by AI is labelled as such. Inside a chat the assistant **remembers the conversation**: the newest earlier messages that fit a token budget go with each question, so a follow-up such as *and what about its timeout?* finds what it is about and *summarize it* means the file just discussed. A reply says how many earlier messages it read. Lookups and searches run on what was typed.
+A chat panel **docked on the right of every workspace section**. It can be widened, narrowed to a slim rail, or, on a narrow screen (V0.2.48), opened as a sheet over the bottom of the page from a floating *Assistant* button (it starts closed there; *Esc* or a tap outside closes it). Each message does exactly one of five things: **find files**, **search content**, **summarize a file**, **ask a question** (the same cited Ask as Retrieval), or give a **workspace overview**. Common phrasings are recognised without AI; otherwise the AI provider picks the action, and without one the assistant lists what it can do. Finding and searching work without AI. Chats are kept per person and can be renamed and deleted. Text written by AI is labelled as such. Inside a chat the assistant **remembers the conversation**: the newest earlier messages that fit a token budget go with each question, so a follow-up such as *and what about its timeout?* finds what it is about and *summarize it* means the file just discussed. A reply says how many earlier messages it read. Lookups and searches run on what was typed.
 
 ### Knowledge map (Map)
 
@@ -545,7 +546,7 @@ The desktop app and the shared server keep **separate data**.
 
 ---
 
-## 13. Known functional gaps (at V0.2.47)
+## 13. Known functional gaps (at V0.2.48)
 
 These are observed in the code and are useful for prioritizing. The roadmap item that addresses each one is in brackets.
 

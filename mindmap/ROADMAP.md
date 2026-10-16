@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.47` (2026-10-16), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.48` (2026-10-16), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -397,7 +397,7 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 | Release | Type | Section | The one change | IDs | Done when |
 |---|---|---|---|---|---|
 | **V0.2.47** ✅ | 🔧 | Web client | Accessibility pass: keyboard paths, focus, labels, contrast | X1 | Every page usable by keyboard alone; automated checks find no serious issue |
-| **V0.2.48** | 🔧 | Web client | Narrow screens: the workspace pages and the assistant usable on a tablet or phone | X2 | No horizontal scrolling at 375 px; the dock becomes a sheet |
+| **V0.2.48** ✅ | 🔧 | Web client | Narrow screens: the workspace pages and the assistant usable on a tablet or phone | X2 | No horizontal scrolling at 375 px; the dock becomes a sheet |
 
 #### Track I: One client (V0.2.49–V0.2.51)
 
@@ -791,6 +791,15 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 - [x] Tests: `src/test/accessibility.test.tsx` (frame landmarks and skip link, titles and page keys, the announcer, toasts, sheet tabs)
 - [ ] Not run in a browser or with a screen reader here: the check is static and the tests were compiled, not executed; an axe or Lighthouse run and a pass with NVDA or VoiceOver are the maintainer's to do. Not covered: a skip link inside dialogs, the rich note editor's toolbar roles, the target size of small icon buttons (24 px minimum), and the retired local edition (`App.tsx`)
 
+#### V0.2.48: Narrow screens
+
+- [x] **X2** Cause found first: `html`, `body`, `#root` and `.shared-home` were `overflow: clip` at every width (to stop focus shifting the shell on wide screens), so the stacked tablet layout of V0.1.x could not scroll at all. `styles/13-narrow-screens.css` (last in the cascade, only below 900 px and 640 px) lets the page scroll and clips only sideways
+- [x] Tablet (≤ 900 px): the rail folds behind a *Workspaces and organizations* button (`aria-expanded`, `aria-controls`; closed on every page load), one column for the detail grids and the knowledge map, toolbars wrap, long names and paths wrap, code blocks scroll inside their box
+- [x] Phone (≤ 640 px): header buttons are icons (their words stay as the accessible name), smaller logo, headings 30 px, the metric, task, retrieval and profile grids in one column, controls at least 40 px high, dialogs and the palette use the window, notifications sit above the floating assistant button
+- [x] **The dock becomes a sheet:** on a narrow screen `AssistantDock` starts closed (the wide-screen open or shrunk state and width are kept untouched), shows a floating *Assistant* button, and opens over the bottom 88% of the window with a backdrop; *Esc*, the close button or a tap outside closes it, focus goes into the sheet and back to the button, and the conversation stays mounted. `useMediaQuery(NARROW_QUERY)` is the one place the 900 px is read in code
+- [x] Tests: `src/test/narrowScreens.test.tsx` (the sheet's open, close and focus, the wide dock unchanged, the folded rail, header names, the stylesheet's width and place in the cascade)
+- [ ] **Not seen on a screen:** nothing was rendered here, so the 375 px claim rests on reading the stylesheets and tracing each fixed width; the maintainer's pass at 375 px and 768 px (browser device mode) is the real test. Known to look at: the knowledge map graph (it pans inside its box), the contribution calendar (scrolls inside its box), the evidence file grid, the System tables (scroll inside their boxes) and the Settings forms. The retired local edition (`App.tsx`) is not touched
+
 ### Decisions to agree before work starts
 
 | # | Decision | Needed by | Proposal |
@@ -917,7 +926,7 @@ Every item of both roads, with the release it is planned for. The evidence behin
 | ID | Item | Size | Target |
 |---|---|---|---|
 | X1 | Accessibility pass: keyboard paths, focus, labels, contrast | M | ✅ V0.2.47 |
-| X2 | Narrow screens: workspace pages and the assistant usable at 375 px | M | V0.2.48 |
+| X2 | Narrow screens: workspace pages and the assistant usable at 375 px | M | ✅ V0.2.48 |
 
 ### Repository indexing track
 

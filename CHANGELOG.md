@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.48 (2026-10-16)
+
+The web client works on a tablet and a phone.
+
+### Fixed
+- **The page could not scroll on a narrow screen.** The page was clipped to the window at every width, which suits the wide layout (each pane scrolls on its own) but left the stacked tablet layout unreachable below the first screen. Below 900 px the page now scrolls, and only sideways overflow is cut.
+
+### Added
+- **A layout for narrow screens** (below 900 px, and a phone layout below 640 px, checked down to 375 px by reading the styles): grids fall to one column, long names and paths wrap, tables, the knowledge map and the contribution calendar scroll inside their own box, and controls are at least 40 px high on a phone.
+- **The side rail folds** behind a *Workspaces and organizations* button on narrow screens, so each page starts at its top.
+- **The assistant becomes a sheet** on narrow screens. It starts closed, a floating *Assistant* button opens it over the bottom of the page, and *Esc*, its close button or a tap outside closes it. The conversation is kept while it is closed. The wide-screen dock, its width and its open or shrunk state are unchanged.
+
+### Changed
+- On a phone the header keeps its buttons as icons (Profile and Sign out keep their names for screen readers), notifications sit above the floating assistant button, and dialogs and the command palette use the window.
+
+### Upgrading
+- Nothing to do. The layout was written from the styles, not seen on a screen: look at a few pages at 375 px and 768 px (browser device mode) and report what overflows.
+
 ## V0.2.47 (2026-10-16)
 
 The web client can be used by keyboard and screen reader.

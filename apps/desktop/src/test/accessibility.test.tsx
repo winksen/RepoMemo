@@ -8,6 +8,10 @@ import { pageKey, pageTitle } from "../web/pageTitle";
 import { parseRoute } from "../web/router";
 import type { SharedSession } from "../types";
 
+beforeEach(() => {
+  // jsdom has no matchMedia; the layout reads the colour scheme and the screen width through it.
+  window.matchMedia = ((query: string) => ({ matches: false, media: query, addEventListener: () => undefined, removeEventListener: () => undefined })) as unknown as typeof window.matchMedia;
+});
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
 const session = { user: { id: "u1", email: "a@example.com", display_name: "Ada" }, authentication: "jwt", memberships: [] } as unknown as SharedSession;
