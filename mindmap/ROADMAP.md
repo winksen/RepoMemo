@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.44` (2026-10-16), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.45` (2026-10-16), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -389,7 +389,7 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 | **V0.2.42** ✅ | ✨ | Backups | Encrypted backups | O6a, decision 14 | A backup restores only with `REPOMEMO_BACKUP_KEY`; a wrong key is refused before anything is written (R2-5 closed) |
 | **V0.2.43** ✅ | ✨ | Backups | A second copy of each backup to another folder or network share | O6b | The copy is verified against the manifest |
 | **V0.2.44** ✅ | 🐞 | Indexing | Document readings in a subprocess with time and memory limits | P10 | An overrunning reading is killed, not abandoned (R2-4 closed) |
-| **V0.2.45** | ✨ | Operations | A container image and a compose file with the proxy | O7 | `docker compose up` gives a working server behind TLS, with data in a volume |
+| **V0.2.45** ✅ | ✨ | Operations | A container image and a compose file with the proxy | O7 | `docker compose up` gives a working server behind TLS, with data in a volume |
 | **V0.2.46** | ✨ | System › Audit | Export of the audit trail (JSON lines, CSV) | O8 | A date range downloads; the download itself is audited |
 
 #### Track H: Experience (V0.2.47–V0.2.48)
@@ -760,6 +760,16 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 - [x] Tests: the wire format and answers (unit), and `readings_run_in_a_process_that_is_killed_when_it_overruns_and_that_crashes_alone` (`crates/ingestion/tests/reader_process.rs`, with the test-only `repomemo-reader` program: a real email read through the process, text and preview, a non-document is an error, memory within and over the limit, no limit, a reading that never ends is killed, a panic and an abort, the next reading unharmed, no server secret in the child's environment, thread mode again)
 - [ ] A child is started per reading (a few milliseconds each; indexing is already limited to two at once); the memory count covers what Rust allocates, which is all the parsers do; a child still has the server's file permissions (no sandbox); the repository file text check and image analysis do not go through readers; Windows has no job object, so an uncooperative child relies on the kill
 
+
+#### V0.2.45: Container image and compose file
+
+- [x] **O7** `Dockerfile` (stages `web`, `build`, `server`, `proxy`): the server on Debian slim with `git` and CA certificates, unprivileged (uid 10001), the data folder as a volume, a health check on `/health/ready`, LibreOffice optional (`WITH_LIBREOFFICE`); Caddy with the web app built for the page's own host (`VITE_REPOMEMO_API_URL=""`) and the content security policy of the build handed to it
+- [x] `docker-compose.yml`, `docker/Caddyfile`, `.env.example`, `.dockerignore`: `docker compose up` starts the server and the proxy on a private network with fixed addresses, the server trusting only the proxy (`REPOMEMO_TRUST_PROXY`, `REPOMEMO_TRUSTED_PROXIES`), an `https://` public address, the secrets required from `.env`, backups every 24 hours; TLS from Let's Encrypt for a real host name, or Caddy's own authority for `localhost`
+- [x] `vite.config.ts`: an empty `VITE_REPOMEMO_API_URL` means the page's own host (`??`) and keeps `127.0.0.1` out of the policy; the sign-in page prints "this address" for it
+- [x] `scripts/check-container.mjs` (`npm run container:check`, a CI step): the files agree with each other and with the variables the server reads, with no Docker needed; `.gitattributes` keeps them on LF
+- [x] Production guide: "In containers" (what runs, first start, what the compose file settles, backup copy and repositories on mounts, upgrading, a proxy of your own)
+- [ ] The images were not built or started in this release (the checks read the files only), so the first `docker compose up` is the maintainer's to try; no published image or registry, no `arm64` job, no `docker compose` test in CI, no Kubernetes manifests, and Caddy's certificate for a real name needs the ports reachable from the internet
+
 ### Decisions to agree before work starts
 
 | # | Decision | Needed by | Proposal |
@@ -874,7 +884,7 @@ Every item of both roads, with the release it is planned for. The evidence behin
 | O4 | Quotas and disk floor | M | ✅ V0.1.75 |
 | O5 | OpenMetrics export | S | ✅ V0.1.75 |
 | O6 | Encrypted backups (6a, R2-5) and a second copy after each backup (6b) | S–M | ✅ V0.2.42, V0.2.43 (decision 14) |
-| O7 | Container image and compose file with the proxy | S–M | V0.2.45 |
+| O7 | Container image and compose file with the proxy | S–M | ✅ V0.2.45 |
 | O8 | Audit trail export | S | V0.2.46 |
 | D1 | Tracker retired, `PRODUCT.md`, Postman v5 | S | ✅ V0.1.66 |
 | R5 | Mindmaps, branch pages, changelog, upgrade notes | M | ✅ V0.1.76 |

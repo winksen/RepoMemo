@@ -50,7 +50,8 @@ function contentSecurityPolicyPlugin(apiUrl: string): Plugin {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "VITE_");
-  const apiUrl = env.VITE_REPOMEMO_API_URL || "http://127.0.0.1:3020";
+  // An empty address means the API is on the page's own host (the container image); only an unset one falls back.
+  const apiUrl = env.VITE_REPOMEMO_API_URL ?? "http://127.0.0.1:3020";
   return {
     plugins: [react(), contentSecurityPolicyPlugin(apiUrl)],
     clearScreen: false,

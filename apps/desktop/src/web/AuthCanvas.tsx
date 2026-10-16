@@ -123,7 +123,7 @@ export function AuthCanvas({
               ? <p>We will send a link to <strong>{email.trim() || "the address above"}</strong> if an account uses it and this server sends mail. It works once, for one hour. <Button disabled={isSubmitting} onClick={() => void forgot()} type="button" variant="secondary">Send the link</Button> <Button onClick={() => setForgotOpen(false)} type="button" variant="secondary">Cancel</Button></p>
               : <p>Forgot your password? <Button onClick={() => setForgotOpen(true)} type="button" variant="secondary">Get a link by email</Button>, or ask a system administrator of this server for a reset link (System › Users).</p>}
           </div> : <p className="shared-auth-hint">Invited by a teammate? Open the invitation link you received instead: it creates the account with the right access.</p>}
-          <p className="shared-api-note">API {apiAvailable === true ? "healthy" : apiAvailable === false ? "unreachable" : "checking"} · <code>{sharedApiUrl}</code></p>
+          <p className="shared-api-note">API {apiAvailable === true ? "healthy" : apiAvailable === false ? "unreachable" : "checking"} · <code>{sharedApiUrl || "this address"}</code></p>
         </div>
       </section>
     </main>

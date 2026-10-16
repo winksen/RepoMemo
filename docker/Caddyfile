@@ -1,0 +1,46 @@
+# The front door of RepoMemo in containers (see ../Dockerfile and
+# ../docker-compose.yml). One host name serves the web app and the API, which
+# the sign-in cookie needs.
+#
+# REPOMEMO_HOST is the name people use. "localhost" (the default) gets a
+# certificate from Caddy's own authority, for trying it out on one machine;
+# a real name gets one from Let's Encrypt, so ports 80 and 443 must reach this
+# container and the name must point at this machine.
+
+{
+	# Caddy's control endpoint is not needed here.
+	admin off
+}
+
+{$REPOMEMO_HOST:localhost} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		-Server
+	}
+
+	# The API and the live event streams: no buffering, so events arrive as
+	# they happen. Caddy adds the client's address in X-Forwarded-For, which
+	# the server believes only from this container (REPOMEMO_TRUSTED_PROXIES).
+	@api path /v1/* /health /health/*
+	handle @api {
+		reverse_proxy server:3020 {
+			flush_interval -1
+			transport http {
+				response_header_timeout 180s
+			}
+		}
+	}
+
+	# The web app, with the content security policy the build wrote.
+	handle {
+		root * /srv/web
+		import /etc/caddy/csp.caddy
+		header X-Frame-Options DENY
+		try_files {path} /index.html
+		file_server
+	}
+}

@@ -37,6 +37,8 @@ jobs:
         with:
           node-version: 22
       - run: node scripts/set-version.mjs --check
+      - name: Container files agree
+        run: node scripts/check-container.mjs
 
   web:
     name: Web client

@@ -1,2 +1,9 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Read by Linux containers: never CRLF.
+Dockerfile text eol=lf
+docker-compose.yml text eol=lf
+docker/Caddyfile text eol=lf
+.env.example text eol=lf
+.dockerignore text eol=lf

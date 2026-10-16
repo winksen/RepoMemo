@@ -1,6 +1,6 @@
 {
   "name": "repomemo",
-  "version": "0.2.44",
+  "version": "0.2.45",
   "private": true,
   "description": "Local-first technical memory workspace for teams.",
   "workspaces": [
@@ -19,7 +19,8 @@
     "types:generate": "node scripts/generate-types.mjs",
     "types:check": "node scripts/generate-types.mjs --check",
     "test:web": "npm --workspace @repomemo/desktop run test",
-    "styles:check": "node scripts/check-styles.mjs"
+    "styles:check": "node scripts/check-styles.mjs",
+    "container:check": "node scripts/check-container.mjs"
   },
   "engines": {
     "node": ">=22",

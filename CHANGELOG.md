@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.45 (2026-10-16)
+
+RepoMemo can be run with `docker compose up`.
+
+### Added
+- **A `Dockerfile` with two images.** `server` is `repomemo-server` on Debian slim with `git` and CA certificates, running unprivileged with its data folder in a volume and a health check on `/health/ready`. `proxy` is Caddy with the web app built into it. LibreOffice for layout-accurate Office previews is left out to keep the image small; `--build-arg WITH_LIBREOFFICE=true` adds it.
+- **`docker-compose.yml`, `docker/Caddyfile` and `.env.example`.** Copy `.env.example` to `.env`, set `REPOMEMO_HOST` and the two required secrets, and run `docker compose up -d --build`. The server is reachable only through the proxy, which gets the certificate (Let's Encrypt for a real name, its own authority for `localhost`), serves the web app with its content security policy, sends `/v1` and `/health` to the server without buffering the live event streams, and is the only address the server trusts for client addresses. Backups run every 24 hours inside the volume.
+- **The web app can be built for the page's own host.** An empty `VITE_REPOMEMO_API_URL` now means "the same host" instead of falling back to `127.0.0.1:3020`, so one image works under any name. Unset still means `http://127.0.0.1:3020`.
+- **`npm run container:check`** (also run by CI) compares the container files with each other and with the variables the server reads. It starts nothing and needs no Docker.
+- The production guide has a new section, *In containers*: the volumes, backups with a second copy on a mount, repositories on disk, upgrading and using your own proxy.
+
+### Upgrading
+- Nothing to do for a server that is not run in containers. To move to containers, back up, restore the backup into the new environment (production guide §6) or mount the old data folder as the volume, and keep the same `REPOMEMO_JWT_SECRET` and `REPOMEMO_SECRET_KEY`.
+- The images were not built or started when this release was cut; the first `docker compose up` is yours to try.
+
 ## V0.2.44 (2026-10-16)
 
 A document that cannot be read no longer costs the server anything.

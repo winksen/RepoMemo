@@ -1,0 +1,74 @@
+# RepoMemo for a team, in containers (roadmap O7).
+#
+#   cp .env.example .env     # then fill in the secrets and the host name
+#   docker compose up -d
+#
+# Open https://<REPOMEMO_HOST> and follow the first-run setup. The data lives
+# in the `repomemo-data` volume; back it up from System > Backups, as in the
+# production guide (mindmap/technical/operations.md, "Running it in containers").
+
+name: repomemo
+
+services:
+  server:
+    build:
+      context: .
+      target: server
+      args:
+        WITH_LIBREOFFICE: ${REPOMEMO_WITH_LIBREOFFICE:-false}
+    image: repomemo-server:${REPOMEMO_VERSION:-local}
+    restart: unless-stopped
+    init: true
+    environment:
+      REPOMEMO_SERVER_ADDR: 0.0.0.0:3020
+      REPOMEMO_SERVER_DATA_DIR: main
+      # The address people use; it turns on HSTS and secure cookies.
+      REPOMEMO_PUBLIC_URL: https://${REPOMEMO_HOST:-localhost}
+      REPOMEMO_ALLOWED_ORIGIN: https://${REPOMEMO_HOST:-localhost}
+      # Only the proxy container is believed about client addresses.
+      REPOMEMO_TRUST_PROXY: "true"
+      REPOMEMO_TRUSTED_PROXIES: 172.29.0.2
+      REPOMEMO_JWT_SECRET: ${REPOMEMO_JWT_SECRET:?Set REPOMEMO_JWT_SECRET in .env (32 or more random characters)}
+      REPOMEMO_SECRET_KEY: ${REPOMEMO_SECRET_KEY:?Set REPOMEMO_SECRET_KEY in .env (32 or more random characters)}
+      REPOMEMO_SETUP_CODE: ${REPOMEMO_SETUP_CODE:-}
+      REPOMEMO_SYSTEM_ADMIN_EMAILS: ${REPOMEMO_SYSTEM_ADMIN_EMAILS:-}
+      REPOMEMO_BACKUP_INTERVAL_HOURS: ${REPOMEMO_BACKUP_INTERVAL_HOURS:-24}
+      REPOMEMO_BACKUP_KEY: ${REPOMEMO_BACKUP_KEY:-}
+    volumes:
+      - repomemo-data:/var/lib/repomemo
+    networks:
+      repomemo:
+        ipv4_address: 172.29.0.3
+
+  proxy:
+    build:
+      context: .
+      target: proxy
+    image: repomemo-proxy:${REPOMEMO_VERSION:-local}
+    restart: unless-stopped
+    depends_on:
+      server:
+        condition: service_healthy
+    environment:
+      REPOMEMO_HOST: ${REPOMEMO_HOST:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      repomemo:
+        ipv4_address: 172.29.0.2
+
+networks:
+  repomemo:
+    ipam:
+      config:
+        - subnet: 172.29.0.0/24
+
+volumes:
+  repomemo-data:
+  caddy-data:
+  caddy-config:

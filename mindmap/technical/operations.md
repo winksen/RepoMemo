@@ -195,6 +195,32 @@ nssm start RepoMemo
 
 On Windows the server restricts `secret.key` to the account it runs as (`icacls`), so run it as the same account every time, and give a backup tool access explicitly if it runs as another one.
 
+### In containers (since V0.2.45)
+
+`docker compose up` gives a working server behind TLS with its data in a volume. Two images are built from the one [Dockerfile](../../Dockerfile), and [docker-compose.yml](../../docker-compose.yml) starts them:
+
+| Container | What it is |
+|---|---|
+| `server` | `repomemo-server` on Debian slim with `git` and CA certificates, running as an unprivileged user (uid 10001). Its working directory is the volume `repomemo-data` (`/var/lib/repomemo`), so the environment is `workspace-data/main` inside it: database, stored files, key file and backups. A health check asks `/health/ready`. LibreOffice for layout-accurate Office previews is not included unless you build with `REPOMEMO_WITH_LIBREOFFICE=true` (about 600 MB more) |
+| `proxy` | Caddy, serving the web app (built for the page's own host, so one image works under any name), sending `/v1` and `/health` to the server with event streams unbuffered, setting the content security policy the web build wrote, and getting the certificate |
+
+```bash
+cp .env.example .env        # set REPOMEMO_HOST, REPOMEMO_JWT_SECRET and REPOMEMO_SECRET_KEY
+docker compose up -d --build
+docker compose logs server  # the first-run setup code is printed here unless REPOMEMO_SETUP_CODE is set
+```
+
+Open `https://<REPOMEMO_HOST>` and follow the first-run setup. With a real host name, ports 80 and 443 must reach the machine and the name must point at it: Caddy then gets a Let's Encrypt certificate by itself and keeps it renewed in the `caddy-data` volume. With the default `localhost` the certificate comes from Caddy's own authority, for trying it out on one machine (the browser asks you to trust it).
+
+What the compose file settles for you, from §2: the server listens on all interfaces of the private network only the proxy shares (`REPOMEMO_SERVER_ADDR=0.0.0.0:3020`, no published port), `REPOMEMO_PUBLIC_URL` and `REPOMEMO_ALLOWED_ORIGIN` are the `https://` address, `REPOMEMO_TRUST_PROXY=true` with `REPOMEMO_TRUSTED_PROXIES` naming the proxy's fixed address (172.29.0.2), and the environment is pinned (`REPOMEMO_SERVER_DATA_DIR=main`). The secrets are required and come from `.env`, never from the image. Anything else in §2 or [DEVELOPMENT_COMMANDS.md](../../docs/DEVELOPMENT_COMMANDS.md) is added under `environment:` of the `server` service.
+
+- **Backups and the second copy.** Backups are made inside the volume (`REPOMEMO_BACKUP_INTERVAL_HOURS` is 24 here). A second copy needs a place outside it: mount a host folder or share on the `server` service, for example `- /srv/repomemo-backups:/backup-copy`, and set `REPOMEMO_BACKUP_COPY_DIR: /backup-copy`; the folder must be writable by uid 10001. Set `REPOMEMO_BACKUP_KEY` to seal them.
+- **Repositories on disk.** Mount the folders read-only and list them in `REPOMEMO_REPO_ROOTS`; remote repositories need `REPOMEMO_GIT_ALLOWED_HOSTS` as before.
+- **Upgrading.** Back up (§6), `git pull` or fetch the new release, then `docker compose up -d --build`. The volume is kept; migrations run at start. To go back, restore the backup into a new environment (§6) and point `REPOMEMO_SERVER_DATA_DIR` at it.
+- **Reading documents** starts a short-lived copy of the server inside the container (§5), so no extra permission is needed. Give the container as much memory as `REPOMEMO_DOCUMENT_MEMORY_MB` plus the server's own.
+- **Behind your own proxy** (nginx, Traefik, a load balancer): build and run only the `server` target, keep it on a private network, and use §3 for the proxy.
+- `node scripts/check-container.mjs` (`npm run container:check`, run by CI) checks the Dockerfile, the compose file, the Caddyfile and `.env.example` against each other and against the variables the server reads; it needs no Docker.
+
 ### Is it up?
 
 | Check | Answers |

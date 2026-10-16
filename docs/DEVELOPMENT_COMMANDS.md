@@ -66,6 +66,18 @@ npm run version:check
 
 Record what changed in `CHANGELOG.md` under the new version.
 
+## Run It In Containers
+
+The server and a Caddy front door (TLS and the web app) as two containers, with the data in a volume:
+
+```powershell
+Copy-Item .env.example .env   # set REPOMEMO_JWT_SECRET and REPOMEMO_SECRET_KEY (32+ random characters each), and REPOMEMO_HOST
+docker compose up -d --build
+docker compose logs server    # the first-run setup code
+```
+
+Why: this is the way to run RepoMemo for a team without building anything by hand; the production guide ("Running it in containers") explains the volumes, the second backup copy, upgrading and using your own proxy. `npm run container:check` compares the container files with each other and with the server's variables without starting Docker.
+
 ## Web Client Tests And Generated Types
 
 ```powershell
