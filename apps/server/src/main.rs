@@ -2,7 +2,17 @@ use repomemo_server::{init_logging, router, serve, ServerConfig};
 use tokio::net::TcpListener;
 use tracing::info;
 
+// Counts memory only in a document reader process, which asks it to; the
+// server itself pays for one flag check per allocation.
+#[global_allocator]
+static ALLOCATOR: repomemo_api::LimitedAllocator = repomemo_api::LimitedAllocator;
+
 fn main() {
+    // A document reading runs in a child process: this program, started with
+    // an argument. It reads one file, answers and exits.
+    if repomemo_api::run_as_document_reader_if_requested() {
+        return;
+    }
     // git runs this program as its credential helper when it fetches a remote
     // repository with a token: answer it and leave, without starting a server.
     if repomemo_git::remote::run_as_askpass_if_requested() {

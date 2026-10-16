@@ -190,7 +190,7 @@ Viewers cannot list members' emails through the API (`organizations.rs:156` need
 - In handlers that only need the workspace, use `storage.get_artifact_summary`, and check the role first.
 - Store the extracted text at indexing time and serve the preview from it.
 - Run `extract_document_text` and `index_artifact` inside `spawn_blocking`.
-- The subprocess readings planned for V0.2.44 (P10) remain the real bound.
+- The subprocess readings of V0.2.44 (P10) are the real bound: a reading that overruns is killed, so it no longer holds anything.
 
 ### E8. V0.2.6's background re-index starts one unbounded task per request
 
@@ -254,7 +254,7 @@ Advisories published since the third pass (2026-10-14 back to June 2026), checke
 
 No 2026 advisory turned up for `hyper`, `tokio`, `tower-http`, `axum`, `sqlx`, `zip`, `calamine`, `mail-parser`, `react-markdown` or `@tanstack/react-query`. That is not proof: CI's `cargo deny` and `npm audit` remain the check of record.
 
-**Lesson from `lopdf`:** a stack overflow or an out-of-memory abort in **any** thread ends the whole server. The document readers' time budget does not help there. Subprocess readings (P10, V0.2.44) are the only real containment, and they would also cover the next parser bug of this kind.
+**Lesson from `lopdf`:** a stack overflow or an out-of-memory abort in **any** thread ends the whole server. The document readers' time budget does not help there. Subprocess readings (P10, V0.2.44) are the real containment, and they also cover the next parser bug of this kind: the child dies alone.
 
 ---
 

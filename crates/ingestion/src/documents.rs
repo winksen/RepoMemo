@@ -16,6 +16,7 @@ use quick_xml::Reader;
 use repomemo_domain::{DocumentPreview, EmailAttachmentInfo, SheetPreview, SlidePreview};
 
 use super::budget::within_budget;
+use super::reader::{read_in_process, RequestKind};
 use super::{extension, extract_word_text, read_zip_member, zip_entry_names};
 
 const MAX_SHEET_ROWS: usize = 50_000;
@@ -86,8 +87,31 @@ pub fn extract_document_text(path: &Path, bytes: &[u8]) -> Result<Option<String>
     if document_kind(path).is_none() {
         return Ok(None);
     }
+    let name = file_name(path);
+    if let Some(answer) = read_in_process(RequestKind::Text, "document reader", &name, bytes) {
+        let answer = answer?;
+        return serde_json::from_slice::<Option<String>>(&answer)
+            .context("The document reader gave an answer that could not be read.");
+    }
     let (path, bytes) = (path.to_path_buf(), bytes.to_vec());
     within_budget("document reader", move || read_document_text(&path, &bytes))
+}
+
+/// The file name alone: all a reader needs to tell the kind, and no folder of this server.
+fn file_name(path: &Path) -> String {
+    path.file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_default()
+}
+
+/// The reader process's side of [`extract_document_text`]: the text, as JSON.
+pub(crate) fn serve_text(path: &Path, bytes: &[u8]) -> Result<Vec<u8>> {
+    Ok(serde_json::to_vec(&read_document_text(path, bytes)?)?)
+}
+
+/// The reader process's side of [`document_preview`]: the preview, as JSON.
+pub(crate) fn serve_preview(path: &Path, bytes: &[u8]) -> Result<Vec<u8>> {
+    Ok(serde_json::to_vec(&read_document_preview(path, bytes))?)
 }
 
 fn read_document_text(path: &Path, bytes: &[u8]) -> Result<Option<String>> {
@@ -113,6 +137,15 @@ fn read_document_text(path: &Path, bytes: &[u8]) -> Result<Option<String>> {
 pub fn document_preview(path: &Path, bytes: &[u8]) -> DocumentPreview {
     if document_kind(path).is_none() {
         return unavailable("This file type has no preview.");
+    }
+    let name = file_name(path);
+    if let Some(answer) = read_in_process(RequestKind::Preview, "preview reader", &name, bytes) {
+        return answer
+            .and_then(|answer| {
+                serde_json::from_slice::<DocumentPreview>(&answer)
+                    .context("The preview reader gave an answer that could not be read.")
+            })
+            .unwrap_or_else(|error| unavailable(&format!("{error:#}")));
     }
     let (path, bytes) = (path.to_path_buf(), bytes.to_vec());
     within_budget("preview reader", move || Ok(read_document_preview(&path, &bytes)))

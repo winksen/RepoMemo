@@ -219,7 +219,9 @@ stored in the database and override the values below until reset.
 | `REPOMEMO_BACKUP_KEY` | unset | Passphrase (16+ characters) that seals every new backup with AES-256-GCM; restoring a sealed backup needs the same value, and a wrong one is refused before anything is written. Keep it apart from the backups: it is stored nowhere in them. |
 | `REPOMEMO_BACKUP_KEEP` | `7` | Backups kept; older ones are deleted after a new one. Also a run-time setting. |
 | `REPOMEMO_VECTOR_INDEX_MB` | `512` | Memory for in-memory vector indexes of meaning search, in MiB. A workspace of 50,000 passages with 768-dimensional vectors takes about 150 MiB. `0` turns the indexes off (the database is scanned). A workspace that does not fit is scanned. |
-| `REPOMEMO_DOCUMENT_TIMEOUT_SECONDS` | `60` | How long reading one document may take before it is skipped. `0` for no limit. |
+| `REPOMEMO_DOCUMENT_TIMEOUT_SECONDS` | `60` | How long reading one document may take before its reader process is killed and the file skipped. `0` for no limit. |
+| `REPOMEMO_DOCUMENT_MEMORY_MB` | `1024` | Memory one document reading may use before its reader process stops and the file is skipped. `0` for no limit. |
+| `REPOMEMO_DOCUMENT_READER` | `process` | `process`: each reading runs in a child process (the server started with `--document-reader`, with an empty environment). `thread`: on a thread of the server, as before V0.2.44, with no memory limit and no way to kill an overrunning reading. |
 | `REPOMEMO_HEAVY_REQUESTS_PER_MINUTE` | `240` | Searches, figures, map, health and file queries per person per minute; `0` is unlimited. Also a run-time setting. |
 | `REPOMEMO_BACKGROUND_AI_PER_DAY` | `2000` | Image descriptions and embedding batches the server makes on its own per workspace per day (UTC); `0` is unlimited. Also a run-time setting. |
 | `REPOMEMO_ACCESS_TOKEN_TTL_MINUTES` | `60` | Access-token lifetime (5–1440). |

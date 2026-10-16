@@ -29,6 +29,11 @@ pub fn set_time_limit(limit: Duration) {
     TIME_LIMIT_SECONDS.store(limit.as_secs(), Ordering::Relaxed);
 }
 
+/// Seconds one reading may take; 0 is no limit.
+pub(crate) fn time_limit_seconds() -> u64 {
+    TIME_LIMIT_SECONDS.load(Ordering::Relaxed)
+}
+
 /// Readings that ran over their budget and are still running.
 pub fn abandoned_readings() -> usize {
     ABANDONED.load(Ordering::Relaxed)

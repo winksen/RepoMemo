@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.43` (2026-10-16), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.44` (2026-10-16), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -388,7 +388,7 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 | **V0.2.41** ✅ | ✨ | Workspaces | Import an archive into a new workspace, with a dry run | O2b | An export imports on another 0.2.x server with everything linked as before |
 | **V0.2.42** ✅ | ✨ | Backups | Encrypted backups | O6a, decision 14 | A backup restores only with `REPOMEMO_BACKUP_KEY`; a wrong key is refused before anything is written (R2-5 closed) |
 | **V0.2.43** ✅ | ✨ | Backups | A second copy of each backup to another folder or network share | O6b | The copy is verified against the manifest |
-| **V0.2.44** | 🐞 | Indexing | Document readings in a subprocess with time and memory limits | P10 | An overrunning reading is killed, not abandoned (R2-4 closed) |
+| **V0.2.44** ✅ | 🐞 | Indexing | Document readings in a subprocess with time and memory limits | P10 | An overrunning reading is killed, not abandoned (R2-4 closed) |
 | **V0.2.45** | ✨ | Operations | A container image and a compose file with the proxy | O7 | `docker compose up` gives a working server behind TLS, with data in a volume |
 | **V0.2.46** | ✨ | System › Audit | Export of the audit trail (JSON lines, CSV) | O8 | A date range downloads; the download itself is audited |
 
@@ -751,6 +751,15 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 - [x] Tests: the copy (whole, checksums, totals against the manifest, re-check finds a changed file, a copy that does not add up leaves nothing, hard links to the previous copy, a destination inside the backups refused, pruning) and `each_backup_is_copied_to_a_second_place_and_checked` (copy and record, same bytes as the original, linked files in the second, a destination that cannot be used fails the job but keeps the backup, no copy asked for when none is set up)
 - [ ] The destination is trusted to be mounted and writable by the server's account; there is no copy of a backup older than the number kept; a restore still reads from the local backups folder (copy a second-location folder back by hand first); a backup made before V0.2.43 has no totals in its manifest and is checked file by file only
 
+
+#### V0.2.44: Document readings in a subprocess
+
+- [x] **P10** (R2-4) `crates/ingestion/src/reader.rs`: a reading can run in a child process, the server started with `--document-reader` (`run_as_document_reader_if_requested`, first thing in `main`, like the git askpass helper) with an empty environment; the file name (no folder) and bytes go in on standard input, one answer (JSON, or an error message) comes back on standard output, capped at 64 MiB; `extract_document_text` and `document_preview` try the process first and fall back to the thread of V0.1.74 only when none is configured
+- [x] Time: the parent polls the child and kills it at `REPOMEMO_DOCUMENT_TIMEOUT_SECONDS` ("took longer than N seconds"); nothing is abandoned. Memory: `LimitedAllocator` (installed in `apps/server/src/main.rs`, off until the reader asks, so the server pays one flag check per allocation) counts the child's allocations and exits with code 87 past `REPOMEMO_DOCUMENT_MEMORY_MB` (default 1,024; 0 is none) ("needed more than N MB of memory"). A panic, abort or stack overflow ends the child alone ("stopped unexpectedly. The file may be damaged.")
+- [x] `REPOMEMO_DOCUMENT_READER` (`process`, the default, or `thread`); `ServerConfig` for tests reads on a thread because the test program cannot be a reader; System › Overview lists how documents are read; the counter `repomemo_document_readings_killed_total`; the gauge for abandoned readings now matters only in `thread` mode
+- [x] Tests: the wire format and answers (unit), and `readings_run_in_a_process_that_is_killed_when_it_overruns_and_that_crashes_alone` (`crates/ingestion/tests/reader_process.rs`, with the test-only `repomemo-reader` program: a real email read through the process, text and preview, a non-document is an error, memory within and over the limit, no limit, a reading that never ends is killed, a panic and an abort, the next reading unharmed, no server secret in the child's environment, thread mode again)
+- [ ] A child is started per reading (a few milliseconds each; indexing is already limited to two at once); the memory count covers what Rust allocates, which is all the parsers do; a child still has the server's file permissions (no sandbox); the repository file text check and image analysis do not go through readers; Windows has no job object, so an uncooperative child relies on the kill
+
 ### Decisions to agree before work starts
 
 | # | Decision | Needed by | Proposal |
@@ -813,7 +822,7 @@ Every item of both roads, with the release it is planned for. The evidence behin
 | — | Integrity | N8 | ✅ V0.1.73 |
 | — | Supply chain | dependency scanning (review §7) | ✅ V0.1.66 (CI) |
 | — | Third pass | R2-1, R2-2 fixed; R2-3, R2-6 accepted | ✅ V0.1.76 |
-| — | Accepted for later | R2-4 (readings cannot be killed); R2-5 (backups not encrypted) ✅ closed by V0.2.42 (O6a) | V0.2.44 (P10) |
+| — | Accepted for later | R2-4 (readings cannot be killed) ✅ closed by V0.2.44 (P10); R2-5 (backups not encrypted) ✅ closed by V0.2.42 (O6a) | — |
 | — | Accepted | N9 (not a boundary, documented), I1, I4 | — |
 | S6 | Remote sources | Credential store and host allowlist (6a ✅ V0.2.19), clone limits (6b); each later surface (SMTP, webhooks, connectors) brings its own rules | V0.2.19, V0.2.22 |
 | — | Registration without enumeration | M4 residual | ✅ V0.2.18 |
@@ -833,7 +842,7 @@ Every item of both roads, with the release it is planned for. The evidence behin
 | P7 | Query cache with targeted invalidation | M | ✅ V0.1.70, remaining pages V0.2.3 |
 | P8 | Writer connection plus read pool; configurable concurrency | M | ✅ V0.1.71 |
 | P9 | Parser time budget (memory caps need a subprocess) | M | ✅ V0.1.74 |
-| P10 | Readings in a subprocess with time and memory limits (R2-4) | M | V0.2.44 |
+| P10 | Readings in a subprocess with time and memory limits (R2-4) | M | ✅ V0.2.44 |
 | P11 | Map and health recomputed only where a change touched | M | ✅ V0.2.8 |
 
 ### Code health and release engineering

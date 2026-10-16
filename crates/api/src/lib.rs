@@ -45,7 +45,11 @@ pub use remote_policy::{RemoteGitPolicy, RemoteRepository, RemoteScheme};
 pub use remote_repo::{looks_remote, CloneLimitHandles, CloneSize, RemoteAuth, RemoteDeployKey, RemoteToken};
 pub use repo_policy::{is_network_path, RepoLinkPolicy};
 pub use repo_sync::RepoHead;
-pub use repomemo_ingestion::{abandoned_readings, served_mime_type, set_document_time_limit};
+pub use repomemo_ingestion::{
+    abandoned_readings, killed_readings, reads_in_a_process, run_as_document_reader_if_requested, served_mime_type,
+    set_document_memory_limit_mb, set_document_time_limit, set_reader_process, LimitedAllocator, ReaderProcess,
+    DEFAULT_MEMORY_LIMIT_MB,
+};
 
 /// Passages Ask puts in front of the model, after reranking a wider pool.
 const ASK_CONTEXT_PASSAGES: usize = 8;

@@ -66,6 +66,11 @@ pub struct ServerConfig {
     /// How long reading one document may take (`REPOMEMO_DOCUMENT_TIMEOUT_SECONDS`,
     /// 0 for no limit).
     pub document_time_limit: Duration,
+    /// Memory one document reading may use, in MiB; 0 is no limit (`REPOMEMO_DOCUMENT_MEMORY_MB`).
+    pub document_memory_mb: u64,
+    /// Whether readings run in a child process (`REPOMEMO_DOCUMENT_READER` = `process`, the default)
+    /// or on a thread (`thread`).
+    pub document_reader_process: bool,
     pub access_token_ttl_minutes: i64,
     pub refresh_token_ttl_days: i64,
     /// Sign-ins and registrations per client address; token refreshes get
@@ -298,6 +303,12 @@ impl ServerConfig {
             vector_index_mb: env_parse::<u32>("REPOMEMO_VECTOR_INDEX_MB", repomemo_storage::DEFAULT_VECTOR_INDEX_MB)?
                 .min(64 * 1024),
             document_time_limit: Duration::from_secs(env_parse("REPOMEMO_DOCUMENT_TIMEOUT_SECONDS", 60)?),
+            document_memory_mb: env_parse("REPOMEMO_DOCUMENT_MEMORY_MB", repomemo_api::DEFAULT_MEMORY_LIMIT_MB)?,
+            document_reader_process: match env_text("REPOMEMO_DOCUMENT_READER").as_deref() {
+                None | Some("process") => true,
+                Some("thread") => false,
+                Some(other) => bail!("REPOMEMO_DOCUMENT_READER must be \"process\" or \"thread\", not \"{other}\""),
+            },
             access_token_ttl_minutes: env_parse::<i64>("REPOMEMO_ACCESS_TOKEN_TTL_MINUTES", 60)?.clamp(5, 24 * 60),
             refresh_token_ttl_days: env_parse::<i64>("REPOMEMO_REFRESH_TOKEN_TTL_DAYS", 30)?.clamp(1, 365),
             auth_quota: Quota::per_minute(env_parse("REPOMEMO_AUTH_REQUESTS_PER_MINUTE", 30)?),
@@ -384,6 +395,9 @@ impl ServerConfig {
             db_read_connections: 4,
             vector_index_mb: 64,
             document_time_limit: Duration::from_secs(60),
+            document_memory_mb: repomemo_api::DEFAULT_MEMORY_LIMIT_MB,
+            // The test program cannot act as a reader process.
+            document_reader_process: false,
             access_token_ttl_minutes: 60,
             refresh_token_ttl_days: 30,
             // Tests register many accounts from one address.

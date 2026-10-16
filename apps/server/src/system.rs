@@ -482,6 +482,18 @@ impl InstanceInfo {
                 },
             ),
             (
+                "Document readings",
+                if repomemo_api::reads_in_a_process() {
+                    if config.document_memory_mb == 0 {
+                        "in a process of their own, no memory limit".to_owned()
+                    } else {
+                        format!("in a process of their own, up to {} MiB each", config.document_memory_mb)
+                    }
+                } else {
+                    "on a thread of the server (no memory limit, cannot be killed)".to_owned()
+                },
+            ),
+            (
                 "Secret key for stored credentials",
                 if config.secret_key.is_some() {
                     "from REPOMEMO_SECRET_KEY".to_owned()
@@ -2088,6 +2100,11 @@ pub(crate) async fn metrics(
         "repomemo_abandoned_document_readings",
         "Document readings that overran their time and are still running.",
         repomemo_api::abandoned_readings(),
+    );
+    out.counter(
+        "repomemo_document_readings_killed",
+        "Document readings stopped for running over their time or memory limit.",
+        repomemo_api::killed_readings(),
     );
     out.gauge(
         "repomemo_maintenance_failed_steps",

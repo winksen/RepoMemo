@@ -220,7 +220,8 @@ All are run-time settings (System › Settings) with an environment default; `0`
 | `REPOMEMO_HEAVY_REQUESTS_PER_MINUTE` | 240 | Searches and reports, per person |
 | `REPOMEMO_AI_REQUESTS_PER_HOUR` | 120 | Interactive AI, per person |
 | `REPOMEMO_BACKGROUND_AI_PER_DAY` | 2,000 | Image descriptions and embedding batches, per workspace |
-| `REPOMEMO_DOCUMENT_TIMEOUT_SECONDS` | 60 | A document that takes forever to read |
+| `REPOMEMO_DOCUMENT_TIMEOUT_SECONDS` | 60 | A document that takes forever to read: its reader process is killed |
+| `REPOMEMO_DOCUMENT_MEMORY_MB` | 1,024 | A document that eats memory: its reader process stops (`0` is no limit) |
 | `REPOMEMO_VECTOR_INDEX_MB` | 512 | Memory held for meaning search |
 
 Plan disk as: stored files + database (roughly a tenth of the text) + the cached previews + **each backup's new files**. Keep the free-disk floor above the size of one backup.
@@ -329,7 +330,8 @@ What is worth an alert:
 | `rate(repomemo_http_server_errors_total[5m])` | above 0 for ten minutes |
 | `repomemo_jobs{status="failed"}` | rising |
 | `repomemo_indexing_queued` | not falling for an hour |
-| `repomemo_abandoned_document_readings` | 4 (readings are refused until they end) |
+| `repomemo_document_readings_killed_total` | rising steadily: documents that overrun their time or memory (look at what is being uploaded) |
+| `repomemo_abandoned_document_readings` | only in `thread` mode: 4 (readings are refused until they end) |
 | `repomemo_maintenance_failed_steps` | above 0 |
 
 The full list is in the response. Counters start again at zero when the server restarts.
@@ -371,7 +373,9 @@ Environments from V0.1.40 and later upgrade in place.
 | Everyone shares one rate limit | The proxy's address is used: set `REPOMEMO_TRUST_PROXY=true` and have the proxy send `X-Forwarded-For` |
 | Live updates stop after a minute | The proxy buffers or times out event streams: use the `location` in §3 |
 | Searches slow after a restart | The first search per workspace builds the vector index; later ones are quick |
-| A PDF "took longer than 60 seconds" | It is skipped on purpose; raise `REPOMEMO_DOCUMENT_TIMEOUT_SECONDS` if the file is legitimate |
+| A PDF "took longer than 60 seconds" | It is skipped on purpose and its reader process was killed; raise `REPOMEMO_DOCUMENT_TIMEOUT_SECONDS` if the file is legitimate |
+| A document "needed more than 1024 MB of memory" | The reader stopped at its limit; raise `REPOMEMO_DOCUMENT_MEMORY_MB` if the file is legitimate and the machine has the memory |
+| Readings fail with "could not be started" | The server starts itself as the reader (`--document-reader`); check that its program file is where it was started from, or set `REPOMEMO_DOCUMENT_READER=thread` as a stopgap (no memory limit, nothing killed) |
 | Embeddings stopped partway | The workspace reached `REPOMEMO_BACKGROUND_AI_PER_DAY`; they resume after midnight UTC |
 | `repomemo.sqlite-wal` is large | Maintenance folds it back each pass; System › Maintenance › *Run maintenance now* does it at once |
 

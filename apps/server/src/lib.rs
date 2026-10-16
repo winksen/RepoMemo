@@ -290,6 +290,21 @@ async fn build_state(
         tracing::debug!("The AI endpoint policy was already set in this process");
     }
     repomemo_api::set_document_time_limit(config.document_time_limit);
+    repomemo_api::set_document_memory_limit_mb(config.document_memory_mb);
+    // Readings run in a child process (this program started as a reader), so
+    // a parser that hangs, eats memory or crashes costs only that child.
+    let reader = if config.document_reader_process {
+        match repomemo_api::ReaderProcess::this_program() {
+            Ok(process) => Some(process),
+            Err(error) => {
+                tracing::warn!(error = %error, "Documents are read on a thread: this program could not be found to start as a reader");
+                None
+            }
+        }
+    } else {
+        None
+    };
+    repomemo_api::set_reader_process(reader);
     // Git runs on folders other people chose: isolate it from the service
     // account's own configuration (review L8). The configured repository
     // folders, and the ones the operator lists, are the trusted ones.

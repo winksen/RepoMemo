@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.44 (2026-10-16)
+
+A document that cannot be read no longer costs the server anything.
+
+### Fixed
+- **Documents are read in a process of their own.** Word, Excel, PowerPoint, PDF, OneNote and email files are now read by a child process (the server started with `--document-reader`). A file that takes too long is **killed** at `REPOMEMO_DOCUMENT_TIMEOUT_SECONDS` instead of being left running, and one that needs too much memory stops at the new `REPOMEMO_DOCUMENT_MEMORY_MB` (default 1024; `0` for no limit). A parser that crashes or overflows its stack ends the child only: the file is reported as possibly damaged and the server carries on.
+- The child starts with an empty environment, so even a parser bug has no key or token to read, and it is given the file name only, never a folder of the server.
+- Previews report the same reasons ("took longer than 60 seconds", "needed more than 1024 MB of memory") as indexing does.
+
+### Added
+- `REPOMEMO_DOCUMENT_READER` (`process`, the default, or `thread` for the earlier behaviour as a stopgap), `REPOMEMO_DOCUMENT_MEMORY_MB`, a *Document readings* line in System › Overview and the counter `repomemo_document_readings_killed_total`.
+
+### Security
+- Closes the accepted review finding **R2-4** (an overrunning reading was abandoned, not killed, and had no memory limit). A stack overflow or out-of-memory abort in a document parser can no longer stop the whole server.
+
+### Upgrading
+- Nothing to do. Reading a file now starts a short-lived process, which takes a few milliseconds. If readings fail with "could not be started", the server could not start its own program file: check where it runs from, or set `REPOMEMO_DOCUMENT_READER=thread` until it is fixed.
+
 ## V0.2.43 (2026-10-16)
 
 Each backup can be copied somewhere else, and the copy is checked.
