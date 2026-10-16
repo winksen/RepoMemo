@@ -1,6 +1,6 @@
 # Authentication and authorization
 
-> **Branch of:** [TECHNICAL_MINDMAP.md §4](../TECHNICAL_MINDMAP.md#4-request-lifecycle-authentication-and-authorization) · **Related:** [api-reference.md](api-reference.md) (every route with its guard), [security review](../security/2026-10-10-security-review.md) · **Status:** V0.1.76
+> **Branch of:** [TECHNICAL_MINDMAP.md §4](../TECHNICAL_MINDMAP.md#4-request-lifecycle-authentication-and-authorization) · **Related:** [api-reference.md](api-reference.md) (every route with its guard), [security review](../security/2026-10-10-security-review.md) · **Status:** V0.2.55 (§4 is what the 0.2.x line added)
 
 This page is the model on one page: who a request is, what that person may do, and the rules a new handler must follow. The mindmap's §4 keeps the history and the details.
 
@@ -81,3 +81,16 @@ The server decides; `GET …/capabilities` only tells the web app what to hide.
 5. Record who did it: `record_workspace_activity` for workspace changes, `audit` for System changes.
 6. Run `node scripts/list-routes.mjs`: a route marked `check` has an extractor but no guard call, which is right only for a person's own data (profile, notifications, own tokens).
 7. Add a test that a viewer, a stranger and an anonymous caller are refused.
+
+---
+
+## 4. What the 0.2.x line added
+
+- **Verified addresses** (V0.2.13). `require_verified` stands before creating an organization or a workspace, importing one and joining one: an unverified account can sign in and read, not create or join. An invitation to that address counts as verification.
+- **Deactivated and anonymized accounts** (V0.2.16, V0.2.17). A deactivated account cannot sign in or use a token, and its sessions, tokens and invitations end at once. Anonymizing also removes the address and name; what the person wrote stays, credited to "Former member".
+- **Self-service reset** (V0.2.11). `POST /v1/auth/forgot-password` answers the same for every address; the link is one-time, valid for one hour, made from `REPOMEMO_PUBLIC_URL`, and ends every session when used.
+- **Two ways to carry a session.** The web app asks with `X-RepoMemo-Client: web` and gets its refresh token in an `HttpOnly` cookie. Every other client (the console, scripts, and the desktop app, which says `desktop`) gets it in the response body and sends it back in the body; the desktop app keeps it in the operating system's credential store (V0.2.49).
+- **Credentials that are not sessions.** A webhook secret signs a call for one source (GitHub, GitLab or `X-RepoMemo-Signature`) and can only queue a sync; a file link is a 60-second token for one file; a personal access token (`rmp_…`) has a read, write or `system` scope; repository and tracker tokens and deploy keys are sealed in `repo_credentials` and only ever sent to their own host.
+- **The anonymous surface** is the public handlers of the [API reference](api-reference.md) (sign-in, registration, refresh, sign-out, reset and verification links, invitation previews, setup, the webhook receivers, shared file links, health). Since V0.2.52 each takes a small body (64 KiB; webhooks 1 MiB), failures count per client address, and none says whether an account or a source exists.
+- **Mail is a power too.** Anything that sends mail (invitations, mentions, assignments, verification links) is limited per recipient (12 an hour) and per person who causes it (60 an hour), with a ceiling on the outbox (V0.2.52).
+- **The desktop window** may call one server (a permission added at run time for that origin) and may show only the bundled app; it has no IPC for any other origin.

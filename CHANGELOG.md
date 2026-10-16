@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.55 (2026-10-16)
+
+The documentation matches the code, and a check keeps it so.
+
+### Added
+- **A documentation check in CI** (`npm run docs:check`). It fails when a route of the server has no row in the API reference, when a setting the code reads is not described in the development commands, when a mindmap or the release index describes another version than the product's, when a release is done in the index and missing from this changelog (or the other way round), or when a link in the documents points at a file or a heading that is not there.
+- **Upgrade notes from 0.2.x** in `UPGRADING.md`: what stays off until you turn it on (mail, remote repositories and trackers, sealed backups, containers), what changed in behaviour, and a build note about line endings.
+
+### Changed
+- **The API reference** gained the nine routes it was missing (mail settings and outbox, verification, notification preferences), the route count is right (203 in the main router) and it lists the body limits.
+- **Pages that were out of date** now say what shipped: the repository sources page (remote links, credentials, webhooks), the connectors, production, console and authentication pages, which has a new section for what the 0.2.x line added. The technical mindmap's counts of migrations and tests are current.
+- `scripts/list-routes.mjs` finds every route again (it had lost the ones with a body limit of their own) and reads Windows checkouts correctly.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.54 (2026-10-16)
 
 Performance runs for repositories and trackers.

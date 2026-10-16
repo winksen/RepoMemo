@@ -1,6 +1,6 @@
 # Repository sources (git)
 
-> **Branch of:** [TECHNICAL_MINDMAP.md](../TECHNICAL_MINDMAP.md) · **Functional view:** [FUNCTIONAL_MINDMAP.md §5b](../FUNCTIONAL_MINDMAP.md#5b-repositories) · **Status:** phase 1 (local path, automatic sync when the branch moves) shipped; phase 1b shipped in V0.1.73; phase 2 (remote repositories) is planned for V0.2.19–V0.2.22 and phase 3a (push webhooks, git awareness) for V0.2.23–V0.2.26 (roadmap F4, F16), see [ROADMAP.md](../ROADMAP.md#repository-indexing-track)
+> **Branch of:** [TECHNICAL_MINDMAP.md](../TECHNICAL_MINDMAP.md) · **Functional view:** [FUNCTIONAL_MINDMAP.md §5b](../FUNCTIONAL_MINDMAP.md#5b-repositories) · **Status:** V0.2.55. Local folders (phase 1, V0.1.x), polish (phase 1b, V0.1.73), remote `https` and `ssh` links with clone limits (phase 2, V0.2.19–V0.2.22), push webhooks, last author, `CODEOWNERS` and a citation at its commit (phase 3a, V0.2.23–V0.2.26) and issues and pull requests through [connectors](connectors.md) (phase 3b, V0.2.27–V0.2.31) have all shipped (roadmap F4, F16, F17), see [ROADMAP.md](../ROADMAP.md#repository-indexing-track)
 
 A repository is not a batch of uploads. It already holds many files, it keeps changing, and git records exactly what changed. RepoMemo therefore treats a repository as a **living source**: it is linked once, and each **sync** brings the workspace in step with what the chosen branch has **committed**.
 
@@ -17,6 +17,8 @@ Repository links are a **per-workspace setting**. Each workspace's owners and ad
 5. Press **Link and sync**. The first sync starts at once; follow it in the **Repositories** section. Commit something and press **Sync now** to see edits, renames and deletions followed.
 
 `git` must be installed and on the server's `PATH`.
+
+**A remote repository** (V0.2.20 and later) is linked the same way, with an `https://…` or `ssh` address in place of the folder. The operator names the host in `REPOMEMO_GIT_ALLOWED_HOSTS` first; a token (`https`) or a deploy key and the host's key (`ssh`) is entered once and sealed. Set up a push webhook on the link to sync within seconds of a push; otherwise the server polls.
 
 ---
 
@@ -157,7 +159,11 @@ Syncs change an artifact's lifecycle only from statuses a person would expect, s
 | PUT | `/v1/repositories/{id}` | A | `{ name?, branch?, include[], exclude[] }`. Applies from the next sync |
 | DELETE | `/v1/repositories/{id}` | A | Deletes the source, its artifacts, chunks and memory links. 409 while syncing. The repository on disk is not touched |
 | POST | `/v1/repositories/{id}/sync` | W | Queues a sync. 409 if one is running |
-| GET | `/v1/repositories/{id}/files` | R | Files currently in the tree, with index state |
+| PUT / DELETE | `/v1/repositories/{id}/token` | A | Sets or clears the `https` token of a remote link (sealed, never returned) |
+| PUT | `/v1/repositories/{id}/deploy-key` | A | Sets the deploy key and the pinned host key of an `ssh` link |
+| POST / DELETE | `/v1/repositories/{id}/webhook` | A | Makes (shown once) or removes the link's webhook secret |
+| POST | `/v1/webhooks/repositories/{id}` | public | The push webhook: signed with that secret (GitHub, GitLab or `X-RepoMemo-Signature`), at most 1 MiB, a repeated delivery id is answered `already received`; it queues one sync and nothing else |
+| GET | `/v1/repositories/{id}/files` | R | Files currently in the tree, with index state, last author and date, and `CODEOWNERS` hints |
 | GET | `/v1/repositories/{id}/detail` | R | `RepoDetail` for the repository page: `repository` (including `overview_artifact_id`), `overview`, `summary`, and `ai_available` (an enabled text provider exists) |
 | POST | `/v1/repositories/{id}/summary` | W | Generates and keeps the AI summary. 400 when no text provider is enabled ("No content was sent") or the repository was never synced |
 
@@ -184,20 +190,18 @@ Tests: `repomemo-git` (tree parsing, reading a real repository), `repomemo-inges
 
 ---
 
-## Known limits of phase 1
+## Known limits
 
 - **Renames are detected only when the content is identical.** A file renamed and edited in the same commit becomes a removal plus an addition, so its comments stay on the old, now outdated, artifact.
 - **Syncs follow the branch by polling.** Every `REPOMEMO_REPO_POLL_SECONDS` (300 by default; `0` turns it off) the server resolves each branch with one `git rev-parse` and syncs the repositories whose branch moved. A sync towards the same commit is not retried within an hour, and a repository that never synced successfully waits for someone to press Sync now. There is no file watching.
-- **Local folders only.** A link is a folder on the server; remote URLs are refused with a clear message. URLs, credentials and webhooks are phase 2, and will reuse the per-workspace link and its access check (with a per-workspace token).
+- **Remote links need a named host, and git resolves names itself.** For a name that points at a private address the host list is advisory: enforce it with an egress rule or a proxy.
 - **One branch per repository.** A repository root can be connected only once per workspace, so two branches of it cannot be indexed side by side yet.
-- The desktop app does not have the Repositories section yet; the engine is in `RepoMemoCore` and can be exposed through Tauri commands.
-- Search results do not show the commit yet, and citations are not pinned to a commit.
+- The Repositories section is part of the web client, which the desktop app now shows against a server; the retired local workspace never had it.
+- A citation names the commit it was made at and *View at commit* shows that text while the server's copy still holds the commit (V0.2.26).
 
-## Next phases
+## Phases
 
-Automatic sync when the branch moves, first listed under phase 1b, has shipped (see *Known limits* above).
-
-1. **Phase 1b, polish (shipped in V0.1.73):** similarity-based renames via `git diff -M`, the commit on search results and citations. The desktop app does not get the section (decision 3).
-2. **Phase 2, remote repositories (V0.2.19–V0.2.22):** connect by URL with an encrypted credential (token or deploy key), a bare partial clone (`--filter=blob:none`) under the data directory, fetch on the poll schedule, `https`/`ssh` only, hosts limited by `REPOMEMO_GIT_ALLOWED_HOSTS` (remote links off when unset), clone size and time limits counted in the storage allowance (roadmap S6, decision 11).
-3. **Phase 3a, git awareness (V0.2.23–V0.2.26):** signed push webhooks, last author and date per file from one `git log` pass, `CODEOWNERS` as ownership hints, and viewing a citation at its commit.
-4. **Phase 3b (V0.2.27–V0.2.31):** links to issues and pull requests, through the GitHub and GitLab connector (roadmap F17).
+1. **Phase 1b, polish (shipped in V0.1.73):** similarity-based renames via `git diff -M`, the commit on search results and citations.
+2. **Phase 2, remote repositories (shipped in V0.2.19–V0.2.22):** connect by URL with an encrypted credential (token or deploy key), a bare partial clone (`--filter=blob:none`) under the data directory, fetch on the poll schedule, `https`/`ssh` only, hosts limited by `REPOMEMO_GIT_ALLOWED_HOSTS` (remote links off when unset), clone size and time limits counted in the storage allowance (roadmap S6, decision 11).
+3. **Phase 3a, git awareness (shipped in V0.2.23–V0.2.26):** signed push webhooks, last author and date per file from one `git log` pass, `CODEOWNERS` as ownership hints, and viewing a citation at its commit.
+4. **Phase 3b (shipped in V0.2.27–V0.2.31):** issues and pull requests, through the GitHub and GitLab connector (roadmap F17), linked to the files and symbols they name.

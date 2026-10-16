@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.2.54` (2026-10-16). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, and the retired local workspace are described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.2.55` (2026-10-16). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, and the retired local workspace are described briefly in [§12](#12-desktop-app).
 
 ---
 
@@ -356,7 +356,7 @@ The **knowledge map** draws each repository as one ringed dot, sized by all of i
 
 The repository's individual files are searchable and citable like any evidence, but they are listed in the Repositories section (and from the repository page) rather than the Evidence ledger, and they cannot be renamed or deleted one by one: change them in the repository, or exclude their path.
 
-**Availability:** repository links are a setting of each workspace; nothing has to be configured on the server. A link must point at a folder the server can read, so for now only repositories on the server's own disk can be linked; remote repositories (by URL) are planned. See the [technical design](technical/repository-sources.md).
+**Availability:** repository links are a setting of each workspace. A link is either a folder the server can read (inside the folders the operator allows with `REPOMEMO_REPO_ROOTS`) or, since V0.2.20, a remote repository by `https` address with a token, or by `ssh` with a deploy key and the host's pinned key (the operator names the host with `REPOMEMO_GIT_ALLOWED_HOSTS`). A remote link is kept as a copy on the server, within a size and a time cap, and can have a push webhook so a push syncs within seconds. See the [technical design](technical/repository-sources.md).
 
 ---
 
@@ -552,7 +552,7 @@ The local workspace and a server keep **separate data**.
 
 ---
 
-## 13. Known functional gaps (at V0.2.54)
+## 13. Known functional gaps (at V0.2.55)
 
 These are observed in the code and are useful for prioritizing. The roadmap item that addresses each one is in brackets.
 
@@ -562,13 +562,11 @@ These are observed in the code and are useful for prioritizing. The roadmap item
 | A citation's old text is opened from the server's copy | *View at commit* (V0.2.26) shows a cited file as it was at the commit it names, while that commit is still in the repository's copy; memory-card links and repository summaries do not offer it yet [F16d]. |
 | `CODEOWNERS` owners are hints only | They show on a repository file's page since V0.2.25 but are not matched to workspace members, assigned or notified [F16c]. |
 | Assistant answers and citations do not name the last author | The last author and date of a repository file show on its page, in the file list and in search results since V0.2.24 [F16b]. |
-| Pushes are noticed by polling unless a webhook is set up | Since V0.2.23 a repository can have a push webhook (GitHub, GitLab or a signed generic call) that queues a sync at once; without one the server polls [F16a]. |
-| Repositories on a host need an allowed host | `https` links work since V0.2.20 (a read-only token for private ones) and `ssh` links since V0.2.21 (a deploy key and the pinned host key); each clone has a size and a time cap since V0.2.22 and counts in the workspace's storage allowance [F4 phase 2]; pushes are noticed only by polling [F16, V0.2.23]. A file renamed and edited in one commit keeps its history since V0.1.73 when at least about half of it is unchanged. |
+| Remote repositories and trackers need a named host, and pushes are noticed by polling unless a webhook is set up | `https` links work since V0.2.20 (a read-only token for private ones) and `ssh` links since V0.2.21 (a deploy key and the pinned host key); each clone has a size and a time cap since V0.2.22 and counts in the workspace's storage allowance; a push webhook (GitHub, GitLab or a signed generic call, V0.2.23) queues a sync at once, otherwise the server polls. git resolves host names itself, so for a name that points at a private address the host list is advisory: an egress rule is what enforces it [F4 phase 2, F16a]. A file renamed and edited in one commit keeps its history since V0.1.73 when at least about half of it is unchanged. |
 | Search across workspaces is plain | The dashboard search (V0.2.33) merges every readable workspace by score, but takes no filters and does not cover code symbols, memory cards or Ask, which stay inside one workspace [F5b]. The assistant remembers a chat since V0.2.32, for questions and summaries. |
-| Invitations and reset links are passed on by hand | Mail delivery exists since V0.2.9 (System › Settings › Mail); invitations are mailed since V0.2.10, "Forgot your password?" works by mail since V0.2.11 and task assignments and mentions are mailed since V0.2.12, and addresses are verified since V0.2.13 (an account that registered on an open server waits for its link before creating organizations or workspaces; an invitation counts), which is why registration is closed by default; the in-app reset notifications exist since V0.1.67 [F6 in V0.2.9–V0.2.12, F12 in V0.2.11, F13 in V0.2.13]. |
-| Issues and pull requests are not evidence | The discussion around the code stays in GitHub or GitLab [F17, V0.2.27–V0.2.31]. |
+| Mail is optional, and without it links are passed on by hand | Mail delivery exists since V0.2.9 (System › Settings › Mail, over TLS): invitations are mailed since V0.2.10, "Forgot your password?" works by mail since V0.2.11, task assignments and mentions are mailed since V0.2.12, and addresses are verified since V0.2.13 (an account that registered on an open server waits for its link before creating organizations or workspaces; an invitation counts), which is why registration is closed by default. One address is sent at most 12 messages an hour and one person causes at most 60 (V0.2.52). Without mail set up, invitation and reset links are shown to copy [F6 in V0.2.9–V0.2.12, F12 in V0.2.11, F13 in V0.2.13]. |
 | Accounts are never deleted | They are deactivated (V0.2.16) and anonymized (V0.2.17); the account row stays as *Former member*. Log files and earlier backups keep the old address until they age out. |
-| Archives are not a sync | A workspace exports (V0.2.40, Settings) and imports as a new workspace (V0.2.41, dashboard); it is a copy, not a link: nothing keeps the two in step, and importing the same archive twice makes two workspaces. Earlier versions of a file, saved searches, assistant chats and the activity feed are not in the archive; the local desktop edition cannot send its workspace to a server yet [F20b, V0.2.50]. |
+| Archives are not a sync | A workspace exports (V0.2.40, Settings) and imports as a new workspace (V0.2.41, dashboard); it is a copy, not a link: nothing keeps the two in step, and importing the same archive twice makes two workspaces. Earlier versions of a file, saved searches, assistant chats and the activity feed are not in the archive. The retired local workspace of the desktop app moves the same way (V0.2.50) [O2, F20b]. |
 | The retired local workspace is still in the app | It moves to a server as an archive (V0.2.50) and is labelled retired (V0.2.51), but is only removed in a 0.3.x release; until then it gets security fixes only. The move is a copy, not a link, and only an organization owner or administrator can import it [F20c]. |
 
 Invitation links and administrator reset links, gaps until V0.1.62, shipped in V0.1.63.

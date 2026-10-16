@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.54` (2026-10-16), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.55` (2026-10-16), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Security review 2026-10-16 (V0.2.52)](security/2026-10-16-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -414,7 +414,7 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 | **V0.2.52** ✅ | 📘 | Security | Feature freeze and the fourth security pass over mail, webhooks, remote clones, connectors, export and import, and the desktop client, with its fixes | R7, R8 | No high or medium finding open |
 | **V0.2.53** ✅ | 📘 | Release | Upgrade test from 0.2.0 environments in CI | R9 | Stored 0.2.0 schemas upgrade in place and pass |
 | **V0.2.54** ✅ | 📘 | Performance | Performance run at 50,000 passages plus a 100,000-file remote repository and 10,000 issues | R10 | The V0.2.0 targets still hold; results in the release notes |
-| **V0.2.55** | 📘 | Documentation | Mindmaps, branch pages (`repository-sources`, a new `connectors` page, `operations`), changelog and upgrade notes from 0.2.x | R11 | Every page matches the code |
+| **V0.2.55** ✅ | 📘 | Documentation | Mindmaps, branch pages (`repository-sources`, a new `connectors` page, `operations`), changelog and upgrade notes from 0.2.x | R11 | Every page matches the code |
 | **V0.2.56** | 📘 | Release | Clean-machine install with mail and a remote repository, following only the guide | R12 | Installed without a workaround; ready to tag |
 | **V0.3.0** | — | — | *Connected* | — | Tag `v0.3.0` |
 
@@ -858,6 +858,14 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 - [x] [technical/performance.md](technical/performance.md): the targets, the four commands (these two and the two of V0.1.74/V0.1.76), what each does and does not measure, and a table to record V0.2.54's figures next to R4's
 - [ ] **Not run, so not claimed.** Release builds and a 100,000-file repository are what this repository's rules keep from the automated work; the harnesses compile (`cargo check --tests`) and were not executed. "The V0.2.0 targets still hold" is therefore **open**: run the four commands of the page, record the figures in its table and here, and fix what misses. Known risks to look at first: a sync with nothing changed on 100,000 files (it reads the whole tree), indexing 10,000 issues behind one queue, and a fourth-and-later connector pass each re-reading the page it resumes from
 
+#### V0.2.55: Documentation
+
+- [x] **R11** `scripts/check-docs.mjs` (`npm run docs:check`, in CI): every route of the server has a row in the API reference; every `REPOMEMO_*` variable the Rust code reads is described in `docs/DEVELOPMENT_COMMANDS.md` (four that the server sets for its helpers, and the performance runs' own, are named there as not being settings); the version the mindmaps and the release index describe is the product's; every release marked done has a changelog entry and the other way round; every relative link of the documents points at a file, and in Markdown at a heading, that exists. First run: 7 problems, all fixed here
+- [x] What the check cannot see, found by reading the pages against the code and fixed: `api-reference.md` (nine routes missing since V0.2.6 and its counts: 203 routes in the main router, 210 operations in all), `repository-sources.md` (still said remote repositories were planned), `connectors.md`, `operations.md`, `admin-console.md` (statuses), `auth-and-authorization.md` (a new §4 for what 0.2.x added: verification, deactivation, reset, the two ways to carry a session, credentials that are not sessions, the anonymous surface, mail limits, the desktop window), the technical mindmap (36 migrations, the test counts of §10, the archive heading) and `scripts/list-routes.mjs` itself (it lost every route with its own layer and read CRLF files wrongly)
+- [x] `UPGRADING.md` has a section *From 0.2.0 to 0.3.0*: what stays off until turned on (mail, remote repositories and trackers, sealed backups and their copy, containers), what changed in behaviour, and the build note about line endings
+- [x] The functional mindmap was read against the releases: §5b's availability still said repository links were local only, and §13 listed shipped things as gaps (pushes by polling, issues and pull requests, mail by hand). They are rewritten as the gaps that remain
+- [ ] Not covered by a check: prose claims that need a person (what a page *does*). The pages were read against the code of their release, not exercised; the clean-machine install (R12) is where a page is followed to the letter
+
 ### Decisions to agree before work starts
 
 | # | Decision | Needed by | Proposal |
@@ -977,7 +985,7 @@ Every item of both roads, with the release it is planned for. The evidence behin
 | D1 | Tracker retired, `PRODUCT.md`, Postman v5 | S | ✅ V0.1.66 |
 | R5 | Mindmaps, branch pages, changelog, upgrade notes | M | ✅ V0.1.76 |
 | R6 follow-up | Corrections from the clean-machine install | S | V0.2.1 |
-| R7–R12 | Release candidate for V0.3.0: freeze and fourth security pass (R7 ✅, R8 ✅ V0.2.52), upgrade from 0.2.0 (R9 ✅ V0.2.53), performance with remote sources (R10: harnesses V0.2.54, run pending), documentation (R11), clean install (R12) | M | V0.2.52–V0.2.56 |
+| R7–R12 | Release candidate for V0.3.0: freeze and fourth security pass (R7 ✅, R8 ✅ V0.2.52), upgrade from 0.2.0 (R9 ✅ V0.2.53), performance with remote sources (R10: harnesses V0.2.54, run pending), documentation (R11 ✅ V0.2.55), clean install (R12) | M | V0.2.52–V0.2.56 |
 
 ### Experience
 

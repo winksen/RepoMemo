@@ -1,8 +1,8 @@
 # Production guide: running RepoMemo for a team
 
-> **Branch of:** [TECHNICAL_MINDMAP.md](../TECHNICAL_MINDMAP.md) · **Functional view:** [FUNCTIONAL_MINDMAP.md §1b](../FUNCTIONAL_MINDMAP.md#1b-system-area-system-administrators) · **Status:** V0.2.1; written in V0.1.75, checked line by line against the code in V0.2.1, and to be followed on a clean machine (R6)
+> **Branch of:** [TECHNICAL_MINDMAP.md](../TECHNICAL_MINDMAP.md) · **Functional view:** [FUNCTIONAL_MINDMAP.md §1b](../FUNCTIONAL_MINDMAP.md#1b-system-area-system-administrators) · **Status:** V0.2.55; written in V0.1.75, checked line by line against the code in V0.2.1 and again in V0.2.55 (`npm run docs:check` compares its settings and routes with the code), updated with each release since (mail, backups, containers, audit export, readings in a process of their own), and still to be followed on a clean machine (R6, R12)
 
-This is what an operator needs to put RepoMemo on a server others can reach, keep it running, and get it back when something goes wrong. Every setting named here is described in [docs/DEVELOPMENT_COMMANDS.md](../../docs/DEVELOPMENT_COMMANDS.md#environment-variables); this page says which ones to set, and why.
+This is what an operator needs to put RepoMemo on a server others can reach, keep it running, and get it back when something goes wrong. Every setting named here is described in [docs/DEVELOPMENT_COMMANDS.md](../../docs/DEVELOPMENT_COMMANDS.md#optional-server-settings); this page says which ones to set, and why.
 
 RepoMemo is **one process and one folder**. The process is `repomemo-server` (the API, the background queues and the maintenance loop). The folder is an *environment*: a SQLite database, the stored files and a key file. There is no separate database server, queue or cache to run.
 

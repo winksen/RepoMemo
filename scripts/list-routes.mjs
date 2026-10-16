@@ -12,7 +12,8 @@ function files(dir) {
   });
 }
 const sources = files(root).filter((path) => !path.includes("/tests/") && !path.includes("\\tests\\"));
-const texts = Object.fromEntries(sources.map((path) => [path, readFileSync(path, "utf8")]));
+// Line ends are normalised so a Windows checkout reads like a Linux one.
+const texts = Object.fromEntries(sources.map((path) => [path, readFileSync(path, "utf8").split("\r\n").join("\n")]));
 
 // Handlers: name -> { file, signature, body }
 const handlers = new Map();
@@ -36,10 +37,11 @@ for (const [path, text] of Object.entries(texts)) {
 
 const lib = texts[join(root, "lib.rs")];
 const routes = [];
-const routePattern = /\.route\(\s*"([^"]+)",\s*((?:\s*[a-z]+\([\w:]+\)\s*\.?)+)\s*,?\s*\)/g;
+// A handler may carry a layer of its own (`post(login).layer(DefaultBodyLimit::max(LIMIT))`, V0.2.52).
+const routePattern = /\.route\(\s*"([^"]+)",\s*((?:\s*[a-z]+\([\w:]+\)(?:\.layer\(\w+::\w+\([\w:]+\)\))?\s*\.?)+)\s*,?\s*\)/g;
 let route;
 while ((route = routePattern.exec(lib))) {
-  for (const call of route[2].matchAll(/([a-z]+)\(([\w:]+)\)/g)) {
+  for (const call of route[2].replace(/\.layer\(\w+::\w+\([\w:]+\)\)/g, "").matchAll(/([a-z]+)\(([\w:]+)\)/g)) {
     routes.push({ method: call[1].toUpperCase(), path: route[1], handler: call[2] });
   }
 }

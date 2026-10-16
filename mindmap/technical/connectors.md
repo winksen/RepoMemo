@@ -1,6 +1,6 @@
 # Connectors (issues and pull requests)
 
-> **Branch of:** [TECHNICAL_MINDMAP.md](../TECHNICAL_MINDMAP.md) · **Roadmap:** F17, decision 12 · **Status:** GitHub issues (V0.2.27) and pull requests (V0.2.28), GitLab issues and merge requests (V0.2.29), links to code (V0.2.30), webhooks and rate limits (V0.2.31)
+> **Branch of:** [TECHNICAL_MINDMAP.md](../TECHNICAL_MINDMAP.md) · **Roadmap:** F17, decision 12 · **Status:** V0.2.55. GitHub issues (V0.2.27) and pull requests (V0.2.28), GitLab issues and merge requests (V0.2.29), links to code (V0.2.30), webhooks and rate limits (V0.2.31) are shipped; V0.2.52 caps a tracker's answer at 20 MiB while it is read and remembers webhook delivery ids
 
 A connector keeps a tracker's items as evidence. It is a source of `type = 'connector'`: each item (an issue, or a pull request) becomes one markdown artifact, indexed like any file, so it is searchable, citable and linkable to memory cards. The tracker stays the source of truth: nothing is ever written to it.
 

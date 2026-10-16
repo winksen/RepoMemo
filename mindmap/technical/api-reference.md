@@ -1,8 +1,8 @@
 # HTTP API reference
 
-> **Branch of:** [TECHNICAL_MINDMAP.md §5](../TECHNICAL_MINDMAP.md#5-http-api-reference-177-operations-under-v1) · **Generated** from the router and the handler signatures by `node scripts/list-routes.mjs --markdown`; the guard column is read from the handler bodies, so check a route's handler before relying on a row · **Status:** V0.2.6 (the two index routes edited by hand; regenerate before the next release candidate)
+> **Branch of:** [TECHNICAL_MINDMAP.md §5](../TECHNICAL_MINDMAP.md#5-http-api-reference-210-operations-under-v1) · **Generated** from the router and the handler signatures by `node scripts/list-routes.mjs --markdown`; the guard column is read from the handler bodies, so check a route's handler before relying on a row · **Status:** V0.2.55. The rows are kept by hand (the guard column of the generator is a first read of each handler); `npm run docs:check` fails when a route of the server has no row, and the nine routes added since V0.2.6 (mail, verification, notification preferences) are in
 
-171 routes of the main router, plus the platform routes (`/v1/platform/*`, [environment.rs](../../apps/server/src/environment.rs), served before an environment is attached) and the avatar routes (`/v1/users/{id}/avatar`, `/v1/profile/avatar`, [avatars.rs](../../apps/server/src/avatars.rs)).
+203 routes of the main router (method and path pairs), plus the platform routes (`/v1/platform/*`, [environment.rs](../../apps/server/src/environment.rs), served before an environment is attached) and the avatar routes (`/v1/users/{id}/avatar`, `/v1/profile/avatar`, [avatars.rs](../../apps/server/src/avatars.rs)).
 
 ## Conventions
 
@@ -14,6 +14,7 @@
 | **Guards** | `require_workspace_read/write/admin/owner`, `require_organization_read/admin/owner`: the caller's role in that workspace or organization; `require_system_admin`: system or app administrators; `require_full_system_admin`: system administrators only; `require_system_change`: a session or a `system` token |
 | **Errors** | `{"error": {"code": "bad_request \| unauthorized \| invalid_credentials \| forbidden \| not_found \| conflict \| rate_limited \| internal_error", "message": "…"}}`. Quota and limit codes seen since V0.1.74: `workspace_full` (413), `workspace_limit` (409), `disk_low` (507), `rate_limited` (429, with `Retry-After`) |
 | **Paging** | `?limit=&offset=` (at most 500) on `artifacts/query` and the artifact list; the total is in `X-Total-Count` |
+| **Body size** | The anonymous endpoints (sign-in, registration, refresh, sign-out, reset, verification, invitations, setup) take at most 64 KiB, the webhook receivers 1 MiB (`413` above), everything else the upload limit (`REPOMEMO_MAX_UPLOAD_MB`); an archive import is streamed and bounded by `REPOMEMO_MAX_IMPORT_MB` and a 100 to 1 expansion limit |
 | **Limits** | Every route but the event streams answers within `REPOMEMO_REQUEST_TIMEOUT_SECONDS` (408). Searches, figures, the map, health and the file query are rate limited per person (`REPOMEMO_HEAVY_REQUESTS_PER_MINUTE`) |
 | **Live events** | `GET /v1/workspaces/{id}/events` and `GET /v1/system/events`: server-sent events (`job`, `activity`, `resync`); a person may hold `REPOMEMO_MAX_EVENT_STREAMS_PER_USER` open |
 
@@ -49,6 +50,7 @@
 | POST | `/v1/profile/tokens` | session | — | CreateTokenRequest | CreatedToken |
 | DELETE | `/v1/profile/tokens/{token_id}` | session | — | — | status |
 | GET | `/v1/session` | auth | — | — | SharedSession |
+| POST | `/v1/auth/verify-email` | public | — | VerifyRequest | VerifiedAnswer (the link in the mail; the address is verified, and a changed address is applied) |
 
 ## Profile and notifications
 
@@ -61,6 +63,10 @@
 | GET | `/v1/notifications` | auth | — | — | Vec<SharedNotification |
 | POST | `/v1/notifications/read-all` | auth | — | — | status |
 | POST | `/v1/notifications/{notification_id}/read` | auth | — | — | SharedNotification |
+| POST | `/v1/profile/email/verify` | auth | — | — | ResendAnswer (sends the verification link again; a few an hour) |
+| PUT | `/v1/profile/email` | session | — | ChangeEmailRequest (with the current password) | SharedUser (the new address is unverified until its link is used) |
+| GET | `/v1/profile/notification-preferences` | auth | — | — | Vec<NotificationPreference> (per kind: in the app, by mail, both or none) |
+| PUT | `/v1/profile/notification-preferences` | auth | — | SetNotificationPreference | Vec<NotificationPreference> |
 
 ## System administration
 
@@ -98,6 +104,10 @@
 | GET | `/v1/system/console` | auth | require_system_admin | — | WelcomeResponse |
 | POST | `/v1/system/console` | reading | require_system_admin (+ require_system_change for --yes) | — | — |
 | GET | `/v1/system/events` | auth | require_system_admin | — | — |
+| GET | `/v1/system/mail` | auth | require_system_admin | — | MailOverview (settings without the password, a readiness line, the outbox counts) |
+| PUT | `/v1/system/mail` | session | require_full_system_admin | MailSettingsRequest | MailOverview (the password is stored encrypted and never returned) |
+| GET | `/v1/system/mail/outbox` | auth | require_system_admin | `limit` query | Vec<MailOutboxEntry> (recipient, subject, kind, state, attempts; never the body or a link) |
+| POST | `/v1/system/mail/test` | auth | require_full_system_admin, require_system_change | TestMailRequest | MailOutboxEntry (queued; refused while 50 are waiting) |
 
 ## Organizations
 

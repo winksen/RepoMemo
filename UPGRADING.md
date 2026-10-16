@@ -1,6 +1,6 @@
 # Upgrading RepoMemo
 
-How to move an existing server from any V0.1.x release (V0.1.40 and later) to **0.2.0**, and what you will notice. [CHANGELOG.md](CHANGELOG.md) has the detail of each release; this page is the checklist.
+How to move an existing server from any V0.1.x release (V0.1.40 and later) to **0.2.0**, and from there through the 0.2.x releases to **0.3.0**, and what you will notice. [CHANGELOG.md](CHANGELOG.md) has the detail of each release; this page is the checklist.
 
 ## Before
 
@@ -57,6 +57,28 @@ Environments from V0.1.40 and later upgrade in place. An older one: open it firs
 
 - Uploads are refused beyond 20 GiB per workspace and while less than 1 GiB of disk is free (`REPOMEMO_WORKSPACE_STORAGE_MB`, `REPOMEMO_DISK_FLOOR_MB`); there are also 600 uploads an hour and 25 owned workspaces per person. All are settings, `0` turns one off.
 - Turn on automatic backups (`REPOMEMO_BACKUP_INTERVAL_HOURS`, for example `24`), and read the [production guide](mindmap/technical/operations.md).
+
+### From 0.2.0 to 0.3.0 (the 0.2.x releases)
+
+Every 0.2.x release upgrades in place from the one before it, and an environment made by 0.2.0 is opened by the current code (a test in CI does exactly that, and a lock keeps every released database migration from being edited). Nothing below is needed to start the server; it is what to set, change or know to use what the line added.
+
+**New things that stay off until you turn them on**
+- **Mail** (V0.2.9): System › Settings › Mail, over TLS, and `REPOMEMO_PUBLIC_URL` so links can be put in messages. A mail server on a private address needs `REPOMEMO_SMTP_ALLOWED_HOSTS`. It switches on invitations by mail, "Forgot your password?", mentions, assignments, verification and the daily digest. Since V0.2.52 one address is sent at most 12 messages an hour.
+- **Remote repositories** (V0.2.19–V0.2.23) and **trackers** (GitHub and GitLab issues and pull requests, V0.2.27–V0.2.31): name their hosts in `REPOMEMO_GIT_ALLOWED_HOSTS` (both are off without it). git must be 2.50.1 or later (or a patched older release); `ssh` links need an `ssh` client on the `PATH`. Clones have a size and a time cap (`REPOMEMO_REPO_CLONE_MAX_MB`, `REPOMEMO_REPO_CLONE_TIMEOUT_MINUTES`) and count in a workspace's storage, so a workspace with large repositories may reach its allowance. Webhooks need the server to be reachable from the host; send a unique delivery header from your own sender (V0.2.52).
+- **Encrypted backups** (V0.2.42): set `REPOMEMO_BACKUP_KEY` and keep the passphrase apart from the backups; without it a sealed backup cannot be restored. A **second copy** of each backup (V0.2.43): `REPOMEMO_BACKUP_COPY_DIR`.
+- **Containers** (V0.2.45): `docker compose up`, with the data in a volume and Caddy in front; see the production guide.
+
+**Behaviour that changed**
+- The two re-index endpoints answer `202` with a running job (V0.2.6): scripts that read the job in the answer poll `GET /v1/jobs/{id}` until it ends.
+- Registering on an open server with mail set up answers `202` with no session and mails the owner of a known address (V0.2.18): a script signs in afterwards.
+- Document files (Word, Excel, PowerPoint, PDF, OneNote, email) are read in a short-lived process of their own with a time and a memory limit (V0.2.44, `REPOMEMO_DOCUMENT_TIMEOUT_SECONDS`, `REPOMEMO_DOCUMENT_MEMORY_MB`). If readings fail with "could not be started", the server cannot start its own program file: check where it runs from, or set `REPOMEMO_DOCUMENT_READER=thread`.
+- The anonymous endpoints (sign-in, registration, refresh, reset, invitations, setup) take bodies of 64 KiB, and the webhook receivers 1 MiB (V0.2.52). An import needs a proxy that lets `POST /v1/workspaces/import` carry a body as large as your biggest archive, unbuffered.
+- Deactivating (V0.2.16) and anonymizing (V0.2.17) accounts exist. Log files and earlier backups keep a person's address until they age out.
+- The desktop app is a window onto a server (V0.2.49); its local workspace is retired and goes in a 0.3.x release. Move any you need with *Move a workspace to a server* (V0.2.50). The server needs nothing.
+
+**If you build the server yourself:** build from a checkout with LF line endings, as CI does: a build with other line endings computes other migration checksums and refuses an environment another build made. The desktop crate pulls `tauri-plugin-http` and `keyring`.
+
+**A short path:** back up, replace the binary and the web app, start it, open System › Overview. Then, if you want any of the above, set it and restart. Rolling back is below; an environment already migrated by a newer release is refused by an older binary, so roll back with a backup.
 
 ## Rolling back
 

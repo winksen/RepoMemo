@@ -41,6 +41,8 @@ jobs:
         run: node scripts/check-container.mjs
       - name: Released migrations are unchanged
         run: node scripts/check-migrations.mjs
+      - name: Documentation matches the code
+        run: node scripts/check-docs.mjs
 
   web:
     name: Web client

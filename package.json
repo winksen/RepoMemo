@@ -1,6 +1,6 @@
 {
   "name": "repomemo",
-  "version": "0.2.54",
+  "version": "0.2.55",
   "private": true,
   "description": "Local-first technical memory workspace for teams.",
   "workspaces": [
@@ -22,7 +22,8 @@
     "styles:check": "node scripts/check-styles.mjs",
     "container:check": "node scripts/check-container.mjs",
     "a11y:check": "node scripts/check-accessibility.mjs",
-    "migrations:check": "node scripts/check-migrations.mjs"
+    "migrations:check": "node scripts/check-migrations.mjs",
+    "docs:check": "node scripts/check-docs.mjs"
   },
   "engines": {
     "node": ">=22",

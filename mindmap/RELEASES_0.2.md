@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.2 → 0.3
 
-> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.54` (2026-10-16) · **Next:** `V0.2.55`
+> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.55` (2026-10-16) · **Next:** `V0.2.56`
 > **Previous line:** [Releases 0.1 → 0.2](RELEASES_0.1.md) · **Related:** [Roadmap, Road to V0.3.0](ROADMAP.md#-road-to-v030) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
 Every release of the 0.2 line, shipped and planned, one row each. The plan comes from the [Road to V0.3.0](ROADMAP.md#-road-to-v030): **one change per release**, each shippable alone, with the security rules for a new outside connection in the release that opens it. Planned rows are proposals until decisions 7–14 in the roadmap are agreed.
@@ -87,6 +87,6 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | **V0.2.52** | ✅ 2026-10-16 | J. Release candidate | 🔒 Security | Security | Feature freeze and the fourth security pass over mail, webhooks, remote clones, connectors, export and import and the desktop client: 12 findings (3 medium, 4 low, 5 informational), the 7 that needed a fix fixed with tests; no high or medium finding open (R7, R8) | No high or medium finding open |
 | **V0.2.53** | ✅ 2026-10-16 | J. Release candidate | 📘 Update | Release | Upgrade test from 0.2.0 environments in CI: a database with the 0.2.0 schema and rows, and its stored files, is opened by the current code, migrated in place and read back whole; a lock keeps every released migration from being edited (R9) | Stored 0.2.0 schemas upgrade in place and pass |
 | **V0.2.54** | ✅ 2026-10-16 | J. Release candidate | 📘 Update | Performance | Performance run at 50,000 passages plus a 100,000-file repository and 10,000 issues: the two new harnesses (a repository of that size synced by the engine; a tracker of that size synced through a connector) and a page for targets, commands and results; the run needs release builds and is the maintainer's (R10) | The V0.2.0 targets still hold; results in the release notes |
-| **V0.2.55** | 🔜 Planned | J. Release candidate | 📘 Update | Documentation | Mindmaps, branch pages (`repository-sources`, a new `connectors` page, `operations`), changelog and upgrade notes from 0.2.x (R11) | Every page matches the code |
+| **V0.2.55** | ✅ 2026-10-16 | J. Release candidate | 📘 Update | Documentation | Documentation: a check that routes, settings, versions, releases and links agree with the code, then the pages it and a reading found out of date (API reference, repository sources, connectors, operations, authentication, console, test and route counts) and upgrade notes from 0.2.x in UPGRADING.md (R11) | Every page matches the code |
 | **V0.2.56** | 🔜 Planned | J. Release candidate | 📘 Update | Release | Clean-machine install with mail and a remote repository, following only the guide (R12) | Installed without a workaround; ready to tag |
 | **V0.3.0** | 🔜 Planned | J. Release candidate | 📘 Update | Connected | The version set to `0.3.0` and tagged `v0.3.0` | Tag `v0.3.0` |

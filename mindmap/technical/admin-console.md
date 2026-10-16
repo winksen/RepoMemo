@@ -1,6 +1,6 @@
 # Admin console (System › Console)
 
-> **Branch of:** [TECHNICAL_MINDMAP.md](../TECHNICAL_MINDMAP.md) · **Functional view:** [FUNCTIONAL_MINDMAP.md §1b](../FUNCTIONAL_MINDMAP.md#1b-system-area-system-administrators) · **Status:** draft, first slice implemented (see [ROADMAP.md](../ROADMAP.md))
+> **Branch of:** [TECHNICAL_MINDMAP.md](../TECHNICAL_MINDMAP.md) · **Functional view:** [FUNCTIONAL_MINDMAP.md §1b](../FUNCTIONAL_MINDMAP.md#1b-system-area-system-administrators) · **Status:** V0.2.55. Implemented: status, jobs, logs, users, tokens, settings, mail, maintenance, backups and, for system administrators, `workspace reindex`, `repo sync` and `embeddings rebuild` (V0.2.7), each with a dry run and an audit line where it changes anything (see [ROADMAP.md](../ROADMAP.md))
 
 Some technical administrators would rather **type** than click. They know what they want ("show failed jobs", "unlock this account", "turn HTTP logs to debug") and want to reach the server in one line, script it, and get an answer they can copy. The System pages cover the same ground, but they are built for browsing.
 

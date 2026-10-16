@@ -86,6 +86,7 @@ npm run types:generate    # rewrite apps/desktop/src/generated/domain.ts from cr
 npm run types:check       # fail when that file is out of date (CI runs this)
 npm run a11y:check        # accessibility rules and colour contrast, reading files only (CI runs this)
 npm run migrations:check  # no released database migration was edited or removed, every one is locked (CI runs this)
+npm run docs:check        # routes, settings, versions, releases and links of the documents agree with the code (CI runs this)
 ```
 
 **Performance runs** (release builds, `#[ignore]`d, they print timings): `cargo test -p repomemo-storage --release performance_at_scale -- --ignored --nocapture`, `cargo test -p repomemo-api --release map_and_health_at_scale -- --ignored --nocapture`, `cargo test -p repomemo-api --release repo_sync_at_scale -- --ignored --nocapture` (a repository of 100,000 files, `REPOMEMO_PERF_FILES`) and `cargo test -p repomemo-server --release ten_thousand_issues -- --ignored --nocapture` (10,000 issues through a connector, `REPOMEMO_PERF_ISSUES`). Targets, what each measures and where to record the figures: [mindmap/technical/performance.md](../mindmap/technical/performance.md).
@@ -209,6 +210,13 @@ stop the server at startup with a message naming the variable. System
 administrators can change the registration, token, protection, AI-quota and
 background settings at run time in **System › Settings**; those changes are
 stored in the database and override the values below until reset.
+
+Four more variables are set by the server itself for the helper it starts and are
+not settings: `REPOMEMO_GIT_ASKPASS`, `REPOMEMO_GIT_USERNAME` and
+`REPOMEMO_GIT_SECRET` (the credential handed to one git command, through the server's own
+program acting as git's askpass) and `REPOMEMO_READER_MEMORY_MB` (the memory cap of a document
+reader). Do not set them. The performance runs read `REPOMEMO_PERF_PASSAGES`,
+`REPOMEMO_PERF_FILES` and `REPOMEMO_PERF_ISSUES`, only in tests.
 
 | Variable | Default | What it does |
 |---|---|---|
