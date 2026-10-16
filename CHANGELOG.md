@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.54 (2026-10-16)
+
+Performance runs for repositories and trackers.
+
+### Added
+- **A performance run for a repository of 100,000 files.** `repo_sync_at_scale` builds a repository that size, syncs it, syncs it again with nothing changed and after one changed file, and then asks the workspace what it is asked (search, the map, health). A remote repository is read by the same engine as a local one, so this measures everything after the clone.
+- **A performance run for a tracker with 10,000 issues.** `ten_thousand_issues_sync_and_stay_searchable` serves that many issues the way GitHub pages them, syncs them through a connector pass after pass, times their indexing and asks the same questions.
+- **[A page for performance](mindmap/technical/performance.md):** the targets, the four commands (these two and the earlier two at 50,000 passages), what each measures, and a table for the figures.
+
+### Not done
+- **The runs were not made.** They need release builds, which the automated work does not make, so no result is claimed and "the targets still hold" is open until the maintainer runs the four commands and records the figures in the page's table.
+
+### Upgrading
+- Nothing to do. The runs are tests marked as ignored: they never run in CI or with `cargo test`.
+
 ## V0.2.53 (2026-10-16)
 
 Upgrading from 0.2.0 is tested.

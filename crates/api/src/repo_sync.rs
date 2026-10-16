@@ -1278,4 +1278,120 @@ mod tests {
         let _ = std::fs::remove_dir_all(data_dir);
         let _ = std::fs::remove_dir_all(repo_dir);
     }
+
+    /// Roadmap R10 (V0.2.54): a repository of 100,000 files read by the sync engine. A remote link is a
+    /// bare clone on the server that the engine reads exactly like this one, so what is measured here is
+    /// everything after the clone; the transfer itself is git's and the host's. Not a check:
+    /// `REPOMEMO_PERF_FILES` sets the size (default 100,000).
+    ///
+    /// `cargo test -p repomemo-api --release repo_sync_at_scale -- --ignored --nocapture`
+    #[tokio::test]
+    #[ignore = "a performance run, not a check"]
+    async fn repo_sync_at_scale() {
+        use std::io::Write;
+        use std::time::Instant;
+        let files: usize = std::env::var("REPOMEMO_PERF_FILES")
+            .ok()
+            .and_then(|value| value.parse().ok())
+            .unwrap_or(100_000);
+        let repo_dir = unique_dir("repo-scale-repo");
+        let data_dir = unique_dir("repo-scale-data");
+        std::fs::create_dir_all(&repo_dir).unwrap();
+        git(&repo_dir, &["init", "--quiet", "--initial-branch=main"]);
+
+        // One commit of `files` small source files, written with `git fast-import` (minutes faster than `git add`).
+        let started = Instant::now();
+        let stream = repo_dir.join("..").join(format!("fast-import-{files}.txt"));
+        {
+            let mut out = std::io::BufWriter::new(std::fs::File::create(&stream).unwrap());
+            for index in 0..files {
+                let body = format!(
+                    "pub fn handler_{index}(input: u64) -> u64 {{\n    // module {} file {index}\n    input + {}\n}}\n",
+                    index % 997,
+                    index % 31
+                );
+                writeln!(out, "blob\nmark :{}\ndata {}\n{body}", index + 1, body.len()).unwrap();
+            }
+            writeln!(out, "commit refs/heads/main\ncommitter Test <test@example.com> 1700000000 +0000\ndata 7\nInitial").unwrap();
+            for index in 0..files {
+                writeln!(out, "M 100644 :{} src/m{:04}/f{index}.rs", index + 1, index % 997).unwrap();
+            }
+            writeln!(out, "done").unwrap();
+        }
+        let status = Command::new("git")
+            .arg("-C")
+            .arg(&repo_dir)
+            .args(["fast-import", "--quiet", "--done"])
+            .stdin(std::fs::File::open(&stream).unwrap())
+            .status()
+            .unwrap();
+        assert!(status.success(), "git fast-import failed");
+        println!("built a repository of {files} files in {:?}", started.elapsed());
+
+        let core = RepoMemoCore::boot(data_dir.clone()).await.unwrap();
+        let workspace = core.create_workspace("Scale".to_owned()).await.unwrap();
+        let source = core
+            .connect_local_repo(&workspace.id, &repo_dir.to_string_lossy(), None, RepoSettings::default())
+            .await
+            .unwrap();
+
+        let started = Instant::now();
+        let first = sync(&core, &source.id).await;
+        let full = started.elapsed();
+        println!(
+            "first sync: {full:?} ({} in the tree, {} added, {} indexed, {} skipped)",
+            first.files_in_tree, first.added, first.indexed, first.skipped
+        );
+
+        let started = Instant::now();
+        let unchanged = sync(&core, &source.id).await;
+        let nothing = started.elapsed();
+        println!("sync with nothing changed: {nothing:?} ({} added, {} updated)", unchanged.added, unchanged.updated);
+
+        write(&repo_dir, "src/m0001/f1.rs", "pub fn handler_1(input: u64) -> u64 {\n    input * 2\n}\n");
+        git(&repo_dir, &["add", "src/m0001/f1.rs"]);
+        git(&repo_dir, &["commit", "--quiet", "-m", "Change one file"]);
+        let started = Instant::now();
+        let changed = sync(&core, &source.id).await;
+        let one_file = started.elapsed();
+        println!("sync after one changed file: {one_file:?} ({} updated)", changed.updated);
+
+        // The workspace answers at this size (targets of V0.1.74: search under 300 ms, map and health under 2 s).
+        let mut times = Vec::new();
+        for round in 0..20 {
+            let started = Instant::now();
+            let hits = core
+                .search_workspace(repomemo_domain::SearchRequest {
+                    workspace_id: workspace.id.clone(),
+                    query: format!("handler_{}", round * 977),
+                    limit: Some(10),
+                    ..Default::default()
+                })
+                .await
+                .unwrap();
+            times.push(started.elapsed());
+            assert!(!hits.is_empty(), "the search finds a function of the repository");
+        }
+        times.sort();
+        let p95 = times[(times.len() * 95 / 100).min(times.len() - 1)];
+        println!("keyword search p95 over 20 searches: {p95:?}");
+        let started = Instant::now();
+        let map = core.knowledge_map(&workspace.id).await.unwrap();
+        let map_time = started.elapsed();
+        let started = Instant::now();
+        let health = core.workspace_health(&workspace.id).await.unwrap();
+        let health_time = started.elapsed();
+        println!("knowledge map, first load: {map_time:?} ({} nodes); health, first load: {health_time:?} ({} findings)", map.nodes.len(), health.findings.len());
+
+        // A change touches one file; nothing about it should cost a tenth of the first run (as for the map in V0.2.8).
+        assert!(nothing * 10 < full, "a sync with nothing changed took {nothing:?} against {full:?} for the first");
+        assert!(one_file * 10 < full, "a sync after one changed file took {one_file:?} against {full:?} for the first");
+        assert!(p95 < std::time::Duration::from_millis(300), "search p95 {p95:?}");
+        assert!(map_time < std::time::Duration::from_secs(2) && health_time < std::time::Duration::from_secs(2));
+
+        drop(core);
+        let _ = std::fs::remove_dir_all(repo_dir);
+        let _ = std::fs::remove_file(stream);
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
 }

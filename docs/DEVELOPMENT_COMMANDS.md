@@ -88,6 +88,8 @@ npm run a11y:check        # accessibility rules and colour contrast, reading fil
 npm run migrations:check  # no released database migration was edited or removed, every one is locked (CI runs this)
 ```
 
+**Performance runs** (release builds, `#[ignore]`d, they print timings): `cargo test -p repomemo-storage --release performance_at_scale -- --ignored --nocapture`, `cargo test -p repomemo-api --release map_and_health_at_scale -- --ignored --nocapture`, `cargo test -p repomemo-api --release repo_sync_at_scale -- --ignored --nocapture` (a repository of 100,000 files, `REPOMEMO_PERF_FILES`) and `cargo test -p repomemo-server --release ten_thousand_issues -- --ignored --nocapture` (10,000 issues through a connector, `REPOMEMO_PERF_ISSUES`). Targets, what each measures and where to record the figures: [mindmap/technical/performance.md](../mindmap/technical/performance.md).
+
 A **database migration** that has shipped is never edited: a change goes into a new numbered file in `crates/storage/migrations/`, and `node scripts/check-migrations.mjs --lock` records it in `crates/storage/migrations.lock` with the release that ships it. `cargo test -p repomemo-storage an_environment_made_by_v0_2_0` runs the upgrade test (a 0.2.0 environment opened by the current code).
 
 After changing a data transfer object in `crates/domain/src/lib.rs`, run

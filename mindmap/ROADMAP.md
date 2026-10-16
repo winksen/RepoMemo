@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.53` (2026-10-16), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.54` (2026-10-16), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Security review 2026-10-16 (V0.2.52)](security/2026-10-16-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -413,7 +413,7 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 |---|---|---|---|---|---|
 | **V0.2.52** ✅ | 📘 | Security | Feature freeze and the fourth security pass over mail, webhooks, remote clones, connectors, export and import, and the desktop client, with its fixes | R7, R8 | No high or medium finding open |
 | **V0.2.53** ✅ | 📘 | Release | Upgrade test from 0.2.0 environments in CI | R9 | Stored 0.2.0 schemas upgrade in place and pass |
-| **V0.2.54** | 📘 | Performance | Performance run at 50,000 passages plus a 100,000-file remote repository and 10,000 issues | R10 | The V0.2.0 targets still hold; results in the release notes |
+| **V0.2.54** ✅ | 📘 | Performance | Performance run at 50,000 passages plus a 100,000-file remote repository and 10,000 issues | R10 | The V0.2.0 targets still hold; results in the release notes |
 | **V0.2.55** | 📘 | Documentation | Mindmaps, branch pages (`repository-sources`, a new `connectors` page, `operations`), changelog and upgrade notes from 0.2.x | R11 | Every page matches the code |
 | **V0.2.56** | 📘 | Release | Clean-machine install with mail and a remote repository, following only the guide | R12 | Installed without a workaround; ready to tag |
 | **V0.3.0** | — | — | *Connected* | — | Tag `v0.3.0` |
@@ -851,6 +851,13 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 - [ ] **Not run:** the test compiles (`cargo check -p repomemo-storage --tests`) and its seed was run through all 36 migrations in SQLite, but the Rust test was not executed. Not covered: a 0.2.0 environment's *stored provider keys, sessions and tokens* (they are not in the seed), an environment older than 0.2.0, and a downgrade (refused by design, see `UPGRADING.md`)
 - [ ] Known: sqlx records a checksum of each migration's text as compiled, so a build whose checkout has other line ends (Windows `autocrlf`) than the one that made an environment refuses it with a version mismatch; build releases from an LF checkout, as CI does
 
+#### V0.2.54: Performance run with remote sources
+
+- [x] **R10** `repo_sync_at_scale` (`crates/api/src/repo_sync.rs`): a repository of 100,000 files (`REPOMEMO_PERF_FILES`) written with `git fast-import`, linked, and timed through the first sync, a sync with nothing changed and a sync after one changed file, then keyword search (p95 of 20), the knowledge map and health on what it indexed. It asserts the targets (each later sync under a tenth of the first, search under 300 ms, map and health under 2 s). A remote link is a bare clone the engine reads like a local repository, so the run measures everything after the clone; the transfer is git's and is bounded by the clone limits
+- [x] `ten_thousand_issues_sync_and_stay_searchable` (`apps/server/src/tests/performance.rs`): a stand-in for GitHub serving 10,000 issues (`REPOMEMO_PERF_ISSUES`) with `per_page`, `since` and a `Link` header; the connector is synced pass after pass (30 pages of 100 each, resumed from its cursor) and each pass is printed, then the time to index, search p95, the dashboard, the map and health are asserted against the V0.1.74 targets
+- [x] [technical/performance.md](technical/performance.md): the targets, the four commands (these two and the two of V0.1.74/V0.1.76), what each does and does not measure, and a table to record V0.2.54's figures next to R4's
+- [ ] **Not run, so not claimed.** Release builds and a 100,000-file repository are what this repository's rules keep from the automated work; the harnesses compile (`cargo check --tests`) and were not executed. "The V0.2.0 targets still hold" is therefore **open**: run the four commands of the page, record the figures in its table and here, and fix what misses. Known risks to look at first: a sync with nothing changed on 100,000 files (it reads the whole tree), indexing 10,000 issues behind one queue, and a fourth-and-later connector pass each re-reading the page it resumes from
+
 ### Decisions to agree before work starts
 
 | # | Decision | Needed by | Proposal |
@@ -970,7 +977,7 @@ Every item of both roads, with the release it is planned for. The evidence behin
 | D1 | Tracker retired, `PRODUCT.md`, Postman v5 | S | ✅ V0.1.66 |
 | R5 | Mindmaps, branch pages, changelog, upgrade notes | M | ✅ V0.1.76 |
 | R6 follow-up | Corrections from the clean-machine install | S | V0.2.1 |
-| R7–R12 | Release candidate for V0.3.0: freeze and fourth security pass (R7 ✅, R8 ✅ V0.2.52), upgrade from 0.2.0 (R9 ✅ V0.2.53), performance with remote sources (R10), documentation (R11), clean install (R12) | M | V0.2.52–V0.2.56 |
+| R7–R12 | Release candidate for V0.3.0: freeze and fourth security pass (R7 ✅, R8 ✅ V0.2.52), upgrade from 0.2.0 (R9 ✅ V0.2.53), performance with remote sources (R10: harnesses V0.2.54, run pending), documentation (R11), clean install (R12) | M | V0.2.52–V0.2.56 |
 
 ### Experience
 
