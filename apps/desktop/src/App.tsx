@@ -763,7 +763,7 @@ function LocalDesktopApp() {
   }
 
   return (
-    <main className="app-shell">
+    <main className="app-shell rm-local-edition">
       <aside className="sidebar">
         <div className="brand-mark">
           <div className="brand-glyph" aria-hidden="true">

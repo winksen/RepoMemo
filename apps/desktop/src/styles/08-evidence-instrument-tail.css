@@ -57,7 +57,7 @@
 
 @media (max-width: 640px) {
   .artifact-library-tools { align-items: stretch; flex-direction: column; }
-  .artifact-search { width: 100%; }
+  :where(.rm-local-edition) .artifact-search { width: 100%; }
   .artifact-result-count { text-align: right; }
   .artifact-list { grid-template-columns: minmax(0, 1fr); }
 }

@@ -425,24 +425,24 @@ body {
   line-height: 12px;
 }
 
-.workspace-create-controls {
+:where(.rm-local-edition) .workspace-create-controls {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 6px;
 }
 
-.workspace-create-controls input,
-input,
-textarea,
-select {
+:where(.rm-local-edition) .workspace-create-controls input,
+:where(.rm-local-edition) input,
+:where(.rm-local-edition) textarea,
+:where(.rm-local-edition) select {
   background: var(--color-surface-2);
   border: 1px solid var(--color-border);
   border-radius: 3px;
 }
 
-.workspace-create-controls input:focus,
-input:focus,
-textarea:focus,
-select:focus {
+:where(.rm-local-edition) .workspace-create-controls input:focus,
+:where(.rm-local-edition) input:focus,
+:where(.rm-local-edition) textarea:focus,
+:where(.rm-local-edition) select:focus {
   background: var(--color-surface);
   border-color: var(--color-accent);
   outline: 2px solid color-mix(in srgb, var(--color-accent) 22%, transparent);

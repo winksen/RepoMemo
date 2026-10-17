@@ -2,6 +2,16 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.64 (2026-10-17)
+
+The retired local edition's styles stay in the local edition.
+
+### Fixed
+- **The web client's fields inherited the local edition's rules.** The local app styled bare `input`, `textarea` and `select` elements (a borderless field with a 6 px corner, then a 3 px one with a 1 px border) and some classes (`.paste-language`, `.workspace-create-controls`, `.search-input-wrap`, `.filter-options`, `.artifact-search`) for the whole page, so every field in the web client had to override them. These 36 selectors are now under `:where(.rm-local-edition)`, a class the local app's root carries. `:where` adds no specificity, so the local edition keeps the cascade it had; the web client matches none of them.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.63 (2026-10-17)
 
 Colours come from tokens.

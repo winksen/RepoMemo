@@ -257,7 +257,7 @@
 .summary-panel,
 .symbol-row,
 .chunk-row,
-.search-input-wrap,
+:where(.rm-local-edition) .search-input-wrap,
 .prequery-hint,
 .coverage-strip,
 .evidence-snippet,
@@ -729,7 +729,7 @@
   margin: 22px 0 18px;
 }
 
-.artifact-search {
+:where(.rm-local-edition) .artifact-search {
   display: flex;
   align-items: center;
   gap: 9px;
@@ -742,13 +742,13 @@
   border-radius: 9px;
 }
 
-.artifact-search:focus-within {
+:where(.rm-local-edition) .artifact-search:focus-within {
   color: var(--color-accent);
   border-color: var(--color-accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 12%, transparent);
 }
 
-.artifact-search input {
+:where(.rm-local-edition) .artifact-search input {
   min-width: 0;
   min-height: 36px;
   padding: 0;
@@ -758,9 +758,9 @@
   box-shadow: none;
 }
 
-.artifact-search input:focus { outline: 0; box-shadow: none; }
+:where(.rm-local-edition) .artifact-search input:focus { outline: 0; box-shadow: none; }
 
-.artifact-search-clear {
+:where(.rm-local-edition) .artifact-search-clear {
   display: grid;
   width: 26px;
   height: 26px;
@@ -771,7 +771,7 @@
   border-radius: 6px;
 }
 
-.artifact-search-clear:hover { color: var(--color-text); background: var(--color-surface-hover); }
+:where(.rm-local-edition) .artifact-search-clear:hover { color: var(--color-text); background: var(--color-surface-hover); }
 
 .artifact-result-count {
   flex: 0 0 auto;

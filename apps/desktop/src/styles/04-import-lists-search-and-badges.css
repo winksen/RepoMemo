@@ -97,13 +97,13 @@
   font-weight: 600;
 }
 
-.paste-language {
+:where(.rm-local-edition) .paste-language {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.paste-language label {
+:where(.rm-local-edition) .paste-language label {
   color: var(--color-text-subtle);
   font-size: 11px;
   font-weight: 600;
@@ -111,7 +111,7 @@
   letter-spacing: 0.04em;
 }
 
-.paste-language select {
+:where(.rm-local-edition) .paste-language select {
   height: 30px;
   padding: 0 28px 0 10px;
   color: var(--color-text);
@@ -130,7 +130,7 @@
   background-repeat: no-repeat;
 }
 
-.paste-language select:hover {
+:where(.rm-local-edition) .paste-language select:hover {
   background-color: var(--color-surface-3);
 }
 
@@ -149,8 +149,8 @@
   justify-content: flex-end;
 }
 
-input,
-textarea {
+:where(.rm-local-edition) input,
+:where(.rm-local-edition) textarea {
   width: 100%;
   color: var(--color-text);
   background: var(--color-surface-2);
@@ -159,17 +159,17 @@ textarea {
   transition: background 100ms var(--ease-standard);
 }
 
-input:focus,
-textarea:focus {
+:where(.rm-local-edition) input:focus,
+:where(.rm-local-edition) textarea:focus {
   background: var(--color-surface-3);
 }
 
-input {
+:where(.rm-local-edition) input {
   min-height: 38px;
   padding: 0 12px;
 }
 
-textarea {
+:where(.rm-local-edition) textarea {
   min-height: 58px;
   resize: vertical;
   padding: 9px 12px;
@@ -418,7 +418,7 @@ textarea {
   gap: 8px;
 }
 
-.search-input-wrap {
+:where(.rm-local-edition) .search-input-wrap {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -430,24 +430,24 @@ textarea {
   transition: background 100ms var(--ease-standard);
 }
 
-.search-input-wrap:focus-within {
+:where(.rm-local-edition) .search-input-wrap:focus-within {
   background: var(--color-surface-3);
   outline: 2px solid var(--color-focus);
   outline-offset: 1px;
 }
 
-.search-input-wrap input {
+:where(.rm-local-edition) .search-input-wrap input {
   min-width: 0;
   min-height: 40px;
   padding: 0;
   background: transparent;
 }
 
-.search-input-wrap input:focus {
+:where(.rm-local-edition) .search-input-wrap input:focus {
   background: transparent;
 }
 
-.search-input-wrap input:focus-visible {
+:where(.rm-local-edition) .search-input-wrap input:focus-visible {
   outline: 0;
 }
 
@@ -507,7 +507,7 @@ textarea {
   background: var(--color-surface-3);
 }
 
-.filter-options {
+:where(.rm-local-edition) .filter-options {
   position: absolute;
   z-index: var(--layer-sticky);
   top: 36px;
@@ -526,7 +526,7 @@ textarea {
   box-shadow: var(--shadow-floating);
 }
 
-.filter-options label {
+:where(.rm-local-edition) .filter-options label {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -537,11 +537,11 @@ textarea {
   font-size: 12px;
 }
 
-.filter-options label:hover {
+:where(.rm-local-edition) .filter-options label:hover {
   background: var(--color-surface-hover);
 }
 
-.filter-options input {
+:where(.rm-local-edition) .filter-options input {
   width: 14px;
   min-height: 14px;
   background: transparent;
