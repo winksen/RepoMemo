@@ -166,7 +166,7 @@ select:focus-visible {
 .shared-setup-form label { display: grid; gap: 7px; color: var(--color-text-muted); font-size: 12px; font-weight: 700; }
 .shared-auth-form input,
 .shared-setup-form input,
-.shared-create-workspace input { width: 100%; height: 42px; padding: 0 12px; color: var(--color-text); background: var(--color-surface); border: 2px solid var(--color-border-strong); border-radius: 8px; }
+.shared-create-workspace input { width: 100%; }
 .shared-api-note { margin: 22px 0 0; color: var(--color-text-subtle); font-size: 12px; }
 .shared-api-note code { color: var(--color-text-muted); font-family: var(--font-mono); }
 .shared-loading { justify-content: center; gap: 10px; height: 100vh; color: var(--color-text-muted); }
@@ -482,7 +482,7 @@ select:focus-visible {
 .shared-note-form textarea,
 .shared-search-form input,
 .shared-memory-form input,
-.shared-memory-form textarea { width: 100%; padding: 10px 11px; color: var(--color-text); background: var(--color-surface); border: 2px solid var(--color-border-strong); border-radius: 8px; }
+.shared-memory-form textarea { width: 100%; }
 .shared-note-form textarea { min-height: 128px; resize: vertical; }
 .shared-readonly-note,
 .shared-muted-copy { color: var(--color-text-muted); font-size: 13px; line-height: 1.55; }
@@ -521,7 +521,6 @@ select:focus-visible {
 .shared-upload-form span { color: var(--color-text-muted); font-size: 12px; line-height: 1.45; }
 .shared-upload-form input[type="file"] { width: 100%; color: var(--color-text-muted); font-size: 12px; }
 .shared-memory-form label { display: grid; gap: 6px; color: var(--color-text-muted); font-size: 12px; font-weight: 700; }
-.shared-memory-form select { width: 100%; min-height: 38px; padding: 0 10px; color: var(--color-text); background: var(--color-surface); border: 2px solid var(--color-border-strong); border-radius: 8px; }
 .shared-task-workspace { display: grid; gap: 22px; }
 .shared-task-toolbar { display: grid; grid-template-columns: minmax(240px, 1fr) minmax(190px, 0.35fr); gap: 10px; }
 .shared-task-create { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; padding: 20px 0; border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); }
@@ -612,7 +611,7 @@ select:focus-visible {
 .shared-member-remove:disabled { cursor: wait; opacity: 0.6; }
 .shared-member-form { display: grid; grid-template-columns: minmax(0, 1fr) 92px auto; gap: 8px; margin-top: 14px; }
 .shared-member-form input,
-.shared-member-form select { width: 100%; min-height: 38px; padding: 0 10px; color: var(--color-text); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px; }
+.shared-member-form select { width: 100%; }
 .shared-route-action { width: fit-content; margin-top: 34px; }
 .shared-record-content { display: grid; gap: 22px; margin-top: 26px; }
 .shared-record-subtitle { overflow-wrap: anywhere; }

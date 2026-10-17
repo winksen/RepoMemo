@@ -2,6 +2,17 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.66 (2026-10-17)
+
+Every form uses the same field.
+
+### Changed
+- **Page forms no longer resize the shared field.** The sign-in, setup and create-workspace fields were 42 px high, the member and memory fields 38 px with a 1 px border or 10 px of padding, each with its own background and corner. Those rules are gone: the fields of these forms and of the note and search forms are the shared field (36 px, a 2 px border, an 8 px corner), and the stylesheet keeps only their layout (full width, the create-workspace field's width, the minimum height of text areas). The comment form never overrode it.
+- `.shared-memory-form select` is deleted; no form has a raw select any more.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.65 (2026-10-17)
 
 Fields are styled by their shared classes only.
