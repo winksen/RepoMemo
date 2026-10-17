@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.2 → 0.3
 
-> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.66` (2026-10-17) · **Next:** `V0.2.67`
+> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.67` (2026-10-17) · **Next:** `V0.2.68`
 > **Previous line:** [Releases 0.1 → 0.2](RELEASES_0.1.md) · **Related:** [Roadmap, Road to V0.3.0](ROADMAP.md#-road-to-v030) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
 Every release of the 0.2 line, shipped and planned, one row each. The plan comes from the [Road to V0.3.0](ROADMAP.md#-road-to-v030): **one change per release**, each shippable alone, with the security rules for a new outside connection in the release that opens it. Planned rows are proposals until decisions 7–14 in the roadmap are agreed.
@@ -101,7 +101,7 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | **V0.2.64** | ✅ 2026-10-17 | K. Frontend polish | 🐞 Fix | Styles | Styles of the retired local edition apply only inside it: 36 selectors (bare fields, the import, search and filter pieces) sit under `:where(.rm-local-edition)`, set on the local app's root, so the web client's fields no longer inherit them; written, not seen on screen | The web client gets no style from these rules. The local edition looks as before (the maintainer checks it by hand). |
 | **V0.2.65** | ✅ 2026-10-17 | K. Frontend polish | 🐞 Fix | Styles | Fields are styled only by their shared classes: the competing global rules for inputs, text areas and selects (three stylesheets, their dark copies) apply only inside the retired local edition; one base reset (font, colour, focus ring) is the rest; written, not seen on screen | No stylesheet outside the local-edition scope styles a bare `input`, `textarea` or `select` except the base reset. |
 | **V0.2.66** | ✅ 2026-10-17 | K. Frontend polish | 🐞 Fix | Styles | Sign-in, setup, create-workspace, member, memory, note and search fields are the shared field: the page-specific 42 px and 38 px heights, 1 px borders and paddings are removed, only layout widths remain; written, not seen on screen | Sign-in, setup, members, memory, notes and search fields look like every other field. |
-| **V0.2.67** | 🔜 Planned | K. Frontend polish | 🐞 Fix | Styles | Checkboxes, radios and file inputs reset | Every checkbox is 16 px and none stretches. |
+| **V0.2.67** | ✅ 2026-10-17 | K. Frontend polish | 🐞 Fix | Styles | Checkboxes, radio buttons and file pickers keep their natural size everywhere: one base rule (16 px, accent colour), six local size patches removed; the evidence type menu keeps its drawn check mark until the shared Checkbox; written, not seen on screen | Every checkbox is 16 px and none stretches. |
 | **V0.2.68** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | Styles | Three icon sizes | `grep 'size={1[2357]}'` finds only documented exceptions. |
 | **V0.2.69** | 🔜 Planned | K. Frontend polish | ✨ Feature | UI kit | `Field` | Used in Profile › Personal details. Each field has a label tied to its control, and the visual is unchanged. |
 | **V0.2.70** | 🔜 Planned | K. Frontend polish | ✨ Feature | UI kit | `Checkbox` | Used in the evidence type filter (`shared-artifact-type-menu-panel`). |

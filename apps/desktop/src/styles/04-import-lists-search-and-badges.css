@@ -541,13 +541,6 @@
   background: var(--color-surface-hover);
 }
 
-:where(.rm-local-edition) .filter-options input {
-  width: 14px;
-  min-height: 14px;
-  background: transparent;
-  accent-color: var(--color-accent);
-}
-
 .search-result-summary {
   display: flex;
   align-items: center;

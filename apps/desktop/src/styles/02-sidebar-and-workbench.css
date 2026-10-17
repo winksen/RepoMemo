@@ -393,13 +393,7 @@
   cursor: pointer;
 }
 
-.provider-toggle input {
-  width: 14px;
-  min-height: 14px;
-  flex: 0 0 14px;
-}
-
-.provider-toggle input { margin-top: 3px; accent-color: var(--color-accent); }
+.provider-toggle input { margin-top: 3px; }
 .provider-toggle span { display: grid; gap: 3px; }
 .provider-toggle small { color: var(--color-text-muted); font-size: 11px; }
 

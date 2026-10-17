@@ -95,6 +95,27 @@ select:focus-visible {
   outline-offset: 2px;
 }
 
+/* Checkboxes, radio buttons and file pickers keep their natural size and take the accent;
+   they are never stretched like text fields. */
+input[type="checkbox"],
+input[type="radio"] {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--color-accent);
+}
+
+input[type="file"] {
+  width: auto;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+}
+
 /* ===== Shared web mode ===== */
 .shared-auth-canvas,
 .shared-home {
@@ -420,7 +441,6 @@ select:focus-visible {
 .shared-artifact-type-menu-panel label { display: flex; align-items: center; gap: 7px; min-width: 0; min-height: 32px; padding: 0 7px; color: var(--color-text-muted); border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 700; }
 .shared-artifact-type-menu-panel label:hover { color: var(--color-text); background: var(--color-surface-2); }
 .shared-artifact-type-menu-panel label:first-child { grid-column: 1 / -1; color: var(--color-text); border-bottom: 1px solid var(--color-border); border-radius: 0; }
-.shared-artifact-type-menu-panel input { width: 14px; height: 14px; margin: 0; accent-color: var(--color-accent); }
 .shared-artifact-browser-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--color-text-subtle); font-size: 12px; }
 .shared-artifact-view-switch { display: flex; gap: 5px; }
 .shared-artifact-view-switch .rm-button { display: grid; width: 34px; min-width: 34px; height: 34px; min-height: 34px; padding: 0; place-items: center; }
@@ -566,7 +586,7 @@ select:focus-visible {
 .shared-task-checklist-panel { display: grid; gap: 10px; margin-top: 16px; padding: 14px; background: var(--color-surface-2); border-radius: 10px; }
 .shared-task-checklist-list { display: grid; gap: 7px; }
 .shared-task-checklist-list label { display: flex; align-items: flex-start; gap: 8px; color: var(--color-text-muted); font-size: 12px; line-height: 1.45; }
-.shared-task-checklist-list input { width: 15px; height: 15px; margin: 1px 0 0; accent-color: var(--color-accent); }
+.shared-task-checklist-list input { margin-top: 1px; }
 .shared-task-checklist-list input:checked + span { color: var(--color-text-subtle); text-decoration: line-through; }
 .shared-task-checklist-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px; padding-top: 9px; border-top: 1px solid var(--color-border); }
 .shared-members-section { margin-top: 30px; padding-top: 22px; border-top: 1px solid var(--color-border); }
@@ -680,7 +700,7 @@ select:focus-visible {
 .shared-ai-provider-form label { display: grid; gap: 6px; color: var(--color-text-muted); font-size: 12px; font-weight: 700; }
 .shared-ai-provider-form .shared-ai-provider-toggle { display: flex; align-items: flex-start; gap: 8px; color: var(--color-text-muted); font-weight: 400; line-height: 1.5; }
 .shared-ai-provider-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.shared-ai-provider-toggle input[type="checkbox"] { width: 16px; min-width: 16px; height: 16px; min-height: 16px; margin: 2px 0 0; accent-color: var(--color-accent); background: transparent; border: 0; border-radius: 3px; }
+.shared-ai-provider-toggle input[type="checkbox"] { margin-top: 2px; }
 .shared-record-edit-form { display: grid; gap: 12px; max-width: 680px; margin: 18px 0 0; padding: 16px; background: var(--color-surface-2); border-radius: 10px; }
 .shared-record-edit-form label { display: grid; gap: 6px; color: var(--color-text-muted); font-size: 12px; font-weight: 700; }
 .rm-button.shared-danger-action { color: var(--color-danger); background: var(--color-surface); border-color: var(--color-border-strong); }

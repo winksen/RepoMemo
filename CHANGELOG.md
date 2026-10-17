@@ -2,6 +2,17 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.67 (2026-10-17)
+
+Checkboxes and radio buttons are the same size everywhere.
+
+### Changed
+- **One rule for checkboxes, radio buttons and file pickers.** A base rule in `01…` sets a checkbox or radio button to 16 px with the accent colour and leaves a file picker its natural width. Six places had patched the size of their own (the evidence type filter, the task checklist, the AI provider and System toggles, the local edition's provider toggle and filter options, and the duplicate-file radio buttons); the size and colour parts are removed and only their vertical alignment stays.
+- The evidence type filter keeps its drawn check mark until the shared `Checkbox` (V0.2.70) replaces it.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.66 (2026-10-17)
 
 Every form uses the same field.
