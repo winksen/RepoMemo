@@ -74,9 +74,9 @@
   .shared-detail-heading .rm-button, .shared-page-heading .rm-button { align-self: stretch; }
 
   /* Touch: controls are at least 40px high. */
-  .rm-button, .rm-input, .rm-dropdown-trigger { min-height: 40px; }
+  .rm-button, .rm-input, .rm-dropdown-trigger { min-height: var(--control-height-touch); }
   .rm-textarea { min-height: 88px; }
-  .rm-dropdown-item { min-height: 40px; }
+  .rm-dropdown-item { min-height: var(--control-height-touch); }
 
   /* Dialogs, the palette and notifications use the window. */
   .rm-dialog { padding: 16px; max-height: calc(100dvh - 24px); }

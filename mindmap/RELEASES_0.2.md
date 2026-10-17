@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.2 → 0.3
 
-> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.59` (2026-10-17) · **Next:** `V0.2.60`
+> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.60` (2026-10-17) · **Next:** `V0.2.61`
 > **Previous line:** [Releases 0.1 → 0.2](RELEASES_0.1.md) · **Related:** [Roadmap, Road to V0.3.0](ROADMAP.md#-road-to-v030) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
 Every release of the 0.2 line, shipped and planned, one row each. The plan comes from the [Road to V0.3.0](ROADMAP.md#-road-to-v030): **one change per release**, each shippable alone, with the security rules for a new outside connection in the release that opens it. Planned rows are proposals until decisions 7–14 in the roadmap are agreed.
@@ -94,7 +94,7 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | **V0.2.57** | ✅ 2026-10-17 | K. Frontend polish | 🐞 Fix | Styles | Dropdowns and menus open above dialogs: one layer scale of nine tokens in `01…` replaces every literal `z-index` above 10; dropdown lists, action menus, mention lists and the map tooltip use `--layer-popover`, above dialogs and sheets; written, not seen on screen | No literal `z-index` above 10 remains outside the scale. A dropdown in the token dialog of Profile › API tokens opens on top of the dialog. |
 | **V0.2.58** | ✅ 2026-10-17 | K. Frontend polish | 🐞 Fix | Styles | Long dropdown lists scroll inside the window: a list is at most 320 px or the room left in the window, its viewport scrolls and arrows at both ends scroll it; written, not seen on screen | The System › Settings level dropdown and the Retrieval language filter stay inside the window when opened near the bottom. |
 | **V0.2.59** | ✅ 2026-10-17 | K. Frontend polish | 🐞 Fix | Styles | Dropdowns take the width of their content (160 px at least) in toolbars and filter rows; the forms that need a full-width dropdown say so (sixteen containers) until `Field` does; written, not seen on screen | The dropdowns in toolbars and filter rows (Tasks, Retrieval, System logs) no longer stretch across the row. |
-| **V0.2.60** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | Styles | One size for every control | Text fields, dropdowns and buttons are the same height on every page (36 px, 40 px on narrow screens). |
+| **V0.2.60** | ✅ 2026-10-17 | K. Frontend polish | 🔧 Enhancement | Styles | Fields, dropdowns and buttons share one height, radius and border from five control tokens (36 px, 40 px on touch screens, as DESIGN.md says); page rules that override them are left for V0.2.66; written, not seen on screen | Text fields, dropdowns and buttons are the same height on every page (36 px, 40 px on narrow screens). |
 | **V0.2.61** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | Styles | True neutral greys | `npm run a11y:check` (contrast) still passes; no neutral token has a hue. |
 | **V0.2.62** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | Styles | One accent: the `--workspace-*` colours retired | `grep -- --workspace- styles` finds nothing. |
 | **V0.2.63** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | Styles | Hard-coded colours become tokens | The only hex colours outside `01…` are inside `:root` token blocks, and dark theme fields are no longer white. |

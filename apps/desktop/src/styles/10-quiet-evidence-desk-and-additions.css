@@ -584,11 +584,11 @@ input:focus, textarea:focus, select:focus { background: #fff; border-color: var(
   width: 100%;
   color: var(--color-text);
   background: var(--color-surface);
-  border: 2px solid var(--color-border-strong);
-  border-radius: 8px;
+  border: var(--control-border) solid var(--color-border-strong);
+  border-radius: var(--control-radius);
   transition: border-color 110ms var(--ease-control);
 }
-.rm-input { min-height: 34px; padding: 0 12px; }
+.rm-input { min-height: var(--control-height); padding: 0 var(--control-padding-x); }
 .rm-textarea { min-height: 76px; padding: 10px 11px; resize: vertical; }
 .rm-input:hover:not(:disabled),
 .rm-textarea:hover:not(:disabled) { border-color: var(--color-accent); box-shadow: none; }

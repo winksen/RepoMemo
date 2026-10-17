@@ -2,6 +2,17 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.60 (2026-10-17)
+
+Text fields, dropdowns and buttons are the same height.
+
+### Changed
+- **One size for controls.** The tokens `--control-height` (36 px), `--control-height-touch` (40 px), `--control-radius` (8 px), `--control-border` (2 px) and `--control-padding-x` (12 px) are in `01-tokens-and-shared-web.css`. Text fields, text areas, dropdowns, dropdown rows and buttons use them, so they are 36 px high instead of 34 px, which is what DESIGN.md says (36–40 px); on narrow screens they use the touch height of 40 px. Colours, borders and corners look as before.
+- Fields of the sign-in, setup, member and memory forms keep their own sizes until V0.2.66.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.59 (2026-10-17)
 
 Dropdowns no longer stretch across toolbars and filter rows.

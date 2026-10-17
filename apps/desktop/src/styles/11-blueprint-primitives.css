@@ -376,7 +376,7 @@ select:focus,
  * two-pixel neutral boundary even where a page has more specific field rules. */
 input.rm-input,
 textarea.rm-textarea {
-  border: 2px solid var(--color-border-strong);
+  border: var(--control-border) solid var(--color-border-strong);
 }
 
 input.rm-input:hover:not(:disabled),
