@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.61 (2026-10-17)
+
+Backgrounds, borders and text are true greys.
+
+### Changed
+- **The light theme's neutrals have no hue.** The tokens that win the cascade (`--color-bg`, `-canvas`, `-surface*`, `-code-surface`, `-text*`, `-border*`, in `11-blueprint-primitives.css`) were blue-grey (hue 220); they are now greys of the same lightness (the muted-subtle text is one point darker, 42 % instead of 43 %, to keep its contrast on hovered rows). The dark theme already was grey. The accent and the status colours are untouched, and the contrast check still passes.
+- The older, overridden copies of these tokens in `01…`, `09…` and `10…` (green-grey) are greys too, so no neutral token has a hue anywhere.
+
+### Fixed
+- **The plan of track K was corrected.** Its audit read the first stylesheet's tokens and took the accent for green and the neutrals for green-tinted; the tokens that win the cascade are the last ones, where the accent is blue, as DESIGN.md says. Decision 16 now keeps that blue, and V0.2.63 removes the overridden token blocks.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.60 (2026-10-17)
 
 Text fields, dropdowns and buttons are the same height.

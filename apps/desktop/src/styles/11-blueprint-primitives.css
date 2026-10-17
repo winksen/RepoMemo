@@ -9,19 +9,19 @@
 :root {
   color-scheme: light;
 
-  --color-bg: hsl(220 16% 98%);
-  --color-canvas: hsl(220 14% 95%);
+  --color-bg: hsl(0 0% 98%);
+  --color-canvas: hsl(0 0% 95%);
   --color-surface: #ffffff;
-  --color-surface-2: hsl(220 16% 98%);
-  --color-surface-3: hsl(220 14% 95%);
-  --color-surface-hover: hsl(220 14% 93%);
-  --color-code-surface: hsl(220 16% 98%);
+  --color-surface-2: hsl(0 0% 98%);
+  --color-surface-3: hsl(0 0% 95%);
+  --color-surface-hover: hsl(0 0% 93%);
+  --color-code-surface: hsl(0 0% 98%);
 
-  --color-text: hsl(220 15% 15%);
-  --color-text-muted: hsl(220 10% 38%);
-  --color-text-subtle: hsl(220 9% 43%);
-  --color-border: hsl(220 12% 90%);
-  --color-border-strong: hsl(220 10% 80%);
+  --color-text: hsl(0 0% 15%);
+  --color-text-muted: hsl(0 0% 38%);
+  --color-text-subtle: hsl(0 0% 42%);
+  --color-border: hsl(0 0% 90%);
+  --color-border-strong: hsl(0 0% 80%);
 
   --color-accent: hsl(233 84% 44%);
   --color-accent-hover: hsl(233 78% 36%);

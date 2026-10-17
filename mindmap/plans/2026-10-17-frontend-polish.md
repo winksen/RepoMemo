@@ -22,7 +22,7 @@ A static reading of `apps/desktop/src` (web client) on 2026-10-17. Line numbers 
 | A4 | **Global element rules fight the primitives.** `input`, `textarea` and `select` are restyled in five stylesheets. The rules disagree: radius 6 (04), 3 (06), 8 (09, 10) and 10 (11); border 0 (04), 1 px (06, 10) and 2 px (11); backgrounds `surface-2` (04), `#fff` (09, 10) and `surface` (11). Dark-theme copies repeat them (11) | `styles/04…`, `06…`, `09…`, `10…`, `11…` (83 element rules that size form controls) |
 | A5 | **Page rules override the shared field.** Sign-in, setup and create-workspace fields are 42 px; member and memory forms are 38 px with a 1 px border; create-workspace is fixed at 260 px | `styles/01…` (`.shared-auth-form input`, `.shared-member-form input`, `.shared-memory-form select`, `.shared-create-workspace input`) |
 | A6 | **Checkboxes are styled as text fields** by the global `input` rules, then patched in six places one by one | `.shared-ai-provider-toggle input[type=checkbox]`, `.shared-artifact-type-menu-panel input`, `.shared-task-checklist-list input`, `.provider-toggle input`, `.filter-options input` |
-| A7 | **Neutrals are tinted green**, against DESIGN.md's "No tinted neutrals" (saturation 0) | `styles/01…:6-18` (`--color-bg: #e2e7e4`, `--color-surface: #f8faf7`, `--color-text: #18201f`…), dark theme `:56-68` |
+| A7 | **Neutrals are tinted**, against DESIGN.md's "No tinted neutrals" (saturation 0). *Corrected in V0.2.61: the tokens that win the cascade are the last `:root` blocks, in `11…`; its light neutrals had hue 220 (blue-grey), its dark ones were already grey. The green values in `01…` and `10…` are overridden and dead* | `styles/01…:6-18` (`--color-bg: #e2e7e4`, `--color-surface: #f8faf7`, `--color-text: #18201f`…), dark theme `:56-68` |
 | A8 | **A second accent.** `--workspace-accent: #147d72` and six other `--workspace-*` colours next to `--color-accent` | `styles/03-workspace-workbench-and-forms.css:4-26`, used at `:293`, `:448` |
 | A9 | **Hard-coded colours.** 96 hex or rgb values in `10…`, 54 in `09…`, 20 in `11…`, plus a danger red `#c9372c` that exists only in dialog footers | `styles/09…`, `10…`, `11…:690-691` |
 | A10 | **Control heights disagree with DESIGN.md** (36–40 px). Fields and dropdowns are 34 px; icon squares are 28, 32, 34, 36 or 44 px | `styles/10…` (`.rm-input`), `01…:354`, `:466`, `11…:695`, `:750`, `:810` |
@@ -36,7 +36,7 @@ A static reading of `apps/desktop/src` (web client) on 2026-10-17. Line numbers 
 | A18 | **Large components.** `SystemAdminPanel` (904 lines, 36 `useState`), `RepositoriesPanel` (882), `KnowledgeMapPanel` (530), `ServerSetup` (377, 21 `useState`) | `wc -l` |
 | A19 | **Data loading outside the query cache.** `useEffect` plus `.then` in `SystemAdminPanel` (11), `KnowledgeMapPanel` (8), `RepositoriesPanel` (6), `AssistantPanel` (5), `ConnectorsPanel` (4), `DocumentViewer` (4); only 11 files guard against a late answer | `grep useEffect` |
 | A20 | **Icon sizes 12–26 px** in nine values (16 ×202, 15 ×70, 18 ×65, 14 ×35, 17 ×22…) | `grep 'size={'` |
-| A21 | **DESIGN.md and the code disagree** on the accent (blue in DESIGN.md, green in the tokens) and on the height of controls | `DESIGN.md` §Color and tone, §Components; `styles/01…:20` |
+| A21 | **DESIGN.md and the code disagree** on the height of controls. *Corrected in V0.2.61: the accent that wins the cascade is blue (`11…`: `hsl(233 84% 44%)`), as DESIGN.md says; the green accent of `01…` and `10…` never shows* | `DESIGN.md` §Color and tone, §Components; `styles/01…:20` |
 
 ---
 
@@ -45,7 +45,7 @@ A static reading of `apps/desktop/src` (web client) on 2026-10-17. Line numbers 
 | # | Decision | Proposal |
 |---|---|---|
 | 15 | **Lift the feature freeze for this track** (the roadmap froze features at V0.2.52) | Yes: this track adds no product feature, only building blocks and fixes. V0.2.129 repeats the release checks before the tag |
-| 16 | **The accent colour** (A21) | Keep the green accent the product has shipped with; V0.2.128 corrects DESIGN.md. Changing to blue would be a new look |
+| 16 | **The accent colour** (A21) | Keep the blue accent the cascade applies, which is what DESIGN.md says (the audit read the dead green tokens of `01…`); V0.2.63 removes the dead token blocks so no stylesheet says otherwise |
 | 17 | **Neutrals at saturation 0** (A7) | Yes, as DESIGN.md already requires: the same lightness, the hue removed. The change is subtle on screen |
 | 18 | **More than two button treatments** (DESIGN.md allows only `main` and `secondary`) | Add `danger` (a destructive confirmation) and the `IconButton` shape (one icon, a required label). Both are already in the code as one-off styles; this makes them deliberate |
 | 19 | **Where form mistakes are shown** | API errors stay toasts (CLAUDE.md). A required or malformed field is marked `aria-invalid` with a one-line hint under the field. That is a field state, not a banner: no colour fill, only the field's border and a short muted line |
@@ -385,7 +385,7 @@ Each release moves one area to `Field`, `Checkbox`, `Switch`, `LoadingState`, `E
 
 #### V0.2.128 · 📘 · DESIGN.md matches the code (A21, decision 16)
 - **Change:** update DESIGN.md:
-  - the accent is green, as shipped;
+  - the accent is blue, as shipped (the audit's "green" was a dead token block);
   - controls are 36 px (40 on touch screens);
   - the layer scale, and that neutrals have saturation 0;
   - the button treatments: `main`, `secondary`, `danger` and `IconButton`;
