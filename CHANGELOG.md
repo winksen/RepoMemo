@@ -2,6 +2,17 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.68 (2026-10-17)
+
+Icons come in three sizes.
+
+### Changed
+- **One constant for icon sizes.** `ICON_SIZE = { sm: 14, md: 16, lg: 18 }` is in `components/ui/icon.ts`. The 503 icons from 12 to 18 px, in 53 files, read it instead of a number: icons of 12, 13 and 15 px became 14 px (the small ones in rows, badges and compact actions) and 17 px ones became 16 px. They used to come in seven sizes, 12 to 18 px. Nothing else in these files changed.
+- **Illustrations keep their size**: avatars, the empty states (25 and 26 px), the setup steps and their status icons (20 and 22 px), file and folder tiles, the page loader, the assistant's introduction and the retired local edition's larger icons.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.67 (2026-10-17)
 
 Checkboxes and radio buttons are the same size everywhere.

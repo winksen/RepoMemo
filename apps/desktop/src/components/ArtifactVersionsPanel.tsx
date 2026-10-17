@@ -6,6 +6,7 @@ import { formatFileSize } from "../web/format";
 import { Button } from "./ui/button";
 import { Dialog, DialogCancel } from "./ui/dialog";
 import { showToast } from "./ui/toast";
+import { ICON_SIZE } from "./ui/icon";
 
 type Opened =
   | { kind: "text"; version: number; text: ArtifactVersionText | null }
@@ -63,14 +64,14 @@ export function ArtifactVersionsPanel({ accessToken, artifactId, updatedAt }: { 
   if (opened?.kind === "text") {
     const text = opened.text;
     dialog = <Dialog className="rm-dialog-wide" description={text ? undefined : "Reading this version…"} footer={<DialogCancel label="Close" onClick={() => setOpened(null)} />} onClose={() => setOpened(null)} open title={`Version ${opened.version}`}>
-      {text === null ? <p className="shared-muted-copy"><Loader className="spin" size={14} /> Loading…</p>
+      {text === null ? <p className="shared-muted-copy"><Loader className="spin" size={ICON_SIZE.sm} /> Loading…</p>
         : text.text !== null ? <><pre className="shared-version-text">{text.text}</pre>{text.truncated ? <p className="shared-muted-copy">Only the start of this version is shown.</p> : null}</>
           : <p className="shared-muted-copy">{text.note ?? "This version has no text to show."}</p>}
     </Dialog>;
   } else if (opened?.kind === "compare") {
     const comparison = opened.comparison;
     dialog = <Dialog className="rm-dialog-wide" description={comparison ? `${comparison.removed} ${comparison.removed === 1 ? "line" : "lines"} removed, ${comparison.added} added` : "Comparing…"} footer={<DialogCancel label="Close" onClick={() => setOpened(null)} />} onClose={() => setOpened(null)} open title={`Version ${opened.from} → version ${opened.to}`}>
-      {comparison === null ? <p className="shared-muted-copy"><Loader className="spin" size={14} /> Loading…</p>
+      {comparison === null ? <p className="shared-muted-copy"><Loader className="spin" size={ICON_SIZE.sm} /> Loading…</p>
         : comparison.note && !comparison.lines.length ? <p className="shared-muted-copy">{comparison.note}</p>
           : <>
             {comparison.note ? <p className="shared-muted-copy">{comparison.note}</p> : null}
@@ -90,7 +91,7 @@ export function ArtifactVersionsPanel({ accessToken, artifactId, updatedAt }: { 
 
   return <section className="shared-record-panel shared-versions-panel" aria-label="Version history">
     {dialog}
-    <div className="shared-panel-heading"><div><History size={18} /><h2>Version history</h2></div><span>{versions.length} versions</span></div>
+    <div className="shared-panel-heading"><div><History size={ICON_SIZE.lg} /><h2>Version history</h2></div><span>{versions.length} versions</span></div>
     <ul className="shared-version-list">
       {versions.map((version) => <li key={version.version}>
         <div>

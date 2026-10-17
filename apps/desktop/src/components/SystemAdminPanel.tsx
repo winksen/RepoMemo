@@ -97,18 +97,19 @@ import { useLiveEventHub, useLiveEvents } from "../lib/liveEvents";
 import { appLink, SecretDialog } from "./SecretDialog";
 
 import { SYSTEM_SECTIONS, type SystemSection } from "../web/constants";
+import { ICON_SIZE } from "./ui/icon";
 export { SYSTEM_SECTIONS };
 export type { SystemSection };
 
 const SECTION_LABELS: Record<SystemSection, { label: string; icon: ReactNode }> = {
-  overview: { label: "Overview", icon: <Server size={16} /> },
-  usage: { label: "Usage", icon: <ChartBar size={16} /> },
-  users: { label: "Users", icon: <Users size={16} /> },
-  settings: { label: "Settings", icon: <Adjustments size={16} /> },
-  logs: { label: "Logs", icon: <FileText size={16} /> },
-  jobs: { label: "Jobs & maintenance", icon: <Tool size={16} /> },
-  audit: { label: "Audit trail", icon: <ClipboardList size={16} /> },
-  console: { label: "Console", icon: <Terminal size={16} /> },
+  overview: { label: "Overview", icon: <Server size={ICON_SIZE.md} /> },
+  usage: { label: "Usage", icon: <ChartBar size={ICON_SIZE.md} /> },
+  users: { label: "Users", icon: <Users size={ICON_SIZE.md} /> },
+  settings: { label: "Settings", icon: <Adjustments size={ICON_SIZE.md} /> },
+  logs: { label: "Logs", icon: <FileText size={ICON_SIZE.md} /> },
+  jobs: { label: "Jobs & maintenance", icon: <Tool size={ICON_SIZE.md} /> },
+  audit: { label: "Audit trail", icon: <ClipboardList size={ICON_SIZE.md} /> },
+  console: { label: "Console", icon: <Terminal size={ICON_SIZE.md} /> },
 };
 
 /** Tabs of the System area, shown in the layout's navigation slot. */
@@ -210,7 +211,7 @@ function count(value: number): string {
 }
 
 function RefreshButton({ isLoading, onClick }: { isLoading: boolean; onClick: () => void }) {
-  return <Button disabled={isLoading} onClick={onClick} type="button" variant="secondary">{isLoading ? <Loader className="spin" size={16} /> : <Refresh size={16} />} Refresh</Button>;
+  return <Button disabled={isLoading} onClick={onClick} type="button" variant="secondary">{isLoading ? <Loader className="spin" size={ICON_SIZE.md} /> : <Refresh size={ICON_SIZE.md} />} Refresh</Button>;
 }
 
 function Facts({ items }: { items: [string, ReactNode][] }) {
@@ -250,7 +251,7 @@ function MaintenancePanel({ accessToken, status, onChanged }: { accessToken: str
   }
   const report = status?.last_report;
   return <section className="shared-settings-group">
-    <div className="shared-panel-heading"><div><Tool size={18} /><h2>Maintenance</h2></div><span>{status?.running ? "running" : status?.next_run_at ? `next ${formatTime(status.next_run_at)}` : "scheduled runs off"}</span></div>
+    <div className="shared-panel-heading"><div><Tool size={ICON_SIZE.lg} /><h2>Maintenance</h2></div><span>{status?.running ? "running" : status?.next_run_at ? `next ${formatTime(status.next_run_at)}` : "scheduled runs off"}</span></div>
     <p className="shared-muted-copy">Clears expired sessions and old jobs, deletes stored files nothing references, retries failed indexing and embeddings, and checkpoints the database.</p>
     <Facts items={[
       ["Last run", status?.last_finished_at ? `${formatTime(status.last_finished_at)} (${status.last_trigger ?? "scheduled"})` : "not yet since the server started"],
@@ -260,7 +261,7 @@ function MaintenancePanel({ accessToken, status, onChanged }: { accessToken: str
       ["Expired sessions removed", report ? count(report.refresh_tokens_purged) : "—"],
       ["Failed steps", report ? count(report.failures) : "—"],
     ]} />
-    <div><Button disabled={isRunning || status?.running} onClick={() => void run()} type="button" variant="main">{isRunning ? <Loader className="spin" size={16} /> : <Rotate size={16} />} Run maintenance now</Button></div>
+    <div><Button disabled={isRunning || status?.running} onClick={() => void run()} type="button" variant="main">{isRunning ? <Loader className="spin" size={ICON_SIZE.md} /> : <Rotate size={ICON_SIZE.md} />} Run maintenance now</Button></div>
   </section>;
 }
 
@@ -268,7 +269,7 @@ function OverviewSection({ accessToken }: { accessToken: string }) {
   const [overview, isLoading, reload] = useSystemData<SystemOverview>(() => getSystemOverview(accessToken), [accessToken], 30_000);
   const [maintenance, setMaintenance] = useState<MaintenanceStatus | null>(null);
   useEffect(() => { if (overview) setMaintenance(overview.background.maintenance); }, [overview]);
-  if (!overview) return <p className="shared-muted-copy">{isLoading ? <><Loader className="spin" size={14} /> Loading the system overview…</> : "The overview is not available."}</p>;
+  if (!overview) return <p className="shared-muted-copy">{isLoading ? <><Loader className="spin" size={ICON_SIZE.sm} /> Loading the system overview…</> : "The overview is not available."}</p>;
   const { instance, statistics, storage, background, traffic, protection } = overview;
   const minuteBars = traffic.requests_per_minute_last_hour.map((value, index, all) => ({ label: `${all.length - 1 - index} min ago`, value }));
   return <>
@@ -282,7 +283,7 @@ function OverviewSection({ accessToken }: { accessToken: string }) {
     </dl>
     <div className="rm-system-grid">
       <section className="shared-settings-group">
-        <div className="shared-panel-heading"><div><Server size={18} /><h2>Back end</h2></div><span>up {formatDuration(instance.uptime_seconds)}</span></div>
+        <div className="shared-panel-heading"><div><Server size={ICON_SIZE.lg} /><h2>Back end</h2></div><span>up {formatDuration(instance.uptime_seconds)}</span></div>
         <Facts items={[
           ["Service", `${instance.service_name} ${instance.version}`],
           ["Host", `${instance.host_name} · ${instance.operating_system}/${instance.architecture}`],
@@ -295,7 +296,7 @@ function OverviewSection({ accessToken }: { accessToken: string }) {
         ]} />
       </section>
       <section className="shared-settings-group">
-        <div className="shared-panel-heading"><div><Database size={18} /><h2>Storage</h2></div><span>{formatBytes(storage.database_bytes + storage.write_ahead_log_bytes + storage.blob_bytes + storage.preview_bytes)}</span></div>
+        <div className="shared-panel-heading"><div><Database size={ICON_SIZE.lg} /><h2>Storage</h2></div><span>{formatBytes(storage.database_bytes + storage.write_ahead_log_bytes + storage.blob_bytes + storage.preview_bytes)}</span></div>
         <Facts items={[
           ["Database", formatBytes(storage.database_bytes)],
           ["Write-ahead log", formatBytes(storage.write_ahead_log_bytes)],
@@ -312,7 +313,7 @@ function OverviewSection({ accessToken }: { accessToken: string }) {
         ]} />
       </section>
       <section className="shared-settings-group">
-        <div className="shared-panel-heading"><div><Activity size={18} /><h2>Background work</h2></div><span>{background.indexing_queued + background.repository_syncs_running ? "busy" : "idle"}</span></div>
+        <div className="shared-panel-heading"><div><Activity size={ICON_SIZE.lg} /><h2>Background work</h2></div><span>{background.indexing_queued + background.repository_syncs_running ? "busy" : "idle"}</span></div>
         <Facts items={[
           ["Files waiting for indexing", count(background.indexing_queued)],
           ["Workspaces waiting for vectors", count(background.embedding_workspaces_waiting)],
@@ -325,7 +326,7 @@ function OverviewSection({ accessToken }: { accessToken: string }) {
         ]} />
       </section>
       <section className="shared-settings-group">
-        <div className="shared-panel-heading"><div><ShieldCheck size={18} /><h2>Traffic and protection</h2></div><span>since start</span></div>
+        <div className="shared-panel-heading"><div><ShieldCheck size={ICON_SIZE.lg} /><h2>Traffic and protection</h2></div><span>since start</span></div>
         <Facts items={[
           ["Requests", count(traffic.requests)],
           ["Client errors · server errors", `${count(traffic.client_errors)} · ${count(traffic.server_errors)}`],
@@ -338,7 +339,7 @@ function OverviewSection({ accessToken }: { accessToken: string }) {
       </section>
     </div>
     <section className="shared-settings-group">
-      <div className="shared-panel-heading"><div><World size={18} /><h2>Front-end clients</h2></div><span>seen in the last 24 hours</span></div>
+      <div className="shared-panel-heading"><div><World size={ICON_SIZE.lg} /><h2>Front-end clients</h2></div><span>seen in the last 24 hours</span></div>
       {overview.clients.length ? <div className="rm-map-coverage"><table>
         <thead><tr><th scope="col">Client</th><th scope="col">Origin</th><th scope="col">Last address</th><th scope="col">Requests</th><th scope="col">First seen</th><th scope="col">Last seen</th></tr></thead>
         <tbody>{overview.clients.map((client) => <tr key={`${client.origin}-${client.client}-${client.agent}`}>
@@ -362,16 +363,16 @@ function UsageSection({ accessToken, onOpenWorkspace }: { accessToken: string; o
     </div>
     {usage ? <>
       <section className="shared-settings-group">
-        <div className="shared-panel-heading"><div><ChartBar size={18} /><h2>Recorded activity per day</h2></div><span>{count(total)} actions</span></div>
+        <div className="shared-panel-heading"><div><ChartBar size={ICON_SIZE.lg} /><h2>Recorded activity per day</h2></div><span>{count(total)} actions</span></div>
         <BarStrip label={`Recorded activity per day over the last ${usage.days} days`} values={usage.activity_by_day.map((entry) => ({ label: entry.label, value: entry.count }))} />
         <div className="rm-system-axis"><span>{usage.activity_by_day[0]?.label}</span><span>{usage.activity_by_day[usage.activity_by_day.length - 1]?.label}</span></div>
       </section>
       <div className="rm-system-grid">
-        <section className="shared-settings-group"><div className="shared-panel-heading"><div><Activity size={18} /><h2>Activity by kind</h2></div></div><CountTable label="Action" rows={usage.activity_by_action} valueLabel="Times" /></section>
-        <section className="shared-settings-group"><div className="shared-panel-heading"><div><Users size={18} /><h2>Most active people</h2></div></div><CountTable label="Person" rows={usage.top_users} valueLabel="Actions" /></section>
+        <section className="shared-settings-group"><div className="shared-panel-heading"><div><Activity size={ICON_SIZE.lg} /><h2>Activity by kind</h2></div></div><CountTable label="Action" rows={usage.activity_by_action} valueLabel="Times" /></section>
+        <section className="shared-settings-group"><div className="shared-panel-heading"><div><Users size={ICON_SIZE.lg} /><h2>Most active people</h2></div></div><CountTable label="Person" rows={usage.top_users} valueLabel="Actions" /></section>
       </div>
       <section className="shared-settings-group">
-        <div className="shared-panel-heading"><div><Database size={18} /><h2>Workspaces</h2></div><span>{usage.workspaces.length}, largest first</span></div>
+        <div className="shared-panel-heading"><div><Database size={ICON_SIZE.lg} /><h2>Workspaces</h2></div><span>{usage.workspaces.length}, largest first</span></div>
         <div className="rm-map-coverage"><table>
           <thead><tr><th scope="col">Workspace</th><th scope="col">Organization</th><th scope="col">Members</th><th scope="col">Files</th><th scope="col">Size</th><th scope="col">Passages</th><th scope="col">Activity</th><th scope="col">AI requests</th><th scope="col">Last activity</th></tr></thead>
           <tbody>{usage.workspaces.map((workspace) => <tr key={workspace.workspace_id}>
@@ -384,7 +385,7 @@ function UsageSection({ accessToken, onOpenWorkspace }: { accessToken: string; o
   </>;
 }
 
-const ROLE_ICON = { owner: <Crown size={12} />, admin: <ShieldCheck size={12} />, member: <UserIcon size={12} />, viewer: <Eye size={12} /> };
+const ROLE_ICON = { owner: <Crown size={ICON_SIZE.sm} />, admin: <ShieldCheck size={ICON_SIZE.sm} />, member: <UserIcon size={ICON_SIZE.sm} />, viewer: <Eye size={ICON_SIZE.sm} /> };
 
 function RoleTag({ role, title }: { role: "owner" | "admin" | "member" | "viewer"; title: string }) {
   return <span className="rm-system-tag rm-system-role" title={title}>{ROLE_ICON[role]} {role[0].toUpperCase() + role.slice(1)}</span>;
@@ -408,9 +409,9 @@ function AccessTree({ user }: { user: SystemUser }) {
   }
   if (!inherited && !groups.size) return <span className="shared-muted-copy">None</span>;
   return <ul className="rm-system-access">
-    {inherited ? <li><span className="rm-system-tag rm-system-role" title="System administrators are administrators of every organization and workspace"><ShieldCheck size={12} /> All organizations and workspaces · Admin</span></li> : null}
+    {inherited ? <li><span className="rm-system-tag rm-system-role" title="System administrators are administrators of every organization and workspace"><ShieldCheck size={ICON_SIZE.sm} /> All organizations and workspaces · Admin</span></li> : null}
     {Array.from(groups, ([key, group]) => <li key={key}>
-      <span className="rm-system-access-org"><Building size={14} /><strong>{group.name}</strong>{group.role ? <RoleTag role={group.role} title={`${group.role} of the organization ${group.name}`} /> : null}</span>
+      <span className="rm-system-access-org"><Building size={ICON_SIZE.sm} /><strong>{group.name}</strong>{group.role ? <RoleTag role={group.role} title={`${group.role} of the organization ${group.name}`} /> : null}</span>
       {group.workspaces.length ? <ul>{group.workspaces.map((workspace) => <li key={workspace.workspace_id}><span>{workspace.name}</span><RoleTag role={workspace.role} title={`${workspace.role} of the workspace ${workspace.name}`} /></li>)}</ul> : null}
     </li>)}
   </ul>;
@@ -492,27 +493,27 @@ function UsersSection({ accessToken, session }: { accessToken: string; session: 
     {users ? <div className="rm-map-coverage"><table>
       <thead><tr><th scope="col">Person</th><th scope="col">Role</th><th scope="col">Organizations and workspaces</th><th scope="col">Sessions</th><th scope="col">Last connected</th><th scope="col">Joined</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
       <tbody>{visible.map((user) => <tr className={user.deactivated_at ? "rm-system-row-inactive" : undefined} key={user.id}>
-        <th scope="row"><span className="rm-system-person"><UserAvatar name={user.display_name} size={32} userId={user.id} /><span><strong>{user.display_name}{user.id === session.user.id ? " (you)" : ""}</strong><small>{user.email}</small>{user.deactivated_at ? <small><span className="rm-system-tag" title={`Deactivated ${formatTime(user.deactivated_at)}`}><UserOff size={12} /> {user.anonymized_at ? "Anonymized" : "Deactivated"}</span></small> : null}</span></span></th>
-        <td>{user.is_system_admin ? <span className="rm-system-tag rm-system-role" title="Administers the server and every organization and workspace"><ServerCog size={13} /> Sys Admin</span> : user.is_app_admin ? <span className="rm-system-tag rm-system-role" title="Uses the System pages, without access to every organization and workspace"><UserCog size={13} /> App Admin</span> : <span className="rm-system-tag rm-system-role"><UserIcon size={13} /> User</span>}</td>
+        <th scope="row"><span className="rm-system-person"><UserAvatar name={user.display_name} size={32} userId={user.id} /><span><strong>{user.display_name}{user.id === session.user.id ? " (you)" : ""}</strong><small>{user.email}</small>{user.deactivated_at ? <small><span className="rm-system-tag" title={`Deactivated ${formatTime(user.deactivated_at)}`}><UserOff size={ICON_SIZE.sm} /> {user.anonymized_at ? "Anonymized" : "Deactivated"}</span></small> : null}</span></span></th>
+        <td>{user.is_system_admin ? <span className="rm-system-tag rm-system-role" title="Administers the server and every organization and workspace"><ServerCog size={ICON_SIZE.sm} /> Sys Admin</span> : user.is_app_admin ? <span className="rm-system-tag rm-system-role" title="Uses the System pages, without access to every organization and workspace"><UserCog size={ICON_SIZE.sm} /> App Admin</span> : <span className="rm-system-tag rm-system-role"><UserIcon size={ICON_SIZE.sm} /> User</span>}</td>
         <td><AccessTree user={user} /></td><td>{count(user.active_sessions)}</td><td>{formatTime(user.last_connected_at)}</td><td>{formatTime(user.created_at)}</td>
         <td>{session.is_system_admin && !user.anonymized_at ? <ActionMenu items={[
           user.is_system_admin
-            ? { label: "Remove system administrator role", icon: <ShieldOff size={15} />, onSelect: () => setPending({ kind: "revoke", user }), destructive: true }
-            : { label: "Make system administrator", icon: <ShieldCheck size={15} />, onSelect: () => setPending({ kind: "grant", user }) },
+            ? { label: "Remove system administrator role", icon: <ShieldOff size={ICON_SIZE.sm} />, onSelect: () => setPending({ kind: "revoke", user }), destructive: true }
+            : { label: "Make system administrator", icon: <ShieldCheck size={ICON_SIZE.sm} />, onSelect: () => setPending({ kind: "grant", user }) },
           user.is_app_admin
-            ? { label: "Remove app administrator role", icon: <ShieldOff size={15} />, onSelect: () => setPending({ kind: "revoke-app", user }), destructive: true }
-            : { label: "Make app administrator", icon: <UserCog size={15} />, onSelect: () => setPending({ kind: "grant-app", user }) },
-          { label: "Create password reset link", icon: <Key size={15} />, onSelect: () => setPending({ kind: "reset", user }) },
-          { label: "Sign out everywhere", icon: <Logout size={15} />, onSelect: () => setPending({ kind: "sign-out", user }), destructive: true },
-          { label: "Lift sign-in lockout", icon: <LockOpen size={15} />, onSelect: () => void unlock(user) },
+            ? { label: "Remove app administrator role", icon: <ShieldOff size={ICON_SIZE.sm} />, onSelect: () => setPending({ kind: "revoke-app", user }), destructive: true }
+            : { label: "Make app administrator", icon: <UserCog size={ICON_SIZE.sm} />, onSelect: () => setPending({ kind: "grant-app", user }) },
+          { label: "Create password reset link", icon: <Key size={ICON_SIZE.sm} />, onSelect: () => setPending({ kind: "reset", user }) },
+          { label: "Sign out everywhere", icon: <Logout size={ICON_SIZE.sm} />, onSelect: () => setPending({ kind: "sign-out", user }), destructive: true },
+          { label: "Lift sign-in lockout", icon: <LockOpen size={ICON_SIZE.sm} />, onSelect: () => void unlock(user) },
           user.deactivated_at
-            ? { label: "Reactivate account", icon: <UserCheck size={15} />, onSelect: () => setPending({ kind: "reactivate", user }) }
-            : { label: "Deactivate account", icon: <UserOff size={15} />, onSelect: () => setPending({ kind: "deactivate", user }), destructive: true },
-          ...(user.deactivated_at && !user.anonymized_at ? [{ label: "Anonymize account", icon: <UserOff size={15} />, onSelect: () => { setConfirmText(""); setPending({ kind: "anonymize", user }); }, destructive: true }] : []),
+            ? { label: "Reactivate account", icon: <UserCheck size={ICON_SIZE.sm} />, onSelect: () => setPending({ kind: "reactivate", user }) }
+            : { label: "Deactivate account", icon: <UserOff size={ICON_SIZE.sm} />, onSelect: () => setPending({ kind: "deactivate", user }), destructive: true },
+          ...(user.deactivated_at && !user.anonymized_at ? [{ label: "Anonymize account", icon: <UserOff size={ICON_SIZE.sm} />, onSelect: () => { setConfirmText(""); setPending({ kind: "anonymize", user }); }, destructive: true }] : []),
         ]} label={`Actions for ${user.display_name}`} /> : null}</td>
       </tr>)}</tbody>
     </table></div> : <p className="shared-muted-copy">{isLoading ? "Loading users…" : "Users are not available."}</p>}
-    <Dialog description={dialog?.description} footer={<><DialogCancel onClick={() => setPending(null)} /><Button disabled={isBusy || (pending?.kind === "anonymize" && confirmText.trim().toLowerCase() !== pending.user.email.toLowerCase())} onClick={() => void confirm()} type="button" variant="main">{isBusy ? <Loader className="spin" size={16} /> : null}{dialog?.action}</Button></>} onClose={() => setPending(null)} open={Boolean(pending)} title={dialog?.title ?? ""} />
+    <Dialog description={dialog?.description} footer={<><DialogCancel onClick={() => setPending(null)} /><Button disabled={isBusy || (pending?.kind === "anonymize" && confirmText.trim().toLowerCase() !== pending.user.email.toLowerCase())} onClick={() => void confirm()} type="button" variant="main">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : null}{dialog?.action}</Button></>} onClose={() => setPending(null)} open={Boolean(pending)} title={dialog?.title ?? ""} />
     {resetLink ? <SecretDialog description={`Send this link to ${resetLink.user.display_name} (${resetLink.user.email}) through a channel you trust. It lets whoever opens it choose the account's password, once, until ${formatTime(resetLink.expiresAt)}.`} onClose={() => setResetLink(null)} title="Password reset link" value={resetLink.url} /> : null}
   </>;
 }
@@ -538,13 +539,13 @@ function EnvironmentGroup({ accessToken }: { accessToken: string }) {
   }
 
   return <section className="shared-settings-group rm-environment-card">
-    <div className="shared-panel-heading"><div><Unplug size={18} /><h2>Environment</h2></div><span>{platform?.environment ?? "—"}</span></div>
+    <div className="shared-panel-heading"><div><Unplug size={ICON_SIZE.lg} /><h2>Environment</h2></div><span>{platform?.environment ?? "—"}</span></div>
     <p className="shared-muted-copy">All data of this server lives in <code>{platform ? `${platform.folder}/${platform.environment ?? ""}` : "its environment folder"}</code>. Detaching signs everyone out, stops background work and closes the database. The server then waits for an environment to be chosen again, using the code printed on its console. Nothing is deleted.</p>
     {platform?.pinned_environment
-      ? <p className="rm-platform-note" role="note"><AlertCircle size={16} /><span>This server starts with <code>{platform.pinned_environment}</code>, set by <code>REPOMEMO_SERVER_DATA_DIR</code>. Another environment chosen after detaching is used only until the server restarts, then it goes back to <code>{platform.pinned_environment}</code>.</span></p>
-      : <p className="rm-platform-note" role="note"><CircleCheck size={16} /><span>This server remembers the environment chosen in the web app and attaches it again when it restarts. After detaching, the next start shows the environment menu until one is chosen.</span></p>}
-    <div><Button disabled={isBusy || !platform?.environment} onClick={() => setIsConfirming(true)} type="button" variant="secondary"><Unplug size={16} /> Detach environment</Button></div>
-    <Dialog description={<>Everyone, you included, is signed out at once and the server stops serving this environment until an administrator with access to the server console attaches one again.{platform?.pinned_environment ? <> <strong>The switch lasts only until the next restart:</strong> this server starts with <code>{platform.pinned_environment}</code> (<code>REPOMEMO_SERVER_DATA_DIR</code>), so a restart goes back to it whatever is chosen now.</> : <> The environment chosen next is remembered for later restarts.</>}</>} footer={<><DialogCancel onClick={() => setIsConfirming(false)} /><Button disabled={isBusy} onClick={() => void detach()} type="button" variant="main">{isBusy ? <Loader className="spin" size={16} /> : null}Detach environment</Button></>} onClose={() => setIsConfirming(false)} open={isConfirming} title={`Detach ${platform?.environment ?? "the environment"}?`} />
+      ? <p className="rm-platform-note" role="note"><AlertCircle size={ICON_SIZE.md} /><span>This server starts with <code>{platform.pinned_environment}</code>, set by <code>REPOMEMO_SERVER_DATA_DIR</code>. Another environment chosen after detaching is used only until the server restarts, then it goes back to <code>{platform.pinned_environment}</code>.</span></p>
+      : <p className="rm-platform-note" role="note"><CircleCheck size={ICON_SIZE.md} /><span>This server remembers the environment chosen in the web app and attaches it again when it restarts. After detaching, the next start shows the environment menu until one is chosen.</span></p>}
+    <div><Button disabled={isBusy || !platform?.environment} onClick={() => setIsConfirming(true)} type="button" variant="secondary"><Unplug size={ICON_SIZE.md} /> Detach environment</Button></div>
+    <Dialog description={<>Everyone, you included, is signed out at once and the server stops serving this environment until an administrator with access to the server console attaches one again.{platform?.pinned_environment ? <> <strong>The switch lasts only until the next restart:</strong> this server starts with <code>{platform.pinned_environment}</code> (<code>REPOMEMO_SERVER_DATA_DIR</code>), so a restart goes back to it whatever is chosen now.</> : <> The environment chosen next is remembered for later restarts.</>}</>} footer={<><DialogCancel onClick={() => setIsConfirming(false)} /><Button disabled={isBusy} onClick={() => void detach()} type="button" variant="main">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : null}Detach environment</Button></>} onClose={() => setIsConfirming(false)} open={isConfirming} title={`Detach ${platform?.environment ?? "the environment"}?`} />
   </section>;
 }
 
@@ -592,13 +593,13 @@ function SettingsSection({ accessToken, session }: { accessToken: string; sessio
     finally { setIsBusy(false); }
   }
 
-  if (!settings) return <p className="shared-muted-copy"><Loader className="spin" size={14} /> Loading settings…</p>;
+  if (!settings) return <p className="shared-muted-copy"><Loader className="spin" size={ICON_SIZE.sm} /> Loading settings…</p>;
   // App administrators read the settings; system administrators change them.
   const readOnly = !session.is_system_admin;
   return <>
-    {readOnly ? <p className="shared-muted-copy">Read only: only system administrators change these settings.</p> : <div className="rm-system-toolbar"><span className="shared-muted-copy">{changed ? `${changed} unsaved change${changed === 1 ? "" : "s"}` : "No unsaved changes"}</span><div className="rm-system-actions"><Button disabled={!changed || isBusy} onClick={() => setDraft({})} type="button" variant="secondary">Discard</Button><Button disabled={!changed || isBusy} onClick={() => void save()} type="button" variant="main">{isBusy ? <Loader className="spin" size={16} /> : null} Save changes</Button></div></div>}
+    {readOnly ? <p className="shared-muted-copy">Read only: only system administrators change these settings.</p> : <div className="rm-system-toolbar"><span className="shared-muted-copy">{changed ? `${changed} unsaved change${changed === 1 ? "" : "s"}` : "No unsaved changes"}</span><div className="rm-system-actions"><Button disabled={!changed || isBusy} onClick={() => setDraft({})} type="button" variant="secondary">Discard</Button><Button disabled={!changed || isBusy} onClick={() => void save()} type="button" variant="main">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : null} Save changes</Button></div></div>}
     {groups.map(([group, entries]) => <section className="shared-settings-group" key={group}>
-      <div className="shared-panel-heading"><div><Adjustments size={18} /><h2>{group}</h2></div></div>
+      <div className="shared-panel-heading"><div><Adjustments size={ICON_SIZE.lg} /><h2>{group}</h2></div></div>
       <div className="rm-system-settings">{entries.map((setting) => {
         const value = draft[setting.key] ?? setting.value;
         const inputId = `system-setting-${setting.key}`;
@@ -612,7 +613,7 @@ function SettingsSection({ accessToken, session }: { accessToken: string; sessio
               : setting.kind === "choice"
                 ? <Dropdown aria-label={setting.label} disabled={readOnly} id={inputId} onValueChange={(next) => edit(setting, next)} options={setting.options} value={String(value)} />
                 : <span className="rm-system-number"><Input disabled={readOnly} id={inputId} max={setting.max} min={setting.min} onChange={(event) => edit(setting, event.target.value === "" ? setting.min : Number(event.target.value))} type="number" value={String(value)} /><small>{setting.unit}</small></span>}
-            {setting.overridden && !readOnly ? <Button disabled={isBusy} onClick={() => void reset(setting)} type="button" variant="secondary"><Rotate size={15} /> Use default</Button> : null}
+            {setting.overridden && !readOnly ? <Button disabled={isBusy} onClick={() => void reset(setting)} type="button" variant="secondary"><Rotate size={ICON_SIZE.sm} /> Use default</Button> : null}
           </div>
         </div>;
       })}</div>
@@ -620,7 +621,7 @@ function SettingsSection({ accessToken, session }: { accessToken: string; sessio
     <MailSettingsPanel accessToken={accessToken} canChange={session.is_system_admin === true} />
     {session.is_system_admin ? <EnvironmentGroup accessToken={accessToken} /> : null}
     <section className="shared-settings-group">
-      <div className="shared-panel-heading"><div><Server size={18} /><h2>Set by the server environment</h2></div><span>read only</span></div>
+      <div className="shared-panel-heading"><div><Server size={ICON_SIZE.lg} /><h2>Set by the server environment</h2></div><span>read only</span></div>
       <p className="shared-muted-copy">These are chosen by whoever runs the server, through environment variables, and need a restart to change.</p>
       <Facts items={settings.environment.map((fact) => [fact.label, fact.value])} />
     </section>
@@ -686,7 +687,7 @@ function LogsSection({ accessToken, canDownload, onOpenSettings, workspaces }: {
   const workspaceOptions = [{ label: "All workspaces", value: "all" }, ...workspaces.map((entry) => ({ label: entry.workspace.name, value: entry.workspace.id }))];
   return <>
     {files ? <section className="shared-settings-group">
-      <div className="shared-panel-heading"><div><Adjustments size={18} /><h2>What is recorded</h2></div><Button onClick={onOpenSettings} type="button" variant="secondary"><Adjustments size={15} /> Logging settings</Button></div>
+      <div className="shared-panel-heading"><div><Adjustments size={ICON_SIZE.lg} /><h2>What is recorded</h2></div><Button onClick={onOpenSettings} type="button" variant="secondary"><Adjustments size={ICON_SIZE.sm} /> Logging settings</Button></div>
       {files.environment_filter
         ? <p className="shared-muted-copy">The server's RUST_LOG filter is in force: <code>{files.effective_filter}</code>. Choosing levels in Settings replaces it.</p>
         : <Facts items={[
@@ -704,7 +705,7 @@ function LogsSection({ accessToken, canDownload, onOpenSettings, workspaces }: {
     <div className="rm-system-toolbar">
       <Input aria-label="Search logs" onChange={(event) => setQuery(event.target.value)} placeholder="Search message, source or fields" value={query} />
       <div className="rm-system-actions">
-        {isLive ? <label className="shared-ai-provider-toggle"><input checked={follow} onChange={(event) => setFollow(event.target.checked)} type="checkbox" /> Follow</label> : canDownload ? <Button onClick={() => void download()} type="button" variant="secondary"><Download size={15} /> Download {source}</Button> : null}
+        {isLive ? <label className="shared-ai-provider-toggle"><input checked={follow} onChange={(event) => setFollow(event.target.checked)} type="checkbox" /> Follow</label> : canDownload ? <Button onClick={() => void download()} type="button" variant="secondary"><Download size={ICON_SIZE.sm} /> Download {source}</Button> : null}
       </div>
     </div>
     {logs && !logs.capturing ? <p className="shared-muted-copy">This server is not capturing logs in memory; read them from its console or log collector.</p> : null}
@@ -772,7 +773,7 @@ function BackupsPanel({ accessToken, canChange }: { accessToken: string; canChan
 
   const status = overview?.status;
   return <section className="shared-settings-group">
-    <div className="shared-panel-heading"><div><Database size={18} /><h2>Backups</h2></div><span>{running ? `${status?.operation ?? "backup"} running…` : overview ? `${overview.backups.length} kept` : "loading"}</span></div>
+    <div className="shared-panel-heading"><div><Database size={ICON_SIZE.lg} /><h2>Backups</h2></div><span>{running ? `${status?.operation ?? "backup"} running…` : overview ? `${overview.backups.length} kept` : "loading"}</span></div>
     <p className="shared-muted-copy">A backup holds a consistent copy of the database, the stored files and the key file, made while the server runs. It sits in the data folder, so copy it to another machine for it to survive a lost disk, or set REPOMEMO_BACKUP_COPY_DIR and the server copies each backup there and checks the copy. Unless it is encrypted, protect it like the data; with REPOMEMO_BACKUP_KEY set, every file in it is sealed and restoring needs that same key, which is kept nowhere in the backup. Restoring never touches the running environment: it creates a new one, which you attach from the environment menu.</p>
     <Facts items={[
       ["Folder", <code key="dir">{overview?.directory ?? "—"}</code>],
@@ -782,7 +783,7 @@ function BackupsPanel({ accessToken, canChange }: { accessToken: string; canChan
       ["Free disk", overview?.disk_free_bytes != null ? formatBytes(overview.disk_free_bytes) : "unknown"],
       ["Last backup or restore", status?.finished_at ? `${formatTime(status.finished_at)} · ${status.message ?? ""}` : "none since the server started"],
     ]} />
-    {canChange ? <div><Button disabled={isBusy || running} onClick={() => void backUp()} type="button" variant="main">{running ? <Loader className="spin" size={16} /> : <Database size={16} />} Back up now</Button>{overview?.copy_directory && overview.backups.some((backup) => !backup.copy) ? <Button disabled={isBusy || running} onClick={() => void copyNow()} type="button" variant="secondary">Copy to the second location now</Button> : null}</div> : <p className="shared-muted-copy">Only system administrators make, restore and delete backups.</p>}
+    {canChange ? <div><Button disabled={isBusy || running} onClick={() => void backUp()} type="button" variant="main">{running ? <Loader className="spin" size={ICON_SIZE.md} /> : <Database size={ICON_SIZE.md} />} Back up now</Button>{overview?.copy_directory && overview.backups.some((backup) => !backup.copy) ? <Button disabled={isBusy || running} onClick={() => void copyNow()} type="button" variant="secondary">Copy to the second location now</Button> : null}</div> : <p className="shared-muted-copy">Only system administrators make, restore and delete backups.</p>}
     {overview?.backups.length ? <div className="rm-map-coverage"><table>
       <thead><tr><th scope="col">Backup</th><th scope="col">Made</th><th scope="col">Version</th><th scope="col">Files</th><th scope="col">Database</th><th scope="col">Key</th>{overview.copy_directory ? <th scope="col">Second copy</th> : null}{canChange ? <th scope="col"><span className="sr-only">Actions</span></th> : null}</tr></thead>
       <tbody>{overview.backups.map((backup) => <tr key={backup.name}>
@@ -797,10 +798,10 @@ function BackupsPanel({ accessToken, canChange }: { accessToken: string; canChan
         ]} label={`Actions for ${backup.name}`} /></td> : null}
       </tr>)}</tbody>
     </table></div> : <p className="shared-muted-copy">{overview ? "No backups yet." : "Loading backups…"}</p>}
-    <Dialog description="The backup is copied into a new environment folder under workspace-data and checked: it must open. The running environment is not changed. Attach the new one from the environment menu when you want to use it." footer={<><DialogCancel onClick={() => setRestoring(null)} /><Button disabled={isBusy || !environment.trim()} onClick={() => void restore()} type="button" variant="main">{isBusy ? <Loader className="spin" size={16} /> : null}Restore</Button></>} onClose={() => setRestoring(null)} open={Boolean(restoring)} title={`Restore ${restoring ?? "the backup"}`}>
+    <Dialog description="The backup is copied into a new environment folder under workspace-data and checked: it must open. The running environment is not changed. Attach the new one from the environment menu when you want to use it." footer={<><DialogCancel onClick={() => setRestoring(null)} /><Button disabled={isBusy || !environment.trim()} onClick={() => void restore()} type="button" variant="main">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : null}Restore</Button></>} onClose={() => setRestoring(null)} open={Boolean(restoring)} title={`Restore ${restoring ?? "the backup"}`}>
       <label className="rm-system-inline">New environment name<Input aria-label="New environment name" onChange={(event) => setEnvironment(event.target.value)} placeholder="restored-2026-10" value={environment} /></label>
     </Dialog>
-    <Dialog description="The backup is deleted from the backups folder. Other backups that share its stored files keep them." footer={<><DialogCancel onClick={() => setDeleting(null)} /><Button disabled={isBusy} onClick={() => void remove()} type="button" variant="main">{isBusy ? <Loader className="spin" size={16} /> : null}Delete backup</Button></>} onClose={() => setDeleting(null)} open={Boolean(deleting)} title={`Delete ${deleting ?? "the backup"}?`} />
+    <Dialog description="The backup is deleted from the backups folder. Other backups that share its stored files keep them." footer={<><DialogCancel onClick={() => setDeleting(null)} /><Button disabled={isBusy} onClick={() => void remove()} type="button" variant="main">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : null}Delete backup</Button></>} onClose={() => setDeleting(null)} open={Boolean(deleting)} title={`Delete ${deleting ?? "the backup"}?`} />
   </section>;
 }
 
@@ -838,7 +839,7 @@ function JobsSection({ accessToken, canChange }: { accessToken: string; canChang
     <MaintenancePanel accessToken={accessToken} onChanged={setMaintenance} status={maintenance} />
     <BackupsPanel accessToken={accessToken} canChange={canChange} />
     <section className="shared-settings-group">
-      <div className="shared-panel-heading"><div><Activity size={18} /><h2>Jobs</h2></div><span>{isLive ? "newest first · live" : "newest first · refreshes every 10 seconds"}</span></div>
+      <div className="shared-panel-heading"><div><Activity size={ICON_SIZE.lg} /><h2>Jobs</h2></div><span>{isLive ? "newest first · live" : "newest first · refreshes every 10 seconds"}</span></div>
       <div className="rm-system-toolbar">
         <label className="rm-system-inline">Status<Dropdown aria-label="Job status" onValueChange={setStatus} options={[{ label: "All", value: "all" }, { label: "Running", value: "running" }, { label: "Failed", value: "failed" }, { label: "Completed", value: "completed" }, { label: "Cancelled", value: "cancelled" }]} value={status} /></label>
         <RefreshButton isLoading={isLoading} onClick={() => void reload()} />
@@ -886,13 +887,13 @@ function AuditSection({ accessToken, canExport }: { accessToken: string; canExpo
 
   return <>
     {canExport ? <section className="shared-settings-group rm-audit-export">
-      <div className="shared-panel-heading"><div><Download size={18} /><h2>Export the audit trail</h2></div><span>JSON lines or CSV</span></div>
+      <div className="shared-panel-heading"><div><Download size={ICON_SIZE.lg} /><h2>Export the audit trail</h2></div><span>JSON lines or CSV</span></div>
       <p className="shared-muted-copy">Every event of a range of days (UTC), oldest first, for an auditor or a log store. Leave both days empty for the whole trail. The export is recorded here, and a CSV cell that a spreadsheet could run as a formula is marked with an apostrophe.</p>
       <div className="rm-system-toolbar">
         <label className="rm-system-inline">Format<Dropdown aria-label="Export format" onValueChange={(value) => setFormat(value === "csv" ? "csv" : "jsonl")} options={[{ label: "JSON lines", value: "jsonl" }, { label: "CSV", value: "csv" }]} value={format} /></label>
         <label className="rm-system-inline">From<Input aria-label="From day" max={to || undefined} onChange={(event) => setFrom(event.target.value)} type="date" value={from} /></label>
         <label className="rm-system-inline">To<Input aria-label="To day" min={from || undefined} onChange={(event) => setTo(event.target.value)} type="date" value={to} /></label>
-        <Button disabled={isExporting} onClick={() => void exportTrail()} type="button" variant="secondary">{isExporting ? <Loader className="spin" size={16} /> : <Download size={16} />} Download</Button>
+        <Button disabled={isExporting} onClick={() => void exportTrail()} type="button" variant="secondary">{isExporting ? <Loader className="spin" size={ICON_SIZE.md} /> : <Download size={ICON_SIZE.md} />} Download</Button>
       </div>
     </section> : null}
     <div className="rm-system-toolbar"><span className="shared-muted-copy">The 200 most recent events. Sign-in and other security events are under Logs › Security events only.</span><RefreshButton isLoading={isLoading} onClick={() => void reload()} /></div>

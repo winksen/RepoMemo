@@ -1,6 +1,7 @@
 import { IconChevronLeft as ChevronLeft, IconChevronRight as ChevronRight } from "@tabler/icons-react";
 import { useEffect } from "react";
 import { Button } from "./button";
+import { ICON_SIZE } from "./icon";
 
 export const DEFAULT_PAGE_SIZE = 24;
 
@@ -25,9 +26,9 @@ export function Pagination({ onPageChange, page, pageSize = DEFAULT_PAGE_SIZE, t
   return <nav aria-label="Pagination" className="rm-pagination">
     <span>{first}–{last} of {total}</span>
     <div>
-      <Button aria-label="Previous page" disabled={page === 0} onClick={() => onPageChange(page - 1)} type="button" variant="secondary"><ChevronLeft size={16} /></Button>
+      <Button aria-label="Previous page" disabled={page === 0} onClick={() => onPageChange(page - 1)} type="button" variant="secondary"><ChevronLeft size={ICON_SIZE.md} /></Button>
       <span aria-current="page">Page {page + 1} of {pageCount}</span>
-      <Button aria-label="Next page" disabled={page >= pageCount - 1} onClick={() => onPageChange(page + 1)} type="button" variant="secondary"><ChevronRight size={16} /></Button>
+      <Button aria-label="Next page" disabled={page >= pageCount - 1} onClick={() => onPageChange(page + 1)} type="button" variant="secondary"><ChevronRight size={ICON_SIZE.md} /></Button>
     </div>
   </nav>;
 }

@@ -1,5 +1,6 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { IconAlertCircle, IconAlertTriangle, IconCircleCheck, IconInfoCircle, IconX } from "@tabler/icons-react";
+import { ICON_SIZE } from "./icon";
 
 export type ToastKind = "error" | "success" | "warning" | "info";
 
@@ -79,9 +80,9 @@ export function ToastViewport() {
             onMouseLeave={() => startTimer(item.id, 2500)}
             role={item.kind === "error" ? "alert" : "status"}
           >
-            <Icon className="rm-toast-icon" size={18} />
+            <Icon className="rm-toast-icon" size={ICON_SIZE.lg} />
             <p>{item.message}</p>
-            <button aria-label="Dismiss notification" className="rm-toast-close" onClick={() => dismissToast(item.id)} type="button"><IconX size={14} /></button>
+            <button aria-label="Dismiss notification" className="rm-toast-close" onClick={() => dismissToast(item.id)} type="button"><IconX size={ICON_SIZE.sm} /></button>
           </div>
         );
       })}

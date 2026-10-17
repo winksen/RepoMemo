@@ -8,6 +8,7 @@ import { showToast } from "../components/ui/toast";
 import { renderHighlightedSnippet } from "./common";
 import { apiMessage, artifactTypeLabel } from "./format";
 import { navigate, routePath } from "./router";
+import { ICON_SIZE } from "../components/ui/icon";
 
 /** One search over every workspace the account can read; each result names its workspace. */
 export function CrossWorkspaceSearch({ accessToken }: { accessToken: string }) {
@@ -29,11 +30,11 @@ export function CrossWorkspaceSearch({ accessToken }: { accessToken: string }) {
 
   const notes = found?.workspaces.filter((workspace) => workspace.note) ?? [];
   return <section aria-label="Search all workspaces" className="shared-cross-search">
-    <div className="shared-panel-heading"><div><Search size={18} /><h2>Search all workspaces</h2></div></div>
+    <div className="shared-panel-heading"><div><Search size={ICON_SIZE.lg} /><h2>Search all workspaces</h2></div></div>
     <form className="shared-retrieval-search" onSubmit={(event) => void run(event)}>
       <div className="shared-retrieval-filter-row">
         <Input aria-label="Search every workspace you can read" onChange={(event) => setQuery(event.target.value)} placeholder="Search the evidence of every workspace you can read" value={query} />
-        <Button disabled={isSearching || !query.trim()} type="submit" variant="main">{isSearching ? <Loader className="spin" size={16} /> : <Search size={16} />} Search</Button>
+        <Button disabled={isSearching || !query.trim()} type="submit" variant="main">{isSearching ? <Loader className="spin" size={ICON_SIZE.md} /> : <Search size={ICON_SIZE.md} />} Search</Button>
       </div>
     </form>
     {found ? <div className="shared-search-results" aria-live="polite">

@@ -12,6 +12,7 @@ import { apiMessage, formatActivityTime, isAiActivity } from "../format";
 import { ContributionCalendar } from "../common";
 import { useActivity, useActivityCalendar, useCapabilities, useMembers } from "./data";
 import { type WorkspacePage, sectionState } from "./page";
+import { ICON_SIZE } from "../../components/ui/icon";
 
 export function PeopleSection({ page }: { page: WorkspacePage }) {
   const { accessToken, workspace, workspaceId, session, canWrite, canManageMembers, canAssignAdmin, canManageWorkspace, isSubmitting, setIsSubmitting, setError, load } = page;
@@ -66,7 +67,7 @@ export function PeopleSection({ page }: { page: WorkspacePage }) {
   return (
 <>
             <div className="shared-members-section">
-              <div className="shared-panel-heading"><div><Users size={18} /><h2>Workspace team</h2></div><span>{members.length}</span></div>
+              <div className="shared-panel-heading"><div><Users size={ICON_SIZE.lg} /><h2>Workspace team</h2></div><span>{members.length}</span></div>
               <p className="shared-muted-copy">{canManageMembers ? "Add people and manage their access to this workspace." : "Your workspace role does not allow membership changes."}</p>
               <div className="shared-capabilities" aria-label="Your workspace capabilities" role="group">
                 <strong>Your {capabilities?.role ?? workspace.role} access</strong>
@@ -92,9 +93,9 @@ export function PeopleSection({ page }: { page: WorkspacePage }) {
             </div>
             <div className="shared-activity-section">
               <ContributionCalendar items={activityCalendar?.activity_by_day ?? []} title="Workspace activity" total={activityCalendar?.total_activity_count} />
-              <div className="shared-panel-heading"><div><Timeline size={18} /><h2>Activity history</h2></div><span>{visibleActivity.length}</span></div>
+              <div className="shared-panel-heading"><div><Timeline size={ICON_SIZE.lg} /><h2>Activity history</h2></div><span>{visibleActivity.length}</span></div>
               <div aria-label="Activity type" className="shared-activity-filter" role="group">
-                {([["user", "User activity", userActivity.length], ["ai", "AI activity", aiActivity.length]] as const).map(([value, label, count]) => <Button aria-pressed={activityKind === value} className={activityKind === value ? "active" : ""} key={value} onClick={() => setActivityKind(value)} type="button" variant="secondary">{value === "ai" ? <Sparkles size={14} /> : <Users size={14} />}{label} <span>{count}</span></Button>)}
+                {([["user", "User activity", userActivity.length], ["ai", "AI activity", aiActivity.length]] as const).map(([value, label, count]) => <Button aria-pressed={activityKind === value} className={activityKind === value ? "active" : ""} key={value} onClick={() => setActivityKind(value)} type="button" variant="secondary">{value === "ai" ? <Sparkles size={ICON_SIZE.sm} /> : <Users size={ICON_SIZE.sm} />}{label} <span>{count}</span></Button>)}
               </div>
               {visibleActivity.length ? <div className="shared-activity-list">{visibleActivity.map((event) => <article key={event.id}><div><strong>{event.summary}</strong><span>{activityKind === "ai" ? `Requested by ${event.actor?.display_name ?? "Unknown"}` : (event.actor?.display_name ?? "System")} · {event.action.replace(/_/g, " ")}</span></div><time dateTime={event.created_at}>{formatActivityTime(event.created_at)}</time></article>)}</div> : <div className="shared-empty-state">{activityKind === "ai" ? <Sparkles size={25} /> : <Timeline size={25} />}<strong>{activityKind === "ai" ? "No AI activity yet" : "No recorded activity yet"}</strong><span>{activityKind === "ai" ? "Assistant questions and generated answers will appear here." : "New workspace changes will appear here."}</span></div>}
             </div>

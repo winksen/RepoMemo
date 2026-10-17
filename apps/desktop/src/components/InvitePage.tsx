@@ -7,6 +7,7 @@ import { ThemeToggle } from "./SharedLayout";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { showToast } from "./ui/toast";
+import { ICON_SIZE } from "./ui/icon";
 
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
@@ -116,11 +117,11 @@ export function InvitePage({
           <h2>This link cannot be used</h2>
           <p>{problem}</p>
           <Button onClick={() => window.location.assign(session ? "/dashboard" : "/login")} type="button" variant="secondary">{session ? "Go to the dashboard" : "Go to sign-in"}</Button>
-        </div> : !preview ? <p className="shared-muted-copy"><Loader className="spin" size={16} /> Checking the invitation…</p> : session ? (isInvitedAccount ? <div className="shared-auth-heading">
+        </div> : !preview ? <p className="shared-muted-copy"><Loader className="spin" size={ICON_SIZE.md} /> Checking the invitation…</p> : session ? (isInvitedAccount ? <div className="shared-auth-heading">
           <p className="shared-eyebrow">Signed in as {session.user.display_name}</p>
           <h2>Join {place}</h2>
           <p>You will join as {preview.role}. If you already have a higher role there, you keep it.</p>
-          <Button disabled={isBusy} onClick={() => void joinSignedIn()} type="button" variant="main">{isBusy ? <Loader className="spin" size={17} /> : <MailForward size={17} />} Accept the invitation</Button>
+          <Button disabled={isBusy} onClick={() => void joinSignedIn()} type="button" variant="main">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : <MailForward size={ICON_SIZE.md} />} Accept the invitation</Button>
         </div> : <div className="shared-auth-heading">
           <p className="shared-eyebrow">Another account</p>
           <h2>This invitation is for {preview.email}</h2>
@@ -136,7 +137,7 @@ export function InvitePage({
             {preview.account_exists ? null : <label>Display name<Input autoComplete="name" maxLength={120} onChange={(event) => setDisplayName(event.target.value)} placeholder="Ada Lovelace" required value={displayName} /></label>}
             <label>Email<Input autoComplete="email" readOnly type="email" value={preview.email} /></label>
             <label>Password<Input autoComplete={preview.account_exists ? "current-password" : "new-password"} minLength={12} onChange={(event) => setPassword(event.target.value)} placeholder="At least 12 characters" required type="password" value={password} /></label>
-            <Button disabled={isBusy} type="submit" variant="main">{isBusy ? <Loader className="spin" size={17} /> : <ArrowRight size={17} />} {preview.account_exists ? "Sign in and join" : "Create account and join"}</Button>
+            <Button disabled={isBusy} type="submit" variant="main">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : <ArrowRight size={ICON_SIZE.md} />} {preview.account_exists ? "Sign in and join" : "Create account and join"}</Button>
           </form>
         </>}
       </div>

@@ -15,15 +15,16 @@ import type { HealthAction, HealthDetector, HealthEvidence, HealthFinding, Works
 import { Button } from "./ui/button";
 import { useLiveRefresh } from "../lib/liveEvents";
 import { showToast } from "./ui/toast";
+import { ICON_SIZE } from "./ui/icon";
 
 const DETECTORS: Record<HealthDetector, { label: string; looksFor: string; icon: ReactNode }> = {
-  older_version_active: { label: "Older versions", looksFor: "An earlier upload of a file still active next to the latest one.", icon: <Versions size={16} /> },
-  duplicate_content: { label: "Duplicates", looksFor: "Files with byte-for-byte identical content.", icon: <Copy size={16} /> },
-  removed_symbol_mentioned: { label: "Removed code", looksFor: "Documents naming a function or type the latest version of its file no longer defines.", icon: <Code size={16} /> },
-  outdated_evidence_referenced: { label: "Outdated references", looksFor: "Files naming a file marked outdated or superseded.", icon: <LinkOff size={16} /> },
-  stale_memory_citation: { label: "Stale memory", looksFor: "Memory cards whose cited passages changed, disappeared or were retired.", icon: <LinkOff size={16} /> },
-  index_failed: { label: "Indexing failures", looksFor: "Files search cannot see because indexing failed.", icon: <FileAlert size={16} /> },
-  unconnected: { label: "Unconnected", looksFor: "Files close in meaning to nothing else and cited by no memory. Information only.", icon: <Unconnected size={16} /> },
+  older_version_active: { label: "Older versions", looksFor: "An earlier upload of a file still active next to the latest one.", icon: <Versions size={ICON_SIZE.md} /> },
+  duplicate_content: { label: "Duplicates", looksFor: "Files with byte-for-byte identical content.", icon: <Copy size={ICON_SIZE.md} /> },
+  removed_symbol_mentioned: { label: "Removed code", looksFor: "Documents naming a function or type the latest version of its file no longer defines.", icon: <Code size={ICON_SIZE.md} /> },
+  outdated_evidence_referenced: { label: "Outdated references", looksFor: "Files naming a file marked outdated or superseded.", icon: <LinkOff size={ICON_SIZE.md} /> },
+  stale_memory_citation: { label: "Stale memory", looksFor: "Memory cards whose cited passages changed, disappeared or were retired.", icon: <LinkOff size={ICON_SIZE.md} /> },
+  index_failed: { label: "Indexing failures", looksFor: "Files search cannot see because indexing failed.", icon: <FileAlert size={ICON_SIZE.md} /> },
+  unconnected: { label: "Unconnected", looksFor: "Files close in meaning to nothing else and cited by no memory. Information only.", icon: <Unconnected size={ICON_SIZE.md} /> },
 };
 
 /** Activity that can change what Health reports. */
@@ -119,25 +120,25 @@ export function WorkspaceHealthPanel({
   return <section className="rm-health" aria-busy={isRefreshing}>
     <div className="rm-map-toolbar">
       <span>{health.findings.length ? `${health.findings.length} finding${health.findings.length === 1 ? "" : "s"}` : "No findings"} across {health.checked_file_count.toLocaleString()} file{health.checked_file_count === 1 ? "" : "s"} in use</span>
-      <Button disabled={isRefreshing} onClick={() => void load()} type="button" variant="secondary"><Refresh size={15} /> Check again</Button>
+      <Button disabled={isRefreshing} onClick={() => void load()} type="button" variant="secondary"><Refresh size={ICON_SIZE.sm} /> Check again</Button>
     </div>
     {!canAct ? <p className="rm-map-notice">You can review findings. Only workspace owners and administrators can act on them.</p> : null}
 
     <section className="rm-map-section" aria-labelledby="rm-health-findings-title">
-      <div className="shared-panel-heading"><div><Stethoscope size={18} /><h2 id="rm-health-findings-title">Needs attention</h2></div></div>
+      <div className="shared-panel-heading"><div><Stethoscope size={ICON_SIZE.lg} /><h2 id="rm-health-findings-title">Needs attention</h2></div></div>
       {warnings.length
         ? <ul className="rm-health-list">{warnings.map((finding) => <FindingCard busy={pending === finding.fingerprint} canAct={canAct} finding={finding} key={finding.fingerprint} onAct={act} onOpenArtifact={onOpenArtifact} />)}</ul>
         : <p className="shared-muted-copy">Nothing needs attention. Findings you act on or dismiss stay hidden until the files change.</p>}
     </section>
 
     {info.length ? <section className="rm-map-section" aria-labelledby="rm-health-info-title">
-      <div className="shared-panel-heading"><div><Unconnected size={18} /><h2 id="rm-health-info-title">For information</h2></div></div>
+      <div className="shared-panel-heading"><div><Unconnected size={ICON_SIZE.lg} /><h2 id="rm-health-info-title">For information</h2></div></div>
       <p className="rm-map-intro">A weak signal: a file unlike the rest can be the most valuable one here. Check that it belongs; nothing is suggested for removal.</p>
       <ul className="rm-health-list">{info.map((finding) => <FindingCard busy={pending === finding.fingerprint} canAct={canAct} finding={finding} key={finding.fingerprint} onAct={act} onOpenArtifact={onOpenArtifact} />)}</ul>
     </section> : null}
 
     <section className="rm-map-section" aria-labelledby="rm-health-checks-title">
-      <div className="shared-panel-heading"><div><FileAlert size={18} /><h2 id="rm-health-checks-title">Checks</h2></div></div>
+      <div className="shared-panel-heading"><div><FileAlert size={ICON_SIZE.lg} /><h2 id="rm-health-checks-title">Checks</h2></div></div>
       <p className="rm-map-intro">Every check reads stored facts only: versions, content hashes, indexed code symbols, lifecycle states and index results. No AI provider is called. Acted-on and dismissed counts show which checks are worth keeping.</p>
       <div className="rm-map-coverage">
         <table>

@@ -3,6 +3,7 @@ import { IconDownload as Download, IconPackageExport as PackageExport } from "@t
 import { downloadSharedWorkspaceArchive } from "../lib/sharedApi";
 import { Button } from "./ui/button";
 import { showToast } from "./ui/toast";
+import { ICON_SIZE } from "./ui/icon";
 
 /** Downloads the workspace as one archive file. Shown to owners and administrators. */
 export function WorkspaceExportSettings({ accessToken, workspaceId }: { accessToken: string; workspaceId: string }) {
@@ -28,9 +29,9 @@ export function WorkspaceExportSettings({ accessToken, workspaceId }: { accessTo
 
   return (
     <section className="shared-settings-group">
-      <div className="shared-panel-heading"><div><PackageExport size={18} /><h2>Export this workspace</h2></div><span>owners and administrators</span></div>
+      <div className="shared-panel-heading"><div><PackageExport size={ICON_SIZE.lg} /><h2>Export this workspace</h2></div><span>owners and administrators</span></div>
       <p className="shared-muted-copy">One file with the evidence and its original files, folders, memory cards with their citations, tasks, comments and each file's lifecycle history, plus a manifest. People are carried by name and address, never by account. Settings that hold secrets (AI provider keys, repository and tracker tokens) are not included.</p>
-      <div><Button disabled={isExporting} onClick={() => void exportWorkspace()} type="button" variant="secondary"><Download size={16} /> {isExporting ? "Preparing the archive…" : "Download archive"}</Button></div>
+      <div><Button disabled={isExporting} onClick={() => void exportWorkspace()} type="button" variant="secondary"><Download size={ICON_SIZE.md} /> {isExporting ? "Preparing the archive…" : "Download archive"}</Button></div>
     </section>
   );
 }

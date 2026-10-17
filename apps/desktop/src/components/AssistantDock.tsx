@@ -10,6 +10,7 @@ import { onAssistantCommand } from "../lib/assistantBridge";
 import { NARROW_QUERY, useMediaQuery } from "../lib/useMediaQuery";
 import { AssistantPanel } from "./AssistantPanel";
 import { Button } from "./ui/button";
+import { ICON_SIZE } from "./ui/icon";
 
 const DOCK_STORAGE_KEY = "repomemo.assistant.dock";
 const DEFAULT_WIDTH = 400;
@@ -112,12 +113,12 @@ export function AssistantDock({ accessToken, onOpenArtifact, workspaceId }: { ac
   return <>
     {narrow && sheetOpen ? <button aria-label="Close assistant" className="shared-assistant-backdrop" onClick={() => toggle(false)} tabIndex={-1} type="button" /> : null}
     <aside aria-label="Workspace assistant" className={`shared-assistant-dock${isOpen ? "" : " collapsed"}${narrow ? " sheet" : ""}`} onKeyDown={closeSheetWithEscape} ref={dock} style={isOpen && !narrow ? { width } : undefined} tabIndex={narrow && sheetOpen ? -1 : undefined}>
-    {isOpen ? null : <Button aria-expanded={false} aria-label="Open assistant" onClick={() => toggle(true)} ref={opener} title="Open assistant" type="button" variant="secondary"><Expand size={18} /><Sparkles size={16} /><span className="shared-assistant-fab-label">Assistant</span></Button>}
+    {isOpen ? null : <Button aria-expanded={false} aria-label="Open assistant" onClick={() => toggle(true)} ref={opener} title="Open assistant" type="button" variant="secondary"><Expand size={ICON_SIZE.lg} /><Sparkles size={ICON_SIZE.md} /><span className="shared-assistant-fab-label">Assistant</span></Button>}
     <div className="shared-assistant-dock-body" hidden={!isOpen}>
       <div aria-label="Resize assistant" aria-orientation="vertical" aria-valuemax={MAX_WIDTH} aria-valuemin={MIN_WIDTH} aria-valuenow={width} className="shared-assistant-resize" onKeyDown={resizeWithKeys} onPointerDown={startResize} role="separator" tabIndex={0} />
       <header className="shared-assistant-dock-header">
-        <span><Sparkles size={16} /> Assistant</span>
-        <Button aria-expanded onClick={() => toggle(false)} aria-label={narrow ? "Close assistant" : "Shrink assistant"} title={narrow ? "Close assistant" : "Shrink assistant"} type="button" variant="secondary">{narrow ? <Close size={16} /> : <Collapse size={16} />}</Button>
+        <span><Sparkles size={ICON_SIZE.md} /> Assistant</span>
+        <Button aria-expanded onClick={() => toggle(false)} aria-label={narrow ? "Close assistant" : "Shrink assistant"} title={narrow ? "Close assistant" : "Shrink assistant"} type="button" variant="secondary">{narrow ? <Close size={ICON_SIZE.md} /> : <Collapse size={ICON_SIZE.md} />}</Button>
       </header>
       {hasOpened ? <AssistantPanel accessToken={accessToken} key={workspaceId} onOpenArtifact={onOpenArtifact} workspaceId={workspaceId} /> : null}
     </div>

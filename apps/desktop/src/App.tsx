@@ -96,6 +96,7 @@ import type {
   Workspace,
   WorkspaceOverview,
 } from "./types";
+import { ICON_SIZE } from "./components/ui/icon";
 
 type LoadState = "idle" | "loading" | "ready" | "error";
 type View = "workspaces" | "import" | "documents" | "artifacts" | "search" | "summary" | "ask" | "memory" | "settings";
@@ -840,7 +841,7 @@ function LocalDesktopApp() {
 
         <section className="storage-panel" aria-label="Storage settings">
           <div className="panel-icon" aria-hidden="true">
-            <HardDrive size={17} />
+            <HardDrive size={ICON_SIZE.md} />
           </div>
           <div>
             <p className="panel-label">Storage root</p>
@@ -854,7 +855,7 @@ function LocalDesktopApp() {
           {activeView === "workspaces" ? (
             <>
               <div className="workspace-header-copy">
-                <p className="workspace-breadcrumb"><span>Library</span><ChevronRight size={13} /> Workspaces</p>
+                <p className="workspace-breadcrumb"><span>Library</span><ChevronRight size={ICON_SIZE.sm} /> Workspaces</p>
                 <div className="workspace-heading-line">
                   <h2>Workspaces</h2>
                   <span>{workspaces.length}</span>
@@ -868,30 +869,30 @@ function LocalDesktopApp() {
                     <small>Private on this device</small>
                   </span>
                 </div>
-                <button aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} aria-pressed={theme === "dark"} className="icon-button workspace-theme-button" onClick={() => setTheme((current) => current === "dark" ? "light" : "dark")} title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} type="button">{theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}</button>
+                <button aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} aria-pressed={theme === "dark"} className="icon-button workspace-theme-button" onClick={() => setTheme((current) => current === "dark" ? "light" : "dark")} title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} type="button">{theme === "dark" ? <Sun size={ICON_SIZE.md} /> : <Moon size={ICON_SIZE.md} />}</button>
                 <button
                   className={`workspace-new-button ${selectedWorkspace ? "secondary" : "primary"}`}
                   type="button"
                   onClick={() => document.getElementById("workspace-name")?.focus()}
                 >
-                  <Plus size={16} /> New workspace
+                  <Plus size={ICON_SIZE.md} /> New workspace
                 </button>
               </div>
             </>
           ) : (
             <>
               <div className="workspace-header-copy">
-            <p className="workspace-breadcrumb"><span>{viewMeta[activeView].section}</span><ChevronRight size={13} /> {viewMeta[activeView].title}</p>
+            <p className="workspace-breadcrumb"><span>{viewMeta[activeView].section}</span><ChevronRight size={ICON_SIZE.sm} /> {viewMeta[activeView].title}</p>
             <h2>{viewMeta[activeView].title}</h2>
           </div>
           <div className="header-actions workspace-header-actions">
-            {selectedWorkspace ? <div className="workspace-context-chip"><Layers3 size={14} /><span>{selectedWorkspace.name}</span></div> : null}
+            {selectedWorkspace ? <div className="workspace-context-chip"><Layers3 size={ICON_SIZE.sm} /><span>{selectedWorkspace.name}</span></div> : null}
             <StatusBadge tone={loadState === "error" ? "danger" : loadState === "ready" ? "success" : "warning"}>
-              {loadState === "error" ? <X size={15} /> : loadState === "ready" ? <CheckCircle2 size={15} /> : <Loader2 className="spin" size={15} />}
+              {loadState === "error" ? <X size={ICON_SIZE.sm} /> : loadState === "ready" ? <CheckCircle2 size={ICON_SIZE.sm} /> : <Loader2 className="spin" size={ICON_SIZE.sm} />}
               {loadState === "error" ? "Local core unavailable" : loadState === "ready" ? "Local core ready" : "Booting core"}
             </StatusBadge>
             <StatusBadge tone={indexingTone === "error" ? "danger" : indexingTone === "attention" ? "warning" : indexingTone === "ready" ? "success" : "neutral"}>
-              <RefreshCw className={indexingActive ? "spin" : undefined} size={14} />
+              <RefreshCw className={indexingActive ? "spin" : undefined} size={ICON_SIZE.sm} />
               Index {indexingLabel}
             </StatusBadge>
             <StatusBadge tone={settings?.ai_enabled ? "success" : "neutral"}>
@@ -900,7 +901,7 @@ function LocalDesktopApp() {
             <StatusBadge tone={activeProvider ? "success" : "neutral"}>
               {activeProvider ? `${activeProvider.provider_type === "openrouter" ? "Cloud" : "Local"} AI` : "AI off"}
             </StatusBadge>
-            <button aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} aria-pressed={theme === "dark"} className="icon-button workspace-theme-button" onClick={() => setTheme((current) => current === "dark" ? "light" : "dark")} title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} type="button">{theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}</button>
+            <button aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} aria-pressed={theme === "dark"} className="icon-button workspace-theme-button" onClick={() => setTheme((current) => current === "dark" ? "light" : "dark")} title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} type="button">{theme === "dark" ? <Sun size={ICON_SIZE.md} /> : <Moon size={ICON_SIZE.md} />}</button>
               </div>
             </>
           )}
@@ -1046,7 +1047,7 @@ function LocalDesktopApp() {
 
         <section className="status-module">
           <div className="status-module-title">
-            <Database size={15} aria-hidden="true" />
+            <Database size={ICON_SIZE.sm} aria-hidden="true" />
             <span>Local database</span>
             <strong>{loadState === "error" ? "Unavailable" : loadState === "ready" ? "Ready" : "Starting"}</strong>
           </div>
@@ -1059,7 +1060,7 @@ function LocalDesktopApp() {
 
         <section className="status-module">
           <div className="status-module-title">
-            <HardDrive size={15} aria-hidden="true" />
+            <HardDrive size={ICON_SIZE.sm} aria-hidden="true" />
             <span>Storage root</span>
             <strong>Local</strong>
           </div>
@@ -1072,7 +1073,7 @@ function LocalDesktopApp() {
 
         <section className={`status-module ${indexingTone}`}>
           <div className="status-module-title">
-            <RefreshCw size={15} aria-hidden="true" />
+            <RefreshCw size={ICON_SIZE.sm} aria-hidden="true" />
             <span>Indexing</span>
             <strong>{indexingLabel}</strong>
           </div>
@@ -1111,7 +1112,7 @@ function LocalDesktopApp() {
 
         <section className="status-module">
           <div className="status-module-title">
-            <Brain size={15} aria-hidden="true" />
+            <Brain size={ICON_SIZE.sm} aria-hidden="true" />
             <span>AI boundary</span>
             <strong>{activeProvider ? (activeProvider.provider_type === "openrouter" ? "Cloud" : "Local") : "Off"}</strong>
           </div>
@@ -1124,7 +1125,7 @@ function LocalDesktopApp() {
             onClick={() => setActiveView("settings")}
             type="button"
           >
-            Configure provider <ArrowRight size={13} />
+            Configure provider <ArrowRight size={ICON_SIZE.sm} />
           </button>
         </section>
 
@@ -1141,14 +1142,14 @@ function LocalDesktopApp() {
           </strong>
           <button className="spine-primary-action" onClick={openNextSafeAction} type="button">
             {!selectedWorkspace
-              ? <Plus size={15} />
+              ? <Plus size={ICON_SIZE.sm} />
               : currentOverview.source_count === 0
-                ? <FolderDown size={15} />
+                ? <FolderDown size={ICON_SIZE.sm} />
                 : artifacts.length === 0 || indexedArtifactCount < artifacts.length
-                  ? <Archive size={15} />
-                  : <Search size={15} />}
+                  ? <Archive size={ICON_SIZE.sm} />
+                  : <Search size={ICON_SIZE.sm} />}
             Continue
-            <ArrowRight size={14} />
+            <ArrowRight size={ICON_SIZE.sm} />
           </button>
         </section>
 
@@ -1216,14 +1217,14 @@ function WorkspaceView({
                 type="button"
                 onClick={() => onSelectWorkspace(workspace.id)}
               >
-                <span className="workspace-row-mark" aria-hidden="true"><Layers3 size={18} /></span>
+                <span className="workspace-row-mark" aria-hidden="true"><Layers3 size={ICON_SIZE.lg} /></span>
                 <span className="workspace-row-copy">
                   <strong>{workspace.name}</strong>
-                  <small><ShieldLock size={12} /> Local workspace</small>
+                  <small><ShieldLock size={ICON_SIZE.sm} /> Local workspace</small>
                 </span>
                 <span className="workspace-row-time" title={formatDate(workspace.updated_at)}>
-                  <Clock size={13} /> {formatRelativeDate(workspace.updated_at)}
-                  <ChevronRight size={16} aria-hidden="true" />
+                  <Clock size={ICON_SIZE.sm} /> {formatRelativeDate(workspace.updated_at)}
+                  <ChevronRight size={ICON_SIZE.md} aria-hidden="true" />
                 </span>
               </button>
             ))
@@ -1232,7 +1233,7 @@ function WorkspaceView({
 
         <form className="workspace-create-v3" onSubmit={onCreateWorkspace}>
           <div className="workspace-create-heading">
-            <span aria-hidden="true"><Plus size={16} /></span>
+            <span aria-hidden="true"><Plus size={ICON_SIZE.md} /></span>
             <label htmlFor="workspace-name">
               <strong>Create a workspace</strong>
               <small>Everything starts local and stays under your control.</small>
@@ -1247,7 +1248,7 @@ function WorkspaceView({
               autoComplete="off"
             />
             <button className="workspace-create-button" disabled={!workspaceName.trim()} type="submit">
-              Create <ArrowRight size={15} />
+              Create <ArrowRight size={ICON_SIZE.sm} />
             </button>
           </div>
         </form>
@@ -1257,7 +1258,7 @@ function WorkspaceView({
         {selectedWorkspace ? (
           <>
             <header className="workspace-inspector-header">
-              <div className="workspace-local-badge"><ShieldLock size={14} /> Stored locally</div>
+              <div className="workspace-local-badge"><ShieldLock size={ICON_SIZE.sm} /> Stored locally</div>
               <p className="workspace-selection-meta">Selected workspace <span aria-hidden="true">/</span> Updated {formatRelativeDate(selectedWorkspace.updated_at)}</p>
               <h3>{selectedWorkspace.name}</h3>
               <p>Project artifacts, searchable context, and durable memory in one private knowledge boundary.</p>
@@ -1274,12 +1275,12 @@ function WorkspaceView({
               <div className="workspace-trace-canvas">
                 <div className="workspace-trace-stack input">
                   <div className={currentOverview.source_count > 0 ? "workspace-trace-node ready" : "workspace-trace-node"}>
-                    <span><FolderDown size={15} /></span>
+                    <span><FolderDown size={ICON_SIZE.sm} /></span>
                     <strong>Sources</strong>
                     <small>{currentOverview.source_count}</small>
                   </div>
                   <div className={currentOverview.artifact_count > 0 ? "workspace-trace-node ready" : "workspace-trace-node"}>
-                    <span><Archive size={15} /></span>
+                    <span><Archive size={ICON_SIZE.sm} /></span>
                     <strong>Artifacts</strong>
                     <small>{currentOverview.artifact_count}</small>
                   </div>
@@ -1288,7 +1289,7 @@ function WorkspaceView({
                   <i /><i /><b />
                 </div>
                 <div className={hasIndexedArtifacts ? "workspace-trace-node core ready" : "workspace-trace-node core"}>
-                  <span><Database size={17} /></span>
+                  <span><Database size={ICON_SIZE.md} /></span>
                   <strong>Indexed evidence</strong>
                   <small>{indexedArtifactCount}/{currentOverview.artifact_count} artifacts · {currentOverview.chunk_count} chunks</small>
                 </div>
@@ -1297,12 +1298,12 @@ function WorkspaceView({
                 </div>
                 <div className="workspace-trace-stack output">
                   <div className={currentOverview.symbol_count > 0 ? "workspace-trace-node ready" : "workspace-trace-node"}>
-                    <span><FileCode2 size={15} /></span>
+                    <span><FileCode2 size={ICON_SIZE.sm} /></span>
                     <strong>Symbols</strong>
                     <small>{currentOverview.symbol_count}</small>
                   </div>
                   <div className={currentOverview.memory_card_count > 0 ? "workspace-trace-node ready" : "workspace-trace-node"}>
-                    <span><Brain size={15} /></span>
+                    <span><Brain size={ICON_SIZE.sm} /></span>
                     <strong>Memory</strong>
                     <small>{currentOverview.memory_card_count}</small>
                   </div>
@@ -1363,13 +1364,13 @@ function WorkspaceView({
               </p>
               <div className="workspace-action-row">
                 <button className="workspace-primary-action" type="button" onClick={() => onNavigate(hasArtifacts ? "artifacts" : "import")}>
-                  {hasArtifacts ? <Archive size={17} /> : <FolderDown size={17} />}
+                  {hasArtifacts ? <Archive size={ICON_SIZE.md} /> : <FolderDown size={ICON_SIZE.md} />}
                   {hasArtifacts ? "Open artifacts" : "Import first source"}
-                  <ArrowRight size={16} />
+                  <ArrowRight size={ICON_SIZE.md} />
                 </button>
                 {hasArtifacts ? (
                   <button className="workspace-secondary-action" type="button" onClick={() => onNavigate(hasIndexedArtifacts ? "search" : "import")}>
-                    {hasIndexedArtifacts ? <Search size={16} /> : <FolderPlus size={16} />}
+                    {hasIndexedArtifacts ? <Search size={ICON_SIZE.md} /> : <FolderPlus size={ICON_SIZE.md} />}
                     {hasIndexedArtifacts ? "Search workspace" : "Add sources"}
                   </button>
                 ) : null}
@@ -1377,7 +1378,7 @@ function WorkspaceView({
             </section>
 
             <footer className="workspace-trust-note">
-              <Database size={18} aria-hidden="true" />
+              <Database size={ICON_SIZE.lg} aria-hidden="true" />
               <span><strong>Private by default</strong><small>Workspace data is stored in RepoMemo's local application directory.</small></span>
             </footer>
           </>
@@ -1388,9 +1389,9 @@ function WorkspaceView({
             <h3>A home for project knowledge</h3>
             <p>Create your first workspace to collect code, documents, decisions, and cited AI output without losing source context.</p>
             <ul>
-              <li><CheckCircle2 size={16} /> Stored on this device</li>
-              <li><CheckCircle2 size={16} /> Search works without AI</li>
-              <li><CheckCircle2 size={16} /> Cloud access stays explicit</li>
+              <li><CheckCircle2 size={ICON_SIZE.md} /> Stored on this device</li>
+              <li><CheckCircle2 size={ICON_SIZE.md} /> Search works without AI</li>
+              <li><CheckCircle2 size={ICON_SIZE.md} /> Cloud access stays explicit</li>
             </ul>
           </div>
         )}
@@ -1438,19 +1439,19 @@ function DocumentsView({
             </div>
           </div>
           <button className="button primary" disabled={isImporting || isIndexing} onClick={onImportDocuments} type="button">
-            {isImporting || isIndexing ? <Loader2 className="spin" size={16} /> : <Upload size={16} />}
+            {isImporting || isIndexing ? <Loader2 className="spin" size={ICON_SIZE.md} /> : <Upload size={ICON_SIZE.md} />}
             {isIndexing ? "Indexing documents" : "Choose Word files"}
           </button>
         </div>
         <p className="import-accepted"><strong>Supported:</strong> <span>{ACCEPTED_DOCUMENT_EXTENSIONS.map((extension) => `.${extension}`).join(", ")}</span></p>
         <div className="document-workflow-note">
-          <CheckCircle2 size={17} aria-hidden="true" />
+          <CheckCircle2 size={ICON_SIZE.md} aria-hidden="true" />
           <span><strong>Evidence-ready by default.</strong> New documents are indexed after upload and remain available in the artifact ledger with their extracted preview.</span>
         </div>
         <section className="document-preview-section" aria-live="polite">
           <div className="document-preview-header">
             <div className="document-preview-title">
-              <BookOpen size={18} aria-hidden="true" />
+              <BookOpen size={ICON_SIZE.lg} aria-hidden="true" />
               <div>
                 <h3>Word preview</h3>
                 <p>The extracted body text RepoMemo will search and cite.</p>
@@ -1463,7 +1464,7 @@ function DocumentsView({
                 onClick={() => onIndexDocument(selectedDocument.id)}
                 type="button"
               >
-                {isIndexing ? <Loader2 className="spin" size={16} /> : <Database size={16} />}
+                {isIndexing ? <Loader2 className="spin" size={ICON_SIZE.md} /> : <Database size={ICON_SIZE.md} />}
                 {selectedDocument.indexed_at ? "Reindex" : "Index"}
               </button>
             ) : null}
@@ -1509,7 +1510,7 @@ function DocumentsView({
               onClick={() => onSelectDocument(artifact.id)}
               type="button"
             >
-              <span aria-hidden="true"><FileText size={15} /></span>
+              <span aria-hidden="true"><FileText size={ICON_SIZE.sm} /></span>
               <div><strong>{artifact.title}</strong><small>{artifact.indexed_at ? "Indexed" : "Stored"} · {formatRelativeDate(artifact.updated_at)}</small></div>
               <span className={artifact.indexed_at ? "state-dot ready" : "state-dot"} title={artifact.indexed_at ? "Indexed" : "Stored"} />
             </button>
@@ -1654,7 +1655,7 @@ function ImportView({
               type="submit"
               disabled={isImporting || !pasteContent.trim()}
             >
-              {isImporting ? <Loader2 className="spin" size={16} /> : <Upload size={16} />}
+              {isImporting ? <Loader2 className="spin" size={ICON_SIZE.md} /> : <Upload size={ICON_SIZE.md} />}
               Save pasted text
             </button>
           </div>
@@ -1676,7 +1677,7 @@ function ImportView({
         <div className="recent-artifact-list">
           {artifacts.length > 0 ? artifacts.slice(0, 6).map((artifact) => (
             <div className="recent-artifact-row" key={artifact.id}>
-              <span aria-hidden="true">{artifact.artifact_type === "image" ? <Photo size={15} /> : <FileCode2 size={15} />}</span>
+              <span aria-hidden="true">{artifact.artifact_type === "image" ? <Photo size={ICON_SIZE.sm} /> : <FileCode2 size={ICON_SIZE.sm} />}</span>
               <div><strong>{artifact.title}</strong><small>{formatArtifactType(artifact.artifact_type)} · {formatRelativeDate(artifact.updated_at)}</small></div>
               <span className={artifact.indexed_at ? "state-dot ready" : "state-dot"} title={artifact.indexed_at ? "Indexed" : "Stored"} />
             </div>
@@ -1755,11 +1756,11 @@ function ArtifactsView({
             type="button"
             onClick={onIndexWorkspace}
           >
-            {isIndexing ? <Loader2 className="spin" size={16} /> : <Database size={16} />}
+            {isIndexing ? <Loader2 className="spin" size={ICON_SIZE.md} /> : <Database size={ICON_SIZE.md} />}
             Index all
           </button>
           <button className="button secondary" type="button" onClick={onRefresh}>
-            <RefreshCw size={16} />
+            <RefreshCw size={ICON_SIZE.md} />
             Refresh
           </button>
         </PanelHeader>
@@ -1770,7 +1771,7 @@ function ArtifactsView({
 
         <div className="artifact-library-tools">
           <label className="artifact-search" htmlFor="artifact-search">
-            <Search size={17} aria-hidden="true" />
+            <Search size={ICON_SIZE.md} aria-hidden="true" />
             <span className="sr-only">Search stored artifacts</span>
             <input
               id="artifact-search"
@@ -1779,7 +1780,7 @@ function ArtifactsView({
               placeholder="Search files, paths, or languages"
               type="search"
             />
-            {artifactQuery ? <button aria-label="Clear artifact search" className="artifact-search-clear" type="button" onClick={() => setArtifactQuery("")}><X size={15} /></button> : null}
+            {artifactQuery ? <button aria-label="Clear artifact search" className="artifact-search-clear" type="button" onClick={() => setArtifactQuery("")}><X size={ICON_SIZE.sm} /></button> : null}
           </label>
           <span className="artifact-result-count" aria-live="polite">{filteredArtifacts.length} of {artifacts.length} files</span>
         </div>
@@ -1837,7 +1838,7 @@ function ArtifactsView({
               type="button"
               onClick={() => artifactDetail && onSummarize(artifactDetail.summary.id)}
             >
-              {isSummarizing ? <Loader2 className="spin" size={16} /> : <Wand2 size={16} />}
+              {isSummarizing ? <Loader2 className="spin" size={ICON_SIZE.md} /> : <Wand2 size={ICON_SIZE.md} />}
               Summarize
             </button>
             <button
@@ -1846,7 +1847,7 @@ function ArtifactsView({
               type="button"
               onClick={() => onIndexArtifact(artifactDetail?.summary.id)}
             >
-              {isIndexing ? <Loader2 className="spin" size={16} /> : <Database size={16} />}
+              {isIndexing ? <Loader2 className="spin" size={ICON_SIZE.md} /> : <Database size={ICON_SIZE.md} />}
               {artifactDetail?.summary.artifact_type === "image"
                 ? artifactDetail.summary.indexed_at ? "Reanalyze image" : "Analyze image"
                 : artifactDetail?.summary.indexed_at ? "Reindex" : "Index"}
@@ -1992,18 +1993,18 @@ function SearchView({
             />
             {query ? (
               <button className="clear-search" type="button" aria-label="Clear search" onClick={() => setQuery("")}>
-                <X size={16} />
+                <X size={ICON_SIZE.md} />
               </button>
             ) : null}
           </div>
           <button className="button primary" disabled={isSearching || !query.trim()} type="submit">
-            {isSearching ? <Loader2 className="spin" size={16} /> : <Search size={16} />}
+            {isSearching ? <Loader2 className="spin" size={ICON_SIZE.md} /> : <Search size={ICON_SIZE.md} />}
             Search
           </button>
         </form>
 
         <div className="filter-bar">
-          <Filter size={16} />
+          <Filter size={ICON_SIZE.md} />
           <FilterMenu label="Type" options={typeOptions.map((value) => ({ value, label: formatArtifactType(value) }))} selected={types} onChange={(values) => setTypes(values as ArtifactSummary["artifact_type"][])} />
           <FilterMenu label="Language" options={languageOptions.map((value) => ({ value, label: value }))} selected={languages} onChange={setLanguages} />
           <FilterMenu label="Source" options={sourceOptions} selected={sources} onChange={setSources} />
@@ -2023,7 +2024,7 @@ function SearchView({
           {!hasSearched ? (
             <div className="prequery">
               <div className="prequery-hint">
-                <Search size={16} />
+                <Search size={ICON_SIZE.md} />
                 <span>Ready to search. Results come from local chunks. No AI, no cloud.</span>
               </div>
               <div className="coverage-strip">
@@ -2081,7 +2082,7 @@ function SearchView({
       <aside className="panel search-preview evidence-rail">
         <PanelHeader icon={BookOpen} label="Matched context" title="Evidence preview">
           <button className="button secondary" disabled={!selectedResult && !selectedSymbol} type="button" onClick={() => selectedSymbol ? onOpenSymbol(selectedSymbol) : selectedResult && onOpenArtifact(selectedResult)}>
-            <BookOpen size={16} /> Open artifact
+            <BookOpen size={ICON_SIZE.md} /> Open artifact
           </button>
         </PanelHeader>
         {selectedSymbol ? (
@@ -2154,7 +2155,7 @@ function NavButton({
       onClick={onClick}
       title={disabled ? `${label} is available in a later phase` : label}
     >
-      <Icon size={18} />
+      <Icon size={ICON_SIZE.lg} />
       {label}
     </button>
   );
@@ -2175,7 +2176,7 @@ function PanelHeader({
     <div className="panel-header">
       <div className="panel-title">
         <div className="panel-icon" aria-hidden="true">
-          <Icon size={18} />
+          <Icon size={ICON_SIZE.lg} />
         </div>
         <div>
           <p className="meta-label">{label}</p>
@@ -2283,13 +2284,13 @@ function MemoryCardsView({
         <PanelHeader icon={Bookmark} label="Durable knowledge" title="Memory cards" />
         <label className="memory-search-label" htmlFor="memory-search">Find local memory</label>
         <div className="search-input-wrap memory-search">
-          <Search size={17} aria-hidden="true" />
+          <Search size={ICON_SIZE.md} aria-hidden="true" />
           <input id="memory-search" value={searchQuery} onChange={(event) => onSearch(event.target.value)} placeholder="Search saved knowledge" />
         </div>
         <div className="memory-card-list" aria-label="Saved memory cards">
           {cards.length > 0 ? cards.map((card) => (
             <button className={card.id === selectedCardId ? "memory-card-row selected" : "memory-card-row"} key={card.id} onClick={() => onSelect(card.id)} type="button">
-              <span className="memory-row-mark"><Bookmark size={15} /></span>
+              <span className="memory-row-mark"><Bookmark size={ICON_SIZE.sm} /></span>
               <span className="memory-row-main"><strong>{card.title}</strong><small>{card.body_excerpt || "No body text"}</small></span>
               <span className="memory-row-meta"><small>{card.evidence_count} evidence</small><small>{formatRelativeDate(card.updated_at)}</small></span>
             </button>
@@ -2299,7 +2300,7 @@ function MemoryCardsView({
 
       <section className="panel memory-reading-pane">
         <PanelHeader icon={BookOpen} label="Card detail" title={detail?.card.title ?? "Create memory"}>
-          {detail ? <button className="button secondary" type="button" onClick={() => onExport(detail.card.id)}><Upload size={16} /> Export Markdown</button> : null}
+          {detail ? <button className="button secondary" type="button" onClick={() => onExport(detail.card.id)}><Upload size={ICON_SIZE.md} /> Export Markdown</button> : null}
         </PanelHeader>
         {detail ? <>
           <div className="memory-card-meta"><StatusBadge tone="neutral">{formatMemorySource(detail.card.source)}</StatusBadge><span>Updated {formatRelativeDate(detail.card.updated_at)}</span></div>
@@ -2312,13 +2313,13 @@ function MemoryCardsView({
           <p className="workspace-summary-intro">Record a durable local note without enabling AI. Add source context in the body when evidence is unavailable.</p>
           <label><span>Title</span><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Decision, pattern, or operational note" autoFocus /></label>
           <label><span>Memory</span><textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder="Write the knowledge worth keeping…" rows={12} /></label>
-          <button className="button primary" disabled={isSaving || !title.trim() || !body.trim()} type="submit">{isSaving ? <Loader2 className="spin" size={16} /> : <Bookmark size={16} />} Save local memory</button>
+          <button className="button primary" disabled={isSaving || !title.trim() || !body.trim()} type="submit">{isSaving ? <Loader2 className="spin" size={ICON_SIZE.md} /> : <Bookmark size={ICON_SIZE.md} />} Save local memory</button>
         </form>}
       </section>
 
       <aside className="panel evidence-rail memory-rail">
         <PanelHeader icon={ShieldLock} label="Durability" title="Evidence boundary" />
-        <div className="trust-callout"><ShieldLock size={18} /><div><strong>Explicit, local, inspectable</strong><p>Nothing is saved automatically. AI-generated cards retain their cited source links; manual cards stay clearly marked.</p></div></div>
+        <div className="trust-callout"><ShieldLock size={ICON_SIZE.lg} /><div><strong>Explicit, local, inspectable</strong><p>Nothing is saved automatically. AI-generated cards retain their cited source links; manual cards stay clearly marked.</p></div></div>
         <dl className="settings-facts"><div><dt>Workspace</dt><dd>{workspace.name}</dd></div><div><dt>Saved cards</dt><dd>{cards.length}</dd></div><div><dt>Selected links</dt><dd>{detail?.evidence.length ?? 0}</dd></div></dl>
       </aside>
     </div>
@@ -2401,14 +2402,14 @@ function ProviderSettingsView({
         </label>
         <div className="provider-actions">
           <button className="button primary" disabled={isSaving} type="submit">
-            {isSaving ? <Loader2 className="spin" size={16} /> : <Settings2 size={16} />} Save provider
+            {isSaving ? <Loader2 className="spin" size={ICON_SIZE.md} /> : <Settings2 size={ICON_SIZE.md} />} Save provider
           </button>
           <button className="button secondary" disabled={!draft.id || isTesting} type="button" onClick={() => onTest(draft.id)}>
-            {isTesting ? <Loader2 className="spin" size={16} /> : <RefreshCw size={16} />} Test connection
+            {isTesting ? <Loader2 className="spin" size={ICON_SIZE.md} /> : <RefreshCw size={ICON_SIZE.md} />} Test connection
           </button>
         </div>
       </form>
-      {testResult ? <div className={testResult.success ? "provider-test ready" : "provider-test failed"}>{testResult.success ? <CheckCircle2 size={17} /> : <X size={17} />} {testResult.message}</div> : null}
+      {testResult ? <div className={testResult.success ? "provider-test ready" : "provider-test failed"}>{testResult.success ? <CheckCircle2 size={ICON_SIZE.md} /> : <X size={ICON_SIZE.md} />} {testResult.message}</div> : null}
     </section>
     <aside className="panel evidence-rail settings-rail">
       <PanelHeader icon={ShieldLock} label="Privacy boundary" title="Connection scope" />
@@ -2422,7 +2423,7 @@ function ProviderSettingsView({
         <div><dt>Chat model</dt><dd>{draft.model || "Not set"}</dd></div>
         <div><dt>Embeddings</dt><dd>{draft.embedding_model || "Full-text fallback"}</dd></div>
       </dl>
-      <div className="trust-callout"><ShieldLock size={18} /><div><strong>Explicit by default</strong><p>Provider access is stored per workspace and remains off until you enable it here.</p></div></div>
+      <div className="trust-callout"><ShieldLock size={ICON_SIZE.lg} /><div><strong>Explicit by default</strong><p>Provider access is stored per workspace and remains off until you enable it here.</p></div></div>
     </aside>
     </div>
   );
@@ -2435,7 +2436,7 @@ function providerDraft(workspaceId: string | undefined): ProviderSettings {
 function SummaryPanel({ summary, onSave }: { summary: SummaryResult; onSave?: () => void }) {
   return (
     <section className="summary-panel">
-      <div className="chunk-panel-header"><strong>Local AI summary</strong><div>{onSave ? <button className="button secondary compact" type="button" onClick={onSave}><Bookmark size={15} /> Save memory</button> : null}<StatusBadge tone="neutral">Cited</StatusBadge></div></div>
+      <div className="chunk-panel-header"><strong>Local AI summary</strong><div>{onSave ? <button className="button secondary compact" type="button" onClick={onSave}><Bookmark size={ICON_SIZE.sm} /> Save memory</button> : null}<StatusBadge tone="neutral">Cited</StatusBadge></div></div>
       <div className="markdown-content">
         <SafeMarkdown>{summary.summary_markdown}</SafeMarkdown>
       </div>
@@ -2468,7 +2469,7 @@ function WorkspaceSummaryView({
       <section className="workspace-summary panel reading-pane">
         <PanelHeader icon={Wand2} label="Workspace intelligence" title="Project briefing">
           <button className="button primary" disabled={isSummarizing} type="button" onClick={onSummarize}>
-            {isSummarizing ? <Loader2 className="spin" size={16} /> : <Wand2 size={16} />} Generate briefing
+            {isSummarizing ? <Loader2 className="spin" size={ICON_SIZE.md} /> : <Wand2 size={ICON_SIZE.md} />} Generate briefing
           </button>
         </PanelHeader>
         <p className="workspace-summary-intro">A concise, cited orientation to <strong>{workspace.name}</strong>, generated only from indexed excerpts in this workspace.</p>
@@ -2476,7 +2477,7 @@ function WorkspaceSummaryView({
       </section>
       <aside className="panel evidence-rail summary-rail">
         <PanelHeader icon={ShieldLock} label="Provenance" title="Source grounding" />
-        <div className="trust-callout"><ShieldLock size={18} /><div><strong>Evidence stays inspectable</strong><p>The briefing is assembled from local chunks. Citations remain available beside the generated result.</p></div></div>
+        <div className="trust-callout"><ShieldLock size={ICON_SIZE.lg} /><div><strong>Evidence stays inspectable</strong><p>The briefing is assembled from local chunks. Citations remain available beside the generated result.</p></div></div>
         <div className="rail-section-heading"><div><strong>Citations</strong><span>Source locations used</span></div><small>{summary?.citations.length ?? 0}</small></div>
         {summary && summary.citations.length > 0 ? (
           <div className="rail-citation-list">{summary.citations.map((citation, index) => <div key={citation.chunk_id ?? citation.artifact_id}><span>{String(index + 1).padStart(2, "0")}</span><code>{formatLineRange(citation.start_line, citation.end_line)}</code></div>)}</div>
@@ -2512,15 +2513,15 @@ function AskView({
     <div className="intelligence-layout ask-layout graphite-page">
     <section className="ask-workbench panel reading-pane">
       <PanelHeader icon={Brain} label="Evidence first" title="Ask the workspace">
-        <button className="button secondary" disabled={isEmbedding} type="button" onClick={onEmbed}>{isEmbedding ? <Loader2 className="spin" size={16} /> : <Database size={16} />} Build local embeddings</button>
+        <button className="button secondary" disabled={isEmbedding} type="button" onClick={onEmbed}>{isEmbedding ? <Loader2 className="spin" size={ICON_SIZE.md} /> : <Database size={ICON_SIZE.md} />} Build local embeddings</button>
       </PanelHeader>
       <p className="workspace-summary-intro">Answers are generated only after RepoMemo retrieves inspectable local evidence. Without embeddings, Ask falls back to full-text retrieval.</p>
       <div className="ask-composer">
         <textarea value={question} onChange={(event) => setQuestion(event.target.value)} placeholder={`What do you want to know about ${workspace.name}?`} rows={3} />
-        <button className="button primary" disabled={isAsking || !question.trim()} type="button" onClick={onAsk}>{isAsking ? <Loader2 className="spin" size={16} /> : <Brain size={16} />} Ask</button>
+        <button className="button primary" disabled={isAsking || !question.trim()} type="button" onClick={onAsk}>{isAsking ? <Loader2 className="spin" size={ICON_SIZE.md} /> : <Brain size={ICON_SIZE.md} />} Ask</button>
       </div>
       {askAnswer ? <div className="ask-answer">
-        <div className="chunk-panel-header"><strong>Answer</strong><div><button className="button secondary compact" type="button" onClick={() => onSaveMemory(`Answer: ${question.trim().slice(0, 72)}`, askAnswer.answer_markdown, "answer", askAnswer.citations, askAnswer.confidence)}><Bookmark size={15} /> Save memory</button><StatusBadge tone={askAnswer.confidence && askAnswer.confidence > 0.15 ? "success" : "warning"}>{askAnswer.confidence && askAnswer.confidence > 0.15 ? "Evidence found" : "Low confidence"}</StatusBadge></div></div>
+        <div className="chunk-panel-header"><strong>Answer</strong><div><button className="button secondary compact" type="button" onClick={() => onSaveMemory(`Answer: ${question.trim().slice(0, 72)}`, askAnswer.answer_markdown, "answer", askAnswer.citations, askAnswer.confidence)}><Bookmark size={ICON_SIZE.sm} /> Save memory</button><StatusBadge tone={askAnswer.confidence && askAnswer.confidence > 0.15 ? "success" : "warning"}>{askAnswer.confidence && askAnswer.confidence > 0.15 ? "Evidence found" : "Low confidence"}</StatusBadge></div></div>
         <div className="markdown-content"><SafeMarkdown>{askAnswer.answer_markdown}</SafeMarkdown></div>
         <div className="citation-list">{askAnswer.citations.map((citation) => <span key={citation.chunk_id ?? citation.artifact_id}>{citation.title} · {formatLineRange(citation.start_line, citation.end_line)}</span>)}</div>
         {askAnswer.warnings.map((warning) => <p className="evidence-note" key={warning}>{warning}</p>)}

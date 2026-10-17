@@ -13,6 +13,7 @@ import { INDEX_POLL_ATTEMPTS, INDEX_POLL_INTERVAL_MS } from "../constants";
 import { apiMessage } from "../format";
 import { useAiProviders, useMetrics } from "./data";
 import { type WorkspacePage, sectionState } from "./page";
+import { ICON_SIZE } from "../../components/ui/icon";
 
 export function SettingsSection({ page }: { page: WorkspacePage }) {
   const { accessToken, workspace, workspaceId, canManageMembers, canManageWorkspace, isLive, isSubmitting, setIsSubmitting, setError, load, onWorkspaceUpdated, onWorkspaceDeleted } = page;
@@ -74,7 +75,7 @@ export function SettingsSection({ page }: { page: WorkspacePage }) {
   return (
           <section className="shared-settings-section">
             {canManageMembers ? <>
-              <div className="shared-settings-policy"><Settings size={18} /><div><strong>Administrative workspace controls</strong><span>Changes are enforced by the shared API. Administrators can manage people and integrations; owner-only workspace actions are explicitly marked.</span></div></div>
+              <div className="shared-settings-policy"><Settings size={ICON_SIZE.lg} /><div><strong>Administrative workspace controls</strong><span>Changes are enforced by the shared API. Administrators can manage people and integrations; owner-only workspace actions are explicitly marked.</span></div></div>
               <AiProviderForm accessToken={accessToken} onSaved={onProviderSaved} providers={aiProviders} purpose="text" workspaceId={workspace.workspace.id} />
               <AiProviderForm accessToken={accessToken} onSaved={onProviderSaved} providers={aiProviders} purpose="vision" workspaceId={workspace.workspace.id} />
               <AiProviderForm accessToken={accessToken} onSaved={onProviderSaved} providers={aiProviders} purpose="embedding" status={embeddingStatus} workspaceId={workspace.workspace.id} />
@@ -83,10 +84,10 @@ export function SettingsSection({ page }: { page: WorkspacePage }) {
               <ConnectorSettings accessToken={accessToken} key={`connectors-${workspace.workspace.id}`} onChanged={() => void load()} workspaceId={workspace.workspace.id} />
               <WorkspaceExportSettings accessToken={accessToken} key={`export-${workspace.workspace.id}`} workspaceId={workspace.workspace.id} />
               {canManageWorkspace ? <section className="shared-settings-group">
-                <div className="shared-panel-heading"><div><Settings size={18} /><h2>Workspace ownership</h2></div><span>owner only</span></div>
+                <div className="shared-panel-heading"><div><Settings size={ICON_SIZE.lg} /><h2>Workspace ownership</h2></div><span>owner only</span></div>
                 <p className="shared-muted-copy">Rename this workspace or remove it permanently. Deletion removes its shared evidence, memory, and memberships.</p>
-                <form className="shared-workspace-rename" onSubmit={renameWorkspace}><Input aria-label="Workspace name" onChange={(event) => setWorkspaceName(event.target.value)} required value={workspaceName} /><Button disabled={isSubmitting} type="submit" variant="secondary"><Pencil size={16} /> Rename</Button></form>
-                <Button className="shared-danger-action" disabled={isSubmitting} onClick={() => void removeWorkspace()} type="button" variant="secondary"><Trash size={16} /> Delete workspace</Button>
+                <form className="shared-workspace-rename" onSubmit={renameWorkspace}><Input aria-label="Workspace name" onChange={(event) => setWorkspaceName(event.target.value)} required value={workspaceName} /><Button disabled={isSubmitting} type="submit" variant="secondary"><Pencil size={ICON_SIZE.md} /> Rename</Button></form>
+                <Button className="shared-danger-action" disabled={isSubmitting} onClick={() => void removeWorkspace()} type="button" variant="secondary"><Trash size={ICON_SIZE.md} /> Delete workspace</Button>
               </section> : null}
             </> : <div className="shared-empty-state"><Settings size={25} /><strong>Administrative access required</strong><span>Only workspace administrators and the owner can open settings. Your current role can still browse shared evidence, memory, and tasks.</span></div>}
           </section>

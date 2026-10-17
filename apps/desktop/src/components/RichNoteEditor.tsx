@@ -17,6 +17,7 @@ import {
   IconListNumbers as ListNumbers,
   IconQuote as Quote,
 } from "@tabler/icons-react";
+import { ICON_SIZE } from "./ui/icon";
 
 /**
  * WYSIWYG note editor. Text is shown formatted while typing and is stored and
@@ -92,16 +93,16 @@ export function RichNoteEditor({
   }
 
   const tools: Array<{ label: string; icon: JSX.Element; on: boolean; run: () => void }> = [
-    { label: "Bold (Ctrl+B)", icon: <Bold size={16} />, on: !!active?.bold, run: () => editor.chain().focus().toggleBold().run() },
-    { label: "Italic (Ctrl+I)", icon: <Italic size={16} />, on: !!active?.italic, run: () => editor.chain().focus().toggleItalic().run() },
-    { label: "Heading", icon: <Heading size={16} />, on: !!active?.heading, run: () => editor.chain().focus().toggleHeading({ level: 2 }).run() },
-    { label: "Bulleted list", icon: <List size={16} />, on: !!active?.bullet, run: () => editor.chain().focus().toggleBulletList().run() },
-    { label: "Numbered list", icon: <ListNumbers size={16} />, on: !!active?.numbered, run: () => editor.chain().focus().toggleOrderedList().run() },
-    { label: "Checklist", icon: <Checklist size={16} />, on: !!active?.task, run: () => editor.chain().focus().toggleTaskList().run() },
-    { label: "Quote", icon: <Quote size={16} />, on: !!active?.quote, run: () => editor.chain().focus().toggleBlockquote().run() },
-    { label: "Inline code", icon: <Code size={16} />, on: !!active?.code, run: () => editor.chain().focus().toggleCode().run() },
-    { label: "Code block", icon: <CodeBlock size={16} />, on: !!active?.codeBlock, run: () => editor.chain().focus().toggleCodeBlock().run() },
-    { label: "Link (Ctrl+K)", icon: <LinkIcon size={16} />, on: !!active?.link, run: () => openLink(editor) },
+    { label: "Bold (Ctrl+B)", icon: <Bold size={ICON_SIZE.md} />, on: !!active?.bold, run: () => editor.chain().focus().toggleBold().run() },
+    { label: "Italic (Ctrl+I)", icon: <Italic size={ICON_SIZE.md} />, on: !!active?.italic, run: () => editor.chain().focus().toggleItalic().run() },
+    { label: "Heading", icon: <Heading size={ICON_SIZE.md} />, on: !!active?.heading, run: () => editor.chain().focus().toggleHeading({ level: 2 }).run() },
+    { label: "Bulleted list", icon: <List size={ICON_SIZE.md} />, on: !!active?.bullet, run: () => editor.chain().focus().toggleBulletList().run() },
+    { label: "Numbered list", icon: <ListNumbers size={ICON_SIZE.md} />, on: !!active?.numbered, run: () => editor.chain().focus().toggleOrderedList().run() },
+    { label: "Checklist", icon: <Checklist size={ICON_SIZE.md} />, on: !!active?.task, run: () => editor.chain().focus().toggleTaskList().run() },
+    { label: "Quote", icon: <Quote size={ICON_SIZE.md} />, on: !!active?.quote, run: () => editor.chain().focus().toggleBlockquote().run() },
+    { label: "Inline code", icon: <Code size={ICON_SIZE.md} />, on: !!active?.code, run: () => editor.chain().focus().toggleCode().run() },
+    { label: "Code block", icon: <CodeBlock size={ICON_SIZE.md} />, on: !!active?.codeBlock, run: () => editor.chain().focus().toggleCodeBlock().run() },
+    { label: "Link (Ctrl+K)", icon: <LinkIcon size={ICON_SIZE.md} />, on: !!active?.link, run: () => openLink(editor) },
   ];
 
   return (

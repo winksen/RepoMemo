@@ -16,6 +16,7 @@ import { openCommandPalette } from "../lib/assistantBridge";
 import { MAIN_CONTENT_ID } from "../web/RouteAnnouncer";
 import { Button } from "./ui/button";
 import { DesktopServerNote } from "./DesktopServerNote";
+import { ICON_SIZE } from "./ui/icon";
 
 const THEME_STORAGE_KEY = "repomemo.theme";
 const THEME_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
@@ -52,7 +53,7 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
   const [theme, toggleTheme] = useSharedTheme();
   const next = theme === "dark" ? "light" : "dark";
   return <Button aria-label={`Switch to ${next} mode`} aria-pressed={theme === "dark"} className={`shared-theme-toggle ${className}`.trim()} onClick={toggleTheme} title={`Switch to ${next} mode`} type="button" variant="secondary">
-    {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+    {theme === "dark" ? <Sun size={ICON_SIZE.md} /> : <Moon size={ICON_SIZE.md} />}
   </Button>;
 }
 
@@ -86,18 +87,18 @@ export function SharedLayout({
         <div className="shared-user-menu" aria-label="Account controls" role="group">
           <div className="shared-account-controls">
             <ThemeToggle />
-            <Button aria-label="Open command palette" className="shared-palette-link" onClick={openCommandPalette} title="Command palette (Ctrl K)" type="button" variant="secondary"><Search size={16} /></Button>
-            <Button aria-label="Open notifications" className="shared-notifications-link" onClick={() => onNavigate("/notifications")} title="Notifications" type="button" variant="secondary"><Bell size={16} /></Button>
-            <Button className="shared-profile-link" onClick={() => onNavigate("/profile")} type="button" variant="secondary"><UserCircle size={16} /> <span className="shared-button-label">Profile</span></Button>
+            <Button aria-label="Open command palette" className="shared-palette-link" onClick={openCommandPalette} title="Command palette (Ctrl K)" type="button" variant="secondary"><Search size={ICON_SIZE.md} /></Button>
+            <Button aria-label="Open notifications" className="shared-notifications-link" onClick={() => onNavigate("/notifications")} title="Notifications" type="button" variant="secondary"><Bell size={ICON_SIZE.md} /></Button>
+            <Button className="shared-profile-link" onClick={() => onNavigate("/profile")} type="button" variant="secondary"><UserCircle size={ICON_SIZE.md} /> <span className="shared-button-label">Profile</span></Button>
           </div>
-          <Button className="shared-user-signout" onClick={signOut} type="button" variant="secondary"><Logout size={16} /> <span className="shared-button-label">Sign out</span></Button>
+          <Button className="shared-user-signout" onClick={signOut} type="button" variant="secondary"><Logout size={ICON_SIZE.md} /> <span className="shared-button-label">Sign out</span></Button>
         </div>
       </div>
     </header>
     <div className="shared-home-frame">
       <aside aria-label="Workspaces and organizations" className="shared-home-rail" data-open={railOpen}>
-        <Button aria-controls="shared-rail-body" aria-expanded={railOpen} className="shared-rail-toggle" onClick={() => setRailOpen((open) => !open)} type="button" variant="secondary"><span>Workspaces and organizations</span><ChevronDown size={16} /></Button>
-        <div className="shared-rail-body" id="shared-rail-body">{sidebar}{session.is_system_admin || session.is_app_admin ? <SystemRailEntry onNavigate={onNavigate} /> : null}<div className="shared-rail-footer"><Shield size={15} /><span>JWT active · API {apiAvailable === true ? "healthy" : apiAvailable === false ? "offline" : "checking"}</span></div><DesktopServerNote signedIn /></div>
+        <Button aria-controls="shared-rail-body" aria-expanded={railOpen} className="shared-rail-toggle" onClick={() => setRailOpen((open) => !open)} type="button" variant="secondary"><span>Workspaces and organizations</span><ChevronDown size={ICON_SIZE.md} /></Button>
+        <div className="shared-rail-body" id="shared-rail-body">{sidebar}{session.is_system_admin || session.is_app_admin ? <SystemRailEntry onNavigate={onNavigate} /> : null}<div className="shared-rail-footer"><Shield size={ICON_SIZE.sm} /><span>JWT active · API {apiAvailable === true ? "healthy" : apiAvailable === false ? "offline" : "checking"}</span></div><DesktopServerNote signedIn /></div>
       </aside>
       <main className="shared-home-content" id={MAIN_CONTENT_ID} tabIndex={-1}>
         {workspaceNavigation}
@@ -115,6 +116,6 @@ function SystemRailEntry({ onNavigate }: { onNavigate: (to: string) => void }) {
   const isActive = window.location.pathname === "/system" || window.location.pathname.startsWith("/system/");
   return <section aria-label="System administration" className="shared-rail-system">
     <p className="shared-eyebrow">Administration</p>
-    <Button aria-current={isActive ? "page" : undefined} className={`shared-rail-organization${isActive ? " active" : ""}`} onClick={() => onNavigate("/system/overview")} title="Administer this server" type="button" variant="secondary"><Server size={16} /><span>System</span></Button>
+    <Button aria-current={isActive ? "page" : undefined} className={`shared-rail-organization${isActive ? " active" : ""}`} onClick={() => onNavigate("/system/overview")} title="Administer this server" type="button" variant="secondary"><Server size={ICON_SIZE.md} /><span>System</span></Button>
   </section>;
 }

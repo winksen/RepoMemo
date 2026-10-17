@@ -3,6 +3,7 @@ import { IconCheck as Check, IconCopy as Copy } from "@tabler/icons-react";
 import { Button } from "./ui/button";
 import { Dialog } from "./ui/dialog";
 import { showToast } from "./ui/toast";
+import { ICON_SIZE } from "./ui/icon";
 
 /**
  * Shows a link or token that the server returns only once: it is not stored
@@ -28,7 +29,7 @@ export function SecretDialog({ description, onClose, title, value }: { descripti
   return <Dialog className="rm-dialog-wide" description={description} footer={<Button onClick={onClose} type="button" variant="main">Done</Button>} onClose={onClose} open title={title}>
     <div className="rm-secret-field">
       <input aria-label={title} className="rm-input" onFocus={(event) => event.currentTarget.select()} readOnly ref={field} spellCheck={false} value={value} />
-      <Button onClick={() => void copy()} type="button" variant="secondary">{copied ? <Check size={16} /> : <Copy size={16} />} {copied ? "Copied" : "Copy"}</Button>
+      <Button onClick={() => void copy()} type="button" variant="secondary">{copied ? <Check size={ICON_SIZE.md} /> : <Copy size={ICON_SIZE.md} />} {copied ? "Copied" : "Copy"}</Button>
     </div>
     <p className="rm-secret-warning">This is shown only once. Keep it somewhere safe before closing; it cannot be displayed again.</p>
   </Dialog>;

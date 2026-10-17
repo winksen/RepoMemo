@@ -9,6 +9,7 @@ import { ThemeToggle } from "../components/SharedLayout";
 import { type AuthMode } from "./constants";
 import { apiMessage } from "./format";
 import { navigate } from "./router";
+import { ICON_SIZE } from "../components/ui/icon";
 
 export function AuthCanvas({
   apiAvailable,
@@ -88,9 +89,9 @@ export function AuthCanvas({
         <h1>One evidence base for the team.</h1>
         <p className="shared-intro-copy">Sign in to the server-authoritative workspace. Your browser only receives data allowed by your signed session.</p>
         <dl className="shared-trust-list">
-          <div><dt><Shield size={16} /> Server boundary</dt><dd>Shared data is requested through the protected API.</dd></div>
-          <div><dt><Key size={16} /> Session token</dt><dd>Access expires and is kept only for this browser session.</dd></div>
-          <div><dt><Users size={16} /> Membership-aware</dt><dd>Workspace access is scoped to the signed-in account.</dd></div>
+          <div><dt><Shield size={ICON_SIZE.md} /> Server boundary</dt><dd>Shared data is requested through the protected API.</dd></div>
+          <div><dt><Key size={ICON_SIZE.md} /> Session token</dt><dd>Access expires and is kept only for this browser session.</dd></div>
+          <div><dt><Users size={ICON_SIZE.md} /> Membership-aware</dt><dd>Workspace access is scoped to the signed-in account.</dd></div>
         </dl>
       </section>
 
@@ -115,7 +116,7 @@ export function AuthCanvas({
             <label>Password<Input autoComplete={mode === "sign-up" ? "new-password" : "current-password"} minLength={12} onChange={(event) => setPassword(event.target.value)} placeholder="At least 12 characters" required type="password" value={password} /></label>
             <Toast kind="error" message={error} />
             <Button disabled={isSubmitting} type="submit" variant="main">
-              {isSubmitting ? <Loader className="spin" size={17} /> : <ArrowRight size={17} />}
+              {isSubmitting ? <Loader className="spin" size={ICON_SIZE.md} /> : <ArrowRight size={ICON_SIZE.md} />}
               {mode === "sign-in" ? "Sign in to shared mode" : "Create account and continue"}
             </Button>
           </form>

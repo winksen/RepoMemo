@@ -7,6 +7,7 @@ import { Dialog, DialogCancel } from "../components/ui/dialog";
 import { Input } from "../components/ui/input";
 import { navigate } from "./router";
 import { paletteEntries, type PaletteEntry } from "./paletteEntries";
+import { ICON_SIZE } from "../components/ui/icon";
 
 const CARD_SEARCH_DELAY_MS = 200;
 
@@ -104,7 +105,7 @@ export function CommandPalette({ accessToken, assistantWorkspaceId, canAdministe
   if (!open) return null;
   let lastGroup = "";
   return <Dialog className="rm-dialog-wide shared-palette" footer={<><span className="shared-palette-hint">Ctrl K opens this anywhere · ↑ ↓ move · Enter runs · Esc closes</span><DialogCancel label="Close" onClick={() => setOpen(false)} /></>} onClose={() => setOpen(false)} open title="Command palette">
-    <div className="shared-palette-field"><Search size={16} />
+    <div className="shared-palette-field"><Search size={ICON_SIZE.md} />
       <Input
         aria-activedescendant={entries[activeIndex] ? `palette-${entries[activeIndex].id}` : undefined}
         aria-autocomplete="list"

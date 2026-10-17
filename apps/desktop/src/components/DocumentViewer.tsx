@@ -19,6 +19,7 @@ import type { ArtifactSummary, DocumentPreview, SheetPreview } from "../types";
 import type { RenderStatus } from "../lib/sharedApi";
 import { Button } from "./ui/button";
 import { showToast } from "./ui/toast";
+import { ICON_SIZE } from "./ui/icon";
 
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong.";
@@ -155,16 +156,16 @@ export function DocumentViewer({ accessToken, artifact }: { accessToken: string;
       <div className="shared-doc-toolbar">
         <div className="shared-doc-title"><strong>{artifact.title}</strong></div>
         <div className="shared-doc-actions">
-          {target ? <Button disabled={isBusy} onClick={() => void openInApp()} type="button" variant="main"><ExternalLink size={16} /> Open in {target.label}</Button> : null}
+          {target ? <Button disabled={isBusy} onClick={() => void openInApp()} type="button" variant="main"><ExternalLink size={ICON_SIZE.md} /> Open in {target.label}</Button> : null}
           {renderedUrl ? <Button onClick={() => setShowExtracted((value) => !value)} type="button" variant="secondary">{showExtracted ? "Show original layout" : "Show extracted view"}</Button> : null}
-          <Button disabled={isBusy} onClick={() => void download()} type="button" variant="secondary"><Download size={16} /> Download</Button>
+          <Button disabled={isBusy} onClick={() => void download()} type="button" variant="secondary"><Download size={ICON_SIZE.md} /> Download</Button>
         </div>
       </div>
-      {rendersLayout && renderState?.state === "converting" ? <p className="shared-doc-note"><Loader className="spin" size={14} /> Rendering the original layout. The extracted view is shown meanwhile.</p> : null}
+      {rendersLayout && renderState?.state === "converting" ? <p className="shared-doc-note"><Loader className="spin" size={ICON_SIZE.sm} /> Rendering the original layout. The extracted view is shown meanwhile.</p> : null}
       {rendersLayout && renderState?.state === "failed" ? <p className="shared-doc-note">The original layout could not be rendered{renderState.message ? `: ${renderState.message}` : ""}. Showing the extracted view.</p> : null}
       {rendersLayout && renderState?.state === "disabled" ? <p className="shared-muted-copy">Install LibreOffice on the server to preview the original layout of Office files.</p> : null}
       {renderedUrl && !showExtracted ? <iframe className="shared-pdf-frame shared-rendered-frame" src={renderedUrl} title="Document preview" /> : <>
-        {isLoading ? <p className="shared-muted-copy"><Loader className="spin" size={14} /> Loading preview…</p> : null}
+        {isLoading ? <p className="shared-muted-copy"><Loader className="spin" size={ICON_SIZE.sm} /> Loading preview…</p> : null}
         {preview ? <PreviewBody pdfUrl={pdfUrl} preview={preview} /> : null}
       </>}
     </div>
@@ -204,14 +205,14 @@ function PreviewBody({ pdfUrl, preview }: { pdfUrl: string | null; preview: Docu
           {preview.cc.length ? <><dt>Cc</dt><dd>{preview.cc.join(", ")}</dd></> : null}
           {preview.date ? <><dt>Date</dt><dd>{preview.date}</dd></> : null}
         </dl>
-        {preview.attachments.length ? <div className="shared-email-attachments">{preview.attachments.map((attachment, index) => <span key={`${attachment.name}-${index}`}><Paperclip size={13} /> {attachment.name} · {formatBytes(attachment.size_bytes)}</span>)}</div> : null}
+        {preview.attachments.length ? <div className="shared-email-attachments">{preview.attachments.map((attachment, index) => <span key={`${attachment.name}-${index}`}><Paperclip size={ICON_SIZE.sm} /> {attachment.name} · {formatBytes(attachment.size_bytes)}</span>)}</div> : null}
         {preview.body ? <pre className="shared-content-preview shared-email-body">{preview.body}</pre> : <p className="shared-muted-copy">This message has no text body.</p>}
         {preview.truncated ? <p className="shared-muted-copy">Preview truncated to keep the page responsive.</p> : null}
       </div>;
     case "pdf":
       return <div className="shared-pdf">
         {preview.page_count ? <p className="shared-muted-copy">{preview.page_count} {preview.page_count === 1 ? "page" : "pages"}</p> : null}
-        {pdfUrl ? <iframe className="shared-pdf-frame" src={pdfUrl} title="PDF preview" /> : <p className="shared-muted-copy"><Loader className="spin" size={14} /> Loading the PDF…</p>}
+        {pdfUrl ? <iframe className="shared-pdf-frame" src={pdfUrl} title="PDF preview" /> : <p className="shared-muted-copy"><Loader className="spin" size={ICON_SIZE.sm} /> Loading the PDF…</p>}
       </div>;
     default:
       return <p className="shared-doc-note">A preview is not available: {preview.reason}. You can still open or download the original file.</p>;

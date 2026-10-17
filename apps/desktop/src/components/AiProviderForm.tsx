@@ -7,6 +7,7 @@ import { Button } from "./ui/button";
 import { Dropdown } from "./ui/dropdown";
 import { Input } from "./ui/input";
 import { Toast } from "./ui/toast";
+import { ICON_SIZE } from "./ui/icon";
 
 type ProviderType = "ollama" | "openrouter";
 type Purpose = "text" | "vision" | "embedding";
@@ -139,7 +140,7 @@ export function AiProviderForm({
   const Icon = ICONS[purpose];
   return (
     <section className="shared-settings-group">
-      <div className="shared-panel-heading"><div><Icon size={18} /><h2>{copy.title}</h2></div><span>{own.some((entry) => entry.enabled) ? "configured" : "not configured"}</span></div>
+      <div className="shared-panel-heading"><div><Icon size={ICON_SIZE.lg} /><h2>{copy.title}</h2></div><span>{own.some((entry) => entry.enabled) ? "configured" : "not configured"}</span></div>
       <p className="shared-muted-copy">{copy.intro}</p>
       {status ? <p className="shared-ai-provider-status">{status}</p> : null}
       <form className="shared-ai-provider-form" onSubmit={save}>
@@ -148,7 +149,7 @@ export function AiProviderForm({
         <label>Base URL<Input onChange={(event) => setBaseUrl(event.target.value)} placeholder={providerType === "ollama" ? OLLAMA_URL : OPENROUTER_URL} value={baseUrl} /></label>
         <label>{copy.modelLabel}<Input onChange={(event) => setModel(event.target.value)} placeholder={providerType === "ollama" ? copy.ollamaModel : copy.cloudModel} required value={model} /></label>
         {providerType === "openrouter" ? <><label>API key<Input autoComplete="off" onChange={(event) => setApiKey(event.target.value)} placeholder={providerId ? "Leave blank to keep the saved key (enter it again if you change the address)" : "Required to enable cloud AI"} type="password" value={apiKey} /></label><label className="shared-ai-provider-toggle"><input checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} type="checkbox" /> {copy.cloudNotice}</label></> : null}
-        <div className="shared-ai-provider-actions"><Button disabled={isBusy} type="submit" variant="secondary">{isBusy ? <Loader className="spin" size={16} /> : <Icon size={16} />} Save provider</Button><Button disabled={isBusy || !providerId} onClick={() => void test()} type="button" variant="secondary">{isBusy ? <Loader className="spin" size={16} /> : <Refresh size={16} />} Test connection</Button></div>
+        <div className="shared-ai-provider-actions"><Button disabled={isBusy} type="submit" variant="secondary">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : <Icon size={ICON_SIZE.md} />} Save provider</Button><Button disabled={isBusy || !providerId} onClick={() => void test()} type="button" variant="secondary">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : <Refresh size={ICON_SIZE.md} />} Test connection</Button></div>
         <Toast kind="error" message={error} />
         <Toast kind={testResult?.success ? "success" : "error"} message={testResult?.message} />
       </form>

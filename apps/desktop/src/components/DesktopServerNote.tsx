@@ -5,6 +5,7 @@ import { desktopServer, isDesktopRuntime } from "../lib/desktop";
 import { Button } from "./ui/button";
 import { Dialog, DialogCancel } from "./ui/dialog";
 import { showToast } from "./ui/toast";
+import { ICON_SIZE } from "./ui/icon";
 
 /** In the desktop app: which server this window is connected to, and the way to choose another. Nothing in a browser. */
 export function DesktopServerNote({ signedIn }: { signedIn: boolean }) {
@@ -26,7 +27,7 @@ export function DesktopServerNote({ signedIn }: { signedIn: boolean }) {
 
   return <>
     <div className="rm-desktop-server">
-      <span><Server size={14} /> <span className="rm-desktop-server-host" title={sharedApiUrl}>{host}</span></span>
+      <span><Server size={ICON_SIZE.sm} /> <span className="rm-desktop-server-host" title={sharedApiUrl}>{host}</span></span>
       <Button onClick={() => setAsking(true)} type="button" variant="secondary">Change server</Button>
     </div>
     <Dialog

@@ -24,6 +24,7 @@ import { Dialog, DialogCancel } from "./ui/dialog";
 import { Dropdown } from "./ui/dropdown";
 import { Input } from "./ui/input";
 import { showToast } from "./ui/toast";
+import { ICON_SIZE } from "./ui/icon";
 
 function errorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
@@ -197,7 +198,7 @@ export function ConnectorSettings({
   }
 
   return <section className="shared-settings-group">
-    <div className="shared-panel-heading"><div><GitHub size={18} /><h2>Issues and pull requests</h2></div><span>{connectors?.length ?? 0} connected</span></div>
+    <div className="shared-panel-heading"><div><GitHub size={ICON_SIZE.lg} /><h2>Issues and pull requests</h2></div><span>{connectors?.length ?? 0} connected</span></div>
     <p className="shared-muted-copy">Keep a GitHub repository's or GitLab project's issues and pull (merge) requests, with their comments, reviews and commits, as searchable and citable evidence. Closed issues and abandoned requests are marked outdated and come back when reopened; merged ones stay. A read-only token is only needed for a private repository or a higher rate limit.</p>
 
     {connectors?.length ? <ul className="rm-repo-links">
@@ -221,10 +222,10 @@ export function ConnectorSettings({
             {connector.has_webhook ? <span className="rm-map-muted">Webhook on{connector.webhook_last_received_at ? ` · last call ${formatDate(connector.webhook_last_received_at)}` : " · no call yet"}</span> : null}
           </div>
           <div className="rm-health-actions">
-            <Button disabled={running} onClick={() => void sync(connector)} type="button" variant="secondary"><Refresh size={15} /> Sync now</Button>
-            <Button disabled={running} onClick={() => { setNewToken(""); setReplacing(connector); }} type="button" variant="secondary"><Key size={15} /> Token</Button>
-            <Button disabled={running} onClick={() => { setHookSecret(null); setHooking(connector); }} type="button" variant="secondary"><Webhook size={15} /> Webhook</Button>
-            <Button className="rm-button-danger" disabled={running} onClick={() => setRemoving(connector)} type="button" variant="secondary"><Trash size={15} /> Remove</Button>
+            <Button disabled={running} onClick={() => void sync(connector)} type="button" variant="secondary"><Refresh size={ICON_SIZE.sm} /> Sync now</Button>
+            <Button disabled={running} onClick={() => { setNewToken(""); setReplacing(connector); }} type="button" variant="secondary"><Key size={ICON_SIZE.sm} /> Token</Button>
+            <Button disabled={running} onClick={() => { setHookSecret(null); setHooking(connector); }} type="button" variant="secondary"><Webhook size={ICON_SIZE.sm} /> Webhook</Button>
+            <Button className="rm-button-danger" disabled={running} onClick={() => setRemoving(connector)} type="button" variant="secondary"><Trash size={ICON_SIZE.sm} /> Remove</Button>
           </div>
         </li>;
       })}
@@ -245,7 +246,7 @@ export function ConnectorSettings({
         <span className="rm-map-muted">A read-only token with access to issues. It is stored encrypted and never shown again.</span>
       </label>
       {checkIsCurrent && check ? <div className="rm-repo-check">
-        <strong><CircleCheck size={16} /> The server can read this {check.provider === "gitlab" ? "project" : "repository"}'s issues</strong>
+        <strong><CircleCheck size={ICON_SIZE.md} /> The server can read this {check.provider === "gitlab" ? "project" : "repository"}'s issues</strong>
         <dl className="rm-repo-facts">
           <div><dt>Repository</dt><dd>{check.name} <span className="rm-map-muted">{check.private ? "private" : "public"}</span></dd></div>
           <div><dt>Open issues</dt><dd>{check.open_issues.toLocaleString()}</dd></div>
@@ -253,8 +254,8 @@ export function ConnectorSettings({
         {check.already_connected ? <span className="rm-map-muted">This repository's issues are already connected to the workspace.</span> : null}
       </div> : null}
       <div className="rm-health-actions">
-        <Button disabled={busy || !link.trim()} type="submit" variant={checkIsCurrent ? "secondary" : "main"}><Refresh size={15} /> {checkIsCurrent ? "Check again" : "Check access"}</Button>
-        <Button disabled={busy || !checkIsCurrent || check?.already_connected} onClick={() => void connect()} type="button" variant={checkIsCurrent ? "main" : "secondary"}><Plus size={15} /> Connect and sync</Button>
+        <Button disabled={busy || !link.trim()} type="submit" variant={checkIsCurrent ? "secondary" : "main"}><Refresh size={ICON_SIZE.sm} /> {checkIsCurrent ? "Check again" : "Check access"}</Button>
+        <Button disabled={busy || !checkIsCurrent || check?.already_connected} onClick={() => void connect()} type="button" variant={checkIsCurrent ? "main" : "secondary"}><Plus size={ICON_SIZE.sm} /> Connect and sync</Button>
       </div>
     </form>
 

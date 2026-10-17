@@ -3,6 +3,7 @@ import { IconCircleCheck as CircleCheck, IconLoader2 as Loader } from "@tabler/i
 import { verifyEmailLink } from "../lib/sharedApi";
 import { ThemeToggle } from "./SharedLayout";
 import { Button } from "./ui/button";
+import { ICON_SIZE } from "./ui/icon";
 
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
@@ -37,8 +38,8 @@ export function VerifyEmailPage({ onContinue, token }: { onContinue: () => void;
           <h2>This link cannot be used</h2>
           <p>{problem}</p>
           <Button onClick={onContinue} type="button" variant="secondary">Continue</Button>
-        </div> : email === null ? <p className="shared-muted-copy"><Loader className="spin" size={16} /> Checking the link…</p> : <div className="shared-auth-heading">
-          <p className="shared-eyebrow"><CircleCheck size={15} /> Confirmed</p>
+        </div> : email === null ? <p className="shared-muted-copy"><Loader className="spin" size={ICON_SIZE.md} /> Checking the link…</p> : <div className="shared-auth-heading">
+          <p className="shared-eyebrow"><CircleCheck size={ICON_SIZE.sm} /> Confirmed</p>
           <h2>{email} is confirmed</h2>
           <p>You can create organizations and workspaces now.</p>
           <Button onClick={onContinue} type="button" variant="main">Continue to RepoMemo</Button>

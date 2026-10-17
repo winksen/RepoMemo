@@ -36,6 +36,7 @@ import { Button } from "./ui/button";
 import { Dropdown } from "./ui/dropdown";
 import { Input } from "./ui/input";
 import { showToast } from "./ui/toast";
+import { ICON_SIZE } from "./ui/icon";
 
 type StepKey = "welcome" | "admin" | "checks" | "access" | "logging" | "organization" | "finish";
 
@@ -97,7 +98,7 @@ export function ServerSetup({ accessToken, onAdminCreated, onFinished, onSignOut
       <div className="shared-brand"><img alt="RepoMemo" className="shared-brand-full" src="/RM-logofull.svg" /></div>
       <div className="rm-setup-header-actions">
         {session ? <span className="rm-setup-signed-in">Signed in as {session.user.email ?? session.user.display_name}</span> : null}
-        {session && onSignOut ? <Button onClick={onSignOut} type="button" variant="secondary"><Logout size={15} /> Sign out</Button> : null}
+        {session && onSignOut ? <Button onClick={onSignOut} type="button" variant="secondary"><Logout size={ICON_SIZE.sm} /> Sign out</Button> : null}
         <ThemeToggle />
       </div>
     </header>
@@ -113,7 +114,7 @@ export function ServerSetup({ accessToken, onAdminCreated, onFinished, onSignOut
             </li>;
           })}
         </ol>
-        <p className="rm-setup-nav-note"><Lock size={14} /> This page is only available until the setup is finished. It never shows again afterwards.</p>
+        <p className="rm-setup-nav-note"><Lock size={ICON_SIZE.sm} /> This page is only available until the setup is finished. It never shows again afterwards.</p>
       </nav>
       <section className="rm-setup-panel" aria-live="polite">
         {step === "welcome" ? <WelcomeStep code={code} onCode={setCode} onVerified={next} /> : null}
@@ -146,13 +147,13 @@ function WelcomeStep({ code, onCode, onVerified }: { code: string; onCode: (code
       This server has no account yet. You will create its system administrator, check the server, choose the first settings and, if you like, a first workspace.
     </StepHeading>
     <ul className="rm-setup-points">
-      <li><ShieldLock size={16} /> Only someone with access to the server can do this: enter the one-time setup code printed on the server console when it started (or the value of <code>REPOMEMO_SETUP_CODE</code>).</li>
-      <li><UserShield size={16} /> The account you create administers the whole server: every organization and workspace, its users and its settings.</li>
-      <li><Lock size={16} /> Until setup is finished, nobody else can create an account here.</li>
+      <li><ShieldLock size={ICON_SIZE.md} /> Only someone with access to the server can do this: enter the one-time setup code printed on the server console when it started (or the value of <code>REPOMEMO_SETUP_CODE</code>).</li>
+      <li><UserShield size={ICON_SIZE.md} /> The account you create administers the whole server: every organization and workspace, its users and its settings.</li>
+      <li><Lock size={ICON_SIZE.md} /> Until setup is finished, nobody else can create an account here.</li>
     </ul>
     <form className="shared-setup-form" onSubmit={submit}>
       <label>Setup code<Input autoComplete="one-time-code" autoFocus onChange={(event) => onCode(event.target.value)} placeholder="ABCD-EFGH-JKLM" required spellCheck={false} value={code} /></label>
-      <div className="rm-setup-actions"><span /><Button disabled={isBusy || !code.trim()} type="submit" variant="main">{isBusy ? <Loader className="spin" size={16} /> : <ArrowRight size={16} />} Continue</Button></div>
+      <div className="rm-setup-actions"><span /><Button disabled={isBusy || !code.trim()} type="submit" variant="main">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : <ArrowRight size={ICON_SIZE.md} />} Continue</Button></div>
     </form>
   </>;
 }
@@ -186,7 +187,7 @@ function AdminStep({ code, onBack, onCodeRejected, onCreated }: { code: string; 
       <label>Email<Input autoComplete="email" onChange={(event) => setEmail(event.target.value)} placeholder="admin@company.com" required type="email" value={email} /></label>
       <label>Password<Input autoComplete="new-password" minLength={12} onChange={(event) => setPassword(event.target.value)} placeholder="At least 12 characters" required type="password" value={password} /></label>
       <label>Confirm password<Input autoComplete="new-password" minLength={12} onChange={(event) => setConfirmation(event.target.value)} required type="password" value={confirmation} /></label>
-      <div className="rm-setup-actions"><Button disabled={isBusy} onClick={onBack} type="button" variant="secondary"><ArrowLeft size={16} /> Back</Button><Button disabled={isBusy} type="submit" variant="main">{isBusy ? <Loader className="spin" size={16} /> : <UserShield size={16} />} Create administrator</Button></div>
+      <div className="rm-setup-actions"><Button disabled={isBusy} onClick={onBack} type="button" variant="secondary"><ArrowLeft size={ICON_SIZE.md} /> Back</Button><Button disabled={isBusy} type="submit" variant="main">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : <UserShield size={ICON_SIZE.md} />} Create administrator</Button></div>
     </form>
   </>;
 }
@@ -215,13 +216,13 @@ function ChecksStep({ accessToken, onNext, onWarnings }: { accessToken: string; 
     {checks ? <ul className="rm-setup-checks">{checks.map((check) => {
       const Icon = CHECK_ICONS[check.status];
       return <li className={`rm-setup-check status-${check.status}`} key={check.key}>
-        <Icon aria-hidden="true" className="rm-setup-check-icon" size={18} />
+        <Icon aria-hidden="true" className="rm-setup-check-icon" size={ICON_SIZE.lg} />
         <div><strong>{check.label}<small>{CHECK_LABELS[check.status]}</small></strong><p>{check.detail}</p>{check.advice && check.status !== "ok" ? <p className="rm-setup-advice">{check.advice}</p> : null}</div>
       </li>;
-    })}</ul> : <p className="shared-muted-copy"><Loader className="spin" size={14} /> Checking the server…</p>}
+    })}</ul> : <p className="shared-muted-copy"><Loader className="spin" size={ICON_SIZE.sm} /> Checking the server…</p>}
     <div className="rm-setup-actions">
-      <Button disabled={isBusy} onClick={() => void run()} type="button" variant="secondary">{isBusy ? <Loader className="spin" size={16} /> : <Refresh size={16} />} Check again</Button>
-      <Button disabled={!checks} onClick={onNext} type="button" variant="main"><ArrowRight size={16} /> {problems ? "Continue anyway" : "Continue"}</Button>
+      <Button disabled={isBusy} onClick={() => void run()} type="button" variant="secondary">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : <Refresh size={ICON_SIZE.md} />} Check again</Button>
+      <Button disabled={!checks} onClick={onNext} type="button" variant="main"><ArrowRight size={ICON_SIZE.md} /> {problems ? "Continue anyway" : "Continue"}</Button>
     </div>
   </>;
 }
@@ -284,10 +285,10 @@ function SettingsStep({ accessToken, description, keys, onBack, onNext, onSaved,
               : <span className="rm-system-number"><Input id={inputId} max={setting.max} min={setting.min} onChange={(event) => edit(setting, event.target.value === "" ? setting.min : Number(event.target.value))} type="number" value={String(value)} /><small>{setting.unit}</small></span>}
         </div>
       </div>;
-    })}</div> : <p className="shared-muted-copy"><Loader className="spin" size={14} /> Loading the settings…</p>}
+    })}</div> : <p className="shared-muted-copy"><Loader className="spin" size={ICON_SIZE.sm} /> Loading the settings…</p>}
     <div className="rm-setup-actions">
-      <Button disabled={isBusy} onClick={onBack} type="button" variant="secondary"><ArrowLeft size={16} /> Back</Button>
-      <Button disabled={isBusy || !settings} onClick={() => void save()} type="button" variant="main">{isBusy ? <Loader className="spin" size={16} /> : <ArrowRight size={16} />} {changed.length ? "Save and continue" : "Keep these and continue"}</Button>
+      <Button disabled={isBusy} onClick={onBack} type="button" variant="secondary"><ArrowLeft size={ICON_SIZE.md} /> Back</Button>
+      <Button disabled={isBusy || !settings} onClick={() => void save()} type="button" variant="main">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : <ArrowRight size={ICON_SIZE.md} />} {changed.length ? "Save and continue" : "Keep these and continue"}</Button>
     </div>
   </>;
 }
@@ -317,13 +318,13 @@ function OrganizationStep({ accessToken, created, onBack, onCreated, onNext }: {
     <StepHeading eyebrow="Step 6 of 7" title="Create a first workspace">
       Optional. An organization is a team or company; a workspace holds one body of knowledge, such as a project or a service. You own what you create here and can invite people afterwards.
     </StepHeading>
-    {created ? <p className="rm-setup-created"><CircleCheck size={16} /> Created {created.organization}{created.workspace ? ` with the workspace ${created.workspace}` : ""}.</p> : null}
-    {created ? <div className="rm-setup-actions"><Button onClick={onBack} type="button" variant="secondary"><ArrowLeft size={16} /> Back</Button><Button onClick={onNext} type="button" variant="main"><ArrowRight size={16} /> Continue</Button></div> : <form className="shared-setup-form" onSubmit={submit}>
+    {created ? <p className="rm-setup-created"><CircleCheck size={ICON_SIZE.md} /> Created {created.organization}{created.workspace ? ` with the workspace ${created.workspace}` : ""}.</p> : null}
+    {created ? <div className="rm-setup-actions"><Button onClick={onBack} type="button" variant="secondary"><ArrowLeft size={ICON_SIZE.md} /> Back</Button><Button onClick={onNext} type="button" variant="main"><ArrowRight size={ICON_SIZE.md} /> Continue</Button></div> : <form className="shared-setup-form" onSubmit={submit}>
       <label>Organization name<Input maxLength={120} onChange={(event) => setOrganization(event.target.value)} placeholder="Acme Engineering" required value={organization} /></label>
       <label>Workspace name (optional)<Input maxLength={120} onChange={(event) => setWorkspace(event.target.value)} placeholder="Payments service" value={workspace} /></label>
       <div className="rm-setup-actions">
-        <Button disabled={isBusy} onClick={onBack} type="button" variant="secondary"><ArrowLeft size={16} /> Back</Button>
-        <span className="rm-setup-actions-end"><Button disabled={isBusy} onClick={onNext} type="button" variant="secondary">Skip</Button><Button disabled={isBusy || !organization.trim()} type="submit" variant="main">{isBusy ? <Loader className="spin" size={16} /> : <Building size={16} />} Create and continue</Button></span>
+        <Button disabled={isBusy} onClick={onBack} type="button" variant="secondary"><ArrowLeft size={ICON_SIZE.md} /> Back</Button>
+        <span className="rm-setup-actions-end"><Button disabled={isBusy} onClick={onNext} type="button" variant="secondary">Skip</Button><Button disabled={isBusy || !organization.trim()} type="submit" variant="main">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : <Building size={ICON_SIZE.md} />} Create and continue</Button></span>
       </div>
     </form>}
   </>;
@@ -358,8 +359,8 @@ function FinishStep({ accessToken, changedSettings, created, onBack, onFinished,
       <div><dt>First workspace</dt><dd>{created ? `${created.organization}${created.workspace ? ` / ${created.workspace}` : ""}` : "Skipped"}</dd></div>
     </dl>
     <div className="rm-setup-actions">
-      <Button disabled={isBusy} onClick={onBack} type="button" variant="secondary"><ArrowLeft size={16} /> Back</Button>
-      <Button disabled={isBusy} onClick={() => void finish()} type="button" variant="main">{isBusy ? <Loader className="spin" size={16} /> : <Flag size={16} />} Finish setup</Button>
+      <Button disabled={isBusy} onClick={onBack} type="button" variant="secondary"><ArrowLeft size={ICON_SIZE.md} /> Back</Button>
+      <Button disabled={isBusy} onClick={() => void finish()} type="button" variant="main">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : <Flag size={ICON_SIZE.md} />} Finish setup</Button>
     </div>
   </>;
 }
@@ -371,7 +372,7 @@ export function ServerSetupWaiting({ onSignOut }: { onSignOut: () => void }) {
       <StepHeading eyebrow="Server setup" title="This server is being set up">
         Its system administrator has not finished the setup yet. Try again later, or sign in as the system administrator.
       </StepHeading>
-      <div className="rm-setup-actions"><span /><Button onClick={onSignOut} type="button" variant="secondary"><Logout size={16} /> Sign out</Button></div>
+      <div className="rm-setup-actions"><span /><Button onClick={onSignOut} type="button" variant="secondary"><Logout size={ICON_SIZE.md} /> Sign out</Button></div>
     </section>
   </main>;
 }

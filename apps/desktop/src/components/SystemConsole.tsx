@@ -5,6 +5,7 @@ import { getConsoleWelcome, runConsoleCommand, SharedApiError } from "../lib/sha
 import type { ConsoleResponse, ConsoleWelcome } from "../types";
 import { Button } from "./ui/button";
 import { showToast } from "./ui/toast";
+import { ICON_SIZE } from "./ui/icon";
 
 const HISTORY_KEY = "repomemo.system.console-history";
 const HISTORY_LIMIT = 100;
@@ -51,7 +52,7 @@ function cell(value: unknown): string {
 
 function Answer({ entry }: { entry: Entry }) {
   const { response } = entry;
-  if (entry.state === "running") return <p className="rm-console-muted"><Loader className="spin" size={14} /> Running…</p>;
+  if (entry.state === "running") return <p className="rm-console-muted"><Loader className="spin" size={ICON_SIZE.sm} /> Running…</p>;
   if (entry.state === "not_run") return <p className="rm-console-muted">Not run.</p>;
   if (entry.state === "error" || !response) return <p className="rm-console-error">{entry.error}</p>;
   if (entry.raw) return <pre className="rm-console-json">{JSON.stringify(response, null, 2)}</pre>;
@@ -168,7 +169,7 @@ export function SystemConsole({ accessToken }: { accessToken: string }) {
   return <section className="shared-settings-group rm-console">
     <div className="rm-system-toolbar">
       <span className="shared-muted-copy">Commands run on the server with your rights. Changes are dry runs until you add <code>--yes</code>; add <code>--json</code> to see the raw answer.</span>
-      <Button disabled={!entries.length} onClick={() => setEntries([])} type="button" variant="secondary"><Eraser size={16} /> Clear</Button>
+      <Button disabled={!entries.length} onClick={() => setEntries([])} type="button" variant="secondary"><Eraser size={ICON_SIZE.md} /> Clear</Button>
     </div>
     {/* a11y-allow: click a click on the screen only moves the caret to the input, which the keyboard already holds */}
     <div aria-label="Console output" aria-live="polite" className="rm-console-screen" onClick={() => inputRef.current?.focus()} role="log">
@@ -177,15 +178,15 @@ export function SystemConsole({ accessToken }: { accessToken: string }) {
         <p className="rm-console-muted">{welcome.tagline}</p>
         <p>Signed in as <strong>{welcome.user}</strong> ({welcome.role}) · RepoMemo {welcome.version}</p>
         <p className="rm-console-muted">{welcome.tips} Up and Down recall earlier lines, Tab completes, Ctrl+L clears.</p>
-      </div> : <p className="rm-console-muted"><Loader className="spin" size={14} /> Opening the console…</p>}
+      </div> : <p className="rm-console-muted"><Loader className="spin" size={ICON_SIZE.sm} /> Opening the console…</p>}
       {entries.map((entry) => <div className="rm-console-entry" key={entry.id}>
-        <p className="rm-console-line"><Prompt aria-hidden size={14} />{entry.line}</p>
+        <p className="rm-console-line"><Prompt aria-hidden size={ICON_SIZE.sm} />{entry.line}</p>
         <Answer entry={entry} />
       </div>)}
       <div ref={endRef} />
     </div>
     <div className="rm-console-prompt">
-      <Prompt aria-hidden size={16} />
+      <Prompt aria-hidden size={ICON_SIZE.md} />
       <input
         aria-describedby="rm-console-hint"
         aria-label="Console command"
@@ -201,7 +202,7 @@ export function SystemConsole({ accessToken }: { accessToken: string }) {
         spellCheck={false}
         value={input}
       />
-      {isRunning ? <Loader aria-label="Running" className="spin" size={16} /> : null}
+      {isRunning ? <Loader aria-label="Running" className="spin" size={ICON_SIZE.md} /> : null}
     </div>
     <p className="rm-console-hint" id="rm-console-hint">{hint || " "}</p>
     <div className="rm-console-suggestions">

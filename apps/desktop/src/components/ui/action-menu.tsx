@@ -1,6 +1,7 @@
 import * as MenuPrimitive from "@radix-ui/react-dropdown-menu";
 import type { ReactNode } from "react";
 import { IconDots } from "@tabler/icons-react";
+import { ICON_SIZE } from "./icon";
 
 export interface ActionMenuItem {
   label: string;
@@ -14,7 +15,7 @@ export function ActionMenu({ items, label, className = "" }: { items: ActionMenu
   return (
     <MenuPrimitive.Root>
       <MenuPrimitive.Trigger aria-label={label} className={`rm-action-trigger ${className}`.trim()} title={label} type="button">
-        <IconDots size={16} />
+        <IconDots size={ICON_SIZE.md} />
       </MenuPrimitive.Trigger>
       <MenuPrimitive.Portal>
         <MenuPrimitive.Content align="start" className="rm-action-menu" sideOffset={4}>

@@ -41,6 +41,7 @@ import { Textarea } from "./ui/textarea";
 import { showToast } from "./ui/toast";
 import { useLiveEvents } from "../lib/liveEvents";
 import type { IndexingJobStatus, LiveEvent } from "../types";
+import { ICON_SIZE } from "./ui/icon";
 
 const POLL_INTERVAL_MS = 1500;
 /** With the workspace event stream open, polling is only a safety net. */
@@ -252,7 +253,7 @@ export function RepositoriesPanel({
   return <section className="rm-repos">
     <div className="rm-map-toolbar">
       <span>{count ? `${count} ${count === 1 ? "repository" : "repositories"}` : "No repositories linked"}</span>
-      {canManage ? <Button onClick={onOpenSettings} type="button" variant="secondary"><Settings size={15} /> Manage links in Settings</Button> : null}
+      {canManage ? <Button onClick={onOpenSettings} type="button" variant="secondary"><Settings size={ICON_SIZE.sm} /> Manage links in Settings</Button> : null}
     </div>
 
     {count ? <ul className="rm-repo-list">
@@ -271,7 +272,7 @@ export function RepositoriesPanel({
       <FolderCode size={25} />
       <strong>No repositories yet</strong>
       <span>{canManage ? "Add a repository link in this workspace's Settings. Its committed files are indexed and kept in step with each sync." : "Owners and administrators can link a git repository to this workspace in Settings."}</span>
-      {canManage ? <Button onClick={onOpenSettings} type="button" variant="main"><Plus size={15} /> Add a repository link</Button> : null}
+      {canManage ? <Button onClick={onOpenSettings} type="button" variant="main"><Plus size={ICON_SIZE.sm} /> Add a repository link</Button> : null}
     </div>}
   </section>;
 }
@@ -439,7 +440,7 @@ export function RepositorySettings({
   }
 
   return <section className="shared-settings-group rm-repo-settings">
-    <div className="shared-panel-heading"><div><GitBranch size={18} /><h2>Repositories</h2></div><span>{repositories?.length ?? 0} linked</span></div>
+    <div className="shared-panel-heading"><div><GitBranch size={ICON_SIZE.lg} /><h2>Repositories</h2></div><span>{repositories?.length ?? 0} linked</span></div>
     <p className="shared-muted-copy">Link git repositories to this workspace. RepoMemo reads what a branch has committed, never uncommitted changes or ignored files, and keeps every file in step with each sync. A link is a folder on the server; the server must be able to read it.</p>
 
     {repositories?.length ? <ul className="rm-repo-links">
@@ -450,8 +451,8 @@ export function RepositorySettings({
           <span className="rm-map-muted">{repository.remote ? (isSshLink(repository.root_path) ? "Remote · deploy key · " : repository.has_credential ? "Remote · with a token · " : "Remote · no token · ") : ""}{repository.settings.branch ? `Branch ${repository.settings.branch}` : repository.remote ? "Follows the default branch" : "Follows the checked-out branch"}{repository.settings.include.length ? ` · ${repository.settings.include.length} include` : ""}{repository.settings.exclude.length ? ` · ${repository.settings.exclude.length} exclude` : ""} · {STATUS_LABEL[repository.active_job ? "syncing" : repository.status]}</span>
         </div>
         <div className="rm-health-actions">
-          <Button disabled={Boolean(repository.active_job)} onClick={() => startEditing(repository)} type="button" variant="secondary"><Pencil size={15} /> Edit</Button>
-          <Button className="rm-button-danger" disabled={Boolean(repository.active_job)} onClick={() => setRemoving(repository)} type="button" variant="secondary"><Trash size={15} /> Remove</Button>
+          <Button disabled={Boolean(repository.active_job)} onClick={() => startEditing(repository)} type="button" variant="secondary"><Pencil size={ICON_SIZE.sm} /> Edit</Button>
+          <Button className="rm-button-danger" disabled={Boolean(repository.active_job)} onClick={() => setRemoving(repository)} type="button" variant="secondary"><Trash size={ICON_SIZE.sm} /> Remove</Button>
         </div>
       </li>)}
     </ul> : null}
@@ -461,8 +462,8 @@ export function RepositorySettings({
       <RepositoryFields form={form} onChange={setForm} showLink />
       {checkIsCurrent && check ? <RepositoryCheckResult check={check} /> : null}
       <div className="rm-health-actions">
-        <Button disabled={busy || !form.link.trim()} type="submit" variant={checkIsCurrent ? "secondary" : "main"}><Refresh size={15} /> {checkIsCurrent ? "Check again" : "Check access"}</Button>
-        <Button disabled={busy || !checkIsCurrent || check?.already_connected} onClick={() => void connect()} type="button" variant={checkIsCurrent ? "main" : "secondary"}><Plus size={15} /> Link and sync</Button>
+        <Button disabled={busy || !form.link.trim()} type="submit" variant={checkIsCurrent ? "secondary" : "main"}><Refresh size={ICON_SIZE.sm} /> {checkIsCurrent ? "Check again" : "Check access"}</Button>
+        <Button disabled={busy || !checkIsCurrent || check?.already_connected} onClick={() => void connect()} type="button" variant={checkIsCurrent ? "main" : "secondary"}><Plus size={ICON_SIZE.sm} /> Link and sync</Button>
       </div>
     </form>
 
@@ -512,14 +513,14 @@ export function RepositorySettings({
 
 function RepositoryCheckResult({ check }: { check: RepoAccessCheck }) {
   return <div className="rm-repo-check">
-    <strong><CircleCheck size={16} /> {check.remote ? "The host answered: the server can reach this repository" : "The server can read this repository"}</strong>
+    <strong><CircleCheck size={ICON_SIZE.md} /> {check.remote ? "The host answered: the server can reach this repository" : "The server can read this repository"}</strong>
     <dl className="rm-repo-facts">
       <div><dt>Repository</dt><dd>{check.name} <code className="rm-repo-path">{check.root_path}</code></dd></div>
-      <div><dt><GitBranch size={14} /> Branch</dt><dd>{check.commit.branch ?? <span className="rm-map-muted">Detached HEAD</span>}</dd></div>
+      <div><dt><GitBranch size={ICON_SIZE.sm} /> Branch</dt><dd>{check.commit.branch ?? <span className="rm-map-muted">Detached HEAD</span>}</dd></div>
       {check.remote
-        ? <div><dt><GitCommit size={14} /> Commit</dt><dd><code>{check.commit.sha.slice(0, 7)}</code> <span className="rm-map-muted">· the files are counted after the first sync, which clones the repository</span></dd></div>
+        ? <div><dt><GitCommit size={ICON_SIZE.sm} /> Commit</dt><dd><code>{check.commit.sha.slice(0, 7)}</code> <span className="rm-map-muted">· the files are counted after the first sync, which clones the repository</span></dd></div>
         : <>
-          <div><dt><GitCommit size={14} /> Commit</dt><dd><code>{check.commit.sha.slice(0, 7)}</code> {check.commit.summary} <span className="rm-map-muted">· {check.commit.author_name} · {formatDate(check.commit.committed_at)}</span></dd></div>
+          <div><dt><GitCommit size={ICON_SIZE.sm} /> Commit</dt><dd><code>{check.commit.sha.slice(0, 7)}</code> {check.commit.summary} <span className="rm-map-muted">· {check.commit.author_name} · {formatDate(check.commit.committed_at)}</span></dd></div>
           <div><dt>Files</dt><dd>About {check.indexable_files.toLocaleString()} of {check.tracked_files.toLocaleString()} committed files will be indexed</dd></div>
         </>}
     </dl>
@@ -620,8 +621,8 @@ function RepositoryCard({
     </div>
 
     <dl className="rm-repo-facts">
-      <div><dt><GitBranch size={14} /> Branch</dt><dd>{commit?.branch ?? settings.branch ?? "Checked-out branch"}{settings.branch ? null : <span className="rm-map-muted"> (follows HEAD)</span>}</dd></div>
-      <div><dt><GitCommit size={14} /> Commit</dt><dd>{commit ? <><code>{commit.sha.slice(0, 7)}</code> {commit.summary} <span className="rm-map-muted">· {commit.author_name} · {formatDate(commit.committed_at)}</span></> : <span className="rm-map-muted">Not synced yet</span>}</dd></div>
+      <div><dt><GitBranch size={ICON_SIZE.sm} /> Branch</dt><dd>{commit?.branch ?? settings.branch ?? "Checked-out branch"}{settings.branch ? null : <span className="rm-map-muted"> (follows HEAD)</span>}</dd></div>
+      <div><dt><GitCommit size={ICON_SIZE.sm} /> Commit</dt><dd>{commit ? <><code>{commit.sha.slice(0, 7)}</code> {commit.summary} <span className="rm-map-muted">· {commit.author_name} · {formatDate(commit.committed_at)}</span></> : <span className="rm-map-muted">Not synced yet</span>}</dd></div>
       <div><dt>Files</dt><dd>{repository.indexed_file_count === repository.file_count ? repository.file_count.toLocaleString() : `${repository.indexed_file_count.toLocaleString()} of ${repository.file_count.toLocaleString()} indexed`}{repository.last_synced_at ? <span className="rm-map-muted"> · synced {formatDate(repository.last_synced_at)}</span> : null}</dd></div>
       {settings.include.length || settings.exclude.length ? <div><dt>Rules</dt><dd className="rm-repo-rules">{settings.include.map((pattern) => <code key={`i-${pattern}`}>+ {pattern}</code>)}{settings.exclude.map((pattern) => <code key={`e-${pattern}`}>− {pattern}</code>)}</dd></div> : null}
       {!job && repository.status === "error" && repository.last_error ? <div><dt>Last error</dt><dd>{repository.last_error}</dd></div> : null}
@@ -642,8 +643,8 @@ function RepositoryCard({
 
     <div className="rm-health-actions">
       {job ? (canSync ? <Button disabled={job.cancel_requested} onClick={onStop} type="button" variant="secondary">{job.cancel_requested ? "Stopping…" : "Stop sync"}</Button> : null)
-        : canSync ? <Button onClick={onSync} type="button" variant="secondary"><Refresh size={15} /> Sync now</Button> : null}
-      {repository.overview_artifact_id ? <Button onClick={() => onOpenArtifact(repository.overview_artifact_id!)} type="button" variant="secondary"><FolderCode size={15} /> Open overview</Button> : null}
+        : canSync ? <Button onClick={onSync} type="button" variant="secondary"><Refresh size={ICON_SIZE.sm} /> Sync now</Button> : null}
+      {repository.overview_artifact_id ? <Button onClick={() => onOpenArtifact(repository.overview_artifact_id!)} type="button" variant="secondary"><FolderCode size={ICON_SIZE.sm} /> Open overview</Button> : null}
       <Button aria-expanded={filesOpen} disabled={!repository.file_count} onClick={onToggleFiles} type="button" variant="secondary">{filesOpen ? "Hide files" : "Browse files"}</Button>
     </div>
 
@@ -808,11 +809,11 @@ export function RepositoryDetailView({
 
   return <>
     <section className="shared-record-panel rm-repo-page">
-      <div className="shared-panel-heading"><div><GitBranch size={18} /><h2>Repository</h2></div><span className={`rm-repo-status status-${status}`}>{STATUS_LABEL[status]}</span></div>
+      <div className="shared-panel-heading"><div><GitBranch size={ICON_SIZE.lg} /><h2>Repository</h2></div><span className={`rm-repo-status status-${status}`}>{STATUS_LABEL[status]}</span></div>
       <dl className="rm-repo-facts">
         <div><dt>Location</dt><dd><code className="rm-repo-path">{repository.root_path}</code></dd></div>
-        <div><dt><GitBranch size={14} /> Branch</dt><dd>{commit?.branch ?? repository.settings.branch ?? "Checked-out branch"}</dd></div>
-        <div><dt><GitCommit size={14} /> Commit</dt><dd>{commit ? <><code>{commit.sha.slice(0, 7)}</code> {commit.summary} <span className="rm-map-muted">· {commit.author_name} · {formatDate(commit.committed_at)}</span></> : <span className="rm-map-muted">Not synced yet</span>}</dd></div>
+        <div><dt><GitBranch size={ICON_SIZE.sm} /> Branch</dt><dd>{commit?.branch ?? repository.settings.branch ?? "Checked-out branch"}</dd></div>
+        <div><dt><GitCommit size={ICON_SIZE.sm} /> Commit</dt><dd>{commit ? <><code>{commit.sha.slice(0, 7)}</code> {commit.summary} <span className="rm-map-muted">· {commit.author_name} · {formatDate(commit.committed_at)}</span></> : <span className="rm-map-muted">Not synced yet</span>}</dd></div>
         <div><dt>Files</dt><dd>{repository.file_count.toLocaleString()} indexed{repository.last_synced_at ? <span className="rm-map-muted"> · synced {formatDate(repository.last_synced_at)}</span> : null}</dd></div>
         {!job && repository.status === "error" && repository.last_error ? <div><dt>Last error</dt><dd>{repository.last_error}</dd></div> : null}
       </dl>
@@ -823,24 +824,24 @@ export function RepositoryDetailView({
       <div className="rm-health-actions">
         {canSync ? job
           ? <Button disabled={job.cancel_requested} onClick={() => void stop()} type="button" variant="secondary">{job.cancel_requested ? "Stopping…" : "Stop sync"}</Button>
-          : <Button onClick={() => void sync()} type="button" variant="secondary"><Refresh size={15} /> Sync now</Button> : null}
+          : <Button onClick={() => void sync()} type="button" variant="secondary"><Refresh size={ICON_SIZE.sm} /> Sync now</Button> : null}
         <Button aria-expanded={filesOpen} disabled={!repository.file_count} onClick={() => setFilesOpen((open) => !open)} type="button" variant="secondary">{filesOpen ? "Hide files" : "Browse files"}</Button>
       </div>
       {filesOpen ? <RepositoryFiles accessToken={accessToken} onOpenArtifact={onOpenArtifact} repository={repository} /> : null}
     </section>
 
     <section className="shared-record-panel rm-repo-page">
-      <div className="shared-panel-heading"><div><Sparkles size={18} /><h2>Summary</h2></div>{summary ? <span>{summary.provider_name}</span> : null}</div>
+      <div className="shared-panel-heading"><div><Sparkles size={ICON_SIZE.lg} /><h2>Summary</h2></div>{summary ? <span>{summary.provider_name}</span> : null}</div>
       {summary ? <>
         <div className="shared-markdown rm-repo-summary"><SafeMarkdown>{summary.summary_markdown}</SafeMarkdown></div>
         <p className="rm-map-muted">Written for commit <code>{summary.commit_sha.slice(0, 7)}</code> on {formatDate(summary.generated_at)}.{summaryIsStale ? " The repository has changed since; regenerate it to describe the current commit." : ""} {summary.warnings.join(" ")}</p>
         {citedFiles.length ? <div className="rm-repo-cited"><span className="rm-map-muted">Based on</span>{citedFiles.map(([artifactId, path]) => <button className="rm-map-link" key={artifactId} onClick={() => onOpenArtifact(artifactId)} type="button">{path}</button>)}</div> : null}
       </> : <p className="shared-muted-copy">{detail.ai_available ? "No summary yet. A summary describes what the repository is, its main parts and where to start reading, from the overview below and the opening of its key files." : "A summary needs a text AI provider, which an administrator can set up in Settings. The overview below needs no AI."}</p>}
-      {canSync && detail.ai_available && overview ? <div className="rm-health-actions"><Button disabled={summarizing} onClick={() => void summarize()} type="button" variant={summary && !summaryIsStale ? "secondary" : "main"}><Sparkles size={15} /> {summarizing ? "Summarizing…" : summary ? "Regenerate summary" : "Generate summary"}</Button></div> : null}
+      {canSync && detail.ai_available && overview ? <div className="rm-health-actions"><Button disabled={summarizing} onClick={() => void summarize()} type="button" variant={summary && !summaryIsStale ? "secondary" : "main"}><Sparkles size={ICON_SIZE.sm} /> {summarizing ? "Summarizing…" : summary ? "Regenerate summary" : "Generate summary"}</Button></div> : null}
     </section>
 
     {overview?.stack ? <section className="shared-record-panel rm-repo-page">
-      <div className="shared-panel-heading"><div><Layers size={18} /><h2>Project analysis</h2></div><span>detected from manifests</span></div>
+      <div className="shared-panel-heading"><div><Layers size={ICON_SIZE.lg} /><h2>Project analysis</h2></div><span>detected from manifests</span></div>
       <p className="rm-stack-summary">{overview.stack.summary}</p>
       <dl className="rm-stack-groups">
         {STACK_CATEGORIES.map(([category, label]) => {
@@ -851,7 +852,7 @@ export function RepositoryDetailView({
     </section> : null}
 
     <section className="shared-record-panel rm-repo-page">
-      <div className="shared-panel-heading"><div><FolderCode size={18} /><h2>Content overview</h2></div>{overview ? <span>{overview.file_count.toLocaleString()} files · {formatBytes(overview.total_bytes)}</span> : null}</div>
+      <div className="shared-panel-heading"><div><FolderCode size={ICON_SIZE.lg} /><h2>Content overview</h2></div>{overview ? <span>{overview.file_count.toLocaleString()} files · {formatBytes(overview.total_bytes)}</span> : null}</div>
       {overview ? <div className="rm-repo-overview">
         <div className="rm-repo-languages">
           <h3 className="rm-repo-caption">Languages</h3>

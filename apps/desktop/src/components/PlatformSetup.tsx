@@ -18,6 +18,7 @@ import { ThemeToggle } from "./SharedLayout";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { showToast } from "./ui/toast";
+import { ICON_SIZE } from "./ui/icon";
 
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
@@ -85,31 +86,31 @@ export function PlatformSetup({ folder, onAttached, pinned }: { folder: string; 
           <p>All data of this server (database, files, logs) lives in one environment folder inside <code>{folder}/</code>. Nothing outside that folder can be used.</p>
         </div>
         {pinned
-          ? <p className="rm-platform-note" role="note"><AlertCircle size={16} /><span>This server starts with <code>{pinned}</code>, set by <code>REPOMEMO_SERVER_DATA_DIR</code>. The environment you choose here is used until the server restarts, then it goes back to <code>{pinned}</code>. To keep a choice made here, start the server without that variable.</span></p>
-          : <p className="rm-platform-note" role="note"><CircleCheck size={16} /><span>The environment you choose here is remembered: the server attaches it again when it restarts, until it is detached in System settings.</span></p>}
+          ? <p className="rm-platform-note" role="note"><AlertCircle size={ICON_SIZE.md} /><span>This server starts with <code>{pinned}</code>, set by <code>REPOMEMO_SERVER_DATA_DIR</code>. The environment you choose here is used until the server restarts, then it goes back to <code>{pinned}</code>. To keep a choice made here, start the server without that variable.</span></p>
+          : <p className="rm-platform-note" role="note"><CircleCheck size={ICON_SIZE.md} /><span>The environment you choose here is remembered: the server attaches it again when it restarts, until it is detached in System settings.</span></p>}
         {environments === null ? <>
           <ul className="rm-setup-points">
-            <li><ShieldLock size={16} /> Enter the code printed on the server console when it started (or the value of <code>REPOMEMO_SETUP_CODE</code>).</li>
-            <li><Lock size={16} /> Until an environment is attached, the server answers nothing else.</li>
+            <li><ShieldLock size={ICON_SIZE.md} /> Enter the code printed on the server console when it started (or the value of <code>REPOMEMO_SETUP_CODE</code>).</li>
+            <li><Lock size={ICON_SIZE.md} /> Until an environment is attached, the server answers nothing else.</li>
           </ul>
           <form className="shared-setup-form" onSubmit={unlock}>
             <label>Code<Input autoComplete="one-time-code" autoFocus onChange={(event) => setCode(event.target.value)} placeholder="ABCD-EFGH-JKLM" required spellCheck={false} value={code} /></label>
-            <div className="rm-setup-actions"><span /><Button disabled={isBusy || !code.trim()} type="submit" variant="main">{isBusy ? <Loader className="spin" size={16} /> : <Key size={16} />} Unlock</Button></div>
+            <div className="rm-setup-actions"><span /><Button disabled={isBusy || !code.trim()} type="submit" variant="main">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : <Key size={ICON_SIZE.md} />} Unlock</Button></div>
           </form>
         </> : <>
-          <div className="rm-platform-heading"><h3>Existing environments</h3><Button disabled={isBusy} onClick={() => void load()} type="button" variant="secondary"><Refresh size={15} /> Refresh</Button></div>
+          <div className="rm-platform-heading"><h3>Existing environments</h3><Button disabled={isBusy} onClick={() => void load()} type="button" variant="secondary"><Refresh size={ICON_SIZE.sm} /> Refresh</Button></div>
           {environments.length === 0
             ? <p className="shared-muted-copy">There is no folder in <code>{folder}/</code> yet. Create the first environment below.</p>
             : <ul className="rm-platform-list">{environments.map((entry) => <li className={`rm-platform-item ${entry.status}`} key={entry.name}>
               <span className="rm-platform-icon" aria-hidden="true">{entry.status === "invalid" ? <AlertCircle size={20} /> : entry.status === "valid" ? <CircleCheck size={20} /> : <Folder size={20} />}</span>
               <span className="rm-platform-text"><strong>{entry.name} <small>{STATUS_LABELS[entry.status]}</small></strong><span>{entry.detail}</span></span>
-              <Button disabled={isBusy || entry.status === "invalid"} onClick={() => void attach(entry)} type="button" variant="secondary">Use <ArrowRight size={15} /></Button>
+              <Button disabled={isBusy || entry.status === "invalid"} onClick={() => void attach(entry)} type="button" variant="secondary">Use <ArrowRight size={ICON_SIZE.sm} /></Button>
             </li>)}</ul>}
           <form className="shared-setup-form rm-platform-create" onSubmit={create}>
             <h3>Create a new environment</h3>
             <label>Name<Input maxLength={48} onChange={(event) => setName(event.target.value)} pattern="[A-Za-z0-9][A-Za-z0-9._\-]*" placeholder="main" required spellCheck={false} value={name} /></label>
             <p className="shared-muted-copy">It is created as <code>{folder}/{name.trim() || "name"}</code>. Letters, digits, "-", "_" and "." only.</p>
-            <div className="rm-setup-actions"><span /><Button disabled={isBusy || !name.trim()} type="submit" variant="main">{isBusy ? <Loader className="spin" size={16} /> : <FolderPlus size={16} />} Create and use</Button></div>
+            <div className="rm-setup-actions"><span /><Button disabled={isBusy || !name.trim()} type="submit" variant="main">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : <FolderPlus size={ICON_SIZE.md} />} Create and use</Button></div>
           </form>
         </>}
       </section>

@@ -11,11 +11,12 @@ import type { ReviewItem, ReviewItemKind, ReviewQueue } from "../types";
 import { useLiveRefresh } from "../lib/liveEvents";
 import { Button } from "./ui/button";
 import { showToast } from "./ui/toast";
+import { ICON_SIZE } from "./ui/icon";
 
 const KINDS: Record<ReviewItemKind, { label: string; open: string; icon: JSX.Element }> = {
-  evidence: { label: "File marked for review", open: "Open file", icon: <FileAlert size={16} /> },
-  memory_card: { label: "Memory card gone stale", open: "Open card", icon: <Notebook size={16} /> },
-  health_finding: { label: "Health finding", open: "Open in Health", icon: <Stethoscope size={16} /> },
+  evidence: { label: "File marked for review", open: "Open file", icon: <FileAlert size={ICON_SIZE.md} /> },
+  memory_card: { label: "Memory card gone stale", open: "Open card", icon: <Notebook size={ICON_SIZE.md} /> },
+  health_finding: { label: "Health finding", open: "Open in Health", icon: <Stethoscope size={ICON_SIZE.md} /> },
 };
 
 /** Activity that can add to or clear the queue. */
@@ -80,7 +81,7 @@ export function ReviewQueuePanel({
   return <section className="rm-health" aria-busy={isRefreshing}>
     <div className="rm-map-toolbar">
       <span>{count ? `${count} ${count === 1 ? "item" : "items"} waiting · ${queue.evidence_count} ${queue.evidence_count === 1 ? "file" : "files"} · ${queue.memory_card_count} memory ${queue.memory_card_count === 1 ? "card" : "cards"} · ${queue.finding_count} ${queue.finding_count === 1 ? "finding" : "findings"}` : "Nothing is waiting"}</span>
-      <Button disabled={isRefreshing} onClick={() => void load()} type="button" variant="secondary"><Refresh size={15} /> Refresh</Button>
+      <Button disabled={isRefreshing} onClick={() => void load()} type="button" variant="secondary"><Refresh size={ICON_SIZE.sm} /> Refresh</Button>
     </div>
     {count ? <ul aria-label="Review queue" className="rm-health-list">
       {queue.items.map((item) => {

@@ -1,5 +1,6 @@
 import { lazy, Suspense, type ComponentProps, type ComponentType } from "react";
 import { IconLoader2 as Loader } from "@tabler/icons-react";
+import { ICON_SIZE } from "../components/ui/icon";
 
 /**
  * Heavy panels are fetched when they are first shown (route-level code
@@ -10,7 +11,7 @@ function lazily<Props extends object>(load: () => Promise<{ default: ComponentTy
   const Component = lazy(load) as unknown as ComponentType<Props>;
   return function Lazy(props: Props) {
     return (
-      <Suspense fallback={<div className="shared-loading" role="status"><Loader className="spin" size={18} /> Loading</div>}>
+      <Suspense fallback={<div className="shared-loading" role="status"><Loader className="spin" size={ICON_SIZE.lg} /> Loading</div>}>
         <Component {...props} />
       </Suspense>
     );

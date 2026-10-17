@@ -9,6 +9,7 @@ import { ThemeToggle } from "./SharedLayout";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { showToast } from "./ui/toast";
+import { ICON_SIZE } from "./ui/icon";
 
 /** Points this client at a server the shell has allowed, and checks that a RepoMemo server answers there. */
 export async function pointAtServer(origin: string) {
@@ -71,8 +72,8 @@ export function DesktopConnect({ onConnected, onUseLocal }: { onConnected: () =>
         <h1>Your team's evidence, on your desktop.</h1>
         <p className="shared-intro-copy">The desktop app opens your RepoMemo server and shows the same pages as the browser. Your workspaces, memory and permissions stay on the server.</p>
         <dl className="shared-trust-list">
-          <div><dt><Shield size={16} /> One server</dt><dd>The app calls only the server you choose here, and cannot be sent to another site.</dd></div>
-          <div><dt><Key size={16} /> Your session</dt><dd>Kept in this computer's credential store (Windows Credential Manager, the macOS Keychain or the system keyring), not in a file.</dd></div>
+          <div><dt><Shield size={ICON_SIZE.md} /> One server</dt><dd>The app calls only the server you choose here, and cannot be sent to another site.</dd></div>
+          <div><dt><Key size={ICON_SIZE.md} /> Your session</dt><dd>Kept in this computer's credential store (Windows Credential Manager, the macOS Keychain or the system keyring), not in a file.</dd></div>
         </dl>
       </section>
 
@@ -87,12 +88,12 @@ export function DesktopConnect({ onConnected, onUseLocal }: { onConnected: () =>
           <form className="shared-auth-form" onSubmit={connect}>
             <label>Server address<Input autoCapitalize="none" autoComplete="url" autoCorrect="off" autoFocus inputMode="url" onChange={(event) => setAddress(event.target.value)} placeholder="https://repomemo.example.com" required spellCheck={false} type="text" value={address} /></label>
             <Button disabled={isConnecting} type="submit" variant="main">
-              {isConnecting ? <Loader className="spin" size={17} /> : <ArrowRight size={17} />}
+              {isConnecting ? <Loader className="spin" size={ICON_SIZE.md} /> : <ArrowRight size={ICON_SIZE.md} />}
               Connect
             </Button>
           </form>
           <p className="shared-auth-hint">
-            Just looking around? <Button onClick={onUseLocal} type="button" variant="secondary"><Server size={15} /> Use the local workspace</Button> It stays on this computer only. It is retired: it gets security fixes only and will be removed in a 0.3.x release, so move your work to a server.
+            Just looking around? <Button onClick={onUseLocal} type="button" variant="secondary"><Server size={ICON_SIZE.sm} /> Use the local workspace</Button> It stays on this computer only. It is retired: it gets security fixes only and will be removed in a 0.3.x release, so move your work to a server.
           </p>
         </div>
       </section>

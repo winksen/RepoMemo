@@ -25,6 +25,7 @@ import { layoutGraph } from "../lib/forceLayout";
 import type { KnowledgeEdge, KnowledgeMap, KnowledgeNode } from "../types";
 import { Button } from "./ui/button";
 import { showToast } from "./ui/toast";
+import { ICON_SIZE } from "./ui/icon";
 
 /** Files are coloured by one of three groups: past three hues, dots that can
  *  sit next to any other dot stop being distinguishable for colour-blind
@@ -121,7 +122,7 @@ export function KnowledgeMapPanel({
   return <section className="rm-map" aria-busy={isRefreshing}>
     <div className="rm-map-toolbar">
       <span>{inProgress ? "Updating while indexing and embedding run…" : "Up to date"}</span>
-      <Button disabled={isRefreshing} onClick={() => void load()} type="button" variant="secondary"><Refresh size={15} /> Refresh</Button>
+      <Button disabled={isRefreshing} onClick={() => void load()} type="button" variant="secondary"><Refresh size={ICON_SIZE.sm} /> Refresh</Button>
     </div>
     <Pipeline canConfigure={canConfigure} map={map} onOpenEvidence={onOpenEvidence} onOpenSettings={onOpenSettings} />
     <Coverage map={map} />
@@ -134,7 +135,7 @@ function Pipeline({ canConfigure, map, onOpenEvidence, onOpenSettings }: { canCo
   const indexedShare = percent(pipeline.indexed_count, pipeline.file_count);
   const embeddedShare = pipeline.embedded_count === null ? null : percent(pipeline.embedded_count, pipeline.passage_count);
   return <section className="rm-map-section" aria-labelledby="rm-map-pipeline-title">
-    <div className="shared-panel-heading"><div><Layers size={18} /><h2 id="rm-map-pipeline-title">From files to searchable knowledge</h2></div></div>
+    <div className="shared-panel-heading"><div><Layers size={ICON_SIZE.lg} /><h2 id="rm-map-pipeline-title">From files to searchable knowledge</h2></div></div>
     <p className="rm-map-intro">Every file goes through these steps. Search works after step 2; search by meaning needs step 4.</p>
     <ol className="rm-map-stages">
       <li>
@@ -142,30 +143,30 @@ function Pipeline({ canConfigure, map, onOpenEvidence, onOpenSettings }: { canCo
         <strong>{pipeline.file_count.toLocaleString()}</strong>
         <span>{pipeline.file_count === 1 ? "file" : "files"} in the workspace</span>
       </li>
-      <li aria-hidden="true" className="rm-map-stage-arrow"><ArrowRight size={16} /></li>
+      <li aria-hidden="true" className="rm-map-stage-arrow"><ArrowRight size={ICON_SIZE.md} /></li>
       <li>
         <span className="rm-map-stage-step">2 · Indexed</span>
         <strong>{indexedShare}%</strong>
         <span>{pipeline.indexed_count.toLocaleString()} of {pipeline.file_count.toLocaleString()} files read and split</span>
         <Meter value={indexedShare} label="Files indexed" />
         {pipeline.pending_count || pipeline.failed_count ? <div className="rm-map-stage-issues">
-          {pipeline.pending_count ? <span><Hourglass size={14} /> {pipeline.pending_count} waiting</span> : null}
-          {pipeline.failed_count ? <button className="rm-map-failed" onClick={onOpenEvidence} type="button"><AlertTriangle size={14} /> {pipeline.failed_count} failed · see Evidence</button> : null}
+          {pipeline.pending_count ? <span><Hourglass size={ICON_SIZE.sm} /> {pipeline.pending_count} waiting</span> : null}
+          {pipeline.failed_count ? <button className="rm-map-failed" onClick={onOpenEvidence} type="button"><AlertTriangle size={ICON_SIZE.sm} /> {pipeline.failed_count} failed · see Evidence</button> : null}
         </div> : null}
       </li>
-      <li aria-hidden="true" className="rm-map-stage-arrow"><ArrowRight size={16} /></li>
+      <li aria-hidden="true" className="rm-map-stage-arrow"><ArrowRight size={ICON_SIZE.md} /></li>
       <li>
         <span className="rm-map-stage-step">3 · Passages</span>
         <strong>{pipeline.passage_count.toLocaleString()}</strong>
         <span>searchable pieces of text (sections or ~100 lines of code)</span>
       </li>
-      <li aria-hidden="true" className="rm-map-stage-arrow"><ArrowRight size={16} /></li>
+      <li aria-hidden="true" className="rm-map-stage-arrow"><ArrowRight size={ICON_SIZE.md} /></li>
       <li>
         <span className="rm-map-stage-step">4 · Searchable by meaning</span>
         {embeddedShare === null ? <>
           <strong>Off</strong>
           <span>No AI for search is set up, so search matches words only.</span>
-          {canConfigure ? <Button onClick={onOpenSettings} type="button" variant="secondary"><Search size={15} /> Set up AI for search</Button> : <span className="rm-map-muted">An administrator can turn it on in Settings.</span>}
+          {canConfigure ? <Button onClick={onOpenSettings} type="button" variant="secondary"><Search size={ICON_SIZE.sm} /> Set up AI for search</Button> : <span className="rm-map-muted">An administrator can turn it on in Settings.</span>}
         </> : <>
           <strong>{embeddedShare}%</strong>
           <span>{pipeline.embedded_count!.toLocaleString()} of {pipeline.passage_count.toLocaleString()} passages embedded{pipeline.embedding_model ? ` with ${pipeline.embedding_model}` : ""}</span>
@@ -191,11 +192,11 @@ function Coverage({ map }: { map: KnowledgeMap }) {
   }
 
   return <section className="rm-map-section" aria-labelledby="rm-map-coverage-title">
-    <div className="shared-panel-heading"><div><FileText size={18} /><h2 id="rm-map-coverage-title">Coverage by kind of file</h2></div></div>
+    <div className="shared-panel-heading"><div><FileText size={ICON_SIZE.lg} /><h2 id="rm-map-coverage-title">Coverage by kind of file</h2></div></div>
     <div className="rm-map-legend" aria-label="Indexing states" role="group">
       <span><i className="rm-map-swatch indexed" /> Indexed</span>
       <span><i className="rm-map-swatch pending" /> Waiting</span>
-      <span><i className="rm-map-swatch failed" /><AlertTriangle size={13} /> Failed</span>
+      <span><i className="rm-map-swatch failed" /><AlertTriangle size={ICON_SIZE.sm} /> Failed</span>
     </div>
     {map.coverage.length ? <div className="rm-map-coverage" ref={container} onMouseLeave={() => setTooltip(null)}>
       <table>
@@ -383,14 +384,14 @@ function RelationGraph({ canConfigure, map, onOpenArtifact, onOpenMemoryCard, on
   }
 
   return <section className="rm-map-section" aria-labelledby="rm-map-graph-title">
-    <div className="shared-panel-heading"><div><Graph size={18} /><h2 id="rm-map-graph-title">How your content connects</h2></div><span>{fileCount} files · {edges.length} links</span></div>
+    <div className="shared-panel-heading"><div><Graph size={ICON_SIZE.lg} /><h2 id="rm-map-graph-title">How your content connects</h2></div><span>{fileCount} files · {edges.length} links</span></div>
     <p className="rm-map-intro">Each dot is a file, or a whole git repository (ringed dot) with all of its files; bigger dots hold more passages. A line joins items whose content means similar things, or a memory card (◆) to what it cites.</p>
     <div className="rm-map-filters">
       <label title={map.similarity_available ? undefined : "Needs AI for search"}><input checked={showSimilar && map.similarity_available} disabled={!map.similarity_available} onChange={(event) => setShowSimilar(event.target.checked)} type="checkbox" /> Similar content</label>
       <label><input checked={showCites} onChange={(event) => setShowCites(event.target.checked)} type="checkbox" /> Memory links</label>
       <div className="shared-artifact-view-switch" role="group" aria-label="Graph view">
-        <Button aria-label="Graph view" aria-pressed={view === "graph"} className={view === "graph" ? "active" : ""} onClick={() => setView("graph")} type="button" variant="secondary"><Graph size={16} /></Button>
-        <Button aria-label="Table view" aria-pressed={view === "table"} className={view === "table" ? "active" : ""} onClick={() => setView("table")} type="button" variant="secondary"><List size={16} /></Button>
+        <Button aria-label="Graph view" aria-pressed={view === "graph"} className={view === "graph" ? "active" : ""} onClick={() => setView("graph")} type="button" variant="secondary"><Graph size={ICON_SIZE.md} /></Button>
+        <Button aria-label="Table view" aria-pressed={view === "table"} className={view === "table" ? "active" : ""} onClick={() => setView("table")} type="button" variant="secondary"><List size={ICON_SIZE.md} /></Button>
       </div>
     </div>
     {!map.similarity_available ? <p className="rm-map-notice">Lines between similar files appear once AI for search is set up and passages are embedded.{canConfigure ? <> <button onClick={onOpenSettings} type="button">Open Settings</button></> : null}</p> : null}
@@ -406,9 +407,9 @@ function RelationGraph({ canConfigure, map, onOpenArtifact, onOpenMemoryCard, on
       : <div className="rm-map-graph">
         <div className="rm-map-canvas" ref={canvas} onMouseLeave={() => setTooltip(null)}>
           <div className="rm-map-zoom" role="group" aria-label="Zoom">
-            <Button aria-label="Zoom in" onClick={() => zoomBy(1.4)} type="button" variant="secondary"><Plus size={15} /></Button>
-            <Button aria-label="Zoom out" onClick={() => zoomBy(1 / 1.4)} type="button" variant="secondary"><Minus size={15} /></Button>
-            <Button aria-label="Fit all dots" onClick={() => fitView()} type="button" variant="secondary"><Recenter size={15} /></Button>
+            <Button aria-label="Zoom in" onClick={() => zoomBy(1.4)} type="button" variant="secondary"><Plus size={ICON_SIZE.sm} /></Button>
+            <Button aria-label="Zoom out" onClick={() => zoomBy(1 / 1.4)} type="button" variant="secondary"><Minus size={ICON_SIZE.sm} /></Button>
+            <Button aria-label="Fit all dots" onClick={() => fitView()} type="button" variant="secondary"><Recenter size={ICON_SIZE.sm} /></Button>
           </div>
           {/* a11y-allow: click a click on the empty canvas only clears the selection; the dots and the table view are the keyboard paths */}
           <svg
@@ -485,7 +486,7 @@ function SelectionPanel({ edges, nodeById, onOpenArtifact, onOpenMemoryCard, onS
     return <aside className="rm-map-selection">
       <span className="rm-map-stage-step">Memory card</span>
       <strong className="rm-map-selection-title">{selected.title}</strong>
-      <Button onClick={() => onOpenMemoryCard(selected.id)} type="button" variant="secondary"><Book size={15} /> Open memory card</Button>
+      <Button onClick={() => onOpenMemoryCard(selected.id)} type="button" variant="secondary"><Book size={ICON_SIZE.sm} /> Open memory card</Button>
       <h3>Cites</h3>
       <ul>{cites.map(({ node }) => <li key={node.id}><button onClick={() => onSelect(node.id)} type="button">{node.title}</button></li>)}</ul>
     </aside>;
@@ -500,7 +501,7 @@ function SelectionPanel({ edges, nodeById, onOpenArtifact, onOpenMemoryCard, onS
       <dt>Passages</dt><dd>{selected.passage_count}</dd>
       {similarityAvailable ? <><dt>By meaning</dt><dd>{percent(selected.embedded_count, selected.passage_count)}% embedded</dd></> : null}
     </dl>
-    <Button onClick={() => onOpenArtifact(selected.id)} type="button" variant="secondary"><ExternalLink size={15} /> Open file</Button>
+    <Button onClick={() => onOpenArtifact(selected.id)} type="button" variant="secondary"><ExternalLink size={ICON_SIZE.sm} /> Open file</Button>
     {similarityAvailable ? <>
       <h3>Closest by meaning</h3>
       {similar.length ? <ul>{similar.map(({ node, weight }) => <li key={node.id}><button onClick={() => onSelect(node.id)} type="button">{node.title}</button><span>{Math.round(weight * 100)}% similar</span></li>)}</ul> : <p className="rm-map-muted">No file is notably close to this one.</p>}

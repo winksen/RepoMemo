@@ -7,6 +7,7 @@ import { Button } from "./ui/button";
 import { Dropdown } from "./ui/dropdown";
 import { Input } from "./ui/input";
 import { showToast } from "./ui/toast";
+import { ICON_SIZE } from "./ui/icon";
 
 function message(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
@@ -86,11 +87,11 @@ export function MailSettingsPanel({ accessToken, canChange }: { accessToken: str
     } catch (error) { showToast("error", message(error, "The test message could not be queued.")); } finally { setIsBusy(false); }
   }
 
-  if (!overview) return <p className="shared-muted-copy"><Loader className="spin" size={14} /> Loading mail settings…</p>;
+  if (!overview) return <p className="shared-muted-copy"><Loader className="spin" size={ICON_SIZE.sm} /> Loading mail settings…</p>;
   const settings = overview.settings;
   const readOnly = !canChange;
   return <section className="shared-settings-group">
-    <div className="shared-panel-heading"><div><Mail size={18} /><h2>Mail</h2></div><span>{settings.enabled ? "on" : settings.configured ? "off" : "not set up"}</span></div>
+    <div className="shared-panel-heading"><div><Mail size={ICON_SIZE.lg} /><h2>Mail</h2></div><span>{settings.enabled ? "on" : settings.configured ? "off" : "not set up"}</span></div>
     <p className="shared-muted-copy">The server sends invitations and notices through your mail server over TLS. Mail is never sent in plain text. Servers on a private address need the operator's say (<code>REPOMEMO_SMTP_ALLOWED_HOSTS</code>).</p>
     <form className="rm-system-settings" onSubmit={save}>
       <label className="shared-ai-provider-toggle"><input checked={enabled} disabled={readOnly} onChange={(event) => setEnabled(event.target.checked)} type="checkbox" /> Send mail</label>
@@ -102,11 +103,11 @@ export function MailSettingsPanel({ accessToken, canChange }: { accessToken: str
       {settings.password_set && !readOnly ? <label className="shared-ai-provider-toggle"><input checked={removePassword} onChange={(event) => setRemovePassword(event.target.checked)} type="checkbox" /> Remove the saved password</label> : null}
       <label>Sender address<Input aria-label="Sender address" disabled={readOnly} onChange={(event) => setFromAddress(event.target.value)} placeholder="repomemo@example.com" type="email" value={fromAddress} /></label>
       <label>Sender name<Input aria-label="Sender name" disabled={readOnly} onChange={(event) => setFromName(event.target.value)} placeholder="RepoMemo" value={fromName} /></label>
-      {readOnly ? null : <Button disabled={isBusy} type="submit" variant="main">{isBusy ? <Loader className="spin" size={16} /> : null} Save mail settings</Button>}
+      {readOnly ? null : <Button disabled={isBusy} type="submit" variant="main">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : null} Save mail settings</Button>}
     </form>
     {readOnly ? null : <div className="rm-system-toolbar">
       <Input aria-label="Send the test message to" onChange={(event) => setTestTo(event.target.value)} placeholder="Your own address when empty" type="email" value={testTo} />
-      <Button disabled={isBusy || !settings.configured || !settings.enabled} onClick={() => void sendTest()} type="button" variant="secondary"><Send size={15} /> Send test mail</Button>
+      <Button disabled={isBusy || !settings.configured || !settings.enabled} onClick={() => void sendTest()} type="button" variant="secondary"><Send size={ICON_SIZE.sm} /> Send test mail</Button>
     </div>}
     <p className="shared-muted-copy">{overview.queued_count} waiting · {overview.sent_last_day} sent and {overview.failed_last_day} failed in the last day</p>
     {overview.entries.length ? <div className="shared-activity-list">{overview.entries.map((entry) => <article key={entry.id}>

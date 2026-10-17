@@ -8,6 +8,7 @@ import { Button } from "./ui/button";
 import { Dialog, DialogCancel } from "./ui/dialog";
 import { Dropdown } from "./ui/dropdown";
 import { showToast } from "./ui/toast";
+import { ICON_SIZE } from "./ui/icon";
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} bytes`;
@@ -92,7 +93,7 @@ export function LocalMoveToServer({ onGoToServer }: { onGoToServer: () => void }
   }
 
   return <>
-    <Button className="rm-desktop-move" onClick={() => setOpen(true)} type="button" variant="secondary"><PackageExport size={15} /> Move a workspace to a server</Button>
+    <Button className="rm-desktop-move" onClick={() => setOpen(true)} type="button" variant="secondary"><PackageExport size={ICON_SIZE.sm} /> Move a workspace to a server</Button>
     <Dialog
       className="rm-dialog-wide"
       description={archive
@@ -104,7 +105,7 @@ export function LocalMoveToServer({ onGoToServer }: { onGoToServer: () => void }
         <Button onClick={goToServer} type="button" variant="main">Go to the server to import it</Button>
       </> : <>
         <DialogCancel onClick={close} />
-        <Button disabled={isBusy || !workspaceId} onClick={() => void prepare()} type="button" variant="main">{isBusy ? <Loader className="spin" size={16} /> : null} Prepare the archive</Button>
+        <Button disabled={isBusy || !workspaceId} onClick={() => void prepare()} type="button" variant="main">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : null} Prepare the archive</Button>
       </>}
       onClose={close}
       open={open}

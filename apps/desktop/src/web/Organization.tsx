@@ -12,6 +12,7 @@ import { ADMIN_WORKSPACE_SECTIONS, type WorkspaceSection } from "./constants";
 import { apiMessage } from "./format";
 import { navigate } from "./router";
 import { useOrganizationNavigation } from "./navigation";
+import { ICON_SIZE } from "../components/ui/icon";
 
 export function OrganizationAdministration({
   accessToken,
@@ -76,16 +77,16 @@ export function OrganizationAdministration({
   }
 
   return <section className="shared-organization-admin" aria-labelledby="organization-admin-title">
-    <div className="shared-panel-heading"><div><Building size={18} /><h2 id="organization-admin-title">Organization administration</h2></div><span>{organization.role}</span></div>
+    <div className="shared-panel-heading"><div><Building size={ICON_SIZE.lg} /><h2 id="organization-admin-title">Organization administration</h2></div><span>{organization.role}</span></div>
     <p className="shared-muted-copy">Organization members inherit access to every workspace. Their organization role controls the level of that access.</p>
     {canRename ? <form className="shared-organization-rename" onSubmit={saveOrganization}><label>Organization name<Input onChange={(event) => setOrganizationName(event.target.value)} required value={organizationName} /></label><Button disabled={isSaving || organizationName.trim() === organization.name} type="submit" variant="secondary">Save name</Button></form> : null}
-    <form className="shared-organization-member-form" onSubmit={(event) => { event.preventDefault(); void saveMember(memberEmail, memberRole); }}><label>Member email<Input onChange={(event) => setMemberEmail(event.target.value)} placeholder="person@example.com" required type="email" value={memberEmail} /></label><label>Organization role<Dropdown aria-label="Organization role" onValueChange={(value) => setMemberRole(value as OrganizationRole)} options={[{ label: "Member", value: "member" }, ...(canAssignAdmin ? [{ label: "Admin", value: "admin" }] : [])]} value={memberRole} /></label><Button disabled={isSaving} type="submit" variant="secondary"><Users size={16} /> Add member</Button></form>
+    <form className="shared-organization-member-form" onSubmit={(event) => { event.preventDefault(); void saveMember(memberEmail, memberRole); }}><label>Member email<Input onChange={(event) => setMemberEmail(event.target.value)} placeholder="person@example.com" required type="email" value={memberEmail} /></label><label>Organization role<Dropdown aria-label="Organization role" onValueChange={(value) => setMemberRole(value as OrganizationRole)} options={[{ label: "Member", value: "member" }, ...(canAssignAdmin ? [{ label: "Admin", value: "admin" }] : [])]} value={memberRole} /></label><Button disabled={isSaving} type="submit" variant="secondary"><Users size={ICON_SIZE.md} /> Add member</Button></form>
     <Toast kind="error" message={error} />
     <div className="shared-organization-member-list" aria-busy={isLoading}>{isLoading ? <p className="shared-muted-copy">Loading organization members…</p> : members.map((member) => {
       const isOwner = member.role === "owner";
       const protectedMember = isOwner || (organization.role === "admin" && member.role === "admin");
       const email = member.user.email ?? "";
-      return <article key={member.user.id}><div className="shared-person"><UserAvatar name={member.user.display_name} size={32} userId={member.user.id} /><div><strong>{member.user.display_name}</strong><span>{email}</span></div></div><div className="shared-organization-member-actions">{organization.role === "owner" && !isOwner ? <Button disabled={isSaving} onClick={() => void makeOwner(member)} type="button" variant="secondary">Make owner</Button> : null}{isOwner ? <span className="shared-member-role">Owner</span> : <Dropdown aria-label={`Role for ${member.user.display_name}`} disabled={protectedMember || isSaving} onValueChange={(value) => void saveMember(email, value as OrganizationRole)} options={[{ label: "Member", value: "member" }, ...(canAssignAdmin ? [{ label: "Admin", value: "admin" }] : [])]} value={member.role} />}{!protectedMember ? <Button aria-label={`Remove ${member.user.display_name} from ${organization.name}`} disabled={isSaving} onClick={() => void removeMember(member)} type="button" variant="secondary"><Trash size={15} /></Button> : null}</div></article>;
+      return <article key={member.user.id}><div className="shared-person"><UserAvatar name={member.user.display_name} size={32} userId={member.user.id} /><div><strong>{member.user.display_name}</strong><span>{email}</span></div></div><div className="shared-organization-member-actions">{organization.role === "owner" && !isOwner ? <Button disabled={isSaving} onClick={() => void makeOwner(member)} type="button" variant="secondary">Make owner</Button> : null}{isOwner ? <span className="shared-member-role">Owner</span> : <Dropdown aria-label={`Role for ${member.user.display_name}`} disabled={protectedMember || isSaving} onValueChange={(value) => void saveMember(email, value as OrganizationRole)} options={[{ label: "Member", value: "member" }, ...(canAssignAdmin ? [{ label: "Admin", value: "admin" }] : [])]} value={member.role} />}{!protectedMember ? <Button aria-label={`Remove ${member.user.display_name} from ${organization.name}`} disabled={isSaving} onClick={() => void removeMember(member)} type="button" variant="secondary"><Trash size={ICON_SIZE.sm} /></Button> : null}</div></article>;
     })}</div>
     <InviteMembers accessToken={accessToken} initialEmail={inviteEmail} key={`invite-${organization.id}`} roleOptions={[{ label: "Member", value: "member" }, ...(canAssignAdmin ? [{ label: "Admin", value: "admin" }] : [])]} targetId={organization.id} targetLabel="organization" targetType="organization" />
   </section>;
@@ -116,13 +117,13 @@ export function OrganizationRail({
         const organization = organizations.find((entry) => entry.id === workspace.organization_id);
         const label = organizations.length > 1 ? `${organization?.name ?? "Organization"} / ${workspace.workspace.name}` : workspace.workspace.name;
         const isCurrent = workspace.workspace.id === workspaceId;
-        return <Button aria-current={isCurrent ? "page" : undefined} className={`shared-rail-workspace${isCurrent ? " active" : ""}`} key={workspace.workspace.id} onClick={() => navigate(`/workspaces/${encodeURIComponent(workspace.workspace.id)}/overview`)} type="button" variant="secondary"><Layers size={16} /><span>{label}</span></Button>;
+        return <Button aria-current={isCurrent ? "page" : undefined} className={`shared-rail-workspace${isCurrent ? " active" : ""}`} key={workspace.workspace.id} onClick={() => navigate(`/workspaces/${encodeURIComponent(workspace.workspace.id)}/overview`)} type="button" variant="secondary"><Layers size={ICON_SIZE.md} /><span>{label}</span></Button>;
       })}</div> : <p className="shared-rail-empty">No accessible workspaces yet.</p>}
     </section> : null}
     {canManageOrganizations ? <section className="shared-rail-organizations" aria-label="Organization management">
       <p className="shared-eyebrow">Organizations</p>
-      {organizations.length ? <div className="shared-rail-list">{organizations.map((organization) => <Button aria-current={organization.id === selectedOrganizationId ? "page" : undefined} className={`shared-rail-organization${organization.id === selectedOrganizationId ? " active" : ""}`} key={organization.id} onClick={() => organizationNavigation.selectOrganization(organization.id)} type="button" variant="secondary"><Building size={16} /><span>{organization.name}</span></Button>)}</div> : <p className="shared-rail-empty">Create an organization to begin.</p>}
-      <Button className="shared-organization-create" onClick={organizationNavigation.startCreatingOrganization} type="button" variant="secondary"><Plus size={16} /> New organization</Button>
+      {organizations.length ? <div className="shared-rail-list">{organizations.map((organization) => <Button aria-current={organization.id === selectedOrganizationId ? "page" : undefined} className={`shared-rail-organization${organization.id === selectedOrganizationId ? " active" : ""}`} key={organization.id} onClick={() => organizationNavigation.selectOrganization(organization.id)} type="button" variant="secondary"><Building size={ICON_SIZE.md} /><span>{organization.name}</span></Button>)}</div> : <p className="shared-rail-empty">Create an organization to begin.</p>}
+      <Button className="shared-organization-create" onClick={organizationNavigation.startCreatingOrganization} type="button" variant="secondary"><Plus size={ICON_SIZE.md} /> New organization</Button>
     </section> : null}
   </div>;
 }
@@ -146,18 +147,18 @@ export function WorkspaceTopbar({
 
   return <nav aria-label="Workspace sections" className="shared-workspace-topbar">
     <div className="shared-workspace-tabs">
-      {workspaceTab("overview", "Overview", <Dashboard size={16} />)}
-      {workspaceTab("evidence", "Evidence", <FileText size={16} />)}
-      {workspaceTab("documents", "Documents", <FileText size={16} />)}
-      {workspaceTab("repositories", "Repositories", <RepositoryIcon size={16} />)}
-      {workspaceTab("retrieval", "Retrieval", <Search size={16} />)}
-      {workspaceTab("map", "Map", <MapIcon size={16} />)}
-      {workspaceTab("health", "Health", <HealthIcon size={16} />)}
-      {workspaceTab("review", "Review", <ReviewIcon size={16} />)}
-      {workspaceTab("memory", "Memory", <Book size={16} />)}
-      {workspaceTab("tasks", "Tasks", <Checklist size={16} />)}
-      {workspaceTab("people", "People & Activity", <Users size={16} />)}
-      {workspaceTab("settings", "Settings", <Settings size={16} />)}
+      {workspaceTab("overview", "Overview", <Dashboard size={ICON_SIZE.md} />)}
+      {workspaceTab("evidence", "Evidence", <FileText size={ICON_SIZE.md} />)}
+      {workspaceTab("documents", "Documents", <FileText size={ICON_SIZE.md} />)}
+      {workspaceTab("repositories", "Repositories", <RepositoryIcon size={ICON_SIZE.md} />)}
+      {workspaceTab("retrieval", "Retrieval", <Search size={ICON_SIZE.md} />)}
+      {workspaceTab("map", "Map", <MapIcon size={ICON_SIZE.md} />)}
+      {workspaceTab("health", "Health", <HealthIcon size={ICON_SIZE.md} />)}
+      {workspaceTab("review", "Review", <ReviewIcon size={ICON_SIZE.md} />)}
+      {workspaceTab("memory", "Memory", <Book size={ICON_SIZE.md} />)}
+      {workspaceTab("tasks", "Tasks", <Checklist size={ICON_SIZE.md} />)}
+      {workspaceTab("people", "People & Activity", <Users size={ICON_SIZE.md} />)}
+      {workspaceTab("settings", "Settings", <Settings size={ICON_SIZE.md} />)}
     </div>
   </nav>;
 }

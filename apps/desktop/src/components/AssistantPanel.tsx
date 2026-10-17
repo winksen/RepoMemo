@@ -35,6 +35,7 @@ import { Dialog, DialogCancel } from "./ui/dialog";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { showToast } from "./ui/toast";
+import { ICON_SIZE } from "./ui/icon";
 
 /** A turn as shown: stored turns plus the one waiting for, or failing to get, a reply. */
 type ThreadTurn = {
@@ -269,30 +270,30 @@ export function AssistantPanel({ accessToken, onOpenArtifact, workspaceId }: { a
     {dialog}
     <div className="shared-assistant-toolbar">
       <strong title={activeConversation?.title ?? "New chat"}>{activeConversation?.title ?? "New chat"}</strong>
-      <Button aria-expanded={showChats} aria-label="Chat history" onClick={() => setShowChats((current) => !current)} title="Chat history" type="button" variant="secondary"><History size={16} /></Button>
-      <Button aria-label="New chat" disabled={isBusy} onClick={() => { startNewChat(); setShowChats(false); }} title="New chat" type="button" variant="secondary"><Plus size={16} /></Button>
+      <Button aria-expanded={showChats} aria-label="Chat history" onClick={() => setShowChats((current) => !current)} title="Chat history" type="button" variant="secondary"><History size={ICON_SIZE.md} /></Button>
+      <Button aria-label="New chat" disabled={isBusy} onClick={() => { startNewChat(); setShowChats(false); }} title="New chat" type="button" variant="secondary"><Plus size={ICON_SIZE.md} /></Button>
     </div>
     {showChats ? <nav className="shared-assistant-chats" aria-label="Assistant chats">
       {conversations.length ? <ul>{conversations.map((conversation) => {
         const isActive = conversation.id === activeId;
         return <li className={isActive ? "active" : ""} key={conversation.id}>
           <button aria-current={isActive ? "page" : undefined} disabled={isBusy} onClick={() => { setShowChats(false); void openChat(conversation.id); }} title={conversation.title} type="button">
-            <Message size={15} />
+            <Message size={ICON_SIZE.sm} />
             <span><strong>{conversation.title}</strong><small>{formatChatTime(conversation.updated_at)} · {conversation.turn_count} {conversation.turn_count === 1 ? "message" : "messages"}</small></span>
           </button>
           <ActionMenu items={[
-            { label: "Rename", icon: <Pencil size={15} />, onSelect: () => { setRenameValue(conversation.title); setChatDialog({ kind: "rename", conversation }); } },
-            { label: "Delete chat", icon: <Trash size={15} />, destructive: true, onSelect: () => setChatDialog({ kind: "delete", conversation }) },
+            { label: "Rename", icon: <Pencil size={ICON_SIZE.sm} />, onSelect: () => { setRenameValue(conversation.title); setChatDialog({ kind: "rename", conversation }); } },
+            { label: "Delete chat", icon: <Trash size={ICON_SIZE.sm} />, destructive: true, onSelect: () => setChatDialog({ kind: "delete", conversation }) },
           ]} label={`Actions for chat ${conversation.title}`} />
         </li>;
       })}</ul> : <p className="shared-assistant-chats-empty">Your chats appear here. Only you can see them.</p>}
     </nav> : null}
     <div className="shared-assistant-main">
       <div className="shared-assistant-thread" role="log" aria-live="polite" aria-busy={isBusy || isLoadingChat}>
-        {isLoadingChat ? <p className="shared-assistant-pending"><Loader className="spin" size={16} /> Loading chat…</p> : turns.length ? turns.map((turn) => <article className="shared-assistant-turn" key={turn.key}>
+        {isLoadingChat ? <p className="shared-assistant-pending"><Loader className="spin" size={ICON_SIZE.md} /> Loading chat…</p> : turns.length ? turns.map((turn) => <article className="shared-assistant-turn" key={turn.key}>
           <div className="shared-assistant-request"><p>{turn.label}</p>{turn.request.capability ? <span>{capabilityLabel(capabilities, turn.request.capability)}</span> : null}</div>
-          {turn.status === "pending" ? <p className="shared-assistant-pending"><Loader className="spin" size={16} /> Working on it…</p> : null}
-          {turn.status === "failed" ? <div className="shared-assistant-failed"><span>No reply. The request did not complete and was not saved.</span><Button disabled={isBusy} onClick={() => void run(turn)} type="button" variant="secondary"><Refresh size={15} /> Retry</Button></div> : null}
+          {turn.status === "pending" ? <p className="shared-assistant-pending"><Loader className="spin" size={ICON_SIZE.md} /> Working on it…</p> : null}
+          {turn.status === "failed" ? <div className="shared-assistant-failed"><span>No reply. The request did not complete and was not saved.</span><Button disabled={isBusy} onClick={() => void run(turn)} type="button" variant="secondary"><Refresh size={ICON_SIZE.sm} /> Retry</Button></div> : null}
           {turn.reply ? <Reply accessToken={accessToken} canSummarize={canSummarize} capabilities={capabilities} isBusy={isBusy} onOpenArtifact={onOpenArtifact} onSummarize={summarize} reply={turn.reply} /> : null}
         </article>) : <div className="shared-assistant-intro">
           <Sparkles size={22} />
@@ -305,15 +306,15 @@ export function AssistantPanel({ accessToken, onOpenArtifact, workspaceId }: { a
         <div className="shared-assistant-actions" role="group" aria-label="Assistant actions">
           {(capabilities?.capabilities ?? []).map((capability) => {
             const Icon = CAPABILITY_ICONS[capability.id];
-            return <Button aria-pressed={selected === capability.id} className={selected === capability.id ? "active" : ""} disabled={!capability.available || isBusy || isLoadingChat} key={capability.id} onClick={() => choose(capability.id)} title={capability.available ? capability.description : `${capability.description} Needs an AI provider enabled in Settings.`} type="button" variant="secondary"><Icon size={15} />{capability.label}</Button>;
+            return <Button aria-pressed={selected === capability.id} className={selected === capability.id ? "active" : ""} disabled={!capability.available || isBusy || isLoadingChat} key={capability.id} onClick={() => choose(capability.id)} title={capability.available ? capability.description : `${capability.description} Needs an AI provider enabled in Settings.`} type="button" variant="secondary"><Icon size={ICON_SIZE.sm} />{capability.label}</Button>;
           })}
         </div>
         <div className="shared-assistant-input">
           <Textarea aria-label="Message the assistant" onChange={(event) => setDraft(event.target.value)} onKeyDown={onComposerKey} placeholder={selectedInfo?.placeholder ?? "Ask, search, or name a file…"} ref={input} rows={2} value={draft} />
-          <Button aria-label="Send" disabled={isBusy || isLoadingChat || !draft.trim()} type="submit" variant="main">{isBusy ? <Loader className="spin" size={16} /> : <Send size={16} />}</Button>
+          <Button aria-label="Send" disabled={isBusy || isLoadingChat || !draft.trim()} type="submit" variant="main">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : <Send size={ICON_SIZE.md} />}</Button>
         </div>
         <div className="shared-assistant-footnote">
-          <span>{capabilities?.provider_name ? <><Brain size={13} /> AI actions use {capabilities.provider_name}. Search and file lookup stay on the server.</> : "No AI provider is enabled, so file lookup and search are available. An administrator can enable AI in Settings."}</span>
+          <span>{capabilities?.provider_name ? <><Brain size={ICON_SIZE.sm} /> AI actions use {capabilities.provider_name}. Search and file lookup stay on the server.</> : "No AI provider is enabled, so file lookup and search are available. An administrator can enable AI in Settings."}</span>
         </div>
       </form>
     </div>
@@ -367,13 +368,13 @@ function Reply({ accessToken, canSummarize, capabilities, isBusy, onOpenArtifact
   const offerSummary = canSummarize && !(reply.capability === "summarize_file" && reply.generated);
   return <div className="shared-assistant-reply">
     <div className="shared-assistant-reply-meta">
-      <span><Sparkles size={14} /> Assistant{note ? ` · ${note}` : ""}{earlier > 0 ? ` · read ${earlier} earlier ${earlier === 1 ? "message" : "messages"}` : ""}</span>
+      <span><Sparkles size={ICON_SIZE.sm} /> Assistant{note ? ` · ${note}` : ""}{earlier > 0 ? ` · read ${earlier} earlier ${earlier === 1 ? "message" : "messages"}` : ""}</span>
       {reply.generated ? <span className="shared-assistant-generated">AI-generated · verify against the cited sources</span> : null}
     </div>
     <div className="shared-markdown"><SafeMarkdown>{reply.reply_markdown}</SafeMarkdown></div>
     {reply.warnings.length ? <div className="shared-ai-overview-warning">{reply.warnings.map((warning) => <p key={warning}>{warning}</p>)}</div> : null}
     {reply.files.length ? <ul className="shared-assistant-files">{reply.files.map((file) => <li key={file.id}>
-      <Button className="shared-assistant-file" onClick={() => onOpenArtifact(file.id)} type="button" variant="secondary"><FileText size={16} /><span><strong>{file.title}</strong><small>{file.path}</small></span></Button>
+      <Button className="shared-assistant-file" onClick={() => onOpenArtifact(file.id)} type="button" variant="secondary"><FileText size={ICON_SIZE.md} /><span><strong>{file.title}</strong><small>{file.path}</small></span></Button>
       {offerSummary ? <Button disabled={isBusy || !file.indexed_at} onClick={() => onSummarize(file.id, file.title)} title={file.indexed_at ? `Summarize ${file.title}` : "This file is not indexed yet"} type="button" variant="secondary">Summarize</Button> : null}
     </li>)}</ul> : null}
     {reply.matches.length ? <div className="shared-search-results">{reply.matches.map((match) => <article key={match.chunk_id}><Button className="shared-search-result" onClick={() => onOpenArtifact(match.artifact_id)} type="button" variant="secondary"><span className="shared-search-result-heading"><strong>{match.title}</strong><span>{match.source_name}</span></span><p>{match.snippet}</p><span className="shared-search-result-path">{match.path}{match.start_line ? ` · line ${match.start_line}` : ""}</span></Button></article>)}</div> : null}
