@@ -34,13 +34,13 @@
   .shared-home-rail[data-open="true"] .shared-rail-body { padding-top: 10px; }
 
   /* The assistant: a floating button, and a sheet over the bottom of the page. */
-  .shared-assistant-dock.sheet.collapsed { position: fixed; right: 16px; bottom: max(16px, env(safe-area-inset-bottom)); z-index: 30; width: auto !important; padding: 0; background: transparent; border: 0; }
+  .shared-assistant-dock.sheet.collapsed { position: fixed; right: 16px; bottom: max(16px, env(safe-area-inset-bottom)); z-index: var(--layer-float); width: auto !important; padding: 0; background: transparent; border: 0; }
   .shared-assistant-dock.sheet.collapsed .rm-button { flex-direction: row; gap: 8px; width: auto; height: 46px; padding: 0 18px; background: var(--color-surface); border: 1px solid var(--color-border-strong); border-radius: 999px; box-shadow: var(--shadow-floating); }
   .shared-assistant-dock.sheet.collapsed .shared-assistant-fab-label { display: inline; font-size: 13px; font-weight: 700; }
-  .shared-assistant-dock.sheet:not(.collapsed) { position: fixed; right: 0; bottom: 0; left: 0; z-index: 45; width: 100% !important; height: min(88dvh, 760px); padding-bottom: env(safe-area-inset-bottom); border: 0; border-radius: 16px 16px 0 0; box-shadow: var(--shadow-floating); outline: none; }
+  .shared-assistant-dock.sheet:not(.collapsed) { position: fixed; right: 0; bottom: 0; left: 0; z-index: var(--layer-sheet-panel); width: 100% !important; height: min(88dvh, 760px); padding-bottom: env(safe-area-inset-bottom); border: 0; border-radius: 16px 16px 0 0; box-shadow: var(--shadow-floating); outline: none; }
   .shared-assistant-dock.sheet:not(.collapsed)::before { content: ""; align-self: center; flex: none; width: 36px; height: 4px; margin-top: 8px; background: var(--color-border-strong); border-radius: 999px; }
   .shared-assistant-dock.sheet .shared-assistant-dock-body { flex: 1; height: auto; min-height: 0; }
-  .shared-assistant-backdrop { position: fixed; inset: 0; z-index: 40; display: block; padding: 0; background: rgb(0 0 0 / 45%); border: 0; cursor: default; }
+  .shared-assistant-backdrop { position: fixed; inset: 0; z-index: var(--layer-sheet); display: block; padding: 0; background: rgb(0 0 0 / 45%); border: 0; cursor: default; }
 
   /* Wrapping rather than widening. */
   .shared-detail-shell, .shared-detail-panel, .shared-artifact-entry, .shared-search-result, .shared-person, .rm-system-facts, .shared-doc-title { overflow-wrap: anywhere; }

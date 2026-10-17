@@ -2,6 +2,19 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.57 (2026-10-17)
+
+Dropdown lists and menus open above dialogs. The first release of the frontend polish track (K1, [plan](mindmap/plans/2026-10-17-frontend-polish.md)): it changes no look and no behaviour besides the stacking.
+
+### Fixed
+- **A dropdown inside a dialog opened behind it.** A dropdown list was at layer 50 and a dialog at 901, so the list of a dropdown in the API token, connector, move-to-server, System and profile dialogs was hidden. Dropdown lists, action menus, mention lists and the map tooltip are now above dialogs.
+
+### Changed
+- **One layer scale.** `--layer-raised` (1), `--layer-sticky` (10), `--layer-float` (20), `--layer-sheet` (800) and `--layer-sheet-panel` (801) for the assistant on narrow screens, `--layer-overlay` (900), `--layer-dialog` (901), `--layer-popover` (950) and `--layer-toast` (1000) are tokens in `01-tokens-and-shared-web.css`. Every `z-index` of the stylesheets uses one, except a single `0` behind the pipeline connectors.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.56 (2026-10-16)
 
 The clean-machine install is prepared. `V0.3.0` is not tagged.

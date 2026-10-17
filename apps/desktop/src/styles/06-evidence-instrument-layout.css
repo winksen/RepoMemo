@@ -473,7 +473,7 @@ select:focus {
 
 .workspace-inspector-v3 > * {
   position: relative;
-  z-index: 1;
+  z-index: var(--layer-raised);
 }
 
 .workspace-inspector-header {
@@ -530,7 +530,7 @@ select:focus {
 
 .workspace-evidence-path > * {
   position: relative;
-  z-index: 1;
+  z-index: var(--layer-raised);
 }
 
 .workspace-section-heading {

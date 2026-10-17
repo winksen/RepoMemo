@@ -1,11 +1,11 @@
 # RepoMemo releases: 0.2 → 0.3
 
-> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.56` (2026-10-16) · **Next:** `V0.3.0`
+> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.57` (2026-10-17) · **Next:** `V0.2.58`
 > **Previous line:** [Releases 0.1 → 0.2](RELEASES_0.1.md) · **Related:** [Roadmap, Road to V0.3.0](ROADMAP.md#-road-to-v030) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
 Every release of the 0.2 line, shipped and planned, one row each. The plan comes from the [Road to V0.3.0](ROADMAP.md#-road-to-v030): **one change per release**, each shippable alone, with the security rules for a new outside connection in the release that opens it. Planned rows are proposals until decisions 7–14 in the roadmap are agreed.
 
-**Type:** ✨ Feature · 🔧 Enhancement · 🐞 Fix · 🔒 Security · 📘 Update (docs, process, dependencies, release). Releases whose purpose is a security rule or a review finding are marked 🔒 here; the roadmap's plan table files them under the kind of work instead.
+**Type:** ✨ Feature · 🔧 Enhancement · 🐞 Fix · 🔒 Security · 📘 Update (docs, process, dependencies, release). Releases whose purpose is a security rule or a review finding are marked 🔒 here; the roadmap's plan table files them under the kind of work instead. · 🧹 Refactor · 🧪 Test
 **Status:** ✅ shipped (with its date) · 🔄 in progress · 🔜 planned
 
 When a release ships, set its status to ✅ with the date and make *What changes* say what was built.
@@ -25,7 +25,9 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | V0.2.40–V0.2.46 | G. Portability and operations | Export, import, encrypted backups, a second backup copy, readings in a subprocess, container image, audit export |
 | V0.2.47–V0.2.48 | H. Experience | Accessibility pass, narrow screens |
 | V0.2.49–V0.2.51 | I. One client | Desktop as a server client, export to a server, local edition retired |
-| V0.2.52–V0.3.0 | J. Release candidate | Freeze and fourth security pass, upgrade test, performance run, documentation, clean install, V0.3.0 *Connected* |
+| V0.2.52–V0.2.56 | J. Release candidate | Freeze and fourth security pass, upgrade test, performance run, documentation, clean install |
+| V0.2.57–V0.2.129 | K. Frontend polish | Tokens, layers and the cascade; building blocks; React foundations; every page on the shared pieces; behaviour; checks and DESIGN.md ([plan](plans/2026-10-17-frontend-polish.md)) |
+| V0.3.0 | — | *Connected* |
 
 ---
 
@@ -89,4 +91,77 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | **V0.2.54** | ✅ 2026-10-16 | J. Release candidate | 📘 Update | Performance | Performance run at 50,000 passages plus a 100,000-file repository and 10,000 issues: the two new harnesses (a repository of that size synced by the engine; a tracker of that size synced through a connector) and a page for targets, commands and results; the run needs release builds and is the maintainer's (R10) | The V0.2.0 targets still hold; results in the release notes |
 | **V0.2.55** | ✅ 2026-10-16 | J. Release candidate | 📘 Update | Documentation | Documentation: a check that routes, settings, versions, releases and links agree with the code, then the pages it and a reading found out of date (API reference, repository sources, connectors, operations, authentication, console, test and route counts) and upgrade notes from 0.2.x in UPGRADING.md (R11) | Every page matches the code |
 | **V0.2.56** | ✅ 2026-10-16 | J. Release candidate | 📘 Update | Release | Clean-machine install with mail and a remote repository: the runbook (fourteen steps, the pre-tag checklist and a result table) and a smoke test extended to mail, a remote repository, the body limit and the webhook; the install itself needs a second machine and is the maintainer's, so the release is prepared and not yet ready to tag (R12) | Installed without a workaround; ready to tag |
-| **V0.3.0** | 🔜 Planned | J. Release candidate | 📘 Update | Connected | The version set to `0.3.0` and tagged `v0.3.0` | Tag `v0.3.0` |
+| **V0.2.57** | ✅ 2026-10-17 | K. Frontend polish | 🐞 Fix | Styles | Dropdowns and menus open above dialogs: one layer scale of nine tokens in `01…` replaces every literal `z-index` above 10; dropdown lists, action menus, mention lists and the map tooltip use `--layer-popover`, above dialogs and sheets; written, not seen on screen | No literal `z-index` above 10 remains outside the scale. A dropdown in the token dialog of Profile › API tokens opens on top of the dialog. |
+| **V0.2.58** | 🔜 Planned | K. Frontend polish | 🐞 Fix | Styles | Long dropdown lists scroll inside the window | The System › Settings level dropdown and the Retrieval language filter stay inside the window when opened near the bottom. |
+| **V0.2.59** | 🔜 Planned | K. Frontend polish | 🐞 Fix | Styles | Dropdowns size to their content unless a form stretches them | The dropdowns in toolbars and filter rows (Tasks, Retrieval, System logs) no longer stretch across the row. |
+| **V0.2.60** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | Styles | One size for every control | Text fields, dropdowns and buttons are the same height on every page (36 px, 40 px on narrow screens). |
+| **V0.2.61** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | Styles | True neutral greys | `npm run a11y:check` (contrast) still passes; no neutral token has a hue. |
+| **V0.2.62** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | Styles | One accent: the `--workspace-*` colours retired | `grep -- --workspace- styles` finds nothing. |
+| **V0.2.63** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | Styles | Hard-coded colours become tokens | The only hex colours outside `01…` are inside `:root` token blocks, and dark theme fields are no longer white. |
+| **V0.2.64** | 🔜 Planned | K. Frontend polish | 🐞 Fix | Styles | Retired desktop styles kept to the desktop edition | The web client gets no style from these rules. The local edition looks as before (the maintainer checks it by hand). |
+| **V0.2.65** | 🔜 Planned | K. Frontend polish | 🐞 Fix | Styles | Duplicate global field rules removed | No stylesheet outside the local-edition scope styles a bare `input`, `textarea` or `select` except the base reset. |
+| **V0.2.66** | 🔜 Planned | K. Frontend polish | 🐞 Fix | Styles | Page rules no longer resize the shared field | Sign-in, setup, members, memory, notes and search fields look like every other field. |
+| **V0.2.67** | 🔜 Planned | K. Frontend polish | 🐞 Fix | Styles | Checkboxes, radios and file inputs reset | Every checkbox is 16 px and none stretches. |
+| **V0.2.68** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | Styles | Three icon sizes | `grep 'size={1[2357]}'` finds only documented exceptions. |
+| **V0.2.69** | 🔜 Planned | K. Frontend polish | ✨ Feature | UI kit | `Field` | Used in Profile › Personal details. Each field has a label tied to its control, and the visual is unchanged. |
+| **V0.2.70** | 🔜 Planned | K. Frontend polish | ✨ Feature | UI kit | `Checkbox` | Used in the evidence type filter (`shared-artifact-type-menu-panel`). |
+| **V0.2.71** | 🔜 Planned | K. Frontend polish | ✨ Feature | UI kit | `Switch` for on and off settings | Used in System › Settings for boolean settings. |
+| **V0.2.72** | 🔜 Planned | K. Frontend polish | 🐞 Fix | UI kit | Buttons no longer submit forms by accident | Every form submits from its submit button and Enter, and no other button submits. |
+| **V0.2.73** | 🔜 Planned | K. Frontend polish | ✨ Feature | UI kit | `Button` shows that it is working | Used on the sign-in and save buttons of Profile. |
+| **V0.2.74** | 🔜 Planned | K. Frontend polish | ✨ Feature | UI kit | `IconButton` | Every icon-only button in those places is an `IconButton`. |
+| **V0.2.75** | 🔜 Planned | K. Frontend polish | ✨ Feature | UI kit | `Tooltip` | Icon-only buttons show their name on hover and on keyboard focus. |
+| **V0.2.76** | 🔜 Planned | K. Frontend polish | ✨ Feature | UI kit | `danger` button | Destructive confirmations use it. |
+| **V0.2.77** | 🔜 Planned | K. Frontend polish | ✨ Feature | UI kit | `ConfirmDialog` and `useConfirm` | Those three deletions confirm in the app's dialog. |
+| **V0.2.78** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | UI kit | No more native confirmations | `grep window.confirm` finds nothing in the web client. |
+| **V0.2.79** | 🔜 Planned | K. Frontend polish | ✨ Feature | UI kit | `LoadingState` | Used on the System pages. |
+| **V0.2.80** | 🔜 Planned | K. Frontend polish | ✨ Feature | UI kit | `EmptyState` | Used for tasks, memory cards and notifications. |
+| **V0.2.81** | 🔜 Planned | K. Frontend polish | ✨ Feature | UI kit | `Badge` | Those classes are gone. |
+| **V0.2.82** | 🔜 Planned | K. Frontend polish | ✨ Feature | UI kit | `SegmentedControl` | The five switches share one look and arrow-key behaviour. |
+| **V0.2.83** | 🔜 Planned | K. Frontend polish | ✨ Feature | UI kit | `PanelHeading` | `grep shared-panel-heading` finds only the component's own CSS. |
+| **V0.2.84** | 🔜 Planned | K. Frontend polish | ✨ Feature | UI kit | `PageHeader` | The dashboard, workspace, artifact, memory card, profile, notifications, organization and System pages use it. |
+| **V0.2.85** | 🔜 Planned | K. Frontend polish | ✨ Feature | UI kit | Table styles | The System users, jobs, audit, map coverage and repository tables share it. |
+| **V0.2.86** | 🔜 Planned | K. Frontend polish | ✨ Feature | UI kit | `Combobox` for long lists | A card's evidence is picked by typing part of a file name. |
+| **V0.2.87** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | UI kit | The searchable picker where lists are long | None of these lists needs scrolling through every file. |
+| **V0.2.88** | 🔜 Planned | K. Frontend polish | ✨ Feature | UI kit | `SearchField` | Those four filters look and behave alike. |
+| **V0.2.89** | 🔜 Planned | K. Frontend polish | ✨ Feature | UI kit | `CopyButton` | Every copy action behaves the same. |
+| **V0.2.90** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | UI kit | One option-list style | Their four separate rule sets are gone. |
+| **V0.2.91** | 🔜 Planned | K. Frontend polish | 🧹 Refactor | Web code | Formatting helpers in one place | `grep 'function format'` finds them only in `web/format.ts`. |
+| **V0.2.92** | 🔜 Planned | K. Frontend polish | 🧹 Refactor | Web code | One error message helper | `grep 'function errorMessage'` finds nothing. |
+| **V0.2.93** | 🔜 Planned | K. Frontend polish | 🧹 Refactor | Web code | `useAsyncAction` | Both use the hook and behave as before. |
+| **V0.2.94** | 🔜 Planned | K. Frontend polish | 🧹 Refactor | Web code | `useFormState` | Profile › Personal details uses it. |
+| **V0.2.95** | 🔜 Planned | K. Frontend polish | 🧹 Refactor | Web code | System area split | No file in `web/system/` is over 300 lines and behaviour is unchanged. |
+| **V0.2.96** | 🔜 Planned | K. Frontend polish | 🧹 Refactor | Web code | Repositories split | No file is over 300 lines and behaviour is unchanged. |
+| **V0.2.97** | 🔜 Planned | K. Frontend polish | 🧹 Refactor | Web code | Setup wizard split | Each step owns its state and the wizard behaves as before. |
+| **V0.2.98** | 🔜 Planned | K. Frontend polish | 🧹 Refactor | Web code | Knowledge map split | Behaviour is unchanged. |
+| **V0.2.99** | 🔜 Planned | K. Frontend polish | 🧹 Refactor | Web code | System pages load through the cache | No System page sets state from a request that answers after it was left. |
+| **V0.2.100** | 🔜 Planned | K. Frontend polish | 🧹 Refactor | Web code | Repositories and connectors load through the cache | As described in the plan |
+| **V0.2.101** | 🔜 Planned | K. Frontend polish | 🧹 Refactor | Web code | Map, document viewer and assistant load through the cache | `grep -c useEffect` drops in each file and no request result lands after unmount. |
+| **V0.2.102** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | Sign-in, registration, invitation, password reset and email verification pages | Sign-in, registration, invitation, reset and verification pages use the shared fields, buttons and states | The area's forms are labelled shared fields of one height, its dropdowns and states are the shared ones, and its unused CSS is gone |
+| **V0.2.103** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | Setup wizard and environment menu | The setup wizard and the environment menu use the shared fields, switches and states | The area's forms are labelled shared fields of one height, its dropdowns and states are the shared ones, and its unused CSS is gone |
+| **V0.2.104** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | Profile (details, password, picture, notification preferences, API tokens) | The profile page and API tokens use the shared fields, switches and states | The area's forms are labelled shared fields of one height, its dropdowns and states are the shared ones, and its unused CSS is gone |
+| **V0.2.105** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | Organization page (rename, members, invitations, ownership) | The organization page uses the shared fields, badges and states | The area's forms are labelled shared fields of one height, its dropdowns and states are the shared ones, and its unused CSS is gone |
+| **V0.2.106** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | Workspace settings (rename, AI providers, AI policy, repository links) | Workspace settings use the shared fields and switches | The area's forms are labelled shared fields of one height, its dropdowns and states are the shared ones, and its unused CSS is gone |
+| **V0.2.107** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | People section (members, invitations, activity) | The people section uses the shared fields, badges and segmented control | The area's forms are labelled shared fields of one height, its dropdowns and states are the shared ones, and its unused CSS is gone |
+| **V0.2.108** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | Evidence section (notes, uploads, folders, filters, bulk bar) | The evidence section's forms, filters and bulk actions use the shared pieces | The area's forms are labelled shared fields of one height, its dropdowns and states are the shared ones, and its unused CSS is gone |
+| **V0.2.109** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | Retrieval (search filters, saved searches, Ask, symbols) | Retrieval filters, saved searches, Ask and symbol search use the shared pieces | The area's forms are labelled shared fields of one height, its dropdowns and states are the shared ones, and its unused CSS is gone |
+| **V0.2.110** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | Tasks (create, filters, card, checklist) | Tasks use the shared fields, checkboxes and states | The area's forms are labelled shared fields of one height, its dropdowns and states are the shared ones, and its unused CSS is gone |
+| **V0.2.111** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | Memory section and memory card page | The memory section and card page use the shared fields, picker and states | The area's forms are labelled shared fields of one height, its dropdowns and states are the shared ones, and its unused CSS is gone |
+| **V0.2.112** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | Artifact page (rename, lifecycle, comments, versions) | The artifact page's forms use the shared pieces | The area's forms are labelled shared fields of one height, its dropdowns and states are the shared ones, and its unused CSS is gone |
+| **V0.2.113** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | Repositories (link check, settings, repository page) | Repository forms and pages use the shared pieces | The area's forms are labelled shared fields of one height, its dropdowns and states are the shared ones, and its unused CSS is gone |
+| **V0.2.114** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | Connectors | Connector forms use the shared pieces | The area's forms are labelled shared fields of one height, its dropdowns and states are the shared ones, and its unused CSS is gone |
+| **V0.2.115** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | Mail settings | Mail settings use the shared fields and states | The area's forms are labelled shared fields of one height, its dropdowns and states are the shared ones, and its unused CSS is gone |
+| **V0.2.116** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | System › Settings (setting rows, numbers, read-only state) | System settings rows use the shared fields and switches | The area's forms are labelled shared fields of one height, its dropdowns and states are the shared ones, and its unused CSS is gone |
+| **V0.2.117** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | System › Users, Logs, Jobs, Audit toolbars (filters, date range) | System toolbars and filters use the shared search field, dropdowns and date fields | The area's forms are labelled shared fields of one height, its dropdowns and states are the shared ones, and its unused CSS is gone |
+| **V0.2.118** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | Assistant dock and composer, command palette | The assistant and the command palette use the shared field and option list | The area's forms are labelled shared fields of one height, its dropdowns and states are the shared ones, and its unused CSS is gone |
+| **V0.2.119** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | Web client | Dialogs behave the same | Every dialog follows the rule (list them in the commit). |
+| **V0.2.120** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | Web client | Unsaved changes are not lost | As described in the plan |
+| **V0.2.121** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | Web client | Ctrl or Cmd plus Enter sends | As described in the plan |
+| **V0.2.122** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | Web client | Required fields before the request | As described in the plan |
+| **V0.2.123** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | Web client | Long lists page | As described in the plan |
+| **V0.2.124** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | Web client | Every change says it happened | The commit lists each mutation and its feedback. |
+| **V0.2.125** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | Web client | Focus lands somewhere sensible | As described in the plan |
+| **V0.2.126** | 🔜 Planned | K. Frontend polish | 🧪 Test | Web tests | Tests for the building blocks | As described in the plan |
+| **V0.2.127** | 🔜 Planned | K. Frontend polish | 🧪 Test | Process | A style check that stops the drift | `npm run styles:check` passes on the tree and fails on a planted example (described in the commit). |
+| **V0.2.128** | 🔜 Planned | K. Frontend polish | 📘 Update | Documentation | DESIGN.md matches the code | As described in the plan |
+| **V0.2.129** | 🔜 Planned | K. Frontend polish | 📘 Update | Release | Release check after the polish track | As described in the plan |
+| **V0.3.0** | 🔜 Planned | — | 📘 Update | Connected | The version set to `0.3.0` and tagged `v0.3.0`, after track K and the clean-machine install | Tag `v0.3.0` |

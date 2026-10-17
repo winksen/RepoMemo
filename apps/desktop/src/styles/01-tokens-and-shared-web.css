@@ -42,6 +42,18 @@
   --shadow-block: 0 1px 2px rgba(24, 32, 31, 0.04);
   --shadow-floating: 0 18px 48px rgba(24, 32, 31, 0.2);
 
+  /* Layers: every z-index in the stylesheets is one of these. Popovers (dropdown
+     lists, action menus, mention lists) sit above dialogs so they open inside them. */
+  --layer-raised: 1;
+  --layer-sticky: 10;
+  --layer-float: 20;
+  --layer-sheet: 800;
+  --layer-sheet-panel: 801;
+  --layer-overlay: 900;
+  --layer-dialog: 901;
+  --layer-popover: 950;
+  --layer-toast: 1000;
+
   --font-ui: "Plus Jakarta Sans Variable", "Segoe UI", sans-serif;
   --font-brand: "Fjalla One", "Arial Narrow", sans-serif;
   --font-display: "Fjalla One", "Arial Narrow", sans-serif;
@@ -190,7 +202,7 @@ textarea:focus-visible {
 .shared-trust-list dt { display: flex; gap: 8px; align-items: center; color: var(--color-text); font-weight: 700; }
 .shared-trust-list dd { margin: 0 0 0 24px; color: var(--color-text-muted); font-size: 13px; }
 
-.rm-button.shared-auth-theme-toggle { position: absolute; top: 20px; right: 20px; z-index: 2; min-height: 36px; }
+.rm-button.shared-auth-theme-toggle { position: absolute; top: 20px; right: 20px; z-index: var(--layer-raised); min-height: 36px; }
 .shared-auth-form-region { display: grid; place-items: center; padding: 40px; background: var(--color-surface-2); }
 .shared-auth-form-shell { width: min(100%, 410px); }
 .shared-auth-switch { gap: 4px; padding: 4px; background: var(--color-surface-3); border-radius: 10px; }
@@ -212,7 +224,7 @@ textarea:focus-visible {
 .shared-loading { justify-content: center; gap: 10px; height: 100vh; color: var(--color-text-muted); }
 
 .shared-home { display: grid; grid-template-rows: 46px minmax(0, 1fr); height: 100dvh; min-height: 0; padding: 8px; overflow: hidden; }
-.shared-home-header { position: relative; z-index: 1; justify-content: space-between; padding: 0 12px; background: var(--color-surface); border-radius: 12px; box-shadow: var(--shadow-block); }
+.shared-home-header { position: relative; z-index: var(--layer-raised); justify-content: space-between; padding: 0 12px; background: var(--color-surface); border-radius: 12px; box-shadow: var(--shadow-block); }
 .shared-header-actions { display: flex; align-items: center; gap: 8px; }
 .shared-user-menu { gap: 8px; color: var(--color-text-muted); font-size: 13px; }
 .shared-account-controls { display: inline-flex; gap: 8px; }
@@ -256,7 +268,7 @@ textarea:focus-visible {
 .shared-workspace-tabs .rm-button:hover:not(:disabled) { color: var(--color-text); background: var(--color-surface-2); border-color: transparent; }
 .shared-workspace-tabs .rm-button.active { color: var(--color-accent-text); border-bottom-color: var(--color-accent); }
 .shared-workspace-tabs .rm-button.active:hover:not(:disabled) { color: var(--color-accent-text); border-bottom-color: var(--color-accent); }
-.shared-workspace-tabs .rm-button:focus-visible { z-index: 1; border-color: var(--color-accent); }
+.shared-workspace-tabs .rm-button:focus-visible { z-index: var(--layer-raised); border-color: var(--color-accent); }
 .shared-workspace-tab-label { display: inline-flex; align-items: center; gap: 6px; }
 .shared-workspace-tab-restricted { padding: 2px 5px; color: var(--color-text-muted); background: var(--color-surface-3); border: 1px solid var(--color-border); border-radius: 4px; font-size: 9px; font-weight: 700; line-height: 1; }
 .shared-page-content,
@@ -456,7 +468,7 @@ textarea:focus-visible {
 .shared-artifact-type-menu summary svg:last-child { color: var(--color-text-muted); transition: transform 110ms var(--ease-control); }
 .shared-artifact-type-menu[open] summary { border-color: var(--color-accent); }
 .shared-artifact-type-menu[open] summary svg:last-child { transform: rotate(180deg); }
-.shared-artifact-type-menu-panel { position: absolute; z-index: 10; top: calc(100% + 6px); right: 0; display: grid; grid-template-columns: repeat(2, minmax(120px, 1fr)); min-width: 280px; gap: 4px; padding: 6px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px; box-shadow: var(--shadow-floating); }
+.shared-artifact-type-menu-panel { position: absolute; z-index: var(--layer-sticky); top: calc(100% + 6px); right: 0; display: grid; grid-template-columns: repeat(2, minmax(120px, 1fr)); min-width: 280px; gap: 4px; padding: 6px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px; box-shadow: var(--shadow-floating); }
 .shared-artifact-type-menu-panel label { display: flex; align-items: center; gap: 7px; min-width: 0; min-height: 32px; padding: 0 7px; color: var(--color-text-muted); border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 700; }
 .shared-artifact-type-menu-panel label:hover { color: var(--color-text); background: var(--color-surface-2); }
 .shared-artifact-type-menu-panel label:first-child { grid-column: 1 / -1; color: var(--color-text); border-bottom: 1px solid var(--color-border); border-radius: 0; }
@@ -793,7 +805,7 @@ textarea:focus-visible {
 .rm-dropdown-trigger[data-state="open"] { border-color: var(--color-accent); box-shadow: none; }
 .rm-dropdown-trigger:disabled { cursor: not-allowed; opacity: 0.55; }
 .rm-dropdown-icon { display: grid; flex: 0 0 auto; place-items: center; color: var(--color-text-muted); }
-.rm-dropdown-content { z-index: 50; min-width: var(--radix-select-trigger-width); overflow: hidden; color: var(--color-text); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 10px; box-shadow: var(--shadow-floating); }
+.rm-dropdown-content { z-index: var(--layer-popover); min-width: var(--radix-select-trigger-width); overflow: hidden; color: var(--color-text); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 10px; box-shadow: var(--shadow-floating); }
 .rm-dropdown-viewport { padding: 4px; }
 .rm-dropdown-item { position: relative; display: flex; align-items: center; min-height: 34px; padding: 0 30px 0 9px; border-radius: 6px; outline: none; cursor: pointer; font-size: 13px; user-select: none; }
 .rm-dropdown-item[data-highlighted] { color: var(--color-text); background: var(--color-surface-2); }

@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.56` (2026-10-16), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.57` (2026-10-17), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Security review 2026-10-16 (V0.2.52)](security/2026-10-16-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -45,7 +45,8 @@ timeline
     V0.2.19 to V0.2.31 : Remote repositories, pushes, issues and pull requests
     V0.2.32 to V0.2.39 : Assistant memory, cross-workspace search, palette, languages, review queue
     V0.2.40 to V0.2.48 : Export and import, encrypted backups, container, accessibility
-    V0.2.49 to V0.2.56 : One client, release candidate : V0.3.0 Connected
+    V0.2.49 to V0.2.56 : One client, release candidate
+    V0.2.57 to V0.2.129 : Frontend polish (track K) : V0.3.0 Connected
 ```
 
 | Stage | Status |
@@ -55,7 +56,8 @@ timeline
 | Phase D: Depth and operability (V0.1.33–V0.1.65) | ✅ Complete |
 | Security review 2026-10-10, second and third passes | ✅ Every finding fixed, mitigated or accepted in writing (V0.1.76); R2-4 and R2-5 scheduled for V0.2.8 |
 | Road to V0.2.0 (V0.1.66–V0.1.76) | 🔄 Built and versioned `0.2.0`; R6 (clean install) and the tag are the maintainer's |
-| Road to V0.3.0 (V0.2.1–V0.2.56, one change each) | 🔜 Proposed 2026-10-14; decisions 7–14 to agree |
+| Road to V0.3.0 (V0.2.1–V0.2.56, one change each) | ✅ V0.2.1–V0.2.56 built; the clean-machine install (R6, R12) is the maintainer's |
+| Track K: frontend polish (V0.2.57–V0.2.129) | 🔄 V0.2.57 built; decisions 15–19 taken as proposed; [plan](plans/2026-10-17-frontend-polish.md) |
 | V0.4.0 and later: scale-out, single sign-on, hosted | 💭 Direction |
 
 ---
@@ -303,7 +305,7 @@ V0.2.0 made RepoMemo trustworthy on its own server. **V0.3.0, *Connected*,** pro
 - **Shippable alone:** each release passes CI, carries its tests, updates the mindmaps, the changelog and its row in [RELEASES_0.2.md](RELEASES_0.2.md), and is committed as `Update V0.2.N` with a short list.
 - **Security comes with the surface:** the rules for a new outside connection (mail, remote git, webhooks, connectors) are part of the release that opens it, never a later one.
 - **Fixes ride along** with the next release when they are small; a fix that needs its own release gets one (decision 6 named the format, not a fixes-only rule).
-- **Feature freeze from V0.2.52:** only the release candidate's checks and their fixes until V0.3.0.
+- **Feature freeze from V0.2.52:** only the release candidate's checks and their fixes until V0.3.0, **lifted for track K** (decision 15): the frontend polish adds building blocks and fixes, no product feature, and V0.2.129 repeats the release checks and restores the freeze until the tag.
 
 ### Release plan
 
@@ -416,7 +418,20 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 | **V0.2.54** ✅ | 📘 | Performance | Performance run at 50,000 passages plus a 100,000-file remote repository and 10,000 issues | R10 | The V0.2.0 targets still hold; results in the release notes |
 | **V0.2.55** ✅ | 📘 | Documentation | Mindmaps, branch pages (`repository-sources`, a new `connectors` page, `operations`), changelog and upgrade notes from 0.2.x | R11 | Every page matches the code |
 | **V0.2.56** ✅ | 📘 | Release | Clean-machine install with mail and a remote repository, following only the guide | R12 | Installed without a workaround; ready to tag |
-| **V0.3.0** | — | — | *Connected* | — | Tag `v0.3.0` |
+| **V0.3.0** | — | — | *Connected*, after track K | — | Tag `v0.3.0` |
+
+#### Track K: Frontend polish (V0.2.57–V0.2.129)
+
+Planned on 2026-10-17. The web client works but does not look like one product: fields of four heights and four radii, dropdowns opening behind dialogs, checkboxes styled as text fields, and every page with its own headings, badges, tabs, loading text and confirmations. Track K **keeps the look** (palette, type, spacing and components stay) and makes every page use it the same way. It adds the few missing building blocks and leaves the React code easier to change. The audit, the evidence, decisions 15–19 and a full brief for each release are in **[the frontend polish plan](plans/2026-10-17-frontend-polish.md)**, written to be handed to an implementer one release at a time.
+
+| Part | Theme | Releases | Count |
+|---|---|---|---|
+| K1 | Foundations: tokens, layers and the cascade | V0.2.57–V0.2.68 | 12 |
+| K2 | Building blocks | V0.2.69–V0.2.90 | 22 |
+| K3 | React foundations | V0.2.91–V0.2.101 | 11 |
+| K4 | Pages on the shared pieces | V0.2.102–V0.2.118 | 17 |
+| K5 | Behaviour you can rely on | V0.2.119–V0.2.125 | 7 |
+| K6 | Keep it that way | V0.2.126–V0.2.129 | 4 |
 
 ### Release checklists (0.2.x)
 
@@ -873,6 +888,101 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 - [x] The page ends with **what must be done before the tag**: CI green, the desktop crate's tests, the performance runs, a browser pass for accessibility and narrow screens, the desktop app tried, the security fixes tried, the container images built once, and the open lines of every release read again; and a result table, empty
 - [ ] **The install itself, which is R6 and R12.** It needs a second machine, a mail account and a running server, which this repository's rules keep from the automated work. **`V0.3.0` is not ready to tag**: the release is prepared, not passed. Many tests of V0.2.46 to V0.2.55 were compiled and never executed, the performance runs and the browser passes have not been made, and the app has not been started (each is in its release's checklist and in the page's pre-tag list)
 
+#### Track K: Frontend polish (planned)
+
+One box per release; the brief, the files and the commit line of each are in [the plan](plans/2026-10-17-frontend-polish.md).
+
+**K1. Foundations: tokens, layers and the cascade**
+
+- [x] **V0.2.57** Dropdowns and menus open above dialogs: one layer scale (`--layer-raised`, `-sticky`, `-float`, `-sheet`, `-sheet-panel`, `-overlay`, `-dialog`, `-popover`, `-toast`) in `01-tokens-and-shared-web.css`; every `z-index` of the stylesheets (except one `0`) is a token; dropdown lists, action menus, mention lists and the map tooltip sit at `--layer-popover`, above dialogs. Typecheck and style check pass; not seen on screen
+- [ ] **V0.2.58** Long dropdown lists scroll inside the window
+- [ ] **V0.2.59** Dropdowns size to their content unless a form stretches them
+- [ ] **V0.2.60** One size for every control
+- [ ] **V0.2.61** True neutral greys
+- [ ] **V0.2.62** One accent: the `--workspace-*` colours retired
+- [ ] **V0.2.63** Hard-coded colours become tokens
+- [ ] **V0.2.64** Retired desktop styles kept to the desktop edition
+- [ ] **V0.2.65** Duplicate global field rules removed
+- [ ] **V0.2.66** Page rules no longer resize the shared field
+- [ ] **V0.2.67** Checkboxes, radios and file inputs reset
+- [ ] **V0.2.68** Three icon sizes
+
+**K2. Building blocks**
+
+- [ ] **V0.2.69** `Field`
+- [ ] **V0.2.70** `Checkbox`
+- [ ] **V0.2.71** `Switch` for on and off settings
+- [ ] **V0.2.72** Buttons no longer submit forms by accident
+- [ ] **V0.2.73** `Button` shows that it is working
+- [ ] **V0.2.74** `IconButton`
+- [ ] **V0.2.75** `Tooltip`
+- [ ] **V0.2.76** `danger` button
+- [ ] **V0.2.77** `ConfirmDialog` and `useConfirm`
+- [ ] **V0.2.78** No more native confirmations
+- [ ] **V0.2.79** `LoadingState`
+- [ ] **V0.2.80** `EmptyState`
+- [ ] **V0.2.81** `Badge`
+- [ ] **V0.2.82** `SegmentedControl`
+- [ ] **V0.2.83** `PanelHeading`
+- [ ] **V0.2.84** `PageHeader`
+- [ ] **V0.2.85** Table styles
+- [ ] **V0.2.86** `Combobox` for long lists
+- [ ] **V0.2.87** The searchable picker where lists are long
+- [ ] **V0.2.88** `SearchField`
+- [ ] **V0.2.89** `CopyButton`
+- [ ] **V0.2.90** One option-list style
+
+**K3. React foundations**
+
+- [ ] **V0.2.91** Formatting helpers in one place
+- [ ] **V0.2.92** One error message helper
+- [ ] **V0.2.93** `useAsyncAction`
+- [ ] **V0.2.94** `useFormState`
+- [ ] **V0.2.95** System area split
+- [ ] **V0.2.96** Repositories split
+- [ ] **V0.2.97** Setup wizard split
+- [ ] **V0.2.98** Knowledge map split
+- [ ] **V0.2.99** System pages load through the cache
+- [ ] **V0.2.100** Repositories and connectors load through the cache
+- [ ] **V0.2.101** Map, document viewer and assistant load through the cache
+
+**K4. Pages on the shared pieces**
+
+- [ ] **V0.2.102** Sign-in, registration, invitation, reset and verification pages use the shared fields, buttons and states
+- [ ] **V0.2.103** The setup wizard and the environment menu use the shared fields, switches and states
+- [ ] **V0.2.104** The profile page and API tokens use the shared fields, switches and states
+- [ ] **V0.2.105** The organization page uses the shared fields, badges and states
+- [ ] **V0.2.106** Workspace settings use the shared fields and switches
+- [ ] **V0.2.107** The people section uses the shared fields, badges and segmented control
+- [ ] **V0.2.108** The evidence section's forms, filters and bulk actions use the shared pieces
+- [ ] **V0.2.109** Retrieval filters, saved searches, Ask and symbol search use the shared pieces
+- [ ] **V0.2.110** Tasks use the shared fields, checkboxes and states
+- [ ] **V0.2.111** The memory section and card page use the shared fields, picker and states
+- [ ] **V0.2.112** The artifact page's forms use the shared pieces
+- [ ] **V0.2.113** Repository forms and pages use the shared pieces
+- [ ] **V0.2.114** Connector forms use the shared pieces
+- [ ] **V0.2.115** Mail settings use the shared fields and states
+- [ ] **V0.2.116** System settings rows use the shared fields and switches
+- [ ] **V0.2.117** System toolbars and filters use the shared search field, dropdowns and date fields
+- [ ] **V0.2.118** The assistant and the command palette use the shared field and option list
+
+**K5. Behaviour you can rely on**
+
+- [ ] **V0.2.119** Dialogs behave the same
+- [ ] **V0.2.120** Unsaved changes are not lost
+- [ ] **V0.2.121** Ctrl or Cmd plus Enter sends
+- [ ] **V0.2.122** Required fields before the request
+- [ ] **V0.2.123** Long lists page
+- [ ] **V0.2.124** Every change says it happened
+- [ ] **V0.2.125** Focus lands somewhere sensible
+
+**K6. Keep it that way**
+
+- [ ] **V0.2.126** Tests for the building blocks
+- [ ] **V0.2.127** A style check that stops the drift
+- [ ] **V0.2.128** DESIGN.md matches the code
+- [ ] **V0.2.129** Release check after the polish track
+
 ### Decisions to agree before work starts
 
 | # | Decision | Needed by | Proposal |
@@ -885,6 +995,11 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 | 12 | **First connectors** | V0.2.27 | GitHub (including GitHub Enterprise Server) and GitLab, read-only, issues and pull/merge requests with their discussion; Linear and Jira later |
 | 13 | **The desktop app** (revisits decision 3) | V0.2.49 | ✅ Done in V0.2.49–V0.2.51. The desktop shell becomes a client: it asks for a server address, signs in and shows the web client. The local edition is retired after one release that offers "export to a server" (V0.2.50); it is labelled retired in V0.2.51 and removed in a 0.3.x release |
 | 14 | **Backup encryption** | V0.2.42 | AES-256-GCM in streaming chunks, key from `REPOMEMO_BACKUP_KEY` (never stored in the backup); off by default, recommended in the guide; restore refuses a wrong key before writing anything |
+| 15 | **Lift the freeze for track K** (frontend polish) | V0.2.57 | Yes: the track adds building blocks and fixes, no product feature; V0.2.129 repeats the release checks and restores the freeze until the tag |
+| 16 | **The accent colour** (DESIGN.md says blue, the product ships green) | V0.2.57 | Keep the shipped green; V0.2.128 corrects DESIGN.md. Blue would be a new look |
+| 17 | **Neutrals at saturation 0** | V0.2.61 | Yes, as DESIGN.md requires: same lightness, no hue |
+| 18 | **More than two button treatments** | V0.2.74 | Add `danger` and the `IconButton` shape; both exist today as one-off styles |
+| 19 | **Where form mistakes show** | V0.2.69 | API errors stay toasts; a required or malformed field is marked `aria-invalid` with a one-line hint under it, a field state rather than a banner |
 
 ---
 
