@@ -2,6 +2,16 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.58 (2026-10-17)
+
+Long dropdown lists stay inside the window.
+
+### Fixed
+- **A long dropdown list ran off the screen.** The list had no maximum height and clipped what did not fit, so a list opened near the bottom of the window (the level in System › Settings, the language filter in Retrieval) could not be reached. A list is now at most 320 px tall or the room the window leaves, whichever is less, and scrolls; arrows at the top and the bottom scroll it while the pointer rests on them.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.57 (2026-10-17)
 
 Dropdown lists and menus open above dialogs. The first release of the frontend polish track (K1, [plan](mindmap/plans/2026-10-17-frontend-polish.md)): it changes no look and no behaviour besides the stacking.

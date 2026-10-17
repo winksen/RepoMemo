@@ -1,5 +1,5 @@
 import * as SelectPrimitive from "@radix-ui/react-select";
-import { IconCheck, IconChevronDown } from "@tabler/icons-react";
+import { IconCheck, IconChevronDown, IconChevronUp } from "@tabler/icons-react";
 import { cn } from "../../lib/utils";
 
 export interface DropdownOption {
@@ -38,6 +38,7 @@ export function Dropdown({
       </SelectPrimitive.Trigger>
       <SelectPrimitive.Portal>
         <SelectPrimitive.Content className="rm-dropdown-content" position="popper" sideOffset={6}>
+          <SelectPrimitive.ScrollUpButton className="rm-dropdown-scroll"><IconChevronUp size={16} /></SelectPrimitive.ScrollUpButton>
           <SelectPrimitive.Viewport className="rm-dropdown-viewport">
             {options.map((option) => (
               <SelectPrimitive.Item className="rm-dropdown-item" disabled={option.disabled} key={option.value} value={option.value}>
@@ -46,6 +47,7 @@ export function Dropdown({
               </SelectPrimitive.Item>
             ))}
           </SelectPrimitive.Viewport>
+          <SelectPrimitive.ScrollDownButton className="rm-dropdown-scroll"><IconChevronDown size={16} /></SelectPrimitive.ScrollDownButton>
         </SelectPrimitive.Content>
       </SelectPrimitive.Portal>
     </SelectPrimitive.Root>
