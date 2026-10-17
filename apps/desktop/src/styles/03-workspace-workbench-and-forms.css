@@ -266,12 +266,12 @@
 }
 
 .workspace-row-v3.selected .workspace-row-mark {
-  color: #ffffff;
-  background: #147d72;
+  color: var(--color-on-accent);
+  background: var(--color-accent);
 }
 
 :root[data-theme="dark"] .workspace-row-v3.selected .workspace-row-mark {
-  color: #071513;
+  color: var(--color-on-accent);
   background: var(--color-accent);
 }
 
@@ -421,13 +421,13 @@
 
 .workspace-create-button,
 .workspace-primary-action {
-  color: #ffffff;
-  background: #147d72;
+  color: var(--color-on-accent);
+  background: var(--color-accent);
 }
 
 :root[data-theme="dark"] .workspace-create-button,
 :root[data-theme="dark"] .workspace-primary-action {
-  color: #071513;
+  color: var(--color-on-accent);
   background: var(--color-accent);
 }
 

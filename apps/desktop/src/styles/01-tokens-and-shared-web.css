@@ -3,45 +3,6 @@
 :root {
   color-scheme: light;
 
-  --color-bg: #e5e5e5;
-  --color-canvas: #dbdbdb;
-  --color-surface: #f9f9f9;
-  --color-surface-2: #f0f0f0;
-  --color-surface-3: #e6e6e6;
-  --color-surface-hover: #eaeaea;
-  --color-code-surface: #efefef;
-
-  --color-text: #1c1c1c;
-  --color-text-muted: #5c5c5c;
-  --color-text-subtle: #5c5c5c;
-  --color-border: #cbcbcb;
-  --color-border-strong: #afafaf;
-
-  --color-accent: #0a735f;
-  --color-accent-hover: #075c4d;
-  --color-accent-soft: #dcece6;
-  --color-accent-text: #075a4b;
-  --color-on-accent: #ffffff;
-
-  /* Semantic colors collapsed to a single blue family: accent for primary,
-     accent-text (darker) for "danger/strong" tone. No green, violet, amber. */
-  --color-info: #326fa8;
-  --color-info-soft: #e7f0f8;
-  --color-success: #0a735f;
-  --color-success-soft: #dcece6;
-  --color-warning: #a65f08;
-  --color-warning-soft: #f5e7cf;
-  --color-danger: #b6473a;
-  --color-danger-soft: #f9e8e5;
-  --color-discovery: #6c5aa7;
-  --color-discovery-soft: #eeeaf8;
-
-  /* Focus ring is the accent blue, not warm orange. */
-  --color-focus: var(--color-accent);
-
-  --shadow-block: 0 1px 2px rgba(24, 32, 31, 0.04);
-  --shadow-floating: 0 18px 48px rgba(24, 32, 31, 0.2);
-
   /* Layers: every z-index in the stylesheets is one of these. Popovers (dropdown
      lists, action menus, mention lists) sit above dialogs so they open inside them. */
   --layer-raised: 1;
@@ -62,53 +23,24 @@
   --control-border: 2px;
   --control-padding-x: 12px;
 
-  --font-ui: "Plus Jakarta Sans Variable", "Segoe UI", sans-serif;
-  --font-brand: "Fjalla One", "Arial Narrow", sans-serif;
-  --font-display: "Fjalla One", "Arial Narrow", sans-serif;
   --font-mono: var(--font-ui);
-  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  /* File-type colours of the evidence icons (the same in both themes). */
+  --file-markdown: #e5b53c;
+  --file-note: #d98a4e;
+  --file-excel: #2fb36d;
+  --file-powerpoint: #e8673c;
+  --file-pdf: #e5484d;
+  --file-onenote: #a77be0;
+  --file-email: #4aa3e0;
+  --file-code: #4cc27f;
+  --file-word: #4f8df0;
+  --file-image: #5cc4f2;
   --ease-control: cubic-bezier(0.42, 0, 0.58, 1);
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-
-  --color-bg: #0f0f0f;
-  --color-canvas: #141414;
-  --color-surface: #191919;
-  --color-surface-2: #202020;
-  --color-surface-3: #2b2b2b;
-  --color-surface-hover: #262626;
-  --color-code-surface: #141414;
-
-  --color-text: #f0f0f0;
-  --color-text-muted: #acacac;
-  --color-text-subtle: #949494;
-  --color-border: #323232;
-  --color-border-strong: #484848;
-
-  --color-accent: #5ed0ae;
-  --color-accent-hover: #76debe;
-  --color-accent-soft: rgba(94, 208, 174, 0.13);
-  --color-accent-text: #86e2c7;
-  --color-on-accent: #081713;
-
-  --color-info: var(--color-accent);
-  --color-info-soft: var(--color-accent-soft);
-  --color-success: var(--color-accent);
-  --color-success-soft: var(--color-accent-soft);
-  --color-info: #6ca7d5;
-  --color-info-soft: rgba(108, 167, 213, 0.13);
-  --color-success: #48c9a2;
-  --color-success-soft: rgba(72, 201, 162, 0.13);
-  --color-warning: #efb35a;
-  --color-warning-soft: rgba(239, 179, 90, 0.13);
-  --color-danger: #e17a6e;
-  --color-danger-soft: rgba(225, 122, 110, 0.13);
-  --color-discovery: #aa98e0;
-  --color-discovery-soft: rgba(170, 152, 224, 0.13);
-
-  --color-focus: var(--color-accent);
 
   --shadow-block: 0 1px 2px rgba(0, 0, 0, 0.28);
   --shadow-floating: 0 24px 64px rgba(0, 0, 0, 0.6);
@@ -493,17 +425,17 @@ textarea:focus-visible {
 .rm-button.shared-artifact-entry:hover:not(:disabled) { background: var(--color-surface); border-color: var(--color-accent); }
 .rm-button.shared-artifact-entry.selected { border-color: var(--color-accent); }
 .shared-artifact-file-icon { display: grid; width: 48px; height: 48px; place-items: center; color: var(--color-text-muted); background: var(--color-surface-3); border-radius: 9px; }
-.shared-artifact-file-icon.category-markdown { color: #e5b53c; }
-.shared-artifact-file-icon.category-note { color: #d98a4e; }
+.shared-artifact-file-icon.category-markdown { color: var(--file-markdown); }
+.shared-artifact-file-icon.category-note { color: var(--file-note); }
 .shared-artifact-file-icon.category-folder { color: var(--color-text); }
-.shared-artifact-file-icon.category-excel { color: #2fb36d; }
-.shared-artifact-file-icon.category-powerpoint { color: #e8673c; }
-.shared-artifact-file-icon.category-pdf { color: #e5484d; }
-.shared-artifact-file-icon.category-onenote { color: #a77be0; }
-.shared-artifact-file-icon.category-email { color: #4aa3e0; }
-.shared-artifact-file-icon.category-code { color: #4cc27f; }
-.shared-artifact-file-icon.category-word { color: #4f8df0; }
-.shared-artifact-file-icon.category-image { color: #5cc4f2; }
+.shared-artifact-file-icon.category-excel { color: var(--file-excel); }
+.shared-artifact-file-icon.category-powerpoint { color: var(--file-powerpoint); }
+.shared-artifact-file-icon.category-pdf { color: var(--file-pdf); }
+.shared-artifact-file-icon.category-onenote { color: var(--file-onenote); }
+.shared-artifact-file-icon.category-email { color: var(--file-email); }
+.shared-artifact-file-icon.category-code { color: var(--file-code); }
+.shared-artifact-file-icon.category-word { color: var(--file-word); }
+.shared-artifact-file-icon.category-image { color: var(--file-image); }
 .shared-artifact-file-icon.category-text { color: var(--color-text-muted); }
 .shared-artifact-entry-copy { display: grid; width: 100%; min-width: 0; gap: 4px; }
 .shared-artifact-entry-copy strong { overflow: hidden; color: var(--color-text); font-size: 13px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
@@ -754,7 +686,7 @@ textarea:focus-visible {
 .shared-chunk-list p { margin: 6px 0 0; font-size: 13px; line-height: 1.55; white-space: pre-wrap; }
 .shared-dialog { inset: 0; width: min(760px, calc(100vw - 32px)); max-height: min(80vh, 720px); margin: auto; padding: 0; overflow: hidden; color: var(--color-text); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px; box-shadow: var(--shadow-floating); }
 .shared-dialog[open] { display: flex; flex-direction: column; }
-.shared-dialog::backdrop { background: rgba(20, 27, 43, 0.4); }
+.shared-dialog::backdrop { background: color-mix(in srgb, black 40%, transparent); }
 .shared-dialog-header,
 .shared-dialog-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 18px; }
 .shared-dialog-header { border-bottom: 1px solid var(--color-border); }

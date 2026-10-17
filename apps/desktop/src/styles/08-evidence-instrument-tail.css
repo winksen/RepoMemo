@@ -6,16 +6,16 @@
   min-height: 148px;
   gap: 0 10px;
   padding: 15px;
-  background: #fff;
+  background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 12px;
   transition: border-color 140ms var(--ease-standard), box-shadow 140ms var(--ease-standard), transform 140ms var(--ease-standard);
 }
 
 .artifact-row:hover {
-  background: #fff;
-  border-color: #cbd3de;
-  box-shadow: 0 5px 16px rgba(15, 23, 36, 0.055);
+  background: var(--color-surface);
+  border-color: var(--color-border-strong);
+  box-shadow: 0 5px 16px color-mix(in srgb, black 5.5%, transparent);
   transform: translateY(-1px);
 }
 
@@ -31,11 +31,11 @@
   height: 36px;
   place-items: center;
   color: var(--color-text-muted);
-  background: #f3f5f7;
+  background: var(--color-surface-3);
   border-radius: 9px;
 }
 
-.artifact-row.selected .artifact-block-icon { color: var(--color-accent); background: #fff; }
+.artifact-row.selected .artifact-block-icon { color: var(--color-accent); background: var(--color-surface); }
 
 .artifact-row-main { align-self: center; }
 .artifact-row strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }

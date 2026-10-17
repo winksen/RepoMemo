@@ -737,7 +737,7 @@
   min-height: 40px;
   padding: 0 11px;
   color: var(--color-text-subtle);
-  background: #fff;
+  background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 9px;
 }
@@ -745,7 +745,7 @@
 .artifact-search:focus-within {
   color: var(--color-accent);
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 12%, transparent);
 }
 
 .artifact-search input {
@@ -767,11 +767,11 @@
   padding: 0;
   place-items: center;
   color: var(--color-text-muted);
-  background: #f3f5f7;
+  background: var(--color-surface-3);
   border-radius: 6px;
 }
 
-.artifact-search-clear:hover { color: var(--color-text); background: #e9edf2; }
+.artifact-search-clear:hover { color: var(--color-text); background: var(--color-surface-hover); }
 
 .artifact-result-count {
   flex: 0 0 auto;

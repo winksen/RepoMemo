@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.63 (2026-10-17)
+
+Colours come from tokens.
+
+### Changed
+- **No raw colours in the page rules.** Every hex, `rgb()` and `rgba()` colour outside a `:root` block in the stylesheets now reads a token: whites are `--color-surface` (or `--color-on-accent` for text on a solid fill), the light greys are the neutral tokens, status colours are the status tokens, focus rings and hover shadows are `color-mix` of the accent or of black. Fields, panels and chips in the dark theme are no longer white where an older rule hard-coded it.
+- **One danger red.** The destructive button in dialog footers used its own `#c9372c`; it uses `--color-danger`, with `--color-on-danger` for its text (white on the light theme, dark on the dark theme's light red). Destructive menu items use `--color-danger` too.
+- **New tokens** for what had no token: `--color-toast-error`, `-success`, `-warning`, `-info` (solid toast fills), `--file-markdown` and the other file-type icon colours, and the knowledge map's `--viz-*` colours, which moved to `:root`.
+
+### Removed
+- **164 token declarations that a later stylesheet overrides.** The cascade's last `:root` blocks decide every token (the blocks in `01…`, `09…` and `10…`, with the green accent no page ever showed, were dead). They are deleted; the effective value of every token in both themes was compared before and after and is identical.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.62 (2026-10-17)
 
 One accent: the workspace palette is retired.

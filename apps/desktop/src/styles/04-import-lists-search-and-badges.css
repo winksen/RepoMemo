@@ -824,26 +824,26 @@ mark {
 }
 
 .status-badge.success {
-  color: #ffffff;
+  color: var(--color-on-accent);
   background: var(--color-success);
 }
 
 .status-badge.warning {
-  color: #ffffff;
+  color: var(--color-on-accent);
   background: var(--color-warning);
 }
 
 .status-badge.danger {
-  color: #ffffff;
+  color: var(--color-on-accent);
   background: var(--color-danger);
 }
 
 .status-badge.info {
-  color: #ffffff;
+  color: var(--color-on-accent);
   background: var(--color-info);
 }
 
 .status-badge.discovery {
-  color: #ffffff;
+  color: var(--color-on-accent);
   background: var(--color-discovery);
 }

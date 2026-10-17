@@ -6,8 +6,9 @@
 /* Knowledge map. Node colours are the dataviz reference palette's first three
    categorical slots, validated all-pairs against the app surfaces in both
    themes (light aqua sits under 3:1, so the legend and table view carry it). */
-.rm-map { --viz-documents: #2a78d6; --viz-notes: #eb6834; --viz-code: #1baf7a; --viz-critical: #d03b3b; display: grid; gap: 28px; max-width: 1160px; }
-:root[data-theme="dark"] .rm-map { --viz-documents: #3987e5; --viz-notes: #d95926; --viz-code: #199e70; }
+:root { --viz-documents: #2a78d6; --viz-notes: #eb6834; --viz-code: #1baf7a; --viz-critical: #d03b3b; }
+:root[data-theme="dark"] { --viz-documents: #3987e5; --viz-notes: #d95926; --viz-code: #199e70; }
+.rm-map { display: grid; gap: 28px; max-width: 1160px; }
 .rm-map-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--color-text-subtle); font-size: 12px; }
 .rm-map-section { display: grid; gap: 12px; min-width: 0; }
 .rm-map-section > .shared-panel-heading { margin-bottom: 0; }
