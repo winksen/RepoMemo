@@ -259,7 +259,7 @@
   .workspace-directory {
     min-height: 460px;
     border-right: 0;
-    border-bottom: 1px solid var(--workspace-line);
+    border-bottom: 1px solid var(--color-border);
   }
 
   .workspace-inspector-v3 {

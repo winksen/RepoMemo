@@ -2,6 +2,17 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.62 (2026-10-17)
+
+One accent: the workspace palette is retired.
+
+### Changed
+- **The `--workspace-*` colours are gone.** Seven colours, a dot-grid colour and a font, with a dark-theme copy, were defined for the "workspaces v3" pages and read about sixty times. They now read the shared tokens (`--color-accent`, `-accent-hover`, `-accent-soft`, `-accent-text`, `--color-border`, `-border-strong`, `--color-surface-2`, `-surface-3`, `--font-ui`). `grep -- --workspace- styles` finds nothing.
+- Those pages are the retired local edition's (`App.tsx`): the web client does not use them, so it looks as before, and the local edition's teal turns into the shared accent.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.61 (2026-10-17)
 
 Backgrounds, borders and text are true greys.
