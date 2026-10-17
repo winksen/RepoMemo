@@ -2,6 +2,17 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.59 (2026-10-17)
+
+Dropdowns no longer stretch across toolbars and filter rows.
+
+### Changed
+- **A dropdown is as wide as its content, 160 px at least.** It used to fill whatever it was placed in, so a dropdown in the System logs toolbar, the Jobs filter or the Tasks and Retrieval filter rows stretched across the row. The Retrieval and Tasks filters stay at the start of their cell.
+- **Forms still stretch it.** The forms whose dropdown is a field (AI providers and policy, API tokens, invitations, the move-to-server dialog, evidence lifecycle, profile notifications, members, task creation and cards, mail and System settings, repository and connector forms) say so in one rule, until the shared `Field` (V0.2.69) does.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.58 (2026-10-17)
 
 Long dropdown lists stay inside the window.

@@ -544,7 +544,8 @@ textarea:focus-visible {
 .shared-search-results { display: grid; gap: 10px; margin-top: 16px; }
 .shared-retrieval-search { display: grid; gap: 8px; }
 .shared-retrieval-filter-row { display: grid; grid-template-columns: repeat(4, minmax(120px, 1fr)) auto auto; gap: 8px; align-items: center; }
-.shared-retrieval-filter-row .rm-dropdown-trigger { width: 100%; }
+.shared-retrieval-filter-row .rm-dropdown-trigger,
+.shared-task-toolbar .rm-dropdown-trigger { justify-self: start; }
 .shared-search-results { margin-top: 20px; }
 .shared-search-result-count { margin: 0; color: var(--color-text-subtle); font-size: 12px; }
 .shared-search-result { display: grid; width: 100%; justify-items: start; gap: 7px; padding: 13px; text-align: left; }
@@ -789,7 +790,8 @@ textarea:focus-visible {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  width: 100%;
+  width: auto;
+  min-width: 160px;
   min-height: 34px;
   padding: 0 10px 0 11px;
   color: var(--color-text);
@@ -811,6 +813,23 @@ textarea:focus-visible {
 .rm-dropdown-item { position: relative; display: flex; align-items: center; min-height: 34px; padding: 0 30px 0 9px; border-radius: 6px; outline: none; cursor: pointer; font-size: 13px; user-select: none; }
 .rm-dropdown-item[data-highlighted] { color: var(--color-text); background: var(--color-surface-2); }
 .rm-dropdown-item[data-disabled] { cursor: not-allowed; opacity: 0.5; }
+/* A dropdown takes the width of its content (160 px at least); a form stretches it to the field (V0.2.59). */
+.shared-ai-provider-form .rm-dropdown-trigger,
+.rm-tokens-form .rm-dropdown-trigger,
+.rm-invite-form .rm-dropdown-trigger,
+.shared-dialog-field .rm-dropdown-trigger,
+.shared-lifecycle-form .rm-dropdown-trigger,
+.shared-record-edit-form .rm-dropdown-trigger,
+.shared-memory-form .rm-dropdown-trigger,
+.shared-profile-panel label .rm-dropdown-trigger,
+.shared-member-form .rm-dropdown-trigger,
+.shared-task-create-fields .rm-dropdown-trigger,
+.shared-task-checklist-select .rm-dropdown-trigger,
+.shared-task-controls .rm-dropdown-trigger,
+.shared-memory-evidence .rm-dropdown-trigger,
+.rm-system-settings label .rm-dropdown-trigger,
+.rm-system-setting-control .rm-dropdown-trigger,
+.rm-repo-form label .rm-dropdown-trigger { width: 100%; min-width: 0; }
 .rm-dropdown-check { position: absolute; right: 9px; display: grid; place-items: center; color: var(--color-accent-text); }
 .rm-button.shared-record-link { min-height: 0; padding: 0; color: inherit; background: transparent; border-color: transparent; border-radius: 0; box-shadow: none; }
 .rm-button.shared-record-link:hover:not(:disabled) { color: inherit; background: transparent; border-color: transparent; box-shadow: none; transform: none; }
