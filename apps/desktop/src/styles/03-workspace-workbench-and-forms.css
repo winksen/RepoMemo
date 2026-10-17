@@ -393,13 +393,13 @@
   line-height: 14px;
 }
 
-.workspace-create-controls {
+:where(.rm-local-edition) .workspace-create-controls {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 7px;
 }
 
-.workspace-create-controls input {
+:where(.rm-local-edition) .workspace-create-controls input {
   min-height: 36px;
   padding: 0 11px;
   color: var(--color-text);
@@ -410,11 +410,11 @@
   font-size: 12px;
 }
 
-.workspace-create-controls input:hover {
+:where(.rm-local-edition) .workspace-create-controls input:hover {
   border-color: var(--color-border);
 }
 
-.workspace-create-controls input:focus {
+:where(.rm-local-edition) .workspace-create-controls input:focus {
   background: var(--color-surface);
   border-color: var(--color-accent);
 }

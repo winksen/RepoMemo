@@ -207,7 +207,7 @@ body {
 .workspace-create-heading > span { color: var(--color-text-muted); background: var(--color-surface-3); border: 0; border-radius: 8px; }
 .workspace-create-heading label strong { font-size: 13px; font-weight: 600; }
 .workspace-create-heading label small { font-size: 12px; }
-.workspace-create-controls input { min-height: 38px; background: var(--color-surface); border-color: var(--color-border); border-radius: 8px; }
+:where(.rm-local-edition) .workspace-create-controls input { min-height: 38px; background: var(--color-surface); border-color: var(--color-border); border-radius: 8px; }
 .workspace-create-button { min-height: 32px; border-radius: 8px; }
 
 .workspace-inspector-v3 {
@@ -308,13 +308,13 @@ body {
 .search-result.selected,
 .memory-card-row.selected { background: var(--color-surface-2); box-shadow: none; }
 
-input,
-textarea,
-select,
-.paste-language select { background: var(--color-surface); border-color: var(--color-border); border-radius: 8px; }
-input:focus,
-textarea:focus,
-select:focus { background: var(--color-surface); border-color: var(--color-accent); outline: 2px solid color-mix(in srgb, var(--color-accent) 16%, transparent); }
+:where(.rm-local-edition) input,
+:where(.rm-local-edition) textarea,
+:where(.rm-local-edition) select,
+:where(.rm-local-edition) .paste-language select { background: var(--color-surface); border-color: var(--color-border); border-radius: 8px; }
+:where(.rm-local-edition) input:focus,
+:where(.rm-local-edition) textarea:focus,
+:where(.rm-local-edition) select:focus { background: var(--color-surface); border-color: var(--color-accent); outline: 2px solid color-mix(in srgb, var(--color-accent) 16%, transparent); }
 
 @media (max-width: 1080px) {
   .workspace-page-v3,

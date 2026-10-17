@@ -322,17 +322,17 @@ body {
 .memory-card-meta { font-size: 12px; }
 .memory-markdown { padding: 20px 0; }
 
-input,
-textarea,
-select,
-.paste-language select {
+:where(.rm-local-edition) input,
+:where(.rm-local-edition) textarea,
+:where(.rm-local-edition) select,
+:where(.rm-local-edition) .paste-language select {
   border: 1px solid var(--color-border);
   border-radius: 8px;
   box-shadow: none;
 }
 
-input:focus,
-textarea:focus { border-color: var(--color-accent); }
+:where(.rm-local-edition) input:focus,
+:where(.rm-local-edition) textarea:focus { border-color: var(--color-accent); }
 
 @media (max-width: 1180px) {
   .app-shell { grid-template-columns: 72px minmax(0, 1fr); }
@@ -446,7 +446,7 @@ body { min-width: 760px; background: var(--color-bg); font-family: var(--font-ui
 .workspace-row-copy strong { font-size: 14px; font-weight: 600; }
 .workspace-row-copy small, .workspace-row-time { color: var(--color-text-muted); font-family: var(--font-ui); font-size: 12px; }
 .workspace-create-v3 { margin-top: 26px; padding: 18px 0 0; border-top: 1px solid var(--color-border); }
-.workspace-create-controls input { min-height: 38px; background: var(--color-surface); border-color: var(--color-border); border-radius: 8px; }
+:where(.rm-local-edition) .workspace-create-controls input { min-height: 38px; background: var(--color-surface); border-color: var(--color-border); border-radius: 8px; }
 .workspace-create-button { min-height: 32px; border-radius: 8px; }
 .workspace-inspector-v3 { display: flex; gap: 0; padding: 0; overflow: auto; background: var(--color-surface); background-image: none; }
 .workspace-inspector-v3::before, .workspace-evidence-path::after { display: none; }
@@ -480,8 +480,8 @@ body { min-width: 760px; background: var(--color-bg); font-family: var(--font-ui
 .import-card-icon { color: var(--color-text-muted); background: var(--color-surface-3); border-radius: 9px; }
 .artifact-row, .search-result, .memory-card-row { border-radius: 8px; box-shadow: none; }
 .artifact-row.selected, .search-result.selected, .memory-card-row.selected { background: var(--color-surface-2); box-shadow: none; }
-input, textarea, select, .paste-language select { background: var(--color-surface); border-color: var(--color-border); border-radius: 8px; }
-input:focus, textarea:focus, select:focus { background: var(--color-surface); border-color: var(--color-accent); outline: 2px solid color-mix(in srgb, var(--color-accent) 16%, transparent); }
+:where(.rm-local-edition) input, :where(.rm-local-edition) textarea, :where(.rm-local-edition) select, :where(.rm-local-edition) .paste-language select { background: var(--color-surface); border-color: var(--color-border); border-radius: 8px; }
+:where(.rm-local-edition) input:focus, :where(.rm-local-edition) textarea:focus, :where(.rm-local-edition) select:focus { background: var(--color-surface); border-color: var(--color-accent); outline: 2px solid color-mix(in srgb, var(--color-accent) 16%, transparent); }
 
 @media (max-width: 1080px) {
   .workspace-page-v3, .workbench-grid, .artifact-layout, .search-layout, .intelligence-layout, .provider-layout { grid-template-columns: minmax(0, 1fr) 340px; }

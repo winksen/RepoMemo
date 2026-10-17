@@ -2,6 +2,18 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.65 (2026-10-17)
+
+Fields are styled by their shared classes only.
+
+### Changed
+- **The competing global field rules are out of the web client.** Three more stylesheets (`09…`, `10…`, `11…`) restyled every bare `input`, `textarea` and `select` — a 6, 8 or 10 px corner, a 1 or 2 px border, a white, grey or surface background — and the dark theme repeated each. They now apply only inside the retired local edition (the same `:where(.rm-local-edition)` scope as V0.2.64, so that edition's look and cascade are kept); in the web client a field is styled by `.rm-input`, `.rm-textarea` or `.rm-dropdown-trigger`, plus one base reset in `01…` (font and colour inherited, the focus ring).
+- The evidence picker of the memory card page, a raw `select` until V0.2.86 replaces it, takes the shared field class.
+- Checkboxes, radio buttons and file pickers are no longer stretched like text fields; V0.2.67 gives them their size and accent colour explicitly.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.64 (2026-10-17)
 
 The retired local edition's styles stay in the local edition.

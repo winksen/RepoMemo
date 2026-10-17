@@ -112,13 +112,6 @@
 *::-webkit-scrollbar-thumb:hover { background: hsl(0 0% 42% / 55%); }
 *::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
 
-button,
-input,
-textarea,
-select {
-  font-family: var(--font-ui);
-}
-
 button:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
@@ -344,7 +337,7 @@ select:focus-visible,
 
 /* Interface labels remain readable UI copy, not terminal-style decoration. */
 .provider-form label:not(.provider-toggle),
-.paste-language label,
+:where(.rm-local-edition) .paste-language label,
 .result-group-label,
 .memory-search-label,
 .memory-create-form label > span {
@@ -355,11 +348,11 @@ select:focus-visible,
   text-transform: none;
 }
 
-input,
-textarea,
-select,
-.paste-language select,
-.workspace-create-controls input {
+:where(.rm-local-edition) input,
+:where(.rm-local-edition) textarea,
+:where(.rm-local-edition) select,
+:where(.rm-local-edition) .paste-language select,
+:where(.rm-local-edition) .workspace-create-controls input {
   background: var(--color-surface);
   border: 2px solid var(--color-border-strong);
   border-radius: 10px;
@@ -367,14 +360,14 @@ select,
   transition: border-color 180ms var(--ease-standard), background 180ms var(--ease-standard);
 }
 
-input:hover:not(:disabled),
-textarea:hover:not(:disabled),
-select:hover:not(:disabled) { border-color: var(--color-accent); }
+:where(.rm-local-edition) input:hover:not(:disabled),
+:where(.rm-local-edition) textarea:hover:not(:disabled),
+:where(.rm-local-edition) select:hover:not(:disabled) { border-color: var(--color-accent); }
 
-input:focus,
-textarea:focus,
-select:focus,
-.workspace-create-controls input:focus {
+:where(.rm-local-edition) input:focus,
+:where(.rm-local-edition) textarea:focus,
+:where(.rm-local-edition) select:focus,
+:where(.rm-local-edition) .workspace-create-controls input:focus {
   background: var(--color-surface);
   border-color: var(--color-accent);
   outline: none;
@@ -394,21 +387,21 @@ textarea.rm-textarea:focus {
   border-color: var(--color-accent);
 }
 
-.search-input-wrap {
+:where(.rm-local-edition) .search-input-wrap {
   background: var(--color-surface-2);
   border: 2px solid transparent;
   border-radius: 999px;
   box-shadow: none;
 }
 
-.search-input-wrap:hover,
-.search-input-wrap:focus-within {
+:where(.rm-local-edition) .search-input-wrap:hover,
+:where(.rm-local-edition) .search-input-wrap:focus-within {
   border-color: var(--color-accent);
   box-shadow: none;
 }
 
-.search-input-wrap input,
-.search-input-wrap input:focus {
+:where(.rm-local-edition) .search-input-wrap input,
+:where(.rm-local-edition) .search-input-wrap input:focus {
   background: transparent;
   border: 0;
   outline: 0;
@@ -487,11 +480,11 @@ textarea.rm-textarea:focus {
   border-color: var(--color-border);
 }
 
-:root[data-theme="dark"] .workspace-create-controls input,
-:root[data-theme="dark"] .paste-language select,
-:root[data-theme="dark"] input,
-:root[data-theme="dark"] textarea,
-:root[data-theme="dark"] select {
+:root[data-theme="dark"] :where(.rm-local-edition) .workspace-create-controls input,
+:root[data-theme="dark"] :where(.rm-local-edition) .paste-language select,
+:root[data-theme="dark"] :where(.rm-local-edition) input,
+:root[data-theme="dark"] :where(.rm-local-edition) textarea,
+:root[data-theme="dark"] :where(.rm-local-edition) select {
   background: var(--color-surface);
   border-color: var(--color-border-strong);
 }
@@ -509,12 +502,12 @@ textarea.rm-textarea:focus {
 :root[data-theme="dark"] .workspace-new-button.secondary:hover:not(:disabled),
 :root[data-theme="dark"] .button.secondary:hover:not(:disabled),
 :root[data-theme="dark"] .workspace-secondary-action:hover:not(:disabled),
-:root[data-theme="dark"] input:hover:not(:disabled),
-:root[data-theme="dark"] textarea:hover:not(:disabled),
-:root[data-theme="dark"] select:hover:not(:disabled),
-:root[data-theme="dark"] input:focus,
-:root[data-theme="dark"] textarea:focus,
-:root[data-theme="dark"] select:focus {
+:root[data-theme="dark"] :where(.rm-local-edition) input:hover:not(:disabled),
+:root[data-theme="dark"] :where(.rm-local-edition) textarea:hover:not(:disabled),
+:root[data-theme="dark"] :where(.rm-local-edition) select:hover:not(:disabled),
+:root[data-theme="dark"] :where(.rm-local-edition) input:focus,
+:root[data-theme="dark"] :where(.rm-local-edition) textarea:focus,
+:root[data-theme="dark"] :where(.rm-local-edition) select:focus {
   border-color: var(--color-accent);
 }
 

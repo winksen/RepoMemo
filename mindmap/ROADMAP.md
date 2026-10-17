@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.64` (2026-10-17), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.65` (2026-10-17), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Security review 2026-10-16 (V0.2.52)](security/2026-10-16-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -57,7 +57,7 @@ timeline
 | Security review 2026-10-10, second and third passes | ✅ Every finding fixed, mitigated or accepted in writing (V0.1.76); R2-4 and R2-5 scheduled for V0.2.8 |
 | Road to V0.2.0 (V0.1.66–V0.1.76) | 🔄 Built and versioned `0.2.0`; R6 (clean install) and the tag are the maintainer's |
 | Road to V0.3.0 (V0.2.1–V0.2.56, one change each) | ✅ V0.2.1–V0.2.56 built; the clean-machine install (R6, R12) is the maintainer's |
-| Track K: frontend polish (V0.2.57–V0.2.129) | 🔄 V0.2.57–V0.2.64 built; decisions 15–19 taken as proposed; [plan](plans/2026-10-17-frontend-polish.md) |
+| Track K: frontend polish (V0.2.57–V0.2.129) | 🔄 V0.2.57–V0.2.65 built; decisions 15–19 taken as proposed; [plan](plans/2026-10-17-frontend-polish.md) |
 | V0.4.0 and later: scale-out, single sign-on, hosted | 💭 Direction |
 
 ---
@@ -902,7 +902,7 @@ One box per release; the brief, the files and the commit line of each are in [th
 - [x] **V0.2.62** One accent: the `--workspace-*` colours retired: the `--workspace-*` tokens (accent, line, inset, selected, grid, font) and their dark copy are removed from `03…`; their 60 uses read `--color-accent*`, `--color-border*`, `--color-surface-2`/`-3` and `--font-ui`; `grep -- --workspace- styles` finds nothing. They were scoped to the retired local edition (`App.tsx`), so the web client is unchanged and the local edition's teal becomes the shared accent (the maintainer checks it by hand). Not seen on screen
 - [x] **V0.2.63** Hard-coded colours become tokens: every hex, `rgb()` and `rgba()` colour outside a `:root` token block now reads a token (or `black`/`white` in a `color-mix` for scrims and shadows); new tokens `--color-on-danger`, `--color-toast-*`, `--file-*` and `--viz-*` (moved to `:root`); the dialog footer's danger red is `--color-danger`; 164 token declarations that a later block overrides are removed, with the effective tokens of both themes checked identical before and after. Dark-theme fields are no longer white. Not seen on screen
 - [x] **V0.2.64** Retired desktop styles kept to the desktop edition: 36 selectors of the retired local edition (bare `input`, `textarea`, `select`, `.paste-language`, `.workspace-create-controls`, `.search-input-wrap`, `.filter-options`, `.artifact-search`) in `04…`, `06…`, `07…` and `08…` are prefixed with `:where(.rm-local-edition)`, which adds no specificity, and `LocalDesktopApp` puts that class on its root. The web client gets no style from them; the local edition keeps its cascade (the maintainer checks it by hand). Typecheck passes; not seen on screen
-- [ ] **V0.2.65** Duplicate global field rules removed
+- [x] **V0.2.65** Duplicate global field rules removed: the competing global rules for bare `input`, `textarea` and `select` in `09…`, `10…`, `11…` (55 selectors in all, dark copies and the local edition's remaining pieces included) move behind `:where(.rm-local-edition)`, so outside the local edition only `.rm-input`, `.rm-textarea`, `.rm-dropdown-trigger` and one base reset in `01…` (font, colour, focus ring) style a field. The memory card's raw evidence `select` takes `.rm-input` until V0.2.86 replaces it. Typecheck passes; not seen on screen
 - [ ] **V0.2.66** Page rules no longer resize the shared field
 - [ ] **V0.2.67** Checkboxes, radios and file inputs reset
 - [ ] **V0.2.68** Three icon sizes

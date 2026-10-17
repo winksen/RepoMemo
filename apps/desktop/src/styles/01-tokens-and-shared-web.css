@@ -72,8 +72,15 @@ body {
 
 button,
 input,
-textarea {
+textarea,
+select {
   font: inherit;
+}
+
+input,
+textarea,
+select {
+  color: inherit;
 }
 
 button {
@@ -82,7 +89,8 @@ button {
 
 button:focus-visible,
 input:focus-visible,
-textarea:focus-visible {
+textarea:focus-visible,
+select:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
