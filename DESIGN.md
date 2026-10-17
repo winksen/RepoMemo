@@ -96,6 +96,10 @@ page's own version, and add to this list when a new one is added.
 - **`Checkbox`**: a 16 px box (accent when checked), its label and an optional muted
   description, built on Radix; the label toggles it. Use it for a choice in a
   list or a form; use `Switch` for a setting that applies at once.
+- **`Switch`**: an on and off setting, a 36 by 20 px track with a round thumb,
+  built on Radix. Give it a `label` beside it (for example "On" or "Off"), an
+  `aria-label`, or a `<label htmlFor>` tied to its `id`. It does not replace a
+  `Checkbox`: use a checkbox to pick items, a switch for a state.
 
 ### Notifications
 

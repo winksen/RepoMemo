@@ -25,3 +25,13 @@
 .rm-checkbox-label { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
 .rm-checkbox-text { display: grid; gap: 2px; min-width: 0; }
 .rm-checkbox-description { color: var(--color-text-muted); font-size: 12px; font-weight: 400; line-height: 1.4; }
+
+/* Switch: an on and off setting; a 36 by 20 px track with a round thumb. */
+.rm-switch { position: relative; flex: 0 0 36px; box-sizing: border-box; width: 36px; height: 20px; padding: 0; background: var(--color-border-strong); border: 0; border-radius: 10px; cursor: pointer; transition: background 110ms var(--ease-control); }
+.rm-switch[data-state="checked"] { background: var(--color-accent); }
+.rm-switch:disabled { cursor: not-allowed; opacity: 0.58; }
+.rm-switch:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.rm-switch-thumb { display: block; width: 16px; height: 16px; background: var(--color-on-accent); border-radius: 50%; transform: translateX(2px); transition: transform 110ms var(--ease-control); }
+.rm-switch-thumb[data-state="checked"] { transform: translateX(18px); }
+.rm-switch-field { display: inline-flex; align-items: center; gap: 8px; color: var(--color-text-muted); cursor: pointer; }
+.rm-switch-field[data-disabled] { cursor: not-allowed; }

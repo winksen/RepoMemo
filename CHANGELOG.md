@@ -2,6 +2,17 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.71 (2026-10-18)
+
+A shared switch for settings that turn on and off.
+
+### Changed
+- **`Switch`** is in `components/ui/switch.tsx`: `<Switch checked onCheckedChange label>`, built on Radix Switch (`@radix-ui/react-switch` is a new dependency). A 36 by 20 px track with a round thumb, the accent colour when on, with a keyboard focus ring. It takes a `label` beside it (clicking the label toggles it), an `aria-label`, or a `<label htmlFor>` tied to its `id`.
+- **First use:** the boolean settings of System › Settings, which were a bare checkbox next to "On" or "Off". They keep their saving: a change is still saved with the page's save button. The other hand-made toggles (`shared-ai-provider-toggle`, in mail settings, the setup wizard and the log follow switch) move with their pages in V0.2.103 to V0.2.116.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.70 (2026-10-18)
 
 A shared checkbox with a label and a description.

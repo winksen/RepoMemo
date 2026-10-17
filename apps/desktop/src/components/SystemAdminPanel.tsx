@@ -92,6 +92,7 @@ import { Button } from "./ui/button";
 import { Dialog, DialogCancel } from "./ui/dialog";
 import { Dropdown } from "./ui/dropdown";
 import { Input } from "./ui/input";
+import { Switch } from "./ui/switch";
 import { showToast } from "./ui/toast";
 import { useLiveEventHub, useLiveEvents } from "../lib/liveEvents";
 import { appLink, SecretDialog } from "./SecretDialog";
@@ -609,7 +610,7 @@ function SettingsSection({ accessToken, session }: { accessToken: string; sessio
           </div>
           <div className="rm-system-setting-control">
             {setting.kind === "boolean"
-              ? <label className="shared-ai-provider-toggle"><input checked={Boolean(value)} disabled={readOnly} id={inputId} onChange={(event) => edit(setting, event.target.checked)} type="checkbox" /> {value ? "On" : "Off"}</label>
+              ? <Switch checked={Boolean(value)} disabled={readOnly} id={inputId} label={value ? "On" : "Off"} onCheckedChange={(next) => edit(setting, next)} />
               : setting.kind === "choice"
                 ? <Dropdown aria-label={setting.label} disabled={readOnly} id={inputId} onValueChange={(next) => edit(setting, next)} options={setting.options} value={String(value)} />
                 : <span className="rm-system-number"><Input disabled={readOnly} id={inputId} max={setting.max} min={setting.min} onChange={(event) => edit(setting, event.target.value === "" ? setting.min : Number(event.target.value))} type="number" value={String(value)} /><small>{setting.unit}</small></span>}
