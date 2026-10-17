@@ -231,7 +231,7 @@ function checkFile(path) {
   }
   const insideLabel = (node) => {
     for (let parent = node.parent; parent; parent = parent.parent) {
-      if (ts.isJsxElement(parent) && ["label", "Label"].includes(tagName(parent.openingElement))) return true;
+      if (ts.isJsxElement(parent) && ["label", "Label", "Field"].includes(tagName(parent.openingElement))) return true;
     }
     return false;
   };

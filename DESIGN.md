@@ -81,6 +81,19 @@ use the shared ease-in-out curve; buttons never move position on hover.
 Do not introduce a third button or dropdown treatment without updating this
 system deliberately.
 
+### Building blocks
+
+Shared pieces beyond the primitives, in `apps/desktop/src/components/ui/` with
+their styles in `styles/14-building-blocks.css`. Use them instead of building a
+page's own version, and add to this list when a new one is added.
+
+- **`Field`** (and `FieldRow`): a label tied to its control, an optional muted
+  hint and, while the field is invalid, a one-line message under it. A required
+  or malformed field is marked `aria-invalid` (only its border turns red) and
+  says why in that line; it is a field state, never a banner or a tinted fill.
+  Server errors stay toasts. `FieldRow` puts fields side by side and stacks
+  them on narrow screens.
+
 ### Notifications
 
 Errors and success confirmations are toasts, never inline banners. They stack at

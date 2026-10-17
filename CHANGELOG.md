@@ -2,6 +2,19 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.69 (2026-10-18)
+
+A shared field: a label, a control and a short message.
+
+### Changed
+- **`Field` and `FieldRow`** are in `components/ui/field.tsx`. `<Field label hint required invalid message htmlFor>` renders a label tied to its control (the id is generated when none is given), an optional muted hint and, while `invalid`, a one-line message under the control. The control gets `aria-invalid` and `aria-describedby`; only its border turns red, with no banner and no fill. `FieldRow` puts fields side by side and stacks them below about 220 px. The styles are in a new `14-building-blocks.css`, which holds every building block of this track.
+- **First use:** Profile › Personal details (display name and email), whose labels are now tied to their fields. The look is unchanged. Required fields are still the browser's own `required`; marking and blocking them with a message comes in V0.2.122.
+- `DESIGN.md` has a *Building blocks* section that lists each shared piece.
+- The accessibility check counts a control inside a `Field` as labelled.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.68 (2026-10-17)
 
 Icons come in three sizes.

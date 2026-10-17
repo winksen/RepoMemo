@@ -1,0 +1,15 @@
+/* Shared building blocks (components/ui): one section per component, in the order they were added. */
+
+/* Field: a label, one control, a muted hint and a one-line message while the field is invalid. */
+.rm-field { display: grid; align-content: start; gap: 6px; min-width: 0; }
+.rm-field-label { color: var(--color-text-muted); font-size: 12px; }
+.rm-field-hint,
+.rm-field-message { color: var(--color-text-muted); font-size: 12px; line-height: 1.4; }
+.rm-field-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 12px; }
+.rm-input[aria-invalid="true"],
+.rm-textarea[aria-invalid="true"],
+.rm-input[aria-invalid="true"]:hover:not(:disabled),
+.rm-textarea[aria-invalid="true"]:hover:not(:disabled),
+.rm-dropdown-trigger[aria-invalid="true"] { border-color: var(--color-danger); }
+.rm-input[aria-invalid="true"]:focus,
+.rm-textarea[aria-invalid="true"]:focus { border-color: var(--color-accent); }
