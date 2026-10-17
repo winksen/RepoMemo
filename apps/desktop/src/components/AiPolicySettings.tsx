@@ -50,11 +50,11 @@ export function AiPolicySettings({ accessToken, onSaved, workspaceId }: {
     <section className="shared-settings-group">
       <div className="shared-panel-heading"><div><ShieldLock size={ICON_SIZE.lg} /><h2>Who can use AI</h2></div><span>{quota}</span></div>
       <p className="shared-muted-copy">Answers, overviews, summaries and the assistant's AI actions send cited excerpts to the workspace's text provider. Choose which roles may start them. Image descriptions and search vectors are built in the background for everyone and are not affected.</p>
-      <form className="shared-ai-provider-form" onSubmit={(event) => event.preventDefault()}>
+      <div className="shared-ai-provider-form">
         <label>AI features available to<Dropdown aria-label="Roles that can use AI features" disabled={!policy || isSaving} onValueChange={(value) => void change(value)} options={OPTIONS} value={policy?.min_role} /></label>
         <Toast kind="error" message={error} />
         <Toast kind="success" message={notice} />
-      </form>
+      </div>
     </section>
   );
 }

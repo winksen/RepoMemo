@@ -2,6 +2,18 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.72 (2026-10-18)
+
+A button only submits a form when it says so.
+
+### Changed
+- **`Button` is a plain button by default.** It renders `type="button"` unless the caller gives a type, so a button inside a form no longer submits it by accident (an HTML button submits by default). `asChild` buttons keep whatever the child element is.
+- **Every form was checked** with a syntax-tree pass over the web client: every `Button` and native button in the web client already carried an explicit `type`, and every form has exactly one `type="submit"` button, either inside it or tied to it with `form="…"` (the repository edit dialog). The one form without a submit button, *Who can use AI* in the workspace settings (a single dropdown that saves when it changes), is a `div` now: it never submitted anything.
+- No submit button lives outside a form without a `form` attribute.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.71 (2026-10-18)
 
 A shared switch for settings that turn on and off.

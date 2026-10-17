@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.71` (2026-10-18), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.72` (2026-10-18), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Security review 2026-10-16 (V0.2.52)](security/2026-10-16-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -57,7 +57,7 @@ timeline
 | Security review 2026-10-10, second and third passes | ✅ Every finding fixed, mitigated or accepted in writing (V0.1.76); R2-4 and R2-5 scheduled for V0.2.8 |
 | Road to V0.2.0 (V0.1.66–V0.1.76) | 🔄 Built and versioned `0.2.0`; R6 (clean install) and the tag are the maintainer's |
 | Road to V0.3.0 (V0.2.1–V0.2.56, one change each) | ✅ V0.2.1–V0.2.56 built; the clean-machine install (R6, R12) is the maintainer's |
-| Track K: frontend polish (V0.2.57–V0.2.129) | 🔄 V0.2.57–V0.2.71 built (K1 done); decisions 15–19 taken as proposed; [plan](plans/2026-10-17-frontend-polish.md) |
+| Track K: frontend polish (V0.2.57–V0.2.129) | 🔄 V0.2.57–V0.2.72 built (K1 done); decisions 15–19 taken as proposed; [plan](plans/2026-10-17-frontend-polish.md) |
 | V0.4.0 and later: scale-out, single sign-on, hosted | 💭 Direction |
 
 ---
@@ -912,7 +912,7 @@ One box per release; the brief, the files and the commit line of each are in [th
 - [x] **V0.2.69** `Field`: `<Field label hint required invalid message htmlFor>` and `FieldRow` in `components/ui/field.tsx` (id generated when none is given; `aria-invalid` and `aria-describedby` set on the control; styles in the new `14-building-blocks.css`); used in Profile › Personal details, look unchanged. Typecheck passes; not seen on screen
 - [x] **V0.2.70** `Checkbox`: `<Checkbox checked onCheckedChange label description>` in `components/ui/checkbox.tsx` on `@radix-ui/react-checkbox` (a new dependency); used for the rows of the evidence type filter, whose drawn check mark and seven input rules in `12…` are gone. Typecheck passes; not seen on screen
 - [x] **V0.2.71** `Switch` for on and off settings: `<Switch checked onCheckedChange label>` in `components/ui/switch.tsx` on `@radix-ui/react-switch` (a new dependency); used for the boolean rows of System › Settings, which still save with the page's button. The other `shared-ai-provider-toggle` uses move with their pages (V0.2.103–V0.2.116). Typecheck passes; not seen on screen
-- [ ] **V0.2.72** Buttons no longer submit forms by accident
+- [x] **V0.2.72** Buttons no longer submit forms by accident: `Button` renders `type="button"` unless given a type (`asChild` excepted). A syntax-tree pass over the web client found every button already typed and every form with one `type="submit"` button (inside it or tied by `form=`, as in the repository edit dialog); the only form without one, the workspace's *Who can use AI* dropdown, is a `div`. Typecheck passes; not seen on screen
 - [ ] **V0.2.73** `Button` shows that it is working
 - [ ] **V0.2.74** `IconButton`
 - [ ] **V0.2.75** `Tooltip`

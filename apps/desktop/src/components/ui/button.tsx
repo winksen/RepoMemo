@@ -15,6 +15,7 @@ export const buttonVariants = cva("rm-button", {
   },
 });
 
+/** `type` defaults to `button`; only a form's one submit button says `type="submit"`. */
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
@@ -22,9 +23,10 @@ export interface ButtonProps
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ asChild = false, className, variant, ...props }, ref) => {
+  ({ asChild = false, className, type, variant, ...props }, ref) => {
     const Comp = asChild ? Slot : "button";
-    return <Comp className={cn(buttonVariants({ variant }), className)} ref={ref} {...props} />;
+    // A plain button unless it says submit, so a button inside a form never submits it by accident.
+    return <Comp className={cn(buttonVariants({ variant }), className)} ref={ref} type={asChild ? type : (type ?? "button")} {...props} />;
   },
 );
 Button.displayName = "Button";
