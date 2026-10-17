@@ -152,11 +152,6 @@
 /* Evidence page refinements */
 .shared-artifact-type-menu summary { transition: border-color 110ms var(--ease-control); }
 .shared-artifact-type-menu summary:hover { border-color: var(--color-accent); }
-.shared-artifact-type-menu-panel input { position: relative; flex: 0 0 auto; width: 16px; height: 16px; appearance: none; background: var(--color-surface); border: 1.5px solid var(--color-border-strong); border-radius: 5px; cursor: pointer; transition: background 110ms var(--ease-control), border-color 110ms var(--ease-control); }
-.shared-artifact-type-menu-panel input:hover { border-color: var(--color-accent); }
-.shared-artifact-type-menu-panel input:checked { background: var(--color-accent); border-color: var(--color-accent); }
-.shared-artifact-type-menu-panel input:checked::after { position: absolute; top: 1px; left: 4.5px; width: 4px; height: 8px; border: solid var(--color-on-accent); border-width: 0 2px 2px 0; content: ""; transform: rotate(45deg); }
-.shared-artifact-type-menu-panel input:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 1px; }
 
 .shared-evidence-additions { padding-top: 20px; border-top: 1px solid var(--color-border); }
 .shared-evidence-additions .shared-note-form,
@@ -170,8 +165,6 @@
 .shared-artifact-browser-summary { display: flex; flex-wrap: wrap; align-items: center; min-width: 0; }
 .shared-artifact-browser-summary .shared-folder-path { margin-bottom: 0; }
 .shared-artifact-browser-summary .shared-folder-path + span::before { margin: 0 8px; color: var(--color-text-subtle); content: "•"; }
-.shared-artifact-type-menu-panel label input[type="checkbox"] { box-sizing: border-box; width: 16px; height: 16px; min-width: 16px; min-height: 16px; max-width: 16px; max-height: 16px; margin: 0; padding: 0; flex: 0 0 16px; align-self: center; }
-.shared-artifact-type-menu-panel label input[type="checkbox"]:checked::after { top: 1px; left: 4px; box-sizing: content-box; }
 
 .rm-button.shared-user-signout:hover:not(:disabled), .rm-button.shared-user-signout:focus-visible { border-color: var(--color-danger); }
 

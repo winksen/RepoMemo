@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.2 → 0.3
 
-> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.69` (2026-10-18) · **Next:** `V0.2.70`
+> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.70` (2026-10-18) · **Next:** `V0.2.71`
 > **Previous line:** [Releases 0.1 → 0.2](RELEASES_0.1.md) · **Related:** [Roadmap, Road to V0.3.0](ROADMAP.md#-road-to-v030) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
 Every release of the 0.2 line, shipped and planned, one row each. The plan comes from the [Road to V0.3.0](ROADMAP.md#-road-to-v030): **one change per release**, each shippable alone, with the security rules for a new outside connection in the release that opens it. Planned rows are proposals until decisions 7–14 in the roadmap are agreed.
@@ -104,7 +104,7 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | **V0.2.67** | ✅ 2026-10-17 | K. Frontend polish | 🐞 Fix | Styles | Checkboxes, radio buttons and file pickers keep their natural size everywhere: one base rule (16 px, accent colour), six local size patches removed; the evidence type menu keeps its drawn check mark until the shared Checkbox; written, not seen on screen | Every checkbox is 16 px and none stretches. |
 | **V0.2.68** | ✅ 2026-10-17 | K. Frontend polish | 🔧 Enhancement | Styles | Icons come in three sizes (14, 16, 18) from one constant: 503 icons in 53 files read `ICON_SIZE`, 12, 13 and 15 becoming 14 and 17 becoming 16; illustrations (avatars, empty states, setup steps, tiles, the page loader) keep their size; written, not seen on screen | `grep 'size={1[2357]}'` finds only documented exceptions. |
 | **V0.2.69** | ✅ 2026-10-18 | K. Frontend polish | ✨ Feature | UI kit | `Field` and `FieldRow` (`components/ui/field.tsx`): label tied to its control, optional hint, one-line field message while invalid (`aria-invalid`, red border only); first used in Profile › Personal details; written, not seen on screen | Used in Profile › Personal details. Each field has a label tied to its control, and the visual is unchanged. |
-| **V0.2.70** | 🔜 Planned | K. Frontend polish | ✨ Feature | UI kit | `Checkbox` | Used in the evidence type filter (`shared-artifact-type-menu-panel`). |
+| **V0.2.70** | ✅ 2026-10-18 | K. Frontend polish | ✨ Feature | UI kit | `Checkbox` (`components/ui/checkbox.tsx`, Radix Checkbox, new dependency): label that toggles, optional description; first used in the evidence type filter, whose hand-drawn check and seven input rules are removed; written, not seen on screen | Used in the evidence type filter (`shared-artifact-type-menu-panel`). |
 | **V0.2.71** | 🔜 Planned | K. Frontend polish | ✨ Feature | UI kit | `Switch` for on and off settings | Used in System › Settings for boolean settings. |
 | **V0.2.72** | 🔜 Planned | K. Frontend polish | 🐞 Fix | UI kit | Buttons no longer submit forms by accident | Every form submits from its submit button and Enter, and no other button submits. |
 | **V0.2.73** | 🔜 Planned | K. Frontend polish | ✨ Feature | UI kit | `Button` shows that it is working | Used on the sign-in and save buttons of Profile. |

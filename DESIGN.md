@@ -93,6 +93,9 @@ page's own version, and add to this list when a new one is added.
   says why in that line; it is a field state, never a banner or a tinted fill.
   Server errors stay toasts. `FieldRow` puts fields side by side and stacks
   them on narrow screens.
+- **`Checkbox`**: a 16 px box (accent when checked), its label and an optional muted
+  description, built on Radix; the label toggles it. Use it for a choice in a
+  list or a form; use `Switch` for a setting that applies at once.
 
 ### Notifications
 

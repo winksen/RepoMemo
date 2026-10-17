@@ -2,6 +2,17 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.70 (2026-10-18)
+
+A shared checkbox with a label and a description.
+
+### Changed
+- **`Checkbox`** is in `components/ui/checkbox.tsx`: `<Checkbox checked onCheckedChange label description>`, built on Radix Checkbox (`@radix-ui/react-checkbox` is a new dependency). A 16 px box that is the accent colour when checked, its label (clicking it toggles the box) and an optional muted description under it. It is a button with the checkbox role, so the keyboard and screen readers behave as for a native one.
+- **First use:** the evidence type filter (*All types* and one row per file type). Its hand-drawn check mark and the seven rules that styled the bare inputs of that menu are removed; the rows look the same.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.69 (2026-10-18)
 
 A shared field: a label, a control and a short message.

@@ -3,6 +3,7 @@ import { IconAlertCircle as AlertCircle, IconBook2 as Book, IconChevronDown as C
 import { bulkSharedArtifacts, moveSharedFolder, createSharedFolder, createSharedTextArtifact, deleteSharedArtifact, deleteSharedFolder, moveSharedArtifact, renameSharedFolder, uploadSharedArtifact } from "../../lib/sharedApi";
 import { type ArtifactSummary, type Folder } from "../../types";
 import { Button } from "../../components/ui/button";
+import { Checkbox } from "../../components/ui/checkbox";
 import { Pagination, paginate } from "../../components/ui/pagination";
 import { ActionMenu } from "../../components/ui/action-menu";
 import { Dialog, DialogCancel } from "../../components/ui/dialog";
@@ -350,10 +351,10 @@ export function EvidenceSection({ page }: { page: WorkspacePage }) {
                 <details className="shared-artifact-type-menu">
                   <summary><Filter size={ICON_SIZE.md} /><span>{artifactTypes.length ? `${artifactTypes.length} types` : "File types"}</span><ChevronDown size={ICON_SIZE.md} /></summary>
                   <div className="shared-artifact-type-menu-panel">
-                    <label><input checked={artifactTypes.length === 0} onChange={() => setArtifactTypes([])} type="checkbox" /><span>All types</span></label>
+                    <Checkbox checked={artifactTypes.length === 0} label="All types" onCheckedChange={() => setArtifactTypes([])} />
                     {FILE_CATEGORIES.map((option) => {
                       const isSelected = artifactTypes.includes(option.value);
-                      return <label key={option.value}><input checked={isSelected} onChange={() => toggleArtifactType(option.value)} type="checkbox" />{fileCategoryIcon(option.value, ICON_SIZE.sm)}<span>{option.label}</span></label>;
+                      return <Checkbox checked={isSelected} key={option.value} label={<>{fileCategoryIcon(option.value, ICON_SIZE.sm)}<span>{option.label}</span></>} onCheckedChange={() => toggleArtifactType(option.value)} />;
                     })}
                   </div>
                 </details>
