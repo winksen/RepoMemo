@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.2 → 0.3
 
-> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.79` (2026-10-18) · **Next:** `V0.2.80`
+> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.80` (2026-10-18) · **Next:** `V0.2.81`
 > **Previous line:** [Releases 0.1 → 0.2](RELEASES_0.1.md) · **Related:** [Roadmap, Road to V0.3.0](ROADMAP.md#-road-to-v030) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
 Every release of the 0.2 line, shipped and planned, one row each. The plan comes from the [Road to V0.3.0](ROADMAP.md#-road-to-v030): **one change per release**, each shippable alone, with the security rules for a new outside connection in the release that opens it. Planned rows are proposals until decisions 7–14 in the roadmap are agreed.
@@ -114,7 +114,7 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | **V0.2.77** | ✅ 2026-10-18 | K. Frontend polish | ✨ Feature | UI kit | `ConfirmDialog` and `useConfirm` (`components/ui/confirm-dialog.tsx`, `ConfirmProvider` in `SharedWebApp`): a promise-returning question in the app's dialog with an optional `danger` action; replaces `window.confirm` for deleting evidence, evidence comments and memory cards; written, not seen on screen | Those three deletions confirm in the app's dialog. |
 | **V0.2.78** | ✅ 2026-10-18 | K. Frontend polish | 🔧 Enhancement | UI kit | The last four `window.confirm` calls (organization and workspace ownership transfer, workspace and task deletion) use `useConfirm`; `grep window.confirm` finds nothing in the web client; written, not seen on screen | `grep window.confirm` finds nothing in the web client. |
 | **V0.2.79** | ✅ 2026-10-18 | K. Frontend polish | ✨ Feature | UI kit | `LoadingState` (`components/ui/loading-state.tsx`): `Spinner` and one muted line with `role="status"`, label worded "Loading <thing>"; used on the eight System pages; written, not seen on screen | Used on the System pages. |
-| **V0.2.80** | 🔜 Planned | K. Frontend polish | ✨ Feature | UI kit | `EmptyState` | Used for tasks, memory cards and notifications. |
+| **V0.2.80** | ✅ 2026-10-18 | K. Frontend polish | ✨ Feature | UI kit | `EmptyState` (`components/ui/empty-state.tsx`): icon, title, one sentence, at most one action, centred; used for tasks, memory cards and notifications; written, not seen on screen | Used for tasks, memory cards and notifications. |
 | **V0.2.81** | 🔜 Planned | K. Frontend polish | ✨ Feature | UI kit | `Badge` | Those classes are gone. |
 | **V0.2.82** | 🔜 Planned | K. Frontend polish | ✨ Feature | UI kit | `SegmentedControl` | The five switches share one look and arrow-key behaviour. |
 | **V0.2.83** | 🔜 Planned | K. Frontend polish | ✨ Feature | UI kit | `PanelHeading` | `grep shared-panel-heading` finds only the component's own CSS. |

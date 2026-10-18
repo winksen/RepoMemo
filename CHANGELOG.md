@@ -2,6 +2,17 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.80 (2026-10-18)
+
+One empty state for lists with nothing in them.
+
+### Changed
+- **`EmptyState`** is in `components/ui/empty-state.tsx`: `<EmptyState icon title description action />` is a muted block centred in its panel, with an illustration-sized icon, a title, one sentence and at most one action.
+- **First use:** the task board when no task matches the filters, the memory cards (one wording when a search finds nothing, another when the workspace has no card yet) and the notifications page. The memory cards had a bare line of text and now say what to do next. The older `shared-empty-state` block stays on the pages that still use it until their move in V0.2.102 to V0.2.118.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.79 (2026-10-18)
 
 One loading state with one wording rule.

@@ -128,6 +128,9 @@ page's own version, and add to this list when a new one is added.
   `role="status"` for something still loading. Word the label `Loading <thing>`
   (`Loading jobs`); the component adds the ellipsis. Use `Spinner` alone inside
   a button or a line of text.
+- **`EmptyState`**: what a list shows when it has nothing in it: an optional
+  illustration-sized icon, a title, one muted sentence and at most one action,
+  centred in its panel. Say what to do next, not only that nothing is there.
 
 ### Notifications
 
