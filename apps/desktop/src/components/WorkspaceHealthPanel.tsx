@@ -18,6 +18,7 @@ import { PanelHeading } from "./ui/panel-heading";
 import { useLiveRefresh } from "../lib/liveEvents";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
+import { formatTime } from "../web/format";
 
 const DETECTORS: Record<HealthDetector, { label: string; looksFor: string; icon: ReactNode }> = {
   older_version_active: { label: "Older versions", looksFor: "An earlier upload of a file still active next to the latest one.", icon: <Versions size={ICON_SIZE.md} /> },
@@ -47,11 +48,6 @@ const ACTION_DONE: Record<HealthAction, string> = {
   create_task: "Task created.",
   dismiss: "Finding dismissed.",
 };
-
-function formatDate(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "medium" });
-}
 
 function lineLabel(start: number | null, end: number | null) {
   if (start === null) return "";
@@ -187,7 +183,7 @@ function FindingCard({
       {finding.files.map((file) => <label key={file.artifact_id}>
         <input checked={keep === file.artifact_id} name={`keep-${finding.fingerprint}`} onChange={() => setKeep(file.artifact_id)} type="radio" />
         <button className="rm-map-link" onClick={() => onOpenArtifact(file.artifact_id)} type="button">{file.title}</button>
-        <span className="rm-map-muted">{file.path !== file.title ? `${file.path} · ` : ""}uploaded {formatDate(file.created_at)}</span>
+        <span className="rm-map-muted">{file.path !== file.title ? `${file.path} · ` : ""}uploaded {formatTime(file.created_at)}</span>
         <span className={`rm-health-fate${keep === file.artifact_id ? " kept" : ""}`}>{keep === file.artifact_id ? "Kept" : "Superseded"}</span>
       </label>)}
     </fieldset> : <ul className="rm-health-files">

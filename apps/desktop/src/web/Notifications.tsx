@@ -9,7 +9,7 @@ import { Toast } from "../components/ui/toast";
 import { accountKeys } from "../lib/queryClient";
 import { useServerState } from "../lib/useServerState";
 import { SharedLayout } from "../components/SharedLayout";
-import { apiMessage, formatActivityTime } from "./format";
+import { apiMessage, formatTime } from "./format";
 import { navigate } from "./router";
 import { OrganizationRail } from "./Organization";
 import { ICON_SIZE } from "../components/ui/icon";
@@ -61,7 +61,7 @@ export function SharedNotifications({
     <section className="shared-page-content shared-notifications-page" aria-busy={isLoading}>
       <PageHeader actions={<Button disabled={isMutating || unreadCount === 0} onClick={() => void markAllRead()} type="button" variant="secondary">Mark all read</Button>} description={<>Task assignments and direct evidence mentions appear here. Mention a teammate with their email, for example <code>@person@example.com</code>.</>} title="Notifications" />
       <Toast kind="error" message={error} />
-      <section className="shared-notification-list" aria-label="Notifications">{notifications.length ? notifications.map((notification) => <article className={notification.read_at ? "" : "is-unread"} key={notification.id}><Button onClick={() => void openNotification(notification)} type="button" variant="secondary"><span className="shared-notification-icon"><Bell size={ICON_SIZE.md} /></span><span><strong>{notification.title}</strong><small>{notification.body}</small><time dateTime={notification.created_at}>{formatActivityTime(notification.created_at)}</time></span><ChevronRight size={ICON_SIZE.md} /></Button></article>) : <EmptyState description="Assignments and evidence mentions will appear here when your team needs your attention." icon={<Bell size={25} />} title="Nothing new" />}</section>
+      <section className="shared-notification-list" aria-label="Notifications">{notifications.length ? notifications.map((notification) => <article className={notification.read_at ? "" : "is-unread"} key={notification.id}><Button onClick={() => void openNotification(notification)} type="button" variant="secondary"><span className="shared-notification-icon"><Bell size={ICON_SIZE.md} /></span><span><strong>{notification.title}</strong><small>{notification.body}</small><time dateTime={notification.created_at}>{formatTime(notification.created_at)}</time></span><ChevronRight size={ICON_SIZE.md} /></Button></article>) : <EmptyState description="Assignments and evidence mentions will appear here when your team needs your attention." icon={<Bell size={25} />} title="Nothing new" />}</section>
     </section>
   </SharedLayout>;
 }

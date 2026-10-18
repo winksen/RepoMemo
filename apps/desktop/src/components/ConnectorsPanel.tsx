@@ -27,14 +27,10 @@ import { Dropdown } from "./ui/dropdown";
 import { Input } from "./ui/input";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
+import { formatTime } from "../web/format";
 
 function errorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
-}
-
-function formatDate(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -213,15 +209,15 @@ export function ConnectorSettings({
             <span className="rm-map-muted">
               {STATUS_LABEL[running ? "syncing" : connector.status] ?? connector.status}
               {" · "}{connector.open_items.toLocaleString()} open · {connector.closed_items.toLocaleString()} closed
-              {connector.last_synced_at ? ` · last sync ${formatDate(connector.last_synced_at)}` : ""}
+              {connector.last_synced_at ? ` · last sync ${formatTime(connector.last_synced_at)}` : ""}
               {connector.has_credential ? " · with a token" : " · no token"}
               {connector.last_report?.more_to_fetch ? " · more to fetch on the next sync" : ""}
             </span>
             {!running && connector.status === "error" && connector.last_error ? <span className="rm-map-muted">{connector.last_error}</span> : null}
             {!running && connector.status === "paused" ? <span className="rm-map-muted">
-              Paused{connector.paused_until ? ` until ${formatDate(connector.paused_until)}` : " until the token is replaced"}: {connector.paused_reason}
+              Paused{connector.paused_until ? ` until ${formatTime(connector.paused_until)}` : " until the token is replaced"}: {connector.paused_reason}
             </span> : null}
-            {connector.has_webhook ? <span className="rm-map-muted">Webhook on{connector.webhook_last_received_at ? ` · last call ${formatDate(connector.webhook_last_received_at)}` : " · no call yet"}</span> : null}
+            {connector.has_webhook ? <span className="rm-map-muted">Webhook on{connector.webhook_last_received_at ? ` · last call ${formatTime(connector.webhook_last_received_at)}` : " · no call yet"}</span> : null}
           </div>
           <div className="rm-health-actions">
             <Button disabled={running} onClick={() => void sync(connector)} type="button" variant="secondary"><Refresh size={ICON_SIZE.sm} /> Sync now</Button>
@@ -283,7 +279,7 @@ export function ConnectorSettings({
       {(() => {
         const live = connectors?.find((connector) => connector.id === hooking.id) ?? hooking;
         return <div className="rm-repo-form">
-          <span className="rm-map-muted">{live.has_webhook ? `On${live.webhook_last_received_at ? ` · last call ${formatDate(live.webhook_last_received_at)}` : " · no call yet"}.` : "Off: the connector is checked on a schedule."}</span>
+          <span className="rm-map-muted">{live.has_webhook ? `On${live.webhook_last_received_at ? ` · last call ${formatTime(live.webhook_last_received_at)}` : " · no call yet"}.` : "Off: the connector is checked on a schedule."}</span>
           {hookSecret ? <div className="rm-repo-check">
             <dl className="rm-repo-facts">
               <div><dt>Payload URL</dt><dd><code className="rm-repo-path">{hookSecret.address}</code> <CopyButton label="Copy the payload URL" value={hookSecret.address} /></dd></div>

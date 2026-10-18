@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { IconHistory as History, IconLoader2 as Loader } from "@tabler/icons-react";
 import { compareSharedArtifactVersions, getSharedArtifactVersionText, listSharedArtifactVersions } from "../lib/sharedApi";
 import type { ArtifactVersion, ArtifactVersionText, VersionComparison } from "../types";
-import { formatFileSize } from "../web/format";
+import { formatBytes } from "../web/format";
 import { Button } from "./ui/button";
 import { PanelHeading } from "./ui/panel-heading";
 import { Dialog, DialogCancel } from "./ui/dialog";
@@ -97,7 +97,7 @@ export function ArtifactVersionsPanel({ accessToken, artifactId, updatedAt }: { 
       {versions.map((version) => <li key={version.version}>
         <div>
           <strong>Version {version.version}{version.is_current ? " · current" : ""}</strong>
-          <small>{version.uploaded_by ? `Uploaded by ${version.uploaded_by} · ` : version.version === 1 ? "First upload · " : ""}{when(version.created_at)} · {formatFileSize(version.size_bytes)}</small>
+          <small>{version.uploaded_by ? `Uploaded by ${version.uploaded_by} · ` : version.version === 1 ? "First upload · " : ""}{when(version.created_at)} · {formatBytes(version.size_bytes)}</small>
         </div>
         <div className="shared-version-actions">
           <Button onClick={() => void viewText(version.version)} type="button" variant="secondary">View text</Button>

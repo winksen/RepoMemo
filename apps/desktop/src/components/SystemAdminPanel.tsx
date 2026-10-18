@@ -107,6 +107,7 @@ import { appLink, SecretDialog } from "./SecretDialog";
 
 import { SYSTEM_SECTIONS, type SystemSection } from "../web/constants";
 import { ICON_SIZE } from "./ui/icon";
+import { formatBytes, formatDuration, formatTime } from "../web/format";
 export { SYSTEM_SECTIONS };
 export type { SystemSection };
 
@@ -189,30 +190,6 @@ function useSystemData<T>(load: () => Promise<T>, dependencies: unknown[], refre
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, dependencies);
   return [data, isLoading, reload, setData];
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  const units = ["KiB", "MiB", "GiB", "TiB"];
-  let value = bytes / 1024;
-  let unit = 0;
-  while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit += 1; }
-  return `${value.toFixed(value < 10 ? 1 : 0)} ${units[unit]}`;
-}
-
-function formatDuration(seconds: number): string {
-  const days = Math.floor(seconds / 86400);
-  const hours = Math.floor((seconds % 86400) / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  if (days) return `${days} d ${hours} h`;
-  if (hours) return `${hours} h ${minutes} min`;
-  return `${minutes} min`;
-}
-
-function formatTime(value: string | null | undefined): string {
-  if (!value) return "—";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
 function count(value: number): string {

@@ -8,15 +8,7 @@ import { Button } from "./ui/button";
 import { PanelHeading } from "./ui/panel-heading";
 import { Input } from "./ui/input";
 import { showToast } from "./ui/toast";
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} bytes`;
-  const units = ["KiB", "MiB", "GiB", "TiB"];
-  let value = bytes / 1024;
-  let unit = 0;
-  while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit += 1; }
-  return `${value.toFixed(1)} ${units[unit]}`;
-}
+import { formatBytes } from "../web/format";
 
 /** What the archive holds, as a sentence. */
 export function describeArchive(report: ArchiveImportReport): string {
@@ -122,7 +114,7 @@ export function WorkspaceImport({ accessToken, onImported, organizationId }: {
       </div>
       {report ? <div className="shared-import-report" role="status">
         <strong>{report.workspace_name}</strong>
-        <span>{describeArchive(report)} · {formatSize(report.total_bytes)} · exported {new Date(report.exported_at).toLocaleDateString()} by RepoMemo {report.source_version}</span>
+        <span>{describeArchive(report)} · {formatBytes(report.total_bytes)} · exported {new Date(report.exported_at).toLocaleDateString()} by RepoMemo {report.source_version}</span>
         {report.problems.length ? <ul aria-label="Problems">{report.problems.map((problem) => <li key={problem}>{problem}</li>)}</ul> : null}
         {report.warnings.length ? <ul aria-label="Warnings">{report.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul> : null}
         {report.ok ? <>

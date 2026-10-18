@@ -2,6 +2,19 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.91 (2026-10-18)
+
+Dates, sizes and durations are formatted in one place.
+
+### Changed
+- **`web/format.ts` holds the formatters:** `formatDate` (a date), `formatTime` (a date with its time), `formatRelativeTime` ("3h ago"), `formatRecentTime` (the time today, the day before), `formatBytes`, `formatDuration` and `formatShare`. Each takes an empty value and one that is not a date without failing (a fallback or the text as it is).
+- **Fifteen local copies are deleted** from the API tokens, assistant, connectors, document viewer, invitation, language chart, move-to-server, import, repositories, System and workspace health components (`formatDate`, `formatBytes`, `formatSize`, `formatDuration`, `formatTime`, `formatChatTime`, `formatShare`). The retired local edition (`App.tsx`) keeps its own.
+- **Small wording differences are gone:** a size reads `512 B`, `48 KB`, `1.5 MB`, `GB` or `TB` everywhere (it was `bytes`, `KiB` or `MiB` in four places), and a date with a time reads the same on every page.
+- **`Time`** (`components/ui/time.tsx`) shows a relative time in a `<time>` element, with the exact date and time in a tooltip. No page uses it yet; the pages of K4 do.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.90 (2026-10-18)
 
 One list style for palettes, suggestions, pickers and chats.

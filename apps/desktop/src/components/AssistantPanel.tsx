@@ -36,6 +36,7 @@ import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
+import { formatRecentTime } from "../web/format";
 
 /** A turn as shown: stored turns plus the one waiting for, or failing to get, a reply. */
 type ThreadTurn = {
@@ -279,7 +280,7 @@ export function AssistantPanel({ accessToken, onOpenArtifact, workspaceId }: { a
         return <li className={isActive ? "rm-option-row active" : "rm-option-row"} key={conversation.id}>
           <button aria-current={isActive ? "page" : undefined} className="rm-option" disabled={isBusy} onClick={() => { setShowChats(false); void openChat(conversation.id); }} title={conversation.title} type="button">
             <Message size={ICON_SIZE.sm} />
-            <span className="rm-option-text"><strong>{conversation.title}</strong><small>{formatChatTime(conversation.updated_at)} · {conversation.turn_count} {conversation.turn_count === 1 ? "message" : "messages"}</small></span>
+            <span className="rm-option-text"><strong>{conversation.title}</strong><small>{formatRecentTime(conversation.updated_at)} · {conversation.turn_count} {conversation.turn_count === 1 ? "message" : "messages"}</small></span>
           </button>
           <ActionMenu items={[
             { label: "Rename", icon: <Pencil size={ICON_SIZE.sm} />, onSelect: () => { setRenameValue(conversation.title); setChatDialog({ kind: "rename", conversation }); } },
@@ -319,15 +320,6 @@ export function AssistantPanel({ accessToken, onOpenArtifact, workspaceId }: { a
       </form>
     </div>
   </section>;
-}
-
-function formatChatTime(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const sameDay = date.toDateString() === new Date().toDateString();
-  return sameDay
-    ? date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
-    : date.toLocaleDateString(undefined, { day: "numeric", month: "short" });
 }
 
 function capabilityLabel(capabilities: AgentCapabilities | null, id: AgentCapability) {

@@ -4,7 +4,7 @@ import { generateSharedWorkspaceAiOverview } from "../../lib/sharedApi";
 import { type WorkspaceAiOverview } from "../../types";
 import { Button } from "../../components/ui/button";
 import { PanelHeading } from "../../components/ui/panel-heading";
-import { apiMessage, formatFileSize } from "../format";
+import { apiMessage, formatBytes } from "../format";
 import { EvidenceUsed, MetricBars, MetricTimeline } from "../common";
 import { useCapabilities, useMetrics, useOverview } from "./data";
 import { type WorkspacePage, sectionState } from "./page";
@@ -31,7 +31,7 @@ export function OverviewSection({ page }: { page: WorkspacePage }) {
           <PanelHeading description={workspaceMetrics ? "Live API snapshot" : "Loading metrics…"} icon={Chart} id="workspace-metrics-heading" title="Workspace pulse" />
           <div className="shared-metric-highlights">
             <div><span>Index coverage</span><strong>{workspaceMetrics ? `${workspaceMetrics.artifact_count ? Math.round((workspaceMetrics.indexed_artifact_count / workspaceMetrics.artifact_count) * 100) : 0}%` : "—"}</strong><small>{workspaceMetrics ? `${workspaceMetrics.indexed_artifact_count} of ${workspaceMetrics.artifact_count} artifacts` : "Waiting for server data"}</small></div>
-            <div><span>Indexed storage</span><strong>{workspaceMetrics ? formatFileSize(workspaceMetrics.indexed_artifact_bytes) : "—"}</strong><small>{workspaceMetrics ? `${formatFileSize(workspaceMetrics.pending_artifact_bytes)} pending` : "Waiting for server data"}</small></div>
+            <div><span>Indexed storage</span><strong>{workspaceMetrics ? formatBytes(workspaceMetrics.indexed_artifact_bytes) : "—"}</strong><small>{workspaceMetrics ? `${formatBytes(workspaceMetrics.pending_artifact_bytes)} pending` : "Waiting for server data"}</small></div>
             <div><span>Fresh evidence</span><strong>{workspaceMetrics?.artifacts_updated_last_7_days ?? "—"}</strong><small>{workspaceMetrics ? `${workspaceMetrics.artifacts_created_last_7_days} added in 7 days` : "Waiting for server data"}</small></div>
             <div><span>Knowledge density</span><strong>{workspaceMetrics ? `${workspaceMetrics.indexed_artifact_count ? Math.round(workspaceMetrics.chunk_count / workspaceMetrics.indexed_artifact_count) : 0}` : "—"}</strong><small>retrieval chunks per indexed file</small></div>
             <div><span>Code symbols</span><strong>{workspaceMetrics?.symbol_count ?? "—"}</strong><small>extracted from evidence</small></div>
@@ -43,7 +43,7 @@ export function OverviewSection({ page }: { page: WorkspacePage }) {
           <div className="shared-metric-visuals">
             <section className="shared-metric-panel shared-metric-coverage"><div><h3>Indexing coverage</h3><span>{workspaceMetrics ? `${workspaceMetrics.pending_artifact_count} waiting to be indexed` : "Loading…"}</span></div><div className="shared-coverage-track" aria-label="Artifact indexing coverage" role="img"><span style={{ width: `${workspaceMetrics?.artifact_count ? (workspaceMetrics.indexed_artifact_count / workspaceMetrics.artifact_count) * 100 : 0}%` }} /></div><div className="shared-coverage-legend"><span>Indexed {workspaceMetrics?.indexed_artifact_count ?? 0}</span><span>Pending {workspaceMetrics?.pending_artifact_count ?? 0}</span></div></section>
             <MetricBars emptyLabel="Evidence types appear after you add files." items={workspaceMetrics?.artifact_types ?? []} title="Evidence by type" />
-            <MetricBars emptyLabel="Storage distribution appears after you add files." formatValue={formatFileSize} items={workspaceMetrics?.artifact_bytes_by_type ?? []} title="Storage by evidence type" />
+            <MetricBars emptyLabel="Storage distribution appears after you add files." formatValue={formatBytes} items={workspaceMetrics?.artifact_bytes_by_type ?? []} title="Storage by evidence type" />
             <MetricBars emptyLabel="Languages appear after indexed files are detected." items={workspaceMetrics?.languages ?? []} title="Languages in evidence" />
             <MetricTimeline items={workspaceMetrics?.activity_by_day ?? []} />
             <MetricBars emptyLabel="Workspace changes will be summarized here." items={workspaceMetrics?.activity_actions ?? []} title="Recent activity" />

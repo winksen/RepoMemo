@@ -8,14 +8,10 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
+import { formatTime } from "../web/format";
 
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
-}
-
-function formatDate(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
 /** Where to go once the invitation is accepted. */
@@ -107,7 +103,7 @@ export function InvitePage({
         <div><dt>{preview.target_type === "workspace" ? "Workspace" : "Organization"}</dt><dd>{preview.target_name}{preview.target_type === "workspace" ? ` · in ${preview.organization_name}` : ""}</dd></div>
         <div><dt>Role</dt><dd>{preview.role}</dd></div>
         <div><dt>For</dt><dd>{preview.email}</dd></div>
-        <div><dt>From</dt><dd>{preview.invited_by ?? "An administrator"} · valid until {formatDate(preview.expires_at)}</dd></div>
+        <div><dt>From</dt><dd>{preview.invited_by ?? "An administrator"} · valid until {formatTime(preview.expires_at)}</dd></div>
       </dl> : null}
     </section>
     <section className="shared-auth-form-region" aria-label="Accept the invitation" aria-live="polite">

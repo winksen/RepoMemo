@@ -32,7 +32,7 @@ import {
   updateSharedRepository,
 } from "../lib/sharedApi";
 import type { RepoAccessCheck, RepoFile, RepoSource, RepoSyncReport, RepositoryDetailResponse } from "../types";
-import { lastChangeLabel } from "../web/format";
+import { formatBytes, formatTime, lastChangeLabel } from "../web/format";
 import { LanguageChart } from "./LanguageChart";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -96,11 +96,6 @@ function formToken(form: RepoForm) {
   }
   const token = form.token.trim();
   return token ? { token, token_username: form.tokenUsername.trim() || undefined } : {};
-}
-
-function formatDate(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
 function lines(value: string) {
@@ -486,7 +481,7 @@ export function RepositorySettings({
           <strong>Push webhooks</strong>
           <span className="rm-map-muted">
             {liveEditing?.has_webhook
-              ? `On${liveEditing?.webhook_last_received_at ? ` · last call ${formatDate(liveEditing?.webhook_last_received_at)}` : " · no call yet"}.`
+              ? `On${liveEditing?.webhook_last_received_at ? ` · last call ${formatTime(liveEditing?.webhook_last_received_at)}` : " · no call yet"}.`
               : "Off. The repository is checked for new commits on a schedule."}
             {" "}GitHub, GitLab or any sender that signs with HMAC-SHA256 (<code>X-RepoMemo-Signature</code>) can ask for a sync as soon as someone pushes.
           </span>
@@ -525,7 +520,7 @@ function RepositoryCheckResult({ check }: { check: RepoAccessCheck }) {
       {check.remote
         ? <div><dt><GitCommit size={ICON_SIZE.sm} /> Commit</dt><dd><code>{check.commit.sha.slice(0, 7)}</code> <span className="rm-map-muted">· the files are counted after the first sync, which clones the repository</span></dd></div>
         : <>
-          <div><dt><GitCommit size={ICON_SIZE.sm} /> Commit</dt><dd><code>{check.commit.sha.slice(0, 7)}</code> {check.commit.summary} <span className="rm-map-muted">· {check.commit.author_name} · {formatDate(check.commit.committed_at)}</span></dd></div>
+          <div><dt><GitCommit size={ICON_SIZE.sm} /> Commit</dt><dd><code>{check.commit.sha.slice(0, 7)}</code> {check.commit.summary} <span className="rm-map-muted">· {check.commit.author_name} · {formatTime(check.commit.committed_at)}</span></dd></div>
           <div><dt>Files</dt><dd>About {check.indexable_files.toLocaleString()} of {check.tracked_files.toLocaleString()} committed files will be indexed</dd></div>
         </>}
     </dl>
@@ -627,8 +622,8 @@ function RepositoryCard({
 
     <dl className="rm-repo-facts">
       <div><dt><GitBranch size={ICON_SIZE.sm} /> Branch</dt><dd>{commit?.branch ?? settings.branch ?? "Checked-out branch"}{settings.branch ? null : <span className="rm-map-muted"> (follows HEAD)</span>}</dd></div>
-      <div><dt><GitCommit size={ICON_SIZE.sm} /> Commit</dt><dd>{commit ? <><code>{commit.sha.slice(0, 7)}</code> <CopyButton label="Copy the commit hash" value={commit.sha} /> {commit.summary} <span className="rm-map-muted">· {commit.author_name} · {formatDate(commit.committed_at)}</span></> : <span className="rm-map-muted">Not synced yet</span>}</dd></div>
-      <div><dt>Files</dt><dd>{repository.indexed_file_count === repository.file_count ? repository.file_count.toLocaleString() : `${repository.indexed_file_count.toLocaleString()} of ${repository.file_count.toLocaleString()} indexed`}{repository.last_synced_at ? <span className="rm-map-muted"> · synced {formatDate(repository.last_synced_at)}</span> : null}</dd></div>
+      <div><dt><GitCommit size={ICON_SIZE.sm} /> Commit</dt><dd>{commit ? <><code>{commit.sha.slice(0, 7)}</code> <CopyButton label="Copy the commit hash" value={commit.sha} /> {commit.summary} <span className="rm-map-muted">· {commit.author_name} · {formatTime(commit.committed_at)}</span></> : <span className="rm-map-muted">Not synced yet</span>}</dd></div>
+      <div><dt>Files</dt><dd>{repository.indexed_file_count === repository.file_count ? repository.file_count.toLocaleString() : `${repository.indexed_file_count.toLocaleString()} of ${repository.file_count.toLocaleString()} indexed`}{repository.last_synced_at ? <span className="rm-map-muted"> · synced {formatTime(repository.last_synced_at)}</span> : null}</dd></div>
       {settings.include.length || settings.exclude.length ? <div><dt>Rules</dt><dd className="rm-repo-rules">{settings.include.map((pattern) => <code key={`i-${pattern}`}>+ {pattern}</code>)}{settings.exclude.map((pattern) => <code key={`e-${pattern}`}>− {pattern}</code>)}</dd></div> : null}
       {!job && repository.status === "error" && repository.last_error ? <div><dt>Last error</dt><dd>{repository.last_error}</dd></div> : null}
     </dl>
@@ -704,12 +699,6 @@ const STACK_CATEGORIES: [string, string][] = [
   ["desktop", "Desktop"], ["mobile", "Mobile"], ["cli", "Command line"], ["game", "Game"], ["data", "Data"],
   ["database", "Database"], ["runtime", "Runtime"], ["testing", "Testing"], ["tooling", "Tooling"],
 ];
-
-function formatBytes(bytes: number) {
-  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-  if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${bytes} bytes`;
-}
 
 const KEY_FILE_ROLE: Record<string, string> = {
   readme: "README",
@@ -818,8 +807,8 @@ export function RepositoryDetailView({
       <dl className="rm-repo-facts">
         <div><dt>Location</dt><dd><code className="rm-repo-path">{repository.root_path}</code></dd></div>
         <div><dt><GitBranch size={ICON_SIZE.sm} /> Branch</dt><dd>{commit?.branch ?? repository.settings.branch ?? "Checked-out branch"}</dd></div>
-        <div><dt><GitCommit size={ICON_SIZE.sm} /> Commit</dt><dd>{commit ? <><code>{commit.sha.slice(0, 7)}</code> <CopyButton label="Copy the commit hash" value={commit.sha} /> {commit.summary} <span className="rm-map-muted">· {commit.author_name} · {formatDate(commit.committed_at)}</span></> : <span className="rm-map-muted">Not synced yet</span>}</dd></div>
-        <div><dt>Files</dt><dd>{repository.file_count.toLocaleString()} indexed{repository.last_synced_at ? <span className="rm-map-muted"> · synced {formatDate(repository.last_synced_at)}</span> : null}</dd></div>
+        <div><dt><GitCommit size={ICON_SIZE.sm} /> Commit</dt><dd>{commit ? <><code>{commit.sha.slice(0, 7)}</code> <CopyButton label="Copy the commit hash" value={commit.sha} /> {commit.summary} <span className="rm-map-muted">· {commit.author_name} · {formatTime(commit.committed_at)}</span></> : <span className="rm-map-muted">Not synced yet</span>}</dd></div>
+        <div><dt>Files</dt><dd>{repository.file_count.toLocaleString()} indexed{repository.last_synced_at ? <span className="rm-map-muted"> · synced {formatTime(repository.last_synced_at)}</span> : null}</dd></div>
         {!job && repository.status === "error" && repository.last_error ? <div><dt>Last error</dt><dd>{repository.last_error}</dd></div> : null}
       </dl>
       {job ? <div className="rm-repo-progress" role="status">
@@ -839,7 +828,7 @@ export function RepositoryDetailView({
       <PanelHeading description={summary ? summary.provider_name : null} icon={Sparkles} title="Summary" />
       {summary ? <>
         <div className="shared-markdown rm-repo-summary"><SafeMarkdown>{summary.summary_markdown}</SafeMarkdown></div>
-        <p className="rm-map-muted">Written for commit <code>{summary.commit_sha.slice(0, 7)}</code> on {formatDate(summary.generated_at)}.{summaryIsStale ? " The repository has changed since; regenerate it to describe the current commit." : ""} {summary.warnings.join(" ")}</p>
+        <p className="rm-map-muted">Written for commit <code>{summary.commit_sha.slice(0, 7)}</code> on {formatTime(summary.generated_at)}.{summaryIsStale ? " The repository has changed since; regenerate it to describe the current commit." : ""} {summary.warnings.join(" ")}</p>
         {citedFiles.length ? <div className="rm-repo-cited"><span className="rm-map-muted">Based on</span>{citedFiles.map(([artifactId, path]) => <button className="rm-map-link" key={artifactId} onClick={() => onOpenArtifact(artifactId)} type="button">{path}</button>)}</div> : null}
       </> : <p className="shared-muted-copy">{detail.ai_available ? "No summary yet. A summary describes what the repository is, its main parts and where to start reading, from the overview below and the opening of its key files." : "A summary needs a text AI provider, which an administrator can set up in Settings. The overview below needs no AI."}</p>}
       {canSync && detail.ai_available && overview ? <div className="rm-health-actions"><Button disabled={summarizing} onClick={() => void summarize()} type="button" variant={summary && !summaryIsStale ? "secondary" : "main"}><Sparkles size={ICON_SIZE.sm} /> {summarizing ? "Summarizing…" : summary ? "Regenerate summary" : "Generate summary"}</Button></div> : null}
@@ -879,7 +868,7 @@ export function RepositoryDetailView({
         </div> : null}
         {overview.recent_commits.length ? <div className="rm-repo-block">
           <h3>Recent commits</h3>
-          <ul className="rm-repo-commits">{overview.recent_commits.map((entry) => <li key={entry.sha}><code>{entry.sha.slice(0, 7)}</code><span>{entry.summary}</span><span className="rm-map-muted">{entry.author_name} · {formatDate(entry.committed_at)}</span></li>)}</ul>
+          <ul className="rm-repo-commits">{overview.recent_commits.map((entry) => <li key={entry.sha}><code>{entry.sha.slice(0, 7)}</code><span>{entry.summary}</span><span className="rm-map-muted">{entry.author_name} · {formatTime(entry.committed_at)}</span></li>)}</ul>
         </div> : null}
       </div> : <p className="shared-muted-copy">The overview appears after the first complete sync.</p>}
     </section>

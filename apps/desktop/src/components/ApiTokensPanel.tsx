@@ -12,15 +12,10 @@ import { Dropdown } from "./ui/dropdown";
 import { Input } from "./ui/input";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
+import { formatDate } from "../web/format";
 
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
-}
-
-function formatDate(value: string | null) {
-  if (!value) return "never";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString(undefined, { dateStyle: "medium" });
 }
 
 const EXPIRY_OPTIONS = [
@@ -92,7 +87,7 @@ export function ApiTokensPanel({ accessToken, isAdministrator }: { accessToken: 
     {tokens?.length ? <ul className="rm-tokens-list">{tokens.map((token) => {
       const expired = token.expires_at <= now;
       return <li className={expired ? "expired" : ""} key={token.id}>
-        <span className="rm-tokens-text"><strong>{token.name} <Badge>{token.scope === "system" ? "system" : token.scope === "write" ? "read and write" : "read only"}</Badge>{expired ? <Badge tone="danger">expired</Badge> : null}</strong><small><code>{token.prefix}…</code> · created {formatDate(token.created_at)} · {expired ? "expired" : "expires"} {formatDate(token.expires_at)} · last used {formatDate(token.last_used_at)}</small></span>
+        <span className="rm-tokens-text"><strong>{token.name} <Badge>{token.scope === "system" ? "system" : token.scope === "write" ? "read and write" : "read only"}</Badge>{expired ? <Badge tone="danger">expired</Badge> : null}</strong><small><code>{token.prefix}…</code> · created {formatDate(token.created_at, "never")} · {expired ? "expired" : "expires"} {formatDate(token.expires_at, "never")} · last used {formatDate(token.last_used_at, "never")}</small></span>
         <Button aria-label={`Revoke ${token.name}`} disabled={isBusy} onClick={() => setRevoking(token)} type="button" variant="secondary"><Trash size={ICON_SIZE.sm} /> {expired ? "Remove" : "Revoke"}</Button>
       </li>;
     })}</ul> : tokens ? <p className="shared-muted-copy">No tokens yet.</p> : null}

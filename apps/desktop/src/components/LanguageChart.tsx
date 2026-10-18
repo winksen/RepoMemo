@@ -1,20 +1,10 @@
 import type { RepoLanguageShare } from "../types";
+import { formatBytes, formatShare } from "../web/format";
 
 const RADIUS = 52;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 /** A gap between slices, in circumference units, so neighbours stay distinguishable. */
 const GAP = 1.5;
-
-function formatBytes(bytes: number) {
-  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-  if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${bytes} B`;
-}
-
-function formatShare(share: number) {
-  if (share > 0 && share < 0.01) return "<1%";
-  return `${Math.round(share * 100)}%`;
-}
 
 /** Languages by share of repository bytes: a donut with a legend that carries the exact figures. */
 export function LanguageChart({ languages, totalBytes }: { languages: RepoLanguageShare[]; totalBytes: number }) {

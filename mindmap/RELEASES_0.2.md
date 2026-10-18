@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.2 → 0.3
 
-> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.90` (2026-10-18) · **Next:** `V0.2.91`
+> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.91` (2026-10-18) · **Next:** `V0.2.92`
 > **Previous line:** [Releases 0.1 → 0.2](RELEASES_0.1.md) · **Related:** [Roadmap, Road to V0.3.0](ROADMAP.md#-road-to-v030) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
 Every release of the 0.2 line, shipped and planned, one row each. The plan comes from the [Road to V0.3.0](ROADMAP.md#-road-to-v030): **one change per release**, each shippable alone, with the security rules for a new outside connection in the release that opens it. Planned rows are proposals until decisions 7–14 in the roadmap are agreed.
@@ -125,7 +125,7 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | **V0.2.88** | ✅ 2026-10-18 | K. Frontend polish | ✨ Feature | UI kit | `SearchField` (`components/ui/search-field.tsx`): search icon, clear button, Escape to clear; replaces the evidence, System users, System logs, task, repository file and command palette fields; written, not seen on screen | Those four filters look and behave alike. |
 | **V0.2.89** | ✅ 2026-10-18 | K. Frontend polish | ✨ Feature | UI kit | `CopyButton` (`components/ui/copy-button.tsx`): copies a value, shows "Copied" for two seconds, warns by toast when the clipboard is refused; replaces the secret dialog's copy code and is added to commit hashes, file paths and webhook values; written, not seen on screen | Every copy action behaves the same. |
 | **V0.2.90** | ✅ 2026-10-18 | K. Frontend polish | 🔧 Enhancement | UI kit | `rm-option-list` and `rm-option` (`14-building-blocks.css`): one row height, highlight, focus ring and group label for the command palette, mention suggestions, folder picker and chat list, whose four rule sets are removed; written, not seen on screen | Their four separate rule sets are gone. |
-| **V0.2.91** | 🔜 Planned | K. Frontend polish | 🧹 Refactor | Web code | Formatting helpers in one place | `grep 'function format'` finds them only in `web/format.ts`. |
+| **V0.2.91** | ✅ 2026-10-18 | K. Frontend polish | 🧹 Refactor | Web code | `web/format.ts` holds `formatDate`, `formatTime`, `formatRelativeTime`, `formatRecentTime`, `formatBytes`, `formatDuration` and `formatShare` (tested in `test/format.test.tsx`, written, not run); fifteen local copies removed; `Time` (`components/ui/time.tsx`) shows a relative time with the exact one on hover; written, not seen on screen | `grep 'function format'` finds them only in `web/format.ts`. |
 | **V0.2.92** | 🔜 Planned | K. Frontend polish | 🧹 Refactor | Web code | One error message helper | `grep 'function errorMessage'` finds nothing. |
 | **V0.2.93** | 🔜 Planned | K. Frontend polish | 🧹 Refactor | Web code | `useAsyncAction` | Both use the hook and behave as before. |
 | **V0.2.94** | 🔜 Planned | K. Frontend polish | 🧹 Refactor | Web code | `useFormState` | Profile › Personal details uses it. |

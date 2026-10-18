@@ -21,11 +21,73 @@ export function documentKindLabel(artifact: Pick<ArtifactSummary, "path">) {
   return kind ? DOCUMENT_KIND_LABEL[kind] : "Document";
 }
 
-export function formatFileSize(bytes: number) {
+function parseDate(value: string): Date | null {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/** "3 Mar 2026". An empty value gives `fallback`; a value that is not a date is shown as it is. */
+export function formatDate(value: string | null | undefined, fallback = "—") {
+  if (!value) return fallback;
+  const date = parseDate(value);
+  return date ? date.toLocaleDateString(undefined, { dateStyle: "medium" }) : value;
+}
+
+/** "3 Mar 2026, 14:05": a date with its time. Empty and invalid values are handled as in `formatDate`. */
+export function formatTime(value: string | null | undefined, fallback = "—") {
+  if (!value) return fallback;
+  const date = parseDate(value);
+  return date ? date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : value;
+}
+
+/** "5m ago", "3h ago", "2d ago", then the date: how long ago something happened, for lists. */
+export function formatRelativeTime(value: string, now: number = Date.now()) {
+  const date = parseDate(value);
+  if (!date) return value;
+  const elapsed = now - date.getTime();
+  if (elapsed < 0) return formatDate(value);
+  const minutes = Math.floor(elapsed / 60_000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return date.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+}
+
+/** The time of day for today, the day and month for an earlier date; empty when it is not a date. */
+export function formatRecentTime(value: string) {
+  const date = parseDate(value);
+  if (!date) return "";
+  return date.toDateString() === new Date().toDateString()
+    ? date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
+    : date.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+}
+
+/** "512 B", "48 KB", "1.5 MB": a size, with no decimals below a megabyte. */
+export function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+  if (bytes < 1024 * 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+  return `${(bytes / (1024 * 1024 * 1024 * 1024)).toFixed(1)} TB`;
+}
+
+/** "3 d 4 h", "5 h 10 min", "12 min": how long a server has been up. */
+export function formatDuration(seconds: number) {
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (days) return `${days} d ${hours} h`;
+  if (hours) return `${hours} h ${minutes} min`;
+  return `${minutes} min`;
+}
+
+/** "42%", or "<1%" for a share too small to round. */
+export function formatShare(share: number) {
+  if (share > 0 && share < 0.01) return "<1%";
+  return `${Math.round(share * 100)}%`;
 }
 
 export function formatMetricDay(value: string) {
@@ -52,12 +114,6 @@ export function isAiActivity(event: WorkspaceActivityEvent) {
   return ["assistant_answered", "ai_overview_generated", "ai_question_answered"].includes(event.action);
 }
 
-export function formatActivityTime(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
-}
-
 export function isTaskOverdue(task: CollaborationTask) {
   if (!task.due_at || task.status === "done") return false;
   const dueAt = new Date(task.due_at);
@@ -72,7 +128,7 @@ export function formatTaskDueDate(value: string) {
 
 export function formatProfileTime(value: string | null | undefined) {
   if (!value) return "Not recorded yet";
-  return formatActivityTime(value);
+  return formatTime(value);
 }
 
 export function artifactCitation(artifacts: ArtifactSummary[], artifactId: string) {

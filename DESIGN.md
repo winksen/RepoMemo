@@ -167,6 +167,10 @@ page's own version, and add to this list when a new one is added.
   (and the word "Copied") for two seconds; if the browser refuses, a toast says
   so and the text is left to copy by hand. Icon-only by default (give it a
   `label`), or a button with a word through `text`. Every copy action uses it.
+- **`Time`**: a moment as a relative time ("3h ago") in a `<time>` element,
+  with the exact date and time in a tooltip. Dates and sizes in text come from
+  `web/format.ts` (`formatDate`, `formatTime`, `formatBytes`, `formatDuration`),
+  never from a local function.
 - **Option list** (`rm-option-list` with `rm-option` rows): the rows of any list
   you pick from by keyboard or mouse: the command palette, mention suggestions,
   the folder picker and the chat list. One row height (the control height), one

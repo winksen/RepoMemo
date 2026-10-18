@@ -21,15 +21,10 @@ import { Button } from "./ui/button";
 import { SegmentedControl } from "./ui/segmented-control";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
+import { formatBytes } from "../web/format";
 
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong.";
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function saveBlob(blob: Blob, filename: string) {

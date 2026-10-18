@@ -11,7 +11,7 @@ import { Dropdown } from "../../components/ui/dropdown";
 import { Input } from "../../components/ui/input";
 import { showToast } from "../../components/ui/toast";
 import { InviteMembers } from "../../components/InviteMembers";
-import { apiMessage, formatActivityTime, isAiActivity } from "../format";
+import { apiMessage, formatTime, isAiActivity } from "../format";
 import { ContributionCalendar } from "../common";
 import { useActivity, useActivityCalendar, useCapabilities, useMembers } from "./data";
 import { type WorkspacePage, sectionState } from "./page";
@@ -99,7 +99,7 @@ export function PeopleSection({ page }: { page: WorkspacePage }) {
               <ContributionCalendar items={activityCalendar?.activity_by_day ?? []} title="Workspace activity" total={activityCalendar?.total_activity_count} />
               <PanelHeading description={visibleActivity.length} icon={Timeline} title="Activity history" />
               <SegmentedControl aria-label="Activity type" className="shared-activity-filter" onValueChange={setActivityKind} options={[{ count: userActivity.length, icon: <Users size={ICON_SIZE.sm} />, label: "User activity", value: "user" }, { count: aiActivity.length, icon: <Sparkles size={ICON_SIZE.sm} />, label: "AI activity", value: "ai" }]} value={activityKind} />
-              {visibleActivity.length ? <div className="shared-activity-list">{visibleActivity.map((event) => <article key={event.id}><div><strong>{event.summary}</strong><span>{activityKind === "ai" ? `Requested by ${event.actor?.display_name ?? "Unknown"}` : (event.actor?.display_name ?? "System")} · {event.action.replace(/_/g, " ")}</span></div><time dateTime={event.created_at}>{formatActivityTime(event.created_at)}</time></article>)}</div> : <div className="shared-empty-state">{activityKind === "ai" ? <Sparkles size={25} /> : <Timeline size={25} />}<strong>{activityKind === "ai" ? "No AI activity yet" : "No recorded activity yet"}</strong><span>{activityKind === "ai" ? "Assistant questions and generated answers will appear here." : "New workspace changes will appear here."}</span></div>}
+              {visibleActivity.length ? <div className="shared-activity-list">{visibleActivity.map((event) => <article key={event.id}><div><strong>{event.summary}</strong><span>{activityKind === "ai" ? `Requested by ${event.actor?.display_name ?? "Unknown"}` : (event.actor?.display_name ?? "System")} · {event.action.replace(/_/g, " ")}</span></div><time dateTime={event.created_at}>{formatTime(event.created_at)}</time></article>)}</div> : <div className="shared-empty-state">{activityKind === "ai" ? <Sparkles size={25} /> : <Timeline size={25} />}<strong>{activityKind === "ai" ? "No AI activity yet" : "No recorded activity yet"}</strong><span>{activityKind === "ai" ? "Assistant questions and generated answers will appear here." : "New workspace changes will appear here."}</span></div>}
             </div>
 </>
   );

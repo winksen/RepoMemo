@@ -9,15 +9,7 @@ import { Dialog, DialogCancel } from "./ui/dialog";
 import { Dropdown } from "./ui/dropdown";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} bytes`;
-  const units = ["KiB", "MiB", "GiB"];
-  let value = bytes / 1024;
-  let unit = 0;
-  while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit += 1; }
-  return `${value.toFixed(1)} ${units[unit]}`;
-}
+import { formatBytes } from "../web/format";
 
 /** What an archive holds, as a sentence. */
 export function describeCounts(archive: PreparedArchive): string {
@@ -97,7 +89,7 @@ export function LocalMoveToServer({ onGoToServer }: { onGoToServer: () => void }
     <Dialog
       className="rm-dialog-wide"
       description={archive
-        ? `${archive.workspace_name} is ready: ${describeCounts(archive)} (${formatSize(archive.size_bytes)}).`
+        ? `${archive.workspace_name} is ready: ${describeCounts(archive)} (${formatBytes(archive.size_bytes)}).`
         : "The workspace is written as an archive, the file a server exports. On the server you check what is in it and import it as a new workspace; this computer's copy is not changed or removed."}
       footer={archive ? <>
         <Button onClick={() => void discard()} type="button" variant="secondary">Discard the archive</Button>
