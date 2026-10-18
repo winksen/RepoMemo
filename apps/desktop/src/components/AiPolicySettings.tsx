@@ -5,6 +5,7 @@ import { getSharedAiPolicy, saveSharedAiPolicy } from "../lib/sharedApi";
 import type { AiMinRole, AiPolicy } from "../types";
 import { Dropdown } from "./ui/dropdown";
 import { Toast } from "./ui/toast";
+import { apiMessage } from "../web/format";
 
 const OPTIONS: { label: string; value: AiMinRole }[] = [
   { label: "Everyone in the workspace", value: "viewer" },
@@ -29,7 +30,7 @@ export function AiPolicySettings({ accessToken, onSaved, workspaceId }: {
     setPolicy(null);
     getSharedAiPolicy(accessToken, workspaceId)
       .then((next) => { if (active) setPolicy(next); })
-      .catch((requestError) => { if (active) setError(requestError instanceof Error ? requestError.message : "The AI policy could not be loaded."); });
+      .catch((requestError) => { if (active) setError(apiMessage(requestError, "The AI policy could not be loaded.")); });
     return () => { active = false; };
   }, [accessToken, workspaceId]);
 
@@ -41,7 +42,7 @@ export function AiPolicySettings({ accessToken, onSaved, workspaceId }: {
       setNotice("AI access updated.");
       onSaved?.(saved);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "The AI policy could not be saved.");
+      setError(apiMessage(requestError, "The AI policy could not be saved."));
     } finally { setIsSaving(false); }
   }
 

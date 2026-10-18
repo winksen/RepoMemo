@@ -12,11 +12,7 @@ import { Dropdown } from "./ui/dropdown";
 import { Input } from "./ui/input";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
-import { formatDate } from "../web/format";
-
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
-}
+import { apiMessage, formatDate } from "../web/format";
 
 const EXPIRY_OPTIONS = [
   { label: "7 days", value: "7" },
@@ -47,7 +43,7 @@ export function ApiTokensPanel({ accessToken, isAdministrator }: { accessToken: 
   const [isBusy, setIsBusy] = useState(false);
 
   useEffect(() => {
-    listPersonalTokens(accessToken).then(setTokens).catch((error) => { showToast("error", errorMessage(error, "API tokens could not be loaded.")); setTokens([]); });
+    listPersonalTokens(accessToken).then(setTokens).catch((error) => { showToast("error", apiMessage(error, "API tokens could not be loaded.")); setTokens([]); });
   }, [accessToken]);
 
   async function create(event: FormEvent<HTMLFormElement>) {
@@ -58,7 +54,7 @@ export function ApiTokensPanel({ accessToken, isAdministrator }: { accessToken: 
       setTokens((current) => [created.token, ...(current ?? [])]);
       setSecret(created.secret);
       setName("");
-    } catch (error) { showToast("error", errorMessage(error, "The token could not be created.")); }
+    } catch (error) { showToast("error", apiMessage(error, "The token could not be created.")); }
     finally { setIsBusy(false); }
   }
 
@@ -70,7 +66,7 @@ export function ApiTokensPanel({ accessToken, isAdministrator }: { accessToken: 
       setTokens((current) => current?.filter((entry) => entry.id !== revoking.id) ?? current);
       showToast("success", `${revoking.name} was revoked. Scripts using it stop working now.`);
       setRevoking(null);
-    } catch (error) { showToast("error", errorMessage(error, "The token could not be revoked.")); }
+    } catch (error) { showToast("error", apiMessage(error, "The token could not be revoked.")); }
     finally { setIsBusy(false); }
   }
 

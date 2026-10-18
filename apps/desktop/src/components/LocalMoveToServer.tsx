@@ -9,7 +9,7 @@ import { Dialog, DialogCancel } from "./ui/dialog";
 import { Dropdown } from "./ui/dropdown";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
-import { formatBytes } from "../web/format";
+import { apiMessage, formatBytes } from "../web/format";
 
 /** What an archive holds, as a sentence. */
 export function describeCounts(archive: PreparedArchive): string {
@@ -55,7 +55,7 @@ export function LocalMoveToServer({ onGoToServer }: { onGoToServer: () => void }
     try {
       setArchive(await prepareLocalArchive(workspaceId));
     } catch (error) {
-      showToast("error", typeof error === "string" ? error : error instanceof Error ? error.message : "The workspace could not be prepared.");
+      showToast("error", typeof error === "string" ? error : apiMessage(error, "The workspace could not be prepared."));
     } finally { setIsBusy(false); }
   }
 
@@ -67,7 +67,7 @@ export function LocalMoveToServer({ onGoToServer }: { onGoToServer: () => void }
       await copyPreparedArchive(archive, destination);
       showToast("success", "Saved a copy of the archive.");
     } catch (error) {
-      showToast("error", typeof error === "string" ? error : error instanceof Error ? error.message : "The copy could not be saved.");
+      showToast("error", typeof error === "string" ? error : apiMessage(error, "The copy could not be saved."));
     }
   }
 

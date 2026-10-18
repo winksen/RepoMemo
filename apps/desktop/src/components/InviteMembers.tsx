@@ -11,11 +11,7 @@ import { Dropdown } from "./ui/dropdown";
 import { Input } from "./ui/input";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
-import { formatDate } from "../web/format";
-
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
-}
+import { apiMessage, formatDate } from "../web/format";
 
 /**
  * Invites someone who may not have an account yet: the administrator creates
@@ -50,7 +46,7 @@ export function InviteMembers({
 
   async function load() {
     try { setInvitations(await listSharedInvitations(accessToken, targetType, targetId)); }
-    catch (error) { showToast("error", errorMessage(error, "Pending invitations could not be loaded.")); setInvitations([]); }
+    catch (error) { showToast("error", apiMessage(error, "Pending invitations could not be loaded.")); setInvitations([]); }
   }
 
   useEffect(() => { void load(); }, [accessToken, targetId, targetType]);
@@ -69,7 +65,7 @@ export function InviteMembers({
       setEmail("");
       onInvited?.();
       await load();
-    } catch (error) { showToast("error", errorMessage(error, "The invitation could not be created.")); }
+    } catch (error) { showToast("error", apiMessage(error, "The invitation could not be created.")); }
     finally { setIsBusy(false); }
   }
 
@@ -79,7 +75,7 @@ export function InviteMembers({
       await revokeSharedInvitation(accessToken, invitation.id);
       setInvitations((current) => current?.filter((entry) => entry.id !== invitation.id) ?? current);
       showToast("success", `The invitation of ${invitation.email} was withdrawn.`);
-    } catch (error) { showToast("error", errorMessage(error, "The invitation could not be withdrawn.")); }
+    } catch (error) { showToast("error", apiMessage(error, "The invitation could not be withdrawn.")); }
     finally { setIsBusy(false); }
   }
 

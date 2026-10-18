@@ -4,10 +4,7 @@ import { verifyEmailLink } from "../lib/sharedApi";
 import { ThemeToggle } from "./SharedLayout";
 import { Button } from "./ui/button";
 import { ICON_SIZE } from "./ui/icon";
-
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
-}
+import { apiMessage } from "../web/format";
 
 /**
  * `/verify-email#<token>`: uses the link mailed to an address. The secret is
@@ -21,7 +18,7 @@ export function VerifyEmailPage({ onContinue, token }: { onContinue: () => void;
   useEffect(() => {
     verifyEmailLink(token)
       .then((answer) => setEmail(answer.email))
-      .catch((error) => setProblem(errorMessage(error, "This link could not be checked.")));
+      .catch((error) => setProblem(apiMessage(error, "This link could not be checked.")));
   }, [token]);
 
   return <main className="shared-auth-canvas">

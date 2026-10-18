@@ -1,7 +1,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { Time } from "../components/ui/time";
-import { formatBytes, formatDate, formatDuration, formatRecentTime, formatRelativeTime, formatShare, formatTime } from "../web/format";
+import { apiMessage, formatBytes, formatDate, formatDuration, formatRecentTime, formatRelativeTime, formatShare, formatTime } from "../web/format";
 
 afterEach(cleanup);
 
@@ -55,6 +55,23 @@ describe("formatting helpers", () => {
     expect(formatRecentTime("2020-01-02T10:00:00Z")).toBe(new Date("2020-01-02T10:00:00Z").toLocaleDateString(undefined, { day: "numeric", month: "short" }));
     const today = new Date();
     expect(formatRecentTime(today.toISOString())).toBe(today.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }));
+  });
+});
+
+describe("apiMessage", () => {
+  it("gives the message of an error, or of any object that has one", () => {
+    expect(apiMessage(new Error("The name is taken."), "Could not save.")).toBe("The name is taken.");
+    expect(apiMessage({ message: "Not allowed." }, "Could not save.")).toBe("Not allowed.");
+  });
+
+  it("gives the fallback when there is no message to show", () => {
+    expect(apiMessage(new Error(""), "Could not save.")).toBe("Could not save.");
+    expect(apiMessage("boom", "Could not save.")).toBe("Could not save.");
+    expect(apiMessage(null, "Could not save.")).toBe("Could not save.");
+  });
+
+  it("says the server could not be reached when no fallback is given", () => {
+    expect(apiMessage(undefined)).toMatch(/could not be reached/);
   });
 });
 

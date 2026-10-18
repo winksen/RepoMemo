@@ -18,7 +18,7 @@ import { PanelHeading } from "./ui/panel-heading";
 import { useLiveRefresh } from "../lib/liveEvents";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
-import { formatTime } from "../web/format";
+import { apiMessage, formatTime } from "../web/format";
 
 const DETECTORS: Record<HealthDetector, { label: string; looksFor: string; icon: ReactNode }> = {
   older_version_active: { label: "Older versions", looksFor: "An earlier upload of a file still active next to the latest one.", icon: <Versions size={ICON_SIZE.md} /> },
@@ -84,7 +84,7 @@ export function WorkspaceHealthPanel({
     try {
       setHealth(await getSharedWorkspaceHealth(accessToken, workspaceId));
     } catch (error) {
-      showToast("error", error instanceof Error ? error.message : "Workspace health could not be checked.");
+      showToast("error", apiMessage(error, "Workspace health could not be checked."));
     } finally {
       setIsRefreshing(false);
     }
@@ -101,7 +101,7 @@ export function WorkspaceHealthPanel({
       showToast("success", ACTION_DONE[action]);
     } catch (error) {
       const stale = error instanceof SharedApiError && error.status === 409;
-      showToast(stale ? "warning" : "error", error instanceof Error ? error.message : "The action could not be applied.");
+      showToast(stale ? "warning" : "error", apiMessage(error, "The action could not be applied."));
     } finally {
       setPending(null);
       await load();

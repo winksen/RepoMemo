@@ -6,6 +6,7 @@ import { Button } from "./ui/button";
 import { Dialog, DialogCancel } from "./ui/dialog";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
+import { apiMessage } from "../web/format";
 
 /** In the desktop app: which server this window is connected to, and the way to choose another. Nothing in a browser. */
 export function DesktopServerNote({ signedIn }: { signedIn: boolean }) {
@@ -20,7 +21,7 @@ export function DesktopServerNote({ signedIn }: { signedIn: boolean }) {
       // Forgets the server and its stored session, then the app starts again and asks for an address.
       await desktopServer.forget();
     } catch (error) {
-      showToast("error", error instanceof Error ? error.message : "The server could not be changed.");
+      showToast("error", apiMessage(error, "The server could not be changed."));
       setIsChanging(false);
     }
   }

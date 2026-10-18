@@ -107,7 +107,7 @@ import { appLink, SecretDialog } from "./SecretDialog";
 
 import { SYSTEM_SECTIONS, type SystemSection } from "../web/constants";
 import { ICON_SIZE } from "./ui/icon";
-import { formatBytes, formatDuration, formatTime } from "../web/format";
+import { apiMessage, formatBytes, formatDuration, formatTime } from "../web/format";
 export { SYSTEM_SECTIONS };
 export type { SystemSection };
 
@@ -168,10 +168,6 @@ export function SystemAdminPanel({ accessToken, onNavigateSection, onOpenWorkspa
   </section>;
 }
 
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
-}
-
 /** Loads data, reloads on demand and, optionally, every `refreshMs`. */
 function useSystemData<T>(load: () => Promise<T>, dependencies: unknown[], refreshMs?: number): [T | null, boolean, () => Promise<void>, Dispatch<SetStateAction<T | null>>] {
   const [data, setData] = useState<T | null>(null);
@@ -179,7 +175,7 @@ function useSystemData<T>(load: () => Promise<T>, dependencies: unknown[], refre
   async function reload() {
     setIsLoading(true);
     try { setData(await load()); }
-    catch (error) { showToast("error", errorMessage(error, "The system information could not be loaded.")); }
+    catch (error) { showToast("error", apiMessage(error, "The system information could not be loaded.")); }
     finally { setIsLoading(false); }
   }
   useEffect(() => {
@@ -232,7 +228,7 @@ function MaintenancePanel({ accessToken, status, onChanged }: { accessToken: str
       showToast(report?.failures ? "warning" : "success", report
         ? `Maintenance finished: ${report.blobs_removed} stored files removed (${formatBytes(report.blob_bytes_reclaimed)}), ${report.jobs_pruned} old jobs and ${report.refresh_tokens_purged} expired sessions cleared${report.failures ? `, ${report.failures} step(s) failed — see Logs` : ""}.`
         : "Maintenance finished.");
-    } catch (error) { showToast("error", errorMessage(error, "Maintenance could not run.")); }
+    } catch (error) { showToast("error", apiMessage(error, "Maintenance could not run.")); }
     finally { setIsRunning(false); }
   }
   const report = status?.last_report;
@@ -448,7 +444,7 @@ function UsersSection({ accessToken, session }: { accessToken: string; session: 
       }
       setPending(null);
       await reload();
-    } catch (error) { showToast("error", errorMessage(error, "The change could not be made.")); }
+    } catch (error) { showToast("error", apiMessage(error, "The change could not be made.")); }
     finally { setIsBusy(false); }
   }
 
@@ -456,7 +452,7 @@ function UsersSection({ accessToken, session }: { accessToken: string; session: 
     try {
       const result = await unlockSystemUser(accessToken, user.id);
       showToast("success", result.cleared ? `Sign-in lockouts lifted for ${user.display_name}.` : `${user.display_name} had no sign-in lockout.`);
-    } catch (error) { showToast("error", errorMessage(error, "The lockout could not be lifted.")); }
+    } catch (error) { showToast("error", apiMessage(error, "The lockout could not be lifted.")); }
   }
 
   const dialog = pending ? {
@@ -519,7 +515,7 @@ function EnvironmentGroup({ accessToken }: { accessToken: string }) {
       clearSharedSession();
       window.location.assign("/");
     } catch (error) {
-      showToast("error", errorMessage(error, "The environment could not be detached."));
+      showToast("error", apiMessage(error, "The environment could not be detached."));
       setIsBusy(false);
     }
   }
@@ -540,7 +536,7 @@ function SettingsSection({ accessToken, session }: { accessToken: string; sessio
   const [draft, setDraft] = useState<Record<string, boolean | number | string>>({});
   const [isBusy, setIsBusy] = useState(false);
   useEffect(() => {
-    getSystemSettings(accessToken).then(setSettings).catch((error) => showToast("error", errorMessage(error, "Settings could not be loaded.")));
+    getSystemSettings(accessToken).then(setSettings).catch((error) => showToast("error", apiMessage(error, "Settings could not be loaded.")));
   }, [accessToken]);
 
   const groups = useMemo(() => {
@@ -565,7 +561,7 @@ function SettingsSection({ accessToken, session }: { accessToken: string; sessio
       setSettings(await saveSystemSettings(accessToken, draft));
       setDraft({});
       showToast("success", `${changed} setting${changed === 1 ? "" : "s"} saved. They apply now.`);
-    } catch (error) { showToast("error", errorMessage(error, "The settings could not be saved.")); }
+    } catch (error) { showToast("error", apiMessage(error, "The settings could not be saved.")); }
     finally { setIsBusy(false); }
   }
 
@@ -575,7 +571,7 @@ function SettingsSection({ accessToken, session }: { accessToken: string; sessio
       setSettings(await resetSystemSetting(accessToken, setting.key));
       setDraft((current) => { const next = { ...current }; delete next[setting.key]; return next; });
       showToast("success", `${setting.label} is back to the server default.`);
-    } catch (error) { showToast("error", errorMessage(error, "The setting could not be reset.")); }
+    } catch (error) { showToast("error", apiMessage(error, "The setting could not be reset.")); }
     finally { setIsBusy(false); }
   }
 
@@ -635,7 +631,7 @@ function LogsSection({ accessToken, canDownload, onOpenSettings, workspaces }: {
   const isLive = source === LIVE_SOURCE;
 
   useEffect(() => {
-    getSystemLogFiles(accessToken).then(setFiles).catch((error) => showToast("error", errorMessage(error, "The log files could not be listed.")));
+    getSystemLogFiles(accessToken).then(setFiles).catch((error) => showToast("error", apiMessage(error, "The log files could not be listed.")));
   }, [accessToken]);
 
   useEffect(() => {
@@ -648,7 +644,7 @@ function LogsSection({ accessToken, canDownload, onOpenSettings, workspaces }: {
       q: query.trim() || undefined,
     })
       .then((next) => { if (active) setLogs(next); })
-      .catch((error) => { if (active) showToast("error", errorMessage(error, "Logs could not be loaded.")); });
+      .catch((error) => { if (active) showToast("error", apiMessage(error, "Logs could not be loaded.")); });
     const delay = window.setTimeout(() => void load(), query ? 300 : 0);
     const timer = follow && isLive ? window.setInterval(() => void load(), 5_000) : undefined;
     return () => { active = false; window.clearTimeout(delay); if (timer) window.clearInterval(timer); };
@@ -665,7 +661,7 @@ function LogsSection({ accessToken, canDownload, onOpenSettings, workspaces }: {
       link.click();
       link.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
-    } catch (error) { showToast("error", errorMessage(error, "The log file could not be downloaded.")); }
+    } catch (error) { showToast("error", apiMessage(error, "The log file could not be downloaded.")); }
   }
 
   const sourceOptions = [{ label: "Live: recent events", value: LIVE_SOURCE }, ...(files?.files ?? []).map((file) => ({ label: `${file.day} · ${formatBytes(file.bytes)}`, value: file.day }))];
@@ -716,7 +712,7 @@ function BackupsPanel({ accessToken, canChange }: { accessToken: string; canChan
 
   async function load() {
     try { setOverview(await getSystemBackups(accessToken)); }
-    catch (error) { showToast("error", errorMessage(error, "Backups could not be listed.")); }
+    catch (error) { showToast("error", apiMessage(error, "Backups could not be listed.")); }
   }
   useEffect(() => { void load(); }, [accessToken]);
   useEffect(() => {
@@ -733,27 +729,27 @@ function BackupsPanel({ accessToken, canChange }: { accessToken: string; canChan
   async function backUp() {
     setIsBusy(true);
     try { setOverview(await createSystemBackup(accessToken)); }
-    catch (error) { showToast("error", errorMessage(error, "The backup could not start.")); }
+    catch (error) { showToast("error", apiMessage(error, "The backup could not start.")); }
     finally { setIsBusy(false); }
   }
   async function copyNow() {
     setIsBusy(true);
     try { setOverview(await copySystemBackups(accessToken)); }
-    catch (error) { showToast("error", errorMessage(error, "The copy could not start.")); }
+    catch (error) { showToast("error", apiMessage(error, "The copy could not start.")); }
     finally { setIsBusy(false); }
   }
   async function restore() {
     if (!restoring) return;
     setIsBusy(true);
     try { setOverview(await restoreSystemBackup(accessToken, restoring, environment.trim())); setRestoring(null); setEnvironment(""); }
-    catch (error) { showToast("error", errorMessage(error, "The restore could not start.")); }
+    catch (error) { showToast("error", apiMessage(error, "The restore could not start.")); }
     finally { setIsBusy(false); }
   }
   async function remove() {
     if (!deleting) return;
     setIsBusy(true);
     try { await deleteSystemBackup(accessToken, deleting); setDeleting(null); showToast("success", "The backup was deleted."); await load(); }
-    catch (error) { showToast("error", errorMessage(error, "The backup could not be deleted.")); }
+    catch (error) { showToast("error", apiMessage(error, "The backup could not be deleted.")); }
     finally { setIsBusy(false); }
   }
 
@@ -818,7 +814,7 @@ function JobsSection({ accessToken, canChange }: { accessToken: string; canChang
 
   async function cancel(job: SystemJob) {
     try { await cancelSharedJob(accessToken, job.id); showToast("success", "Cancellation requested; the job stops at its next step."); await reload(); }
-    catch (error) { showToast("error", errorMessage(error, "The job could not be cancelled.")); }
+    catch (error) { showToast("error", apiMessage(error, "The job could not be cancelled.")); }
   }
 
   return <>
@@ -867,7 +863,7 @@ function AuditSection({ accessToken, canExport }: { accessToken: string; canExpo
       window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
       showToast("success", `Downloaded ${count.toLocaleString()} audit event${count === 1 ? "" : "s"}. The download is recorded in the trail.`);
       void reload();
-    } catch (error) { showToast("error", errorMessage(error, "The audit trail could not be exported.")); }
+    } catch (error) { showToast("error", apiMessage(error, "The audit trail could not be exported.")); }
     finally { setIsExporting(false); }
   }
 

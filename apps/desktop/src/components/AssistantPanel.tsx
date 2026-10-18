@@ -36,7 +36,7 @@ import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
-import { formatRecentTime } from "../web/format";
+import { apiMessage, formatRecentTime } from "../web/format";
 
 /** A turn as shown: stored turns plus the one waiting for, or failing to get, a reply. */
 type ThreadTurn = {
@@ -79,10 +79,6 @@ function storedTurn(turn: AgentTurn): ThreadTurn {
   return { key: turn.id, label: turn.label, request: turn.request, status: "done", reply: turn.reply };
 }
 
-function errorMessage(error: unknown, fallback: string) {
-  return error instanceof Error ? error.message : fallback;
-}
-
 /** Workspace assistant: routes each message to one capability on the server and keeps the user's chats there. */
 export function AssistantPanel({ accessToken, onOpenArtifact, workspaceId }: { accessToken: string; onOpenArtifact: (artifactId: string) => void; workspaceId: string }) {
   const [capabilities, setCapabilities] = useState<AgentCapabilities | null>(null);
@@ -117,7 +113,7 @@ export function AssistantPanel({ accessToken, onOpenArtifact, workspaceId }: { a
         const last = rememberedChat(workspaceId);
         if (last && nextConversations.some((conversation) => conversation.id === last)) void openChat(last);
       })
-      .catch((error: unknown) => showToast("error", errorMessage(error, "The assistant is unavailable.")));
+      .catch((error: unknown) => showToast("error", apiMessage(error, "The assistant is unavailable.")));
     return () => { cancelled = true; };
   }, [accessToken, workspaceId]);
   useEffect(() => { threadEnd.current?.scrollIntoView({ block: "end", behavior: "smooth" }); }, [turns.length, isBusy]);
@@ -156,7 +152,7 @@ export function AssistantPanel({ accessToken, onOpenArtifact, workspaceId }: { a
       upsertConversation(detail.conversation);
     } catch (error) {
       if (token !== view.current) return;
-      showToast("error", errorMessage(error, "This chat could not be loaded."));
+      showToast("error", apiMessage(error, "This chat could not be loaded."));
       startNewChat();
     } finally {
       if (token === view.current) setIsLoadingChat(false);
@@ -191,7 +187,7 @@ export function AssistantPanel({ accessToken, onOpenArtifact, workspaceId }: { a
       }
       setTurns((current) => current.map((entry) => entry.key === turn.key ? storedTurn(saved) : entry));
     } catch (error) {
-      showToast("error", errorMessage(error, "The assistant could not reply."));
+      showToast("error", apiMessage(error, "The assistant could not reply."));
       if (token !== view.current) return;
       setTurns((current) => current.map((entry) => entry.key === turn.key ? { ...entry, status: "failed" } : entry));
     }
@@ -238,7 +234,7 @@ export function AssistantPanel({ accessToken, onOpenArtifact, workspaceId }: { a
       upsertConversation(await renameSharedAgentConversation(accessToken, conversation.id, renameValue.trim()));
       setChatDialog(null);
     } catch (error) {
-      showToast("error", errorMessage(error, "The chat could not be renamed."));
+      showToast("error", apiMessage(error, "The chat could not be renamed."));
     } finally {
       setIsSavingChat(false);
     }
@@ -253,7 +249,7 @@ export function AssistantPanel({ accessToken, onOpenArtifact, workspaceId }: { a
       setChatDialog(null);
       showToast("success", "Chat deleted.");
     } catch (error) {
-      showToast("error", errorMessage(error, "The chat could not be deleted."));
+      showToast("error", apiMessage(error, "The chat could not be deleted."));
     } finally {
       setIsSavingChat(false);
     }

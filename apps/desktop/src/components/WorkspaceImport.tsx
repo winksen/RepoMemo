@@ -8,7 +8,7 @@ import { Button } from "./ui/button";
 import { PanelHeading } from "./ui/panel-heading";
 import { Input } from "./ui/input";
 import { showToast } from "./ui/toast";
-import { formatBytes } from "../web/format";
+import { apiMessage, formatBytes } from "../web/format";
 
 /** What the archive holds, as a sentence. */
 export function describeArchive(report: ArchiveImportReport): string {
@@ -55,7 +55,7 @@ export function WorkspaceImport({ accessToken, onImported, organizationId }: {
         setReport(answer);
         setName(answer.workspace_name);
       } catch (error) {
-        if (!cancelled) showToast("error", typeof error === "string" ? error : error instanceof Error ? error.message : "The prepared archive could not be read.");
+        if (!cancelled) showToast("error", typeof error === "string" ? error : apiMessage(error, "The prepared archive could not be read."));
       } finally { if (!cancelled) setIsBusy(false); }
     })();
     return () => { cancelled = true; };
@@ -99,7 +99,7 @@ export function WorkspaceImport({ accessToken, onImported, organizationId }: {
         reset();
       }
     } catch (error) {
-      showToast("error", error instanceof Error ? error.message : "The archive could not be imported.");
+      showToast("error", apiMessage(error, "The archive could not be imported."));
     } finally { setIsBusy(false); }
   }
 

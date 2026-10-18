@@ -10,6 +10,7 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
+import { apiMessage } from "../web/format";
 
 /** Points this client at a server the shell has allowed, and checks that a RepoMemo server answers there. */
 export async function pointAtServer(origin: string) {
@@ -19,7 +20,7 @@ export async function pointAtServer(origin: string) {
 }
 
 function reason(error: unknown): string {
-  const text = typeof error === "string" ? error : error instanceof Error ? error.message : "";
+  const text = typeof error === "string" ? error : apiMessage(error, "");
   return text.trim();
 }
 

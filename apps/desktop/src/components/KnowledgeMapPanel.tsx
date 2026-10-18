@@ -30,6 +30,7 @@ import { SegmentedControl } from "./ui/segmented-control";
 import { Tooltip } from "./ui/tooltip";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
+import { apiMessage } from "../web/format";
 
 /** Files are coloured by one of three groups: past three hues, dots that can
  *  sit next to any other dot stop being distinguishable for colour-blind
@@ -95,7 +96,7 @@ export function KnowledgeMapPanel({
     try {
       setMap(await getSharedKnowledgeMap(accessToken, workspaceId));
     } catch (error) {
-      showToast("error", error instanceof Error ? error.message : "The knowledge map could not be loaded.");
+      showToast("error", apiMessage(error, "The knowledge map could not be loaded."));
     } finally {
       setIsRefreshing(false);
     }

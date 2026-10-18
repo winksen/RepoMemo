@@ -9,10 +9,7 @@ import { Dropdown } from "./ui/dropdown";
 import { Input } from "./ui/input";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
-
-function message(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
-}
+import { apiMessage } from "../web/format";
 
 function when(value: string | null): string {
   if (!value) return "—";
@@ -56,7 +53,7 @@ export function MailSettingsPanel({ accessToken, canChange }: { accessToken: str
   }
 
   async function load() {
-    try { show(await getSystemMail(accessToken)); } catch (error) { showToast("error", message(error, "The mail settings could not be loaded.")); }
+    try { show(await getSystemMail(accessToken)); } catch (error) { showToast("error", apiMessage(error, "The mail settings could not be loaded.")); }
   }
 
   useEffect(() => { void load(); }, [accessToken]);
@@ -76,7 +73,7 @@ export function MailSettingsPanel({ accessToken, canChange }: { accessToken: str
         ...(removePassword ? { password: "" } : password ? { password } : {}),
       }));
       showToast("success", "Mail settings saved.");
-    } catch (error) { showToast("error", message(error, "The mail settings could not be saved.")); } finally { setIsBusy(false); }
+    } catch (error) { showToast("error", apiMessage(error, "The mail settings could not be saved.")); } finally { setIsBusy(false); }
   }
 
   async function sendTest() {
@@ -85,7 +82,7 @@ export function MailSettingsPanel({ accessToken, canChange }: { accessToken: str
       await sendSystemTestMail(accessToken, testTo.trim() || undefined);
       showToast("success", "Test message queued. Its result shows in the list below.");
       await load();
-    } catch (error) { showToast("error", message(error, "The test message could not be queued.")); } finally { setIsBusy(false); }
+    } catch (error) { showToast("error", apiMessage(error, "The test message could not be queued.")); } finally { setIsBusy(false); }
   }
 
   if (!overview) return <p className="shared-muted-copy"><Loader className="spin" size={ICON_SIZE.sm} /> Loading mail settings…</p>;

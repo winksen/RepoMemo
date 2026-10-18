@@ -19,10 +19,7 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
-
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
-}
+import { apiMessage } from "../web/format";
 
 const STATUS_LABELS = { valid: "RepoMemo environment", empty: "Empty", invalid: "Cannot be attached" } as const;
 
@@ -41,7 +38,7 @@ export function PlatformSetup({ folder, onAttached, pinned }: { folder: string; 
     setIsBusy(true);
     try { setEnvironments(await listEnvironments(code)); }
     catch (error) {
-      showToast("error", errorMessage(error, "The environments could not be listed."));
+      showToast("error", apiMessage(error, "The environments could not be listed."));
       if (error instanceof SharedApiError && error.status === 403) setEnvironments(null);
     }
     finally { setIsBusy(false); }
@@ -58,7 +55,7 @@ export function PlatformSetup({ folder, onAttached, pinned }: { folder: string; 
       const status = await attachEnvironment(code, entry.name);
       showToast("success", `Attached to ${entry.name}.`);
       onAttached(status);
-    } catch (error) { showToast("error", errorMessage(error, "The environment could not be attached.")); }
+    } catch (error) { showToast("error", apiMessage(error, "The environment could not be attached.")); }
     finally { setIsBusy(false); }
   }
 
@@ -69,7 +66,7 @@ export function PlatformSetup({ folder, onAttached, pinned }: { folder: string; 
       const status = await createEnvironment(code, name.trim());
       showToast("success", `Created ${name.trim()} in ${folder}/.`);
       onAttached(status);
-    } catch (error) { showToast("error", errorMessage(error, "The environment could not be created.")); }
+    } catch (error) { showToast("error", apiMessage(error, "The environment could not be created.")); }
     finally { setIsBusy(false); }
   }
 

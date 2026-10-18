@@ -9,6 +9,7 @@ import { Dropdown } from "./ui/dropdown";
 import { Input } from "./ui/input";
 import { Toast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
+import { apiMessage } from "../web/format";
 
 type ProviderType = "ollama" | "openrouter";
 type Purpose = "text" | "vision" | "embedding";
@@ -123,7 +124,7 @@ export function AiProviderForm({
       setTestResult(null);
       onSaved(saved);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "The provider could not be saved.");
+      setError(apiMessage(requestError, "The provider could not be saved."));
     } finally { setIsBusy(false); }
   }
 
@@ -134,7 +135,7 @@ export function AiProviderForm({
     }
     setIsBusy(true); setError(null); setTestResult(null);
     try { setTestResult(await testSharedWorkspaceAiProvider(accessToken, workspaceId, providerId)); }
-    catch (requestError) { setError(requestError instanceof Error ? requestError.message : "The connection test failed."); }
+    catch (requestError) { setError(apiMessage(requestError, "The connection test failed.")); }
     finally { setIsBusy(false); }
   }
 

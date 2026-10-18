@@ -32,7 +32,7 @@ import {
   updateSharedRepository,
 } from "../lib/sharedApi";
 import type { RepoAccessCheck, RepoFile, RepoSource, RepoSyncReport, RepositoryDetailResponse } from "../types";
-import { formatBytes, formatTime, lastChangeLabel } from "../web/format";
+import { apiMessage, formatBytes, formatTime, lastChangeLabel } from "../web/format";
 import { LanguageChart } from "./LanguageChart";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -106,10 +106,6 @@ function formSettings(form: RepoForm) {
   return { branch: form.branch.trim() || null, include: lines(form.include), exclude: lines(form.exclude) };
 }
 
-function errorMessage(error: unknown, fallback: string) {
-  return error instanceof Error ? error.message : fallback;
-}
-
 function isRunning(job: IndexingJobStatus) {
   return job.status === "running" || job.status === "pending";
 }
@@ -143,7 +139,7 @@ function useRepositories(accessToken: string, workspaceId: string, onChanged: ()
       announceFinishedSyncs(next.repositories);
       setRepositories(next.repositories);
     } catch (error) {
-      showToast("error", errorMessage(error, "Repositories could not be loaded."));
+      showToast("error", apiMessage(error, "Repositories could not be loaded."));
     }
   }
 
@@ -231,7 +227,7 @@ export function RepositoriesPanel({
       track(repository.id, job?.id);
       await load();
     } catch (error) {
-      showToast("error", errorMessage(error, "The sync could not be started."));
+      showToast("error", apiMessage(error, "The sync could not be started."));
     }
   }
 
@@ -241,7 +237,7 @@ export function RepositoriesPanel({
       await cancelSharedJob(accessToken, repository.active_job.id);
       await load();
     } catch (error) {
-      showToast("error", errorMessage(error, "The sync could not be stopped."));
+      showToast("error", apiMessage(error, "The sync could not be stopped."));
     }
   }
 
@@ -316,7 +312,7 @@ export function RepositorySettings({
       setCheckedFor(formKey);
     } catch (error) {
       setCheck(null);
-      showToast("error", errorMessage(error, "The repository link could not be checked."));
+      showToast("error", apiMessage(error, "The repository link could not be checked."));
     } finally {
       setBusy(false);
     }
@@ -337,7 +333,7 @@ export function RepositorySettings({
       showToast("success", `Linked ${repository.name}. The first sync has started.`);
       await load();
     } catch (error) {
-      showToast("error", errorMessage(error, "The repository could not be linked."));
+      showToast("error", apiMessage(error, "The repository could not be linked."));
     } finally {
       setBusy(false);
     }
@@ -376,7 +372,7 @@ export function RepositorySettings({
       showToast("success", "Settings saved. They apply from the next sync.");
       await load();
     } catch (error) {
-      showToast("error", errorMessage(error, "The settings could not be saved."));
+      showToast("error", apiMessage(error, "The settings could not be saved."));
     } finally {
       setBusy(false);
     }
@@ -390,7 +386,7 @@ export function RepositorySettings({
       showToast("success", "The webhook secret is shown below. Copy it now: it is not shown again.");
       await load();
     } catch (error) {
-      showToast("error", errorMessage(error, "The webhook could not be set up."));
+      showToast("error", apiMessage(error, "The webhook could not be set up."));
     } finally {
       setBusy(false);
     }
@@ -404,7 +400,7 @@ export function RepositorySettings({
       showToast("success", "Push webhooks were turned off for this repository.");
       await load();
     } catch (error) {
-      showToast("error", errorMessage(error, "The webhook could not be removed."));
+      showToast("error", apiMessage(error, "The webhook could not be removed."));
     } finally {
       setBusy(false);
     }
@@ -418,7 +414,7 @@ export function RepositorySettings({
       showToast("success", `The token of ${repository.name} was removed. It is fetched without signing in from the next sync.`);
       await load();
     } catch (error) {
-      showToast("error", errorMessage(error, "The token could not be removed."));
+      showToast("error", apiMessage(error, "The token could not be removed."));
     } finally {
       setBusy(false);
     }
@@ -433,7 +429,7 @@ export function RepositorySettings({
       await load();
       onChanged();
     } catch (error) {
-      showToast("error", errorMessage(error, "The repository could not be removed."));
+      showToast("error", apiMessage(error, "The repository could not be removed."));
     } finally {
       setBusy(false);
     }
@@ -669,7 +665,7 @@ function RepositoryFiles({
     let cancelled = false;
     listSharedRepositoryFiles(accessToken, repository.id)
       .then((next) => { if (!cancelled) setFiles(next); })
-      .catch((error) => showToast("error", errorMessage(error, "The files could not be loaded.")));
+      .catch((error) => showToast("error", apiMessage(error, "The files could not be loaded.")));
     return () => { cancelled = true; };
   }, [accessToken, repository.id, commitSha, repository.indexed_file_count]);
 
@@ -737,7 +733,7 @@ export function RepositoryDetailView({
       }
       setDetail(next);
     } catch (error) {
-      showToast("error", errorMessage(error, "The repository could not be loaded."));
+      showToast("error", apiMessage(error, "The repository could not be loaded."));
     }
   }
 
@@ -763,7 +759,7 @@ export function RepositoryDetailView({
       if (job) runningJob.current = job.id;
       await load();
     } catch (error) {
-      showToast("error", errorMessage(error, "The sync could not be started."));
+      showToast("error", apiMessage(error, "The sync could not be started."));
     }
   }
 
@@ -774,7 +770,7 @@ export function RepositoryDetailView({
       await cancelSharedJob(accessToken, job.id);
       await load();
     } catch (error) {
-      showToast("error", errorMessage(error, "The sync could not be stopped."));
+      showToast("error", apiMessage(error, "The sync could not be stopped."));
     }
   }
 
@@ -785,7 +781,7 @@ export function RepositoryDetailView({
       setDetail((current) => current ? { ...current, summary } : current);
       showToast("success", "Summary generated.");
     } catch (error) {
-      showToast("error", errorMessage(error, "The summary could not be generated."));
+      showToast("error", apiMessage(error, "The summary could not be generated."));
     } finally {
       setSummarizing(false);
     }

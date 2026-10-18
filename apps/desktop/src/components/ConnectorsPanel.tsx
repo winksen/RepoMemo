@@ -27,11 +27,7 @@ import { Dropdown } from "./ui/dropdown";
 import { Input } from "./ui/input";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
-import { formatTime } from "../web/format";
-
-function errorMessage(error: unknown, fallback: string) {
-  return error instanceof Error ? error.message : fallback;
-}
+import { apiMessage, formatTime } from "../web/format";
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "Not synced yet",
@@ -72,7 +68,7 @@ export function ConnectorSettings({
     try {
       setConnectors((await listSharedConnectors(accessToken, workspaceId)).connectors);
     } catch (error) {
-      showToast("error", errorMessage(error, "The connectors could not be loaded."));
+      showToast("error", apiMessage(error, "The connectors could not be loaded."));
       setConnectors((current) => current ?? []);
     }
   }, [accessToken, workspaceId]);
@@ -106,7 +102,7 @@ export function ConnectorSettings({
       setCheckedFor(formKey);
     } catch (error) {
       setCheck(null);
-      showToast("error", errorMessage(error, "The tracker could not be checked."));
+      showToast("error", apiMessage(error, "The tracker could not be checked."));
     } finally {
       setBusy(false);
     }
@@ -122,7 +118,7 @@ export function ConnectorSettings({
       showToast("success", `Connected ${connector.name}. The first sync has started.`);
       await load();
     } catch (error) {
-      showToast("error", errorMessage(error, "The tracker could not be connected."));
+      showToast("error", apiMessage(error, "The tracker could not be connected."));
     } finally {
       setBusy(false);
     }
@@ -133,7 +129,7 @@ export function ConnectorSettings({
       await syncSharedConnector(accessToken, connector.id);
       await load();
     } catch (error) {
-      showToast("error", errorMessage(error, "The sync could not be started."));
+      showToast("error", apiMessage(error, "The sync could not be started."));
     }
   }
 
@@ -146,7 +142,7 @@ export function ConnectorSettings({
       showToast("success", "The token was replaced.");
       await load();
     } catch (error) {
-      showToast("error", errorMessage(error, "The token could not be replaced."));
+      showToast("error", apiMessage(error, "The token could not be replaced."));
     } finally {
       setBusy(false);
     }
@@ -160,7 +156,7 @@ export function ConnectorSettings({
       showToast("success", "The webhook secret is shown below. Copy it now: it is not shown again.");
       await load();
     } catch (error) {
-      showToast("error", errorMessage(error, "The webhook could not be set up."));
+      showToast("error", apiMessage(error, "The webhook could not be set up."));
     } finally {
       setBusy(false);
     }
@@ -174,7 +170,7 @@ export function ConnectorSettings({
       showToast("success", "Webhooks were turned off for this connector.");
       await load();
     } catch (error) {
-      showToast("error", errorMessage(error, "The webhook could not be removed."));
+      showToast("error", apiMessage(error, "The webhook could not be removed."));
     } finally {
       setBusy(false);
     }
@@ -189,7 +185,7 @@ export function ConnectorSettings({
       await load();
       onChanged();
     } catch (error) {
-      showToast("error", errorMessage(error, "The connector could not be removed."));
+      showToast("error", apiMessage(error, "The connector could not be removed."));
     } finally {
       setBusy(false);
     }

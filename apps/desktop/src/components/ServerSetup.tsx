@@ -37,6 +37,7 @@ import { Dropdown } from "./ui/dropdown";
 import { Input } from "./ui/input";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
+import { apiMessage } from "../web/format";
 
 type StepKey = "welcome" | "admin" | "checks" | "access" | "logging" | "organization" | "finish";
 
@@ -55,10 +56,6 @@ const ACCESS_SETTINGS = ["allow_registration", "refresh_token_ttl_days", "login_
 const LOGGING_SETTINGS = ["log_level", "log_to_file", "log_retention_days", "log_console_format"];
 
 type SettingValue = boolean | number | string;
-
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
-}
 
 /**
  * The onboarding of a brand-new server. In the `new` phase anyone who reaches the server sees the first two steps, and
@@ -87,7 +84,7 @@ export function ServerSetup({ accessToken, onAdminCreated, onFinished, onSignOut
     if (phase !== "finishing" || !accessToken) return;
     getSystemSettings(accessToken)
       .then((response) => setSettings(response.settings))
-      .catch((error) => showToast("error", errorMessage(error, "The server settings could not be loaded.")));
+      .catch((error) => showToast("error", apiMessage(error, "The server settings could not be loaded.")));
   }, [phase, accessToken]);
 
   const next = () => setStep(STEPS[Math.min(stepIndex + 1, STEPS.length - 1)].key);
@@ -139,7 +136,7 @@ function WelcomeStep({ code, onCode, onVerified }: { code: string; onCode: (code
     event.preventDefault();
     setIsBusy(true);
     try { await verifySetupCode(code); onVerified(); }
-    catch (error) { showToast("error", errorMessage(error, "The setup code could not be checked.")); }
+    catch (error) { showToast("error", apiMessage(error, "The setup code could not be checked.")); }
     finally { setIsBusy(false); }
   }
   return <>
@@ -173,7 +170,7 @@ function AdminStep({ code, onBack, onCodeRejected, onCreated }: { code: string; 
       showToast("success", "System administrator created. You are signed in.");
       onCreated(response.access_token);
     } catch (error) {
-      showToast("error", errorMessage(error, "The administrator could not be created."));
+      showToast("error", apiMessage(error, "The administrator could not be created."));
       // The code changes when the server restarts; ask for it again.
       if (error instanceof SharedApiError && error.status === 403) onCodeRejected();
     } finally { setIsBusy(false); }
@@ -204,7 +201,7 @@ function ChecksStep({ accessToken, onNext, onWarnings }: { accessToken: string; 
       const next = await getSetupChecks(accessToken);
       setChecks(next);
       onWarnings(next.filter((check) => check.status === "warning" || check.status === "error").length);
-    } catch (error) { showToast("error", errorMessage(error, "The server could not be checked.")); }
+    } catch (error) { showToast("error", apiMessage(error, "The server could not be checked.")); }
     finally { setIsBusy(false); }
   }
   useEffect(() => { void run(); }, [accessToken]);
@@ -265,7 +262,7 @@ function SettingsStep({ accessToken, description, keys, onBack, onNext, onSaved,
       onSaved(changed, response.settings);
       setDraft({});
       onNext();
-    } catch (error) { showToast("error", errorMessage(error, "The settings could not be saved.")); }
+    } catch (error) { showToast("error", apiMessage(error, "The settings could not be saved.")); }
     finally { setIsBusy(false); }
   }
 
@@ -311,7 +308,7 @@ function OrganizationStep({ accessToken, created, onBack, onCreated, onNext }: {
       const createdWorkspace = workspace.trim() ? await createSharedWorkspace(accessToken, createdOrganization.id, workspace.trim()) : null;
       onCreated({ organization: createdOrganization.name, workspace: createdWorkspace?.workspace.name ?? null });
       onNext();
-    } catch (error) { showToast("error", errorMessage(error, "The organization could not be created.")); }
+    } catch (error) { showToast("error", apiMessage(error, "The organization could not be created.")); }
     finally { setIsBusy(false); }
   }
   return <>
@@ -346,7 +343,7 @@ function FinishStep({ accessToken, changedSettings, created, onBack, onFinished,
       await completeServerSetup(accessToken);
       showToast("success", "The server is set up. Welcome to RepoMemo.");
       onFinished();
-    } catch (error) { showToast("error", errorMessage(error, "The setup could not be finished.")); setIsBusy(false); }
+    } catch (error) { showToast("error", apiMessage(error, "The setup could not be finished.")); setIsBusy(false); }
   }
   return <>
     <StepHeading eyebrow="Step 7 of 7" title="Review and finish">

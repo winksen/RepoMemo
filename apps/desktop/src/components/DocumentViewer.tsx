@@ -21,11 +21,7 @@ import { Button } from "./ui/button";
 import { SegmentedControl } from "./ui/segmented-control";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
-import { formatBytes } from "../web/format";
-
-function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : "Something went wrong.";
-}
+import { apiMessage, formatBytes } from "../web/format";
 
 function saveBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
@@ -57,7 +53,7 @@ export function DocumentViewer({ accessToken, artifact }: { accessToken: string;
     setIsLoading(true);
     getSharedDocumentPreview(accessToken, artifact.id)
       .then((next) => { if (!cancelled) setPreview(next); })
-      .catch((error) => { if (!cancelled) setPreview({ kind: "unavailable", reason: errorText(error) }); })
+      .catch((error) => { if (!cancelled) setPreview({ kind: "unavailable", reason: apiMessage(error, "Something went wrong.") }); })
       .finally(() => { if (!cancelled) setIsLoading(false); });
     return () => { cancelled = true; };
   }, [accessToken, artifact.id]);
@@ -87,7 +83,7 @@ export function DocumentViewer({ accessToken, artifact }: { accessToken: string;
           setRenderedUrl(url);
         }
       } catch (error) {
-        if (!cancelled) setRenderState({ state: "failed", message: errorText(error) });
+        if (!cancelled) setRenderState({ state: "failed", message: apiMessage(error, "Something went wrong.") });
       }
     };
     void check();
@@ -109,14 +105,14 @@ export function DocumentViewer({ accessToken, artifact }: { accessToken: string;
         url = URL.createObjectURL(new Blob([blob], { type: "application/pdf" }));
         setPdfUrl(url);
       })
-      .catch((error) => { if (!cancelled) showToast("error", errorText(error)); });
+      .catch((error) => { if (!cancelled) showToast("error", apiMessage(error, "Something went wrong.")); });
     return () => { cancelled = true; if (url) URL.revokeObjectURL(url); };
   }, [accessToken, artifact.id, preview?.kind]);
 
   async function download() {
     setIsBusy(true);
     try { saveBlob(await downloadSharedArtifactFile(accessToken, artifact.id), filename); }
-    catch (error) { showToast("error", errorText(error)); }
+    catch (error) { showToast("error", apiMessage(error, "Something went wrong.")); }
     finally { setIsBusy(false); }
   }
 
@@ -142,7 +138,7 @@ export function DocumentViewer({ accessToken, artifact }: { accessToken: string;
         saveBlob(await downloadSharedArtifactFile(accessToken, artifact.id), filename);
         showToast("info", `Saved ${filename}. Open it to read it in ${target.label}.`);
       }
-    } catch (error) { showToast("error", errorText(error)); }
+    } catch (error) { showToast("error", apiMessage(error, "Something went wrong.")); }
     finally { setIsBusy(false); }
   }
 

@@ -8,11 +8,7 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
-import { formatTime } from "../web/format";
-
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
-}
+import { apiMessage, formatTime } from "../web/format";
 
 /** Where to go once the invitation is accepted. */
 export function invitationDestination(accepted: AcceptedInvitation): string {
@@ -52,7 +48,7 @@ export function InvitePage({
   const [isBusy, setIsBusy] = useState(false);
 
   useEffect(() => {
-    previewSharedInvitation(token).then(setPreview).catch((error) => setProblem(errorMessage(error, "This invitation link could not be checked.")));
+    previewSharedInvitation(token).then(setPreview).catch((error) => setProblem(apiMessage(error, "This invitation link could not be checked.")));
   }, [token]);
 
   const signedInEmail = session?.user.email?.toLowerCase() ?? null;
@@ -70,7 +66,7 @@ export function InvitePage({
       const destination = await joinAs(accessToken);
       showToast("success", `You joined ${place}.`);
       onJoined(destination);
-    } catch (error) { showToast("error", errorMessage(error, "The invitation could not be accepted.")); setIsBusy(false); }
+    } catch (error) { showToast("error", apiMessage(error, "The invitation could not be accepted.")); setIsBusy(false); }
   }
 
   async function signInAndJoin(event: FormEvent<HTMLFormElement>) {
@@ -87,10 +83,10 @@ export function InvitePage({
         showToast("success", `You joined ${place}.`);
         onAuthenticated(response.access_token, destination);
       } catch (error) {
-        showToast("error", errorMessage(error, "You are signed in, but the invitation could not be accepted."));
+        showToast("error", apiMessage(error, "You are signed in, but the invitation could not be accepted."));
         onAuthenticated(response.access_token, `/invite#${encodeURIComponent(token)}`);
       }
-    } catch (error) { showToast("error", errorMessage(error, preview.account_exists ? "Sign-in failed." : "The account could not be created.")); setIsBusy(false); }
+    } catch (error) { showToast("error", apiMessage(error, preview.account_exists ? "Sign-in failed." : "The account could not be created.")); setIsBusy(false); }
   }
 
   return <main className="shared-auth-canvas">

@@ -153,9 +153,15 @@ export function citationLines(citation: Pick<Citation, "start_line" | "end_line"
   return `${lines}${commit}`;
 }
 
-export function apiMessage(error: unknown): string {
-  if (error && typeof error === "object" && "message" in error) return String((error as SharedApiError).message);
-  return "The shared API could not be reached. Confirm that the server is running and try again.";
+const UNREACHABLE = "The shared API could not be reached. Confirm that the server is running and try again.";
+
+/** The message of an error, for a toast; `fallback` when it has none (a thrown string, an empty message). */
+export function apiMessage(error: unknown, fallback: string = UNREACHABLE): string {
+  if (error && typeof error === "object" && "message" in error) {
+    const message = String((error as SharedApiError).message);
+    if (message) return message;
+  }
+  return fallback;
 }
 
 /** "Ana · 3 Mar 2026": who last changed a repository file, and when. */

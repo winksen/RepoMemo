@@ -5,6 +5,7 @@ import { Button } from "./ui/button";
 import { PanelHeading } from "./ui/panel-heading";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
+import { apiMessage } from "../web/format";
 
 /** Downloads the workspace as one archive file. Shown to owners and administrators. */
 export function WorkspaceExportSettings({ accessToken, workspaceId }: { accessToken: string; workspaceId: string }) {
@@ -24,7 +25,7 @@ export function WorkspaceExportSettings({ accessToken, workspaceId }: { accessTo
       window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
       showToast("success", "The workspace archive was downloaded.");
     } catch (error) {
-      showToast("error", error instanceof Error ? error.message : "The workspace could not be exported.");
+      showToast("error", apiMessage(error, "The workspace could not be exported."));
     } finally { setIsExporting(false); }
   }
 

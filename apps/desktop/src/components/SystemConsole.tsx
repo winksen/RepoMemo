@@ -8,6 +8,7 @@ import { Button } from "./ui/button";
 import { Table } from "./ui/table";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
+import { apiMessage } from "../web/format";
 
 const HISTORY_KEY = "repomemo.system.console-history";
 const HISTORY_LIMIT = 100;
@@ -133,7 +134,7 @@ export function SystemConsole({ accessToken }: { accessToken: string }) {
         settle({ state: "error", error: error.message });
       } else {
         settle({ state: "not_run" });
-        showToast("error", error instanceof Error && error.message ? error.message : "The server could not run this command.");
+        showToast("error", apiMessage(error, "The server could not run this command."));
       }
     } finally {
       setIsRunning(false);

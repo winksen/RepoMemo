@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { IconHistory as History, IconLoader2 as Loader } from "@tabler/icons-react";
 import { compareSharedArtifactVersions, getSharedArtifactVersionText, listSharedArtifactVersions } from "../lib/sharedApi";
 import type { ArtifactVersion, ArtifactVersionText, VersionComparison } from "../types";
-import { formatBytes } from "../web/format";
+import { apiMessage, formatBytes } from "../web/format";
 import { Button } from "./ui/button";
 import { PanelHeading } from "./ui/panel-heading";
 import { Dialog, DialogCancel } from "./ui/dialog";
@@ -43,7 +43,7 @@ export function ArtifactVersionsPanel({ accessToken, artifactId, updatedAt }: { 
       setOpened((current) => current?.kind === "text" && current.version === version ? { kind: "text", version, text } : current);
     } catch (error) {
       setOpened(null);
-      showToast("error", error instanceof Error ? error.message : "That version could not be read.");
+      showToast("error", apiMessage(error, "That version could not be read."));
     }
   }
 
@@ -54,7 +54,7 @@ export function ArtifactVersionsPanel({ accessToken, artifactId, updatedAt }: { 
       setOpened((current) => current?.kind === "compare" && current.from === from && current.to === to ? { kind: "compare", from, to, comparison } : current);
     } catch (error) {
       setOpened(null);
-      showToast("error", error instanceof Error ? error.message : "The versions could not be compared.");
+      showToast("error", apiMessage(error, "The versions could not be compared."));
     }
   }
 

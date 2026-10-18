@@ -2,6 +2,17 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.92 (2026-10-18)
+
+One helper turns an error into the text of a toast.
+
+### Changed
+- **`apiMessage(error, fallback)`** in `web/format.ts` gives an error's message, or `fallback` when it has none (a thrown string, an empty message). Without a fallback it says the server could not be reached.
+- **Twelve local helpers are deleted** (`errorMessage` in ten components, `message` in the mail settings, `errorText` in the document viewer) and eighteen inline `error instanceof Error ? error.message : "…"` checks use `apiMessage` instead. A message that is empty now shows the fallback in the few places that showed nothing.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.91 (2026-10-18)
 
 Dates, sizes and durations are formatted in one place.

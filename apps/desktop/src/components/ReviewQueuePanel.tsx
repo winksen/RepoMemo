@@ -12,6 +12,7 @@ import { useLiveRefresh } from "../lib/liveEvents";
 import { Button } from "./ui/button";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
+import { apiMessage } from "../web/format";
 
 const KINDS: Record<ReviewItemKind, { label: string; open: string; icon: JSX.Element }> = {
   evidence: { label: "File marked for review", open: "Open file", icon: <FileAlert size={ICON_SIZE.md} /> },
@@ -58,7 +59,7 @@ export function ReviewQueuePanel({
     try {
       setQueue(await getSharedReviewQueue(accessToken, workspaceId));
     } catch (error) {
-      showToast("error", error instanceof Error ? error.message : "The review queue could not be read.");
+      showToast("error", apiMessage(error, "The review queue could not be read."));
     } finally {
       setIsRefreshing(false);
     }

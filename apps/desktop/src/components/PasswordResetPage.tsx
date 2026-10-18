@@ -8,10 +8,7 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
-
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
-}
+import { apiMessage } from "../web/format";
 
 /**
  * `/reset-password#<token>`: a one-time link from a system administrator.
@@ -27,7 +24,7 @@ export function PasswordResetPage({ onAuthenticated, token }: { onAuthenticated:
   const [isBusy, setIsBusy] = useState(false);
 
   useEffect(() => {
-    previewSharedPasswordReset(token).then(setPreview).catch((error) => setProblem(errorMessage(error, "This link could not be checked.")));
+    previewSharedPasswordReset(token).then(setPreview).catch((error) => setProblem(apiMessage(error, "This link could not be checked.")));
   }, [token]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -38,7 +35,7 @@ export function PasswordResetPage({ onAuthenticated, token }: { onAuthenticated:
       const response = await completeSharedPasswordReset(token, password);
       showToast("success", "Your password was changed. Every other device was signed out.");
       onAuthenticated(response.access_token);
-    } catch (error) { showToast("error", errorMessage(error, "The password could not be changed.")); setIsBusy(false); }
+    } catch (error) { showToast("error", apiMessage(error, "The password could not be changed.")); setIsBusy(false); }
   }
 
   return <main className="shared-auth-canvas">
