@@ -8,6 +8,7 @@ import { Checkbox } from "../../components/ui/checkbox";
 import { Pagination, paginate } from "../../components/ui/pagination";
 import { ActionMenu } from "../../components/ui/action-menu";
 import { Dialog, DialogCancel } from "../../components/ui/dialog";
+import { SearchField } from "../../components/ui/search-field";
 import { SegmentedControl } from "../../components/ui/segmented-control";
 import { Input } from "../../components/ui/input";
 import { Tooltip } from "../../components/ui/tooltip";
@@ -350,7 +351,7 @@ export function EvidenceSection({ page }: { page: WorkspacePage }) {
             <div className="shared-artifact-browser">
               {itemDialogs}
               <div className="shared-artifact-filters">
-                <Input aria-label="Search evidence files" onChange={(event) => setArtifactQuery(event.target.value)} placeholder="Search file name or path" value={artifactQuery} />
+                <SearchField aria-label="Search evidence files" onValueChange={setArtifactQuery} placeholder="Search file name or path" value={artifactQuery} />
                 <details className="shared-artifact-type-menu">
                   <summary><Filter size={ICON_SIZE.md} /><span>{artifactTypes.length ? `${artifactTypes.length} types` : "File types"}</span><ChevronDown size={ICON_SIZE.md} /></summary>
                   <div className="shared-artifact-type-menu-panel">

@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.2 → 0.3
 
-> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.87` (2026-10-18) · **Next:** `V0.2.88`
+> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.88` (2026-10-18) · **Next:** `V0.2.89`
 > **Previous line:** [Releases 0.1 → 0.2](RELEASES_0.1.md) · **Related:** [Roadmap, Road to V0.3.0](ROADMAP.md#-road-to-v030) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
 Every release of the 0.2 line, shipped and planned, one row each. The plan comes from the [Road to V0.3.0](ROADMAP.md#-road-to-v030): **one change per release**, each shippable alone, with the security rules for a new outside connection in the release that opens it. Planned rows are proposals until decisions 7–14 in the roadmap are agreed.
@@ -122,7 +122,7 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | **V0.2.85** | ✅ 2026-10-18 | K. Frontend polish | ✨ Feature | UI kit | `Table` and the `rm-table` styles (`components/ui/table.tsx`): sideways-scrolling box, sticky header past 640 px, row hover, `rm-table-number` for right-aligned tabular figures; used by the System, map, health and repository tables, replacing `rm-map-coverage`; written, not seen on screen | The System users, jobs, audit, map coverage and repository tables share it. |
 | **V0.2.86** | ✅ 2026-10-18 | K. Frontend polish | ✨ Feature | UI kit | `Combobox` (`components/ui/combobox.tsx`, Radix Popover, new dependency): searchable single choice with keyboard support and a 100-row cap; replaces the raw `<select>` that adds evidence to a memory card; written, not seen on screen | A card's evidence is picked by typing part of a file name. |
 | **V0.2.87** | ✅ 2026-10-18 | K. Frontend polish | 🔧 Enhancement | UI kit | `Combobox` for *Replacement evidence* (artifact lifecycle), a task's *Related evidence* and *Open a task checklist*; `Combobox` gains `noneLabel` to clear a choice; written, not seen on screen | None of these lists needs scrolling through every file. |
-| **V0.2.88** | 🔜 Planned | K. Frontend polish | ✨ Feature | UI kit | `SearchField` | Those four filters look and behave alike. |
+| **V0.2.88** | ✅ 2026-10-18 | K. Frontend polish | ✨ Feature | UI kit | `SearchField` (`components/ui/search-field.tsx`): search icon, clear button, Escape to clear; replaces the evidence, System users, System logs, task, repository file and command palette fields; written, not seen on screen | Those four filters look and behave alike. |
 | **V0.2.89** | 🔜 Planned | K. Frontend polish | ✨ Feature | UI kit | `CopyButton` | Every copy action behaves the same. |
 | **V0.2.90** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | UI kit | One option-list style | Their four separate rule sets are gone. |
 | **V0.2.91** | 🔜 Planned | K. Frontend polish | 🧹 Refactor | Web code | Formatting helpers in one place | `grep 'function format'` finds them only in `web/format.ts`. |

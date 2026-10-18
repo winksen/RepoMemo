@@ -159,6 +159,10 @@ page's own version, and add to this list when a new one is added.
   Enter chooses, Escape closes). It looks like a `Dropdown`. Use a `Dropdown` for
   a handful of options and a `Combobox` where scrolling the whole list would be
   slow: files, people, tasks.
+- **`SearchField`**: the text field for filtering a list: a search icon, a clear
+  button once there is text and Escape to clear it. Use it for a filter that
+  narrows a list as you type; a search that needs a button to run stays a
+  `Field` with an `Input`.
 
 ### Notifications
 

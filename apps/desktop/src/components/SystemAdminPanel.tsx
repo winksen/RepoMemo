@@ -97,6 +97,7 @@ import { Dropdown } from "./ui/dropdown";
 import { IconButton } from "./ui/icon-button";
 import { Input } from "./ui/input";
 import { PageHeader } from "./ui/page-header";
+import { SearchField } from "./ui/search-field";
 import { LoadingState } from "./ui/loading-state";
 import { Tooltip } from "./ui/tooltip";
 import { Switch } from "./ui/switch";
@@ -495,7 +496,7 @@ function UsersSection({ accessToken, session }: { accessToken: string; session: 
 
   return <>
     <div className="rm-system-toolbar">
-      <Input aria-label="Filter users" onChange={(event) => setFilter(event.target.value)} placeholder="Filter by name or email" value={filter} />
+      <SearchField aria-label="Filter users" onValueChange={setFilter} placeholder="Filter by name or email" value={filter} />
       <RefreshButton isLoading={isLoading} onClick={() => void reload()} />
     </div>
     {users ? <Table>
@@ -711,7 +712,7 @@ function LogsSection({ accessToken, canDownload, onOpenSettings, workspaces }: {
       <label className="rm-system-inline">Level<Dropdown aria-label="Lowest level shown" onValueChange={setLevel} options={[{ label: "Errors", value: "error" }, { label: "Warnings and up", value: "warn" }, { label: "Information and up", value: "info" }, { label: "Everything kept", value: "trace" }]} value={level} /></label>
     </div>
     <div className="rm-system-toolbar">
-      <Input aria-label="Search logs" onChange={(event) => setQuery(event.target.value)} placeholder="Search message, source or fields" value={query} />
+      <SearchField aria-label="Search logs" onValueChange={setQuery} placeholder="Search message, source or fields" value={query} />
       <div className="rm-system-actions">
         {isLive ? <label className="shared-ai-provider-toggle"><input checked={follow} onChange={(event) => setFollow(event.target.checked)} type="checkbox" /> Follow</label> : canDownload ? <Button onClick={() => void download()} type="button" variant="secondary"><Download size={ICON_SIZE.sm} /> Download {source}</Button> : null}
       </div>

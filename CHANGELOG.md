@@ -2,6 +2,17 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.88 (2026-10-18)
+
+One search field for list filters.
+
+### Changed
+- **`SearchField`** is in `components/ui/search-field.tsx`: `<SearchField aria-label value onValueChange />`. A text field with a search icon, a clear button once there is text (kept out of the tab order; Escape does the same from the keyboard, and focus stays in the field) and the shared field look. It forwards its ref and any `input` attribute, and `clearOnEscape={false}` leaves Escape alone where it already closes something.
+- **It replaces** the evidence file filter, the System users filter, the repository file filter and the command palette's field, plus the System logs search and the task search, which were the same kind of filter. The palette keeps Escape for closing its dialog, and its hand-made field box is gone. The searches that run from a button (Retrieve, Ask, the team memory search, searching every workspace) keep their forms.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.87 (2026-10-18)
 
 The searchable picker where lists are long.

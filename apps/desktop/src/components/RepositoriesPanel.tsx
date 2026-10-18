@@ -36,6 +36,7 @@ import { lastChangeLabel } from "../web/format";
 import { LanguageChart } from "./LanguageChart";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
+import { SearchField } from "./ui/search-field";
 import { Table } from "./ui/table";
 import { PanelHeading } from "./ui/panel-heading";
 import { Dialog, DialogCancel } from "./ui/dialog";
@@ -683,7 +684,7 @@ function RepositoryFiles({
 
   if (!files) return <p className="shared-muted-copy">Loading files…</p>;
   return <div className="rm-repo-files">
-    <Input aria-label={`Filter files of ${repository.name}`} onChange={(event) => setFilter(event.target.value)} placeholder="Filter by path" value={filter} />
+    <SearchField aria-label={`Filter files of ${repository.name}`} onValueChange={setFilter} placeholder="Filter by path" value={filter} />
     <ul>
       {matching.slice(0, FILE_LIST_LIMIT).map((file) => <li key={file.artifact_id}>
         <button className="rm-map-link" onClick={() => onOpenArtifact(file.artifact_id)} type="button">{file.path}</button>
