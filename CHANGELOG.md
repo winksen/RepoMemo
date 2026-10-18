@@ -2,6 +2,17 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.79 (2026-10-18)
+
+One loading state with one wording rule.
+
+### Changed
+- **`LoadingState`** is in `components/ui/loading-state.tsx`: `<LoadingState label="Loading jobs" />` shows the `Spinner` and one muted line, announced as a status. The rule for the label is "Loading <thing>"; the component adds the ellipsis.
+- **First use:** the System pages. The overview, usage, users, settings, logs, backups, jobs and audit pages each had their own sentence ("Loading the system overview…", "Loading usage…" and so on, some with a spinner, some without) and now share the component and its look.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.78 (2026-10-18)
 
 No more browser confirmations.

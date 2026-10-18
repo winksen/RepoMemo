@@ -56,3 +56,6 @@
 /* Danger button: the solid decisive action of a destructive confirmation. */
 .rm-button-danger { color: var(--color-on-danger); background: var(--color-danger); border-color: var(--color-danger); }
 .rm-button-danger:hover:not(:disabled) { background: color-mix(in srgb, var(--color-danger) 85%, black); border-color: color-mix(in srgb, var(--color-danger) 85%, black); }
+
+/* LoadingState: a spinner and one muted line. */
+.rm-loading-state { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--color-text-muted); font-size: 13px; line-height: 1.55; }

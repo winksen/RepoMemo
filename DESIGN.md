@@ -124,6 +124,10 @@ page's own version, and add to this list when a new one is added.
   action and `false` on Cancel, Escape or a click outside. Name the action after
   what it does ("Delete", not "OK") and set `danger` when it cannot be undone.
   `ConfirmProvider` is mounted once in `SharedWebApp`.
+- **`LoadingState`** and **`Spinner`**: a turning ring and one muted line with
+  `role="status"` for something still loading. Word the label `Loading <thing>`
+  (`Loading jobs`); the component adds the ellipsis. Use `Spinner` alone inside
+  a button or a line of text.
 
 ### Notifications
 

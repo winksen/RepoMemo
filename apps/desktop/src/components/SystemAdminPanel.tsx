@@ -93,6 +93,7 @@ import { Dialog, DialogCancel } from "./ui/dialog";
 import { Dropdown } from "./ui/dropdown";
 import { IconButton } from "./ui/icon-button";
 import { Input } from "./ui/input";
+import { LoadingState } from "./ui/loading-state";
 import { Switch } from "./ui/switch";
 import { showToast } from "./ui/toast";
 import { useLiveEventHub, useLiveEvents } from "../lib/liveEvents";
@@ -271,7 +272,7 @@ function OverviewSection({ accessToken }: { accessToken: string }) {
   const [overview, isLoading, reload] = useSystemData<SystemOverview>(() => getSystemOverview(accessToken), [accessToken], 30_000);
   const [maintenance, setMaintenance] = useState<MaintenanceStatus | null>(null);
   useEffect(() => { if (overview) setMaintenance(overview.background.maintenance); }, [overview]);
-  if (!overview) return <p className="shared-muted-copy">{isLoading ? <><Loader className="spin" size={ICON_SIZE.sm} /> Loading the system overview…</> : "The overview is not available."}</p>;
+  if (!overview) return isLoading ? <LoadingState label="Loading the system overview" /> : <p className="shared-muted-copy">The overview is not available.</p>;
   const { instance, statistics, storage, background, traffic, protection } = overview;
   const minuteBars = traffic.requests_per_minute_last_hour.map((value, index, all) => ({ label: `${all.length - 1 - index} min ago`, value }));
   return <>
@@ -383,7 +384,7 @@ function UsageSection({ accessToken, onOpenWorkspace }: { accessToken: string; o
           </tr>)}</tbody>
         </table></div>
       </section>
-    </> : <p className="shared-muted-copy">{isLoading ? "Loading usage…" : "Usage is not available."}</p>}
+    </> : isLoading ? <LoadingState label="Loading usage" /> : <p className="shared-muted-copy">Usage is not available.</p>}
   </>;
 }
 
@@ -514,7 +515,7 @@ function UsersSection({ accessToken, session }: { accessToken: string; session: 
           ...(user.deactivated_at && !user.anonymized_at ? [{ label: "Anonymize account", icon: <UserOff size={ICON_SIZE.sm} />, onSelect: () => { setConfirmText(""); setPending({ kind: "anonymize", user }); }, destructive: true }] : []),
         ]} label={`Actions for ${user.display_name}`} /> : null}</td>
       </tr>)}</tbody>
-    </table></div> : <p className="shared-muted-copy">{isLoading ? "Loading users…" : "Users are not available."}</p>}
+    </table></div> : isLoading ? <LoadingState label="Loading users" /> : <p className="shared-muted-copy">Users are not available.</p>}
     <Dialog description={dialog?.description} footer={<><DialogCancel onClick={() => setPending(null)} /><Button disabled={isBusy || (pending?.kind === "anonymize" && confirmText.trim().toLowerCase() !== pending.user.email.toLowerCase())} onClick={() => void confirm()} type="button" variant="main">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : null}{dialog?.action}</Button></>} onClose={() => setPending(null)} open={Boolean(pending)} title={dialog?.title ?? ""} />
     {resetLink ? <SecretDialog description={`Send this link to ${resetLink.user.display_name} (${resetLink.user.email}) through a channel you trust. It lets whoever opens it choose the account's password, once, until ${formatTime(resetLink.expiresAt)}.`} onClose={() => setResetLink(null)} title="Password reset link" value={resetLink.url} /> : null}
   </>;
@@ -595,7 +596,7 @@ function SettingsSection({ accessToken, session }: { accessToken: string; sessio
     finally { setIsBusy(false); }
   }
 
-  if (!settings) return <p className="shared-muted-copy"><Loader className="spin" size={ICON_SIZE.sm} /> Loading settings…</p>;
+  if (!settings) return <LoadingState label="Loading settings" />;
   // App administrators read the settings; system administrators change them.
   const readOnly = !session.is_system_admin;
   return <>
@@ -716,7 +717,7 @@ function LogsSection({ accessToken, canDownload, onOpenSettings, workspaces }: {
       <span className="rm-system-log-level">{record.level}</span>
       <span className="rm-system-log-target">{record.target}</span>
       <span className="rm-system-log-message">{record.message}{record.fields ? <small>{record.fields}</small> : null}</span>
-    </li>)}</ol> : <p className="shared-muted-copy">{logs ? "No log events match." : "Loading logs…"}</p>}
+    </li>)}</ol> : logs ? <p className="shared-muted-copy">No log events match.</p> : <LoadingState label="Loading logs" />}
   </>;
 }
 
@@ -799,7 +800,7 @@ function BackupsPanel({ accessToken, canChange }: { accessToken: string; canChan
           { label: "Delete", onSelect: () => setDeleting(backup.name), destructive: true },
         ]} label={`Actions for ${backup.name}`} /></td> : null}
       </tr>)}</tbody>
-    </table></div> : <p className="shared-muted-copy">{overview ? "No backups yet." : "Loading backups…"}</p>}
+    </table></div> : overview ? <p className="shared-muted-copy">No backups yet.</p> : <LoadingState label="Loading backups" />}
     <Dialog description="The backup is copied into a new environment folder under workspace-data and checked: it must open. The running environment is not changed. Attach the new one from the environment menu when you want to use it." footer={<><DialogCancel onClick={() => setRestoring(null)} /><Button disabled={isBusy || !environment.trim()} onClick={() => void restore()} type="button" variant="main">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : null}Restore</Button></>} onClose={() => setRestoring(null)} open={Boolean(restoring)} title={`Restore ${restoring ?? "the backup"}`}>
       <label className="rm-system-inline">New environment name<Input aria-label="New environment name" onChange={(event) => setEnvironment(event.target.value)} placeholder="restored-2026-10" value={environment} /></label>
     </Dialog>
@@ -857,7 +858,7 @@ function JobsSection({ accessToken, canChange }: { accessToken: string; canChang
           <td>{job.error_message ?? job.stage.replace(/_/g, " ")}</td>
           <td>{job.status === "running" && !job.cancel_requested ? <Button onClick={() => void cancel(job)} type="button" variant="secondary">Stop</Button> : null}</td>
         </tr>)}</tbody>
-      </table></div> : <p className="shared-muted-copy">{jobs ? "No jobs match." : "Loading jobs…"}</p>}
+      </table></div> : jobs ? <p className="shared-muted-copy">No jobs match.</p> : <LoadingState label="Loading jobs" />}
     </section>
   </>;
 }
@@ -902,6 +903,6 @@ function AuditSection({ accessToken, canExport }: { accessToken: string; canExpo
     {events?.length ? <div className="rm-map-coverage"><table>
       <thead><tr><th scope="col">When</th><th scope="col">Who</th><th scope="col">Action</th><th scope="col">Detail</th></tr></thead>
       <tbody>{events.map((event) => <tr key={event.id}><td>{formatTime(event.created_at)}</td><td>{event.actor ? event.actor.display_name : "System"}</td><th scope="row">{event.action.replace(/_/g, " ")}</th><td>{event.detail}</td></tr>)}</tbody>
-    </table></div> : <p className="shared-muted-copy">{events ? "Nothing recorded yet." : "Loading the audit trail…"}</p>}
+    </table></div> : events ? <p className="shared-muted-copy">Nothing recorded yet.</p> : <LoadingState label="Loading the audit trail" />}
   </>;
 }
