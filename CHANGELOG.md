@@ -2,6 +2,17 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.93 (2026-10-18)
+
+One hook runs a mutation, with its busy flag and its toasts.
+
+### Changed
+- **`useAsyncAction()`** (`lib/useAsyncAction.ts`) returns `{ isBusy, run }`. `run(action, { success, failure })` sets the busy flag, shows a success toast (a text, or a function of what the action returned) and shows an error toast when the action throws (the error's own message, or `failure` when it has none). It resolves to `true` or `false`. Overlapping actions keep the flag on until the last is done, and nothing is set after the component left.
+- **The profile page and the task board use it.** Their thirteen `setIsSubmitting(true) … try … catch … finally` blocks are gone. Profile no longer keeps `error` and `notice` states for two `<Toast>` elements: its messages go straight to toasts, with the same texts. The task board's busy flag is its own instead of the workspace page's, so it disables only the task board's controls.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.92 (2026-10-18)
 
 One helper turns an error into the text of a toast.

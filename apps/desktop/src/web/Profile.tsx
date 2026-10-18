@@ -11,9 +11,10 @@ import { Dialog, DialogCancel } from "../components/ui/dialog";
 import { Dropdown } from "../components/ui/dropdown";
 import { Field } from "../components/ui/field";
 import { Input } from "../components/ui/input";
-import { Toast } from "../components/ui/toast";
+import { showToast } from "../components/ui/toast";
 import { ApiTokensPanel } from "../components/ApiTokensPanel";
 import { accountKeys } from "../lib/queryClient";
+import { useAsyncAction } from "../lib/useAsyncAction";
 import { useServerState } from "../lib/useServerState";
 import { SharedLayout } from "../components/SharedLayout";
 import { apiMessage, formatProfileTime, formatTaskDueDate } from "./format";
@@ -56,10 +57,8 @@ export function SharedProfile({
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const isLoading = profileQuery.isLoading || tasksQuery.isLoading;
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { isBusy: isSubmitting, run } = useAsyncAction();
   const [isConfirmingSignOut, setIsConfirmingSignOut] = useState(false);
   const [hasAvatar, setHasAvatar] = useState(false);
   const avatarInput = useRef<HTMLInputElement>(null);
@@ -74,90 +73,75 @@ export function SharedProfile({
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
-    setIsSubmitting(true); setError(null); setNotice(null);
-    try {
+    await run(async () => {
       await uploadSharedAvatar(accessToken, session.user.id, await prepareAvatar(file));
       setHasAvatar(true);
-      setNotice("Profile picture updated.");
-    } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
+    }, { success: "Profile picture updated." });
   }
 
   async function removeAvatar() {
-    setIsSubmitting(true); setError(null); setNotice(null);
-    try {
+    await run(async () => {
       await deleteSharedAvatar(accessToken, session.user.id);
       setHasAvatar(false);
-      setNotice("Profile picture removed.");
-    } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
+    }, { success: "Profile picture removed." });
   }
 
   const loadError = profileQuery.error ?? tasksQuery.error;
-  useEffect(() => { if (loadError) setError(apiMessage(loadError)); }, [loadError]);
+  useEffect(() => { if (loadError) showToast("error", apiMessage(loadError)); }, [loadError]);
   useEffect(() => { if (profile) setDisplayName(profile.user.display_name); }, [profile?.user.display_name]);
 
   async function saveProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setIsSubmitting(true); setError(null); setNotice(null);
-    try {
+    await run(async () => {
       const user = await updateSharedProfile(accessToken, displayName);
       onSessionUserUpdated(user);
       setProfile((current) => current ? { ...current, user, updated_at: new Date().toISOString() } : current);
-      setNotice("Profile name updated.");
-    } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
+    }, { success: "Profile name updated." });
   }
 
   async function chooseChannel(kind: string, channel: string) {
     try {
       setPreferences(await setNotificationPreference(accessToken, kind, channel));
-    } catch (requestError) { setError(apiMessage(requestError)); }
+    } catch (requestError) { showToast("error", apiMessage(requestError)); }
   }
 
   async function resendVerification() {
-    setIsSubmitting(true); setError(null);
-    try {
-      const answer = await resendEmailVerification(accessToken);
-      setNotice(answer.verified ? "Your address is already confirmed." : answer.sent ? "A link was sent to your address." : "No link could be sent: mail is not set up on this server.");
-    } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
+    await run(() => resendEmailVerification(accessToken), {
+      success: (answer) => answer.verified ? "Your address is already confirmed." : answer.sent ? "A link was sent to your address." : "No link could be sent: mail is not set up on this server.",
+    });
   }
 
   async function changeEmail(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setIsSubmitting(true); setError(null); setNotice(null);
-    try {
+    await run(async () => {
       const user = await changeEmailAddress(accessToken, { email: newEmail, currentPassword: emailPassword });
       onSessionUserUpdated(user);
       setProfile((current) => current ? { ...current, user, email_verified: false } : current);
       setNewEmail(""); setEmailPassword("");
-      setNotice("Your address was changed. A link to confirm it was sent there.");
-    } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
+    }, { success: "Your address was changed. A link to confirm it was sent there." });
   }
 
   async function changePassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (newPassword !== confirmPassword) { setError("New password confirmation does not match."); return; }
-    setIsSubmitting(true); setError(null); setNotice(null);
-    try {
+    if (newPassword !== confirmPassword) { showToast("error", "New password confirmation does not match."); return; }
+    await run(async () => {
       await changeSharedPassword(accessToken, { currentPassword, newPassword });
       setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
-      setNotice("Password changed. You were signed out on every other device.");
-    } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
+    }, { success: "Password changed. You were signed out on every other device." });
   }
 
   async function endAllSessions() {
-    setIsSubmitting(true); setError(null); setNotice(null);
-    try {
+    await run(async () => {
       await signOutEverywhere(accessToken);
       setIsConfirmingSignOut(false);
       signOut();
-    } catch (requestError) { setError(apiMessage(requestError)); setIsSubmitting(false); }
+    });
   }
 
 
   return <SharedLayout apiAvailable={apiAvailable} onNavigate={navigate} session={session} signOut={signOut} sidebar={<OrganizationRail organizations={organizations} workspaces={workspaces} />}>
     <section className="shared-page-content shared-profile-page" aria-busy={isLoading}>
       <PageHeader description="Manage your identity and review your activity across shared workspaces." title="Your profile" />
-      <Toast kind="error" message={error} />
-      <Toast kind="success" message={notice} />
       <div className="shared-profile-layout">
         <section className="shared-profile-identity"><UserAvatar className="shared-profile-avatar" name={profile?.user.display_name ?? session.user.display_name} size={72} userId={session.user.id} /><div><h2>{profile?.user.display_name ?? session.user.display_name}</h2><p>{profile?.user.email ?? session.user.email ?? "No email address"}</p><div className="shared-profile-avatar-actions"><input accept={AVATAR_INPUT_TYPES.join(",")} aria-label="Choose a profile picture" hidden onChange={(event) => void changeAvatar(event)} ref={avatarInput} type="file" /><Button disabled={isSubmitting} onClick={() => avatarInput.current?.click()} type="button" variant="secondary"><Camera size={ICON_SIZE.sm} /> {hasAvatar ? "Change picture" : "Upload picture"}</Button>{hasAvatar ? <Button disabled={isSubmitting} onClick={() => void removeAvatar()} type="button" variant="secondary"><Trash size={ICON_SIZE.sm} /> Remove</Button> : null}</div><small className="shared-muted-copy">PNG, JPEG or WebP. It is cropped to a square and shrunk before upload.</small></div><dl><div><dt>Last connected</dt><dd>{formatProfileTime(profile?.last_connected_at)}</dd></div><div><dt>Member since</dt><dd>{formatProfileTime(profile?.created_at)}</dd></div><div><dt>Shared workspaces</dt><dd>{profile?.workspace_count ?? "—"}</dd></div><div><dt>Recorded actions</dt><dd>{profile?.recent_activity_count ?? "—"}</dd></div></dl></section>
         <ContributionCalendar items={profile?.activity_by_day ?? []} title="Your activity" total={profile?.recent_activity_count} />

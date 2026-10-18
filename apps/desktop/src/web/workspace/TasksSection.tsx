@@ -12,13 +12,15 @@ import { Input } from "../../components/ui/input";
 import { SearchField } from "../../components/ui/search-field";
 import { Textarea } from "../../components/ui/textarea";
 import { TASK_COLUMNS } from "../constants";
-import { apiMessage, formatTaskDueDate, isTaskOverdue } from "../format";
+import { formatTaskDueDate, isTaskOverdue } from "../format";
+import { useAsyncAction } from "../../lib/useAsyncAction";
 import { useArtifacts, useMembers, useMetrics, useTasks } from "./data";
 import { type WorkspacePage, sectionState } from "./page";
 import { ICON_SIZE } from "../../components/ui/icon";
 
 export function TasksSection({ page }: { page: WorkspacePage }) {
-  const { accessToken, workspace, workspaceId, session, canWrite, canManageMembers, isSubmitting, setIsSubmitting, setError, onOpenArtifact } = page;
+  const { accessToken, workspace, workspaceId, session, canWrite, canManageMembers, onOpenArtifact } = page;
+  const { isBusy: isSubmitting, run } = useAsyncAction();
   const useS = sectionState(page.store, "tasks");
   const confirm = useConfirm();
   const [taskChecklists, setTaskChecklists] = useS<Record<string, TaskChecklistItem[]>>("taskChecklists", {});
@@ -45,8 +47,7 @@ export function TasksSection({ page }: { page: WorkspacePage }) {
   });
   async function addTask(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setIsSubmitting(true); setError(null);
-    try {
+    await run(async () => {
       await createSharedCollaborationTask(accessToken, workspace.workspace.id, {
         title: taskTitle,
         description: taskDescription,
@@ -59,12 +60,11 @@ export function TasksSection({ page }: { page: WorkspacePage }) {
       setTaskTitle(""); setTaskDescription(""); setTaskPriority("medium"); setTaskAssigneeId(""); setTaskArtifactId(""); setTaskDueDate("");
       setTasks(await listSharedCollaborationTasks(accessToken, workspace.workspace.id));
       setWorkspaceMetrics(await getSharedWorkspaceMetrics(accessToken, workspace.workspace.id));
-    } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
+    });
   }
 
   async function reviseTask(task: CollaborationTask, changes: { status?: CollaborationTaskStatus; priority?: CollaborationTaskPriority; assigneeUserId?: string | null }) {
-    setIsSubmitting(true); setError(null);
-    try {
+    await run(async () => {
       const updated = await updateSharedCollaborationTask(accessToken, task.id, {
         title: task.title,
         description: task.description,
@@ -76,33 +76,41 @@ export function TasksSection({ page }: { page: WorkspacePage }) {
       });
       setTasks((current) => current.map((entry) => entry.id === updated.id ? updated : entry));
       setWorkspaceMetrics(await getSharedWorkspaceMetrics(accessToken, workspace.workspace.id));
-    } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
+    });
   }
 
   async function removeTask(task: CollaborationTask) {
     if (!(await confirm({ action: "Delete", danger: true, title: `Delete “${task.title}”?` }))) return;
-    setIsSubmitting(true); setError(null);
-    try {
+    await run(async () => {
       await deleteSharedCollaborationTask(accessToken, task.id);
       setTasks((current) => current.filter((entry) => entry.id !== task.id));
       setWorkspaceMetrics(await getSharedWorkspaceMetrics(accessToken, workspace.workspace.id));
-    } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
+    });
   }
 
   async function toggleTaskChecklist(task: CollaborationTask) {
     if (expandedTaskId === task.id) { setExpandedTaskId(null); return; }
-    setIsSubmitting(true); setError(null);
-    try { const checklist = await listSharedTaskChecklist(accessToken, task.id); setTaskChecklists((current) => ({ ...current, [task.id]: checklist })); setExpandedTaskId(task.id); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
+    await run(async () => {
+      const checklist = await listSharedTaskChecklist(accessToken, task.id);
+      setTaskChecklists((current) => ({ ...current, [task.id]: checklist }));
+      setExpandedTaskId(task.id);
+    });
   }
 
   async function addChecklistItem(task: CollaborationTask, event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); setIsSubmitting(true); setError(null);
-    try { const item = await createSharedTaskChecklistItem(accessToken, task.id, checklistBody); setTaskChecklists((current) => ({ ...current, [task.id]: [...(current[task.id] ?? []), item] })); setChecklistBody(""); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
+    event.preventDefault();
+    await run(async () => {
+      const item = await createSharedTaskChecklistItem(accessToken, task.id, checklistBody);
+      setTaskChecklists((current) => ({ ...current, [task.id]: [...(current[task.id] ?? []), item] }));
+      setChecklistBody("");
+    });
   }
 
   async function toggleChecklistItem(item: TaskChecklistItem) {
-    setIsSubmitting(true); setError(null);
-    try { const updated = await toggleSharedTaskChecklistItem(accessToken, item.id, !item.completed_at); setTaskChecklists((current) => ({ ...current, [item.task_id]: (current[item.task_id] ?? []).map((entry) => entry.id === updated.id ? updated : entry) })); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
+    await run(async () => {
+      const updated = await toggleSharedTaskChecklistItem(accessToken, item.id, !item.completed_at);
+      setTaskChecklists((current) => ({ ...current, [item.task_id]: (current[item.task_id] ?? []).map((entry) => entry.id === updated.id ? updated : entry) }));
+    });
   }
 
   return (
