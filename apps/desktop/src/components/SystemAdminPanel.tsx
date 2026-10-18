@@ -91,6 +91,7 @@ import { ActionMenu } from "./ui/action-menu";
 import { Button } from "./ui/button";
 import { Dialog, DialogCancel } from "./ui/dialog";
 import { Dropdown } from "./ui/dropdown";
+import { IconButton } from "./ui/icon-button";
 import { Input } from "./ui/input";
 import { Switch } from "./ui/switch";
 import { showToast } from "./ui/toast";
@@ -212,7 +213,7 @@ function count(value: number): string {
 }
 
 function RefreshButton({ isLoading, onClick }: { isLoading: boolean; onClick: () => void }) {
-  return <Button disabled={isLoading} onClick={onClick} type="button" variant="secondary">{isLoading ? <Loader className="spin" size={ICON_SIZE.md} /> : <Refresh size={ICON_SIZE.md} />} Refresh</Button>;
+  return <IconButton busy={isLoading} label="Refresh" onClick={onClick}><Refresh size={ICON_SIZE.md} /></IconButton>;
 }
 
 function Facts({ items }: { items: [string, ReactNode][] }) {

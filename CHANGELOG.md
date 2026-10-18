@@ -2,6 +2,18 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.74 (2026-10-18)
+
+A shared button for a single icon.
+
+### Changed
+- **`IconButton`** is in `components/ui/icon-button.tsx`: a square button holding one icon with a required `label` (its `aria-label`, and for now its `title`). It is 32 px (`size="sm"`) or the control height of 36 px (`md`, the default), has an `outline` or a `plain` look (bare until hovered) and takes `pressed` for a toggle that is on and `busy` for work in progress.
+- **Where it is used:** the *more actions* trigger of every `ActionMenu` (it was `rm-action-trigger`, 28 px, now 32 px), the System pages' *Refresh* button (an icon now, not an icon with a word), the remove button of an organization member, and the grid and list switch of the evidence view and the graph and table switch of the knowledge map (they were 34 px squares).
+- Removed: `rm-action-trigger` and the 34 px rules of the view switch and of the organization member actions. The latter also applied to the *Make owner* text button, which now has the normal button width.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.73 (2026-10-18)
 
 Buttons can show that they are working.

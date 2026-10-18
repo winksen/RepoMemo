@@ -24,6 +24,7 @@ import { getSharedKnowledgeMap } from "../lib/sharedApi";
 import { layoutGraph } from "../lib/forceLayout";
 import type { KnowledgeEdge, KnowledgeMap, KnowledgeNode } from "../types";
 import { Button } from "./ui/button";
+import { IconButton } from "./ui/icon-button";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
 
@@ -390,8 +391,8 @@ function RelationGraph({ canConfigure, map, onOpenArtifact, onOpenMemoryCard, on
       <label title={map.similarity_available ? undefined : "Needs AI for search"}><input checked={showSimilar && map.similarity_available} disabled={!map.similarity_available} onChange={(event) => setShowSimilar(event.target.checked)} type="checkbox" /> Similar content</label>
       <label><input checked={showCites} onChange={(event) => setShowCites(event.target.checked)} type="checkbox" /> Memory links</label>
       <div className="shared-artifact-view-switch" role="group" aria-label="Graph view">
-        <Button aria-label="Graph view" aria-pressed={view === "graph"} className={view === "graph" ? "active" : ""} onClick={() => setView("graph")} type="button" variant="secondary"><Graph size={ICON_SIZE.md} /></Button>
-        <Button aria-label="Table view" aria-pressed={view === "table"} className={view === "table" ? "active" : ""} onClick={() => setView("table")} type="button" variant="secondary"><List size={ICON_SIZE.md} /></Button>
+        <IconButton label="Graph view" onClick={() => setView("graph")} pressed={view === "graph"}><Graph size={ICON_SIZE.md} /></IconButton>
+        <IconButton label="Table view" onClick={() => setView("table")} pressed={view === "table"}><List size={ICON_SIZE.md} /></IconButton>
       </div>
     </div>
     {!map.similarity_available ? <p className="rm-map-notice">Lines between similar files appear once AI for search is set up and passages are embedded.{canConfigure ? <> <button onClick={onOpenSettings} type="button">Open Settings</button></> : null}</p> : null}

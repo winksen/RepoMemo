@@ -104,6 +104,12 @@ page's own version, and add to this list when a new one is added.
   button's icon, the label stays, the button is disabled and `aria-busy` is
   set. Use it on the button that started the work instead of a hand-made
   spinner. `Spinner` is the same turning ring for inline use.
+- **`IconButton`**: a square button with one icon and a required `label` (its
+  accessible name), 32 px (`size="sm"`, in rows and menus) or the control
+  height (`md`, beside fields). `appearance="plain"` is bare until hovered;
+  `pressed` marks a toggle that is on. An icon-only button is always an
+  `IconButton`, never a `Button` with an `aria-label`. It is the third button
+  treatment next to `main` and `secondary` (decision 18).
 
 ### Notifications
 

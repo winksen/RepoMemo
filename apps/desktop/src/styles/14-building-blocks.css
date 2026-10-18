@@ -39,3 +39,12 @@
 /* Busy button: the spinner takes the place of the button's own icon; the label stays. */
 .rm-button[aria-busy="true"] > svg:not(.rm-spinner) { display: none; }
 .rm-button[aria-busy="true"] { cursor: progress; }
+
+/* IconButton: a square button holding one icon, 32 px (sm) or the control height (md). */
+.rm-button.rm-icon-button { display: grid; flex: 0 0 auto; place-items: center; padding: 0; }
+.rm-button.rm-icon-button-sm { width: 32px; min-width: 32px; height: 32px; min-height: 32px; }
+.rm-button.rm-icon-button-md { width: var(--control-height); min-width: var(--control-height); height: var(--control-height); min-height: var(--control-height); }
+.rm-button.rm-icon-button[aria-pressed="true"] { background: var(--color-surface-2); border-color: var(--color-border-strong); }
+.rm-button.rm-icon-button-plain { color: var(--color-text-muted); background: transparent; border-color: transparent; }
+.rm-button.rm-icon-button-plain:hover:not(:disabled),
+.rm-button.rm-icon-button-plain[data-state="open"] { color: var(--color-text); background: var(--color-surface-hover); border-color: transparent; }
