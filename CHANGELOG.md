@@ -2,6 +2,17 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.77 (2026-10-18)
+
+Confirmations in the app's own dialog.
+
+### Changed
+- **`ConfirmDialog` and `useConfirm`** are in `components/ui/confirm-dialog.tsx`. `const confirm = useConfirm(); if (!(await confirm({ title, description, action, danger }))) return;` opens the app's dialog with Cancel on the left and the decisive action on the right (the `danger` button when `danger` is set) and resolves `true` or `false`. Escape and a click outside answer `false`. `ConfirmProvider` hosts the one dialog and is mounted in `SharedWebApp`; a second question while one is open answers the first with `false`.
+- **First use:** deleting evidence (it names the file and says that linked memory citations are removed), deleting an evidence comment and deleting a memory card. They were the browser's `window.confirm`.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.76 (2026-10-18)
 
 A danger button for destructive confirmations.

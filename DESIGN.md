@@ -118,6 +118,12 @@ page's own version, and add to this list when a new one is added.
   confirmation (`--color-danger` fill, white text). Use it only for the one
   button that deletes or removes something for good in a dialog's footer; the
   row button that opens that dialog stays `secondary`.
+- **`ConfirmDialog` and `useConfirm`**: a question in the app's own dialog, never
+  `window.confirm`. `const confirm = useConfirm(); if (!(await confirm({ title,
+  description, action, danger }))) return;` resolves `true` on the decisive
+  action and `false` on Cancel, Escape or a click outside. Name the action after
+  what it does ("Delete", not "OK") and set `danger` when it cannot be undone.
+  `ConfirmProvider` is mounted once in `SharedWebApp`.
 
 ### Notifications
 

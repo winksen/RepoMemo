@@ -33,11 +33,12 @@ import { SharedMemoryCardDetail, SharedRouteNotFound } from "./web/MemoryCardDet
 import { CommandPalette } from "./web/CommandPalette";
 import { RouteAnnouncer } from "./web/RouteAnnouncer";
 import { pageKey, pageTitle } from "./web/pageTitle";
+import { ConfirmProvider } from "./components/ui/confirm-dialog";
 
 export function SharedWebApp() {
   return (
     <QueryClientProvider client={queryClient}>
-      <OrganizationNavigationProvider><SharedWebAppContent /></OrganizationNavigationProvider>
+      <ConfirmProvider><OrganizationNavigationProvider><SharedWebAppContent /></OrganizationNavigationProvider></ConfirmProvider>
     </QueryClientProvider>
   );
 }

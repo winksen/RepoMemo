@@ -4,6 +4,7 @@ import { IconArrowLeft as ArrowLeft, IconFileText as FileText, IconLoader2 as Lo
 import { deleteSharedMemoryCard, exportSharedMemoryCard, getSharedMemoryCard, listSharedArtifacts, updateSharedMemoryCard } from "../lib/sharedApi";
 import { type ArtifactSummary, type MemoryCardDetail, type Organization, type SharedSession, type SharedWorkspace } from "../types";
 import { Button } from "../components/ui/button";
+import { useConfirm } from "../components/ui/confirm-dialog";
 import { Input } from "../components/ui/input";
 import { Textarea } from "../components/ui/textarea";
 import { Toast } from "../components/ui/toast";
@@ -55,6 +56,7 @@ export function SharedMemoryCardDetail({
   // The card is in the query cache under its workspace: shown at once on a
   // later visit, refetched when the page opens, and marked stale by live events.
   const workspaceId = workspace.workspace.id;
+  const confirm = useConfirm();
   const cardKey = workspaceKeys.memoryCard(workspaceId, cardId);
   const [card, , cardQuery] = useServerState<MemoryCardDetail | null>({
     key: cardKey, fetch: () => getSharedMemoryCard(accessToken, cardId), initial: null, staleTime: 0,
@@ -160,7 +162,7 @@ export function SharedMemoryCardDetail({
   }
 
   async function removeCard() {
-    if (!window.confirm(`Delete ${card?.card.title ?? "this memory card"}? This cannot be undone.`)) return;
+    if (!(await confirm({ action: "Delete", danger: true, description: "This cannot be undone.", title: `Delete ${card?.card.title ?? "this memory card"}?` }))) return;
     setIsMutating(true); setError(null);
     try { await deleteSharedMemoryCard(accessToken, cardId); onBack(); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsMutating(false); }
   }

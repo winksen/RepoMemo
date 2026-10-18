@@ -6,6 +6,7 @@ import { IconLoader2 as Loader, IconMessageCircle as MessageCircle, IconPencil a
 import { uploadSharedArtifactVersion, createSharedArtifactComment, deleteSharedArtifact, deleteSharedArtifactComment, getSharedArtifact, getSharedArtifactLifecycle, indexSharedArtifact, listSharedArtifactChunks, waitForSharedJob, listSharedArtifactComments, listSharedArtifactLifecycleEvents, updateSharedArtifact, updateSharedArtifactComment, updateSharedArtifactLifecycle } from "../lib/sharedApi";
 import { type ArtifactComment, type ArtifactDetail, type ArtifactLifecycle, type ArtifactLifecycleEvent, type ArtifactLifecycleStatus, type ArtifactSummary, type Chunk, type Organization, type SharedSession, type SharedWorkspace } from "../types";
 import { Button } from "../components/ui/button";
+import { useConfirm } from "../components/ui/confirm-dialog";
 import { Dropdown } from "../components/ui/dropdown";
 import { Input } from "../components/ui/input";
 import { Textarea } from "../components/ui/textarea";
@@ -52,6 +53,7 @@ export function SharedArtifactDetail({
   // at once on a later visit, refetched when the page opens, and marked stale
   // by live events and by changes made here.
   const workspaceId = workspace.workspace.id;
+  const confirm = useConfirm();
   const [artifact, setArtifact, artifactQuery] = useServerState<ArtifactDetail | null>({
     key: workspaceKeys.artifact(workspaceId, artifactId), fetch: () => getSharedArtifact(accessToken, artifactId), initial: null, staleTime: 0,
   });
@@ -178,7 +180,7 @@ export function SharedArtifactDetail({
   }
 
   async function removeArtifact() {
-    if (!window.confirm(`Delete ${artifact?.summary.title ?? "this evidence"}? Linked memory citations will be removed.`)) return;
+    if (!(await confirm({ action: "Delete", danger: true, description: "Linked memory citations will be removed.", title: `Delete ${artifact?.summary.title ?? "this evidence"}?` }))) return;
     setIsMutating(true); setError(null);
     try { await deleteSharedArtifact(accessToken, artifactId); onBack(); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsMutating(false); }
   }
@@ -220,7 +222,7 @@ export function SharedArtifactDetail({
   }
 
   async function removeComment(comment: ArtifactComment) {
-    if (!window.confirm("Delete this evidence comment?")) return;
+    if (!(await confirm({ action: "Delete", danger: true, title: "Delete this evidence comment?" }))) return;
     setIsMutating(true); setError(null);
     try {
       await deleteSharedArtifactComment(accessToken, comment.id);

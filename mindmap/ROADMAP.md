@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.76` (2026-10-18), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.77` (2026-10-18), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Security review 2026-10-16 (V0.2.52)](security/2026-10-16-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -57,7 +57,7 @@ timeline
 | Security review 2026-10-10, second and third passes | ✅ Every finding fixed, mitigated or accepted in writing (V0.1.76); R2-4 and R2-5 scheduled for V0.2.8 |
 | Road to V0.2.0 (V0.1.66–V0.1.76) | 🔄 Built and versioned `0.2.0`; R6 (clean install) and the tag are the maintainer's |
 | Road to V0.3.0 (V0.2.1–V0.2.56, one change each) | ✅ V0.2.1–V0.2.56 built; the clean-machine install (R6, R12) is the maintainer's |
-| Track K: frontend polish (V0.2.57–V0.2.129) | 🔄 V0.2.57–V0.2.76 built (K1 done); decisions 15–19 taken as proposed; [plan](plans/2026-10-17-frontend-polish.md) |
+| Track K: frontend polish (V0.2.57–V0.2.129) | 🔄 V0.2.57–V0.2.77 built (K1 done); decisions 15–19 taken as proposed; [plan](plans/2026-10-17-frontend-polish.md) |
 | V0.4.0 and later: scale-out, single sign-on, hosted | 💭 Direction |
 
 ---
@@ -917,7 +917,7 @@ One box per release; the brief, the files and the commit line of each are in [th
 - [x] **V0.2.74** `IconButton`: `<IconButton label size appearance pressed busy>` in `components/ui/icon-button.tsx` (32 or 36 px); it replaces `rm-action-trigger` (the `ActionMenu` trigger), the System `RefreshButton` and the 34 px squares of the organization member remove button and of the evidence and map view switches, whose size rules are gone. Typecheck passes; not seen on screen
 - [x] **V0.2.75** `Tooltip`: `<Tooltip content>` in `components/ui/tooltip.tsx` on `@radix-ui/react-tooltip` (a new dependency); `IconButton` shows its label in one, and the theme toggle (now an `IconButton`), *New folder* and the map's *Similar content* use it instead of `title`. Typecheck passes; not seen on screen
 - [x] **V0.2.76** `danger` button: `variant="danger"` on `Button` (solid `--color-danger` fill, white text, darker hover) replaces the dialog-footer-only `.rm-button-danger` rule of `11…`; the destructive confirmations (folder, files, repository, connector, assistant chat) use it, and the five row buttons that carried the class without effect lost it. Typecheck passes; not seen on screen
-- [ ] **V0.2.77** `ConfirmDialog` and `useConfirm`
+- [x] **V0.2.77** `ConfirmDialog` and `useConfirm`: `useConfirm()` returns `confirm({ title, description, action, danger })`, a promise of true or false, shown by `ConfirmDialog` through the `ConfirmProvider` mounted in `SharedWebApp` (`components/ui/confirm-dialog.tsx`); it replaces the three native confirmations of the artifact page (evidence, comment) and the memory card page. Typecheck passes; not seen on screen
 - [ ] **V0.2.78** No more native confirmations
 - [ ] **V0.2.79** `LoadingState`
 - [ ] **V0.2.80** `EmptyState`
