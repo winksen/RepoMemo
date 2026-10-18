@@ -2,6 +2,17 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.87 (2026-10-18)
+
+The searchable picker where lists are long.
+
+### Changed
+- **`Combobox` replaces three long dropdowns:** *Replacement evidence* in the evidence lifecycle form, a task's *Related evidence* in the new-task form, and *Open a task checklist* in the task toolbar. Each listed every file or task of the workspace; they now open a search field and narrow as you type.
+- `Combobox` gained `noneLabel`, which adds a first option that clears the choice ("No evidence link" for a task).
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.86 (2026-10-18)
 
 A searchable picker for long lists.

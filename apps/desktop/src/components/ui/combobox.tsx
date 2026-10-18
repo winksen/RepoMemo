@@ -18,6 +18,8 @@ export interface ComboboxProps {
   /** Shown in the list when nothing matches the typed text. */
   emptyLabel?: string;
   id?: string;
+  /** Adds a first option with an empty value that clears the choice, and names it. */
+  noneLabel?: string;
   onValueChange: (value: string) => void;
   options: ComboboxOption[];
   /** Shown while nothing is chosen. */
@@ -34,11 +36,12 @@ const VISIBLE_ROWS = 100;
  * options and a `Combobox` where scrolling the whole list would be slow: files, people, tasks.
  * Arrow keys move through the matches, Enter chooses, Escape closes.
  */
-export function Combobox({ "aria-label": ariaLabel, className, disabled, emptyLabel = "Nothing matches", id, onValueChange, options, placeholder = "Choose…", value }: ComboboxProps) {
+export function Combobox({ "aria-label": ariaLabel, className, disabled, emptyLabel = "Nothing matches", id, noneLabel, onValueChange, options: items, placeholder = "Choose…", value }: ComboboxProps) {
   const listId = useId();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
+  const options = useMemo(() => (noneLabel ? [{ label: noneLabel, value: "" }, ...items] : items), [items, noneLabel]);
   const selected = options.find((option) => option.value === value);
   const matches = useMemo(() => {
     const words = query.toLowerCase().split(/\s+/).filter(Boolean);
