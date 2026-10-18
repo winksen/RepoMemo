@@ -163,6 +163,10 @@ page's own version, and add to this list when a new one is added.
   button once there is text and Escape to clear it. Use it for a filter that
   narrows a list as you type; a search that needs a button to run stays a
   `Field` with an `Input`.
+- **`CopyButton`**: copies a value to the clipboard. The icon becomes a check
+  (and the word "Copied") for two seconds; if the browser refuses, a toast says
+  so and the text is left to copy by hand. Icon-only by default (give it a
+  `label`), or a button with a word through `text`. Every copy action uses it.
 
 ### Notifications
 

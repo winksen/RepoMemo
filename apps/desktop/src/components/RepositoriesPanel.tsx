@@ -36,6 +36,7 @@ import { lastChangeLabel } from "../web/format";
 import { LanguageChart } from "./LanguageChart";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
+import { CopyButton } from "./ui/copy-button";
 import { SearchField } from "./ui/search-field";
 import { Table } from "./ui/table";
 import { PanelHeading } from "./ui/panel-heading";
@@ -491,8 +492,8 @@ export function RepositorySettings({
           </span>
           {webhookSecret ? <div className="rm-repo-check">
             <dl className="rm-repo-facts">
-              <div><dt>Payload URL</dt><dd><code className="rm-repo-path">{webhookSecret.address}</code></dd></div>
-              <div><dt>Secret</dt><dd><code className="rm-repo-path">{webhookSecret.secret}</code></dd></div>
+              <div><dt>Payload URL</dt><dd><code className="rm-repo-path">{webhookSecret.address}</code> <CopyButton label="Copy the payload URL" value={webhookSecret.address} /></dd></div>
+              <div><dt>Secret</dt><dd><code className="rm-repo-path">{webhookSecret.secret}</code> <CopyButton label="Copy the secret" value={webhookSecret.secret} /></dd></div>
             </dl>
             <span className="rm-map-muted">Content type JSON, push events only. Shown once: renewing it ends the old one.</span>
           </div> : null}
@@ -626,7 +627,7 @@ function RepositoryCard({
 
     <dl className="rm-repo-facts">
       <div><dt><GitBranch size={ICON_SIZE.sm} /> Branch</dt><dd>{commit?.branch ?? settings.branch ?? "Checked-out branch"}{settings.branch ? null : <span className="rm-map-muted"> (follows HEAD)</span>}</dd></div>
-      <div><dt><GitCommit size={ICON_SIZE.sm} /> Commit</dt><dd>{commit ? <><code>{commit.sha.slice(0, 7)}</code> {commit.summary} <span className="rm-map-muted">· {commit.author_name} · {formatDate(commit.committed_at)}</span></> : <span className="rm-map-muted">Not synced yet</span>}</dd></div>
+      <div><dt><GitCommit size={ICON_SIZE.sm} /> Commit</dt><dd>{commit ? <><code>{commit.sha.slice(0, 7)}</code> <CopyButton label="Copy the commit hash" value={commit.sha} /> {commit.summary} <span className="rm-map-muted">· {commit.author_name} · {formatDate(commit.committed_at)}</span></> : <span className="rm-map-muted">Not synced yet</span>}</dd></div>
       <div><dt>Files</dt><dd>{repository.indexed_file_count === repository.file_count ? repository.file_count.toLocaleString() : `${repository.indexed_file_count.toLocaleString()} of ${repository.file_count.toLocaleString()} indexed`}{repository.last_synced_at ? <span className="rm-map-muted"> · synced {formatDate(repository.last_synced_at)}</span> : null}</dd></div>
       {settings.include.length || settings.exclude.length ? <div><dt>Rules</dt><dd className="rm-repo-rules">{settings.include.map((pattern) => <code key={`i-${pattern}`}>+ {pattern}</code>)}{settings.exclude.map((pattern) => <code key={`e-${pattern}`}>− {pattern}</code>)}</dd></div> : null}
       {!job && repository.status === "error" && repository.last_error ? <div><dt>Last error</dt><dd>{repository.last_error}</dd></div> : null}
@@ -817,7 +818,7 @@ export function RepositoryDetailView({
       <dl className="rm-repo-facts">
         <div><dt>Location</dt><dd><code className="rm-repo-path">{repository.root_path}</code></dd></div>
         <div><dt><GitBranch size={ICON_SIZE.sm} /> Branch</dt><dd>{commit?.branch ?? repository.settings.branch ?? "Checked-out branch"}</dd></div>
-        <div><dt><GitCommit size={ICON_SIZE.sm} /> Commit</dt><dd>{commit ? <><code>{commit.sha.slice(0, 7)}</code> {commit.summary} <span className="rm-map-muted">· {commit.author_name} · {formatDate(commit.committed_at)}</span></> : <span className="rm-map-muted">Not synced yet</span>}</dd></div>
+        <div><dt><GitCommit size={ICON_SIZE.sm} /> Commit</dt><dd>{commit ? <><code>{commit.sha.slice(0, 7)}</code> <CopyButton label="Copy the commit hash" value={commit.sha} /> {commit.summary} <span className="rm-map-muted">· {commit.author_name} · {formatDate(commit.committed_at)}</span></> : <span className="rm-map-muted">Not synced yet</span>}</dd></div>
         <div><dt>Files</dt><dd>{repository.file_count.toLocaleString()} indexed{repository.last_synced_at ? <span className="rm-map-muted"> · synced {formatDate(repository.last_synced_at)}</span> : null}</dd></div>
         {!job && repository.status === "error" && repository.last_error ? <div><dt>Last error</dt><dd>{repository.last_error}</dd></div> : null}
       </dl>

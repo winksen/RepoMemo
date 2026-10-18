@@ -20,6 +20,7 @@ import {
 } from "../lib/sharedApi";
 import type { ConnectorAccessCheck, ConnectorSource } from "../types";
 import { Button } from "./ui/button";
+import { CopyButton } from "./ui/copy-button";
 import { PanelHeading } from "./ui/panel-heading";
 import { Dialog, DialogCancel } from "./ui/dialog";
 import { Dropdown } from "./ui/dropdown";
@@ -285,8 +286,8 @@ export function ConnectorSettings({
           <span className="rm-map-muted">{live.has_webhook ? `On${live.webhook_last_received_at ? ` · last call ${formatDate(live.webhook_last_received_at)}` : " · no call yet"}.` : "Off: the connector is checked on a schedule."}</span>
           {hookSecret ? <div className="rm-repo-check">
             <dl className="rm-repo-facts">
-              <div><dt>Payload URL</dt><dd><code className="rm-repo-path">{hookSecret.address}</code></dd></div>
-              <div><dt>Secret</dt><dd><code className="rm-repo-path">{hookSecret.secret}</code></dd></div>
+              <div><dt>Payload URL</dt><dd><code className="rm-repo-path">{hookSecret.address}</code> <CopyButton label="Copy the payload URL" value={hookSecret.address} /></dd></div>
+              <div><dt>Secret</dt><dd><code className="rm-repo-path">{hookSecret.secret}</code> <CopyButton label="Copy the secret" value={hookSecret.secret} /></dd></div>
             </dl>
             <span className="rm-map-muted">Shown once: renewing it ends the old one. GitHub signs with it; for GitLab paste it as the secret token.</span>
           </div> : null}

@@ -2,6 +2,17 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.89 (2026-10-18)
+
+One copy button with the same feedback everywhere.
+
+### Changed
+- **`CopyButton`** is in `components/ui/copy-button.tsx`. It puts a value on the clipboard, turns its icon into a check (and its word into "Copied") for two seconds, announces it politely to screen readers and, when the browser refuses (plain http, a denied permission), shows a warning toast and runs an optional `onUnavailable` (the secret dialog selects its field for a manual copy). Icon-only through `IconButton` by default, or a button with a word through `text`.
+- **It replaces the copy code of the secret dialog** (invitation links and tokens shown once), whose own clipboard call, success toast and state are gone, and **adds the copy action next to** a repository's last synced commit (the repository page and its settings), a repository file's commit and path on the evidence page, and the payload URL and secret of a webhook (repositories and connectors). Before, those values could only be selected by hand.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.88 (2026-10-18)
 
 One search field for list filters.
