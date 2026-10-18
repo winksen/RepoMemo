@@ -82,10 +82,7 @@
 .rm-health-evidence blockquote { margin: 0; padding: 8px 12px; color: var(--color-text-muted); background: var(--color-code-surface); border-radius: 8px; font-family: var(--font-mono); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; white-space: pre-wrap; }
 .rm-health-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .shared-mention-field { position: relative; display: grid; }
-.shared-mention-list { position: absolute; top: 100%; right: 0; left: 0; z-index: var(--layer-popover); display: grid; max-height: 240px; margin: 4px 0 0; padding: 4px; overflow: auto; list-style: none; background: var(--color-surface); border: 1px solid var(--color-border-strong); border-radius: 10px; box-shadow: var(--shadow-floating); }
-.shared-mention-list button { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; width: 100%; padding: 7px 10px; color: var(--color-text); background: transparent; border: 0; border-radius: 7px; cursor: pointer; font: inherit; font-size: 13px; text-align: left; }
-.shared-mention-list button.active { background: var(--color-surface-hover); }
-.shared-mention-list small { overflow: hidden; color: var(--color-text-muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.rm-option-list.rm-option-popover { position: absolute; top: 100%; right: 0; left: 0; z-index: var(--layer-popover); max-height: 240px; margin: 4px 0 0; padding: 4px; background: var(--color-surface); border: 1px solid var(--color-border-strong); border-radius: 10px; box-shadow: var(--shadow-floating); }
 .shared-version-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .shared-version-list li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 10px 12px; border: 1px solid var(--color-border); border-radius: 10px; }
 .shared-version-list li > div:first-child { display: grid; gap: 2px; min-width: 0; }

@@ -274,12 +274,12 @@ export function AssistantPanel({ accessToken, onOpenArtifact, workspaceId }: { a
       <Button aria-label="New chat" disabled={isBusy} onClick={() => { startNewChat(); setShowChats(false); }} title="New chat" type="button" variant="secondary"><Plus size={ICON_SIZE.md} /></Button>
     </div>
     {showChats ? <nav className="shared-assistant-chats" aria-label="Assistant chats">
-      {conversations.length ? <ul>{conversations.map((conversation) => {
+      {conversations.length ? <ul className="rm-option-list">{conversations.map((conversation) => {
         const isActive = conversation.id === activeId;
-        return <li className={isActive ? "active" : ""} key={conversation.id}>
-          <button aria-current={isActive ? "page" : undefined} disabled={isBusy} onClick={() => { setShowChats(false); void openChat(conversation.id); }} title={conversation.title} type="button">
+        return <li className={isActive ? "rm-option-row active" : "rm-option-row"} key={conversation.id}>
+          <button aria-current={isActive ? "page" : undefined} className="rm-option" disabled={isBusy} onClick={() => { setShowChats(false); void openChat(conversation.id); }} title={conversation.title} type="button">
             <Message size={ICON_SIZE.sm} />
-            <span><strong>{conversation.title}</strong><small>{formatChatTime(conversation.updated_at)} · {conversation.turn_count} {conversation.turn_count === 1 ? "message" : "messages"}</small></span>
+            <span className="rm-option-text"><strong>{conversation.title}</strong><small>{formatChatTime(conversation.updated_at)} · {conversation.turn_count} {conversation.turn_count === 1 ? "message" : "messages"}</small></span>
           </button>
           <ActionMenu items={[
             { label: "Rename", icon: <Pencil size={ICON_SIZE.sm} />, onSelect: () => { setRenameValue(conversation.title); setChatDialog({ kind: "rename", conversation }); } },

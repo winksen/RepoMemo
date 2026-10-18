@@ -167,6 +167,12 @@ page's own version, and add to this list when a new one is added.
   (and the word "Copied") for two seconds; if the browser refuses, a toast says
   so and the text is left to copy by hand. Icon-only by default (give it a
   `label`), or a button with a word through `text`. Every copy action uses it.
+- **Option list** (`rm-option-list` with `rm-option` rows): the rows of any list
+  you pick from by keyboard or mouse: the command palette, mention suggestions,
+  the folder picker and the chat list. One row height (the control height), one
+  highlight for hover and for the active row (`aria-selected`, `aria-pressed` or
+  `aria-current`), one focus ring. `rm-option-text` stacks a title over a small
+  line; `rm-option-row` holds an option next to a menu button.
 
 ### Notifications
 

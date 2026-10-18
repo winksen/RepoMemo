@@ -133,3 +133,26 @@ th > .rm-badge,
 .rm-search-field-icon { position: absolute; left: 11px; color: var(--color-text-muted); pointer-events: none; }
 .rm-search-field-input { padding-left: 34px; padding-right: 36px; }
 .rm-search-field-clear.rm-button { position: absolute; right: 2px; }
+
+/* Option list: the rows of the command palette, mention suggestions, the folder picker and the chat list. */
+.rm-option-list { display: grid; gap: 2px; margin: 0; padding: 0; overflow: auto; list-style: none; }
+.rm-option-list-box { max-height: 280px; border: 1px solid var(--color-border); border-radius: 8px; }
+.rm-option { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: var(--control-height); padding: 6px 10px; color: var(--color-text); background: transparent; border: 0; border-radius: 7px; cursor: pointer; font: inherit; font-size: 13px; text-align: left; }
+.rm-option:hover:not(:disabled),
+.rm-option[aria-selected="true"],
+.rm-option[aria-current="page"] { background: var(--color-surface-hover); }
+.rm-option[aria-pressed="true"] { background: var(--color-surface-3); font-weight: 700; }
+.rm-option:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
+.rm-option:disabled { color: var(--color-text-subtle); cursor: default; }
+.rm-option small { overflow: hidden; color: var(--color-text-muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.rm-option-text { display: grid; flex: 1; gap: 2px; min-width: 0; }
+.rm-option-text strong { overflow: hidden; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.rm-option-group { display: block; padding: 8px 10px 2px; color: var(--color-text-muted); font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.rm-option-row { position: relative; display: flex; align-items: center; border-radius: 8px; }
+.rm-option-row:hover,
+.rm-option-row.active { background: var(--color-surface-3); }
+.rm-option-row > .rm-option { flex: 1; min-width: 0; }
+.rm-option-row > .rm-option:hover:not(:disabled) { background: transparent; }
+.rm-option-row.active strong { font-weight: 700; }
+.rm-mention-links { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.rm-option > svg { flex: none; }

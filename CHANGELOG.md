@@ -2,6 +2,18 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.90 (2026-10-18)
+
+One list style for palettes, suggestions, pickers and chats.
+
+### Changed
+- **`rm-option-list` and `rm-option`** are the shared style of a list you pick a row from: a row as tall as a control, one highlight for hover and for the active row (read from `aria-selected`, `aria-pressed` or `aria-current`), one focus ring, a muted small line, group labels (`rm-option-group`), a boxed variant (`rm-option-list-box`) and a row that holds a menu button (`rm-option-row`).
+- **Four lists use it, and their own rule sets are gone:** the command palette, the mention suggestions of notes and comments, the folder picker of *Move to folder* and the assistant's chat list. Each keeps only what is its own: the palette's width and height, the suggestion list's popover position, the chat list's hidden-until-hover menu.
+- The *Mentioned in* and *Mentions* lists of an evidence page used the suggestion list's class by accident (and so its popover position); they are plain lists now.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.89 (2026-10-18)
 
 One copy button with the same feedback everywhere.

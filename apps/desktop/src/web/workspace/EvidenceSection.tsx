@@ -339,9 +339,9 @@ export function EvidenceSection({ page }: { page: WorkspacePage }) {
       : itemDialog.kind === "move-files" ? bulkAction({ action: "move", folderId: moveTarget }) : moveFileAction(itemDialog.artifact);
     const name = subject ? ("title" in subject ? subject.title : subject.name) : `${selectedIds.size} selected files`;
     return <Dialog description={<>Choose where to put <strong>{name}</strong>.</>} footer={<><DialogCancel onClick={() => setItemDialog(null)} /><Button disabled={busy || unchanged} onClick={() => void run()} type="button" variant="main">Move here</Button></>} onClose={() => setItemDialog(null)} open title="Move to folder">
-      <div className="rm-folder-picker" role="group" aria-label="Destination folder">
-        <button aria-pressed={moveTarget === null} onClick={() => setMoveTarget(null)} type="button"><FolderIcon size={ICON_SIZE.md} /> All evidence (top level)</button>
-        {folderPickerRows.map(({ folder, depth }) => <button aria-pressed={moveTarget === folder.id} key={folder.id} onClick={() => setMoveTarget(folder.id)} style={{ paddingLeft: 10 + (depth + 1) * 16 }} type="button"><FolderIcon size={ICON_SIZE.md} /> {folder.name}</button>)}
+      <div className="rm-option-list rm-option-list-box" role="group" aria-label="Destination folder">
+        <button aria-pressed={moveTarget === null} className="rm-option" onClick={() => setMoveTarget(null)} type="button"><FolderIcon size={ICON_SIZE.md} /> All evidence (top level)</button>
+        {folderPickerRows.map(({ folder, depth }) => <button aria-pressed={moveTarget === folder.id} className="rm-option" key={folder.id} onClick={() => setMoveTarget(folder.id)} style={{ paddingLeft: 10 + (depth + 1) * 16 }} type="button"><FolderIcon size={ICON_SIZE.md} /> {folder.name}</button>)}
       </div>
     </Dialog>;
   })();

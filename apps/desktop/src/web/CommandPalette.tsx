@@ -117,13 +117,13 @@ export function CommandPalette({ accessToken, assistantWorkspaceId, canAdministe
       role="combobox"
       value={query}
     />
-    {entries.length ? <ul aria-label="Results" className="shared-palette-list" id="palette-results" ref={list} role="listbox">
+    {entries.length ? <ul aria-label="Results" className="rm-option-list shared-palette-list" id="palette-results" ref={list} role="listbox">
       {entries.map((entry, index) => {
         const heading = entry.group !== lastGroup ? entry.group : null;
         lastGroup = entry.group;
         return <li key={entry.id} role="presentation">
-          {heading ? <span className="shared-palette-group">{heading}</span> : null}
-          <button aria-selected={index === activeIndex} className={index === activeIndex ? "active" : ""} id={`palette-${entry.id}`} onClick={() => run(entry)} onMouseMove={() => setActive(index)} role="option" tabIndex={-1} type="button">
+          {heading ? <span className="rm-option-group">{heading}</span> : null}
+          <button aria-selected={index === activeIndex} className="rm-option" id={`palette-${entry.id}`} onClick={() => run(entry)} onMouseMove={() => setActive(index)} role="option" tabIndex={-1} type="button">
             <strong>{entry.label}</strong>{entry.hint ? <small>{entry.hint}</small> : null}
           </button>
         </li>;

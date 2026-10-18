@@ -40,7 +40,7 @@ export function ArtifactMentionsPanel({
 
   if (!mentions || (!mentions.mentioned_in.length && !mentions.mentions.length)) return null;
 
-  const list = (items: ArtifactMention[]) => <ul className="shared-mention-list">
+  const list = (items: ArtifactMention[]) => <ul className="rm-mention-links">
     {items.map((mention) => <li key={`${mention.artifact_id}-${mention.kind}-${mention.label}`}>
       <button className="rm-map-link" onClick={() => onOpenArtifact(mention.artifact_id)} type="button">{mention.title}</button>
       <span className="rm-map-muted"> · {artifactTypeLabel(mention.artifact_type)} · {describe(mention)}</span>

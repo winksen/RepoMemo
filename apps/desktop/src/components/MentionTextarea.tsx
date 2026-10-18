@@ -87,9 +87,9 @@ export function MentionTextarea({ accessToken, onValueChange, value, workspaceId
       role="combobox"
       value={value}
     />
-    {open ? <ul aria-label="People you can mention" className="shared-mention-list" id={listId} role="listbox">
+    {open ? <ul aria-label="People you can mention" className="rm-option-list rm-option-popover" id={listId} role="listbox">
       {suggestions.map((user, index) => <li key={user.id} role="presentation">
-        <button aria-selected={index === active} className={index === active ? "active" : ""} id={`${listId}-${index}`} onMouseDown={(event) => { event.preventDefault(); choose(user); }} onMouseMove={() => setActive(index)} role="option" tabIndex={-1} type="button">
+        <button aria-selected={index === active} className="rm-option" id={`${listId}-${index}`} onMouseDown={(event) => { event.preventDefault(); choose(user); }} onMouseMove={() => setActive(index)} role="option" tabIndex={-1} type="button">
           <strong>{user.display_name}</strong><small>{user.email}</small>
         </button>
       </li>)}
