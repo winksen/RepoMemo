@@ -225,7 +225,7 @@ export function ConnectorSettings({
             <Button disabled={running} onClick={() => void sync(connector)} type="button" variant="secondary"><Refresh size={ICON_SIZE.sm} /> Sync now</Button>
             <Button disabled={running} onClick={() => { setNewToken(""); setReplacing(connector); }} type="button" variant="secondary"><Key size={ICON_SIZE.sm} /> Token</Button>
             <Button disabled={running} onClick={() => { setHookSecret(null); setHooking(connector); }} type="button" variant="secondary"><Webhook size={ICON_SIZE.sm} /> Webhook</Button>
-            <Button className="rm-button-danger" disabled={running} onClick={() => setRemoving(connector)} type="button" variant="secondary"><Trash size={ICON_SIZE.sm} /> Remove</Button>
+            <Button disabled={running} onClick={() => setRemoving(connector)} type="button" variant="secondary"><Trash size={ICON_SIZE.sm} /> Remove</Button>
           </div>
         </li>;
       })}
@@ -291,7 +291,7 @@ export function ConnectorSettings({
           </div> : null}
           <div className="rm-health-actions">
             <Button disabled={busy} onClick={() => void makeWebhook(live)} type="button" variant="secondary">{live.has_webhook ? "Make a new secret" : "Set up a webhook"}</Button>
-            {live.has_webhook ? <Button className="rm-button-danger" disabled={busy} onClick={() => void removeWebhook(live)} type="button" variant="secondary">Turn off</Button> : null}
+            {live.has_webhook ? <Button disabled={busy} onClick={() => void removeWebhook(live)} type="button" variant="secondary">Turn off</Button> : null}
           </div>
         </div>;
       })()}
@@ -299,7 +299,7 @@ export function ConnectorSettings({
 
     {removing ? <Dialog
       description={<>Remove <strong>{removing.name}</strong> and its {(removing.open_items + removing.closed_items).toLocaleString()} items from the workspace? Their index, comments and memory-card links are deleted too. Nothing changes in the tracker.</>}
-      footer={<><DialogCancel onClick={() => setRemoving(null)} /><Button className="rm-button-danger" disabled={busy} onClick={() => void remove(removing)} type="button" variant="secondary">Remove connector</Button></>}
+      footer={<><DialogCancel onClick={() => setRemoving(null)} /><Button disabled={busy} onClick={() => void remove(removing)} type="button" variant="secondary">Remove connector</Button></>}
       onClose={() => setRemoving(null)}
       open
       title="Remove connector"

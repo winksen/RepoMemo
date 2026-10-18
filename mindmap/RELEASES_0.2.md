@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.2 → 0.3
 
-> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.75` (2026-10-18) · **Next:** `V0.2.76`
+> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.76` (2026-10-18) · **Next:** `V0.2.77`
 > **Previous line:** [Releases 0.1 → 0.2](RELEASES_0.1.md) · **Related:** [Roadmap, Road to V0.3.0](ROADMAP.md#-road-to-v030) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
 Every release of the 0.2 line, shipped and planned, one row each. The plan comes from the [Road to V0.3.0](ROADMAP.md#-road-to-v030): **one change per release**, each shippable alone, with the security rules for a new outside connection in the release that opens it. Planned rows are proposals until decisions 7–14 in the roadmap are agreed.
@@ -110,7 +110,7 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | **V0.2.73** | ✅ 2026-10-18 | K. Frontend polish | ✨ Feature | UI kit | `Button` `busy` prop (spinner replaces the icon, label stays, disabled, `aria-busy`) and a shared `Spinner`; used on the sign-in button and Profile's save, password and sign-out-everywhere buttons; written, not seen on screen | Used on the sign-in and save buttons of Profile. |
 | **V0.2.74** | ✅ 2026-10-18 | K. Frontend polish | ✨ Feature | UI kit | `IconButton` (`components/ui/icon-button.tsx`): one icon, required `label`, 32 or 36 px, `outline` or `plain`, `pressed`, `busy`; replaces `rm-action-trigger`, the System refresh button and the 34 px squares of the organization and view switches; written, not seen on screen | Every icon-only button in those places is an `IconButton`. |
 | **V0.2.75** | ✅ 2026-10-18 | K. Frontend polish | ✨ Feature | UI kit | `Tooltip` (`components/ui/tooltip.tsx`, Radix Tooltip, new dependency): shown on hover and keyboard focus; `IconButton` labels, the theme toggle, *New folder* and the map's *Similar content* use it instead of `title`; written, not seen on screen | Icon-only buttons show their name on hover and on keyboard focus. |
-| **V0.2.76** | 🔜 Planned | K. Frontend polish | ✨ Feature | UI kit | `danger` button | Destructive confirmations use it. |
+| **V0.2.76** | ✅ 2026-10-18 | K. Frontend polish | ✨ Feature | UI kit | `Button variant="danger"` (solid `--color-danger`, white text) in `14-building-blocks.css`, replacing the footer-only `.rm-button-danger`; used by the destructive confirmations (folder, files, repository, connector, chat); written, not seen on screen | Destructive confirmations use it. |
 | **V0.2.77** | 🔜 Planned | K. Frontend polish | ✨ Feature | UI kit | `ConfirmDialog` and `useConfirm` | Those three deletions confirm in the app's dialog. |
 | **V0.2.78** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | UI kit | No more native confirmations | `grep window.confirm` finds nothing in the web client. |
 | **V0.2.79** | 🔜 Planned | K. Frontend polish | ✨ Feature | UI kit | `LoadingState` | Used on the System pages. |

@@ -263,7 +263,7 @@ export function AssistantPanel({ accessToken, onOpenArtifact, workspaceId }: { a
       <Input aria-label="Chat name" autoFocus maxLength={120} onChange={(event) => setRenameValue(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && renameValue.trim()) void renameChat(chatDialog.conversation); }} value={renameValue} />
     </Dialog>
     : chatDialog?.kind === "delete"
-      ? <Dialog description={<>Delete <strong>{chatDialog.conversation.title}</strong> and its {chatDialog.conversation.turn_count} {chatDialog.conversation.turn_count === 1 ? "message" : "messages"}? This cannot be undone.</>} footer={<><DialogCancel onClick={() => setChatDialog(null)} /><Button className="rm-button-danger" disabled={isSavingChat} onClick={() => void deleteChat(chatDialog.conversation)} type="button" variant="secondary">Delete chat</Button></>} onClose={() => setChatDialog(null)} open title="Delete chat" />
+      ? <Dialog description={<>Delete <strong>{chatDialog.conversation.title}</strong> and its {chatDialog.conversation.turn_count} {chatDialog.conversation.turn_count === 1 ? "message" : "messages"}? This cannot be undone.</>} footer={<><DialogCancel onClick={() => setChatDialog(null)} /><Button disabled={isSavingChat} onClick={() => void deleteChat(chatDialog.conversation)} type="button" variant="secondary">Delete chat</Button></>} onClose={() => setChatDialog(null)} open title="Delete chat" />
       : null;
 
   return <section className="shared-assistant" aria-label="Workspace assistant">

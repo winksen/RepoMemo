@@ -452,7 +452,7 @@ export function RepositorySettings({
         </div>
         <div className="rm-health-actions">
           <Button disabled={Boolean(repository.active_job)} onClick={() => startEditing(repository)} type="button" variant="secondary"><Pencil size={ICON_SIZE.sm} /> Edit</Button>
-          <Button className="rm-button-danger" disabled={Boolean(repository.active_job)} onClick={() => setRemoving(repository)} type="button" variant="secondary"><Trash size={ICON_SIZE.sm} /> Remove</Button>
+          <Button disabled={Boolean(repository.active_job)} onClick={() => setRemoving(repository)} type="button" variant="secondary"><Trash size={ICON_SIZE.sm} /> Remove</Button>
         </div>
       </li>)}
     </ul> : null}
@@ -494,7 +494,7 @@ export function RepositorySettings({
           </div> : null}
           <div className="rm-health-actions">
             <Button disabled={busy} onClick={() => void makeWebhook(editing)} type="button" variant="secondary">{liveEditing?.has_webhook ? "Make a new secret" : "Set up a webhook"}</Button>
-            {liveEditing?.has_webhook ? <Button className="rm-button-danger" disabled={busy} onClick={() => void removeWebhook(editing)} type="button" variant="secondary">Turn off</Button> : null}
+            {liveEditing?.has_webhook ? <Button disabled={busy} onClick={() => void removeWebhook(editing)} type="button" variant="secondary">Turn off</Button> : null}
           </div>
         </div>
         {editing.remote && editing.has_credential && !isSshLink(editing.root_path) ? <div><Button disabled={busy} onClick={() => void removeToken(editing)} type="button" variant="secondary">Remove the token</Button></div> : null}
@@ -503,7 +503,7 @@ export function RepositorySettings({
 
     {removing ? <Dialog
       description={<>Remove <strong>{removing.name}</strong> and its {removing.file_count.toLocaleString()} files from the workspace? Their index, comments and memory-card links are deleted too. The repository on disk is not touched.</>}
-      footer={<><DialogCancel onClick={() => setRemoving(null)} /><Button className="rm-button-danger" disabled={busy} onClick={() => void remove(removing)} type="button" variant="secondary">Remove repository</Button></>}
+      footer={<><DialogCancel onClick={() => setRemoving(null)} /><Button disabled={busy} onClick={() => void remove(removing)} type="button" variant="secondary">Remove repository</Button></>}
       onClose={() => setRemoving(null)}
       open
       title="Remove repository"

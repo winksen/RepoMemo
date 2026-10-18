@@ -2,6 +2,17 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.76 (2026-10-18)
+
+A danger button for destructive confirmations.
+
+### Changed
+- **`variant="danger"` on `Button`.** A solid `--color-danger` fill with white text and a darker hover, defined once in `14-building-blocks.css`. It replaces the one-off `.rm-dialog-footer .rm-button-danger` rule, which only worked by className inside a dialog footer.
+- **Used by** the confirmations that delete or remove for good: deleting a folder, a file or several files, removing a repository, removing a connector and deleting an assistant chat. The `rm-button-danger` class that five row buttons (*Remove*, *Turn off*, bulk delete) carried without effect is gone; they stay secondary buttons.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.75 (2026-10-18)
 
 Icon-only buttons name themselves in a tooltip.

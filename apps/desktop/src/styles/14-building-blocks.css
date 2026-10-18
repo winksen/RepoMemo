@@ -52,3 +52,7 @@
 /* Tooltip: a short neutral label above a control, on hover and keyboard focus. */
 .rm-tooltip { z-index: var(--layer-popover); max-width: 260px; padding: 6px 8px; color: var(--color-bg); background: var(--color-text); border-radius: 6px; box-shadow: var(--shadow-floating); font-size: 12px; line-height: 1.4; pointer-events: none; }
 .rm-tooltip-anchor { display: inline-flex; }
+
+/* Danger button: the solid decisive action of a destructive confirmation. */
+.rm-button-danger { color: var(--color-on-danger); background: var(--color-danger); border-color: var(--color-danger); }
+.rm-button-danger:hover:not(:disabled) { background: color-mix(in srgb, var(--color-danger) 85%, black); border-color: color-mix(in srgb, var(--color-danger) 85%, black); }

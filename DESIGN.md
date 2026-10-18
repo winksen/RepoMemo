@@ -114,6 +114,10 @@ page's own version, and add to this list when a new one is added.
   hover and on keyboard focus, built on Radix. `IconButton` shows its `label`
   in one. Use it instead of a `title` attribute to explain a control; wrap a
   disabled control in a `span` so the tooltip can still open.
+- **`Button variant="danger"`**: the solid decisive action of a destructive
+  confirmation (`--color-danger` fill, white text). Use it only for the one
+  button that deletes or removes something for good in a dialog's footer; the
+  row button that opens that dialog stays `secondary`.
 
 ### Notifications
 

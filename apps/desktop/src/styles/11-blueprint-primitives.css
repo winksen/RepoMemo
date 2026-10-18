@@ -685,8 +685,6 @@ body,
 .shared-assistant-citation-more:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
 .rm-dialog-body { display: grid; gap: 8px; }
 .rm-dialog-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
-.rm-dialog-footer .rm-button.rm-button-danger { color: var(--color-on-danger); background: var(--color-danger); border-color: var(--color-danger); }
-.rm-dialog-footer .rm-button.rm-button-danger:hover:not(:disabled) { background: color-mix(in srgb, var(--color-danger) 85%, black); border-color: color-mix(in srgb, var(--color-danger) 85%, black); }
 .rm-folder-picker { display: grid; max-height: 280px; overflow: auto; border: 1px solid var(--color-border); border-radius: 8px; }
 .rm-folder-picker button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; color: var(--color-text); background: transparent; border: 0; cursor: pointer; font: inherit; font-size: 13px; text-align: left; }
 .rm-folder-picker button:hover:not(:disabled) { background: var(--color-surface-hover); }

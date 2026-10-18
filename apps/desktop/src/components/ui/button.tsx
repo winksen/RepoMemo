@@ -9,6 +9,7 @@ export const buttonVariants = cva("rm-button", {
     variant: {
       main: "rm-button-main",
       secondary: "rm-button-secondary",
+      danger: "rm-button-danger",
     },
   },
   defaultVariants: {
