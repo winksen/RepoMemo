@@ -2,6 +2,17 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.73 (2026-10-18)
+
+Buttons can show that they are working.
+
+### Changed
+- **`busy` on `Button`.** `<Button busy={isSubmitting}>` puts a spinner in front of the label, hides the button's own icon, disables the button and sets `aria-busy`. The label does not change, so the button keeps its width. A new `Spinner` (`components/ui/spinner.tsx`) is the turning ring, also for inline use.
+- **First use:** the sign-in and account creation button, and Profile's *Save details*, *Change password* and *Sign out everywhere* buttons, which each had their own spinner swap.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.72 (2026-10-18)
 
 A button only submits a form when it says so.

@@ -115,8 +115,8 @@ export function AuthCanvas({
             <label>Email<Input autoComplete="email" onChange={(event) => setEmail(event.target.value)} placeholder="you@company.com" required type="email" value={email} /></label>
             <label>Password<Input autoComplete={mode === "sign-up" ? "new-password" : "current-password"} minLength={12} onChange={(event) => setPassword(event.target.value)} placeholder="At least 12 characters" required type="password" value={password} /></label>
             <Toast kind="error" message={error} />
-            <Button disabled={isSubmitting} type="submit" variant="main">
-              {isSubmitting ? <Loader className="spin" size={ICON_SIZE.md} /> : <ArrowRight size={ICON_SIZE.md} />}
+            <Button busy={isSubmitting} type="submit" variant="main">
+              <ArrowRight size={ICON_SIZE.md} />
               {mode === "sign-in" ? "Sign in to shared mode" : "Create account and continue"}
             </Button>
           </form>

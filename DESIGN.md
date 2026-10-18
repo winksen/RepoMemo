@@ -100,6 +100,10 @@ page's own version, and add to this list when a new one is added.
   built on Radix. Give it a `label` beside it (for example "On" or "Off"), an
   `aria-label`, or a `<label htmlFor>` tied to its `id`. It does not replace a
   `Checkbox`: use a checkbox to pick items, a switch for a state.
+- **`Button` with `busy`**: while work is in progress a spinner replaces the
+  button's icon, the label stays, the button is disabled and `aria-busy` is
+  set. Use it on the button that started the work instead of a hand-made
+  spinner. `Spinner` is the same turning ring for inline use.
 
 ### Notifications
 

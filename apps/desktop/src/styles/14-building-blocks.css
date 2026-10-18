@@ -35,3 +35,7 @@
 .rm-switch-thumb[data-state="checked"] { transform: translateX(18px); }
 .rm-switch-field { display: inline-flex; align-items: center; gap: 8px; color: var(--color-text-muted); cursor: pointer; }
 .rm-switch-field[data-disabled] { cursor: not-allowed; }
+
+/* Busy button: the spinner takes the place of the button's own icon; the label stays. */
+.rm-button[aria-busy="true"] > svg:not(.rm-spinner) { display: none; }
+.rm-button[aria-busy="true"] { cursor: progress; }
