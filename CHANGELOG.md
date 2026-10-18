@@ -2,6 +2,18 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.75 (2026-10-18)
+
+Icon-only buttons name themselves in a tooltip.
+
+### Changed
+- **`Tooltip`** is in `components/ui/tooltip.tsx`, built on Radix Tooltip (`@radix-ui/react-tooltip` is a new dependency): a small label in inverted greys above the control, after 400 ms of hover and at once on keyboard focus. It sits in the popover layer, so it shows above dialogs.
+- **`IconButton` shows its `label` in a tooltip** instead of a `title` attribute, which keyboard users never saw. The theme toggle of the account controls is an `IconButton` now.
+- **The other `title` hints on controls** became tooltips: *New folder* in the evidence browser (including why it is disabled at the folder depth limit) and *Similar content* in the knowledge map when AI for search is not set up.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.74 (2026-10-18)
 
 A shared button for a single icon.

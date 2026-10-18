@@ -1,6 +1,7 @@
 import { forwardRef } from "react";
 import { cn } from "../../lib/utils";
 import { Button, type ButtonProps } from "./button";
+import { Tooltip } from "./tooltip";
 
 export interface IconButtonProps extends Omit<ButtonProps, "asChild" | "variant"> {
   /** `outline` has the secondary button's border; `plain` is bare until hovered (menus, rows). */
@@ -13,18 +14,19 @@ export interface IconButtonProps extends Omit<ButtonProps, "asChild" | "variant"
   size?: "sm" | "md";
 }
 
-/** A square button holding one icon, with a required name. */
+/** A square button holding one icon, with a required name that shows in a tooltip on hover and focus. */
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
-  ({ appearance = "outline", className, label, pressed, size = "md", title, ...props }, ref) => (
-    <Button
-      aria-label={label}
-      aria-pressed={pressed}
-      className={cn("rm-icon-button", `rm-icon-button-${size}`, appearance === "plain" && "rm-icon-button-plain", className)}
-      ref={ref}
-      title={title ?? label}
-      variant="secondary"
-      {...props}
-    />
+  ({ appearance = "outline", className, label, pressed, size = "md", ...props }, ref) => (
+    <Tooltip content={label}>
+      <Button
+        aria-label={label}
+        aria-pressed={pressed}
+        className={cn("rm-icon-button", `rm-icon-button-${size}`, appearance === "plain" && "rm-icon-button-plain", className)}
+        ref={ref}
+        variant="secondary"
+        {...props}
+      />
+    </Tooltip>
   ),
 );
 IconButton.displayName = "IconButton";

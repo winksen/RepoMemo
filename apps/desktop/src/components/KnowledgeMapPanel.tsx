@@ -25,6 +25,7 @@ import { layoutGraph } from "../lib/forceLayout";
 import type { KnowledgeEdge, KnowledgeMap, KnowledgeNode } from "../types";
 import { Button } from "./ui/button";
 import { IconButton } from "./ui/icon-button";
+import { Tooltip } from "./ui/tooltip";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
 
@@ -388,7 +389,7 @@ function RelationGraph({ canConfigure, map, onOpenArtifact, onOpenMemoryCard, on
     <div className="shared-panel-heading"><div><Graph size={ICON_SIZE.lg} /><h2 id="rm-map-graph-title">How your content connects</h2></div><span>{fileCount} files · {edges.length} links</span></div>
     <p className="rm-map-intro">Each dot is a file, or a whole git repository (ringed dot) with all of its files; bigger dots hold more passages. A line joins items whose content means similar things, or a memory card (◆) to what it cites.</p>
     <div className="rm-map-filters">
-      <label title={map.similarity_available ? undefined : "Needs AI for search"}><input checked={showSimilar && map.similarity_available} disabled={!map.similarity_available} onChange={(event) => setShowSimilar(event.target.checked)} type="checkbox" /> Similar content</label>
+      <Tooltip content={map.similarity_available ? "Lines between similar files" : "Needs AI for search"}><label><input checked={showSimilar && map.similarity_available} disabled={!map.similarity_available} onChange={(event) => setShowSimilar(event.target.checked)} type="checkbox" /> Similar content</label></Tooltip>
       <label><input checked={showCites} onChange={(event) => setShowCites(event.target.checked)} type="checkbox" /> Memory links</label>
       <div className="shared-artifact-view-switch" role="group" aria-label="Graph view">
         <IconButton label="Graph view" onClick={() => setView("graph")} pressed={view === "graph"}><Graph size={ICON_SIZE.md} /></IconButton>

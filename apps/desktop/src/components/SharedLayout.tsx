@@ -15,6 +15,7 @@ import type { SharedSession } from "../types";
 import { openCommandPalette } from "../lib/assistantBridge";
 import { MAIN_CONTENT_ID } from "../web/RouteAnnouncer";
 import { Button } from "./ui/button";
+import { IconButton } from "./ui/icon-button";
 import { DesktopServerNote } from "./DesktopServerNote";
 import { ICON_SIZE } from "./ui/icon";
 
@@ -52,9 +53,9 @@ export function useSharedTheme(): [Theme, () => void] {
 export function ThemeToggle({ className = "" }: { className?: string }) {
   const [theme, toggleTheme] = useSharedTheme();
   const next = theme === "dark" ? "light" : "dark";
-  return <Button aria-label={`Switch to ${next} mode`} aria-pressed={theme === "dark"} className={`shared-theme-toggle ${className}`.trim()} onClick={toggleTheme} title={`Switch to ${next} mode`} type="button" variant="secondary">
+  return <IconButton className={`shared-theme-toggle ${className}`.trim()} label={`Switch to ${next} mode`} onClick={toggleTheme} pressed={theme === "dark"} size="sm">
     {theme === "dark" ? <Sun size={ICON_SIZE.md} /> : <Moon size={ICON_SIZE.md} />}
-  </Button>;
+  </IconButton>;
 }
 
 export function SharedLayout({

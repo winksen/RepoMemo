@@ -110,6 +110,10 @@ page's own version, and add to this list when a new one is added.
   `pressed` marks a toggle that is on. An icon-only button is always an
   `IconButton`, never a `Button` with an `aria-label`. It is the third button
   treatment next to `main` and `secondary` (decision 18).
+- **`Tooltip`**: a short neutral label (inverted greys) above a control, on
+  hover and on keyboard focus, built on Radix. `IconButton` shows its `label`
+  in one. Use it instead of a `title` attribute to explain a control; wrap a
+  disabled control in a `span` so the tooltip can still open.
 
 ### Notifications
 
