@@ -15,6 +15,7 @@ import { showToast } from "../components/ui/toast";
 import { ApiTokensPanel } from "../components/ApiTokensPanel";
 import { accountKeys } from "../lib/queryClient";
 import { useAsyncAction } from "../lib/useAsyncAction";
+import { useFormState } from "../lib/useFormState";
 import { useServerState } from "../lib/useServerState";
 import { SharedLayout } from "../components/SharedLayout";
 import { apiMessage, formatProfileTime, formatTaskDueDate } from "./format";
@@ -48,7 +49,7 @@ export function SharedProfile({
   const [assignedTasks, , tasksQuery] = useServerState<CollaborationTask[]>({
     key: accountKeys.profileTasks(session.user.id), fetch: () => listSharedProfileTasks(accessToken), initial: [], staleTime: 0,
   });
-  const [displayName, setDisplayName] = useState(session.user.display_name);
+  const personal = useFormState({ displayName: profile?.user.display_name ?? session.user.display_name });
   const [preferences, setPreferences, preferencesQuery] = useServerState<NotificationPreference[]>({
     key: accountKeys.notificationPreferences(session.user.id), fetch: () => getNotificationPreferences(accessToken), initial: [], staleTime: 0,
   });
@@ -88,12 +89,11 @@ export function SharedProfile({
 
   const loadError = profileQuery.error ?? tasksQuery.error;
   useEffect(() => { if (loadError) showToast("error", apiMessage(loadError)); }, [loadError]);
-  useEffect(() => { if (profile) setDisplayName(profile.user.display_name); }, [profile?.user.display_name]);
 
   async function saveProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await run(async () => {
-      const user = await updateSharedProfile(accessToken, displayName);
+      const user = await updateSharedProfile(accessToken, personal.values.displayName);
       onSessionUserUpdated(user);
       setProfile((current) => current ? { ...current, user, updated_at: new Date().toISOString() } : current);
     }, { success: "Profile name updated." });
@@ -146,7 +146,7 @@ export function SharedProfile({
         <section className="shared-profile-identity"><UserAvatar className="shared-profile-avatar" name={profile?.user.display_name ?? session.user.display_name} size={72} userId={session.user.id} /><div><h2>{profile?.user.display_name ?? session.user.display_name}</h2><p>{profile?.user.email ?? session.user.email ?? "No email address"}</p><div className="shared-profile-avatar-actions"><input accept={AVATAR_INPUT_TYPES.join(",")} aria-label="Choose a profile picture" hidden onChange={(event) => void changeAvatar(event)} ref={avatarInput} type="file" /><Button disabled={isSubmitting} onClick={() => avatarInput.current?.click()} type="button" variant="secondary"><Camera size={ICON_SIZE.sm} /> {hasAvatar ? "Change picture" : "Upload picture"}</Button>{hasAvatar ? <Button disabled={isSubmitting} onClick={() => void removeAvatar()} type="button" variant="secondary"><Trash size={ICON_SIZE.sm} /> Remove</Button> : null}</div><small className="shared-muted-copy">PNG, JPEG or WebP. It is cropped to a square and shrunk before upload.</small></div><dl><div><dt>Last connected</dt><dd>{formatProfileTime(profile?.last_connected_at)}</dd></div><div><dt>Member since</dt><dd>{formatProfileTime(profile?.created_at)}</dd></div><div><dt>Shared workspaces</dt><dd>{profile?.workspace_count ?? "—"}</dd></div><div><dt>Recorded actions</dt><dd>{profile?.recent_activity_count ?? "—"}</dd></div></dl></section>
         <ContributionCalendar items={profile?.activity_by_day ?? []} title="Your activity" total={profile?.recent_activity_count} />
         <section className="shared-profile-assigned"><PanelHeading description={<>{assignedTasks.length} active</>} icon={Checklist} title="Assigned to you" />{assignedTasks.length ? <div className="shared-profile-task-list">{assignedTasks.map((task) => <Button key={task.id} onClick={() => navigate(`/workspaces/${encodeURIComponent(task.workspace_id)}/tasks`)} type="button" variant="secondary"><span><strong>{task.title}</strong><small>{task.status.replace(/_/g, " ")} · {task.priority} priority{task.due_at ? ` · due ${formatTaskDueDate(task.due_at)}` : ""}</small></span><ChevronRight size={ICON_SIZE.md} /></Button>)}</div> : <p className="shared-muted-copy">No active tasks are assigned to you.</p>}</section>
-        <section className="shared-profile-panel"><PanelHeading icon={UserCircle} title="Personal details" /><form onSubmit={saveProfile}><Field label="Display name" required><Input autoComplete="name" onChange={(event) => setDisplayName(event.target.value)} value={displayName} /></Field><Field label="Email"><Input disabled value={profile?.user.email ?? session.user.email ?? ""} /></Field><Button busy={isSubmitting} type="submit" variant="main"><Pencil size={ICON_SIZE.md} /> Save details</Button></form></section>
+        <section className="shared-profile-panel"><PanelHeading icon={UserCircle} title="Personal details" /><form onSubmit={saveProfile}><Field label="Display name" required><Input autoComplete="name" onChange={(event) => personal.set("displayName", event.target.value)} value={personal.values.displayName} /></Field><Field label="Email"><Input disabled value={profile?.user.email ?? session.user.email ?? ""} /></Field><Button busy={isSubmitting} type="submit" variant="main"><Pencil size={ICON_SIZE.md} /> Save details</Button></form></section>
         <section className="shared-profile-panel"><PanelHeading description={profile?.email_verified === false ? "not confirmed" : "confirmed"} icon={UserCircle} title="Email address" />
           <p className="shared-muted-copy">{profile?.email_verified === false ? (profile.verification_required ? "Confirm your address with the link we sent: until then you cannot create organizations or workspaces." : "This address has not been confirmed.") : `Invitations and notices go to ${profile?.user.email ?? "your address"}.`}</p>
           {profile?.email_verified === false ? <Button disabled={isSubmitting} onClick={() => void resendVerification()} type="button" variant="secondary">Send the link again</Button> : null}

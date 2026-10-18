@@ -2,6 +2,17 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.94 (2026-10-18)
+
+A small hook holds a form's values and tells whether they changed.
+
+### Changed
+- **`useFormState(initial)`** (`lib/useFormState.ts`) returns `{ values, initial, isDirty, set, patch, reset }`: the current values, the values the form started from, whether they differ, a setter for one field or several, and a way back. When `initial` changes (the saved record was loaded, or a save updated it) the form starts over from the new values, so a page needs no effect that copies a record into its fields.
+- **Profile › Personal details uses it** for the display name, in place of a `useState` and the effect that copied the loaded name into it. The form looks and behaves as before.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.93 (2026-10-18)
 
 One hook runs a mutation, with its busy flag and its toasts.

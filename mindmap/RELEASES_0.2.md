@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.2 → 0.3
 
-> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.93` (2026-10-18) · **Next:** `V0.2.94`
+> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.94` (2026-10-18) · **Next:** `V0.2.95`
 > **Previous line:** [Releases 0.1 → 0.2](RELEASES_0.1.md) · **Related:** [Roadmap, Road to V0.3.0](ROADMAP.md#-road-to-v030) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
 Every release of the 0.2 line, shipped and planned, one row each. The plan comes from the [Road to V0.3.0](ROADMAP.md#-road-to-v030): **one change per release**, each shippable alone, with the security rules for a new outside connection in the release that opens it. Planned rows are proposals until decisions 7–14 in the roadmap are agreed.
@@ -128,7 +128,7 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | **V0.2.91** | ✅ 2026-10-18 | K. Frontend polish | 🧹 Refactor | Web code | `web/format.ts` holds `formatDate`, `formatTime`, `formatRelativeTime`, `formatRecentTime`, `formatBytes`, `formatDuration` and `formatShare` (tested in `test/format.test.tsx`, written, not run); fifteen local copies removed; `Time` (`components/ui/time.tsx`) shows a relative time with the exact one on hover; written, not seen on screen | `grep 'function format'` finds them only in `web/format.ts`. |
 | **V0.2.92** | ✅ 2026-10-18 | K. Frontend polish | 🧹 Refactor | Web code | `apiMessage(error, fallback)` in `web/format.ts` replaces ten local `errorMessage` functions, the mail settings `message`, the document viewer `errorText` and eighteen inline checks (tested in `test/format.test.tsx`, written, not run); written, not seen on screen | `grep 'function errorMessage'` finds nothing. |
 | **V0.2.93** | ✅ 2026-10-18 | K. Frontend polish | 🧹 Refactor | Web code | `useAsyncAction()` (`lib/useAsyncAction.ts`): a busy flag, a success toast and an error toast around a mutation; used by the profile page and the task board in place of thirteen try/catch/finally blocks (tested in `test/useAsyncAction.test.tsx`, written, not run); written, not seen on screen | Both use the hook and behave as before. |
-| **V0.2.94** | 🔜 Planned | K. Frontend polish | 🧹 Refactor | Web code | `useFormState` | Profile › Personal details uses it. |
+| **V0.2.94** | ✅ 2026-10-18 | K. Frontend polish | 🧹 Refactor | Web code | `useFormState(initial)` (`lib/useFormState.ts`): the values of a form, its initial values, `isDirty`, `set`, `patch` and `reset`; Profile › Personal details uses it (tested in `test/useFormState.test.tsx`, written, not run); written, not seen on screen | Profile › Personal details uses it. |
 | **V0.2.95** | 🔜 Planned | K. Frontend polish | 🧹 Refactor | Web code | System area split | No file in `web/system/` is over 300 lines and behaviour is unchanged. |
 | **V0.2.96** | 🔜 Planned | K. Frontend polish | 🧹 Refactor | Web code | Repositories split | No file is over 300 lines and behaviour is unchanged. |
 | **V0.2.97** | 🔜 Planned | K. Frontend polish | 🧹 Refactor | Web code | Setup wizard split | Each step owns its state and the wizard behaves as before. |
