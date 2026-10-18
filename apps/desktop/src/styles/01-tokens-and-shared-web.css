@@ -284,7 +284,7 @@ input[type="file"] {
 .shared-profile-task-list strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .shared-profile-task-list small { color: var(--color-text-muted); font-size: 10px; text-transform: capitalize; }
 .shared-profile-panel { display: grid; align-content: start; gap: 14px; padding: 18px; background: var(--color-surface-2); border-radius: 10px; }
-.shared-profile-panel .shared-panel-heading { margin-bottom: 0; }
+.shared-profile-panel .rm-panel-heading { margin-bottom: 0; }
 .shared-profile-panel form { display: grid; gap: 12px; }
 .shared-profile-panel label { display: grid; gap: 6px; color: var(--color-text-muted); font-size: 12px; }
 .shared-profile-panel .rm-input { width: 100%; }
@@ -310,8 +310,8 @@ input[type="file"] {
 .shared-create-workspace input { width: min(260px, 28vw); }
 .shared-workspace-list { display: grid; margin-top: 18px; }
 .shared-organization-admin { display: grid; gap: 14px; margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--color-border); }
-.shared-organization-admin .shared-panel-heading { margin: 0; }
-.shared-organization-admin .shared-panel-heading > span { color: var(--color-text-muted); background: var(--color-surface-3); border-radius: 6px; font-size: 10px; font-weight: 700; text-transform: capitalize; }
+.shared-organization-admin .rm-panel-heading { margin: 0; }
+.shared-organization-admin .rm-panel-heading > .rm-panel-heading-description { color: var(--color-text-muted); background: var(--color-surface-3); border-radius: 6px; font-size: 10px; font-weight: 700; text-transform: capitalize; }
 .shared-organization-rename,
 .shared-organization-member-form { display: flex; align-items: end; flex-wrap: wrap; gap: 10px; }
 .shared-organization-rename label,
@@ -348,7 +348,7 @@ input[type="file"] {
 .shared-evidence-summary span:last-child { border-right: 0; }
 .shared-evidence-summary strong { margin-right: 5px; color: var(--color-text); font-size: 17px; }
 .shared-metrics-dashboard { display: grid; gap: 18px; margin: 28px 0; padding: 22px 0; border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); }
-.shared-metrics-dashboard .shared-panel-heading { margin-bottom: 0; }
+.shared-metrics-dashboard .rm-panel-heading { margin-bottom: 0; }
 .shared-metric-highlights { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid var(--color-border); border-radius: 10px; }
 .shared-metric-highlights > div { display: grid; gap: 4px; min-width: 0; padding: 15px; border-right: 1px solid var(--color-border); }
 .shared-metric-highlights > div:nth-child(3n) { border-right: 0; }
@@ -417,10 +417,6 @@ input[type="file"] {
 .shared-detail-grid.settings-only { grid-template-columns: minmax(0, 1fr); }
 .shared-detail-panel { min-width: 0; }
 .shared-retrieval-panel { padding-left: 24px; border-left: 1px solid var(--color-border); }
-.shared-panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 14px; }
-.shared-panel-heading > div { display: flex; align-items: center; gap: 8px; }
-.shared-panel-heading h2 { margin: 0; font-size: 15px; letter-spacing: -0.01em; }
-.shared-panel-heading span { color: var(--color-text-subtle); font-size: 12px; }
 .shared-record-link { display: flex; align-items: center; justify-content: space-between; gap: 14px; width: 100%; padding: 0; color: inherit; background: transparent; cursor: pointer; text-align: left; }
 .shared-record-link:hover strong { color: var(--color-accent-text); }
 .shared-artifact-browser { display: grid; gap: 14px; }
@@ -487,7 +483,7 @@ input[type="file"] {
 .shared-evidence-additions .shared-note-form,
 .shared-evidence-additions .shared-upload-form { margin-top: 0; }
 .shared-document-preview { display: grid; gap: 12px; margin-top: 24px; padding-top: 22px; border-top: 1px solid var(--color-border); }
-.shared-document-preview .shared-panel-heading { margin-bottom: 0; }
+.shared-document-preview .rm-panel-heading { margin-bottom: 0; }
 .shared-word-preview-body { max-height: min(48vh, 560px); }
 .shared-note-form h3 { margin: 0 0 2px; font-size: 14px; }
 .shared-note-form input,

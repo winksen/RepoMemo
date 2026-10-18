@@ -24,6 +24,7 @@ import { getSharedKnowledgeMap } from "../lib/sharedApi";
 import { layoutGraph } from "../lib/forceLayout";
 import type { KnowledgeEdge, KnowledgeMap, KnowledgeNode } from "../types";
 import { Button } from "./ui/button";
+import { PanelHeading } from "./ui/panel-heading";
 import { SegmentedControl } from "./ui/segmented-control";
 import { Tooltip } from "./ui/tooltip";
 import { showToast } from "./ui/toast";
@@ -137,7 +138,7 @@ function Pipeline({ canConfigure, map, onOpenEvidence, onOpenSettings }: { canCo
   const indexedShare = percent(pipeline.indexed_count, pipeline.file_count);
   const embeddedShare = pipeline.embedded_count === null ? null : percent(pipeline.embedded_count, pipeline.passage_count);
   return <section className="rm-map-section" aria-labelledby="rm-map-pipeline-title">
-    <div className="shared-panel-heading"><div><Layers size={ICON_SIZE.lg} /><h2 id="rm-map-pipeline-title">From files to searchable knowledge</h2></div></div>
+    <PanelHeading icon={Layers} id="rm-map-pipeline-title" title="From files to searchable knowledge" />
     <p className="rm-map-intro">Every file goes through these steps. Search works after step 2; search by meaning needs step 4.</p>
     <ol className="rm-map-stages">
       <li>
@@ -194,7 +195,7 @@ function Coverage({ map }: { map: KnowledgeMap }) {
   }
 
   return <section className="rm-map-section" aria-labelledby="rm-map-coverage-title">
-    <div className="shared-panel-heading"><div><FileText size={ICON_SIZE.lg} /><h2 id="rm-map-coverage-title">Coverage by kind of file</h2></div></div>
+    <PanelHeading icon={FileText} id="rm-map-coverage-title" title="Coverage by kind of file" />
     <div className="rm-map-legend" aria-label="Indexing states" role="group">
       <span><i className="rm-map-swatch indexed" /> Indexed</span>
       <span><i className="rm-map-swatch pending" /> Waiting</span>
@@ -386,7 +387,7 @@ function RelationGraph({ canConfigure, map, onOpenArtifact, onOpenMemoryCard, on
   }
 
   return <section className="rm-map-section" aria-labelledby="rm-map-graph-title">
-    <div className="shared-panel-heading"><div><Graph size={ICON_SIZE.lg} /><h2 id="rm-map-graph-title">How your content connects</h2></div><span>{fileCount} files · {edges.length} links</span></div>
+    <PanelHeading description={<>{fileCount} files · {edges.length} links</>} icon={Graph} id="rm-map-graph-title" title="How your content connects" />
     <p className="rm-map-intro">Each dot is a file, or a whole git repository (ringed dot) with all of its files; bigger dots hold more passages. A line joins items whose content means similar things, or a memory card (◆) to what it cites.</p>
     <div className="rm-map-filters">
       <Tooltip content={map.similarity_available ? "Lines between similar files" : "Needs AI for search"}><label><input checked={showSimilar && map.similarity_available} disabled={!map.similarity_available} onChange={(event) => setShowSimilar(event.target.checked)} type="checkbox" /> Similar content</label></Tooltip>

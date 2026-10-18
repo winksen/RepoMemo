@@ -4,6 +4,7 @@ import { SharedApiError, listSharedOrganizationMembers, removeSharedOrganization
 import { type Organization, type OrganizationMember, type OrganizationRole, type SharedWorkspace } from "../types";
 import { UserAvatar } from "../components/UserAvatar";
 import { Button } from "../components/ui/button";
+import { PanelHeading } from "../components/ui/panel-heading";
 import { useConfirm } from "../components/ui/confirm-dialog";
 import { Dropdown } from "../components/ui/dropdown";
 import { IconButton } from "../components/ui/icon-button";
@@ -80,7 +81,7 @@ export function OrganizationAdministration({
   }
 
   return <section className="shared-organization-admin" aria-labelledby="organization-admin-title">
-    <div className="shared-panel-heading"><div><Building size={ICON_SIZE.lg} /><h2 id="organization-admin-title">Organization administration</h2></div><span>{organization.role}</span></div>
+    <PanelHeading description={organization.role} icon={Building} id="organization-admin-title" title="Organization administration" />
     <p className="shared-muted-copy">Organization members inherit access to every workspace. Their organization role controls the level of that access.</p>
     {canRename ? <form className="shared-organization-rename" onSubmit={saveOrganization}><label>Organization name<Input onChange={(event) => setOrganizationName(event.target.value)} required value={organizationName} /></label><Button disabled={isSaving || organizationName.trim() === organization.name} type="submit" variant="secondary">Save name</Button></form> : null}
     <form className="shared-organization-member-form" onSubmit={(event) => { event.preventDefault(); void saveMember(memberEmail, memberRole); }}><label>Member email<Input onChange={(event) => setMemberEmail(event.target.value)} placeholder="person@example.com" required type="email" value={memberEmail} /></label><label>Organization role<Dropdown aria-label="Organization role" onValueChange={(value) => setMemberRole(value as OrganizationRole)} options={[{ label: "Member", value: "member" }, ...(canAssignAdmin ? [{ label: "Admin", value: "admin" }] : [])]} value={memberRole} /></label><Button disabled={isSaving} type="submit" variant="secondary"><Users size={ICON_SIZE.md} /> Add member</Button></form>

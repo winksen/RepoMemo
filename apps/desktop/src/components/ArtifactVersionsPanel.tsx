@@ -4,6 +4,7 @@ import { compareSharedArtifactVersions, getSharedArtifactVersionText, listShared
 import type { ArtifactVersion, ArtifactVersionText, VersionComparison } from "../types";
 import { formatFileSize } from "../web/format";
 import { Button } from "./ui/button";
+import { PanelHeading } from "./ui/panel-heading";
 import { Dialog, DialogCancel } from "./ui/dialog";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
@@ -91,7 +92,7 @@ export function ArtifactVersionsPanel({ accessToken, artifactId, updatedAt }: { 
 
   return <section className="shared-record-panel shared-versions-panel" aria-label="Version history">
     {dialog}
-    <div className="shared-panel-heading"><div><History size={ICON_SIZE.lg} /><h2>Version history</h2></div><span>{versions.length} versions</span></div>
+    <PanelHeading description={<>{versions.length} versions</>} icon={History} title="Version history" />
     <ul className="shared-version-list">
       {versions.map((version) => <li key={version.version}>
         <div>

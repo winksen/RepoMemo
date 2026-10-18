@@ -20,6 +20,7 @@ import {
 } from "../lib/sharedApi";
 import type { ConnectorAccessCheck, ConnectorSource } from "../types";
 import { Button } from "./ui/button";
+import { PanelHeading } from "./ui/panel-heading";
 import { Dialog, DialogCancel } from "./ui/dialog";
 import { Dropdown } from "./ui/dropdown";
 import { Input } from "./ui/input";
@@ -198,7 +199,7 @@ export function ConnectorSettings({
   }
 
   return <section className="shared-settings-group">
-    <div className="shared-panel-heading"><div><GitHub size={ICON_SIZE.lg} /><h2>Issues and pull requests</h2></div><span>{connectors?.length ?? 0} connected</span></div>
+    <PanelHeading description={<>{connectors?.length ?? 0} connected</>} icon={GitHub} title="Issues and pull requests" />
     <p className="shared-muted-copy">Keep a GitHub repository's or GitLab project's issues and pull (merge) requests, with their comments, reviews and commits, as searchable and citable evidence. Closed issues and abandoned requests are marked outdated and come back when reopened; merged ones stay. A read-only token is only needed for a private repository or a higher rate limit.</p>
 
     {connectors?.length ? <ul className="rm-repo-links">

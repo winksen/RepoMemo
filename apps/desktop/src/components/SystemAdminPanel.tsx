@@ -90,6 +90,7 @@ import type {
 import { ActionMenu } from "./ui/action-menu";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
+import { PanelHeading } from "./ui/panel-heading";
 import { Dialog, DialogCancel } from "./ui/dialog";
 import { Dropdown } from "./ui/dropdown";
 import { IconButton } from "./ui/icon-button";
@@ -256,7 +257,7 @@ function MaintenancePanel({ accessToken, status, onChanged }: { accessToken: str
   }
   const report = status?.last_report;
   return <section className="shared-settings-group">
-    <div className="shared-panel-heading"><div><Tool size={ICON_SIZE.lg} /><h2>Maintenance</h2></div><span>{status?.running ? "running" : status?.next_run_at ? `next ${formatTime(status.next_run_at)}` : "scheduled runs off"}</span></div>
+    <PanelHeading description={status?.running ? "running" : status?.next_run_at ? `next ${formatTime(status.next_run_at)}` : "scheduled runs off"} icon={Tool} title="Maintenance" />
     <p className="shared-muted-copy">Clears expired sessions and old jobs, deletes stored files nothing references, retries failed indexing and embeddings, and checkpoints the database.</p>
     <Facts items={[
       ["Last run", status?.last_finished_at ? `${formatTime(status.last_finished_at)} (${status.last_trigger ?? "scheduled"})` : "not yet since the server started"],
@@ -288,7 +289,7 @@ function OverviewSection({ accessToken }: { accessToken: string }) {
     </dl>
     <div className="rm-system-grid">
       <section className="shared-settings-group">
-        <div className="shared-panel-heading"><div><Server size={ICON_SIZE.lg} /><h2>Back end</h2></div><span>up {formatDuration(instance.uptime_seconds)}</span></div>
+        <PanelHeading description={<>up {formatDuration(instance.uptime_seconds)}</>} icon={Server} title="Back end" />
         <Facts items={[
           ["Service", `${instance.service_name} ${instance.version}`],
           ["Host", `${instance.host_name} · ${instance.operating_system}/${instance.architecture}`],
@@ -301,7 +302,7 @@ function OverviewSection({ accessToken }: { accessToken: string }) {
         ]} />
       </section>
       <section className="shared-settings-group">
-        <div className="shared-panel-heading"><div><Database size={ICON_SIZE.lg} /><h2>Storage</h2></div><span>{formatBytes(storage.database_bytes + storage.write_ahead_log_bytes + storage.blob_bytes + storage.preview_bytes)}</span></div>
+        <PanelHeading description={formatBytes(storage.database_bytes + storage.write_ahead_log_bytes + storage.blob_bytes + storage.preview_bytes)} icon={Database} title="Storage" />
         <Facts items={[
           ["Database", formatBytes(storage.database_bytes)],
           ["Write-ahead log", formatBytes(storage.write_ahead_log_bytes)],
@@ -318,7 +319,7 @@ function OverviewSection({ accessToken }: { accessToken: string }) {
         ]} />
       </section>
       <section className="shared-settings-group">
-        <div className="shared-panel-heading"><div><Activity size={ICON_SIZE.lg} /><h2>Background work</h2></div><span>{background.indexing_queued + background.repository_syncs_running ? "busy" : "idle"}</span></div>
+        <PanelHeading description={background.indexing_queued + background.repository_syncs_running ? "busy" : "idle"} icon={Activity} title="Background work" />
         <Facts items={[
           ["Files waiting for indexing", count(background.indexing_queued)],
           ["Workspaces waiting for vectors", count(background.embedding_workspaces_waiting)],
@@ -331,7 +332,7 @@ function OverviewSection({ accessToken }: { accessToken: string }) {
         ]} />
       </section>
       <section className="shared-settings-group">
-        <div className="shared-panel-heading"><div><ShieldCheck size={ICON_SIZE.lg} /><h2>Traffic and protection</h2></div><span>since start</span></div>
+        <PanelHeading description="since start" icon={ShieldCheck} title="Traffic and protection" />
         <Facts items={[
           ["Requests", count(traffic.requests)],
           ["Client errors · server errors", `${count(traffic.client_errors)} · ${count(traffic.server_errors)}`],
@@ -344,7 +345,7 @@ function OverviewSection({ accessToken }: { accessToken: string }) {
       </section>
     </div>
     <section className="shared-settings-group">
-      <div className="shared-panel-heading"><div><World size={ICON_SIZE.lg} /><h2>Front-end clients</h2></div><span>seen in the last 24 hours</span></div>
+      <PanelHeading description="seen in the last 24 hours" icon={World} title="Front-end clients" />
       {overview.clients.length ? <div className="rm-map-coverage"><table>
         <thead><tr><th scope="col">Client</th><th scope="col">Origin</th><th scope="col">Last address</th><th scope="col">Requests</th><th scope="col">First seen</th><th scope="col">Last seen</th></tr></thead>
         <tbody>{overview.clients.map((client) => <tr key={`${client.origin}-${client.client}-${client.agent}`}>
@@ -368,16 +369,16 @@ function UsageSection({ accessToken, onOpenWorkspace }: { accessToken: string; o
     </div>
     {usage ? <>
       <section className="shared-settings-group">
-        <div className="shared-panel-heading"><div><ChartBar size={ICON_SIZE.lg} /><h2>Recorded activity per day</h2></div><span>{count(total)} actions</span></div>
+        <PanelHeading description={<>{count(total)} actions</>} icon={ChartBar} title="Recorded activity per day" />
         <BarStrip label={`Recorded activity per day over the last ${usage.days} days`} values={usage.activity_by_day.map((entry) => ({ label: entry.label, value: entry.count }))} />
         <div className="rm-system-axis"><span>{usage.activity_by_day[0]?.label}</span><span>{usage.activity_by_day[usage.activity_by_day.length - 1]?.label}</span></div>
       </section>
       <div className="rm-system-grid">
-        <section className="shared-settings-group"><div className="shared-panel-heading"><div><Activity size={ICON_SIZE.lg} /><h2>Activity by kind</h2></div></div><CountTable label="Action" rows={usage.activity_by_action} valueLabel="Times" /></section>
-        <section className="shared-settings-group"><div className="shared-panel-heading"><div><Users size={ICON_SIZE.lg} /><h2>Most active people</h2></div></div><CountTable label="Person" rows={usage.top_users} valueLabel="Actions" /></section>
+        <section className="shared-settings-group"><PanelHeading icon={Activity} title="Activity by kind" /><CountTable label="Action" rows={usage.activity_by_action} valueLabel="Times" /></section>
+        <section className="shared-settings-group"><PanelHeading icon={Users} title="Most active people" /><CountTable label="Person" rows={usage.top_users} valueLabel="Actions" /></section>
       </div>
       <section className="shared-settings-group">
-        <div className="shared-panel-heading"><div><Database size={ICON_SIZE.lg} /><h2>Workspaces</h2></div><span>{usage.workspaces.length}, largest first</span></div>
+        <PanelHeading description={<>{usage.workspaces.length}, largest first</>} icon={Database} title="Workspaces" />
         <div className="rm-map-coverage"><table>
           <thead><tr><th scope="col">Workspace</th><th scope="col">Organization</th><th scope="col">Members</th><th scope="col">Files</th><th scope="col">Size</th><th scope="col">Passages</th><th scope="col">Activity</th><th scope="col">AI requests</th><th scope="col">Last activity</th></tr></thead>
           <tbody>{usage.workspaces.map((workspace) => <tr key={workspace.workspace_id}>
@@ -544,7 +545,7 @@ function EnvironmentGroup({ accessToken }: { accessToken: string }) {
   }
 
   return <section className="shared-settings-group rm-environment-card">
-    <div className="shared-panel-heading"><div><Unplug size={ICON_SIZE.lg} /><h2>Environment</h2></div><span>{platform?.environment ?? "—"}</span></div>
+    <PanelHeading description={platform?.environment ?? "—"} icon={Unplug} title="Environment" />
     <p className="shared-muted-copy">All data of this server lives in <code>{platform ? `${platform.folder}/${platform.environment ?? ""}` : "its environment folder"}</code>. Detaching signs everyone out, stops background work and closes the database. The server then waits for an environment to be chosen again, using the code printed on its console. Nothing is deleted.</p>
     {platform?.pinned_environment
       ? <p className="rm-platform-note" role="note"><AlertCircle size={ICON_SIZE.md} /><span>This server starts with <code>{platform.pinned_environment}</code>, set by <code>REPOMEMO_SERVER_DATA_DIR</code>. Another environment chosen after detaching is used only until the server restarts, then it goes back to <code>{platform.pinned_environment}</code>.</span></p>
@@ -604,7 +605,7 @@ function SettingsSection({ accessToken, session }: { accessToken: string; sessio
   return <>
     {readOnly ? <p className="shared-muted-copy">Read only: only system administrators change these settings.</p> : <div className="rm-system-toolbar"><span className="shared-muted-copy">{changed ? `${changed} unsaved change${changed === 1 ? "" : "s"}` : "No unsaved changes"}</span><div className="rm-system-actions"><Button disabled={!changed || isBusy} onClick={() => setDraft({})} type="button" variant="secondary">Discard</Button><Button disabled={!changed || isBusy} onClick={() => void save()} type="button" variant="main">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : null} Save changes</Button></div></div>}
     {groups.map(([group, entries]) => <section className="shared-settings-group" key={group}>
-      <div className="shared-panel-heading"><div><Adjustments size={ICON_SIZE.lg} /><h2>{group}</h2></div></div>
+      <PanelHeading icon={Adjustments} title={group} />
       <div className="rm-system-settings">{entries.map((setting) => {
         const value = draft[setting.key] ?? setting.value;
         const inputId = `system-setting-${setting.key}`;
@@ -626,7 +627,7 @@ function SettingsSection({ accessToken, session }: { accessToken: string; sessio
     <MailSettingsPanel accessToken={accessToken} canChange={session.is_system_admin === true} />
     {session.is_system_admin ? <EnvironmentGroup accessToken={accessToken} /> : null}
     <section className="shared-settings-group">
-      <div className="shared-panel-heading"><div><Server size={ICON_SIZE.lg} /><h2>Set by the server environment</h2></div><span>read only</span></div>
+      <PanelHeading description="read only" icon={Server} title="Set by the server environment" />
       <p className="shared-muted-copy">These are chosen by whoever runs the server, through environment variables, and need a restart to change.</p>
       <Facts items={settings.environment.map((fact) => [fact.label, fact.value])} />
     </section>
@@ -692,7 +693,7 @@ function LogsSection({ accessToken, canDownload, onOpenSettings, workspaces }: {
   const workspaceOptions = [{ label: "All workspaces", value: "all" }, ...workspaces.map((entry) => ({ label: entry.workspace.name, value: entry.workspace.id }))];
   return <>
     {files ? <section className="shared-settings-group">
-      <div className="shared-panel-heading"><div><Adjustments size={ICON_SIZE.lg} /><h2>What is recorded</h2></div><Button onClick={onOpenSettings} type="button" variant="secondary"><Adjustments size={ICON_SIZE.sm} /> Logging settings</Button></div>
+      <PanelHeading actions={<Button onClick={onOpenSettings} type="button" variant="secondary"><Adjustments size={ICON_SIZE.sm} /> Logging settings</Button>} icon={Adjustments} title="What is recorded" />
       {files.environment_filter
         ? <p className="shared-muted-copy">The server's RUST_LOG filter is in force: <code>{files.effective_filter}</code>. Choosing levels in Settings replaces it.</p>
         : <Facts items={[
@@ -778,7 +779,7 @@ function BackupsPanel({ accessToken, canChange }: { accessToken: string; canChan
 
   const status = overview?.status;
   return <section className="shared-settings-group">
-    <div className="shared-panel-heading"><div><Database size={ICON_SIZE.lg} /><h2>Backups</h2></div><span>{running ? `${status?.operation ?? "backup"} running…` : overview ? `${overview.backups.length} kept` : "loading"}</span></div>
+    <PanelHeading description={running ? `${status?.operation ?? "backup"} running…` : overview ? `${overview.backups.length} kept` : "loading"} icon={Database} title="Backups" />
     <p className="shared-muted-copy">A backup holds a consistent copy of the database, the stored files and the key file, made while the server runs. It sits in the data folder, so copy it to another machine for it to survive a lost disk, or set REPOMEMO_BACKUP_COPY_DIR and the server copies each backup there and checks the copy. Unless it is encrypted, protect it like the data; with REPOMEMO_BACKUP_KEY set, every file in it is sealed and restoring needs that same key, which is kept nowhere in the backup. Restoring never touches the running environment: it creates a new one, which you attach from the environment menu.</p>
     <Facts items={[
       ["Folder", <code key="dir">{overview?.directory ?? "—"}</code>],
@@ -844,7 +845,7 @@ function JobsSection({ accessToken, canChange }: { accessToken: string; canChang
     <MaintenancePanel accessToken={accessToken} onChanged={setMaintenance} status={maintenance} />
     <BackupsPanel accessToken={accessToken} canChange={canChange} />
     <section className="shared-settings-group">
-      <div className="shared-panel-heading"><div><Activity size={ICON_SIZE.lg} /><h2>Jobs</h2></div><span>{isLive ? "newest first · live" : "newest first · refreshes every 10 seconds"}</span></div>
+      <PanelHeading description={isLive ? "newest first · live" : "newest first · refreshes every 10 seconds"} icon={Activity} title="Jobs" />
       <div className="rm-system-toolbar">
         <label className="rm-system-inline">Status<Dropdown aria-label="Job status" onValueChange={setStatus} options={[{ label: "All", value: "all" }, { label: "Running", value: "running" }, { label: "Failed", value: "failed" }, { label: "Completed", value: "completed" }, { label: "Cancelled", value: "cancelled" }]} value={status} /></label>
         <RefreshButton isLoading={isLoading} onClick={() => void reload()} />
@@ -892,7 +893,7 @@ function AuditSection({ accessToken, canExport }: { accessToken: string; canExpo
 
   return <>
     {canExport ? <section className="shared-settings-group rm-audit-export">
-      <div className="shared-panel-heading"><div><Download size={ICON_SIZE.lg} /><h2>Export the audit trail</h2></div><span>JSON lines or CSV</span></div>
+      <PanelHeading description="JSON lines or CSV" icon={Download} title="Export the audit trail" />
       <p className="shared-muted-copy">Every event of a range of days (UTC), oldest first, for an auditor or a log store. Leave both days empty for the whole trail. The export is recorded here, and a CSV cell that a spreadsheet could run as a formula is marked with an apostrophe.</p>
       <div className="rm-system-toolbar">
         <label className="rm-system-inline">Format<Dropdown aria-label="Export format" onValueChange={(value) => setFormat(value === "csv" ? "csv" : "jsonl")} options={[{ label: "JSON lines", value: "jsonl" }, { label: "CSV", value: "csv" }]} value={format} /></label>

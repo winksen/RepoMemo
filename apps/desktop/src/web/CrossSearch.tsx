@@ -3,6 +3,7 @@ import { IconLoader2 as Loader, IconSearch as Search } from "@tabler/icons-react
 import { searchAllWorkspaces } from "../lib/sharedApi";
 import { type CrossSearchResponse } from "../types";
 import { Button } from "../components/ui/button";
+import { PanelHeading } from "../components/ui/panel-heading";
 import { Input } from "../components/ui/input";
 import { showToast } from "../components/ui/toast";
 import { renderHighlightedSnippet } from "./common";
@@ -30,7 +31,7 @@ export function CrossWorkspaceSearch({ accessToken }: { accessToken: string }) {
 
   const notes = found?.workspaces.filter((workspace) => workspace.note) ?? [];
   return <section aria-label="Search all workspaces" className="shared-cross-search">
-    <div className="shared-panel-heading"><div><Search size={ICON_SIZE.lg} /><h2>Search all workspaces</h2></div></div>
+    <PanelHeading icon={Search} title="Search all workspaces" />
     <form className="shared-retrieval-search" onSubmit={(event) => void run(event)}>
       <div className="shared-retrieval-filter-row">
         <Input aria-label="Search every workspace you can read" onChange={(event) => setQuery(event.target.value)} placeholder="Search the evidence of every workspace you can read" value={query} />

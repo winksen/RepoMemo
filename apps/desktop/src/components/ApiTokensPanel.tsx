@@ -6,6 +6,7 @@ import type { PersonalAccessToken } from "../types";
 import { SecretDialog } from "./SecretDialog";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
+import { PanelHeading } from "./ui/panel-heading";
 import { Dialog, DialogCancel } from "./ui/dialog";
 import { Dropdown } from "./ui/dropdown";
 import { Input } from "./ui/input";
@@ -80,7 +81,7 @@ export function ApiTokensPanel({ accessToken, isAdministrator }: { accessToken: 
 
   const now = new Date().toISOString();
   return <section className="shared-profile-panel rm-tokens">
-    <div className="shared-panel-heading"><div><ApiIcon size={ICON_SIZE.lg} /><h2>API tokens</h2></div><span>{tokens?.length ?? 0}</span></div>
+    <PanelHeading description={tokens?.length ?? 0} icon={ApiIcon} title="API tokens" />
     <p className="shared-muted-copy">For scripts, CI and the terminal console: send <code>Authorization: Bearer &lt;token&gt;</code>, or set <code>REPOMEMO_TOKEN</code> for <code>repomemo-console</code>. A token acts as you, so it only reaches what you can. It cannot manage tokens, change your password or grant roles. It keeps working when you change your password; revoke it here, or ask an administrator to sign you out everywhere.</p>
     <form className="rm-tokens-form" onSubmit={create}>
       <label>Name<Input maxLength={80} onChange={(event) => setName(event.target.value)} placeholder="CI release notes" required value={name} /></label>

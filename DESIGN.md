@@ -141,6 +141,10 @@ page's own version, and add to this list when a new one is added.
   segments and the chosen one cannot be turned off. Options have a label, an
   optional icon and count, or only an icon with a `name`. For many options use
   a `Dropdown`.
+- **`PanelHeading`**: the heading of a panel: a Tabler icon, the title (an `h2`;
+  `level={3}` for a part of a panel), an optional muted `description` at the end
+  (a count or a state) and optional `actions` (buttons, a status). Panel titles
+  are 16 px at most; the page title is the `PageHeader`.
 
 ### Notifications
 

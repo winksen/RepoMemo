@@ -11,7 +11,7 @@
 .rm-map { display: grid; gap: 28px; max-width: 1160px; }
 .rm-map-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--color-text-subtle); font-size: 12px; }
 .rm-map-section { display: grid; gap: 12px; min-width: 0; }
-.rm-map-section > .shared-panel-heading { margin-bottom: 0; }
+.rm-map-section > .rm-panel-heading { margin-bottom: 0; }
 .rm-map-intro { max-width: 72ch; margin: 0; color: var(--color-text-muted); font-size: 13px; line-height: 1.5; }
 .rm-map-muted { color: var(--color-text-subtle); font-size: 12px; line-height: 1.5; }
 .rm-map-stages { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px; margin: 0; padding: 0; list-style: none; }
@@ -213,7 +213,7 @@
 .rm-repo-links li > div:first-child { display: grid; gap: 2px; min-width: 0; }
 .rm-repo-check { display: grid; gap: 10px; padding: 12px; background: var(--color-surface-2); border-radius: 10px; }
 .rm-repo-page { display: grid; gap: 14px; }
-.rm-repo-page > .shared-panel-heading { margin-bottom: 0; }
+.rm-repo-page > .rm-panel-heading { margin-bottom: 0; }
 .rm-repo-summary { max-width: 80ch; }
 .rm-repo-cited { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; font-size: 13px; }
 .rm-repo-cited .rm-map-link { font-family: var(--font-mono); font-size: 12px; }

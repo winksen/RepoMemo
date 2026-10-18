@@ -1,10 +1,10 @@
+import { PanelHeading } from "./ui/panel-heading";
 import { useEffect, useState } from "react";
 import { IconShieldLock as ShieldLock } from "@tabler/icons-react";
 import { getSharedAiPolicy, saveSharedAiPolicy } from "../lib/sharedApi";
 import type { AiMinRole, AiPolicy } from "../types";
 import { Dropdown } from "./ui/dropdown";
 import { Toast } from "./ui/toast";
-import { ICON_SIZE } from "./ui/icon";
 
 const OPTIONS: { label: string; value: AiMinRole }[] = [
   { label: "Everyone in the workspace", value: "viewer" },
@@ -48,7 +48,7 @@ export function AiPolicySettings({ accessToken, onSaved, workspaceId }: {
   const quota = policy ? (policy.requests_per_hour > 0 ? `${policy.requests_per_hour} AI requests per person per hour` : "no hourly limit") : "loading";
   return (
     <section className="shared-settings-group">
-      <div className="shared-panel-heading"><div><ShieldLock size={ICON_SIZE.lg} /><h2>Who can use AI</h2></div><span>{quota}</span></div>
+      <PanelHeading description={quota} icon={ShieldLock} title="Who can use AI" />
       <p className="shared-muted-copy">Answers, overviews, summaries and the assistant's AI actions send cited excerpts to the workspace's text provider. Choose which roles may start them. Image descriptions and search vectors are built in the background for everyone and are not affected.</p>
       <div className="shared-ai-provider-form">
         <label>AI features available to<Dropdown aria-label="Roles that can use AI features" disabled={!policy || isSaving} onValueChange={(value) => void change(value)} options={OPTIONS} value={policy?.min_role} /></label>

@@ -13,6 +13,7 @@ import {
 import { applySharedHealthAction, getSharedWorkspaceHealth, SharedApiError } from "../lib/sharedApi";
 import type { HealthAction, HealthDetector, HealthEvidence, HealthFinding, WorkspaceHealth } from "../types";
 import { Button } from "./ui/button";
+import { PanelHeading } from "./ui/panel-heading";
 import { useLiveRefresh } from "../lib/liveEvents";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
@@ -125,20 +126,20 @@ export function WorkspaceHealthPanel({
     {!canAct ? <p className="rm-map-notice">You can review findings. Only workspace owners and administrators can act on them.</p> : null}
 
     <section className="rm-map-section" aria-labelledby="rm-health-findings-title">
-      <div className="shared-panel-heading"><div><Stethoscope size={ICON_SIZE.lg} /><h2 id="rm-health-findings-title">Needs attention</h2></div></div>
+      <PanelHeading icon={Stethoscope} id="rm-health-findings-title" title="Needs attention" />
       {warnings.length
         ? <ul className="rm-health-list">{warnings.map((finding) => <FindingCard busy={pending === finding.fingerprint} canAct={canAct} finding={finding} key={finding.fingerprint} onAct={act} onOpenArtifact={onOpenArtifact} />)}</ul>
         : <p className="shared-muted-copy">Nothing needs attention. Findings you act on or dismiss stay hidden until the files change.</p>}
     </section>
 
     {info.length ? <section className="rm-map-section" aria-labelledby="rm-health-info-title">
-      <div className="shared-panel-heading"><div><Unconnected size={ICON_SIZE.lg} /><h2 id="rm-health-info-title">For information</h2></div></div>
+      <PanelHeading icon={Unconnected} id="rm-health-info-title" title="For information" />
       <p className="rm-map-intro">A weak signal: a file unlike the rest can be the most valuable one here. Check that it belongs; nothing is suggested for removal.</p>
       <ul className="rm-health-list">{info.map((finding) => <FindingCard busy={pending === finding.fingerprint} canAct={canAct} finding={finding} key={finding.fingerprint} onAct={act} onOpenArtifact={onOpenArtifact} />)}</ul>
     </section> : null}
 
     <section className="rm-map-section" aria-labelledby="rm-health-checks-title">
-      <div className="shared-panel-heading"><div><FileAlert size={ICON_SIZE.lg} /><h2 id="rm-health-checks-title">Checks</h2></div></div>
+      <PanelHeading icon={FileAlert} id="rm-health-checks-title" title="Checks" />
       <p className="rm-map-intro">Every check reads stored facts only: versions, content hashes, indexed code symbols, lifecycle states and index results. No AI provider is called. Acted-on and dismissed counts show which checks are worth keeping.</p>
       <div className="rm-map-coverage">
         <table>

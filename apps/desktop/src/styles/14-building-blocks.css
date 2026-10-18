@@ -86,3 +86,9 @@ th > .rm-badge,
 .rm-segmented-item:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 1px; }
 .rm-segmented-count { margin-left: 2px; opacity: 0.65; font-weight: 400; }
 .rm-map-filters .rm-segmented { margin-left: auto; }
+
+/* PanelHeading: the icon and title of a panel, a muted note and actions at the end. */
+.rm-panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 14px; }
+.rm-panel-heading > div { display: flex; align-items: center; gap: 8px; }
+.rm-panel-heading h2 { margin: 0; font-size: 15px; letter-spacing: -0.01em; }
+.rm-panel-heading-description { color: var(--color-text-subtle); font-size: 12px; }

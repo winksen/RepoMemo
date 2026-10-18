@@ -36,6 +36,7 @@ import { lastChangeLabel } from "../web/format";
 import { LanguageChart } from "./LanguageChart";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
+import { PanelHeading } from "./ui/panel-heading";
 import { Dialog, DialogCancel } from "./ui/dialog";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
@@ -441,7 +442,7 @@ export function RepositorySettings({
   }
 
   return <section className="shared-settings-group rm-repo-settings">
-    <div className="shared-panel-heading"><div><GitBranch size={ICON_SIZE.lg} /><h2>Repositories</h2></div><span>{repositories?.length ?? 0} linked</span></div>
+    <PanelHeading description={<>{repositories?.length ?? 0} linked</>} icon={GitBranch} title="Repositories" />
     <p className="shared-muted-copy">Link git repositories to this workspace. RepoMemo reads what a branch has committed, never uncommitted changes or ignored files, and keeps every file in step with each sync. A link is a folder on the server; the server must be able to read it.</p>
 
     {repositories?.length ? <ul className="rm-repo-links">
@@ -810,7 +811,7 @@ export function RepositoryDetailView({
 
   return <>
     <section className="shared-record-panel rm-repo-page">
-      <div className="shared-panel-heading"><div><GitBranch size={ICON_SIZE.lg} /><h2>Repository</h2></div><span className={`rm-repo-status status-${status}`}>{STATUS_LABEL[status]}</span></div>
+      <PanelHeading actions={<span className={`rm-repo-status status-${status}`}>{STATUS_LABEL[status]}</span>} icon={GitBranch} title="Repository" />
       <dl className="rm-repo-facts">
         <div><dt>Location</dt><dd><code className="rm-repo-path">{repository.root_path}</code></dd></div>
         <div><dt><GitBranch size={ICON_SIZE.sm} /> Branch</dt><dd>{commit?.branch ?? repository.settings.branch ?? "Checked-out branch"}</dd></div>
@@ -832,7 +833,7 @@ export function RepositoryDetailView({
     </section>
 
     <section className="shared-record-panel rm-repo-page">
-      <div className="shared-panel-heading"><div><Sparkles size={ICON_SIZE.lg} /><h2>Summary</h2></div>{summary ? <span>{summary.provider_name}</span> : null}</div>
+      <PanelHeading description={summary ? summary.provider_name : null} icon={Sparkles} title="Summary" />
       {summary ? <>
         <div className="shared-markdown rm-repo-summary"><SafeMarkdown>{summary.summary_markdown}</SafeMarkdown></div>
         <p className="rm-map-muted">Written for commit <code>{summary.commit_sha.slice(0, 7)}</code> on {formatDate(summary.generated_at)}.{summaryIsStale ? " The repository has changed since; regenerate it to describe the current commit." : ""} {summary.warnings.join(" ")}</p>
@@ -842,7 +843,7 @@ export function RepositoryDetailView({
     </section>
 
     {overview?.stack ? <section className="shared-record-panel rm-repo-page">
-      <div className="shared-panel-heading"><div><Layers size={ICON_SIZE.lg} /><h2>Project analysis</h2></div><span>detected from manifests</span></div>
+      <PanelHeading description="detected from manifests" icon={Layers} title="Project analysis" />
       <p className="rm-stack-summary">{overview.stack.summary}</p>
       <dl className="rm-stack-groups">
         {STACK_CATEGORIES.map(([category, label]) => {
@@ -853,7 +854,7 @@ export function RepositoryDetailView({
     </section> : null}
 
     <section className="shared-record-panel rm-repo-page">
-      <div className="shared-panel-heading"><div><FolderCode size={ICON_SIZE.lg} /><h2>Content overview</h2></div>{overview ? <span>{overview.file_count.toLocaleString()} files · {formatBytes(overview.total_bytes)}</span> : null}</div>
+      <PanelHeading description={overview ? <>{overview.file_count.toLocaleString()} files · {formatBytes(overview.total_bytes)}</> : null} icon={FolderCode} title="Content overview" />
       {overview ? <div className="rm-repo-overview">
         <div className="rm-repo-languages">
           <h3 className="rm-repo-caption">Languages</h3>

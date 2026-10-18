@@ -3,6 +3,7 @@ import { IconBrain as Brain, IconChartBar as Chart, IconCode as Code, IconLoader
 import { generateSharedWorkspaceAiOverview } from "../../lib/sharedApi";
 import { type WorkspaceAiOverview } from "../../types";
 import { Button } from "../../components/ui/button";
+import { PanelHeading } from "../../components/ui/panel-heading";
 import { apiMessage, formatFileSize } from "../format";
 import { EvidenceUsed, MetricBars, MetricTimeline } from "../common";
 import { useCapabilities, useMetrics, useOverview } from "./data";
@@ -27,7 +28,7 @@ export function OverviewSection({ page }: { page: WorkspacePage }) {
           <span><strong>{overview?.artifact_count ?? "—"}</strong> artifacts</span>{canInspectIndex ? <span><strong>{overview?.chunk_count ?? "—"}</strong> indexed chunks</span> : null}<span><strong>{overview?.memory_card_count ?? "—"}</strong> memory cards</span>
         </div>
         <section className="shared-metrics-dashboard" aria-labelledby="workspace-metrics-heading">
-          <div className="shared-panel-heading"><div><Chart size={ICON_SIZE.lg} /><h2 id="workspace-metrics-heading">Workspace pulse</h2></div><span>{workspaceMetrics ? "Live API snapshot" : "Loading metrics…"}</span></div>
+          <PanelHeading description={workspaceMetrics ? "Live API snapshot" : "Loading metrics…"} icon={Chart} id="workspace-metrics-heading" title="Workspace pulse" />
           <div className="shared-metric-highlights">
             <div><span>Index coverage</span><strong>{workspaceMetrics ? `${workspaceMetrics.artifact_count ? Math.round((workspaceMetrics.indexed_artifact_count / workspaceMetrics.artifact_count) * 100) : 0}%` : "—"}</strong><small>{workspaceMetrics ? `${workspaceMetrics.indexed_artifact_count} of ${workspaceMetrics.artifact_count} artifacts` : "Waiting for server data"}</small></div>
             <div><span>Indexed storage</span><strong>{workspaceMetrics ? formatFileSize(workspaceMetrics.indexed_artifact_bytes) : "—"}</strong><small>{workspaceMetrics ? `${formatFileSize(workspaceMetrics.pending_artifact_bytes)} pending` : "Waiting for server data"}</small></div>
@@ -50,7 +51,7 @@ export function OverviewSection({ page }: { page: WorkspacePage }) {
           </div>
         </section></>
         <section className="shared-ai-overview" aria-live="polite">
-          <div className="shared-panel-heading"><div><Brain size={ICON_SIZE.lg} /><h2>AI workspace overview</h2></div>{aiOverview?.provider_name ? <span>{aiOverview.provider_name}</span> : null}</div>
+          <PanelHeading description={aiOverview?.provider_name ? aiOverview.provider_name : null} icon={Brain} title="AI workspace overview" />
           {aiOverview?.summary_markdown ? <div className="shared-markdown shared-ai-answer"><SafeMarkdown>{aiOverview.summary_markdown}</SafeMarkdown></div> : <p className="shared-muted-copy">Generate a concise project briefing from indexed evidence. RepoMemo only uses an enabled provider configured for this workspace and returns the source citations with the result.</p>}
           {aiOverview?.warnings.length ? <div className="shared-ai-overview-warning">{aiOverview.warnings.map((warning) => <p key={warning}>{warning}</p>)}</div> : null}
           {aiOverview?.citations.length ? <EvidenceUsed accessToken={accessToken} citations={aiOverview.citations} onOpenArtifact={onOpenArtifact} /> : null}

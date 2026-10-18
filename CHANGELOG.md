@@ -2,6 +2,17 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.83 (2026-10-18)
+
+One heading for every panel.
+
+### Changed
+- **`PanelHeading`** is in `components/ui/panel-heading.tsx`: `<PanelHeading icon title description actions level id />`. The icon is a Tabler component drawn at the heading's size (18 px in an `h2`, 16 px in an `h3`), `description` is the muted note at the end (a count, a state), `actions` hold buttons or a status element, and `id` lets a section name itself by it with `aria-labelledby`.
+- **It replaces all 59 hand-built `shared-panel-heading` blocks** in 24 files (System, Profile, repositories, connectors, the knowledge map, workspace pages and others). The rules moved to `14-building-blocks.css` as `rm-panel-heading`, and the page-specific margin and note rules were renamed with it; `grep shared-panel-heading` finds nothing. The two status pills in a heading (a repository's status, an evidence lifecycle status) now take their own size and colour instead of the heading's note style.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.82 (2026-10-18)
 
 One segmented control for switches and tab strips.

@@ -4,6 +4,7 @@ import { IconBrain as Brain, IconLoader2 as Loader, IconPhoto as Photo, IconRefr
 import { saveSharedWorkspaceAiProvider, testSharedWorkspaceAiProvider } from "../lib/sharedApi";
 import type { ProviderTestResult, SharedAiProviderSettings } from "../types";
 import { Button } from "./ui/button";
+import { PanelHeading } from "./ui/panel-heading";
 import { Dropdown } from "./ui/dropdown";
 import { Input } from "./ui/input";
 import { Toast } from "./ui/toast";
@@ -140,7 +141,7 @@ export function AiProviderForm({
   const Icon = ICONS[purpose];
   return (
     <section className="shared-settings-group">
-      <div className="shared-panel-heading"><div><Icon size={ICON_SIZE.lg} /><h2>{copy.title}</h2></div><span>{own.some((entry) => entry.enabled) ? "configured" : "not configured"}</span></div>
+      <PanelHeading description={own.some((entry) => entry.enabled) ? "configured" : "not configured"} icon={Icon} title={copy.title} />
       <p className="shared-muted-copy">{copy.intro}</p>
       {status ? <p className="shared-ai-provider-status">{status}</p> : null}
       <form className="shared-ai-provider-form" onSubmit={save}>

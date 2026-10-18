@@ -3,6 +3,7 @@ import { IconPencil as Pencil, IconSettings as Settings, IconTrash as Trash } fr
 import { deleteSharedWorkspace, getSharedWorkspaceMetrics, updateSharedWorkspace } from "../../lib/sharedApi";
 import { type SharedAiProviderSettings } from "../../types";
 import { Button } from "../../components/ui/button";
+import { PanelHeading } from "../../components/ui/panel-heading";
 import { useConfirm } from "../../components/ui/confirm-dialog";
 import { Input } from "../../components/ui/input";
 import { AiPolicySettings } from "../../components/AiPolicySettings";
@@ -86,7 +87,7 @@ export function SettingsSection({ page }: { page: WorkspacePage }) {
               <ConnectorSettings accessToken={accessToken} key={`connectors-${workspace.workspace.id}`} onChanged={() => void load()} workspaceId={workspace.workspace.id} />
               <WorkspaceExportSettings accessToken={accessToken} key={`export-${workspace.workspace.id}`} workspaceId={workspace.workspace.id} />
               {canManageWorkspace ? <section className="shared-settings-group">
-                <div className="shared-panel-heading"><div><Settings size={ICON_SIZE.lg} /><h2>Workspace ownership</h2></div><span>owner only</span></div>
+                <PanelHeading description="owner only" icon={Settings} title="Workspace ownership" />
                 <p className="shared-muted-copy">Rename this workspace or remove it permanently. Deletion removes its shared evidence, memory, and memberships.</p>
                 <form className="shared-workspace-rename" onSubmit={renameWorkspace}><Input aria-label="Workspace name" onChange={(event) => setWorkspaceName(event.target.value)} required value={workspaceName} /><Button disabled={isSubmitting} type="submit" variant="secondary"><Pencil size={ICON_SIZE.md} /> Rename</Button></form>
                 <Button className="shared-danger-action" disabled={isSubmitting} onClick={() => void removeWorkspace()} type="button" variant="secondary"><Trash size={ICON_SIZE.md} /> Delete workspace</Button>

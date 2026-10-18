@@ -4,6 +4,7 @@ import { IconLoader2 as Loader, IconMail as Mail, IconSend as Send } from "@tabl
 import { getSystemMail, saveSystemMail, sendSystemTestMail } from "../lib/sharedApi";
 import type { MailOverview } from "../types";
 import { Button } from "./ui/button";
+import { PanelHeading } from "./ui/panel-heading";
 import { Dropdown } from "./ui/dropdown";
 import { Input } from "./ui/input";
 import { showToast } from "./ui/toast";
@@ -91,7 +92,7 @@ export function MailSettingsPanel({ accessToken, canChange }: { accessToken: str
   const settings = overview.settings;
   const readOnly = !canChange;
   return <section className="shared-settings-group">
-    <div className="shared-panel-heading"><div><Mail size={ICON_SIZE.lg} /><h2>Mail</h2></div><span>{settings.enabled ? "on" : settings.configured ? "off" : "not set up"}</span></div>
+    <PanelHeading description={settings.enabled ? "on" : settings.configured ? "off" : "not set up"} icon={Mail} title="Mail" />
     <p className="shared-muted-copy">The server sends invitations and notices through your mail server over TLS. Mail is never sent in plain text. Servers on a private address need the operator's say (<code>REPOMEMO_SMTP_ALLOWED_HOSTS</code>).</p>
     <form className="rm-system-settings" onSubmit={save}>
       <label className="shared-ai-provider-toggle"><input checked={enabled} disabled={readOnly} onChange={(event) => setEnabled(event.target.checked)} type="checkbox" /> Send mail</label>

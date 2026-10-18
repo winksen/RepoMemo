@@ -6,6 +6,7 @@ import type { InvitationTarget } from "../lib/sharedApi";
 import type { Invitation } from "../types";
 import { appLink, SecretDialog } from "./SecretDialog";
 import { Button } from "./ui/button";
+import { PanelHeading } from "./ui/panel-heading";
 import { Dropdown } from "./ui/dropdown";
 import { Input } from "./ui/input";
 import { showToast } from "./ui/toast";
@@ -87,7 +88,7 @@ export function InviteMembers({
   }
 
   return <section className="shared-settings-group rm-invite" aria-label={`Invite to this ${targetLabel}`}>
-    <div className="shared-panel-heading"><div><MailForward size={ICON_SIZE.lg} /><h2>Invite by link</h2></div><span>{invitations?.length ?? 0} pending</span></div>
+    <PanelHeading description={<>{invitations?.length ?? 0} pending</>} icon={MailForward} title="Invite by link" />
     <p className="shared-muted-copy">For people without an account, or to send an access link. You get a link to pass on yourself; it works once, for this email address only, and expires after 7 days. They can create their account from it even when registration is closed.</p>
     <form className="rm-invite-form" onSubmit={invite}>
       <Input aria-label="Email to invite" autoComplete="off" onChange={(event) => setEmail(event.target.value)} placeholder="person@example.com" required type="email" value={email} />

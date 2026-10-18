@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.2 → 0.3
 
-> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.82` (2026-10-18) · **Next:** `V0.2.83`
+> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.83` (2026-10-18) · **Next:** `V0.2.84`
 > **Previous line:** [Releases 0.1 → 0.2](RELEASES_0.1.md) · **Related:** [Roadmap, Road to V0.3.0](ROADMAP.md#-road-to-v030) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
 Every release of the 0.2 line, shipped and planned, one row each. The plan comes from the [Road to V0.3.0](ROADMAP.md#-road-to-v030): **one change per release**, each shippable alone, with the security rules for a new outside connection in the release that opens it. Planned rows are proposals until decisions 7–14 in the roadmap are agreed.
@@ -117,7 +117,7 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | **V0.2.80** | ✅ 2026-10-18 | K. Frontend polish | ✨ Feature | UI kit | `EmptyState` (`components/ui/empty-state.tsx`): icon, title, one sentence, at most one action, centred; used for tasks, memory cards and notifications; written, not seen on screen | Used for tasks, memory cards and notifications. |
 | **V0.2.81** | ✅ 2026-10-18 | K. Frontend polish | ✨ Feature | UI kit | `Badge` (`components/ui/badge.tsx`): neutral surface and text with an optional status dot for a tone, forwarding its ref; replaces `rm-system-tag`, `rm-system-role`, `shared-review-badge`, `rm-console-tag`, `workspace-context-chip` and `rm-stack-chip`, whose rules are removed; written, not seen on screen | Those classes are gone. |
 | **V0.2.82** | ✅ 2026-10-18 | K. Frontend polish | ✨ Feature | UI kit | `SegmentedControl` (`components/ui/segmented-control.tsx`, Radix Toggle Group, new dependency): replaces the account switch, the activity filter, the evidence and map view switches and the sheet tabs; their styles are gone; the sheets test is rewritten (written, not run); not seen on screen | The five switches share one look and arrow-key behaviour. |
-| **V0.2.83** | 🔜 Planned | K. Frontend polish | ✨ Feature | UI kit | `PanelHeading` | `grep shared-panel-heading` finds only the component's own CSS. |
+| **V0.2.83** | ✅ 2026-10-18 | K. Frontend polish | ✨ Feature | UI kit | `PanelHeading` (`components/ui/panel-heading.tsx`): icon, title, muted note, actions, heading level and id; replaces the 59 `shared-panel-heading` blocks in 24 files, and its rules moved to `rm-panel-heading`; written, not seen on screen | `grep shared-panel-heading` finds only the component's own CSS. |
 | **V0.2.84** | 🔜 Planned | K. Frontend polish | ✨ Feature | UI kit | `PageHeader` | The dashboard, workspace, artifact, memory card, profile, notifications, organization and System pages use it. |
 | **V0.2.85** | 🔜 Planned | K. Frontend polish | ✨ Feature | UI kit | Table styles | The System users, jobs, audit, map coverage and repository tables share it. |
 | **V0.2.86** | 🔜 Planned | K. Frontend polish | ✨ Feature | UI kit | `Combobox` for long lists | A card's evidence is picked by typing part of a file name. |

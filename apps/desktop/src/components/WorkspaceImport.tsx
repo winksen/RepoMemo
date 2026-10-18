@@ -5,9 +5,9 @@ import { isDesktopRuntime } from "../lib/desktop";
 import { discardPreparedArchive, loadPreparedArchive, pendingHandoff, type PreparedArchive, rememberHandoff } from "../lib/handoff";
 import type { ArchiveImportReport, SharedWorkspace } from "../types";
 import { Button } from "./ui/button";
+import { PanelHeading } from "./ui/panel-heading";
 import { Input } from "./ui/input";
 import { showToast } from "./ui/toast";
-import { ICON_SIZE } from "./ui/icon";
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} bytes`;
@@ -113,7 +113,7 @@ export function WorkspaceImport({ accessToken, onImported, organizationId }: {
 
   return (
     <section className="shared-settings-group shared-import-workspace">
-      <div className="shared-panel-heading"><div><PackageImport size={ICON_SIZE.lg} /><h2>Import a workspace</h2></div><span>from an archive</span></div>
+      <PanelHeading description="from an archive" icon={PackageImport} title="Import a workspace" />
       <p className="shared-muted-copy">Bring in a workspace exported from RepoMemo as a new workspace. The archive is checked first and nothing is written until you confirm. Comments, tasks and history are credited to you, with the original names kept in the text.</p>
       {handoff ? <p className="shared-import-handoff" role="status">Prepared on this computer: <strong>{handoff.workspace_name}</strong>. It is being checked below; nothing is written until you import it. <Button onClick={() => void forgetHandoff()} type="button" variant="secondary">Discard it</Button></p> : null}
       <div className="shared-import-row">

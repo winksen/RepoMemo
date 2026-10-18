@@ -4,6 +4,7 @@ import { SharedApiError, transferSharedWorkspaceOwnership, removeSharedWorkspace
 import { type WorkspaceMember, type WorkspaceRole } from "../../types";
 import { UserAvatar } from "../../components/UserAvatar";
 import { Button } from "../../components/ui/button";
+import { PanelHeading } from "../../components/ui/panel-heading";
 import { SegmentedControl } from "../../components/ui/segmented-control";
 import { useConfirm } from "../../components/ui/confirm-dialog";
 import { Dropdown } from "../../components/ui/dropdown";
@@ -70,7 +71,7 @@ export function PeopleSection({ page }: { page: WorkspacePage }) {
   return (
 <>
             <div className="shared-members-section">
-              <div className="shared-panel-heading"><div><Users size={ICON_SIZE.lg} /><h2>Workspace team</h2></div><span>{members.length}</span></div>
+              <PanelHeading description={members.length} icon={Users} title="Workspace team" />
               <p className="shared-muted-copy">{canManageMembers ? "Add people and manage their access to this workspace." : "Your workspace role does not allow membership changes."}</p>
               <div className="shared-capabilities" aria-label="Your workspace capabilities" role="group">
                 <strong>Your {capabilities?.role ?? workspace.role} access</strong>
@@ -96,7 +97,7 @@ export function PeopleSection({ page }: { page: WorkspacePage }) {
             </div>
             <div className="shared-activity-section">
               <ContributionCalendar items={activityCalendar?.activity_by_day ?? []} title="Workspace activity" total={activityCalendar?.total_activity_count} />
-              <div className="shared-panel-heading"><div><Timeline size={ICON_SIZE.lg} /><h2>Activity history</h2></div><span>{visibleActivity.length}</span></div>
+              <PanelHeading description={visibleActivity.length} icon={Timeline} title="Activity history" />
               <SegmentedControl aria-label="Activity type" className="shared-activity-filter" onValueChange={setActivityKind} options={[{ count: userActivity.length, icon: <Users size={ICON_SIZE.sm} />, label: "User activity", value: "user" }, { count: aiActivity.length, icon: <Sparkles size={ICON_SIZE.sm} />, label: "AI activity", value: "ai" }]} value={activityKind} />
               {visibleActivity.length ? <div className="shared-activity-list">{visibleActivity.map((event) => <article key={event.id}><div><strong>{event.summary}</strong><span>{activityKind === "ai" ? `Requested by ${event.actor?.display_name ?? "Unknown"}` : (event.actor?.display_name ?? "System")} · {event.action.replace(/_/g, " ")}</span></div><time dateTime={event.created_at}>{formatActivityTime(event.created_at)}</time></article>)}</div> : <div className="shared-empty-state">{activityKind === "ai" ? <Sparkles size={25} /> : <Timeline size={25} />}<strong>{activityKind === "ai" ? "No AI activity yet" : "No recorded activity yet"}</strong><span>{activityKind === "ai" ? "Assistant questions and generated answers will appear here." : "New workspace changes will appear here."}</span></div>}
             </div>
