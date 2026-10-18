@@ -1,5 +1,5 @@
 import { SharedLayout } from "../components/SharedLayout";
-import { SystemAdminPanel, SystemNavigation } from "../components/SystemAdminPanel";
+import { SystemAdminPanel, SystemNavigation } from "./system/SystemAdminPanel";
 import type { Organization, SharedSession, SharedWorkspace } from "../types";
 import type { SystemSection } from "./constants";
 import { OrganizationRail } from "./Organization";

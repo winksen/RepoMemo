@@ -2,6 +2,18 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.95 (2026-10-18)
+
+The System area is one file per page.
+
+### Changed
+- **`components/SystemAdminPanel.tsx` (887 lines) becomes `web/system/`:** `SystemAdminPanel.tsx` (the page header, the tabs and the choice of page), `Overview.tsx`, `Usage.tsx`, `Users.tsx`, `Settings.tsx`, `Logs.tsx`, `Jobs.tsx`, `Backups.tsx`, `Audit.tsx`, `Maintenance.tsx` (shared by Overview and Jobs) and `shared.tsx` (the data hook, `RefreshButton`, `Facts`, `BarStrip`, `CountTable`). The longest file is 178 lines.
+- **Nothing else changes:** the code was moved as it was, so the pages look and behave as before. `web/SystemArea.tsx` imports the area from its new place.
+- **`test/splitModules.test.ts`** checks that no file of a split folder grows past 300 lines. It lists `web/system` and later releases add their folders.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.94 (2026-10-18)
 
 A small hook holds a form's values and tells whether they changed.
