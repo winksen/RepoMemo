@@ -5,6 +5,7 @@ import { getConsoleWelcome, runConsoleCommand, SharedApiError } from "../lib/sha
 import type { ConsoleResponse, ConsoleWelcome } from "../types";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
+import { Table } from "./ui/table";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
 
@@ -63,12 +64,12 @@ function Answer({ entry }: { entry: Entry }) {
     {view.kind === "facts" && Array.isArray(data) ? <dl className="rm-system-facts rm-console-facts">
       {(data as [string, unknown][]).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{cell(value)}</dd></div>)}
     </dl> : null}
-    {view.kind === "table" && Array.isArray(data) && data.length ? <div className="rm-map-coverage rm-console-table"><table>
+    {view.kind === "table" && Array.isArray(data) && data.length ? <Table className="rm-console-table">
       <thead><tr>{view.columns.map((column) => <th key={column} scope="col">{column.replace(/_/g, " ")}</th>)}</tr></thead>
       <tbody>{(data as Record<string, unknown>[]).map((row, index) => <tr key={index}>
         {view.columns.map((column) => <td key={column}>{cell(row[column])}</td>)}
       </tr>)}</tbody>
-    </table></div> : null}
+    </Table> : null}
   </>;
 }
 

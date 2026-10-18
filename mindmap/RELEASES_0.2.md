@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.2 → 0.3
 
-> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.84` (2026-10-18) · **Next:** `V0.2.85`
+> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.85` (2026-10-18) · **Next:** `V0.2.86`
 > **Previous line:** [Releases 0.1 → 0.2](RELEASES_0.1.md) · **Related:** [Roadmap, Road to V0.3.0](ROADMAP.md#-road-to-v030) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
 Every release of the 0.2 line, shipped and planned, one row each. The plan comes from the [Road to V0.3.0](ROADMAP.md#-road-to-v030): **one change per release**, each shippable alone, with the security rules for a new outside connection in the release that opens it. Planned rows are proposals until decisions 7–14 in the roadmap are agreed.
@@ -119,7 +119,7 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | **V0.2.82** | ✅ 2026-10-18 | K. Frontend polish | ✨ Feature | UI kit | `SegmentedControl` (`components/ui/segmented-control.tsx`, Radix Toggle Group, new dependency): replaces the account switch, the activity filter, the evidence and map view switches and the sheet tabs; their styles are gone; the sheets test is rewritten (written, not run); not seen on screen | The five switches share one look and arrow-key behaviour. |
 | **V0.2.83** | ✅ 2026-10-18 | K. Frontend polish | ✨ Feature | UI kit | `PanelHeading` (`components/ui/panel-heading.tsx`): icon, title, muted note, actions, heading level and id; replaces the 59 `shared-panel-heading` blocks in 24 files, and its rules moved to `rm-panel-heading`; written, not seen on screen | `grep shared-panel-heading` finds only the component's own CSS. |
 | **V0.2.84** | ✅ 2026-10-18 | K. Frontend polish | ✨ Feature | UI kit | `PageHeader` (`components/ui/page-header.tsx`): title, description, actions, optional back link; used by the dashboard, workspace, artifact, memory card, profile, notifications and System pages; page titles are 28 to 32 px and panel titles 16 px as DESIGN.md says; `shared-page-heading` and `shared-detail-heading` removed; written, not seen on screen | The dashboard, workspace, artifact, memory card, profile, notifications, organization and System pages use it. |
-| **V0.2.85** | 🔜 Planned | K. Frontend polish | ✨ Feature | UI kit | Table styles | The System users, jobs, audit, map coverage and repository tables share it. |
+| **V0.2.85** | ✅ 2026-10-18 | K. Frontend polish | ✨ Feature | UI kit | `Table` and the `rm-table` styles (`components/ui/table.tsx`): sideways-scrolling box, sticky header past 640 px, row hover, `rm-table-number` for right-aligned tabular figures; used by the System, map, health and repository tables, replacing `rm-map-coverage`; written, not seen on screen | The System users, jobs, audit, map coverage and repository tables share it. |
 | **V0.2.86** | 🔜 Planned | K. Frontend polish | ✨ Feature | UI kit | `Combobox` for long lists | A card's evidence is picked by typing part of a file name. |
 | **V0.2.87** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | UI kit | The searchable picker where lists are long | None of these lists needs scrolling through every file. |
 | **V0.2.88** | 🔜 Planned | K. Frontend polish | ✨ Feature | UI kit | `SearchField` | Those four filters look and behave alike. |

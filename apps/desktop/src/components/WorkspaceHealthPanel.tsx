@@ -13,6 +13,7 @@ import {
 import { applySharedHealthAction, getSharedWorkspaceHealth, SharedApiError } from "../lib/sharedApi";
 import type { HealthAction, HealthDetector, HealthEvidence, HealthFinding, WorkspaceHealth } from "../types";
 import { Button } from "./ui/button";
+import { Table } from "./ui/table";
 import { PanelHeading } from "./ui/panel-heading";
 import { useLiveRefresh } from "../lib/liveEvents";
 import { showToast } from "./ui/toast";
@@ -141,18 +142,17 @@ export function WorkspaceHealthPanel({
     <section className="rm-map-section" aria-labelledby="rm-health-checks-title">
       <PanelHeading icon={FileAlert} id="rm-health-checks-title" title="Checks" />
       <p className="rm-map-intro">Every check reads stored facts only: versions, content hashes, indexed code symbols, lifecycle states and index results. No AI provider is called. Acted-on and dismissed counts show which checks are worth keeping.</p>
-      <div className="rm-map-coverage">
-        <table>
-          <thead><tr><th scope="col">Check</th><th scope="col">Looks for</th><th scope="col">Open</th><th scope="col">Acted on</th><th scope="col">Dismissed</th></tr></thead>
+      <Table>
+        
+          <thead><tr><th scope="col">Check</th><th scope="col">Looks for</th><th className="rm-table-number" scope="col">Open</th><th className="rm-table-number" scope="col">Acted on</th><th className="rm-table-number" scope="col">Dismissed</th></tr></thead>
           <tbody>{health.detectors.map((stats) => <tr key={stats.detector}>
             <th scope="row">{DETECTORS[stats.detector].label}</th>
             <td className="rm-health-looks-for">{DETECTORS[stats.detector].looksFor}{stats.detector === "unconnected" && !health.similarity_available ? <span className="rm-map-muted"> Needs an embedding provider.</span> : null}</td>
-            <td>{stats.open_count}</td>
-            <td>{stats.acted_count}</td>
-            <td>{stats.dismissed_count}</td>
+            <td className="rm-table-number">{stats.open_count}</td>
+            <td className="rm-table-number">{stats.acted_count}</td>
+            <td className="rm-table-number">{stats.dismissed_count}</td>
           </tr>)}</tbody>
-        </table>
-      </div>
+        </Table>
     </section>
   </section>;
 }

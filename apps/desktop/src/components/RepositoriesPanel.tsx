@@ -36,6 +36,7 @@ import { lastChangeLabel } from "../web/format";
 import { LanguageChart } from "./LanguageChart";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
+import { Table } from "./ui/table";
 import { PanelHeading } from "./ui/panel-heading";
 import { Dialog, DialogCancel } from "./ui/dialog";
 import { Input } from "./ui/input";
@@ -860,13 +861,12 @@ export function RepositoryDetailView({
           <h3 className="rm-repo-caption">Languages</h3>
           <LanguageChart languages={overview.languages} totalBytes={overview.total_bytes} />
         </div>
-        <div className="rm-map-coverage">
-          <table>
+        <Table>
+          
             <caption className="rm-repo-caption">Structure</caption>
-            <thead><tr><th scope="col">Folder</th><th scope="col">Files</th></tr></thead>
-            <tbody>{overview.folders.map((folder) => <tr key={folder.path}><th scope="row">{folder.path ? <code>{folder.path}/</code> : "Repository root"}</th><td>{folder.files.toLocaleString()}</td></tr>)}</tbody>
-          </table>
-        </div>
+            <thead><tr><th scope="col">Folder</th><th className="rm-table-number" scope="col">Files</th></tr></thead>
+            <tbody>{overview.folders.map((folder) => <tr key={folder.path}><th scope="row">{folder.path ? <code>{folder.path}/</code> : "Repository root"}</th><td className="rm-table-number">{folder.files.toLocaleString()}</td></tr>)}</tbody>
+          </Table>
         {overview.key_files.length ? <div className="rm-repo-block">
           <h3>Key files</h3>
           <ul className="rm-repo-keyfiles">{overview.key_files.map((file) => <li key={file.artifact_id}><button className="rm-map-link" onClick={() => onOpenArtifact(file.artifact_id)} type="button">{file.path}</button><span className="rm-health-fate">{KEY_FILE_ROLE[file.role] ?? file.role}</span></li>)}</ul>

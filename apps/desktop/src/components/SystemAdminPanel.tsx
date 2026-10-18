@@ -90,6 +90,7 @@ import type {
 import { ActionMenu } from "./ui/action-menu";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
+import { Table } from "./ui/table";
 import { PanelHeading } from "./ui/panel-heading";
 import { Dialog, DialogCancel } from "./ui/dialog";
 import { Dropdown } from "./ui/dropdown";
@@ -236,10 +237,10 @@ function BarStrip({ label, values }: { label: string; values: { label: string; v
 }
 
 function CountTable({ rows, label, valueLabel }: { rows: CountByLabel[]; label: string; valueLabel: string }) {
-  return rows.length ? <div className="rm-map-coverage"><table>
-    <thead><tr><th scope="col">{label}</th><th scope="col">{valueLabel}</th></tr></thead>
-    <tbody>{rows.map((row) => <tr key={row.label}><th scope="row">{row.label.replace(/_/g, " ")}</th><td>{count(row.count)}</td></tr>)}</tbody>
-  </table></div> : <p className="shared-muted-copy">Nothing recorded in this period.</p>;
+  return rows.length ? <Table>
+    <thead><tr><th scope="col">{label}</th><th className="rm-table-number" scope="col">{valueLabel}</th></tr></thead>
+    <tbody>{rows.map((row) => <tr key={row.label}><th scope="row">{row.label.replace(/_/g, " ")}</th><td className="rm-table-number">{count(row.count)}</td></tr>)}</tbody>
+  </Table> : <p className="shared-muted-copy">Nothing recorded in this period.</p>;
 }
 
 function MaintenancePanel({ accessToken, status, onChanged }: { accessToken: string; status: MaintenanceStatus | null; onChanged: (status: MaintenanceStatus) => void }) {
@@ -347,13 +348,13 @@ function OverviewSection({ accessToken }: { accessToken: string }) {
     </div>
     <section className="shared-settings-group">
       <PanelHeading description="seen in the last 24 hours" icon={World} title="Front-end clients" />
-      {overview.clients.length ? <div className="rm-map-coverage"><table>
+      {overview.clients.length ? <Table>
         <thead><tr><th scope="col">Client</th><th scope="col">Origin</th><th scope="col">Last address</th><th scope="col">Requests</th><th scope="col">First seen</th><th scope="col">Last seen</th></tr></thead>
         <tbody>{overview.clients.map((client) => <tr key={`${client.origin}-${client.client}-${client.agent}`}>
           <th scope="row">{client.agent}{client.client ? <Badge>{client.client}</Badge> : null}</th>
           <td>{client.origin ?? "no origin (tool or direct link)"}</td><td><code>{client.last_address}</code></td><td>{count(client.requests)}</td><td>{formatTime(client.first_seen_at)}</td><td>{formatTime(client.last_seen_at)}</td>
         </tr>)}</tbody>
-      </table></div> : <p className="shared-muted-copy">No clients seen yet.</p>}
+      </Table> : <p className="shared-muted-copy">No clients seen yet.</p>}
     </section>
     <MaintenancePanel accessToken={accessToken} onChanged={setMaintenance} status={maintenance} />
   </>;
@@ -380,13 +381,13 @@ function UsageSection({ accessToken, onOpenWorkspace }: { accessToken: string; o
       </div>
       <section className="shared-settings-group">
         <PanelHeading description={<>{usage.workspaces.length}, largest first</>} icon={Database} title="Workspaces" />
-        <div className="rm-map-coverage"><table>
+        <Table>
           <thead><tr><th scope="col">Workspace</th><th scope="col">Organization</th><th scope="col">Members</th><th scope="col">Files</th><th scope="col">Size</th><th scope="col">Passages</th><th scope="col">Activity</th><th scope="col">AI requests</th><th scope="col">Last activity</th></tr></thead>
           <tbody>{usage.workspaces.map((workspace) => <tr key={workspace.workspace_id}>
             <th scope="row"><button className="rm-system-link" onClick={() => onOpenWorkspace(workspace.workspace_id)} type="button">{workspace.workspace_name}</button></th>
             <td>{workspace.organization_name ?? "—"}</td><td>{count(workspace.member_count)}</td><td>{count(workspace.artifact_count)}</td><td>{formatBytes(workspace.artifact_bytes)}</td><td>{count(workspace.chunk_count)}</td><td>{count(workspace.activity_last_30_days)}</td><td>{count(workspace.ai_requests_last_30_days)}</td><td>{formatTime(workspace.last_activity_at)}</td>
           </tr>)}</tbody>
-        </table></div>
+        </Table>
       </section>
     </> : isLoading ? <LoadingState label="Loading usage" /> : <p className="shared-muted-copy">Usage is not available.</p>}
   </>;
@@ -497,7 +498,7 @@ function UsersSection({ accessToken, session }: { accessToken: string; session: 
       <Input aria-label="Filter users" onChange={(event) => setFilter(event.target.value)} placeholder="Filter by name or email" value={filter} />
       <RefreshButton isLoading={isLoading} onClick={() => void reload()} />
     </div>
-    {users ? <div className="rm-map-coverage"><table>
+    {users ? <Table>
       <thead><tr><th scope="col">Person</th><th scope="col">Role</th><th scope="col">Organizations and workspaces</th><th scope="col">Sessions</th><th scope="col">Last connected</th><th scope="col">Joined</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
       <tbody>{visible.map((user) => <tr className={user.deactivated_at ? "rm-system-row-inactive" : undefined} key={user.id}>
         <th scope="row"><span className="rm-system-person"><UserAvatar name={user.display_name} size={32} userId={user.id} /><span><strong>{user.display_name}{user.id === session.user.id ? " (you)" : ""}</strong><small>{user.email}</small>{user.deactivated_at ? <small><Tooltip content={`Deactivated ${formatTime(user.deactivated_at)}`}><Badge icon={<UserOff size={ICON_SIZE.sm} />} tone="warning">{user.anonymized_at ? "Anonymized" : "Deactivated"}</Badge></Tooltip></small> : null}</span></span></th>
@@ -519,7 +520,7 @@ function UsersSection({ accessToken, session }: { accessToken: string; session: 
           ...(user.deactivated_at && !user.anonymized_at ? [{ label: "Anonymize account", icon: <UserOff size={ICON_SIZE.sm} />, onSelect: () => { setConfirmText(""); setPending({ kind: "anonymize", user }); }, destructive: true }] : []),
         ]} label={`Actions for ${user.display_name}`} /> : null}</td>
       </tr>)}</tbody>
-    </table></div> : isLoading ? <LoadingState label="Loading users" /> : <p className="shared-muted-copy">Users are not available.</p>}
+    </Table> : isLoading ? <LoadingState label="Loading users" /> : <p className="shared-muted-copy">Users are not available.</p>}
     <Dialog description={dialog?.description} footer={<><DialogCancel onClick={() => setPending(null)} /><Button disabled={isBusy || (pending?.kind === "anonymize" && confirmText.trim().toLowerCase() !== pending.user.email.toLowerCase())} onClick={() => void confirm()} type="button" variant="main">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : null}{dialog?.action}</Button></>} onClose={() => setPending(null)} open={Boolean(pending)} title={dialog?.title ?? ""} />
     {resetLink ? <SecretDialog description={`Send this link to ${resetLink.user.display_name} (${resetLink.user.email}) through a channel you trust. It lets whoever opens it choose the account's password, once, until ${formatTime(resetLink.expiresAt)}.`} onClose={() => setResetLink(null)} title="Password reset link" value={resetLink.url} /> : null}
   </>;
@@ -791,7 +792,7 @@ function BackupsPanel({ accessToken, canChange }: { accessToken: string; canChan
       ["Last backup or restore", status?.finished_at ? `${formatTime(status.finished_at)} · ${status.message ?? ""}` : "none since the server started"],
     ]} />
     {canChange ? <div><Button disabled={isBusy || running} onClick={() => void backUp()} type="button" variant="main">{running ? <Loader className="spin" size={ICON_SIZE.md} /> : <Database size={ICON_SIZE.md} />} Back up now</Button>{overview?.copy_directory && overview.backups.some((backup) => !backup.copy) ? <Button disabled={isBusy || running} onClick={() => void copyNow()} type="button" variant="secondary">Copy to the second location now</Button> : null}</div> : <p className="shared-muted-copy">Only system administrators make, restore and delete backups.</p>}
-    {overview?.backups.length ? <div className="rm-map-coverage"><table>
+    {overview?.backups.length ? <Table>
       <thead><tr><th scope="col">Backup</th><th scope="col">Made</th><th scope="col">Version</th><th scope="col">Files</th><th scope="col">Database</th><th scope="col">Key</th>{overview.copy_directory ? <th scope="col">Second copy</th> : null}{canChange ? <th scope="col"><span className="sr-only">Actions</span></th> : null}</tr></thead>
       <tbody>{overview.backups.map((backup) => <tr key={backup.name}>
         <th scope="row">{backup.name}<Badge>{backup.trigger}</Badge>{backup.encryption ? <Badge>encrypted</Badge> : null}</th>
@@ -804,7 +805,7 @@ function BackupsPanel({ accessToken, canChange }: { accessToken: string; canChan
           { label: "Delete", onSelect: () => setDeleting(backup.name), destructive: true },
         ]} label={`Actions for ${backup.name}`} /></td> : null}
       </tr>)}</tbody>
-    </table></div> : overview ? <p className="shared-muted-copy">No backups yet.</p> : <LoadingState label="Loading backups" />}
+    </Table> : overview ? <p className="shared-muted-copy">No backups yet.</p> : <LoadingState label="Loading backups" />}
     <Dialog description="The backup is copied into a new environment folder under workspace-data and checked: it must open. The running environment is not changed. Attach the new one from the environment menu when you want to use it." footer={<><DialogCancel onClick={() => setRestoring(null)} /><Button disabled={isBusy || !environment.trim()} onClick={() => void restore()} type="button" variant="main">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : null}Restore</Button></>} onClose={() => setRestoring(null)} open={Boolean(restoring)} title={`Restore ${restoring ?? "the backup"}`}>
       <label className="rm-system-inline">New environment name<Input aria-label="New environment name" onChange={(event) => setEnvironment(event.target.value)} placeholder="restored-2026-10" value={environment} /></label>
     </Dialog>
@@ -851,7 +852,7 @@ function JobsSection({ accessToken, canChange }: { accessToken: string; canChang
         <label className="rm-system-inline">Status<Dropdown aria-label="Job status" onValueChange={setStatus} options={[{ label: "All", value: "all" }, { label: "Running", value: "running" }, { label: "Failed", value: "failed" }, { label: "Completed", value: "completed" }, { label: "Cancelled", value: "cancelled" }]} value={status} /></label>
         <RefreshButton isLoading={isLoading} onClick={() => void reload()} />
       </div>
-      {jobs?.length ? <div className="rm-map-coverage"><table>
+      {jobs?.length ? <Table>
         <thead><tr><th scope="col">Kind</th><th scope="col">Workspace</th><th scope="col">Status</th><th scope="col">Progress</th><th scope="col">Started</th><th scope="col">Updated</th><th scope="col">Detail</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
         <tbody>{jobs.map((job) => <tr key={job.id}>
           <th scope="row">{(job.kind ?? "indexing").replace(/_/g, " ")}</th>
@@ -862,7 +863,7 @@ function JobsSection({ accessToken, canChange }: { accessToken: string; canChang
           <td>{job.error_message ?? job.stage.replace(/_/g, " ")}</td>
           <td>{job.status === "running" && !job.cancel_requested ? <Button onClick={() => void cancel(job)} type="button" variant="secondary">Stop</Button> : null}</td>
         </tr>)}</tbody>
-      </table></div> : jobs ? <p className="shared-muted-copy">No jobs match.</p> : <LoadingState label="Loading jobs" />}
+      </Table> : jobs ? <p className="shared-muted-copy">No jobs match.</p> : <LoadingState label="Loading jobs" />}
     </section>
   </>;
 }
@@ -904,9 +905,9 @@ function AuditSection({ accessToken, canExport }: { accessToken: string; canExpo
       </div>
     </section> : null}
     <div className="rm-system-toolbar"><span className="shared-muted-copy">The 200 most recent events. Sign-in and other security events are under Logs › Security events only.</span><RefreshButton isLoading={isLoading} onClick={() => void reload()} /></div>
-    {events?.length ? <div className="rm-map-coverage"><table>
+    {events?.length ? <Table>
       <thead><tr><th scope="col">When</th><th scope="col">Who</th><th scope="col">Action</th><th scope="col">Detail</th></tr></thead>
       <tbody>{events.map((event) => <tr key={event.id}><td>{formatTime(event.created_at)}</td><td>{event.actor ? event.actor.display_name : "System"}</td><th scope="row">{event.action.replace(/_/g, " ")}</th><td>{event.detail}</td></tr>)}</tbody>
-    </table></div> : events ? <p className="shared-muted-copy">Nothing recorded yet.</p> : <LoadingState label="Loading the audit trail" />}
+    </Table> : events ? <p className="shared-muted-copy">Nothing recorded yet.</p> : <LoadingState label="Loading the audit trail" />}
   </>;
 }

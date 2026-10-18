@@ -2,6 +2,18 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.85 (2026-10-18)
+
+One table style for the System, map and repository tables.
+
+### Changed
+- **`Table`** is in `components/ui/table.tsx`, with the `rm-table` styles: `<Table>` wraps the `<thead>` and `<tbody>` in a box that scrolls sideways on narrow screens and, past 640 px of height, keeps the header in view. Rows highlight on hover, cells use tabular figures, and a numeric column takes `className="rm-table-number"` to align right. The box forwards its ref and attributes, and an `overlay` slot holds the map's hover tooltip.
+- **Twelve tables use it:** the System overview clients, usage (activity by kind, most active people, workspaces), users, backups, jobs and audit trail; the System console results; the knowledge map's coverage and link tables; the workspace health checks; and the repository structure. They shared one `rm-map-coverage` class, which is gone along with its rules. The count columns of the coverage, health, repository and System count tables are right-aligned; the other numeric columns follow with their pages (V0.2.102 to V0.2.118).
+- The workbook sheet preview keeps its own spreadsheet-like table style.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.84 (2026-10-18)
 
 One header for every page.

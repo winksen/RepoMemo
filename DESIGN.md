@@ -149,6 +149,11 @@ page's own version, and add to this list when a new one is added.
   28 to 32 px), a short description, actions at the end and an optional back
   link. The dashboard, workspace, artifact, memory card, profile, notifications
   and System pages use it; a panel inside a page uses `PanelHeading`.
+- **`Table`** (and the `rm-table` styles): the one look for a data table: a box
+  that scrolls sideways on narrow screens, a header that stays in view past
+  640 px, a hover on each row and numbers (`className="rm-table-number"`)
+  right-aligned in tabular figures. Use `<Table>` around a `<thead>` and a
+  `<tbody>`; do not style a table of your own.
 
 ### Notifications
 

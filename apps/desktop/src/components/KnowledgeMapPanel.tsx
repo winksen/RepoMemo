@@ -24,6 +24,7 @@ import { getSharedKnowledgeMap } from "../lib/sharedApi";
 import { layoutGraph } from "../lib/forceLayout";
 import type { KnowledgeEdge, KnowledgeMap, KnowledgeNode } from "../types";
 import { Button } from "./ui/button";
+import { Table } from "./ui/table";
 import { PanelHeading } from "./ui/panel-heading";
 import { SegmentedControl } from "./ui/segmented-control";
 import { Tooltip } from "./ui/tooltip";
@@ -201,9 +202,9 @@ function Coverage({ map }: { map: KnowledgeMap }) {
       <span><i className="rm-map-swatch pending" /> Waiting</span>
       <span><i className="rm-map-swatch failed" /><AlertTriangle size={ICON_SIZE.sm} /> Failed</span>
     </div>
-    {map.coverage.length ? <div className="rm-map-coverage" ref={container} onMouseLeave={() => setTooltip(null)}>
-      <table>
-        <thead><tr><th scope="col">Kind</th><th scope="col">Files</th><th scope="col">Indexing</th><th scope="col">Passages</th><th scope="col">By meaning</th></tr></thead>
+    {map.coverage.length ? <Table ref={container} onMouseLeave={() => setTooltip(null)} overlay={tooltip ? <div className="rm-map-tooltip" role="tooltip" style={{ left: tooltip.x, top: tooltip.y }}>{tooltip.content}</div> : null}>
+      
+        <thead><tr><th scope="col">Kind</th><th className="rm-table-number" scope="col">Files</th><th scope="col">Indexing</th><th className="rm-table-number" scope="col">Passages</th><th className="rm-table-number" scope="col">By meaning</th></tr></thead>
         <tbody>{map.coverage.map((row) => {
           const segments = [
             { key: "indexed", count: row.indexed_count, label: "indexed" },
@@ -212,7 +213,7 @@ function Coverage({ map }: { map: KnowledgeMap }) {
           ].filter((segment) => segment.count > 0);
           return <tr key={row.label}>
             <th scope="row">{row.label}</th>
-            <td>{row.file_count.toLocaleString()}</td>
+            <td className="rm-table-number">{row.file_count.toLocaleString()}</td>
             <td>
               <div className="rm-map-stack">{segments.map((segment) => <span
                 className={`rm-map-segment ${segment.key}`}
@@ -222,13 +223,11 @@ function Coverage({ map }: { map: KnowledgeMap }) {
               />)}</div>
               <span className="rm-map-stack-caption">{row.indexed_count} of {row.file_count} indexed{row.failed_count ? ` · ${row.failed_count} failed` : ""}</span>
             </td>
-            <td>{row.passage_count.toLocaleString()}</td>
-            <td>{embeddingOn ? `${percent(row.embedded_count, row.passage_count)}%` : <span className="rm-map-muted">Off</span>}</td>
+            <td className="rm-table-number">{row.passage_count.toLocaleString()}</td>
+            <td className="rm-table-number">{embeddingOn ? `${percent(row.embedded_count, row.passage_count)}%` : <span className="rm-map-muted">Off</span>}</td>
           </tr>;
         })}</tbody>
-      </table>
-      {tooltip ? <div className="rm-map-tooltip" role="tooltip" style={{ left: tooltip.x, top: tooltip.y }}>{tooltip.content}</div> : null}
-    </div> : <p className="shared-muted-copy">Add files in Evidence or Documents to see coverage.</p>}
+      </Table> : <p className="shared-muted-copy">Add files in Evidence or Documents to see coverage.</p>}
   </section>;
 }
 
@@ -516,8 +515,8 @@ function SelectionPanel({ edges, nodeById, onOpenArtifact, onOpenMemoryCard, onS
 function EdgeTable({ edges, nodeById, onSelect }: { edges: KnowledgeEdge[]; nodeById: Map<string, KnowledgeNode>; onSelect: (id: string) => void }) {
   const rows = [...edges].sort((a, b) => a.kind === b.kind ? b.weight - a.weight : a.kind === "similar" ? -1 : 1);
   if (!rows.length) return <p className="shared-muted-copy">No links to list with the current filters.</p>;
-  return <div className="rm-map-coverage">
-    <table>
+  return <Table>
+    
       <caption className="sr-only">Links between files and memory cards</caption>
       <thead><tr><th scope="col">From</th><th scope="col">To</th><th scope="col">Link</th><th scope="col">Strength</th></tr></thead>
       <tbody>{rows.map((edge) => <tr key={`${edge.kind}-${edge.source}-${edge.target}`}>
@@ -526,6 +525,5 @@ function EdgeTable({ edges, nodeById, onSelect }: { edges: KnowledgeEdge[]; node
         <td>{edge.kind === "similar" ? "Similar content" : "Memory cites file"}</td>
         <td>{edge.kind === "similar" ? `${Math.round(edge.weight * 100)}%` : "—"}</td>
       </tr>)}</tbody>
-    </table>
-  </div>;
+    </Table>;
 }
