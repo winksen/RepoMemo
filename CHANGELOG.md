@@ -2,6 +2,18 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.81 (2026-10-18)
+
+One badge for tags, roles and chips.
+
+### Changed
+- **`Badge`** is in `components/ui/badge.tsx`: `<Badge tone icon>`. A neutral surface with a border and grey text; a tone (`success`, `warning`, `danger`, `info`) adds a 6 px status dot and nothing else, so there is no tinted fill with text of the same hue, as DESIGN.md asks. It forwards its ref, so a `Tooltip` can wrap it.
+- **It replaces six classes:** `rm-system-tag` and `rm-system-role` (token scopes, the client of an access log line, backup trigger and encryption, user roles, deactivated users), `shared-review-badge` (*Needs review* on a memory card, now with a warning dot and a tooltip), `rm-console-tag` (*dry run*, which had a tinted warning fill), `workspace-context-chip` (the retired local edition's workspace chip) and `rm-stack-chip` (a repository's technologies). Their rules are gone; an expired API token now has a danger dot.
+- The role badges keep their hints as tooltips instead of `title` attributes.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.80 (2026-10-18)
 
 One empty state for lists with nothing in them.

@@ -131,6 +131,10 @@ page's own version, and add to this list when a new one is added.
 - **`EmptyState`**: what a list shows when it has nothing in it: an optional
   illustration-sized icon, a title, one muted sentence and at most one action,
   centred in its panel. Say what to do next, not only that nothing is there.
+- **`Badge`**: a short label for a state, role or kind. Neutral surface, border
+  and grey text; a `tone` (`success`, `warning`, `danger`, `info`) only adds a
+  small status dot, never a tinted fill with same-hue text. An optional `icon`
+  goes before the text. Do not invent a tag or chip class.
 
 ### Notifications
 

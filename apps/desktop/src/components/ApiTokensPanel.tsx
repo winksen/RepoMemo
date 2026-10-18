@@ -4,6 +4,7 @@ import { IconApi as ApiIcon, IconPlus as Plus, IconTrash as Trash } from "@table
 import { createPersonalToken, listPersonalTokens, revokePersonalToken } from "../lib/sharedApi";
 import type { PersonalAccessToken } from "../types";
 import { SecretDialog } from "./SecretDialog";
+import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Dialog, DialogCancel } from "./ui/dialog";
 import { Dropdown } from "./ui/dropdown";
@@ -90,7 +91,7 @@ export function ApiTokensPanel({ accessToken, isAdministrator }: { accessToken: 
     {tokens?.length ? <ul className="rm-tokens-list">{tokens.map((token) => {
       const expired = token.expires_at <= now;
       return <li className={expired ? "expired" : ""} key={token.id}>
-        <span className="rm-tokens-text"><strong>{token.name} <small className="rm-system-tag">{token.scope === "system" ? "system" : token.scope === "write" ? "read and write" : "read only"}</small>{expired ? <small className="rm-system-tag">expired</small> : null}</strong><small><code>{token.prefix}…</code> · created {formatDate(token.created_at)} · {expired ? "expired" : "expires"} {formatDate(token.expires_at)} · last used {formatDate(token.last_used_at)}</small></span>
+        <span className="rm-tokens-text"><strong>{token.name} <Badge>{token.scope === "system" ? "system" : token.scope === "write" ? "read and write" : "read only"}</Badge>{expired ? <Badge tone="danger">expired</Badge> : null}</strong><small><code>{token.prefix}…</code> · created {formatDate(token.created_at)} · {expired ? "expired" : "expires"} {formatDate(token.expires_at)} · last used {formatDate(token.last_used_at)}</small></span>
         <Button aria-label={`Revoke ${token.name}`} disabled={isBusy} onClick={() => setRevoking(token)} type="button" variant="secondary"><Trash size={ICON_SIZE.sm} /> {expired ? "Remove" : "Revoke"}</Button>
       </li>;
     })}</ul> : tokens ? <p className="shared-muted-copy">No tokens yet.</p> : null}

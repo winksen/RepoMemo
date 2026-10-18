@@ -88,12 +88,14 @@ import type {
   SystemUserWorkspace,
 } from "../types";
 import { ActionMenu } from "./ui/action-menu";
+import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Dialog, DialogCancel } from "./ui/dialog";
 import { Dropdown } from "./ui/dropdown";
 import { IconButton } from "./ui/icon-button";
 import { Input } from "./ui/input";
 import { LoadingState } from "./ui/loading-state";
+import { Tooltip } from "./ui/tooltip";
 import { Switch } from "./ui/switch";
 import { showToast } from "./ui/toast";
 import { useLiveEventHub, useLiveEvents } from "../lib/liveEvents";
@@ -346,7 +348,7 @@ function OverviewSection({ accessToken }: { accessToken: string }) {
       {overview.clients.length ? <div className="rm-map-coverage"><table>
         <thead><tr><th scope="col">Client</th><th scope="col">Origin</th><th scope="col">Last address</th><th scope="col">Requests</th><th scope="col">First seen</th><th scope="col">Last seen</th></tr></thead>
         <tbody>{overview.clients.map((client) => <tr key={`${client.origin}-${client.client}-${client.agent}`}>
-          <th scope="row">{client.agent}{client.client ? <small className="rm-system-tag">{client.client}</small> : null}</th>
+          <th scope="row">{client.agent}{client.client ? <Badge>{client.client}</Badge> : null}</th>
           <td>{client.origin ?? "no origin (tool or direct link)"}</td><td><code>{client.last_address}</code></td><td>{count(client.requests)}</td><td>{formatTime(client.first_seen_at)}</td><td>{formatTime(client.last_seen_at)}</td>
         </tr>)}</tbody>
       </table></div> : <p className="shared-muted-copy">No clients seen yet.</p>}
@@ -391,7 +393,7 @@ function UsageSection({ accessToken, onOpenWorkspace }: { accessToken: string; o
 const ROLE_ICON = { owner: <Crown size={ICON_SIZE.sm} />, admin: <ShieldCheck size={ICON_SIZE.sm} />, member: <UserIcon size={ICON_SIZE.sm} />, viewer: <Eye size={ICON_SIZE.sm} /> };
 
 function RoleTag({ role, title }: { role: "owner" | "admin" | "member" | "viewer"; title: string }) {
-  return <span className="rm-system-tag rm-system-role" title={title}>{ROLE_ICON[role]} {role[0].toUpperCase() + role.slice(1)}</span>;
+  return <Tooltip content={title}><Badge icon={ROLE_ICON[role]}>{role[0].toUpperCase() + role.slice(1)}</Badge></Tooltip>;
 }
 
 /** What a person belongs to, as a tree: each organization on its own line with their role, and under it the workspaces of that organization with their role in each. System administrators are administrators of every organization and workspace; only what they own is listed on top of that. */
@@ -412,7 +414,7 @@ function AccessTree({ user }: { user: SystemUser }) {
   }
   if (!inherited && !groups.size) return <span className="shared-muted-copy">None</span>;
   return <ul className="rm-system-access">
-    {inherited ? <li><span className="rm-system-tag rm-system-role" title="System administrators are administrators of every organization and workspace"><ShieldCheck size={ICON_SIZE.sm} /> All organizations and workspaces · Admin</span></li> : null}
+    {inherited ? <li><Tooltip content="System administrators are administrators of every organization and workspace"><Badge icon={<ShieldCheck size={ICON_SIZE.sm} />}>All organizations and workspaces · Admin</Badge></Tooltip></li> : null}
     {Array.from(groups, ([key, group]) => <li key={key}>
       <span className="rm-system-access-org"><Building size={ICON_SIZE.sm} /><strong>{group.name}</strong>{group.role ? <RoleTag role={group.role} title={`${group.role} of the organization ${group.name}`} /> : null}</span>
       {group.workspaces.length ? <ul>{group.workspaces.map((workspace) => <li key={workspace.workspace_id}><span>{workspace.name}</span><RoleTag role={workspace.role} title={`${workspace.role} of the workspace ${workspace.name}`} /></li>)}</ul> : null}
@@ -496,8 +498,8 @@ function UsersSection({ accessToken, session }: { accessToken: string; session: 
     {users ? <div className="rm-map-coverage"><table>
       <thead><tr><th scope="col">Person</th><th scope="col">Role</th><th scope="col">Organizations and workspaces</th><th scope="col">Sessions</th><th scope="col">Last connected</th><th scope="col">Joined</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
       <tbody>{visible.map((user) => <tr className={user.deactivated_at ? "rm-system-row-inactive" : undefined} key={user.id}>
-        <th scope="row"><span className="rm-system-person"><UserAvatar name={user.display_name} size={32} userId={user.id} /><span><strong>{user.display_name}{user.id === session.user.id ? " (you)" : ""}</strong><small>{user.email}</small>{user.deactivated_at ? <small><span className="rm-system-tag" title={`Deactivated ${formatTime(user.deactivated_at)}`}><UserOff size={ICON_SIZE.sm} /> {user.anonymized_at ? "Anonymized" : "Deactivated"}</span></small> : null}</span></span></th>
-        <td>{user.is_system_admin ? <span className="rm-system-tag rm-system-role" title="Administers the server and every organization and workspace"><ServerCog size={ICON_SIZE.sm} /> Sys Admin</span> : user.is_app_admin ? <span className="rm-system-tag rm-system-role" title="Uses the System pages, without access to every organization and workspace"><UserCog size={ICON_SIZE.sm} /> App Admin</span> : <span className="rm-system-tag rm-system-role"><UserIcon size={ICON_SIZE.sm} /> User</span>}</td>
+        <th scope="row"><span className="rm-system-person"><UserAvatar name={user.display_name} size={32} userId={user.id} /><span><strong>{user.display_name}{user.id === session.user.id ? " (you)" : ""}</strong><small>{user.email}</small>{user.deactivated_at ? <small><Tooltip content={`Deactivated ${formatTime(user.deactivated_at)}`}><Badge icon={<UserOff size={ICON_SIZE.sm} />} tone="warning">{user.anonymized_at ? "Anonymized" : "Deactivated"}</Badge></Tooltip></small> : null}</span></span></th>
+        <td>{user.is_system_admin ? <Tooltip content="Administers the server and every organization and workspace"><Badge icon={<ServerCog size={ICON_SIZE.sm} />}>Sys Admin</Badge></Tooltip> : user.is_app_admin ? <Tooltip content="Uses the System pages, without access to every organization and workspace"><Badge icon={<UserCog size={ICON_SIZE.sm} />}>App Admin</Badge></Tooltip> : <Badge icon={<UserIcon size={ICON_SIZE.sm} />}>User</Badge>}</td>
         <td><AccessTree user={user} /></td><td>{count(user.active_sessions)}</td><td>{formatTime(user.last_connected_at)}</td><td>{formatTime(user.created_at)}</td>
         <td>{session.is_system_admin && !user.anonymized_at ? <ActionMenu items={[
           user.is_system_admin
@@ -790,7 +792,7 @@ function BackupsPanel({ accessToken, canChange }: { accessToken: string; canChan
     {overview?.backups.length ? <div className="rm-map-coverage"><table>
       <thead><tr><th scope="col">Backup</th><th scope="col">Made</th><th scope="col">Version</th><th scope="col">Files</th><th scope="col">Database</th><th scope="col">Key</th>{overview.copy_directory ? <th scope="col">Second copy</th> : null}{canChange ? <th scope="col"><span className="sr-only">Actions</span></th> : null}</tr></thead>
       <tbody>{overview.backups.map((backup) => <tr key={backup.name}>
-        <th scope="row">{backup.name}<small className="rm-system-tag">{backup.trigger}</small>{backup.encryption ? <small className="rm-system-tag">encrypted</small> : null}</th>
+        <th scope="row">{backup.name}<Badge>{backup.trigger}</Badge>{backup.encryption ? <Badge>encrypted</Badge> : null}</th>
         <td>{formatTime(backup.created_at)}</td><td>{backup.version}</td>
         <td>{count(backup.blob_count)} · {formatBytes(backup.blob_bytes)}{backup.missing_blobs ? ` · ${count(backup.missing_blobs)} missing` : ""}</td>
         <td>{formatBytes(backup.database_bytes)}</td><td>{backup.includes_key ? "included" : "not in it"}</td>

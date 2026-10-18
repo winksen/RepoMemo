@@ -252,7 +252,6 @@ select:focus-visible,
  * a second row of equally-weighted buttons. */
 .graphite-header .header-actions > .status-badge:nth-of-type(n + 2) { display: none; }
 
-.workspace-context-chip,
 .status-badge {
   min-height: 26px;
   padding: 0 9px;
@@ -474,7 +473,6 @@ textarea.rm-textarea:focus {
 :root[data-theme="dark"] .workspace-new-button.secondary,
 :root[data-theme="dark"] .button.secondary,
 :root[data-theme="dark"] .workspace-secondary-action,
-:root[data-theme="dark"] .workspace-context-chip,
 :root[data-theme="dark"] .status-badge {
   background: var(--color-surface);
   border-color: var(--color-border);
@@ -517,7 +515,6 @@ textarea.rm-textarea:focus {
 
 @media (max-width: 900px) {
   .graphite-header .header-actions > .status-badge { display: none; }
-  .workspace-context-chip { max-width: min(42vw, 260px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -619,7 +616,6 @@ body,
 .shared-markdown pre { padding: 12px; overflow: auto; background: var(--color-surface-3); border-radius: 8px; }
 .shared-markdown pre code { padding: 0; background: transparent; }
 .shared-markdown a { color: var(--color-accent-text); }
-.shared-review-badge { color: var(--color-text-muted); font-weight: 400; }
 .shared-review-panel ul { margin: 8px 0 12px; padding-left: 1.2em; }
 .shared-memory-citations { border: 1px solid var(--color-border-strong); border-radius: 8px; padding: 10px 12px; }
 .shared-memory-citations ul { list-style: none; margin: 0 0 8px; padding: 0; }

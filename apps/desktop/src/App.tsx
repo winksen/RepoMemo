@@ -11,6 +11,7 @@ import { useEffect, useMemo, useState } from "react";
 import { SharedWebApp } from "./SharedWebApp";
 import { DesktopApp } from "./components/DesktopApp";
 import { SafeMarkdown } from "./components/SafeMarkdown";
+import { Badge } from "./components/ui/badge";
 import { Toast } from "./components/ui/toast";
 import {
   IconArchive as Archive,
@@ -886,7 +887,7 @@ function LocalDesktopApp() {
             <h2>{viewMeta[activeView].title}</h2>
           </div>
           <div className="header-actions workspace-header-actions">
-            {selectedWorkspace ? <div className="workspace-context-chip"><Layers3 size={ICON_SIZE.sm} /><span>{selectedWorkspace.name}</span></div> : null}
+            {selectedWorkspace ? <Badge icon={<Layers3 size={ICON_SIZE.sm} />}>{selectedWorkspace.name}</Badge> : null}
             <StatusBadge tone={loadState === "error" ? "danger" : loadState === "ready" ? "success" : "warning"}>
               {loadState === "error" ? <X size={ICON_SIZE.sm} /> : loadState === "ready" ? <CheckCircle2 size={ICON_SIZE.sm} /> : <Loader2 className="spin" size={ICON_SIZE.sm} />}
               {loadState === "error" ? "Local core unavailable" : loadState === "ready" ? "Local core ready" : "Booting core"}

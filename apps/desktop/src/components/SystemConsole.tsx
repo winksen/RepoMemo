@@ -3,6 +3,7 @@ import type { KeyboardEvent } from "react";
 import { IconChevronRight as Prompt, IconEraser as Eraser, IconLoader2 as Loader } from "@tabler/icons-react";
 import { getConsoleWelcome, runConsoleCommand, SharedApiError } from "../lib/sharedApi";
 import type { ConsoleResponse, ConsoleWelcome } from "../types";
+import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
@@ -58,7 +59,7 @@ function Answer({ entry }: { entry: Entry }) {
   if (entry.raw) return <pre className="rm-console-json">{JSON.stringify(response, null, 2)}</pre>;
   const { view, data } = response;
   return <>
-    <p className={response.dry_run ? "rm-console-dry-run" : "rm-console-summary"}>{response.dry_run ? <span className="rm-console-tag">dry run</span> : null}{response.summary}</p>
+    <p className={response.dry_run ? "rm-console-dry-run" : "rm-console-summary"}>{response.dry_run ? <Badge tone="warning">dry run</Badge> : null}{response.summary}</p>
     {view.kind === "facts" && Array.isArray(data) ? <dl className="rm-system-facts rm-console-facts">
       {(data as [string, unknown][]).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{cell(value)}</dd></div>)}
     </dl> : null}

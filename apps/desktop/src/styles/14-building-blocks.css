@@ -64,3 +64,14 @@
 .rm-empty-state { display: grid; justify-items: center; gap: 8px; padding: 42px 16px; color: var(--color-text-muted); text-align: center; }
 .rm-empty-state strong { color: var(--color-text); }
 .rm-empty-state span { max-width: 48ch; font-size: 13px; line-height: 1.55; }
+
+/* Badge: neutral surface and text; a tone adds a small status dot, never a tinted fill. */
+.rm-badge { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; padding: 1px 7px; overflow: hidden; color: var(--color-text-muted); background: var(--color-surface); border: 1px solid var(--color-border-strong); border-radius: 6px; font-size: 11px; font-weight: 500; line-height: 1.5; text-overflow: ellipsis; white-space: nowrap; }
+.rm-badge[data-tone]::before { flex: 0 0 auto; width: 6px; height: 6px; background: var(--color-text-muted); border-radius: 50%; content: ""; }
+.rm-badge[data-tone="success"]::before { background: var(--color-success); }
+.rm-badge[data-tone="warning"]::before { background: var(--color-warning); }
+.rm-badge[data-tone="danger"]::before { background: var(--color-danger); }
+.rm-badge[data-tone="info"]::before { background: var(--color-info); }
+th > .rm-badge,
+.rm-tokens-text strong > .rm-badge { margin-left: 6px; }
+.rm-console-dry-run > .rm-badge { margin-right: 8px; }

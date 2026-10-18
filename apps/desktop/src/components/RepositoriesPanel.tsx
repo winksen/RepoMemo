@@ -34,6 +34,7 @@ import {
 import type { RepoAccessCheck, RepoFile, RepoSource, RepoSyncReport, RepositoryDetailResponse } from "../types";
 import { lastChangeLabel } from "../web/format";
 import { LanguageChart } from "./LanguageChart";
+import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Dialog, DialogCancel } from "./ui/dialog";
 import { Input } from "./ui/input";
@@ -846,7 +847,7 @@ export function RepositoryDetailView({
       <dl className="rm-stack-groups">
         {STACK_CATEGORIES.map(([category, label]) => {
           const items = overview.stack!.technologies.filter((technology) => technology.category === category);
-          return items.length ? <div key={category}><dt>{label}</dt><dd>{items.map((technology) => <span className="rm-stack-chip" key={technology.name}>{technology.name}</span>)}</dd></div> : null;
+          return items.length ? <div key={category}><dt>{label}</dt><dd>{items.map((technology) => <Badge key={technology.name}>{technology.name}</Badge>)}</dd></div> : null;
         })}
       </dl>
     </section> : null}

@@ -655,8 +655,7 @@
     border-radius: 0;
   }
 
-  .workspace-runtime-status,
-  .workspace-context-chip {
+  .workspace-runtime-status {
     display: none;
   }
 
