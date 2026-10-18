@@ -65,13 +65,13 @@
   .shared-account-controls button, .rm-button.shared-user-signout { justify-content: center; min-width: 40px; min-height: 40px; padding: 0 !important; }
 
   /* One column. */
-  .shared-page-heading h1, .shared-detail-heading h1 { max-width: none; font-size: 30px; overflow-wrap: anywhere; }
-  .shared-page-heading, .shared-detail-heading { gap: 12px; }
-  .shared-page-content > .shared-page-heading, .shared-page-content > .shared-detail-heading, .shared-detail-shell > .shared-detail-heading { margin-bottom: 20px; }
+  .rm-page-header h1 { max-width: none; overflow-wrap: anywhere; }
+  .rm-page-header { gap: 12px; }
+  .shared-page-content > .rm-page-header, .shared-detail-shell > .rm-page-header { margin-bottom: 20px; }
   .shared-metric-visuals, .shared-task-create-fields, .shared-task-board, .shared-retrieval-filter-row, .shared-profile-identity dl, .shared-member-list:has(.shared-member-card), .shared-artifact-manager.grid { grid-template-columns: minmax(0, 1fr); }
   .shared-create-workspace > div { min-width: 0; }
   .shared-organization-member-form label:first-child { flex-basis: 100%; }
-  .shared-detail-heading .rm-button, .shared-page-heading .rm-button { align-self: stretch; }
+  .rm-page-header .rm-button { align-self: stretch; }
 
   /* Touch: controls are at least 40px high. */
   .rm-button, .rm-input, .rm-dropdown-trigger { min-height: var(--control-height-touch); }

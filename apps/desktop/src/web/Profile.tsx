@@ -5,6 +5,7 @@ import { type CollaborationTask, type Organization, type SharedSession, type Sha
 import { UserAvatar } from "../components/UserAvatar";
 import { AVATAR_INPUT_TYPES, prepareAvatar } from "../lib/avatarImage";
 import { Button } from "../components/ui/button";
+import { PageHeader } from "../components/ui/page-header";
 import { PanelHeading } from "../components/ui/panel-heading";
 import { Dialog, DialogCancel } from "../components/ui/dialog";
 import { Dropdown } from "../components/ui/dropdown";
@@ -154,7 +155,7 @@ export function SharedProfile({
 
   return <SharedLayout apiAvailable={apiAvailable} onNavigate={navigate} session={session} signOut={signOut} sidebar={<OrganizationRail organizations={organizations} workspaces={workspaces} />}>
     <section className="shared-page-content shared-profile-page" aria-busy={isLoading}>
-      <div className="shared-detail-heading"><div><h1>Your profile</h1><p>Manage your identity and review your activity across shared workspaces.</p></div></div>
+      <PageHeader description="Manage your identity and review your activity across shared workspaces." title="Your profile" />
       <Toast kind="error" message={error} />
       <Toast kind="success" message={notice} />
       <div className="shared-profile-layout">

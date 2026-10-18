@@ -6,6 +6,7 @@ import { type Organization, type SharedSession, type SharedWorkspace } from "../
 import { accountKeys } from "../lib/queryClient";
 import { useServerState } from "../lib/useServerState";
 import { Button } from "../components/ui/button";
+import { PageHeader } from "../components/ui/page-header";
 import { Input } from "../components/ui/input";
 import { Toast } from "../components/ui/toast";
 import { SharedLayout } from "../components/SharedLayout";
@@ -54,7 +55,7 @@ export function SharedDashboard({
 
   return <SharedLayout apiAvailable={apiAvailable} onNavigate={navigate} session={session} signOut={signOut} sidebar={<OrganizationRail organizations={organizations} workspaces={workspaces} />}>
     <section className="shared-page-content shared-dashboard-page" aria-busy={isLoading}>
-      <div className="shared-page-heading"><div><h1>Dashboard</h1><p>Accessible organizations, workspaces, and the evidence your teams are building.</p></div></div>
+      <PageHeader description="Accessible organizations, workspaces, and the evidence your teams are building." title="Dashboard" />
       <Toast kind="error" message={error} />
       <dl className="shared-dashboard-summary">
         <div><dt>Organizations</dt><dd>{organizations.length}</dd><span>available to your account</span></div>
@@ -154,7 +155,7 @@ export function SharedWorkspaceHome({
       sidebar={<OrganizationRail organizations={organizations} organizationId={organizationId} workspaces={workspaces} />}
     >
         <div className="shared-page-content">
-          <div className="shared-page-heading"><div><h1>{showOrganizationForm ? "Create an organization" : currentOrganization ? currentOrganization.name : "Set up your team"}</h1><p>{showOrganizationForm ? "Create a separate team boundary for its own shared workspaces and members." : "Workspaces are server-authoritative and available only to their members."}</p></div>{organizations.length ? <Button onClick={organizationNavigation.startCreatingOrganization} type="button" variant="secondary"><Plus size={ICON_SIZE.md} /> New organization</Button> : null}</div>
+          <PageHeader actions={organizations.length ? <Button onClick={organizationNavigation.startCreatingOrganization} type="button" variant="secondary"><Plus size={ICON_SIZE.md} /> New organization</Button> : null} description={showOrganizationForm ? "Create a separate team boundary for its own shared workspaces and members." : "Workspaces are server-authoritative and available only to their members."} title={showOrganizationForm ? "Create an organization" : currentOrganization ? currentOrganization.name : "Set up your team"} />
           {showOrganizationForm ? <form className="shared-setup-form" onSubmit={createOrganization}><label>Organization name<Input autoFocus onChange={(event) => setOrganizationName(event.target.value)} placeholder="Engineering" required value={organizationName} /></label><div className="shared-setup-actions"><Button disabled={isSubmitting} type="submit" variant="main">{isSubmitting ? <Loader className="spin" size={ICON_SIZE.md} /> : <Plus size={ICON_SIZE.md} />} Create organization</Button>{organizations.length ? <Button disabled={isSubmitting} onClick={organizationNavigation.cancelOrganizationCreation} type="button" variant="secondary">Cancel</Button> : null}</div></form> : <>
             {canManageOrganization ? <form className="shared-create-workspace" onSubmit={createWorkspace}><div><strong>Create a workspace</strong><span>Start a bounded memory space for a repository, system, or initiative.</span></div><label className="sr-only" htmlFor="shared-workspace-name">Workspace name</label><Input id="shared-workspace-name" onChange={(event) => setWorkspaceName(event.target.value)} placeholder="Payments platform" required value={workspaceName} /><Button disabled={isSubmitting} type="submit" variant="main">{isSubmitting ? <Loader className="spin" size={ICON_SIZE.md} /> : <Plus size={ICON_SIZE.md} />} Create workspace</Button></form> : <p className="shared-muted-copy">Your organization role grants access to its workspaces but not workspace creation.</p>}
             {canManageOrganization ? <WorkspaceImport accessToken={accessToken} key={`import-${organizationId}`} onImported={(workspace) => setWorkspaces((current) => [workspace, ...current])} organizationId={organizationId} /> : null}

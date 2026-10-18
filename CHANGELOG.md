@@ -2,6 +2,18 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.84 (2026-10-18)
+
+One header for every page.
+
+### Changed
+- **`PageHeader`** is in `components/ui/page-header.tsx`: `<PageHeader title description actions back />`. The title is the page's `h1`; the description sits under it; `actions` are buttons at the end (they stack under the title on narrow screens); `back` is an optional link to the page this one belongs to (no page uses it yet).
+- **Seven page shapes use it:** the dashboard (and its organization view), the workspace pages, the artifact and memory card pages (through the shared record layout), the profile, the notifications and every System page. `shared-page-heading` and `shared-detail-heading` are gone.
+- **Title sizes now follow DESIGN.md.** The two old styles disagreed (34 to 52 px on detail pages, 42 to 72 px on the dashboard and System); every page title is 28 to 32 px now, and panel titles are 16 px (they were 15). This is the one visible change of the release.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.83 (2026-10-18)
 
 One heading for every panel.

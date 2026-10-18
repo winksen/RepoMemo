@@ -4,6 +4,7 @@ import { IconArrowLeft as ArrowLeft, IconFileText as FileText, IconLoader2 as Lo
 import { deleteSharedMemoryCard, exportSharedMemoryCard, getSharedMemoryCard, listSharedArtifacts, updateSharedMemoryCard } from "../lib/sharedApi";
 import { type ArtifactSummary, type MemoryCardDetail, type Organization, type SharedSession, type SharedWorkspace } from "../types";
 import { Button } from "../components/ui/button";
+import { PageHeader } from "../components/ui/page-header";
 import { useConfirm } from "../components/ui/confirm-dialog";
 import { Input } from "../components/ui/input";
 import { Textarea } from "../components/ui/textarea";
@@ -206,7 +207,7 @@ export function SharedRecordLayout({
   return (
     <SharedLayout apiAvailable={apiAvailable} onNavigate={navigate} session={session} signOut={signOut} sidebar={<OrganizationRail organizationId={organization?.id} organizations={organizations} workspaceId={workspace.workspace.id} workspaces={workspaces} />} workspaceNavigation={<WorkspaceTopbar activeSection={activeSection} onNavigate={(section) => navigate(`/workspaces/${encodeURIComponent(workspace.workspace.id)}/${section}`)} workspace={workspace} />}>
       <section className="shared-detail-shell">
-        <div className="shared-detail-heading"><div><h1>{title}</h1><p className="shared-record-subtitle">{subtitle}</p></div></div>
+        <PageHeader description={subtitle} title={title} />
         <div className="shared-record-content">{children}</div>
       </section>
     </SharedLayout>

@@ -145,6 +145,10 @@ page's own version, and add to this list when a new one is added.
   `level={3}` for a part of a panel), an optional muted `description` at the end
   (a count or a state) and optional `actions` (buttons, a status). Panel titles
   are 16 px at most; the page title is the `PageHeader`.
+- **`PageHeader`**: the one header of a page: the title (the page's only `h1`,
+  28 to 32 px), a short description, actions at the end and an optional back
+  link. The dashboard, workspace, artifact, memory card, profile, notifications
+  and System pages use it; a panel inside a page uses `PanelHeading`.
 
 ### Notifications
 

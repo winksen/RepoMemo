@@ -95,6 +95,7 @@ import { Dialog, DialogCancel } from "./ui/dialog";
 import { Dropdown } from "./ui/dropdown";
 import { IconButton } from "./ui/icon-button";
 import { Input } from "./ui/input";
+import { PageHeader } from "./ui/page-header";
 import { LoadingState } from "./ui/loading-state";
 import { Tooltip } from "./ui/tooltip";
 import { Switch } from "./ui/switch";
@@ -152,7 +153,7 @@ export function SystemAdminPanel({ accessToken, onNavigateSection, onOpenWorkspa
   workspaces: SharedWorkspace[];
 }) {
   return <section className="shared-page-content rm-system-page">
-    <div className="shared-page-heading"><div><h1>System · {SECTION_LABELS[section].label}</h1><p>{SECTION_INTRO[section]}</p></div></div>
+    <PageHeader description={SECTION_INTRO[section]} title={`System · ${SECTION_LABELS[section].label}`} />
     {section === "overview" ? <OverviewSection accessToken={accessToken} /> : null}
     {section === "usage" ? <UsageSection accessToken={accessToken} onOpenWorkspace={onOpenWorkspace} /> : null}
     {section === "users" ? <UsersSection accessToken={accessToken} session={session} /> : null}

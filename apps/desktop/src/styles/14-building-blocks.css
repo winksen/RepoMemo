@@ -90,5 +90,15 @@ th > .rm-badge,
 /* PanelHeading: the icon and title of a panel, a muted note and actions at the end. */
 .rm-panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 14px; }
 .rm-panel-heading > div { display: flex; align-items: center; gap: 8px; }
-.rm-panel-heading h2 { margin: 0; font-size: 15px; letter-spacing: -0.01em; }
+.rm-panel-heading h2 { margin: 0; font-size: 16px; letter-spacing: -0.01em; }
 .rm-panel-heading-description { color: var(--color-text-subtle); font-size: 12px; }
+
+/* PageHeader: the title of a page (28 to 32 px, DESIGN.md), its description and its actions. */
+.rm-page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding-bottom: 14px; border-bottom: 1px solid var(--color-border); }
+.rm-page-header > div { min-width: 0; }
+.rm-page-header h1 { max-width: 24ch; margin: 0; font-family: var(--font-display); font-size: clamp(28px, 3vw, 32px); font-weight: 400; letter-spacing: -0.025em; line-height: 1.1; overflow-wrap: anywhere; }
+.rm-page-header p { max-width: 62ch; margin: 12px 0 0; overflow-wrap: anywhere; color: var(--color-text-muted); font-size: 14px; line-height: 1.55; }
+.rm-page-header-actions { display: flex; flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.rm-page-header-back { margin: 0 0 8px; padding: 0; color: var(--color-text-muted); background: transparent; border: 0; cursor: pointer; font: inherit; font-size: 13px; }
+.rm-page-header-back:hover { color: var(--color-text); }
+.rm-page-header-back:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
