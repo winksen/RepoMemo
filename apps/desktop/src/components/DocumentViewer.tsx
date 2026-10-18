@@ -1,4 +1,4 @@
-import { type KeyboardEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   IconDownload as Download,
   IconExternalLink as ExternalLink,
@@ -18,6 +18,7 @@ import { isDesktopRuntime } from "../lib/desktop";
 import type { ArtifactSummary, DocumentPreview, SheetPreview } from "../types";
 import type { RenderStatus } from "../lib/sharedApi";
 import { Button } from "./ui/button";
+import { SegmentedControl } from "./ui/segmented-control";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
 
@@ -224,23 +225,14 @@ export function SheetsPreview({ sheets, totalSheets }: { sheets: SheetPreview[];
   const sheet = sheets[Math.min(active, sheets.length - 1)];
   if (!sheet) return <p className="shared-muted-copy">This workbook has no sheets.</p>;
   const columns = Math.min(sheet.total_columns, sheet.rows[0]?.length ?? sheet.total_columns);
-  // Arrow keys move between the sheets, Home and End go to the first and last; only the chosen tab is in the tab order.
-  function moveBetweenSheets(event: KeyboardEvent<HTMLDivElement>) {
-    const keys: Record<string, number> = { ArrowRight: active + 1, ArrowLeft: active - 1, Home: 0, End: sheets.length - 1 };
-    if (!(event.key in keys)) return;
-    event.preventDefault();
-    const next = (keys[event.key] + sheets.length) % sheets.length;
-    setActive(next);
-    (event.currentTarget.querySelectorAll<HTMLElement>('[role="tab"]')[next])?.focus();
-  }
   return (
     <div className="shared-sheet">
-      <div aria-label="Sheets" className="shared-sheet-tabs" onKeyDown={moveBetweenSheets} role="tablist">
-        {sheets.map((entry, index) => <button aria-controls="shared-sheet-panel" aria-selected={index === active} className={index === active ? "active" : ""} id={`shared-sheet-tab-${index}`} key={`${entry.name}-${index}`} onClick={() => setActive(index)} role="tab" tabIndex={index === active ? 0 : -1} type="button">{entry.name}</button>)}
+      <div className="shared-sheet-tabs">
+        <SegmentedControl aria-label="Sheets" followFocus onValueChange={(next) => setActive(Number(next))} options={sheets.map((entry, index) => ({ label: entry.name, value: String(index) }))} value={String(Math.min(active, sheets.length - 1))} />
         {totalSheets > sheets.length ? <span className="shared-muted-copy">+{totalSheets - sheets.length} more sheets</span> : null}
       </div>
       {sheet.rows.length ? (
-        <div aria-labelledby={`shared-sheet-tab-${Math.min(active, sheets.length - 1)}`} className="shared-sheet-scroll" id="shared-sheet-panel" role="tabpanel" tabIndex={0}>
+        <div aria-label={`Sheet ${sheet.name}`} className="shared-sheet-scroll" role="region" tabIndex={0}>
           <table>
             <thead><tr><th scope="col"><span className="sr-only">Row</span></th>{Array.from({ length: columns }, (_, index) => <th key={index} scope="col">{columnLetters(index)}</th>)}</tr></thead>
             <tbody>{sheet.rows.map((row, rowIndex) => <tr key={rowIndex}><th scope="row">{rowIndex + 1}</th>{Array.from({ length: columns }, (_, columnIndex) => <td key={columnIndex}>{row[columnIndex] ?? ""}</td>)}</tr>)}</tbody>

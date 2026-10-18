@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SharedLayout } from "../components/SharedLayout";
 import { SheetsPreview } from "../components/DocumentViewer";
@@ -90,18 +90,19 @@ describe("toasts", () => {
 
 describe("workbook sheets", () => {
   const sheets = ["Q1", "Q2", "Q3"].map((name) => ({ name, rows: [["a"]], total_rows: 1, total_columns: 1 }));
-  it("are tabs: one in the tab order, arrow keys move between them", () => {
+  it("are a segmented control: arrow keys move between them and show the chosen sheet", async () => {
     render(<SheetsPreview sheets={sheets} totalSheets={3} />);
-    const tabs = screen.getAllByRole("tab");
-    expect(tabs.map((tab) => tab.getAttribute("tabindex"))).toEqual(["0", "-1", "-1"]);
-    fireEvent.keyDown(tabs[0], { key: "ArrowRight" });
-    expect(screen.getAllByRole("tab").map((tab) => tab.getAttribute("aria-selected"))).toEqual(["false", "true", "false"]);
-    expect(document.activeElement).toBe(screen.getAllByRole("tab")[1]);
-    fireEvent.keyDown(screen.getAllByRole("tab")[1], { key: "End" });
-    expect(document.activeElement).toBe(screen.getAllByRole("tab")[2]);
-    fireEvent.keyDown(screen.getAllByRole("tab")[2], { key: "ArrowRight" });
-    expect(document.activeElement).toBe(screen.getAllByRole("tab")[0]);
-    expect(screen.getByRole("tabpanel").getAttribute("aria-labelledby")).toBe(screen.getAllByRole("tab")[0].id);
+    const sheetButtons = () => screen.getAllByRole("radio");
+    expect(sheetButtons().map((button) => button.getAttribute("aria-checked"))).toEqual(["true", "false", "false"]);
+    sheetButtons()[0].focus();
+    fireEvent.keyDown(sheetButtons()[0], { key: "ArrowRight" });
+    await waitFor(() => expect(sheetButtons().map((button) => button.getAttribute("aria-checked"))).toEqual(["false", "true", "false"]));
+    expect(document.activeElement).toBe(sheetButtons()[1]);
+    fireEvent.keyDown(sheetButtons()[1], { key: "End" });
+    await waitFor(() => expect(document.activeElement).toBe(sheetButtons()[2]));
+    fireEvent.keyDown(sheetButtons()[2], { key: "ArrowRight" });
+    await waitFor(() => expect(document.activeElement).toBe(sheetButtons()[0]));
+    expect(screen.getByRole("region", { name: "Sheet Q1" })).toBeTruthy();
   });
 });
 

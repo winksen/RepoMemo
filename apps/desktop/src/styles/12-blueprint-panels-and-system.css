@@ -44,7 +44,6 @@
 .rm-map-tooltip strong { color: var(--color-text); }
 .rm-map-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; font-size: 13px; }
 .rm-map-filters label { display: inline-flex; align-items: center; gap: 6px; }
-.rm-map-filters .shared-artifact-view-switch { margin-left: auto; }
 .rm-map-notice { margin: 0; padding: 8px 12px; color: var(--color-text-muted); background: var(--color-surface-2); border-radius: 8px; font-size: 12px; line-height: 1.5; }
 .rm-map-notice button, .rm-map-link, .rm-map-selection li button { padding: 0; color: var(--color-text); background: none; border: 0; cursor: pointer; font: inherit; text-align: left; text-decoration: underline; }
 .rm-map-notice button:focus-visible, .rm-map-link:focus-visible, .rm-map-selection li button:focus-visible, .rm-map-failed:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; border-radius: 2px; }

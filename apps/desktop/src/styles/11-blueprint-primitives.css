@@ -707,8 +707,6 @@ body,
 .shared-pdf-frame { width: 100%; height: 620px; background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: 10px; }
 .shared-sheet { display: grid; gap: 10px; }
 .shared-sheet-tabs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
-.shared-sheet-tabs button { padding: 6px 12px; color: var(--color-text-muted); background: transparent; border: 1px solid var(--color-border); border-radius: 8px; cursor: pointer; font: inherit; font-size: 13px; }
-.shared-sheet-tabs button.active { color: var(--color-text); background: var(--color-surface-3); border-color: var(--color-border-strong); font-weight: 700; }
 .shared-sheet-scroll { max-height: 440px; overflow: auto; border: 1px solid var(--color-border); border-radius: 10px; }
 .shared-sheet table { border-collapse: collapse; width: max-content; min-width: 100%; font-size: 12px; }
 .shared-sheet th, .shared-sheet td { max-width: 260px; padding: 5px 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-right: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); text-align: left; }

@@ -1,6 +1,6 @@
 {
   "name": "@repomemo/desktop",
-  "version": "0.2.81",
+  "version": "0.2.82",
   "private": true,
   "type": "module",
   "scripts": {
@@ -20,6 +20,7 @@
     "@radix-ui/react-select": "^2.3.7",
     "@radix-ui/react-slot": "^1.3.3",
     "@radix-ui/react-switch": "^1.4.1",
+    "@radix-ui/react-toggle-group": "^1.2.1",
     "@radix-ui/react-tooltip": "^1.4.1",
     "@tabler/icons-react": "^3.44.0",
     "@tanstack/react-query": "^5.104.2",

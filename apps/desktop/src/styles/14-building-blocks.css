@@ -75,3 +75,14 @@
 th > .rm-badge,
 .rm-tokens-text strong > .rm-badge { margin-left: 6px; }
 .rm-console-dry-run > .rm-badge { margin-right: 8px; }
+
+/* SegmentedControl: joined segments, one chosen. */
+.rm-segmented { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 4px; background: var(--color-surface-3); border-radius: 10px; }
+.rm-segmented-fill { display: flex; }
+.rm-segmented-fill .rm-segmented-item { flex: 1; }
+.rm-segmented-item { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 28px; min-height: 28px; padding: 0 12px; color: var(--color-text-muted); background: transparent; border: 0; border-radius: 7px; cursor: pointer; font: inherit; font-size: 13px; font-weight: 700; transition: color 110ms var(--ease-control), background 110ms var(--ease-control); }
+.rm-segmented-item:hover { color: var(--color-text); }
+.rm-segmented-item[data-state="on"] { color: var(--color-text); background: var(--color-surface); box-shadow: var(--shadow-block); }
+.rm-segmented-item:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 1px; }
+.rm-segmented-count { margin-left: 2px; opacity: 0.65; font-weight: 400; }
+.rm-map-filters .rm-segmented { margin-left: auto; }

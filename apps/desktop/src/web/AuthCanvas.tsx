@@ -3,6 +3,7 @@ import { IconArrowRight as ArrowRight, IconKey as Key, IconLoader2 as Loader, Ic
 import { DesktopServerNote } from "../components/DesktopServerNote";
 import { loginSharedUser, requestPasswordResetMail, sharedApiUrl, signUpSharedUser } from "../lib/sharedApi";
 import { Button } from "../components/ui/button";
+import { SegmentedControl } from "../components/ui/segmented-control";
 import { Input } from "../components/ui/input";
 import { Toast, showToast } from "../components/ui/toast";
 import { ThemeToggle } from "../components/SharedLayout";
@@ -97,10 +98,7 @@ export function AuthCanvas({
 
       <section className="shared-auth-form-region" aria-label="Account access">
         <div className="shared-auth-form-shell">
-          {setupPending ? null : <div className="shared-auth-switch" role="group" aria-label="Account action">
-            <Button aria-pressed={mode === "sign-in"} className={mode === "sign-in" ? "active" : ""} onClick={() => { navigate("/login"); setMode("sign-in"); setError(null); }} type="button" variant="secondary">Sign in</Button>
-            <Button aria-pressed={mode === "sign-up"} className={mode === "sign-up" ? "active" : ""} onClick={() => { navigate("/register"); setMode("sign-up"); setError(null); }} type="button" variant="secondary">Create account</Button>
-          </div>}
+          {setupPending ? null : <SegmentedControl aria-label="Account action" fill onValueChange={(next) => { navigate(next === "sign-in" ? "/login" : "/register"); setMode(next); setError(null); }} options={[{ label: "Sign in", value: "sign-in" }, { label: "Create account", value: "sign-up" }]} value={mode} />}
           {setupPending ? <div className="shared-auth-heading">
             <p className="shared-eyebrow">Server setup</p>
             <h2>Finish setting up RepoMemo</h2>

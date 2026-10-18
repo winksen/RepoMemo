@@ -135,6 +135,12 @@ page's own version, and add to this list when a new one is added.
   and grey text; a `tone` (`success`, `warning`, `danger`, `info`) only adds a
   small status dot, never a tinted fill with same-hue text. An optional `icon`
   goes before the text. Do not invent a tag or chip class.
+- **`SegmentedControl`**: one choice out of a few that are all shown at once,
+  as joined segments (Radix Toggle Group): sign in or create account, a view
+  switch, a filter, the sheets of a workbook. Arrow keys move between the
+  segments and the chosen one cannot be turned off. Options have a label, an
+  optional icon and count, or only an icon with a `name`. For many options use
+  a `Dropdown`.
 
 ### Notifications
 

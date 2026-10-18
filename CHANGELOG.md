@@ -2,6 +2,19 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.82 (2026-10-18)
+
+One segmented control for switches and tab strips.
+
+### Changed
+- **`SegmentedControl`** is in `components/ui/segmented-control.tsx`, built on Radix Toggle Group (`@radix-ui/react-toggle-group` is a new dependency). Options have a label, an optional icon and count, or only an icon with a `name`; one is always chosen; the arrow keys, Home and End move between them. `fill` shares the width, `followFocus` makes the arrow keys choose as they move.
+- **It replaces five hand-made switches:** sign in or create account (`shared-auth-switch`), the activity type filter of People (`shared-activity-filter`), the grid and list switch of the evidence view and the graph and table switch of the knowledge map (`shared-artifact-view-switch`, which were `IconButton`s) and the sheet tabs of a workbook preview (`shared-sheet-tabs`, with `followFocus`). Their styles are gone; the sheets are a labelled group of radio buttons now, with the sheet shown in a region of its name.
+- `rm-desktop-switch` was a single button (*Connect to a server*) with no style of its own, not a switch; it lost the class.
+- The workbook sheets test in `accessibility.test.tsx` was rewritten for the new roles (written, not run; CI runs it).
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.81 (2026-10-18)
 
 One badge for tags, roles and chips.

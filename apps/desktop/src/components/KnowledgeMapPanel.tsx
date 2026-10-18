@@ -24,7 +24,7 @@ import { getSharedKnowledgeMap } from "../lib/sharedApi";
 import { layoutGraph } from "../lib/forceLayout";
 import type { KnowledgeEdge, KnowledgeMap, KnowledgeNode } from "../types";
 import { Button } from "./ui/button";
-import { IconButton } from "./ui/icon-button";
+import { SegmentedControl } from "./ui/segmented-control";
 import { Tooltip } from "./ui/tooltip";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
@@ -391,10 +391,7 @@ function RelationGraph({ canConfigure, map, onOpenArtifact, onOpenMemoryCard, on
     <div className="rm-map-filters">
       <Tooltip content={map.similarity_available ? "Lines between similar files" : "Needs AI for search"}><label><input checked={showSimilar && map.similarity_available} disabled={!map.similarity_available} onChange={(event) => setShowSimilar(event.target.checked)} type="checkbox" /> Similar content</label></Tooltip>
       <label><input checked={showCites} onChange={(event) => setShowCites(event.target.checked)} type="checkbox" /> Memory links</label>
-      <div className="shared-artifact-view-switch" role="group" aria-label="Graph view">
-        <IconButton label="Graph view" onClick={() => setView("graph")} pressed={view === "graph"}><Graph size={ICON_SIZE.md} /></IconButton>
-        <IconButton label="Table view" onClick={() => setView("table")} pressed={view === "table"}><List size={ICON_SIZE.md} /></IconButton>
-      </div>
+      <SegmentedControl aria-label="Map view" onValueChange={setView} options={[{ icon: <Graph size={ICON_SIZE.md} />, name: "Graph view", value: "graph" }, { icon: <List size={ICON_SIZE.md} />, name: "Table view", value: "table" }]} value={view} />
     </div>
     {!map.similarity_available ? <p className="rm-map-notice">Lines between similar files appear once AI for search is set up and passages are embedded.{canConfigure ? <> <button onClick={onOpenSettings} type="button">Open Settings</button></> : null}</p> : null}
     {map.hidden_file_count ? <p className="rm-map-notice">Showing the {fileCount} largest files; {map.hidden_file_count} smaller ones are left out to keep the map readable.</p> : null}

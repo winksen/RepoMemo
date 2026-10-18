@@ -145,7 +145,6 @@ input[type="file"] {
 .shared-create-workspace,
 .shared-workspace-row,
 .shared-rail-footer,
-.shared-auth-switch,
 .shared-loading {
   display: flex;
   align-items: center;
@@ -174,9 +173,6 @@ input[type="file"] {
 .rm-button.shared-auth-theme-toggle { position: absolute; top: 20px; right: 20px; z-index: var(--layer-raised); min-height: 36px; }
 .shared-auth-form-region { display: grid; place-items: center; padding: 40px; background: var(--color-surface-2); }
 .shared-auth-form-shell { width: min(100%, 410px); }
-.shared-auth-switch { gap: 4px; padding: 4px; background: var(--color-surface-3); border-radius: 10px; }
-.shared-auth-switch button { flex: 1; padding: 8px 10px; color: var(--color-text-muted); background: transparent; border-radius: 7px; cursor: pointer; font-size: 13px; font-weight: 700; }
-.shared-auth-switch button.active { color: var(--color-text); background: var(--color-surface); box-shadow: var(--shadow-block); }
 .shared-auth-heading { margin: 36px 0 24px; }
 .shared-auth-heading .shared-eyebrow { margin: 0 0 8px; }
 .shared-auth-heading h2 { margin: 0; font-family: var(--font-display); font-size: 32px; font-weight: 400; letter-spacing: -0.015em; }
@@ -441,7 +437,6 @@ input[type="file"] {
 .shared-artifact-type-menu-panel label:hover { color: var(--color-text); background: var(--color-surface-2); }
 .shared-artifact-type-menu-panel label:first-child { grid-column: 1 / -1; color: var(--color-text); border-bottom: 1px solid var(--color-border); border-radius: 0; }
 .shared-artifact-browser-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--color-text-subtle); font-size: 12px; }
-.shared-artifact-view-switch { display: flex; gap: 5px; }
 .shared-artifact-manager { display: grid; gap: 10px; }
 .shared-artifact-manager.grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
 .shared-artifact-manager article { min-width: 0; }

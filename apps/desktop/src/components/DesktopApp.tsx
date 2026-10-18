@@ -67,7 +67,7 @@ export function DesktopApp({ local }: { local: ReactNode }) {
       <div className="rm-desktop-retired" role="note">
         <p><strong>The local workspace is retired.</strong> It stays available for now, receives security fixes only and will be removed in a 0.3.x release. Move your workspaces to a server.</p>
         <LocalMoveToServer onGoToServer={() => void goToServer()} />
-        <Button className="rm-desktop-switch" onClick={() => void goToServer()} type="button" variant="secondary"><Server size={ICON_SIZE.sm} /> Connect to a server</Button>
+        <Button onClick={() => void goToServer()} type="button" variant="secondary"><Server size={ICON_SIZE.sm} /> Connect to a server</Button>
       </div>
       <div className="rm-desktop-local-body">{local}</div>
     </div>;
