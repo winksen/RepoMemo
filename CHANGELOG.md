@@ -2,6 +2,17 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.86 (2026-10-18)
+
+A searchable picker for long lists.
+
+### Changed
+- **`Combobox`** is in `components/ui/combobox.tsx`, built on Radix Popover (`@radix-ui/react-popover` is a new dependency): a trigger that looks like a dropdown opens a popover with a search field and the matching options. Every typed word must appear in the option's label or description (so a path can be searched next to a title), the arrow keys, Home and End move through the matches, Enter chooses and Escape closes. At most 100 rows are drawn; the rest are summarised in one line until the text narrows the list.
+- **First use:** the memory card editor, where *Add a file…* was a native `<select>` over every file of the workspace. Evidence is now picked by typing part of a file name. The select was the last raw `<select>` of the web client.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.85 (2026-10-18)
 
 One table style for the System, map and repository tables.

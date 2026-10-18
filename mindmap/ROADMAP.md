@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.85` (2026-10-18), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.86` (2026-10-18), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Security review 2026-10-16 (V0.2.52)](security/2026-10-16-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -57,7 +57,7 @@ timeline
 | Security review 2026-10-10, second and third passes | ✅ Every finding fixed, mitigated or accepted in writing (V0.1.76); R2-4 and R2-5 scheduled for V0.2.8 |
 | Road to V0.2.0 (V0.1.66–V0.1.76) | 🔄 Built and versioned `0.2.0`; R6 (clean install) and the tag are the maintainer's |
 | Road to V0.3.0 (V0.2.1–V0.2.56, one change each) | ✅ V0.2.1–V0.2.56 built; the clean-machine install (R6, R12) is the maintainer's |
-| Track K: frontend polish (V0.2.57–V0.2.129) | 🔄 V0.2.57–V0.2.85 built (K1 done); decisions 15–19 taken as proposed; [plan](plans/2026-10-17-frontend-polish.md) |
+| Track K: frontend polish (V0.2.57–V0.2.129) | 🔄 V0.2.57–V0.2.86 built (K1 done); decisions 15–19 taken as proposed; [plan](plans/2026-10-17-frontend-polish.md) |
 | V0.4.0 and later: scale-out, single sign-on, hosted | 💭 Direction |
 
 ---
@@ -926,7 +926,7 @@ One box per release; the brief, the files and the commit line of each are in [th
 - [x] **V0.2.83** `PanelHeading`: `<PanelHeading icon title description actions level id>` in `components/ui/panel-heading.tsx` replaces all 59 `shared-panel-heading` blocks (24 files); the rules became `rm-panel-heading` in `14-building-blocks.css` and `grep shared-panel-heading` finds nothing. Typecheck passes; not seen on screen
 - [x] **V0.2.84** `PageHeader`: `<PageHeader title description actions back>` in `components/ui/page-header.tsx` replaces `shared-page-heading` and `shared-detail-heading` on the dashboard, workspace, artifact and memory card (record layout), profile, notifications and System pages; page titles are 28 to 32 px (they were 34 to 72 px) and panel titles 16 px, as DESIGN.md says. Typecheck passes; not seen on screen
 - [x] **V0.2.85** Table styles: `<Table>` (`components/ui/table.tsx`) with the `rm-table` styles (sideways-scrolling box, sticky header, row hover, `rm-table-number`) replaces `rm-map-coverage` in twelve tables: System overview, usage, users, backups, jobs, audit and console, the map's coverage and link tables, health checks and repository structure. Typecheck passes; not seen on screen
-- [ ] **V0.2.86** `Combobox` for long lists
+- [x] **V0.2.86** `Combobox` for long lists: `<Combobox aria-label options value onValueChange placeholder emptyLabel>` in `components/ui/combobox.tsx` on `@radix-ui/react-popover` (a new dependency): a dropdown-looking trigger, a search field, filtering on label and description, keyboard choice; it replaces the raw `<select>` of *Add a file…* in the memory card editor, the last one in the web client. Typecheck passes; not seen on screen
 - [ ] **V0.2.87** The searchable picker where lists are long
 - [ ] **V0.2.88** `SearchField`
 - [ ] **V0.2.89** `CopyButton`

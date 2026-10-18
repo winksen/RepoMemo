@@ -154,6 +154,11 @@ page's own version, and add to this list when a new one is added.
   640 px, a hover on each row and numbers (`className="rm-table-number"`)
   right-aligned in tabular figures. Use `<Table>` around a `<thead>` and a
   `<tbody>`; do not style a table of your own.
+- **`Combobox`**: chooses one item out of many by typing part of its name (a
+  Radix Popover with a search field and a list of matches; arrow keys move,
+  Enter chooses, Escape closes). It looks like a `Dropdown`. Use a `Dropdown` for
+  a handful of options and a `Combobox` where scrolling the whole list would be
+  slow: files, people, tasks.
 
 ### Notifications
 
