@@ -4,6 +4,7 @@ import { SharedApiError, transferSharedWorkspaceOwnership, removeSharedWorkspace
 import { type WorkspaceMember, type WorkspaceRole } from "../../types";
 import { UserAvatar } from "../../components/UserAvatar";
 import { Button } from "../../components/ui/button";
+import { useConfirm } from "../../components/ui/confirm-dialog";
 import { Dropdown } from "../../components/ui/dropdown";
 import { Input } from "../../components/ui/input";
 import { showToast } from "../../components/ui/toast";
@@ -17,6 +18,7 @@ import { ICON_SIZE } from "../../components/ui/icon";
 export function PeopleSection({ page }: { page: WorkspacePage }) {
   const { accessToken, workspace, workspaceId, session, canWrite, canManageMembers, canAssignAdmin, canManageWorkspace, isSubmitting, setIsSubmitting, setError, load } = page;
   const useS = sectionState(page.store, "people");
+  const confirm = useConfirm();
   const [activityKind, setActivityKind] = useS<"user" | "ai">("activityKind", "user");
   const [memberEmail, setMemberEmail] = useS("memberEmail", "");
   const [memberRole, setMemberRole] = useS<WorkspaceRole>("memberRole", "member");
@@ -49,7 +51,7 @@ export function PeopleSection({ page }: { page: WorkspacePage }) {
   }
 
   async function makeOwner(member: WorkspaceMember) {
-    if (!window.confirm(`Hand this workspace to ${member.user.display_name}? You stay on as an administrator and cannot take it back yourself.`)) return;
+    if (!(await confirm({ action: "Hand over", description: "You stay on as an administrator and cannot take it back yourself.", title: `Hand this workspace to ${member.user.display_name}?` }))) return;
     setIsSubmitting(true); setError(null);
     try {
       await transferSharedWorkspaceOwnership(accessToken, workspace.workspace.id, member.user.id);

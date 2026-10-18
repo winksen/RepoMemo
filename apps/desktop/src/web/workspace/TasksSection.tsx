@@ -3,6 +3,7 @@ import { IconChecklist as Checklist, IconFileText as FileText, IconFilter as Fil
 import { createSharedCollaborationTask, createSharedTaskChecklistItem, deleteSharedCollaborationTask, getSharedWorkspaceMetrics, listSharedCollaborationTasks, listSharedTaskChecklist, toggleSharedTaskChecklistItem, updateSharedCollaborationTask } from "../../lib/sharedApi";
 import { type CollaborationTask, type CollaborationTaskPriority, type CollaborationTaskStatus, type TaskChecklistItem } from "../../types";
 import { Button } from "../../components/ui/button";
+import { useConfirm } from "../../components/ui/confirm-dialog";
 import { Dropdown } from "../../components/ui/dropdown";
 import { Input } from "../../components/ui/input";
 import { Textarea } from "../../components/ui/textarea";
@@ -15,6 +16,7 @@ import { ICON_SIZE } from "../../components/ui/icon";
 export function TasksSection({ page }: { page: WorkspacePage }) {
   const { accessToken, workspace, workspaceId, session, canWrite, canManageMembers, isSubmitting, setIsSubmitting, setError, onOpenArtifact } = page;
   const useS = sectionState(page.store, "tasks");
+  const confirm = useConfirm();
   const [taskChecklists, setTaskChecklists] = useS<Record<string, TaskChecklistItem[]>>("taskChecklists", {});
   const [expandedTaskId, setExpandedTaskId] = useS<string | null>("expandedTaskId", null);
   const [checklistBody, setChecklistBody] = useS("checklistBody", "");
@@ -74,7 +76,7 @@ export function TasksSection({ page }: { page: WorkspacePage }) {
   }
 
   async function removeTask(task: CollaborationTask) {
-    if (!window.confirm(`Delete “${task.title}”?`)) return;
+    if (!(await confirm({ action: "Delete", danger: true, title: `Delete “${task.title}”?` }))) return;
     setIsSubmitting(true); setError(null);
     try {
       await deleteSharedCollaborationTask(accessToken, task.id);

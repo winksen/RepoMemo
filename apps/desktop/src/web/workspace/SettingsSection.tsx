@@ -3,6 +3,7 @@ import { IconPencil as Pencil, IconSettings as Settings, IconTrash as Trash } fr
 import { deleteSharedWorkspace, getSharedWorkspaceMetrics, updateSharedWorkspace } from "../../lib/sharedApi";
 import { type SharedAiProviderSettings } from "../../types";
 import { Button } from "../../components/ui/button";
+import { useConfirm } from "../../components/ui/confirm-dialog";
 import { Input } from "../../components/ui/input";
 import { AiPolicySettings } from "../../components/AiPolicySettings";
 import { AiProviderForm } from "../../components/AiProviderForm";
@@ -19,6 +20,7 @@ export function SettingsSection({ page }: { page: WorkspacePage }) {
   const { accessToken, workspace, workspaceId, canManageMembers, canManageWorkspace, isLive, isSubmitting, setIsSubmitting, setError, load, onWorkspaceUpdated, onWorkspaceDeleted } = page;
   const isSettingsView = page.section === "settings";
   const useS = sectionState(page.store, "settings");
+  const confirm = useConfirm();
   const [workspaceName, setWorkspaceName] = useS("workspaceName", workspace.workspace.name);
   const [aiProviders, setAiProviders] = useAiProviders(accessToken, workspaceId, canManageMembers);
   const [workspaceMetrics, setWorkspaceMetrics] = useMetrics(accessToken, workspaceId);
@@ -58,7 +60,7 @@ export function SettingsSection({ page }: { page: WorkspacePage }) {
   }
 
   async function removeWorkspace() {
-    if (!window.confirm(`Delete ${workspace.workspace.name}? This permanently removes all shared evidence and memory in this workspace.`)) return;
+    if (!(await confirm({ action: "Delete workspace", danger: true, description: "This permanently removes all shared evidence and memory in this workspace.", title: `Delete ${workspace.workspace.name}?` }))) return;
     setIsSubmitting(true); setError(null);
     try {
       await deleteSharedWorkspace(accessToken, workspace.workspace.id);

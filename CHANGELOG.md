@@ -2,6 +2,17 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.78 (2026-10-18)
+
+No more browser confirmations.
+
+### Changed
+- **`useConfirm` replaces the last four `window.confirm` calls** of the web client: handing an organization to a member (Organization), handing a workspace to a member (People), deleting a workspace (Settings, with the danger button) and deleting a task (Tasks, with the danger button). Handing over names the member in the title and says in the description that the previous owner stays on as an administrator and cannot take it back.
+- `grep window.confirm` finds nothing in the web client.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.77 (2026-10-18)
 
 Confirmations in the app's own dialog.

@@ -4,6 +4,7 @@ import { SharedApiError, listSharedOrganizationMembers, removeSharedOrganization
 import { type Organization, type OrganizationMember, type OrganizationRole, type SharedWorkspace } from "../types";
 import { UserAvatar } from "../components/UserAvatar";
 import { Button } from "../components/ui/button";
+import { useConfirm } from "../components/ui/confirm-dialog";
 import { Dropdown } from "../components/ui/dropdown";
 import { IconButton } from "../components/ui/icon-button";
 import { Input } from "../components/ui/input";
@@ -24,6 +25,7 @@ export function OrganizationAdministration({
   onOrganizationUpdated: (organization: Organization) => void;
   organization: Organization;
 }) {
+  const confirm = useConfirm();
   const [members, setMembers] = useState<OrganizationMember[]>([]);
   const [organizationName, setOrganizationName] = useState(organization.name);
   const [memberEmail, setMemberEmail] = useState("");
@@ -64,7 +66,7 @@ export function OrganizationAdministration({
   }
 
   async function makeOwner(member: OrganizationMember) {
-    if (!window.confirm(`Hand this organization to ${member.user.display_name}? You stay on as an administrator and cannot take it back yourself.`)) return;
+    if (!(await confirm({ action: "Hand over", description: "You stay on as an administrator and cannot take it back yourself.", title: `Hand this organization to ${member.user.display_name}?` }))) return;
     setIsSaving(true); setError(null);
     try {
       await transferSharedOrganizationOwnership(accessToken, organization.id, member.user.id);
