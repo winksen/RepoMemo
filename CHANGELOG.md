@@ -2,6 +2,18 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.97 (2026-10-19)
+
+The setup wizard is one component per step.
+
+### Changed
+- **`components/ServerSetup.tsx` (375 lines) becomes `web/setup/`:** `ServerSetup.tsx` (which step is shown, the setup code, the settings read and the choices carried to the last step, plus the waiting page), `StepFrame.tsx` (the shared frame: header, list of steps and panel, and the step heading), `steps.tsx` (the step list and the settings offered), and one file per step: `WelcomeStep`, `AdminStep`, `ChecksStep`, `SettingsStep` (used for *Access and security* and for *Logging*), `OrganizationStep` and `FinishStep`. Each step keeps its own form state. The longest file is 99 lines.
+- **Two copies of the "settings were saved" handler are one** (`settingsSaved`), and the page shell that wrapped every step is the new `StepFrame`. Nothing else changes: the wizard looks and behaves as before.
+- **`test/splitModules.test.ts`** now guards `web/setup` too.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.96 (2026-10-19)
 
 The repositories pages are split by what they show.

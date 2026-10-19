@@ -12,7 +12,7 @@ import { queryClient } from "./lib/queryClient";
 import { SHARED_SESSION_STORAGE_KEY as SESSION_STORAGE_KEY, clearSharedSession, getPlatformStatus, getServerSetup, getSharedHealth, getSharedSession, listSharedOrganizations, listSharedWorkspaces, refreshSharedSession } from "./lib/sharedApi";
 import { type Organization, type ServerSetupStatus, type SharedSession, type SharedWorkspace } from "./types";
 import { PlatformSetup } from "./components/PlatformSetup";
-import { ServerSetup, ServerSetupWaiting } from "./components/ServerSetup";
+import { ServerSetup, ServerSetupWaiting } from "./web/setup/ServerSetup";
 import { InvitePage } from "./components/InvitePage";
 import { PasswordResetPage } from "./components/PasswordResetPage";
 import { VerifyEmailPage } from "./components/VerifyEmailPage";
