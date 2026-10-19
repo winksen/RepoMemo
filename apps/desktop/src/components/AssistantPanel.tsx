@@ -18,15 +18,7 @@ import {
   IconSparkles as Sparkles,
   IconTrash as Trash,
 } from "@tabler/icons-react";
-import {
-  deleteSharedAgentConversation,
-  getSharedAgentCapabilities,
-  getSharedAgentConversation,
-  listSharedAgentConversations,
-  renameSharedAgentConversation,
-  sendSharedAgentMessage,
-} from "../lib/sharedApi";
-import { onAssistantCommand, takeAssistantCommand, type AssistantCommand } from "../lib/assistantBridge";
+import { deleteSharedAgentConversation, getSharedAgentCapabilities, getSharedAgentConversation, listSharedAgentConversations, renameSharedAgentConversation, sendSharedAgentMessage } from "../lib/sharedApi";
 import type { AgentCapabilities, AgentCapability, AgentConversation, AgentMessage, AgentReply, AgentTurn } from "../types";
 import { ViewAtCommit } from "../web/common";
 import { ActionMenu } from "./ui/action-menu";
@@ -37,6 +29,10 @@ import { Textarea } from "./ui/textarea";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
 import { apiMessage, formatRecentTime } from "../web/format";
+import { workspaceKeys } from "../lib/queryClient";
+import { useServerState } from "../lib/useServerState";
+import { useErrorToast } from "../lib/useErrorToast";
+import { useAssistantCommands } from "../lib/useAssistantCommands";
 
 /** A turn as shown: stored turns plus the one waiting for, or failing to get, a reply. */
 type ThreadTurn = {
@@ -81,8 +77,19 @@ function storedTurn(turn: AgentTurn): ThreadTurn {
 
 /** Workspace assistant: routes each message to one capability on the server and keeps the user's chats there. */
 export function AssistantPanel({ accessToken, onOpenArtifact, workspaceId }: { accessToken: string; onOpenArtifact: (artifactId: string) => void; workspaceId: string }) {
-  const [capabilities, setCapabilities] = useState<AgentCapabilities | null>(null);
-  const [conversations, setConversations] = useState<AgentConversation[]>([]);
+  const [capabilities, , capabilitiesQuery] = useServerState<AgentCapabilities | null>({
+    key: workspaceKeys.assistantCapabilities(workspaceId),
+    fetch: () => getSharedAgentCapabilities(accessToken, workspaceId),
+    initial: null,
+  });
+  // The person's chats of this workspace; handlers that rename, delete or add one write to the cache.
+  const [conversations, setConversations, chatsQuery] = useServerState<AgentConversation[]>({
+    key: workspaceKeys.assistantChats(workspaceId),
+    fetch: () => listSharedAgentConversations(accessToken, workspaceId),
+    initial: [],
+    staleTime: 0,
+  });
+  useErrorToast(capabilitiesQuery.error ?? chatsQuery.error, "The assistant is unavailable.");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [turns, setTurns] = useState<ThreadTurn[]>([]);
   const [isLoadingChat, setIsLoadingChat] = useState(false);
@@ -103,41 +110,32 @@ export function AssistantPanel({ accessToken, onOpenArtifact, workspaceId }: { a
   const canSummarize = capabilities?.capabilities.some((capability) => capability.id === "summarize_file" && capability.available) ?? false;
   const activeConversation = conversations.find((conversation) => conversation.id === activeId) ?? null;
 
+  // Once the chats are known, open the one this person had open last time.
+  const restoredFor = useRef<string | null>(null);
+  const chatsLoaded = chatsQuery.data !== undefined;
   useEffect(() => {
-    let cancelled = false;
-    Promise.all([getSharedAgentCapabilities(accessToken, workspaceId), listSharedAgentConversations(accessToken, workspaceId)])
-      .then(([nextCapabilities, nextConversations]) => {
-        if (cancelled) return;
-        setCapabilities(nextCapabilities);
-        setConversations(nextConversations);
-        const last = rememberedChat(workspaceId);
-        if (last && nextConversations.some((conversation) => conversation.id === last)) void openChat(last);
-      })
-      .catch((error: unknown) => showToast("error", apiMessage(error, "The assistant is unavailable.")));
-    return () => { cancelled = true; };
-  }, [accessToken, workspaceId]);
+    if (!chatsLoaded || restoredFor.current === workspaceId) return;
+    restoredFor.current = workspaceId;
+    const last = rememberedChat(workspaceId);
+    if (last && conversations.some((conversation) => conversation.id === last)) void openChat(last);
+  }, [chatsLoaded, workspaceId]);
   useEffect(() => { threadEnd.current?.scrollIntoView({ block: "end", behavior: "smooth" }); }, [turns.length, isBusy]);
 
-  // Commands from the command palette wait here until the chat is loaded and idle.
-  const [queued, setQueued] = useState<AssistantCommand | null>(null);
-  useEffect(() => {
-    const take = () => { const command = takeAssistantCommand(); if (command) setQueued(command); };
-    take();
-    return onAssistantCommand(take);
-  }, []);
-  useEffect(() => {
-    if (!queued || !capabilities || isBusy || isLoadingChat) return;
-    setQueued(null);
-    const label = queued.message.trim() || (queued.capability ? capabilityLabel(capabilities, queued.capability) : "");
-    if (queued.capability === "workspace_overview" || (queued.message.trim() && label)) {
-      send({ message: queued.message.trim(), capability: queued.capability }, label);
-      setSelected(null);
-    } else if (queued.capability) {
-      // Only the action was chosen: select it and let the person type.
-      setSelected(queued.capability);
-      input.current?.focus();
-    }
-  }, [queued, capabilities, isBusy, isLoadingChat]);
+  // Commands from the command palette wait until the capabilities are loaded and the chat is idle.
+  useAssistantCommands({
+    ready: Boolean(capabilities) && !isBusy && !isLoadingChat,
+    handle: (queued) => {
+      const label = queued.message.trim() || (queued.capability ? capabilityLabel(capabilities, queued.capability) : "");
+      if (queued.capability === "workspace_overview" || (queued.message.trim() && label)) {
+        send({ message: queued.message.trim(), capability: queued.capability }, label);
+        setSelected(null);
+      } else if (queued.capability) {
+        // Only the action was chosen: select it and let the person type.
+        setSelected(queued.capability);
+        input.current?.focus();
+      }
+    },
+  });
 
   async function openChat(conversationId: string) {
     const token = ++view.current;

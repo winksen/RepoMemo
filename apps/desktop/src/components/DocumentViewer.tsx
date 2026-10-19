@@ -1,18 +1,6 @@
-import { useEffect, useState } from "react";
-import {
-  IconDownload as Download,
-  IconExternalLink as ExternalLink,
-  IconLoader2 as Loader,
-  IconPaperclip as Paperclip,
-} from "@tabler/icons-react";
-import {
-  createSharedFileLink,
-  downloadSharedArtifactFile,
-  downloadSharedRenderedPreview,
-  getSharedDocumentPreview,
-  getSharedRenderStatus,
-  sharedApiUrl,
-} from "../lib/sharedApi";
+import { useState, useRef } from "react";
+import { IconDownload as Download, IconExternalLink as ExternalLink, IconLoader2 as Loader, IconPaperclip as Paperclip } from "@tabler/icons-react";
+import { createSharedFileLink, downloadSharedArtifactFile, downloadSharedRenderedPreview, getSharedDocumentPreview, getSharedRenderStatus, sharedApiUrl } from "../lib/sharedApi";
 import { columnLetters, documentKindOf, OPEN_IN_APP } from "../lib/documents";
 import { isDesktopRuntime } from "../lib/desktop";
 import type { ArtifactSummary, DocumentPreview, SheetPreview } from "../types";
@@ -22,6 +10,10 @@ import { SegmentedControl } from "./ui/segmented-control";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
 import { apiMessage, formatBytes } from "../web/format";
+import { workspaceKeys } from "../lib/queryClient";
+import { useServerState } from "../lib/useServerState";
+import { useErrorToast } from "../lib/useErrorToast";
+import { useObjectUrl } from "../lib/useObjectUrl";
 
 function saveBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
@@ -38,76 +30,57 @@ function saveBlob(blob: Blob, filename: string) {
 export function DocumentViewer({ accessToken, artifact }: { accessToken: string; artifact: ArtifactSummary }) {
   const kind = documentKindOf(artifact);
   const filename = artifact.path.split(/[\\/]/).pop() ?? artifact.title;
-  const [preview, setPreview] = useState<DocumentPreview | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isBusy, setIsBusy] = useState(false);
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-  const [renderState, setRenderState] = useState<RenderStatus | null>(null);
-  const [renderedUrl, setRenderedUrl] = useState<string | null>(null);
-  const [showExtracted, setShowExtracted] = useState(false);
+  // Which file the person asked to see as extracted text instead of the original layout.
+  const [extractedFor, setExtractedFor] = useState<string | null>(null);
+  const showExtracted = extractedFor === artifact.id;
   const rendersLayout = kind === "word" || kind === "powerpoint";
+  const workspaceId = artifact.workspace_id;
 
-  useEffect(() => {
-    let cancelled = false;
-    setPreview(null);
-    setIsLoading(true);
-    getSharedDocumentPreview(accessToken, artifact.id)
-      .then((next) => { if (!cancelled) setPreview(next); })
-      .catch((error) => { if (!cancelled) setPreview({ kind: "unavailable", reason: apiMessage(error, "Something went wrong.") }); })
-      .finally(() => { if (!cancelled) setIsLoading(false); });
-    return () => { cancelled = true; };
-  }, [accessToken, artifact.id]);
+  const [loadedPreview, , previewQuery] = useServerState<DocumentPreview | null>({
+    key: workspaceKeys.artifactPreview(workspaceId, artifact.id),
+    fetch: () => getSharedDocumentPreview(accessToken, artifact.id),
+    initial: null,
+    staleTime: 0,
+  });
+  const preview: DocumentPreview | null = loadedPreview ?? (previewQuery.isError ? { kind: "unavailable", reason: apiMessage(previewQuery.error, "Something went wrong.") } : null);
+  const isLoading = preview === null;
 
   // Office files: LibreOffice renders the real layout to a PDF on the server.
-  // The status call starts that conversion, so poll until it is ready.
-  useEffect(() => {
-    if (!rendersLayout) return;
-    let cancelled = false;
-    let timer: number | undefined;
-    let url: string | null = null;
-    let attempts = 0;
-    setRenderState(null);
-    setRenderedUrl(null);
-    setShowExtracted(false);
-    const check = async () => {
-      try {
-        const status = await getSharedRenderStatus(accessToken, artifact.id);
-        if (cancelled) return;
-        setRenderState(status);
-        if (status.state === "converting" && attempts++ < 80) {
-          timer = window.setTimeout(() => void check(), 1500);
-        } else if (status.state === "ready") {
-          const blob = await downloadSharedRenderedPreview(accessToken, artifact.id);
-          if (cancelled) return;
-          url = URL.createObjectURL(new Blob([blob], { type: "application/pdf" }));
-          setRenderedUrl(url);
-        }
-      } catch (error) {
-        if (!cancelled) setRenderState({ state: "failed", message: apiMessage(error, "Something went wrong.") });
-      }
-    };
-    void check();
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-      if (url) URL.revokeObjectURL(url);
-    };
-  }, [accessToken, artifact.id, rendersLayout]);
+  // The status call starts that conversion, so it is asked again until it is ready.
+  const checks = useRef(0);
+  const [loadedStatus, , statusQuery] = useServerState<RenderStatus | null>({
+    key: workspaceKeys.artifactRenderStatus(workspaceId, artifact.id),
+    fetch: () => getSharedRenderStatus(accessToken, artifact.id),
+    initial: null,
+    enabled: rendersLayout,
+    staleTime: 0,
+    refetchInterval: (status) => {
+      if (status?.state !== "converting") { checks.current = 0; return false; }
+      return checks.current++ < 80 ? 1500 : false;
+    },
+  });
+  const [renderedFile, , renderedQuery] = useServerState<Blob | null>({
+    key: workspaceKeys.artifactRendered(workspaceId, artifact.id),
+    fetch: () => downloadSharedRenderedPreview(accessToken, artifact.id),
+    initial: null,
+    enabled: rendersLayout && loadedStatus?.state === "ready",
+    staleTime: 0,
+  });
+  const renderedUrl = useObjectUrl(renderedFile);
+  const failure = statusQuery.error ?? renderedQuery.error;
+  const renderState: RenderStatus | null = failure ? { state: "failed", message: apiMessage(failure, "Something went wrong.") } : rendersLayout ? loadedStatus : null;
 
   // The browser's own PDF viewer shows the original file.
-  useEffect(() => {
-    if (preview?.kind !== "pdf") { setPdfUrl(null); return; }
-    let cancelled = false;
-    let url: string | null = null;
-    downloadSharedArtifactFile(accessToken, artifact.id)
-      .then((blob) => {
-        if (cancelled) return;
-        url = URL.createObjectURL(new Blob([blob], { type: "application/pdf" }));
-        setPdfUrl(url);
-      })
-      .catch((error) => { if (!cancelled) showToast("error", apiMessage(error, "Something went wrong.")); });
-    return () => { cancelled = true; if (url) URL.revokeObjectURL(url); };
-  }, [accessToken, artifact.id, preview?.kind]);
+  const [pdfFile, , pdfQuery] = useServerState<Blob | null>({
+    key: workspaceKeys.artifactFile(workspaceId, artifact.id),
+    fetch: () => downloadSharedArtifactFile(accessToken, artifact.id),
+    initial: null,
+    enabled: preview?.kind === "pdf",
+    staleTime: 0,
+  });
+  const pdfUrl = useObjectUrl(preview?.kind === "pdf" ? pdfFile : null);
+  useErrorToast(pdfQuery.error, "Something went wrong.");
 
   async function download() {
     setIsBusy(true);
@@ -149,7 +122,7 @@ export function DocumentViewer({ accessToken, artifact }: { accessToken: string;
         <div className="shared-doc-title"><strong>{artifact.title}</strong></div>
         <div className="shared-doc-actions">
           {target ? <Button disabled={isBusy} onClick={() => void openInApp()} type="button" variant="main"><ExternalLink size={ICON_SIZE.md} /> Open in {target.label}</Button> : null}
-          {renderedUrl ? <Button onClick={() => setShowExtracted((value) => !value)} type="button" variant="secondary">{showExtracted ? "Show original layout" : "Show extracted view"}</Button> : null}
+          {renderedUrl ? <Button onClick={() => setExtractedFor(showExtracted ? null : artifact.id)} type="button" variant="secondary">{showExtracted ? "Show original layout" : "Show extracted view"}</Button> : null}
           <Button disabled={isBusy} onClick={() => void download()} type="button" variant="secondary"><Download size={ICON_SIZE.md} /> Download</Button>
         </div>
       </div>

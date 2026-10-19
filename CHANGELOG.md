@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.101 (2026-10-19)
+
+The knowledge map, the document viewer and the assistant's chat list load through the query cache.
+
+### Changed
+- **Knowledge map:** read through `useServerState` (`workspaceKeys.knowledgeMap`). While files wait to be indexed or passages to be embedded it is read again every 5 s, up to 120 times, by the query's `refetchInterval`. Live evidence and memory events and the *Refresh* button read it again; only those show it as busy, not the reads while indexing runs.
+- **Document viewer:** the preview, the render status of a Word or PowerPoint file (asked again every 1.5 s while the server converts it, up to 80 times), the rendered PDF and the original PDF are four queries (`workspaceKeys.artifactPreview`, `.artifactRenderStatus`, `.artifactRendered`, `.artifactFile`). The two PDFs get their browser addresses from the new `useObjectUrl`, which releases them when the file goes or the page is left. The viewer has no data-loading effect left.
+- **Assistant:** the capabilities and the chat list are queries (`workspaceKeys.assistantCapabilities`, `.assistantChats`); renaming, deleting and adding a chat write to the cache. The chat that was open last time is still opened once the list is known. The palette's commands wait for the assistant in the new `useAssistantCommands` hook (two effects moved out of the component).
+- **New small hooks:** `useErrorToast(error, fallback)` shows a failed query as a toast; `useObjectUrl(file)`; `useAssistantCommands({ ready, handle })`.
+- A result that arrives after the page was left lands in the cache and nowhere else, in all three.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.100 (2026-10-19)
 
 The repositories and connectors pages load through the query cache.

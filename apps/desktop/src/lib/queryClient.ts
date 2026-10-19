@@ -38,6 +38,14 @@ export const workspaceKeys = {
   savedSearches: (workspaceId: string) => ["workspace", workspaceId, "saved-searches"] as const,
   repositories: (workspaceId: string) => ["workspace", workspaceId, "repositories"] as const,
   connectors: (workspaceId: string) => ["workspace", workspaceId, "connectors"] as const,
+  knowledgeMap: (workspaceId: string) => ["workspace", workspaceId, "knowledge-map"] as const,
+  assistantCapabilities: (workspaceId: string) => ["workspace", workspaceId, "assistant-capabilities"] as const,
+  assistantChats: (workspaceId: string) => ["workspace", workspaceId, "assistant-chats"] as const,
+  // What the document viewer reads about one file.
+  artifactPreview: (workspaceId: string, artifactId: string) => ["workspace", workspaceId, "artifact", artifactId, "preview"] as const,
+  artifactRenderStatus: (workspaceId: string, artifactId: string) => ["workspace", workspaceId, "artifact", artifactId, "render-status"] as const,
+  artifactRendered: (workspaceId: string, artifactId: string) => ["workspace", workspaceId, "artifact", artifactId, "rendered"] as const,
+  artifactFile: (workspaceId: string, artifactId: string) => ["workspace", workspaceId, "artifact", artifactId, "file"] as const,
   // Detail pages live under their workspace, so a full reload of the workspace refreshes them too.
   artifact: (workspaceId: string, artifactId: string) => ["workspace", workspaceId, "artifact", artifactId] as const,
   artifactComments: (workspaceId: string, artifactId: string) => ["workspace", workspaceId, "artifact", artifactId, "comments"] as const,

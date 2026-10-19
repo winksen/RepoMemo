@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.100` (2026-10-19), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.101` (2026-10-19), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Security review 2026-10-16 (V0.2.52)](security/2026-10-16-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -57,7 +57,7 @@ timeline
 | Security review 2026-10-10, second and third passes | ✅ Every finding fixed, mitigated or accepted in writing (V0.1.76); R2-4 and R2-5 scheduled for V0.2.8 |
 | Road to V0.2.0 (V0.1.66–V0.1.76) | 🔄 Built and versioned `0.2.0`; R6 (clean install) and the tag are the maintainer's |
 | Road to V0.3.0 (V0.2.1–V0.2.56, one change each) | ✅ V0.2.1–V0.2.56 built; the clean-machine install (R6, R12) is the maintainer's |
-| Track K: frontend polish (V0.2.57–V0.2.129) | 🔄 V0.2.57–V0.2.100 built (K1 and K2 done); decisions 15–19 taken as proposed; [plan](plans/2026-10-17-frontend-polish.md) |
+| Track K: frontend polish (V0.2.57–V0.2.129) | 🔄 V0.2.57–V0.2.101 built (K1 to K3 done); decisions 15–19 taken as proposed; [plan](plans/2026-10-17-frontend-polish.md) |
 | V0.4.0 and later: scale-out, single sign-on, hosted | 💭 Direction |
 
 ---
@@ -944,7 +944,7 @@ One box per release; the brief, the files and the commit line of each are in [th
 - [x] **V0.2.98** Knowledge map split: `components/KnowledgeMapPanel.tsx` becomes `web/map/` (`KnowledgeMapPanel`, `Pipeline`, `Coverage`, `RelationGraph`, `SelectionPanel`, `EdgeTable`, `shared`), the longest file 263 lines; behaviour unchanged. Typecheck passes; not seen on screen
 - [x] **V0.2.99** System pages load through the cache: `useSystemData(key, load, { refreshMs, keepPrevious, failure })` in `web/system/shared.tsx` wraps `useServerState` (which gained `refetchInterval` and `keepPrevious`), with `systemKeys` in `lib/queryClient.ts`; Overview, Usage, Users, Settings (and the environment status), Logs, Backups, Jobs and Audit use it, Jobs invalidates its query on a resync or an unknown workspace, and the polling timers are the query's `refetchInterval`; `test/systemData.test.tsx` is written, not run. Typecheck passes; not seen on screen
 - [x] **V0.2.100** Repositories and connectors load through the cache: `useRepositories`, `RepositoryDetailView` and `RepositoryFiles` (`web/repositories/`) and `ConnectorSettings` read through `useServerState` with `workspaceKeys.repositories`/`connectors` and `repositoryKeys.detail`/`files`; polling is `refetchInterval` (1.5 s while a sync runs and the stream is down, 15 s when it is up); the end of a sync is announced from a change of the data; `test/repositoriesData.test.tsx` is written, not run. Typecheck passes; not seen on screen
-- [ ] **V0.2.101** Map, document viewer and assistant load through the cache
+- [x] **V0.2.101** Map, document viewer and assistant load through the cache: `KnowledgeMapPanel` (`workspaceKeys.knowledgeMap`, re-read while indexing), `DocumentViewer` (`artifactPreview`, `artifactRenderStatus`, `artifactRendered`, `artifactFile`) and `AssistantPanel` (`assistantCapabilities`, `assistantChats`) read through `useServerState`; new `useErrorToast`, `useObjectUrl` and `useAssistantCommands` in `lib/`. `grep -c useEffect` drops from 8 to 0 (map), 4 to 0 (viewer) and 5 to 3 (assistant); `test/viewerAndAssistantData.test.tsx` is written, not run. K3 is complete: V0.2.91 to V0.2.101. Typecheck passes; not seen on screen
 
 **K4. Pages on the shared pieces**
 
