@@ -13,11 +13,13 @@ import { LoadingState } from "../../components/ui/loading-state";
 import { showToast } from "../../components/ui/toast";
 import { ICON_SIZE } from "../../components/ui/icon";
 import { apiMessage, formatBytes, formatTime } from "../format";
-import { count, Facts } from "./shared";
+import { count, Facts, useSystemData } from "./shared";
+import { systemKeys } from "../../lib/queryClient";
 
 /** Backups of the environment, and restoring one into a new environment folder. */
 export function BackupsPanel({ accessToken, canChange }: { accessToken: string; canChange: boolean }) {
-  const [overview, setOverview] = useState<BackupsOverview | null>(null);
+  // While a backup or restore runs, the list is read again every two seconds.
+  const [overview, , reload, setOverview] = useSystemData<BackupsOverview>(systemKeys.backups(), () => getSystemBackups(accessToken), { failure: "Backups could not be listed.", refreshMs: (current) => current?.status.running ? 2_000 : false });
   const [restoring, setRestoring] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [environment, setEnvironment] = useState("");
@@ -25,16 +27,6 @@ export function BackupsPanel({ accessToken, canChange }: { accessToken: string; 
   const wasRunning = useRef(false);
   const running = overview?.status.running ?? false;
 
-  async function load() {
-    try { setOverview(await getSystemBackups(accessToken)); }
-    catch (error) { showToast("error", apiMessage(error, "Backups could not be listed.")); }
-  }
-  useEffect(() => { void load(); }, [accessToken]);
-  useEffect(() => {
-    if (!running) return undefined;
-    const timer = window.setInterval(() => void load(), 2_000);
-    return () => window.clearInterval(timer);
-  }, [running, accessToken]);
   useEffect(() => {
     // Say how a backup or restore ended, once, when it was running before.
     if (wasRunning.current && !running && overview?.status.message) showToast(overview.status.succeeded ? "success" : "error", overview.status.message);
@@ -63,7 +55,7 @@ export function BackupsPanel({ accessToken, canChange }: { accessToken: string; 
   async function remove() {
     if (!deleting) return;
     setIsBusy(true);
-    try { await deleteSystemBackup(accessToken, deleting); setDeleting(null); showToast("success", "The backup was deleted."); await load(); }
+    try { await deleteSystemBackup(accessToken, deleting); setDeleting(null); showToast("success", "The backup was deleted."); await reload(); }
     catch (error) { showToast("error", apiMessage(error, "The backup could not be deleted.")); }
     finally { setIsBusy(false); }
   }

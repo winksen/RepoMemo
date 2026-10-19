@@ -11,7 +11,8 @@ import { LoadingState } from "../../components/ui/loading-state";
 import { showToast } from "../../components/ui/toast";
 import { ICON_SIZE } from "../../components/ui/icon";
 import { apiMessage, formatBytes } from "../format";
-import { Facts } from "./shared";
+import { Facts, useSystemData } from "./shared";
+import { systemKeys } from "../../lib/queryClient";
 
 const LIVE_SOURCE = "live";
 const LEVEL_LABELS: Record<string, string> = { off: "off", error: "errors", warn: "warnings", info: "information", debug: "debug", trace: "trace" };
@@ -23,29 +24,22 @@ export function LogsSection({ accessToken, canDownload, onOpenSettings, workspac
   const [workspace, setWorkspace] = useState("all");
   const [query, setQuery] = useState("");
   const [follow, setFollow] = useState(true);
-  const [logs, setLogs] = useState<SystemLogs | null>(null);
-  const [files, setFiles] = useState<SystemLogFiles | null>(null);
   const isLive = source === LIVE_SOURCE;
-
+  // The search is sent a moment after the last key, not on every key.
+  const [searched, setSearched] = useState("");
   useEffect(() => {
-    getSystemLogFiles(accessToken).then(setFiles).catch((error) => showToast("error", apiMessage(error, "The log files could not be listed.")));
-  }, [accessToken]);
-
-  useEffect(() => {
-    let active = true;
-    const load = () => getSystemLogs(accessToken, {
-      level,
-      category: category === "all" ? undefined : category,
-      workspace: workspace === "all" ? undefined : workspace,
-      day: isLive ? undefined : source,
-      q: query.trim() || undefined,
-    })
-      .then((next) => { if (active) setLogs(next); })
-      .catch((error) => { if (active) showToast("error", apiMessage(error, "Logs could not be loaded.")); });
-    const delay = window.setTimeout(() => void load(), query ? 300 : 0);
-    const timer = follow && isLive ? window.setInterval(() => void load(), 5_000) : undefined;
-    return () => { active = false; window.clearTimeout(delay); if (timer) window.clearInterval(timer); };
-  }, [accessToken, level, category, workspace, source, query, follow, isLive]);
+    const timer = window.setTimeout(() => setSearched(query.trim()), query ? 300 : 0);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+  const filter = {
+    level,
+    category: category === "all" ? undefined : category,
+    workspace: workspace === "all" ? undefined : workspace,
+    day: isLive ? undefined : source,
+    q: searched || undefined,
+  };
+  const [files] = useSystemData<SystemLogFiles>(systemKeys.logFiles(), () => getSystemLogFiles(accessToken), { failure: "The log files could not be listed." });
+  const [logs] = useSystemData<SystemLogs>(systemKeys.logs(filter), () => getSystemLogs(accessToken, filter), { failure: "Logs could not be loaded.", keepPrevious: true, refreshMs: follow && isLive ? 5_000 : undefined });
 
   async function download() {
     try {

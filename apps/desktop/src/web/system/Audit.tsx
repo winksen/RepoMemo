@@ -12,9 +12,10 @@ import { showToast } from "../../components/ui/toast";
 import { ICON_SIZE } from "../../components/ui/icon";
 import { apiMessage, formatTime } from "../format";
 import { useSystemData, count, RefreshButton } from "./shared";
+import { systemKeys } from "../../lib/queryClient";
 
 export function AuditSection({ accessToken, canExport }: { accessToken: string; canExport: boolean }) {
-  const [events, isLoading, reload] = useSystemData<SystemAuditEvent[]>(() => listSystemAuditEvents(accessToken), [accessToken]);
+  const [events, isLoading, reload] = useSystemData<SystemAuditEvent[]>(systemKeys.audit(), () => listSystemAuditEvents(accessToken));
   const [format, setFormat] = useState<"jsonl" | "csv">("jsonl");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");

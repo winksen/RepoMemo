@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { IconActivity as Activity } from "@tabler/icons-react";
 import { cancelSharedJob, getSystemOverview, listSystemJobs } from "../../lib/sharedApi";
-import type { MaintenanceStatus, SystemJob } from "../../types";
+import type { MaintenanceStatus, SystemJob, SystemOverview } from "../../types";
 import { Button } from "../../components/ui/button";
 import { Table } from "../../components/ui/table";
 import { PanelHeading } from "../../components/ui/panel-heading";
@@ -13,22 +13,24 @@ import { apiMessage, formatTime } from "../format";
 import { useSystemData, count, RefreshButton } from "./shared";
 import { MaintenancePanel } from "./Maintenance";
 import { BackupsPanel } from "./Backups";
+import { systemKeys, invalidateKeys } from "../../lib/queryClient";
+import { useServerState } from "../../lib/useServerState";
 
 export function JobsSection({ accessToken, canChange }: { accessToken: string; canChange: boolean }) {
   const [status, setStatus] = useState("all");
   // Job changes in every workspace arrive on the System event stream; the
   // list then refreshes only now and then, as a safety net.
   const liveHub = useLiveEventHub("/v1/system/events", accessToken);
-  const [jobs, isLoading, reload, setJobs] = useSystemData<SystemJob[]>(() => listSystemJobs(accessToken, status === "all" ? undefined : status), [accessToken, status, liveHub.connected], liveHub.connected ? 60_000 : 10_000);
+  const [jobs, isLoading, reload, setJobs] = useSystemData<SystemJob[]>(systemKeys.jobs(status), () => listSystemJobs(accessToken, status === "all" ? undefined : status), { keepPrevious: true, refreshMs: liveHub.connected ? 60_000 : 10_000 });
   const isLive = useLiveEvents((event) => {
-    if (event.type === "resync") { void reload(); return; }
+    if (event.type === "resync") { void invalidateKeys([systemKeys.jobsAll()]); return; }
     if (event.type !== "job") return;
     const { job } = event;
     const matches = status === "all" || job.status === status;
     const known = jobs?.some((entry) => entry.id === job.id) ?? false;
     const workspaceName = jobs?.find((entry) => entry.workspace_id === job.workspace_id)?.workspace_name;
     // A job of a workspace not listed yet needs its name from the server.
-    if (!known && matches && workspaceName === undefined) { void listSystemJobs(accessToken, status === "all" ? undefined : status).then(setJobs).catch(() => undefined); return; }
+    if (!known && matches && workspaceName === undefined) { void invalidateKeys([systemKeys.jobs(status)]); return; }
     setJobs((current) => {
       if (!current) return current;
       const index = current.findIndex((entry) => entry.id === job.id);
@@ -36,8 +38,9 @@ export function JobsSection({ accessToken, canChange }: { accessToken: string; c
       return matches ? [{ ...job, workspace_name: workspaceName ?? null }, ...current].slice(0, 100) : current;
     });
   }, liveHub);
-  const [maintenance, setMaintenance] = useState<MaintenanceStatus | null>(null);
-  useEffect(() => { getSystemOverview(accessToken).then((overview) => setMaintenance(overview.background.maintenance)).catch(() => undefined); }, [accessToken]);
+  // The maintenance status is part of the overview, which the Overview page shares through the cache.
+  const [overview, setOverview] = useServerState<SystemOverview | null>({ key: systemKeys.overview(), fetch: () => getSystemOverview(accessToken), initial: null, staleTime: 0 });
+  const setMaintenance = (next: MaintenanceStatus) => setOverview((current) => current ? { ...current, background: { ...current.background, maintenance: next } } : current);
 
   async function cancel(job: SystemJob) {
     try { await cancelSharedJob(accessToken, job.id); showToast("success", "Cancellation requested; the job stops at its next step."); await reload(); }
@@ -45,7 +48,7 @@ export function JobsSection({ accessToken, canChange }: { accessToken: string; c
   }
 
   return <>
-    <MaintenancePanel accessToken={accessToken} onChanged={setMaintenance} status={maintenance} />
+    <MaintenancePanel accessToken={accessToken} onChanged={setMaintenance} status={overview?.background.maintenance ?? null} />
     <BackupsPanel accessToken={accessToken} canChange={canChange} />
     <section className="shared-settings-group">
       <PanelHeading description={isLive ? "newest first · live" : "newest first · refreshes every 10 seconds"} icon={Activity} title="Jobs" />

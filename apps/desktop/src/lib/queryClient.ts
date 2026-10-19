@@ -54,6 +54,22 @@ export const accountKeys = {
   notificationPreferences: (userId: string) => ["account", userId, "notification-preferences"] as const,
 };
 
+/** Cache keys of the System area (administrators only). Every key starts with `["system"]`, so one call clears them all. */
+export const systemKeys = {
+  all: ["system"] as const,
+  overview: () => ["system", "overview"] as const,
+  usage: (days: number) => ["system", "usage", days] as const,
+  users: () => ["system", "users"] as const,
+  settings: () => ["system", "settings"] as const,
+  platform: () => ["system", "platform"] as const,
+  logFiles: () => ["system", "log-files"] as const,
+  logs: (filter: Record<string, string | undefined>) => ["system", "logs", filter] as const,
+  backups: () => ["system", "backups"] as const,
+  jobs: (status: string) => ["system", "jobs", status] as const,
+  jobsAll: () => ["system", "jobs"] as const,
+  audit: () => ["system", "audit"] as const,
+};
+
 /** What a kind of change makes stale (P7): live events name one of these instead of reloading the page. */
 export const workspaceInvalidation = {
   ledger: (workspaceId: string) => [workspaceKeys.artifacts(workspaceId), workspaceKeys.indexFailures(workspaceId), workspaceKeys.folders(workspaceId)],

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { MailSettingsPanel } from "../../components/MailSettingsPanel";
 import {
   IconAdjustments as Adjustments,
@@ -9,7 +9,15 @@ import {
   IconServer as Server,
   IconPlugConnectedX as Unplug,
 } from "@tabler/icons-react";
-import { detachEnvironment, getPlatformStatus, getSystemSettings, clearSharedSession, resetSystemSetting, saveSystemSettings } from "../../lib/sharedApi";
+import {
+  detachEnvironment,
+  getPlatformStatus,
+  getSystemSettings,
+  clearSharedSession,
+  resetSystemSetting,
+  saveSystemSettings,
+  PlatformStatus,
+} from "../../lib/sharedApi";
 import type { SharedSession, SystemSetting, SystemSettings } from "../../types";
 import { Button } from "../../components/ui/button";
 import { PanelHeading } from "../../components/ui/panel-heading";
@@ -21,14 +29,15 @@ import { Switch } from "../../components/ui/switch";
 import { showToast } from "../../components/ui/toast";
 import { ICON_SIZE } from "../../components/ui/icon";
 import { apiMessage, formatTime } from "../format";
-import { Facts } from "./shared";
+import { Facts, useSystemData } from "./shared";
+import { systemKeys } from "../../lib/queryClient";
+import { useServerState } from "../../lib/useServerState";
 
 /** The environment folder this server is attached to, and the way to detach it (system administrators only). */
 function EnvironmentGroup({ accessToken }: { accessToken: string }) {
-  const [platform, setPlatform] = useState<{ environment: string | null; folder: string; pinned_environment: string | null } | null>(null);
+  const [platform] = useServerState<PlatformStatus | null>({ key: systemKeys.platform(), fetch: getPlatformStatus, initial: null, staleTime: 0 });
   const [isConfirming, setIsConfirming] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
-  useEffect(() => { getPlatformStatus().then(setPlatform).catch(() => undefined); }, []);
 
   async function detach() {
     setIsBusy(true);
@@ -55,12 +64,9 @@ function EnvironmentGroup({ accessToken }: { accessToken: string }) {
 }
 
 export function SettingsSection({ accessToken, session }: { accessToken: string; session: SharedSession }) {
-  const [settings, setSettings] = useState<SystemSettings | null>(null);
+  const [settings, , , setSettings] = useSystemData<SystemSettings>(systemKeys.settings(), () => getSystemSettings(accessToken), { failure: "Settings could not be loaded." });
   const [draft, setDraft] = useState<Record<string, boolean | number | string>>({});
   const [isBusy, setIsBusy] = useState(false);
-  useEffect(() => {
-    getSystemSettings(accessToken).then(setSettings).catch((error) => showToast("error", apiMessage(error, "Settings could not be loaded.")));
-  }, [accessToken]);
 
   const groups = useMemo(() => {
     const byGroup = new Map<string, SystemSetting[]>();

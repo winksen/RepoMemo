@@ -43,6 +43,7 @@ import { appLink, SecretDialog } from "../../components/SecretDialog";
 import { ICON_SIZE } from "../../components/ui/icon";
 import { apiMessage, formatTime } from "../format";
 import { useSystemData, count, RefreshButton } from "./shared";
+import { systemKeys } from "../../lib/queryClient";
 
 const ROLE_ICON = { owner: <Crown size={ICON_SIZE.sm} />, admin: <ShieldCheck size={ICON_SIZE.sm} />, member: <UserIcon size={ICON_SIZE.sm} />, viewer: <Eye size={ICON_SIZE.sm} /> };
 
@@ -79,7 +80,7 @@ function AccessTree({ user }: { user: SystemUser }) {
 type UserAction = { kind: "grant" | "revoke" | "grant-app" | "revoke-app" | "sign-out" | "reset" | "deactivate" | "reactivate" | "anonymize"; user: SystemUser };
 
 export function UsersSection({ accessToken, session }: { accessToken: string; session: SharedSession }) {
-  const [users, isLoading, reload] = useSystemData<SystemUser[]>(() => listSystemUsers(accessToken), [accessToken]);
+  const [users, isLoading, reload] = useSystemData<SystemUser[]>(systemKeys.users(), () => listSystemUsers(accessToken));
   const [filter, setFilter] = useState("");
   const [pending, setPending] = useState<UserAction | null>(null);
   const [resetLink, setResetLink] = useState<{ user: SystemUser; url: string; expiresAt: string } | null>(null);

@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { IconActivity as Activity, IconDatabase as Database, IconServer as Server, IconShieldCheck as ShieldCheck, IconUsers as Users, IconWorld as World } from "@tabler/icons-react";
 import { getSystemOverview } from "../../lib/sharedApi";
 import type { MaintenanceStatus, SystemOverview } from "../../types";
@@ -9,11 +8,11 @@ import { LoadingState } from "../../components/ui/loading-state";
 import { formatBytes, formatDuration, formatTime } from "../format";
 import { useSystemData, count, RefreshButton, Facts, BarStrip } from "./shared";
 import { MaintenancePanel } from "./Maintenance";
+import { systemKeys } from "../../lib/queryClient";
 
 export function OverviewSection({ accessToken }: { accessToken: string }) {
-  const [overview, isLoading, reload] = useSystemData<SystemOverview>(() => getSystemOverview(accessToken), [accessToken], 30_000);
-  const [maintenance, setMaintenance] = useState<MaintenanceStatus | null>(null);
-  useEffect(() => { if (overview) setMaintenance(overview.background.maintenance); }, [overview]);
+  const [overview, isLoading, reload, setOverview] = useSystemData<SystemOverview>(systemKeys.overview(), () => getSystemOverview(accessToken), { refreshMs: 30_000 });
+  const setMaintenance = (next: MaintenanceStatus) => setOverview((current) => current ? { ...current, background: { ...current.background, maintenance: next } } : current);
   if (!overview) return isLoading ? <LoadingState label="Loading the system overview" /> : <p className="shared-muted-copy">The overview is not available.</p>;
   const { instance, statistics, storage, background, traffic, protection } = overview;
   const minuteBars = traffic.requests_per_minute_last_hour.map((value, index, all) => ({ label: `${all.length - 1 - index} min ago`, value }));
@@ -93,6 +92,6 @@ export function OverviewSection({ accessToken }: { accessToken: string }) {
         </tr>)}</tbody>
       </Table> : <p className="shared-muted-copy">No clients seen yet.</p>}
     </section>
-    <MaintenancePanel accessToken={accessToken} onChanged={setMaintenance} status={maintenance} />
+    <MaintenancePanel accessToken={accessToken} onChanged={setMaintenance} status={background.maintenance} />
   </>;
 }

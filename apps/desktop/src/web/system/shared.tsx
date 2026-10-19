@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect } from "react";
 import type { Dispatch, SetStateAction, ReactNode } from "react";
 import { IconRefresh as Refresh } from "@tabler/icons-react";
 import type { CountByLabel } from "../../types";
@@ -6,26 +6,22 @@ import { Table } from "../../components/ui/table";
 import { IconButton } from "../../components/ui/icon-button";
 import { showToast } from "../../components/ui/toast";
 import { ICON_SIZE } from "../../components/ui/icon";
+import { useServerState } from "../../lib/useServerState";
 import { apiMessage } from "../format";
 
-/** Loads data, reloads on demand and, optionally, every `refreshMs`. */
-export function useSystemData<T>(load: () => Promise<T>, dependencies: unknown[], refreshMs?: number): [T | null, boolean, () => Promise<void>, Dispatch<SetStateAction<T | null>>] {
-  const [data, setData] = useState<T | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  async function reload() {
-    setIsLoading(true);
-    try { setData(await load()); }
-    catch (error) { showToast("error", apiMessage(error, "The system information could not be loaded.")); }
-    finally { setIsLoading(false); }
-  }
+/**
+ * A System page's data, held in the query cache. It shows the cached answer at once, fetches again when the
+ * page opens (and every `refreshMs`), and an answer that arrives after the page was left only reaches the
+ * cache, never a page that is gone. Returns the data, whether a fetch is running, a way to fetch again and a
+ * setter that writes the cache.
+ */
+export function useSystemData<T>(key: readonly unknown[], load: () => Promise<T>, options: { refreshMs?: number | ((data: T | null | undefined) => number | false); keepPrevious?: boolean; failure?: string } = {}): [T | null, boolean, () => Promise<void>, Dispatch<SetStateAction<T | null>>] {
+  const [data, setData, query] = useServerState<T | null>({ key, fetch: load, initial: null, staleTime: 0, refetchInterval: options.refreshMs ?? false, keepPrevious: options.keepPrevious });
   useEffect(() => {
-    void reload();
-    if (!refreshMs) return undefined;
-    const timer = window.setInterval(() => { void load().then(setData).catch(() => undefined); }, refreshMs);
-    return () => window.clearInterval(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, dependencies);
-  return [data, isLoading, reload, setData];
+    if (query.error) showToast("error", apiMessage(query.error, options.failure ?? "The system information could not be loaded."));
+  }, [query.error]);
+  const reload = useCallback(async () => { await query.refetch(); }, [query.refetch]);
+  return [data, query.isFetching, reload, setData];
 }
 
 export function count(value: number): string {

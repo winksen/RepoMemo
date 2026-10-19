@@ -8,10 +8,11 @@ import { Dropdown } from "../../components/ui/dropdown";
 import { LoadingState } from "../../components/ui/loading-state";
 import { formatBytes, formatTime } from "../format";
 import { useSystemData, count, RefreshButton, BarStrip, CountTable } from "./shared";
+import { systemKeys } from "../../lib/queryClient";
 
 export function UsageSection({ accessToken, onOpenWorkspace }: { accessToken: string; onOpenWorkspace: (workspaceId: string) => void }) {
   const [days, setDays] = useState(30);
-  const [usage, isLoading, reload] = useSystemData<SystemUsage>(() => getSystemUsage(accessToken, days), [accessToken, days]);
+  const [usage, isLoading, reload] = useSystemData<SystemUsage>(systemKeys.usage(days), () => getSystemUsage(accessToken, days), { keepPrevious: true });
   const total = usage?.activity_by_day.reduce((sum, entry) => sum + entry.count, 0) ?? 0;
   return <>
     <div className="rm-system-toolbar">

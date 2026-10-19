@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.99 (2026-10-19)
+
+The System pages load through the query cache.
+
+### Changed
+- **Every System page reads its data through the cache** (`useSystemData`, now built on `useServerState`), with keys in the new `systemKeys` (`lib/queryClient.ts`): overview, usage (per period), users, settings, the environment status, log files, logs (per filter), backups, jobs (per status) and the audit trail. A page shows its cached answer at once on a later visit and reads again when it opens, as before.
+- **An answer that arrives after a page was left is ignored by that page.** It lands in the cache, where the next visit finds it; no page sets state from it. This replaces the `useEffect` blocks that loaded with `.then(setState)`, and the timers that polled by hand (the overview every 30 s, the logs every 5 s while following, the backups every 2 s while one runs, the jobs every 10 s or 60 s).
+- **`useServerState` takes `refetchInterval`** (a number, or a function of the data so a page can stop polling) **and `keepPrevious`** (keep showing the last answer while a changed filter is fetched).
+- **Live job events invalidate the jobs query:** a resync, or a job of a workspace not yet listed, marks the list stale so it is read again; other job events still update the row in place. The Overview and Jobs pages share the maintenance status through the cached overview.
+- The logs search is sent 300 ms after the last key, as before.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.98 (2026-10-19)
 
 The knowledge map page is split into its four parts.
