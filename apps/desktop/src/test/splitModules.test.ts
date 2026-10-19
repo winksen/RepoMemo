@@ -5,7 +5,8 @@ const MAX_LINES = 300;
 
 /** Folders a large component was split into: the source of each of their files, by path. */
 const SPLIT_FOLDERS: Record<string, Record<string, string>> = {
-  "web/system": import.meta.glob("../web/system/*.tsx", { query: "?raw", import: "default", eager: true }) as Record<string, string>,
+  "web/system": import.meta.glob("../web/system/*.{ts,tsx}", { query: "?raw", import: "default", eager: true }) as Record<string, string>,
+  "web/repositories": import.meta.glob("../web/repositories/*.{ts,tsx}", { query: "?raw", import: "default", eager: true }) as Record<string, string>,
 };
 
 describe("split modules", () => {

@@ -35,13 +35,13 @@ export const DocumentViewer = lazily<Module<"DocumentViewer", typeof import("../
 export const RichNoteEditor = lazily<Module<"RichNoteEditor", typeof import("../components/RichNoteEditor")>>(
   () => import("../components/RichNoteEditor").then((module) => ({ default: module.RichNoteEditor })),
 );
-export const RepositoriesPanel = lazily<Module<"RepositoriesPanel", typeof import("../components/RepositoriesPanel")>>(
-  () => import("../components/RepositoriesPanel").then((module) => ({ default: module.RepositoriesPanel })),
+export const RepositoriesPanel = lazily<Module<"RepositoriesPanel", typeof import("./repositories/RepositoriesPanel")>>(
+  () => import("./repositories/RepositoriesPanel").then((module) => ({ default: module.RepositoriesPanel })),
 );
-export const RepositorySettings = lazily<Module<"RepositorySettings", typeof import("../components/RepositoriesPanel")>>(
-  () => import("../components/RepositoriesPanel").then((module) => ({ default: module.RepositorySettings })),
+export const RepositorySettings = lazily<Module<"RepositorySettings", typeof import("./repositories/RepositorySettings")>>(
+  () => import("./repositories/RepositorySettings").then((module) => ({ default: module.RepositorySettings })),
 );
-export const RepositoryDetailView = lazily<Module<"RepositoryDetailView", typeof import("../components/RepositoriesPanel")>>(
-  () => import("../components/RepositoriesPanel").then((module) => ({ default: module.RepositoryDetailView })),
+export const RepositoryDetailView = lazily<Module<"RepositoryDetailView", typeof import("./repositories/RepositoryPage")>>(
+  () => import("./repositories/RepositoryPage").then((module) => ({ default: module.RepositoryDetailView })),
 );
 export const SystemArea = lazily<ComponentProps<typeof import("./SystemArea").default>>(() => import("./SystemArea"));

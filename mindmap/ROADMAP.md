@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.95` (2026-10-18), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.96` (2026-10-19), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Security review 2026-10-16 (V0.2.52)](security/2026-10-16-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -57,7 +57,7 @@ timeline
 | Security review 2026-10-10, second and third passes | ✅ Every finding fixed, mitigated or accepted in writing (V0.1.76); R2-4 and R2-5 scheduled for V0.2.8 |
 | Road to V0.2.0 (V0.1.66–V0.1.76) | 🔄 Built and versioned `0.2.0`; R6 (clean install) and the tag are the maintainer's |
 | Road to V0.3.0 (V0.2.1–V0.2.56, one change each) | ✅ V0.2.1–V0.2.56 built; the clean-machine install (R6, R12) is the maintainer's |
-| Track K: frontend polish (V0.2.57–V0.2.129) | 🔄 V0.2.57–V0.2.95 built (K1 and K2 done); decisions 15–19 taken as proposed; [plan](plans/2026-10-17-frontend-polish.md) |
+| Track K: frontend polish (V0.2.57–V0.2.129) | 🔄 V0.2.57–V0.2.96 built (K1 and K2 done); decisions 15–19 taken as proposed; [plan](plans/2026-10-17-frontend-polish.md) |
 | V0.4.0 and later: scale-out, single sign-on, hosted | 💭 Direction |
 
 ---
@@ -939,7 +939,7 @@ One box per release; the brief, the files and the commit line of each are in [th
 - [x] **V0.2.93** `useAsyncAction`: `const { isBusy, run } = useAsyncAction()` in `lib/useAsyncAction.ts`; `run(action, { success, failure })` sets the busy flag and shows the success and error toasts. Profile (avatar, name, address, verification link, password, sign out everywhere) and `TasksSection` use it in place of thirteen `setIsSubmitting`/`try`/`finally` blocks; `test/useAsyncAction.test.tsx` is written, not run. Typecheck passes; not seen on screen
 - [x] **V0.2.94** `useFormState`: `const form = useFormState({ field: value })` in `lib/useFormState.ts` returns `values`, `initial`, `isDirty`, `set(field, value)`, `patch(changes)` and `reset()`, and starts over when `initial` changes; Profile › Personal details uses it for the display name in place of a `useState` and its copying effect; `test/useFormState.test.tsx` is written, not run. Typecheck passes; not seen on screen
 - [x] **V0.2.95** System area split: `components/SystemAdminPanel.tsx` becomes `web/system/` (`SystemAdminPanel`, `Overview`, `Usage`, `Users`, `Settings`, `Logs`, `Jobs`, `Backups`, `Audit`, `Maintenance`, `shared`), the longest file 178 lines; `test/splitModules.test.ts` is written, not run. Typecheck passes; not seen on screen
-- [ ] **V0.2.96** Repositories split
+- [x] **V0.2.96** Repositories split: `components/RepositoriesPanel.tsx` becomes `web/repositories/` (`RepositoriesPanel`, `RepositoryCard`, `RepositorySettings`, `LinkForm`, `RepositoryPage`, `FileBrowser`, `useRepositories`, `shared`), the longest file 260 lines; `web/lazy.tsx` imports the new files. Typecheck passes; not seen on screen
 - [ ] **V0.2.97** Setup wizard split
 - [ ] **V0.2.98** Knowledge map split
 - [ ] **V0.2.99** System pages load through the cache

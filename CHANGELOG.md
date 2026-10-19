@@ -2,6 +2,18 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.96 (2026-10-19)
+
+The repositories pages are split by what they show.
+
+### Changed
+- **`components/RepositoriesPanel.tsx` (872 lines) becomes `web/repositories/`:** `RepositoriesPanel.tsx` (the list of a workspace's repositories), `RepositoryCard.tsx` (one repository in that list), `RepositorySettings.tsx` (the link form, the repositories' settings and their removal), `LinkForm.tsx` (the fields and the access check of a link), `RepositoryPage.tsx` (the page of a whole repository, its summary and overview), `FileBrowser.tsx` (the file list), `useRepositories.ts` (loading and following syncs) and `shared.ts` (constants and helpers). The longest file is 260 lines.
+- **Nothing else changes:** the code was moved as it was. `web/lazy.tsx` loads the three pages from their new files.
+- **`test/splitModules.test.ts`** now guards `web/repositories` too.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.95 (2026-10-18)
 
 The System area is one file per page.

@@ -184,7 +184,7 @@ Syncs run in the background, one at a time across the server and never two for t
 | Overview and summary (`compute_overview`, `overview_markdown`, `summarize_repo`) | [crates/api/src/repo_overview.rs](../../crates/api/src/repo_overview.rs) |
 | Domain types (`RepoSource`, `RepoSyncReport`, `RepoFile`) | [crates/domain/src/lib.rs](../../crates/domain/src/lib.rs) |
 | HTTP routes and background runner | [apps/server/src/repositories.rs](../../apps/server/src/repositories.rs) |
-| Web UI: Repositories section (`RepositoriesPanel`), Settings › Repositories (`RepositorySettings`) and the repository page (`RepositoryDetailView`) | [RepositoriesPanel.tsx](../../apps/desktop/src/components/RepositoriesPanel.tsx) |
+| Web UI: Repositories section (`RepositoriesPanel`), Settings › Repositories (`RepositorySettings`) and the repository page (`RepositoryDetailView`) | [RepositoriesPanel.tsx](../../apps/desktop/src/web/repositories/RepositoriesPanel.tsx), [RepositorySettings.tsx](../../apps/desktop/src/web/repositories/RepositorySettings.tsx), [RepositoryPage.tsx](../../apps/desktop/src/web/repositories/RepositoryPage.tsx) |
 
 Tests: `repomemo-git` (tree parsing, reading a real repository), `repomemo-ingestion` (patterns and classification), `repomemo-api` (`syncs_follow_commits_and_keep_artifact_identity`: add, edit, rename, delete, search, the repository item and its overview, remove; plus overview and README-excerpt unit tests) and `repomemo-server` (`workspace_repository_links_are_checked_then_synced_in_the_background`: roles, link checks for URLs, missing folders and non-repositories, background sync, refused edits, the repository item, its detail and a cited AI summary through a fake Ollama).
 
