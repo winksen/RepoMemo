@@ -2,6 +2,19 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.100 (2026-10-19)
+
+The repositories and connectors pages load through the query cache.
+
+### Changed
+- **The list of a workspace's repositories, a repository's page, a repository's file list and the connectors list** are read through `useServerState`, with new keys (`workspaceKeys.repositories`, `workspaceKeys.connectors` and `repositoryKeys.detail` and `.files` in `lib/queryClient.ts`). A page shows its cached answer at once on a later visit and reads again when it opens. An answer that arrives after the page was left no longer reaches it.
+- **The hand-made polling timers are the query's `refetchInterval`:** a repository list or page is read again every 1.5 s while a sync runs and the event stream is down (every 15 s when it is up), and the connectors list every 1.5 s while one syncs. They stop by themselves when the sync ends.
+- **The end of a sync is announced from the data.** The toast ("synced", "stopped" or the failure) and the refresh of the workspace now follow a change of the cached list instead of the code that fetched it. The connectors page tells its parent only when a sync *ends*, not when a cached list is shown.
+- A connectors list that cannot be read shows as empty with an error toast, as before.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.99 (2026-10-19)
 
 The System pages load through the query cache.

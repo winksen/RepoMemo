@@ -1,32 +1,40 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { listSharedRepositories } from "../../lib/sharedApi";
 import type { RepoSource } from "../../types";
 import { apiMessage } from "../format";
 import { showToast } from "../../components/ui/toast";
 import { useLiveEvents } from "../../lib/liveEvents";
+import { workspaceKeys } from "../../lib/queryClient";
+import { useServerState } from "../../lib/useServerState";
 import { POLL_INTERVAL_MS, LIVE_FALLBACK_POLL_MS, REPOSITORY_LIST_ACTIONS, isRunning, repoSyncJob, reportSummary } from "./shared";
 
-/** Loads the workspace's repositories, follows each sync's progress from the
- *  workspace event stream (polling while the stream is down), and announces
- *  each sync that finishes. */
+/** Loads the workspace's repositories through the query cache, follows each
+ *  sync's progress from the workspace event stream (polling while a sync runs
+ *  and the stream is down), and announces each sync that finishes. */
 export function useRepositories(accessToken: string, workspaceId: string, onChanged: () => void) {
-  const [repositories, setRepositories] = useState<RepoSource[] | null>(null);
   // Jobs seen running, so the end of a sync can be announced once.
   const runningJobs = useRef(new Map<string, string>());
+  const streamIsUp = useRef(false);
+  const [repositories, setRepositories, query] = useServerState<RepoSource[] | null>({
+    key: workspaceKeys.repositories(workspaceId),
+    fetch: async () => (await listSharedRepositories(accessToken, workspaceId)).repositories,
+    initial: null,
+    staleTime: 0,
+    // While a sync runs the list is read again: now and then if the stream shows its progress, often if not.
+    refetchInterval: (current) => current?.some((repository) => repository.active_job) ? (streamIsUp.current ? LIVE_FALLBACK_POLL_MS : POLL_INTERVAL_MS) : false,
+  });
+  const load = async () => { await query.refetch(); };
 
-  async function load() {
-    try {
-      const next = await listSharedRepositories(accessToken, workspaceId);
-      announceFinishedSyncs(next.repositories);
-      setRepositories(next.repositories);
-    } catch (error) {
-      showToast("error", apiMessage(error, "Repositories could not be loaded."));
-    }
-  }
+  useEffect(() => { runningJobs.current.clear(); }, [workspaceId]);
+  useEffect(() => {
+    if (query.error) showToast("error", apiMessage(query.error, "Repositories could not be loaded."));
+  }, [query.error]);
 
-  function announceFinishedSyncs(next: RepoSource[]) {
+  // Each time the list changes: a sync that was running and no longer is has finished.
+  useEffect(() => {
+    if (!repositories) return;
     let finished = false;
-    for (const repository of next) {
+    for (const repository of repositories) {
       const wasRunning = runningJobs.current.has(repository.id);
       if (repository.active_job) {
         runningJobs.current.set(repository.id, repository.active_job.id);
@@ -44,19 +52,13 @@ export function useRepositories(accessToken: string, workspaceId: string, onChan
       }
     }
     if (finished) onChanged();
-  }
+  }, [repositories]);
 
   function track(repositoryId: string, jobId: string | undefined) {
     if (jobId) runningJobs.current.set(repositoryId, jobId);
   }
 
-  useEffect(() => {
-    setRepositories(null);
-    runningJobs.current.clear();
-    void load();
-  }, [accessToken, workspaceId]);
-
-  const live = useLiveEvents((event) => {
+  streamIsUp.current = useLiveEvents((event) => {
     if (event.type === "resync") { void load(); return; }
     if (event.type === "activity") {
       if (REPOSITORY_LIST_ACTIONS.has(event.event.action)) void load();
@@ -68,13 +70,6 @@ export function useRepositories(accessToken: string, workspaceId: string, onChan
     runningJobs.current.set(job.source_id!, job.id);
     setRepositories((current) => current?.map((repository) => repository.id === job.source_id ? { ...repository, active_job: job } : repository) ?? current);
   });
-
-  const syncing = Boolean(repositories?.some((repository) => repository.active_job));
-  useEffect(() => {
-    if (!syncing) return;
-    const timer = window.setInterval(() => void load(), live ? LIVE_FALLBACK_POLL_MS : POLL_INTERVAL_MS);
-    return () => window.clearInterval(timer);
-  }, [syncing, live, accessToken, workspaceId]);
 
   return { repositories, load, track };
 }

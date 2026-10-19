@@ -31,6 +31,8 @@ import {
   reportSummary,
 } from "./shared";
 import { RepositoryFiles } from "./FileBrowser";
+import { repositoryKeys } from "../../lib/queryClient";
+import { useServerState } from "../../lib/useServerState";
 
 /** Order and labels of the technology groups in the project analysis. */
 const STACK_CATEGORIES: [string, string][] = [
@@ -59,29 +61,36 @@ export function RepositoryDetailView({
   onOpenArtifact: (artifactId: string) => void;
   repositoryId: string;
 }) {
-  const [detail, setDetail] = useState<RepositoryDetailResponse | null>(null);
   const [summarizing, setSummarizing] = useState(false);
   const [filesOpen, setFilesOpen] = useState(false);
   const runningJob = useRef<string | null>(null);
+  const streamIsUp = useRef(false);
+  const [detail, setDetail, query] = useServerState<RepositoryDetailResponse | null>({
+    key: repositoryKeys.detail(repositoryId),
+    fetch: () => getSharedRepositoryDetail(accessToken, repositoryId),
+    initial: null,
+    staleTime: 0,
+    // While a sync runs the page is read again: now and then if the stream shows its progress, often if not.
+    refetchInterval: (current) => current?.repository.active_job ? (streamIsUp.current ? LIVE_FALLBACK_POLL_MS : POLL_INTERVAL_MS) : false,
+  });
+  const load = async () => { await query.refetch(); };
 
-  async function load() {
-    try {
-      const next = await getSharedRepositoryDetail(accessToken, repositoryId);
-      const job = next.repository.active_job;
-      if (job) runningJob.current = job.id;
-      else if (runningJob.current) {
-        runningJob.current = null;
-        if (next.repository.status === "error") showToast("error", `${next.repository.name}: ${next.repository.last_error ?? "the sync failed."}`);
-        else if (next.repository.last_report) showToast("success", `${next.repository.name} synced. ${reportSummary(next.repository.last_report)}.`);
-      }
-      setDetail(next);
-    } catch (error) {
-      showToast("error", apiMessage(error, "The repository could not be loaded."));
+  useEffect(() => { runningJob.current = null; }, [repositoryId]);
+  useEffect(() => {
+    if (query.error) showToast("error", apiMessage(query.error, "The repository could not be loaded."));
+  }, [query.error]);
+  // Each time the page's data changes: a sync that was running and no longer is has finished.
+  useEffect(() => {
+    if (!detail) return;
+    const job = detail.repository.active_job;
+    if (job) runningJob.current = job.id;
+    else if (runningJob.current) {
+      runningJob.current = null;
+      if (detail.repository.status === "error") showToast("error", `${detail.repository.name}: ${detail.repository.last_error ?? "the sync failed."}`);
+      else if (detail.repository.last_report) showToast("success", `${detail.repository.name} synced. ${reportSummary(detail.repository.last_report)}.`);
     }
-  }
-
-  useEffect(() => { setDetail(null); runningJob.current = null; void load(); }, [accessToken, repositoryId]);
-  const live = useLiveEvents((event) => {
+  }, [detail]);
+  streamIsUp.current = useLiveEvents((event) => {
     if (event.type === "resync") { void load(); return; }
     const job = repoSyncJob(event);
     if (!job || job.source_id !== repositoryId) return;
@@ -89,12 +98,6 @@ export function RepositoryDetailView({
     runningJob.current = job.id;
     setDetail((current) => current ? { ...current, repository: { ...current.repository, active_job: job } } : current);
   });
-  const syncing = Boolean(detail?.repository.active_job);
-  useEffect(() => {
-    if (!syncing) return;
-    const timer = window.setInterval(() => void load(), live ? LIVE_FALLBACK_POLL_MS : POLL_INTERVAL_MS);
-    return () => window.clearInterval(timer);
-  }, [syncing, live, accessToken, repositoryId]);
 
   async function sync() {
     try {

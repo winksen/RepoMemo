@@ -5,6 +5,8 @@ import { apiMessage, lastChangeLabel } from "../format";
 import { SearchField } from "../../components/ui/search-field";
 import { showToast } from "../../components/ui/toast";
 import { FILE_LIST_LIMIT } from "./shared";
+import { repositoryKeys } from "../../lib/queryClient";
+import { useServerState } from "../../lib/useServerState";
 
 export function RepositoryFiles({
   accessToken,
@@ -15,17 +17,16 @@ export function RepositoryFiles({
   onOpenArtifact: (artifactId: string) => void;
   repository: RepoSource;
 }) {
-  const [files, setFiles] = useState<RepoFile[] | null>(null);
   const [filter, setFilter] = useState("");
-  const commitSha = repository.last_synced_commit?.sha;
-
+  // Read again when the repository's commit or its count of indexed files changes.
+  const [files, , query] = useServerState<RepoFile[] | null>({
+    key: repositoryKeys.files(repository.id, repository.last_synced_commit?.sha, repository.indexed_file_count),
+    fetch: () => listSharedRepositoryFiles(accessToken, repository.id),
+    initial: null,
+  });
   useEffect(() => {
-    let cancelled = false;
-    listSharedRepositoryFiles(accessToken, repository.id)
-      .then((next) => { if (!cancelled) setFiles(next); })
-      .catch((error) => showToast("error", apiMessage(error, "The files could not be loaded.")));
-    return () => { cancelled = true; };
-  }, [accessToken, repository.id, commitSha, repository.indexed_file_count]);
+    if (query.error) showToast("error", apiMessage(query.error, "The files could not be loaded."));
+  }, [query.error]);
 
   const matching = useMemo(() => {
     const needle = filter.trim().toLowerCase();

@@ -1,4 +1,4 @@
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import {
   IconBrandGithub as GitHub,
   IconCircleCheck as CircleCheck,
@@ -28,6 +28,8 @@ import { Input } from "./ui/input";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
 import { apiMessage, formatTime } from "../web/format";
+import { workspaceKeys } from "../lib/queryClient";
+import { useServerState } from "../lib/useServerState";
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "Not synced yet",
@@ -49,7 +51,16 @@ export function ConnectorSettings({
   onChanged: () => void;
   workspaceId: string;
 }) {
-  const [connectors, setConnectors] = useState<ConnectorSource[] | null>(null);
+  // While a sync runs the list is read again every second and a half.
+  const [loaded, , query] = useServerState<ConnectorSource[] | null>({
+    key: workspaceKeys.connectors(workspaceId),
+    fetch: async () => (await listSharedConnectors(accessToken, workspaceId)).connectors,
+    initial: null,
+    staleTime: 0,
+    refetchInterval: (current) => current?.some((connector) => connector.status === "syncing" || connector.active_job) ? 1500 : false,
+  });
+  // A list that could not be read shows as empty instead of loading for ever.
+  const connectors = loaded ?? (query.isError ? [] : null);
   const [link, setLink] = useState("");
   // "" lets the address tell GitHub from GitLab.
   const [provider, setProvider] = useState("");
@@ -64,29 +75,18 @@ export function ConnectorSettings({
   const [hooking, setHooking] = useState<ConnectorSource | null>(null);
   const [hookSecret, setHookSecret] = useState<{ secret: string; address: string } | null>(null);
 
-  const load = useCallback(async () => {
-    try {
-      setConnectors((await listSharedConnectors(accessToken, workspaceId)).connectors);
-    } catch (error) {
-      showToast("error", apiMessage(error, "The connectors could not be loaded."));
-      setConnectors((current) => current ?? []);
-    }
-  }, [accessToken, workspaceId]);
-
+  const load = useCallback(async () => { await query.refetch(); }, [query.refetch]);
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (query.error) showToast("error", apiMessage(query.error, "The connectors could not be loaded."));
+  }, [query.error]);
 
-  // While a sync runs, follow it; the workspace's evidence changes with it.
+  // While a sync runs the workspace's evidence changes with it: tell the page when the sync is over.
   const syncing = connectors?.some((connector) => connector.status === "syncing" || connector.active_job) ?? false;
+  const wasSyncing = useRef(false);
   useEffect(() => {
-    if (!syncing) return undefined;
-    const timer = window.setInterval(() => void load(), 1500);
-    return () => window.clearInterval(timer);
-  }, [syncing, load]);
-  useEffect(() => {
-    if (connectors && !syncing) onChanged();
-    // Only when a sync finishes.
+    // Only when a sync finishes, not when a list that was cached is shown.
+    if (wasSyncing.current && !syncing) onChanged();
+    wasSyncing.current = syncing;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [syncing]);
 

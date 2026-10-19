@@ -36,6 +36,8 @@ export const workspaceKeys = {
   activityCalendar: (workspaceId: string) => ["workspace", workspaceId, "activity-calendar"] as const,
   tasks: (workspaceId: string) => ["workspace", workspaceId, "tasks"] as const,
   savedSearches: (workspaceId: string) => ["workspace", workspaceId, "saved-searches"] as const,
+  repositories: (workspaceId: string) => ["workspace", workspaceId, "repositories"] as const,
+  connectors: (workspaceId: string) => ["workspace", workspaceId, "connectors"] as const,
   // Detail pages live under their workspace, so a full reload of the workspace refreshes them too.
   artifact: (workspaceId: string, artifactId: string) => ["workspace", workspaceId, "artifact", artifactId] as const,
   artifactComments: (workspaceId: string, artifactId: string) => ["workspace", workspaceId, "artifact", artifactId, "comments"] as const,
@@ -43,6 +45,12 @@ export const workspaceKeys = {
   artifactLifecycleEvents: (workspaceId: string, artifactId: string) => ["workspace", workspaceId, "artifact", artifactId, "lifecycle-events"] as const,
   artifactChunks: (workspaceId: string, artifactId: string) => ["workspace", workspaceId, "artifact", artifactId, "chunks"] as const,
   memoryCard: (workspaceId: string, cardId: string) => ["workspace", workspaceId, "memory-card", cardId] as const,
+};
+
+/** Cache keys of one repository's pages (its page and its file list). A repository page does not know its workspace. */
+export const repositoryKeys = {
+  detail: (repositoryId: string) => ["repository", repositoryId, "detail"] as const,
+  files: (repositoryId: string, commit: string | undefined, indexedFiles: number) => ["repository", repositoryId, "files", commit ?? "", indexedFiles] as const,
 };
 
 /** Cache keys of what belongs to the signed-in person, not to a workspace. The cache is cleared when the session ends. */
