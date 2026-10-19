@@ -8,6 +8,7 @@ const SPLIT_FOLDERS: Record<string, Record<string, string>> = {
   "web/system": import.meta.glob("../web/system/*.{ts,tsx}", { query: "?raw", import: "default", eager: true }) as Record<string, string>,
   "web/repositories": import.meta.glob("../web/repositories/*.{ts,tsx}", { query: "?raw", import: "default", eager: true }) as Record<string, string>,
   "web/setup": import.meta.glob("../web/setup/*.{ts,tsx}", { query: "?raw", import: "default", eager: true }) as Record<string, string>,
+  "web/map": import.meta.glob("../web/map/*.{ts,tsx}", { query: "?raw", import: "default", eager: true }) as Record<string, string>,
 };
 
 describe("split modules", () => {

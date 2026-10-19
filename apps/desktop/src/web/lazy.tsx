@@ -20,8 +20,8 @@ function lazily<Props extends object>(load: () => Promise<{ default: ComponentTy
 
 type Module<Name extends string, Source> = Source extends Record<Name, ComponentType<infer Props>> ? Props : never;
 
-export const KnowledgeMapPanel = lazily<Module<"KnowledgeMapPanel", typeof import("../components/KnowledgeMapPanel")>>(
-  () => import("../components/KnowledgeMapPanel").then((module) => ({ default: module.KnowledgeMapPanel })),
+export const KnowledgeMapPanel = lazily<Module<"KnowledgeMapPanel", typeof import("./map/KnowledgeMapPanel")>>(
+  () => import("./map/KnowledgeMapPanel").then((module) => ({ default: module.KnowledgeMapPanel })),
 );
 export const WorkspaceHealthPanel = lazily<Module<"WorkspaceHealthPanel", typeof import("../components/WorkspaceHealthPanel")>>(
   () => import("../components/WorkspaceHealthPanel").then((module) => ({ default: module.WorkspaceHealthPanel })),

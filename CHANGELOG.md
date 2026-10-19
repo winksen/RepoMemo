@@ -2,6 +2,18 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.98 (2026-10-19)
+
+The knowledge map page is split into its four parts.
+
+### Changed
+- **`components/KnowledgeMapPanel.tsx` (530 lines) becomes `web/map/`:** `KnowledgeMapPanel.tsx` (loading, live refresh and the polling while indexing runs), `Pipeline.tsx` (from files to searchable knowledge), `Coverage.tsx` (coverage by kind of file), `RelationGraph.tsx` (the graph and its viewport), `SelectionPanel.tsx` (the side panel of the selected dot), `EdgeTable.tsx` (the table of links) and `shared.ts` (the file groups, the canvas size and the small helpers). The longest file is 263 lines.
+- **Nothing else changes:** the code was moved as it was. The hover label's type is called `HoverTip` so that it no longer shares a name with the `Tooltip` component.
+- **`test/splitModules.test.ts`** now guards `web/map` too.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.97 (2026-10-19)
 
 The setup wizard is one component per step.
