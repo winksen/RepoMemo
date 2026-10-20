@@ -70,7 +70,7 @@
   .shared-page-content > .rm-page-header, .shared-detail-shell > .rm-page-header { margin-bottom: 20px; }
   .shared-metric-visuals, .shared-task-create-fields, .shared-task-board, .shared-retrieval-filter-row, .shared-profile-identity dl, .shared-member-list:has(.shared-member-card), .shared-artifact-manager.grid { grid-template-columns: minmax(0, 1fr); }
   .shared-create-workspace > div { min-width: 0; }
-  .shared-organization-member-form label:first-child { flex-basis: 100%; }
+  .shared-organization-member-form .rm-field:first-child { flex-basis: 100%; }
   .rm-page-header .rm-button { align-self: stretch; }
 
   /* Touch: controls are at least 40px high. */

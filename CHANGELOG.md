@@ -2,6 +2,19 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.105 (2026-10-21)
+
+The organization page uses the shared fields, badges and states.
+
+### Changed
+- **Fields:** renaming the organization, adding a member (email and role) and the invitation form (`InviteMembers`: address and role, now with visible labels instead of hidden ones) use `Field`; the role dropdowns are tied to their labels by the field's id.
+- **Badge and states:** the *Owner* mark of the member list is the shared `Badge`, and the member list shows the shared `LoadingState` while it loads.
+- **Buttons:** *Save name*, *Add member* and *Create invite link* use the `busy` prop.
+- **CSS:** the label rules of `.shared-organization-rename` and `.shared-organization-member-form` now size the fields (`.rm-field`), the invite form lines its button up with the bottom of the fields, and the per-form dropdown width rules for both are removed. The invitation form is shared with the people section, which gets the same fields.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.104 (2026-10-21)
 
 The profile page and API tokens use the shared fields, switches and states.

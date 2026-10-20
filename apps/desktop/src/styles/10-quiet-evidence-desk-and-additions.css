@@ -614,7 +614,7 @@ body { min-width: 760px; background: var(--color-bg); font-family: var(--font-ui
 
 /* Invitations (workspace People, organization administration) */
 .rm-invite { display: grid; gap: 10px; }
-.rm-invite-form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(120px, 160px) auto; gap: 8px; align-items: center; }
+.rm-invite-form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(120px, 160px) auto; gap: 8px; align-items: end; }
 .rm-invite-list, .rm-tokens-list { display: grid; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--color-border); }
 .rm-invite-list li, .rm-tokens-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--color-border); }
 .rm-invite-text, .rm-tokens-text { display: grid; gap: 2px; min-width: 0; }

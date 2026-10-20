@@ -8,6 +8,7 @@ import { appLink, SecretDialog } from "./SecretDialog";
 import { Button } from "./ui/button";
 import { PanelHeading } from "./ui/panel-heading";
 import { Dropdown } from "./ui/dropdown";
+import { Field } from "./ui/field";
 import { Input } from "./ui/input";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
@@ -83,13 +84,13 @@ export function InviteMembers({
     <PanelHeading description={<>{invitations?.length ?? 0} pending</>} icon={MailForward} title="Invite by link" />
     <p className="shared-muted-copy">For people without an account, or to send an access link. You get a link to pass on yourself; it works once, for this email address only, and expires after 7 days. They can create their account from it even when registration is closed.</p>
     <form className="rm-invite-form" onSubmit={invite}>
-      <Input aria-label="Email to invite" autoComplete="off" onChange={(event) => setEmail(event.target.value)} placeholder="person@example.com" required type="email" value={email} />
-      <Dropdown aria-label="Role for the invited person" onValueChange={setRole} options={roleOptions} value={role} />
-      <Button disabled={isBusy || !email.trim()} type="submit" variant="secondary"><LinkIcon size={ICON_SIZE.md} /> Create invite link</Button>
+      <Field label="Email to invite" required><Input autoComplete="off" onChange={(event) => setEmail(event.target.value)} placeholder="person@example.com" type="email" value={email} /></Field>
+      <Field label="Role for the invited person">{(control) => <Dropdown id={control.id} onValueChange={setRole} options={roleOptions} value={role} />}</Field>
+      <Button busy={isBusy} disabled={!email.trim()} type="submit" variant="secondary"><LinkIcon size={ICON_SIZE.md} /> Create invite link</Button>
     </form>
     {invitations?.length ? <ul className="rm-invite-list">{invitations.map((invitation) => <li key={invitation.id}>
       <span className="rm-invite-text"><strong>{invitation.email}</strong><small>{invitation.role} · expires {formatDate(invitation.expires_at)}{invitation.invited_by ? ` · by ${invitation.invited_by.display_name}` : ""}</small></span>
-      <Button aria-label={`Withdraw the invitation of ${invitation.email}`} disabled={isBusy} onClick={() => void withdraw(invitation)} type="button" variant="secondary"><Trash size={ICON_SIZE.sm} /> Withdraw</Button>
+      <Button aria-label={`Withdraw the invitation of ${invitation.email}`} disabled={isBusy} onClick={() => void withdraw(invitation)} variant="secondary"><Trash size={ICON_SIZE.sm} /> Withdraw</Button>
     </li>)}</ul> : null}
     {link ? <SecretDialog description={`Send this link to ${link.email}. Opening it lets them create an account (or sign in) and join this ${targetLabel}.`} onClose={() => setLink(null)} title="Invitation link" value={link.url} /> : null}
   </section>;

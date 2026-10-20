@@ -299,10 +299,9 @@ input[type="file"] {
 .shared-organization-admin .rm-panel-heading > .rm-panel-heading-description { color: var(--color-text-muted); background: var(--color-surface-3); border-radius: 6px; font-size: 10px; font-weight: 700; text-transform: capitalize; }
 .shared-organization-rename,
 .shared-organization-member-form { display: flex; align-items: end; flex-wrap: wrap; gap: 10px; }
-.shared-organization-rename label,
-.shared-organization-member-form label { display: grid; flex: 1 1 180px; gap: 6px; color: var(--color-text-muted); font-size: 12px; font-weight: 700; }
-.shared-organization-member-form label:first-child { flex-basis: 240px; }
-.shared-organization-member-form .rm-dropdown-trigger { width: 100%; }
+.shared-organization-rename .rm-field,
+.shared-organization-member-form .rm-field { flex: 1 1 180px; }
+.shared-organization-member-form .rm-field:first-child { flex-basis: 240px; }
 .shared-organization-member-list { display: grid; border-top: 1px solid var(--color-border); }
 .shared-organization-member-list article { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 56px; padding: 10px 0; border-bottom: 1px solid var(--color-border); }
 .shared-organization-member-list .shared-person { display: flex; align-items: center; min-width: 0; gap: 12px; }
@@ -755,7 +754,6 @@ input[type="file"] {
 .rm-dropdown-item[data-disabled] { cursor: not-allowed; opacity: 0.5; }
 /* A dropdown takes the width of its content (160 px at least); a form stretches it to the field (V0.2.59). */
 .shared-ai-provider-form .rm-dropdown-trigger,
-.rm-invite-form .rm-dropdown-trigger,
 .shared-dialog-field .rm-dropdown-trigger,
 .shared-lifecycle-form .rm-dropdown-trigger,
 .shared-record-edit-form .rm-dropdown-trigger,
