@@ -2,6 +2,19 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.111 (2026-10-21)
+
+The memory section and the memory card page use the shared fields, picker and states.
+
+### Changed
+- **Memory section:** the search is the shared `SearchField`; a new card's title and statement are `Field`s (required); its evidence links are chosen with the searchable `Combobox` in a `Field` (type part of a file name) instead of a dropdown that held every file behind an "Add" placeholder item.
+- **Memory card page:** editing uses `Field`s for the title, source and statement, a `Field` around the evidence picker, the shared `EmptyState` for "No evidence is cited" and for a card without linked evidence, and the shared `LoadingState` while the card loads. *Export Markdown* and *Save memory* use `busy`; *Confirm as it is* shows its work.
+- **Save as memory dialog** (an answer kept from Retrieval or the assistant): title and statement are `Field`s and each evidence link is a shared `Checkbox`.
+- **CSS removed:** the label rules of `.shared-record-edit-form` and `.shared-memory-form`, the evidence label rule and the dropdown width rule of `.shared-memory-evidence`, and the checkbox label rules of the draft dialog.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.110 (2026-10-21)
 
 Tasks use the shared fields, checkboxes and states.

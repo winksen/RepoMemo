@@ -4,7 +4,9 @@ import { cancelSharedJob, createSharedMemoryCard, getSharedRetrievalFacets, getS
 import { type Citation, type IndexingJobStatus, type LiveEvent, type Organization, type SharedSession, type SharedWorkspace, type WorkspaceActivityEvent } from "../types";
 import { Button } from "../components/ui/button";
 import { PageHeader } from "../components/ui/page-header";
+import { Checkbox } from "../components/ui/checkbox";
 import { Dialog, DialogCancel } from "../components/ui/dialog";
+import { Field } from "../components/ui/field";
 import { Input } from "../components/ui/input";
 import { Textarea } from "../components/ui/textarea";
 import { AssistantDock } from "../components/AssistantDock";
@@ -277,10 +279,10 @@ export function SharedWorkspaceDetail({
     })}
   </section> : null;
 
-  const memoryDraftDialog = memoryDraft ? <Dialog className="rm-dialog-wide" description="Keep this answer as a durable team memory card. Its cited passages become the card's evidence links." footer={<><DialogCancel onClick={() => setMemoryDraft(null)} /><Button disabled={isSubmitting || !memoryDraft.title.trim() || !memoryDraft.body.trim()} onClick={() => void saveMemoryDraft()} type="button" variant="main">{isSubmitting ? <Loader className="spin" size={ICON_SIZE.md} /> : <Shield size={ICON_SIZE.md} />} Save memory</Button></>} onClose={() => setMemoryDraft(null)} open title="Save as memory">
-    <label className="shared-dialog-field">Title<Input maxLength={200} onChange={(event) => setMemoryDraft((current) => current ? { ...current, title: event.target.value } : current)} required value={memoryDraft.title} /></label>
-    <label className="shared-dialog-field">Statement<Textarea className="shared-memory-draft-body" onChange={(event) => setMemoryDraft((current) => current ? { ...current, body: event.target.value } : current)} required value={memoryDraft.body} /></label>
-    {memoryDraft.citations.length ? <fieldset className="shared-memory-draft-citations"><legend>Evidence links ({memoryDraft.selected.size} of {memoryDraft.citations.length})</legend>{memoryDraft.citations.map((citation, index) => <label key={`${citation.artifact_id}-${citation.chunk_id ?? "artifact"}-${index}`}><input checked={memoryDraft.selected.has(index)} onChange={() => setMemoryDraft((current) => { if (!current) return current; const selected = new Set(current.selected); if (selected.has(index)) selected.delete(index); else selected.add(index); return { ...current, selected }; })} type="checkbox" /><span>[{index + 1}] {citation.title} · {citation.path}{citationLines(citation)}</span></label>)}</fieldset> : null}
+  const memoryDraftDialog = memoryDraft ? <Dialog className="rm-dialog-wide" description="Keep this answer as a durable team memory card. Its cited passages become the card's evidence links." footer={<><DialogCancel onClick={() => setMemoryDraft(null)} /><Button busy={isSubmitting} disabled={!memoryDraft.title.trim() || !memoryDraft.body.trim()} onClick={() => void saveMemoryDraft()} variant="main"><Shield size={ICON_SIZE.md} /> Save memory</Button></>} onClose={() => setMemoryDraft(null)} open title="Save as memory">
+    <Field label="Title" required><Input maxLength={200} onChange={(event) => setMemoryDraft((current) => current ? { ...current, title: event.target.value } : current)} value={memoryDraft.title} /></Field>
+    <Field label="Statement" required><Textarea className="shared-memory-draft-body" onChange={(event) => setMemoryDraft((current) => current ? { ...current, body: event.target.value } : current)} value={memoryDraft.body} /></Field>
+    {memoryDraft.citations.length ? <fieldset className="shared-memory-draft-citations"><legend>Evidence links ({memoryDraft.selected.size} of {memoryDraft.citations.length})</legend>{memoryDraft.citations.map((citation, index) => <Checkbox checked={memoryDraft.selected.has(index)} key={`${citation.artifact_id}-${citation.chunk_id ?? "artifact"}-${index}`} label={<span>[{index + 1}] {citation.title} · {citation.path}{citationLines(citation)}</span>} onCheckedChange={() => setMemoryDraft((current) => { if (!current) return current; const selected = new Set(current.selected); if (selected.has(index)) selected.delete(index); else selected.add(index); return { ...current, selected }; })} />)}</fieldset> : null}
   </Dialog> : null;
 
   const page: WorkspacePage = {

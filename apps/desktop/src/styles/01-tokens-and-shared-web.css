@@ -511,7 +511,6 @@ input[type="file"] {
 .shared-upload-form strong { font-size: 14px; }
 .shared-upload-form span { color: var(--color-text-muted); font-size: 12px; line-height: 1.45; }
 .shared-upload-form input[type="file"] { width: 100%; color: var(--color-text-muted); font-size: 12px; }
-.shared-memory-form label { display: grid; gap: 6px; color: var(--color-text-muted); font-size: 12px; font-weight: 700; }
 .shared-task-workspace { display: grid; gap: 22px; }
 .shared-task-toolbar { display: grid; grid-template-columns: minmax(240px, 1fr) minmax(190px, 0.35fr); gap: 10px; }
 .shared-task-create { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; padding: 20px 0; border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); }
@@ -666,7 +665,6 @@ input[type="file"] {
 .shared-ai-provider-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .shared-ai-provider-toggle input[type="checkbox"] { margin-top: 2px; }
 .shared-record-edit-form { display: grid; gap: 12px; max-width: 680px; margin: 18px 0 0; padding: 16px; background: var(--color-surface-2); border-radius: 10px; }
-.shared-record-edit-form label { display: grid; gap: 6px; color: var(--color-text-muted); font-size: 12px; font-weight: 700; }
 .rm-button.shared-danger-action { color: var(--color-danger); background: var(--color-surface); border-color: var(--color-border-strong); }
 .rm-button.shared-danger-action:hover:not(:disabled) { color: var(--color-danger); background: var(--color-surface); border-color: var(--color-danger); }
 .shared-content-preview { max-height: 440px; margin: 0; padding: 16px; overflow: auto; color: var(--color-text); background: var(--color-surface-2); border-radius: 10px; font-family: var(--font-mono); font-size: 12px; line-height: 1.6; white-space: pre-wrap; }
@@ -751,7 +749,6 @@ input[type="file"] {
 .shared-memory-form .rm-dropdown-trigger,
 .shared-task-checklist-select .rm-dropdown-trigger,
 .shared-task-controls .rm-dropdown-trigger,
-.shared-memory-evidence .rm-dropdown-trigger,
 .rm-system-settings label .rm-dropdown-trigger,
 .rm-system-setting-control .rm-dropdown-trigger,
 .rm-repo-form label .rm-dropdown-trigger { width: 100%; min-width: 0; }
