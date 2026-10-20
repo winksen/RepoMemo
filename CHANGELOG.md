@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.110 (2026-10-21)
+
+Tasks use the shared fields, checkboxes and states.
+
+### Changed
+- **Create form:** title, description, priority, assignee, related evidence (the searchable picker) and due date are `Field`s with visible labels instead of unlabelled controls carrying an `aria-label`; the title is marked required.
+- **Checklist:** the steps of a task are shared `Checkbox`es (a clickable label, a 16 px box, a struck-through label once done) instead of bare checkboxes; a task without steps shows the shared `EmptyState`; the new step is a `Field`.
+- **Card:** the delete button of a task card is an `IconButton` that names the task. The per-card status, assignee and priority dropdowns and the board's search and assignee filter keep their accessible names without visible labels, so the cards and the toolbar stay compact.
+- **Buttons:** *Create task* and *Add step* use `busy`.
+- **CSS:** the checkbox rules of `.shared-task-checklist-list` and the dropdown width rule of the create fields are removed.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.109 (2026-10-21)
 
 Retrieval filters, saved searches, Ask and symbol search use the shared pieces.

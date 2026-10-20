@@ -516,7 +516,7 @@ input[type="file"] {
 .shared-task-toolbar { display: grid; grid-template-columns: minmax(240px, 1fr) minmax(190px, 0.35fr); gap: 10px; }
 .shared-task-create { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; padding: 20px 0; border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); }
 .shared-task-create-heading,
-.shared-task-create > textarea { grid-column: 1 / -1; }
+.shared-task-create > .rm-field { grid-column: 1 / -1; }
 .shared-task-create-heading > div { display: flex; align-items: flex-start; gap: 9px; }
 .shared-task-create-heading strong,
 .shared-task-create-heading span { display: block; }
@@ -556,10 +556,9 @@ input[type="file"] {
 .shared-task-checklist-select { margin-top: 12px; }
 .shared-task-checklist-panel { display: grid; gap: 10px; margin-top: 16px; padding: 14px; background: var(--color-surface-2); border-radius: 10px; }
 .shared-task-checklist-list { display: grid; gap: 7px; }
-.shared-task-checklist-list label { display: flex; align-items: flex-start; gap: 8px; color: var(--color-text-muted); font-size: 12px; line-height: 1.45; }
-.shared-task-checklist-list input { margin-top: 1px; }
-.shared-task-checklist-list input:checked + span { color: var(--color-text-subtle); text-decoration: line-through; }
-.shared-task-checklist-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px; padding-top: 9px; border-top: 1px solid var(--color-border); }
+.shared-task-checklist-list .rm-checkbox { color: var(--color-text-muted); font-size: 12px; line-height: 1.45; }
+.shared-task-checklist-list .rm-checkbox:has([data-state="checked"]) .rm-checkbox-label { color: var(--color-text-subtle); text-decoration: line-through; }
+.shared-task-checklist-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px; align-items: end; padding-top: 9px; border-top: 1px solid var(--color-border); }
 .shared-members-section { margin-top: 30px; padding-top: 22px; border-top: 1px solid var(--color-border); }
 .shared-activity-list { border-top: 1px solid var(--color-border); }
 .shared-activity-list article { position: relative; display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 14px 0 14px 21px; border-bottom: 1px solid var(--color-border); }
@@ -750,7 +749,6 @@ input[type="file"] {
 .shared-lifecycle-form .rm-dropdown-trigger,
 .shared-record-edit-form .rm-dropdown-trigger,
 .shared-memory-form .rm-dropdown-trigger,
-.shared-task-create-fields .rm-dropdown-trigger,
 .shared-task-checklist-select .rm-dropdown-trigger,
 .shared-task-controls .rm-dropdown-trigger,
 .shared-memory-evidence .rm-dropdown-trigger,
