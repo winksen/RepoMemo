@@ -1,8 +1,9 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { IconArrowLeft as ArrowLeft, IconLoader2 as Loader, IconUserShield as UserShield } from "@tabler/icons-react";
+import { IconArrowLeft as ArrowLeft, IconUserShield as UserShield } from "@tabler/icons-react";
 import { createSetupAdmin, SharedApiError } from "../../lib/sharedApi";
 import { Button } from "../../components/ui/button";
+import { Field } from "../../components/ui/field";
 import { Input } from "../../components/ui/input";
 import { showToast } from "../../components/ui/toast";
 import { ICON_SIZE } from "../../components/ui/icon";
@@ -34,11 +35,11 @@ export function AdminStep({ code, onBack, onCodeRejected, onCreated }: { code: s
       Use an address you keep long-term and a strong password: this account can change everything on the server.
     </StepHeading>
     <form className="shared-setup-form" onSubmit={submit}>
-      <label>Name<Input autoComplete="name" autoFocus maxLength={120} onChange={(event) => setDisplayName(event.target.value)} placeholder="Ada Lovelace" required value={displayName} /></label>
-      <label>Email<Input autoComplete="email" onChange={(event) => setEmail(event.target.value)} placeholder="admin@company.com" required type="email" value={email} /></label>
-      <label>Password<Input autoComplete="new-password" minLength={12} onChange={(event) => setPassword(event.target.value)} placeholder="At least 12 characters" required type="password" value={password} /></label>
-      <label>Confirm password<Input autoComplete="new-password" minLength={12} onChange={(event) => setConfirmation(event.target.value)} required type="password" value={confirmation} /></label>
-      <div className="rm-setup-actions"><Button disabled={isBusy} onClick={onBack} type="button" variant="secondary"><ArrowLeft size={ICON_SIZE.md} /> Back</Button><Button disabled={isBusy} type="submit" variant="main">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : <UserShield size={ICON_SIZE.md} />} Create administrator</Button></div>
+      <Field label="Name" required><Input autoComplete="name" autoFocus maxLength={120} onChange={(event) => setDisplayName(event.target.value)} placeholder="Ada Lovelace" value={displayName} /></Field>
+      <Field label="Email" required><Input autoComplete="email" onChange={(event) => setEmail(event.target.value)} placeholder="admin@company.com" type="email" value={email} /></Field>
+      <Field label="Password" required><Input autoComplete="new-password" minLength={12} onChange={(event) => setPassword(event.target.value)} placeholder="At least 12 characters" type="password" value={password} /></Field>
+      <Field label="Confirm password" required><Input autoComplete="new-password" minLength={12} onChange={(event) => setConfirmation(event.target.value)} type="password" value={confirmation} /></Field>
+      <div className="rm-setup-actions"><Button disabled={isBusy} onClick={onBack} variant="secondary"><ArrowLeft size={ICON_SIZE.md} /> Back</Button><Button busy={isBusy} type="submit" variant="main"><UserShield size={ICON_SIZE.md} /> Create administrator</Button></div>
     </form>
   </>;
 }

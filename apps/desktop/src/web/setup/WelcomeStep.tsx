@@ -1,8 +1,9 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { IconArrowRight as ArrowRight, IconLoader2 as Loader, IconLock as Lock, IconShieldLock as ShieldLock, IconUserShield as UserShield } from "@tabler/icons-react";
+import { IconArrowRight as ArrowRight, IconLock as Lock, IconShieldLock as ShieldLock, IconUserShield as UserShield } from "@tabler/icons-react";
 import { verifySetupCode } from "../../lib/sharedApi";
 import { Button } from "../../components/ui/button";
+import { Field } from "../../components/ui/field";
 import { Input } from "../../components/ui/input";
 import { showToast } from "../../components/ui/toast";
 import { ICON_SIZE } from "../../components/ui/icon";
@@ -28,8 +29,8 @@ export function WelcomeStep({ code, onCode, onVerified }: { code: string; onCode
       <li><Lock size={ICON_SIZE.md} /> Until setup is finished, nobody else can create an account here.</li>
     </ul>
     <form className="shared-setup-form" onSubmit={submit}>
-      <label>Setup code<Input autoComplete="one-time-code" autoFocus onChange={(event) => onCode(event.target.value)} placeholder="ABCD-EFGH-JKLM" required spellCheck={false} value={code} /></label>
-      <div className="rm-setup-actions"><span /><Button disabled={isBusy || !code.trim()} type="submit" variant="main">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : <ArrowRight size={ICON_SIZE.md} />} Continue</Button></div>
+      <Field label="Setup code" required><Input autoComplete="one-time-code" autoFocus onChange={(event) => onCode(event.target.value)} placeholder="ABCD-EFGH-JKLM" spellCheck={false} value={code} /></Field>
+      <div className="rm-setup-actions"><span /><Button busy={isBusy} disabled={!code.trim()} type="submit" variant="main"><ArrowRight size={ICON_SIZE.md} /> Continue</Button></div>
     </form>
   </>;
 }

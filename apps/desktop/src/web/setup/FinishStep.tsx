@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { IconArrowLeft as ArrowLeft, IconFlag as Flag, IconLoader2 as Loader, IconServer as Server } from "@tabler/icons-react";
+import { IconArrowLeft as ArrowLeft, IconFlag as Flag } from "@tabler/icons-react";
 import { completeServerSetup } from "../../lib/sharedApi";
 import type { SharedSession, SystemSetting } from "../../types";
 import { Button } from "../../components/ui/button";
@@ -38,8 +38,8 @@ export function FinishStep({ accessToken, changedSettings, created, onBack, onFi
       <div><dt>First workspace</dt><dd>{created ? `${created.organization}${created.workspace ? ` / ${created.workspace}` : ""}` : "Skipped"}</dd></div>
     </dl>
     <div className="rm-setup-actions">
-      <Button disabled={isBusy} onClick={onBack} type="button" variant="secondary"><ArrowLeft size={ICON_SIZE.md} /> Back</Button>
-      <Button disabled={isBusy} onClick={() => void finish()} type="button" variant="main">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : <Flag size={ICON_SIZE.md} />} Finish setup</Button>
+      <Button disabled={isBusy} onClick={onBack} variant="secondary"><ArrowLeft size={ICON_SIZE.md} /> Back</Button>
+      <Button busy={isBusy} onClick={() => void finish()} variant="main"><Flag size={ICON_SIZE.md} /> Finish setup</Button>
     </div>
   </>;
 }

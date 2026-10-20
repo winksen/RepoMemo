@@ -1,8 +1,9 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { IconArrowLeft as ArrowLeft, IconArrowRight as ArrowRight, IconBuilding as Building, IconCircleCheck as CircleCheck, IconLoader2 as Loader } from "@tabler/icons-react";
+import { IconArrowLeft as ArrowLeft, IconArrowRight as ArrowRight, IconBuilding as Building, IconCircleCheck as CircleCheck } from "@tabler/icons-react";
 import { createSharedOrganization, createSharedWorkspace } from "../../lib/sharedApi";
 import { Button } from "../../components/ui/button";
+import { Field } from "../../components/ui/field";
 import { Input } from "../../components/ui/input";
 import { showToast } from "../../components/ui/toast";
 import { ICON_SIZE } from "../../components/ui/icon";
@@ -36,11 +37,11 @@ export function OrganizationStep({ accessToken, created, onBack, onCreated, onNe
     </StepHeading>
     {created ? <p className="rm-setup-created"><CircleCheck size={ICON_SIZE.md} /> Created {created.organization}{created.workspace ? ` with the workspace ${created.workspace}` : ""}.</p> : null}
     {created ? <div className="rm-setup-actions"><Button onClick={onBack} type="button" variant="secondary"><ArrowLeft size={ICON_SIZE.md} /> Back</Button><Button onClick={onNext} type="button" variant="main"><ArrowRight size={ICON_SIZE.md} /> Continue</Button></div> : <form className="shared-setup-form" onSubmit={submit}>
-      <label>Organization name<Input maxLength={120} onChange={(event) => setOrganization(event.target.value)} placeholder="Acme Engineering" required value={organization} /></label>
-      <label>Workspace name (optional)<Input maxLength={120} onChange={(event) => setWorkspace(event.target.value)} placeholder="Payments service" value={workspace} /></label>
+      <Field label="Organization name" required><Input maxLength={120} onChange={(event) => setOrganization(event.target.value)} placeholder="Acme Engineering" value={organization} /></Field>
+      <Field label="Workspace name (optional)"><Input maxLength={120} onChange={(event) => setWorkspace(event.target.value)} placeholder="Payments service" value={workspace} /></Field>
       <div className="rm-setup-actions">
-        <Button disabled={isBusy} onClick={onBack} type="button" variant="secondary"><ArrowLeft size={ICON_SIZE.md} /> Back</Button>
-        <span className="rm-setup-actions-end"><Button disabled={isBusy} onClick={onNext} type="button" variant="secondary">Skip</Button><Button disabled={isBusy || !organization.trim()} type="submit" variant="main">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : <Building size={ICON_SIZE.md} />} Create and continue</Button></span>
+        <Button disabled={isBusy} onClick={onBack} variant="secondary"><ArrowLeft size={ICON_SIZE.md} /> Back</Button>
+        <span className="rm-setup-actions-end"><Button disabled={isBusy} onClick={onNext} variant="secondary">Skip</Button><Button busy={isBusy} disabled={!organization.trim()} type="submit" variant="main"><Building size={ICON_SIZE.md} /> Create and continue</Button></span>
       </div>
     </form>}
   </>;

@@ -178,8 +178,6 @@ input[type="file"] {
 .shared-auth-heading p:not(.shared-eyebrow) { margin: 10px 0 0; color: var(--color-text-muted); font-size: 14px; line-height: 1.55; }
 .shared-auth-form,
 .shared-setup-form { display: grid; gap: 16px; }
-.shared-setup-form label { display: grid; gap: 7px; color: var(--color-text-muted); font-size: 12px; font-weight: 700; }
-.shared-setup-form input,
 .shared-create-workspace input { width: 100%; }
 .shared-api-note { margin: 22px 0 0; color: var(--color-text-subtle); font-size: 12px; }
 .shared-api-note code { color: var(--color-text-muted); font-family: var(--font-mono); }

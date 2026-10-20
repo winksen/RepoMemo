@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.103 (2026-10-21)
+
+The setup wizard and the environment menu use the shared fields, switches and states.
+
+### Changed
+- **Fields:** the setup code (wizard and environment menu), the administrator's name, email and password twice, the first organization and workspace names and the new environment's name use `Field` with an `Input`. Each control is tied to its label, the required ones are marked on the `Field`, and the environment name's rule ("It is created as <folder>/<name>") is the field's hint instead of a separate paragraph.
+- **Switch:** a yes or no setting of the wizard's settings steps is the shared `Switch` (as in System › Settings) instead of the hand-made toggle with a bare checkbox.
+- **States:** "Loading the settings…" and "Checking the server…" are the shared `LoadingState`; an environments folder with nothing in it is the shared `EmptyState`.
+- **Buttons:** *Unlock*, *Continue*, *Create administrator*, *Create and continue*, *Save and continue*, *Check again*, *Finish setup*, *Refresh* and *Create and use* use the `busy` prop in place of a swapped-in spinner; redundant `type="button"` removed.
+- **CSS removed:** the `.shared-setup-form` label and input rules, which only these forms used.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.102 (2026-10-21)
 
 The sign-in, registration, invitation, password reset and email verification pages use the shared fields, buttons and states.

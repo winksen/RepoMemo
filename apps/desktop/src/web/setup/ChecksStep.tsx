@@ -5,7 +5,6 @@ import {
   IconArrowRight as ArrowRight,
   IconCircleCheck as CircleCheck,
   IconInfoCircle as InfoCircle,
-  IconLoader2 as Loader,
   IconRefresh as Refresh,
 } from "@tabler/icons-react";
 import { getSetupChecks } from "../../lib/sharedApi";
@@ -13,6 +12,7 @@ import type { SetupCheck } from "../../types";
 import { Button } from "../../components/ui/button";
 import { showToast } from "../../components/ui/toast";
 import { ICON_SIZE } from "../../components/ui/icon";
+import { LoadingState } from "../../components/ui/loading-state";
 import { apiMessage } from "../format";
 import { StepHeading } from "./StepFrame";
 
@@ -43,10 +43,10 @@ export function ChecksStep({ accessToken, onNext, onWarnings }: { accessToken: s
         <Icon aria-hidden="true" className="rm-setup-check-icon" size={ICON_SIZE.lg} />
         <div><strong>{check.label}<small>{CHECK_LABELS[check.status]}</small></strong><p>{check.detail}</p>{check.advice && check.status !== "ok" ? <p className="rm-setup-advice">{check.advice}</p> : null}</div>
       </li>;
-    })}</ul> : <p className="shared-muted-copy"><Loader className="spin" size={ICON_SIZE.sm} /> Checking the server…</p>}
+    })}</ul> : <LoadingState label="Checking the server" />}
     <div className="rm-setup-actions">
-      <Button disabled={isBusy} onClick={() => void run()} type="button" variant="secondary">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : <Refresh size={ICON_SIZE.md} />} Check again</Button>
-      <Button disabled={!checks} onClick={onNext} type="button" variant="main"><ArrowRight size={ICON_SIZE.md} /> {problems ? "Continue anyway" : "Continue"}</Button>
+      <Button busy={isBusy} onClick={() => void run()} variant="secondary"><Refresh size={ICON_SIZE.md} /> Check again</Button>
+      <Button disabled={!checks} onClick={onNext} variant="main"><ArrowRight size={ICON_SIZE.md} /> {problems ? "Continue anyway" : "Continue"}</Button>
     </div>
   </>;
 }

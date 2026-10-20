@@ -1,10 +1,12 @@
 import { useMemo, useState } from "react";
-import { IconArrowLeft as ArrowLeft, IconArrowRight as ArrowRight, IconLoader2 as Loader, IconServer as Server } from "@tabler/icons-react";
+import { IconArrowLeft as ArrowLeft, IconArrowRight as ArrowRight } from "@tabler/icons-react";
 import { saveSystemSettings } from "../../lib/sharedApi";
 import type { SystemSetting } from "../../types";
 import { Button } from "../../components/ui/button";
 import { Dropdown } from "../../components/ui/dropdown";
 import { Input } from "../../components/ui/input";
+import { LoadingState } from "../../components/ui/loading-state";
+import { Switch } from "../../components/ui/switch";
 import { showToast } from "../../components/ui/toast";
 import { ICON_SIZE } from "../../components/ui/icon";
 import { apiMessage } from "../format";
@@ -63,16 +65,16 @@ export function SettingsStep({ accessToken, description, keys, onBack, onNext, o
         <div><label htmlFor={inputId}><strong>{setting.label}</strong></label><p>{setting.description}</p><small>Server default: {settingValueLabel(setting, setting.default_value)}</small></div>
         <div className="rm-system-setting-control">
           {setting.kind === "boolean"
-            ? <label className="shared-ai-provider-toggle"><input checked={Boolean(value)} id={inputId} onChange={(event) => edit(setting, event.target.checked)} type="checkbox" /> {value ? "On" : "Off"}</label>
+            ? <Switch checked={Boolean(value)} id={inputId} label={value ? "On" : "Off"} onCheckedChange={(next) => edit(setting, next)} />
             : setting.kind === "choice"
               ? <Dropdown aria-label={setting.label} id={inputId} onValueChange={(next) => edit(setting, next)} options={setting.options} value={String(value)} />
               : <span className="rm-system-number"><Input id={inputId} max={setting.max} min={setting.min} onChange={(event) => edit(setting, event.target.value === "" ? setting.min : Number(event.target.value))} type="number" value={String(value)} /><small>{setting.unit}</small></span>}
         </div>
       </div>;
-    })}</div> : <p className="shared-muted-copy"><Loader className="spin" size={ICON_SIZE.sm} /> Loading the settings…</p>}
+    })}</div> : <LoadingState label="Loading settings" />}
     <div className="rm-setup-actions">
-      <Button disabled={isBusy} onClick={onBack} type="button" variant="secondary"><ArrowLeft size={ICON_SIZE.md} /> Back</Button>
-      <Button disabled={isBusy || !settings} onClick={() => void save()} type="button" variant="main">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : <ArrowRight size={ICON_SIZE.md} />} {changed.length ? "Save and continue" : "Keep these and continue"}</Button>
+      <Button disabled={isBusy} onClick={onBack} variant="secondary"><ArrowLeft size={ICON_SIZE.md} /> Back</Button>
+      <Button busy={isBusy} disabled={!settings} onClick={() => void save()} variant="main"><ArrowRight size={ICON_SIZE.md} /> {changed.length ? "Save and continue" : "Keep these and continue"}</Button>
     </div>
   </>;
 }
