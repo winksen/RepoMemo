@@ -744,7 +744,6 @@ input[type="file"] {
 .shared-memory-form .rm-dropdown-trigger,
 .shared-task-checklist-select .rm-dropdown-trigger,
 .shared-task-controls .rm-dropdown-trigger,
-.rm-system-settings label .rm-dropdown-trigger,
 .rm-system-setting-control .rm-dropdown-trigger,
 .rm-dropdown-check { position: absolute; right: 9px; display: grid; place-items: center; color: var(--color-accent-text); }
 .rm-button.shared-record-link { min-height: 0; padding: 0; color: inherit; background: transparent; border-color: transparent; border-radius: 0; box-shadow: none; }

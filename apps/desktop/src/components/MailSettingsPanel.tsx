@@ -1,12 +1,17 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { IconLoader2 as Loader, IconMail as Mail, IconSend as Send } from "@tabler/icons-react";
+import { IconMail as Mail, IconSend as Send } from "@tabler/icons-react";
 import { getSystemMail, saveSystemMail, sendSystemTestMail } from "../lib/sharedApi";
 import type { MailOverview } from "../types";
 import { Button } from "./ui/button";
+import { Checkbox } from "./ui/checkbox";
+import { EmptyState } from "./ui/empty-state";
+import { Field, FieldRow } from "./ui/field";
+import { LoadingState } from "./ui/loading-state";
 import { PanelHeading } from "./ui/panel-heading";
 import { Dropdown } from "./ui/dropdown";
 import { Input } from "./ui/input";
+import { Switch } from "./ui/switch";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
 import { apiMessage } from "../web/format";
@@ -36,7 +41,8 @@ export function MailSettingsPanel({ accessToken, canChange }: { accessToken: str
   const [fromAddress, setFromAddress] = useState("");
   const [fromName, setFromName] = useState("");
   const [testTo, setTestTo] = useState("");
-  const [isBusy, setIsBusy] = useState(false);
+  const [action, setAction] = useState<"save" | "test" | null>(null);
+  const isBusy = action !== null;
 
   function show(next: MailOverview) {
     setOverview(next);
@@ -66,51 +72,57 @@ export function MailSettingsPanel({ accessToken, canChange }: { accessToken: str
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setIsBusy(true);
+    setAction("save");
     try {
       show(await saveSystemMail(accessToken, {
         enabled, host, port: Number(port), security, username, from_address: fromAddress, from_name: fromName,
         ...(removePassword ? { password: "" } : password ? { password } : {}),
       }));
       showToast("success", "Mail settings saved.");
-    } catch (error) { showToast("error", apiMessage(error, "The mail settings could not be saved.")); } finally { setIsBusy(false); }
+    } catch (error) { showToast("error", apiMessage(error, "The mail settings could not be saved.")); } finally { setAction(null); }
   }
 
   async function sendTest() {
-    setIsBusy(true);
+    setAction("test");
     try {
       await sendSystemTestMail(accessToken, testTo.trim() || undefined);
       showToast("success", "Test message queued. Its result shows in the list below.");
       await load();
-    } catch (error) { showToast("error", apiMessage(error, "The test message could not be queued.")); } finally { setIsBusy(false); }
+    } catch (error) { showToast("error", apiMessage(error, "The test message could not be queued.")); } finally { setAction(null); }
   }
 
-  if (!overview) return <p className="shared-muted-copy"><Loader className="spin" size={ICON_SIZE.sm} /> Loading mail settings…</p>;
+  if (!overview) return <LoadingState label="Loading mail settings" />;
   const settings = overview.settings;
   const readOnly = !canChange;
   return <section className="shared-settings-group">
     <PanelHeading description={settings.enabled ? "on" : settings.configured ? "off" : "not set up"} icon={Mail} title="Mail" />
     <p className="shared-muted-copy">The server sends invitations and notices through your mail server over TLS. Mail is never sent in plain text. Servers on a private address need the operator's say (<code>REPOMEMO_SMTP_ALLOWED_HOSTS</code>).</p>
-    <form className="rm-system-settings" onSubmit={save}>
-      <label className="shared-ai-provider-toggle"><input checked={enabled} disabled={readOnly} onChange={(event) => setEnabled(event.target.checked)} type="checkbox" /> Send mail</label>
-      <label>Mail server<Input aria-label="Mail server" disabled={readOnly} onChange={(event) => setHost(event.target.value)} placeholder="smtp.example.com" value={host} /></label>
-      <label>Port<Input aria-label="Port" disabled={readOnly} inputMode="numeric" onChange={(event) => setPort(event.target.value)} value={port} /></label>
-      <label>Connection<Dropdown aria-label="Connection security" disabled={readOnly} onValueChange={(value) => { setSecurity(value); setPort(value === "tls" ? "465" : "587"); }} options={[{ label: "STARTTLS (usually port 587)", value: "starttls" }, { label: "TLS from the start (usually port 465)", value: "tls" }]} value={security} /></label>
-      <label>User name<Input aria-label="User name" autoComplete="off" disabled={readOnly} onChange={(event) => setUsername(event.target.value)} value={username} /></label>
-      <label>Password<Input aria-label="Password" autoComplete="new-password" disabled={readOnly || removePassword} onChange={(event) => setPassword(event.target.value)} placeholder={settings.password_set ? "Saved: leave empty to keep it" : "Not set"} type="password" value={password} /></label>
-      {settings.password_set && !readOnly ? <label className="shared-ai-provider-toggle"><input checked={removePassword} onChange={(event) => setRemovePassword(event.target.checked)} type="checkbox" /> Remove the saved password</label> : null}
-      <label>Sender address<Input aria-label="Sender address" disabled={readOnly} onChange={(event) => setFromAddress(event.target.value)} placeholder="repomemo@example.com" type="email" value={fromAddress} /></label>
-      <label>Sender name<Input aria-label="Sender name" disabled={readOnly} onChange={(event) => setFromName(event.target.value)} placeholder="RepoMemo" value={fromName} /></label>
-      {readOnly ? null : <Button disabled={isBusy} type="submit" variant="main">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : null} Save mail settings</Button>}
+    <form className="rm-mail-form" onSubmit={save}>
+      <Switch checked={enabled} disabled={readOnly} label="Send mail" onCheckedChange={setEnabled} />
+      <Field label="Mail server"><Input disabled={readOnly} onChange={(event) => setHost(event.target.value)} placeholder="smtp.example.com" value={host} /></Field>
+      <FieldRow>
+        <Field label="Connection">{(control) => <Dropdown disabled={readOnly} id={control.id} onValueChange={(value) => { setSecurity(value); setPort(value === "tls" ? "465" : "587"); }} options={[{ label: "STARTTLS (usually port 587)", value: "starttls" }, { label: "TLS from the start (usually port 465)", value: "tls" }]} value={security} />}</Field>
+        <Field label="Port"><Input disabled={readOnly} inputMode="numeric" onChange={(event) => setPort(event.target.value)} value={port} /></Field>
+      </FieldRow>
+      <FieldRow>
+        <Field label="User name"><Input autoComplete="off" disabled={readOnly} onChange={(event) => setUsername(event.target.value)} value={username} /></Field>
+        <Field label="Password"><Input autoComplete="new-password" disabled={readOnly || removePassword} onChange={(event) => setPassword(event.target.value)} placeholder={settings.password_set ? "Saved: leave empty to keep it" : "Not set"} type="password" value={password} /></Field>
+      </FieldRow>
+      {settings.password_set && !readOnly ? <Checkbox checked={removePassword} label="Remove the saved password" onCheckedChange={setRemovePassword} /> : null}
+      <FieldRow>
+        <Field label="Sender address"><Input disabled={readOnly} onChange={(event) => setFromAddress(event.target.value)} placeholder="repomemo@example.com" type="email" value={fromAddress} /></Field>
+        <Field label="Sender name"><Input disabled={readOnly} onChange={(event) => setFromName(event.target.value)} placeholder="RepoMemo" value={fromName} /></Field>
+      </FieldRow>
+      {readOnly ? null : <div><Button busy={action === "save"} disabled={isBusy} type="submit" variant="main">Save mail settings</Button></div>}
     </form>
-    {readOnly ? null : <div className="rm-system-toolbar">
-      <Input aria-label="Send the test message to" onChange={(event) => setTestTo(event.target.value)} placeholder="Your own address when empty" type="email" value={testTo} />
-      <Button disabled={isBusy || !settings.configured || !settings.enabled} onClick={() => void sendTest()} type="button" variant="secondary"><Send size={ICON_SIZE.sm} /> Send test mail</Button>
+    {readOnly ? null : <div className="rm-mail-test">
+      <Field label="Send the test message to"><Input onChange={(event) => setTestTo(event.target.value)} placeholder="Your own address when empty" type="email" value={testTo} /></Field>
+      <Button busy={action === "test"} disabled={isBusy || !settings.configured || !settings.enabled} onClick={() => void sendTest()} variant="secondary"><Send size={ICON_SIZE.sm} /> Send test mail</Button>
     </div>}
     <p className="shared-muted-copy">{overview.queued_count} waiting · {overview.sent_last_day} sent and {overview.failed_last_day} failed in the last day</p>
     {overview.entries.length ? <div className="shared-activity-list">{overview.entries.map((entry) => <article key={entry.id}>
       <div><strong>{entry.subject}</strong><span>{entry.to_address} · {entry.kind} · {STATUS_LABEL[entry.status] ?? entry.status}{entry.attempts ? ` · ${entry.attempts} ${entry.attempts === 1 ? "try" : "tries"}` : ""}{entry.last_error ? ` · ${entry.last_error}` : ""}</span></div>
       <time dateTime={entry.sent_at ?? entry.created_at}>{when(entry.sent_at ?? entry.created_at)}</time>
-    </article>)}</div> : <p className="shared-muted-copy">No messages yet.</p>}
+    </article>)}</div> : <EmptyState title="No messages yet" />}
   </section>;
 }

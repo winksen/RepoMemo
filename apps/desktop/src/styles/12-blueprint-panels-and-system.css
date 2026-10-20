@@ -290,6 +290,9 @@ tr.rm-system-row-inactive .rm-system-person img, tr.rm-system-row-inactive .rm-s
 .rm-system-link:hover { text-decoration-color: currentColor; }
 .rm-system-link:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
 .rm-system-settings { display: grid; }
+.rm-mail-form { display: grid; gap: 14px; max-width: 560px; }
+.rm-mail-test { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; max-width: 560px; }
+.rm-mail-test .rm-field { flex: 1 1 260px; }
 .rm-system-setting { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--color-border); }
 .rm-system-setting:last-child { border-bottom: 0; }
 .rm-system-setting p { margin: 4px 0; color: var(--color-text-muted); font-size: 13px; max-width: 72ch; }

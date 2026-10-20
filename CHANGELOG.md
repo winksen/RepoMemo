@@ -2,6 +2,19 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.115 (2026-10-21)
+
+Mail settings use the shared fields and states.
+
+### Changed
+- **Fields:** the mail server, connection security, port, user name, password, sender address and sender name are `Field`s with visible labels (they carried only an `aria-label` copy before); the connection and port, the user name and password, and the two sender fields sit side by side in a `FieldRow` that stacks on narrow screens; the test message's address is a `Field`.
+- **Switch and checkbox:** *Send mail* is the shared `Switch` (saved with the form's button, as in System › Settings) and *Remove the saved password* is the shared `Checkbox`, instead of two bare checkboxes in labels.
+- **States and buttons:** "Loading mail settings…" is the shared `LoadingState` and an empty outbox is the shared `EmptyState`; *Save mail settings* and *Send test mail* each show their own work with `busy`.
+- **CSS:** the form has its own layout (`.rm-mail-form`, `.rm-mail-test`) instead of borrowing the settings list's, and the dropdown width rule for labels in that list is removed.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.114 (2026-10-21)
 
 Connector forms use the shared pieces.
