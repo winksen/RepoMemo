@@ -2,6 +2,18 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.114 (2026-10-21)
+
+Connector forms use the shared pieces.
+
+### Changed
+- **Form:** the repository address, the tracker (a dropdown tied to its label by the field's id) and the access token are `Field`s with their explanation as the hint; the new token in the *Replace the token* dialog is a required `Field`. This also gives the connector form back the labels that the repository form's CSS used to style (V0.2.113 removed those rules).
+- **States:** the connector list shows the shared `LoadingState` while it is read for the first time.
+- **Buttons:** *Check access*, *Connect and sync* and *Replace token* use `busy`; *Remove connector* is a `danger` button; the redundant `type="button"` is dropped.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.113 (2026-10-21)
 
 Repository forms and pages use the shared pieces.

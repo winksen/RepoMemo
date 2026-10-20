@@ -24,7 +24,9 @@ import { CopyButton } from "./ui/copy-button";
 import { PanelHeading } from "./ui/panel-heading";
 import { Dialog, DialogCancel } from "./ui/dialog";
 import { Dropdown } from "./ui/dropdown";
+import { Field } from "./ui/field";
 import { Input } from "./ui/input";
+import { LoadingState } from "./ui/loading-state";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
 import { apiMessage, formatTime } from "../web/format";
@@ -216,29 +218,26 @@ export function ConnectorSettings({
             {connector.has_webhook ? <span className="rm-map-muted">Webhook on{connector.webhook_last_received_at ? ` · last call ${formatTime(connector.webhook_last_received_at)}` : " · no call yet"}</span> : null}
           </div>
           <div className="rm-health-actions">
-            <Button disabled={running} onClick={() => void sync(connector)} type="button" variant="secondary"><Refresh size={ICON_SIZE.sm} /> Sync now</Button>
-            <Button disabled={running} onClick={() => { setNewToken(""); setReplacing(connector); }} type="button" variant="secondary"><Key size={ICON_SIZE.sm} /> Token</Button>
-            <Button disabled={running} onClick={() => { setHookSecret(null); setHooking(connector); }} type="button" variant="secondary"><Webhook size={ICON_SIZE.sm} /> Webhook</Button>
-            <Button disabled={running} onClick={() => setRemoving(connector)} type="button" variant="secondary"><Trash size={ICON_SIZE.sm} /> Remove</Button>
+            <Button disabled={running} onClick={() => void sync(connector)} variant="secondary"><Refresh size={ICON_SIZE.sm} /> Sync now</Button>
+            <Button disabled={running} onClick={() => { setNewToken(""); setReplacing(connector); }} variant="secondary"><Key size={ICON_SIZE.sm} /> Token</Button>
+            <Button disabled={running} onClick={() => { setHookSecret(null); setHooking(connector); }} variant="secondary"><Webhook size={ICON_SIZE.sm} /> Webhook</Button>
+            <Button disabled={running} onClick={() => setRemoving(connector)} variant="secondary"><Trash size={ICON_SIZE.sm} /> Remove</Button>
           </div>
         </li>;
       })}
-    </ul> : null}
+    </ul> : connectors === null ? <LoadingState label="Loading connectors" /> : null}
 
     <form className="rm-repo-form" onSubmit={runCheck}>
       <h3>Connect a repository's issues</h3>
-      <label>Repository address
+      <Field hint="A github.com or gitlab.com repository, or a self-hosted GitHub Enterprise Server or GitLab one. The server's operator names the hosts a tracker may be on." label="Repository address">
         <Input onChange={(event) => setLink(event.target.value)} placeholder="https://github.com/acme/app or https://gitlab.com/group/project" value={link} />
-        <span className="rm-map-muted">A github.com or gitlab.com repository, or a self-hosted GitHub Enterprise Server or GitLab one. The server's operator names the hosts a tracker may be on.</span>
-      </label>
-      <label>Tracker
-        <Dropdown aria-label="Tracker" onValueChange={(value) => setProvider(value === "__detect__" ? "" : value)} options={[{ label: "Detect from the address", value: "__detect__" }, { label: "GitHub", value: "github" }, { label: "GitLab", value: "gitlab" }]} value={provider || "__detect__"} />
-        <span className="rm-map-muted">Needed only for a self-hosted address whose name does not say which it is.</span>
-      </label>
-      <label>Access token
+      </Field>
+      <Field hint="Needed only for a self-hosted address whose name does not say which it is." label="Tracker">
+        {(control) => <Dropdown id={control.id} onValueChange={(value) => setProvider(value === "__detect__" ? "" : value)} options={[{ label: "Detect from the address", value: "__detect__" }, { label: "GitHub", value: "github" }, { label: "GitLab", value: "gitlab" }]} value={provider || "__detect__"} />}
+      </Field>
+      <Field hint="A read-only token with access to issues. It is stored encrypted and never shown again." label="Access token">
         <Input autoComplete="off" onChange={(event) => setToken(event.target.value)} placeholder="Only for a private repository" type="password" value={token} />
-        <span className="rm-map-muted">A read-only token with access to issues. It is stored encrypted and never shown again.</span>
-      </label>
+      </Field>
       {checkIsCurrent && check ? <div className="rm-repo-check">
         <strong><CircleCheck size={ICON_SIZE.md} /> The server can read this {check.provider === "gitlab" ? "project" : "repository"}'s issues</strong>
         <dl className="rm-repo-facts">
@@ -248,21 +247,21 @@ export function ConnectorSettings({
         {check.already_connected ? <span className="rm-map-muted">This repository's issues are already connected to the workspace.</span> : null}
       </div> : null}
       <div className="rm-health-actions">
-        <Button disabled={busy || !link.trim()} type="submit" variant={checkIsCurrent ? "secondary" : "main"}><Refresh size={ICON_SIZE.sm} /> {checkIsCurrent ? "Check again" : "Check access"}</Button>
-        <Button disabled={busy || !checkIsCurrent || check?.already_connected} onClick={() => void connect()} type="button" variant={checkIsCurrent ? "main" : "secondary"}><Plus size={ICON_SIZE.sm} /> Connect and sync</Button>
+        <Button busy={busy && !checkIsCurrent} disabled={busy || !link.trim()} type="submit" variant={checkIsCurrent ? "secondary" : "main"}><Refresh size={ICON_SIZE.sm} /> {checkIsCurrent ? "Check again" : "Check access"}</Button>
+        <Button busy={busy && checkIsCurrent} disabled={!checkIsCurrent || check?.already_connected} onClick={() => void connect()} variant={checkIsCurrent ? "main" : "secondary"}><Plus size={ICON_SIZE.sm} /> Connect and sync</Button>
       </div>
     </form>
 
     {replacing ? <Dialog
       description={<>Replace the token of <strong>{replacing.name}</strong>. The new token is tried against the tracker before it replaces the old one.</>}
-      footer={<><DialogCancel onClick={() => setReplacing(null)} /><Button disabled={busy || !newToken.trim()} onClick={() => void replaceToken(replacing)} type="button" variant="main">Replace token</Button></>}
+      footer={<><DialogCancel onClick={() => setReplacing(null)} /><Button busy={busy} disabled={!newToken.trim()} onClick={() => void replaceToken(replacing)} variant="main">Replace token</Button></>}
       onClose={() => setReplacing(null)}
       open
       title="Replace the token"
     >
-      <label>New access token
+      <Field label="New access token" required>
         <Input autoComplete="off" onChange={(event) => setNewToken(event.target.value)} type="password" value={newToken} />
-      </label>
+      </Field>
     </Dialog> : null}
 
     {hooking ? <Dialog
@@ -284,8 +283,8 @@ export function ConnectorSettings({
             <span className="rm-map-muted">Shown once: renewing it ends the old one. GitHub signs with it; for GitLab paste it as the secret token.</span>
           </div> : null}
           <div className="rm-health-actions">
-            <Button disabled={busy} onClick={() => void makeWebhook(live)} type="button" variant="secondary">{live.has_webhook ? "Make a new secret" : "Set up a webhook"}</Button>
-            {live.has_webhook ? <Button disabled={busy} onClick={() => void removeWebhook(live)} type="button" variant="secondary">Turn off</Button> : null}
+            <Button disabled={busy} onClick={() => void makeWebhook(live)} variant="secondary">{live.has_webhook ? "Make a new secret" : "Set up a webhook"}</Button>
+            {live.has_webhook ? <Button disabled={busy} onClick={() => void removeWebhook(live)} variant="secondary">Turn off</Button> : null}
           </div>
         </div>;
       })()}
@@ -293,7 +292,7 @@ export function ConnectorSettings({
 
     {removing ? <Dialog
       description={<>Remove <strong>{removing.name}</strong> and its {(removing.open_items + removing.closed_items).toLocaleString()} items from the workspace? Their index, comments and memory-card links are deleted too. Nothing changes in the tracker.</>}
-      footer={<><DialogCancel onClick={() => setRemoving(null)} /><Button disabled={busy} onClick={() => void remove(removing)} type="button" variant="secondary">Remove connector</Button></>}
+      footer={<><DialogCancel onClick={() => setRemoving(null)} /><Button busy={busy} onClick={() => void remove(removing)} variant="danger">Remove connector</Button></>}
       onClose={() => setRemoving(null)}
       open
       title="Remove connector"
