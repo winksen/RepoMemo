@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.104 (2026-10-21)
+
+The profile page and API tokens use the shared fields, switches and states.
+
+### Changed
+- **Fields:** *Email address* (new address, current password), *Password* (current, new, confirmation), each notification preference and the API token form (name, access, lifetime) use `Field`. The notification, access and lifetime dropdowns are tied to their labels by the field's id instead of an `aria-label` copy of the label; *Personal details* already did so.
+- **Dropdowns in fields fill the field:** one rule, `.rm-field .rm-dropdown-trigger`, replaces the per-form rules that stretched them (`.shared-profile-panel label`, `.rm-tokens-form`). The notification preferences stay dropdowns, as each has more than two channels.
+- **States:** an empty task list on the profile is the shared `EmptyState`; the API token list shows `LoadingState` while it loads and `EmptyState` when there is no token.
+- **Buttons:** *Send the link again*, *Change address*, *Create token* and *Revoke token* use the `busy` prop.
+- **CSS removed:** `.shared-profile-panel label`, `.rm-tokens-form label` and their dropdown-width selectors.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.103 (2026-10-21)
 
 The setup wizard and the environment menu use the shared fields, switches and states.

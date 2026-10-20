@@ -6,6 +6,8 @@
 .rm-field-hint,
 .rm-field-message { color: var(--color-text-muted); font-size: 12px; line-height: 1.4; }
 .rm-field-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 12px; }
+/* A dropdown or picker in a field fills the field, as a text field does. */
+.rm-field .rm-dropdown-trigger { width: 100%; min-width: 0; }
 .rm-input[aria-invalid="true"],
 .rm-textarea[aria-invalid="true"],
 .rm-input[aria-invalid="true"]:hover:not(:disabled),

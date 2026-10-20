@@ -281,7 +281,6 @@ input[type="file"] {
 .shared-profile-panel { display: grid; align-content: start; gap: 14px; padding: 18px; background: var(--color-surface-2); border-radius: 10px; }
 .shared-profile-panel .rm-panel-heading { margin-bottom: 0; }
 .shared-profile-panel form { display: grid; gap: 12px; }
-.shared-profile-panel label { display: grid; gap: 6px; color: var(--color-text-muted); font-size: 12px; }
 .shared-profile-panel .rm-input { width: 100%; }
 .shared-page-content > .rm-page-header,
 .shared-detail-shell > .rm-page-header { margin-bottom: 32px; }
@@ -756,13 +755,11 @@ input[type="file"] {
 .rm-dropdown-item[data-disabled] { cursor: not-allowed; opacity: 0.5; }
 /* A dropdown takes the width of its content (160 px at least); a form stretches it to the field (V0.2.59). */
 .shared-ai-provider-form .rm-dropdown-trigger,
-.rm-tokens-form .rm-dropdown-trigger,
 .rm-invite-form .rm-dropdown-trigger,
 .shared-dialog-field .rm-dropdown-trigger,
 .shared-lifecycle-form .rm-dropdown-trigger,
 .shared-record-edit-form .rm-dropdown-trigger,
 .shared-memory-form .rm-dropdown-trigger,
-.shared-profile-panel label .rm-dropdown-trigger,
 .shared-member-form .rm-dropdown-trigger,
 .shared-task-create-fields .rm-dropdown-trigger,
 .shared-task-checklist-select .rm-dropdown-trigger,

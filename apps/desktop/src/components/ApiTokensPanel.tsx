@@ -9,7 +9,10 @@ import { Button } from "./ui/button";
 import { PanelHeading } from "./ui/panel-heading";
 import { Dialog, DialogCancel } from "./ui/dialog";
 import { Dropdown } from "./ui/dropdown";
+import { EmptyState } from "./ui/empty-state";
+import { Field } from "./ui/field";
 import { Input } from "./ui/input";
+import { LoadingState } from "./ui/loading-state";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
 import { apiMessage, formatDate } from "../web/format";
@@ -75,19 +78,19 @@ export function ApiTokensPanel({ accessToken, isAdministrator }: { accessToken: 
     <PanelHeading description={tokens?.length ?? 0} icon={ApiIcon} title="API tokens" />
     <p className="shared-muted-copy">For scripts, CI and the terminal console: send <code>Authorization: Bearer &lt;token&gt;</code>, or set <code>REPOMEMO_TOKEN</code> for <code>repomemo-console</code>. A token acts as you, so it only reaches what you can. It cannot manage tokens, change your password or grant roles. It keeps working when you change your password; revoke it here, or ask an administrator to sign you out everywhere.</p>
     <form className="rm-tokens-form" onSubmit={create}>
-      <label>Name<Input maxLength={80} onChange={(event) => setName(event.target.value)} placeholder="CI release notes" required value={name} /></label>
-      <label>Access<Dropdown aria-label="Token access" onValueChange={(value) => setScope(value as "read" | "write" | "system")} options={isAdministrator ? [...SCOPE_OPTIONS, SYSTEM_SCOPE_OPTION] : SCOPE_OPTIONS} value={scope} /></label>
-      <label>Expires after<Dropdown aria-label="Token lifetime" onValueChange={setExpiry} options={EXPIRY_OPTIONS} value={expiry} /></label>
-      <Button disabled={isBusy || !name.trim()} type="submit" variant="secondary"><Plus size={ICON_SIZE.md} /> Create token</Button>
+      <Field label="Name" required><Input maxLength={80} onChange={(event) => setName(event.target.value)} placeholder="CI release notes" value={name} /></Field>
+      <Field label="Access">{(control) => <Dropdown id={control.id} onValueChange={(value) => setScope(value as "read" | "write" | "system")} options={isAdministrator ? [...SCOPE_OPTIONS, SYSTEM_SCOPE_OPTION] : SCOPE_OPTIONS} value={scope} />}</Field>
+      <Field label="Expires after">{(control) => <Dropdown id={control.id} onValueChange={setExpiry} options={EXPIRY_OPTIONS} value={expiry} />}</Field>
+      <Button busy={isBusy} disabled={!name.trim()} type="submit" variant="secondary"><Plus size={ICON_SIZE.md} /> Create token</Button>
     </form>
     {tokens?.length ? <ul className="rm-tokens-list">{tokens.map((token) => {
       const expired = token.expires_at <= now;
       return <li className={expired ? "expired" : ""} key={token.id}>
         <span className="rm-tokens-text"><strong>{token.name} <Badge>{token.scope === "system" ? "system" : token.scope === "write" ? "read and write" : "read only"}</Badge>{expired ? <Badge tone="danger">expired</Badge> : null}</strong><small><code>{token.prefix}…</code> · created {formatDate(token.created_at, "never")} · {expired ? "expired" : "expires"} {formatDate(token.expires_at, "never")} · last used {formatDate(token.last_used_at, "never")}</small></span>
-        <Button aria-label={`Revoke ${token.name}`} disabled={isBusy} onClick={() => setRevoking(token)} type="button" variant="secondary"><Trash size={ICON_SIZE.sm} /> {expired ? "Remove" : "Revoke"}</Button>
+        <Button aria-label={`Revoke ${token.name}`} disabled={isBusy} onClick={() => setRevoking(token)} variant="secondary"><Trash size={ICON_SIZE.sm} /> {expired ? "Remove" : "Revoke"}</Button>
       </li>;
-    })}</ul> : tokens ? <p className="shared-muted-copy">No tokens yet.</p> : null}
+    })}</ul> : tokens ? <EmptyState description="Create one above to use the API from a script." title="No tokens yet" /> : <LoadingState label="Loading API tokens" />}
     {secret ? <SecretDialog description="Use it as a bearer token, or set it as REPOMEMO_TOKEN for repomemo-console. Treat it like a password." onClose={() => setSecret(null)} title="New API token" value={secret} /> : null}
-    <Dialog description={revoking ? `Scripts using ${revoking.name} (${revoking.prefix}…) stop working at once. This cannot be undone.` : undefined} footer={<><DialogCancel onClick={() => setRevoking(null)} /><Button disabled={isBusy} onClick={() => void revoke()} type="button" variant="main">Revoke token</Button></>} onClose={() => setRevoking(null)} open={Boolean(revoking)} title={`Revoke ${revoking?.name ?? "the token"}?`} />
+    <Dialog description={revoking ? `Scripts using ${revoking.name} (${revoking.prefix}…) stop working at once. This cannot be undone.` : undefined} footer={<><DialogCancel onClick={() => setRevoking(null)} /><Button busy={isBusy} onClick={() => void revoke()} variant="main">Revoke token</Button></>} onClose={() => setRevoking(null)} open={Boolean(revoking)} title={`Revoke ${revoking?.name ?? "the token"}?`} />
   </section>;
 }

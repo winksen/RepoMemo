@@ -626,7 +626,6 @@ body { min-width: 760px; background: var(--color-bg); font-family: var(--font-ui
 /* API tokens (profile) */
 .rm-tokens { display: grid; gap: 12px; }
 .rm-tokens-form { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.4fr) minmax(0, 1fr) auto; gap: 8px; align-items: end; }
-.rm-tokens-form label { display: grid; gap: 5px; color: var(--color-text-muted); font-size: 12px; font-weight: 600; }
 @media (max-width: 760px) { .rm-tokens-form { grid-template-columns: 1fr; } }
 
 /* Sign-in page hints */
