@@ -414,7 +414,7 @@ tr.rm-system-row-inactive .rm-system-person img, tr.rm-system-row-inactive .rm-s
 .rm-platform code, .rm-environment-card code { font-family: var(--font-mono); font-size: 12px; }
 .shared-bulk-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 10px; }
 .shared-bulk-bar > span { color: var(--color-text-muted); font-size: 13px; }
-.shared-select-box { align-self: center; margin-right: 8px; }
+.shared-select-box { margin-bottom: 6px; }
 
 /* A citation that names a commit: the open button and "View at <commit>" side by side. */
 .shared-assistant-citation-row { display: flex; align-items: baseline; gap: 8px; min-width: 0; }

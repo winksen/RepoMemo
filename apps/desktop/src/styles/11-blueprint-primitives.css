@@ -649,8 +649,8 @@ body,
 .rm-rich-content a { color: var(--color-accent-text); text-decoration: underline; cursor: text; }
 .rm-rich-content p.is-editor-empty:first-child::before { float: left; height: 0; color: var(--color-text-subtle); content: attr(data-placeholder); pointer-events: none; }
 
-.shared-folder-form { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
-.shared-folder-form input { flex: 1; min-width: 0; }
+.shared-folder-form { display: flex; gap: 8px; align-items: end; margin-bottom: 12px; }
+.shared-folder-form .rm-field { flex: 1; }
 .shared-folder-path { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; margin-bottom: 12px; font-size: 13px; color: var(--color-text-muted); }
 .shared-folder-path span { display: inline-flex; align-items: center; gap: 2px; }
 .shared-folder-path button { padding: 4px 6px; color: var(--color-text-muted); background: transparent; border: 0; border-radius: 6px; cursor: pointer; font: inherit; }

@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.108 (2026-10-21)
+
+The evidence section's forms, filters and bulk actions use the shared pieces.
+
+### Changed
+- **Fields:** the new folder form, the rename-folder dialog and the note title use `Field`, with visible labels instead of hidden ones. The type filter (`Checkbox`) and the search (`SearchField`) were already shared and are unchanged.
+- **Bulk selection:** the box that picks a file while *Select files* is on is the shared `Checkbox`, labelled "Select <file>" for screen readers.
+- **Destructive dialogs:** *Delete folder*, *Delete file* and *Delete N files* are `danger` buttons (they were plain secondary buttons); *Rename*, *Move here*, *Create*, *Store evidence* and *Upload* show their work with `busy`.
+- **States:** the empty ledger, an empty folder, a filter with no match and a document list with no selection are the shared `EmptyState`.
+- **CSS:** the folder form lines its buttons up with the field; `.shared-select-box` loses its flex-only rules.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.107 (2026-10-21)
 
 The people section uses the shared fields, badges and segmented control.
