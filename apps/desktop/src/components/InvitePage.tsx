@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { IconArrowRight as ArrowRight, IconLoader2 as Loader, IconMailForward as MailForward } from "@tabler/icons-react";
+import { IconArrowRight as ArrowRight, IconMailForward as MailForward } from "@tabler/icons-react";
 import { acceptSharedInvitation, loginSharedUser, previewSharedInvitation, registerSharedUser } from "../lib/sharedApi";
 import type { AcceptedInvitation, InvitationPreview, SharedSession } from "../types";
 import { ThemeToggle } from "./SharedLayout";
 import { Button } from "./ui/button";
+import { Field } from "./ui/field";
 import { Input } from "./ui/input";
+import { LoadingState } from "./ui/loading-state";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
 import { apiMessage, formatTime } from "../web/format";
@@ -109,11 +111,11 @@ export function InvitePage({
           <h2>This link cannot be used</h2>
           <p>{problem}</p>
           <Button onClick={() => window.location.assign(session ? "/dashboard" : "/login")} type="button" variant="secondary">{session ? "Go to the dashboard" : "Go to sign-in"}</Button>
-        </div> : !preview ? <p className="shared-muted-copy"><Loader className="spin" size={ICON_SIZE.md} /> Checking the invitation…</p> : session ? (isInvitedAccount ? <div className="shared-auth-heading">
+        </div> : !preview ? <LoadingState label="Checking the invitation" /> : session ? (isInvitedAccount ? <div className="shared-auth-heading">
           <p className="shared-eyebrow">Signed in as {session.user.display_name}</p>
           <h2>Join {place}</h2>
           <p>You will join as {preview.role}. If you already have a higher role there, you keep it.</p>
-          <Button disabled={isBusy} onClick={() => void joinSignedIn()} type="button" variant="main">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : <MailForward size={ICON_SIZE.md} />} Accept the invitation</Button>
+          <Button busy={isBusy} onClick={() => void joinSignedIn()} variant="main"><MailForward size={ICON_SIZE.md} /> Accept the invitation</Button>
         </div> : <div className="shared-auth-heading">
           <p className="shared-eyebrow">Another account</p>
           <h2>This invitation is for {preview.email}</h2>
@@ -126,10 +128,10 @@ export function InvitePage({
             <p>{preview.account_exists ? `An account exists for ${preview.email}. Sign in and you join ${place} right away.` : `Your account uses ${preview.email}. You join ${place} as soon as it is created.`}</p>
           </div>
           <form className="shared-auth-form" onSubmit={signInAndJoin}>
-            {preview.account_exists ? null : <label>Display name<Input autoComplete="name" maxLength={120} onChange={(event) => setDisplayName(event.target.value)} placeholder="Ada Lovelace" required value={displayName} /></label>}
-            <label>Email<Input autoComplete="email" readOnly type="email" value={preview.email} /></label>
-            <label>Password<Input autoComplete={preview.account_exists ? "current-password" : "new-password"} minLength={12} onChange={(event) => setPassword(event.target.value)} placeholder="At least 12 characters" required type="password" value={password} /></label>
-            <Button disabled={isBusy} type="submit" variant="main">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : <ArrowRight size={ICON_SIZE.md} />} {preview.account_exists ? "Sign in and join" : "Create account and join"}</Button>
+            {preview.account_exists ? null : <Field label="Display name" required><Input autoComplete="name" maxLength={120} onChange={(event) => setDisplayName(event.target.value)} placeholder="Ada Lovelace" value={displayName} /></Field>}
+            <Field label="Email"><Input autoComplete="email" readOnly type="email" value={preview.email} /></Field>
+            <Field label="Password" required><Input autoComplete={preview.account_exists ? "current-password" : "new-password"} minLength={12} onChange={(event) => setPassword(event.target.value)} placeholder="At least 12 characters" type="password" value={password} /></Field>
+            <Button busy={isBusy} type="submit" variant="main"><ArrowRight size={ICON_SIZE.md} /> {preview.account_exists ? "Sign in and join" : "Create account and join"}</Button>
           </form>
         </>}
       </div>

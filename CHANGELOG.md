@@ -2,6 +2,19 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.102 (2026-10-21)
+
+The sign-in, registration, invitation, password reset and email verification pages use the shared fields, buttons and states.
+
+### Changed
+- **Fields:** the sign-in and registration form (`web/AuthCanvas.tsx`), the invitation form (`InvitePage`), the new-password form (`PasswordResetPage`) and the server address of the desktop app's first screen (`DesktopConnect`) use `Field` with an `Input`: every control is tied to its label with an id, the required ones are marked in one place (`required` on the `Field`), and all have the one control height. The invited address stays a read-only field.
+- **Buttons:** the submit buttons, *Accept the invitation* and *Send the link* show that they are working with the shared `busy` prop (a spinner, the label kept, `aria-busy`) instead of swapping their icon for a hand-placed spinner; the `type="button"` that every `Button` already defaults to is dropped.
+- **States:** the "Checking the invitation…" and "Checking the link…" lines are the shared `LoadingState`, with the same words as before.
+- **CSS removed:** the `.shared-auth-form label` and `.shared-auth-form input` rules, which only these forms used. The setup wizard's `.shared-setup-form` rules stay for V0.2.103.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.101 (2026-10-19)
 
 The knowledge map, the document viewer and the assistant's chat list load through the query cache.

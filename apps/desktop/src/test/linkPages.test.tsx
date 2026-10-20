@@ -263,3 +263,26 @@ describe("email verification page", () => {
     expect(screen.getByText(message)).toBeTruthy();
   });
 });
+
+describe("the shared fields on the link pages", () => {
+  it("ties each field of the invitation form to its label and marks the required ones", async () => {
+    vi.mocked(previewSharedInvitation).mockResolvedValue(invitation({ account_exists: false }));
+    renderInvite();
+    const name = await screen.findByLabelText("Display name") as HTMLInputElement;
+    expect(name.required).toBe(true);
+    expect(name.closest(".rm-field")).not.toBeNull();
+    expect((screen.getByLabelText("Email") as HTMLInputElement).required).toBe(false);
+    expect((screen.getByLabelText("Password") as HTMLInputElement).closest(".rm-field")).not.toBeNull();
+  });
+
+  it("disables the submit button and marks it busy while the new password is saved", async () => {
+    vi.mocked(previewSharedPasswordReset).mockResolvedValue({ display_name: "Ada", email: "ada@example.com" } as PasswordResetPreview);
+    vi.mocked(completeSharedPasswordReset).mockReturnValue(new Promise(() => undefined));
+    render(<PasswordResetPage onAuthenticated={vi.fn()} token="secret" />);
+    fireEvent.change(await screen.findByPlaceholderText("At least 12 characters"), { target: { value: "a brand new passphrase" } });
+    fireEvent.change(screen.getByLabelText("Repeat it"), { target: { value: "a brand new passphrase" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save the new password" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Save the new password" }).getAttribute("aria-busy")).toBe("true"));
+    expect((screen.getByRole("button", { name: "Save the new password" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+});

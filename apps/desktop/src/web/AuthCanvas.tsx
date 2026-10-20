@@ -1,8 +1,9 @@
 import { type FormEvent, useEffect, useState } from "react";
-import { IconArrowRight as ArrowRight, IconKey as Key, IconLoader2 as Loader, IconShieldLock as Shield, IconUsers as Users } from "@tabler/icons-react";
+import { IconArrowRight as ArrowRight, IconKey as Key, IconShieldLock as Shield, IconUsers as Users } from "@tabler/icons-react";
 import { DesktopServerNote } from "../components/DesktopServerNote";
 import { loginSharedUser, requestPasswordResetMail, sharedApiUrl, signUpSharedUser } from "../lib/sharedApi";
 import { Button } from "../components/ui/button";
+import { Field } from "../components/ui/field";
 import { SegmentedControl } from "../components/ui/segmented-control";
 import { Input } from "../components/ui/input";
 import { Toast, showToast } from "../components/ui/toast";
@@ -109,9 +110,9 @@ export function AuthCanvas({
             <p>{mode === "sign-in" ? "Use the credentials registered with this server." : "Your account will be the initial owner of any organization you create."}</p>
           </div>}
           <form className="shared-auth-form" onSubmit={submit}>
-            {mode === "sign-up" ? <label>Display name<Input autoComplete="name" onChange={(event) => setDisplayName(event.target.value)} placeholder="Ada Lovelace" required value={displayName} /></label> : null}
-            <label>Email<Input autoComplete="email" onChange={(event) => setEmail(event.target.value)} placeholder="you@company.com" required type="email" value={email} /></label>
-            <label>Password<Input autoComplete={mode === "sign-up" ? "new-password" : "current-password"} minLength={12} onChange={(event) => setPassword(event.target.value)} placeholder="At least 12 characters" required type="password" value={password} /></label>
+            {mode === "sign-up" ? <Field label="Display name" required><Input autoComplete="name" onChange={(event) => setDisplayName(event.target.value)} placeholder="Ada Lovelace" value={displayName} /></Field> : null}
+            <Field label="Email" required><Input autoComplete="email" onChange={(event) => setEmail(event.target.value)} placeholder="you@company.com" type="email" value={email} /></Field>
+            <Field label="Password" required><Input autoComplete={mode === "sign-up" ? "new-password" : "current-password"} minLength={12} onChange={(event) => setPassword(event.target.value)} placeholder="At least 12 characters" type="password" value={password} /></Field>
             <Toast kind="error" message={error} />
             <Button busy={isSubmitting} type="submit" variant="main">
               <ArrowRight size={ICON_SIZE.md} />
@@ -120,8 +121,8 @@ export function AuthCanvas({
           </form>
           {mode === "sign-in" ? <div className="shared-auth-hint">
             {forgotOpen
-              ? <p>We will send a link to <strong>{email.trim() || "the address above"}</strong> if an account uses it and this server sends mail. It works once, for one hour. <Button disabled={isSubmitting} onClick={() => void forgot()} type="button" variant="secondary">Send the link</Button> <Button onClick={() => setForgotOpen(false)} type="button" variant="secondary">Cancel</Button></p>
-              : <p>Forgot your password? <Button onClick={() => setForgotOpen(true)} type="button" variant="secondary">Get a link by email</Button>, or ask a system administrator of this server for a reset link (System › Users).</p>}
+              ? <p>We will send a link to <strong>{email.trim() || "the address above"}</strong> if an account uses it and this server sends mail. It works once, for one hour. <Button busy={isSubmitting} onClick={() => void forgot()} variant="secondary">Send the link</Button> <Button onClick={() => setForgotOpen(false)} variant="secondary">Cancel</Button></p>
+              : <p>Forgot your password? <Button onClick={() => setForgotOpen(true)} variant="secondary">Get a link by email</Button>, or ask a system administrator of this server for a reset link (System › Users).</p>}
           </div> : <p className="shared-auth-hint">Invited by a teammate? Open the invitation link you received instead: it creates the account with the right access.</p>}
           <p className="shared-api-note">API {apiAvailable === true ? "healthy" : apiAvailable === false ? "unreachable" : "checking"} · <code>{sharedApiUrl || "this address"}</code></p>
           <DesktopServerNote signedIn={false} />

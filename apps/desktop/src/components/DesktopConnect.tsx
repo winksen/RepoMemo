@@ -1,12 +1,13 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { IconArrowRight as ArrowRight, IconKey as Key, IconLoader2 as Loader, IconServer as Server, IconShieldLock as Shield } from "@tabler/icons-react";
+import { IconArrowRight as ArrowRight, IconKey as Key, IconServer as Server, IconShieldLock as Shield } from "@tabler/icons-react";
 import { configureDesktopApi, getSharedHealth } from "../lib/sharedApi";
 import { desktopServer } from "../lib/desktop";
 import { normalizeServerAddress } from "../lib/serverAddress";
 import { pendingHandoff } from "../lib/handoff";
 import { ThemeToggle } from "./SharedLayout";
 import { Button } from "./ui/button";
+import { Field } from "./ui/field";
 import { Input } from "./ui/input";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
@@ -87,9 +88,9 @@ export function DesktopConnect({ onConnected, onUseLocal }: { onConnected: () =>
           </div>
           {waiting ? <p className="shared-auth-hint" role="status">Your workspace <strong>{waiting.workspace_name}</strong> is ready to move. Connect to the server you want it on, sign in, and the dashboard's <em>Import a workspace</em> checks it for you.</p> : null}
           <form className="shared-auth-form" onSubmit={connect}>
-            <label>Server address<Input autoCapitalize="none" autoComplete="url" autoCorrect="off" autoFocus inputMode="url" onChange={(event) => setAddress(event.target.value)} placeholder="https://repomemo.example.com" required spellCheck={false} type="text" value={address} /></label>
-            <Button disabled={isConnecting} type="submit" variant="main">
-              {isConnecting ? <Loader className="spin" size={ICON_SIZE.md} /> : <ArrowRight size={ICON_SIZE.md} />}
+            <Field label="Server address" required><Input autoCapitalize="none" autoComplete="url" autoCorrect="off" autoFocus inputMode="url" onChange={(event) => setAddress(event.target.value)} placeholder="https://repomemo.example.com" spellCheck={false} type="text" value={address} /></Field>
+            <Button busy={isConnecting} type="submit" variant="main">
+              <ArrowRight size={ICON_SIZE.md} />
               Connect
             </Button>
           </form>

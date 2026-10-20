@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { IconKey as Key, IconLoader2 as Loader } from "@tabler/icons-react";
+import { IconKey as Key } from "@tabler/icons-react";
 import { completeSharedPasswordReset, previewSharedPasswordReset } from "../lib/sharedApi";
 import type { PasswordResetPreview } from "../types";
 import { ThemeToggle } from "./SharedLayout";
 import { Button } from "./ui/button";
+import { Field } from "./ui/field";
 import { Input } from "./ui/input";
+import { LoadingState } from "./ui/loading-state";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
 import { apiMessage } from "../web/format";
@@ -53,7 +55,7 @@ export function PasswordResetPage({ onAuthenticated, token }: { onAuthenticated:
           <h2>This link cannot be used</h2>
           <p>{problem}</p>
           <Button onClick={() => window.location.assign("/login")} type="button" variant="secondary">Go to sign-in</Button>
-        </div> : !preview ? <p className="shared-muted-copy"><Loader className="spin" size={ICON_SIZE.md} /> Checking the link…</p> : <>
+        </div> : !preview ? <LoadingState label="Checking the link" /> : <>
           <div className="shared-auth-heading">
             <p className="shared-eyebrow">{preview.display_name}</p>
             <h2>New password for {preview.email ?? preview.display_name}</h2>
@@ -61,9 +63,9 @@ export function PasswordResetPage({ onAuthenticated, token }: { onAuthenticated:
           </div>
           <form className="shared-auth-form" onSubmit={submit}>
             <input autoComplete="username" hidden readOnly value={preview.email ?? ""} />
-            <label>New password<Input autoComplete="new-password" autoFocus maxLength={1024} minLength={12} onChange={(event) => setPassword(event.target.value)} placeholder="At least 12 characters" required type="password" value={password} /></label>
-            <label>Repeat it<Input autoComplete="new-password" maxLength={1024} minLength={12} onChange={(event) => setConfirmation(event.target.value)} required type="password" value={confirmation} /></label>
-            <Button disabled={isBusy} type="submit" variant="main">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : <Key size={ICON_SIZE.md} />} Save the new password</Button>
+            <Field label="New password" required><Input autoComplete="new-password" autoFocus maxLength={1024} minLength={12} onChange={(event) => setPassword(event.target.value)} placeholder="At least 12 characters" type="password" value={password} /></Field>
+            <Field label="Repeat it" required><Input autoComplete="new-password" maxLength={1024} minLength={12} onChange={(event) => setConfirmation(event.target.value)} type="password" value={confirmation} /></Field>
+            <Button busy={isBusy} type="submit" variant="main"><Key size={ICON_SIZE.md} /> Save the new password</Button>
           </form>
         </>}
       </div>

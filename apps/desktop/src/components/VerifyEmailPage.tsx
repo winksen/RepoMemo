@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { IconCircleCheck as CircleCheck, IconLoader2 as Loader } from "@tabler/icons-react";
+import { IconCircleCheck as CircleCheck } from "@tabler/icons-react";
 import { verifyEmailLink } from "../lib/sharedApi";
 import { ThemeToggle } from "./SharedLayout";
 import { Button } from "./ui/button";
 import { ICON_SIZE } from "./ui/icon";
+import { LoadingState } from "./ui/loading-state";
 import { apiMessage } from "../web/format";
 
 /**
@@ -35,7 +36,7 @@ export function VerifyEmailPage({ onContinue, token }: { onContinue: () => void;
           <h2>This link cannot be used</h2>
           <p>{problem}</p>
           <Button onClick={onContinue} type="button" variant="secondary">Continue</Button>
-        </div> : email === null ? <p className="shared-muted-copy"><Loader className="spin" size={ICON_SIZE.md} /> Checking the link…</p> : <div className="shared-auth-heading">
+        </div> : email === null ? <LoadingState label="Checking the link" /> : <div className="shared-auth-heading">
           <p className="shared-eyebrow"><CircleCheck size={ICON_SIZE.sm} /> Confirmed</p>
           <h2>{email} is confirmed</h2>
           <p>You can create organizations and workspaces now.</p>
