@@ -13,6 +13,7 @@ import { cancelSharedJob, getSharedRepositoryDetail, summarizeSharedRepository, 
 import type { RepositoryDetailResponse } from "../../types";
 import { apiMessage, formatBytes, formatTime } from "../format";
 import { LanguageChart } from "../../components/LanguageChart";
+import { LoadingState } from "../../components/ui/loading-state";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { CopyButton } from "../../components/ui/copy-button";
@@ -26,6 +27,7 @@ import {
   LIVE_FALLBACK_POLL_MS,
   STAGE_LABEL,
   STATUS_LABEL,
+  STATUS_TONE,
   isRunning,
   repoSyncJob,
   reportSummary,
@@ -133,7 +135,7 @@ export function RepositoryDetailView({
     }
   }
 
-  if (!detail) return <section className="shared-record-panel" aria-busy="true"><p className="shared-muted-copy">Loading the repository…</p></section>;
+  if (!detail) return <section className="shared-record-panel" aria-busy="true"><LoadingState label="Loading the repository" /></section>;
 
   const { repository, overview, summary } = detail;
   const job = repository.active_job;
@@ -145,7 +147,7 @@ export function RepositoryDetailView({
 
   return <>
     <section className="shared-record-panel rm-repo-page">
-      <PanelHeading actions={<span className={`rm-repo-status status-${status}`}>{STATUS_LABEL[status]}</span>} icon={GitBranch} title="Repository" />
+      <PanelHeading actions={<Badge tone={STATUS_TONE[status]}>{STATUS_LABEL[status]}</Badge>} icon={GitBranch} title="Repository" />
       <dl className="rm-repo-facts">
         <div><dt>Location</dt><dd><code className="rm-repo-path">{repository.root_path}</code></dd></div>
         <div><dt><GitBranch size={ICON_SIZE.sm} /> Branch</dt><dd>{commit?.branch ?? repository.settings.branch ?? "Checked-out branch"}</dd></div>
@@ -159,9 +161,9 @@ export function RepositoryDetailView({
       </div> : null}
       <div className="rm-health-actions">
         {canSync ? job
-          ? <Button disabled={job.cancel_requested} onClick={() => void stop()} type="button" variant="secondary">{job.cancel_requested ? "Stopping…" : "Stop sync"}</Button>
-          : <Button onClick={() => void sync()} type="button" variant="secondary"><Refresh size={ICON_SIZE.sm} /> Sync now</Button> : null}
-        <Button aria-expanded={filesOpen} disabled={!repository.file_count} onClick={() => setFilesOpen((open) => !open)} type="button" variant="secondary">{filesOpen ? "Hide files" : "Browse files"}</Button>
+          ? <Button disabled={job.cancel_requested} onClick={() => void stop()} variant="secondary">{job.cancel_requested ? "Stopping…" : "Stop sync"}</Button>
+          : <Button onClick={() => void sync()} variant="secondary"><Refresh size={ICON_SIZE.sm} /> Sync now</Button> : null}
+        <Button aria-expanded={filesOpen} disabled={!repository.file_count} onClick={() => setFilesOpen((open) => !open)} variant="secondary">{filesOpen ? "Hide files" : "Browse files"}</Button>
       </div>
       {filesOpen ? <RepositoryFiles accessToken={accessToken} onOpenArtifact={onOpenArtifact} repository={repository} /> : null}
     </section>
@@ -173,7 +175,7 @@ export function RepositoryDetailView({
         <p className="rm-map-muted">Written for commit <code>{summary.commit_sha.slice(0, 7)}</code> on {formatTime(summary.generated_at)}.{summaryIsStale ? " The repository has changed since; regenerate it to describe the current commit." : ""} {summary.warnings.join(" ")}</p>
         {citedFiles.length ? <div className="rm-repo-cited"><span className="rm-map-muted">Based on</span>{citedFiles.map(([artifactId, path]) => <button className="rm-map-link" key={artifactId} onClick={() => onOpenArtifact(artifactId)} type="button">{path}</button>)}</div> : null}
       </> : <p className="shared-muted-copy">{detail.ai_available ? "No summary yet. A summary describes what the repository is, its main parts and where to start reading, from the overview below and the opening of its key files." : "A summary needs a text AI provider, which an administrator can set up in Settings. The overview below needs no AI."}</p>}
-      {canSync && detail.ai_available && overview ? <div className="rm-health-actions"><Button disabled={summarizing} onClick={() => void summarize()} type="button" variant={summary && !summaryIsStale ? "secondary" : "main"}><Sparkles size={ICON_SIZE.sm} /> {summarizing ? "Summarizing…" : summary ? "Regenerate summary" : "Generate summary"}</Button></div> : null}
+      {canSync && detail.ai_available && overview ? <div className="rm-health-actions"><Button busy={summarizing} onClick={() => void summarize()} variant={summary && !summaryIsStale ? "secondary" : "main"}><Sparkles size={ICON_SIZE.sm} /> {summarizing ? "Summarizing…" : summary ? "Regenerate summary" : "Generate summary"}</Button></div> : null}
     </section>
 
     {overview?.stack ? <section className="shared-record-panel rm-repo-page">

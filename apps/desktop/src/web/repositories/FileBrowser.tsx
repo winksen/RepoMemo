@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { listSharedRepositoryFiles } from "../../lib/sharedApi";
 import type { RepoFile, RepoSource } from "../../types";
 import { apiMessage, lastChangeLabel } from "../format";
+import { LoadingState } from "../../components/ui/loading-state";
 import { SearchField } from "../../components/ui/search-field";
 import { showToast } from "../../components/ui/toast";
 import { FILE_LIST_LIMIT } from "./shared";
@@ -33,7 +34,7 @@ export function RepositoryFiles({
     return (files ?? []).filter((file) => !needle || file.path.toLowerCase().includes(needle));
   }, [files, filter]);
 
-  if (!files) return <p className="shared-muted-copy">Loading files…</p>;
+  if (!files) return <LoadingState label="Loading files" />;
   return <div className="rm-repo-files">
     <SearchField aria-label={`Filter files of ${repository.name}`} onValueChange={setFilter} placeholder="Filter by path" value={filter} />
     <ul>

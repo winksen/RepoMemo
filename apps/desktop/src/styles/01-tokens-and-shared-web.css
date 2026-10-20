@@ -746,7 +746,6 @@ input[type="file"] {
 .shared-task-controls .rm-dropdown-trigger,
 .rm-system-settings label .rm-dropdown-trigger,
 .rm-system-setting-control .rm-dropdown-trigger,
-.rm-repo-form label .rm-dropdown-trigger { width: 100%; min-width: 0; }
 .rm-dropdown-check { position: absolute; right: 9px; display: grid; place-items: center; color: var(--color-accent-text); }
 .rm-button.shared-record-link { min-height: 0; padding: 0; color: inherit; background: transparent; border-color: transparent; border-radius: 0; box-shadow: none; }
 .rm-button.shared-record-link:hover:not(:disabled) { color: inherit; background: transparent; border-color: transparent; box-shadow: none; transform: none; }

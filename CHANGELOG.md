@@ -2,6 +2,19 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.113 (2026-10-21)
+
+Repository forms and pages use the shared pieces.
+
+### Changed
+- **Link form** (Workspace Settings › Repositories, and the edit dialog): the repository link, deploy key, host key, access token and its account name, name, branch and the include and exclude patterns are `Field`s whose explanation is the field's hint (a muted line under the control, tied to it with `aria-describedby`); the token and its account name, and the name and branch, sit in a `FieldRow` that stacks on narrow screens.
+- **Status:** the sync status of a repository (not synced, syncing, up to date, failed) is the shared `Badge` with a tone (`STATUS_TONE`), on the repository card and on the repository page, instead of its own pill.
+- **States and buttons:** "Loading repositories…", "Loading the repository…" and "Loading files…" are the shared `LoadingState`; *Check access*, *Link and sync*, *Save* and *Generate summary* show their work with `busy`; *Remove repository* is a `danger` button.
+- **CSS removed:** the label rules of `.rm-repo-form`, `.rm-repo-form-row` and the four `.rm-repo-status` rules, and the dropdown width rule of the form.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.112 (2026-10-21)
 
 The artifact page's forms use the shared pieces.

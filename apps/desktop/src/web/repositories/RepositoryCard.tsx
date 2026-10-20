@@ -1,10 +1,11 @@
 import { IconFolderCode as FolderCode, IconGitBranch as GitBranch, IconGitCommit as GitCommit, IconRefresh as Refresh } from "@tabler/icons-react";
 import type { RepoSource } from "../../types";
 import { formatTime } from "../format";
+import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { CopyButton } from "../../components/ui/copy-button";
 import { ICON_SIZE } from "../../components/ui/icon";
-import { STAGE_LABEL, STATUS_LABEL, reportSummary } from "./shared";
+import { STAGE_LABEL, STATUS_LABEL, STATUS_TONE, reportSummary } from "./shared";
 import { RepositoryFiles } from "./FileBrowser";
 
 export function RepositoryCard({
@@ -39,7 +40,7 @@ export function RepositoryCard({
         <h3>{repository.name}</h3>
         <code className="rm-repo-path">{repository.root_path}</code>
       </div>
-      <span className={`rm-repo-status status-${status}`}>{STATUS_LABEL[status]}</span>
+      <Badge tone={STATUS_TONE[status]}>{STATUS_LABEL[status]}</Badge>
     </div>
 
     <dl className="rm-repo-facts">
@@ -64,10 +65,10 @@ export function RepositoryCard({
     </div> : null}
 
     <div className="rm-health-actions">
-      {job ? (canSync ? <Button disabled={job.cancel_requested} onClick={onStop} type="button" variant="secondary">{job.cancel_requested ? "Stopping…" : "Stop sync"}</Button> : null)
-        : canSync ? <Button onClick={onSync} type="button" variant="secondary"><Refresh size={ICON_SIZE.sm} /> Sync now</Button> : null}
-      {repository.overview_artifact_id ? <Button onClick={() => onOpenArtifact(repository.overview_artifact_id!)} type="button" variant="secondary"><FolderCode size={ICON_SIZE.sm} /> Open overview</Button> : null}
-      <Button aria-expanded={filesOpen} disabled={!repository.file_count} onClick={onToggleFiles} type="button" variant="secondary">{filesOpen ? "Hide files" : "Browse files"}</Button>
+      {job ? (canSync ? <Button disabled={job.cancel_requested} onClick={onStop} variant="secondary">{job.cancel_requested ? "Stopping…" : "Stop sync"}</Button> : null)
+        : canSync ? <Button onClick={onSync} variant="secondary"><Refresh size={ICON_SIZE.sm} /> Sync now</Button> : null}
+      {repository.overview_artifact_id ? <Button onClick={() => onOpenArtifact(repository.overview_artifact_id!)} variant="secondary"><FolderCode size={ICON_SIZE.sm} /> Open overview</Button> : null}
+      <Button aria-expanded={filesOpen} disabled={!repository.file_count} onClick={onToggleFiles} variant="secondary">{filesOpen ? "Hide files" : "Browse files"}</Button>
     </div>
 
     {filesOpen ? <RepositoryFiles accessToken={accessToken} onOpenArtifact={onOpenArtifact} repository={repository} /> : null}

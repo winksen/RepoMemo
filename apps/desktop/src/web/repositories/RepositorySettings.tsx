@@ -198,8 +198,8 @@ export function RepositorySettings({
           <span className="rm-map-muted">{repository.remote ? (isSshLink(repository.root_path) ? "Remote · deploy key · " : repository.has_credential ? "Remote · with a token · " : "Remote · no token · ") : ""}{repository.settings.branch ? `Branch ${repository.settings.branch}` : repository.remote ? "Follows the default branch" : "Follows the checked-out branch"}{repository.settings.include.length ? ` · ${repository.settings.include.length} include` : ""}{repository.settings.exclude.length ? ` · ${repository.settings.exclude.length} exclude` : ""} · {STATUS_LABEL[repository.active_job ? "syncing" : repository.status]}</span>
         </div>
         <div className="rm-health-actions">
-          <Button disabled={Boolean(repository.active_job)} onClick={() => startEditing(repository)} type="button" variant="secondary"><Pencil size={ICON_SIZE.sm} /> Edit</Button>
-          <Button disabled={Boolean(repository.active_job)} onClick={() => setRemoving(repository)} type="button" variant="secondary"><Trash size={ICON_SIZE.sm} /> Remove</Button>
+          <Button disabled={Boolean(repository.active_job)} onClick={() => startEditing(repository)} variant="secondary"><Pencil size={ICON_SIZE.sm} /> Edit</Button>
+          <Button disabled={Boolean(repository.active_job)} onClick={() => setRemoving(repository)} variant="secondary"><Trash size={ICON_SIZE.sm} /> Remove</Button>
         </div>
       </li>)}
     </ul> : null}
@@ -209,15 +209,15 @@ export function RepositorySettings({
       <RepositoryFields form={form} onChange={setForm} showLink />
       {checkIsCurrent && check ? <RepositoryCheckResult check={check} /> : null}
       <div className="rm-health-actions">
-        <Button disabled={busy || !form.link.trim()} type="submit" variant={checkIsCurrent ? "secondary" : "main"}><Refresh size={ICON_SIZE.sm} /> {checkIsCurrent ? "Check again" : "Check access"}</Button>
-        <Button disabled={busy || !checkIsCurrent || check?.already_connected} onClick={() => void connect()} type="button" variant={checkIsCurrent ? "main" : "secondary"}><Plus size={ICON_SIZE.sm} /> Link and sync</Button>
+        <Button busy={busy && !checkIsCurrent} disabled={busy || !form.link.trim()} type="submit" variant={checkIsCurrent ? "secondary" : "main"}><Refresh size={ICON_SIZE.sm} /> {checkIsCurrent ? "Check again" : "Check access"}</Button>
+        <Button busy={busy && checkIsCurrent} disabled={!checkIsCurrent || check?.already_connected} onClick={() => void connect()} variant={checkIsCurrent ? "main" : "secondary"}><Plus size={ICON_SIZE.sm} /> Link and sync</Button>
       </div>
     </form>
 
     {editing ? <Dialog
       className="rm-dialog-wide"
       description={<>Changes apply from the next sync. Files no longer matched leave search; files newly matched are added.</>}
-      footer={<><DialogCancel onClick={() => setEditing(null)} /><Button disabled={busy} form="rm-repo-edit-form" type="submit" variant="main">Save</Button></>}
+      footer={<><DialogCancel onClick={() => setEditing(null)} /><Button busy={busy} form="rm-repo-edit-form" type="submit" variant="main">Save</Button></>}
       onClose={() => setEditing(null)}
       open
       title={`Edit ${editing.name}`}
@@ -240,17 +240,17 @@ export function RepositorySettings({
             <span className="rm-map-muted">Content type JSON, push events only. Shown once: renewing it ends the old one.</span>
           </div> : null}
           <div className="rm-health-actions">
-            <Button disabled={busy} onClick={() => void makeWebhook(editing)} type="button" variant="secondary">{liveEditing?.has_webhook ? "Make a new secret" : "Set up a webhook"}</Button>
-            {liveEditing?.has_webhook ? <Button disabled={busy} onClick={() => void removeWebhook(editing)} type="button" variant="secondary">Turn off</Button> : null}
+            <Button disabled={busy} onClick={() => void makeWebhook(editing)} variant="secondary">{liveEditing?.has_webhook ? "Make a new secret" : "Set up a webhook"}</Button>
+            {liveEditing?.has_webhook ? <Button disabled={busy} onClick={() => void removeWebhook(editing)} variant="secondary">Turn off</Button> : null}
           </div>
         </div>
-        {editing.remote && editing.has_credential && !isSshLink(editing.root_path) ? <div><Button disabled={busy} onClick={() => void removeToken(editing)} type="button" variant="secondary">Remove the token</Button></div> : null}
+        {editing.remote && editing.has_credential && !isSshLink(editing.root_path) ? <div><Button disabled={busy} onClick={() => void removeToken(editing)} variant="secondary">Remove the token</Button></div> : null}
       </form>
     </Dialog> : null}
 
     {removing ? <Dialog
       description={<>Remove <strong>{removing.name}</strong> and its {removing.file_count.toLocaleString()} files from the workspace? Their index, comments and memory-card links are deleted too. The repository on disk is not touched.</>}
-      footer={<><DialogCancel onClick={() => setRemoving(null)} /><Button disabled={busy} onClick={() => void remove(removing)} type="button" variant="secondary">Remove repository</Button></>}
+      footer={<><DialogCancel onClick={() => setRemoving(null)} /><Button busy={busy} onClick={() => void remove(removing)} variant="danger">Remove repository</Button></>}
       onClose={() => setRemoving(null)}
       open
       title="Remove repository"

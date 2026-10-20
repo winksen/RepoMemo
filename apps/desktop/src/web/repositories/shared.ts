@@ -1,3 +1,4 @@
+import type { BadgeTone } from "../../components/ui/badge";
 import type { RepoSource, RepoSyncReport, IndexingJobStatus, LiveEvent } from "../../types";
 
 export const POLL_INTERVAL_MS = 1500;
@@ -14,6 +15,14 @@ export const STAGE_LABEL: Record<string, string> = {
   reading_repository: "Reading the repository",
   storing_files: "Storing changed files",
   indexing: "Indexing",
+};
+
+/** The badge tone of a repository's sync status. */
+export const STATUS_TONE: Record<RepoSource["status"], BadgeTone> = {
+  pending: "neutral",
+  syncing: "info",
+  ready: "success",
+  error: "danger",
 };
 
 export const STATUS_LABEL: Record<RepoSource["status"], string> = {
