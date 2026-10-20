@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.109 (2026-10-21)
+
+Retrieval filters, saved searches, Ask and symbol search use the shared pieces.
+
+### Changed
+- **Search fields:** the evidence query and the symbol name are the shared `SearchField` (icon, clear button, Escape to clear), as the other list filters are.
+- **Filters:** file type, language, source, evidence state, folder, the two dates and the number of results are `Field`s with a visible label ("File type", "Language", "Source", "Evidence state", "Folder", "Updated from", "Updated to", "Results") instead of unlabelled dropdowns that carried an `aria-label`. The filter row is a grid that fills the width and lines its buttons up with the fields; a dropdown in a field fills it.
+- **Saved searches and Ask:** the search name and the question are `Field`s (the question's text area included); the delete button of a saved search is an `IconButton` that names it.
+- **States and buttons:** a search that was not run yet, no saved search and no symbol found are the shared `EmptyState`; *Search*, *Find definition*, *Save current search* and *Ask* use `busy`.
+- **CSS removed:** `.shared-retrieval-date` and the `justify-self` rule of the retrieval dropdowns.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.108 (2026-10-21)
 
 The evidence section's forms, filters and bulk actions use the shared pieces.
