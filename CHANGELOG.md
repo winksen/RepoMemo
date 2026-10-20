@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.106 (2026-10-21)
+
+Workspace settings use the shared fields and switches.
+
+### Changed
+- **Fields:** the three AI provider forms (text, images, search: provider, name, base URL, model, API key), *Who can use AI* and the workspace rename use `Field`; the rename field has a visible label instead of a hidden one.
+- **Checkbox:** the cloud acknowledgement of a provider is the shared `Checkbox`, with a clickable label, instead of a bare checkbox in a label.
+- **States and buttons:** a settings page the role may not open shows the shared `EmptyState`; *Save provider* and *Test connection* each show their own work with `busy` (before, both swapped to a spinner at the same time); *Rename* and *Download archive* use `busy`.
+- **CSS removed:** the label and toggle rules of `.shared-ai-provider-form` and its dropdown width rule (a dropdown in a field fills it). The workspace's repository links keep their form until V0.2.113, which moves the repository forms together.
+- **Narrow screens:** the rename form stacks and stretches its field.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.105 (2026-10-21)
 
 The organization page uses the shared fields, badges and states.

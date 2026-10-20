@@ -5,6 +5,8 @@ import { type SharedAiProviderSettings } from "../../types";
 import { Button } from "../../components/ui/button";
 import { PanelHeading } from "../../components/ui/panel-heading";
 import { useConfirm } from "../../components/ui/confirm-dialog";
+import { EmptyState } from "../../components/ui/empty-state";
+import { Field } from "../../components/ui/field";
 import { Input } from "../../components/ui/input";
 import { AiPolicySettings } from "../../components/AiPolicySettings";
 import { AiProviderForm } from "../../components/AiProviderForm";
@@ -89,10 +91,10 @@ export function SettingsSection({ page }: { page: WorkspacePage }) {
               {canManageWorkspace ? <section className="shared-settings-group">
                 <PanelHeading description="owner only" icon={Settings} title="Workspace ownership" />
                 <p className="shared-muted-copy">Rename this workspace or remove it permanently. Deletion removes its shared evidence, memory, and memberships.</p>
-                <form className="shared-workspace-rename" onSubmit={renameWorkspace}><Input aria-label="Workspace name" onChange={(event) => setWorkspaceName(event.target.value)} required value={workspaceName} /><Button disabled={isSubmitting} type="submit" variant="secondary"><Pencil size={ICON_SIZE.md} /> Rename</Button></form>
-                <Button className="shared-danger-action" disabled={isSubmitting} onClick={() => void removeWorkspace()} type="button" variant="secondary"><Trash size={ICON_SIZE.md} /> Delete workspace</Button>
+                <form className="shared-workspace-rename" onSubmit={renameWorkspace}><Field label="Workspace name" required><Input onChange={(event) => setWorkspaceName(event.target.value)} value={workspaceName} /></Field><Button busy={isSubmitting} type="submit" variant="secondary"><Pencil size={ICON_SIZE.md} /> Rename</Button></form>
+                <Button className="shared-danger-action" disabled={isSubmitting} onClick={() => void removeWorkspace()} variant="secondary"><Trash size={ICON_SIZE.md} /> Delete workspace</Button>
               </section> : null}
-            </> : <div className="shared-empty-state"><Settings size={25} /><strong>Administrative access required</strong><span>Only workspace administrators and the owner can open settings. Your current role can still browse shared evidence, memory, and tasks.</span></div>}
+            </> : <EmptyState description="Only workspace administrators and the owner can open settings. Your current role can still browse shared evidence, memory, and tasks." icon={<Settings size={25} />} title="Administrative access required" />}
           </section>
   );
 }

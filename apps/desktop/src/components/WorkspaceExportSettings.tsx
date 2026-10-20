@@ -33,7 +33,7 @@ export function WorkspaceExportSettings({ accessToken, workspaceId }: { accessTo
     <section className="shared-settings-group">
       <PanelHeading description="owners and administrators" icon={PackageExport} title="Export this workspace" />
       <p className="shared-muted-copy">One file with the evidence and its original files, folders, memory cards with their citations, tasks, comments and each file's lifecycle history, plus a manifest. People are carried by name and address, never by account. Settings that hold secrets (AI provider keys, repository and tracker tokens) are not included.</p>
-      <div><Button disabled={isExporting} onClick={() => void exportWorkspace()} type="button" variant="secondary"><Download size={ICON_SIZE.md} /> {isExporting ? "Preparing the archive…" : "Download archive"}</Button></div>
+      <div><Button busy={isExporting} onClick={() => void exportWorkspace()} variant="secondary"><Download size={ICON_SIZE.md} /> {isExporting ? "Preparing the archive…" : "Download archive"}</Button></div>
     </section>
   );
 }

@@ -658,19 +658,16 @@ input[type="file"] {
 .shared-settings-policy span { margin-top: 3px; }
 .shared-settings-group { display: grid; gap: 12px; }
 .shared-settings-group > .shared-muted-copy { max-width: 72ch; margin: -3px 0 0; }
-.shared-workspace-rename { display: flex; gap: 8px; max-width: 560px; }
-.shared-workspace-rename .rm-input { min-width: 0; }
+.shared-workspace-rename { display: flex; align-items: end; gap: 8px; max-width: 560px; }
+.shared-workspace-rename .rm-field { flex: 1 1 auto; }
 .shared-import-workspace { margin-top: 18px; }
 .shared-import-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .shared-import-report { display: grid; gap: 8px; max-width: 680px; padding: 14px 16px; background: var(--color-surface-2); border-radius: 10px; font-size: 13px; }
 .shared-import-report ul { margin: 0; padding-left: 18px; color: var(--color-text-muted); }
 .shared-import-report label { display: grid; gap: 4px; max-width: 360px; }
 .shared-ai-provider-form { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px !important; max-width: 680px; padding: 16px; background: var(--color-surface-2); border-radius: 10px; }
-.shared-ai-provider-form > div,
-.shared-ai-provider-form > button,
-.shared-ai-provider-form .shared-ai-provider-toggle { grid-column: 1 / -1; }
-.shared-ai-provider-form label { display: grid; gap: 6px; color: var(--color-text-muted); font-size: 12px; font-weight: 700; }
-.shared-ai-provider-form .shared-ai-provider-toggle { display: flex; align-items: flex-start; gap: 8px; color: var(--color-text-muted); font-weight: 400; line-height: 1.5; }
+.shared-ai-provider-form > .shared-ai-provider-actions,
+.shared-ai-provider-form > .rm-checkbox { grid-column: 1 / -1; }
 .shared-ai-provider-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .shared-ai-provider-toggle input[type="checkbox"] { margin-top: 2px; }
 .shared-record-edit-form { display: grid; gap: 12px; max-width: 680px; margin: 18px 0 0; padding: 16px; background: var(--color-surface-2); border-radius: 10px; }
@@ -753,7 +750,6 @@ input[type="file"] {
 .rm-dropdown-item[data-highlighted] { color: var(--color-text); background: var(--color-surface-2); }
 .rm-dropdown-item[data-disabled] { cursor: not-allowed; opacity: 0.5; }
 /* A dropdown takes the width of its content (160 px at least); a form stretches it to the field (V0.2.59). */
-.shared-ai-provider-form .rm-dropdown-trigger,
 .shared-dialog-field .rm-dropdown-trigger,
 .shared-lifecycle-form .rm-dropdown-trigger,
 .shared-record-edit-form .rm-dropdown-trigger,
@@ -826,7 +822,7 @@ input[type="file"] {
   .shared-artifact-manager.list .rm-button.shared-artifact-entry { grid-template-columns: auto minmax(0, 1fr); }
   .shared-artifact-manager.list .shared-artifact-status { position: absolute; grid-column: auto; }
   .shared-artifact-manager.list .shared-artifact-entry-meta { grid-column: 2; justify-content: flex-start; max-width: none; }
-  .shared-workspace-rename { flex-direction: column; }
+  .shared-workspace-rename { align-items: stretch; flex-direction: column; }
 }
 
 .mono {

@@ -4,6 +4,7 @@ import { IconShieldLock as ShieldLock } from "@tabler/icons-react";
 import { getSharedAiPolicy, saveSharedAiPolicy } from "../lib/sharedApi";
 import type { AiMinRole, AiPolicy } from "../types";
 import { Dropdown } from "./ui/dropdown";
+import { Field } from "./ui/field";
 import { Toast } from "./ui/toast";
 import { apiMessage } from "../web/format";
 
@@ -52,7 +53,7 @@ export function AiPolicySettings({ accessToken, onSaved, workspaceId }: {
       <PanelHeading description={quota} icon={ShieldLock} title="Who can use AI" />
       <p className="shared-muted-copy">Answers, overviews, summaries and the assistant's AI actions send cited excerpts to the workspace's text provider. Choose which roles may start them. Image descriptions and search vectors are built in the background for everyone and are not affected.</p>
       <div className="shared-ai-provider-form">
-        <label>AI features available to<Dropdown aria-label="Roles that can use AI features" disabled={!policy || isSaving} onValueChange={(value) => void change(value)} options={OPTIONS} value={policy?.min_role} /></label>
+        <Field label="AI features available to">{(control) => <Dropdown disabled={!policy || isSaving} id={control.id} onValueChange={(value) => void change(value)} options={OPTIONS} value={policy?.min_role} />}</Field>
         <Toast kind="error" message={error} />
         <Toast kind="success" message={notice} />
       </div>

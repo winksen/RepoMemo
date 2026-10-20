@@ -1,11 +1,13 @@
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
-import { IconBrain as Brain, IconLoader2 as Loader, IconPhoto as Photo, IconRefresh as Refresh, IconSearch as Search } from "@tabler/icons-react";
+import { IconBrain as Brain, IconPhoto as Photo, IconRefresh as Refresh, IconSearch as Search } from "@tabler/icons-react";
 import { saveSharedWorkspaceAiProvider, testSharedWorkspaceAiProvider } from "../lib/sharedApi";
 import type { ProviderTestResult, SharedAiProviderSettings } from "../types";
 import { Button } from "./ui/button";
+import { Checkbox } from "./ui/checkbox";
 import { PanelHeading } from "./ui/panel-heading";
 import { Dropdown } from "./ui/dropdown";
+import { Field } from "./ui/field";
 import { Input } from "./ui/input";
 import { Toast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
@@ -79,7 +81,8 @@ export function AiProviderForm({
   const [acknowledged, setAcknowledged] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<ProviderTestResult | null>(null);
-  const [isBusy, setIsBusy] = useState(false);
+  const [action, setAction] = useState<"save" | "test" | null>(null);
+  const isBusy = action !== null;
 
   const own = providers.filter((entry) => entry.purpose === purpose);
   const current = own.find((entry) => entry.enabled) ?? own[0];
@@ -106,7 +109,7 @@ export function AiProviderForm({
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setIsBusy(true); setError(null);
+    setAction("save"); setError(null);
     try {
       const saved = await saveSharedWorkspaceAiProvider(accessToken, workspaceId, {
         id: providerId || undefined,
@@ -125,7 +128,7 @@ export function AiProviderForm({
       onSaved(saved);
     } catch (requestError) {
       setError(apiMessage(requestError, "The provider could not be saved."));
-    } finally { setIsBusy(false); }
+    } finally { setAction(null); }
   }
 
   async function test() {
@@ -133,10 +136,10 @@ export function AiProviderForm({
       setError("Save the provider before testing its connection.");
       return;
     }
-    setIsBusy(true); setError(null); setTestResult(null);
+    setAction("test"); setError(null); setTestResult(null);
     try { setTestResult(await testSharedWorkspaceAiProvider(accessToken, workspaceId, providerId)); }
     catch (requestError) { setError(apiMessage(requestError, "The connection test failed.")); }
-    finally { setIsBusy(false); }
+    finally { setAction(null); }
   }
 
   const Icon = ICONS[purpose];
@@ -146,12 +149,12 @@ export function AiProviderForm({
       <p className="shared-muted-copy">{copy.intro}</p>
       {status ? <p className="shared-ai-provider-status">{status}</p> : null}
       <form className="shared-ai-provider-form" onSubmit={save}>
-        <label>Provider<Dropdown aria-label={`${copy.title} provider`} onValueChange={(value) => selectType(value as ProviderType)} options={[{ label: "Ollama (local)", value: "ollama" }, { label: "OpenRouter (cloud)", value: "openrouter" }]} value={providerType} /></label>
-        <label>Provider name<Input onChange={(event) => setProviderName(event.target.value)} required value={providerName} /></label>
-        <label>Base URL<Input onChange={(event) => setBaseUrl(event.target.value)} placeholder={providerType === "ollama" ? OLLAMA_URL : OPENROUTER_URL} value={baseUrl} /></label>
-        <label>{copy.modelLabel}<Input onChange={(event) => setModel(event.target.value)} placeholder={providerType === "ollama" ? copy.ollamaModel : copy.cloudModel} required value={model} /></label>
-        {providerType === "openrouter" ? <><label>API key<Input autoComplete="off" onChange={(event) => setApiKey(event.target.value)} placeholder={providerId ? "Leave blank to keep the saved key (enter it again if you change the address)" : "Required to enable cloud AI"} type="password" value={apiKey} /></label><label className="shared-ai-provider-toggle"><input checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} type="checkbox" /> {copy.cloudNotice}</label></> : null}
-        <div className="shared-ai-provider-actions"><Button disabled={isBusy} type="submit" variant="secondary">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : <Icon size={ICON_SIZE.md} />} Save provider</Button><Button disabled={isBusy || !providerId} onClick={() => void test()} type="button" variant="secondary">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : <Refresh size={ICON_SIZE.md} />} Test connection</Button></div>
+        <Field label="Provider">{(control) => <Dropdown aria-label={`${copy.title} provider`} id={control.id} onValueChange={(value) => selectType(value as ProviderType)} options={[{ label: "Ollama (local)", value: "ollama" }, { label: "OpenRouter (cloud)", value: "openrouter" }]} value={providerType} />}</Field>
+        <Field label="Provider name" required><Input onChange={(event) => setProviderName(event.target.value)} value={providerName} /></Field>
+        <Field label="Base URL"><Input onChange={(event) => setBaseUrl(event.target.value)} placeholder={providerType === "ollama" ? OLLAMA_URL : OPENROUTER_URL} value={baseUrl} /></Field>
+        <Field label={copy.modelLabel} required><Input onChange={(event) => setModel(event.target.value)} placeholder={providerType === "ollama" ? copy.ollamaModel : copy.cloudModel} value={model} /></Field>
+        {providerType === "openrouter" ? <><Field label="API key"><Input autoComplete="off" onChange={(event) => setApiKey(event.target.value)} placeholder={providerId ? "Leave blank to keep the saved key (enter it again if you change the address)" : "Required to enable cloud AI"} type="password" value={apiKey} /></Field><Checkbox checked={acknowledged} label={copy.cloudNotice} onCheckedChange={setAcknowledged} /></> : null}
+        <div className="shared-ai-provider-actions"><Button busy={action === "save"} disabled={isBusy} type="submit" variant="secondary"><Icon size={ICON_SIZE.md} /> Save provider</Button><Button busy={action === "test"} disabled={isBusy || !providerId} onClick={() => void test()} variant="secondary"><Refresh size={ICON_SIZE.md} /> Test connection</Button></div>
         <Toast kind="error" message={error} />
         <Toast kind={testResult?.success ? "success" : "error"} message={testResult?.message} />
       </form>
