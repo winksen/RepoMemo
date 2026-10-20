@@ -7,7 +7,6 @@ import {
   IconFileText as FileText,
   IconHistory as History,
   IconLayoutDashboard as Dashboard,
-  IconLoader2 as Loader,
   IconMessage as Message,
   IconMessageQuestion as Question,
   IconPencil as Pencil,
@@ -24,7 +23,10 @@ import { ViewAtCommit } from "../web/common";
 import { ActionMenu } from "./ui/action-menu";
 import { Button } from "./ui/button";
 import { Dialog, DialogCancel } from "./ui/dialog";
+import { Field } from "./ui/field";
+import { IconButton } from "./ui/icon-button";
 import { Input } from "./ui/input";
+import { LoadingState } from "./ui/loading-state";
 import { Textarea } from "./ui/textarea";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
@@ -254,19 +256,19 @@ export function AssistantPanel({ accessToken, onOpenArtifact, workspaceId }: { a
   }
 
   const dialog = chatDialog?.kind === "rename"
-    ? <Dialog footer={<><DialogCancel onClick={() => setChatDialog(null)} /><Button disabled={isSavingChat || !renameValue.trim()} onClick={() => void renameChat(chatDialog.conversation)} type="button" variant="main">Rename</Button></>} onClose={() => setChatDialog(null)} open title="Rename chat">
-      <Input aria-label="Chat name" autoFocus maxLength={120} onChange={(event) => setRenameValue(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && renameValue.trim()) void renameChat(chatDialog.conversation); }} value={renameValue} />
+    ? <Dialog footer={<><DialogCancel onClick={() => setChatDialog(null)} /><Button busy={isSavingChat} disabled={!renameValue.trim()} onClick={() => void renameChat(chatDialog.conversation)} variant="main">Rename</Button></>} onClose={() => setChatDialog(null)} open title="Rename chat">
+      <Field label="Chat name" required><Input autoFocus maxLength={120} onChange={(event) => setRenameValue(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && renameValue.trim()) void renameChat(chatDialog.conversation); }} value={renameValue} /></Field>
     </Dialog>
     : chatDialog?.kind === "delete"
-      ? <Dialog description={<>Delete <strong>{chatDialog.conversation.title}</strong> and its {chatDialog.conversation.turn_count} {chatDialog.conversation.turn_count === 1 ? "message" : "messages"}? This cannot be undone.</>} footer={<><DialogCancel onClick={() => setChatDialog(null)} /><Button disabled={isSavingChat} onClick={() => void deleteChat(chatDialog.conversation)} type="button" variant="secondary">Delete chat</Button></>} onClose={() => setChatDialog(null)} open title="Delete chat" />
+      ? <Dialog description={<>Delete <strong>{chatDialog.conversation.title}</strong> and its {chatDialog.conversation.turn_count} {chatDialog.conversation.turn_count === 1 ? "message" : "messages"}? This cannot be undone.</>} footer={<><DialogCancel onClick={() => setChatDialog(null)} /><Button busy={isSavingChat} onClick={() => void deleteChat(chatDialog.conversation)} variant="danger">Delete chat</Button></>} onClose={() => setChatDialog(null)} open title="Delete chat" />
       : null;
 
   return <section className="shared-assistant" aria-label="Workspace assistant">
     {dialog}
     <div className="shared-assistant-toolbar">
       <strong title={activeConversation?.title ?? "New chat"}>{activeConversation?.title ?? "New chat"}</strong>
-      <Button aria-expanded={showChats} aria-label="Chat history" onClick={() => setShowChats((current) => !current)} title="Chat history" type="button" variant="secondary"><History size={ICON_SIZE.md} /></Button>
-      <Button aria-label="New chat" disabled={isBusy} onClick={() => { startNewChat(); setShowChats(false); }} title="New chat" type="button" variant="secondary"><Plus size={ICON_SIZE.md} /></Button>
+      <IconButton aria-expanded={showChats} label="Chat history" onClick={() => setShowChats((current) => !current)} size="sm"><History size={ICON_SIZE.md} /></IconButton>
+      <IconButton disabled={isBusy} label="New chat" onClick={() => { startNewChat(); setShowChats(false); }} size="sm"><Plus size={ICON_SIZE.md} /></IconButton>
     </div>
     {showChats ? <nav className="shared-assistant-chats" aria-label="Assistant chats">
       {conversations.length ? <ul className="rm-option-list">{conversations.map((conversation) => {
@@ -285,10 +287,10 @@ export function AssistantPanel({ accessToken, onOpenArtifact, workspaceId }: { a
     </nav> : null}
     <div className="shared-assistant-main">
       <div className="shared-assistant-thread" role="log" aria-live="polite" aria-busy={isBusy || isLoadingChat}>
-        {isLoadingChat ? <p className="shared-assistant-pending"><Loader className="spin" size={ICON_SIZE.md} /> Loading chat…</p> : turns.length ? turns.map((turn) => <article className="shared-assistant-turn" key={turn.key}>
+        {isLoadingChat ? <LoadingState label="Loading chat" /> : turns.length ? turns.map((turn) => <article className="shared-assistant-turn" key={turn.key}>
           <div className="shared-assistant-request"><p>{turn.label}</p>{turn.request.capability ? <span>{capabilityLabel(capabilities, turn.request.capability)}</span> : null}</div>
-          {turn.status === "pending" ? <p className="shared-assistant-pending"><Loader className="spin" size={ICON_SIZE.md} /> Working on it…</p> : null}
-          {turn.status === "failed" ? <div className="shared-assistant-failed"><span>No reply. The request did not complete and was not saved.</span><Button disabled={isBusy} onClick={() => void run(turn)} type="button" variant="secondary"><Refresh size={ICON_SIZE.sm} /> Retry</Button></div> : null}
+          {turn.status === "pending" ? <LoadingState label="Working on it" /> : null}
+          {turn.status === "failed" ? <div className="shared-assistant-failed"><span>No reply. The request did not complete and was not saved.</span><Button disabled={isBusy} onClick={() => void run(turn)} variant="secondary"><Refresh size={ICON_SIZE.sm} /> Retry</Button></div> : null}
           {turn.reply ? <Reply accessToken={accessToken} canSummarize={canSummarize} capabilities={capabilities} isBusy={isBusy} onOpenArtifact={onOpenArtifact} onSummarize={summarize} reply={turn.reply} /> : null}
         </article>) : <div className="shared-assistant-intro">
           <Sparkles size={22} />
@@ -306,7 +308,7 @@ export function AssistantPanel({ accessToken, onOpenArtifact, workspaceId }: { a
         </div>
         <div className="shared-assistant-input">
           <Textarea aria-label="Message the assistant" onChange={(event) => setDraft(event.target.value)} onKeyDown={onComposerKey} placeholder={selectedInfo?.placeholder ?? "Ask, search, or name a file…"} ref={input} rows={2} value={draft} />
-          <Button aria-label="Send" disabled={isBusy || isLoadingChat || !draft.trim()} type="submit" variant="main">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : <Send size={ICON_SIZE.md} />}</Button>
+          <Button aria-label="Send" busy={isBusy} disabled={isLoadingChat || !draft.trim()} type="submit" variant="main"><Send size={ICON_SIZE.md} /></Button>
         </div>
         <div className="shared-assistant-footnote">
           <span>{capabilities?.provider_name ? <><Brain size={ICON_SIZE.sm} /> AI actions use {capabilities.provider_name}. Search and file lookup stay on the server.</> : "No AI provider is enabled, so file lookup and search are available. An administrator can enable AI in Settings."}</span>

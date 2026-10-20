@@ -10,6 +10,7 @@ import { onAssistantCommand } from "../lib/assistantBridge";
 import { NARROW_QUERY, useMediaQuery } from "../lib/useMediaQuery";
 import { AssistantPanel } from "./AssistantPanel";
 import { Button } from "./ui/button";
+import { IconButton } from "./ui/icon-button";
 import { ICON_SIZE } from "./ui/icon";
 
 const DOCK_STORAGE_KEY = "repomemo.assistant.dock";
@@ -118,7 +119,7 @@ export function AssistantDock({ accessToken, onOpenArtifact, workspaceId }: { ac
       <div aria-label="Resize assistant" aria-orientation="vertical" aria-valuemax={MAX_WIDTH} aria-valuemin={MIN_WIDTH} aria-valuenow={width} className="shared-assistant-resize" onKeyDown={resizeWithKeys} onPointerDown={startResize} role="separator" tabIndex={0} />
       <header className="shared-assistant-dock-header">
         <span><Sparkles size={ICON_SIZE.md} /> Assistant</span>
-        <Button aria-expanded onClick={() => toggle(false)} aria-label={narrow ? "Close assistant" : "Shrink assistant"} title={narrow ? "Close assistant" : "Shrink assistant"} type="button" variant="secondary">{narrow ? <Close size={ICON_SIZE.md} /> : <Collapse size={ICON_SIZE.md} />}</Button>
+        <IconButton aria-expanded label={narrow ? "Close assistant" : "Shrink assistant"} onClick={() => toggle(false)} size="sm">{narrow ? <Close size={ICON_SIZE.md} /> : <Collapse size={ICON_SIZE.md} />}</IconButton>
       </header>
       {hasOpened ? <AssistantPanel accessToken={accessToken} key={workspaceId} onOpenArtifact={onOpenArtifact} workspaceId={workspaceId} /> : null}
     </div>

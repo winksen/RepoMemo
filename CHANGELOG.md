@@ -2,6 +2,19 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.118 (2026-10-21)
+
+The assistant and the command palette use the shared field and option list. The pages-on-the-shared-pieces track (K4) is complete: V0.2.102 to V0.2.118.
+
+### Changed
+- **Assistant dock and panel:** the chat history, new chat and shrink or close buttons are `IconButton`s (32 px, named in a tooltip on hover and focus) instead of icon buttons with a `title`; renaming a chat uses a `Field`; *Delete chat* is a `danger` button; the send button, rename and delete show their work with `busy`; "Loading chat…" and "Working on it…" are the shared `LoadingState`, so the assistant's own pending style is gone.
+- **Command palette:** the field is the shared `SearchField` and the results are the shared `rm-option-list` (both since V0.2.88 and V0.2.90); a query with no match shows the shared `EmptyState`, sized to the palette.
+- **CSS removed:** `.shared-assistant-pending`, the 32 px override for the assistant's header buttons, and the checkbox rule of the retired provider toggle (the last user of `.shared-ai-provider-toggle` went in V0.2.117).
+- **K4 as a whole:** every form of the pages in the plan has labelled fields of one height, its dropdowns are the shared ones and fill their field, and its loading, empty and busy states are the shared ones. Still on their own markup, outside this track's list: the dashboard's create forms, the knowledge map's graph toggles, the health findings list, the workspace import and the retired local edition's move-to-server dialog.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.117 (2026-10-21)
 
 System toolbars and filters use the shared search field, dropdowns and date fields.

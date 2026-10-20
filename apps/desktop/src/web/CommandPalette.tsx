@@ -3,6 +3,7 @@ import { listSharedArtifacts, searchSharedMemoryCards } from "../lib/sharedApi";
 import { onOpenCommandPalette, sendToAssistant } from "../lib/assistantBridge";
 import { type ArtifactSummary, type MemoryCardSummary, type SharedWorkspace } from "../types";
 import { Dialog, DialogCancel } from "../components/ui/dialog";
+import { EmptyState } from "../components/ui/empty-state";
 import { SearchField } from "../components/ui/search-field";
 import { navigate } from "./router";
 import { paletteEntries, type PaletteEntry } from "./paletteEntries";
@@ -128,6 +129,6 @@ export function CommandPalette({ accessToken, assistantWorkspaceId, canAdministe
           </button>
         </li>;
       })}
-    </ul> : <p className="shared-muted-copy">Nothing matches “{query.trim()}”.</p>}
+    </ul> : <EmptyState className="shared-palette-empty" title={`Nothing matches “${query.trim()}”`} />}
   </Dialog>;
 }

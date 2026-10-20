@@ -129,4 +129,14 @@ describe("CommandPalette", () => {
     expect(takeAssistantCommand()).toEqual({ capability: "ask_question", message: "how do retries work" });
     expect(navigate).not.toHaveBeenCalled();
   });
+
+  it("uses the shared search field for the query and the shared empty state when nothing matches", async () => {
+    palette(null);
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+    const input = await screen.findByRole("combobox");
+    expect(input.closest(".rm-search-field")).not.toBeNull();
+    fireEvent.change(input, { target: { value: "zzqxv" } });
+    expect((await screen.findByText("Nothing matches “zzqxv”")).closest(".rm-empty-state")).not.toBeNull();
+    expect(screen.queryAllByRole("option")).toHaveLength(0);
+  });
 });

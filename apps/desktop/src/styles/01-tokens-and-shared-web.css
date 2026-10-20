@@ -659,7 +659,6 @@ input[type="file"] {
 .shared-ai-provider-form > .shared-ai-provider-actions,
 .shared-ai-provider-form > .rm-checkbox { grid-column: 1 / -1; }
 .shared-ai-provider-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.shared-ai-provider-toggle input[type="checkbox"] { margin-top: 2px; }
 .shared-record-edit-form { display: grid; gap: 12px; max-width: 680px; margin: 18px 0 0; padding: 16px; background: var(--color-surface-2); border-radius: 10px; }
 .rm-button.shared-danger-action { color: var(--color-danger); background: var(--color-surface); border-color: var(--color-border-strong); }
 .rm-button.shared-danger-action:hover:not(:disabled) { color: var(--color-danger); background: var(--color-surface); border-color: var(--color-danger); }
