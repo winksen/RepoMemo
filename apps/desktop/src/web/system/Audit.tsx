@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { IconDownload as Download, IconLoader2 as Loader } from "@tabler/icons-react";
+import { IconDownload as Download } from "@tabler/icons-react";
 import { downloadSystemAuditExport, listSystemAuditEvents } from "../../lib/sharedApi";
 import type { SystemAuditEvent } from "../../types";
 import { Button } from "../../components/ui/button";
 import { Table } from "../../components/ui/table";
 import { PanelHeading } from "../../components/ui/panel-heading";
 import { Dropdown } from "../../components/ui/dropdown";
+import { EmptyState } from "../../components/ui/empty-state";
+import { Field } from "../../components/ui/field";
 import { Input } from "../../components/ui/input";
 import { LoadingState } from "../../components/ui/loading-state";
 import { showToast } from "../../components/ui/toast";
@@ -44,16 +46,16 @@ export function AuditSection({ accessToken, canExport }: { accessToken: string; 
       <PanelHeading description="JSON lines or CSV" icon={Download} title="Export the audit trail" />
       <p className="shared-muted-copy">Every event of a range of days (UTC), oldest first, for an auditor or a log store. Leave both days empty for the whole trail. The export is recorded here, and a CSV cell that a spreadsheet could run as a formula is marked with an apostrophe.</p>
       <div className="rm-system-toolbar">
-        <label className="rm-system-inline">Format<Dropdown aria-label="Export format" onValueChange={(value) => setFormat(value === "csv" ? "csv" : "jsonl")} options={[{ label: "JSON lines", value: "jsonl" }, { label: "CSV", value: "csv" }]} value={format} /></label>
-        <label className="rm-system-inline">From<Input aria-label="From day" max={to || undefined} onChange={(event) => setFrom(event.target.value)} type="date" value={from} /></label>
-        <label className="rm-system-inline">To<Input aria-label="To day" min={from || undefined} onChange={(event) => setTo(event.target.value)} type="date" value={to} /></label>
-        <Button disabled={isExporting} onClick={() => void exportTrail()} type="button" variant="secondary">{isExporting ? <Loader className="spin" size={ICON_SIZE.md} /> : <Download size={ICON_SIZE.md} />} Download</Button>
+        <Field label="Format">{(control) => <Dropdown id={control.id} onValueChange={(value) => setFormat(value === "csv" ? "csv" : "jsonl")} options={[{ label: "JSON lines", value: "jsonl" }, { label: "CSV", value: "csv" }]} value={format} />}</Field>
+        <Field label="From"><Input max={to || undefined} onChange={(event) => setFrom(event.target.value)} type="date" value={from} /></Field>
+        <Field label="To"><Input min={from || undefined} onChange={(event) => setTo(event.target.value)} type="date" value={to} /></Field>
+        <Button busy={isExporting} onClick={() => void exportTrail()} variant="secondary"><Download size={ICON_SIZE.md} /> Download</Button>
       </div>
     </section> : null}
     <div className="rm-system-toolbar"><span className="shared-muted-copy">The 200 most recent events. Sign-in and other security events are under Logs › Security events only.</span><RefreshButton isLoading={isLoading} onClick={() => void reload()} /></div>
     {events?.length ? <Table>
       <thead><tr><th scope="col">When</th><th scope="col">Who</th><th scope="col">Action</th><th scope="col">Detail</th></tr></thead>
       <tbody>{events.map((event) => <tr key={event.id}><td>{formatTime(event.created_at)}</td><td>{event.actor ? event.actor.display_name : "System"}</td><th scope="row">{event.action.replace(/_/g, " ")}</th><td>{event.detail}</td></tr>)}</tbody>
-    </Table> : events ? <p className="shared-muted-copy">Nothing recorded yet.</p> : <LoadingState label="Loading the audit trail" />}
+    </Table> : events ? <EmptyState title="Nothing recorded yet" /> : <LoadingState label="Loading the audit trail" />}
   </>;
 }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { IconDatabase as Database, IconKey as Key, IconLoader2 as Loader } from "@tabler/icons-react";
+import { IconDatabase as Database, IconKey as Key } from "@tabler/icons-react";
 import { copySystemBackups, createSystemBackup, deleteSystemBackup, getSystemBackups, restoreSystemBackup } from "../../lib/sharedApi";
 import type { BackupsOverview } from "../../types";
 import { ActionMenu } from "../../components/ui/action-menu";
@@ -8,6 +8,8 @@ import { Button } from "../../components/ui/button";
 import { Table } from "../../components/ui/table";
 import { PanelHeading } from "../../components/ui/panel-heading";
 import { Dialog, DialogCancel } from "../../components/ui/dialog";
+import { EmptyState } from "../../components/ui/empty-state";
+import { Field } from "../../components/ui/field";
 import { Input } from "../../components/ui/input";
 import { LoadingState } from "../../components/ui/loading-state";
 import { showToast } from "../../components/ui/toast";
@@ -72,7 +74,7 @@ export function BackupsPanel({ accessToken, canChange }: { accessToken: string; 
       ["Free disk", overview?.disk_free_bytes != null ? formatBytes(overview.disk_free_bytes) : "unknown"],
       ["Last backup or restore", status?.finished_at ? `${formatTime(status.finished_at)} · ${status.message ?? ""}` : "none since the server started"],
     ]} />
-    {canChange ? <div><Button disabled={isBusy || running} onClick={() => void backUp()} type="button" variant="main">{running ? <Loader className="spin" size={ICON_SIZE.md} /> : <Database size={ICON_SIZE.md} />} Back up now</Button>{overview?.copy_directory && overview.backups.some((backup) => !backup.copy) ? <Button disabled={isBusy || running} onClick={() => void copyNow()} type="button" variant="secondary">Copy to the second location now</Button> : null}</div> : <p className="shared-muted-copy">Only system administrators make, restore and delete backups.</p>}
+    {canChange ? <div><Button busy={running} disabled={isBusy} onClick={() => void backUp()} variant="main"><Database size={ICON_SIZE.md} /> Back up now</Button>{overview?.copy_directory && overview.backups.some((backup) => !backup.copy) ? <Button disabled={isBusy || running} onClick={() => void copyNow()} variant="secondary">Copy to the second location now</Button> : null}</div> : <p className="shared-muted-copy">Only system administrators make, restore and delete backups.</p>}
     {overview?.backups.length ? <Table>
       <thead><tr><th scope="col">Backup</th><th scope="col">Made</th><th scope="col">Version</th><th scope="col">Files</th><th scope="col">Database</th><th scope="col">Key</th>{overview.copy_directory ? <th scope="col">Second copy</th> : null}{canChange ? <th scope="col"><span className="sr-only">Actions</span></th> : null}</tr></thead>
       <tbody>{overview.backups.map((backup) => <tr key={backup.name}>
@@ -86,10 +88,10 @@ export function BackupsPanel({ accessToken, canChange }: { accessToken: string; 
           { label: "Delete", onSelect: () => setDeleting(backup.name), destructive: true },
         ]} label={`Actions for ${backup.name}`} /></td> : null}
       </tr>)}</tbody>
-    </Table> : overview ? <p className="shared-muted-copy">No backups yet.</p> : <LoadingState label="Loading backups" />}
-    <Dialog description="The backup is copied into a new environment folder under workspace-data and checked: it must open. The running environment is not changed. Attach the new one from the environment menu when you want to use it." footer={<><DialogCancel onClick={() => setRestoring(null)} /><Button disabled={isBusy || !environment.trim()} onClick={() => void restore()} type="button" variant="main">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : null}Restore</Button></>} onClose={() => setRestoring(null)} open={Boolean(restoring)} title={`Restore ${restoring ?? "the backup"}`}>
-      <label className="rm-system-inline">New environment name<Input aria-label="New environment name" onChange={(event) => setEnvironment(event.target.value)} placeholder="restored-2026-10" value={environment} /></label>
+    </Table> : overview ? <EmptyState title="No backups yet" /> : <LoadingState label="Loading backups" />}
+    <Dialog description="The backup is copied into a new environment folder under workspace-data and checked: it must open. The running environment is not changed. Attach the new one from the environment menu when you want to use it." footer={<><DialogCancel onClick={() => setRestoring(null)} /><Button busy={isBusy} disabled={!environment.trim()} onClick={() => void restore()} variant="main">Restore</Button></>} onClose={() => setRestoring(null)} open={Boolean(restoring)} title={`Restore ${restoring ?? "the backup"}`}>
+      <Field label="New environment name"><Input onChange={(event) => setEnvironment(event.target.value)} placeholder="restored-2026-10" value={environment} /></Field>
     </Dialog>
-    <Dialog description="The backup is deleted from the backups folder. Other backups that share its stored files keep them." footer={<><DialogCancel onClick={() => setDeleting(null)} /><Button disabled={isBusy} onClick={() => void remove()} type="button" variant="main">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : null}Delete backup</Button></>} onClose={() => setDeleting(null)} open={Boolean(deleting)} title={`Delete ${deleting ?? "the backup"}?`} />
+    <Dialog description="The backup is deleted from the backups folder. Other backups that share its stored files keep them." footer={<><DialogCancel onClick={() => setDeleting(null)} /><Button busy={isBusy} onClick={() => void remove()} variant="danger">Delete backup</Button></>} onClose={() => setDeleting(null)} open={Boolean(deleting)} title={`Delete ${deleting ?? "the backup"}?`} />
   </section>;
 }

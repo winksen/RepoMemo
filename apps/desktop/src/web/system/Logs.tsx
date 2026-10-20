@@ -6,8 +6,11 @@ import type { SharedWorkspace, SystemLogFiles, SystemLogs } from "../../types";
 import { Button } from "../../components/ui/button";
 import { PanelHeading } from "../../components/ui/panel-heading";
 import { Dropdown } from "../../components/ui/dropdown";
+import { EmptyState } from "../../components/ui/empty-state";
+import { Field } from "../../components/ui/field";
 import { SearchField } from "../../components/ui/search-field";
 import { LoadingState } from "../../components/ui/loading-state";
+import { Switch } from "../../components/ui/switch";
 import { showToast } from "../../components/ui/toast";
 import { ICON_SIZE } from "../../components/ui/icon";
 import { apiMessage, formatBytes } from "../format";
@@ -70,15 +73,15 @@ export function LogsSection({ accessToken, canDownload, onOpenSettings, workspac
       <p className="shared-muted-copy">Console: {files.console_format === "json" ? "JSON lines" : `${files.console_format} text`} · Files: {files.writing_files ? `daily, kept ${files.retention_days ? `${files.retention_days} days` : "forever"}` : "off"}</p>
     </section> : null}
     <div className="rm-system-toolbar">
-      <label className="rm-system-inline">Source<Dropdown aria-label="Log source" onValueChange={setSource} options={sourceOptions} value={source} /></label>
-      <label className="rm-system-inline">Category<Dropdown aria-label="Log category" onValueChange={setCategory} options={categoryOptions} value={category} /></label>
-      <label className="rm-system-inline">Workspace<Dropdown aria-label="Workspace" onValueChange={setWorkspace} options={workspaceOptions} value={workspace} /></label>
-      <label className="rm-system-inline">Level<Dropdown aria-label="Lowest level shown" onValueChange={setLevel} options={[{ label: "Errors", value: "error" }, { label: "Warnings and up", value: "warn" }, { label: "Information and up", value: "info" }, { label: "Everything kept", value: "trace" }]} value={level} /></label>
+      <Field label="Source">{(control) => <Dropdown id={control.id} onValueChange={setSource} options={sourceOptions} value={source} />}</Field>
+      <Field label="Category">{(control) => <Dropdown id={control.id} onValueChange={setCategory} options={categoryOptions} value={category} />}</Field>
+      <Field label="Workspace">{(control) => <Dropdown id={control.id} onValueChange={setWorkspace} options={workspaceOptions} value={workspace} />}</Field>
+      <Field label="Level">{(control) => <Dropdown id={control.id} onValueChange={setLevel} options={[{ label: "Errors", value: "error" }, { label: "Warnings and up", value: "warn" }, { label: "Information and up", value: "info" }, { label: "Everything kept", value: "trace" }]} value={level} />}</Field>
     </div>
     <div className="rm-system-toolbar">
       <SearchField aria-label="Search logs" onValueChange={setQuery} placeholder="Search message, source or fields" value={query} />
       <div className="rm-system-actions">
-        {isLive ? <label className="shared-ai-provider-toggle"><input checked={follow} onChange={(event) => setFollow(event.target.checked)} type="checkbox" /> Follow</label> : canDownload ? <Button onClick={() => void download()} type="button" variant="secondary"><Download size={ICON_SIZE.sm} /> Download {source}</Button> : null}
+        {isLive ? <Switch checked={follow} label="Follow" onCheckedChange={setFollow} /> : canDownload ? <Button onClick={() => void download()} variant="secondary"><Download size={ICON_SIZE.sm} /> Download {source}</Button> : null}
       </div>
     </div>
     {logs && !logs.capturing ? <p className="shared-muted-copy">This server is not capturing logs in memory; read them from its console or log collector.</p> : null}
@@ -87,6 +90,6 @@ export function LogsSection({ accessToken, canDownload, onOpenSettings, workspac
       <span className="rm-system-log-level">{record.level}</span>
       <span className="rm-system-log-target">{record.target}</span>
       <span className="rm-system-log-message">{record.message}{record.fields ? <small>{record.fields}</small> : null}</span>
-    </li>)}</ol> : logs ? <p className="shared-muted-copy">No log events match.</p> : <LoadingState label="Loading logs" />}
+    </li>)}</ol> : logs ? <EmptyState title="No log events match" /> : <LoadingState label="Loading logs" />}
   </>;
 }

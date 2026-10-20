@@ -257,10 +257,9 @@ h3.rm-repo-caption { margin: 0 0 10px; }
 
 /* System administration */
 .rm-system-page { display: grid; gap: 20px; min-width: 0; }
-.rm-system-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+.rm-system-toolbar { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 10px 16px; }
 .rm-system-toolbar .rm-input { max-width: 320px; }
 .rm-system-actions { display: flex; gap: 8px; }
-.rm-system-inline { display: inline-flex; align-items: center; gap: 8px; color: var(--color-text-muted); font-size: 13px; }
 .rm-system-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 20px; min-width: 0; }
 .rm-system-facts { display: grid; gap: 0; margin: 0; }
 .rm-system-facts > div { display: grid; grid-template-columns: minmax(140px, 40%) 1fr; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--color-border); font-size: 13px; }

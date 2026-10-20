@@ -4,7 +4,6 @@ import {
   IconCrown as Crown,
   IconEye as Eye,
   IconKey as Key,
-  IconLoader2 as Loader,
   IconLockOpen as LockOpen,
   IconLogout as Logout,
   IconServerCog as ServerCog,
@@ -34,6 +33,8 @@ import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Table } from "../../components/ui/table";
 import { Dialog, DialogCancel } from "../../components/ui/dialog";
+import { EmptyState } from "../../components/ui/empty-state";
+import { Field } from "../../components/ui/field";
 import { Input } from "../../components/ui/input";
 import { SearchField } from "../../components/ui/search-field";
 import { LoadingState } from "../../components/ui/loading-state";
@@ -44,6 +45,9 @@ import { ICON_SIZE } from "../../components/ui/icon";
 import { apiMessage, formatTime } from "../format";
 import { useSystemData, count, RefreshButton } from "./shared";
 import { systemKeys } from "../../lib/queryClient";
+
+/** The confirmations that take something away: their button is the danger button. */
+const DESTRUCTIVE_KINDS = new Set(["revoke", "revoke-app", "sign-out", "deactivate", "anonymize"]);
 
 const ROLE_ICON = { owner: <Crown size={ICON_SIZE.sm} />, admin: <ShieldCheck size={ICON_SIZE.sm} />, member: <UserIcon size={ICON_SIZE.sm} />, viewer: <Eye size={ICON_SIZE.sm} /> };
 
@@ -140,7 +144,7 @@ export function UsersSection({ accessToken, session }: { accessToken: string; se
     "revoke-app": { title: `Remove ${pending.user.display_name} from the app administrators?`, description: pending.user.id === session.user.id ? "You will lose access to the System pages." : "They keep their own organization and workspace memberships.", action: "Remove role" },
     "sign-out": { title: `Sign ${pending.user.display_name} out everywhere?`, description: "Every device signed in to this account is signed out at once, and its personal access tokens are revoked, so scripts using them stop too. Their password is not changed.", action: "Sign out everywhere" },
     deactivate: { title: `Deactivate ${pending.user.display_name}?`, description: "They can no longer sign in or use a token. Their sessions end now, their API tokens are revoked and the invitations they sent are withdrawn. Everything they wrote stays, and so do their memberships. An owner must transfer what they own first. You can reactivate the account later.", action: "Deactivate account" },
-    anonymize: { title: `Anonymize ${pending.user.display_name}?`, description: <>Their email address, name, password, picture, memberships, notices and assistant conversations are removed for good, and the address and name are taken out of activity summaries. What they wrote stays, credited to <strong>Former member</strong>. Log files and earlier backups are not rewritten. <strong>This cannot be undone.</strong> Type <code>{pending.user.email}</code> to confirm.<Input aria-label="Confirm the email address" autoComplete="off" onChange={(event) => setConfirmText(event.target.value)} placeholder={pending.user.email} value={confirmText} /></>, action: "Anonymize account" },
+    anonymize: { title: `Anonymize ${pending.user.display_name}?`, description: <>Their email address, name, password, picture, memberships, notices and assistant conversations are removed for good, and the address and name are taken out of activity summaries. What they wrote stays, credited to <strong>Former member</strong>. Log files and earlier backups are not rewritten. <strong>This cannot be undone.</strong> Type <code>{pending.user.email}</code> to confirm.</>, action: "Anonymize account" },
     reactivate: { title: `Reactivate ${pending.user.display_name}?`, description: "They can sign in again with the password they had. Sessions, tokens and invitations that ended when the account was deactivated are not brought back.", action: "Reactivate account" },
     reset: { title: `Create a password reset link for ${pending.user.display_name}?`, description: "You get a one-time link to pass on to them. It works for 24 hours; a newer link replaces it. Their current password keeps working until the link is used; then every device of the account is signed out and sign-in lockouts are lifted.", action: "Create link" },
   }[pending.kind] : null;
@@ -172,8 +176,10 @@ export function UsersSection({ accessToken, session }: { accessToken: string; se
           ...(user.deactivated_at && !user.anonymized_at ? [{ label: "Anonymize account", icon: <UserOff size={ICON_SIZE.sm} />, onSelect: () => { setConfirmText(""); setPending({ kind: "anonymize", user }); }, destructive: true }] : []),
         ]} label={`Actions for ${user.display_name}`} /> : null}</td>
       </tr>)}</tbody>
-    </Table> : isLoading ? <LoadingState label="Loading users" /> : <p className="shared-muted-copy">Users are not available.</p>}
-    <Dialog description={dialog?.description} footer={<><DialogCancel onClick={() => setPending(null)} /><Button disabled={isBusy || (pending?.kind === "anonymize" && confirmText.trim().toLowerCase() !== pending.user.email.toLowerCase())} onClick={() => void confirm()} type="button" variant="main">{isBusy ? <Loader className="spin" size={ICON_SIZE.md} /> : null}{dialog?.action}</Button></>} onClose={() => setPending(null)} open={Boolean(pending)} title={dialog?.title ?? ""} />
+    </Table> : isLoading ? <LoadingState label="Loading users" /> : <EmptyState title="Users are not available" />}
+    <Dialog description={dialog?.description} footer={<><DialogCancel onClick={() => setPending(null)} /><Button busy={isBusy} disabled={pending?.kind === "anonymize" && confirmText.trim().toLowerCase() !== pending.user.email.toLowerCase()} onClick={() => void confirm()} variant={pending && DESTRUCTIVE_KINDS.has(pending.kind) ? "danger" : "main"}>{dialog?.action}</Button></>} onClose={() => setPending(null)} open={Boolean(pending)} title={dialog?.title ?? ""}>
+      {pending?.kind === "anonymize" ? <Field label="Confirm the email address"><Input autoComplete="off" onChange={(event) => setConfirmText(event.target.value)} placeholder={pending.user.email} value={confirmText} /></Field> : null}
+    </Dialog>
     {resetLink ? <SecretDialog description={`Send this link to ${resetLink.user.display_name} (${resetLink.user.email}) through a channel you trust. It lets whoever opens it choose the account's password, once, until ${formatTime(resetLink.expiresAt)}.`} onClose={() => setResetLink(null)} title="Password reset link" value={resetLink.url} /> : null}
   </>;
 }

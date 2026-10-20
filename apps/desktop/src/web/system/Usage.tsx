@@ -5,6 +5,7 @@ import type { SystemUsage } from "../../types";
 import { Table } from "../../components/ui/table";
 import { PanelHeading } from "../../components/ui/panel-heading";
 import { Dropdown } from "../../components/ui/dropdown";
+import { Field } from "../../components/ui/field";
 import { LoadingState } from "../../components/ui/loading-state";
 import { formatBytes, formatTime } from "../format";
 import { useSystemData, count, RefreshButton, BarStrip, CountTable } from "./shared";
@@ -16,7 +17,7 @@ export function UsageSection({ accessToken, onOpenWorkspace }: { accessToken: st
   const total = usage?.activity_by_day.reduce((sum, entry) => sum + entry.count, 0) ?? 0;
   return <>
     <div className="rm-system-toolbar">
-      <label className="rm-system-inline">Period<Dropdown aria-label="Usage period" onValueChange={(value) => setDays(Number(value))} options={[{ label: "Last 7 days", value: "7" }, { label: "Last 30 days", value: "30" }, { label: "Last 90 days", value: "90" }, { label: "Last 365 days", value: "365" }]} value={String(days)} /></label>
+      <Field label="Period">{(control) => <Dropdown id={control.id} onValueChange={(value) => setDays(Number(value))} options={[{ label: "Last 7 days", value: "7" }, { label: "Last 30 days", value: "30" }, { label: "Last 90 days", value: "90" }, { label: "Last 365 days", value: "365" }]} value={String(days)} />}</Field>
       <RefreshButton isLoading={isLoading} onClick={() => void reload()} />
     </div>
     {usage ? <>

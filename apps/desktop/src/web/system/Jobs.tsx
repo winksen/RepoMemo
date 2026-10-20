@@ -6,6 +6,8 @@ import { Button } from "../../components/ui/button";
 import { Table } from "../../components/ui/table";
 import { PanelHeading } from "../../components/ui/panel-heading";
 import { Dropdown } from "../../components/ui/dropdown";
+import { EmptyState } from "../../components/ui/empty-state";
+import { Field } from "../../components/ui/field";
 import { LoadingState } from "../../components/ui/loading-state";
 import { showToast } from "../../components/ui/toast";
 import { useLiveEventHub, useLiveEvents } from "../../lib/liveEvents";
@@ -53,7 +55,7 @@ export function JobsSection({ accessToken, canChange }: { accessToken: string; c
     <section className="shared-settings-group">
       <PanelHeading description={isLive ? "newest first · live" : "newest first · refreshes every 10 seconds"} icon={Activity} title="Jobs" />
       <div className="rm-system-toolbar">
-        <label className="rm-system-inline">Status<Dropdown aria-label="Job status" onValueChange={setStatus} options={[{ label: "All", value: "all" }, { label: "Running", value: "running" }, { label: "Failed", value: "failed" }, { label: "Completed", value: "completed" }, { label: "Cancelled", value: "cancelled" }]} value={status} /></label>
+        <Field label="Status">{(control) => <Dropdown id={control.id} onValueChange={setStatus} options={[{ label: "All", value: "all" }, { label: "Running", value: "running" }, { label: "Failed", value: "failed" }, { label: "Completed", value: "completed" }, { label: "Cancelled", value: "cancelled" }]} value={status} />}</Field>
         <RefreshButton isLoading={isLoading} onClick={() => void reload()} />
       </div>
       {jobs?.length ? <Table>
@@ -65,9 +67,9 @@ export function JobsSection({ accessToken, canChange }: { accessToken: string; c
           <td>{job.progress_total ? `${count(job.progress_current)} / ${count(job.progress_total)}` : count(job.progress_current)}</td>
           <td>{formatTime(job.created_at)}</td><td>{formatTime(job.updated_at)}</td>
           <td>{job.error_message ?? job.stage.replace(/_/g, " ")}</td>
-          <td>{job.status === "running" && !job.cancel_requested ? <Button onClick={() => void cancel(job)} type="button" variant="secondary">Stop</Button> : null}</td>
+          <td>{job.status === "running" && !job.cancel_requested ? <Button onClick={() => void cancel(job)} variant="secondary">Stop</Button> : null}</td>
         </tr>)}</tbody>
-      </Table> : jobs ? <p className="shared-muted-copy">No jobs match.</p> : <LoadingState label="Loading jobs" />}
+      </Table> : jobs ? <EmptyState title="No jobs match" /> : <LoadingState label="Loading jobs" />}
     </section>
   </>;
 }

@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.117 (2026-10-21)
+
+System toolbars and filters use the shared search field, dropdowns and date fields.
+
+### Changed
+- **Filters as fields:** the log source, category, workspace and level, the job status, the usage period, the audit export format and the two export days are `Field`s with a visible label above the control, in place of the inline `label` that wrapped each control. The two days are date inputs that bound each other (`From` stops at `To`, `To` starts at `From`). Toolbars line their controls up on the bottom edge. The user filter (`SearchField`) was already shared.
+- **Follow:** the logs' *Follow* toggle is the shared `Switch`.
+- **Dialogs:** the email to type before anonymizing an account and the name of the environment a backup is restored into are `Field`s inside their dialog (not inside the description text); destructive confirmations (*Remove role*, *Sign out everywhere*, *Deactivate account*, *Anonymize account*, *Delete backup*) are `danger` buttons with `busy`.
+- **States and buttons:** empty users, jobs, log events, backups and audit trail are the shared `EmptyState`; *Back up now*, *Restore* and *Download* use `busy`.
+- **CSS removed:** `.rm-system-inline`.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.116 (2026-10-21)
 
 System settings rows use the shared fields and switches.
