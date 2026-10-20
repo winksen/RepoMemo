@@ -581,7 +581,7 @@ input[type="file"] {
 .shared-comment-actions { display: flex; gap: 7px; margin-left: 39px; }
 .shared-comment-actions button { min-height: 30px; padding: 0 9px; font-size: 10px; }
 .shared-comment-list form { display: grid; gap: 8px; margin-left: 39px; }
-.shared-comment-list form > div { display: flex; gap: 7px; }
+.shared-comment-list form > div:not(.rm-field) { display: flex; gap: 7px; }
 .shared-comment-form { display: grid; justify-items: start; gap: 9px; padding-top: 2px; }
 .shared-comment-form textarea { width: 100%; min-height: 96px; }
 .shared-member-list { display: grid; gap: 8px; margin-top: 14px; }
@@ -604,10 +604,7 @@ input[type="file"] {
 .shared-record-panel { padding-top: 20px; border-top: 1px solid var(--color-border); }
 .shared-record-panel h2 { margin: 0 0 12px; font-size: 15px; }
 .shared-lifecycle-panel { display: grid; gap: 14px; }
-.shared-lifecycle-status { padding: 4px 8px; color: var(--color-text-muted); background: var(--color-surface-3); border-radius: 999px; font-size: 10px; font-weight: 700; text-transform: capitalize; }
-.shared-lifecycle-status.status-needs_review,
-.shared-lifecycle-status.status-outdated { color: var(--color-warning); background: var(--color-warning-soft); }
-.shared-lifecycle-status.status-superseded { color: var(--color-text-muted); background: var(--color-surface-3); }
+.shared-lifecycle-status { text-transform: capitalize; }
 .shared-lifecycle-summary { display: grid; align-items: start; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 18px; }
 .shared-lifecycle-summary > div { display: grid; gap: 3px; }
 .shared-lifecycle-summary strong { font-size: 13px; }
@@ -615,11 +612,10 @@ input[type="file"] {
 .shared-lifecycle-summary > p { grid-column: 1 / -1; max-width: 75ch; margin: 3px 0 0; color: var(--color-text-muted); font-size: 12px; line-height: 1.55; white-space: pre-wrap; }
 .shared-lifecycle-summary .shared-lifecycle-replacement { grid-column: 1 / -1; color: var(--color-text-subtle); }
 .shared-lifecycle-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 14px; background: var(--color-surface-2); border-radius: 10px; }
-.shared-lifecycle-form label { display: grid; gap: 6px; color: var(--color-text-muted); font-size: 11px; font-weight: 700; }
 .shared-lifecycle-form .shared-lifecycle-note,
-.shared-lifecycle-form > div { grid-column: 1 / -1; }
+.shared-lifecycle-form > .shared-lifecycle-actions { grid-column: 1 / -1; }
 .shared-lifecycle-form textarea { min-height: 82px; }
-.shared-lifecycle-form > div { display: flex; gap: 8px; }
+.shared-lifecycle-form > .shared-lifecycle-actions { display: flex; gap: 8px; }
 .shared-lifecycle-history { display: grid; gap: 8px; padding-top: 14px; border-top: 1px solid var(--color-border); }
 .shared-lifecycle-history > strong { font-size: 12px; }
 .shared-lifecycle-history > p { display: grid; gap: 3px; margin: 0; color: var(--color-text-muted); font-size: 11px; line-height: 1.45; }
@@ -744,7 +740,6 @@ input[type="file"] {
 .rm-dropdown-item[data-disabled] { cursor: not-allowed; opacity: 0.5; }
 /* A dropdown takes the width of its content (160 px at least); a form stretches it to the field (V0.2.59). */
 .shared-dialog-field .rm-dropdown-trigger,
-.shared-lifecycle-form .rm-dropdown-trigger,
 .shared-record-edit-form .rm-dropdown-trigger,
 .shared-memory-form .rm-dropdown-trigger,
 .shared-task-checklist-select .rm-dropdown-trigger,

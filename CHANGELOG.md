@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.112 (2026-10-21)
+
+The artifact page's forms use the shared pieces.
+
+### Changed
+- **Fields:** the evidence title, the lifecycle form (status, review owner, replacement evidence in the searchable picker, review note), editing a comment and writing a new one (the mention-aware text area included) are `Field`s with visible labels; the dropdowns and the picker are tied to their labels by the field's id.
+- **Lifecycle status:** the status shown in the lifecycle panel is the shared `Badge` (a warning dot for evidence that needs review or is outdated), instead of its own pill style.
+- **States:** "Loading chunks…" is the shared `LoadingState`; a file with no text preview, no discussion and an empty chunk list show the shared `EmptyState`.
+- **Buttons:** *Save evidence*, *Save lifecycle*, *Save comment*, *Add comment*, *New version* and *Re-index* use `busy`; the redundant `type="button"` is dropped.
+- **CSS:** the label rules of the lifecycle form and the pill styles of the status are removed; the lifecycle form and the comment form now place their buttons by class (`.shared-lifecycle-actions`) rather than by "any div", which would have caught the fields.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.111 (2026-10-21)
 
 The memory section and the memory card page use the shared fields, picker and states.
