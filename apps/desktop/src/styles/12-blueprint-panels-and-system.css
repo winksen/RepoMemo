@@ -300,6 +300,7 @@ tr.rm-system-row-inactive .rm-system-person img, tr.rm-system-row-inactive .rm-s
 .rm-system-setting-control { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
 .rm-system-number { display: inline-flex; align-items: center; gap: 6px; }
 .rm-system-number .rm-input { width: 110px; }
+.rm-setting-problem { flex: 1 0 100%; text-align: right; }
 .rm-system-log { display: grid; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--color-border); font-size: 12px; }
 .rm-system-log li { display: grid; grid-template-columns: 84px 56px minmax(120px, 200px) minmax(0, 1fr); gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--color-border); }
 .rm-system-log time, .rm-system-log-target { color: var(--color-text-muted); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }

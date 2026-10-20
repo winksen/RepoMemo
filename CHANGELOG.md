@@ -2,6 +2,19 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.116 (2026-10-21)
+
+System settings rows use the shared fields and switches.
+
+### Changed
+- **One control for every row:** the control of a setting (a `Switch` for on and off, a `Dropdown` for a choice, a number `Input` with its unit for a whole number) is the new `SettingControl` (`web/system/SettingControl.tsx`), used by System › Settings and by the setup wizard's settings steps, which had two copies of it.
+- **Number rows:** a whole number outside the range the server accepts is marked `aria-invalid` with a one-line message under the field ("Between 1 and 365 days."), as decision 19 describes, and *Save changes* (or the wizard's *Save and continue*) stays off until every changed number is valid. The row's description is tied to the control with `aria-describedby`.
+- **Read-only state:** for an application administrator who may read but not change, every control of the row is disabled as before; the shared control carries that in one place.
+- **Buttons:** *Save changes* uses `busy`; *Detach environment* is a `danger` button with `busy`; the redundant `type="button"` is dropped.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.115 (2026-10-21)
 
 Mail settings use the shared fields and states.
