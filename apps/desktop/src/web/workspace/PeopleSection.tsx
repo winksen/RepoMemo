@@ -3,11 +3,14 @@ import { IconSparkles as Sparkles, IconTimeline as Timeline, IconUsers as Users 
 import { SharedApiError, transferSharedWorkspaceOwnership, removeSharedWorkspaceMember, upsertSharedWorkspaceMember } from "../../lib/sharedApi";
 import { type WorkspaceMember, type WorkspaceRole } from "../../types";
 import { UserAvatar } from "../../components/UserAvatar";
+import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { PanelHeading } from "../../components/ui/panel-heading";
 import { SegmentedControl } from "../../components/ui/segmented-control";
 import { useConfirm } from "../../components/ui/confirm-dialog";
 import { Dropdown } from "../../components/ui/dropdown";
+import { EmptyState } from "../../components/ui/empty-state";
+import { Field } from "../../components/ui/field";
 import { Input } from "../../components/ui/input";
 import { showToast } from "../../components/ui/toast";
 import { InviteMembers } from "../../components/InviteMembers";
@@ -84,14 +87,14 @@ export function PeopleSection({ page }: { page: WorkspacePage }) {
                 {members.map((member) => <article className={`shared-member-card role-${member.role}`} key={member.user.id}>
                   <UserAvatar className="shared-member-avatar" name={member.user.display_name} size={40} userId={member.user.id} />
                   <div><strong>{member.user.display_name}</strong><span>{member.user.email ?? "No email"}</span></div>
-                  <span className="shared-member-role">{member.role}</span>
-                  {workspace.role === "owner" && member.role !== "owner" && member.user.id !== session.user.id ? <Button disabled={isSubmitting} onClick={() => void makeOwner(member)} type="button" variant="secondary">Make owner</Button> : null}
-                  {canManageMembers && member.role !== "owner" ? <Button className="shared-member-remove" disabled={isSubmitting} onClick={() => void removeMember(member.user.id)} type="button" variant="secondary">Remove</Button> : null}
+                  <Badge>{member.role}</Badge>
+                  {workspace.role === "owner" && member.role !== "owner" && member.user.id !== session.user.id ? <Button disabled={isSubmitting} onClick={() => void makeOwner(member)} variant="secondary">Make owner</Button> : null}
+                  {canManageMembers && member.role !== "owner" ? <Button className="shared-member-remove" disabled={isSubmitting} onClick={() => void removeMember(member.user.id)} variant="secondary">Remove</Button> : null}
                 </article>)}
               </div>
               {canManageMembers ? <section className="shared-settings-group">
                 <p className="shared-muted-copy">Add a registered RepoMemo user or update their role. Administrators cannot create, edit, or remove other administrators; owners retain the final authority.</p>
-                <form className="shared-member-form" onSubmit={saveMember}><Input aria-label="Member email" onChange={(event) => setMemberEmail(event.target.value)} placeholder="person@example.com" required type="email" value={memberEmail} /><Dropdown aria-label="Member role" onValueChange={(value) => setMemberRole(value as WorkspaceRole)} options={[{ label: "Viewer", value: "viewer" }, { label: "Member", value: "member" }, ...(canAssignAdmin ? [{ label: "Admin", value: "admin" }] : [])]} value={memberRole} /><Button disabled={isSubmitting} type="submit" variant="secondary">Add / update</Button></form>
+                <form className="shared-member-form" onSubmit={saveMember}><Field label="Member email" required><Input onChange={(event) => setMemberEmail(event.target.value)} placeholder="person@example.com" type="email" value={memberEmail} /></Field><Field label="Member role">{(control) => <Dropdown id={control.id} onValueChange={(value) => setMemberRole(value as WorkspaceRole)} options={[{ label: "Viewer", value: "viewer" }, { label: "Member", value: "member" }, ...(canAssignAdmin ? [{ label: "Admin", value: "admin" }] : [])]} value={memberRole} />}</Field><Button busy={isSubmitting} type="submit" variant="secondary">Add / update</Button></form>
               </section> : null}
               {canManageMembers ? <InviteMembers accessToken={accessToken} initialEmail={inviteEmail} key={`invite-${workspace.workspace.id}`} roleOptions={[{ label: "Member", value: "member" }, { label: "Viewer", value: "viewer" }, ...(canAssignAdmin ? [{ label: "Admin", value: "admin" }] : [])]} targetId={workspace.workspace.id} targetLabel="workspace" targetType="workspace" /> : null}
             </div>
@@ -99,7 +102,7 @@ export function PeopleSection({ page }: { page: WorkspacePage }) {
               <ContributionCalendar items={activityCalendar?.activity_by_day ?? []} title="Workspace activity" total={activityCalendar?.total_activity_count} />
               <PanelHeading description={visibleActivity.length} icon={Timeline} title="Activity history" />
               <SegmentedControl aria-label="Activity type" className="shared-activity-filter" onValueChange={setActivityKind} options={[{ count: userActivity.length, icon: <Users size={ICON_SIZE.sm} />, label: "User activity", value: "user" }, { count: aiActivity.length, icon: <Sparkles size={ICON_SIZE.sm} />, label: "AI activity", value: "ai" }]} value={activityKind} />
-              {visibleActivity.length ? <div className="shared-activity-list">{visibleActivity.map((event) => <article key={event.id}><div><strong>{event.summary}</strong><span>{activityKind === "ai" ? `Requested by ${event.actor?.display_name ?? "Unknown"}` : (event.actor?.display_name ?? "System")} · {event.action.replace(/_/g, " ")}</span></div><time dateTime={event.created_at}>{formatTime(event.created_at)}</time></article>)}</div> : <div className="shared-empty-state">{activityKind === "ai" ? <Sparkles size={25} /> : <Timeline size={25} />}<strong>{activityKind === "ai" ? "No AI activity yet" : "No recorded activity yet"}</strong><span>{activityKind === "ai" ? "Assistant questions and generated answers will appear here." : "New workspace changes will appear here."}</span></div>}
+              {visibleActivity.length ? <div className="shared-activity-list">{visibleActivity.map((event) => <article key={event.id}><div><strong>{event.summary}</strong><span>{activityKind === "ai" ? `Requested by ${event.actor?.display_name ?? "Unknown"}` : (event.actor?.display_name ?? "System")} · {event.action.replace(/_/g, " ")}</span></div><time dateTime={event.created_at}>{formatTime(event.created_at)}</time></article>)}</div> : <EmptyState description={activityKind === "ai" ? "Assistant questions and generated answers will appear here." : "New workspace changes will appear here."} icon={activityKind === "ai" ? <Sparkles size={25} /> : <Timeline size={25} />} title={activityKind === "ai" ? "No AI activity yet" : "No recorded activity yet"} />}
             </div>
 </>
   );

@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.107 (2026-10-21)
+
+The people section uses the shared fields, badges and segmented control.
+
+### Changed
+- **Fields:** the form that adds or updates a member (email and role) uses `Field`, with visible labels instead of hidden ones. The invitation form below it already uses them (V0.2.105).
+- **Badge:** a member's role in the team list is the shared `Badge`, in place of the `.shared-member-role` pill.
+- **States and buttons:** an empty activity history is the shared `EmptyState`; *Add / update* uses `busy`; the redundant `type="button"` of *Make owner* and *Remove* is dropped.
+- **Segmented control:** *User activity* and *AI activity* already use `SegmentedControl` (V0.2.82); nothing changes there.
+- **CSS removed:** `.shared-member-role`, the width rules of `.shared-member-form` inputs and its dropdown width rule. The form's columns (email, 92 px role, button) are unchanged and now align on the bottom of the fields.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.106 (2026-10-21)
 
 Workspace settings use the shared fields and switches.
