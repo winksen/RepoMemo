@@ -2186,3 +2186,99 @@ async fn an_archive_that_claims_far_more_than_it_is_made_of_is_refused_before_it
     assert!(report["problems"][0].as_str().unwrap().contains("compression bomb"), "{report}");
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+/// E6: the activity feed (who did what, with the summary) is for owners and administrators; a viewer's
+/// stream carries a `changed` notice with the kind of change instead.
+#[tokio::test]
+async fn a_viewers_stream_gets_a_changed_notice_where_an_owner_gets_the_activity() {
+    use axum::body::Body;
+    use tokio_stream::StreamExt;
+    let data_dir = temp_data_dir("event-activity-roles");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let (owner, _) = register_account(&app, "feed-owner@example.com").await;
+    let (viewer, _) = register_account(&app, "feed-viewer@example.com").await;
+    let workspace_id = create_workspace(&app, &owner).await;
+    join(
+        &app,
+        &owner,
+        "workspaces",
+        &workspace_id,
+        "feed-viewer@example.com",
+        "viewer",
+    )
+    .await;
+
+    let open = |who: &str| {
+        let app = app.clone();
+        let request = auth_request("GET", &format!("/v1/workspaces/{workspace_id}/events"), who);
+        async move {
+            let response = app.oneshot(request).await.unwrap();
+            assert_eq!(response.status(), 200);
+            let body: Body = response.into_body();
+            body.into_data_stream()
+        }
+    };
+    let mut owner_stream = open(&owner).await;
+    let mut viewer_stream = open(&viewer).await;
+
+    // The owner creates a task; the workspace records who did it.
+    let created = app
+        .clone()
+        .oneshot(json_request(
+            "POST",
+            &format!("/v1/workspaces/{workspace_id}/tasks"),
+            &owner,
+            json!({"title": "Secret plans", "description": "", "status": "open", "priority": "medium"}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(created.status(), 201);
+
+    // The first message of a stream that is not a job is the activity (or the notice).
+    async fn next_text(
+        stream: &mut (impl tokio_stream::Stream<Item = Result<axum::body::Bytes, axum::Error>> + Unpin),
+    ) -> String {
+        let mut text = String::new();
+        let deadline = std::time::Duration::from_secs(10);
+        while !text.contains("\n\n") {
+            let chunk = tokio::time::timeout(deadline, stream.next())
+                .await
+                .expect("the stream should deliver the event")
+                .expect("the stream stays open")
+                .expect("a readable chunk");
+            text.push_str(&String::from_utf8_lossy(&chunk));
+        }
+        text
+    }
+    let owner_message = next_text(&mut owner_stream).await;
+    assert!(owner_message.contains("event: activity"), "{owner_message}");
+    assert!(
+        owner_message.contains("feed-owner@example.com") || owner_message.contains("Person"),
+        "{owner_message}"
+    );
+    assert!(
+        owner_message.contains("Secret plans") || owner_message.contains("task_created"),
+        "{owner_message}"
+    );
+
+    let viewer_message = next_text(&mut viewer_stream).await;
+    assert!(viewer_message.contains("event: changed"), "{viewer_message}");
+    assert!(
+        viewer_message.contains("task_created"),
+        "the kind of change is named: {viewer_message}"
+    );
+    for private in [
+        "feed-owner@example.com",
+        "Person",
+        "Secret plans",
+        "actor",
+        "summary",
+        "created_at",
+    ] {
+        assert!(
+            !viewer_message.contains(private),
+            "a viewer's stream must not carry {private}: {viewer_message}"
+        );
+    }
+    let _ = std::fs::remove_dir_all(data_dir);
+}

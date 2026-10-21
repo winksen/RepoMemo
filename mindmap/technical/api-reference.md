@@ -16,7 +16,7 @@
 | **Paging** | `?limit=&offset=` (at most 500) on `artifacts/query` and the artifact list; the total is in `X-Total-Count` |
 | **Body size** | The anonymous endpoints (sign-in, registration, refresh, sign-out, reset, verification, invitations, setup) take at most 64 KiB, the webhook receivers 1 MiB (`413` above), everything else the upload limit (`REPOMEMO_MAX_UPLOAD_MB`); an archive import is streamed and bounded by `REPOMEMO_MAX_IMPORT_MB` and a 100 to 1 expansion limit |
 | **Limits** | Every route but the event streams answers within `REPOMEMO_REQUEST_TIMEOUT_SECONDS` (408). Searches, figures, the map, health and the file query are rate limited per person (`REPOMEMO_HEAVY_REQUESTS_PER_MINUTE`) |
-| **Live events** | `GET /v1/workspaces/{id}/events` and `GET /v1/system/events`: server-sent events (`job`, `activity`, `resync`); a person may hold `REPOMEMO_MAX_EVENT_STREAMS_PER_USER` open |
+| **Live events** | `GET /v1/workspaces/{id}/events` and `GET /v1/system/events`: server-sent events (`job`, `activity`, `resync`; a reader who is not an owner or administrator gets `changed` where an owner gets `activity`, with the kind of change and nothing about who made it); a person may hold `REPOMEMO_MAX_EVENT_STREAMS_PER_USER` open |
 
 ## Health and setup
 

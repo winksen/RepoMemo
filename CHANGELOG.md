@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.141 (2026-10-21)
+
+The live stream no longer hands every reader the activity feed that only owners and administrators may read.
+
+### Security
+- **Activity events by role (E6):** `GET /v1/workspaces/{id}/events` forwarded every activity row (who did what, the summary, the actor) to anyone who could read the workspace, while `GET …/activity` asks for an administrator. The stream now matches: owners and administrators (a system administrator acts as one) get the `activity` event as before; every other reader gets `event: changed` with `{"type":"changed","action","subject_type","subject_id"}`. The notice carries no actor, summary or time, and the id only for something a reader can open (a file, memory card, task, folder, repository, connector or saved search); the ids of members, invitations, providers and the workspace itself stay out. A viewer's stream carries no actor, summary or address.
+- **A demotion applies to a stream already open:** the role is read when the stream opens and again every 30 seconds with the other access checks, so a person made a viewer stops receiving the feed without reconnecting.
+
+### Changed
+- **The web client** turns a `changed` notice into the activity event its pages already listen to (`fromWire` in `liveEvents.ts`), so the file list, tasks, memory cards and repositories still refresh live for a viewer. A change a viewer makes themselves also refreshes their page, because the notice has no actor to compare with.
+- **Tests (written, not run):** who sees the feed, what a notice carries (and that it does not carry the address, the summary or the ids of a member), how an event becomes the message for each kind of reader, a viewer's stream against an owner's when a task is created, and the client's reading of a notice.
+- **Checks run on this release:** `cargo check` of the server with its tests compiles, `rustfmt` is clean for the files changed and `clippy` reports nothing new; `npm run typecheck`, `docs:check`, `version:check` and `container:check` pass. No server was started.
+
+### Upgrading
+- Nothing to do for people using the web app. A script that read the `activity` events as a member or viewer receives `changed` events now; use an owner or administrator account for the feed.
+
 ## V0.2.140 (2026-10-21)
 
 A personal access token with read and write access can no longer grant access, delete, repoint, link or export: those routes need a session, or a token that was given the new `admin` scope on purpose.

@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.2.140` (2026-10-21). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, and the retired local workspace are described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.2.141` (2026-10-21). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, and the retired local workspace are described briefly in [§12](#12-desktop-app).
 
 ---
 
@@ -267,7 +267,7 @@ A workspace is opened at `/workspaces/:id/<section>` and has **twelve sections**
 | **Review** | One list of what waits for a person: files marked *needs review*, memory cards whose evidence changed and open health findings, each opening where it is resolved (§7b) | Everyone (resolving: writers; findings: owner and admin) |
 | **Memory** | Team memory cards: search and create. A card shows **Needs review** when what it cites changed, disappeared or was retired; its page lists why, lets writers edit the evidence it cites, and confirm it as it is | Everyone |
 | **Tasks** | Team action board | Everyone |
-| **People** | Members, invitations, a summary of *your* capabilities, and the activity feed (user or AI activity) with a 365-day calendar | Owner and admin |
+| **People** | Members, invitations, a summary of *your* capabilities, and the activity feed (user or AI activity) with a 365-day calendar; the live updates carry that feed to owners and administrators only (everyone else is told that something changed, not who changed it) | Owner and admin |
 | **Settings** | Members, AI providers and who may use AI, repository links, **export as an archive**, rename or delete | Owner and admin (rename and delete are owner only) |
 
 ### Workspace pulse (Overview)
@@ -552,7 +552,7 @@ The local workspace and a server keep **separate data**.
 
 ---
 
-## 13. Known functional gaps (at V0.2.140)
+## 13. Known functional gaps (at V0.2.141)
 
 These are observed in the code and are useful for prioritizing. The roadmap item that addresses each one is in brackets.
 

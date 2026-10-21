@@ -36,6 +36,21 @@ describe("live events", () => {
     unmount();
   });
 
+  it("turns the changed notice a non-administrator gets into the activity event listeners know", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(streamOf([
+      `event: changed\ndata: ${JSON.stringify({ type: "changed", action: "task_created", subject_type: "task", subject_id: "t1" })}\n\n`,
+    ]));
+    const { result, unmount } = renderHook(() => useLiveEventHub("/v1/workspaces/w1/events", "token"));
+    const received: LiveEvent[] = [];
+    result.current.subscribe((next) => received.push(next));
+    await waitFor(() => expect(received.length).toBe(1));
+    expect(received[0]).toEqual({
+      type: "activity",
+      event: { id: "", workspace_id: "", actor: null, action: "task_created", subject_type: "task", subject_id: "t1", summary: "", created_at: "" },
+    });
+    unmount();
+  });
+
   it("opens nothing without a path", () => {
     const fetchMock = vi.spyOn(globalThis, "fetch");
     const { result } = renderHook(() => useLiveEventHub(null, "token"));

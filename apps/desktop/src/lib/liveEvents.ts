@@ -111,6 +111,29 @@ export function useLiveRefresh(reload: () => void, actions: RegExp, delayMs = 15
   });
 }
 
+/**
+ * What the server sends becomes a `LiveEvent`. A reader who may not see the activity feed gets a `changed`
+ * notice (the action, the kind of subject and, for a file or card they can open, its id); listeners treat it
+ * as the activity event it stands for, with no actor, summary or time.
+ */
+export function fromWire(message: { type?: unknown } & Record<string, unknown>): LiveEvent | null {
+  if (!message || typeof message.type !== "string") return null;
+  if (message.type !== "changed") return message as unknown as LiveEvent;
+  return {
+    type: "activity",
+    event: {
+      id: "",
+      workspace_id: "",
+      actor: null,
+      action: typeof message.action === "string" ? message.action : "",
+      subject_type: typeof message.subject_type === "string" ? message.subject_type : "",
+      subject_id: typeof message.subject_id === "string" ? message.subject_id : null,
+      summary: "",
+      created_at: "",
+    },
+  };
+}
+
 /** Reads `event:`/`data:` blocks until the stream ends. Comments (the
  *  server's keep-alives) and blocks without JSON data are ignored. */
 async function readEventStream(body: ReadableStream<Uint8Array>, dispatch: Listener, signal: AbortSignal) {
@@ -133,8 +156,8 @@ async function readEventStream(body: ReadableStream<Uint8Array>, dispatch: Liste
         .join("\n");
       if (data) {
         try {
-          const event = JSON.parse(data) as LiveEvent;
-          if (event && typeof event.type === "string") dispatch(event);
+          const event = fromWire(JSON.parse(data) as { type?: unknown } & Record<string, unknown>);
+          if (event) dispatch(event);
         } catch { /* not JSON; skip it */ }
       }
       boundary = buffer.indexOf("\n\n");
