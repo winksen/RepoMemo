@@ -36,7 +36,8 @@ async fn refresh_tokens_rotate_and_detect_reuse() {
     let second_refresh = second["refresh_token"].as_str().unwrap().to_owned();
     assert_ne!(first_refresh, second_refresh);
 
-    // Replaying the rotated token fails and revokes the whole family.
+    // Replaying the rotated token a moment later (the other tab of a browser) is refused with a
+    // conflict, and the session it was rotated into goes on.
     let response = app
         .clone()
         .oneshot(post(
@@ -45,7 +46,7 @@ async fn refresh_tokens_rotate_and_detect_reuse() {
         ))
         .await
         .unwrap();
-    assert_eq!(response.status(), 401);
+    assert_eq!(response.status(), 409);
     let response = app
         .clone()
         .oneshot(post(
@@ -54,7 +55,7 @@ async fn refresh_tokens_rotate_and_detect_reuse() {
         ))
         .await
         .unwrap();
-    assert_eq!(response.status(), 401);
+    assert_eq!(response.status(), 200, "two tabs at once end no session");
     let _ = std::fs::remove_dir_all(data_dir);
 }
 
@@ -202,14 +203,17 @@ async fn the_web_app_keeps_its_refresh_token_in_a_cookie() {
     let second = token_of(&set_cookie(&refreshed));
     assert!(!second.is_empty() && second != first);
     assert!(response_json(refreshed).await["access_token"].as_str().is_some());
-    assert_eq!(
-        app.clone()
-            .oneshot(web("/v1/auth/refresh", Some(&first), json!({})))
-            .await
-            .unwrap()
-            .status(),
-        401,
-        "a used token is refused"
+    // The second tab presents the cookie the first one just replaced: refused, and its cookie is not cleared
+    // (that would delete the new one the first tab received), so it renews again with the cookie it now holds.
+    let crossed = app
+        .clone()
+        .oneshot(web("/v1/auth/refresh", Some(&first), json!({})))
+        .await
+        .unwrap();
+    assert_eq!(crossed.status(), 409, "a token used a moment ago is refused");
+    assert!(
+        crossed.headers().get("set-cookie").is_none(),
+        "and the cookie is left alone"
     );
 
     // Other clients still get the token in the body and send it there.
@@ -1333,5 +1337,127 @@ async fn event_streams_end_when_the_token_that_opened_them_is_revoked() {
     )
     .await;
     assert!(ended.is_ok(), "the stream should close once its token is revoked");
+    let _ = std::fs::remove_dir_all(data_dir);
+}
+
+/// S5-4: over HTTPS the refresh cookie carries the `__Secure-` prefix, a cookie an earlier release set is
+/// read once and replaced, and signing out clears both.
+#[tokio::test]
+async fn over_https_the_refresh_cookie_has_the_secure_prefix_and_the_old_one_is_replaced() {
+    let data_dir = temp_data_dir("secure-cookie");
+    let mut config = ServerConfig::for_test(data_dir.clone());
+    config.public_url = Some("https://repomemo.example.test".to_owned());
+    let app = router(config).await.unwrap();
+    let web = |uri: &str, cookie: Option<&str>, body: Value| {
+        let mut request = Request::builder()
+            .method("POST")
+            .uri(uri)
+            .header("content-type", "application/json")
+            .header("x-repomemo-client", "web");
+        if let Some(cookie) = cookie {
+            request = request.header("cookie", cookie);
+        }
+        request.body(Body::from(body.to_string())).unwrap()
+    };
+    let cookies = |response: &axum::response::Response| {
+        response
+            .headers()
+            .get_all("set-cookie")
+            .iter()
+            .map(|value| value.to_str().unwrap().to_owned())
+            .collect::<Vec<_>>()
+    };
+    let registered = app
+        .clone()
+        .oneshot(web(
+            "/v1/auth/register",
+            None,
+            json!({"email": "secure-cookie@example.com", "display_name": "Secure", "password": "not-a-real-password"}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(registered.status(), 201);
+    let set = cookies(&registered);
+    assert!(
+        set[0].starts_with("__Secure-repomemo_refresh=") && set[0].contains("; Secure"),
+        "{set:?}"
+    );
+    assert!(
+        set.iter()
+            .any(|cookie| cookie.starts_with("repomemo_refresh=;") && cookie.contains("Max-Age=0")),
+        "the plain name an earlier release set is cleared: {set:?}"
+    );
+    let first = set[0]
+        .split(';')
+        .next()
+        .unwrap()
+        .trim_start_matches("__Secure-repomemo_refresh=")
+        .to_owned();
+
+    // The new name renews the session and rotates.
+    let refreshed = app
+        .clone()
+        .oneshot(web(
+            "/v1/auth/refresh",
+            Some(&format!("__Secure-repomemo_refresh={first}")),
+            json!({}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(refreshed.status(), 200);
+    let second = cookies(&refreshed)[0]
+        .split(';')
+        .next()
+        .unwrap()
+        .trim_start_matches("__Secure-repomemo_refresh=")
+        .to_owned();
+    assert!(!second.is_empty() && second != first);
+
+    // A browser that still holds the cookie an earlier release set is read once and gets the new name.
+    let legacy = app
+        .clone()
+        .oneshot(web(
+            "/v1/auth/refresh",
+            Some(&format!("repomemo_refresh={second}")),
+            json!({}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(legacy.status(), 200, "the old name is still read");
+    let set = cookies(&legacy);
+    assert!(set[0].starts_with("__Secure-repomemo_refresh="), "{set:?}");
+    assert!(
+        set.iter().any(|cookie| cookie.starts_with("repomemo_refresh=;")),
+        "{set:?}"
+    );
+    let third = set[0]
+        .split(';')
+        .next()
+        .unwrap()
+        .trim_start_matches("__Secure-repomemo_refresh=")
+        .to_owned();
+
+    // Signing out clears both names.
+    let out = app
+        .clone()
+        .oneshot(web(
+            "/v1/auth/logout",
+            Some(&format!("__Secure-repomemo_refresh={third}")),
+            json!({}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(out.status(), 204);
+    let set = cookies(&out);
+    assert!(
+        set.iter()
+            .any(|cookie| cookie.starts_with("__Secure-repomemo_refresh=;") && cookie.contains("Max-Age=0")),
+        "{set:?}"
+    );
+    assert!(
+        set.iter()
+            .any(|cookie| cookie.starts_with("repomemo_refresh=;") && cookie.contains("Max-Age=0")),
+        "{set:?}"
+    );
     let _ = std::fs::remove_dir_all(data_dir);
 }

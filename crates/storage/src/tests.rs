@@ -553,7 +553,10 @@ async fn ending_sessions_bumps_the_version_and_revokes_refresh_tokens() {
     let refresh = storage.create_refresh_token(&user.id, 30).await.unwrap();
     assert_eq!(storage.end_user_sessions(&user.id).await.unwrap(), 1);
     assert_eq!(storage.user_session_version(&user.id).await.unwrap(), Some(1));
-    assert_eq!(storage.consume_refresh_token(&refresh).await.unwrap(), None);
+    assert_eq!(
+        storage.consume_refresh_token(&refresh).await.unwrap(),
+        crate::RefreshOutcome::Refused
+    );
     assert_eq!(storage.user_session_version("missing").await.unwrap(), None);
     assert_eq!(storage.count_users().await.unwrap(), 1);
 
@@ -1416,5 +1419,60 @@ async fn an_environment_made_by_v0_2_0_upgrades_in_place_and_keeps_its_data() {
         .unwrap();
     assert_eq!(reapplied, applied);
     drop(again);
+    let _ = std::fs::remove_dir_all(data_dir);
+}
+
+/// S5-4: two tabs that refresh at the same moment present the same cookie. The second must not end the
+/// account's sessions; an older rotated token (real reuse) still does.
+#[tokio::test]
+async fn a_token_rotated_a_moment_ago_is_refused_without_ending_the_sessions_but_older_reuse_ends_them() {
+    use crate::RefreshOutcome::{JustRotated, Refused, Rotated};
+    let (storage, data_dir) = temp_storage("rotation-grace").await;
+    let user = storage.create_user("grace@example.com", "Grace", "hash").await.unwrap();
+    let first = storage.create_refresh_token(&user.id, 30).await.unwrap();
+    assert_eq!(
+        storage.consume_refresh_token(&first).await.unwrap(),
+        Rotated(user.id.clone())
+    );
+    // The cookie the first tab received.
+    let second = storage.create_refresh_token(&user.id, 30).await.unwrap();
+
+    // The second tab presents the old cookie a moment later: refused, nothing revoked.
+    assert_eq!(storage.consume_refresh_token(&first).await.unwrap(), JustRotated);
+    assert_eq!(
+        storage.consume_refresh_token(&first).await.unwrap(),
+        JustRotated,
+        "and again"
+    );
+    assert_eq!(
+        storage.refresh_token_user(&second).await.unwrap().as_deref(),
+        Some(user.id.as_str()),
+        "the new token still works"
+    );
+
+    // Presented long after its rotation, the same token is theft: every session ends.
+    sqlx::query("UPDATE refresh_tokens SET replaced_at = '2000-01-01T00:00:00+00:00' WHERE token_hash = ?1")
+        .bind(crate::hash_refresh_token(&first))
+        .execute(&storage.pool)
+        .await
+        .unwrap();
+    assert_eq!(storage.consume_refresh_token(&first).await.unwrap(), Refused);
+    assert_eq!(
+        storage.consume_refresh_token(&second).await.unwrap(),
+        Refused,
+        "reuse ended every session"
+    );
+
+    // A token revoked for another reason is reuse at once: signing out, then presenting it again.
+    let third = storage.create_refresh_token(&user.id, 30).await.unwrap();
+    let fourth = storage.create_refresh_token(&user.id, 30).await.unwrap();
+    storage.revoke_refresh_token(&third).await.unwrap();
+    assert_eq!(storage.consume_refresh_token(&third).await.unwrap(), Refused);
+    assert_eq!(storage.consume_refresh_token(&fourth).await.unwrap(), Refused);
+
+    // An unknown token is just refused.
+    assert_eq!(storage.consume_refresh_token("unknown").await.unwrap(), Refused);
+    storage.pool.close().await;
+    drop(storage);
     let _ = std::fs::remove_dir_all(data_dir);
 }

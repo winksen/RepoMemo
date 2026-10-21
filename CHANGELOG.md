@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.144 (2026-10-21)
+
+Reopening a browser with several RepoMemo tabs, or two tabs crossing the hour together, no longer signs the person out everywhere.
+
+### Security
+- **Two tabs refreshing at once end no session (S5-4):** the refresh cookie is shared by the tabs of a browser, and renewing rotates it. When two tabs renewed at the same moment, the second presented the cookie the first had just rotated, which read as token theft and revoked every session of the account, the first tab's new one included. A refresh token now remembers why it was revoked and when it was rotated (migration `0039_refresh_token_reasons.sql`). A token rotated less than 30 seconds ago and presented again is **refused with `409`** and nothing is revoked; a token rotated longer ago, or revoked for any other reason (signing out, ending sessions), is still reuse and ends them all. A request that loses the race for the same token in the database gets the same `409`. Tokens that existed before this release have no reason recorded, so presenting one is reuse, as before.
+- **The cookie is left alone on a `409`:** the server clears the cookie on a `401` from `/v1/auth/refresh`, which here would have deleted the new cookie the first tab had just received; a `409` does not touch it.
+- **The web app renews one tab at a time:** a renewal runs inside the browser's `navigator.locks` lock `repomemo-refresh`, so the second tab waits and presents the cookie the first one received; where the lock is missing, or a `409` still comes back, the app asks again after 300 ms, twice at most, and keeps the session if that fails.
+- **`__Secure-` prefix over HTTPS (E14):** when the public address is HTTPS the cookie is `__Secure-repomemo_refresh`, which a browser refuses unless it was set with `Secure` from a secure page, so a plain-HTTP response cannot plant or overwrite it. The old name is read once (a browser holding it stays signed in), replaced by the new one, and cleared; signing out and a refused renewal clear both. Over plain HTTP (development) the name is unchanged.
+
+### Changed
+- **Tests (written, not run):** a token rotated a moment ago is `JustRotated` while the new token keeps working, then the same token with an old rotation time ends every session, a signed-out token is reuse at once, an unknown token is just refused (storage); the replay in the refresh and cookie tests answers `409` and the cookie is not cleared; over HTTPS the new name is set, the old one read once, replaced and cleared, and signing out clears both (server); the cookie names and their order (cookie unit tests); renewing takes the lock, asks again after a `409` and gives up after two retries (web).
+- **Checks run on this release:** `cargo check` of the storage crate and the server with their tests compiles, `rustfmt` is clean for what changed apart from hunks that were already there and `clippy` reports nothing new; `npm run typecheck`, `migrations:check`, `docs:check` and `version:check` pass. No server was started and two tabs were not tried.
+
+### Upgrading
+- The migration runs at start and nobody is signed out. Over HTTPS each browser gets the new cookie name on its next renewal. A script that calls `POST /v1/auth/refresh` should treat a `409` as "try again", not as the end of the session.
+
 ## V0.2.143 (2026-10-21)
 
 Creating an organization and linking a folder of the server's disk are no longer open to every account and every workspace administrator.

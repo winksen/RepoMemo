@@ -26,7 +26,7 @@ flowchart TD
 | Credential | Lifetime | Stored as | Ends when |
 |---|---|---|---|
 | Access token (JWT) | 60 min (`REPOMEMO_ACCESS_TOKEN_TTL_MINUTES`) | not stored | it expires, or the user's *session version* changes |
-| Refresh token | 30 days (`REPOMEMO_REFRESH_TOKEN_TTL_DAYS`), rotated on every use | SHA-256 hash | reuse of a rotated one revokes the family; sign-out; password change |
+| Refresh token | 30 days (`REPOMEMO_REFRESH_TOKEN_TTL_DAYS`), rotated on every use | SHA-256 hash | reuse of a rotated one revokes the family, except that a token rotated less than 30 seconds ago (another tab) is only refused with `409` (V0.2.144); sign-out; password change |
 | Web refresh cookie | same | the refresh token itself | `HttpOnly; SameSite=Strict; Path=/v1/auth`, `Secure` on HTTPS |
 | Personal access token | 7–365 days | SHA-256 hash | revoked, expired, or a used password reset link |
 | Invitation or reset link | 7 days / 24 hours, single use | SHA-256 hash | used, withdrawn, expired |

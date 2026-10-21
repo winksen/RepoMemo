@@ -52,6 +52,38 @@ describe("web session", () => {
     expect(window.sessionStorage.getItem(SHARED_SESSION_STORAGE_KEY)).toBeNull();
   });
 
+  it("renews inside the lock the tabs of a browser share, so two tabs never present one cookie", async () => {
+    window.localStorage.setItem(MARKER, "1");
+    const request = vi.fn(async (_name: string, work: () => Promise<unknown>) => work());
+    Object.defineProperty(navigator, "locks", { value: { request }, configurable: true });
+    try {
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(json(tokens));
+      expect(await refreshSharedSession()).toBe("access-1");
+      expect(request).toHaveBeenCalledTimes(1);
+      expect(request.mock.calls[0][0]).toBe("repomemo-refresh");
+    } finally {
+      Reflect.deleteProperty(navigator, "locks");
+    }
+  });
+
+  it("asks again a moment later when the server says another tab renewed, and keeps the session", async () => {
+    window.localStorage.setItem(MARKER, "1");
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(json({ error: { message: "renewed elsewhere" } }, 409))
+      .mockResolvedValueOnce(json(tokens));
+    expect(await refreshSharedSession()).toBe("access-1");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(window.localStorage.getItem(MARKER)).toBe("1");
+  });
+
+  it("gives up after two retries without ending the session", async () => {
+    window.localStorage.setItem(MARKER, "1");
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async () => json({ error: { message: "renewed elsewhere" } }, 409));
+    expect(await refreshSharedSession()).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(window.localStorage.getItem(MARKER)).toBe("1");
+  });
+
   it("keeps the session when the network fails", async () => {
     window.localStorage.setItem(MARKER, "1");
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("offline"));

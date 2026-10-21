@@ -348,12 +348,22 @@ pub(crate) async fn refresh_session(
     Json(request): Json<RefreshRequest>,
 ) -> Result<Json<TokenResponse>, ApiError> {
     check_auth_quota(&state, &client, AuthAction::Refresh)?;
-    let user_id = state
+    let user_id = match state
         .storage
         .consume_refresh_token(&request.refresh_token)
         .await
         .map_err(ApiError::internal)?
-        .ok_or_else(ApiError::unauthorized)?;
+    {
+        repomemo_storage::RefreshOutcome::Rotated(user_id) => user_id,
+        repomemo_storage::RefreshOutcome::Refused => return Err(ApiError::unauthorized()),
+        // Another tab of the same browser renewed the session a moment ago: nothing was revoked and the
+        // cookie must not be cleared. The caller asks again with the cookie it holds now.
+        repomemo_storage::RefreshOutcome::JustRotated => {
+            return Err(ApiError::conflict(
+                "This session was just renewed in another tab; try again.",
+            ))
+        }
+    };
     let user = state
         .storage
         .find_user(&user_id)

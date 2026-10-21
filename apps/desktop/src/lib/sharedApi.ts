@@ -189,6 +189,22 @@ export function clearSharedSession() {
 const refreshedTokens = new Map<string, string>();
 let refreshInFlight: Promise<string | null> | null = null;
 
+/**
+ * The tabs of one browser share one refresh cookie, and renewing rotates it: two tabs renewing at the same
+ * moment would present the same token. They take this lock in turn, so the second presents the cookie the
+ * first one received.
+ */
+const REFRESH_LOCK = "repomemo-refresh";
+/** When the server answers 409, another tab renewed a moment ago; asking again presents the new cookie. */
+const CONFLICT_RETRIES = 2;
+const CONFLICT_DELAY_MS = 300;
+
+async function whileNoOtherTabRenews<T>(work: () => Promise<T>): Promise<T> {
+  const locks = typeof navigator === "undefined" ? undefined : navigator.locks;
+  if (!locks) return work();
+  return (await locks.request(REFRESH_LOCK, work)) as unknown as T;
+}
+
 function latestToken(token: string): string {
   let current = token;
   for (let hops = 0; refreshedTokens.has(current) && hops < 50; hops += 1) current = refreshedTokens.get(current)!;
@@ -206,11 +222,19 @@ export function refreshSharedSession(staleAccessToken?: string): Promise<string 
       // In the desktop app the credential store is the only place a session is kept between runs.
       const token = desktopSession ? await sessionStore.load().catch(() => null) : legacyToken;
       if (desktopSession && !token) return null;
-      const response = await httpFetch(`${API_URL}/v1/auth/refresh`, {
+      const send = () => httpFetch(`${API_URL}/v1/auth/refresh`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json", Accept: "application/json", ...Object.fromEntries([clientHeader()]) },
         body: JSON.stringify(token ? { refresh_token: token } : {}),
+      });
+      const response = await whileNoOtherTabRenews(async () => {
+        let reply = await send();
+        for (let attempt = 0; reply.status === 409 && attempt < CONFLICT_RETRIES; attempt += 1) {
+          await new Promise<void>((resolve) => { window.setTimeout(resolve, CONFLICT_DELAY_MS); });
+          reply = await send();
+        }
+        return reply;
       });
       if (!response.ok) {
         // Only a definitive rejection ends the session; a flaky network keeps it.

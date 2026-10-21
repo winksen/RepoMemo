@@ -59,6 +59,7 @@ pub use secrets::{restrict_to_owner, KEY_FILE_NAME as SECRET_KEY_FILE_NAME, MIN_
 pub use setup::SetupState;
 pub use stats::{ArtifactQuery, ArtifactStats, DashboardCounts};
 pub use system::{StoredSystemSetting, UserAccess};
+pub use users::RefreshOutcome;
 
 /// The database file inside an environment folder.
 const DATABASE_FILE: &str = "repomemo.sqlite";

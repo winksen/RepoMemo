@@ -29,6 +29,9 @@ use serde_json::{json, Value};
 use crate::AppState;
 
 const COOKIE_NAME: &str = "repomemo_refresh";
+/// The name over HTTPS: the `__Secure-` prefix makes a browser refuse the cookie unless it was set
+/// with `Secure` from a secure page, so a plain-HTTP response cannot plant or overwrite it (E14).
+const SECURE_COOKIE_NAME: &str = "__Secure-repomemo_refresh";
 const COOKIE_PATH: &str = "/v1/auth";
 /// Request bodies of the paths below are tiny JSON objects.
 const MAX_REQUEST_BYTES: usize = 64 * 1024;
@@ -55,22 +58,47 @@ fn is_web_client(headers: &HeaderMap) -> bool {
         .is_some_and(|value| value.eq_ignore_ascii_case("web"))
 }
 
-/// The refresh token the browser sent in its cookie.
-fn cookie_token(headers: &HeaderMap) -> Option<String> {
+/// The value of the cookie called `name` among the browser's cookies.
+fn cookie_value(headers: &HeaderMap, name: &str) -> Option<String> {
     headers
         .get_all(header::COOKIE)
         .iter()
         .filter_map(|value| value.to_str().ok())
         .flat_map(|value| value.split(';'))
-        .filter_map(|pair| pair.trim().strip_prefix(COOKIE_NAME)?.strip_prefix('='))
+        .filter_map(|pair| pair.trim().strip_prefix(name)?.strip_prefix('='))
         .map(str::to_owned)
         .find(|value| !value.is_empty())
 }
 
+/// The refresh token the browser sent in its cookie: under the `__Secure-` name, or, from a browser that
+/// still holds the cookie an earlier release set, under the old name (it is replaced by the next response).
+fn cookie_token(headers: &HeaderMap) -> Option<String> {
+    cookie_value(headers, SECURE_COOKIE_NAME).or_else(|| cookie_value(headers, COOKIE_NAME))
+}
+
+/// The name the cookie is set under: with the `__Secure-` prefix when the public address is HTTPS.
+fn cookie_name(secure: bool) -> &'static str {
+    if secure {
+        SECURE_COOKIE_NAME
+    } else {
+        COOKIE_NAME
+    }
+}
+
 fn set_cookie(token: &str, max_age_seconds: i64, secure: bool) -> HeaderValue {
-    let secure = if secure { "; Secure" } else { "" };
+    let flag = if secure { "; Secure" } else { "" };
+    let name = cookie_name(secure);
     HeaderValue::from_str(&format!(
-        "{COOKIE_NAME}={token}; Path={COOKIE_PATH}; HttpOnly; SameSite=Strict; Max-Age={max_age_seconds}{secure}"
+        "{name}={token}; Path={COOKIE_PATH}; HttpOnly; SameSite=Strict; Max-Age={max_age_seconds}{flag}"
+    ))
+    .unwrap_or_else(|_| HeaderValue::from_static(""))
+}
+
+/// Removes the cookie under the plain name that an earlier release set, once the server sets the `__Secure-`
+/// one (HTTPS), so a browser does not keep two.
+fn clear_legacy_cookie() -> HeaderValue {
+    HeaderValue::from_str(&format!(
+        "{COOKIE_NAME}=; Path={COOKIE_PATH}; HttpOnly; SameSite=Strict; Max-Age=0"
     ))
     .unwrap_or_else(|_| HeaderValue::from_static(""))
 }
@@ -128,9 +156,13 @@ pub(crate) async fn web_session(State(state): State<AppState>, request: Request,
     if (ENDS_SESSION.contains(&path.as_str()) && status.is_success())
         || (path == "/v1/auth/refresh" && status == StatusCode::UNAUTHORIZED)
     {
+        // Both names go over HTTPS: the one in use and the one an earlier release set.
         response
             .headers_mut()
             .append(header::SET_COOKIE, set_cookie("", 0, settings.secure_cookies));
+        if settings.secure_cookies {
+            response.headers_mut().append(header::SET_COOKIE, clear_legacy_cookie());
+        }
         return response;
     }
 
@@ -155,6 +187,10 @@ pub(crate) async fn web_session(State(state): State<AppState>, request: Request,
         parts
             .headers
             .append(header::SET_COOKIE, set_cookie(&token, max_age, settings.secure_cookies));
+        // The name an earlier release used is read once (above) and replaced here.
+        if settings.secure_cookies {
+            parts.headers.append(header::SET_COOKIE, clear_legacy_cookie());
+        }
         parts.headers.remove(header::CONTENT_LENGTH);
         return Response::from_parts(parts, Body::from(serde_json::to_vec(&value).unwrap_or_default()));
     }
@@ -187,5 +223,47 @@ mod tests {
             assert!(text.contains(part), "{part} missing from {text}");
         }
         assert!(!set_cookie("token", 60, false).to_str().unwrap().contains("Secure"));
+    }
+
+    #[test]
+    fn over_https_the_cookie_carries_the_secure_prefix_and_the_old_name_is_read_once_and_cleared() {
+        let secure = set_cookie("token", 60, true);
+        assert!(
+            secure.to_str().unwrap().starts_with("__Secure-repomemo_refresh=token;"),
+            "{secure:?}"
+        );
+        assert!(secure.to_str().unwrap().contains("; Secure"));
+        let plain = set_cookie("token", 60, false);
+        assert!(
+            plain.to_str().unwrap().starts_with("repomemo_refresh=token;"),
+            "{plain:?}"
+        );
+
+        // The plain name an earlier release set is cleared on the way.
+        let clears_plain = clear_legacy_cookie();
+        assert!(
+            clears_plain.to_str().unwrap().starts_with("repomemo_refresh=;"),
+            "{clears_plain:?}"
+        );
+        assert!(clears_plain.to_str().unwrap().contains("Max-Age=0"));
+
+        // Either name is read; the new one wins when a browser holds both.
+        let mut headers = HeaderMap::new();
+        headers.insert(header::COOKIE, HeaderValue::from_static("repomemo_refresh=old"));
+        assert_eq!(
+            cookie_token(&headers).as_deref(),
+            Some("old"),
+            "an earlier release's cookie is read once"
+        );
+        headers.insert(
+            header::COOKIE,
+            HeaderValue::from_static("repomemo_refresh=old; __Secure-repomemo_refresh=new"),
+        );
+        assert_eq!(cookie_token(&headers).as_deref(), Some("new"));
+        headers.insert(
+            header::COOKIE,
+            HeaderValue::from_static("x__Secure-repomemo_refresh=nope"),
+        );
+        assert_eq!(cookie_token(&headers), None, "a longer name is not ours");
     }
 }

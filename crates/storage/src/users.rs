@@ -1,5 +1,23 @@
 use super::*;
 
+/// How long after a refresh token was rotated the same token may be presented again without it
+/// counting as theft: the other tab of the same browser, a retry, a request that crossed the first.
+const ROTATION_GRACE_SECONDS: i64 = 30;
+
+/// What presenting a refresh token came to.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RefreshOutcome {
+    /// The token was good and is used up; the user it belongs to. A new one is to be issued.
+    Rotated(String),
+    /// Unknown, expired or revoked. A revoked one that was not rotated moments ago is reuse: every
+    /// refresh token of its user has been revoked.
+    Refused,
+    /// The token was rotated less than 30 seconds ago (or while this request was being served), most
+    /// likely by another tab of the same browser. Nothing is revoked; the caller should try again
+    /// with the cookie it now holds.
+    JustRotated,
+}
+
 impl StorageEngine {
     /// Ends every session of every user (access tokens stop being accepted,
     /// refresh tokens are revoked). Returns how many accounts were affected.
@@ -172,34 +190,48 @@ impl StorageEngine {
         Ok(raw)
     }
 
-    /// Consumes a refresh token and returns its user id, or `None` if it is unknown, expired or revoked.
-    /// Reusing an already-revoked token revokes every refresh token of that user.
-    pub async fn consume_refresh_token(&self, raw: &str) -> Result<Option<String>> {
+    /// Consumes a refresh token: its user when it is good, otherwise why not (see [`RefreshOutcome`]).
+    /// Presenting a token that was revoked for any reason but a rotation less than 30 seconds ago is
+    /// reuse, and revokes every refresh token of that user.
+    pub async fn consume_refresh_token(&self, raw: &str) -> Result<RefreshOutcome> {
         let hash = hash_refresh_token(raw);
-        let now = Utc::now().to_rfc3339();
-        let row: Option<(String, String, Option<String>)> =
-            sqlx::query_as("SELECT user_id, expires_at, revoked_at FROM refresh_tokens WHERE token_hash = ?1")
-                .bind(&hash)
-                .fetch_optional(self.reader())
-                .await?;
-        let Some((user_id, expires_at, revoked_at)) = row else {
-            return Ok(None);
+        let now = Utc::now();
+        let row: Option<(String, String, Option<String>, Option<String>, Option<String>)> = sqlx::query_as(
+            "SELECT user_id, expires_at, revoked_at, revoked_reason, replaced_at FROM refresh_tokens WHERE token_hash = ?1",
+        )
+        .bind(&hash)
+        .fetch_optional(self.reader())
+        .await?;
+        let Some((user_id, expires_at, revoked_at, revoked_reason, replaced_at)) = row else {
+            return Ok(RefreshOutcome::Refused);
         };
         if revoked_at.is_some() {
-            self.revoke_user_refresh_tokens(&user_id).await?;
-            return Ok(None);
+            let recent = (now - chrono::Duration::seconds(ROTATION_GRACE_SECONDS)).to_rfc3339();
+            let just_rotated = revoked_reason.as_deref() == Some("rotated")
+                && replaced_at.as_deref().is_some_and(|at| at >= recent.as_str());
+            if just_rotated {
+                return Ok(RefreshOutcome::JustRotated);
+            }
+            self.revoke_user_refresh_tokens(&user_id, "reuse").await?;
+            return Ok(RefreshOutcome::Refused);
         }
-        // Conditional update makes concurrent rotation of the same token race-safe.
-        let changed =
-            sqlx::query("UPDATE refresh_tokens SET revoked_at = ?1 WHERE token_hash = ?2 AND revoked_at IS NULL")
-                .bind(&now)
-                .bind(&hash)
-                .execute(&self.pool)
-                .await?;
-        if changed.rows_affected() == 0 || expires_at < now {
-            return Ok(None);
+        // Conditional update makes concurrent rotation of the same token race-safe: the request that
+        // loses it was presented the same token a moment after the winner, which is the grace case.
+        let rotated_at = now.to_rfc3339();
+        let changed = sqlx::query(
+            "UPDATE refresh_tokens SET revoked_at = ?1, revoked_reason = 'rotated', replaced_at = ?1 WHERE token_hash = ?2 AND revoked_at IS NULL",
+        )
+        .bind(&rotated_at)
+        .bind(&hash)
+        .execute(&self.pool)
+        .await?;
+        if changed.rows_affected() == 0 {
+            return Ok(RefreshOutcome::JustRotated);
         }
-        Ok(Some(user_id))
+        if expires_at < rotated_at {
+            return Ok(RefreshOutcome::Refused);
+        }
+        Ok(RefreshOutcome::Rotated(user_id))
     }
 
     /// The user a refresh token belongs to while it is still usable, without
@@ -216,7 +248,7 @@ impl StorageEngine {
     }
 
     pub async fn revoke_refresh_token(&self, raw: &str) -> Result<()> {
-        sqlx::query("UPDATE refresh_tokens SET revoked_at = ?1 WHERE token_hash = ?2 AND revoked_at IS NULL")
+        sqlx::query("UPDATE refresh_tokens SET revoked_at = ?1, revoked_reason = 'signed_out' WHERE token_hash = ?2 AND revoked_at IS NULL")
             .bind(Utc::now().to_rfc3339())
             .bind(hash_refresh_token(raw))
             .execute(&self.pool)
@@ -224,12 +256,16 @@ impl StorageEngine {
         Ok(())
     }
 
-    pub async fn revoke_user_refresh_tokens(&self, user_id: &str) -> Result<()> {
-        sqlx::query("UPDATE refresh_tokens SET revoked_at = ?1 WHERE user_id = ?2 AND revoked_at IS NULL")
-            .bind(Utc::now().to_rfc3339())
-            .bind(user_id)
-            .execute(&self.pool)
-            .await?;
+    /// Revokes every refresh token of a user that is still usable, noting why (`reuse`, `ended`, …).
+    pub async fn revoke_user_refresh_tokens(&self, user_id: &str, reason: &str) -> Result<()> {
+        sqlx::query(
+            "UPDATE refresh_tokens SET revoked_at = ?1, revoked_reason = ?3 WHERE user_id = ?2 AND revoked_at IS NULL",
+        )
+        .bind(Utc::now().to_rfc3339())
+        .bind(user_id)
+        .bind(reason)
+        .execute(&self.pool)
+        .await?;
         Ok(())
     }
 
@@ -256,7 +292,7 @@ impl StorageEngine {
         .fetch_optional(&mut *tx)
         .await?
         .ok_or_else(|| repomemo_domain::not_found!("User was not found."))?;
-        sqlx::query("UPDATE refresh_tokens SET revoked_at = ?1 WHERE user_id = ?2 AND revoked_at IS NULL")
+        sqlx::query("UPDATE refresh_tokens SET revoked_at = ?1, revoked_reason = 'ended' WHERE user_id = ?2 AND revoked_at IS NULL")
             .bind(Utc::now().to_rfc3339())
             .bind(user_id)
             .execute(&mut *tx)
