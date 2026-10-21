@@ -48,7 +48,7 @@ sha2 = "0.10"
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "sqlite", "macros", "migrate", "chrono", "json", "uuid"] }
 tree-sitter = "0.25"
 tree-sitter-c-sharp = "0.23"
-tree-sitter-go = "0.23"
+tree-sitter-go = "0.25"
 tree-sitter-java = "0.23"
 tree-sitter-php = "0.23"
 tree-sitter-python = "0.23"
