@@ -20,6 +20,7 @@ import { parseRoute } from "../router";
 import { useAiProviders, useMetrics } from "./data";
 import { type WorkspacePage, sectionState } from "./page";
 import { ICON_SIZE } from "../../components/ui/icon";
+import { showToast } from "../../components/ui/toast";
 
 export function SettingsSection({ page }: { page: WorkspacePage }) {
   const { accessToken, workspace, workspaceId, canManageMembers, canManageWorkspace, isLive, isSubmitting, setIsSubmitting, setError, load, onWorkspaceUpdated, onWorkspaceDeleted } = page;
@@ -66,6 +67,7 @@ export function SettingsSection({ page }: { page: WorkspacePage }) {
     try {
       const updated = await updateSharedWorkspace(accessToken, workspace.workspace.id, workspaceName);
       onWorkspaceUpdated(updated);
+      showToast("success", "Workspace renamed.");
     } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
   }
 
@@ -75,6 +77,7 @@ export function SettingsSection({ page }: { page: WorkspacePage }) {
     try {
       await deleteSharedWorkspace(accessToken, workspace.workspace.id);
       onWorkspaceDeleted(workspace.workspace.id);
+      showToast("success", "Workspace deleted.");
     } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
   }
 

@@ -66,7 +66,7 @@ export function TasksSection({ page }: { page: WorkspacePage }) {
       setTaskTitle(""); setTaskDescription(""); setTaskPriority("medium"); setTaskAssigneeId(""); setTaskArtifactId(""); setTaskDueDate("");
       setTasks(await listSharedCollaborationTasks(accessToken, workspace.workspace.id));
       setWorkspaceMetrics(await getSharedWorkspaceMetrics(accessToken, workspace.workspace.id));
-    });
+    }, { success: "Task created." });
   }
 
   async function reviseTask(task: CollaborationTask, changes: { status?: CollaborationTaskStatus; priority?: CollaborationTaskPriority; assigneeUserId?: string | null }) {
@@ -91,7 +91,7 @@ export function TasksSection({ page }: { page: WorkspacePage }) {
       await deleteSharedCollaborationTask(accessToken, task.id);
       setTasks((current) => current.filter((entry) => entry.id !== task.id));
       setWorkspaceMetrics(await getSharedWorkspaceMetrics(accessToken, workspace.workspace.id));
-    });
+    }, { success: "Task deleted." });
   }
 
   async function toggleTaskChecklist(task: CollaborationTask) {
@@ -109,7 +109,7 @@ export function TasksSection({ page }: { page: WorkspacePage }) {
       const item = await createSharedTaskChecklistItem(accessToken, task.id, checklistBody);
       setTaskChecklists((current) => ({ ...current, [task.id]: [...(current[task.id] ?? []), item] }));
       setChecklistBody("");
-    });
+    }, { success: "Checklist item added." });
   }
 
   async function toggleChecklistItem(item: TaskChecklistItem) {

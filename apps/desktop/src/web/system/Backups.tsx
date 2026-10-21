@@ -37,13 +37,13 @@ export function BackupsPanel({ accessToken, canChange }: { accessToken: string; 
 
   async function backUp() {
     setIsBusy(true);
-    try { setOverview(await createSystemBackup(accessToken)); }
+    try { setOverview(await createSystemBackup(accessToken)); showToast("success", "A backup was started."); }
     catch (error) { showToast("error", apiMessage(error, "The backup could not start.")); }
     finally { setIsBusy(false); }
   }
   async function copyNow() {
     setIsBusy(true);
-    try { setOverview(await copySystemBackups(accessToken)); }
+    try { setOverview(await copySystemBackups(accessToken)); showToast("success", "Copying the backups was started."); }
     catch (error) { showToast("error", apiMessage(error, "The copy could not start.")); }
     finally { setIsBusy(false); }
   }

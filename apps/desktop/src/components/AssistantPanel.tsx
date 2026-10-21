@@ -234,6 +234,7 @@ export function AssistantPanel({ accessToken, onOpenArtifact, workspaceId }: { a
     try {
       upsertConversation(await renameSharedAgentConversation(accessToken, conversation.id, renameValue.trim()));
       setChatDialog(null);
+      showToast("success", "Chat renamed.");
     } catch (error) {
       showToast("error", apiMessage(error, "The chat could not be renamed."));
     } finally {

@@ -8,7 +8,7 @@ import { useServerState } from "../lib/useServerState";
 import { Button } from "../components/ui/button";
 import { PageHeader } from "../components/ui/page-header";
 import { Input } from "../components/ui/input";
-import { Toast } from "../components/ui/toast";
+import { Toast, showToast } from "../components/ui/toast";
 import { SharedLayout } from "../components/SharedLayout";
 import { apiMessage } from "./format";
 import { navigate } from "./router";
@@ -132,6 +132,7 @@ export function SharedWorkspaceHome({
       setOrganizations((current) => [...current, organization]);
       organizationNavigation.selectOrganization(organization.id);
       setOrganizationName("");
+      showToast("success", `${organization.name} was created.`);
     } catch (requestError) { setFormError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
   }
 
@@ -143,6 +144,7 @@ export function SharedWorkspaceHome({
       const workspace = await createSharedWorkspace(accessToken, organizationId, workspaceName);
       setWorkspaces((current) => [workspace, ...current]);
       setWorkspaceName("");
+      showToast("success", `${workspace.workspace.name} was created.`);
     } catch (requestError) { setFormError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
   }
 

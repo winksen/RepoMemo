@@ -7,7 +7,7 @@ import { PageHeader } from "../components/ui/page-header";
 import { EmptyState } from "../components/ui/empty-state";
 import { Pagination } from "../components/ui/pagination";
 import { usePagedList } from "../lib/usePagedList";
-import { Toast } from "../components/ui/toast";
+import { Toast, showToast } from "../components/ui/toast";
 import { accountKeys } from "../lib/queryClient";
 import { useServerState } from "../lib/useServerState";
 import { SharedLayout } from "../components/SharedLayout";
@@ -56,6 +56,7 @@ export function SharedNotifications({
     try {
       await markAllSharedNotificationsRead(accessToken);
       setNotifications((current) => current.map((entry) => entry.read_at ? entry : { ...entry, read_at: new Date().toISOString() }));
+      showToast("success", "All notifications are marked read.");
     } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsMutating(false); }
   }
 

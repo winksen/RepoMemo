@@ -9,7 +9,7 @@ import { PanelHeading } from "./ui/panel-heading";
 import { Dropdown } from "./ui/dropdown";
 import { Field } from "./ui/field";
 import { Input } from "./ui/input";
-import { Toast } from "./ui/toast";
+import { Toast, showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
 import { apiMessage } from "../web/format";
 
@@ -126,6 +126,7 @@ export function AiProviderForm({
       setApiKey("");
       setTestResult(null);
       onSaved(saved);
+      showToast("success", `${copy.title} provider saved.`);
     } catch (requestError) {
       setError(apiMessage(requestError, "The provider could not be saved."));
     } finally { setAction(null); }

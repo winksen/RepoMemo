@@ -189,13 +189,13 @@ export function SharedArtifactDetail({
   async function saveArtifact(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsMutating(true); setError(null);
-    try { await updateSharedArtifact(accessToken, artifactId, title); setIsEditing(false); await load(); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsMutating(false); }
+    try { await updateSharedArtifact(accessToken, artifactId, title); setIsEditing(false); await load(); showToast("success", "Evidence renamed."); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsMutating(false); }
   }
 
   async function removeArtifact() {
     if (!(await confirm({ action: "Delete", danger: true, description: "Linked memory citations will be removed.", title: `Delete ${artifact?.summary.title ?? "this evidence"}?` }))) return;
     setIsMutating(true); setError(null);
-    try { await deleteSharedArtifact(accessToken, artifactId); onBack(); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsMutating(false); }
+    try { await deleteSharedArtifact(accessToken, artifactId); onBack(); showToast("success", "Evidence deleted."); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsMutating(false); }
   }
 
   async function saveLifecycle(event: FormEvent<HTMLFormElement>) {
@@ -210,6 +210,7 @@ export function SharedArtifactDetail({
       });
       setIsEditingLifecycle(false);
       await load();
+      showToast("success", "Lifecycle saved.");
     } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsMutating(false); }
   }
 
@@ -220,6 +221,7 @@ export function SharedArtifactDetail({
       const comment = await createSharedArtifactComment(accessToken, artifactId, commentBody);
       setComments((current) => [...current, comment]);
       setCommentBody("");
+      showToast("success", "Comment added.");
     } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsMutating(false); }
   }
 
@@ -231,6 +233,7 @@ export function SharedArtifactDetail({
       const updated = await updateSharedArtifactComment(accessToken, editingCommentId, editingCommentBody);
       setComments((current) => current.map((comment) => comment.id === updated.id ? updated : comment));
       setEditingCommentId(null); setEditingCommentBody("");
+      showToast("success", "Comment updated.");
     } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsMutating(false); }
   }
 
@@ -240,6 +243,7 @@ export function SharedArtifactDetail({
     try {
       await deleteSharedArtifactComment(accessToken, comment.id);
       setComments((current) => current.filter((entry) => entry.id !== comment.id));
+      showToast("success", "Comment deleted.");
     } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsMutating(false); }
   }
 

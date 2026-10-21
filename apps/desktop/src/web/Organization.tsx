@@ -51,7 +51,7 @@ export function OrganizationAdministration({
   async function saveOrganization(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsSaving(true); setError(null);
-    try { onOrganizationUpdated(await updateSharedOrganization(accessToken, organization.id, organizationName)); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSaving(false); }
+    try { onOrganizationUpdated(await updateSharedOrganization(accessToken, organization.id, organizationName)); showToast("success", "Organization renamed."); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSaving(false); }
   }
 
   async function saveMember(email: string, role: OrganizationRole) {
@@ -60,6 +60,7 @@ export function OrganizationAdministration({
       const member = await upsertSharedOrganizationMember(accessToken, organization.id, { email, role });
       setMembers((current) => current.some((entry) => entry.user.id === member.user.id) ? current.map((entry) => entry.user.id === member.user.id ? member : entry) : [...current, member]);
       setMemberEmail("");
+      showToast("success", `${member.user.display_name} is now ${role} in the organization.`);
     } catch (requestError) {
       // Not in the organization yet (with or without an account): they join by invitation.
       if (requestError instanceof SharedApiError && requestError.status === 409) {
@@ -80,7 +81,7 @@ export function OrganizationAdministration({
 
   async function removeMember(member: OrganizationMember) {
     setIsSaving(true); setError(null);
-    try { await removeSharedOrganizationMember(accessToken, organization.id, member.user.id); setMembers((current) => current.filter((entry) => entry.user.id !== member.user.id)); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSaving(false); }
+    try { await removeSharedOrganizationMember(accessToken, organization.id, member.user.id); setMembers((current) => current.filter((entry) => entry.user.id !== member.user.id)); showToast("success", `${member.user.display_name} was removed from the organization.`); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSaving(false); }
   }
 
   return <section className="shared-organization-admin" aria-labelledby="organization-admin-title">

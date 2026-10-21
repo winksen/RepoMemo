@@ -123,6 +123,7 @@ export function EvidenceSection({ page }: { page: WorkspacePage }) {
       });
       setNoteTitle(""); setNoteContent("");
       await load();
+      showToast("success", "Note stored. It is indexed in the background.");
     } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
   }
 

@@ -12,7 +12,7 @@ import { Field } from "../components/ui/field";
 import { Input } from "../components/ui/input";
 import { LoadingState } from "../components/ui/loading-state";
 import { Textarea } from "../components/ui/textarea";
-import { Toast } from "../components/ui/toast";
+import { Toast, showToast } from "../components/ui/toast";
 import { SharedLayout } from "../components/SharedLayout";
 import { invalidateKeys, queryClient, workspaceKeys } from "../lib/queryClient";
 import { useLiveEventHub, useLiveEvents } from "../lib/liveEvents";
@@ -148,6 +148,7 @@ export function SharedMemoryCardDetail({
     try {
       await updateSharedMemoryCard(accessToken, cardId, { title: card.card.title, bodyMarkdown: card.card.body_markdown, source: card.card.source });
       await load();
+      showToast("success", "Memory card confirmed.");
     } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsMutating(false); }
   }
 
@@ -172,13 +173,14 @@ export function SharedMemoryCardDetail({
       await updateSharedMemoryCard(accessToken, cardId, { title, bodyMarkdown, source, citations });
       setIsEditing(false);
       await load();
+      showToast("success", "Memory card saved.");
     } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsMutating(false); }
   }
 
   async function removeCard() {
     if (!(await confirm({ action: "Delete", danger: true, description: "This cannot be undone.", title: `Delete ${card?.card.title ?? "this memory card"}?` }))) return;
     setIsMutating(true); setError(null);
-    try { await deleteSharedMemoryCard(accessToken, cardId); onBack(); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsMutating(false); }
+    try { await deleteSharedMemoryCard(accessToken, cardId); onBack(); showToast("success", "Memory card deleted."); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsMutating(false); }
   }
 
   return (

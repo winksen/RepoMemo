@@ -19,6 +19,7 @@ import { EvidenceUsed, renderHighlightedSnippet } from "../common";
 import { useFolders, useRetrievalFacets, useSavedSearches } from "./data";
 import { type WorkspacePage, sectionState } from "./page";
 import { ICON_SIZE } from "../../components/ui/icon";
+import { showToast } from "../../components/ui/toast";
 import { submitHint } from "../../lib/submitShortcut";
 
 export function RetrievalSection({ page }: { page: WorkspacePage }) {
@@ -92,7 +93,7 @@ export function RetrievalSection({ page }: { page: WorkspacePage }) {
     setIsSubmitting(true); setError(null);
     try {
       const saved = await createSharedSavedSearch(accessToken, workspace.workspace.id, { name: savedSearchName, query, artifactTypes: retrievalArtifactType === "all" ? [] : [retrievalArtifactType], languages: retrievalLanguage === "all" ? [] : [retrievalLanguage], sourceIds: retrievalSourceId === "all" ? [] : [retrievalSourceId], resultLimit: Number(retrievalLimit) });
-      setSavedSearches((current) => [saved, ...current]); setSavedSearchName("");
+      setSavedSearches((current) => [saved, ...current]); setSavedSearchName(""); showToast("success", "Search saved.");
     } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
   }
 
@@ -102,7 +103,7 @@ export function RetrievalSection({ page }: { page: WorkspacePage }) {
 
   async function removeSavedSearch(saved: SavedSearch) {
     setIsSubmitting(true); setError(null);
-    try { await deleteSharedSavedSearch(accessToken, saved.id); setSavedSearches((current) => current.filter((entry) => entry.id !== saved.id)); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
+    try { await deleteSharedSavedSearch(accessToken, saved.id); setSavedSearches((current) => current.filter((entry) => entry.id !== saved.id)); showToast("success", "Saved search deleted."); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
   }
 
   async function askEvidence(event: FormEvent<HTMLFormElement>) {

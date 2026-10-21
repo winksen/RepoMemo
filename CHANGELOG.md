@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.124 (2026-10-21)
+
+Every change confirms itself with a success toast or a visible change on the page, and every failure with an error toast.
+
+### Changed
+- **Success toasts added:** evidence renamed, deleted, lifecycle saved, comment added, updated and deleted (artifact page); memory card confirmed, saved and deleted; organization renamed, member saved, member removed; workspace renamed and deleted; workspace member saved and removed; note stored; search saved and saved search deleted; task created and deleted, checklist item added; organization and workspace created (dashboard); AI provider saved; chat renamed; all notifications marked read; notification preference saved; backup and backup copy started.
+- **Already confirmed before:** the profile (name, picture, address, password, verification link), API tokens, system settings, user administration, maintenance, restore and delete backup, uploads, folders, moves, bulk actions, connectors, repositories (the sync announces when it finishes), the workspace export and import, the AI policy (a notice) and the sign-in flows.
+- **Confirmed by what the page shows, so no toast:** a task moved to another column or reassigned, a checklist item ticked, a message sent to the assistant (the answer appears), a sync or stop (the progress shows), a token created (the secret dialog opens), a console command (its output), transferring ownership and detaching the environment (the page reloads).
+- **Failures:** every mutation of the web client already reports a failure as an error toast (through `showToast`, `useAsyncAction` or the page's error toast); none fails silently. The remaining empty handlers are reads and conveniences (remembering a width, refreshing after a live event).
+- **Not added on purpose:** a toast for the start of a repository sync, since the sync announces itself when it finishes.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.123 (2026-10-21)
 
 Long lists show 24 rows a page with the shared pagination.

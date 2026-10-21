@@ -103,6 +103,7 @@ export function SharedProfile({
   async function chooseChannel(kind: string, channel: string) {
     try {
       setPreferences(await setNotificationPreference(accessToken, kind, channel));
+      showToast("success", "Notification preference saved.");
     } catch (requestError) { showToast("error", apiMessage(requestError)); }
   }
 

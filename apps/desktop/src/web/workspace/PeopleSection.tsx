@@ -46,6 +46,7 @@ export function PeopleSection({ page }: { page: WorkspacePage }) {
       setMemberEmail("");
       setMemberRole("member");
       await load();
+      showToast("success", "Member saved.");
     } catch (requestError) {
       // Not in the organization yet (with or without an account): they join by invitation.
       if (requestError instanceof SharedApiError && requestError.status === 409) {
@@ -68,7 +69,7 @@ export function PeopleSection({ page }: { page: WorkspacePage }) {
 
   async function removeMember(userId: string) {
     setIsSubmitting(true); setError(null);
-    try { await removeSharedWorkspaceMember(accessToken, workspace.workspace.id, userId); await load(); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
+    try { await removeSharedWorkspaceMember(accessToken, workspace.workspace.id, userId); await load(); showToast("success", "Member removed."); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
   }
 
   return (
