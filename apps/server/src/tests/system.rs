@@ -1042,3 +1042,184 @@ async fn the_audit_trail_downloads_for_a_date_range_and_the_download_is_audited(
     assert_eq!(get("/v1/system/audit/export".to_owned(), &member).await.status(), 403);
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+/// E3 and E4 (decision 22): who creates organizations, and who links a folder of the server's disk, are system
+/// settings. System administrators only by default; the settings open each of them.
+#[tokio::test]
+async fn organizations_and_local_links_are_for_administrators_until_the_settings_say_otherwise() {
+    let data_dir = temp_data_dir("creators-and-linkers");
+    let mut config = ServerConfig::for_test(data_dir.clone());
+    // What a fresh server starts with (the tests of everything else start more open).
+    config.organization_creators = "administrators".to_owned();
+    config.local_repository_linkers = "system_admins".to_owned();
+    config.repo_roots = vec![data_dir.join("repos")];
+    let app = router(config).await.unwrap();
+    let send = |method: &'static str, uri: String, who: &str, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let (admin, _) = register_account(&app, "creators-admin@example.com").await;
+    let (member, _) = register_account(&app, "creators-member@example.com").await;
+    let may_create = |who: String| {
+        let reply = send("GET", "/v1/session".to_owned(), &who, json!(null));
+        async move {
+            response_json(reply.await).await["can_create_organizations"]
+                .as_bool()
+                .unwrap()
+        }
+    };
+
+    // Organizations: the administrator creates one, an ordinary account is turned away with a message.
+    assert!(may_create(admin.clone()).await);
+    assert!(
+        !may_create(member.clone()).await,
+        "the session says what the person cannot do"
+    );
+    let refused = send("POST", "/v1/organizations".to_owned(), &member, json!({"name": "Mine"})).await;
+    assert_eq!(refused.status(), 403);
+    let message = response_json(refused).await["error"]["message"]
+        .as_str()
+        .unwrap_or_default()
+        .to_owned();
+    assert!(message.contains("system administrators"), "{message}");
+    let organization = response_json(
+        send(
+            "POST",
+            "/v1/organizations".to_owned(),
+            &admin,
+            json!({"name": "Theirs"}),
+        )
+        .await,
+    )
+    .await["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let workspace_id = response_json(
+        send(
+            "POST",
+            "/v1/workspaces".to_owned(),
+            &admin,
+            json!({"organization_id": organization, "name": "Workspace"}),
+        )
+        .await,
+    )
+    .await["workspace"]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+
+    // Local links: a workspace administrator who is not a system administrator may not link a folder of the disk.
+    join(
+        &app,
+        &admin,
+        "organizations",
+        &organization,
+        "creators-member@example.com",
+        "admin",
+    )
+    .await;
+    let link = json!({"link": data_dir.join("repos").join("anything").to_string_lossy()});
+    for route in ["repositories/check", "repositories"] {
+        let refused = send(
+            "POST",
+            format!("/v1/workspaces/{workspace_id}/{route}"),
+            &member,
+            link.clone(),
+        )
+        .await;
+        assert_eq!(refused.status(), 403, "{route}");
+        let message = response_json(refused).await["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .to_owned();
+        assert!(message.contains("system administrators"), "{route}: {message}");
+        // A system administrator is past the right (the folder itself does not exist, which is another answer).
+        let past = send(
+            "POST",
+            format!("/v1/workspaces/{workspace_id}/{route}"),
+            &admin,
+            link.clone(),
+        )
+        .await;
+        assert_ne!(past.status(), 403, "{route}");
+    }
+    // A remote address is not a local link: the setting does not touch it.
+    let remote = send(
+        "POST",
+        format!("/v1/workspaces/{workspace_id}/repositories/check"),
+        &member,
+        json!({"link": "https://github.com/acme/app.git"}),
+    )
+    .await;
+    let remote_message = response_json(remote).await["error"]["message"]
+        .as_str()
+        .unwrap_or_default()
+        .to_owned();
+    assert!(!remote_message.contains("system administrators"), "{remote_message}");
+
+    // Opening each setting opens that right, and only that one.
+    assert_eq!(
+        send(
+            "PUT",
+            "/v1/system/settings".to_owned(),
+            &admin,
+            json!({"values": {"organization_creators": "everyone"}}),
+        )
+        .await
+        .status(),
+        200
+    );
+    assert!(may_create(member.clone()).await);
+    assert_eq!(
+        send("POST", "/v1/organizations".to_owned(), &member, json!({"name": "Mine"}))
+            .await
+            .status(),
+        201
+    );
+    let still = send(
+        "POST",
+        format!("/v1/workspaces/{workspace_id}/repositories/check"),
+        &member,
+        link.clone(),
+    )
+    .await;
+    assert_eq!(still.status(), 403, "opening one setting does not open the other");
+    assert_eq!(
+        send(
+            "PUT",
+            "/v1/system/settings".to_owned(),
+            &admin,
+            json!({"values": {"local_repository_linkers": "workspace_admins"}}),
+        )
+        .await
+        .status(),
+        200
+    );
+    let allowed = send(
+        "POST",
+        format!("/v1/workspaces/{workspace_id}/repositories/check"),
+        &member,
+        link,
+    )
+    .await;
+    assert_ne!(
+        allowed.status(),
+        403,
+        "workspace administrators may link a folder once the setting says so"
+    );
+    // Values outside the choices are refused.
+    assert_eq!(
+        send(
+            "PUT",
+            "/v1/system/settings".to_owned(),
+            &admin,
+            json!({"values": {"organization_creators": "anyone"}}),
+        )
+        .await
+        .status(),
+        400
+    );
+    let _ = std::fs::remove_dir_all(data_dir);
+}

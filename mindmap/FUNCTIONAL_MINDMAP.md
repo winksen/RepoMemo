@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.2.142` (2026-10-21). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, and the retired local workspace are described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.2.143` (2026-10-21). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, and the retired local workspace are described briefly in [§12](#12-desktop-app).
 
 ---
 
@@ -356,7 +356,7 @@ The **knowledge map** draws each repository as one ringed dot, sized by all of i
 
 The repository's individual files are searchable and citable like any evidence, but they are listed in the Repositories section (and from the repository page) rather than the Evidence ledger, and they cannot be renamed or deleted one by one: change them in the repository, or exclude their path.
 
-**Availability:** repository links are a setting of each workspace. A link is either a folder the server can read (inside the folders the operator allows with `REPOMEMO_REPO_ROOTS`) or, since V0.2.20, a remote repository by `https` address with a token, or by `ssh` with a deploy key and the host's pinned key (the operator names the host with `REPOMEMO_GIT_ALLOWED_HOSTS`). A remote link is kept as a copy on the server, within a size and a time cap, and can have a push webhook so a push syncs within seconds. See the [technical design](technical/repository-sources.md).
+**Availability:** repository links are a setting of each workspace. A link is either a folder the server can read (inside the folders the operator allows with `REPOMEMO_REPO_ROOTS`; since V0.2.143 only system administrators link one unless System › Settings › *Who can link a local repository* says workspace administrators may) or, since V0.2.20, a remote repository by `https` address with a token, or by `ssh` with a deploy key and the host's pinned key (the operator names the host with `REPOMEMO_GIT_ALLOWED_HOSTS`). A remote link is kept as a copy on the server, within a size and a time cap, and can have a push webhook so a push syncs within seconds. See the [technical design](technical/repository-sources.md).
 
 ---
 
@@ -552,7 +552,7 @@ The local workspace and a server keep **separate data**.
 
 ---
 
-## 13. Known functional gaps (at V0.2.142)
+## 13. Known functional gaps (at V0.2.143)
 
 These are observed in the code and are useful for prioritizing. The roadmap item that addresses each one is in brackets.
 

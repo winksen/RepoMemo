@@ -151,6 +151,8 @@ export interface SharedSession {
    * every organization and workspace.
    */
   is_app_admin: boolean;
+  /** The server lets this person create an organization (see the system setting `organization_creators`). */
+  can_create_organizations: boolean;
 }
 
 export interface Organization {

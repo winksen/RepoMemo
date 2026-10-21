@@ -6,6 +6,11 @@ pub(crate) async fn create_organization(
     Json(request): Json<CreateOrganizationRequest>,
 ) -> Result<(StatusCode, Json<Organization>), ApiError> {
     crate::verification::require_verified(&state, &subject.user_id).await?;
+    if state.settings().organization_creators != "everyone" && !(subject.is_system_admin || subject.is_app_admin) {
+        return Err(ApiError::forbidden_because(
+            "Only system administrators can create organizations on this server. Ask one, or ask them to open System › Settings › Who can create organizations.",
+        ));
+    }
     let organization = state
         .storage
         .create_organization(&subject.user_id, &request.name)

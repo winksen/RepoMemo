@@ -35,6 +35,12 @@ pub struct ServerConfig {
     /// can be registered; everyone else is added by an administrator after
     /// registering while it was open, or by the operator.
     pub allow_registration: bool,
+    /// Who may create an organization: `administrators` (system and app administrators, the default)
+    /// or `everyone` (any verified account). A system setting, changed in System › Settings.
+    pub organization_creators: String,
+    /// Who may link a repository that lives on this machine's disk: `system_admins` (the default)
+    /// or `workspace_admins`. A system setting, changed in System › Settings.
+    pub local_repository_linkers: String,
     /// Take the client address from `X-Forwarded-For` / `X-Real-IP`. Only for
     /// a server reachable solely through a reverse proxy that sets them.
     pub trust_proxy: bool,
@@ -298,6 +304,8 @@ impl ServerConfig {
             backup_copy_dir: env_text("REPOMEMO_BACKUP_COPY_DIR").map(std::path::PathBuf::from),
             // Closed by default: people join with invitation links (review M1).
             allow_registration: env_flag("REPOMEMO_ALLOW_REGISTRATION", false)?,
+            organization_creators: "administrators".to_owned(),
+            local_repository_linkers: "system_admins".to_owned(),
             trust_proxy,
             trusted_proxies,
             public_url,
@@ -392,6 +400,10 @@ impl ServerConfig {
             backup_key: None,
             backup_copy_dir: None,
             allow_registration: true,
+            // The tests of everything else sign in as ordinary people who create their own organizations
+            // and link folders; the tests of these two settings set them to the server's defaults.
+            organization_creators: "everyone".to_owned(),
+            local_repository_linkers: "workspace_admins".to_owned(),
             trust_proxy: false,
             trusted_proxies: Vec::new(),
             public_url: None,
@@ -512,6 +524,10 @@ pub(crate) fn env_flag(name: &str, default: bool) -> Result<bool> {
 pub(crate) struct RuntimeSettings {
     pub(crate) service_name: String,
     pub(crate) allow_registration: bool,
+    /// `administrators` or `everyone` (see [`ServerConfig::organization_creators`]).
+    pub(crate) organization_creators: String,
+    /// `system_admins` or `workspace_admins` (see [`ServerConfig::local_repository_linkers`]).
+    pub(crate) local_repository_linkers: String,
     pub(crate) proxy: security::ProxyTrust,
     /// The refresh cookie carries `Secure` (the public address is HTTPS).
     pub(crate) secure_cookies: bool,
@@ -546,6 +562,8 @@ impl RuntimeSettings {
         Self {
             service_name: config.service_name.clone(),
             allow_registration: config.allow_registration,
+            organization_creators: config.organization_creators.clone(),
+            local_repository_linkers: config.local_repository_linkers.clone(),
             proxy: config.proxy_trust(),
             secure_cookies: config
                 .public_url

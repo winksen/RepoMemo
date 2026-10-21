@@ -245,6 +245,8 @@ export interface SharedSession {
   is_system_admin?: boolean;
   /** Uses the System pages without the wildcard administrator access. */
   is_app_admin?: boolean;
+  /** The server lets this person create an organization; absent on an older server, where everyone could. */
+  can_create_organizations?: boolean;
 }
 
 export interface UserProfile {

@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.143 (2026-10-21)
+
+Creating an organization and linking a folder of the server's disk are no longer open to every account and every workspace administrator.
+
+### Security
+- **Who creates organizations (E3, decision 22):** every verified account could create an organization and become its owner. The System setting *Who can create organizations* (`organization_creators`) decides: **system administrators only** by default, or every verified account. An account that is turned away gets a message naming the setting, and `GET /v1/session` now says `can_create_organizations`, so the web client does not offer "New organization" or "Create organization" to someone who cannot (the empty dashboard says to ask a system administrator).
+- **Who links a local repository (E4, decision 22):** any workspace administrator could link any folder under `REPOMEMO_REPO_ROOTS`, which can hold other teams' repositories. The System setting *Who can link a local repository* (`local_repository_linkers`) decides: **system administrators only** by default, or workspace administrators. It is checked when a link is checked and when it is made, for a folder only; remote repositories (an `https` or `ssh` address) are not affected. "Administrators" here are system and app administrators.
+
+### Changed
+- **The setup wizard asks both questions** in its *Access and security* step, next to open registration. Both settings live under System › Settings › Accounts and apply at once.
+- **Existing data is untouched:** organizations, workspaces and links made before this release stay. Only creating and linking from now on follows the settings.
+- **Tests (written, not run):** with the server's defaults an ordinary account is refused with a message and the session says so, the administrator creates an organization, a workspace administrator who is not a system administrator is refused when checking and when making a local link while a remote address is not touched, opening one setting does not open the other, and a value outside the choices is refused. The tests of everything else start with both settings open.
+- **Checks run on this release:** `cargo check` of the server with its tests compiles, `rustfmt` is clean for the files changed (apart from hunks that were already there) and `clippy` reports nothing new; `npm run typecheck`, `types:check`, `docs:check` and `version:check` pass. No server was started.
+
+### Upgrading
+- **Ordinary accounts can no longer create organizations, and workspace administrators can no longer link a local folder.** If that is what your server relied on, open the matching setting after upgrading (System › Settings › Accounts). Nothing already created changes.
+
 ## V0.2.142 (2026-10-21)
 
 Changing a person's organization role no longer undoes what a workspace decided for itself.

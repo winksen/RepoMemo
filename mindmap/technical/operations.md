@@ -42,7 +42,7 @@ Set these in the service's environment, not in a file the web server can read.
 | `REPOMEMO_SERVER_DATA_DIR` | `main` | Pins the environment (`workspace-data/main`). Without it a restart attaches whichever one was chosen last |
 | `REPOMEMO_SYSTEM_ADMIN_EMAILS` | the operators' addresses | Accounts promoted to system administrators at startup |
 | `REPOMEMO_SETUP_CODE` | 12 or more letters and digits, once | Unlocks the first-run setup; printed on the console when unset |
-| `REPOMEMO_REPO_ROOTS` | the folders that hold repositories | Repository links are **off** without it |
+| `REPOMEMO_REPO_ROOTS` | the folders that hold repositories | Repository links are **off** without it. Who may link one of these folders is a System setting, system administrators by default (V0.2.143) |
 | `REPOMEMO_GIT_ALLOWED_HOSTS` | the hosts repositories may be fetched from, such as `github.com` | Remote repository links and connectors (GitHub with `api.github.com` named, GitLab with its host) are **off** without it (`https` since V0.2.20, `ssh` since V0.2.21, which also needs an `ssh` client on the `PATH`) |
 
 Leave `REPOMEMO_ALLOW_REGISTRATION` at its default (closed): people join with invitation links.

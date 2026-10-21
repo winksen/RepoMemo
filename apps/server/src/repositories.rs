@@ -410,12 +410,28 @@ pub(crate) async fn check_repository(
             .map(Json)
             .map_err(map_repo_error);
     }
+    require_local_link_right(&state, &subject)?;
     state
         .core
         .check_repo_link(&workspace_id, &request.link, settings)
         .await
         .map(Json)
         .map_err(map_repo_error)
+}
+
+/// Linking a folder of this machine's disk (E4): by default only system administrators may, because the
+/// folders under `REPOMEMO_REPO_ROOTS` can belong to other teams. `local_repository_linkers` hands it to
+/// workspace administrators.
+fn require_local_link_right(state: &AppState, subject: &AuthenticatedSubject) -> Result<(), ApiError> {
+    if state.settings().local_repository_linkers == "workspace_admins"
+        || subject.is_system_admin
+        || subject.is_app_admin
+    {
+        return Ok(());
+    }
+    Err(ApiError::forbidden_because(
+        "Only system administrators can link a repository that lives on the server's disk. Link a remote address, or ask one, or ask them to open System › Settings › Who can link a local repository.",
+    ))
 }
 
 pub(crate) async fn connect_repository(
@@ -430,6 +446,9 @@ pub(crate) async fn connect_repository(
         include: request.include.clone(),
         exclude: request.exclude.clone(),
     };
+    if !repomemo_api::looks_remote(&request.link) {
+        require_local_link_right(&state, &subject)?;
+    }
     let repository = if repomemo_api::looks_remote(&request.link) {
         state
             .core

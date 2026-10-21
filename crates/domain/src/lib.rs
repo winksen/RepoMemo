@@ -175,6 +175,9 @@ pub struct SharedSession {
     /// every organization and workspace.
     #[serde(default)]
     pub is_app_admin: bool,
+    /// The server lets this person create an organization (see the system setting `organization_creators`).
+    #[serde(default)]
+    pub can_create_organizations: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

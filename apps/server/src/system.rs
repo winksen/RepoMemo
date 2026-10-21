@@ -173,8 +173,20 @@ fn category_setting(category: &str) -> String {
     format!("log_{category}_level")
 }
 
+const ORGANIZATION_CREATOR_OPTIONS: &[(&str, &str)] = &[
+    ("administrators", "System administrators only"),
+    ("everyone", "Every verified account"),
+];
+
+const LOCAL_LINKER_OPTIONS: &[(&str, &str)] = &[
+    ("system_admins", "System administrators only"),
+    ("workspace_admins", "Workspace administrators"),
+];
+
 const SETTINGS: &[SettingSpec] = &[
     SettingSpec { key: "allow_registration", group: "Accounts", label: "Open registration", description: "Anyone who can reach the server can create an account. When off, people join with an invitation link from a workspace or organization administrator; the first account can always register. Email addresses are not verified, so leave it off on a server others can reach.", kind: SettingKind::Boolean, min: 0, max: 1, unit: "", options: &[] },
+    SettingSpec { key: "organization_creators", group: "Accounts", label: "Who can create organizations", description: "An organization is a boundary of its own, and its creator becomes its owner. By default only system administrators create one and invite people into it; open it to every verified account only on a server where everyone is trusted to start teams.", kind: SettingKind::Choice, min: 0, max: 0, unit: "", options: ORGANIZATION_CREATOR_OPTIONS },
+    SettingSpec { key: "local_repository_linkers", group: "Accounts", label: "Who can link a local repository", description: "A local link makes the server read a folder of its own disk, under the folders the operator listed in REPOMEMO_REPO_ROOTS, which may belong to other teams. By default only system administrators link one; the other choice lets any workspace administrator. Remote repositories are not affected.", kind: SettingKind::Choice, min: 0, max: 0, unit: "", options: LOCAL_LINKER_OPTIONS },
     SettingSpec { key: "access_token_ttl_minutes", group: "Accounts", label: "Access token lifetime", description: "How long a sign-in token is valid before the browser renews it silently.", kind: SettingKind::Integer, min: 5, max: 1440, unit: "minutes", options: &[] },
     SettingSpec { key: "refresh_token_ttl_days", group: "Accounts", label: "Session lifetime", description: "How long a session lasts without use before people must sign in again.", kind: SettingKind::Integer, min: 1, max: 365, unit: "days", options: &[] },
     SettingSpec { key: "auth_requests_per_minute", group: "Protection", label: "Sign-in requests per address", description: "Sign-ins and registrations allowed per client address each minute (session renewals get four times as many). 0 turns the limit off.", kind: SettingKind::Integer, min: 0, max: 10_000, unit: "per minute", options: &[] },
@@ -218,6 +230,8 @@ fn read_setting(settings: &RuntimeSettings, key: &str) -> Value {
     let maintenance = &settings.maintenance;
     match key {
         "allow_registration" => json!(settings.allow_registration),
+        "organization_creators" => json!(settings.organization_creators),
+        "local_repository_linkers" => json!(settings.local_repository_linkers),
         "access_token_ttl_minutes" => json!(settings.access_token_ttl_minutes),
         "refresh_token_ttl_days" => json!(settings.refresh_token_ttl_days),
         "auth_requests_per_minute" => json!(settings.auth_quota.limit),
@@ -289,7 +303,11 @@ fn apply_setting(settings: &mut RuntimeSettings, key: &str, value: &Value) -> Re
                             .join(", ")
                     )
                 })?;
-            if key == "log_console_format" {
+            if key == "organization_creators" {
+                settings.organization_creators = choice.to_owned();
+            } else if key == "local_repository_linkers" {
+                settings.local_repository_linkers = choice.to_owned();
+            } else if key == "log_console_format" {
                 settings.logging.console_format = ConsoleFormat::parse(choice).expect("listed formats parse");
             } else if key == "log_level" {
                 if choice == "off" {

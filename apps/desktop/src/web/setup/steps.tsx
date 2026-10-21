@@ -22,7 +22,7 @@ export const STEPS: { key: StepKey; label: string; icon: ReactNode }[] = [
 ];
 
 /** Settings offered during setup; everything else stays at the server default and can be changed later in System › Settings. */
-export const ACCESS_SETTINGS = ["allow_registration", "refresh_token_ttl_days", "login_max_failures", "login_lockout_minutes", "ai_requests_per_hour"];
+export const ACCESS_SETTINGS = ["allow_registration", "organization_creators", "local_repository_linkers", "refresh_token_ttl_days", "login_max_failures", "login_lockout_minutes", "ai_requests_per_hour"];
 export const LOGGING_SETTINGS = ["log_level", "log_to_file", "log_retention_days", "log_console_format"];
 
 export type SettingValue = boolean | number | string;
