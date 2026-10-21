@@ -15,7 +15,7 @@
 # ---------------------------------------------------------------------------
 # The web app. The API is the page's own host, so it is called by relative
 # address (an empty VITE_REPOMEMO_API_URL): the same image works under any name.
-FROM node:22-bookworm-slim@sha256:a6385bc33f0f9d6a08482c87f52baee537a9184e2b47dea1ed97caac62f8960c AS web
+FROM node:25-bookworm-slim@sha256:81db02c4b671288a03915da9534dbd54f96d0e7c24d80ccc54f5b36b2e684370 AS web
 WORKDIR /build
 COPY package.json package-lock.json ./
 COPY apps/desktop/package.json apps/desktop/package.json
