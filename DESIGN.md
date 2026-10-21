@@ -2,30 +2,34 @@
 name: RepoMemo Neutral Research Canvas
 description: A light, composed productivity workspace that places a local knowledge task beside its inspectable context.
 colors:
-  canvas: "#f7f8fa"
+  canvas: "#f2f2f2"
   surface: "#ffffff"
-  surface-subtle: "#fafbfc"
-  ink: "#17181a"
-  ink-muted: "#6f747c"
-  divider: "#e6e9ee"
-  action-blue: "#2563eb"
-  action-blue-soft: "#eff6ff"
+  surface-subtle: "#fafafa"
+  ink: "#262626"
+  ink-muted: "#616161"
+  divider: "#e6e6e6"
+  action-blue: "#1228ce"
+  action-blue-soft: "#f0f3ff"
   suggestion-wash: "#f4e7d2"
 typography:
   display:
-    fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif"
+    fontFamily: "Fjalla One, Arial Narrow, sans-serif"
     fontSize: "30px"
-    fontWeight: 700
+    fontWeight: 400
     lineHeight: 1.12
-    letterSpacing: "-0.03em"
+    letterSpacing: "-0.025em"
   body:
-    fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif"
+    fontFamily: "Plus Jakarta Sans Variable, Segoe UI, system-ui, sans-serif"
     fontSize: "14px"
     fontWeight: 400
     lineHeight: 1.55
 rounded:
   control: "8px"
   plane: "12px"
+sizes:
+  control-height: "36px"
+  control-height-touch: "40px"
+  icon-button-compact: "32px"
 spacing:
   compact: "8px"
   module: "16px"
@@ -45,15 +49,15 @@ The reader should be able to select a workspace, search or ask a question, and i
 
 ## Color and tone
 
-Light mode is the product's default. The physical scene is a developer working through a project on a normal desktop display, with enough contrast for long reading and no themed ambient field. White is the working surface; a very cool gray establishes gutters and inactive controls; thin cool-gray dividers define regions.
+Light mode is the product's default. The physical scene is a developer working through a project on a normal desktop display, with enough contrast for long reading and no themed ambient field. White is the working surface; a neutral grey (saturation 0, in both themes) establishes gutters and inactive controls; thin grey dividers define regions.
 
-Blue is the only expressive color. It denotes keyboard focus, a direct primary action, and an active tab. Green, amber, and red remain semantic exception colors only; they never brand broad regions. A warm suggestion wash may appear only behind actionable assistant recommendations, never as general decoration.
+Blue (`--color-accent`, `hsl(233 84% 44%)`) is the only expressive color, as shipped; the green accent that older stylesheets declared is dead and gone. It denotes keyboard focus, a direct primary action, and an active tab. Green, amber, and red remain semantic exception colors only; they never brand broad regions. A warm suggestion wash may appear only behind actionable assistant recommendations, never as general decoration.
 
 ## Typography
 
-Use a system sans stack with a straightforward product-editor rhythm. Headlines are bold and compact, while supporting copy is 14px and deliberately spacious. Monospace is limited to file paths, identifiers, ranges, and code.
+Body text is Plus Jakarta Sans (with Segoe UI and the system sans as fallbacks) in a straightforward product-editor rhythm; page titles use the compact display face, Fjalla One. Supporting copy is 14px and deliberately spacious. Monospace is limited to file paths, identifiers, ranges, and code.
 
-- Page title: 28–32px / 700 / -0.03em.
+- Page title: 28–32px / display face / -0.025em.
 - Panel title: 16px / 600.
 - Body: 14px / 1.55, at 65–75ch where reading matters.
 - Metadata: 12px / 400, neutral gray.
@@ -66,20 +70,54 @@ The Workspace route uses the central canvas to browse and create workspaces. Its
 
 ## Components
 
-Controls are 36–40px tall, softly rounded at 8px, and communicate through text and icons rather than colored blocks. Surfaces use one faint divider or a very soft offset shadow, never both by default. Selected rows use neutral surfaces with stronger ink or a neutral boundary. Never pair accent-colored text or icons with an accent-tint background on a component or button—at rest, selected, or hovered. Reserve accent backgrounds for solid primary actions and accent color for focus and restrained status signals. User-supplied logo artwork remains black and white; do not recolor it with the accent. Suggested actions can use the reserved warm wash and a small trailing action control. Inputs are white with a subtle border and blue focus outline.
+Controls (text fields, dropdowns and buttons) are 36px tall, 40px on touch screens (narrow windows), with a 2px border, softly rounded at 8px, and communicate through text and icons rather than colored blocks. They take their size from the control tokens (`--control-height`, `--control-height-touch`, `--control-radius`, `--control-border`, `--control-padding-x`), never from a pixel value of their own. Surfaces use one faint divider or a very soft offset shadow, never both by default. Selected rows use neutral surfaces with stronger ink or a neutral boundary. Never pair accent-colored text or icons with an accent-tint background on a component or button—at rest, selected, or hovered. Reserve accent backgrounds for solid primary actions and accent color for focus and restrained status signals. User-supplied logo artwork remains black and white; do not recolor it with the accent. Suggested actions can use the reserved warm wash and a small trailing action control. Inputs are white with a subtle border and blue focus outline.
 
 ### Shared UI primitives
 
 The web client uses shadcn's source-owned component pattern. Components live in
 `apps/desktop/src/components/ui/`, remain editable in this repository, and use
-Radix only for interaction behavior. `Button` has exactly two variants:
-`main` for the single decisive action in a group and `secondary` for every
-other action. `Dropdown` has one accessible visual treatment for all selects.
-`Input` and `Textarea` own all text-entry fields: a calm neutral boundary at
-rest and a solid blue boundary on hover and focus. Control-state transitions
-use the shared ease-in-out curve; buttons never move position on hover.
-Do not introduce a third button or dropdown treatment without updating this
+Radix only for interaction behavior. There are three button treatments and one
+icon shape, and no others:
+
+- `Button variant="main"`: the single decisive action in a group.
+- `Button variant="secondary"`: every other action (the default).
+- `Button variant="danger"`: the decisive action of a destructive confirmation.
+- `IconButton`: a button with one icon and a required label.
+
+`Dropdown` has one accessible visual treatment for all selects: its trigger
+takes the width of its content (at least 160 px) in a toolbar and fills its
+field in a form; its list is at most 320 px tall and scrolls inside the window;
+it opens above a dialog. `Input` and `Textarea` own all text-entry fields: a
+calm neutral boundary at rest and a solid blue boundary on hover and focus.
+Control-state transitions use the shared ease-in-out curve; buttons never move
+position on hover. A `Button` is `type="button"` unless it says `type="submit"`.
+Do not introduce another button or dropdown treatment without updating this
 system deliberately.
+
+### Layers
+
+Every `z-index` in the stylesheets is one of the layer tokens of
+`styles/01-tokens-and-shared-web.css` (0, -1 and auto are the only literals),
+so a menu can never open behind the thing that holds it:
+
+| Token | Value | For |
+|---|---|---|
+| `--layer-raised` | 1 | a part lifted above its neighbours (table headers, map controls) |
+| `--layer-sticky` | 10 | a menu attached to a control (the file type filter) |
+| `--layer-float` | 20 | the assistant dock's button on narrow screens |
+| `--layer-sheet` | 800 | the backdrop of the assistant sheet, and `--layer-sheet-panel` 801 for its panel |
+| `--layer-overlay` | 900 | the backdrop of a dialog |
+| `--layer-dialog` | 901 | dialogs |
+| `--layer-popover` | 950 | dropdown lists, action menus, mention lists: above dialogs |
+| `--layer-toast` | 1000 | toasts |
+
+### Icons
+
+Every icon next to text takes one of three sizes from `ICON_SIZE`
+(`components/ui/icon.ts`): `sm` 14px in dense rows and badges, `md` 16px next to
+text and inside controls, `lg` 18px in panel headings. Larger icons are
+illustrations (empty states, setup steps, file and folder tiles, avatars) and
+keep their own size.
 
 ### Building blocks
 
@@ -92,7 +130,7 @@ page's own version, and add to this list when a new one is added.
   or malformed field is marked `aria-invalid` (only its border turns red) and
   says why in that line; it is a field state, never a banner or a tinted fill.
   Server errors stay toasts. `FieldRow` puts fields side by side and stacks
-  them on narrow screens.
+  them on narrow screens. See "Forms" below for when a field marks itself.
 - **`Checkbox`**: a 16 px box (accent when checked), its label and an optional muted
   description, built on Radix; the label toggles it. Use it for a choice in a
   list or a form; use `Switch` for a setting that applies at once.
@@ -124,6 +162,20 @@ page's own version, and add to this list when a new one is added.
   action and `false` on Cancel, Escape or a click outside. Name the action after
   what it does ("Delete", not "OK") and set `danger` when it cannot be undone.
   `ConfirmProvider` is mounted once in `SharedWebApp`.
+- **`Dialog`**: the one modal: a title, an optional description, a body and a
+  footer of actions, built on Radix. Its `size` is `sm` (400 px, a question),
+  `md` (520 px, a small form; the default when it has a body) or `lg` (720 px,
+  long content such as a version or the palette). It focuses its first writable
+  field when it opens, Escape closes it, focus returns to what opened it, and
+  the footer puts Cancel before the decisive action. A dialog with fields takes
+  `onSubmit`, so Enter in a field runs the decisive action, and that footer
+  button says `type="submit"`. Never build a modal of your own.
+- **`ActionMenu`**: the "more actions" button of a row or card (`IconButton` plus
+  a Radix menu); a destructive item is marked `destructive` and opens a
+  confirmation rather than acting at once.
+- **`Pagination`** (with `usePagedList`): a list that can pass 24 rows shows 24 a
+  page, with "1–24 of 60" and previous and next buttons under it; it is hidden
+  while everything fits. A filter returns the list to its first page.
 - **`LoadingState`** and **`Spinner`**: a turning ring and one muted line with
   `role="status"` for something still loading. Word the label `Loading <thing>`
   (`Loading jobs`); the component adds the ellipsis. Use `Spinner` alone inside
@@ -188,6 +240,33 @@ from `components/ui/toast.tsx`. A toast is a solid fill in its status color
 white icon, and no border. This is the one place a colored fill is used for
 status; it still never pairs tinted fills with same-hue text.
 
+Every change confirms itself: a mutation ends in a success toast ("Comment
+added.") or in a change the person can see (a card moved to another column, a
+secret dialog opening), and a failure in an error toast. Do not add a toast for
+the start of work that announces its own end, such as a repository sync.
+
+### Forms
+
+- **Marking mistakes.** A control inside a `Field` that the browser refuses on
+  submit (`required`, `type="email"` or `"url"`, `minLength`, a range) marks
+  itself: `aria-invalid`, a one-line message under it ("Title is required.",
+  "Enter a value from 1 to 65535."), focus on the first one, and it clears as
+  soon as the value is valid. Nothing is sent while a field is refused. A rule
+  only the page knows is passed as `invalid` and `message`. API errors are
+  toasts, never a message under a field.
+- **Sending.** Enter in a single-line field submits its form; Ctrl+Enter
+  (Cmd+Enter on macOS) submits from a `Textarea` and from the note editor, and a
+  muted hint under the field says so (`submitHint()`). A button that sends is
+  the form's one `type="submit"` button and shows `busy` while it works.
+- **Unsaved changes.** A form that holds work (System settings, a note being
+  written, a memory card being edited, a new workspace name) asks "Discard
+  unsaved changes?" through `useConfirm` before the page changes, and the browser
+  warns before the tab closes (`useUnsavedChanges`). A draft that the page
+  keeps while someone moves between sections of a workspace does not ask.
+- **Focus.** After a dialog closes, focus is on the control that opened it; after
+  a deletion it moves to the next item, else the previous one, else the heading
+  of the list. After a move to another page it is at the start of the page.
+
 ### No tinted neutrals
 
 Backgrounds, borders and body text are true neutral greys (saturation 0) in both
@@ -206,6 +285,8 @@ a tinted background or recolor the text to match.
 - Do make the primary task the largest, brightest surface.
 - Do expose local evidence in a calm companion pane instead of permanent telemetry.
 - Do reserve blue for action, current state, and focus.
-- Don't use dark themes, grids, terminal motifs, traced diagrams, or dashboard metric strips as the default experience.
+- Do use a building block above before writing a page's own heading, tag, tab, loading line, empty line, dialog or confirmation.
+- Do take sizes, colours and layers from the tokens; `npm run styles:check` refuses a new bare element style, raw colour, raw layer or raw control height.
+- Don't make the dark theme the default, and don't use grids, terminal motifs, traced diagrams, or dashboard metric strips as the default experience.
 - Don't repeat workspace state in a graph, metrics row, and readiness tracker.
 - Don't use all-caps technical labels or monospace as ordinary interface copy.

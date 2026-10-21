@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.128 (2026-10-21)
+
+DESIGN.md describes the interface as it is built: accent, sizes, layers, buttons and building blocks.
+
+### Changed
+- **Colour and type:** the front matter and the text now name the shipped values: the blue accent `hsl(233 84% 44%)` (#1228ce; the green accent an older audit read was a dead token block), neutral greys at saturation 0 (canvas #f2f2f2, ink #262626, divider #e6e6e6), Plus Jakarta Sans for text and Fjalla One for page titles.
+- **Controls:** 36 px tall (40 px on touch screens), a 2 px border, 8 px corners, from the `--control-*` tokens; the dropdown's width, list height and layer are described.
+- **Buttons:** three treatments and one shape, `main`, `secondary`, `danger` and `IconButton`, replacing "exactly two variants"; a `Button` is `type="button"` unless it says `type="submit"`.
+- **Layers and icons:** a table of the layer scale (`--layer-raised` to `--layer-toast`) and the three icon sizes (14, 16 and 18 px).
+- **Building blocks:** `Dialog` (sizes, first field, Enter, Escape, Cancel first, focus return), `ActionMenu` and `Pagination` with `usePagedList` are added to the list that already had `Field`, `Checkbox`, `Switch`, `IconButton`, `Tooltip`, `ConfirmDialog`, `LoadingState`, `EmptyState`, `Badge`, `SegmentedControl`, `PanelHeading`, `PageHeader`, `Table`, `Combobox`, `SearchField`, `CopyButton`, `Time` and the option list.
+- **Rules written down:** the field-message rule (a refused field marks itself, API errors stay toasts), sending with Enter and Ctrl+Enter, unsaved changes, focus after a dialog and a deletion, and that every change confirms itself with a toast or a visible change. The do's and don'ts point to the tokens and to `npm run styles:check`.
+- **Technical mindmap §9:** the UI kit row names DESIGN.md as the place that lists each block and rule.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.127 (2026-10-21)
 
 The style check refuses bare element styles, raw colours, raw layers and raw control heights, so the stylesheets stop drifting.

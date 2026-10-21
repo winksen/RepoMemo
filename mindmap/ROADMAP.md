@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.127` (2026-10-21), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.128` (2026-10-21), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Security review 2026-10-16 (V0.2.52)](security/2026-10-16-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -57,7 +57,7 @@ timeline
 | Security review 2026-10-10, second and third passes | ✅ Every finding fixed, mitigated or accepted in writing (V0.1.76); R2-4 and R2-5 scheduled for V0.2.8 |
 | Road to V0.2.0 (V0.1.66–V0.1.76) | 🔄 Built and versioned `0.2.0`; R6 (clean install) and the tag are the maintainer's |
 | Road to V0.3.0 (V0.2.1–V0.2.56, one change each) | ✅ V0.2.1–V0.2.56 built; the clean-machine install (R6, R12) is the maintainer's |
-| Track K: frontend polish (V0.2.57–V0.2.129) | 🔄 V0.2.57–V0.2.127 built (K1 to K4 done); decisions 15–19 taken as proposed; [plan](plans/2026-10-17-frontend-polish.md) |
+| Track K: frontend polish (V0.2.57–V0.2.129) | 🔄 V0.2.57–V0.2.128 built (K1 to K4 done); decisions 15–19 taken as proposed; [plan](plans/2026-10-17-frontend-polish.md) |
 | V0.4.0 and later: scale-out, single sign-on, hosted | 💭 Direction |
 
 ---
@@ -980,7 +980,7 @@ One box per release; the brief, the files and the commit line of each are in [th
 
 - [x] **V0.2.126** `test/buildingBlocks.test.tsx` covers `Field`, `Checkbox`, `Switch`, `Dropdown`, `ConfirmDialog` and `useConfirm`, `LoadingState`, `EmptyState`, `Badge`, `SegmentedControl`, `Combobox`, `SearchField`, `CopyButton` and `useFormState`; with the tests of V0.2.119 to V0.2.125 every shared building block has one; written, not run (CI runs them). Typecheck passes
 - [x] **V0.2.127** `scripts/check-styles.mjs` refuses a bare `input`/`select`/`textarea`/`button` selector outside the base reset and the local edition, a raw colour outside a token block, a `z-index` that is not a layer token and a pixel control height; the 111 older cases are in `scripts/styles-baseline.json` and the list can only shrink; the scrollbar colours became tokens; a planted example is checked on every run. Style check passes on the tree and fails on the planted example
-- [ ] **V0.2.128** DESIGN.md matches the code
+- [x] **V0.2.128** DESIGN.md names the shipped accent (blue), greys, fonts, 36 px controls (40 px on touch screens), the layer scale, the icon sizes, the three button treatments and `IconButton`, adds `Dialog`, `ActionMenu` and `Pagination` to the building blocks, and writes down the form, feedback and focus rules; technical mindmap §9 points to it. Documentation check passes
 - [ ] **V0.2.129** Release check after the polish track
 
 ### Decisions to agree before work starts
