@@ -363,14 +363,16 @@ async fn build_state(
     let connector_polling = runtime.clone();
     let connector_task = connector_sync.start_polling(move || connector_polling.current().repo_poll_interval);
 
+    // The previews live under the data folder unless the operator put them on a volume of their own.
+    let preview_base = config.preview_root.clone().unwrap_or_else(|| data_dir.clone());
     let converter = match config.soffice.clone() {
         Some(path) => Converter::with_options(
-            &data_dir,
+            &preview_base,
             Some(path),
             config.soffice_wrapper.clone(),
             config.office_previews,
         ),
-        None => Converter::detect(&data_dir, config.soffice_wrapper.clone(), config.office_previews),
+        None => Converter::detect(&preview_base, config.soffice_wrapper.clone(), config.office_previews),
     };
     // Asks LibreOffice for its release when previews are on (and only then); nothing is converted before it answers.
     converter.probe_version().await;

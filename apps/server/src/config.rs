@@ -20,6 +20,10 @@ pub struct ServerConfig {
     /// LibreOffice executable used for Office previews. When unset the server
     /// looks for it; without it the extracted previews are used.
     pub soffice: Option<PathBuf>,
+    /// The folder that holds the `previews` folder (the converted PDFs, the conversions' work folders and
+    /// LibreOffice's profile). Unset: the data folder. The container layout puts it on a volume of its own,
+    /// which is all the converter container sees (`REPOMEMO_PREVIEW_ROOT`).
+    pub preview_root: Option<PathBuf>,
     /// A command LibreOffice is started through (`REPOMEMO_SOFFICE_WRAPPER`),
     /// split on spaces; `{work}` and `{profile}` stand for the folders it needs.
     pub soffice_wrapper: Vec<String>,
@@ -295,6 +299,7 @@ impl ServerConfig {
             jwt_secret,
             allowed_origins,
             office_previews: env_flag("REPOMEMO_OFFICE_PREVIEWS", false)?,
+            preview_root: env_text("REPOMEMO_PREVIEW_ROOT").map(PathBuf::from),
             soffice: std::env::var_os("REPOMEMO_SOFFICE").map(PathBuf::from),
             soffice_wrapper: env_text("REPOMEMO_SOFFICE_WRAPPER")
                 .map(|command| command.split_whitespace().map(str::to_owned).collect())
@@ -394,6 +399,7 @@ impl ServerConfig {
             jwt_secret: "test-secret-that-is-long-enough-for-jwt-signing".to_owned(),
             allowed_origins: Vec::new(),
             office_previews: false,
+            preview_root: None,
             soffice: None,
             soffice_wrapper: Vec::new(),
             secret_key: None,

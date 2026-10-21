@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.148 (2026-10-21)
+
+The container layout stops giving a document that escapes LibreOffice the database, the key file and the network. This closes track L.
+
+### Security
+- **A locked-down server container (S5-8):** the compose file runs the server with `read_only: true` (`/tmp` is a `tmpfs`), `cap_drop: [ALL]` and `security_opt: [no-new-privileges:true]`. It writes only to the data volume, the previews volume and the socket volume.
+- **LibreOffice in a container of its own (E1c):** a new `converter` service, behind the compose profile `previews`, has **no network** (`network_mode: none`), the same lock-down, and sees only two volumes: `repomemo-previews` (the converted PDFs, the work folders and LibreOffice's profile) and `soffice-socket`. It no longer shares a container with the database, `secret.key` and the network. The server reaches it through `repomemo-soffice-wrapper` (`REPOMEMO_SOFFICE_WRAPPER`), which sends LibreOffice's arguments over the socket with `socat`, NUL-separated; a listener in the converter runs one `repomemo-soffice-run` per request, which accepts only LibreOffice's own flags, the `pdf` format and paths inside the previews volume, and answers with LibreOffice's output and an exit status. Version probing and conversions go through the same path, so the release check of V0.2.137 applies unchanged. With previews off the converter is not started; with the profile missing the server finds nobody answering and converts nothing, and says so.
+- **`REPOMEMO_PREVIEW_ROOT` (new setting):** the folder that holds the `previews` folder, the data folder when unset. The compose file points it at the previews volume, which is how the converter can see the work folders without seeing anything else of the data. System › Overview counts the previews there.
+
+### Changed
+- **`npm run container:check` asserts each setting:** the server's read-only root, `/tmp` `tmpfs`, dropped capabilities and `no-new-privileges`; for the converter, the same, no network, the `previews` profile, no data volume, no published port, the two shared volumes, the Dockerfile stage and the three scripts it copies; the `docker/*.sh` files stay on LF. Tried on planted examples: with the server's lock-down removed, a network on the converter, or the data volume given to it, it reported each and exited with 1; on the tree it passes.
+- **`REPOMEMO_WITH_LIBREOFFICE` is gone from the compose file** and `.env.example` (the build argument still exists for a plain `docker build`); `COMPOSE_PROFILES=previews` takes its place.
+- **Checks run on this release:** `cargo check` of the server with its tests compiles and `rustfmt` and `clippy` show nothing new for the files changed; `container:check`, `docs:check`, `version:check` and `migrations:check` pass. **Not run:** `docker compose build` or `up`, so the converter, its scripts and the socket have never run; that is the maintainer's try (below).
+
+### Upgrading
+- Rebuild (`docker compose up -d --build`). To keep layout-accurate previews set `COMPOSE_PROFILES=previews` and `REPOMEMO_OFFICE_PREVIEWS=true` in `.env`. Try: with them on, open a Word file; System › Overview should name LibreOffice's release, or say why it is refused (Debian 13's may be older than 26.2.5). A custom compose file must let the server write only to its volumes and `/tmp`.
+
 ## V0.2.147 (2026-10-21)
 
 Two small fixes in the web client: links that look local but leave the site, and a button that should not open a file that can carry macros.

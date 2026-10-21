@@ -1010,7 +1010,7 @@ pub(crate) async fn overview(
     let statistics = state.storage.system_statistics().await.map_err(map_storage_error)?;
     let data_dir = PathBuf::from(&state.instance.data_dir);
     let file_size = |name: &str| std::fs::metadata(data_dir.join(name)).map_or(0, |metadata| metadata.len());
-    let (preview_count, preview_bytes) = std::fs::read_dir(data_dir.join("previews"))
+    let (preview_count, preview_bytes) = std::fs::read_dir(state.converter.cache_dir())
         .map(|entries| {
             entries
                 .flatten()

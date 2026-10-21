@@ -214,6 +214,11 @@ impl Converter {
         tokio::fs::write(self.inner.profile_dir.join(JAVA_SETTINGS_FILE), JAVA_DISABLED).await
     }
 
+    /// The folder that holds the converted PDFs, the work folders and the profile.
+    pub fn cache_dir(&self) -> &Path {
+        &self.inner.cache_dir
+    }
+
     /// Whether LibreOffice is started inside the operator's sandbox command.
     pub fn sandboxed(&self) -> bool {
         !self.inner.wrapper.is_empty()
@@ -893,6 +898,15 @@ mod tests {
         assert!(converter.cached_pdf("workspace-a", hash).is_none());
         assert!(!converter.ready_path("workspace-b", hash).exists());
         let _ = std::fs::remove_dir_all(&data);
+    }
+
+    #[test]
+    fn the_previews_folder_sits_under_the_folder_the_operator_names() {
+        let base = std::env::temp_dir().join(format!("repomemo-preview-root-test-{}", std::process::id()));
+        let converter = Converter::with_options(&base, None, Vec::new(), false);
+        assert_eq!(converter.cache_dir(), base.join("previews"));
+        assert!(base.join("previews").is_dir());
+        let _ = std::fs::remove_dir_all(&base);
     }
 
     #[test]

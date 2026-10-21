@@ -6,6 +6,10 @@
 # Open https://<REPOMEMO_HOST> and follow the first-run setup. The data lives
 # in the `repomemo-data` volume; back it up from System > Backups, as in the
 # production guide (mindmap/technical/operations.md, "Running it in containers").
+#
+# The server runs with a read-only root, no capabilities and no way to gain any. Layout-accurate
+# Office previews run in the `converter` container, which has no network and sees only the previews
+# volume: turn them on with COMPOSE_PROFILES=previews and REPOMEMO_OFFICE_PREVIEWS=true in .env.
 
 name: repomemo
 
@@ -14,11 +18,16 @@ services:
     build:
       context: .
       target: server
-      args:
-        WITH_LIBREOFFICE: ${REPOMEMO_WITH_LIBREOFFICE:-false}
     image: repomemo-server:${REPOMEMO_VERSION:-local}
     restart: unless-stopped
     init: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     environment:
       REPOMEMO_SERVER_ADDR: 0.0.0.0:3020
       REPOMEMO_SERVER_DATA_DIR: main
@@ -35,11 +44,40 @@ services:
       REPOMEMO_BACKUP_INTERVAL_HOURS: ${REPOMEMO_BACKUP_INTERVAL_HOURS:-24}
       REPOMEMO_BACKUP_KEY: ${REPOMEMO_BACKUP_KEY:-}
       REPOMEMO_OFFICE_PREVIEWS: ${REPOMEMO_OFFICE_PREVIEWS:-false}
+      # Where LibreOffice runs when previews are on: the converter container, through its socket.
+      REPOMEMO_PREVIEW_ROOT: /var/lib/repomemo-previews
+      REPOMEMO_SOFFICE: soffice
+      REPOMEMO_SOFFICE_WRAPPER: /usr/local/bin/repomemo-soffice-wrapper
     volumes:
       - repomemo-data:/var/lib/repomemo
+      - repomemo-previews:/var/lib/repomemo-previews
+      - soffice-socket:/run/soffice
     networks:
       repomemo:
         ipv4_address: 172.29.0.3
+
+  # LibreOffice for layout-accurate previews, only with COMPOSE_PROFILES=previews. No network, a read-only
+  # root, no capabilities, and a view of nothing but the previews volume and the socket it answers on.
+  converter:
+    profiles:
+      - previews
+    build:
+      context: .
+      target: converter
+    image: repomemo-converter:${REPOMEMO_VERSION:-local}
+    restart: unless-stopped
+    init: true
+    network_mode: none
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - repomemo-previews:/var/lib/repomemo-previews
+      - soffice-socket:/run/soffice
 
   proxy:
     build:
@@ -71,5 +109,7 @@ networks:
 
 volumes:
   repomemo-data:
+  repomemo-previews:
+  soffice-socket:
   caddy-data:
   caddy-config:

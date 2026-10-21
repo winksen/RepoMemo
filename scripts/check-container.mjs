@@ -1,6 +1,7 @@
 // Checks the container files against each other and against the server
 // (roadmap O7): the compose file builds stages the Dockerfile has, sets only
-// variables the server reads, requires what .env.example explains, points the
+// variables the server reads, requires what .env.example explains, keeps the server and the LibreOffice
+// container locked down (V0.2.148), points the
 // proxy at the server's port and trusts the proxy's address. Nothing may move
 // under it either: every base image is pinned by digest and every CI action by
 // commit (roadmap E17). It reads files only: it starts nothing and needs no Docker.
@@ -33,7 +34,7 @@ const serverManifest = read("apps/server/Cargo.toml");
 // No tabs in YAML, and files that Linux reads keep LF line endings in the repository.
 if (/\t/.test(compose)) problems.push("docker-compose.yml contains a tab; YAML allows spaces only");
 const attributes = read(".gitattributes");
-for (const pattern of ["Dockerfile", "docker/Caddyfile", "docker-compose.yml"]) {
+for (const pattern of ["Dockerfile", "docker/Caddyfile", "docker/*.sh", "docker-compose.yml"]) {
   if (!attributes.split(/\r?\n/).some((line) => line.startsWith(pattern) && /eol=lf/.test(line))) {
     problems.push(`.gitattributes does not keep ${pattern} on LF line endings`);
   }
@@ -92,6 +93,39 @@ for (const stage of ["server", "proxy"]) {
   if (!new RegExp(`^\\s+target:\\s*${stage}\\s*$`, "m").test(compose)) problems.push(`docker-compose.yml does not build the ${stage} image`);
 }
 
+// Lock-down (S5-8, E1c): the server has a read-only root, no capabilities and no way to gain any; LibreOffice runs
+// in a container of its own with no network that sees only the previews volume and its socket.
+const service = (name) => {
+  const match = new RegExp(`^  ${name}:\\n([\\s\\S]*?)(?=^  \\S|^\\S|(?![\\s\\S]))`, "m").exec(compose);
+  return match ? match[1] : null;
+};
+const lockedDown = (name, block) => {
+  if (!/^\s+read_only:\s*true\s*$/m.test(block)) problems.push(`docker-compose.yml: ${name} does not have a read-only root filesystem (read_only: true)`);
+  if (!/^\s+tmpfs:\s*\n\s+-\s*\/tmp\s*$/m.test(block)) problems.push(`docker-compose.yml: ${name} has no tmpfs for /tmp`);
+  if (!/^\s+cap_drop:\s*\n\s+-\s*ALL\s*$/m.test(block)) problems.push(`docker-compose.yml: ${name} does not drop every capability (cap_drop: [ALL])`);
+  if (!/no-new-privileges:true/.test(block)) problems.push(`docker-compose.yml: ${name} lacks security_opt no-new-privileges:true`);
+};
+const serverBlock = service("server");
+const converterBlock = service("converter");
+if (!serverBlock) problems.push("docker-compose.yml has no server service");
+else lockedDown("server", serverBlock);
+if (converterBlock) {
+  lockedDown("converter", converterBlock);
+  if (!/^\s+network_mode:\s*none\s*$/m.test(converterBlock)) problems.push("docker-compose.yml: the converter has a network (network_mode: none)");
+  if (!/^\s+profiles:\s*\n\s+-\s*previews\s*$/m.test(converterBlock)) problems.push("docker-compose.yml: the converter is not behind the previews profile");
+  if (/repomemo-data/.test(converterBlock)) problems.push("docker-compose.yml: the converter sees the data volume; it may see only the previews volume and its socket");
+  if (/ports:/.test(converterBlock)) problems.push("docker-compose.yml: the converter publishes a port");
+  for (const volume of ["repomemo-previews", "soffice-socket"]) {
+    if (!converterBlock.includes(volume) || !(serverBlock ?? "").includes(volume)) problems.push(`the server and the converter must share the ${volume} volume`);
+  }
+  if (!/target:\s*converter/.test(converterBlock) || !stages.includes("converter")) problems.push("the converter service needs the Dockerfile's converter stage");
+  for (const file of ["docker/soffice-wrapper.sh", "docker/soffice-run.sh", "docker/soffice-listener.sh"]) {
+    if (!existsSync(file)) problems.push(`${file} is missing`);
+    else if (!dockerfile.includes(file)) problems.push(`the Dockerfile does not copy ${file}`);
+  }
+  if (!/REPOMEMO_SOFFICE_WRAPPER:\s*\/usr\/local\/bin\/repomemo-soffice-wrapper/.test(serverBlock ?? "")) problems.push("the server does not reach LibreOffice through the wrapper");
+}
+
 // The binary the Dockerfile copies is the one the server package builds.
 const packageName = /^name\s*=\s*"([^"]+)"/m.exec(serverManifest)?.[1];
 if (!packageName || !dockerfile.includes(`-p ${packageName}`) || !dockerfile.includes(`target/release/${packageName}`)) {
@@ -112,12 +146,12 @@ const walk = (folder) => {
 };
 walk("apps/server/src");
 const sourceText = serverSource.join("\n");
-const composeOnly = new Set(["REPOMEMO_HOST", "REPOMEMO_VERSION", "REPOMEMO_WITH_LIBREOFFICE"]);
+const composeOnly = new Set(["REPOMEMO_HOST", "REPOMEMO_VERSION"]);
 const used = new Set([...compose.matchAll(/\b(REPOMEMO_[A-Z0-9_]+)\b/g)].map((match) => match[1]));
 for (const name of used) {
   if (!composeOnly.has(name) && !sourceText.includes(`"${name}"`)) problems.push(`docker-compose.yml sets ${name}, which the server does not read`);
 }
-for (const name of ["REPOMEMO_HOST", "REPOMEMO_VERSION", "REPOMEMO_WITH_LIBREOFFICE"]) {
+for (const name of ["REPOMEMO_HOST", "REPOMEMO_VERSION"]) {
   if (!example.includes(`${name}=`)) problems.push(`.env.example does not explain ${name}`);
 }
 

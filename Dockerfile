@@ -39,20 +39,23 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 # The server, on Debian 13 (trixie): its git 2.47.3 is a release the remote-clone check
 # accepts, where Debian 12's 2.39.5 is refused (`npm run container:check` asserts the pair).
 # Readings of documents start this same program again, so it must stay where it is.
-# Layout-accurate Office previews need LibreOffice, which is large: add it with
-# `--build-arg WITH_LIBREOFFICE=true`.
+# Layout-accurate Office previews need LibreOffice, which is large and parses files strangers uploaded:
+# the compose file runs it in the `converter` stage below, a container of its own with no network, and
+# reaches it through repomemo-soffice-wrapper. `--build-arg WITH_LIBREOFFICE=true` still puts it in this
+# image, for a plain `docker run`.
 FROM debian:trixie-slim@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad AS server
 ARG WITH_LIBREOFFICE=false
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl git \
+    && apt-get install -y --no-install-recommends ca-certificates curl git socat \
     && if [ "$WITH_LIBREOFFICE" = "true" ]; then \
          apt-get install -y --no-install-recommends libreoffice-core libreoffice-writer libreoffice-calc libreoffice-impress fonts-dejavu-core; \
        fi \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --system --uid 10001 --home-dir /var/lib/repomemo --shell /usr/sbin/nologin repomemo \
-    && mkdir -p /var/lib/repomemo \
-    && chown repomemo:repomemo /var/lib/repomemo
+    && mkdir -p /var/lib/repomemo /var/lib/repomemo-previews /run/soffice \
+    && chown repomemo:repomemo /var/lib/repomemo /var/lib/repomemo-previews /run/soffice
 COPY --from=build /out/repomemo-server /usr/local/bin/repomemo-server
+COPY --chmod=0755 docker/soffice-wrapper.sh /usr/local/bin/repomemo-soffice-wrapper
 
 # The data folder (the database, the stored files, the key file and the
 # backups) is `workspace-data/` under the working directory. Keep it in a volume.
@@ -65,6 +68,24 @@ EXPOSE 3020
 HEALTHCHECK --interval=15s --timeout=5s --start-period=40s --retries=3 \
     CMD curl --fail --silent http://127.0.0.1:3020/health/ready || exit 1
 ENTRYPOINT ["repomemo-server"]
+
+# ---------------------------------------------------------------------------
+# The converter (V0.2.148): LibreOffice and nothing else, for the compose profile `previews`. It listens on a
+# socket on a volume it shares with the server, sees only the previews volume, and has no network.
+# Debian 13's LibreOffice may be older than the fixed releases the server insists on; the server says so in
+# System > Overview and converts nothing until it is a release at or past them.
+FROM debian:trixie-slim@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad AS converter
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends bash socat libreoffice-core libreoffice-writer libreoffice-calc libreoffice-impress fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --system --uid 10001 --home-dir /tmp --shell /usr/sbin/nologin repomemo \
+    && mkdir -p /var/lib/repomemo-previews /run/soffice \
+    && chown repomemo:repomemo /var/lib/repomemo-previews /run/soffice
+COPY --chmod=0755 docker/soffice-listener.sh /usr/local/bin/repomemo-soffice-listener
+COPY --chmod=0755 docker/soffice-run.sh /usr/local/bin/repomemo-soffice-run
+USER repomemo
+ENV HOME=/tmp
+ENTRYPOINT ["repomemo-soffice-listener"]
 
 # ---------------------------------------------------------------------------
 # The front door: Caddy gets the certificate, serves the web app and sends
