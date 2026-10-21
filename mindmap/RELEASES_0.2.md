@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.2 → 0.3
 
-> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.132` (2026-10-21) · **Next:** `V0.2.133`
+> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.133` (2026-10-21) · **Next:** `V0.2.134`
 > **Previous line:** [Releases 0.1 → 0.2](RELEASES_0.1.md) · **Related:** [Roadmap, Road to V0.3.0](ROADMAP.md#-road-to-v030) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
 Every release of the 0.2 line, shipped and planned, one row each. The plan comes from the [Road to V0.3.0](ROADMAP.md#-road-to-v030): **one change per release**, each shippable alone, with the security rules for a new outside connection in the release that opens it. Planned rows are proposals until decisions 7–14 in the roadmap are agreed; tracks L and M wait on decisions 20–23.
@@ -169,7 +169,7 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | **V0.2.130** | ✅ 2026-10-21 |L. Security and dependencies |🔒 Security | Dependencies | `rustls` 0.23.46, `rustls-webpki` 0.103.16 and `webpki-roots` 1.0.10, a lockfile-only update (S5-1) | `cargo deny check advisories` reports only the three `zip` advisories |
 | **V0.2.131** | ✅ 2026-10-21 |L. Security and dependencies |🔒 Security | Dependencies | `calamine` 0.37 with `zip` 9 and `quick-xml` 0.42; `rust-version` 1.88 (S5-2) | `cargo deny check advisories` passes with no new ignore; spreadsheet tests pass |
 | **V0.2.132** | ✅ 2026-10-21 |L. Security and dependencies |🔒 Security | Dependencies | `sqlx` without a TLS stack (S5-10) | `rustls` and `webpki-roots` no longer reached through `sqlx` |
-| **V0.2.133** | 🔜 Planned | L. Security and dependencies | 🔒 Security | Web toolchain | Patch releases of PostCSS, nanoid, browserslist, source-map-js and baseline-browser-mapping (S5-3a) | `npm audit` lists only the Vite and Vitest families |
+| **V0.2.133** | ✅ 2026-10-21 |L. Security and dependencies |🔒 Security | Web toolchain | Patch releases of PostCSS, nanoid, browserslist, source-map-js and baseline-browser-mapping (S5-3a) | `npm audit` lists only the Vite and Vitest families |
 | **V0.2.134** | 🔜 Planned | L. Security and dependencies | 🔒 Security | Web toolchain | Vite, `@vitejs/plugin-react` and Vitest to current majors (S5-3b) | `npm audit` with development packages finds nothing; the build still writes the CSP file |
 | **V0.2.135** | 🔜 Planned | L. Security and dependencies | 🔒 Security | CI and container | Actions and base images pinned by digest; Dependabot (E17) | No moving tag in CI or the `Dockerfile`; `container:check` refuses one |
 | **V0.2.136** | 🔜 Planned | L. Security and dependencies | 🔒 Security | Container | A server image whose git the remote-clone check accepts (S5-7) | `container:check` asserts the git release; a remote repository syncs in the container |

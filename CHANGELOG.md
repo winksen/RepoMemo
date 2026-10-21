@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.133 (2026-10-21)
+
+Five transitive packages of the web toolchain are updated to patch releases that close their advisories.
+
+### Security
+- **Web toolchain, first part (S5-3a):** `postcss` 8.5.15 to 8.5.31, `nanoid` 3.3.12 to 3.3.20, `browserslist` 4.28.2 to 4.29.4, `source-map-js` 1.2.1 to 1.2.2 and `baseline-browser-mapping` 2.10.33 to 2.11.30 (source-map file disclosure, loops and memory growth). They are development packages: the built web app never contained them, and `npm audit --omit=dev` was already clean.
+- **What is left:** `npm audit` now lists five entries, all in the test and build tools that need a new major: `vite`, `esbuild`, `vitest`, `@vitest/mocker` and `tinypool`. V0.2.134 moves Vite and Vitest.
+
+### Changed
+- **Only `package-lock.json` moves,** inside the ranges `package.json` already allowed. `caniuse-lite`, `electron-to-chromium` and `node-releases` (data used by `browserslist`) moved with it; no source file changed.
+- **Checks run on this release:** `npm audit` (5 entries, none in production), `npm audit --omit=dev` (0), `version:check` and `docs:check`. The lockfile was updated without reinstalling, so the typecheck and the web tests were not run; CI installs from the new lockfile and runs both.
+
+### Upgrading
+- Nothing to do. Run `npm ci` to install the new versions.
+
 ## V0.2.132 (2026-10-21)
 
 The database layer no longer links a TLS stack it never used.
