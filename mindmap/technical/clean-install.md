@@ -1,6 +1,6 @@
 # Clean-machine install: the run before the tag
 
-> **Branch of:** [TECHNICAL_MINDMAP.md](../TECHNICAL_MINDMAP.md) · **Roadmap:** [R6 (V0.2.0)](../ROADMAP.md#v020-team-ready), [R12 (V0.2.56)](../ROADMAP.md) · **Guide followed:** [operations.md](operations.md) · **Status:** V0.2.56. The run itself is the maintainer's (it needs a second machine and a running server, which this repository's rules keep from the automated work), so the result table at the end is empty until it is made.
+> **Branch of:** [TECHNICAL_MINDMAP.md](../TECHNICAL_MINDMAP.md) · **Roadmap:** [R6 (V0.2.0)](../ROADMAP.md#v020-team-ready), [R12 (V0.2.56)](../ROADMAP.md) · **Guide followed:** [operations.md](operations.md) · **Status:** V0.2.129 (the polish track K added a browser pass to §3 and its notes to §5). The run itself is the maintainer's (it needs a second machine and a running server, which this repository's rules keep from the automated work), so the result table at the end is empty until it is made.
 
 `V0.3.0` is tagged when a person who has nothing of RepoMemo on their machine installs it **following only the production guide**, with mail and a remote repository, and meets **no workaround**. A workaround is anything done that the guide does not say: a command guessed, a setting found in the code, a retry after a message that should have said why. Each one is written down and becomes a fix of the guide or the server (the way V0.2.1 came from the first run), and the run is made again.
 
@@ -44,6 +44,7 @@ The releases of the 0.2.x line were written and compiled without running the ser
 - [ ] **`cargo test -p repomemo-desktop`** passes on the maintainer's machine (CI leaves the crate out).
 - [ ] **The performance runs** of [performance.md](performance.md) are made, recorded, and the targets hold (V0.2.54).
 - [ ] **A browser pass**: axe or Lighthouse on the signed-in pages and a keyboard-only pass (V0.2.47); the pages at 375 px and 768 px (V0.2.48).
+- [ ] **The polished pages** (track K, V0.2.57–V0.2.129) are looked at in both themes at 375 px, 768 px and desktop width: a dialog from each area (focus lands on its first field, Enter submits, Escape closes, focus returns to the button), a form with a missing required field, a long list (24 rows and the pager), a deletion (focus moves on), a dropdown opened inside a dialog, and the web steps 4, 6 to 8 and 11 of §2 made once on them. Nothing in track K was seen on screen while it was written.
 - [ ] **The desktop app** is tried against a server: connect, sign in, upload, open a PDF, a link in an answer, *Change server*, and *Move a workspace to a server* (V0.2.49, V0.2.50).
 - [ ] **The security fixes** of V0.2.52 are tried against a running server (the spot checks above).
 - [ ] **The two images** of the container route are built and started once (V0.2.45).
@@ -55,4 +56,23 @@ The releases of the 0.2.x line were written and compiled without running the ser
 |---|---|---|---|---|---|---|
 | *not yet run* | | | | | | |
 
-When the run passes with no workaround, record it here and in the roadmap's R6 and R12 lines, tick §3, set the version to `0.3.0` (`npm run version:set -- 0.3.0`), write the changelog's `V0.3.0` entry from the releases V0.2.1 to V0.2.56 (the [release index](../RELEASES_0.2.md) is the list), and tag `v0.3.0`.
+When the run passes with no workaround, record it here and in the roadmap's R6 and R12 lines, tick §3, set the version to `0.3.0` (`npm run version:set -- 0.3.0`), write the changelog's `V0.3.0` entry from the releases V0.2.1 to V0.2.129 (the [release index](../RELEASES_0.2.md) is the list; §5 has the notes for the polish track), and tag `v0.3.0`.
+
+## 5. Notes for the V0.3.0 changelog: the frontend polish (V0.2.57–V0.2.129)
+
+A draft for the entry; the [plan](../plans/2026-10-17-frontend-polish.md) and the [release index](../RELEASES_0.2.md) have the detail. No product feature was added; the look is the one that shipped.
+
+**What a person sees**
+- One look for every form: fields, dropdowns and buttons are the same height (36 px, 40 px on touch screens), checkboxes and switches are the right shape, and neutral greys have no tint.
+- Dropdowns open above dialogs and stay inside the window; long lists show 24 rows a page with the same pager; a repository's file list no longer stops at 300 files.
+- Every dialog focuses its first field, submits on Enter, closes on Escape, returns focus to its opener and has one of three widths; a deletion moves focus to the next item.
+- A required or malformed field is marked before anything is sent, with a one-line message; Ctrl+Enter (Cmd+Enter on macOS) sends comments, notes, questions and memory statements.
+- Leaving a form with unsaved changes asks first, and every change ends in a success toast or a visible change.
+- The searchable picker, search field, copy button, tabs, badges, loading and empty states look and behave the same on every page.
+
+**What a developer gets**
+- A set of building blocks in `components/ui` described in [DESIGN.md](../../DESIGN.md), tests for each of them, and hooks for mutations, forms, unsaved changes, paging and focus.
+- The large components split into folders (`web/system`, `web/repositories`, `web/setup`, `web/map`) and server data loaded through the query cache.
+- `npm run styles:check` refuses a new bare element style, raw colour, raw layer or raw control height; 111 older cases are listed in `scripts/styles-baseline.json` and can only shrink.
+
+**Not done:** none of this was seen on screen or run as tests while it was written; §3 lists the browser pass and CI.

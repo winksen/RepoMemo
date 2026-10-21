@@ -1,6 +1,6 @@
 # Frontend polish: V0.2.57 → V0.2.129
 
-> **Status:** planned on 2026-10-17, not started. **Line:** after V0.2.56, before `V0.3.0`.
+> **Status:** built, V0.2.57 to V0.2.129 (2026-10-21); planned on 2026-10-17. The browser pass of the polished pages and the clean-install web steps are the maintainer's. **Line:** after V0.2.56, before `V0.3.0`.
 > **For:** the model or person implementing it, one release at a time, in order.
 > **Related:** [Roadmap, track K](../ROADMAP.md#track-k-frontend-polish-v0257v02129) · [Release index](../RELEASES_0.2.md) · [DESIGN.md](../../DESIGN.md) · [Technical mindmap §9](../TECHNICAL_MINDMAP.md)
 

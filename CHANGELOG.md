@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.129 (2026-10-21)
+
+The release checks are repeated after the frontend polish track (V0.2.57 to V0.2.129), the notes for V0.3.0 include it, and the feature freeze is back on until the tag.
+
+### Changed
+- **Checks run on this release:** `npm run typecheck`, `styles:check`, `a11y:check`, `types:check`, `version:check`, `docs:check`, `container:check` and `migrations:check` all pass. The Vitest tests written since V0.2.57 (building blocks, pages, behaviour) were written and not run, as the project's rules ask; CI runs them. `cargo` was not run: the Rust crates changed only by their version number in this track.
+- **Release notes for V0.3.0:** [clean-install.md](mindmap/technical/clean-install.md) now lists V0.2.1 to V0.2.129 as the source of the `V0.3.0` changelog entry and carries a draft section of notes for the polish track (what a person sees, what a developer gets).
+- **Before the tag:** the runbook's pre-tag list has a new line for a browser pass over the polished pages in both themes (dialogs, forms, lists, focus) and the web steps of the run (4, 6 to 8 and 11) made once on them. That pass, and the clean-machine install, are the maintainer's.
+- **Freeze restored:** from this release until `V0.3.0` is tagged, only the release candidate's checks and the fixes the clean install finds go in; track K's exception (decision 15) ends here.
+- **Track K:** 73 releases (V0.2.57 to V0.2.129) in six parts: foundations (K1), building blocks (K2), React foundations (K3), pages on the shared pieces (K4), behaviour (K5) and the checks that keep it so (K6). The plan's status line says it is built.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.128 (2026-10-21)
 
 DESIGN.md describes the interface as it is built: accent, sizes, layers, buttons and building blocks.
