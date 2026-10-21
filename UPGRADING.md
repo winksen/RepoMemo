@@ -37,7 +37,7 @@ Environments from V0.1.40 and later upgrade in place. An older one: open it firs
 
 ### From before V0.1.69
 
-- Providers outside this machine and OpenRouter need `REPOMEMO_AI_ALLOWED_HOSTS`. Repository links need `REPOMEMO_REPO_ROOTS` (they are off without it). `git config --global` of the service account is no longer read: use `REPOMEMO_GIT_SAFE_DIRECTORIES`.
+- Providers outside this machine and OpenRouter need `REPOMEMO_AI_ALLOWED_HOSTS`. From V0.2.139 the built-in list names Ollama's port (11434) and OpenRouter's (443) and allows no path beyond the provider's own: a provider saved with another port on this machine, or with a path such as `/api`, is refused when it is next saved or used. List the host (without a port to allow any, or with `:port`) in `REPOMEMO_AI_ALLOWED_HOSTS` to keep it. Repository links need `REPOMEMO_REPO_ROOTS` (they are off without it). `git config --global` of the service account is no longer read: use `REPOMEMO_GIT_SAFE_DIRECTORIES`.
 
 ### From before V0.1.71
 

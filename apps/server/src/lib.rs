@@ -285,8 +285,10 @@ async fn build_state(
     });
     if !repomemo_ai::set_endpoint_policy(repomemo_ai::EndpointPolicy {
         allowed_hosts: config.ai_allowed_hosts.clone(),
-        // The built-in list stands for the public OpenRouter; an operator's own list may name internal services.
+        // The built-in list stands for the public OpenRouter and a local Ollama; an operator's own list may name
+        // internal services, other ports and gateways with paths of their own.
         public_hostnames_only: built_in_hosts,
+        provider_paths_only: built_in_hosts,
     }) {
         tracing::debug!("The AI endpoint policy was already set in this process");
     }

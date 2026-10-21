@@ -200,8 +200,8 @@ impl ServerConfig {
         if let Some(Err(message)) = backup_key.as_deref().map(crate::backup_crypto::validate_passphrase) {
             bail!("{message}");
         }
-        // Unset: this machine and OpenRouter only. `*` opens every host
-        // (link-local and cloud-metadata addresses stay refused).
+        // Unset: this machine's Ollama (its port) and OpenRouter only. `*` opens every host
+        // (link-local and cloud-metadata addresses stay refused). An entry may end in `:port`.
         let ai_allowed_hosts = match env_text("REPOMEMO_AI_ALLOWED_HOSTS") {
             None => Some(
                 repomemo_ai::DEFAULT_ALLOWED_HOSTS
@@ -210,13 +210,17 @@ impl ServerConfig {
                     .collect(),
             ),
             Some(hosts) if hosts.trim() == "*" => None,
-            Some(hosts) => Some(
-                hosts
+            Some(hosts) => {
+                let hosts = hosts
                     .split(',')
                     .map(|host| host.trim().to_ascii_lowercase())
                     .filter(|host| !host.is_empty())
-                    .collect::<Vec<_>>(),
-            ),
+                    .collect::<Vec<_>>();
+                for host in &hosts {
+                    repomemo_ai::validate_allowed_host(host).context("REPOMEMO_AI_ALLOWED_HOSTS")?;
+                }
+                Some(hosts)
+            }
         };
         let smtp_allowed_hosts = env_text("REPOMEMO_SMTP_ALLOWED_HOSTS")
             .map(|list| {

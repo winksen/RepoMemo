@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.139 (2026-10-21)
+
+A workspace administrator can no longer aim the server at other services of the machine through an AI provider address.
+
+### Security
+- **A provider address is a host and a port (E2, high):** the built-in list of provider hosts now names ports: `127.0.0.1:11434`, `localhost:11434`, `[::1]:11434` (Ollama) and `openrouter.ai:443`. Before, `127.0.0.1` and `localhost` allowed every port, so the server could be pointed at its own port, an admin console or any other local service.
+- **No path beyond the provider's own:** with the built-in list, the base URL may carry nothing after the host and port except OpenRouter's `/api/v1` (Ollama: nothing), and no query or fragment. `http://localhost:11434/api/pull`, `http://127.0.0.1:11434/api/tags` and `https://openrouter.ai/other` are refused; so are `http://127.0.0.1:3020`, `http://127.0.0.1:22` and `http://127.0.0.1` (port 80).
+- **One answer for an address nothing answers at:** the connection test said different things for a refused connection and other failures. A refused connection, a reset, a timeout and a name that resolves nowhere allowed now give the same message, `The provider could not be reached at this address.` (the cause stays in the server log), so the test cannot be used to find open ports.
+
+### Changed
+- **`REPOMEMO_AI_ALLOWED_HOSTS`:** an entry may end in `:port` (`llm.internal:8080`, `[::1]:11434`, `.example.com:443`); one without a port still allows any port, and a list you write yourself leaves paths to you, so gateways at `/v1` keep working. The entries are checked when the server starts, and a typo (`host:99999`) stops it with the name of the setting. `*` still allows every host.
+- **Server check and documentation:** the setup wizard says "This machine's Ollama (port 11434) and OpenRouter"; the settings table, the technical mindmap and `UPGRADING.md` describe the ports and paths.
+- **Tests (written, not run):** every refused form above under the built-in list, the allowed forms (including `localhost:11434/` and `openrouter.ai` with no path), how entries with ports, suffixes and bare IPv6 addresses are read, and an operator's list with and without ports.
+- **Checks run on this release:** `cargo check` of the AI crate and the server with their tests compiles, `rustfmt` is clean for the AI crate and `clippy` reports nothing in the files changed; `docs:check`, `version:check` and `container:check` pass. No server was started and no provider was contacted.
+
+### Upgrading
+- A provider saved on this machine with another port (for example a second Ollama on 11435), or with a path such as `http://localhost:11434/api`, is refused when it is next saved or used. Remove the path, or list the host in `REPOMEMO_AI_ALLOWED_HOSTS` (`localhost` for any port, or `localhost:11435`).
+
 ## V0.2.138 (2026-10-21)
 
 LibreOffice is started with settings the server controls, and a workspace is no longer told a preview is ready because another workspace holds the same file.

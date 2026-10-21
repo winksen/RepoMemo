@@ -486,7 +486,7 @@ pub(crate) async fn checks(
             CheckStatus::Info
         },
         detail: if facts.ai_hosts_restricted {
-            "This machine and OpenRouter, unless REPOMEMO_AI_ALLOWED_HOSTS lists others.".to_owned()
+            "This machine's Ollama (port 11434) and OpenRouter, unless REPOMEMO_AI_ALLOWED_HOSTS lists others.".to_owned()
         } else {
             "Any address except link-local and cloud-metadata ones (REPOMEMO_AI_ALLOWED_HOSTS=*).".to_owned()
         },

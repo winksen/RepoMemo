@@ -33,9 +33,15 @@ const METADATA_HOSTS: &[&str] = &[
     "metadata.azure.internal",
 ];
 
-/// The hosts AI providers may be reached at when the operator lists none:
-/// this machine (Ollama) and OpenRouter.
-pub const DEFAULT_ALLOWED_HOSTS: &[&str] = &["127.0.0.1", "localhost", "::1", "openrouter.ai"];
+/// The hosts AI providers may be reached at when the operator lists none: this machine's Ollama
+/// (its own port only, so no other service on this machine can be reached through a provider
+/// address) and OpenRouter on the HTTPS port.
+pub const DEFAULT_ALLOWED_HOSTS: &[&str] = &["127.0.0.1:11434", "localhost:11434", "[::1]:11434", "openrouter.ai:443"];
+
+/// The one answer for an address nothing answers at: a refused connection, a reset, a timeout and a
+/// name that resolves nowhere allowed look the same, so the connection test cannot be used to learn
+/// which ports of this machine or its network are open.
+const UNREACHABLE: &str = "The provider could not be reached at this address.";
 
 /// Which addresses AI providers may be reached at. The server sets it once at
 /// startup from its configuration; link-local and cloud-metadata addresses are
@@ -43,14 +49,22 @@ pub const DEFAULT_ALLOWED_HOSTS: &[&str] = &["127.0.0.1", "localhost", "::1", "o
 #[derive(Debug, Clone, Default)]
 pub struct EndpointPolicy {
     /// When set, a provider's host must equal one of these names, or end with
-    /// one that starts with a dot (`.example.com`). When not set, every host
-    /// is allowed (the operator asked for that explicitly).
+    /// one that starts with a dot (`.example.com`). An entry may name a port
+    /// (`127.0.0.1:11434`, `[::1]:11434`, `.example.com:443`): then the address
+    /// must use that port; an entry without one allows any port, as an operator
+    /// who wrote it chose. When not set, every host is allowed (the operator
+    /// asked for that explicitly).
     pub allowed_hosts: Option<Vec<String>>,
     /// Names other than `localhost` must resolve to publicly routable
     /// addresses, so a name on the list cannot be pointed at the server's own
     /// network (DNS rebinding). On for the built-in list; an operator's own
     /// list is trusted to name internal services.
     pub public_hostnames_only: bool,
+    /// A provider address is a host and a port and nothing else: no query or fragment, and no
+    /// path beyond the provider's own (`/api/v1` for OpenRouter, none for Ollama), so the
+    /// server cannot be pointed at `/api/pull` and the like. On for the built-in list; an
+    /// operator's own list may name gateways with paths of their own.
+    pub provider_paths_only: bool,
 }
 
 impl EndpointPolicy {
@@ -59,6 +73,7 @@ impl EndpointPolicy {
         Self {
             allowed_hosts: Some(DEFAULT_ALLOWED_HOSTS.iter().map(|host| (*host).to_owned()).collect()),
             public_hostnames_only: true,
+            provider_paths_only: true,
         }
     }
 }
@@ -78,11 +93,58 @@ fn endpoint_policy() -> &'static EndpointPolicy {
 /// Refuses provider URLs that would turn the server into a proxy towards
 /// places it should never call: credentials embedded in the URL, link-local
 /// and cloud-metadata addresses, and hosts outside the operator's allow-list.
-pub fn check_provider_url(base_url: &str) -> Result<()> {
-    check_provider_url_with(base_url, endpoint_policy())
+///
+/// `provider_path` is the path the provider's own API lives at (`/api/v1` for OpenRouter, empty
+/// for Ollama); under a policy that limits paths, the address may carry no other.
+pub fn check_provider_url(base_url: &str, provider_path: &str) -> Result<()> {
+    check_provider_url_for(base_url, provider_path, endpoint_policy())
 }
 
-fn check_provider_url_with(base_url: &str, policy: &EndpointPolicy) -> Result<()> {
+/// An entry of the allowed hosts: a name or address, whether it also covers the names below it
+/// (`.example.com`), and the port it is limited to, if any.
+#[derive(Debug, PartialEq, Eq)]
+struct AllowedHost {
+    host: String,
+    suffix: bool,
+    port: Option<u16>,
+}
+
+/// Reads `host`, `host:port`, `[::1]`, `[::1]:port`, a bare IPv6 address, and each with a leading dot.
+fn parse_allowed_host(entry: &str) -> Option<AllowedHost> {
+    let entry = entry.trim().to_ascii_lowercase();
+    let (rest, suffix) = match entry.strip_prefix('.') {
+        Some(rest) => (rest, true),
+        None => (entry.as_str(), false),
+    };
+    let (host, port) = if let Some(inner) = rest.strip_prefix('[') {
+        let (host, after) = inner.split_once(']')?;
+        let port = match after {
+            "" => None,
+            after => Some(after.strip_prefix(':')?.parse::<u16>().ok()?),
+        };
+        (host, port)
+    } else if rest.matches(':').count() == 1 {
+        let (host, port) = rest.split_once(':')?;
+        (host, Some(port.parse::<u16>().ok()?))
+    } else {
+        // No colon, or several: a bare IPv6 address has no port.
+        (rest, None)
+    };
+    (!host.is_empty()).then(|| AllowedHost {
+        host: host.to_owned(),
+        suffix,
+        port,
+    })
+}
+
+/// Whether an entry of `REPOMEMO_AI_ALLOWED_HOSTS` can be read, so a typo is found at start.
+pub fn validate_allowed_host(entry: &str) -> Result<()> {
+    parse_allowed_host(entry)
+        .map(|_| ())
+        .with_context(|| format!("\"{entry}\" is not a host name, address or .suffix, optionally followed by :port"))
+}
+
+fn check_provider_url_for(base_url: &str, provider_path: &str, policy: &EndpointPolicy) -> Result<()> {
     let url =
         reqwest::Url::parse(base_url.trim()).map_err(|_| anyhow::anyhow!("Provider base URL is not a valid URL."))?;
     if !matches!(url.scheme(), "http" | "https") {
@@ -109,18 +171,40 @@ fn check_provider_url_with(base_url: &str, policy: &EndpointPolicy) -> Result<()
             bail!("Provider base URL points at a link-local or reserved address ({address}), which is not allowed.")
         }
     }
+    let port = url.port_or_known_default();
     if let Some(allowed) = &policy.allowed_hosts {
-        let permitted = allowed.iter().any(|entry| {
-            let entry = entry.trim().to_ascii_lowercase();
-            match entry.strip_prefix('.') {
-                Some(suffix) => host == suffix || host.ends_with(&format!(".{suffix}")),
-                None => host == entry,
-            }
-        });
+        let permitted = allowed
+            .iter()
+            .filter_map(|entry| parse_allowed_host(entry))
+            .any(|entry| {
+                let host_matches = if entry.suffix {
+                    host == entry.host || host.ends_with(&format!(".{}", entry.host))
+                } else {
+                    host == entry.host
+                };
+                host_matches && entry.port.is_none_or(|wanted| Some(wanted) == port)
+            });
         if !permitted {
+            let at = port.map_or(host.clone(), |port| format!("{host}:{port}"));
             bail!(
-                "The server only allows AI providers at: {}. Ask the server operator to add {host}.",
+                "The server only allows AI providers at: {}. Ask the server operator to add {at}.",
                 allowed.join(", ")
+            )
+        }
+    }
+    if policy.provider_paths_only {
+        if url.query().is_some() || url.fragment().is_some() {
+            bail!("The provider base URL must not carry a query or a fragment.")
+        }
+        let path = url.path().trim_end_matches('/');
+        if !path.is_empty() && path != provider_path {
+            bail!(
+                "The server only reaches a provider at its own address{}; remove the path {path} from the base URL.",
+                if provider_path.is_empty() {
+                    String::new()
+                } else {
+                    format!(" (the path is empty or {provider_path})")
+                }
             )
         }
     }
@@ -243,6 +327,16 @@ fn provider_client(timeout: Duration) -> reqwest::Result<reqwest::Client> {
             public_only: endpoint_policy().public_hostnames_only,
         }))
         .build()
+}
+
+/// The result of a connection test that got no answer (see [`UNREACHABLE`]); the cause stays in the log.
+fn unreachable_result(provider_id: &str, error: &reqwest::Error) -> ProviderTestResult {
+    tracing::warn!(error = %error, "AI provider connection test got no answer");
+    ProviderTestResult {
+        provider_id: provider_id.to_owned(),
+        success: false,
+        message: UNREACHABLE.to_owned(),
+    }
 }
 
 /// Reads at most `limit` bytes of a response body.
@@ -417,12 +511,10 @@ impl AiProvider for OllamaProvider {
     }
 
     async fn test_connection(&self) -> Result<ProviderTestResult> {
-        let response = self
-            .client
-            .get(self.endpoint("/api/tags"))
-            .send()
-            .await
-            .context("could not reach the local Ollama provider")?;
+        let response = match self.client.get(self.endpoint("/api/tags")).send().await {
+            Ok(response) => response,
+            Err(error) => return Ok(unreachable_result(&self.settings.id, &error)),
+        };
         let response = checked(response, "local Ollama provider rejected the connection test").await?;
         let body: OllamaTagsResponse =
             read_json(response, "local Ollama provider returned an invalid response").await?;
@@ -592,11 +684,10 @@ impl AiProvider for OpenRouterProvider {
             success,
             message,
         };
-        let key = self
-            .request(reqwest::Method::GET, "/key")
-            .send()
-            .await
-            .context("could not reach OpenRouter")?;
+        let key = match self.request(reqwest::Method::GET, "/key").send().await {
+            Ok(response) => response,
+            Err(error) => return Ok(unreachable_result(&self.settings.id, &error)),
+        };
         if matches!(key.status().as_u16(), 401 | 403) {
             return Ok(result(
                 false,
@@ -604,11 +695,10 @@ impl AiProvider for OpenRouterProvider {
             ));
         }
 
-        let models = self
-            .request(reqwest::Method::GET, "/models")
-            .send()
-            .await
-            .context("could not reach OpenRouter")?;
+        let models = match self.request(reqwest::Method::GET, "/models").send().await {
+            Ok(response) => response,
+            Err(error) => return Ok(unreachable_result(&self.settings.id, &error)),
+        };
         let models: Value = read_json(
             checked(models, "OpenRouter could not list its models").await?,
             "OpenRouter returned an invalid model list",
@@ -878,16 +968,16 @@ pub fn validate_settings(settings: &ProviderSettings) -> Result<()> {
     if settings.name.trim().is_empty() {
         bail!("Provider name is required.")
     }
-    let default_url = if settings.provider_type == "openrouter" {
-        OPENROUTER_BASE_URL
+    let (default_url, provider_path) = if settings.provider_type == "openrouter" {
+        (OPENROUTER_BASE_URL, "/api/v1")
     } else {
-        DEFAULT_BASE_URL
+        (DEFAULT_BASE_URL, "")
     };
     let base_url = settings.base_url.as_deref().unwrap_or(default_url).trim();
     if !(base_url.starts_with("http://") || base_url.starts_with("https://")) {
         bail!("Provider base URL must start with http:// or https://.")
     }
-    check_provider_url(base_url)?;
+    check_provider_url(base_url, provider_path)?;
     if settings.model.as_deref().unwrap_or_default().trim().is_empty() {
         bail!("A chat model is required.")
     }
@@ -1015,7 +1105,8 @@ mod tests {
 
     #[test]
     fn provider_urls_cannot_reach_metadata_or_embed_credentials() {
-        use super::{check_provider_url_with, EndpointPolicy};
+        use super::{check_provider_url_for, EndpointPolicy};
+        let check_provider_url_with = |url: &str, policy: &EndpointPolicy| check_provider_url_for(url, "", policy);
         let open = EndpointPolicy::default();
         for allowed in [
             "http://127.0.0.1:11434",
@@ -1060,18 +1151,25 @@ mod tests {
 
     #[test]
     fn the_built_in_policy_allows_this_machine_and_openrouter_only() {
-        use super::{check_provider_url_with, EndpointPolicy};
+        use super::{check_provider_url_for, EndpointPolicy};
         let built_in = EndpointPolicy::built_in();
+        let ollama = |url: &str| check_provider_url_for(url, "", &built_in);
+        let openrouter = |url: &str| check_provider_url_for(url, "/api/v1", &built_in);
         for allowed in [
             "http://127.0.0.1:11434",
             "http://localhost:11434",
+            "http://localhost:11434/",
             "http://[::1]:11434",
-            "https://openrouter.ai/api/v1",
         ] {
-            assert!(
-                check_provider_url_with(allowed, &built_in).is_ok(),
-                "{allowed} should be allowed"
-            );
+            assert!(ollama(allowed).is_ok(), "{allowed} should be allowed");
+        }
+        for allowed in [
+            "https://openrouter.ai/api/v1",
+            "https://openrouter.ai/api/v1/",
+            "https://openrouter.ai:443/api/v1",
+            "https://openrouter.ai",
+        ] {
+            assert!(openrouter(allowed).is_ok(), "{allowed} should be allowed");
         }
         for refused in [
             "http://192.168.1.20:11434",
@@ -1079,11 +1177,105 @@ mod tests {
             "https://api.openai.com/v1",
             "https://eu.openrouter.ai/api/v1",
         ] {
-            assert!(
-                check_provider_url_with(refused, &built_in).is_err(),
-                "{refused} should be refused"
-            );
+            assert!(ollama(refused).is_err(), "{refused} should be refused");
+            assert!(openrouter(refused).is_err(), "{refused} should be refused");
         }
+    }
+
+    /// E2: a provider address is a host and a port, with no other service of this machine and no
+    /// path beyond the provider's own.
+    #[test]
+    fn the_built_in_policy_reaches_neither_other_ports_nor_other_paths() {
+        use super::{check_provider_url_for, EndpointPolicy};
+        let built_in = EndpointPolicy::built_in();
+        let ollama = |url: &str| check_provider_url_for(url, "", &built_in);
+        let openrouter = |url: &str| check_provider_url_for(url, "/api/v1", &built_in);
+        for refused in [
+            // The server's own port, SSH, and the default port of http.
+            "http://127.0.0.1:3020",
+            "http://127.0.0.1:22",
+            "http://127.0.0.1",
+            "http://localhost:3021",
+            "http://[::1]:8080",
+            // Paths and queries of Ollama's other endpoints.
+            "http://localhost:11434/api/pull",
+            "http://127.0.0.1:11434/api/tags",
+            "http://127.0.0.1:11434/?model=x",
+            "http://127.0.0.1:11434/#frag",
+        ] {
+            let error = ollama(refused).expect_err(refused).to_string();
+            assert!(!error.is_empty(), "{refused}");
+        }
+        for refused in [
+            "https://openrouter.ai:8443/api/v1",
+            "http://openrouter.ai/api/v1",
+            "https://openrouter.ai/api/v2",
+            "https://openrouter.ai/other",
+            "https://openrouter.ai/api/v1?x=1",
+        ] {
+            assert!(openrouter(refused).is_err(), "{refused} should be refused");
+        }
+        // Another provider's path is not this provider's.
+        assert!(check_provider_url_for("https://openrouter.ai/api/v1", "", &built_in).is_err());
+        assert!(check_provider_url_for("http://127.0.0.1:11434/api/v1", "/api/v1", &built_in).is_err());
+    }
+
+    #[test]
+    fn an_operators_list_may_name_ports_suffixes_and_gateways() {
+        use super::{check_provider_url_for, parse_allowed_host, validate_allowed_host, AllowedHost, EndpointPolicy};
+        assert_eq!(
+            parse_allowed_host("[::1]:11434"),
+            Some(AllowedHost {
+                host: "::1".to_owned(),
+                suffix: false,
+                port: Some(11434)
+            })
+        );
+        assert_eq!(
+            parse_allowed_host(".Example.com:8443"),
+            Some(AllowedHost {
+                host: "example.com".to_owned(),
+                suffix: true,
+                port: Some(8443)
+            })
+        );
+        assert_eq!(
+            parse_allowed_host("::1"),
+            Some(AllowedHost {
+                host: "::1".to_owned(),
+                suffix: false,
+                port: None
+            })
+        );
+        assert_eq!(parse_allowed_host("llm.internal").unwrap().port, None);
+        for unreadable in ["", "host:", "host:99999", "host:abc", "[::1", "[::1]x", ":8080"] {
+            assert!(parse_allowed_host(unreadable).is_none(), "{unreadable}");
+            assert!(validate_allowed_host(unreadable).is_err(), "{unreadable}");
+        }
+        assert!(validate_allowed_host("llm.internal:8080").is_ok());
+
+        // An entry with a port limits the port; one without allows any, and paths are the operator's.
+        let operator = EndpointPolicy {
+            allowed_hosts: Some(vec![
+                "llm.internal:8080".to_owned(),
+                "127.0.0.1".to_owned(),
+                ".example.com:443".to_owned(),
+            ]),
+            ..EndpointPolicy::default()
+        };
+        let check = |url: &str| check_provider_url_for(url, "", &operator);
+        assert!(check("http://llm.internal:8080/v1").is_ok());
+        assert!(check("http://llm.internal:9090/v1").is_err());
+        assert!(
+            check("http://127.0.0.1:3020").is_ok(),
+            "no port in the entry: any port, as chosen"
+        );
+        assert!(
+            check("http://127.0.0.1:11434/api/pull").is_ok(),
+            "paths are not limited outside the built-in list"
+        );
+        assert!(check("https://eu.example.com/v1").is_ok());
+        assert!(check("https://eu.example.com:8443/v1").is_err());
     }
 
     #[test]
