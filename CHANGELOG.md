@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.123 (2026-10-21)
+
+Long lists show 24 rows a page with the shared pagination.
+
+### Changed
+- **Lists that page:** notifications, the tasks of each board column (each column has its own pager), memory cards (and the results of a memory search), System › Users, System › Jobs, System › Audit, and a repository's file list. Evidence and search results already did.
+- **How:** each list shows 24 rows and the shared `Pagination` under it ("1–24 of 60", *Previous page*, *Next page*), which stays hidden while everything fits on one page. A list starts again at the first page when its filter changes (users, jobs by status, files, memory search); a page that no longer exists after a change moves to the last one.
+- **Repository files:** the list no longer stops at the first 300 files with a "Filter to narrow the list" line; every matching file is reachable, 24 at a time, with the count under the pager.
+
+### Added
+- **`usePagedList(items, resetKey)`** (`lib/usePagedList.ts`): the rows of the current page and the props of `<Pagination>`.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.122 (2026-10-21)
 
 Required and malformed fields are marked before anything is sent; server errors stay toasts.

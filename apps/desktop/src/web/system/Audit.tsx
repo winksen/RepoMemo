@@ -4,6 +4,8 @@ import { downloadSystemAuditExport, listSystemAuditEvents } from "../../lib/shar
 import type { SystemAuditEvent } from "../../types";
 import { Button } from "../../components/ui/button";
 import { Table } from "../../components/ui/table";
+import { Pagination } from "../../components/ui/pagination";
+import { usePagedList } from "../../lib/usePagedList";
 import { PanelHeading } from "../../components/ui/panel-heading";
 import { Dropdown } from "../../components/ui/dropdown";
 import { EmptyState } from "../../components/ui/empty-state";
@@ -18,6 +20,7 @@ import { systemKeys } from "../../lib/queryClient";
 
 export function AuditSection({ accessToken, canExport }: { accessToken: string; canExport: boolean }) {
   const [events, isLoading, reload] = useSystemData<SystemAuditEvent[]>(systemKeys.audit(), () => listSystemAuditEvents(accessToken));
+  const paging = usePagedList(events ?? []);
   const [format, setFormat] = useState<"jsonl" | "csv">("jsonl");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -53,9 +56,12 @@ export function AuditSection({ accessToken, canExport }: { accessToken: string; 
       </div>
     </section> : null}
     <div className="rm-system-toolbar"><span className="shared-muted-copy">The 200 most recent events. Sign-in and other security events are under Logs › Security events only.</span><RefreshButton isLoading={isLoading} onClick={() => void reload()} /></div>
-    {events?.length ? <Table>
+    {events?.length ? <>
+    <Table>
       <thead><tr><th scope="col">When</th><th scope="col">Who</th><th scope="col">Action</th><th scope="col">Detail</th></tr></thead>
-      <tbody>{events.map((event) => <tr key={event.id}><td>{formatTime(event.created_at)}</td><td>{event.actor ? event.actor.display_name : "System"}</td><th scope="row">{event.action.replace(/_/g, " ")}</th><td>{event.detail}</td></tr>)}</tbody>
-    </Table> : events ? <EmptyState title="Nothing recorded yet" /> : <LoadingState label="Loading the audit trail" />}
+      <tbody>{paging.rows.map((event) => <tr key={event.id}><td>{formatTime(event.created_at)}</td><td>{event.actor ? event.actor.display_name : "System"}</td><th scope="row">{event.action.replace(/_/g, " ")}</th><td>{event.detail}</td></tr>)}</tbody>
+    </Table>
+    <Pagination {...paging.props} />
+    </> : events ? <EmptyState title="Nothing recorded yet" /> : <LoadingState label="Loading the audit trail" />}
   </>;
 }

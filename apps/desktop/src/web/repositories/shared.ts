@@ -6,8 +6,6 @@ export const POLL_INTERVAL_MS = 1500;
 export const LIVE_FALLBACK_POLL_MS = 15_000;
 /** Activity that changes the list of repositories (syncs arrive as job events). */
 export const REPOSITORY_LIST_ACTIONS = new Set(["repository_connected", "repository_updated", "repository_removed"]);
-/** Files listed at once; a filter narrows larger repositories. */
-export const FILE_LIST_LIMIT = 300;
 
 export const STAGE_LABEL: Record<string, string> = {
   queued: "Waiting for another sync to finish",

@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.2 → 0.3
 
-> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.122` (2026-10-21) · **Next:** `V0.2.123`
+> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.123` (2026-10-21) · **Next:** `V0.2.124`
 > **Previous line:** [Releases 0.1 → 0.2](RELEASES_0.1.md) · **Related:** [Roadmap, Road to V0.3.0](ROADMAP.md#-road-to-v030) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
 Every release of the 0.2 line, shipped and planned, one row each. The plan comes from the [Road to V0.3.0](ROADMAP.md#-road-to-v030): **one change per release**, each shippable alone, with the security rules for a new outside connection in the release that opens it. Planned rows are proposals until decisions 7–14 in the roadmap are agreed.
@@ -157,7 +157,7 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | **V0.2.120** | ✅ 2026-10-21 |K. Frontend polish |🔧 Enhancement |Web client | A form with unsaved changes asks before the page changes or the tab closes (System › Settings, the evidence note, a memory card being edited, the workspace name, *Save as memory*) through `useUnsavedChanges` and the guards of `navigate()`; the back button is not guarded (tested in `test/unsavedChanges.test.tsx`, written, not run); not seen on screen | As described in the plan |
 | **V0.2.121** | ✅ 2026-10-21 |K. Frontend polish |🔧 Enhancement |Web client | Ctrl+Enter (Cmd+Enter on macOS) sends comments, notes, the Ask question, the assistant message and memory statements: every `Textarea` and the note editor submit their form, with a muted hint under each field (tested in `test/submitShortcut.test.tsx`, written, not run); not seen on screen | As described in the plan |
 | **V0.2.122** | ✅ 2026-10-21 |K. Frontend polish |🔧 Enhancement |Web client | `Field` marks a control the browser refuses on submit (required, email, address, length, range) with `aria-invalid`, a one-line message and focus on the first one, for every form built with `Field`; the AI provider address is `type="url"`; server errors stay toasts (tested in `test/fieldValidation.test.tsx`, written, not run); not seen on screen | As described in the plan |
-| **V0.2.123** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | Web client | Long lists page | As described in the plan |
+| **V0.2.123** | ✅ 2026-10-21 |K. Frontend polish |🔧 Enhancement |Web client | Notifications, tasks (each column), memory cards, System users, jobs and audit, and repository files show 24 rows a page with the shared `Pagination` and `usePagedList`; a filter returns a list to its first page; the repository file list no longer stops at 300 files (tested in `test/pagedLists.test.tsx`, written, not run); not seen on screen | As described in the plan |
 | **V0.2.124** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | Web client | Every change says it happened | The commit lists each mutation and its feedback. |
 | **V0.2.125** | 🔜 Planned | K. Frontend polish | 🔧 Enhancement | Web client | Focus lands somewhere sensible | As described in the plan |
 | **V0.2.126** | 🔜 Planned | K. Frontend polish | 🧪 Test | Web tests | Tests for the building blocks | As described in the plan |

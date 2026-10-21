@@ -5,7 +5,8 @@ import { apiMessage, lastChangeLabel } from "../format";
 import { LoadingState } from "../../components/ui/loading-state";
 import { SearchField } from "../../components/ui/search-field";
 import { showToast } from "../../components/ui/toast";
-import { FILE_LIST_LIMIT } from "./shared";
+import { Pagination } from "../../components/ui/pagination";
+import { usePagedList } from "../../lib/usePagedList";
 import { repositoryKeys } from "../../lib/queryClient";
 import { useServerState } from "../../lib/useServerState";
 
@@ -34,17 +35,19 @@ export function RepositoryFiles({
     return (files ?? []).filter((file) => !needle || file.path.toLowerCase().includes(needle));
   }, [files, filter]);
 
+  const paging = usePagedList(matching, filter);
   if (!files) return <LoadingState label="Loading files" />;
   return <div className="rm-repo-files">
     <SearchField aria-label={`Filter files of ${repository.name}`} onValueChange={setFilter} placeholder="Filter by path" value={filter} />
     <ul>
-      {matching.slice(0, FILE_LIST_LIMIT).map((file) => <li key={file.artifact_id}>
+      {paging.rows.map((file) => <li key={file.artifact_id}>
         <button className="rm-map-link" onClick={() => onOpenArtifact(file.artifact_id)} type="button">{file.path}</button>
         {file.last_author ? <span className="rm-map-muted"> · {lastChangeLabel(file.last_author, file.last_changed_at)}</span> : null}
         <span className="rm-map-muted">{file.language ?? ""}</span>
         {file.indexed ? null : <span className="rm-map-muted" title={file.index_failure ?? undefined}>{file.index_failure ? "Not indexed" : "Indexing…"}</span>}
       </li>)}
     </ul>
-    <span className="rm-map-muted">{matching.length > FILE_LIST_LIMIT ? `Showing ${FILE_LIST_LIMIT} of ${matching.length.toLocaleString()} files. Filter to narrow the list.` : `${matching.length.toLocaleString()} ${matching.length === 1 ? "file" : "files"}`}</span>
+    <Pagination {...paging.props} />
+    <span className="rm-map-muted">{matching.length.toLocaleString()} {matching.length === 1 ? "file" : "files"}</span>
   </div>;
 }

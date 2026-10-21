@@ -5,6 +5,8 @@ import { type Organization, type SharedNotification, type SharedSession, type Sh
 import { Button } from "../components/ui/button";
 import { PageHeader } from "../components/ui/page-header";
 import { EmptyState } from "../components/ui/empty-state";
+import { Pagination } from "../components/ui/pagination";
+import { usePagedList } from "../lib/usePagedList";
 import { Toast } from "../components/ui/toast";
 import { accountKeys } from "../lib/queryClient";
 import { useServerState } from "../lib/useServerState";
@@ -33,6 +35,7 @@ export function SharedNotifications({
     key: accountKeys.notifications(session.user.id), fetch: () => listSharedNotifications(accessToken), initial: [], staleTime: 0,
   });
   const [error, setError] = useState<string | null>(null);
+  const paging = usePagedList(notifications);
   const isLoading = notificationsQuery.isLoading;
   const [isMutating, setIsMutating] = useState(false);
   useEffect(() => { if (notificationsQuery.error) setError(apiMessage(notificationsQuery.error)); }, [notificationsQuery.error]);
@@ -61,7 +64,8 @@ export function SharedNotifications({
     <section className="shared-page-content shared-notifications-page" aria-busy={isLoading}>
       <PageHeader actions={<Button disabled={isMutating || unreadCount === 0} onClick={() => void markAllRead()} type="button" variant="secondary">Mark all read</Button>} description={<>Task assignments and direct evidence mentions appear here. Mention a teammate with their email, for example <code>@person@example.com</code>.</>} title="Notifications" />
       <Toast kind="error" message={error} />
-      <section className="shared-notification-list" aria-label="Notifications">{notifications.length ? notifications.map((notification) => <article className={notification.read_at ? "" : "is-unread"} key={notification.id}><Button onClick={() => void openNotification(notification)} type="button" variant="secondary"><span className="shared-notification-icon"><Bell size={ICON_SIZE.md} /></span><span><strong>{notification.title}</strong><small>{notification.body}</small><time dateTime={notification.created_at}>{formatTime(notification.created_at)}</time></span><ChevronRight size={ICON_SIZE.md} /></Button></article>) : <EmptyState description="Assignments and evidence mentions will appear here when your team needs your attention." icon={<Bell size={25} />} title="Nothing new" />}</section>
+      <section className="shared-notification-list" aria-label="Notifications">{notifications.length ? paging.rows.map((notification) => <article className={notification.read_at ? "" : "is-unread"} key={notification.id}><Button onClick={() => void openNotification(notification)} type="button" variant="secondary"><span className="shared-notification-icon"><Bell size={ICON_SIZE.md} /></span><span><strong>{notification.title}</strong><small>{notification.body}</small><time dateTime={notification.created_at}>{formatTime(notification.created_at)}</time></span><ChevronRight size={ICON_SIZE.md} /></Button></article>) : <EmptyState description="Assignments and evidence mentions will appear here when your team needs your attention." icon={<Bell size={25} />} title="Nothing new" />}</section>
+      <Pagination {...paging.props} />
     </section>
   </SharedLayout>;
 }

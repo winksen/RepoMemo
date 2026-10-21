@@ -4,6 +4,8 @@ import { cancelSharedJob, getSystemOverview, listSystemJobs } from "../../lib/sh
 import type { MaintenanceStatus, SystemJob, SystemOverview } from "../../types";
 import { Button } from "../../components/ui/button";
 import { Table } from "../../components/ui/table";
+import { Pagination } from "../../components/ui/pagination";
+import { usePagedList } from "../../lib/usePagedList";
 import { PanelHeading } from "../../components/ui/panel-heading";
 import { Dropdown } from "../../components/ui/dropdown";
 import { EmptyState } from "../../components/ui/empty-state";
@@ -40,6 +42,7 @@ export function JobsSection({ accessToken, canChange }: { accessToken: string; c
       return matches ? [{ ...job, workspace_name: workspaceName ?? null }, ...current].slice(0, 100) : current;
     });
   }, liveHub);
+  const paging = usePagedList(jobs ?? [], status);
   // The maintenance status is part of the overview, which the Overview page shares through the cache.
   const [overview, setOverview] = useServerState<SystemOverview | null>({ key: systemKeys.overview(), fetch: () => getSystemOverview(accessToken), initial: null, staleTime: 0 });
   const setMaintenance = (next: MaintenanceStatus) => setOverview((current) => current ? { ...current, background: { ...current.background, maintenance: next } } : current);
@@ -58,9 +61,10 @@ export function JobsSection({ accessToken, canChange }: { accessToken: string; c
         <Field label="Status">{(control) => <Dropdown id={control.id} onValueChange={setStatus} options={[{ label: "All", value: "all" }, { label: "Running", value: "running" }, { label: "Failed", value: "failed" }, { label: "Completed", value: "completed" }, { label: "Cancelled", value: "cancelled" }]} value={status} />}</Field>
         <RefreshButton isLoading={isLoading} onClick={() => void reload()} />
       </div>
-      {jobs?.length ? <Table>
+      {jobs?.length ? <>
+      <Table>
         <thead><tr><th scope="col">Kind</th><th scope="col">Workspace</th><th scope="col">Status</th><th scope="col">Progress</th><th scope="col">Started</th><th scope="col">Updated</th><th scope="col">Detail</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
-        <tbody>{jobs.map((job) => <tr key={job.id}>
+        <tbody>{paging.rows.map((job) => <tr key={job.id}>
           <th scope="row">{(job.kind ?? "indexing").replace(/_/g, " ")}</th>
           <td>{job.workspace_name ?? "—"}</td>
           <td>{job.status}{job.cancel_requested && job.status === "running" ? " (stopping)" : ""}</td>
@@ -69,7 +73,9 @@ export function JobsSection({ accessToken, canChange }: { accessToken: string; c
           <td>{job.error_message ?? job.stage.replace(/_/g, " ")}</td>
           <td>{job.status === "running" && !job.cancel_requested ? <Button onClick={() => void cancel(job)} variant="secondary">Stop</Button> : null}</td>
         </tr>)}</tbody>
-      </Table> : jobs ? <EmptyState title="No jobs match" /> : <LoadingState label="Loading jobs" />}
+      </Table>
+      <Pagination {...paging.props} />
+      </> : jobs ? <EmptyState title="No jobs match" /> : <LoadingState label="Loading jobs" />}
     </section>
   </>;
 }

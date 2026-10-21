@@ -32,6 +32,8 @@ import { ActionMenu } from "../../components/ui/action-menu";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Table } from "../../components/ui/table";
+import { Pagination } from "../../components/ui/pagination";
+import { usePagedList } from "../../lib/usePagedList";
 import { Dialog, DialogCancel } from "../../components/ui/dialog";
 import { EmptyState } from "../../components/ui/empty-state";
 import { Field } from "../../components/ui/field";
@@ -94,6 +96,7 @@ export function UsersSection({ accessToken, session }: { accessToken: string; se
     const needle = filter.trim().toLowerCase();
     return (users ?? []).filter((user) => !needle || user.display_name.toLowerCase().includes(needle) || user.email.toLowerCase().includes(needle));
   }, [users, filter]);
+  const paging = usePagedList(visible, filter);
 
   async function confirm() {
     if (!pending) return;
@@ -154,9 +157,10 @@ export function UsersSection({ accessToken, session }: { accessToken: string; se
       <SearchField aria-label="Filter users" onValueChange={setFilter} placeholder="Filter by name or email" value={filter} />
       <RefreshButton isLoading={isLoading} onClick={() => void reload()} />
     </div>
-    {users ? <Table>
+    {users ? <>
+    <Table>
       <thead><tr><th scope="col">Person</th><th scope="col">Role</th><th scope="col">Organizations and workspaces</th><th scope="col">Sessions</th><th scope="col">Last connected</th><th scope="col">Joined</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
-      <tbody>{visible.map((user) => <tr className={user.deactivated_at ? "rm-system-row-inactive" : undefined} key={user.id}>
+      <tbody>{paging.rows.map((user) => <tr className={user.deactivated_at ? "rm-system-row-inactive" : undefined} key={user.id}>
         <th scope="row"><span className="rm-system-person"><UserAvatar name={user.display_name} size={32} userId={user.id} /><span><strong>{user.display_name}{user.id === session.user.id ? " (you)" : ""}</strong><small>{user.email}</small>{user.deactivated_at ? <small><Tooltip content={`Deactivated ${formatTime(user.deactivated_at)}`}><Badge icon={<UserOff size={ICON_SIZE.sm} />} tone="warning">{user.anonymized_at ? "Anonymized" : "Deactivated"}</Badge></Tooltip></small> : null}</span></span></th>
         <td>{user.is_system_admin ? <Tooltip content="Administers the server and every organization and workspace"><Badge icon={<ServerCog size={ICON_SIZE.sm} />}>Sys Admin</Badge></Tooltip> : user.is_app_admin ? <Tooltip content="Uses the System pages, without access to every organization and workspace"><Badge icon={<UserCog size={ICON_SIZE.sm} />}>App Admin</Badge></Tooltip> : <Badge icon={<UserIcon size={ICON_SIZE.sm} />}>User</Badge>}</td>
         <td><AccessTree user={user} /></td><td>{count(user.active_sessions)}</td><td>{formatTime(user.last_connected_at)}</td><td>{formatTime(user.created_at)}</td>
@@ -176,7 +180,9 @@ export function UsersSection({ accessToken, session }: { accessToken: string; se
           ...(user.deactivated_at && !user.anonymized_at ? [{ label: "Anonymize account", icon: <UserOff size={ICON_SIZE.sm} />, onSelect: () => { setConfirmText(""); setPending({ kind: "anonymize", user }); }, destructive: true }] : []),
         ]} label={`Actions for ${user.display_name}`} /> : null}</td>
       </tr>)}</tbody>
-    </Table> : isLoading ? <LoadingState label="Loading users" /> : <EmptyState title="Users are not available" />}
+    </Table>
+    <Pagination {...paging.props} />
+    </> : isLoading ? <LoadingState label="Loading users" /> : <EmptyState title="Users are not available" />}
     <Dialog description={dialog?.description} footer={<><DialogCancel onClick={() => setPending(null)} /><Button busy={isBusy} disabled={pending?.kind === "anonymize" && confirmText.trim().toLowerCase() !== pending.user.email.toLowerCase()} type="submit" variant={pending && DESTRUCTIVE_KINDS.has(pending.kind) ? "danger" : "main"}>{dialog?.action}</Button></>} onClose={() => setPending(null)} onSubmit={() => void confirm()} open={Boolean(pending)} title={dialog?.title ?? ""}>
       {pending?.kind === "anonymize" ? <Field label="Confirm the email address"><Input autoComplete="off" onChange={(event) => setConfirmText(event.target.value)} placeholder={pending.user.email} value={confirmText} /></Field> : null}
     </Dialog>
