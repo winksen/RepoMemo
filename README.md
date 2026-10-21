@@ -42,7 +42,7 @@ RepoMemo can be run two ways:
 
 ## Quick start (shared mode)
 
-**Prerequisites:** Node.js 22+, npm 10+, and the stable Rust toolchain. For Windows specifics, see [docs/WINDOWS_SETUP.md](docs/WINDOWS_SETUP.md).
+**Prerequisites:** Node.js 22+, npm 10+, and the stable Rust toolchain (1.88 or later). For Windows specifics, see [docs/WINDOWS_SETUP.md](docs/WINDOWS_SETUP.md).
 
 ```bash
 npm install

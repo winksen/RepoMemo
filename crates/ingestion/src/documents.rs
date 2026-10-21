@@ -232,11 +232,11 @@ fn cap_chars(value: String, limit: usize) -> String {
 // XML helpers
 // ---------------------------------------------------------------------------
 
-fn local(name: &[u8]) -> &[u8] {
-    name.rsplit(|byte| *byte == b':').next().unwrap_or(name)
+fn local(name: &str) -> &str {
+    name.rsplit(':').next().unwrap_or(name)
 }
 
-fn attribute(event: &BytesStart, key: &[u8]) -> Option<String> {
+fn attribute(event: &BytesStart, key: &str) -> Option<String> {
     event.attributes().flatten().find_map(|attribute| {
         (local(attribute.key.as_ref()) == key)
             .then(|| {
@@ -254,10 +254,8 @@ fn push_reference(output: &mut String, reference: &quick_xml::events::BytesRef) 
         output.push(character);
         return;
     }
-    if let Ok(name) = reference.decode() {
-        if let Some(resolved) = quick_xml::escape::resolve_predefined_entity(&name) {
-            output.push_str(resolved);
-        }
+    if let Some(resolved) = quick_xml::escape::resolve_predefined_entity(reference.as_ref()) {
+        output.push_str(resolved);
     }
 }
 
@@ -348,8 +346,8 @@ fn workbook_sheets(xml: &[u8]) -> Result<Vec<(String, String)>> {
     let mut sheets = Vec::new();
     loop {
         match reader.read_event_into(&mut buffer) {
-            Ok(Event::Start(event)) | Ok(Event::Empty(event)) if local(event.name().as_ref()) == b"sheet" => {
-                if let (Some(name), Some(id)) = (attribute(&event, b"name"), attribute(&event, b"id")) {
+            Ok(Event::Start(event)) | Ok(Event::Empty(event)) if local(event.name().as_ref()) == "sheet" => {
+                if let (Some(name), Some(id)) = (attribute(&event, "name"), attribute(&event, "id")) {
                     sheets.push((name, id));
                 }
             }
@@ -368,8 +366,8 @@ fn relationship_targets(xml: &[u8]) -> Result<HashMap<String, String>> {
     let mut targets = HashMap::new();
     loop {
         match reader.read_event_into(&mut buffer) {
-            Ok(Event::Start(event)) | Ok(Event::Empty(event)) if local(event.name().as_ref()) == b"Relationship" => {
-                if let (Some(id), Some(target)) = (attribute(&event, b"Id"), attribute(&event, b"Target")) {
+            Ok(Event::Start(event)) | Ok(Event::Empty(event)) if local(event.name().as_ref()) == "Relationship" => {
+                if let (Some(id), Some(target)) = (attribute(&event, "Id"), attribute(&event, "Target")) {
                     targets.insert(id, target);
                 }
             }
@@ -393,24 +391,24 @@ fn shared_strings(xml: &[u8]) -> Result<Vec<String>> {
     loop {
         match reader.read_event_into(&mut buffer) {
             Ok(Event::Start(event)) => match local(event.name().as_ref()) {
-                b"si" => {
+                "si" => {
                     in_item = true;
                     current.clear();
                 }
-                b"rPh" => in_phonetic = true,
-                b"t" if in_item && !in_phonetic => in_text = true,
+                "rPh" => in_phonetic = true,
+                "t" if in_item && !in_phonetic => in_text = true,
                 _ => {}
             },
             Ok(Event::End(event)) => match local(event.name().as_ref()) {
-                b"si" => {
+                "si" => {
                     in_item = false;
                     strings.push(clip(std::mem::take(&mut current), MAX_CELL_CHARS));
                 }
-                b"rPh" => in_phonetic = false,
-                b"t" => in_text = false,
+                "rPh" => in_phonetic = false,
+                "t" => in_text = false,
                 _ => {}
             },
-            Ok(Event::Text(text)) if in_text => current.push_str(&text.decode().context("invalid shared string")?),
+            Ok(Event::Text(text)) if in_text => current.push_str(&text.xml10_content()),
             Ok(Event::GeneralRef(reference)) if in_text => push_reference(&mut current, &reference),
             Ok(Event::Eof) => break,
             Err(error) => bail!("invalid sharedStrings.xml: {error}"),
@@ -431,23 +429,23 @@ fn date_styles(xml: &[u8]) -> Vec<bool> {
     loop {
         match reader.read_event_into(&mut buffer) {
             Ok(Event::Start(event)) | Ok(Event::Empty(event)) => match local(event.name().as_ref()) {
-                b"numFmt" => {
-                    if let (Some(id), Some(code)) = (attribute(&event, b"numFmtId"), attribute(&event, b"formatCode")) {
+                "numFmt" => {
+                    if let (Some(id), Some(code)) = (attribute(&event, "numFmtId"), attribute(&event, "formatCode")) {
                         if let Ok(id) = id.parse() {
                             custom.insert(id, code);
                         }
                     }
                 }
-                b"cellXfs" => in_cell_xfs = true,
-                b"xf" if in_cell_xfs => {
-                    let id = attribute(&event, b"numFmtId")
+                "cellXfs" => in_cell_xfs = true,
+                "xf" if in_cell_xfs => {
+                    let id = attribute(&event, "numFmtId")
                         .and_then(|value| value.parse::<u32>().ok())
                         .unwrap_or(0);
                     styles.push(is_date_format(id, custom.get(&id).map(String::as_str)));
                 }
                 _ => {}
             },
-            Ok(Event::End(event)) if local(event.name().as_ref()) == b"cellXfs" => in_cell_xfs = false,
+            Ok(Event::End(event)) if local(event.name().as_ref()) == "cellXfs" => in_cell_xfs = false,
             Ok(Event::Eof) | Err(_) => break,
             _ => {}
         }
@@ -511,36 +509,36 @@ fn parse_sheet_rows(xml: &[u8], shared: &[String], date_styles: &[bool]) -> Resu
     loop {
         match reader.read_event_into(&mut buffer) {
             Ok(Event::Start(event)) => match local(event.name().as_ref()) {
-                b"row" => {
-                    row_index = attribute(&event, b"r")
+                "row" => {
+                    row_index = attribute(&event, "r")
                         .and_then(|value| value.parse::<usize>().ok())
                         .map(|number| number.saturating_sub(1))
                         .unwrap_or(rows.len());
                     next_column = 0;
                 }
-                b"c" => {
+                "c" => {
                     in_cell = true;
                     value.clear();
-                    cell_type = attribute(&event, b"t").unwrap_or_default();
-                    cell_style = attribute(&event, b"s")
+                    cell_type = attribute(&event, "t").unwrap_or_default();
+                    cell_style = attribute(&event, "s")
                         .and_then(|value| value.parse().ok())
                         .unwrap_or(0);
-                    cell_column = attribute(&event, b"r")
+                    cell_column = attribute(&event, "r")
                         .and_then(|reference| column_index(&reference))
                         .unwrap_or(next_column);
                 }
-                b"v" if in_cell => in_value = true,
-                b"t" if in_cell => in_inline_text = true,
+                "v" if in_cell => in_value = true,
+                "t" if in_cell => in_inline_text = true,
                 _ => {}
             },
             Ok(Event::Text(text)) if in_value || in_inline_text => {
-                value.push_str(&text.decode().context("invalid cell text")?)
+                value.push_str(&text.xml10_content())
             }
             Ok(Event::GeneralRef(reference)) if in_value || in_inline_text => push_reference(&mut value, &reference),
             Ok(Event::End(event)) => match local(event.name().as_ref()) {
-                b"v" => in_value = false,
-                b"t" => in_inline_text = false,
-                b"c" => {
+                "v" => in_value = false,
+                "t" => in_inline_text = false,
+                "c" => {
                     in_cell = false;
                     next_column = cell_column + 1;
                     if row_index >= MAX_SHEET_ROWS || cell_column >= MAX_SHEET_COLUMNS {
@@ -762,24 +760,24 @@ fn slide_paragraphs(xml: &[u8], notes_page: bool) -> Result<(Option<String>, Vec
 
     loop {
         match reader.read_event_into(&mut buffer) {
-            Ok(Event::Start(event)) | Ok(Event::Empty(event)) if local(event.name().as_ref()) == b"ph" => {
-                placeholder = Some(attribute(&event, b"type").unwrap_or_else(|| "body".into()));
+            Ok(Event::Start(event)) | Ok(Event::Empty(event)) if local(event.name().as_ref()) == "ph" => {
+                placeholder = Some(attribute(&event, "type").unwrap_or_else(|| "body".into()));
             }
             Ok(Event::Start(event)) => match local(event.name().as_ref()) {
-                b"sp" | b"graphicFrame" => placeholder = None,
-                b"p" => {
+                "sp" | "graphicFrame" => placeholder = None,
+                "p" => {
                     in_paragraph = true;
                     paragraph.clear();
                 }
-                b"t" if in_paragraph => in_text = true,
-                b"br" if in_paragraph => paragraph.push('\n'),
+                "t" if in_paragraph => in_text = true,
+                "br" if in_paragraph => paragraph.push('\n'),
                 _ => {}
             },
-            Ok(Event::Text(text)) if in_text => paragraph.push_str(&text.decode().context("invalid slide text")?),
+            Ok(Event::Text(text)) if in_text => paragraph.push_str(&text.xml10_content()),
             Ok(Event::GeneralRef(reference)) if in_text => push_reference(&mut paragraph, &reference),
             Ok(Event::End(event)) => match local(event.name().as_ref()) {
-                b"t" => in_text = false,
-                b"p" => {
+                "t" => in_text = false,
+                "p" => {
                     in_paragraph = false;
                     let value = paragraph.trim().to_owned();
                     if value.is_empty() {

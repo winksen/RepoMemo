@@ -2,7 +2,7 @@
 
 > **Scope:** the whole server (`apps/server`, the crates), the web client where it meets the API, CI and the container files, at `V0.2.129` (commit `f1550cd`). Three questions: which dependencies carry known advisories; which findings of the [review of 2026-10-14](2026-10-14-security-review.md) are still open (nothing in the changelog or the roadmap tracked them to closure); and what a fresh pass over the backend finds for security, logic, hardening and speed.
 > **Method:** `cargo deny --workspace check advisories`, `npm audit` (with and without development packages) and `osv-scanner` over `Cargo.lock` and `package-lock.json`, run on 2026-10-21; then a static reading of the code. `cargo update --dry-run` confirmed which Rust fixes are lockfile-only. **Nothing was built, started or attacked**, as this repository's rules ask. Line numbers are as of `f1550cd`.
-> **Status:** open. **2 high, 9 medium, 15 low, 4 info**, fixed so far: S5-1 (V0.2.130); eleven performance findings beside them. The releases that close them are planned as tracks L and M of the [Road to V0.3.0](../ROADMAP.md#track-l-security-and-dependencies-v02130v02148).
+> **Status:** open. **2 high, 9 medium, 15 low, 4 info**, fixed so far: S5-1 (V0.2.130), S5-2 (V0.2.131); eleven performance findings beside them. The releases that close them are planned as tracks L and M of the [Road to V0.3.0](../ROADMAP.md#track-l-security-and-dependencies-v02130v02148).
 > **Previous review:** [2026-10-16](2026-10-16-security-review.md) (the fourth pass), closed. Its surfaces were not re-read, apart from the container.
 
 | ID | Severity | Finding | Status | Release |
@@ -28,7 +28,7 @@
 | E16 | Low | *Open in Office* is offered for macro-enabled formats (`.xlsm`, `.docm`, `.pptm`) | Partly fixed (`ofv`, view mode) | V0.2.147 |
 | E17 | Low | GitHub Actions pinned to moving tags; container base images too | Open, wider | V0.2.135 |
 | E18 | Low | Local git commands inherit the server's secrets in their environment (remote ones start empty) | Open for local repositories | V0.2.146 |
-| S5-2 | Low | `zip` 8.6.0 (through `calamine`) has three extraction advisories. RepoMemo never calls `extract()`, so they are not reachable, but they fail CI | New | V0.2.131 |
+| S5-2 | Low | `zip` 8.6.0 (through `calamine`) has three extraction advisories. RepoMemo never calls `extract()`, so they are not reachable, but they fail CI | Fixed in V0.2.131 | V0.2.131 |
 | S5-3 | Low | Ten advisories in development packages (Vite 5, Vitest 3 and `tinypool`, PostCSS, nanoid, browserslist, source-map-js, esbuild). The production bundle is clean | New | V0.2.133, V0.2.134 |
 | S5-7 | Low | The container's git (Debian bookworm, 2.39.5) is refused by the remote-clone check, so remote repositories cannot work in the official image | New (a logic bug) | V0.2.136 |
 | S5-8 | Low | The server container runs with a writable root filesystem, every default capability and no `no-new-privileges` | New | V0.2.148 |

@@ -348,18 +348,18 @@ fn extract_docx_text(bytes: &[u8]) -> Result<String> {
 
     loop {
         match reader.read_event_into(&mut buffer) {
-            Ok(Event::Start(event)) if word_tag(event.name().as_ref(), b"p") => {
+            Ok(Event::Start(event)) if word_tag(event.name().as_ref(), "p") => {
                 if !text.is_empty() && !text.ends_with('\n') {
                     text.push('\n');
                 }
             }
-            Ok(Event::Empty(event)) if word_tag(event.name().as_ref(), b"tab") => text.push('\t'),
+            Ok(Event::Empty(event)) if word_tag(event.name().as_ref(), "tab") => text.push('\t'),
             Ok(Event::Empty(event))
-                if word_tag(event.name().as_ref(), b"br") || word_tag(event.name().as_ref(), b"cr") =>
+                if word_tag(event.name().as_ref(), "br") || word_tag(event.name().as_ref(), "cr") =>
             {
                 text.push('\n')
             }
-            Ok(Event::Text(event)) => text.push_str(&event.decode().context("invalid XML text in DOCX")?),
+            Ok(Event::Text(event)) => text.push_str(&event.xml10_content()),
             Ok(Event::Eof) => break,
             Err(error) => return Err(anyhow::anyhow!("invalid WordprocessingML: {error}")),
             _ => {}
@@ -374,8 +374,8 @@ fn extract_docx_text(bytes: &[u8]) -> Result<String> {
     Ok(text)
 }
 
-fn word_tag(name: &[u8], local_name: &[u8]) -> bool {
-    name == local_name || name.strip_prefix(b"w:") == Some(local_name)
+fn word_tag(name: &str, local_name: &str) -> bool {
+    name == local_name || name.strip_prefix("w:") == Some(local_name)
 }
 
 /// Names of every member in a ZIP archive, from its central directory.

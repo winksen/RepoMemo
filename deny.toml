@@ -19,8 +19,8 @@ ignore = [
 ]
 
 [bans]
-# Two versions of a crate cost build time but are not a defect: reqwest 0.13
-# and quick-xml 0.39 arrive through Tauri, next to the versions the server uses.
+# A second version of a crate costs build time but is not a defect: reqwest 0.13
+# arrives through Tauri, next to the version the server uses.
 multiple-versions = "warn"
 wildcards = "allow"
 

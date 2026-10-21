@@ -2,6 +2,28 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.131 (2026-10-21)
+
+Spreadsheet reading moves to `calamine` 0.37, which brings `zip` 9 and closes the last advisories that fail CI's dependency check.
+
+### Security
+- **`zip` 8.6.0 to 9.0.5 (S5-2):** the three extraction advisories (RUSTSEC-2026-0367, -0368 and -0369: SUID bits, symbolic links and permissions applied by `extract()`) are gone from the lock. RepoMemo never called `extract()`, so they were not reachable, but they failed the blocking `cargo deny` job. `calamine` 0.37 is the release that accepts `zip` 9; it is the only user of `zip`.
+
+### Changed
+- **Dependencies:** `calamine` 0.36 to 0.37 and `quick-xml` 0.41 to 0.42 (Tauri already used 0.42, so the lock now holds a single `quick-xml`). `nix` 0.31 (Unix only) is added next to the older ones, through the new `zip`.
+- **XML reading:** `quick-xml` 0.42 reads names, attributes and text as UTF-8 strings. `crates/ingestion` (`documents.rs` for workbooks, presentations and shared strings, `lib.rs` for Word) follows: names are compared as text, and text is read with its line endings normalized the way XML 1.0 says (`
+` becomes `
+`). The readings and their results are otherwise the same; a part that is not UTF-8 (rare, and not what Office writes) is now reported as an invalid file instead of being decoded.
+- **Rust version:** the workspace's `rust-version` is 1.88, which `calamine` 0.37 needs. The README and the Windows setup page say "1.88 or later"; `rust-toolchain.toml` already follows `stable`.
+- **`deny.toml`:** the comment on duplicate versions no longer names `quick-xml`. No advisory is ignored that was not before.
+
+### Checks run on this release
+- `cargo deny --workspace check` passes: advisories, bans, licenses and sources are all ok, with no new ignore.
+- `cargo check -p repomemo-ingestion --tests` compiles. The tests were not run (CI runs them), and no spreadsheet, Word or PowerPoint file was opened by hand.
+
+### Upgrading
+- Building from source needs Rust 1.88 or later (`rustup update`).
+
 ## V0.2.130 (2026-10-21)
 
 The TLS libraries behind every outbound connection are updated, and CI's blocking dependency check no longer fails on them. This is the first release of track L (security and dependencies), which lifts the feature freeze for security fixes, dependency updates and backend hardening until V0.2.162.

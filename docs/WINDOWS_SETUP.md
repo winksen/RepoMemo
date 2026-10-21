@@ -6,7 +6,7 @@ RepoMemo uses a React frontend and a Rust/Tauri desktop backend. The frontend ca
 
 - Node.js 22+
 - npm 10+
-- Rust stable toolchain with Cargo
+- Rust stable toolchain with Cargo (1.88 or later)
 - Microsoft C++ build tools, including the MSVC linker `link.exe`
 - WebView2 runtime, normally already present on current Windows installs
 

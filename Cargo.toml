@@ -19,11 +19,11 @@ resolver = "2"
 # The product version: the server reports it (System › Overview, the console).
 # Set it everywhere at once with `npm run version:set -- <version>`; CI checks
 # that Cargo.toml, Cargo.lock, package.json and tauri.conf.json agree.
-version = "0.2.130"
+version = "0.2.131"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/repomemo/repomemo"
-rust-version = "1.78"
+rust-version = "1.88"
 
 [workspace.dependencies]
 anyhow = "1"
@@ -31,10 +31,10 @@ argon2 = "0.5"
 axum = "0.8"
 base64 = "0.22"
 chrono = { version = "0.4", features = ["serde"] }
-calamine = { version = "0.36", default-features = false }
+calamine = { version = "0.37", default-features = false }
 cfb = "0.7"
 flate2 = "1.1"
-quick-xml = "0.41"
+quick-xml = "0.42"
 ring = "0.17"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 hex = "0.4"
