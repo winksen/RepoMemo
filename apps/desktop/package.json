@@ -1,6 +1,6 @@
 {
   "name": "@repomemo/desktop",
-  "version": "0.2.133",
+  "version": "0.2.134",
   "private": true,
   "type": "module",
   "scripts": {
@@ -48,10 +48,10 @@
     "@testing-library/react": "^16.3.3",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
-    "@vitejs/plugin-react": "^4.3.4",
+    "@vitejs/plugin-react": "^6.1.2",
     "jsdom": "^26.1.0",
     "typescript": "^5.6.3",
-    "vite": "^5.4.11",
-    "vitest": "^3.2.7"
+    "vite": "^8.3.5",
+    "vitest": "^4.1.12"
   }
 }

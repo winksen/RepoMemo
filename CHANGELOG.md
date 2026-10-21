@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.134 (2026-10-21)
+
+The web build and test tools move to current majors, which closes the last advisories of the development packages.
+
+### Security
+- **Web toolchain, second part (S5-3b):** `vite` 5.4.21 to 8.3.5, `@vitejs/plugin-react` 4.7.0 to 6.1.2 and `vitest` 3.2.7 to 4.1.12. The Vite 5 line gets no fixes; the advisories were a development-server file-access bypass (`server.fs.deny` with Windows alternate paths), a `.map` path traversal, and prototype-pollution and file-read issues in Vitest and `tinypool`. `npm audit` now finds **nothing**, with or without development packages. The built web app never contained these tools.
+- **Fewer packages:** Vite 8 builds with Rolldown, so `esbuild` and `rollup` leave the lock; `package-lock.json` lists 66 packages fewer (478 to 412).
+
+### Changed
+- **Node 22.12 or later:** Vite 8 needs it (`engines` in the root `package.json`, the README and the Windows setup page say so). The container image and CI already use the current Node 22.
+- **Configuration:** `vite.config.ts` keeps the content security policy plugin, the `VITE_` and `TAURI_ENV_` prefixes, the development server on `127.0.0.1:3021` and the `jsdom` tests unchanged. One setting is added, `test.mockReset: true`: Vitest 4's `restoreMocks` restores only `vi.spyOn` spies, so the `vi.fn()` mocks of the tests' `vi.mock` factories would have kept their calls and answers from one test to the next; the reset keeps each test as isolated as before.
+- **Checks run on this release:** `npm run typecheck` passes against the new versions (run in a scratch copy, so the working `node_modules` was not touched); the new lockfile passes `npm ci --dry-run` and `npm audit` (0, with and without `--omit=dev`); Vite loads `vite.config.ts` with both plugins and the test settings. **Not run:** `npm run build` (the `content-security-policy.txt` file and the meta tag are the maintainer's to confirm), `npm run web:dev` and the Vitest suite (CI runs it).
+
+### Upgrading
+- Run `npm ci` after pulling. Node 22.12 or later is required.
+
 ## V0.2.133 (2026-10-21)
 
 Five transitive packages of the web toolchain are updated to patch releases that close their advisories.
