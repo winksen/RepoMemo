@@ -35,7 +35,7 @@ use tokio_stream::StreamExt;
 
 use crate::quotas::{format_bytes, free_disk_bytes};
 use crate::{
-    consume_heavy_quota, map_storage_error, record_workspace_activity, ApiError, AppState, AuthenticatedSubject,
+    consume_heavy_quota, map_storage_error, record_workspace_activity, ApiError, AppState, AuthenticatedSubject, ManagingSubject,
 };
 
 const MIB: u64 = 1024 * 1024;
@@ -77,7 +77,7 @@ impl Drop for TempFile {
 /// `POST /v1/workspaces/import?organization_id=&dry_run=&name=`: the body is
 /// the archive. 200 with a report for a dry run, 201 with the new workspace.
 pub(crate) async fn import_workspace(
-    subject: AuthenticatedSubject,
+    ManagingSubject(subject): ManagingSubject,
     State(state): State<AppState>,
     Query(query): Query<ImportQuery>,
     body: Body,

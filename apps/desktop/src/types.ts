@@ -914,7 +914,7 @@ export interface PersonalAccessToken {
   /** The start of the token, to tell tokens apart. */
   prefix: string;
   /** `system` (administrators only) also allows changes in the System area. */
-  scope: "read" | "write" | "system";
+  scope: "read" | "write" | "admin" | "system";
   created_at: string;
   expires_at: string;
   last_used_at: string | null;

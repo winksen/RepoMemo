@@ -19,6 +19,7 @@ flowchart TD
   S --> X{extractor the handler takes}
   X -->|AuthenticatedSubject| A[session or token;<br/>read-only tokens only GET and HEAD]
   X -->|ReadingSubject| B[like A, and a read-only token<br/>may POST a read]
+  X -->|ManagingSubject| M[session, or a token with the admin scope]
   X -->|SessionSubject| C[session only, never a token]
 ```
 

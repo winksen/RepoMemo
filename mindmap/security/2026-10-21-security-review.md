@@ -2,7 +2,7 @@
 
 > **Scope:** the whole server (`apps/server`, the crates), the web client where it meets the API, CI and the container files, at `V0.2.129` (commit `f1550cd`). Three questions: which dependencies carry known advisories; which findings of the [review of 2026-10-14](2026-10-14-security-review.md) are still open (nothing in the changelog or the roadmap tracked them to closure); and what a fresh pass over the backend finds for security, logic, hardening and speed.
 > **Method:** `cargo deny --workspace check advisories`, `npm audit` (with and without development packages) and `osv-scanner` over `Cargo.lock` and `package-lock.json`, run on 2026-10-21; then a static reading of the code. `cargo update --dry-run` confirmed which Rust fixes are lockfile-only. **Nothing was built, started or attacked**, as this repository's rules ask. Line numbers are as of `f1550cd`.
-> **Status:** open. **2 high, 9 medium, 15 low, 4 info**, fixed so far: S5-1 (V0.2.130), S5-2 (V0.2.131), S5-10 (V0.2.132), S5-3 (V0.2.133, V0.2.134), E17 (V0.2.135), S5-7 (V0.2.136), E1 in part (V0.2.137, V0.2.138), E19 (V0.2.138), E2 (V0.2.139); eleven performance findings beside them. The releases that close them are planned as tracks L and M of the [Road to V0.3.0](../ROADMAP.md#track-l-security-and-dependencies-v02130v02148).
+> **Status:** open. **2 high, 9 medium, 15 low, 4 info**, fixed so far: S5-1 (V0.2.130), S5-2 (V0.2.131), S5-10 (V0.2.132), S5-3 (V0.2.133, V0.2.134), E17 (V0.2.135), S5-7 (V0.2.136), E1 in part (V0.2.137, V0.2.138), E19 (V0.2.138), E2 (V0.2.139), E5 and E15 (V0.2.140); eleven performance findings beside them. The releases that close them are planned as tracks L and M of the [Road to V0.3.0](../ROADMAP.md#track-l-security-and-dependencies-v02130v02148).
 > **Previous review:** [2026-10-16](2026-10-16-security-review.md) (the fourth pass), closed. Its surfaces were not re-read, apart from the container.
 
 | ID | Severity | Finding | Status | Release |
@@ -13,7 +13,7 @@
 | S5-4 | Medium | Two tabs that refresh at the same moment sign the person out **everywhere**: the second tab presents the cookie the first just rotated, which reads as token theft | New | V0.2.144 |
 | E3 | Medium | Every verified account can create an organization and become its owner | Open since 2026-10-14 | V0.2.143 |
 | E4 | Medium | Any workspace administrator can link any local repository under `REPOMEMO_REPO_ROOTS`, other teams' included | Open since 2026-10-14 | V0.2.143 |
-| E5 | Medium | A read-and-write personal access token can invite, change roles, delete workspaces, repoint AI providers, link repositories, set webhooks, export and import | Open since 2026-10-14 | V0.2.140 |
+| E5 | Medium | A read-and-write personal access token can invite, change roles, delete workspaces, repoint AI providers, link repositories, set webhooks, export and import | Fixed in V0.2.140 | V0.2.140 |
 | E6 | Medium | The live event stream sends every reader the activity feed the API keeps for owners and administrators | Open since 2026-10-14 | V0.2.141 |
 | E7 | Medium | Ten artifact handlers load the full artifact, which re-reads a document's text in a reader process **on an async worker thread**, only to find its workspace, **before** checking the caller's rights | Open since 2026-10-14, wider | V0.2.149, V0.2.150 |
 | E9 | Medium | An organization role change re-adds the person to every workspace of the organization, undoing a workspace's own removals and downgrades | Open since 2026-10-14 | V0.2.142 |
@@ -24,7 +24,7 @@
 | E12 | Low | The sign-in address is logged with `%` (`Display`), so a line break forges a line in the text console log | Open | V0.2.146 |
 | E13 | Low | Addresses are checked for an `@` only; display names take control and bidirectional characters. Mail headers are safe since V0.2.9 (`compose` refuses control characters) | Partly fixed | V0.2.146 |
 | E14 | Low | The refresh cookie has no `__Secure-` prefix | Open | V0.2.144 |
-| E15 | Low | Revoking a personal access token does not end the event streams it opened (deactivation does) | Partly fixed | V0.2.140 |
+| E15 | Low | Revoking a personal access token does not end the event streams it opened (deactivation does) | Fixed in V0.2.140 | V0.2.140 |
 | E16 | Low | *Open in Office* is offered for macro-enabled formats (`.xlsm`, `.docm`, `.pptm`) | Partly fixed (`ofv`, view mode) | V0.2.147 |
 | E17 | Low | GitHub Actions pinned to moving tags; container base images too | Fixed in V0.2.135 | V0.2.135 |
 | E18 | Low | Local git commands inherit the server's secrets in their environment (remote ones start empty) | Open for local repositories | V0.2.146 |

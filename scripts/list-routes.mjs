@@ -58,7 +58,9 @@ const rows = routes.map((entry) => {
   if (!found) return { ...entry, authn: "?", guards: [], request: "", response: "", note: "handler not found" };
   const authn = /SessionSubject/.test(found.params)
     ? "session"
-    : /ReadingSubject/.test(found.params)
+    : /ManagingSubject/.test(found.params)
+      ? "managing"
+      : /ReadingSubject/.test(found.params)
       ? "reading"
       : /AuthenticatedSubject/.test(found.params)
         ? "auth"

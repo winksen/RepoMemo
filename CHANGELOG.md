@@ -2,6 +2,26 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.140 (2026-10-21)
+
+A personal access token with read and write access can no longer grant access, delete, repoint, link or export: those routes need a session, or a token that was given the new `admin` scope on purpose.
+
+### Security
+- **A read-and-write token does content work, not access (E5, decision 23):** inviting people (workspace and organization), changing member roles, adding or removing members, deleting or renaming a workspace or an organization, saving AI providers and the AI policy, linking, changing or removing repositories and connectors (their tokens, deploy keys and webhooks included), and exporting or importing a workspace are taken by a new extractor, `ManagingSubject`. It lets through a signed-in session, or a token with the `admin` scope, and refuses every other token with `403` on every method, a `GET` included (an export hands over the whole workspace). The answer names the scope: "Sign in in the browser, or use a personal access token with the admin scope." 29 handlers moved to it. Read-only, read-and-write and `system` tokens are refused there; content work (files, notes, tasks, comments, memory, searches) and the System area stay as they were.
+- **Revoking a token ends its streams (E15):** a live event stream opened with a personal access token re-checks that the token still exists and has not expired, as it already did for the session, the membership and the role, so a revoked token stops watching within the recheck interval (30 seconds).
+- **The comment was wrong, the code was right to be narrower:** the doc comment of `AuthenticatedSubject` said invitations needed a session while the handlers took any token; it now names the three extractors and what each is for.
+
+### Added
+- **The `admin` scope** (migration `0037_admin_token_scope.sql`: the token table is rebuilt with the new value, as in 0024; every existing token keeps its scope). Profile › API tokens offers "Admin: read, write and manage access, links and exports" to everyone, with a warning under the form and a badge in the list. A token is still shown once, expires in 7 to 365 days and cannot manage tokens or the password.
+- **The API reference** marks the 29 routes as *managing* (generated from the handler signatures by `scripts/list-routes.mjs`, which learned the new extractor).
+
+### Changed
+- **Tests (written, not run):** every one of the 29 routes is refused to a read, a read-and-write and a `system` token with the message naming the scope, and answers an `admin` token as it answers the session (an admin token also deletes a workspace); a read-and-write token still creates a note; the storage test covers the new scope, the token id and a revoked token no longer being active; a stream opened with a token closes when the token is revoked.
+- **Checks run on this release:** `cargo check` of the storage crate and the server with their tests compiles; `rustfmt` is clean for the files changed (apart from hunks that were already there) and `clippy` reports nothing new; `npm run typecheck`, `docs:check`, `migrations:check`, `version:check` and `container:check` pass. No server was started.
+
+### Upgrading
+- **Scripts with a read-and-write token that invite, change roles, delete, change AI settings, link repositories or connectors, set webhooks, export or import now get `403`.** Create a token with the `admin` scope in Profile › API tokens for those, keep it short-lived, or sign in. Nothing else changes; existing tokens keep their scope, and the migration runs at start.
+
 ## V0.2.139 (2026-10-21)
 
 A workspace administrator can no longer aim the server at other services of the machine through an AI provider address.

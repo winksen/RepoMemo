@@ -19,8 +19,9 @@ pub(crate) enum EventStreamItem {
 /// comments keep proxies from closing the connection during quiet stretches.
 ///
 /// The stream ends when the access token expires, when the user's sessions
-/// are ended, or when the user leaves the workspace; the client reconnects
-/// with a fresh token.
+/// are ended, when a personal access token that opened it is revoked or
+/// expires, or when the user leaves the workspace; the client reconnects with
+/// a fresh token.
 pub(crate) async fn workspace_events(
     subject: AuthenticatedSubject,
     State(state): State<AppState>,
@@ -126,8 +127,9 @@ pub(crate) async fn watch_system_event_stream_access(
             }),
             Err(_) => true,
         };
+        let token_active = token_is_active(&state, &subject).await;
         let closing = state.closing.load(std::sync::atomic::Ordering::SeqCst);
-        if expired || !allowed || closing {
+        if expired || !allowed || !token_active || closing {
             let _ = closer.send(()).await;
             return;
         }
@@ -162,6 +164,19 @@ impl Drop for OpenEventStream {
     }
 }
 
+/// Whether the personal access token a stream was opened with is still there (a session has none).
+/// A failed lookup keeps the stream, as for the other checks.
+async fn token_is_active(state: &AppState, subject: &AuthenticatedSubject) -> bool {
+    match &subject.token {
+        Some(token) => state
+            .storage
+            .personal_token_active(&token.token_id)
+            .await
+            .unwrap_or(true),
+        None => true,
+    }
+}
+
 /// Closes an event stream once its token expires or its user may no longer
 /// read the workspace. Stops by itself when the client disconnects.
 pub(crate) async fn watch_event_stream_access(
@@ -186,8 +201,9 @@ pub(crate) async fn watch_event_stream_access(
             .await
             .map(|role| role.is_some())
             .unwrap_or(true);
+        let token_active = token_is_active(&state, &subject).await;
         let closing = state.closing.load(std::sync::atomic::Ordering::SeqCst);
-        if expired || !session_valid || !member || closing {
+        if expired || !session_valid || !member || !token_active || closing {
             let _ = closer.send(()).await;
             return;
         }

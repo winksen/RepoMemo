@@ -23,7 +23,7 @@ use tokio::sync::Semaphore;
 
 use crate::{
     embedding::EmbeddingQueue, record_workspace_activity, require_workspace_admin, require_workspace_read,
-    require_workspace_write, system::SettingsCell, ApiError, AppState, AuthenticatedSubject,
+    require_workspace_write, system::SettingsCell, ApiError, AppState, AuthenticatedSubject, ManagingSubject,
 };
 
 /// Runs connector syncs in the background, one at a time across the server,
@@ -260,7 +260,7 @@ pub(crate) async fn list_connectors(
 }
 
 pub(crate) async fn check_connector(
-    subject: AuthenticatedSubject,
+    ManagingSubject(subject): ManagingSubject,
     State(state): State<AppState>,
     Path(workspace_id): Path<String>,
     Json(request): Json<ConnectorLinkRequest>,
@@ -280,7 +280,7 @@ pub(crate) async fn check_connector(
 }
 
 pub(crate) async fn connect_connector(
-    subject: AuthenticatedSubject,
+    ManagingSubject(subject): ManagingSubject,
     State(state): State<AppState>,
     Path(workspace_id): Path<String>,
     Json(request): Json<ConnectorLinkRequest>,
@@ -349,7 +349,7 @@ pub(crate) async fn sync_connector(
 
 /// Replaces the token. The new one is tried against the tracker first.
 pub(crate) async fn set_connector_token(
-    subject: AuthenticatedSubject,
+    ManagingSubject(subject): ManagingSubject,
     State(state): State<AppState>,
     Path(source_id): Path<String>,
     Json(request): Json<ConnectorTokenRequest>,
@@ -378,7 +378,7 @@ pub(crate) async fn set_connector_token(
 }
 
 pub(crate) async fn delete_connector(
-    subject: AuthenticatedSubject,
+    ManagingSubject(subject): ManagingSubject,
     State(state): State<AppState>,
     Path(source_id): Path<String>,
 ) -> Result<StatusCode, ApiError> {

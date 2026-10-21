@@ -10,7 +10,7 @@
 |---|---|
 | **Base** | JSON over HTTPS, `Content-Type: application/json`. File uploads send the bytes as the body with `X-RepoMemo-Filename` (percent-encoded) and optionally `X-RepoMemo-Folder-Id` |
 | **Authentication** | `Authorization: Bearer <access token>` (a JWT from sign-in) or a personal access token (`rmp_…`). The web app also sends `X-RepoMemo-Client: web`, which makes the refresh token travel in an `HttpOnly` cookie |
-| **Authentication column** | *public*: none. *auth*: any session or token (read-only tokens only on GET and HEAD). *reading*: like auth, and a read-only token may make this POST because it only reads. *session*: a signed-in session only, never a token. *signed link*: the link's own token |
+| **Authentication column** | *public*: none. *auth*: any session or token (read-only tokens only on GET and HEAD). *reading*: like auth, and a read-only token may make this POST because it only reads. *managing*: a signed-in session, or a personal access token with the `admin` scope (V0.2.140): what grants access, deletes, repoints, links or exports. *session*: a signed-in session only, never a token. *signed link*: the link's own token |
 | **Guards** | `require_workspace_read/write/admin/owner`, `require_organization_read/admin/owner`: the caller's role in that workspace or organization; `require_system_admin`: system or app administrators; `require_full_system_admin`: system administrators only; `require_system_change`: a session or a `system` token |
 | **Errors** | `{"error": {"code": "bad_request \| unauthorized \| invalid_credentials \| forbidden \| not_found \| conflict \| rate_limited \| internal_error", "message": "…"}}`. Quota and limit codes seen since V0.1.74: `workspace_full` (413), `workspace_limit` (409), `disk_low` (507), `rate_limited` (429, with `Retry-After`) |
 | **Paging** | `?limit=&offset=` (at most 500) on `artifacts/query` and the artifact list; the total is in `X-Total-Count` |
@@ -45,7 +45,7 @@
 | POST | `/v1/auth/password-reset` | public | — | CompletePasswordReset | TokenResponse |
 | POST | `/v1/invitations/preview` | public | — | TokenBody | InvitationPreview |
 | POST | `/v1/invitations/accept` | session | — | TokenBody | AcceptedInvitation |
-| DELETE | `/v1/invitations/{invitation_id}` | auth | require_workspace_admin, require_organization_admin | — | status |
+| DELETE | `/v1/invitations/{invitation_id}` | managing | require_workspace_admin, require_organization_admin | — | status |
 | GET | `/v1/profile/tokens` | session | — | — | Vec<PersonalAccessToken |
 | POST | `/v1/profile/tokens` | session | — | CreateTokenRequest | CreatedToken |
 | DELETE | `/v1/profile/tokens/{token_id}` | session | — | — | status |
@@ -115,12 +115,12 @@
 |---|---|---|---|---|---|
 | GET | `/v1/organizations` | auth | — | — | Vec<Organization |
 | POST | `/v1/organizations` | auth | — | CreateOrganizationRequest | Organization |
-| PUT | `/v1/organizations/{organization_id}` | auth | require_organization_owner | UpdateOrganizationRequest | Organization |
+| PUT | `/v1/organizations/{organization_id}` | managing | require_organization_owner | UpdateOrganizationRequest | Organization |
 | GET | `/v1/organizations/{organization_id}/members` | auth | require_organization_read | — | Vec<OrganizationMember |
-| PUT | `/v1/organizations/{organization_id}/members` | auth | require_organization_admin | UpsertOrganizationMemberRequest | OrganizationMember |
+| PUT | `/v1/organizations/{organization_id}/members` | managing | require_organization_admin | UpsertOrganizationMemberRequest | OrganizationMember |
 | GET | `/v1/organizations/{organization_id}/invitations` | auth | require_organization_admin | — | Vec<Invitation |
-| POST | `/v1/organizations/{organization_id}/invitations` | auth | require_organization_admin | CreateInvitationRequest | CreatedInvitation |
-| DELETE | `/v1/organizations/{organization_id}/members/{user_id}` | auth | require_organization_admin | — | status |
+| POST | `/v1/organizations/{organization_id}/invitations` | managing | require_organization_admin | CreateInvitationRequest | CreatedInvitation |
+| DELETE | `/v1/organizations/{organization_id}/members/{user_id}` | managing | require_organization_admin | — | status |
 | POST | `/v1/organizations/{organization_id}/transfer-ownership` | session | require_organization_owner | TransferOwnershipRequest | status |
 
 ## Dashboard and workspaces
@@ -130,8 +130,8 @@
 | GET | `/v1/dashboard` | auth | — | — | DashboardResponse |
 | GET | `/v1/workspaces` | auth | — | — | Vec<SharedWorkspace |
 | POST | `/v1/workspaces` | auth | — | CreateWorkspaceRequest | SharedWorkspace |
-| PUT | `/v1/workspaces/{workspace_id}` | auth | require_workspace_owner | UpdateWorkspaceRequest | Workspace |
-| DELETE | `/v1/workspaces/{workspace_id}` | auth | require_workspace_owner | — | status |
+| PUT | `/v1/workspaces/{workspace_id}` | managing | require_workspace_owner | UpdateWorkspaceRequest | Workspace |
+| DELETE | `/v1/workspaces/{workspace_id}` | managing | require_workspace_owner | — | status |
 
 ## Evidence, folders and files
 
@@ -158,8 +158,8 @@
 | GET | `/v1/artifacts/{artifact_id}/comments` | auth | require_workspace_read | — | Vec<ArtifactComment |
 | POST | `/v1/artifacts/{artifact_id}/comments` | auth | require_workspace_write | SaveArtifactCommentRequest | ArtifactComment |
 | GET | `/v1/workspaces/{workspace_id}/mention-suggestions` | auth | require_workspace_write | `q` query | Vec<SharedUser> |
-| GET | `/v1/workspaces/{workspace_id}/export` | auth | require_workspace_admin | — | `application/gzip` stream |
-| POST | `/v1/workspaces/import` | auth | create-workspace role check in storage | raw archive; `organization_id`, `dry_run`, `name` query | ArchiveImportReport |
+| GET | `/v1/workspaces/{workspace_id}/export` | managing | require_workspace_admin | — | `application/gzip` stream |
+| POST | `/v1/workspaces/import` | managing | create-workspace role check in storage | raw archive; `organization_id`, `dry_run`, `name` query | ArchiveImportReport |
 | GET | `/v1/artifacts/{artifact_id}/lifecycle` | auth | require_workspace_read | — | ArtifactLifecycle |
 | PUT | `/v1/artifacts/{artifact_id}/lifecycle` | auth | require_workspace_write | SaveArtifactLifecycleRequest | ArtifactLifecycle |
 | GET | `/v1/artifacts/{artifact_id}/lifecycle/history` | auth | require_workspace_read | — | Vec<ArtifactLifecycleEvent |
@@ -205,28 +205,28 @@
 | Method | Path | Authentication | Guards | Request body | Response |
 |---|---|---|---|---|---|
 | GET | `/v1/workspaces/{workspace_id}/repositories` | auth | require_workspace_read | — | — |
-| POST | `/v1/workspaces/{workspace_id}/repositories` | auth | require_workspace_admin | RepositoryLinkRequest | RepositorySyncResponse |
-| POST | `/v1/workspaces/{workspace_id}/repositories/check` | auth | require_workspace_admin | RepositoryLinkRequest | RepoAccessCheck |
+| POST | `/v1/workspaces/{workspace_id}/repositories` | managing | require_workspace_admin | RepositoryLinkRequest | RepositorySyncResponse |
+| POST | `/v1/workspaces/{workspace_id}/repositories/check` | managing | require_workspace_admin | RepositoryLinkRequest | RepoAccessCheck |
 | GET | `/v1/repositories/{source_id}` | auth | require_workspace_read | — | RepoSource |
-| PUT | `/v1/repositories/{source_id}` | auth | require_workspace_admin | UpdateRepositoryRequest | RepoSource |
-| DELETE | `/v1/repositories/{source_id}` | auth | require_workspace_admin | — | status |
-| POST | `/v1/connectors/{source_id}/webhook` | auth | require_workspace_admin | — | WebhookCreated |
-| DELETE | `/v1/connectors/{source_id}/webhook` | auth | require_workspace_admin | — | status |
+| PUT | `/v1/repositories/{source_id}` | managing | require_workspace_admin | UpdateRepositoryRequest | RepoSource |
+| DELETE | `/v1/repositories/{source_id}` | managing | require_workspace_admin | — | status |
+| POST | `/v1/connectors/{source_id}/webhook` | managing | require_workspace_admin | — | WebhookCreated |
+| DELETE | `/v1/connectors/{source_id}/webhook` | managing | require_workspace_admin | — | status |
 | POST | `/v1/webhooks/connectors/{source_id}` | public | — | raw body, signed | 200 or 202 `{queued, note}`, else 401 |
 | GET | `/v1/workspaces/{workspace_id}/connectors` | auth | require_workspace_read | — | ConnectorsResponse |
-| POST | `/v1/workspaces/{workspace_id}/connectors` | auth | require_workspace_admin | ConnectorLinkRequest (`link`, `provider?`, `name?`, `token?`) | ConnectorSyncResponse (201) |
-| POST | `/v1/workspaces/{workspace_id}/connectors/check` | auth | require_workspace_admin | ConnectorLinkRequest | ConnectorAccessCheck |
+| POST | `/v1/workspaces/{workspace_id}/connectors` | managing | require_workspace_admin | ConnectorLinkRequest (`link`, `provider?`, `name?`, `token?`) | ConnectorSyncResponse (201) |
+| POST | `/v1/workspaces/{workspace_id}/connectors/check` | managing | require_workspace_admin | ConnectorLinkRequest | ConnectorAccessCheck |
 | GET | `/v1/connectors/{source_id}` | auth | require_workspace_read | — | ConnectorSource |
-| DELETE | `/v1/connectors/{source_id}` | auth | require_workspace_admin | — | status |
+| DELETE | `/v1/connectors/{source_id}` | managing | require_workspace_admin | — | status |
 | POST | `/v1/connectors/{source_id}/sync` | auth | require_workspace_write | — | ConnectorSyncResponse |
-| PUT | `/v1/connectors/{source_id}/token` | auth | require_workspace_admin | ConnectorTokenRequest | ConnectorSource |
+| PUT | `/v1/connectors/{source_id}/token` | managing | require_workspace_admin | ConnectorTokenRequest | ConnectorSource |
 | GET | `/v1/artifacts/{artifact_id}/mentions` | auth | require_workspace_read | — | ArtifactMentions |
 | GET | `/v1/artifacts/{artifact_id}/at/{commit}` | auth | require_workspace_read | — | RepoFileAtCommit |
-| POST | `/v1/repositories/{source_id}/webhook` | auth | require_workspace_admin | — | WebhookCreated |
-| DELETE | `/v1/repositories/{source_id}/webhook` | auth | require_workspace_admin | — | status |
-| PUT | `/v1/repositories/{source_id}/deploy-key` | auth | require_workspace_admin | RepositoryDeployKeyRequest | RepoSource |
-| PUT | `/v1/repositories/{source_id}/token` | auth | require_workspace_admin | RepositoryTokenRequest | RepoSource |
-| DELETE | `/v1/repositories/{source_id}/token` | auth | require_workspace_admin | — | status |
+| POST | `/v1/repositories/{source_id}/webhook` | managing | require_workspace_admin | — | WebhookCreated |
+| DELETE | `/v1/repositories/{source_id}/webhook` | managing | require_workspace_admin | — | status |
+| PUT | `/v1/repositories/{source_id}/deploy-key` | managing | require_workspace_admin | RepositoryDeployKeyRequest | RepoSource |
+| PUT | `/v1/repositories/{source_id}/token` | managing | require_workspace_admin | RepositoryTokenRequest | RepoSource |
+| DELETE | `/v1/repositories/{source_id}/token` | managing | require_workspace_admin | — | status |
 | POST | `/v1/repositories/{source_id}/sync` | auth | require_workspace_write | — | RepositorySyncResponse |
 | GET | `/v1/repositories/{source_id}/files` | auth | require_workspace_read | — | Vec<RepoFile |
 | GET | `/v1/repositories/{source_id}/detail` | auth | require_workspace_read | — | RepositoryDetailResponse |
@@ -260,10 +260,10 @@
 | DELETE | `/v1/task-checklist/{item_id}` | auth | require_workspace_write | — | status |
 | DELETE | `/v1/saved-searches/{search_id}` | auth | require_workspace_write | — | status |
 | GET | `/v1/workspaces/{workspace_id}/members` | auth | require_workspace_admin | — | Vec<WorkspaceMember |
-| PUT | `/v1/workspaces/{workspace_id}/members` | auth | require_workspace_admin | UpsertWorkspaceMemberRequest | WorkspaceMember |
+| PUT | `/v1/workspaces/{workspace_id}/members` | managing | require_workspace_admin | UpsertWorkspaceMemberRequest | WorkspaceMember |
 | GET | `/v1/workspaces/{workspace_id}/invitations` | auth | require_workspace_admin | — | Vec<Invitation |
-| POST | `/v1/workspaces/{workspace_id}/invitations` | auth | require_workspace_admin | CreateInvitationRequest | CreatedInvitation |
-| DELETE | `/v1/workspaces/{workspace_id}/members/{user_id}` | auth | require_workspace_admin | — | status |
+| POST | `/v1/workspaces/{workspace_id}/invitations` | managing | require_workspace_admin | CreateInvitationRequest | CreatedInvitation |
+| DELETE | `/v1/workspaces/{workspace_id}/members/{user_id}` | managing | require_workspace_admin | — | status |
 | PUT | `/v1/comments/{comment_id}` | auth | require_workspace_write | SaveArtifactCommentRequest | ArtifactComment |
 | DELETE | `/v1/comments/{comment_id}` | auth | require_workspace_write | — | status |
 
@@ -275,8 +275,8 @@
 | GET | `/v1/workspaces/{workspace_id}/metrics` | auth | require_workspace_read | — | WorkspaceMetricsResponse |
 | GET | `/v1/workspaces/{workspace_id}/capabilities` | auth | require_workspace_read | — | WorkspaceCapabilities |
 | GET | `/v1/workspaces/{workspace_id}/ai-providers` | auth | require_workspace_admin | — | Vec<SharedAiProviderSettings |
-| PUT | `/v1/workspaces/{workspace_id}/ai-providers` | auth | require_workspace_admin | SaveAiProviderRequest | SharedAiProviderSettings |
+| PUT | `/v1/workspaces/{workspace_id}/ai-providers` | managing | require_workspace_admin | SaveAiProviderRequest | SharedAiProviderSettings |
 | GET | `/v1/workspaces/{workspace_id}/ai-policy` | auth | require_workspace_read | — | AiPolicyResponse |
-| PUT | `/v1/workspaces/{workspace_id}/ai-policy` | auth | require_workspace_admin | UpdateAiPolicyRequest | AiPolicyResponse |
+| PUT | `/v1/workspaces/{workspace_id}/ai-policy` | managing | require_workspace_admin | UpdateAiPolicyRequest | AiPolicyResponse |
 | POST | `/v1/workspaces/{workspace_id}/ai-providers/{provider_id}/test` | auth | require_workspace_admin | — | ProviderTestResult |
 | POST | `/v1/workspaces/{workspace_id}/transfer-ownership` | session | require_workspace_owner | TransferOwnershipRequest | status |

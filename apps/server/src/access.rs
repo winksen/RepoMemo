@@ -26,7 +26,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     check_auth_quota, create_notification, hash_password, issue_session, map_storage_error, record_workspace_activity,
     require_organization_admin, require_workspace_admin, security::ClientIp, validate_password, workspace_role_label,
-    ApiError, AppState, AuthAction, AuthenticatedSubject, SessionSubject, TokenResponse,
+    ApiError, AppState, AuthAction, AuthenticatedSubject, ManagingSubject, SessionSubject, TokenResponse,
 };
 
 /// How long an invitation link works.
@@ -134,7 +134,7 @@ fn check_organization_grant(caller: &OrganizationRole, role: &OrganizationRole) 
 }
 
 pub(crate) async fn create_workspace_invitation(
-    subject: AuthenticatedSubject,
+    ManagingSubject(subject): ManagingSubject,
     State(state): State<AppState>,
     Path(workspace_id): Path<String>,
     Json(request): Json<CreateInvitationRequest>,
@@ -210,7 +210,7 @@ pub(crate) async fn list_workspace_invitations(
 }
 
 pub(crate) async fn create_organization_invitation(
-    subject: AuthenticatedSubject,
+    ManagingSubject(subject): ManagingSubject,
     State(state): State<AppState>,
     Path(organization_id): Path<String>,
     Json(request): Json<CreateInvitationRequest>,
@@ -277,7 +277,7 @@ pub(crate) async fn list_organization_invitations(
 
 /// Withdraws a pending invitation; administrators of its target only.
 pub(crate) async fn revoke_invitation(
-    subject: AuthenticatedSubject,
+    ManagingSubject(subject): ManagingSubject,
     State(state): State<AppState>,
     Path(invitation_id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
@@ -833,6 +833,13 @@ pub(crate) async fn revoke_token(
     }
     tracing::info!(target: "audit", user_id = %subject.user_id, token_id = %token_id, "Personal access token revoked");
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// What a script sees when it asks for something only the `admin` scope or a session may do.
+pub(crate) fn admin_scope_refusal() -> ApiError {
+    ApiError::forbidden_because(
+        "This route changes who has access or how the workspace is set up. Sign in in the browser, or use a personal access token with the admin scope.",
+    )
 }
 
 /// What a script sees when it asks for something its token cannot do.

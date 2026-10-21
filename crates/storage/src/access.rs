@@ -371,8 +371,8 @@ impl StorageEngine {
         if name.is_empty() || name.chars().count() > 80 {
             repomemo_domain::bail_invalid!("Token name must be between 1 and 80 characters.");
         }
-        if !matches!(scope, "read" | "write" | "system") {
-            repomemo_domain::bail_invalid!("Token scope must be read, write or system.");
+        if !matches!(scope, "read" | "write" | "admin" | "system") {
+            repomemo_domain::bail_invalid!("Token scope must be read, write, admin or system.");
         }
         let id = Uuid::new_v4().to_string();
         let secret = new_secret();
@@ -439,6 +439,18 @@ impl StorageEngine {
                 .await?
                 .rows_affected(),
         )
+    }
+
+    /// Whether a personal access token still exists: not revoked and not expired. The event
+    /// streams it opened ask this, so revoking a token ends them (E15).
+    pub async fn personal_token_active(&self, token_id: &str) -> Result<bool> {
+        let expires_at = sqlx::query_scalar::<_, String>(
+            "SELECT expires_at FROM personal_access_tokens WHERE id = ?1 AND revoked_at IS NULL",
+        )
+        .bind(token_id)
+        .fetch_optional(self.reader())
+        .await?;
+        Ok(expires_at.is_some_and(|at| at > Utc::now().to_rfc3339()))
     }
 
     /// Checks a raw token: what it grants, or `None` when it is unknown,
@@ -747,7 +759,34 @@ mod tests {
         assert!(storage.revoke_personal_token(&user.id, &token.id).await.unwrap());
         assert!(storage.authenticate_personal_token(&raw).await.unwrap().is_none());
         assert!(storage.create_personal_token(&user.id, " ", "read", 30).await.is_err());
-        assert!(storage.create_personal_token(&user.id, "x", "admin", 30).await.is_err());
+        assert!(storage.create_personal_token(&user.id, "x", "owner", 30).await.is_err());
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[tokio::test]
+    async fn the_admin_scope_exists_and_a_revoked_token_is_no_longer_active() {
+        let (storage, dir) = storage().await;
+        let user = storage
+            .create_user("scopes@example.com", "Scopes", "hash")
+            .await
+            .unwrap();
+        for scope in ["read", "write", "admin", "system"] {
+            let (token, raw) = storage.create_personal_token(&user.id, scope, scope, 7).await.unwrap();
+            let grant = storage.authenticate_personal_token(&raw).await.unwrap().unwrap();
+            assert_eq!(grant.scope, scope);
+            assert_eq!(grant.token_id, token.id);
+            assert!(storage.personal_token_active(&token.id).await.unwrap(), "{scope}");
+        }
+        let (token, _) = storage
+            .create_personal_token(&user.id, "short", "admin", 7)
+            .await
+            .unwrap();
+        assert!(storage.revoke_personal_token(&user.id, &token.id).await.unwrap());
+        assert!(
+            !storage.personal_token_active(&token.id).await.unwrap(),
+            "a revoked token ends the streams it opened"
+        );
+        assert!(!storage.personal_token_active("no-such-token").await.unwrap());
         let _ = std::fs::remove_dir_all(dir);
     }
 

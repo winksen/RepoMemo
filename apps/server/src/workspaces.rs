@@ -68,7 +68,7 @@ pub(crate) async fn dashboard(
 }
 
 pub(crate) async fn update_workspace(
-    subject: AuthenticatedSubject,
+    ManagingSubject(subject): ManagingSubject,
     State(state): State<AppState>,
     Path(workspace_id): Path<String>,
     Json(request): Json<UpdateWorkspaceRequest>,
@@ -93,7 +93,7 @@ pub(crate) async fn update_workspace(
 }
 
 pub(crate) async fn delete_workspace(
-    subject: AuthenticatedSubject,
+    ManagingSubject(subject): ManagingSubject,
     State(state): State<AppState>,
     Path(workspace_id): Path<String>,
 ) -> Result<StatusCode, ApiError> {

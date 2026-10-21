@@ -31,7 +31,7 @@ pub(crate) async fn list_organizations(
 }
 
 pub(crate) async fn update_organization(
-    subject: AuthenticatedSubject,
+    ManagingSubject(subject): ManagingSubject,
     State(state): State<AppState>,
     Path(organization_id): Path<String>,
     Json(request): Json<UpdateOrganizationRequest>,
@@ -60,7 +60,7 @@ pub(crate) async fn list_organization_members(
 }
 
 pub(crate) async fn upsert_organization_member(
-    subject: AuthenticatedSubject,
+    ManagingSubject(subject): ManagingSubject,
     State(state): State<AppState>,
     Path(organization_id): Path<String>,
     Json(request): Json<UpsertOrganizationMemberRequest>,
@@ -114,7 +114,7 @@ pub(crate) async fn upsert_organization_member(
 }
 
 pub(crate) async fn remove_organization_member(
-    subject: AuthenticatedSubject,
+    ManagingSubject(subject): ManagingSubject,
     State(state): State<AppState>,
     Path((organization_id, user_id)): Path<(String, String)>,
 ) -> Result<StatusCode, ApiError> {
@@ -164,7 +164,7 @@ pub(crate) async fn list_workspace_members(
 }
 
 pub(crate) async fn upsert_workspace_member(
-    subject: AuthenticatedSubject,
+    ManagingSubject(subject): ManagingSubject,
     State(state): State<AppState>,
     Path(workspace_id): Path<String>,
     Json(request): Json<UpsertWorkspaceMemberRequest>,
@@ -237,7 +237,7 @@ pub(crate) async fn upsert_workspace_member(
 }
 
 pub(crate) async fn remove_workspace_member(
-    subject: AuthenticatedSubject,
+    ManagingSubject(subject): ManagingSubject,
     State(state): State<AppState>,
     Path((workspace_id, user_id)): Path<(String, String)>,
 ) -> Result<StatusCode, ApiError> {

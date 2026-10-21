@@ -426,7 +426,11 @@ pub(crate) struct AuthenticatedSubject {
 /// What a personal access token used for a request may do.
 #[derive(Debug, Clone)]
 pub(crate) struct TokenGrant {
+    /// The token itself, so a stream it opened can end when it is revoked.
+    pub(crate) token_id: String,
     pub(crate) read_only: bool,
+    /// The `admin` scope: also the routes that grant access, delete, repoint, link or export.
+    pub(crate) admin: bool,
     /// The `system` scope: also changes in the System area.
     pub(crate) system: bool,
 }

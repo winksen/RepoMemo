@@ -29,6 +29,7 @@ Environments from V0.1.40 and later upgrade in place. An older one: open it firs
 
 - **Registration is closed by default.** A server that relied on open registration sets `REPOMEMO_ALLOW_REGISTRATION=true`, or people join with invitation links (preferred).
 - A server bound beyond loopback over plain HTTP stops at startup until it has `REPOMEMO_PUBLIC_URL=https://…`, `REPOMEMO_TRUST_PROXY=true` or `REPOMEMO_ALLOW_INSECURE_HTTP=true`.
+- **A read-and-write token no longer grants access or removes things (V0.2.140).** Inviting people, changing roles, adding or removing members, deleting or renaming a workspace or organization, changing AI providers or policy, linking repositories and connectors (with their tokens, deploy keys and webhooks), and exporting or importing a workspace need a browser session or a token with the new `admin` scope (Profile › API tokens; a short-lived one, for a script that needs it). Existing tokens keep their scope and lose these routes: a script that calls them gets `403` and the message names the scope. Content work (files, notes, tasks, comments, memory, searches) is unchanged, and so are `system` tokens for the System area. Revoking a token now ends the live streams it opened.
 - Scripts that added existing accounts directly to a workspace create an invitation instead; scripts that made System changes with a read-and-write token need a token with the `system` scope.
 
 ### From before V0.1.68

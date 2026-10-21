@@ -27,7 +27,7 @@ use tokio_stream::wrappers::ReceiverStream;
 
 use crate::{
     consume_heavy_quota, map_storage_error, record_workspace_activity, require_workspace_admin, ApiError, AppState,
-    AuthenticatedSubject,
+    ManagingSubject,
 };
 
 /// Bytes of a file handed to the compressor at a time, so the stream moves
@@ -41,7 +41,7 @@ type Piece = Result<Vec<u8>, std::io::Error>;
 /// `GET /v1/workspaces/{id}/export`: the workspace as an archive, for its
 /// owners and administrators.
 pub(crate) async fn export_workspace(
-    subject: AuthenticatedSubject,
+    ManagingSubject(subject): ManagingSubject,
     State(state): State<AppState>,
     Path(workspace_id): Path<String>,
 ) -> Result<Response, ApiError> {

@@ -17,7 +17,7 @@ use serde_json::json;
 use crate::{
     map_storage_error, record_workspace_activity, require_workspace_admin, require_workspace_read,
     security::{too_many_requests, wait_text},
-    ApiError, AppState, AuthenticatedSubject,
+    ApiError, AppState, AuthenticatedSubject, ManagingSubject,
 };
 
 /// Key of the policy in the workspace settings object.
@@ -143,7 +143,7 @@ pub(crate) async fn get_ai_policy(
 }
 
 pub(crate) async fn update_ai_policy(
-    subject: AuthenticatedSubject,
+    ManagingSubject(subject): ManagingSubject,
     State(state): State<AppState>,
     Path(workspace_id): Path<String>,
     Json(request): Json<UpdateAiPolicyRequest>,

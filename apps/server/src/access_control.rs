@@ -160,9 +160,12 @@ pub(crate) fn workspace_role_label(role: &WorkspaceRole) -> &'static str {
 /// The caller of a handler. A personal access token is accepted; a read-only
 /// one only for GET and HEAD. Handlers mark stricter or looser needs in their
 /// signature instead: [`SessionSubject`] for the account's own security
-/// (tokens, password, roles, sign-out everywhere, invitations, the
-/// environment), [`ReadingSubject`] for a POST that only reads (searches,
-/// questions, console lookups).
+/// (tokens, password, sign-out everywhere, the environment),
+/// [`ManagingSubject`] for what grants access, deletes, repoints, links or
+/// exports (invitations, members and roles, deleting or renaming a workspace
+/// or organization, AI providers and policy, repository and connector links,
+/// webhooks, export and import), [`ReadingSubject`] for a POST that only
+/// reads (searches, questions, console lookups).
 impl FromRequestParts<AppState> for AuthenticatedSubject {
     type Rejection = ApiError;
 
@@ -188,6 +191,26 @@ impl FromRequestParts<AppState> for SessionSubject {
         let subject = authenticate(parts, state).await?;
         if subject.token.is_some() {
             return Err(access::token_refusal(false));
+        }
+        Ok(Self(subject))
+    }
+}
+
+/// The caller of a route that grants or changes access, deletes, repoints,
+/// links or exports (V0.2.140, decision 23): a browser session, or a personal
+/// access token with the `admin` scope, which its owner grants on purpose. A
+/// read-only or read-and-write token is refused on every method, GET included
+/// (an export hands over the whole workspace), and so is a `system` token,
+/// whose extra reach is the System area.
+pub(crate) struct ManagingSubject(pub(crate) AuthenticatedSubject);
+
+impl FromRequestParts<AppState> for ManagingSubject {
+    type Rejection = ApiError;
+
+    async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, Self::Rejection> {
+        let subject = authenticate(parts, state).await?;
+        if subject.token.as_ref().is_some_and(|token| !token.admin) {
+            return Err(access::admin_scope_refusal());
         }
         Ok(Self(subject))
     }
@@ -267,7 +290,8 @@ pub(crate) async fn authenticate_personal_token(
         .await
         .map_err(ApiError::internal)?
         .ok_or_else(ApiError::unauthorized)?;
-    let read_only = !matches!(grant.scope.as_str(), "write" | "system");
+    let read_only = !matches!(grant.scope.as_str(), "write" | "admin" | "system");
+    let admin = grant.scope == "admin";
     let system = grant.scope == "system";
     tracing::debug!(target: "audit", user_id = %grant.user_id, token_id = %grant.token_id, method = %parts.method, path = parts.uri.path(), "Personal access token used");
     let expires_at = chrono::DateTime::parse_from_rfc3339(&grant.expires_at)
@@ -279,6 +303,11 @@ pub(crate) async fn authenticate_personal_token(
         session_version: access.session_version,
         is_system_admin: access.is_system_admin,
         is_app_admin: access.is_app_admin,
-        token: Some(TokenGrant { read_only, system }),
+        token: Some(TokenGrant {
+            token_id: grant.token_id,
+            read_only,
+            admin,
+            system,
+        }),
     })
 }

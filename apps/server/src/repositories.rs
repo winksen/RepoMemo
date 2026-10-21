@@ -27,7 +27,7 @@ use tokio::sync::Semaphore;
 
 use crate::{
     ai_access, embedding::EmbeddingQueue, record_workspace_activity, require_workspace_admin, require_workspace_read,
-    require_workspace_write, system::SettingsCell, ApiError, AppState, AuthenticatedSubject,
+    require_workspace_write, system::SettingsCell, ApiError, AppState, AuthenticatedSubject, ManagingSubject,
 };
 
 /// An automatic sync towards the same commit is not tried again sooner than
@@ -391,7 +391,7 @@ pub(crate) async fn list_repositories(
 /// Tells an administrator whether the server can read a repository link, and
 /// what connecting it would index, without storing anything.
 pub(crate) async fn check_repository(
-    subject: AuthenticatedSubject,
+    ManagingSubject(subject): ManagingSubject,
     State(state): State<AppState>,
     Path(workspace_id): Path<String>,
     Json(request): Json<RepositoryLinkRequest>,
@@ -419,7 +419,7 @@ pub(crate) async fn check_repository(
 }
 
 pub(crate) async fn connect_repository(
-    subject: AuthenticatedSubject,
+    ManagingSubject(subject): ManagingSubject,
     State(state): State<AppState>,
     Path(workspace_id): Path<String>,
     Json(request): Json<RepositoryLinkRequest>,
@@ -480,7 +480,7 @@ pub(crate) async fn get_repository(
 }
 
 pub(crate) async fn update_repository(
-    subject: AuthenticatedSubject,
+    ManagingSubject(subject): ManagingSubject,
     State(state): State<AppState>,
     Path(source_id): Path<String>,
     Json(request): Json<UpdateRepositoryRequest>,
@@ -514,7 +514,7 @@ pub(crate) async fn update_repository(
 }
 
 pub(crate) async fn delete_repository(
-    subject: AuthenticatedSubject,
+    ManagingSubject(subject): ManagingSubject,
     State(state): State<AppState>,
     Path(source_id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
@@ -549,7 +549,7 @@ pub(crate) async fn delete_repository(
 /// Replaces the token of a remote repository. The new one is tried against
 /// the host first, and nothing about it is ever returned.
 pub(crate) async fn set_repository_token(
-    subject: AuthenticatedSubject,
+    ManagingSubject(subject): ManagingSubject,
     State(state): State<AppState>,
     Path(source_id): Path<String>,
     Json(request): Json<RepositoryTokenRequest>,
@@ -584,7 +584,7 @@ pub(crate) async fn set_repository_token(
 /// Replaces the deploy key (and, when given, the pinned host key) of an
 /// `ssh` repository. The new key is tried against the host first.
 pub(crate) async fn set_repository_deploy_key(
-    subject: AuthenticatedSubject,
+    ManagingSubject(subject): ManagingSubject,
     State(state): State<AppState>,
     Path(source_id): Path<String>,
     Json(request): Json<RepositoryDeployKeyRequest>,
@@ -617,7 +617,7 @@ pub(crate) async fn set_repository_deploy_key(
 }
 
 pub(crate) async fn clear_repository_token(
-    subject: AuthenticatedSubject,
+    ManagingSubject(subject): ManagingSubject,
     State(state): State<AppState>,
     Path(source_id): Path<String>,
 ) -> Result<StatusCode, ApiError> {

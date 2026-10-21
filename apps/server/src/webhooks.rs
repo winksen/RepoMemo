@@ -403,7 +403,7 @@ async fn delete_webhook(
 
 /// Makes or replaces a repository's webhook secret (workspace administrators).
 pub(crate) async fn create_repository_webhook(
-    subject: AuthenticatedSubject,
+    ManagingSubject(subject): ManagingSubject,
     State(state): State<AppState>,
     Path(source_id): Path<String>,
 ) -> Result<(StatusCode, Json<WebhookCreated>), ApiError> {
@@ -426,7 +426,7 @@ pub(crate) async fn create_repository_webhook(
 }
 
 pub(crate) async fn delete_repository_webhook(
-    subject: AuthenticatedSubject,
+    ManagingSubject(subject): ManagingSubject,
     State(state): State<AppState>,
     Path(source_id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
@@ -449,7 +449,7 @@ pub(crate) async fn delete_repository_webhook(
 
 /// Makes or replaces a connector's webhook secret (workspace administrators).
 pub(crate) async fn create_connector_webhook(
-    subject: AuthenticatedSubject,
+    ManagingSubject(subject): ManagingSubject,
     State(state): State<AppState>,
     Path(source_id): Path<String>,
 ) -> Result<(StatusCode, Json<WebhookCreated>), ApiError> {
@@ -472,7 +472,7 @@ pub(crate) async fn create_connector_webhook(
 }
 
 pub(crate) async fn delete_connector_webhook(
-    subject: AuthenticatedSubject,
+    ManagingSubject(subject): ManagingSubject,
     State(state): State<AppState>,
     Path(source_id): Path<String>,
 ) -> Result<StatusCode, ApiError> {

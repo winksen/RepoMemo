@@ -113,7 +113,7 @@ pub(crate) async fn list_workspace_ai_providers(
 }
 
 pub(crate) async fn save_workspace_ai_provider(
-    subject: AuthenticatedSubject,
+    ManagingSubject(subject): ManagingSubject,
     State(state): State<AppState>,
     Path(workspace_id): Path<String>,
     Json(request): Json<SaveAiProviderRequest>,

@@ -1086,3 +1086,252 @@ async fn anonymous_endpoints_take_small_bodies_whatever_the_upload_limit_is() {
     assert!(tokens["access_token"].is_string());
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+/// Decision 23 (E5): a read-and-write token does content work, but granting access, deleting,
+/// repointing, linking, exporting and importing need a session or the `admin` scope.
+#[tokio::test]
+async fn the_routes_that_grant_access_or_remove_things_need_a_session_or_an_admin_token() {
+    let data_dir = temp_data_dir("managing-tokens");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let send = |method: &'static str, uri: String, who: String, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, &who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let (owner, _) = register_account(&app, "managing-owner@example.com").await;
+    let organization = response_json(
+        send(
+            "POST",
+            "/v1/organizations".to_owned(),
+            owner.clone(),
+            json!({"name": "Managing"}),
+        )
+        .await,
+    )
+    .await["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let workspace = response_json(
+        send(
+            "POST",
+            "/v1/workspaces".to_owned(),
+            owner.clone(),
+            json!({"organization_id": organization, "name": "Managed"}),
+        )
+        .await,
+    )
+    .await["workspace"]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+
+    let mint = |scope: &'static str| {
+        let send = &send;
+        let owner = owner.clone();
+        async move {
+            let created = response_json(
+                send(
+                    "POST",
+                    "/v1/profile/tokens".to_owned(),
+                    owner,
+                    json!({"name": scope, "scope": scope, "expires_in_days": 7}),
+                )
+                .await,
+            )
+            .await;
+            format!("Bearer {}", created["secret"].as_str().unwrap())
+        }
+    };
+    let read = mint("read").await;
+    let write = mint("write").await;
+    let system = mint("system").await;
+    let admin = mint("admin").await;
+
+    let routes: Vec<(&'static str, String, Value)> = vec![
+        ("DELETE", "/v1/invitations/any".to_owned(), json!({})),
+        (
+            "POST",
+            format!("/v1/organizations/{organization}/invitations"),
+            json!({}),
+        ),
+        ("POST", format!("/v1/workspaces/{workspace}/invitations"), json!({})),
+        (
+            "PUT",
+            format!("/v1/organizations/{organization}"),
+            json!({"name": "Renamed"}),
+        ),
+        ("PUT", format!("/v1/organizations/{organization}/members"), json!({})),
+        (
+            "DELETE",
+            format!("/v1/organizations/{organization}/members/someone"),
+            json!({}),
+        ),
+        ("PUT", format!("/v1/workspaces/{workspace}/members"), json!({})),
+        (
+            "DELETE",
+            format!("/v1/workspaces/{workspace}/members/someone"),
+            json!({}),
+        ),
+        ("PUT", format!("/v1/workspaces/{workspace}"), json!({"name": "Renamed"})),
+        ("DELETE", format!("/v1/workspaces/{workspace}"), json!({})),
+        ("PUT", format!("/v1/workspaces/{workspace}/ai-providers"), json!({})),
+        ("PUT", format!("/v1/workspaces/{workspace}/ai-policy"), json!({})),
+        ("POST", format!("/v1/workspaces/{workspace}/repositories"), json!({})),
+        (
+            "POST",
+            format!("/v1/workspaces/{workspace}/repositories/check"),
+            json!({}),
+        ),
+        ("PUT", "/v1/repositories/any".to_owned(), json!({})),
+        ("DELETE", "/v1/repositories/any".to_owned(), json!({})),
+        ("PUT", "/v1/repositories/any/token".to_owned(), json!({})),
+        ("DELETE", "/v1/repositories/any/token".to_owned(), json!({})),
+        ("PUT", "/v1/repositories/any/deploy-key".to_owned(), json!({})),
+        ("POST", "/v1/repositories/any/webhook".to_owned(), json!({})),
+        ("DELETE", "/v1/repositories/any/webhook".to_owned(), json!({})),
+        ("POST", format!("/v1/workspaces/{workspace}/connectors"), json!({})),
+        (
+            "POST",
+            format!("/v1/workspaces/{workspace}/connectors/check"),
+            json!({}),
+        ),
+        ("DELETE", "/v1/connectors/any".to_owned(), json!({})),
+        ("PUT", "/v1/connectors/any/token".to_owned(), json!({})),
+        ("POST", "/v1/connectors/any/webhook".to_owned(), json!({})),
+        ("DELETE", "/v1/connectors/any/webhook".to_owned(), json!({})),
+        ("GET", format!("/v1/workspaces/{workspace}/export"), json!(null)),
+        ("POST", "/v1/workspaces/import".to_owned(), json!({})),
+    ];
+    // The refusals come before anything is read or changed, so none of the requests below does anything.
+    for (method, uri, body) in &routes {
+        for (label, token) in [("read", &read), ("write", &write), ("system", &system)] {
+            let response = send(method, uri.clone(), token.clone(), body.clone()).await;
+            assert_eq!(
+                response.status(),
+                403,
+                "a {label} token must be refused on {method} {uri}"
+            );
+            let message = response_json(response).await["error"]["message"]
+                .as_str()
+                .unwrap_or_default()
+                .to_owned();
+            assert!(
+                message.contains("admin scope"),
+                "the guard answered {method} {uri}: {message}"
+            );
+        }
+    }
+    assert_eq!(
+        send("GET", format!("/v1/workspaces/{workspace}"), owner.clone(), json!(null))
+            .await
+            .status(),
+        200,
+        "nothing above took effect"
+    );
+
+    // A session, and a token granted the admin scope, are past the guard (what they ask for may still be refused).
+    for (method, uri, body) in &routes {
+        if *method == "DELETE" && uri == &format!("/v1/workspaces/{workspace}") {
+            continue;
+        }
+        let session = send(method, uri.clone(), owner.clone(), body.clone()).await;
+        let session_status = session.status();
+        let by_token = send(method, uri.clone(), admin.clone(), body.clone()).await;
+        assert_eq!(
+            by_token.status(),
+            session_status,
+            "an admin token gets the session's answer on {method} {uri}"
+        );
+        assert_ne!(by_token.status(), 401, "the admin token is known on {method} {uri}");
+        let message = response_json(by_token).await["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .to_owned();
+        assert!(
+            !message.contains("admin scope"),
+            "the guard let the admin token through on {method} {uri}: {message}"
+        );
+    }
+
+    // Content work stays open to a read-and-write token, and a read-only token still only reads.
+    assert!(send(
+        "POST",
+        format!("/v1/workspaces/{workspace}/artifacts/text"),
+        write.clone(),
+        json!({"title": "From a script", "content": "Release notes"})
+    )
+    .await
+    .status()
+    .is_success());
+    assert_eq!(
+        send(
+            "GET",
+            format!("/v1/workspaces/{workspace}/artifacts"),
+            read.clone(),
+            json!(null)
+        )
+        .await
+        .status(),
+        200
+    );
+    assert!(
+        send("DELETE", format!("/v1/workspaces/{workspace}"), admin, json!({}))
+            .await
+            .status()
+            .is_success(),
+        "an admin token deletes a workspace, as its owner may"
+    );
+    let _ = std::fs::remove_dir_all(data_dir);
+}
+
+/// E15: revoking a personal access token ends the live streams it opened.
+#[tokio::test]
+async fn event_streams_end_when_the_token_that_opened_them_is_revoked() {
+    let data_dir = temp_data_dir("token-streams");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let (owner, _) = register_account(&app, "token-stream-owner@example.com").await;
+    let workspace_id = create_workspace(&app, &owner).await;
+    let created = response_json(
+        app.clone()
+            .oneshot(json_request(
+                "POST",
+                "/v1/profile/tokens",
+                &owner,
+                json!({"name": "Watcher", "scope": "read", "expires_in_days": 7}),
+            ))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let bearer = format!("Bearer {}", created["secret"].as_str().unwrap());
+    let token_id = created["token"]["id"].as_str().unwrap().to_owned();
+
+    let stream = app
+        .clone()
+        .oneshot(auth_request(
+            "GET",
+            &format!("/v1/workspaces/{workspace_id}/events"),
+            &bearer,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(stream.status(), 200);
+    let revoked = app
+        .clone()
+        .oneshot(auth_request(
+            "DELETE",
+            &format!("/v1/profile/tokens/{token_id}"),
+            &owner,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(revoked.status(), 204);
+    let ended = tokio::time::timeout(
+        std::time::Duration::from_secs(10),
+        to_bytes(stream.into_body(), usize::MAX),
+    )
+    .await;
+    assert!(ended.is_ok(), "the stream should close once its token is revoked");
+    let _ = std::fs::remove_dir_all(data_dir);
+}
