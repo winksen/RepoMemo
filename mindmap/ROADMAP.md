@@ -1,8 +1,8 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.129` (2026-10-21), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.129` (2026-10-21), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next:** tracks L and M, security and backend hardening (V0.2.130–V0.2.162, planned 2026-10-21) · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
-> **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Security review 2026-10-16 (V0.2.52)](security/2026-10-16-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
+> **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Security review 2026-10-16 (V0.2.52)](security/2026-10-16-security-review.md) · [Security and backend review 2026-10-21 (V0.2.129)](security/2026-10-21-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
 RepoMemo started as a local-first desktop workbench. It is now a **self-hosted team product**: a shared API server with a web client, organizations and roles, collaboration, git repositories as living sources, business documents, and optional AI grounded in cited evidence. A server can be installed and administered entirely from the browser (environment menu, first-run setup, System area, admin console).
 
@@ -11,6 +11,8 @@ Between V0.1.32 and V0.1.62 the work went into **depth and operability**. V0.1.6
 **V0.2.0 is proposed as the first *team-ready* release**: a server a team can install, expose and trust with its knowledge. That means secure by default, deployable and recoverable, checked on every commit, and keeping its core promise that memory stays true. The plan to get there is [Road to V0.2.0](#-road-to-v020); every release of it is built and only the clean-machine install (R6) remains before the tag.
 
 **V0.3.0, *Connected*,** is proposed next: remote repositories, mail, issues and pull requests, an assistant that remembers the conversation, portable workspaces and one client, reached through 56 single-purpose releases (V0.2.1–V0.2.56). The plan is [Road to V0.3.0](#-road-to-v030).
+
+Before the tag, **tracks L and M** (V0.2.130–V0.2.162, planned 2026-10-21) act on the [fifth review](security/2026-10-21-security-review.md): CI's blocking dependency check fails on `main`, two high and six medium findings of the 2026-10-14 review were never closed, and the backend does work it could skip (whole documents read for a rights check, whole file lists on every workspace page, repository syncs with nothing to do).
 
 > **Versions** are set in one place since V0.1.66 (`npm run version:set -- <version>`), checked in CI, and recorded in [CHANGELOG.md](../CHANGELOG.md).
 
@@ -46,7 +48,9 @@ timeline
     V0.2.32 to V0.2.39 : Assistant memory, cross-workspace search, palette, languages, review queue
     V0.2.40 to V0.2.48 : Export and import, encrypted backups, container, accessibility
     V0.2.49 to V0.2.56 : One client, release candidate
-    V0.2.57 to V0.2.129 : Frontend polish (track K) : V0.3.0 Connected
+    V0.2.57 to V0.2.129 : Frontend polish (track K)
+    V0.2.130 to V0.2.148 : Security and dependencies (track L)
+    V0.2.149 to V0.2.162 : Backend hardening and performance (track M) : V0.3.0 Connected
 ```
 
 | Stage | Status |
@@ -58,6 +62,9 @@ timeline
 | Road to V0.2.0 (V0.1.66–V0.1.76) | 🔄 Built and versioned `0.2.0`; R6 (clean install) and the tag are the maintainer's |
 | Road to V0.3.0 (V0.2.1–V0.2.56, one change each) | ✅ V0.2.1–V0.2.56 built; the clean-machine install (R6, R12) is the maintainer's |
 | Track K: frontend polish (V0.2.57–V0.2.129) | ✅ V0.2.57–V0.2.129 built (K1 to K6 done); decisions 15–19 taken as proposed; [plan](plans/2026-10-17-frontend-polish.md) |
+| Security and backend review 2026-10-21 (fifth pass) | 🔄 Open: 2 high, 9 medium, 15 low, 4 info, plus 11 performance findings; [review](security/2026-10-21-security-review.md) |
+| Track L: security and dependencies (V0.2.130–V0.2.148) | 🔜 Planned 2026-10-21; decisions 20–23 to agree |
+| Track M: backend hardening and performance (V0.2.149–V0.2.162) | 🔜 Planned 2026-10-21 |
 | V0.4.0 and later: scale-out, single sign-on, hosted | 💭 Direction |
 
 ---
@@ -305,7 +312,7 @@ V0.2.0 made RepoMemo trustworthy on its own server. **V0.3.0, *Connected*,** pro
 - **Shippable alone:** each release passes CI, carries its tests, updates the mindmaps, the changelog and its row in [RELEASES_0.2.md](RELEASES_0.2.md), and is committed as `Update V0.2.N` with a short list.
 - **Security comes with the surface:** the rules for a new outside connection (mail, remote git, webhooks, connectors) are part of the release that opens it, never a later one.
 - **Fixes ride along** with the next release when they are small; a fix that needs its own release gets one (decision 6 named the format, not a fixes-only rule).
-- **Feature freeze from V0.2.52:** only the release candidate's checks and their fixes until V0.3.0, **lifted for track K** (decision 15): the frontend polish adds building blocks and fixes, no product feature, and V0.2.129 repeated the release checks and **restored the freeze**: from V0.2.129 until the tag, only the checks of the clean install and the fixes it finds go in.
+- **Feature freeze from V0.2.52:** only the release candidate's checks and their fixes until V0.3.0, **lifted for track K** (decision 15): the frontend polish adds building blocks and fixes, no product feature, and V0.2.129 repeated the release checks and **restored the freeze**: from V0.2.129 until the tag, only the checks of the clean install and the fixes it finds go in. **Lifted again for tracks L and M** (decision 20, proposed): security fixes, dependency updates and backend hardening, no product feature; V0.2.162 repeats the release checks and restores it.
 
 ### Release plan
 
@@ -418,7 +425,7 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 | **V0.2.54** ✅ | 📘 | Performance | Performance run at 50,000 passages plus a 100,000-file remote repository and 10,000 issues | R10 | The V0.2.0 targets still hold; results in the release notes |
 | **V0.2.55** ✅ | 📘 | Documentation | Mindmaps, branch pages (`repository-sources`, a new `connectors` page, `operations`), changelog and upgrade notes from 0.2.x | R11 | Every page matches the code |
 | **V0.2.56** ✅ | 📘 | Release | Clean-machine install with mail and a remote repository, following only the guide | R12 | Installed without a workaround; ready to tag |
-| **V0.3.0** | — | — | *Connected*, after track K | — | Tag `v0.3.0` |
+| **V0.3.0** | — | — | *Connected*, after tracks K, L and M | — | Tag `v0.3.0` |
 
 #### Track K: Frontend polish (V0.2.57–V0.2.129)
 
@@ -432,6 +439,53 @@ Planned on 2026-10-17. The web client works but does not look like one product: 
 | K4 | Pages on the shared pieces | V0.2.102–V0.2.118 | 17 |
 | K5 | Behaviour you can rely on | V0.2.119–V0.2.125 | 7 |
 | K6 | Keep it that way | V0.2.126–V0.2.129 | 4 |
+
+#### Track L: Security and dependencies (V0.2.130–V0.2.148)
+
+Planned on 2026-10-21 from the [fifth review](security/2026-10-21-security-review.md). `cargo deny` fails on `main` (six TLS advisories and three in `zip`), and the [2026-10-14 review](security/2026-10-14-security-review.md)'s findings were never tracked to closure: E1 and E2 (high) and E3–E7 and E9 (medium) are still open. The order is CI green first, then the high findings, then the medium, then the low ones riding together. Each release states its finding IDs; the evidence (files and lines) is in the review.
+
+| Release | Type | Section | The one change | IDs | Done when |
+|---|---|---|---|---|---|
+| **V0.2.130** | 📘 | Dependencies | `rustls` 0.23.46, `rustls-webpki` 0.103.16 and `webpki-roots` 1.0.10, a lockfile-only update | S5-1 | `cargo deny check advisories` reports only the three `zip` advisories |
+| **V0.2.131** | 📘 | Dependencies | `calamine` 0.37 (with `zip` 9 and `quick-xml` 0.42); the workspace's `rust-version` raised to 1.88 | S5-2 | `cargo deny check advisories` passes with no new ignore; the spreadsheet reading tests pass; one `quick-xml` left in the lock |
+| **V0.2.132** | 📘 | Dependencies | `sqlx` without a TLS stack: SQLite needs none | S5-10 | `cargo tree -i rustls` and `-i webpki-roots` no longer pass through `sqlx`; storage tests pass |
+| **V0.2.133** | 📘 | Web toolchain | Patch releases of PostCSS, nanoid, browserslist, source-map-js and baseline-browser-mapping, a lockfile-only update | S5-3a | `npm audit` lists only Vite, esbuild, Vitest and tinypool; `npm audit --omit=dev` still finds nothing |
+| **V0.2.134** | 📘 | Web toolchain | Vite and `@vitejs/plugin-react` to the current major; Vitest 4.1.11 or later | S5-3b | `npm audit`, development packages included, finds nothing; the build still writes `content-security-policy.txt`; typecheck and the web tests pass |
+| **V0.2.135** | 📘 | CI and container | GitHub Actions and the container's base images pinned by digest; Dependabot for Cargo, npm, Actions and Docker | E17 | No `uses:` or `FROM` names a moving tag, and `npm run container:check` refuses one |
+| **V0.2.136** | 🐞 | Container | A server image whose git the remote-clone check accepts | S5-7 | `container:check` names the base's git release and it passes `is_patched_git`; a remote repository syncs in the container (the maintainer's try) |
+| **V0.2.137** | 🐞 | Office previews | Layout previews through LibreOffice become opt-in, and a LibreOffice older than the fixed releases is refused | E1a, decision 21 | Without `REPOMEMO_OFFICE_PREVIEWS` nothing is converted; an old version is named with the reason in System › Overview and the server check |
+| **V0.2.138** | 🐞 | Office previews | LibreOffice starts with a profile the server writes: no Java, no macros, no fetching of links or updates; the render status is kept per workspace | E1b, E19 | The profile is rewritten before each conversion; a file uploaded in two workspaces is converted, as far as each can tell, in each |
+| **V0.2.139** | 🐞 | AI providers | A provider address is a host and a port, with no path beyond the provider's own; the built-in list names Ollama's port; the test answers alike for every unreachable address | E2 | `http://127.0.0.1:3020`, `http://localhost:11434/api/pull` and `http://127.0.0.1:22` are refused; a refused port and a closed one give the same message |
+| **V0.2.140** | 🐞 | Personal access tokens | Granting access, deleting a workspace, AI provider and policy changes, repository links, webhooks, export and import need a session or a new `admin` scope; revoking a token ends its streams | E5, E15, decision 23 | A read-and-write token gets `403` on each of those route families (a test for each); a revoked token's stream closes within the recheck interval |
+| **V0.2.141** | 🐞 | Live events | Activity events reach owners and administrators only; other readers get a `changed` notice with nothing in it | E6 | A viewer's stream carries no actor, summary or address |
+| **V0.2.142** | 🐞 | People | An organization role reaches only the workspaces whose access came from the organization; a workspace's own removal or downgrade stays (migration 0038) | E9 | After an organization role change, a person a workspace removed stays removed and a viewer stays a viewer |
+| **V0.2.143** | 🐞 | Organizations | Who may create organizations, and who may link local repositories, becomes a system setting, administrators only by default | E3, E4, decision 22 | With the default, a verified account can neither create an organization nor link a local folder; the setting opens both |
+| **V0.2.144** | 🐞 | Sessions | Two tabs refreshing at once no longer sign the person out everywhere; on HTTPS the cookie is `__Secure-repomemo_refresh` | S5-4, E14 | Two refreshes with one cookie within 30 s end no session; an older token reused still ends them all; the old cookie name is read once and replaced |
+| **V0.2.145** | 🐞 | Sign-in | IPv6 clients counted per /64, password hashing behind a cap that answers `429`, limiter maps bounded | E11 | One /64 shares one budget; 200 sign-ins at once never hash more than the cap at a time; a flood of addresses cannot grow the maps past their bound |
+| **V0.2.146** | 🐞 | Input and logs | The low findings on input: strict addresses and display names for new values, user input escaped in text logs, local git started with a cleared environment | E12, E13, E18 | A line break in a sign-in address writes one log line; control and bidirectional characters are refused; git sees no `REPOMEMO_*` variable |
+| **V0.2.147** | 🐞 | Web client | `//host` and `\\host` links shown with their host and opened in a new tab; *Open in Office* not offered for macro-enabled formats | E10, E16 | Tests for both link forms; `.xlsm`, `.docm` and `.pptm` offer a download only |
+| **V0.2.148** | 🔧 | Container | A read-only root, no capabilities and `no-new-privileges` for the server; LibreOffice in a container of its own, with no network, that sees only its work folder | S5-8, E1c | `container:check` asserts each setting; the compose file starts with previews on and with them off (the maintainer's try) |
+
+#### Track M: Backend hardening and performance (V0.2.149–V0.2.162)
+
+Planned on 2026-10-21 from §4 of the [fifth review](security/2026-10-21-security-review.md#4-backend-performance). The work the server does that it could skip, first where it is also a risk (reading documents before a rights check, bodies and uploads held in memory), then the large-workspace paths of the 100,000-file repository of V0.2.54. **Before the first release**, the maintainer runs the four commands of [technical/performance.md](technical/performance.md) on a release build and records the figures, so every release here can be compared with them.
+
+| Release | Type | Section | The one change | IDs | Done when |
+|---|---|---|---|---|---|
+| **V0.2.149** | 🐞 | Artifact routes | Every artifact route reads the summary and checks rights before any other work; no document is read to find its workspace | E7a, P12 | A non-member asking for a large PDF gets `403` with no reader started; a test per route counts the readings |
+| **V0.2.150** | 🔧 | Artifact page | The artifact page shows the text indexing already stored, read off the runtime | E7b, P13 | Opening an indexed document's page starts no reader; one not indexed yet is read once, on the blocking pool |
+| **V0.2.151** | 🔧 | Jobs | A single-file re-index goes through the indexing queue, one per file; a job is cancelled by the person who started it or an administrator | E8, S5-9 | Ten requests for one file make one job; a member cannot cancel an administrator's re-index |
+| **V0.2.152** | 🐞 | API | Body limits per route: 1 MiB for JSON, the upload limit only on uploads, new versions and import | S5-5 | A 2 MiB comment is `413` whatever the upload limit; an upload up to the limit still works |
+| **V0.2.153** | 🔧 | Uploads | Uploads streamed to a temporary file and hashed as they arrive, then moved into the blob store, with a cap on upload bytes in flight | P14 | A 500 MiB upload never holds more than a buffer in memory; past the cap the answer is `503` with `Retry-After` |
+| **V0.2.154** | 🔧 | Evidence API | `GET …/artifacts` pages in SQL, with folder and repository ids for that page only; an unpaged call is capped | P15a | At 100,000 files a page answers in under 100 ms (release build); `X-Total-Count` gives the total |
+| **V0.2.155** | 🔧 | Web data | The workspace pages stop loading the whole file list: the evidence list pages, pickers and the command palette ask the server | P15b | No request of the web client asks for an unpaged file list; a live event refetches one page |
+| **V0.2.156** | 🔧 | Repositories | A sync whose commit, settings and rules have not changed stops after resolving the commit | P16 | A sync with nothing new on 100,000 files takes under a second and reports "nothing changed" |
+| **V0.2.157** | 🔧 | Repositories | The last-author pass reads only the commits since the previous sync | P17 | A one-commit change reads one commit of history; a rewritten history falls back to the full pass |
+| **V0.2.158** | 🔧 | Search | Search across workspaces runs a few workspaces at a time and embeds the query once per provider and model | P18 | 30 workspaces on one provider make one embedding call; the merged results match the sequential ones |
+| **V0.2.159** | 🔧 | Storage | SQLite read connections get a larger page cache, memory-mapped reads and in-memory temporary tables, each set by an environment variable | P19 | `performance_at_scale` (release build, the maintainer's run) is no slower anywhere; the new figures are recorded |
+| **V0.2.160** | 🔧 | API | JSON answers compressed when the client asks; event streams and file downloads untouched | P20 | A search answer arrives compressed; an event stream still delivers each event at once |
+| **V0.2.161** | 🔧 | API | Load shedding: a cap on requests in flight, for the server and per account, answered with `503` or `429` and `Retry-After` | P21 | Past the cap a request is refused at once instead of queuing until its timeout; health checks and sign-in keep room of their own |
+| **V0.2.162** | 📘 | Release | Release checks repeated after tracks L and M; the fifth review closed; the freeze restored | R13 | `cargo deny`, `npm audit` (development included) and every CI check pass; the review's status table has no open high or medium; the performance figures before and after are recorded (the maintainer's run) |
 
 ### Release checklists (0.2.x)
 
@@ -983,6 +1037,47 @@ One box per release; the brief, the files and the commit line of each are in [th
 - [x] **V0.2.128** DESIGN.md names the shipped accent (blue), greys, fonts, 36 px controls (40 px on touch screens), the layer scale, the icon sizes, the three button treatments and `IconButton`, adds `Dialog`, `ActionMenu` and `Pagination` to the building blocks, and writes down the form, feedback and focus rules; technical mindmap §9 points to it. Documentation check passes
 - [x] **V0.2.129** Release checks repeated after track K (typecheck, styles, accessibility, types, version, documentation, container and migrations checks pass); the notes for V0.3.0 in the clean-install page cover the polish; the feature freeze is back on until the tag. Track K is built: V0.2.57 to V0.2.129. The browser pass and the clean-machine install are the maintainer's
 
+#### Track L: Security and dependencies (planned)
+
+One box per release, with what to change and where. The finding behind each, with its evidence, is in [the fifth review](security/2026-10-21-security-review.md). Commit as `Update V0.2.N`, as before.
+
+- [ ] **V0.2.130** `cargo update -p rustls -p rustls-webpki -p webpki-roots@1.0.9` (a dry run on 2026-10-21 moved exactly these three: 0.23.46, 0.103.16, 1.0.10). No source change. Run `cargo deny --workspace check advisories`: the `zip` trio is all that stays, for V0.2.131
+- [ ] **V0.2.131** `calamine = "0.37"` in `Cargo.toml` (it needs `zip` 9, `quick-xml` 0.42 and Rust 1.88); `rust-version = "1.88"`; set the workspace's `quick-xml` to 0.42 so the lock keeps one (Tauri already uses 0.42). Adapt `crates/ingestion` to the 0.37 API where it changed. `cargo deny check` passes with `deny.toml` unchanged
+- [ ] **V0.2.132** `sqlx` features `runtime-tokio` in place of `runtime-tokio-rustls` (no TLS: the database is a file). Check `cargo tree -i rustls` (only `reqwest`, `repomemo-mail` and Tauri remain) and `cargo tree -i webpki-roots`
+- [ ] **V0.2.133** `npm update postcss nanoid browserslist source-map-js baseline-browser-mapping` (transitive, inside current ranges); `package-lock.json` only. `npm audit` then lists the Vite and Vitest families alone
+- [ ] **V0.2.134** `vite`, `@vitejs/plugin-react` and `vitest` (with `jsdom` if its peer range asks) to current releases in `apps/desktop/package.json`; check `vite.config.ts` (the CSP meta injection and `content-security-policy.txt`, `envPrefix`, the dev server bound to `127.0.0.1:3021`, `devCsp`) against the new major's changes; the C3 suite must run unchanged. `deny.toml` and the policy line about "Vite 5 stays" (V0.1.66, C10) are updated
+- [ ] **V0.2.135** `.github/workflows/ci.yml`: every `uses:` at a full commit SHA with the tag in a comment; `.github/dependabot.yml` for `cargo`, `npm`, `github-actions` and `docker`, weekly. `Dockerfile`: `node`, `rust`, `debian` and `caddy` images by `@sha256:` digest. `scripts/check-container.mjs` refuses a `FROM` without a digest
+- [ ] **V0.2.136** The `server` stage on Debian 13 (`trixie-slim`, git 2.47.3) or git from a source whose version `is_patched_git` accepts; `container:check` reads the release named for the base and asserts it. `docs/DEVELOPMENT_COMMANDS.md` and `operations.md` say which git the image carries
+- [ ] **V0.2.137** `REPOMEMO_OFFICE_PREVIEWS` (`config.rs`, off by default): `Converter::detect` keeps `find_soffice()` for the System overview but converts nothing while off. `probe_version` compares the reported release with the fixed ones of the 2026-10-05 advisories (26.2.5 on the 26.2 line, 26.8.0 after) and refuses older; System › Overview and the server check say which and why. `UPGRADING.md`: previews stop until the setting is turned on
+- [ ] **V0.2.138** Before each run, `conversion.rs` writes `<profile>/user/registrymodifications.xcu` with Java off, macro security at its highest with macros disabled, link updates never, no remote images or OLE links fetched; `--norestore` and the scrubbed environment stay. The render status and the `in_flight` set are keyed by workspace and content hash (the PDF itself can stay shared on disk) (E19). Unit test: the written profile has each item
+- [ ] **V0.2.139** `crates/ai/src/lib.rs`: an allowed-hosts entry may carry a port (`127.0.0.1:11434`, `localhost:11434`, `[::1]:11434`, `openrouter.ai:443`), and without one only the provider's default port is allowed; the base path must be empty or the provider's own (`/api/v1` for OpenRouter); `REPOMEMO_AI_ALLOWED_HOSTS` keeps working (an entry without a port allows any port, as an operator chose). The provider test maps connection refused, reset and timeout to one message. Tests for each refused form
+- [ ] **V0.2.140** A `ManagingSubject` extractor in `access_control.rs` (session, or a token with the new `admin` scope, migration 0037) on: invitations (create, revoke), member upserts and removals, role changes, workspace and organization deletion and rename, AI provider and policy, repository and connector links, tokens and deploy keys, webhooks, export and import. Personal access tokens record the scope; Profile › API tokens offers it with a warning. `watch_event_stream_access` re-checks a token's id (E15). Correct the doc comment of `AuthenticatedSubject`
+- [ ] **V0.2.141** `streams.rs`: the subscriber's role is read when the stream opens and re-read by the watcher; `WorkspaceEvent::Activity` goes through only for owners and administrators, others get `event: changed` with the kind alone (the web client's `workspaceInvalidation` already treats activity as "refetch")
+- [ ] **V0.2.142** Migration 0038: `workspace_memberships.origin` (`organization` or `direct`, existing rows `direct` unless they match the organization role exactly). `upsert_organization_member` updates only `origin = 'organization'` rows and inserts where none exists; a workspace removal of an organization member is remembered (a `removed` row or a tombstone) so the next role change does not re-add. Test: remove, downgrade, then change the organization role
+- [ ] **V0.2.143** System setting `organization_creators` (`administrators` default, `everyone`) read by `create_organization`; `connect_repository` for a local path asks for a system administrator unless the setting `local_repository_linkers` is `workspace_admins`. The setup wizard asks both questions; the web client hides what the person cannot do (capabilities)
+- [ ] **V0.2.144** Migration 0039: `refresh_tokens.revoked_reason` and `replaced_at`. `consume_refresh_token`: a token rotated less than 30 s ago answers `None` without `revoke_user_refresh_tokens`; reuse after that, or of a token signed out, still revokes the family. `sharedApi.ts`: refresh inside `navigator.locks.request("repomemo-refresh", …)` where available, and a tab that wakes after another refreshed retries once. `web_session.rs`: `__Secure-repomemo_refresh` when the public address is HTTPS, the old name accepted once and cleared (E14)
+- [ ] **V0.2.145** `client_ip` keys IPv6 by its /64 for limits and lockouts (not for logs); a `Semaphore` (twice the cores) around `hash_password` and `verify_password` that answers `429` when full; `RateLimiter::check` prunes expired windows when the map passes a bound (100,000 keys)
+- [ ] **V0.2.146** `email = ?email` (escaped) in `auth.rs` and `lib.rs`, or one `log_text()` helper; `normalize_email` refuses whitespace, control characters and more than one `@`, and `require_name` control and bidirectional-override characters, for new values only (stored ones are left, mail already refuses them); `git_command` in `crates/git/src/lib.rs` starts from `env_clear()` plus `PATH`, `HOME`, `SystemRoot` and the `GIT_*` it sets, as `remote.rs` does
+- [ ] **V0.2.147** `externalHost` parses with `new URL(href, window.location.href)` and treats any other origin as external (host shown, new tab, `noopener noreferrer`); `lib/documents.ts` drops `xlsm`, `docm`, `pptm` (and other macro formats) from *Open in Office*. Tests in `src/test/` for `//host`, `\\host`, `/v1/…` and a macro workbook
+- [ ] **V0.2.148** `docker-compose.yml`: `read_only: true`, `tmpfs: /tmp`, `cap_drop: [ALL]`, `security_opt: [no-new-privileges:true]` on the server; LibreOffice as a third service (`network_mode: none`, its own volume for work files) reached through `REPOMEMO_SOFFICE_WRAPPER`, or left out when previews are off. `container:check` asserts the settings; `operations.md` describes both layouts
+
+#### Track M: Backend hardening and performance (planned)
+
+- [ ] **V0.2.149** In `apps/server/src/artifacts.rs`, every handler that calls `state.core.get_artifact` for its workspace uses `readable_artifact_workspace` (or a writing twin) on the summary first, and loads the detail only where it returns it. Add a counter of readings to the ingestion test hooks and assert that a refused request starts none
+- [ ] **V0.2.150** `RepoMemoCore::get_artifact` builds the preview text from the stored passages (in order) when the file is indexed and unchanged, and otherwise calls `extract_document_text` inside `spawn_blocking`; the 120,000-character cap stays. Test: the page of an indexed PDF starts no reader
+- [ ] **V0.2.151** `index_artifact` calls `state.index_queue.enqueue` (deduplicated per artifact) and answers `202` with the queued job; `cancel_job` allows the job's starter (`indexing_jobs.started_by`, migration 0040, null for older jobs) or an administrator
+- [ ] **V0.2.152** The router's `DefaultBodyLimit` becomes 1 MiB; `upload_artifact`, `upload_artifact_version` and `import_workspace` get `DefaultBodyLimit::max(config.max_upload_bytes)` as a route layer (avatars keep theirs). Test: a 2 MiB JSON body is `413` with the upload limit at 100 MiB
+- [ ] **V0.2.153** `upload_artifact` and `upload_artifact_version` take `Body` and stream it to `<data>/tmp/` while hashing (SHA-256) and counting, then `store_blob` moves the file into place (same hash rules as now); quotas checked against `Content-Length` first and the count at the end; a `Semaphore` of upload bytes in flight. `import_workspace` already streams
+- [ ] **V0.2.154** `StorageEngine::list_artifacts_page(workspace, limit, offset)` with a count query; `artifact_folder_ids` and `repo_artifact_sources` for a list of ids; `list_artifacts` answers at most 2,000 items without `limit` and says so in a header. Add a case to `performance_at_scale`
+- [ ] **V0.2.155** `useArtifacts` replaced: the evidence list uses `POST …/artifacts/query` pages (it exists since V0.1.74); `Combobox` gets an async search (`onSearch`) used by the memory card, task and replacement pickers; the command palette searches files through `…/artifacts/query` with a title filter. `workspaceInvalidation` invalidates the current page only
+- [ ] **V0.2.156** `sync_repo` compares the resolved commit, the include and exclude rules and `INDEXER_VERSION` with the source's metadata and, when all match and no file failed last time, ends the job as `completed` with "nothing changed". The webhook and poll paths go through it unchanged
+- [ ] **V0.2.157** `GitRepo::last_changes(since, commit)`: `git log previous..commit` when `previous` is an ancestor of `commit` (`merge-base --is-ancestor`), merged into the stored last changes; otherwise the full pass as now
+- [ ] **V0.2.158** `search_all_workspaces` checks rights for every workspace first, then runs the searches with `futures::stream::iter(…).buffer_unordered(4)`; `RepoMemoCore` gets the query embedding once per (provider, model) and passes it to each workspace's search. Same merge and order
+- [ ] **V0.2.159** `SqliteConnectOptions::pragma` on readers: `cache_size` (default −32768, 32 MiB), `mmap_size` (default 256 MiB), `temp_store = MEMORY`, from `REPOMEMO_SQLITE_CACHE_MB` and `REPOMEMO_SQLITE_MMAP_MB` (documented, shown in System › Overview with the other concurrency settings). The figures go in `performance.md`
+- [ ] **V0.2.160** `tower_http::compression::CompressionLayer` (gzip and Brotli, the `compression-*` features) with a predicate that skips `text/event-stream`, attachments and answers under 1 KiB. The nginx recipe in `operations.md` says the server compresses, so the proxy need not
+- [ ] **V0.2.161** A `ConcurrencyLimit` for the API (`REPOMEMO_MAX_IN_FLIGHT`, default from the read pool size) that answers `503` with `Retry-After` through `load_shed`, and a per-account in-flight count answering `429`; `/health*`, `/v1/auth/*` and the event streams are outside it. Counted in `/v1/system/metrics`
+- [ ] **V0.2.162** Release checks repeated (typecheck, styles, accessibility, types, versions, documentation, container, migrations); `cargo deny check` and `npm audit` with development packages clean; the fifth review's table updated with the release of each fix; decision 20's freeze restored. The performance runs before and after track M are the maintainer's
+
 ### Decisions to agree before work starts
 
 | # | Decision | Needed by | Proposal |
@@ -1000,6 +1095,10 @@ One box per release; the brief, the files and the commit line of each are in [th
 | 17 | **Neutrals at saturation 0** | V0.2.61 | Yes, as DESIGN.md requires: same lightness, no hue |
 | 18 | **More than two button treatments** | V0.2.74 | Add `danger` and the `IconButton` shape; both exist today as one-off styles |
 | 19 | **Where form mistakes show** | V0.2.69 | API errors stay toasts; a required or malformed field is marked `aria-invalid` with a one-line hint under it, a field state rather than a banner |
+| 20 | **Lift the freeze for tracks L and M** (security and backend) | V0.2.130 | Yes: security fixes, dependency updates and backend hardening, no product feature; V0.2.162 repeats the release checks and restores the freeze until the tag |
+| 21 | **Office previews off by default** (E1) | V0.2.137 | `REPOMEMO_OFFICE_PREVIEWS` off by default, so an upgraded server stops converting until its operator turns it on, and then only with a LibreOffice at or above the fixed releases. Text previews are not affected. Named in `UPGRADING.md` |
+| 22 | **Who creates organizations and links local repositories** (E3, E4) | V0.2.143 | Two system settings: *Who can create organizations* (`administrators` by default, or `everyone`) and *Who can link local repositories* (system administrators by default, or workspace administrators). The setup wizard asks both |
+| 23 | **What a read-and-write token may do** (E5) | V0.2.140 | Content work stays (evidence, notes, tasks, comments, memory, searches). Granting access, deleting, AI settings, repository and connector links, webhooks, export and import need a session or a new `admin` scope that a person grants on purpose. Existing tokens keep their scope and lose those routes; `UPGRADING.md` says so |
 
 ---
 
@@ -1055,6 +1154,8 @@ Every item of both roads, with the release it is planned for. The evidence behin
 | S6 | Remote sources | Credential store and host allowlist (6a ✅ V0.2.19), clone limits (6b); each later surface (SMTP, webhooks, connectors) brings its own rules | V0.2.19, V0.2.22 |
 | — | Registration without enumeration | M4 residual | ✅ V0.2.18 |
 | — | Fourth pass | Mail, webhooks, remote clones, connectors, export and import, desktop client | ✅ V0.2.52 (R8): [review of 2026-10-16](security/2026-10-16-security-review.md), 3 medium and 4 low fixed, 5 informational |
+| — | Review of 2026-10-14 (V0.2.6) | E1–E22: 2 high, 7 medium, 9 low, 4 info | Not tracked until 2026-10-21. E1–E19 still open or partly fixed: tracks L and M |
+| — | Fifth pass | Dependencies (S5-1, S5-2, S5-3, S5-10), sessions (S5-4), body limits (S5-5), container (S5-7, S5-8), jobs (S5-9), and E1–E19 above | V0.2.130–V0.2.152: [review of 2026-10-21](security/2026-10-21-security-review.md), 2 high, 9 medium, 15 low, 4 info |
 
 ### Platform performance
 
@@ -1072,6 +1173,16 @@ Every item of both roads, with the release it is planned for. The evidence behin
 | P9 | Parser time budget (memory caps need a subprocess) | M | ✅ V0.1.74 |
 | P10 | Readings in a subprocess with time and memory limits (R2-4) | M | ✅ V0.2.44 |
 | P11 | Map and health recomputed only where a change touched | M | ✅ V0.2.8 |
+| P12 | Rights checked on the summary before a document is read (E7) | S | V0.2.149 |
+| P13 | The artifact page from stored passages, not a new reading | S | V0.2.150 |
+| P14 | Uploads streamed to disk and hashed as they arrive | M | V0.2.153 |
+| P15 | The file list paged in SQL (15a) and the web client off the full list (15b) | M | V0.2.154, V0.2.155 |
+| P16 | A repository sync with nothing new stops early | S | V0.2.156 |
+| P17 | Incremental last-author pass | S | V0.2.157 |
+| P18 | Search across workspaces in parallel, one query embedding per model | S | V0.2.158 |
+| P19 | SQLite read tuning (page cache, memory-mapped reads) | S | V0.2.159 |
+| P20 | Compressed API answers | S | V0.2.160 |
+| P21 | Load shedding | S–M | V0.2.161 |
 
 ### Code health and release engineering
 
@@ -1107,6 +1218,7 @@ Every item of both roads, with the release it is planned for. The evidence behin
 | D1 | Tracker retired, `PRODUCT.md`, Postman v5 | S | ✅ V0.1.66 |
 | R5 | Mindmaps, branch pages, changelog, upgrade notes | M | ✅ V0.1.76 |
 | R6 follow-up | Corrections from the clean-machine install | S | V0.2.1 |
+| R13 | Release checks repeated after tracks L and M, the fifth review closed, the freeze restored | S | V0.2.162 |
 | R7–R12 | Release candidate for V0.3.0: freeze and fourth security pass (R7 ✅, R8 ✅ V0.2.52), upgrade from 0.2.0 (R9 ✅ V0.2.53), performance with remote sources (R10: harnesses V0.2.54, run pending), documentation (R11 ✅ V0.2.55), clean install (R12: runbook V0.2.56, install pending) | M | V0.2.52–V0.2.56 |
 
 ### Experience
