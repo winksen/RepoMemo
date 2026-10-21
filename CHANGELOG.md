@@ -2,6 +2,18 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.126 (2026-10-21)
+
+Tests for every shared building block. They are written, not run: CI runs them.
+
+### Changed
+- **`test/buildingBlocks.test.tsx`:** `Field` (label, hint and message tied to the control by id and `aria-describedby`; no message while valid), `Checkbox` and `Switch` (toggle from their label, nothing while disabled), `Dropdown` (its list opens in a portal outside the form, chosen with the keyboard), `ConfirmDialog` and `useConfirm` (true on the decisive action, false on Cancel, an error outside its provider), `LoadingState` (a status line), `EmptyState` (title, sentence, one action), `Badge` (tone as data), `SegmentedControl` (chooses, never turns the chosen option off), `Combobox` (filters by label and description, Enter chooses, empty text), `SearchField` (Escape and the clear button, Escape passes when empty), `CopyButton` (Copied for two seconds, a toast and `onUnavailable` when the clipboard refuses) and `useFormState` (a new saved value starts the form over).
+- **Already covered by earlier releases:** `Field` marking a refused control (`fieldValidation`), `Dialog` (`dialogBehaviour`), `Pagination` and `usePagedList` (`pagedLists`), `useUnsavedChanges` (`unsavedChanges`), the send shortcut (`submitShortcut`), focus return (`focusReturn`), `IconButton` (`assistantPieces`) and `useFormState` itself (`useFormState`).
+- **Setup:** the file gives jsdom the few browser functions Radix asks for (pointer capture, `scrollIntoView`, `ResizeObserver`).
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.125 (2026-10-21)
 
 Focus returns to the opener after a dialog and moves to the next item after a deletion.

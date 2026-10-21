@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.2 → 0.3
 
-> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.125` (2026-10-21) · **Next:** `V0.2.126`
+> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.126` (2026-10-21) · **Next:** `V0.2.127`
 > **Previous line:** [Releases 0.1 → 0.2](RELEASES_0.1.md) · **Related:** [Roadmap, Road to V0.3.0](ROADMAP.md#-road-to-v030) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
 Every release of the 0.2 line, shipped and planned, one row each. The plan comes from the [Road to V0.3.0](ROADMAP.md#-road-to-v030): **one change per release**, each shippable alone, with the security rules for a new outside connection in the release that opens it. Planned rows are proposals until decisions 7–14 in the roadmap are agreed.
@@ -160,7 +160,7 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | **V0.2.123** | ✅ 2026-10-21 |K. Frontend polish |🔧 Enhancement |Web client | Notifications, tasks (each column), memory cards, System users, jobs and audit, and repository files show 24 rows a page with the shared `Pagination` and `usePagedList`; a filter returns a list to its first page; the repository file list no longer stops at 300 files (tested in `test/pagedLists.test.tsx`, written, not run); not seen on screen | As described in the plan |
 | **V0.2.124** | ✅ 2026-10-21 |K. Frontend polish |🔧 Enhancement |Web client | Every mutation confirms itself with a success toast or a visible state change, and every failure with an error toast: the artifact page (rename, delete, lifecycle, comments), memory cards, organization and workspace (rename, delete, members), notes, saved searches, tasks, dashboard creation, AI provider, chat rename, notifications and backups gained a success toast; the list is in the changelog; not seen on screen | The commit lists each mutation and its feedback. |
 | **V0.2.125** | ✅ 2026-10-21 |K. Frontend polish |🔧 Enhancement |Web client | A dialog gives focus back to the control that opened it, and after a deletion focus moves to the next item, else the previous one, else the list heading (`lib/focusReturn.ts`, `Dialog` and `watchFocusLoss`; tested in `test/focusReturn.test.tsx`, written, not run); not seen on screen | As described in the plan |
-| **V0.2.126** | 🔜 Planned | K. Frontend polish | 🧪 Test | Web tests | Tests for the building blocks | As described in the plan |
+| **V0.2.126** | ✅ 2026-10-21 |K. Frontend polish |🧪 Test |Web tests | Tests for every shared building block in `test/buildingBlocks.test.tsx` (`Field`, `Checkbox`, `Switch`, `Dropdown`, `ConfirmDialog` and `useConfirm`, `LoadingState`, `EmptyState`, `Badge`, `SegmentedControl`, `Combobox`, `SearchField`, `CopyButton`, `useFormState`); written, not run (CI runs them) | As described in the plan |
 | **V0.2.127** | 🔜 Planned | K. Frontend polish | 🧪 Test | Process | A style check that stops the drift | `npm run styles:check` passes on the tree and fails on a planted example (described in the commit). |
 | **V0.2.128** | 🔜 Planned | K. Frontend polish | 📘 Update | Documentation | DESIGN.md matches the code | As described in the plan |
 | **V0.2.129** | 🔜 Planned | K. Frontend polish | 📘 Update | Release | Release check after the polish track | As described in the plan |
