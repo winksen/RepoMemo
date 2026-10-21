@@ -10,6 +10,14 @@ import { useSystemData, count, RefreshButton, Facts, BarStrip } from "./shared";
 import { MaintenancePanel } from "./Maintenance";
 import { systemKeys } from "../../lib/queryClient";
 
+/** What System › Overview says about the Office previews: working, off, refused or absent. */
+function officePreviewsText(previews: SystemOverview["background"]["office_previews"]): string {
+  if (previews.available) return `${previews.version ?? "version not read yet"} · ${previews.sandboxed ? "in a sandbox" : "no sandbox"}`;
+  if (previews.refused) return `refused: ${previews.refused}`;
+  if (!previews.installed) return previews.requested ? "turned on, but not found" : "not installed";
+  return previews.requested ? "turned on, release being checked" : "installed, previews off (REPOMEMO_OFFICE_PREVIEWS)";
+}
+
 export function OverviewSection({ accessToken }: { accessToken: string }) {
   const [overview, isLoading, reload, setOverview] = useSystemData<SystemOverview>(systemKeys.overview(), () => getSystemOverview(accessToken), { refreshMs: 30_000 });
   const setMaintenance = (next: MaintenanceStatus) => setOverview((current) => current ? { ...current, background: { ...current.background, maintenance: next } } : current);
@@ -63,7 +71,7 @@ export function OverviewSection({ accessToken }: { accessToken: string }) {
           ["Workspaces waiting for vectors", count(background.embedding_workspaces_waiting)],
           ["Repository syncs", count(background.repository_syncs_running)],
           ["Preview conversions", count(background.preview_conversions_running)],
-          ["LibreOffice", background.office_previews.available ? `${background.office_previews.version ?? "version not read yet"} · ${background.office_previews.sandboxed ? "in a sandbox" : "no sandbox"}` : "not installed"],
+          ["LibreOffice", officePreviewsText(background.office_previews)],
           ["Jobs", statistics.jobs_by_status.map((entry) => `${count(entry.count)} ${entry.label}`).join(" · ") || "none"],
           ["Live event streams", `${count(background.open_event_streams)} open · ${count(background.event_channels)} workspaces watched`],
           ["AI providers", `${count(statistics.enabled_provider_count)} enabled · ${count(statistics.cloud_provider_count)} cloud`],

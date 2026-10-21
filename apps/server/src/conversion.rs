@@ -1,8 +1,11 @@
 //! Faithful previews of Office files: LibreOffice converts Word, Excel and
 //! PowerPoint documents to PDF once, and the PDF is cached by content hash.
 //!
-//! LibreOffice is optional. When it is not installed the converter is
-//! disabled and the client keeps showing the extracted-text previews.
+//! LibreOffice is optional and off by default. Nothing is converted unless the
+//! operator sets `REPOMEMO_OFFICE_PREVIEWS`, LibreOffice is installed, and the
+//! release it reports is at or past the fixed ones (see [`release_problem`]);
+//! otherwise the converter is disabled and the client keeps showing the
+//! extracted-text previews. [`Converter::status`] says which of these it is.
 //!
 //! Hardening: the input is written under a fixed name (the upload's file name
 //! never reaches the command line), only one conversion runs at a time, each
@@ -36,7 +39,8 @@ const SUPPORTED_EXTENSIONS: &[&str] = &["doc", "docx", "xls", "xlsx", "xlsm", "p
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RenderState {
-    /// LibreOffice is not available on this server.
+    /// Office previews are not available on this server: they are off,
+    /// LibreOffice is missing or its release is refused.
     Disabled,
     /// This file type is not converted.
     Unsupported,
@@ -45,12 +49,38 @@ pub enum RenderState {
     Failed(String),
 }
 
+/// Why the converter does or does not convert, for System › Overview and the
+/// server check.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ConverterStatus {
+    /// LibreOffice was not found.
+    NotInstalled,
+    /// LibreOffice is installed and `REPOMEMO_OFFICE_PREVIEWS` is not on.
+    Off,
+    /// Previews are on and the release LibreOffice reports is not known yet.
+    Checking,
+    /// Previews are on, and this release is refused (the text says why).
+    Refused(String),
+    /// Previews are on and the release is accepted.
+    Ready,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum VersionCheck {
+    Pending,
+    Accepted,
+    Refused(String),
+}
+
 struct Inner {
+    /// `REPOMEMO_OFFICE_PREVIEWS`: nothing is converted while it is off.
+    previews: bool,
     soffice: Option<PathBuf>,
     /// A command that LibreOffice is started through (`REPOMEMO_SOFFICE_WRAPPER`),
     /// with `{work}` and `{profile}` replaced by the folders it needs.
     wrapper: Vec<String>,
     version: Mutex<Option<String>>,
+    check: Mutex<VersionCheck>,
     cache_dir: PathBuf,
     profile_dir: PathBuf,
     gate: Semaphore,
@@ -64,13 +94,15 @@ pub struct Converter {
 
 impl Converter {
     /// Looks for LibreOffice (`REPOMEMO_SOFFICE`, then the usual locations) and
-    /// prepares the cache under the server data directory.
-    pub fn detect(data_dir: &Path, wrapper: Vec<String>) -> Self {
+    /// prepares the cache under the server data directory. LibreOffice is
+    /// found even when `previews` is off, so System › Overview can say it is
+    /// installed; it is not started, and nothing is converted, until it is on.
+    pub fn detect(data_dir: &Path, wrapper: Vec<String>, previews: bool) -> Self {
         let explicit = std::env::var_os("REPOMEMO_SOFFICE").map(PathBuf::from);
-        Self::with_options(data_dir, explicit.or_else(find_soffice), wrapper)
+        Self::with_options(data_dir, explicit.or_else(find_soffice), wrapper, previews)
     }
 
-    pub fn with_options(data_dir: &Path, soffice: Option<PathBuf>, wrapper: Vec<String>) -> Self {
+    pub fn with_options(data_dir: &Path, soffice: Option<PathBuf>, wrapper: Vec<String>, previews: bool) -> Self {
         let cache_dir = data_dir.join("previews");
         let _ = std::fs::create_dir_all(&cache_dir);
         // A restart is a fresh chance for files that failed before.
@@ -85,9 +117,11 @@ impl Converter {
         let _ = std::fs::remove_dir_all(cache_dir.join("tmp"));
         Self {
             inner: Arc::new(Inner {
+                previews,
                 soffice: soffice.filter(|path| path.exists() || path.components().count() == 1),
                 wrapper,
                 version: Mutex::new(None),
+                check: Mutex::new(VersionCheck::Pending),
                 profile_dir: cache_dir.join("profile"),
                 cache_dir,
                 gate: Semaphore::new(1),
@@ -106,26 +140,70 @@ impl Converter {
         self.inner.version.lock().ok().and_then(|version| version.clone())
     }
 
-    /// Asks LibreOffice for its version (for System › Overview). Quiet on
-    /// failure: the converter itself reports what goes wrong.
+    /// Asks LibreOffice for its version and decides whether it may convert:
+    /// the release must be at or past the fixed ones. Does nothing unless
+    /// previews are on and LibreOffice is installed (an off converter never
+    /// starts it). Call it once at start, before the server takes requests;
+    /// until it has answered nothing is converted. A version that cannot be
+    /// read is refused too, because it cannot be compared.
     pub async fn probe_version(&self) {
         let Some(soffice) = self.inner.soffice.clone() else {
             return;
         };
+        if !self.inner.previews {
+            return;
+        }
         let mut command = self.command(&soffice, &self.inner.cache_dir.join("tmp"));
         command
             .arg("--version")
             .stdin(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .kill_on_drop(true);
-        let output = tokio::time::timeout(Duration::from_secs(30), command.output()).await;
-        if let Ok(Ok(output)) = output {
-            let text = String::from_utf8_lossy(&output.stdout);
-            if let Some(line) = text.lines().map(str::trim).find(|line| !line.is_empty()) {
-                if let Ok(mut version) = self.inner.version.lock() {
-                    *version = Some(line.chars().take(120).collect());
-                }
-            }
+        let reported = match tokio::time::timeout(Duration::from_secs(30), command.output()).await {
+            Ok(Ok(output)) => String::from_utf8_lossy(&output.stdout)
+                .lines()
+                .map(str::trim)
+                .find(|line| !line.is_empty())
+                .map(|line| line.chars().take(120).collect::<String>()),
+            _ => None,
+        };
+        let check = match reported.as_deref().map(release_problem) {
+            Some(None) => VersionCheck::Accepted,
+            Some(Some(problem)) => VersionCheck::Refused(problem),
+            None => VersionCheck::Refused(
+                "its version could not be read, so it cannot be compared with the fixed releases".to_owned(),
+            ),
+        };
+        if let Ok(mut version) = self.inner.version.lock() {
+            *version = reported;
+        }
+        if let Ok(mut state) = self.inner.check.lock() {
+            *state = check;
+        }
+    }
+
+    /// Whether the operator turned previews on (`REPOMEMO_OFFICE_PREVIEWS`).
+    pub fn requested(&self) -> bool {
+        self.inner.previews
+    }
+
+    /// Whether LibreOffice was found on this machine.
+    pub fn installed(&self) -> bool {
+        self.inner.soffice.is_some()
+    }
+
+    /// Why the converter does or does not convert.
+    pub fn status(&self) -> ConverterStatus {
+        if self.inner.soffice.is_none() {
+            return ConverterStatus::NotInstalled;
+        }
+        if !self.inner.previews {
+            return ConverterStatus::Off;
+        }
+        match self.inner.check.lock().map(|check| check.clone()) {
+            Ok(VersionCheck::Accepted) => ConverterStatus::Ready,
+            Ok(VersionCheck::Refused(problem)) => ConverterStatus::Refused(problem),
+            _ => ConverterStatus::Checking,
         }
     }
 
@@ -165,8 +243,10 @@ impl Converter {
         self.inner.in_flight.lock().map(|running| running.len()).unwrap_or(0)
     }
 
+    /// Whether files are converted: previews are on, LibreOffice is installed
+    /// and its release is accepted.
     pub fn enabled(&self) -> bool {
-        self.inner.soffice.is_some()
+        self.status() == ConverterStatus::Ready
     }
 
     pub fn supports(path: &str) -> bool {
@@ -284,6 +364,9 @@ impl Converter {
     }
 
     async fn convert(&self, storage: &StorageEngine, summary: &ArtifactSummary) -> Result<(), String> {
+        if !self.enabled() {
+            return Err("Office previews are off, or this LibreOffice release is refused.".to_owned());
+        }
         let soffice = self.inner.soffice.clone().ok_or("LibreOffice is not available.")?;
         let _turn = self
             .inner
@@ -374,6 +457,32 @@ impl Converter {
             }
         }
     }
+}
+
+/// The year, month and micro numbers of a `soffice --version` line such as
+/// `LibreOffice 26.2.5.2 abc(Build:2)` (an older `7.6.7.2` reads as 7, 6, 7).
+fn parse_release(line: &str) -> Option<(u32, u32, u32)> {
+    let release = line
+        .split_whitespace()
+        .find(|word| word.chars().next().is_some_and(|first| first.is_ascii_digit()))?;
+    let mut numbers = release.split('.').map(|part| part.parse::<u32>().ok());
+    Some((numbers.next()??, numbers.next()??, numbers.next()??))
+}
+
+/// What is wrong with the release a `soffice --version` line reports, or
+/// `None` when it is at or past the releases that fixed the advisories of
+/// 2026-10-05: 26.2.5 on the 26.2 line, and 26.8.0 and every later line.
+/// Anything older, and anything that cannot be read, is refused.
+fn release_problem(line: &str) -> Option<String> {
+    let patched = match parse_release(line) {
+        Some((year, month, micro)) => year > 26 || (year == 26 && (month > 2 || (month == 2 && micro >= 5))),
+        None => false,
+    };
+    (!patched).then(|| {
+        format!(
+            "{line} is older than the fixed releases (26.2.5 on the 26.2 line, 26.8.0 and later); update LibreOffice"
+        )
+    })
 }
 
 /// Variables LibreOffice has no use for and a hostile document must not reach:
@@ -514,6 +623,7 @@ mod tests {
                 "--bind={work}".to_owned(),
                 "--net=none".to_owned(),
             ],
+            true,
         );
         assert!(converter.sandboxed());
         let command = converter.command(Path::new("/usr/bin/soffice"), Path::new("/work/dir"));
@@ -524,6 +634,50 @@ mod tests {
             .map(|argument| argument.to_string_lossy().into_owned())
             .collect::<Vec<_>>();
         assert_eq!(arguments, vec!["--bind=/work/dir", "--net=none", "/usr/bin/soffice"]);
+    }
+
+    #[test]
+    fn only_the_fixed_libreoffice_releases_are_accepted() {
+        for fixed in [
+            "LibreOffice 26.2.5.2 abc(Build:2)",
+            "LibreOffice 26.2.6.1",
+            "LibreOffice 26.8.0.3 def(Build:3)",
+            "LibreOffice 26.8.2.1",
+            "LibreOffice 27.2.0.1",
+        ] {
+            assert_eq!(release_problem(fixed), None, "{fixed}");
+        }
+        for old in [
+            "LibreOffice 26.2.4.2 abc(Build:2)",
+            "LibreOffice 26.2.0.1",
+            "LibreOffice 25.8.4.2",
+            "LibreOffice 25.2.7.2",
+            "LibreOffice 24.8.7.2 480(Build:2)",
+            "LibreOffice 7.6.7.2 60(Build:2)",
+            "LibreOffice",
+            "",
+        ] {
+            let problem = release_problem(old).unwrap_or_else(|| panic!("{old} was accepted"));
+            assert!(problem.contains("26.2.5") && problem.contains("26.8.0"), "{problem}");
+            assert!(problem.starts_with(old), "the release is named: {problem}");
+        }
+    }
+
+    #[test]
+    fn nothing_is_converted_while_previews_are_off() {
+        let directory = std::env::temp_dir().join("repomemo-previews-off-test");
+        let itself = std::env::current_exe().unwrap();
+        let off = Converter::with_options(&directory, Some(itself.clone()), Vec::new(), false);
+        assert!(off.installed() && !off.requested());
+        assert_eq!(off.status(), ConverterStatus::Off);
+        assert!(!off.enabled());
+        // Turned on, a converter waits for its version check before it converts.
+        let on = Converter::with_options(&directory, Some(itself), Vec::new(), true);
+        assert_eq!(on.status(), ConverterStatus::Checking);
+        assert!(!on.enabled());
+        let missing = Converter::with_options(&directory, None, Vec::new(), true);
+        assert_eq!(missing.status(), ConverterStatus::NotInstalled);
+        assert!(!missing.enabled());
     }
 
     #[test]

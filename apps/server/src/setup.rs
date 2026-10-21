@@ -26,7 +26,9 @@ use repomemo_storage::SetupState;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    check_auth_quota, hash_password, issue_session, logs, map_storage_error,
+    check_auth_quota,
+    conversion::ConverterStatus,
+    hash_password, issue_session, logs, map_storage_error,
     security::{too_many_requests, wait_text},
     validate_registration, ApiError, AppState, AuthAction, AuthenticatedSubject, ClientIp, RegisterRequest,
     TokenResponse,
@@ -378,17 +380,46 @@ pub(crate) async fn checks(
         },
     });
 
-    checks.push(if state.converter.enabled() {
-        let sandboxed = state.converter.sandboxed();
-        SetupCheck {
+    checks.push(match state.converter.status() {
+        ConverterStatus::Ready => {
+            let sandboxed = state.converter.sandboxed();
+            SetupCheck {
+                key: "libreoffice",
+                label: "LibreOffice",
+                status: if sandboxed { CheckStatus::Ok } else { CheckStatus::Info },
+                detail: if sandboxed { "Word, Excel and PowerPoint files get layout-accurate previews, converted inside the sandbox command.".to_owned() } else { "Word, Excel and PowerPoint files get layout-accurate previews. LibreOffice reads uploaded files on this machine without a sandbox.".to_owned() },
+                advice: (!sandboxed).then_some("Set REPOMEMO_SOFFICE_WRAPPER to a command that runs it without network and without the data folder (see the operations notes)."),
+            }
+        }
+        ConverterStatus::Refused(problem) => SetupCheck {
             key: "libreoffice",
             label: "LibreOffice",
-            status: if sandboxed { CheckStatus::Ok } else { CheckStatus::Info },
-            detail: if sandboxed { "Word, Excel and PowerPoint files get layout-accurate previews, converted inside the sandbox command.".to_owned() } else { "Word, Excel and PowerPoint files get layout-accurate previews. LibreOffice reads uploaded files on this machine without a sandbox.".to_owned() },
-            advice: (!sandboxed).then_some("Set REPOMEMO_SOFFICE_WRAPPER to a command that runs it without network and without the data folder (see the operations notes)."),
-        }
-    } else {
-        SetupCheck { key: "libreoffice", label: "LibreOffice", status: CheckStatus::Info, detail: "Not installed: Office files show extracted text and tables.".to_owned(), advice: Some("Optional. Install LibreOffice, or set REPOMEMO_SOFFICE to its soffice program, for faithful previews.") }
+            status: CheckStatus::Warning,
+            detail: format!("Office previews are turned on, but this LibreOffice is refused: {problem}. Office files show extracted text and tables."),
+            advice: Some("Install LibreOffice 26.2.5 or later (26.8.0 or later on the next line), or turn REPOMEMO_OFFICE_PREVIEWS off."),
+        },
+        ConverterStatus::Checking => SetupCheck {
+            key: "libreoffice",
+            label: "LibreOffice",
+            status: CheckStatus::Info,
+            detail: "Office previews are turned on; the release LibreOffice reports is being checked.".to_owned(),
+            advice: None,
+        },
+        ConverterStatus::Off => SetupCheck {
+            key: "libreoffice",
+            label: "LibreOffice",
+            status: CheckStatus::Info,
+            detail: "Installed, but layout-accurate previews are off: Office files show extracted text and tables.".to_owned(),
+            advice: Some("Optional. Set REPOMEMO_OFFICE_PREVIEWS=true to turn them on (LibreOffice 26.2.5 or later, with REPOMEMO_SOFFICE_WRAPPER as a sandbox)."),
+        },
+        ConverterStatus::NotInstalled if state.converter.requested() => SetupCheck {
+            key: "libreoffice",
+            label: "LibreOffice",
+            status: CheckStatus::Warning,
+            detail: "Office previews are turned on, but LibreOffice was not found: Office files show extracted text and tables.".to_owned(),
+            advice: Some("Install LibreOffice 26.2.5 or later, or set REPOMEMO_SOFFICE to its soffice program."),
+        },
+        ConverterStatus::NotInstalled => SetupCheck { key: "libreoffice", label: "LibreOffice", status: CheckStatus::Info, detail: "Not installed: Office files show extracted text and tables.".to_owned(), advice: Some("Optional. Install LibreOffice 26.2.5 or later and set REPOMEMO_OFFICE_PREVIEWS=true for faithful previews.") },
     });
 
     checks.push(SetupCheck {

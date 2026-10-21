@@ -12,6 +12,11 @@ pub struct ServerConfig {
     pub jwt_secret: String,
     /// Browser origins allowed to call the API (CORS). Empty: no CORS headers.
     pub allowed_origins: Vec<HeaderValue>,
+    /// Whether LibreOffice converts uploaded Office files for layout-accurate
+    /// previews (`REPOMEMO_OFFICE_PREVIEWS`). Off by default: LibreOffice parses
+    /// files strangers uploaded, so an operator turns it on on purpose, and
+    /// only a release at or past the fixed ones is used.
+    pub office_previews: bool,
     /// LibreOffice executable used for Office previews. When unset the server
     /// looks for it; without it the extracted previews are used.
     pub soffice: Option<PathBuf>,
@@ -279,6 +284,7 @@ impl ServerConfig {
             data_dir,
             jwt_secret,
             allowed_origins,
+            office_previews: env_flag("REPOMEMO_OFFICE_PREVIEWS", false)?,
             soffice: std::env::var_os("REPOMEMO_SOFFICE").map(PathBuf::from),
             soffice_wrapper: env_text("REPOMEMO_SOFFICE_WRAPPER")
                 .map(|command| command.split_whitespace().map(str::to_owned).collect())
@@ -375,6 +381,7 @@ impl ServerConfig {
             data_dir: Some(data_dir),
             jwt_secret: "test-secret-that-is-long-enough-for-jwt-signing".to_owned(),
             allowed_origins: Vec::new(),
+            office_previews: false,
             soffice: None,
             soffice_wrapper: Vec::new(),
             secret_key: None,

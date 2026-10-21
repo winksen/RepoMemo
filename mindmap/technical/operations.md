@@ -368,7 +368,7 @@ The full list is in the response. Counters start again at zero when the server r
 
 ## 8. Office previews and the sandbox
 
-Layout-accurate previews come from LibreOffice, which has a history of memory-safety bugs and reads files any writer can upload. Without it, previews fall back to extracted text. When you install it, run it **without network and without access to the data folder**:
+Layout-accurate previews come from LibreOffice, which has a history of memory-safety bugs and reads files any writer can upload. **They are off until you turn them on** (`REPOMEMO_OFFICE_PREVIEWS=true`, V0.2.137): a LibreOffice that happens to be installed converts nothing and is not started. When they are on, the server asks LibreOffice for its release at start and refuses one older than the fixed releases (26.2.5 on the 26.2 line, 26.8.0 and later): System › Overview and the setup wizard's server check name the release and the reason, and files show extracted text meanwhile. Without LibreOffice, or with previews off, previews fall back to extracted text. When you turn them on, run LibreOffice **without network and without access to the data folder**:
 
 ```bash
 REPOMEMO_SOFFICE_WRAPPER="bwrap --ro-bind / / --bind {work} {work} --bind {profile} {profile} --unshare-net --die-with-parent"

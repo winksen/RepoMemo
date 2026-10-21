@@ -422,7 +422,7 @@ pub(crate) struct InstanceInfo {
 }
 
 impl InstanceInfo {
-    pub(crate) fn new(config: &crate::ServerConfig, libreoffice: bool) -> Self {
+    pub(crate) fn new(config: &crate::ServerConfig, converter: &crate::conversion::Converter) -> Self {
         let configured = config.data_dir.clone().unwrap_or_default();
         let data_dir = std::fs::canonicalize(&configured)
             .unwrap_or(configured)
@@ -530,14 +530,7 @@ impl InstanceInfo {
                 "System administrators from the environment",
                 config.system_admin_emails.len().to_string(),
             ),
-            (
-                "LibreOffice previews",
-                if libreoffice {
-                    "available".to_owned()
-                } else {
-                    "not installed".to_owned()
-                },
-            ),
+            ("LibreOffice previews", office_previews_text(converter)),
             (
                 "Log filter from RUST_LOG",
                 config
@@ -936,9 +929,29 @@ struct CloneView {
     bytes: u64,
 }
 
+/// What System › Overview says about the Office previews: working, off, refused or absent.
+fn office_previews_text(converter: &crate::conversion::Converter) -> String {
+    use crate::conversion::ConverterStatus;
+    match converter.status() {
+        ConverterStatus::Ready => "available".to_owned(),
+        ConverterStatus::Checking => "turned on, release being checked".to_owned(),
+        ConverterStatus::Refused(problem) => format!("refused: {problem}"),
+        ConverterStatus::Off => "installed, off (REPOMEMO_OFFICE_PREVIEWS)".to_owned(),
+        ConverterStatus::NotInstalled if converter.requested() => "turned on, but LibreOffice was not found".to_owned(),
+        ConverterStatus::NotInstalled => "not installed".to_owned(),
+    }
+}
+
 #[derive(Debug, Serialize)]
 struct OfficePreviewsView {
+    /// Files are being converted: previews are on, LibreOffice is installed and its release accepted.
     available: bool,
+    /// LibreOffice was found on this machine.
+    installed: bool,
+    /// `REPOMEMO_OFFICE_PREVIEWS` is on.
+    requested: bool,
+    /// Why previews are not available although they were asked for (a release that is too old, or not readable).
+    refused: Option<String>,
     /// What `soffice --version` reported, once it has answered.
     version: Option<String>,
     /// LibreOffice is started inside `REPOMEMO_SOFFICE_WRAPPER`.
@@ -1029,6 +1042,12 @@ pub(crate) async fn overview(
             preview_conversions_running: state.converter.running_count(),
             office_previews: OfficePreviewsView {
                 available: state.converter.enabled(),
+                installed: state.converter.installed(),
+                requested: state.converter.requested(),
+                refused: match state.converter.status() {
+                    crate::conversion::ConverterStatus::Refused(problem) => Some(problem),
+                    _ => None,
+                },
                 version: state.converter.version(),
                 sandboxed: state.converter.sandboxed(),
             },

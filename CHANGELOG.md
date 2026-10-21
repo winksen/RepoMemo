@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.137 (2026-10-21)
+
+LibreOffice no longer converts uploaded files just because it is installed: previews are opt-in, and only a release that carries the security fixes is used.
+
+### Security
+- **Office previews are off until the operator turns them on (E1a, decision 21):** the new setting `REPOMEMO_OFFICE_PREVIEWS` (default `false`) must be `true` before any Word, Excel or PowerPoint file is converted. While it is off, LibreOffice is not even started, wherever it is installed, and files show extracted text and tables. Before, finding `soffice` on the machine was enough, so a strangers' upload was parsed by a program with a long history of memory-safety bugs on the server's own host.
+- **A minimum LibreOffice release:** when previews are on, the server asks LibreOffice for its release once at start (`soffice --version`) and converts only with 26.2.5 or later on the 26.2 line, or 26.8.0 or later (the releases that fixed the advisories of 2026-10-05). An older release, or one whose version cannot be read, is refused: nothing is converted, files show extracted text, and the reason names the release. Nothing is converted before that check has answered.
+- **Where it shows:** System › Overview (`LibreOffice`: `installed, off (REPOMEMO_OFFICE_PREVIEWS)`, `refused: LibreOffice 24.8.7.2 … is older than the fixed releases …`, or the version and the sandbox), the setup wizard's server check (a warning when previews are on and the release is refused or LibreOffice is missing), the start-up log, and `GET /v1/system/overview` (`background.office_previews` gains `installed`, `requested` and `refused`).
+
+### Changed
+- **`REPOMEMO_SOFFICE` alone no longer turns previews on:** it only says where `soffice` is. The container's compose file passes `REPOMEMO_OFFICE_PREVIEWS` (and `.env.example` explains it) next to `REPOMEMO_WITH_LIBREOFFICE`, which adds the program to the image.
+- **Tests (written, not run):** the release table (fixed, older, unreadable), a converter that is off never starts LibreOffice, a turned-on one waits for its check and refuses an old release naming it, and the existing conversion test now sets the setting. The test stand-in for LibreOffice answers `--version`.
+- **Checks run on this release:** `cargo check -p repomemo-server --tests` compiles; `npm run typecheck`, `container:check`, `docs:check` and `version:check` pass. No server was started and no file was converted. `rustfmt` and `clippy` already report findings elsewhere in the tree on the current Rust; none are new in the files changed here.
+
+### Upgrading
+- **Previews stop until you turn them on.** A server with LibreOffice installed that showed layout-accurate Word, Excel and PowerPoint files falls back to extracted text and tables after this release. To keep them: set `REPOMEMO_OFFICE_PREVIEWS=true`, use LibreOffice 26.2.5 or later (26.8.0 or later on the next line), ideally behind `REPOMEMO_SOFFICE_WRAPPER`, and restart. In the containers, set `REPOMEMO_OFFICE_PREVIEWS=true` next to `REPOMEMO_WITH_LIBREOFFICE=true`; Debian 13's own LibreOffice is older than the fixed releases, so previews stay refused there until V0.2.148 puts LibreOffice in a container of its own.
+
 ## V0.2.136 (2026-10-21)
 
 Remote repositories can be cloned inside the official container: its git is now one the server accepts.

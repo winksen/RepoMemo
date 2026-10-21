@@ -684,7 +684,7 @@ export interface SystemOverview {
     embedding_workspaces_waiting: number;
     repository_syncs_running: number;
     preview_conversions_running: number;
-    office_previews: { available: boolean; version: string | null; sandboxed: boolean };
+    office_previews: { available: boolean; installed: boolean; requested: boolean; refused: string | null; version: string | null; sandboxed: boolean };
     event_channels: number;
     event_subscribers: number;
     open_event_streams: number;

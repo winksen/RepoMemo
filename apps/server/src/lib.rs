@@ -114,7 +114,7 @@ use tokio_stream::{
     Stream, StreamExt,
 };
 
-use crate::conversion::{Converter, RenderState};
+use crate::conversion::{Converter, ConverterStatus, RenderState};
 use crate::embedding::EmbeddingQueue;
 use crate::events::{BusActivityObserver, BusJobObserver, WorkspaceEventBus};
 use crate::indexing::IndexQueue;
@@ -362,23 +362,38 @@ async fn build_state(
     let connector_task = connector_sync.start_polling(move || connector_polling.current().repo_poll_interval);
 
     let converter = match config.soffice.clone() {
-        Some(path) => Converter::with_options(&data_dir, Some(path), config.soffice_wrapper.clone()),
-        None => Converter::detect(&data_dir, config.soffice_wrapper.clone()),
+        Some(path) => Converter::with_options(
+            &data_dir,
+            Some(path),
+            config.soffice_wrapper.clone(),
+            config.office_previews,
+        ),
+        None => Converter::detect(&data_dir, config.soffice_wrapper.clone(), config.office_previews),
     };
-    if converter.enabled() {
-        tracing::info!(
+    // Asks LibreOffice for its release when previews are on (and only then); nothing is converted before it answers.
+    converter.probe_version().await;
+    match converter.status() {
+        ConverterStatus::Ready => tracing::info!(
             sandboxed = converter.sandboxed(),
-            "LibreOffice found: Office files get layout-accurate previews"
-        );
-        // Not in tests: every test server would start LibreOffice.
-        if !cfg!(test) {
-            let probing = converter.clone();
-            tokio::spawn(async move { probing.probe_version().await });
+            version = converter.version().unwrap_or_default(),
+            "Office previews are on: Office files get layout-accurate previews"
+        ),
+        ConverterStatus::Refused(problem) => {
+            tracing::warn!(%problem, "Office previews are on but LibreOffice is refused: Office files show extracted text and tables")
         }
-    } else {
-        tracing::info!("LibreOffice not found: Office previews show extracted text and tables");
+        ConverterStatus::Off => tracing::info!(
+            "LibreOffice found, Office previews are off: set REPOMEMO_OFFICE_PREVIEWS=true to turn them on"
+        ),
+        ConverterStatus::NotInstalled if converter.requested() => {
+            tracing::warn!(
+                "Office previews are on but LibreOffice was not found: Office files show extracted text and tables"
+            )
+        }
+        ConverterStatus::NotInstalled | ConverterStatus::Checking => {
+            tracing::info!("LibreOffice not found: Office previews show extracted text and tables")
+        }
     }
-    let instance = Arc::new(InstanceInfo::new(config, converter.enabled()));
+    let instance = Arc::new(InstanceInfo::new(config, &converter));
     let setup = Arc::new(setup::SetupGate::prepare(
         config.setup_wizard,
         config.setup_code.as_deref(),

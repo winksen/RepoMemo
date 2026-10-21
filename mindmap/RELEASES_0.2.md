@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.2 → 0.3
 
-> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.136` (2026-10-21) · **Next:** `V0.2.137`
+> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.137` (2026-10-21) · **Next:** `V0.2.138`
 > **Previous line:** [Releases 0.1 → 0.2](RELEASES_0.1.md) · **Related:** [Roadmap, Road to V0.3.0](ROADMAP.md#-road-to-v030) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
 Every release of the 0.2 line, shipped and planned, one row each. The plan comes from the [Road to V0.3.0](ROADMAP.md#-road-to-v030): **one change per release**, each shippable alone, with the security rules for a new outside connection in the release that opens it. Planned rows are proposals until decisions 7–14 in the roadmap are agreed; tracks L and M wait on decisions 20–23.
@@ -173,7 +173,7 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | **V0.2.134** | ✅ 2026-10-21 |L. Security and dependencies |🔒 Security | Web toolchain | Vite, `@vitejs/plugin-react` and Vitest to current majors (S5-3b) | `npm audit` with development packages finds nothing; the build still writes the CSP file |
 | **V0.2.135** | ✅ 2026-10-21 |L. Security and dependencies |🔒 Security | CI and container | Actions and base images pinned by digest; Dependabot (E17) | No moving tag in CI or the `Dockerfile`; `container:check` refuses one |
 | **V0.2.136** | ✅ 2026-10-21 |L. Security and dependencies |🔒 Security | Container | A server image whose git the remote-clone check accepts (S5-7) | `container:check` asserts the git release; a remote repository syncs in the container |
-| **V0.2.137** | 🔜 Planned | L. Security and dependencies | 🔒 Security | Office previews | LibreOffice previews opt-in, with a minimum version (E1a, decision 21) | Nothing converted without `REPOMEMO_OFFICE_PREVIEWS`; an old LibreOffice is refused and named |
+| **V0.2.137** | ✅ 2026-10-21 |L. Security and dependencies |🔒 Security | Office previews | LibreOffice previews opt-in, with a minimum version (E1a, decision 21) | Nothing converted without `REPOMEMO_OFFICE_PREVIEWS`; an old LibreOffice is refused and named |
 | **V0.2.138** | 🔜 Planned | L. Security and dependencies | 🔒 Security | Office previews | A locked LibreOffice profile; render status per workspace (E1b, E19) | No Java, macros or link fetching in the written profile; no cross-workspace "ready" |
 | **V0.2.139** | 🔜 Planned | L. Security and dependencies | 🔒 Security | AI providers | Provider addresses limited to a host and port, no foreign path; one answer for unreachable (E2) | Loopback ports other than the provider's and paths like `/api/pull` are refused |
 | **V0.2.140** | 🔜 Planned | L. Security and dependencies | 🔒 Security | Personal access tokens | Access-granting and destructive routes need a session or an `admin` scope; revocation ends streams (E5, E15, decision 23) | A read-and-write token gets `403` on each of those route families |

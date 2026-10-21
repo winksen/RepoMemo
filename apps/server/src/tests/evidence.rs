@@ -1226,20 +1226,29 @@ async fn business_documents_preview_download_and_open_link() {
 
 /// A stand-in for LibreOffice that "converts" by copying the input to
 /// `<outdir>/input.pdf`, so the conversion pipeline can be tested anywhere.
-#[cfg(windows)]
+/// It reports a release that the version check accepts.
 fn fake_soffice(directory: &std::path::Path) -> std::path::PathBuf {
+    fake_soffice_reporting(directory, "LibreOffice 26.8.0.1 fake(Build:1)")
+}
+
+#[cfg(windows)]
+fn fake_soffice_reporting(directory: &std::path::Path, version: &str) -> std::path::PathBuf {
     std::fs::create_dir_all(directory).unwrap();
     let path = directory.join("fake-soffice.bat");
     let script = [
-        "@echo off",
-        ":loop",
-        "if \"%~1\"==\"\" goto done",
-        "if \"%~1\"==\"--outdir\" set OUT=%~2",
-        "set LAST=%~1",
-        "shift",
-        "goto loop",
-        ":done",
-        "copy /Y \"%LAST%\" \"%OUT%\\input.pdf\" >nul",
+        "@echo off".to_owned(),
+        "if \"%~1\"==\"--version\" goto version".to_owned(),
+        ":loop".to_owned(),
+        "if \"%~1\"==\"\" goto done".to_owned(),
+        "if \"%~1\"==\"--outdir\" set OUT=%~2".to_owned(),
+        "set LAST=%~1".to_owned(),
+        "shift".to_owned(),
+        "goto loop".to_owned(),
+        ":done".to_owned(),
+        "copy /Y \"%LAST%\" \"%OUT%\\input.pdf\" >nul".to_owned(),
+        "goto :eof".to_owned(),
+        ":version".to_owned(),
+        format!("echo {version}"),
     ]
     .join("\r\n");
     std::fs::write(&path, script).unwrap();
@@ -1247,17 +1256,18 @@ fn fake_soffice(directory: &std::path::Path) -> std::path::PathBuf {
 }
 
 #[cfg(unix)]
-fn fake_soffice(directory: &std::path::Path) -> std::path::PathBuf {
+fn fake_soffice_reporting(directory: &std::path::Path, version: &str) -> std::path::PathBuf {
     use std::os::unix::fs::PermissionsExt;
     std::fs::create_dir_all(directory).unwrap();
     let path = directory.join("fake-soffice.sh");
     let script = [
-        "#!/bin/sh",
-        "while [ $# -gt 0 ]; do",
-        "  if [ \"$1\" = \"--outdir\" ]; then out=\"$2\"; fi",
-        "  last=\"$1\"; shift",
-        "done",
-        "cp \"$last\" \"$out/input.pdf\"",
+        "#!/bin/sh".to_owned(),
+        format!("if [ \"$1\" = \"--version\" ]; then echo '{version}'; exit 0; fi"),
+        "while [ $# -gt 0 ]; do".to_owned(),
+        "  if [ \"$1\" = \"--outdir\" ]; then out=\"$2\"; fi".to_owned(),
+        "  last=\"$1\"; shift".to_owned(),
+        "done".to_owned(),
+        "cp \"$last\" \"$out/input.pdf\"".to_owned(),
     ]
     .join("\n");
     std::fs::write(&path, script).unwrap();
@@ -1272,6 +1282,7 @@ async fn office_files_are_rendered_to_a_cached_pdf() {
     // Next to the environment, not inside it: an environment folder must
     // hold nothing but RepoMemo's own files.
     config.soffice = Some(fake_soffice(&data_dir.with_extension("bin")));
+    config.office_previews = true;
     let app = router(config).await.unwrap();
     let response = app
         .clone()
@@ -1387,6 +1398,44 @@ async fn office_files_are_rendered_to_a_cached_pdf() {
         to_bytes(pdf.into_body(), usize::MAX).await.unwrap(),
         "pretend this is a Word file".as_bytes()
     );
+}
+
+/// Previews are opt-in (E1a): a LibreOffice that is installed converts nothing until the operator
+/// turns `REPOMEMO_OFFICE_PREVIEWS` on, and an old release is refused with its version named.
+#[tokio::test]
+async fn office_previews_need_the_setting_and_a_fixed_libreoffice_release() {
+    use crate::conversion::{Converter, ConverterStatus};
+    let directory = std::env::temp_dir().join(format!("repomemo-server-previews-{}", uuid::Uuid::new_v4()));
+    let current = fake_soffice(&directory.join("current"));
+    let old = fake_soffice_reporting(&directory.join("old"), "LibreOffice 24.8.7.2 480(Build:2)");
+    let data = directory.join("data");
+
+    // Installed, but the setting is off: nothing is started, nothing is converted.
+    let off = Converter::with_options(&data, Some(current.clone()), Vec::new(), false);
+    off.probe_version().await;
+    assert_eq!(off.status(), ConverterStatus::Off);
+    assert!(!off.enabled());
+    assert_eq!(off.version(), None, "an off converter never starts LibreOffice");
+
+    // On, and the release is fixed: it converts.
+    let on = Converter::with_options(&data, Some(current), Vec::new(), true);
+    assert_eq!(on.status(), ConverterStatus::Checking);
+    on.probe_version().await;
+    assert_eq!(on.status(), ConverterStatus::Ready);
+    assert!(on.enabled());
+
+    // On, but too old: refused, and the reason names the release.
+    let refused = Converter::with_options(&data, Some(old), Vec::new(), true);
+    refused.probe_version().await;
+    let ConverterStatus::Refused(problem) = refused.status() else {
+        panic!("an old release must be refused");
+    };
+    assert!(problem.contains("24.8.7.2") && problem.contains("26.2.5"), "{problem}");
+    assert!(!refused.enabled());
+    assert_eq!(refused.version().as_deref(), Some("LibreOffice 24.8.7.2 480(Build:2)"));
+
+    // The default of the server is off, so a new upgrade converts nothing by itself.
+    assert!(!ServerConfig::for_test(directory.join("env")).office_previews);
 }
 
 #[tokio::test]
