@@ -34,6 +34,19 @@ describe("SafeMarkdown", () => {
     expect(container.querySelector("a")?.getAttribute("href") ?? "").not.toContain("javascript:");
   });
 
+  it("treats a scheme-relative or backslash address as another host, shows it and opens it in a new tab", () => {
+    expect(externalHost("//evil.example/x")).toBe("evil.example");
+    expect(externalHost("\\\\evil.example\\share")).toBe("evil.example");
+    expect(externalHost("/v1/artifacts/1")).toBeNull();
+    expect(externalHost("#section")).toBeNull();
+    expect(externalHost(window.location.href)).toBeNull();
+    const { container } = render(<SafeMarkdown>{"[the report](//evil.example/report)"}</SafeMarkdown>);
+    const link = container.querySelector("a");
+    expect(link?.getAttribute("target")).toBe("_blank");
+    expect(link?.getAttribute("rel")).toContain("noreferrer");
+    expect(container.textContent).toContain("(evil.example)");
+  });
+
   it("only names the host of web addresses", () => {
     expect(externalHost("https://a.example/x")).toBe("a.example");
     expect(externalHost("mailto:me@example.com")).toBeNull();

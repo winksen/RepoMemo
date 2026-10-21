@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.2 → 0.3
 
-> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.146` (2026-10-21) · **Next:** `V0.2.147`
+> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.147` (2026-10-21) · **Next:** `V0.2.148`
 > **Previous line:** [Releases 0.1 → 0.2](RELEASES_0.1.md) · **Related:** [Roadmap, Road to V0.3.0](ROADMAP.md#-road-to-v030) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
 Every release of the 0.2 line, shipped and planned, one row each. The plan comes from the [Road to V0.3.0](ROADMAP.md#-road-to-v030): **one change per release**, each shippable alone, with the security rules for a new outside connection in the release that opens it. Planned rows are proposals until decisions 7–14 in the roadmap are agreed; tracks L and M wait on decisions 20–23.
@@ -183,7 +183,7 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | **V0.2.144** | ✅ 2026-10-21 |L. Security and dependencies |🔒 Security | Sessions | Two tabs refreshing at once no longer end every session; `__Secure-` cookie on HTTPS (S5-4, E14) | Two refreshes with one cookie within 30 s end no session; real reuse still ends them all |
 | **V0.2.145** | ✅ 2026-10-21 |L. Security and dependencies |🔒 Security | Sign-in | IPv6 per /64, a cap on password hashing, bounded limiter maps (E11) | One /64 shares a budget; hashing never exceeds the cap |
 | **V0.2.146** | ✅ 2026-10-21 |L. Security and dependencies |🔒 Security | Input and logs | Strict addresses and names, escaped log fields, local git with a cleared environment (E12, E13, E18) | One log line per sign-in whatever the address; git sees no `REPOMEMO_*` variable |
-| **V0.2.147** | 🔜 Planned | L. Security and dependencies | 🔒 Security | Web client | `//host` links labelled and in a new tab; no *Open in Office* for macro formats (E10, E16) | Tests for both link forms and a macro workbook |
+| **V0.2.147** | ✅ 2026-10-21 |L. Security and dependencies |🔒 Security | Web client | `//host` links labelled and in a new tab; no *Open in Office* for macro formats (E10, E16) | Tests for both link forms and a macro workbook |
 | **V0.2.148** | 🔜 Planned | L. Security and dependencies | 🔒 Security | Container | Read-only root, no capabilities, `no-new-privileges`; LibreOffice in its own container without network (S5-8, E1c) | `container:check` asserts each setting |
 | **V0.2.149** | 🔜 Planned | M. Backend hardening and performance | 🔒 Security | Artifact routes | Rights checked on the summary before any document is read (E7a, P12) | A non-member's request starts no reader |
 | **V0.2.150** | 🔜 Planned | M. Backend hardening and performance | 🔧 Enhancement | Artifact page | The page's text from stored passages, read off the runtime (E7b, P13) | Opening an indexed document's page starts no reader |

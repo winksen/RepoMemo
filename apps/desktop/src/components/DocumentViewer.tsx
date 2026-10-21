@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { IconDownload as Download, IconExternalLink as ExternalLink, IconLoader2 as Loader, IconPaperclip as Paperclip } from "@tabler/icons-react";
 import { createSharedFileLink, downloadSharedArtifactFile, downloadSharedRenderedPreview, getSharedDocumentPreview, getSharedRenderStatus, sharedApiUrl } from "../lib/sharedApi";
-import { columnLetters, documentKindOf, OPEN_IN_APP } from "../lib/documents";
+import { canOpenInApp, columnLetters, documentKindOf, OPEN_IN_APP } from "../lib/documents";
 import { isDesktopRuntime } from "../lib/desktop";
 import type { ArtifactSummary, DocumentPreview, SheetPreview } from "../types";
 import type { RenderStatus } from "../lib/sharedApi";
@@ -115,7 +115,7 @@ export function DocumentViewer({ accessToken, artifact }: { accessToken: string;
     finally { setIsBusy(false); }
   }
 
-  const target = kind ? OPEN_IN_APP[kind] : null;
+  const target = kind && canOpenInApp(artifact) ? OPEN_IN_APP[kind] : null;
   return (
     <div className="shared-doc-viewer">
       <div className="shared-doc-toolbar">
@@ -128,7 +128,7 @@ export function DocumentViewer({ accessToken, artifact }: { accessToken: string;
       </div>
       {rendersLayout && renderState?.state === "converting" ? <p className="shared-doc-note"><Loader className="spin" size={ICON_SIZE.sm} /> Rendering the original layout. The extracted view is shown meanwhile.</p> : null}
       {rendersLayout && renderState?.state === "failed" ? <p className="shared-doc-note">The original layout could not be rendered{renderState.message ? `: ${renderState.message}` : ""}. Showing the extracted view.</p> : null}
-      {rendersLayout && renderState?.state === "disabled" ? <p className="shared-muted-copy">Install LibreOffice on the server to preview the original layout of Office files.</p> : null}
+      {rendersLayout && renderState?.state === "disabled" ? <p className="shared-muted-copy">The original layout is not available: an administrator turns it on in the server settings (it needs LibreOffice).</p> : null}
       {renderedUrl && !showExtracted ? <iframe className="shared-pdf-frame shared-rendered-frame" src={renderedUrl} title="Document preview" /> : <>
         {isLoading ? <p className="shared-muted-copy"><Loader className="spin" size={ICON_SIZE.sm} /> Loading preview…</p> : null}
         {preview ? <PreviewBody pdfUrl={pdfUrl} preview={preview} /> : null}

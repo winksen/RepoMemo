@@ -14,12 +14,18 @@ import remarkGfm from "remark-gfm";
  *   the link opens in a new tab without an opener or a referrer.
  */
 
-/** The host of an `http(s)` address, or null for anything else. */
+/**
+ * The host of an address that leaves this page's own origin, or null for anything else. The address is read
+ * the way a browser reads it from this page, so `//host/path` and `\\host\path` (both go to another host
+ * with this page's scheme) are external, while `/v1/files`, `#section` and `mailto:` are not (V0.2.147).
+ */
 export function externalHost(address: string | undefined): string | null {
   if (!address) return null;
   try {
-    const url = new URL(address);
-    return url.protocol === "http:" || url.protocol === "https:" ? url.host : null;
+    const base = typeof window === "undefined" ? undefined : window.location.href;
+    const url = new URL(address, base);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    return base && url.origin === new URL(base).origin ? null : url.host;
   } catch {
     return null;
   }

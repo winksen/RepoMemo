@@ -32,6 +32,22 @@ export function documentKindOf(artifact: Pick<ArtifactSummary, "path">): Documen
   return KIND_BY_EXTENSION[extension] ?? null;
 }
 
+/**
+ * Formats that can carry macros. They are read (text, tables, slides) and downloaded, but *Open in Office* is
+ * not offered: that opens the file straight in the application from a link (V0.2.147).
+ */
+const MACRO_EXTENSIONS = new Set(["xlsm", "xlsb", "xltm", "xlam", "docm", "dotm", "pptm", "potm", "ppsm", "sldm", "ppam"]);
+
+export function hasMacros(artifact: Pick<ArtifactSummary, "path">): boolean {
+  return MACRO_EXTENSIONS.has(artifact.path.split(".").pop()?.toLowerCase() ?? "");
+}
+
+/** Whether *Open in …* is offered for this file: its kind has an application, and it cannot carry macros. */
+export function canOpenInApp(artifact: Pick<ArtifactSummary, "path">): boolean {
+  const kind = documentKindOf(artifact);
+  return kind !== null && !hasMacros(artifact);
+}
+
 export function isDocumentArtifact(artifact: Pick<ArtifactSummary, "path">): boolean {
   return documentKindOf(artifact) !== null;
 }

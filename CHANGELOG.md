@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.147 (2026-10-21)
+
+Two small fixes in the web client: links that look local but leave the site, and a button that should not open a file that can carry macros.
+
+### Security
+- **Links to another host say so (E10):** Markdown links in notes, answers, memory cards and READMEs show their target host and open in a new tab without an opener or referrer, but only for addresses that parsed on their own. `//evil.example/x` and `\\evil.example\share` do not (no scheme), so they were drawn like local links, with no host and in the same tab, although a browser takes them to another host. The address is now read the way the browser reads it from the page, and anything that leaves the page's own origin is external. Local paths, `#section` anchors and `mailto:` links are as before; a full address of this same site is now treated as local.
+- **No *Open in Office* for macro formats (E16):** `.xlsm`, `.xlsb`, `.xltm`, `.xlam`, `.docm`, `.dotm`, `.pptm`, `.potm`, `.ppsm`, `.sldm` and `.ppam` are still read here (text, tables, slides) and downloaded, but the button that hands the file to the desktop application through a link is no longer shown for them. The rest of the Office formats keep it, in view mode.
+
+### Changed
+- **The preview note** for a server with the layout preview off now says an administrator turns it on in the server settings (it used to say to install LibreOffice, which is no longer enough since V0.2.137).
+- **Tests (written, not run):** `//host` and `\\host` addresses give their host and render as a new-tab link with the host named; local paths, anchors and the page's own address do not; the macro formats (and unknown files) get no *Open in Office*, the others do.
+- **Checks run on this release:** `npm run typecheck`, `docs:check` and `version:check` pass. The web tests were not run.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.146 (2026-10-21)
 
 The last low findings on input: odd characters in new addresses and names, a log line a stranger could forge, and the server's secrets visible to local git.
