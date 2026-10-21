@@ -2,7 +2,7 @@
 
 > **Scope:** the whole server (`apps/server`, the crates), the web client where it meets the API, CI and the container files, at `V0.2.129` (commit `f1550cd`). Three questions: which dependencies carry known advisories; which findings of the [review of 2026-10-14](2026-10-14-security-review.md) are still open (nothing in the changelog or the roadmap tracked them to closure); and what a fresh pass over the backend finds for security, logic, hardening and speed.
 > **Method:** `cargo deny --workspace check advisories`, `npm audit` (with and without development packages) and `osv-scanner` over `Cargo.lock` and `package-lock.json`, run on 2026-10-21; then a static reading of the code. `cargo update --dry-run` confirmed which Rust fixes are lockfile-only. **Nothing was built, started or attacked**, as this repository's rules ask. Line numbers are as of `f1550cd`.
-> **Status:** open. **2 high, 9 medium, 15 low, 4 info**, fixed so far: S5-1 (V0.2.130), S5-2 (V0.2.131); eleven performance findings beside them. The releases that close them are planned as tracks L and M of the [Road to V0.3.0](../ROADMAP.md#track-l-security-and-dependencies-v02130v02148).
+> **Status:** open. **2 high, 9 medium, 15 low, 4 info**, fixed so far: S5-1 (V0.2.130), S5-2 (V0.2.131), S5-10 (V0.2.132); eleven performance findings beside them. The releases that close them are planned as tracks L and M of the [Road to V0.3.0](../ROADMAP.md#track-l-security-and-dependencies-v02130v02148).
 > **Previous review:** [2026-10-16](2026-10-16-security-review.md) (the fourth pass), closed. Its surfaces were not re-read, apart from the container.
 
 | ID | Severity | Finding | Status | Release |
@@ -34,7 +34,7 @@
 | S5-8 | Low | The server container runs with a writable root filesystem, every default capability and no `no-new-privileges` | New | V0.2.148 |
 | S5-9 | Low | Any workspace writer can cancel any job of the workspace, an administrator's whole-workspace re-index included | New | V0.2.151 |
 | E19 | Info | Rendered previews are cached server-wide by content hash, which tells a user whether the same Office file exists elsewhere | Open | V0.2.138 |
-| S5-10 | Info | `sqlx` links a TLS stack (`rustls`, `webpki-roots` 0.26) that SQLite never uses | New | V0.2.132 |
+| S5-10 | Info | `sqlx` links a TLS stack (`rustls`, `webpki-roots` 0.26) that SQLite never uses | Fixed in V0.2.132 | V0.2.132 |
 | S5-11 | Info | Unmaintained crates with no fixed release: `ttf-parser` (through `pdf-extract`, on the server), and `zvariant`, `zbus_names`, `glib`, `proc-macro-error` (Tauri on Linux, desktop only) | Tracked | — |
 | S5-12 | Info | The web app keeps its access token (60 minutes) in `sessionStorage`; the strict content security policy is what keeps a script from reading it | Accepted | — |
 
