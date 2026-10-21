@@ -254,8 +254,9 @@ export function ConnectorSettings({
 
     {replacing ? <Dialog
       description={<>Replace the token of <strong>{replacing.name}</strong>. The new token is tried against the tracker before it replaces the old one.</>}
-      footer={<><DialogCancel onClick={() => setReplacing(null)} /><Button busy={busy} disabled={!newToken.trim()} onClick={() => void replaceToken(replacing)} variant="main">Replace token</Button></>}
+      footer={<><DialogCancel onClick={() => setReplacing(null)} /><Button busy={busy} disabled={!newToken.trim()} type="submit" variant="main">Replace token</Button></>}
       onClose={() => setReplacing(null)}
+      onSubmit={() => { if (newToken.trim()) void replaceToken(replacing); }}
       open
       title="Replace the token"
     >

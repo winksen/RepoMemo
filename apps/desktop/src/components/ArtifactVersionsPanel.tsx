@@ -64,14 +64,14 @@ export function ArtifactVersionsPanel({ accessToken, artifactId, updatedAt }: { 
   let dialog = null;
   if (opened?.kind === "text") {
     const text = opened.text;
-    dialog = <Dialog className="rm-dialog-wide" description={text ? undefined : "Reading this version…"} footer={<DialogCancel label="Close" onClick={() => setOpened(null)} />} onClose={() => setOpened(null)} open title={`Version ${opened.version}`}>
+    dialog = <Dialog size="lg" description={text ? undefined : "Reading this version…"} footer={<DialogCancel label="Close" onClick={() => setOpened(null)} />} onClose={() => setOpened(null)} open title={`Version ${opened.version}`}>
       {text === null ? <p className="shared-muted-copy"><Loader className="spin" size={ICON_SIZE.sm} /> Loading…</p>
         : text.text !== null ? <><pre className="shared-version-text">{text.text}</pre>{text.truncated ? <p className="shared-muted-copy">Only the start of this version is shown.</p> : null}</>
           : <p className="shared-muted-copy">{text.note ?? "This version has no text to show."}</p>}
     </Dialog>;
   } else if (opened?.kind === "compare") {
     const comparison = opened.comparison;
-    dialog = <Dialog className="rm-dialog-wide" description={comparison ? `${comparison.removed} ${comparison.removed === 1 ? "line" : "lines"} removed, ${comparison.added} added` : "Comparing…"} footer={<DialogCancel label="Close" onClick={() => setOpened(null)} />} onClose={() => setOpened(null)} open title={`Version ${opened.from} → version ${opened.to}`}>
+    dialog = <Dialog size="lg" description={comparison ? `${comparison.removed} ${comparison.removed === 1 ? "line" : "lines"} removed, ${comparison.added} added` : "Comparing…"} footer={<DialogCancel label="Close" onClick={() => setOpened(null)} />} onClose={() => setOpened(null)} open title={`Version ${opened.from} → version ${opened.to}`}>
       {comparison === null ? <p className="shared-muted-copy"><Loader className="spin" size={ICON_SIZE.sm} /> Loading…</p>
         : comparison.note && !comparison.lines.length ? <p className="shared-muted-copy">{comparison.note}</p>
           : <>

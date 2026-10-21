@@ -312,8 +312,8 @@ export function EvidenceSection({ page }: { page: WorkspacePage }) {
     const busy = isSubmitting;
     if (itemDialog.kind === "rename-folder") {
       const { folder } = itemDialog;
-      return <Dialog footer={<><DialogCancel onClick={() => setItemDialog(null)} /><Button busy={busy} disabled={!renameValue.trim()} onClick={() => void renameFolderAction(folder)} variant="main">Rename</Button></>} onClose={() => setItemDialog(null)} open title="Rename folder">
-        <Field label="Folder name"><Input autoFocus maxLength={80} onChange={(event) => setRenameValue(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && renameValue.trim()) void renameFolderAction(folder); }} value={renameValue} /></Field>
+      return <Dialog footer={<><DialogCancel onClick={() => setItemDialog(null)} /><Button busy={busy} disabled={!renameValue.trim()} type="submit" variant="main">Rename</Button></>} onClose={() => setItemDialog(null)} onSubmit={() => { if (renameValue.trim()) void renameFolderAction(folder); }} open title="Rename folder">
+        <Field label="Folder name"><Input maxLength={80} onChange={(event) => setRenameValue(event.target.value)} value={renameValue} /></Field>
       </Dialog>;
     }
     if (itemDialog.kind === "delete-folder") {

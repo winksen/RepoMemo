@@ -103,7 +103,7 @@ export function CommandPalette({ accessToken, assistantWorkspaceId, canAdministe
 
   if (!open) return null;
   let lastGroup = "";
-  return <Dialog className="rm-dialog-wide shared-palette" footer={<><span className="shared-palette-hint">Ctrl K opens this anywhere · ↑ ↓ move · Enter runs · Esc closes</span><DialogCancel label="Close" onClick={() => setOpen(false)} /></>} onClose={() => setOpen(false)} open title="Command palette">
+  return <Dialog className="shared-palette" size="lg" footer={<><span className="shared-palette-hint">Ctrl K opens this anywhere · ↑ ↓ move · Enter runs · Esc closes</span><DialogCancel label="Close" onClick={() => setOpen(false)} /></>} onClose={() => setOpen(false)} open title="Command palette">
     <SearchField
       aria-activedescendant={entries[activeIndex] ? `palette-${entries[activeIndex].id}` : undefined}
       aria-autocomplete="list"

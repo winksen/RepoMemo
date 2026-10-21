@@ -215,7 +215,7 @@ export function RepositorySettings({
     </form>
 
     {editing ? <Dialog
-      className="rm-dialog-wide"
+      size="lg"
       description={<>Changes apply from the next sync. Files no longer matched leave search; files newly matched are added.</>}
       footer={<><DialogCancel onClick={() => setEditing(null)} /><Button busy={busy} form="rm-repo-edit-form" type="submit" variant="main">Save</Button></>}
       onClose={() => setEditing(null)}

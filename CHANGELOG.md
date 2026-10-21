@@ -2,6 +2,19 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.119 (2026-10-21)
+
+Every dialog focuses its first field, submits on Enter, closes on Escape and has one of three widths.
+
+### Changed
+- **`Dialog`:** takes `size` (`sm` 400 px for a question, `md` 520 px for a form, `lg` 720 px for long content; `md` when it has a body and `sm` when it has none) instead of the one-off `rm-dialog-wide` class, which is removed. It focuses its first writable field when it opens, and Escape closes it, as before.
+- **Submit on Enter:** a dialog with fields takes `onSubmit`; it wraps the body and footer in a form, so Enter in a field runs it and the decisive footer button is `type="submit"` (disabled or busy, it blocks the Enter too). The five hand-written Enter key handlers and `autoFocus` props are gone.
+- **Dialogs checked:** all 28 dialogs of the web client follow the rule; Cancel is before the decisive action in each, and the ones with a field are Rename chat, Rename folder, Replace the token, Restore a backup, the System user confirmation (anonymize) and Save as memory.
+- **Widths:** the command palette, the commit text, the evidence list of the assistant, the version text and comparison, the secret link, the repository edit form, the move-to-server dialog and Save as memory are `lg`; the forms are `md`; the questions are `sm`.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.118 (2026-10-21)
 
 The assistant and the command palette use the shared field and option list. The pages-on-the-shared-pieces track (K4) is complete: V0.2.102 to V0.2.118.

@@ -256,8 +256,8 @@ export function AssistantPanel({ accessToken, onOpenArtifact, workspaceId }: { a
   }
 
   const dialog = chatDialog?.kind === "rename"
-    ? <Dialog footer={<><DialogCancel onClick={() => setChatDialog(null)} /><Button busy={isSavingChat} disabled={!renameValue.trim()} onClick={() => void renameChat(chatDialog.conversation)} variant="main">Rename</Button></>} onClose={() => setChatDialog(null)} open title="Rename chat">
-      <Field label="Chat name" required><Input autoFocus maxLength={120} onChange={(event) => setRenameValue(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && renameValue.trim()) void renameChat(chatDialog.conversation); }} value={renameValue} /></Field>
+    ? <Dialog footer={<><DialogCancel onClick={() => setChatDialog(null)} /><Button busy={isSavingChat} disabled={!renameValue.trim()} type="submit" variant="main">Rename</Button></>} onClose={() => setChatDialog(null)} onSubmit={() => { if (renameValue.trim()) void renameChat(chatDialog.conversation); }} open title="Rename chat">
+      <Field label="Chat name" required><Input maxLength={120} onChange={(event) => setRenameValue(event.target.value)} value={renameValue} /></Field>
     </Dialog>
     : chatDialog?.kind === "delete"
       ? <Dialog description={<>Delete <strong>{chatDialog.conversation.title}</strong> and its {chatDialog.conversation.turn_count} {chatDialog.conversation.turn_count === 1 ? "message" : "messages"}? This cannot be undone.</>} footer={<><DialogCancel onClick={() => setChatDialog(null)} /><Button busy={isSavingChat} onClick={() => void deleteChat(chatDialog.conversation)} variant="danger">Delete chat</Button></>} onClose={() => setChatDialog(null)} open title="Delete chat" />
@@ -343,7 +343,7 @@ function Evidence({ accessToken, citations, isQuestion, onOpenArtifact }: { acce
     <strong>Evidence used</strong>
     {citations.slice(0, EVIDENCE_PREVIEW_LIMIT).map((citation, index) => renderCitation(citation, index, onOpenArtifact))}
     {hidden > 0 ? <button className="shared-assistant-citation-more" onClick={() => setShowAll(true)} type="button">Show all {citations.length} sources</button> : null}
-    {showAll ? <Dialog className="rm-dialog-wide" footer={<DialogCancel label="Close" onClick={() => setShowAll(false)} />} onClose={() => setShowAll(false)} open title={`Evidence used (${citations.length})`}>
+    {showAll ? <Dialog size="lg" footer={<DialogCancel label="Close" onClick={() => setShowAll(false)} />} onClose={() => setShowAll(false)} open title={`Evidence used (${citations.length})`}>
       <div className="shared-ai-citations shared-ai-citations-full">{citations.map((citation, index) => renderCitation(citation, index, (id) => { setShowAll(false); onOpenArtifact(id); }))}</div>
     </Dialog> : null}
   </div>;

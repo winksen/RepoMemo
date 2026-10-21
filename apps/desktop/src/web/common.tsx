@@ -104,7 +104,7 @@ export function ViewAtCommit({ accessToken, citation }: { accessToken: string; c
   return <>
     <Button className="shared-assistant-citation-commit" disabled={busy} onClick={() => void show()} title={`Show ${citation.path} as it was at commit ${commit.slice(0, 7)}`} type="button" variant="secondary">View at {commit.slice(0, 7)}</Button>
     {open && file ? <Dialog
-      className="rm-dialog-wide"
+      size="lg"
       description={<>As it was at commit <code>{file.commit.slice(0, 7)}</code>: {file.summary} · {file.author_name} · {new Date(file.committed_at).toLocaleDateString()}. {file.current_commit ? <>This is <strong>not the current version</strong>: the workspace holds <code>{file.current_commit.slice(0, 7)}</code>.</> : "This is also the current version."}</>}
       footer={<DialogCancel label="Close" onClick={() => setOpen(false)} />}
       onClose={() => setOpen(false)}

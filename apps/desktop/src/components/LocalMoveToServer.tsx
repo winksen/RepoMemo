@@ -87,7 +87,7 @@ export function LocalMoveToServer({ onGoToServer }: { onGoToServer: () => void }
   return <>
     <Button className="rm-desktop-move" onClick={() => setOpen(true)} type="button" variant="secondary"><PackageExport size={ICON_SIZE.sm} /> Move a workspace to a server</Button>
     <Dialog
-      className="rm-dialog-wide"
+      size="lg"
       description={archive
         ? `${archive.workspace_name} is ready: ${describeCounts(archive)} (${formatBytes(archive.size_bytes)}).`
         : "The workspace is written as an archive, the file a server exports. On the server you check what is in it and import it as a new workspace; this computer's copy is not changed or removed."}
