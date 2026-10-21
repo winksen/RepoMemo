@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.121 (2026-10-21)
+
+Ctrl+Enter (Cmd+Enter on macOS) sends comments, notes, questions and memory statements, and a muted hint says so.
+
+### Changed
+- **Every `Textarea`:** Ctrl+Enter, or Cmd+Enter on macOS, submits the form the field is in, unless the field's own key handler already used the key (the mention list, for example). A plain Enter still adds a line.
+- **The note editor:** Ctrl+Enter (Cmd+Enter) stores the note instead of adding a line break.
+- **The assistant:** Enter sends, Shift+Enter adds a line, and Ctrl+Enter (Cmd+Enter) sends as well; a muted line under the composer says so.
+- **Hints:** a muted line under the field names the shortcut and what it does: new and edited evidence comments ("Ctrl+Enter sends."), the question to ask the evidence ("asks"), the statement of a memory card in the memory section, on the card page and in *Save as memory* ("saves"), and the note ("stores the note"). The hint reads "Cmd+Enter" on macOS.
+
+### Added
+- **`lib/submitShortcut.ts`:** `isSubmitShortcut`, `submitOnShortcut`, `submitShortcutLabel` and `submitHint`.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.120 (2026-10-21)
 
 Leaving a form with unsaved changes asks first: System › Settings, the evidence note, a memory card being edited, the workspace name and the "Save as memory" dialog.

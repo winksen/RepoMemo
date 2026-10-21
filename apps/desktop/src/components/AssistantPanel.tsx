@@ -35,6 +35,7 @@ import { workspaceKeys } from "../lib/queryClient";
 import { useServerState } from "../lib/useServerState";
 import { useErrorToast } from "../lib/useErrorToast";
 import { useAssistantCommands } from "../lib/useAssistantCommands";
+import { submitShortcutLabel } from "../lib/submitShortcut";
 
 /** A turn as shown: stored turns plus the one waiting for, or failing to get, a reply. */
 type ThreadTurn = {
@@ -311,6 +312,7 @@ export function AssistantPanel({ accessToken, onOpenArtifact, workspaceId }: { a
           <Button aria-label="Send" busy={isBusy} disabled={isLoadingChat || !draft.trim()} type="submit" variant="main"><Send size={ICON_SIZE.md} /></Button>
         </div>
         <div className="shared-assistant-footnote">
+          <span>Enter or {submitShortcutLabel()} sends; Shift+Enter adds a line.</span>
           <span>{capabilities?.provider_name ? <><Brain size={ICON_SIZE.sm} /> AI actions use {capabilities.provider_name}. Search and file lookup stay on the server.</> : "No AI provider is enabled, so file lookup and search are available. An administrator can enable AI in Settings."}</span>
         </div>
       </form>

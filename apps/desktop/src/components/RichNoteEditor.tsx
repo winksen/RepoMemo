@@ -18,6 +18,7 @@ import {
   IconQuote as Quote,
 } from "@tabler/icons-react";
 import { ICON_SIZE } from "./ui/icon";
+import { isSubmitShortcut } from "../lib/submitShortcut";
 
 /**
  * WYSIWYG note editor. Text is shown formatted while typing and is stored and
@@ -46,7 +47,18 @@ export function RichNoteEditor({
     ],
     content: value,
     contentType: "markdown",
-    editorProps: { attributes: { "aria-label": "Note body", class: "rm-rich-content" } },
+    editorProps: {
+      attributes: { "aria-label": "Note body", class: "rm-rich-content" },
+      // Ctrl+Enter (Cmd+Enter) stores the note; it is handled here because the editor would otherwise add a line break.
+      handleKeyDown: (view, event) => {
+        if (!isSubmitShortcut(event)) return false;
+        const form = view.dom.closest("form");
+        if (!form) return false;
+        event.preventDefault();
+        form.requestSubmit();
+        return true;
+      },
+    },
     onUpdate: ({ editor: current }) => {
       const markdown = current.isEmpty ? "" : current.getMarkdown();
       lastEmitted.current = markdown;

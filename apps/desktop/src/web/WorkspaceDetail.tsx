@@ -30,6 +30,7 @@ import { OverviewSection } from "./workspace/OverviewSection";
 import { useAiProviders, useArtifacts, useCapabilities, useFolders, useIndexFailures, useMembers, useMemoryCards, useMetrics, useOverview, useRetrievalFacets, useRunningJobs } from "./workspace/data";
 import { type WorkspacePage } from "./workspace/page";
 import { ICON_SIZE } from "../components/ui/icon";
+import { submitHint } from "../lib/submitShortcut";
 
 export function SharedWorkspaceDetail({
   accessToken,
@@ -286,7 +287,7 @@ export function SharedWorkspaceDetail({
 
   const memoryDraftDialog = memoryDraft ? <Dialog size="lg" description="Keep this answer as a durable team memory card. Its cited passages become the card's evidence links." footer={<><DialogCancel onClick={closeMemoryDraft} /><Button busy={isSubmitting} disabled={!memoryDraft.title.trim() || !memoryDraft.body.trim()} type="submit" variant="main"><Shield size={ICON_SIZE.md} /> Save memory</Button></>} onClose={closeMemoryDraft} onSubmit={() => { if (memoryDraft.title.trim() && memoryDraft.body.trim()) void saveMemoryDraft(); }} open title="Save as memory">
     <Field label="Title" required><Input maxLength={200} onChange={(event) => setMemoryDraft((current) => current ? { ...current, title: event.target.value } : current)} value={memoryDraft.title} /></Field>
-    <Field label="Statement" required><Textarea className="shared-memory-draft-body" onChange={(event) => setMemoryDraft((current) => current ? { ...current, body: event.target.value } : current)} value={memoryDraft.body} /></Field>
+    <Field hint={submitHint("saves")} label="Statement" required><Textarea className="shared-memory-draft-body" onChange={(event) => setMemoryDraft((current) => current ? { ...current, body: event.target.value } : current)} value={memoryDraft.body} /></Field>
     {memoryDraft.citations.length ? <fieldset className="shared-memory-draft-citations"><legend>Evidence links ({memoryDraft.selected.size} of {memoryDraft.citations.length})</legend>{memoryDraft.citations.map((citation, index) => <Checkbox checked={memoryDraft.selected.has(index)} key={`${citation.artifact_id}-${citation.chunk_id ?? "artifact"}-${index}`} label={<span>[{index + 1}] {citation.title} · {citation.path}{citationLines(citation)}</span>} onCheckedChange={() => setMemoryDraft((current) => { if (!current) return current; const selected = new Set(current.selected); if (selected.has(index)) selected.delete(index); else selected.add(index); return { ...current, selected }; })} />)}</fieldset> : null}
   </Dialog> : null;
 

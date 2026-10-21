@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.120` (2026-10-21), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.121` (2026-10-21), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Security review 2026-10-16 (V0.2.52)](security/2026-10-16-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -57,7 +57,7 @@ timeline
 | Security review 2026-10-10, second and third passes | ✅ Every finding fixed, mitigated or accepted in writing (V0.1.76); R2-4 and R2-5 scheduled for V0.2.8 |
 | Road to V0.2.0 (V0.1.66–V0.1.76) | 🔄 Built and versioned `0.2.0`; R6 (clean install) and the tag are the maintainer's |
 | Road to V0.3.0 (V0.2.1–V0.2.56, one change each) | ✅ V0.2.1–V0.2.56 built; the clean-machine install (R6, R12) is the maintainer's |
-| Track K: frontend polish (V0.2.57–V0.2.129) | 🔄 V0.2.57–V0.2.120 built (K1 to K4 done); decisions 15–19 taken as proposed; [plan](plans/2026-10-17-frontend-polish.md) |
+| Track K: frontend polish (V0.2.57–V0.2.129) | 🔄 V0.2.57–V0.2.121 built (K1 to K4 done); decisions 15–19 taken as proposed; [plan](plans/2026-10-17-frontend-polish.md) |
 | V0.4.0 and later: scale-out, single sign-on, hosted | 💭 Direction |
 
 ---
@@ -970,7 +970,7 @@ One box per release; the brief, the files and the commit line of each are in [th
 
 - [x] **V0.2.119** `Dialog` takes `size` (`sm` 400 px, `md` 520 px, `lg` 720 px) in place of `rm-dialog-wide`, focuses its first field when it opens, and `onSubmit` makes Enter in a field run the decisive action (rename chat, rename folder, replace token, restore backup, anonymize user, save as memory); `test/dialogBehaviour.test.tsx` is written, not run. Typecheck passes; not seen on screen
 - [x] **V0.2.120** Leaving a form with unsaved changes asks to discard through `useConfirm` (route change, tab close, Cancel edit, closing the dialog): System › Settings, the evidence note, a memory card being edited, the workspace name and *Save as memory*; `navigate()` consults `addNavigationGuard` guards and `useUnsavedChanges` is the hook; `test/unsavedChanges.test.tsx` is written, not run. Typecheck passes; not seen on screen
-- [ ] **V0.2.121** Ctrl or Cmd plus Enter sends
+- [x] **V0.2.121** Ctrl+Enter (Cmd+Enter on macOS) submits the form of every `Textarea` and of the note editor; hints under evidence comments, the Ask question, memory statements (section, card page, *Save as memory*), the note and the assistant composer; `lib/submitShortcut.ts` and `test/submitShortcut.test.tsx` (written, not run). Typecheck passes; not seen on screen
 - [ ] **V0.2.122** Required fields before the request
 - [ ] **V0.2.123** Long lists page
 - [ ] **V0.2.124** Every change says it happened
