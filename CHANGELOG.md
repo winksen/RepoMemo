@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.125 (2026-10-21)
+
+Focus returns to the opener after a dialog and moves to the next item after a deletion.
+
+### Changed
+- **After a dialog:** every `Dialog` notes the control that had focus when it opened (a menu or another dialog is never the opener: the control that opened them is) and gives focus back to it when it closes, by Cancel, Escape, a click outside or the decisive action. The action menus of rows and cards count: closing a dialog opened from *Actions for…* lands on that button.
+- **After a deletion:** when the control that had focus is removed from the page (a deleted comment, task, member, token, saved search, file or backup row, a removed chip), focus moves to the item that took its place, else the one before it, else the heading of the list, instead of falling to the top of the page. A dialog whose opener is gone does the same.
+- **Unchanged:** a move to another page still puts focus at the start of the page (V0.2.47).
+
+### Added
+- **`lib/focusReturn.ts`:** `currentOpener`, `anchorFor`, `restoreFocus` and `watchFocusLoss` (started once in `SharedWebApp`).
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.124 (2026-10-21)
 
 Every change confirms itself with a success toast or a visible change on the page, and every failure with an error toast.

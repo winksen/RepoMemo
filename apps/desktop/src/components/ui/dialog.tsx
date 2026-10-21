@@ -1,5 +1,6 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useRef, type FormEvent, type ReactNode } from "react";
+import { currentOpener, restoreFocus, type FocusAnchor } from "../../lib/focusReturn";
 import { Button } from "./button";
 
 /** `sm` 400 px (a question), `md` 520 px (a small form), `lg` 720 px (long content). */
@@ -10,7 +11,8 @@ const FIRST_FIELD = "input:not([type=hidden]):not([disabled]):not([readonly]), t
 /**
  * A centered modal with a title, optional description and a footer of actions.
  * It focuses its first field when it opens (Radix focuses the first control otherwise),
- * Escape closes it, and Cancel comes before the decisive action in the footer.
+ * Escape closes it, focus returns to what opened it (or, if that is gone, to its neighbour),
+ * and Cancel comes before the decisive action in the footer.
  * Give it `onSubmit` for a dialog with fields: Enter in a field runs it, and the
  * decisive button in the footer says `type="submit"`.
  */
@@ -37,6 +39,11 @@ export function Dialog({
   title: string;
 }) {
   const content = useRef<HTMLDivElement>(null);
+  const opener = useRef<FocusAnchor | null>(null);
+  const wasOpen = useRef(false);
+  // Noted while the opening control still has focus, before the dialog takes it.
+  if (open && !wasOpen.current) opener.current = currentOpener();
+  wasOpen.current = open;
   const width = `rm-dialog-${size ?? (children ? "md" : "sm")}`;
   const body = <>
     {children ? <div className="rm-dialog-body">{children}</div> : null}
@@ -57,6 +64,9 @@ export function Dialog({
             if (!field) return;
             event.preventDefault();
             field.focus();
+          }}
+          onCloseAutoFocus={(event) => {
+            if (opener.current && restoreFocus(opener.current)) event.preventDefault();
           }}
           ref={content}
         >

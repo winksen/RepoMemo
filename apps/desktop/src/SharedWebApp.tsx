@@ -34,6 +34,7 @@ import { CommandPalette } from "./web/CommandPalette";
 import { RouteAnnouncer } from "./web/RouteAnnouncer";
 import { pageKey, pageTitle } from "./web/pageTitle";
 import { ConfirmProvider } from "./components/ui/confirm-dialog";
+import { watchFocusLoss } from "./lib/focusReturn";
 
 export function SharedWebApp() {
   return (
@@ -67,6 +68,9 @@ function SharedWebAppContent() {
   useEffect(() => {
     document.documentElement.dataset.theme = initialSharedTheme();
   }, []);
+
+  // A deleted row or a removed chip must not leave the keyboard on the page body.
+  useEffect(() => watchFocusLoss(), []);
 
   useEffect(() => {
     // If the status cannot be read (an older server, or the API is down), the normal sign-in shows.
