@@ -4,6 +4,9 @@ use super::*;
 /// counting as theft: the other tab of the same browser, a retry, a request that crossed the first.
 const ROTATION_GRACE_SECONDS: i64 = 30;
 
+/// A refresh token's user, expiry, revocation time, revocation reason and rotation time.
+type RefreshRow = (String, String, Option<String>, Option<String>, Option<String>);
+
 /// What presenting a refresh token came to.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RefreshOutcome {
@@ -38,7 +41,7 @@ impl StorageEngine {
     pub async fn create_user(&self, email: &str, display_name: &str, password_hash: &str) -> Result<SharedUser> {
         let id = Uuid::new_v4().to_string();
         let now = Utc::now().to_rfc3339();
-        let email = normalize_email(email)?;
+        let email = normalize_new_email(email)?;
 
         sqlx::query(
             "INSERT INTO users (id, email, display_name, password_hash, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
@@ -196,7 +199,7 @@ impl StorageEngine {
     pub async fn consume_refresh_token(&self, raw: &str) -> Result<RefreshOutcome> {
         let hash = hash_refresh_token(raw);
         let now = Utc::now();
-        let row: Option<(String, String, Option<String>, Option<String>, Option<String>)> = sqlx::query_as(
+        let row: Option<RefreshRow> = sqlx::query_as(
             "SELECT user_id, expires_at, revoked_at, revoked_reason, replaced_at FROM refresh_tokens WHERE token_hash = ?1",
         )
         .bind(&hash)

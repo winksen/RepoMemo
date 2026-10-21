@@ -272,7 +272,7 @@ pub(crate) async fn login(
             if known_device(&state, &email, request.refresh_token.as_deref()).await {
                 continue;
             }
-            tracing::warn!(target: "audit", email = %email, client = %client.0, "Sign-in refused: account temporarily locked");
+            tracing::warn!(target: "audit", email = ?email, client = %client.0, "Sign-in refused: account temporarily locked");
             return Err(too_many_requests(
                 format!(
                     "Too many failed sign-in attempts for this account. Try again in {}.",
@@ -305,7 +305,7 @@ pub(crate) async fn login(
                 settings.login_max_failures.saturating_mul(5),
                 settings.login_lockout,
             );
-        tracing::warn!(target: "audit", email = %email, client = %client.0, locked, "Sign-in failed");
+        tracing::warn!(target: "audit", email = ?email, client = %client.0, locked, "Sign-in failed");
         return Err(invalid_credentials());
     };
     // Said only after the password is right, so it does not tell anyone

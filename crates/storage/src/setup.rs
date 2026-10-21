@@ -10,7 +10,7 @@ use repomemo_domain::SharedUser;
 use sqlx::Row;
 use uuid::Uuid;
 
-use super::{normalize_email, StorageEngine};
+use super::{normalize_new_email, StorageEngine};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SetupState {
@@ -64,7 +64,7 @@ impl StorageEngine {
     ) -> Result<Option<SharedUser>> {
         let id = Uuid::new_v4().to_string();
         let now = Utc::now().to_rfc3339();
-        let email = normalize_email(email)?;
+        let email = normalize_new_email(email)?;
         let display_name = display_name.trim().to_owned();
         let mut tx = self.pool.begin().await?;
         let inserted = sqlx::query(

@@ -1476,3 +1476,53 @@ async fn a_token_rotated_a_moment_ago_is_refused_without_ending_the_sessions_but
     drop(storage);
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+/// E13: a new address or name refuses control and text-direction characters; looking an address up stays as
+/// lenient as before, so accounts made earlier still sign in.
+#[tokio::test]
+async fn new_addresses_and_names_refuse_hidden_characters_but_lookups_stay_lenient() {
+    let (storage, data_dir) = temp_storage("hidden-characters").await;
+    for refused in [
+        "ada lovelace@example.com",
+        "ada@exam ple.com",
+        "ada\n@example.com",
+        "ada@example.com\u{0}",
+        "ada\u{202E}@example.com",
+        "ada\u{2066}@example.com",
+        "ada@@example.com",
+        "ada@b@example.com",
+        "@example.com",
+        "ada@",
+    ] {
+        assert!(
+            storage.create_user(refused, "Ada", "hash").await.is_err(),
+            "{refused:?} should be refused for a new account"
+        );
+    }
+    let user = storage.create_user("Ada@Example.com ", "Ada", "hash").await.unwrap();
+    assert_eq!(user.email.as_deref(), Some("ada@example.com"));
+    assert!(
+        storage.find_user_by_email(" ADA@example.com").await.unwrap().is_some(),
+        "lookups stay lenient"
+    );
+
+    assert!(storage
+        .change_user_email(&user.id, "ada@lovelace\u{202E}.com")
+        .await
+        .is_err());
+    assert!(storage.update_user_display_name(&user.id, "Ada\u{202E}").await.is_err());
+    assert!(storage
+        .update_user_display_name(&user.id, "Ada\nLovelace")
+        .await
+        .is_err());
+    assert!(storage.update_user_display_name(&user.id, "Ada Lovelace").await.is_ok());
+    assert!(storage.create_organization(&user.id, "Team\u{2067}").await.is_err());
+    assert!(storage.create_organization(&user.id, "Engineering").await.is_ok());
+
+    // What is written to a log is the Debug form, which cannot start a line of its own.
+    let hostile = "ada@example.com\nINFO forged line";
+    assert!(!format!("{hostile:?}").contains('\n'));
+    storage.pool.close().await;
+    drop(storage);
+    let _ = std::fs::remove_dir_all(data_dir);
+}

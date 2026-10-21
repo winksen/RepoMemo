@@ -1363,12 +1363,55 @@ fn normalize_email(value: &str) -> Result<String> {
     Ok(email)
 }
 
+/// A character that changes how text is drawn or read without being seen: any control character, and the
+/// bidirectional marks and overrides that make `gpj.exe` look like `exe.jpg` (V0.2.146, review E13).
+fn is_hidden_character(character: char) -> bool {
+    character.is_control()
+        || matches!(
+            character,
+            '\u{061C}' | '\u{200E}' | '\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}'
+        )
+}
+
+/// A name a person gave something new: 1 to 120 characters, none of them hidden. Names stored before
+/// V0.2.146 are left as they are.
 fn require_name(value: &str, field: &str) -> Result<String> {
     let value = value.trim();
     if value.is_empty() || value.len() > 120 {
         repomemo_domain::bail_invalid!("{field} must be between 1 and 120 characters.");
     }
+    if value.chars().any(is_hidden_character) {
+        repomemo_domain::bail_invalid!("{field} must not contain control or text-direction characters.");
+    }
     Ok(value.to_owned())
+}
+
+/// A title taken from a file name or a pasted text: only the length is checked, as before, because a
+/// repository can hold a file name this release would not accept for a person's name.
+fn require_title(value: &str, field: &str) -> Result<String> {
+    let value = value.trim();
+    if value.is_empty() || value.len() > 120 {
+        repomemo_domain::bail_invalid!("{field} must be between 1 and 120 characters.");
+    }
+    Ok(value.to_owned())
+}
+
+/// An address given for a new account, invitation or change: one `@` between two non-empty parts, no
+/// white space, control or text-direction characters. Looking an address up stays as lenient as before
+/// ([`normalize_email`]), so accounts made earlier still sign in.
+fn normalize_new_email(value: &str) -> Result<String> {
+    let email = normalize_email(value)?;
+    let (local, domain) = email.split_once('@').unwrap_or_default();
+    if local.is_empty()
+        || domain.is_empty()
+        || domain.contains('@')
+        || email
+            .chars()
+            .any(|character| character.is_whitespace() || is_hidden_character(character))
+    {
+        repomemo_domain::bail_invalid!("A valid email address is required.");
+    }
+    Ok(email)
 }
 
 fn workspace_role_from_db(value: &str) -> Result<WorkspaceRole> {

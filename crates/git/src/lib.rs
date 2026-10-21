@@ -244,7 +244,11 @@ impl GitRepo {
             bail!("git ls-tree failed: {}", stderr_text(&output.stderr));
         }
         let mut entries = Vec::new();
-        for record in output.stdout.split(|byte| *byte == 0).filter(|record| !record.is_empty()) {
+        for record in output
+            .stdout
+            .split(|byte| *byte == 0)
+            .filter(|record| !record.is_empty())
+        {
             let record = std::str::from_utf8(record).context("git returned a non UTF-8 path")?;
             // "<mode> <type> <object>\t<path>"
             let (meta, path) = record
@@ -353,11 +357,17 @@ impl GitRepo {
                 "That commit is not in the server's copy of the repository any more (it may have been force-pushed away)."
             );
         }
-        let size = String::from_utf8_lossy(&size.stdout).trim().parse::<u64>().unwrap_or(u64::MAX);
+        let size = String::from_utf8_lossy(&size.stdout)
+            .trim()
+            .parse::<u64>()
+            .unwrap_or(u64::MAX);
         if size > max_bytes {
             repomemo_domain::bail_invalid!("This file is too large to show at a commit.");
         }
-        let content = git_command(&self.root).args(["cat-file", "blob", &spec]).output().await?;
+        let content = git_command(&self.root)
+            .args(["cat-file", "blob", &spec])
+            .output()
+            .await?;
         if !content.status.success() {
             repomemo_domain::bail_not_found!(
                 "The content of this file at that commit is not held by the server (it was too large to copy)."
@@ -485,8 +495,38 @@ pub fn harden(hardening: Hardening) -> bool {
     HARDENING.set(hardening).is_ok()
 }
 
+/// The variables a local git process keeps from the server's environment: what it needs to run and to find a
+/// home and its temporary folder. Everything else (the server's `REPOMEMO_*` settings, keys, tokens, a stray
+/// `GIT_DIR`) is dropped, as for the remote commands.
+const KEPT_VARIABLES: &[&str] = &[
+    "PATH",
+    "HOME",
+    "USERPROFILE",
+    "HOMEDRIVE",
+    "HOMEPATH",
+    "XDG_CONFIG_HOME",
+    "SystemRoot",
+    "SYSTEMROOT",
+    "windir",
+    "TEMP",
+    "TMP",
+    "TMPDIR",
+    "LANG",
+    "LC_ALL",
+];
+
+fn kept_variables(
+    environment: impl IntoIterator<Item = (std::ffi::OsString, std::ffi::OsString)>,
+) -> Vec<(std::ffi::OsString, std::ffi::OsString)> {
+    environment
+        .into_iter()
+        .filter(|(name, _)| KEPT_VARIABLES.iter().any(|kept| name.to_str() == Some(*kept)))
+        .collect()
+}
+
 fn git_command(directory: &Path) -> Command {
     let mut command = Command::new("git");
+    command.env_clear().envs(kept_variables(std::env::vars_os()));
     command
         .arg("-C")
         .arg(directory)
@@ -521,6 +561,33 @@ fn git_command(directory: &Path) -> Command {
         command.creation_flags(0x0800_0000);
     }
     command
+}
+
+#[cfg(test)]
+mod environment_tests {
+    use super::kept_variables;
+    use std::ffi::OsString;
+
+    #[test]
+    fn local_git_sees_no_variable_of_the_server() {
+        let environment = [
+            ("PATH", "/usr/bin"),
+            ("HOME", "/home/repomemo"),
+            ("REPOMEMO_SECRET_KEY", "sealed"),
+            ("REPOMEMO_JWT_SECRET", "signing"),
+            ("GITHUB_TOKEN", "ghp_x"),
+            ("AWS_SECRET_ACCESS_KEY", "aws"),
+            ("GIT_DIR", "/elsewhere"),
+            ("GIT_SSH_COMMAND", "sh -c evil"),
+            ("LANG", "C"),
+        ]
+        .map(|(name, value)| (OsString::from(name), OsString::from(value)));
+        let kept = kept_variables(environment)
+            .into_iter()
+            .map(|(name, _)| name.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+        assert_eq!(kept, ["PATH", "HOME", "LANG"]);
+    }
 }
 
 fn null_device() -> &'static str {
@@ -745,7 +812,14 @@ mod tests {
 
         // A blobless-over-a-limit clone, the shape the server keeps.
         let status = std::process::Command::new("git")
-            .args(["clone", "--quiet", "--bare", "--no-local", "--filter=blob:limit=100", "--"])
+            .args([
+                "clone",
+                "--quiet",
+                "--bare",
+                "--no-local",
+                "--filter=blob:limit=100",
+                "--",
+            ])
             .arg(format!("file://{}", source.to_string_lossy().replace('\\', "/")))
             .arg(&clone)
             .stdout(Stdio::null())
@@ -758,7 +832,10 @@ mod tests {
             return;
         }
 
-        assert!(GitRepo::open(&clone).await.is_err(), "a bare repository is not a checkout");
+        assert!(
+            GitRepo::open(&clone).await.is_err(),
+            "a bare repository is not a checkout"
+        );
         let repo = GitRepo::open_bare(&clone).await.unwrap();
         assert_eq!(repo.current_branch().await.unwrap().as_deref(), Some("main"));
         let head = repo.resolve_commit(Some("main")).await.unwrap();
@@ -808,7 +885,10 @@ mod tests {
         assert_eq!(repo.recent_commits(&head, 5).await.unwrap(), vec![info]);
         assert_eq!(repo.file_at(&head, "README.md", 1024).await.unwrap(), b"# Hello\n");
         assert!(repo.file_at(&head, "missing.md", 1024).await.is_err());
-        assert!(repo.file_at(&head, "README.md", 3).await.is_err(), "over the size limit");
+        assert!(
+            repo.file_at(&head, "README.md", 3).await.is_err(),
+            "over the size limit"
+        );
         assert!(repo.file_at("deadbeefdeadbeef", "README.md", 1024).await.is_err());
         assert!(repo.file_at("--oops", "README.md", 1024).await.is_err());
         let last = repo.last_changes(&head, 100).await.unwrap();

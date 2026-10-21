@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.146 (2026-10-21)
+
+The last low findings on input: odd characters in new addresses and names, a log line a stranger could forge, and the server's secrets visible to local git.
+
+### Security
+- **New addresses are strict (E13):** an address for a new account, an invitation, an address change or the first administrator needs one `@` between two non-empty parts and no white space, control or text-direction character. Looking an address up is as lenient as before, so every existing account signs in.
+- **New names refuse hidden characters (E13):** display, workspace and organization names (and renames) no longer take control characters or the bidirectional marks and overrides that make `gpj.exe` read as `exe.jpg`. Names stored earlier are left. A file title taken from a file name or pasted text keeps only the length check, so a repository holding an odd file name still syncs.
+- **No forged log lines (E12):** the sign-in address was written to the text console log as typed, so a line break could start a line of its own. It is now written escaped (`email = "ada@example.com\nINFO …"`), one line per sign-in whatever the address; the same for the warning about a listed administrator with no account.
+- **Local git starts empty (E18):** git processes for local repositories inherited the server's whole environment (its `REPOMEMO_*` settings, keys, tokens). They now start from an empty environment with only what git needs to run (`PATH`, home and temporary folders, `LANG`, `LC_ALL`) plus the `GIT_*` the server sets, as the remote commands already did.
+
+### Changed
+- **Clippy:** the tuple read for a refresh token (V0.2.144) became a named type.
+- **Tests (written, not run):** a new account refuses spaces, line breaks, NUL, text-direction marks, a second `@` and an empty side, while a lookup with capitals and spaces still finds the account; names and an address change refuse hidden characters; a hostile address in Debug form has no line break; local git keeps `PATH`, `HOME` and `LANG` and drops `REPOMEMO_*`, tokens, keys and `GIT_DIR`.
+- **Checks run on this release:** `cargo check` of the git and storage crates and the server with their tests compiles, `rustfmt` is clean for what changed apart from hunks that were already there and `clippy` reports nothing new; `docs:check` and `version:check` pass.
+
+### Upgrading
+- Nothing to do for existing accounts and names. Scripts that create accounts or invitations with unusual addresses get `400`.
+
 ## V0.2.145 (2026-10-21)
 
 Sign-in protection can no longer be sidestepped by changing IPv6 address, and a burst of sign-ins cannot exhaust the server.

@@ -11,7 +11,7 @@ use chrono::{Duration, Utc};
 use repomemo_domain::{Invitation, PersonalAccessToken, SharedUser};
 use uuid::Uuid;
 
-use super::{hash_refresh_token as hash_secret, normalize_email, StorageEngine};
+use super::{hash_refresh_token as hash_secret, normalize_new_email, StorageEngine};
 
 /// Personal access tokens start with this, so they are recognisable in
 /// configuration files and secret scanners, and easy to tell from a session.
@@ -150,7 +150,7 @@ impl StorageEngine {
         if !matches!(target_type, "organization" | "workspace") {
             repomemo_domain::bail_invalid!("An invitation is for an organization or a workspace.");
         }
-        let email = normalize_email(email)?;
+        let email = normalize_new_email(email)?;
         let id = Uuid::new_v4().to_string();
         let raw = new_secret();
         let now = Utc::now();
@@ -582,7 +582,7 @@ impl StorageEngine {
 
     /// Gives the account another address, unverified. Pending links stop working.
     pub async fn change_user_email(&self, user_id: &str, email: &str) -> Result<SharedUser> {
-        let email = normalize_email(email)?;
+        let email = normalize_new_email(email)?;
         let taken = sqlx::query_scalar::<_, String>("SELECT id FROM users WHERE email = ?1 AND id != ?2")
             .bind(&email)
             .bind(user_id)

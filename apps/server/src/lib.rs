@@ -253,7 +253,7 @@ async fn build_state(
     let promoted = storage.promote_system_admins(&config.system_admin_emails).await?;
     for email in &config.system_admin_emails {
         if matches!(storage.find_user_by_email(email).await, Ok(None)) {
-            tracing::warn!(target: "audit", email = %email, "REPOMEMO_SYSTEM_ADMIN_EMAILS lists an address with no account. Registering it will not make it a system administrator; grant the role in System › Users once the person has an account.");
+            tracing::warn!(target: "audit", email = ?email, "REPOMEMO_SYSTEM_ADMIN_EMAILS lists an address with no account. Registering it will not make it a system administrator; grant the role in System › Users once the person has an account.");
         }
     }
     if promoted > 0 {

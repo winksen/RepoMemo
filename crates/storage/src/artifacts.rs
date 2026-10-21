@@ -468,7 +468,7 @@ impl StorageEngine {
     }
 
     pub async fn update_artifact_title(&self, artifact_id: &str, title: &str) -> Result<ArtifactSummary> {
-        let title = require_name(title, "Artifact title")?;
+        let title = require_title(title, "Artifact title")?;
         let now = Utc::now().to_rfc3339();
         let changed = sqlx::query("UPDATE artifacts SET title = ?1, updated_at = ?2 WHERE id = ?3")
             .bind(&title)
