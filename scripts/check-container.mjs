@@ -58,6 +58,28 @@ for (const ecosystem of ["cargo", "npm", "github-actions", "docker"]) {
   if (!new RegExp(String.raw`package-ecosystem:\s*${ecosystem}\b`).test(dependabot)) problems.push(`.github/dependabot.yml does not watch ${ecosystem}`);
 }
 
+// The server image's git must be one the remote-clone check accepts (S5-7): Debian 12 ships 2.39.5, which
+// `is_patched_git` refuses, so remote repositories could not be cloned in the image.
+const gitOfDebian = { bookworm: "2.39.5", trixie: "2.47.3" };
+const baseRelease = /^FROM\s+debian:([a-z]+)(?:-slim)?(?:@\S+)?\s+AS\s+server\b/im.exec(dockerfile)?.[1];
+const gitSource = read("crates/git/src/remote.rs");
+const acceptedFrom = {};
+for (const arm of /pub fn is_patched_git[\s\S]*?match minor \{([\s\S]*?)\n    \}/.exec(gitSource)?.[1].matchAll(/^\s*(\d+) => patch >= (\d+),/gm) ?? []) {
+  acceptedFrom[Number(arm[1])] = Number(arm[2]);
+}
+let serverGit = "unknown";
+if (!baseRelease || !(baseRelease in gitOfDebian)) {
+  problems.push(`the server stage's base ${baseRelease ?? "(none)"} is not one this check knows the git release of (${Object.keys(gitOfDebian).join(", ")})`);
+} else if (Object.keys(acceptedFrom).length === 0) {
+  problems.push("crates/git/src/remote.rs: is_patched_git has no release table this check can read");
+} else {
+  serverGit = gitOfDebian[baseRelease];
+  const [, minor, patch] = serverGit.split(".").map(Number);
+  if (!(minor in acceptedFrom) || patch < acceptedFrom[minor]) {
+    problems.push(`the server image's base (Debian ${baseRelease}) carries git ${serverGit}, which is_patched_git refuses; remote repositories could not be cloned`);
+  }
+}
+
 // Stages: the compose targets exist, and the two images the guide names are there.
 const stages = [...dockerfile.matchAll(/^FROM\s+\S+\s+AS\s+(\S+)/gim)].map((match) => match[1]);
 for (const stage of ["web", "build", "server", "proxy"]) {
@@ -142,4 +164,4 @@ if (problems.length) {
   for (const problem of problems) console.error(` - ${problem}`);
   process.exit(1);
 }
-console.log(`Container files agree (${stages.length} stages, ${used.size} variables, proxy ${proxyAddress} to server:${listens}).`);
+console.log(`Container files agree (${stages.length} stages, ${used.size} variables, proxy ${proxyAddress} to server:${listens}, git ${serverGit} on Debian ${baseRelease}).`);

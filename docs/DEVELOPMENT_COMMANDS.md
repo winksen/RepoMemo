@@ -76,7 +76,7 @@ docker compose up -d --build
 docker compose logs server    # the first-run setup code
 ```
 
-Why: this is the way to run RepoMemo for a team without building anything by hand; the production guide ("Running it in containers") explains the volumes, the second backup copy, upgrading and using your own proxy. `npm run container:check` compares the container files with each other and with the server's variables without starting Docker, and refuses a base image or CI action that is not pinned (a digest or a commit).
+Why: this is the way to run RepoMemo for a team without building anything by hand; the production guide ("Running it in containers") explains the volumes, the second backup copy, upgrading and using your own proxy. `npm run container:check` compares the container files with each other and with the server's variables without starting Docker, asserts the git release of the server image, and refuses a base image or CI action that is not pinned (a digest or a commit).
 
 ## Web Client Tests And Generated Types
 

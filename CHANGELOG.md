@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.136 (2026-10-21)
+
+Remote repositories can be cloned inside the official container: its git is now one the server accepts.
+
+### Fixed
+- **The container's git was refused (S5-7):** the server image was built on Debian 12, which ships git 2.39.5 with the fix for CVE-2025-48384 backported. The server checks the version number, and 2.39.5 is below every release it accepts, so it refused every remote clone in the official image. The `server` stage is now `debian:trixie-slim` (Debian 13), whose git is 2.47.3, a release `is_patched_git` accepts. The build stage follows (`rust:1-trixie`), so the binary is built and run on the same libraries. Both are pinned by digest. The web stage (`node:22-bookworm-slim`) is unchanged: it ships nothing.
+
+### Changed
+- **`npm run container:check` asserts the pair:** it reads the release table of `is_patched_git` in `crates/git/src/remote.rs`, looks up the git that the server stage's Debian release carries (bookworm 2.39.5, trixie 2.47.3) and fails if the server would refuse it. It prints the result (`git 2.47.3 on Debian trixie`). With the base put back to bookworm it reported the problem and exited with 1; on the tree it passes. A new Debian release has to be added to the check's table before it can be used.
+- **Documentation:** the production guide and the commands page say which git the image carries and what the check asserts.
+- **Checks run on this release:** `container:check`, `version:check`, `docs:check` and `migrations:check`. No image was built and no repository was cloned; that is the maintainer's try (below). LibreOffice (`--build-arg WITH_LIBREOFFICE=true`) now comes from Debian 13's packages; V0.2.137 sets a minimum version for it and V0.2.148 moves it into a container of its own.
+
+### Upgrading
+- Rebuild the images (`docker compose up -d --build`); the volume and the database are untouched.
+- To try it: add a remote repository to a workspace in the container and sync it. Before this release the sync was refused with a message about the git version.
+
 ## V0.2.135 (2026-10-21)
 
 Nothing that builds RepoMemo can move under it any more: CI actions and container base images are pinned, and Dependabot proposes the next versions.

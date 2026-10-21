@@ -201,7 +201,7 @@ On Windows the server restricts `secret.key` to the account it runs as (`icacls`
 
 | Container | What it is |
 |---|---|
-| `server` | `repomemo-server` on Debian slim with `git` and CA certificates, running as an unprivileged user (uid 10001). Its working directory is the volume `repomemo-data` (`/var/lib/repomemo`), so the environment is `workspace-data/main` inside it: database, stored files, key file and backups. A health check asks `/health/ready`. LibreOffice for layout-accurate Office previews is not included unless you build with `REPOMEMO_WITH_LIBREOFFICE=true` (about 600 MB more) |
+| `server` | `repomemo-server` on Debian 13 (trixie) slim with `git` 2.47.3 (a release the remote-clone check accepts; the Debian 12 image carried 2.39.5, which it refused) and CA certificates, running as an unprivileged user (uid 10001). Its working directory is the volume `repomemo-data` (`/var/lib/repomemo`), so the environment is `workspace-data/main` inside it: database, stored files, key file and backups. A health check asks `/health/ready`. LibreOffice for layout-accurate Office previews is not included unless you build with `REPOMEMO_WITH_LIBREOFFICE=true` (about 600 MB more) |
 | `proxy` | Caddy, serving the web app (built for the page's own host, so one image works under any name), sending `/v1` and `/health` to the server with event streams unbuffered, setting the content security policy the web build wrote, and getting the certificate |
 
 ```bash
@@ -219,7 +219,7 @@ What the compose file settles for you, from §2: the server listens on all inter
 - **Upgrading.** Back up (§6), `git pull` or fetch the new release, then `docker compose up -d --build`. The volume is kept; migrations run at start. To go back, restore the backup into a new environment (§6) and point `REPOMEMO_SERVER_DATA_DIR` at it.
 - **Reading documents** starts a short-lived copy of the server inside the container (§5), so no extra permission is needed. Give the container as much memory as `REPOMEMO_DOCUMENT_MEMORY_MB` plus the server's own.
 - **Behind your own proxy** (nginx, Traefik, a load balancer): build and run only the `server` target, keep it on a private network, and use §3 for the proxy.
-- `node scripts/check-container.mjs` (`npm run container:check`, run by CI) checks the Dockerfile, the compose file, the Caddyfile and `.env.example` against each other and against the variables the server reads, and refuses a base image without a digest, a CI action not pinned to a commit and a Dependabot file that leaves an ecosystem out; it needs no Docker.
+- `node scripts/check-container.mjs` (`npm run container:check`, run by CI) checks the Dockerfile, the compose file, the Caddyfile and `.env.example` against each other and against the variables the server reads, asserts that the server image's git is one `is_patched_git` accepts, refuses a base image without a digest, a CI action not pinned to a commit and a Dependabot file that leaves an ecosystem out; it needs no Docker.
 
 ### Is it up?
 

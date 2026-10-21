@@ -26,7 +26,7 @@ RUN npm run build
 
 # ---------------------------------------------------------------------------
 # The server binary.
-FROM rust:1-bookworm@sha256:5c1a1732ac3f77635b24d397ceb67b4d9ea61de348f68c0aa54a79fd01e65c69 AS build
+FROM rust:1-trixie@sha256:767c71592f7d1f3f242292000f8efd4e67b6732363da176772f4d220332e264f AS build
 WORKDIR /build
 COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
@@ -36,10 +36,12 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     && cp target/release/repomemo-server /out/repomemo-server
 
 # ---------------------------------------------------------------------------
-# The server. Readings of documents start this same program again, so it must
-# stay where it is. Layout-accurate Office previews need LibreOffice, which is
-# large: add it with `--build-arg WITH_LIBREOFFICE=true`.
-FROM debian:bookworm-slim@sha256:7ff6ba31527b9e336162fa061746c366c4b2032f4d2cff2078bea43f78efe3f8 AS server
+# The server, on Debian 13 (trixie): its git 2.47.3 is a release the remote-clone check
+# accepts, where Debian 12's 2.39.5 is refused (`npm run container:check` asserts the pair).
+# Readings of documents start this same program again, so it must stay where it is.
+# Layout-accurate Office previews need LibreOffice, which is large: add it with
+# `--build-arg WITH_LIBREOFFICE=true`.
+FROM debian:trixie-slim@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad AS server
 ARG WITH_LIBREOFFICE=false
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl git \
