@@ -17,6 +17,7 @@ import { SharedLayout } from "../components/SharedLayout";
 import { invalidateKeys, queryClient, workspaceKeys } from "../lib/queryClient";
 import { useLiveEventHub, useLiveEvents } from "../lib/liveEvents";
 import { useServerState } from "../lib/useServerState";
+import { useUnsavedChanges } from "../lib/unsavedChanges";
 import { LEDGER_ACTIONS, LIVE_REFRESH_DELAY_MS, type WorkspaceSection } from "./constants";
 import { apiMessage, citationLines } from "./format";
 import { navigate } from "./router";
@@ -79,6 +80,21 @@ export function SharedMemoryCardDetail({
   const [citations, setCitations] = useState<EditableCitation[]>([]);
   const [addArtifactId, setAddArtifactId] = useState("");
   const canWrite = workspace.role !== "viewer";
+  // The evidence the card cites now, which editing starts from.
+  const citedEvidence: EditableCitation[] = (card?.evidence ?? []).filter((entry) => entry.artifact_id && entry.exists).map((entry) => ({
+    artifact_id: entry.artifact_id!,
+    chunk_id: entry.chunk_id,
+    title: entry.title ?? "Untitled evidence",
+    path: entry.path ?? "",
+    start_line: entry.start_line,
+    end_line: entry.end_line,
+    confidence: null,
+  }));
+  const citationKey = (list: EditableCitation[]) => list.map((entry) => `${entry.artifact_id}:${entry.chunk_id ?? ""}`).join("|");
+  const isDirty = isEditing && Boolean(card) && (
+    title !== card!.card.title || bodyMarkdown !== card!.card.body_markdown || source !== card!.card.source || citationKey(citations) !== citationKey(citedEvidence)
+  );
+  const canLeave = useUnsavedChanges(isDirty, { subject: "your edits to this memory card" });
   // The evidence a card can cite is the workspace's file list, read when editing starts.
   const [artifacts] = useServerState<ArtifactSummary[]>({
     key: workspaceKeys.artifacts(workspaceId), fetch: () => listSharedArtifacts(accessToken, workspaceId), initial: [], enabled: isEditing,
@@ -113,15 +129,7 @@ export function SharedMemoryCardDetail({
   }, [card?.card.body_markdown, card?.card.source, card?.card.title]);
 
   function startEditing() {
-    setCitations((card?.evidence ?? []).filter((entry) => entry.artifact_id && entry.exists).map((entry) => ({
-      artifact_id: entry.artifact_id!,
-      chunk_id: entry.chunk_id,
-      title: entry.title ?? "Untitled evidence",
-      path: entry.path ?? "",
-      start_line: entry.start_line,
-      end_line: entry.end_line,
-      confidence: null,
-    })));
+    setCitations(citedEvidence);
     setIsEditing(true);
   }
 
@@ -174,7 +182,7 @@ export function SharedMemoryCardDetail({
 
   return (
     <SharedRecordLayout activeSection="memory" apiAvailable={apiAvailable} organization={organization} organizations={organizations} session={session} signOut={signOut} title={card?.card.title ?? "Memory card"} subtitle={card ? `Source: ${card.card.source}` : "Loading durable team memory…"} workspace={workspace} workspaces={workspaces}>
-      <div className="shared-detail-actions">{canWrite ? <><Button disabled={isLoading || isMutating} onClick={() => (isEditing ? setIsEditing(false) : startEditing())} variant="secondary"><Pencil size={ICON_SIZE.md} /> {isEditing ? "Cancel edit" : "Edit"}</Button><Button className="shared-danger-action" disabled={isLoading || isMutating} onClick={() => void removeCard()} variant="secondary"><Trash size={ICON_SIZE.md} /> Delete</Button></> : null}<Button busy={isExporting} disabled={isLoading || isMutating} onClick={() => void exportCard()} variant="main"><FileText size={ICON_SIZE.md} /> Export Markdown</Button></div>
+      <div className="shared-detail-actions">{canWrite ? <><Button disabled={isLoading || isMutating} onClick={() => { if (!isEditing) startEditing(); else void canLeave().then((leave) => { if (leave) setIsEditing(false); }); }} variant="secondary"><Pencil size={ICON_SIZE.md} /> {isEditing ? "Cancel edit" : "Edit"}</Button><Button className="shared-danger-action" disabled={isLoading || isMutating} onClick={() => void removeCard()} variant="secondary"><Trash size={ICON_SIZE.md} /> Delete</Button></> : null}<Button busy={isExporting} disabled={isLoading || isMutating} onClick={() => void exportCard()} variant="main"><FileText size={ICON_SIZE.md} /> Export Markdown</Button></div>
       <Toast kind="error" message={error} />
       {!card && isLoading ? <LoadingState label="Loading the memory card" /> : null}
       {card?.review.length ? <section className="shared-record-panel shared-review-panel"><h2>Needs review</h2><p className="shared-muted-copy">Evidence this card cites has changed since it was written. Check what it says, edit it or its evidence, or confirm it as it is.</p><ul>{card.review.map((reason, index) => <li key={`${reason.kind}-${index}`}>{reason.detail}{reason.artifact_id ? <> <button className="shared-assistant-citation" onClick={() => onOpenArtifact(reason.artifact_id!)} type="button">Open</button></> : null}</li>)}</ul>{canWrite ? <Button busy={isMutating} onClick={() => void confirmCard()} variant="secondary">Confirm as it is</Button> : null}</section> : null}

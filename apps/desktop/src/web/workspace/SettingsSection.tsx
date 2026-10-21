@@ -15,6 +15,8 @@ import { WorkspaceExportSettings } from "../../components/WorkspaceExportSetting
 import { RepositorySettings } from "../lazy";
 import { INDEX_POLL_ATTEMPTS, INDEX_POLL_INTERVAL_MS } from "../constants";
 import { apiMessage } from "../format";
+import { useUnsavedChanges } from "../../lib/unsavedChanges";
+import { parseRoute } from "../router";
 import { useAiProviders, useMetrics } from "./data";
 import { type WorkspacePage, sectionState } from "./page";
 import { ICON_SIZE } from "../../components/ui/icon";
@@ -52,6 +54,11 @@ export function SettingsSection({ page }: { page: WorkspacePage }) {
   }, [accessToken, embeddingPending, isLive, isSettingsView, workspace.workspace.id]);
 
   useEffect(() => { setWorkspaceName(workspace.workspace.name); }, [workspace.workspace.name]);
+  // The draft stays while the person moves between sections of this workspace.
+  useUnsavedChanges(canManageWorkspace && workspaceName !== workspace.workspace.name, {
+    keepsOn: (to) => { const route = parseRoute(to.split("?")[0]); return route.name === "workspace" && route.workspaceId === workspaceId; },
+    subject: "the new workspace name",
+  });
 
   async function renameWorkspace(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

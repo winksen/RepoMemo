@@ -24,6 +24,7 @@ vi.mock("../web/lazy", () => ({
   RichNoteEditor: () => <div>Note editor</div>,
 }));
 
+import { ConfirmProvider } from "../components/ui/confirm-dialog";
 import { EvidenceSection } from "../web/workspace/EvidenceSection";
 import { makePage } from "./workspacePage";
 
@@ -33,12 +34,12 @@ const file = { id: "a1", title: "Runbook", path: "docs/runbook.md", artifact_typ
 
 describe("the evidence section on the shared pieces", () => {
   it("shows the shared empty state when the ledger has nothing", () => {
-    render(<EvidenceSection page={makePage()} />);
+    render(<ConfirmProvider><EvidenceSection page={makePage()} /></ConfirmProvider>);
     expect(screen.getByText("No shared evidence yet").closest(".rm-empty-state")).not.toBeNull();
   });
 
   it("opens the folder form with a labelled, required field", () => {
-    render(<EvidenceSection page={makePage()} />);
+    render(<ConfirmProvider><EvidenceSection page={makePage()} /></ConfirmProvider>);
     fireEvent.click(screen.getByRole("button", { name: /New folder/ }));
     const name = screen.getByLabelText("Folder name") as HTMLInputElement;
     expect(name.required).toBe(true);
@@ -47,7 +48,7 @@ describe("the evidence section on the shared pieces", () => {
 
   it("labels the note title and picks files with the shared checkbox while selecting", () => {
     artifacts.list = [file];
-    render(<EvidenceSection page={makePage()} />);
+    render(<ConfirmProvider><EvidenceSection page={makePage()} /></ConfirmProvider>);
     expect((screen.getByLabelText("Note title") as HTMLInputElement).required).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "Select files" }));
     const box = screen.getByRole("checkbox", { name: "Select Runbook" });

@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.120 (2026-10-21)
+
+Leaving a form with unsaved changes asks first: System › Settings, the evidence note, a memory card being edited, the workspace name and the "Save as memory" dialog.
+
+### Changed
+- **A question before leaving:** while one of these forms holds unsaved changes, moving to another page of the app asks "Discard unsaved changes?" in the app's own dialog (`useConfirm`), with *Cancel* and a danger *Discard changes*; closing or reloading the tab shows the browser's own warning.
+- **Where:** System › Settings (the count of unsaved settings), the note title and body being written in the evidence section, a memory card being edited (title, source, statement or evidence changed), the new workspace name in workspace settings, and the title and statement of the *Save as memory* dialog (closing it asks, as does *Cancel edit* on a card).
+- **Where it does not ask:** the note draft and the new workspace name are kept while someone moves between sections of the same workspace, so those moves do not ask; an automatic redirect (such as to sign-in) never asks; the browser's back button is not intercepted, because the address has already changed when the app hears of it.
+- **Navigation:** `navigate()` in `web/router.ts` asks the registered guards before a move the person made; the `replace` form used for redirects does not.
+
+### Added
+- **`useUnsavedChanges(isDirty, { keepsOn, subject })`** (`lib/unsavedChanges.ts`): registers the guard and the tab warning, and returns `canLeave()` for a form's own exits.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.119 (2026-10-21)
 
 Every dialog focuses its first field, submits on Enter, closes on Escape and has one of three widths.

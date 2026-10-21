@@ -20,6 +20,8 @@ import { showToast } from "../../components/ui/toast";
 import { type ArtifactViewMode, FILE_CATEGORIES, type FileCategory, type ItemDialog, MAX_FOLDER_DEPTH, UPLOAD_CONCURRENCY, UPLOAD_EXTENSIONS, type UploadProgress } from "../constants";
 import { apiMessage, artifactKindLabel, documentKindLabel, fileCategory, formatBytes } from "../format";
 import { selectUploads } from "../../lib/uploadFilter";
+import { useUnsavedChanges } from "../../lib/unsavedChanges";
+import { parseRoute } from "../router";
 import { fileCategoryIcon } from "../common";
 import { useArtifacts, useFolders, useIndexFailures } from "./data";
 import { type WorkspacePage, sectionState } from "./page";
@@ -37,6 +39,11 @@ export function EvidenceSection({ page }: { page: WorkspacePage }) {
   const [artifactViewMode, setArtifactViewMode] = useS<ArtifactViewMode>("artifactViewMode", "grid");
   const [noteTitle, setNoteTitle] = useS("noteTitle", "");
   const [noteContent, setNoteContent] = useS("noteContent", "");
+  // The note draft stays while the person moves between sections of this workspace.
+  useUnsavedChanges(Boolean(noteTitle.trim() || noteContent.trim()), {
+    keepsOn: (to) => { const route = parseRoute(to.split("?")[0]); return route.name === "workspace" && route.workspaceId === page.workspaceId; },
+    subject: "the note you are writing",
+  });
   const [uploadFiles, setUploadFiles] = useS<File[]>("uploadFiles", []);
   const [uploadProgress, setUploadProgress] = useS<UploadProgress | null>("uploadProgress", null);
   const [selectedDocumentId, setSelectedDocumentId] = useS<string | null>("selectedDocumentId", null);

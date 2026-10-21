@@ -17,6 +17,7 @@ import { SharedLayout } from "../components/SharedLayout";
 import { ADMIN_WORKSPACE_SECTIONS, INDEX_POLL_ATTEMPTS, INDEX_POLL_INTERVAL_MS, JOB_KIND_LABEL, JOB_STAGE_LABEL, LEDGER_ACTIONS, LIVE_FALLBACK_POLL_MS, LIVE_METRICS_DELAY_MS, LIVE_REFRESH_DELAY_MS, type LiveRefresh, MEMORY_ACTIONS, type MemoryDraft, NO_LIVE_REFRESH, TASK_ACTIONS, type WorkspaceSection } from "./constants";
 import { apiMessage, citationLines } from "./format";
 import { navigate } from "./router";
+import { useUnsavedChanges } from "../lib/unsavedChanges";
 import { invalidateKeys, queryClient, workspaceInvalidation, workspaceKeys } from "../lib/queryClient";
 import { OrganizationRail, WorkspaceTopbar } from "./Organization";
 import { EvidenceSection } from "./workspace/EvidenceSection";
@@ -68,6 +69,9 @@ export function SharedWorkspaceDetail({
   const liveRefresh = useRef<LiveRefresh>({ ...NO_LIVE_REFRESH });
   const [indexingStalled, setIndexingStalled] = useState(false);
   const [memoryDraft, setMemoryDraft] = useState<MemoryDraft | null>(null);
+  const memoryDraftOrigin = useRef({ title: "", body: "" });
+  const canLeaveMemoryDraft = useUnsavedChanges(Boolean(memoryDraft) && (memoryDraft!.title !== memoryDraftOrigin.current.title || memoryDraft!.body !== memoryDraftOrigin.current.body), { subject: "your edits to the memory card" });
+  const closeMemoryDraft = () => { void canLeaveMemoryDraft().then((leave) => { if (leave) setMemoryDraft(null); }); };
   // Server state lives in the query cache (see lib/queryClient): it is shared
   // with other pages, refreshed in the background, and marked stale by live
   // events and mutations instead of the page reloading everything. Each section
@@ -246,6 +250,7 @@ export function SharedWorkspaceDetail({
   /** Opens the "save as memory" dialog with an AI answer and its sources. */
   function draftMemoryFromAnswer(title: string, body: string, source: string, citations: Citation[]) {
     setError(null);
+    memoryDraftOrigin.current = { title: title.slice(0, 200), body };
     setMemoryDraft({ title: title.slice(0, 200), body, source, citations, selected: new Set(citations.map((_, index) => index)) });
   }
 
@@ -279,7 +284,7 @@ export function SharedWorkspaceDetail({
     })}
   </section> : null;
 
-  const memoryDraftDialog = memoryDraft ? <Dialog size="lg" description="Keep this answer as a durable team memory card. Its cited passages become the card's evidence links." footer={<><DialogCancel onClick={() => setMemoryDraft(null)} /><Button busy={isSubmitting} disabled={!memoryDraft.title.trim() || !memoryDraft.body.trim()} type="submit" variant="main"><Shield size={ICON_SIZE.md} /> Save memory</Button></>} onClose={() => setMemoryDraft(null)} onSubmit={() => { if (memoryDraft.title.trim() && memoryDraft.body.trim()) void saveMemoryDraft(); }} open title="Save as memory">
+  const memoryDraftDialog = memoryDraft ? <Dialog size="lg" description="Keep this answer as a durable team memory card. Its cited passages become the card's evidence links." footer={<><DialogCancel onClick={closeMemoryDraft} /><Button busy={isSubmitting} disabled={!memoryDraft.title.trim() || !memoryDraft.body.trim()} type="submit" variant="main"><Shield size={ICON_SIZE.md} /> Save memory</Button></>} onClose={closeMemoryDraft} onSubmit={() => { if (memoryDraft.title.trim() && memoryDraft.body.trim()) void saveMemoryDraft(); }} open title="Save as memory">
     <Field label="Title" required><Input maxLength={200} onChange={(event) => setMemoryDraft((current) => current ? { ...current, title: event.target.value } : current)} value={memoryDraft.title} /></Field>
     <Field label="Statement" required><Textarea className="shared-memory-draft-body" onChange={(event) => setMemoryDraft((current) => current ? { ...current, body: event.target.value } : current)} value={memoryDraft.body} /></Field>
     {memoryDraft.citations.length ? <fieldset className="shared-memory-draft-citations"><legend>Evidence links ({memoryDraft.selected.size} of {memoryDraft.citations.length})</legend>{memoryDraft.citations.map((citation, index) => <Checkbox checked={memoryDraft.selected.has(index)} key={`${citation.artifact_id}-${citation.chunk_id ?? "artifact"}-${index}`} label={<span>[{index + 1}] {citation.title} · {citation.path}{citationLines(citation)}</span>} onCheckedChange={() => setMemoryDraft((current) => { if (!current) return current; const selected = new Set(current.selected); if (selected.has(index)) selected.delete(index); else selected.add(index); return { ...current, selected }; })} />)}</fieldset> : null}

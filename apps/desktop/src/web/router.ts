@@ -15,10 +15,33 @@ export function currentLocation() {
   return `${currentPathname()}${window.location.search}`;
 }
 
-export function navigate(to: string, replace = false) {
-  if (currentLocation() === to) return;
+/** Asked before the address changes to `to`; resolves `false` to stay (a form with unsaved changes). */
+export type NavigationGuard = (to: string) => Promise<boolean>;
+const navigationGuards = new Set<NavigationGuard>();
+
+/** Registers a guard and returns the function that removes it. */
+export function addNavigationGuard(guard: NavigationGuard): () => void {
+  navigationGuards.add(guard);
+  return () => { navigationGuards.delete(guard); };
+}
+
+function go(to: string, replace: boolean) {
   window.history[replace ? "replaceState" : "pushState"]({}, "", to);
   window.dispatchEvent(new PopStateEvent("popstate"));
+}
+
+/**
+ * Moves to `to`. A move the person made (not a `replace`, which is the app redirecting) first
+ * asks every registered guard, so a form with unsaved changes can stop it.
+ * The browser's back button is not guarded: the address has already changed when the app hears of it.
+ */
+export function navigate(to: string, replace = false) {
+  if (currentLocation() === to) return;
+  if (replace || navigationGuards.size === 0) { go(to, replace); return; }
+  void (async () => {
+    for (const guard of [...navigationGuards]) if (!(await guard(to))) return;
+    go(to, replace);
+  })();
 }
 
 /** Everything the address bar can name once someone is signed in. */

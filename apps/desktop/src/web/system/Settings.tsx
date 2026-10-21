@@ -29,6 +29,7 @@ import { Facts, useSystemData } from "./shared";
 import { SettingControl, settingProblem } from "./SettingControl";
 import { systemKeys } from "../../lib/queryClient";
 import { useServerState } from "../../lib/useServerState";
+import { useUnsavedChanges } from "../../lib/unsavedChanges";
 
 /** The environment folder this server is attached to, and the way to detach it (system administrators only). */
 function EnvironmentGroup({ accessToken }: { accessToken: string }) {
@@ -73,6 +74,8 @@ export function SettingsSection({ accessToken, session }: { accessToken: string;
   const changed = Object.keys(draft).length;
   // A whole number outside its range cannot be saved.
   const hasProblem = (settings?.settings ?? []).some((setting) => setting.key in draft && settingProblem(setting, draft[setting.key]) !== null);
+
+  useUnsavedChanges(changed > 0, { subject: `the ${changed} unsaved setting${changed === 1 ? "" : "s"}` });
 
   function edit(setting: SystemSetting, value: boolean | number | string) {
     setDraft((current) => {
