@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.138 (2026-10-21)
+
+LibreOffice is started with settings the server controls, and a workspace is no longer told a preview is ready because another workspace holds the same file.
+
+### Security
+- **A locked profile (E1b):** before every conversion the server writes LibreOffice's profile again, over whatever the previous document left: macro execution disabled at the highest security level, active content (OLE and DDE) and OLE automation off, links from untrusted documents blocked, links never updated when a Writer or Calc document loads, the Python runtime off, and the update check off. Java is switched off by a settings file the server writes and points LibreOffice to (`-env:UNO_JAVA_JFW_USER_DATA`). The server's secrets stay out of its environment and `--norestore` stays, as before. The settings follow LibreOffice's own configuration schema; they were written from it and have not been tried against a LibreOffice here.
+- **Preview state per workspace (E19):** whether a preview is `ready`, `converting` or `failed` is now remembered per workspace (`previews/workspaces/<workspace>/<hash>.ready` or `.failed`), and the conversions in flight are counted per workspace and file. A workspace goes through the same states for a file whoever else holds it, and its PDF is not served before its own request has run. The converted PDF itself is still stored once per content hash and shared. What remains: when another workspace already converted the file, the first conversion is fast, so a careful observer could still guess from the delay; closing that would mean converting the file again in every workspace.
+
+### Changed
+- **Clean-up:** forgetting a file whose blob is gone also removes its per-workspace markers; a restart still clears remembered failures (in every workspace, and the ones an earlier release kept next to the PDFs). Markers of a deleted workspace stay until the file is forgotten; they are empty files.
+- **Tests (written, not run):** the profile is rewritten over a hostile one and holds each setting (and the Java file); a preview another workspace made is not ready or served here until this workspace has asked; workspace ids are accepted as folder names only when plain; forgetting clears every workspace.
+- **Checks run on this release:** `cargo check -p repomemo-server --tests` compiles; `rustfmt` is clean for the file changed, and `clippy` reports nothing in the files changed; `docs:check`, `version:check` and `container:check` pass. No server was started and no file was converted.
+
+### Upgrading
+- Nothing to do. Previews already converted show their first state again once per workspace (a quick `converting` before `ready`), because the markers start empty.
+
 ## V0.2.137 (2026-10-21)
 
 LibreOffice no longer converts uploaded files just because it is installed: previews are opt-in, and only a release that carries the security fixes is used.

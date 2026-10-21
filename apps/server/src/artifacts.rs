@@ -208,7 +208,7 @@ pub(crate) async fn rendered_preview_pdf(
     require_workspace_read(&state, &subject, &summary.workspace_id).await?;
     let path = state
         .converter
-        .cached_pdf(&summary.content_hash)
+        .cached_pdf(&summary.workspace_id, &summary.content_hash)
         .ok_or_else(|| ApiError::bad_request("The rendered preview is not ready yet."))?;
     let bytes = tokio::fs::read(path).await.map_err(ApiError::internal)?;
     let mut rendered = summary;

@@ -10,8 +10,11 @@
 //! Hardening: the input is written under a fixed name (the upload's file name
 //! never reaches the command line), only one conversion runs at a time, each
 //! has a timeout after which the whole process tree is killed, and the output
-//! size is capped. Conversion never executes macros: LibreOffice's default
-//! macro security blocks them in headless mode.
+//! size is capped. LibreOffice starts with a profile the server writes before
+//! every conversion (see [`PROFILE_SETTINGS`]): macros disabled at the highest
+//! security level, no active content, links never updated or followed from
+//! untrusted documents, no Java and no update check, so a document cannot
+//! change those settings for the next one.
 //!
 //! Sandboxing (review M10): LibreOffice parses files strangers uploaded, on
 //! the server's own host. It runs without the server's secrets (every
@@ -33,6 +36,79 @@ use repomemo_domain::ArtifactSummary;
 use repomemo_storage::StorageEngine;
 use tokio::{process::Command, sync::Semaphore};
 
+/// Under the cache folder, one folder per workspace for what that workspace has been told.
+const WORKSPACES_DIR: &str = "workspaces";
+
+/// What the server writes into LibreOffice's profile (`user/registrymodifications.xcu`) before every
+/// conversion: (configuration path, property, value). The numbers follow LibreOffice's own schema:
+/// macro security level 3 is "very high", and "update links" is 2 (never) in Writer but 1 (never)
+/// in Calc, whose numbering differs.
+const PROFILE_SETTINGS: &[(&str, &str, &str)] = &[
+    (
+        "/org.openoffice.Office.Common/Security/Scripting",
+        "MacroSecurityLevel",
+        "3",
+    ),
+    (
+        "/org.openoffice.Office.Common/Security/Scripting",
+        "DisableMacrosExecution",
+        "true",
+    ),
+    (
+        "/org.openoffice.Office.Common/Security/Scripting",
+        "DisableActiveContent",
+        "true",
+    ),
+    (
+        "/org.openoffice.Office.Common/Security/Scripting",
+        "BlockUntrustedRefererLinks",
+        "true",
+    ),
+    (
+        "/org.openoffice.Office.Common/Security/Scripting",
+        "DisableOLEAutomation",
+        "true",
+    ),
+    (
+        "/org.openoffice.Office.Common/Security/Scripting",
+        "DisablePythonRuntime",
+        "true",
+    ),
+    ("/org.openoffice.Office.Writer/Content/Update", "Link", "2"),
+    ("/org.openoffice.Office.Calc/Content/Update", "Link", "1"),
+    (
+        "/org.openoffice.Office.Jobs/Jobs/org.openoffice.Office.Jobs:Job['UpdateCheck']/Arguments",
+        "AutoCheckEnabled",
+        "false",
+    ),
+];
+
+/// LibreOffice's Java settings file, read from the path given by `UNO_JAVA_JFW_USER_DATA`: Java is off.
+const JAVA_SETTINGS_FILE: &str = "javasettings.xml";
+const JAVA_DISABLED: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<java xmlns="http://openoffice.org/2004/java/framework/1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<enabled xsi:nil="false">false</enabled>
+<userClassPath xsi:nil="true"/>
+<vmParameters xsi:nil="true"/>
+<jreLocations xsi:nil="true"/>
+<javaInfo xsi:nil="true"/>
+</java>
+"#;
+
+/// The text of `registrymodifications.xcu` for [`PROFILE_SETTINGS`].
+fn profile_registry() -> String {
+    let mut text = String::from(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<oor:items xmlns:oor=\"http://openoffice.org/2001/registry\" \
+         xmlns:xs=\"http://www.w3.org/2001/XMLSchema\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\n",
+    );
+    for (path, property, value) in PROFILE_SETTINGS {
+        text.push_str(&format!(
+            "<item oor:path=\"{path}\"><prop oor:name=\"{property}\" oor:op=\"fuse\"><value>{value}</value></prop></item>\n"
+        ));
+    }
+    text.push_str("</oor:items>\n");
+    text
+}
 const CONVERSION_TIMEOUT: Duration = Duration::from_secs(120);
 const MAX_PDF_BYTES: u64 = 100 * 1024 * 1024;
 const SUPPORTED_EXTENSIONS: &[&str] = &["doc", "docx", "xls", "xlsx", "xlsm", "ppt", "pptx"];
@@ -105,13 +181,12 @@ impl Converter {
     pub fn with_options(data_dir: &Path, soffice: Option<PathBuf>, wrapper: Vec<String>, previews: bool) -> Self {
         let cache_dir = data_dir.join("previews");
         let _ = std::fs::create_dir_all(&cache_dir);
-        // A restart is a fresh chance for files that failed before.
-        if let Ok(entries) = std::fs::read_dir(&cache_dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.extension().is_some_and(|extension| extension == "failed") {
-                    let _ = std::fs::remove_file(path);
-                }
+        // A restart is a fresh chance for files that failed before: the remembered failures of every
+        // workspace go (and the ones an earlier release kept next to the PDFs).
+        remove_failures(&cache_dir);
+        if let Ok(workspaces) = std::fs::read_dir(cache_dir.join(WORKSPACES_DIR)) {
+            for workspace in workspaces.flatten() {
+                remove_failures(&workspace.path());
             }
         }
         let _ = std::fs::remove_dir_all(cache_dir.join("tmp"));
@@ -128,6 +203,15 @@ impl Converter {
                 in_flight: Mutex::new(HashSet::new()),
             }),
         }
+    }
+
+    /// Writes the settings LibreOffice is started with, over whatever the last document left in
+    /// the profile: the registry of [`PROFILE_SETTINGS`] and the file that turns Java off.
+    async fn write_profile(&self) -> std::io::Result<()> {
+        let user = self.inner.profile_dir.join("user");
+        tokio::fs::create_dir_all(&user).await?;
+        tokio::fs::write(user.join("registrymodifications.xcu"), profile_registry()).await?;
+        tokio::fs::write(self.inner.profile_dir.join(JAVA_SETTINGS_FILE), JAVA_DISABLED).await
     }
 
     /// Whether LibreOffice is started inside the operator's sandbox command.
@@ -256,21 +340,43 @@ impl Converter {
             .is_some_and(|extension| SUPPORTED_EXTENSIONS.contains(&extension.as_str()))
     }
 
+    /// The converted PDF, shared by every workspace that holds the same bytes.
     fn pdf_path(&self, content_hash: &str) -> PathBuf {
         self.inner.cache_dir.join(format!("{content_hash}.pdf"))
     }
 
-    fn failure_path(&self, content_hash: &str) -> PathBuf {
-        self.inner.cache_dir.join(format!("{content_hash}.failed"))
+    /// What a workspace has been told about a file: `<hash>.ready` once its own request found the PDF
+    /// done, `<hash>.failed` (with the reason) when it failed. Kept per workspace, so a workspace
+    /// cannot tell from a preview being "ready" at once that another one holds the same file (E19).
+    fn marker_path(&self, workspace_id: &str, content_hash: &str, kind: &str) -> PathBuf {
+        self.inner
+            .cache_dir
+            .join(WORKSPACES_DIR)
+            .join(workspace_id)
+            .join(format!("{content_hash}.{kind}"))
     }
 
-    /// Deletes the cached preview (and any remembered failure) of a content
+    fn ready_path(&self, workspace_id: &str, content_hash: &str) -> PathBuf {
+        self.marker_path(workspace_id, content_hash, "ready")
+    }
+
+    fn failure_path(&self, workspace_id: &str, content_hash: &str) -> PathBuf {
+        self.marker_path(workspace_id, content_hash, "failed")
+    }
+
+    /// Deletes the cached preview (and any remembered state) of a content
     /// hash whose blob is gone. Returns true when a cached PDF was removed.
     pub fn forget(&self, content_hash: &str) -> bool {
         if !safe_hash(content_hash) {
             return false;
         }
-        let _ = std::fs::remove_file(self.failure_path(content_hash));
+        if let Ok(workspaces) = std::fs::read_dir(self.inner.cache_dir.join(WORKSPACES_DIR)) {
+            for workspace in workspaces.flatten() {
+                let _ = std::fs::remove_file(workspace.path().join(format!("{content_hash}.ready")));
+                let _ = std::fs::remove_file(workspace.path().join(format!("{content_hash}.failed")));
+            }
+        }
+        let _ = std::fs::remove_file(self.inner.cache_dir.join(format!("{content_hash}.failed")));
         std::fs::remove_file(self.pdf_path(content_hash)).is_ok()
     }
 
@@ -293,11 +399,12 @@ impl Converter {
             if !safe_hash(&hash) {
                 continue;
             }
+            let suffix = format!("/{hash}");
             let in_flight = self
                 .inner
                 .in_flight
                 .lock()
-                .map(|running| running.contains(&hash))
+                .map(|running| running.iter().any(|key| key.ends_with(&suffix)))
                 .unwrap_or(true);
             if !in_flight && !storage.blob_exists(&hash).await? && tokio::fs::remove_file(&path).await.is_ok() {
                 removed += 1;
@@ -306,46 +413,51 @@ impl Converter {
         Ok(removed)
     }
 
-    /// The cached PDF for a file, when its conversion has finished.
-    pub fn cached_pdf(&self, content_hash: &str) -> Option<PathBuf> {
-        safe_hash(content_hash)
+    /// The cached PDF for a file in a workspace, once that workspace's own conversion request has
+    /// finished (a PDF another workspace made is not served until this one has asked for it).
+    pub fn cached_pdf(&self, workspace_id: &str, content_hash: &str) -> Option<PathBuf> {
+        (safe_hash(content_hash) && safe_id(workspace_id) && self.ready_path(workspace_id, content_hash).exists())
             .then(|| self.pdf_path(content_hash))
             .filter(|path| path.exists())
     }
 
-    /// The current state, starting a conversion when none has run yet.
+    /// The current state, starting a conversion when this workspace has not asked for one yet.
     pub fn state(&self, storage: &StorageEngine, summary: &ArtifactSummary) -> RenderState {
         if !Self::supports(&summary.path) {
             return RenderState::Unsupported;
         }
-        if !self.enabled() || !safe_hash(&summary.content_hash) {
+        if !self.enabled() || !safe_hash(&summary.content_hash) || !safe_id(&summary.workspace_id) {
             return RenderState::Disabled;
         }
-        if self.pdf_path(&summary.content_hash).exists() {
+        if self.cached_pdf(&summary.workspace_id, &summary.content_hash).is_some() {
             return RenderState::Ready;
         }
-        if let Ok(message) = std::fs::read_to_string(self.failure_path(&summary.content_hash)) {
+        if let Ok(message) = std::fs::read_to_string(self.failure_path(&summary.workspace_id, &summary.content_hash)) {
             return RenderState::Failed(message);
         }
         self.ensure(storage.clone(), summary.clone());
         RenderState::Converting
     }
 
-    /// Starts a background conversion unless one is cached, failed or running.
+    /// Starts a background conversion for a workspace unless it is ready, failed or running there.
+    /// When another workspace already made the PDF, the conversion finds it and only records that
+    /// this workspace has asked, so the answer goes through the same states in every workspace.
     pub fn ensure(&self, storage: StorageEngine, summary: ArtifactSummary) {
         if !self.enabled()
             || !Self::supports(&summary.path)
             || !safe_hash(&summary.content_hash)
-            || self.pdf_path(&summary.content_hash).exists()
-            || self.failure_path(&summary.content_hash).exists()
+            || !safe_id(&summary.workspace_id)
+            || self.cached_pdf(&summary.workspace_id, &summary.content_hash).is_some()
+            || self.failure_path(&summary.workspace_id, &summary.content_hash).exists()
         {
             return;
         }
+        let key = format!("{}/{}", summary.workspace_id, summary.content_hash);
         let newly_started = self
             .inner
             .in_flight
             .lock()
-            .map(|mut running| running.insert(summary.content_hash.clone()))
+            .map(|mut running| running.insert(key.clone()))
             .unwrap_or(false);
         if !newly_started {
             return;
@@ -353,12 +465,27 @@ impl Converter {
         let converter = self.clone();
         tokio::spawn(async move {
             let outcome = converter.convert(&storage, &summary).await;
-            if let Err(message) = outcome {
-                tracing::warn!(artifact_id = %summary.id, error = %message, "Office preview conversion failed");
-                let _ = std::fs::write(converter.failure_path(&summary.content_hash), message);
+            let markers = converter.marker_path(&summary.workspace_id, &summary.content_hash, "ready");
+            match outcome {
+                Ok(()) => {
+                    if let Some(folder) = markers.parent() {
+                        let _ = std::fs::create_dir_all(folder);
+                    }
+                    let _ = std::fs::write(&markers, b"");
+                }
+                Err(message) => {
+                    tracing::warn!(artifact_id = %summary.id, error = %message, "Office preview conversion failed");
+                    if let Some(folder) = markers.parent() {
+                        let _ = std::fs::create_dir_all(folder);
+                    }
+                    let _ = std::fs::write(
+                        converter.failure_path(&summary.workspace_id, &summary.content_hash),
+                        message,
+                    );
+                }
             }
             if let Ok(mut running) = converter.inner.in_flight.lock() {
-                running.remove(&summary.content_hash);
+                running.remove(&key);
             }
         });
     }
@@ -394,9 +521,9 @@ impl Converter {
         tokio::fs::create_dir_all(&work)
             .await
             .map_err(|error| error.to_string())?;
-        tokio::fs::create_dir_all(&self.inner.profile_dir)
+        self.write_profile()
             .await
-            .map_err(|error| error.to_string())?;
+            .map_err(|error| format!("could not prepare LibreOffice's profile: {error}"))?;
         let input = work.join(format!("input.{extension}"));
         tokio::fs::write(&input, &bytes)
             .await
@@ -433,6 +560,10 @@ impl Converter {
             .arg("--nodefault")
             .arg("--nologo")
             .arg(format!("-env:UserInstallation={}", file_uri(&self.inner.profile_dir)))
+            .arg(format!(
+                "-env:UNO_JAVA_JFW_USER_DATA={}",
+                file_uri(&self.inner.profile_dir.join(JAVA_SETTINGS_FILE))
+            ))
             .arg("--convert-to")
             .arg("pdf")
             .arg("--outdir")
@@ -498,6 +629,26 @@ fn is_secret_variable(name: &str) -> bool {
 
 fn safe_hash(value: &str) -> bool {
     !value.is_empty() && value.chars().all(|character| character.is_ascii_alphanumeric())
+}
+
+/// A workspace id is used as a folder name: letters, digits and hyphens only.
+fn safe_id(value: &str) -> bool {
+    !value.is_empty()
+        && value
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || character == '-')
+}
+
+/// Removes the remembered failures (`*.failed`) in a folder: a restart is a fresh chance.
+fn remove_failures(folder: &Path) {
+    if let Ok(entries) = std::fs::read_dir(folder) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().is_some_and(|extension| extension == "failed") {
+                let _ = std::fs::remove_file(path);
+            }
+        }
+    }
 }
 
 fn uuid_like(seed: &str) -> String {
@@ -678,6 +829,78 @@ mod tests {
         let missing = Converter::with_options(&directory, None, Vec::new(), true);
         assert_eq!(missing.status(), ConverterStatus::NotInstalled);
         assert!(!missing.enabled());
+    }
+
+    #[tokio::test]
+    async fn the_profile_is_written_before_each_conversion_and_locks_libreoffice_down() {
+        let data = std::env::temp_dir().join(format!("repomemo-profile-test-{}", std::process::id()));
+        let converter = Converter::with_options(&data, None, Vec::new(), true);
+        // A document (or an earlier run) left the macro level low and Java on.
+        let user = data.join("previews").join("profile").join("user");
+        std::fs::create_dir_all(&user).unwrap();
+        std::fs::write(
+            user.join("registrymodifications.xcu"),
+            "<item>MacroSecurityLevel 0</item>",
+        )
+        .unwrap();
+        converter.write_profile().await.unwrap();
+
+        let registry = std::fs::read_to_string(user.join("registrymodifications.xcu")).unwrap();
+        assert!(!registry.contains("MacroSecurityLevel 0"), "the old file is replaced");
+        for (path, property, value) in PROFILE_SETTINGS {
+            let item = format!("<item oor:path=\"{path}\"><prop oor:name=\"{property}\" oor:op=\"fuse\"><value>{value}</value></prop></item>");
+            assert!(registry.contains(&item), "{property} is written: {item}");
+        }
+        // The headline items: macros off at the highest level, no active content, links never updated.
+        for needle in [
+            "oor:name=\"MacroSecurityLevel\" oor:op=\"fuse\"><value>3</value>",
+            "oor:name=\"DisableMacrosExecution\" oor:op=\"fuse\"><value>true</value>",
+            "oor:name=\"DisableActiveContent\" oor:op=\"fuse\"><value>true</value>",
+            "oor:path=\"/org.openoffice.Office.Writer/Content/Update\"><prop oor:name=\"Link\" oor:op=\"fuse\"><value>2</value>",
+            "oor:path=\"/org.openoffice.Office.Calc/Content/Update\"><prop oor:name=\"Link\" oor:op=\"fuse\"><value>1</value>",
+            "AutoCheckEnabled\" oor:op=\"fuse\"><value>false</value>",
+        ] {
+            assert!(registry.contains(needle), "{needle}");
+        }
+        let java = std::fs::read_to_string(data.join("previews").join("profile").join(JAVA_SETTINGS_FILE)).unwrap();
+        assert!(java.contains("<enabled xsi:nil=\"false\">false</enabled>"), "{java}");
+        let _ = std::fs::remove_dir_all(&data);
+    }
+
+    #[test]
+    fn a_preview_another_workspace_made_is_not_ready_here_until_this_workspace_asked() {
+        let data = std::env::temp_dir().join(format!("repomemo-scope-test-{}", std::process::id()));
+        let converter = Converter::with_options(&data, None, Vec::new(), true);
+        let hash = "abc123def456";
+        // Workspace A converted the file: the PDF is on disk and A has been told so.
+        std::fs::write(converter.pdf_path(hash), b"%PDF-1.4").unwrap();
+        std::fs::create_dir_all(converter.ready_path("workspace-a", hash).parent().unwrap()).unwrap();
+        std::fs::write(converter.ready_path("workspace-a", hash), b"").unwrap();
+        assert!(converter.cached_pdf("workspace-a", hash).is_some());
+        // Workspace B holds the same bytes but has not asked: nothing is ready, so nothing is served.
+        assert!(
+            converter.cached_pdf("workspace-b", hash).is_none(),
+            "B must not learn that A has the file"
+        );
+        // Once B's own request has run, it is ready there too.
+        std::fs::create_dir_all(converter.ready_path("workspace-b", hash).parent().unwrap()).unwrap();
+        std::fs::write(converter.ready_path("workspace-b", hash), b"").unwrap();
+        assert!(converter.cached_pdf("workspace-b", hash).is_some());
+        // An id that is not a plain folder name is never looked up.
+        assert!(converter.cached_pdf("../workspace-a", hash).is_none());
+        // Forgetting a file whose blob is gone clears it for every workspace.
+        assert!(converter.forget(hash));
+        assert!(converter.cached_pdf("workspace-a", hash).is_none());
+        assert!(!converter.ready_path("workspace-b", hash).exists());
+        let _ = std::fs::remove_dir_all(&data);
+    }
+
+    #[test]
+    fn workspace_ids_are_safe_folder_names() {
+        assert!(safe_id("3f2a9c1e-77aa-4b0d-9d1e-0c2b4a6f8e10"));
+        assert!(!safe_id(""));
+        assert!(!safe_id("../other"));
+        assert!(!safe_id("a/b"));
     }
 
     #[test]

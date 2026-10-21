@@ -374,7 +374,9 @@ Layout-accurate previews come from LibreOffice, which has a history of memory-sa
 REPOMEMO_SOFFICE_WRAPPER="bwrap --ro-bind / / --bind {work} {work} --bind {profile} {profile} --unshare-net --die-with-parent"
 ```
 
-`{work}` is the conversion folder and `{profile}` its profile folder. System › Overview shows whether previews are sandboxed. On Windows, run the whole service under the low-privilege account of §4 and keep the data folder's permissions to that account.
+`{work}` is the conversion folder and `{profile}` its profile folder. System › Overview shows whether previews are sandboxed.
+
+Before **every** conversion the server rewrites LibreOffice's profile (V0.2.138), so one document cannot loosen the settings for the next: macros disabled at the highest security level, no active content (OLE, DDE) or OLE automation, links from untrusted documents blocked, links never updated on load (Writer and Calc), no Python runtime, no update check, and Java switched off through a settings file the server points LibreOffice to (`-env:UNO_JAVA_JFW_USER_DATA`). The profile is `previews/profile` in the data folder. What a workspace is told about a preview (`ready`, `failed`) is kept per workspace under `previews/workspaces/`; the PDF itself is shared by every workspace that holds the same bytes. On Windows, run the whole service under the low-privilege account of §4 and keep the data folder's permissions to that account.
 
 ---
 
