@@ -165,6 +165,7 @@ Joining an organization **automatically grants access to every workspace in it**
 | Add, check, edit or remove repository links (Settings) | ✅ | ✅ | — | — |
 | Sync a connected repository | ✅ | ✅ | ✅ | — |
 | Rename or delete the workspace | ✅ | — | — | — |
+| Choose the workspace's icon (Settings) | ✅ | ✅ | — | — |
 
 ¹ The AI features need an enabled provider. By default everyone in the workspace can use them, viewers included; owners and admins can keep them to members and above, or to admins and owners (**Settings › Who can use AI**). Each person can also make a limited number of AI requests per hour (120 by default, set by the server operator), so nobody can run up a cloud bill by accident. The server's own background work (describing images, preparing search vectors) has a daily allowance per workspace too (2,000 calls by default).
 ² Admins can grant only `member` or `viewer`, and cannot change or remove other admins or the owner. Nobody can assign `owner` through the UI, and the owner's own role cannot be changed there either, so a workspace or organization never ends up without an owner (since V0.1.65). Someone who becomes a viewer can no longer edit or delete their earlier comments and tasks.
@@ -253,7 +254,7 @@ A **System** button in the header opens `/system`, with these pages:
 
 ## 4. Workspaces
 
-A workspace is opened at `/workspaces/:id/<section>` and has **twelve sections**. The **assistant** (§7b) is docked on the right of every section page.
+A workspace is opened at `/workspaces/:id/<section>` and has **twelve sections**. The **assistant** (§7b) is docked on the right of every section page. Each section's title is led by the workspace's icon and name and a dot (for example "Bendly · Evidence ledger"); the Overview shows the icon and the name alone.
 
 | Section | Purpose | Who sees it |
 |---|---|---|
@@ -268,7 +269,7 @@ A workspace is opened at `/workspaces/:id/<section>` and has **twelve sections**
 | **Memory** | Team memory cards: search and create. A card shows **Needs review** when what it cites changed, disappeared or was retired; its page lists why, lets writers edit the evidence it cites, and confirm it as it is | Everyone |
 | **Tasks** | Team action board | Everyone |
 | **People** | Members, invitations, a summary of *your* capabilities, and the activity feed (user or AI activity) with a 365-day calendar; the live updates carry that feed to owners and administrators only (everyone else is told that something changed, not who changed it) | Owner and admin |
-| **Settings** | Members, AI providers and who may use AI, repository links, **export as an archive**, rename or delete | Owner and admin (rename and delete are owner only) |
+| **Settings** | The workspace's **icon** (one of 32, saved on click and shown on the dashboard, the workspace lists and the organization menu), members, AI providers and who may use AI, repository links, **export as an archive**, rename or delete | Owner and admin (rename and delete are owner only) |
 
 ### Workspace pulse (Overview)
 

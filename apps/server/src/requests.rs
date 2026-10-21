@@ -60,6 +60,13 @@ pub(crate) struct UpdateWorkspaceRequest {
 }
 
 #[derive(Debug, Deserialize)]
+pub(crate) struct UpdateWorkspaceIconRequest {
+    /// The icon's key, or none to go back to the default icon.
+    #[serde(default)]
+    pub(crate) icon: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
 pub(crate) struct CreateTextArtifactRequest {
     pub(crate) title: String,
     pub(crate) content: String,

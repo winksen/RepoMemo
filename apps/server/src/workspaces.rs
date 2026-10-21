@@ -92,6 +92,55 @@ pub(crate) async fn update_workspace(
     Ok(Json(workspace))
 }
 
+/// Key of the workspace icon in the workspace settings object.
+const ICON_SETTING: &str = "icon";
+const MAX_ICON_KEY_LENGTH: usize = 40;
+
+#[derive(Debug, serde::Serialize)]
+pub(crate) struct WorkspaceIconResponse {
+    icon: Option<String>,
+}
+
+/// Chooses the icon shown for the workspace. Administrators and owners may
+/// change it. The client owns the set of icons, so the server only checks that
+/// the key is a short slug; a key the client does not know shows the default.
+pub(crate) async fn update_workspace_icon(
+    ManagingSubject(subject): ManagingSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+    Json(request): Json<UpdateWorkspaceIconRequest>,
+) -> Result<Json<WorkspaceIconResponse>, ApiError> {
+    require_workspace_admin(&state, &subject, &workspace_id).await?;
+    let icon = request.icon.map(|icon| icon.trim().to_owned()).filter(|icon| !icon.is_empty());
+    if let Some(icon) = &icon {
+        let is_slug = icon.len() <= MAX_ICON_KEY_LENGTH
+            && icon.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-');
+        if !is_slug {
+            return Err(ApiError::bad_request("That workspace icon is not valid."));
+        }
+    }
+    state
+        .storage
+        .set_workspace_setting(&workspace_id, ICON_SETTING, serde_json::json!(icon))
+        .await
+        .map_err(map_storage_error)?;
+    record_workspace_activity(
+        &state,
+        &workspace_id,
+        &subject.user_id,
+        "workspace_icon_updated",
+        "workspace",
+        Some(&workspace_id),
+        if icon.is_some() {
+            "Changed the workspace icon.".to_owned()
+        } else {
+            "Reset the workspace icon to the default.".to_owned()
+        },
+    )
+    .await;
+    Ok(Json(WorkspaceIconResponse { icon }))
+}
+
 pub(crate) async fn delete_workspace(
     ManagingSubject(subject): ManagingSubject,
     State(state): State<AppState>,

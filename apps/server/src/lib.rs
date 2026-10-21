@@ -598,6 +598,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             "/v1/workspaces/{workspace_id}",
             put(update_workspace).delete(delete_workspace),
         )
+        .route("/v1/workspaces/{workspace_id}/icon", put(update_workspace_icon))
         .route("/v1/workspaces/{workspace_id}/overview", get(workspace_overview))
         .route("/v1/workspaces/{workspace_id}/metrics", get(workspace_metrics))
         .route(

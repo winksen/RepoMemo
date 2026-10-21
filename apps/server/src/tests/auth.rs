@@ -1179,6 +1179,7 @@ async fn the_routes_that_grant_access_or_remove_things_need_a_session_or_an_admi
         ),
         ("PUT", format!("/v1/workspaces/{workspace}"), json!({"name": "Renamed"})),
         ("DELETE", format!("/v1/workspaces/{workspace}"), json!({})),
+        ("PUT", format!("/v1/workspaces/{workspace}/icon"), json!({"icon": "rocket"})),
         ("PUT", format!("/v1/workspaces/{workspace}/ai-providers"), json!({})),
         ("PUT", format!("/v1/workspaces/{workspace}/ai-policy"), json!({})),
         ("POST", format!("/v1/workspaces/{workspace}/repositories"), json!({})),

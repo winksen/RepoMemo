@@ -500,6 +500,14 @@ export function updateSharedWorkspace(accessToken: string, workspaceId: string, 
   }, accessToken);
 }
 
+/** Chooses the workspace's icon (`null` for the default). Administrators and owners only. */
+export function saveSharedWorkspaceIcon(accessToken: string, workspaceId: string, icon: string | null) {
+  return request<{ icon: string | null }>(`/v1/workspaces/${workspaceId}/icon`, {
+    method: "PUT",
+    body: JSON.stringify({ icon }),
+  }, accessToken);
+}
+
 export function deleteSharedWorkspace(accessToken: string, workspaceId: string): Promise<void> {
   return request<void>(`/v1/workspaces/${workspaceId}`, { method: "DELETE" }, accessToken);
 }

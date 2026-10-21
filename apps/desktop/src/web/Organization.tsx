@@ -1,5 +1,5 @@
 import { type FormEvent, type ReactNode, useEffect, useState } from "react";
-import { IconBook2 as Book, IconBuildingCommunity as Building, IconChartDots3 as MapIcon, IconChecklist as Checklist, IconEyeCheck as ReviewIcon, IconFileText as FileText, IconGitBranch as RepositoryIcon, IconLayoutDashboard as Dashboard, IconPlus as Plus, IconSearch as Search, IconSettings as Settings, IconStack2 as Layers, IconStethoscope as HealthIcon, IconTrash as Trash, IconUsers as Users } from "@tabler/icons-react";
+import { IconBook2 as Book, IconBuildingCommunity as Building, IconChartDots3 as MapIcon, IconChecklist as Checklist, IconEyeCheck as ReviewIcon, IconFileText as FileText, IconGitBranch as RepositoryIcon, IconLayoutDashboard as Dashboard, IconPlus as Plus, IconSearch as Search, IconSettings as Settings, IconStethoscope as HealthIcon, IconTrash as Trash, IconUsers as Users } from "@tabler/icons-react";
 import { SharedApiError, listSharedOrganizationMembers, removeSharedOrganizationMember, transferSharedOrganizationOwnership, updateSharedOrganization, upsertSharedOrganizationMember } from "../lib/sharedApi";
 import { type Organization, type OrganizationMember, type OrganizationRole, type SharedWorkspace } from "../types";
 import { UserAvatar } from "../components/UserAvatar";
@@ -19,6 +19,7 @@ import { apiMessage } from "./format";
 import { navigate } from "./router";
 import { useOrganizationNavigation } from "./navigation";
 import { ICON_SIZE } from "../components/ui/icon";
+import { WorkspaceIcon } from "./workspaceIcons";
 
 export function OrganizationAdministration({
   accessToken,
@@ -125,7 +126,7 @@ export function OrganizationRail({
         const organization = organizations.find((entry) => entry.id === workspace.organization_id);
         const label = organizations.length > 1 ? `${organization?.name ?? "Organization"} / ${workspace.workspace.name}` : workspace.workspace.name;
         const isCurrent = workspace.workspace.id === workspaceId;
-        return <Button aria-current={isCurrent ? "page" : undefined} className={`shared-rail-workspace${isCurrent ? " active" : ""}`} key={workspace.workspace.id} onClick={() => navigate(`/workspaces/${encodeURIComponent(workspace.workspace.id)}/overview`)} type="button" variant="secondary"><Layers size={ICON_SIZE.md} /><span>{label}</span></Button>;
+        return <Button aria-current={isCurrent ? "page" : undefined} className={`shared-rail-workspace${isCurrent ? " active" : ""}`} key={workspace.workspace.id} onClick={() => navigate(`/workspaces/${encodeURIComponent(workspace.workspace.id)}/overview`)} type="button" variant="secondary"><WorkspaceIcon size={ICON_SIZE.md} workspace={workspace.workspace} /><span>{label}</span></Button>;
       })}</div> : <p className="shared-rail-empty">No accessible workspaces yet.</p>}
     </section> : null}
     {canManageOrganizations ? <section className="shared-rail-organizations" aria-label="Organization management">

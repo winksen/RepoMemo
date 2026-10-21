@@ -132,6 +132,7 @@
 | POST | `/v1/workspaces` | auth | — | CreateWorkspaceRequest | SharedWorkspace |
 | PUT | `/v1/workspaces/{workspace_id}` | managing | require_workspace_owner | UpdateWorkspaceRequest | Workspace |
 | DELETE | `/v1/workspaces/{workspace_id}` | managing | require_workspace_owner | — | status |
+| PUT | `/v1/workspaces/{workspace_id}/icon` | managing | require_workspace_admin | UpdateWorkspaceIconRequest | WorkspaceIconResponse |
 
 ## Evidence, folders and files
 
