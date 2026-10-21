@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.129` (2026-10-21), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next:** tracks L and M, security and backend hardening (V0.2.130–V0.2.162, planned 2026-10-21) · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.130` (2026-10-21), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next:** tracks L and M, security and backend hardening (V0.2.130–V0.2.162, planned 2026-10-21) · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Security review 2026-10-16 (V0.2.52)](security/2026-10-16-security-review.md) · [Security and backend review 2026-10-21 (V0.2.129)](security/2026-10-21-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -62,8 +62,8 @@ timeline
 | Road to V0.2.0 (V0.1.66–V0.1.76) | 🔄 Built and versioned `0.2.0`; R6 (clean install) and the tag are the maintainer's |
 | Road to V0.3.0 (V0.2.1–V0.2.56, one change each) | ✅ V0.2.1–V0.2.56 built; the clean-machine install (R6, R12) is the maintainer's |
 | Track K: frontend polish (V0.2.57–V0.2.129) | ✅ V0.2.57–V0.2.129 built (K1 to K6 done); decisions 15–19 taken as proposed; [plan](plans/2026-10-17-frontend-polish.md) |
-| Security and backend review 2026-10-21 (fifth pass) | 🔄 Open: 2 high, 9 medium, 15 low, 4 info, plus 11 performance findings; [review](security/2026-10-21-security-review.md) |
-| Track L: security and dependencies (V0.2.130–V0.2.148) | 🔜 Planned 2026-10-21; decisions 20–23 to agree |
+| Security and backend review 2026-10-21 (fifth pass) | 🔄 In progress: 2 high, 9 medium, 15 low, 4 info, plus 11 performance findings; the review's table names the release of each fix; [review](security/2026-10-21-security-review.md) |
+| Track L: security and dependencies (V0.2.130–V0.2.148) | 🔄 V0.2.130 built; decisions 20–23 taken as proposed |
 | Track M: backend hardening and performance (V0.2.149–V0.2.162) | 🔜 Planned 2026-10-21 |
 | V0.4.0 and later: scale-out, single sign-on, hosted | 💭 Direction |
 
@@ -446,7 +446,7 @@ Planned on 2026-10-21 from the [fifth review](security/2026-10-21-security-revie
 
 | Release | Type | Section | The one change | IDs | Done when |
 |---|---|---|---|---|---|
-| **V0.2.130** | 📘 | Dependencies | `rustls` 0.23.46, `rustls-webpki` 0.103.16 and `webpki-roots` 1.0.10, a lockfile-only update | S5-1 | `cargo deny check advisories` reports only the three `zip` advisories |
+| **V0.2.130** ✅ | 📘 | Dependencies | `rustls` 0.23.46, `rustls-webpki` 0.103.16 and `webpki-roots` 1.0.10, a lockfile-only update | S5-1 | `cargo deny check advisories` reports only the three `zip` advisories |
 | **V0.2.131** | 📘 | Dependencies | `calamine` 0.37 (with `zip` 9 and `quick-xml` 0.42); the workspace's `rust-version` raised to 1.88 | S5-2 | `cargo deny check advisories` passes with no new ignore; the spreadsheet reading tests pass; one `quick-xml` left in the lock |
 | **V0.2.132** | 📘 | Dependencies | `sqlx` without a TLS stack: SQLite needs none | S5-10 | `cargo tree -i rustls` and `-i webpki-roots` no longer pass through `sqlx`; storage tests pass |
 | **V0.2.133** | 📘 | Web toolchain | Patch releases of PostCSS, nanoid, browserslist, source-map-js and baseline-browser-mapping, a lockfile-only update | S5-3a | `npm audit` lists only Vite, esbuild, Vitest and tinypool; `npm audit --omit=dev` still finds nothing |
@@ -1041,7 +1041,7 @@ One box per release; the brief, the files and the commit line of each are in [th
 
 One box per release, with what to change and where. The finding behind each, with its evidence, is in [the fifth review](security/2026-10-21-security-review.md). Commit as `Update V0.2.N`, as before.
 
-- [ ] **V0.2.130** `cargo update -p rustls -p rustls-webpki -p webpki-roots@1.0.9` (a dry run on 2026-10-21 moved exactly these three: 0.23.46, 0.103.16, 1.0.10). No source change. Run `cargo deny --workspace check advisories`: the `zip` trio is all that stays, for V0.2.131
+- [x] **V0.2.130** `cargo update -p rustls -p rustls-webpki -p webpki-roots@1.0.9` (a dry run on 2026-10-21 moved exactly these three: 0.23.46, 0.103.16, 1.0.10). No source change. Run `cargo deny --workspace check advisories`: the `zip` trio is all that stays, for V0.2.131. Done: the three crates moved and nothing else; `cargo deny` reports the `zip` trio only
 - [ ] **V0.2.131** `calamine = "0.37"` in `Cargo.toml` (it needs `zip` 9, `quick-xml` 0.42 and Rust 1.88); `rust-version = "1.88"`; set the workspace's `quick-xml` to 0.42 so the lock keeps one (Tauri already uses 0.42). Adapt `crates/ingestion` to the 0.37 API where it changed. `cargo deny check` passes with `deny.toml` unchanged
 - [ ] **V0.2.132** `sqlx` features `runtime-tokio` in place of `runtime-tokio-rustls` (no TLS: the database is a file). Check `cargo tree -i rustls` (only `reqwest`, `repomemo-mail` and Tauri remain) and `cargo tree -i webpki-roots`
 - [ ] **V0.2.133** `npm update postcss nanoid browserslist source-map-js baseline-browser-mapping` (transitive, inside current ranges); `package-lock.json` only. `npm audit` then lists the Vite and Vitest families alone

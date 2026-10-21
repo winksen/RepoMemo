@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.130 (2026-10-21)
+
+The TLS libraries behind every outbound connection are updated, and CI's blocking dependency check no longer fails on them. This is the first release of track L (security and dependencies), which lifts the feature freeze for security fixes, dependency updates and backend hardening until V0.2.162.
+
+### Security
+- **TLS libraries updated (S5-1):** `rustls` 0.23.45 to 0.23.46, `rustls-webpki` 0.103.15 to 0.103.16 and `webpki-roots` 1.0.9 to 1.0.10. They carry six advisories (RUSTSEC-2026-0346, -0347, -0348, -0349, -0381 and -0382), among them a certificate-decompression allocation of up to 1 GiB before authentication, a key-exchange downgrade after an unauthenticated ServerHello, and distrusted intermediates accepted. They are used by every outbound call: AI providers, mail, connectors and the desktop client.
+- **A lockfile-only change:** all three are patch releases inside the current requirements, so `Cargo.lock` is the only dependency file that moves; no source file changed.
+
+### Changed
+- **Checks run on this release:** `cargo deny --workspace check advisories` now reports only the three `zip` advisories (RUSTSEC-2026-0367, -0368, -0369), which V0.2.131 closes; the TLS advisories are gone. `version:check`, `container:check`, `migrations:check` and `types:check` pass. `cargo check` was not run: the Rust sources did not change.
+- **Plan and review:** the [fifth security and backend review](mindmap/security/2026-10-21-security-review.md) and the plan for tracks L and M (V0.2.130 to V0.2.162, with decisions 20 to 23) are added to the roadmap and the release index. Decisions 20 to 23 are taken as proposed.
+
+### Upgrading
+- Nothing to do. Rebuild the server and the desktop app to pick up the new libraries.
+
 ## V0.2.129 (2026-10-21)
 
 The release checks are repeated after the frontend polish track (V0.2.57 to V0.2.129), the notes for V0.3.0 include it, and the feature freeze is back on until the tag.
