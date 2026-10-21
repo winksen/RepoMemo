@@ -8,14 +8,14 @@
 # `docker compose up` (see docker-compose.yml) builds and starts both. The
 # guide is mindmap/technical/operations.md, "Running it in containers".
 
-ARG NODE_VERSION=22
-ARG RUST_VERSION=1
-ARG DEBIAN_RELEASE=bookworm
+# Every base image is pinned by digest (roadmap E17): a tag can move, a digest cannot.
+# Dependabot (.github/dependabot.yml) proposes the next digest, and `npm run container:check`
+# refuses a FROM line without one.
 
 # ---------------------------------------------------------------------------
 # The web app. The API is the page's own host, so it is called by relative
 # address (an empty VITE_REPOMEMO_API_URL): the same image works under any name.
-FROM node:${NODE_VERSION}-${DEBIAN_RELEASE}-slim AS web
+FROM node:22-bookworm-slim@sha256:a6385bc33f0f9d6a08482c87f52baee537a9184e2b47dea1ed97caac62f8960c AS web
 WORKDIR /build
 COPY package.json package-lock.json ./
 COPY apps/desktop/package.json apps/desktop/package.json
@@ -26,7 +26,7 @@ RUN npm run build
 
 # ---------------------------------------------------------------------------
 # The server binary.
-FROM rust:${RUST_VERSION}-${DEBIAN_RELEASE} AS build
+FROM rust:1-bookworm@sha256:5c1a1732ac3f77635b24d397ceb67b4d9ea61de348f68c0aa54a79fd01e65c69 AS build
 WORKDIR /build
 COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
@@ -39,7 +39,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 # The server. Readings of documents start this same program again, so it must
 # stay where it is. Layout-accurate Office previews need LibreOffice, which is
 # large: add it with `--build-arg WITH_LIBREOFFICE=true`.
-FROM debian:${DEBIAN_RELEASE}-slim AS server
+FROM debian:bookworm-slim@sha256:7ff6ba31527b9e336162fa061746c366c4b2032f4d2cff2078bea43f78efe3f8 AS server
 ARG WITH_LIBREOFFICE=false
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl git \
@@ -68,7 +68,7 @@ ENTRYPOINT ["repomemo-server"]
 # The front door: Caddy gets the certificate, serves the web app and sends
 # /v1 and /health to the server. The content security policy the build wrote
 # next to the web app is put into the Caddy configuration, as the guide asks.
-FROM caddy:2-alpine AS proxy
+FROM caddy:2-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f AS proxy
 COPY --from=web /build/apps/desktop/dist /srv/web
 COPY docker/Caddyfile /etc/caddy/Caddyfile
 RUN printf 'header ?Content-Security-Policy "%s"\n' "$(cat /srv/web/content-security-policy.txt)" > /etc/caddy/csp.caddy

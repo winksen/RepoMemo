@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.135 (2026-10-21)
+
+Nothing that builds RepoMemo can move under it any more: CI actions and container base images are pinned, and Dependabot proposes the next versions.
+
+### Security
+- **CI actions pinned to a commit (E17):** `actions/checkout`, `actions/setup-node`, `Swatinem/rust-cache`, `EmbarkStudios/cargo-deny-action` and `dtolnay/rust-toolchain` name a full commit, with the release it is in a comment (v4.4.0, v4.4.0, v2.9.3, v2.1.1, `stable`). A tag can be moved to other code after the fact; a commit cannot. `dtolnay/rust-toolchain` took its toolchain from the name it was called by, so the jobs now say `toolchain: stable` themselves.
+- **Container base images pinned by digest:** `node:22-bookworm-slim`, `rust:1-bookworm`, `debian:bookworm-slim` and `caddy:2-alpine` name their `sha256` digest in the `Dockerfile`. The `NODE_VERSION`, `RUST_VERSION` and `DEBIAN_RELEASE` build arguments are gone (nothing used them): the tag and the digest are written on the `FROM` line, where Dependabot reads them.
+
+### Added
+- **`.github/dependabot.yml`:** a weekly check of `cargo`, `npm`, `github-actions` and `docker`; the minor and patch updates of Cargo and npm arrive as one pull request each. Security updates open their own pull requests whenever an advisory appears.
+
+### Changed
+- **`npm run container:check`** also refuses a `FROM` line without a digest, a `uses:` in `.github/workflows` that names a tag or branch, and a Dependabot file that leaves out one of the four ecosystems. It was tried on a planted example: with the digest of the Caddy image removed and `actions/checkout@v4` put back it reported both and exited with 1; on the tree it passes.
+- **Checks run on this release:** `container:check`, `version:check`, `docs:check`, `migrations:check`. No image was built and no workflow was run: the digests and commits were read from the registry and from GitHub, and CI is the first run of the pinned workflow. The images are the same as the tags pointed to when they were read.
+
+### Upgrading
+- Nothing to do. Merge or close Dependabot's pull requests as they come: each one is a release of its own.
+
 ## V0.2.134 (2026-10-21)
 
 The web build and test tools move to current majors, which closes the last advisories of the development packages.

@@ -1,0 +1,32 @@
+# Dependency updates, one pull request a week per ecosystem (roadmap E17). Security updates
+# open their own pull requests whenever an advisory appears. Each update is a release of its
+# own (changelog, mindmaps, release index), so the minor and patch updates of an ecosystem
+# arrive as one pull request.
+
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      cargo-minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      npm-minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly

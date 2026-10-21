@@ -1,8 +1,9 @@
 // Checks the container files against each other and against the server
 // (roadmap O7): the compose file builds stages the Dockerfile has, sets only
 // variables the server reads, requires what .env.example explains, points the
-// proxy at the server's port and trusts the proxy's address. It reads files
-// only: it starts nothing and needs no Docker.
+// proxy at the server's port and trusts the proxy's address. Nothing may move
+// under it either: every base image is pinned by digest and every CI action by
+// commit (roadmap E17). It reads files only: it starts nothing and needs no Docker.
 //
 //   node scripts/check-container.mjs
 
@@ -19,6 +20,9 @@ const read = (path) => {
 };
 
 const dockerfile = read("Dockerfile");
+const workflows = readdirSync(".github/workflows")
+  .filter((name) => /.ya?ml$/.test(name))
+  .map((name) => [name, read(join(".github/workflows", name))]);
 const compose = read("docker-compose.yml");
 const caddyfile = read("docker/Caddyfile");
 const example = read(".env.example");
@@ -33,6 +37,25 @@ for (const pattern of ["Dockerfile", "docker/Caddyfile", "docker-compose.yml"]) 
   if (!attributes.split(/\r?\n/).some((line) => line.startsWith(pattern) && /eol=lf/.test(line))) {
     problems.push(`.gitattributes does not keep ${pattern} on LF line endings`);
   }
+}
+
+// Nothing moves: a base image names a digest, an action names a commit, and Dependabot keeps both current.
+const earlierStages = new Set();
+for (const match of dockerfile.matchAll(/^FROM\s+(\S+)(?:\s+AS\s+(\S+))?/gim)) {
+  const [, image, stage] = match;
+  if (image !== "scratch" && !earlierStages.has(image) && !/@sha256:[0-9a-f]{64}$/.test(image)) problems.push(`the Dockerfile's FROM ${image} names no digest (use image:tag@sha256:...)`);
+  if (stage) earlierStages.add(stage);
+}
+for (const [name, text] of workflows) {
+  for (const match of text.matchAll(/^\s*-?\s*uses:\s*(\S+)/gm)) {
+    const [action, ref] = match[1].split("@");
+    if (action.startsWith("./")) continue;
+    if (!/^[0-9a-f]{40}$/.test(ref ?? "")) problems.push(`.github/workflows/${name} uses ${match[1]}, which is a tag or branch; pin it to a commit`);
+  }
+}
+const dependabot = read(".github/dependabot.yml");
+for (const ecosystem of ["cargo", "npm", "github-actions", "docker"]) {
+  if (!new RegExp(String.raw`package-ecosystem:\s*${ecosystem}\b`).test(dependabot)) problems.push(`.github/dependabot.yml does not watch ${ecosystem}`);
 }
 
 // Stages: the compose targets exist, and the two images the guide names are there.
