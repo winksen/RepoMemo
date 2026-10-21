@@ -102,14 +102,14 @@
 *::before,
 *::after {
   scrollbar-width: thin;
-  scrollbar-color: hsl(0 0% 42% / 40%) transparent;
+  scrollbar-color: var(--scrollbar) transparent;
 }
 
 *::-webkit-scrollbar { width: 8px; height: 8px; }
 *::-webkit-scrollbar-track,
 *::-webkit-scrollbar-corner { background: transparent; }
-*::-webkit-scrollbar-thumb { background: hsl(0 0% 42% / 35%); border-radius: 999px; }
-*::-webkit-scrollbar-thumb:hover { background: hsl(0 0% 42% / 55%); }
+*::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 999px; }
+*::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
 *::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
 
 button:focus-visible,

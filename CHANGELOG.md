@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.127 (2026-10-21)
+
+The style check refuses bare element styles, raw colours, raw layers and raw control heights, so the stylesheets stop drifting.
+
+### Changed
+- **`npm run styles:check` fails on:** a bare `input`, `select`, `textarea` or `button` selector (alone, or at the end of a path such as `.page-form input`) outside the base reset (the top of `01-tokens-and-shared-web.css`) and the retired local edition; a hex, rgb or hsl colour outside a `:root` or `[data-theme]` token block; a `z-index` that is not a `var(--layer-*)` token (0, -1 and auto stay allowed); and a pixel `height` or `min-height` on a button, input, select or dropdown trigger.
+- **What the tree already did:** 111 older cases (62 bare element selectors in page rules, 49 control heights) are listed in `scripts/styles-baseline.json`. The check passes on the tree, fails for anything not on that list, and also fails for a listed case that is gone, so the list can only shrink; `npm run styles:check -- --update-baseline` rewrites it after a cleanup. No raw colour or raw layer was left to list.
+- **Raw colours:** the three scrollbar colours of `11-blueprint-primitives.css` became the tokens `--scrollbar`, `--scrollbar-thumb` and `--scrollbar-thumb-hover` (same values).
+- **Proof that it catches drift:** every run first checks a planted stylesheet in memory (a page rule on `input`, a hex colour, `z-index: 5`, a 30 px `.rm-button`), which must trip all four rules, and a clean twin, which must trip none. Planted into a folder of its own, the check exited with 5 problems; the clean twin exited 0.
+- **Docs:** `docs/DEVELOPMENT_COMMANDS.md` lists `npm run styles:check`.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.126 (2026-10-21)
 
 Tests for every shared building block. They are written, not run: CI runs them.

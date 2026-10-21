@@ -23,6 +23,11 @@
   --control-border: 2px;
   --control-padding-x: 12px;
 
+  /* Scrollbars: a mid grey that works on both themes. */
+  --scrollbar: hsl(0 0% 42% / 40%);
+  --scrollbar-thumb: hsl(0 0% 42% / 35%);
+  --scrollbar-thumb-hover: hsl(0 0% 42% / 55%);
+
   --font-mono: var(--font-ui);
 
   /* File-type colours of the evidence icons (the same in both themes). */
