@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.122 (2026-10-21)
+
+Required and malformed fields are marked before anything is sent; server errors stay toasts.
+
+### Changed
+- **`Field` marks its own control:** when a form is submitted and the browser refuses a control inside a `Field` (empty `required`, a wrong `type="email"` or `type="url"`, `minLength`, a number outside its range), the field sets `aria-invalid`, shows a one-line message under the control, replaces the browser's bubble, and focuses the first refused control. The message clears as soon as the value is valid. Nothing is sent while a field is refused.
+- **Messages:** "Title is required." (the field's own label), "Enter an email address such as name@example.com.", "Enter a web address that starts with http:// or https://.", "Enter a value from 1 to 65535.", "Use at least 12 characters.", "Enter a number." and the like, worded in `lib/fieldMessage.ts`. A page can still pass `invalid` and `message` for a rule only it knows; that wins.
+- **Covered without a change to each form:** every form built with `Field` already uses the browser's own checks (`required`, `type="email"`, `minLength`, `min`/`max`): sign-in and registration, invitations, password reset, the setup wizard, profile, organization and workspace members, tasks, memory, notes, comments and the rest.
+- **AI provider address:** the *Base URL* field is `type="url"`, so a malformed address is marked before saving.
+- **Unchanged:** a form whose submit button stays disabled until it is ready (many create forms) never reaches the browser's check, so it shows no message; server errors stay toasts.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.121 (2026-10-21)
 
 Ctrl+Enter (Cmd+Enter on macOS) sends comments, notes, questions and memory statements, and a muted hint says so.
