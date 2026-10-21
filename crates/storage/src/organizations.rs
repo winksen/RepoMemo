@@ -277,9 +277,11 @@ impl StorageEngine {
             .bind(&now)
             .execute(&mut *tx)
             .await?;
-        // The organization role sets the role in every workspace, except that
-        // it never takes a workspace away from its owner.
-        sqlx::query("INSERT INTO workspace_memberships (workspace_id, user_id, role, created_at, updated_at) SELECT wo.workspace_id, ?1, CASE ?2 WHEN 'admin' THEN 'admin' ELSE 'member' END, ?3, ?3 FROM workspace_organizations wo WHERE wo.organization_id = ?4 ON CONFLICT(workspace_id, user_id) DO UPDATE SET role = CASE WHEN workspace_memberships.role = 'owner' THEN 'owner' ELSE excluded.role END, updated_at = excluded.updated_at")
+        // The organization role sets the role in the workspaces whose access came from the
+        // organization: it never takes a workspace away from its owner, does not undo a role a
+        // workspace set itself (`origin = 'direct'`), and does not bring back a person a
+        // workspace administrator removed (V0.2.142, review E9).
+        sqlx::query("INSERT INTO workspace_memberships (workspace_id, user_id, role, created_at, updated_at, origin) SELECT wo.workspace_id, ?1, CASE ?2 WHEN 'admin' THEN 'admin' ELSE 'member' END, ?3, ?3, 'organization' FROM workspace_organizations wo WHERE wo.organization_id = ?4 AND NOT EXISTS (SELECT 1 FROM workspace_membership_removals r WHERE r.workspace_id = wo.workspace_id AND r.user_id = ?1) ON CONFLICT(workspace_id, user_id) DO UPDATE SET role = excluded.role, updated_at = excluded.updated_at WHERE workspace_memberships.origin = 'organization' AND workspace_memberships.role <> 'owner'")
             .bind(&user.id)
             .bind(organization_role_to_db(&role))
             .bind(&now)
@@ -327,6 +329,12 @@ impl StorageEngine {
             repomemo_domain::bail_not_found!("Organization membership was not found.");
         }
         sqlx::query("DELETE FROM workspace_memberships WHERE user_id = ?1 AND workspace_id IN (SELECT workspace_id FROM workspace_organizations WHERE organization_id = ?2)")
+            .bind(user_id)
+            .bind(organization_id)
+            .execute(&mut *tx)
+            .await?;
+        // Someone who leaves the organization starts afresh if they return.
+        sqlx::query("DELETE FROM workspace_membership_removals WHERE user_id = ?1 AND workspace_id IN (SELECT workspace_id FROM workspace_organizations WHERE organization_id = ?2)")
             .bind(user_id)
             .bind(organization_id)
             .execute(&mut *tx)
@@ -474,7 +482,7 @@ impl StorageEngine {
             .bind(organization_id)
             .execute(&mut *tx)
             .await?;
-        sqlx::query("INSERT INTO workspace_memberships (workspace_id, user_id, role, created_at, updated_at) SELECT ?1, om.user_id, CASE om.role WHEN 'owner' THEN 'owner' WHEN 'admin' THEN 'admin' ELSE 'member' END, ?2, ?2 FROM organization_memberships om WHERE om.organization_id = ?3")
+        sqlx::query("INSERT INTO workspace_memberships (workspace_id, user_id, role, created_at, updated_at, origin) SELECT ?1, om.user_id, CASE om.role WHEN 'owner' THEN 'owner' WHEN 'admin' THEN 'admin' ELSE 'member' END, ?2, ?2, 'organization' FROM organization_memberships om WHERE om.organization_id = ?3")
             .bind(&id)
             .bind(&now)
             .bind(organization_id)
@@ -586,14 +594,22 @@ impl StorageEngine {
             );
         }
         let now = Utc::now().to_rfc3339();
-        sqlx::query("INSERT INTO workspace_memberships (workspace_id, user_id, role, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT(workspace_id, user_id) DO UPDATE SET role = excluded.role, updated_at = excluded.updated_at")
+        let mut tx = self.pool.begin().await?;
+        // A role set here is the workspace's own: an organization role change leaves it alone.
+        sqlx::query("INSERT INTO workspace_memberships (workspace_id, user_id, role, created_at, updated_at, origin) VALUES (?1, ?2, ?3, ?4, ?5, 'direct') ON CONFLICT(workspace_id, user_id) DO UPDATE SET role = excluded.role, updated_at = excluded.updated_at, origin = 'direct'")
             .bind(workspace_id)
             .bind(&user.id)
             .bind(workspace_role_to_db(&role))
             .bind(&now)
             .bind(&now)
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await?;
+        sqlx::query("DELETE FROM workspace_membership_removals WHERE workspace_id = ?1 AND user_id = ?2")
+            .bind(workspace_id)
+            .bind(&user.id)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
         self.list_workspace_members(workspace_id)
             .await?
             .into_iter()
@@ -606,14 +622,24 @@ impl StorageEngine {
         if matches!(role, Some(WorkspaceRole::Owner)) {
             repomemo_domain::bail_invalid!("The workspace owner cannot be removed.");
         }
+        let mut tx = self.pool.begin().await?;
         let result = sqlx::query("DELETE FROM workspace_memberships WHERE workspace_id = ?1 AND user_id = ?2")
             .bind(workspace_id)
             .bind(user_id)
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await?;
         if result.rows_affected() == 0 {
             repomemo_domain::bail_not_found!("Workspace membership was not found.");
         }
+        // A member of the workspace's organization comes back with the next organization role
+        // change unless this removal is remembered (V0.2.142, review E9).
+        sqlx::query("INSERT OR REPLACE INTO workspace_membership_removals (workspace_id, user_id, removed_at) SELECT ?1, ?2, ?3 WHERE EXISTS (SELECT 1 FROM organization_memberships om JOIN workspace_organizations wo ON wo.organization_id = om.organization_id WHERE wo.workspace_id = ?1 AND om.user_id = ?2)")
+            .bind(workspace_id)
+            .bind(user_id)
+            .bind(Utc::now().to_rfc3339())
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
         Ok(())
     }
 }

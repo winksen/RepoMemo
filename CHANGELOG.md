@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.142 (2026-10-21)
+
+Changing a person's organization role no longer undoes what a workspace decided for itself.
+
+### Security
+- **Organization roles respect a workspace's own removals and downgrades (E9):** changing someone's role in an organization wrote that role into every workspace of it. A person a workspace owner had removed came back, and a viewer became a member or an administrator. A workspace role now remembers where it came from (`origin`: `organization` or `direct`), and an organization role change updates only rows that came from the organization. A role a workspace set (adding someone, changing their role) is `direct` and stays; a person a workspace administrator removes from the workspace while they belong to the organization is remembered, and the next organization role change does not add them back. Adding the person to the workspace again on purpose clears the memory; leaving the organization and rejoining starts afresh. The workspace owner's role is still never lowered.
+- **Existing roles:** migration `0038_membership_origin.sql` adds the column, with older rows `direct` unless they match the organization role exactly (then they were most likely made by it), and the table of remembered removals.
+
+### Changed
+- **New workspaces** take their members from the organization as before; those rows are `organization`.
+- **Anonymizing an account** also forgets its remembered removals.
+- **Tests (written, not run):** one end-to-end test: three people join an organization; a workspace removes one and makes another a viewer; the organization raises all three to administrator and only the third follows; it follows the role back down; a person added on purpose keeps the workspace's role; leaving and rejoining the organization brings the workspace back.
+- **Checks run on this release:** `cargo check` of the storage crate and the server with their tests compiles, `rustfmt` is clean for what changed apart from hunks that were already there, and `clippy` reports nothing new; `migrations:check`, `docs:check` and `version:check` pass. The upgrade test (a 0.2.0 environment opening in place) was not run: CI runs it.
+
+### Upgrading
+- The migration runs at start. Roles stay as they are. From now on, to make a workspace follow the organization again for someone, remove them from the workspace and change their organization role once more, or leave and rejoin the organization.
+
 ## V0.2.141 (2026-10-21)
 
 The live stream no longer hands every reader the activity feed that only owners and administrators may read.

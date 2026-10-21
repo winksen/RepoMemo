@@ -272,6 +272,10 @@ impl StorageEngine {
             .execute(&mut *tx)
             .await?
             .rows_affected();
+        sqlx::query("DELETE FROM workspace_membership_removals WHERE user_id = ?1")
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await?;
         report.memberships = sqlx::query("DELETE FROM workspace_memberships WHERE user_id = ?1")
             .bind(user_id)
             .execute(&mut *tx)

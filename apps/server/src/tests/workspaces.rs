@@ -2282,3 +2282,166 @@ async fn a_viewers_stream_gets_a_changed_notice_where_an_owner_gets_the_activity
     }
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+/// E9: an organization role change reaches only the workspaces whose access came from the organization.
+/// A person a workspace removed stays removed, and a role the workspace set itself stays.
+#[tokio::test]
+async fn an_organization_role_change_does_not_undo_what_a_workspace_set_itself() {
+    let data_dir = temp_data_dir("org-role-origin");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let (owner, _) = register_account(&app, "origin-owner@example.com").await;
+    let (_, ada) = register_account(&app, "origin-ada@example.com").await;
+    let ada_id = ada["user"]["id"].as_str().unwrap().to_owned();
+    let (_, _) = register_account(&app, "origin-grace@example.com").await;
+    let (_, _) = register_account(&app, "origin-linus@example.com").await;
+    let send = |method: &'static str, uri: String, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, &owner, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let organization = response_json(send("POST", "/v1/organizations".to_owned(), json!({"name": "Origin"})).await)
+        .await["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let workspace_id = response_json(
+        send(
+            "POST",
+            "/v1/workspaces".to_owned(),
+            json!({"organization_id": organization, "name": "Origin workspace"}),
+        )
+        .await,
+    )
+    .await["workspace"]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    for email in [
+        "origin-ada@example.com",
+        "origin-grace@example.com",
+        "origin-linus@example.com",
+    ] {
+        join(&app, &owner, "organizations", &organization, email, "member").await;
+    }
+    let role_of = |email: &'static str| {
+        let listing = send("GET", format!("/v1/workspaces/{workspace_id}/members"), json!(null));
+        async move {
+            let members = response_json(listing.await).await;
+            members
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|member| member["user"]["email"] == email)
+                .map(|member| member["role"].as_str().unwrap().to_owned())
+        }
+    };
+    let set_organization_role = |email: &'static str, role: &'static str| {
+        let reply = send(
+            "PUT",
+            format!("/v1/organizations/{organization}/members"),
+            json!({"email": email, "role": role}),
+        );
+        async move { assert_eq!(reply.await.status(), 200, "{email} becomes {role} in the organization") }
+    };
+    for email in [
+        "origin-ada@example.com",
+        "origin-grace@example.com",
+        "origin-linus@example.com",
+    ] {
+        assert_eq!(
+            role_of(email).await.as_deref(),
+            Some("member"),
+            "{email} joined with the organization"
+        );
+    }
+
+    // The workspace removes Ada and makes Grace a viewer.
+    assert_eq!(
+        send(
+            "DELETE",
+            format!("/v1/workspaces/{workspace_id}/members/{ada_id}"),
+            json!(null)
+        )
+        .await
+        .status(),
+        204
+    );
+    assert_eq!(
+        send(
+            "PUT",
+            format!("/v1/workspaces/{workspace_id}/members"),
+            json!({"email": "origin-grace@example.com", "role": "viewer"}),
+        )
+        .await
+        .status(),
+        200
+    );
+
+    // The organization raises everyone to administrator: only the one who follows the organization follows it.
+    for email in [
+        "origin-ada@example.com",
+        "origin-grace@example.com",
+        "origin-linus@example.com",
+    ] {
+        set_organization_role(email, "admin").await;
+    }
+    assert_eq!(
+        role_of("origin-ada@example.com").await,
+        None,
+        "a removed person stays removed"
+    );
+    assert_eq!(
+        role_of("origin-grace@example.com").await.as_deref(),
+        Some("viewer"),
+        "a viewer stays a viewer"
+    );
+    assert_eq!(
+        role_of("origin-linus@example.com").await.as_deref(),
+        Some("admin"),
+        "the rest follows the organization"
+    );
+    set_organization_role("origin-linus@example.com", "member").await;
+    assert_eq!(
+        role_of("origin-linus@example.com").await.as_deref(),
+        Some("member"),
+        "and follows it back down"
+    );
+
+    // Adding Ada to the workspace on purpose makes her role the workspace's own.
+    assert_eq!(
+        send(
+            "PUT",
+            format!("/v1/workspaces/{workspace_id}/members"),
+            json!({"email": "origin-ada@example.com", "role": "member"}),
+        )
+        .await
+        .status(),
+        200
+    );
+    set_organization_role("origin-ada@example.com", "admin").await;
+    assert_eq!(role_of("origin-ada@example.com").await.as_deref(), Some("member"));
+
+    // Leaving the organization and coming back starts afresh.
+    assert_eq!(
+        send(
+            "DELETE",
+            format!("/v1/organizations/{organization}/members/{ada_id}"),
+            json!(null)
+        )
+        .await
+        .status(),
+        204
+    );
+    assert_eq!(role_of("origin-ada@example.com").await, None);
+    join(
+        &app,
+        &owner,
+        "organizations",
+        &organization,
+        "origin-ada@example.com",
+        "member",
+    )
+    .await;
+    assert_eq!(role_of("origin-ada@example.com").await.as_deref(), Some("member"));
+    let _ = std::fs::remove_dir_all(data_dir);
+}

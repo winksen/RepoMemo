@@ -45,7 +45,7 @@ Sign-in answers identically for an unknown email and a wrong password and spends
 | Level | Roles (high to low) | Comes from |
 |---|---|---|
 | Organization | owner, admin, member | `organization_memberships` |
-| Workspace | owner, admin, member, viewer | `workspace_memberships`; an organization role propagates to every workspace of it, except that adding a person to one workspace does not make them a member of the organization (they appear as a *guest*) |
+| Workspace | owner, admin, member, viewer | `workspace_memberships`; an organization role propagates to the workspaces whose access came from the organization (`origin = 'organization'`), not to a role the workspace set itself or a person it removed (V0.2.142), and adding a person to one workspace does not make them a member of the organization (they appear as a *guest*) |
 | Server | system administrator, app administrator | `users.is_system_admin`, `users.is_app_admin` |
 
 System administrators act as **administrators in every organization and workspace** (and owners of what they own). App administrators use the System pages but have no wildcard access, and only *read* them and run jobs and maintenance, and list backups; settings, roles, sessions, lockouts, reset links, raw log files, detaching the environment, and making, restoring or deleting backups are for system administrators.
