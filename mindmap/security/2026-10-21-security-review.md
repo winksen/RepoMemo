@@ -2,7 +2,7 @@
 
 > **Scope:** the whole server (`apps/server`, the crates), the web client where it meets the API, CI and the container files, at `V0.2.129` (commit `f1550cd`). Three questions: which dependencies carry known advisories; which findings of the [review of 2026-10-14](2026-10-14-security-review.md) are still open (nothing in the changelog or the roadmap tracked them to closure); and what a fresh pass over the backend finds for security, logic, hardening and speed.
 > **Method:** `cargo deny --workspace check advisories`, `npm audit` (with and without development packages) and `osv-scanner` over `Cargo.lock` and `package-lock.json`, run on 2026-10-21; then a static reading of the code. `cargo update --dry-run` confirmed which Rust fixes are lockfile-only. **Nothing was built, started or attacked**, as this repository's rules ask. Line numbers are as of `f1550cd`.
-> **Status:** open. **2 high, 9 medium, 15 low, 4 info**, fixed so far: S5-1 (V0.2.130), S5-2 (V0.2.131), S5-10 (V0.2.132), S5-3 (V0.2.133, V0.2.134), E17 (V0.2.135), S5-7 (V0.2.136), E1 in part (V0.2.137, V0.2.138), E19 (V0.2.138), E2 (V0.2.139), E5 and E15 (V0.2.140), E6 (V0.2.141), E9 (V0.2.142), E3 and E4 (V0.2.143), S5-4 and E14 (V0.2.144); eleven performance findings beside them. The releases that close them are planned as tracks L and M of the [Road to V0.3.0](../ROADMAP.md#track-l-security-and-dependencies-v02130v02148).
+> **Status:** open. **2 high, 9 medium, 15 low, 4 info**, fixed so far: S5-1 (V0.2.130), S5-2 (V0.2.131), S5-10 (V0.2.132), S5-3 (V0.2.133, V0.2.134), E17 (V0.2.135), S5-7 (V0.2.136), E1 in part (V0.2.137, V0.2.138), E19 (V0.2.138), E2 (V0.2.139), E5 and E15 (V0.2.140), E6 (V0.2.141), E9 (V0.2.142), E3 and E4 (V0.2.143), S5-4 and E14 (V0.2.144), E11 (V0.2.145); eleven performance findings beside them. The releases that close them are planned as tracks L and M of the [Road to V0.3.0](../ROADMAP.md#track-l-security-and-dependencies-v02130v02148).
 > **Previous review:** [2026-10-16](2026-10-16-security-review.md) (the fourth pass), closed. Its surfaces were not re-read, apart from the container.
 
 | ID | Severity | Finding | Status | Release |
@@ -20,7 +20,7 @@
 | S5-5 | Medium | Every authenticated JSON route reads a body up to the upload limit (10 MiB by default, up to 1 GiB) | New | V0.2.152 |
 | E8 | Low | A single-file re-index starts one background task per request, with no deduplication (the whole-workspace pass answers `409` since V0.2.6) | Partly fixed | V0.2.151 |
 | E10 | Low | `//host` and `\\host` links in Markdown are shown without their host and open in the same tab | Open (web client) | V0.2.147 |
-| E11 | Low | Per-address limits count each IPv6 address apart; password hashing has no global cap; limiter maps grow without bound for an hour | Open | V0.2.145 |
+| E11 | Low | Per-address limits count each IPv6 address apart; password hashing has no global cap; limiter maps grow without bound for an hour | Fixed in V0.2.145 | V0.2.145 |
 | E12 | Low | The sign-in address is logged with `%` (`Display`), so a line break forges a line in the text console log | Open | V0.2.146 |
 | E13 | Low | Addresses are checked for an `@` only; display names take control and bidirectional characters. Mail headers are safe since V0.2.9 (`compose` refuses control characters) | Partly fixed | V0.2.146 |
 | E14 | Low | The refresh cookie has no `__Secure-` prefix | Fixed in V0.2.144 | V0.2.144 |

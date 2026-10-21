@@ -1,3 +1,7 @@
+use std::sync::Arc;
+
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
+
 use crate::*;
 
 /// Registration is open by configuration, or because nobody has an account
@@ -34,7 +38,7 @@ pub(crate) fn check_auth_quota(state: &AppState, client: &ClientIp, action: Auth
     state
         .guards
         .auth
-        .check(&format!("{action:?}:{}", client.0), quota)
+        .check(&format!("{action:?}:{}", client.limit_key()), quota)
         .map_err(|wait| {
             tracing::warn!(target: "audit", client = %client.0, ?action, "Authentication rate limit reached");
             too_many_requests(
@@ -257,7 +261,7 @@ pub(crate) async fn login(
     // Failures are counted per account and address, and per account across
     // all addresses with a higher bar, so one attacker cannot lock a victim
     // out from everywhere while a distributed one is still slowed down.
-    let pair_key = format!("login:{email}|{}", client.0);
+    let pair_key = format!("login:{email}|{}", client.limit_key());
     let account_key = format!("login:{email}");
     let settings = state.settings();
     for key in [&pair_key, &account_key] {
@@ -289,7 +293,7 @@ pub(crate) async fn login(
         Some(account) => (account.password_hash, Some(account.user)),
         None => (dummy_password_hash().to_owned(), None),
     };
-    let verified = verify_password(&request.password, &stored_hash).await;
+    let verified = verify_password(&request.password, &stored_hash).await?;
     let Some(user) = user.filter(|_| verified) else {
         // `|`, not `||`: both counters must see every failure.
         let locked = state
@@ -447,7 +451,7 @@ pub(crate) async fn change_profile_password(
         .await
         .map_err(ApiError::internal)?
         .ok_or_else(ApiError::unauthorized)?;
-    if !verify_password(&request.current_password, &stored_account.password_hash).await {
+    if !verify_password(&request.current_password, &stored_account.password_hash).await? {
         tracing::warn!(target: "audit", user_id = %subject.user_id, "Password change refused: wrong current password");
         return Err(ApiError::bad_request("Current password is incorrect."));
     }
@@ -548,11 +552,34 @@ pub(crate) fn validate_password(password: &str, email: Option<&str>) -> Result<(
     Ok(())
 }
 
+/// How many passwords may be hashed or checked at once: twice the cores. Argon2 takes tens of milliseconds
+/// and a lot of memory, so a burst of sign-ins would otherwise fill the blocking pool and the memory.
+fn hashing_gate() -> &'static Arc<Semaphore> {
+    static GATE: std::sync::OnceLock<Arc<Semaphore>> = std::sync::OnceLock::new();
+    GATE.get_or_init(|| {
+        let cores = std::thread::available_parallelism().map_or(2, std::num::NonZeroUsize::get);
+        Arc::new(Semaphore::new(cores * 2))
+    })
+}
+
+/// A place at the hashing gate, or the 429 that tells the caller to come back in a moment.
+fn hashing_permit(gate: &Arc<Semaphore>) -> Result<OwnedSemaphorePermit, ApiError> {
+    gate.clone().try_acquire_owned().map_err(|_| {
+        too_many_requests(
+            "The server is busy checking passwords. Try again in a moment.",
+            Duration::from_secs(2),
+        )
+    })
+}
+
 /// Argon2 is deliberately slow (tens of milliseconds), so it runs on the
-/// blocking pool instead of holding up the async workers.
+/// blocking pool instead of holding up the async workers, a few at a time
+/// ([`hashing_gate`]); past that the answer is 429.
 pub(crate) async fn hash_password(password: &str) -> Result<String, ApiError> {
     let password = password.to_owned();
+    let permit = hashing_permit(hashing_gate())?;
     tokio::task::spawn_blocking(move || {
+        let _permit = permit;
         let salt = SaltString::generate(&mut OsRng);
         Argon2::default()
             .hash_password(password.as_bytes(), &salt)
@@ -563,17 +590,19 @@ pub(crate) async fn hash_password(password: &str) -> Result<String, ApiError> {
     .map_err(ApiError::internal)
 }
 
-pub(crate) async fn verify_password(password: &str, stored_hash: &str) -> bool {
+pub(crate) async fn verify_password(password: &str, stored_hash: &str) -> Result<bool, ApiError> {
     let password = password.to_owned();
     let stored_hash = stored_hash.to_owned();
-    tokio::task::spawn_blocking(move || {
+    let permit = hashing_permit(hashing_gate())?;
+    Ok(tokio::task::spawn_blocking(move || {
+        let _permit = permit;
         PasswordHash::new(&stored_hash)
             .ok()
             .and_then(|hash| Argon2::default().verify_password(password.as_bytes(), &hash).ok())
             .is_some()
     })
     .await
-    .unwrap_or(false)
+    .unwrap_or(false))
 }
 
 /// A valid Argon2 hash of a random password nobody knows, checked when an
@@ -647,4 +676,98 @@ pub(crate) fn issue_token(
         expires_in: Duration::from_secs(ttl_minutes.max(0) as u64 * 60).as_secs(),
         user,
     })
+}
+
+/// V0.2.145 (E11): limits count an IPv6 client by its /64, hashing is capped, and the maps stay bounded.
+#[cfg(test)]
+mod abuse_tests {
+    use super::*;
+    use crate::security::{network_key, LoginThrottle, Quota, RateLimiter};
+    use std::time::Duration;
+
+    #[test]
+    fn an_ipv6_client_is_counted_by_its_slash_64_and_an_ipv4_one_by_itself() {
+        assert_eq!(network_key("203.0.113.9"), "203.0.113.9");
+        assert_eq!(network_key("2001:db8:1:2:aaaa:bbbb:cccc:dddd"), "2001:db8:1:2::/64");
+        assert_eq!(
+            network_key("2001:db8:1:2:1111:2222:3333:4444"),
+            network_key("2001:db8:1:2:ffff:eeee:dddd:cccc"),
+            "one /64 shares one key"
+        );
+        assert_ne!(network_key("2001:db8:1:2::1"), network_key("2001:db8:1:3::1"));
+        assert_eq!(
+            network_key("::ffff:203.0.113.9"),
+            "203.0.113.9",
+            "a mapped IPv4 address is an IPv4 one"
+        );
+        assert_eq!(network_key("unknown"), "unknown");
+        // One /64 shares one budget.
+        let limiter = RateLimiter::default();
+        let quota = Quota::per_minute(2);
+        let key = |address: &str| format!("Login:{}", network_key(address));
+        assert!(limiter.check(&key("2001:db8:1:2::1"), quota).is_ok());
+        assert!(limiter.check(&key("2001:db8:1:2::2"), quota).is_ok());
+        assert!(
+            limiter.check(&key("2001:db8:1:2::3"), quota).is_err(),
+            "a third address of the /64 is over budget"
+        );
+        assert!(
+            limiter.check(&key("2001:db8:1:9::1"), quota).is_ok(),
+            "another /64 has its own"
+        );
+    }
+
+    #[test]
+    fn hashing_is_capped_and_the_answer_is_429() {
+        let gate = Arc::new(Semaphore::new(2));
+        let first = hashing_permit(&gate).expect("a place");
+        let _second = hashing_permit(&gate).expect("a second place");
+        let refused = hashing_permit(&gate).expect_err("none left");
+        assert_eq!(refused.status, axum::http::StatusCode::TOO_MANY_REQUESTS);
+        assert!(refused.retry_after.is_some());
+        drop(first);
+        assert!(hashing_permit(&gate).is_ok(), "a finished hash frees its place");
+    }
+
+    #[test]
+    fn the_limiter_maps_cannot_grow_past_their_bound() {
+        let limiter = RateLimiter::with_max_keys(20);
+        let quota = Quota::per_minute(5);
+        for index in 0..500 {
+            let _ = limiter.check(&format!("flood:{index}"), quota);
+        }
+        assert!(limiter.len() <= 20, "{} keys", limiter.len());
+        // A key already there is still counted.
+        let _ = limiter.check("steady", quota);
+        for _ in 0..5 {
+            let _ = limiter.check("steady", quota);
+        }
+        assert!(limiter.check("steady", quota).is_err());
+
+        let throttle = LoginThrottle::with_max_keys(20);
+        for index in 0..500 {
+            throttle.record_failure(
+                &format!("login:{index}@example.com|1.2.3.4"),
+                5,
+                Duration::from_secs(60),
+            );
+        }
+        assert!(throttle.len() <= 20, "{} keys", throttle.len());
+        // A lockout is never evicted to make room.
+        for _ in 0..5 {
+            throttle.record_failure("login:victim@example.com", 5, Duration::from_secs(600));
+        }
+        assert!(throttle.locked_for("login:victim@example.com").is_some());
+        for index in 0..500 {
+            throttle.record_failure(
+                &format!("login:more{index}@example.com|5.6.7.8"),
+                5,
+                Duration::from_secs(600),
+            );
+        }
+        assert!(
+            throttle.locked_for("login:victim@example.com").is_some(),
+            "the lockout survived the flood"
+        );
+    }
 }

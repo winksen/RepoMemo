@@ -185,7 +185,7 @@ async fn check_new_server_and_code(state: &AppState, client: &ClientIp, code: &s
     if state.storage.setup_state().await.map_err(map_storage_error)? != SetupState::New {
         return Err(ApiError::conflict("This server already has its system administrator."));
     }
-    let key = format!("setup:{}", client.0);
+    let key = format!("setup:{}", client.limit_key());
     if let Some(wait) = state.guards.logins.locked_for(&key) {
         return Err(too_many_requests(
             format!(
@@ -486,7 +486,8 @@ pub(crate) async fn checks(
             CheckStatus::Info
         },
         detail: if facts.ai_hosts_restricted {
-            "This machine's Ollama (port 11434) and OpenRouter, unless REPOMEMO_AI_ALLOWED_HOSTS lists others.".to_owned()
+            "This machine's Ollama (port 11434) and OpenRouter, unless REPOMEMO_AI_ALLOWED_HOSTS lists others."
+                .to_owned()
         } else {
             "Any address except link-local and cloud-metadata ones (REPOMEMO_AI_ALLOWED_HOSTS=*).".to_owned()
         },

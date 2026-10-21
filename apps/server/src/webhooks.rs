@@ -188,7 +188,7 @@ async fn authenticate(
         match state
             .guards
             .auth
-            .check(&format!("webhook-fail:{}", client.0), Quota::per_minute(FAILURES_PER_MINUTE))
+            .check(&format!("webhook-fail:{}", client.limit_key()), Quota::per_minute(FAILURES_PER_MINUTE))
         {
             Ok(()) => ApiError::unauthorized(),
             Err(wait) => crate::security::too_many_requests(

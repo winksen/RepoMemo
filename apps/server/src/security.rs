@@ -55,14 +55,31 @@ struct Window {
     count: u32,
 }
 
+/// The most keys a limiter holds at once. Past it, windows that ran out are dropped, and if that is not
+/// enough the oldest are, so a flood of addresses cannot grow the map without bound (V0.2.145).
+const MAX_TRACKED_KEYS: usize = 100_000;
+
 /// Fixed-window request counters per key.
-#[derive(Default)]
 pub struct RateLimiter {
     windows: Mutex<HashMap<String, Window>>,
+    max_keys: usize,
+}
+
+impl Default for RateLimiter {
+    fn default() -> Self {
+        Self::with_max_keys(MAX_TRACKED_KEYS)
+    }
 }
 
 impl RateLimiter {
-    fn len(&self) -> usize {
+    pub fn with_max_keys(max_keys: usize) -> Self {
+        Self {
+            windows: Mutex::default(),
+            max_keys: max_keys.max(1),
+        }
+    }
+
+    pub(crate) fn len(&self) -> usize {
         self.windows.lock().map(|windows| windows.len()).unwrap_or(0)
     }
 
@@ -76,6 +93,20 @@ impl RateLimiter {
         let Ok(mut windows) = self.windows.lock() else {
             return Ok(());
         };
+        if windows.len() >= self.max_keys && !windows.contains_key(key) {
+            // Windows past their period count for nothing; then the oldest go, a tenth of the bound at a time.
+            windows.retain(|_, window| now.duration_since(window.started) < quota.period);
+            if windows.len() >= self.max_keys {
+                let mut oldest: Vec<(Instant, String)> = windows
+                    .iter()
+                    .map(|(key, window)| (window.started, key.clone()))
+                    .collect();
+                oldest.sort();
+                for (_, key) in oldest.into_iter().take((self.max_keys / 10).max(1)) {
+                    windows.remove(&key);
+                }
+            }
+        }
         let window = windows
             .entry(key.to_owned())
             .or_insert(Window { started: now, count: 0 });
@@ -113,12 +144,25 @@ struct Failures {
 
 /// Consecutive failed sign-ins per key, with a temporary lockout once a key
 /// reaches the configured number of failures.
-#[derive(Default)]
 pub struct LoginThrottle {
     failures: Mutex<HashMap<String, Failures>>,
+    max_keys: usize,
+}
+
+impl Default for LoginThrottle {
+    fn default() -> Self {
+        Self::with_max_keys(MAX_TRACKED_KEYS)
+    }
 }
 
 impl LoginThrottle {
+    pub fn with_max_keys(max_keys: usize) -> Self {
+        Self {
+            failures: Mutex::default(),
+            max_keys: max_keys.max(1),
+        }
+    }
+
     /// How much longer `key` is locked out, if it is.
     pub fn locked_for(&self, key: &str) -> Option<Duration> {
         let now = Instant::now();
@@ -136,6 +180,24 @@ impl LoginThrottle {
         let Ok(mut failures) = self.failures.lock() else {
             return false;
         };
+        if failures.len() >= self.max_keys && !failures.contains_key(key) {
+            // Counts that went quiet for a lockout period are forgotten; if that is not enough, the quietest
+            // keys that are not locked out go. A lockout is never evicted to make room.
+            failures.retain(|_, entry| {
+                entry.locked_until.is_some_and(|until| until > now) || now.duration_since(entry.last_at) <= lockout
+            });
+            if failures.len() >= self.max_keys {
+                let mut quiet: Vec<(Instant, String)> = failures
+                    .iter()
+                    .filter(|(_, entry)| !entry.locked_until.is_some_and(|until| until > now))
+                    .map(|(key, entry)| (entry.last_at, key.clone()))
+                    .collect();
+                quiet.sort();
+                for (_, key) in quiet.into_iter().take((self.max_keys / 10).max(1)) {
+                    failures.remove(&key);
+                }
+            }
+        }
         let entry = failures.entry(key.to_owned()).or_insert(Failures {
             count: 0,
             last_at: now,
@@ -154,6 +216,11 @@ impl LoginThrottle {
             return true;
         }
         false
+    }
+
+    #[cfg(test)]
+    pub(crate) fn len(&self) -> usize {
+        self.failures.lock().map(|failures| failures.len()).unwrap_or(0)
     }
 
     pub fn clear(&self, key: &str) {
@@ -294,6 +361,29 @@ impl ProxyTrust {
 /// trusted proxy, the address it reports (see [`client_ip`]).
 #[derive(Debug, Clone)]
 pub struct ClientIp(pub String);
+
+impl ClientIp {
+    /// What limits and lockouts are counted against: the address itself for IPv4, the /64 it belongs to for IPv6
+    /// (a person or an attacker holds a whole /64, so counting each address apart would give them as many
+    /// budgets as they like). Logs keep the full address in `.0`.
+    pub fn limit_key(&self) -> String {
+        network_key(&self.0)
+    }
+}
+
+/// The key an address is counted under (see [`ClientIp::limit_key`]).
+pub(crate) fn network_key(address: &str) -> String {
+    match address.parse::<IpAddr>() {
+        Ok(IpAddr::V6(v6)) => match v6.to_ipv4_mapped() {
+            Some(v4) => v4.to_string(),
+            None => {
+                let [a, b, c, d, ..] = v6.segments();
+                format!("{}/64", std::net::Ipv6Addr::new(a, b, c, d, 0, 0, 0, 0))
+            }
+        },
+        _ => address.to_owned(),
+    }
+}
 
 impl FromRequestParts<AppState> for ClientIp {
     type Rejection = std::convert::Infallible;

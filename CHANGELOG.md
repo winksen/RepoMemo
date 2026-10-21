@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.145 (2026-10-21)
+
+Sign-in protection can no longer be sidestepped by changing IPv6 address, and a burst of sign-ins cannot exhaust the server.
+
+### Security
+- **IPv6 per /64 (E11):** limits and lockouts were counted per address, but whoever holds an IPv6 connection holds a whole /64, billions of addresses, each with its own budget. They are now counted by the /64 (an IPv4-mapped address by its IPv4); the sign-in, registration, refresh, setup-code and webhook-failure limits and the per-account-and-address lockout use it. Logs keep the full address.
+- **A cap on password hashing:** Argon2 takes tens of milliseconds and a good deal of memory, and every sign-in ran it on the blocking pool without limit. Hashing and checking passwords now take a place at a gate of twice the number of cores; past it the answer is `429` with `Retry-After`, instead of a growing queue. Unknown addresses still cost the same time as wrong passwords.
+- **Bounded maps:** the rate limiter and the lockout table held a key for every address seen until the hourly maintenance. Each now holds at most 100,000 keys; past that, windows that ran out are dropped, then the oldest, and a lockout is never evicted to make room.
+
+### Changed
+- **Tests (written, not run):** the /64 key (one prefix shares one budget, another has its own, an IPv4-mapped address is IPv4), the gate (two places, a third is refused with 429, a finished hash gives its place back), and both maps under a flood of 500 keys with a bound of 20, with a lockout surviving it.
+- **Checks run on this release:** `cargo check` of the server with its tests compiles, `rustfmt` is clean for what changed apart from hunks that were already there, `clippy` reports nothing new; `docs:check` and `version:check` pass. A load of 200 simultaneous sign-ins was not tried.
+
+### Upgrading
+- Nothing to do. People on one IPv6 prefix share one sign-in budget.
+
 ## V0.2.144 (2026-10-21)
 
 Reopening a browser with several RepoMemo tabs, or two tabs crossing the hour together, no longer signs the person out everywhere.

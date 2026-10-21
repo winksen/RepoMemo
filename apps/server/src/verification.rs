@@ -183,7 +183,7 @@ pub(crate) async fn change_email(
         .await
         .map_err(map_storage_error)?
         .ok_or_else(ApiError::unauthorized)?;
-    if !crate::auth::verify_password(&request.current_password, &stored.password_hash).await {
+    if !crate::auth::verify_password(&request.current_password, &stored.password_hash).await? {
         return Err(ApiError::forbidden_because("The current password is not right."));
     }
     let user = state
