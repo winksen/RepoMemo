@@ -193,6 +193,34 @@ export interface WorkspaceTemplateRef {
   overrides: unknown;
 }
 
+/** A template as the picker lists it: what identifies it, none of its blocks. */
+export interface TemplateSummary {
+  id: string;
+  version: number;
+  name: string;
+  summary: string;
+  icon: string;
+}
+
+/** The template a workspace uses and where it came from. */
+export interface WorkspaceTemplateView {
+  /** The template in force: the workspace's choice, or `general`. */
+  template: TemplateSummary;
+  /** `default` (no choice saved), `workspace` (its own choice) or `fallback` (the choice cannot be used on this server). */
+  source: string;
+  /** Why `general` is in force when `source` is `fallback`. */
+  reason: string | null;
+  /** The id the workspace chose; not the one in force when `source` is `fallback`. */
+  chosen_id: string | null;
+  /** The adjustments saved on top of the template (none can be saved yet). */
+  overrides: unknown;
+}
+
+/** Chooses a workspace's template; `null` returns the workspace to the default. */
+export interface UpdateWorkspaceTemplateRequest {
+  template_id: string | null;
+}
+
 export interface WorkspaceOverview {
   workspace_id: string;
   source_count: number;

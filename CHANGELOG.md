@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.167 (2026-10-22)
+
+Routes to list templates and to read and change a workspace's template.
+
+### Added
+- **`GET /v1/templates`:** the catalogue as a picker lists it, `general` first: id, version, name, summary and icon of each, none of the blocks. Any signed-in caller may ask.
+- **`GET /v1/workspaces/{id}/template`:** the template in force for the workspace, where it came from (`default` when none was chosen, `workspace` for its own choice, `fallback` with the `reason` when the choice cannot be used on this server), the id the workspace chose and the adjustments saved on it. Any member may read it, as may a read-only token.
+- **`PUT /v1/workspaces/{id}/template`:** `{"template_id": "…"}` chooses a template and `{"template_id": null}` returns the workspace to the default. It needs a workspace owner or administrator with a browser session or a personal access token with the `admin` scope (decision 26 with decision 23): a viewer, a member and a read-only or read-and-write token get `403`. An id the catalogue lacks is `404` and writes nothing. A change is `workspace_template_changed` in the activity feed ("Changed the workspace template to General."); choosing the template the workspace already has records nothing, and the adjustments saved on it stay.
+- **A template never touches a right:** the routes call the same guards as every other workspace route and nothing in them reads the template; who may open a workspace and what they may do in it is as before.
+- **Types:** `TemplateSummary`, `WorkspaceTemplateView` and `UpdateWorkspaceTemplateRequest` are domain types, so the web client's types carry them.
+- **No page uses them yet:** the catalogue holds `general` alone until V0.2.170, and the picker is V0.2.169.
+- **Tests (written, not run):** `templates_are_listed_read_by_members_and_changed_only_by_administrators` (the catalogue and its shape, a member reads and a stranger gets `403`, a viewer and a read-and-write token cannot change, an unknown id is `404` and writes nothing, the owner's choice is in the feed once and choosing it again adds nothing, an `admin` token resets it), two in the core (the catalogue check, one write, the adjustments kept, the reset; a fallback reported with the choice that could not be used), and the new route added to the list that read, read-and-write and system tokens must be refused on.
+- **Checks run on this release:** `cargo check` of the api and the server with their tests compiles; `rustfmt` shows nothing for the lines changed; `types:check`, `typecheck`, `docs:check` and `version:check` pass. **Not run:** the tests, as asked.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.166 (2026-10-22)
 
 A workspace remembers its template, and one resolver gives every part of the product the same answer.

@@ -244,6 +244,37 @@ impl WorkspaceTemplateRef {
     }
 }
 
+/// A template as the picker lists it: what identifies it, none of its blocks.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TemplateSummary {
+    pub id: String,
+    pub version: u32,
+    pub name: String,
+    pub summary: String,
+    pub icon: String,
+}
+
+/// The template a workspace uses and where it came from.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct WorkspaceTemplateView {
+    /// The template in force: the workspace's choice, or `general`.
+    pub template: TemplateSummary,
+    /// `default` (no choice saved), `workspace` (its own choice) or `fallback` (the choice cannot be used on this server).
+    pub source: String,
+    /// Why `general` is in force when `source` is `fallback`.
+    pub reason: Option<String>,
+    /// The id the workspace chose; not the one in force when `source` is `fallback`.
+    pub chosen_id: Option<String>,
+    /// The adjustments saved on top of the template (none can be saved yet).
+    pub overrides: Value,
+}
+
+/// Chooses a workspace's template; `null` returns the workspace to the default.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateWorkspaceTemplateRequest {
+    pub template_id: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkspaceOverview {
     pub workspace_id: String,

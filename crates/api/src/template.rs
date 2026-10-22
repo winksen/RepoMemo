@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
-use repomemo_domain::WorkspaceTemplateRef;
+use repomemo_domain::{TemplateSummary, WorkspaceTemplateRef, WorkspaceTemplateView};
 use repomemo_templates::{Catalogue, Origin, TemplateDefinition};
 
 use crate::RepoMemoCore;
@@ -27,6 +27,47 @@ pub struct EffectiveTemplate {
     pub origin: Origin,
     /// The choice as saved, whether or not it could be used.
     pub reference: Option<WorkspaceTemplateRef>,
+}
+
+impl EffectiveTemplate {
+    /// The answer in the shape the API gives.
+    pub fn view(&self) -> WorkspaceTemplateView {
+        let (source, reason) = match &self.origin {
+            Origin::Default => ("default", None),
+            Origin::Workspace => ("workspace", None),
+            Origin::Fallback { reason } => ("fallback", Some(reason.clone())),
+        };
+        WorkspaceTemplateView {
+            template: summary_of(&self.template),
+            source: source.to_owned(),
+            reason,
+            chosen_id: self.reference.as_ref().map(|reference| reference.id.clone()),
+            overrides: self
+                .reference
+                .as_ref()
+                .map(|reference| reference.overrides.clone())
+                .unwrap_or_default(),
+        }
+    }
+}
+
+/// What identifies a template, for a list.
+pub fn summary_of(template: &TemplateDefinition) -> TemplateSummary {
+    TemplateSummary {
+        id: template.meta.id.clone(),
+        version: template.meta.version,
+        name: template.meta.name.clone(),
+        summary: template.meta.summary.clone(),
+        icon: template.meta.icon.clone(),
+    }
+}
+
+/// The result of choosing a template for a workspace.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TemplateChange {
+    /// False when the workspace was already on that template (nothing to record).
+    pub changed: bool,
+    pub effective: EffectiveTemplate,
 }
 
 #[derive(Debug, Clone)]
@@ -92,6 +133,50 @@ impl RepoMemoCore {
     /// The templates this server offers, `general` first.
     pub fn template_catalogue(&self) -> &Catalogue {
         &self.templates.catalogue
+    }
+
+    /// The catalogue as a picker lists it.
+    pub fn template_summaries(&self) -> Vec<TemplateSummary> {
+        self.templates.catalogue.list().iter().map(summary_of).collect()
+    }
+
+    /// Chooses the workspace's template, or returns it to the default with `None`. An id the catalogue lacks is
+    /// "not found" and writes nothing. Choosing the template the workspace already has changes nothing, and the
+    /// adjustments saved on it stay.
+    pub async fn set_workspace_template(
+        &self,
+        workspace_id: &str,
+        template_id: Option<&str>,
+    ) -> Result<TemplateChange> {
+        let before = self.storage.workspace_template_ref(workspace_id).await?;
+        let after = match template_id {
+            None => None,
+            Some(id) => {
+                let Some(template) = self.templates.catalogue.get(id) else {
+                    repomemo_domain::bail_not_found!("That template was not found.");
+                };
+                let overrides = before
+                    .as_ref()
+                    .filter(|reference| reference.id == id)
+                    .map(|reference| reference.overrides.clone())
+                    .unwrap_or_default();
+                Some(WorkspaceTemplateRef {
+                    id: id.to_owned(),
+                    version: template.meta.version,
+                    overrides,
+                })
+            }
+        };
+        if before != after {
+            self.storage
+                .set_workspace_template_ref(workspace_id, after.as_ref())
+                .await?;
+        }
+        let changed = before.as_ref().map(|reference| &reference.id) != after.as_ref().map(|reference| &reference.id);
+        Ok(TemplateChange {
+            changed,
+            effective: self.effective_template(workspace_id).await?,
+        })
     }
 }
 
@@ -166,6 +251,90 @@ mod tests {
         assert!(core.effective_template("no-such-workspace").await.is_err());
 
         let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn choosing_a_template_checks_the_catalogue_writes_once_and_keeps_the_adjustments() {
+        let (core, data_dir) = core("choose").await;
+        let workspace = core.create_workspace("Runbooks".to_owned()).await.unwrap();
+
+        // An id the catalogue lacks is not found, and nothing is written.
+        let error = core
+            .set_workspace_template(&workspace.id, Some("no-such-template"))
+            .await
+            .unwrap_err();
+        assert!(error.to_string().contains("not found"), "{error}");
+        assert_eq!(
+            core.storage().workspace_template_ref(&workspace.id).await.unwrap(),
+            None
+        );
+        assert!(core
+            .set_workspace_template("no-such-workspace", Some(GENERAL_ID))
+            .await
+            .is_err());
+
+        // Choosing a template changes the workspace once; choosing it again changes nothing.
+        let first = core
+            .set_workspace_template(&workspace.id, Some(GENERAL_ID))
+            .await
+            .unwrap();
+        assert!(first.changed);
+        assert_eq!(first.effective.origin, Origin::Workspace);
+        let view = first.effective.view();
+        assert_eq!(
+            (view.source.as_str(), view.chosen_id.as_deref()),
+            ("workspace", Some(GENERAL_ID))
+        );
+        assert_eq!(view.template.id, GENERAL_ID);
+        assert!(view.reason.is_none());
+        let again = core
+            .set_workspace_template(&workspace.id, Some(GENERAL_ID))
+            .await
+            .unwrap();
+        assert!(!again.changed);
+
+        // The adjustments saved on the template stay when it is chosen again, and go with a different choice.
+        let adjusted = WorkspaceTemplateRef {
+            id: GENERAL_ID.to_owned(),
+            version: 1,
+            overrides: json!({ "landing": "review" }),
+        };
+        core.storage()
+            .set_workspace_template_ref(&workspace.id, Some(&adjusted))
+            .await
+            .unwrap();
+        core.set_workspace_template(&workspace.id, Some(GENERAL_ID))
+            .await
+            .unwrap();
+        let kept = core.storage().workspace_template_ref(&workspace.id).await.unwrap();
+        assert_eq!(kept, Some(adjusted));
+
+        // Back to the default.
+        let reset = core.set_workspace_template(&workspace.id, None).await.unwrap();
+        assert!(reset.changed);
+        assert_eq!(reset.effective.view().source, "default");
+        assert!(!core.set_workspace_template(&workspace.id, None).await.unwrap().changed);
+
+        // The catalogue as a picker lists it: General first.
+        assert_eq!(core.template_summaries()[0].id, GENERAL_ID);
+        assert_eq!(core.template_summaries().len(), core.template_catalogue().list().len());
+
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn a_fallback_is_reported_with_the_choice_that_could_not_be_used() {
+        let resolver = TemplateResolver::default();
+        let missing = WorkspaceTemplateRef {
+            id: "ghost".to_owned(),
+            version: 1,
+            overrides: json!(null),
+        };
+        let view = resolver.resolve("w", Some(missing)).view();
+        assert_eq!(view.source, "fallback");
+        assert_eq!(view.template.id, GENERAL_ID);
+        assert_eq!(view.chosen_id.as_deref(), Some("ghost"));
+        assert!(view.reason.unwrap().contains("ghost"));
     }
 
     #[test]

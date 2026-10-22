@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.2 → 0.3
 
-> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.166` (2026-10-22) · **Next:** `V0.2.167`
+> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.167` (2026-10-22) · **Next:** `V0.2.168`
 > **Previous line:** [Releases 0.1 → 0.2](RELEASES_0.1.md) · **Related:** [Roadmap, Road to V0.3.0](ROADMAP.md#-road-to-v030) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
 Every release of the 0.2 line, shipped and planned, one row each. The plan comes from the [Road to V0.3.0](ROADMAP.md#-road-to-v030): **one change per release**, each shippable alone, with the security rules for a new outside connection in the release that opens it. Planned rows are proposals until decisions 7–14 in the roadmap are agreed; tracks L and M waited on decisions 20–23, and track N on decisions 24–28 (taken as proposed).
@@ -204,7 +204,7 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | **V0.2.164** | ✅ 2026-10-22 |N. Workspace templates |✨ Feature | Templates | A template crate: the identity block, limits and validation; General defined | Every limit and refusal has a unit test |
 | **V0.2.165** | ✅ 2026-10-22 |N. Workspace templates |✨ Feature | Templates | The built-in catalogue: the JSON files of one folder, registered without code | A valid file added to the folder appears with no other edit |
 | **V0.2.166** | ✅ 2026-10-22 |N. Workspace templates |✨ Feature | Templates | A workspace remembers its template; one resolver, General when it cannot | A missing template resolves to General with a reason; export and import keep the choice |
-| **V0.2.167** | 🔜 Planned | N. Workspace templates | ✨ Feature | API | Routes to list templates and to read and change a workspace's template | A viewer reads and cannot change; a read-and-write token gets `403` on the change |
+| **V0.2.167** | ✅ 2026-10-22 |N. Workspace templates |✨ Feature | API | Routes to list templates and to read and change a workspace's template | A viewer reads and cannot change; a read-and-write token gets `403` on the change |
 | **V0.2.168** | 🔜 Planned | N. Workspace templates | ✨ Feature | Workspaces | Create a workspace from a template, with its starter folders | A template's folders exist after creation; General creates none |
 | **V0.2.169** | 🔜 Planned | N. Workspace templates | 🔧 Enhancement | Web | Template types and a picker in the create dialog and the setup wizard | The dialog creates a workspace with the chosen template |
 | **V0.2.170** | 🔜 Planned | N. Workspace templates | ✨ Feature | Templates | Four templates ship: Software engineering, Operations and incidents, Product and decisions, Knowledge base | The picker lists five; each creates its folders |

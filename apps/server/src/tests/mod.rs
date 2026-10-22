@@ -21,6 +21,7 @@ mod memory;
 mod operations;
 mod performance;
 mod system;
+mod templates;
 mod workspaces;
 
 pub(super) async fn wait_for_indexed_artifacts(

@@ -1,8 +1,8 @@
 # HTTP API reference
 
-> **Branch of:** [TECHNICAL_MINDMAP.md §5](../TECHNICAL_MINDMAP.md#5-http-api-reference-210-operations-under-v1) · **Generated** from the router and the handler signatures by `node scripts/list-routes.mjs --markdown`; the guard column is read from the handler bodies, so check a route's handler before relying on a row · **Status:** V0.2.55. The rows are kept by hand (the guard column of the generator is a first read of each handler); `npm run docs:check` fails when a route of the server has no row, and the nine routes added since V0.2.6 (mail, verification, notification preferences) are in
+> **Branch of:** [TECHNICAL_MINDMAP.md §5](../TECHNICAL_MINDMAP.md#5-http-api-reference-213-operations-under-v1) · **Generated** from the router and the handler signatures by `node scripts/list-routes.mjs --markdown`; the guard column is read from the handler bodies, so check a route's handler before relying on a row · **Status:** V0.2.55. The rows are kept by hand (the guard column of the generator is a first read of each handler); `npm run docs:check` fails when a route of the server has no row, and the nine routes added since V0.2.6 (mail, verification, notification preferences) are in
 
-203 routes of the main router (method and path pairs), plus the platform routes (`/v1/platform/*`, [environment.rs](../../apps/server/src/environment.rs), served before an environment is attached) and the avatar routes (`/v1/users/{id}/avatar`, `/v1/profile/avatar`, [avatars.rs](../../apps/server/src/avatars.rs)).
+206 routes of the main router (method and path pairs), plus the platform routes (`/v1/platform/*`, [environment.rs](../../apps/server/src/environment.rs), served before an environment is attached) and the avatar routes (`/v1/users/{id}/avatar`, `/v1/profile/avatar`, [avatars.rs](../../apps/server/src/avatars.rs)).
 
 ## Conventions
 
@@ -133,6 +133,9 @@
 | PUT | `/v1/workspaces/{workspace_id}` | managing | require_workspace_owner | UpdateWorkspaceRequest | Workspace |
 | DELETE | `/v1/workspaces/{workspace_id}` | managing | require_workspace_owner | — | status |
 | PUT | `/v1/workspaces/{workspace_id}/icon` | managing | require_workspace_admin | UpdateWorkspaceIconRequest | WorkspaceIconResponse |
+| GET | `/v1/templates` | auth | — | — | Vec<TemplateSummary> |
+| GET | `/v1/workspaces/{workspace_id}/template` | auth | require_workspace_read | — | WorkspaceTemplateView |
+| PUT | `/v1/workspaces/{workspace_id}/template` | managing | require_workspace_admin | UpdateWorkspaceTemplateRequest | WorkspaceTemplateView |
 
 ## Evidence, folders and files
 

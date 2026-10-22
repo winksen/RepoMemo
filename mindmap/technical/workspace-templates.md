@@ -1,6 +1,6 @@
 # Workspace templates: the format, the rules, how to add one
 
-> **Branch of:** [TECHNICAL_MINDMAP.md](../TECHNICAL_MINDMAP.md) · **Roadmap:** [track N, V0.2.163–V0.2.193](../ROADMAP.md#track-n-workspace-templates-v02163v02193), decisions 24–28 · **Plan:** [the workspace templates plan](../plans/2026-10-22-workspace-templates.md) · **Decision record:** [0005](../../docs/decisions/0005-templates-are-data-over-a-closed-set-of-modules.md) · **Status:** designed at V0.2.163; the crate with the `format` and `meta` keys and `general` exists since V0.2.164, the built-in catalogue since V0.2.165, and a workspace's choice and its resolver since V0.2.166; each other block below is built by the release in its table row, and a block that no release has built yet is not read by anything.
+> **Branch of:** [TECHNICAL_MINDMAP.md](../TECHNICAL_MINDMAP.md) · **Roadmap:** [track N, V0.2.163–V0.2.193](../ROADMAP.md#track-n-workspace-templates-v02163v02193), decisions 24–28 · **Plan:** [the workspace templates plan](../plans/2026-10-22-workspace-templates.md) · **Decision record:** [0005](../../docs/decisions/0005-templates-are-data-over-a-closed-set-of-modules.md) · **Status:** designed at V0.2.163; the crate with the `format` and `meta` keys and `general` exists since V0.2.164, the built-in catalogue since V0.2.165, a workspace's choice and its resolver since V0.2.166, and the routes since V0.2.167; each other block below is built by the release in its table row, and a block that no release has built yet is not read by anything.
 
 Every workspace used to be organized the same way: twelve sections in one fixed order, one ranking rule (verified evidence gets 10 % more), one set of health checks, one set of assistant suggestions. A **workspace template** is a small piece of data that tells the backend, the engine and the web client *which modules matter most in this workspace and how they are shown*. It chooses and orders; it never adds code and never touches rights.
 
@@ -80,11 +80,21 @@ workspace settings  ──►  effective template (one resolver, cached per work
 
 The answer carries where it came from (`workspace`, `default` or `fallback` with the reason) so Settings can say why a workspace is not on the template it was given.
 
-## 5. Adding a template
+## 5. The routes
+
+| Route | For | Does |
+|---|---|---|
+| `GET /v1/templates` | anyone signed in | The catalogue as a picker lists it, `general` first: id, version, name, summary, icon, none of the blocks |
+| `GET /v1/workspaces/{id}/template` | any member | The template in force, where it came from (`default`, `workspace` or `fallback` with the reason), the id the workspace chose and its saved adjustments |
+| `PUT /v1/workspaces/{id}/template` | owners and administrators, with a session or an `admin` token | `{ "template_id": "…" }` chooses a template; `null` returns the workspace to the default. An id the catalogue lacks is `404` and writes nothing. A change is `workspace_template_changed` in the activity feed; choosing the template the workspace already has records nothing |
+
+A read-only or read-and-write token may read a template and may not change it (decision 23). The routes decide nothing about rights: who may open the workspace, and what they may do in it, is settled by the same guards as before.
+
+## 6. Adding a template
 
 Until V0.2.188 the only way is a release: add a JSON file named after the template's id (`operations.json` for `"id": "operations"`) to `crates/templates/definitions/`, and `build.rs` registers it (every `*.json` whose name does not start with `_`, in file-name order). No Rust is edited. `Catalogue::load` leaves out and names a file that does not validate, is not named after its id, repeats an id or tries to replace `general`; the test over the folder fails while any such file exists. The catalogue lists `general` first and the others by name. From V0.2.188 the guide `docs/TEMPLATES.md` and `npm run templates:check` cover the same steps, and from V0.2.189 an operator can drop a file in `REPOMEMO_TEMPLATES_DIR` with no release.
 
-## 6. Decisions 24–28
+## 7. Decisions 24–28
 
 | # | Decision | As agreed (V0.2.163) |
 |---|---|---|
@@ -94,6 +104,6 @@ Until V0.2.188 the only way is a release: add a JSON file named after the templa
 | 27 | Existing workspaces | They stay on `general`; a new workspace asks at creation with `general` preselected |
 | 28 | What ships first | `general` plus Software engineering, Operations and incidents, Product and decisions and Knowledge base, as data. Organization-defined templates are V0.4.0 direction |
 
-## 7. Not in the track
+## 8. Not in the track
 
 Organization-defined templates, new sections or modules defined by a template, per-user layouts, different chunking or indexing per template, installing a template from a URL, AI-written templates and moving existing evidence into starter folders are listed with their reasons in the plan's [section 7](../plans/2026-10-22-workspace-templates.md#7-not-in-this-track).

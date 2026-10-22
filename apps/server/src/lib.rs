@@ -40,6 +40,7 @@ mod serve;
 mod setup;
 mod streams;
 mod system;
+mod templates;
 mod verification;
 mod web_session;
 mod webhooks;
@@ -626,6 +627,11 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             put(update_workspace).delete(delete_workspace),
         )
         .route("/v1/workspaces/{workspace_id}/icon", put(update_workspace_icon))
+        .route("/v1/templates", get(templates::list_templates))
+        .route(
+            "/v1/workspaces/{workspace_id}/template",
+            get(templates::workspace_template).put(templates::update_workspace_template),
+        )
         .route("/v1/workspaces/{workspace_id}/overview", get(workspace_overview))
         .route("/v1/workspaces/{workspace_id}/metrics", get(workspace_metrics))
         .route(
