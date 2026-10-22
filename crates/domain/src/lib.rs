@@ -210,6 +210,40 @@ pub struct Workspace {
     pub settings: Value,
 }
 
+/// The template a workspace was given, as kept in its settings under `template`: the template's id, the
+/// version it was chosen at and the few adjustments an administrator saved on top of it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct WorkspaceTemplateRef {
+    pub id: String,
+    pub version: u32,
+    #[serde(default, skip_serializing_if = "Value::is_null")]
+    pub overrides: Value,
+}
+
+/// The most the saved adjustments of a template may take, serialized.
+pub const MAX_TEMPLATE_OVERRIDES_BYTES: usize = 16 * 1024;
+
+impl WorkspaceTemplateRef {
+    /// Reads the `template` setting of a workspace, or of an archive that came from another server. A value that is
+    /// not shaped like a reference (an id that is not a short slug, a version of 0, adjustments that are not an
+    /// object or are too large) is `None`, so the workspace is simply on `general`.
+    pub fn from_setting(value: &Value) -> Option<Self> {
+        let reference: Self = serde_json::from_value(value.clone()).ok()?;
+        let slug = !reference.id.is_empty()
+            && reference.id.len() <= 40
+            && reference
+                .id
+                .chars()
+                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-');
+        let overrides_fit = match &reference.overrides {
+            Value::Null => true,
+            Value::Object(_) => reference.overrides.to_string().len() <= MAX_TEMPLATE_OVERRIDES_BYTES,
+            _ => false,
+        };
+        (slug && reference.version >= 1 && overrides_fit).then_some(reference)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkspaceOverview {
     pub workspace_id: String,

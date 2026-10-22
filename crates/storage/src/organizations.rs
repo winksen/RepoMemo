@@ -1,4 +1,9 @@
+use repomemo_domain::WorkspaceTemplateRef;
+
 use super::*;
+
+/// Key of the workspace's template in its settings object.
+pub(crate) const TEMPLATE_SETTING: &str = "template";
 
 impl StorageEngine {
     pub async fn workspace_exists(&self, workspace_id: &str) -> Result<bool> {
@@ -129,6 +134,30 @@ impl StorageEngine {
             .await?;
         tx.commit().await?;
         Ok(settings)
+    }
+
+    /// The template the workspace was given (V0.2.166), or `None` when it has none, or one that is not shaped like a
+    /// reference: such a workspace is on `general`.
+    pub async fn workspace_template_ref(&self, workspace_id: &str) -> Result<Option<WorkspaceTemplateRef>> {
+        let settings = self.workspace_settings(workspace_id).await?;
+        Ok(settings
+            .get(TEMPLATE_SETTING)
+            .and_then(WorkspaceTemplateRef::from_setting))
+    }
+
+    /// Saves the workspace's template, or clears it (`None`), keeping the other settings.
+    pub async fn set_workspace_template_ref(
+        &self,
+        workspace_id: &str,
+        reference: Option<&WorkspaceTemplateRef>,
+    ) -> Result<()> {
+        let value = match reference {
+            Some(reference) => serde_json::to_value(reference)?,
+            None => Value::Null,
+        };
+        self.set_workspace_setting(workspace_id, TEMPLATE_SETTING, value)
+            .await
+            .map(|_| ())
     }
 
     pub async fn create_organization(&self, owner_id: &str, name: &str) -> Result<Organization> {

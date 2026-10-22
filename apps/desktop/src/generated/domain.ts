@@ -183,6 +183,16 @@ export interface Workspace {
   settings: unknown;
 }
 
+/**
+ * The template a workspace was given, as kept in its settings under `template`: the template's id, the
+ * version it was chosen at and the few adjustments an administrator saved on top of it.
+ */
+export interface WorkspaceTemplateRef {
+  id: string;
+  version: number;
+  overrides: unknown;
+}
+
 export interface WorkspaceOverview {
   workspace_id: string;
   source_count: number;

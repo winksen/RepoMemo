@@ -16,6 +16,7 @@ mod general;
 mod issue;
 pub mod limits;
 mod meta;
+mod resolve;
 
 #[cfg(test)]
 mod tests;
@@ -24,6 +25,7 @@ pub use catalogue::{Catalogue, SourceProblem};
 pub use general::{general, GENERAL_ID};
 pub use issue::TemplateIssue;
 pub use meta::{TemplateMeta, WORKSPACE_ICONS};
+pub use resolve::{Origin, Resolution};
 
 use serde::{Deserialize, Serialize};
 

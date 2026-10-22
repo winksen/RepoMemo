@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.166 (2026-10-22)
+
+A workspace remembers its template, and one resolver gives every part of the product the same answer.
+
+### Added
+- **The choice:** a workspace's settings gain one key, `template` (`{ id, version, overrides }`; the domain type `WorkspaceTemplateRef`). It rides in the settings the workspace already has, so there is no migration. `StorageEngine::workspace_template_ref` reads it and `set_workspace_template_ref` writes or clears it, keeping the other settings. A value that is not shaped like a reference (an id that is not a short slug, a version of 0, adjustments that are not an object or are over 16 KiB) reads as no choice.
+- **The resolver:** `Catalogue::resolve` settles a saved choice against the catalogue and never fails. No choice gives `general`; an id this server lacks gives `general` with the reason; a choice saved at a higher version than the server's template (a newer server) gives `general` with the reason; a lower saved version uses the server's current file. `RepoMemoCore::effective_template(workspace_id)` reads the choice and returns the template in force, where it came from (`Default`, `Workspace` or `Fallback` with the reason) and the choice as saved. The answer is kept per workspace and reused while the saved choice is the same.
+- **Export and import keep it:** a workspace archive already carries the workspace's whole settings object, so an export holds the choice; an import now writes it back into the new workspace when it is well shaped (an id that is not a short slug is left behind). A server that lacks the template shows `general` with the reason, and the choice takes effect if the template is added later.
+- **No change a person can see:** no route, setting or page uses the resolver yet; every workspace resolves to `general`.
+- **Tests (written, not run):** four in the templates crate (no choice, a choice at an older and the current version, a missing template, a choice from a newer server), one in storage (saved with its adjustments next to other settings, malformed values read as none, an export and import keep the reference and a tampered id is dropped, cleared) and two in the core (General by default and a reason for a missing template, the answer kept until the choice changes).
+- **Checks run on this release:** `cargo check` of the templates, domain, storage and api crates with their tests compiles; `rustfmt` shows nothing for the lines changed; `types:check`, `typecheck`, `docs:check` and `version:check` pass. **Not run:** the tests, as asked.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.165 (2026-10-22)
 
 The templates a server knows are the JSON files of one folder.

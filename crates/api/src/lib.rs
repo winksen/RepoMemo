@@ -33,6 +33,7 @@ mod remote_repo;
 mod repo_policy;
 mod repo_stack;
 mod repo_sync;
+mod template;
 mod versions;
 
 pub use agent::{
@@ -112,6 +113,8 @@ pub struct RepoMemoCore {
     ai_budget: BackgroundAiBudget,
     /// Per-file results of the knowledge map and health, kept between requests.
     meaning: meaning::MeaningCache,
+    /// The template each workspace uses, settled once and kept until its choice changes.
+    templates: template::TemplateResolver,
 }
 
 impl RepoMemoCore {
@@ -133,6 +136,7 @@ impl RepoMemoCore {
             clone_limits: CloneLimitHandles::default(),
             ai_budget: BackgroundAiBudget::default(),
             meaning: meaning::MeaningCache::default(),
+            templates: template::TemplateResolver::default(),
         }
     }
 
@@ -193,6 +197,7 @@ impl RepoMemoCore {
     }
 
     pub async fn delete_workspace(&self, workspace_id: String) -> Result<()> {
+        self.templates.forget(&workspace_id);
         self.storage.delete_workspace(&workspace_id).await
     }
 

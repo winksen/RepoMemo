@@ -1,5 +1,7 @@
 use crate::catalogue::BUILTIN_SOURCES;
-use crate::{general, limits, Catalogue, TemplateDefinition, TemplateIssue, FORMAT, GENERAL_ID, WORKSPACE_ICONS};
+use crate::{
+    general, limits, Catalogue, Origin, TemplateDefinition, TemplateIssue, FORMAT, GENERAL_ID, WORKSPACE_ICONS,
+};
 
 const VALID: &str = r#"{
   "format": 1,
@@ -370,4 +372,58 @@ fn a_catalogue_of_nothing_is_general_alone() {
     assert!(problems.is_empty());
     assert_eq!(catalogue, Catalogue::general_only());
     assert_eq!(ids(&catalogue), ["general"]);
+}
+
+fn catalogue_with_operations(version: u32) -> Catalogue {
+    let file = VALID.replace("\"version\": 2", &format!("\"version\": {version}"));
+    let (catalogue, problems) = Catalogue::load([("operations.json", file.as_str())]);
+    assert!(problems.is_empty(), "{problems:?}");
+    catalogue
+}
+
+#[test]
+fn no_choice_resolves_to_general() {
+    let resolution = catalogue_with_operations(2).resolve(None);
+    assert_eq!(resolution.template, general());
+    assert_eq!(resolution.origin, Origin::Default);
+}
+
+#[test]
+fn a_choice_the_catalogue_has_is_used_at_its_current_file() {
+    let catalogue = catalogue_with_operations(2);
+    for saved in [1, 2] {
+        let resolution = catalogue.resolve(Some(("operations", saved)));
+        assert_eq!(resolution.template.id(), "operations", "saved at version {saved}");
+        assert_eq!(resolution.template.meta.version, 2);
+        assert_eq!(resolution.origin, Origin::Workspace);
+    }
+    let general_chosen = catalogue.resolve(Some((GENERAL_ID, 1)));
+    assert_eq!(general_chosen.template, general());
+    assert_eq!(general_chosen.origin, Origin::Workspace);
+}
+
+#[test]
+fn a_missing_template_resolves_to_general_with_a_reason() {
+    let resolution = catalogue_with_operations(2).resolve(Some(("no-such-template", 1)));
+    assert_eq!(resolution.template, general());
+    let Origin::Fallback { reason } = resolution.origin else {
+        panic!("a fallback was expected")
+    };
+    assert!(
+        reason.contains("no-such-template") && reason.contains("not available"),
+        "{reason}"
+    );
+}
+
+#[test]
+fn a_choice_saved_by_a_newer_server_resolves_to_general_with_a_reason() {
+    let resolution = catalogue_with_operations(2).resolve(Some(("operations", 3)));
+    assert_eq!(resolution.template, general());
+    let Origin::Fallback { reason } = resolution.origin else {
+        panic!("a fallback was expected")
+    };
+    assert!(
+        reason.contains("operations") && reason.contains("newer server"),
+        "{reason}"
+    );
 }

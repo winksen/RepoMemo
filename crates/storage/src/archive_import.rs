@@ -11,8 +11,11 @@
 //! the text. The same goes for owners and assignees.
 
 use repomemo_domain::{
-    ArchiveChunkRef, ArchivePerson, WorkspaceArchiveData, LIFECYCLE_STATUSES, TASK_PRIORITIES, TASK_STATUSES,
+    ArchiveChunkRef, ArchivePerson, WorkspaceArchiveData, WorkspaceTemplateRef, LIFECYCLE_STATUSES, TASK_PRIORITIES,
+    TASK_STATUSES,
 };
+
+use crate::organizations::TEMPLATE_SETTING;
 
 use super::*;
 
@@ -373,6 +376,22 @@ impl StorageEngine {
                 .bind(workspace_id)
                 .execute(&mut *tx)
                 .await?;
+        }
+
+        // The template, by its reference: a server that lacks the template resolves it to `general` (V0.2.166).
+        if let Some(reference) = data
+            .workspace
+            .settings
+            .get(TEMPLATE_SETTING)
+            .and_then(WorkspaceTemplateRef::from_setting)
+        {
+            sqlx::query(&format!(
+                "UPDATE workspaces SET settings_json = json_set(settings_json, '$.{TEMPLATE_SETTING}', json(?1)) WHERE id = ?2"
+            ))
+            .bind(serde_json::to_string(&reference)?)
+            .bind(workspace_id)
+            .execute(&mut *tx)
+            .await?;
         }
 
         tx.commit().await?;

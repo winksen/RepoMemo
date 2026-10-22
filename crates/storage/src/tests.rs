@@ -1071,6 +1071,110 @@ async fn workspace_settings_keep_other_keys() {
 }
 
 #[tokio::test]
+async fn a_workspace_remembers_its_template_and_an_import_keeps_it() {
+    use repomemo_domain::WorkspaceTemplateRef;
+
+    let (storage, data_dir) = temp_storage("template-ref").await;
+    let workspace = storage.create_workspace("Runbooks").await.unwrap();
+    assert_eq!(storage.workspace_template_ref(&workspace.id).await.unwrap(), None);
+    assert!(storage.workspace_template_ref("missing").await.is_err());
+
+    // Saved with its adjustments, and the other settings stay.
+    let chosen = WorkspaceTemplateRef {
+        id: "operations".to_owned(),
+        version: 2,
+        overrides: json!({ "landing": "review" }),
+    };
+    storage
+        .set_workspace_setting(&workspace.id, "icon", json!("rocket"))
+        .await
+        .unwrap();
+    storage
+        .set_workspace_template_ref(&workspace.id, Some(&chosen))
+        .await
+        .unwrap();
+    assert_eq!(
+        storage.workspace_template_ref(&workspace.id).await.unwrap(),
+        Some(chosen.clone())
+    );
+    assert_eq!(
+        storage.workspace_settings(&workspace.id).await.unwrap()["icon"],
+        json!("rocket")
+    );
+    let plain = WorkspaceTemplateRef {
+        id: "general".to_owned(),
+        version: 1,
+        overrides: json!(null),
+    };
+    storage
+        .set_workspace_template_ref(&workspace.id, Some(&plain))
+        .await
+        .unwrap();
+    assert_eq!(
+        storage.workspace_settings(&workspace.id).await.unwrap()["template"],
+        json!({ "id": "general", "version": 1 }),
+        "no adjustments are written when there are none"
+    );
+
+    // A setting that is not shaped like a reference reads as no template.
+    let too_big = json!({ "id": "ops", "version": 1, "overrides": { "x": "y".repeat(20_000) } });
+    for bad in [
+        json!("operations"),
+        json!({ "id": "Ops", "version": 1 }),
+        json!({ "id": "", "version": 1 }),
+        json!({ "id": "ops", "version": 0 }),
+        json!({ "id": "ops", "version": 1, "overrides": [1] }),
+        too_big,
+        json!(null),
+    ] {
+        storage
+            .set_workspace_setting(&workspace.id, "template", bad.clone())
+            .await
+            .unwrap();
+        assert_eq!(
+            storage.workspace_template_ref(&workspace.id).await.unwrap(),
+            None,
+            "{bad}"
+        );
+    }
+
+    // The archive carries it, and an import writes it into the new workspace.
+    storage
+        .set_workspace_template_ref(&workspace.id, Some(&chosen))
+        .await
+        .unwrap();
+    let data = storage.export_workspace_data(&workspace.id).await.unwrap();
+    assert_eq!(data.workspace.settings["template"]["id"], json!("operations"));
+    let copy = storage.create_workspace("Copy").await.unwrap();
+    storage
+        .import_workspace_data(&copy.id, "importer", &data)
+        .await
+        .unwrap();
+    assert_eq!(
+        storage.workspace_template_ref(&copy.id).await.unwrap(),
+        Some(chosen.clone())
+    );
+
+    // A reference an archive should not carry is left behind.
+    let mut tampered = data.clone();
+    tampered.workspace.settings["template"] = json!({ "id": "../../etc", "version": 1 });
+    let other = storage.create_workspace("Other").await.unwrap();
+    storage
+        .import_workspace_data(&other.id, "importer", &tampered)
+        .await
+        .unwrap();
+    assert_eq!(storage.workspace_template_ref(&other.id).await.unwrap(), None);
+
+    // Clearing it returns the workspace to no template.
+    storage.set_workspace_template_ref(&workspace.id, None).await.unwrap();
+    assert_eq!(storage.workspace_template_ref(&workspace.id).await.unwrap(), None);
+
+    storage.pool.close().await;
+    drop(storage);
+    let _ = std::fs::remove_dir_all(data_dir);
+}
+
+#[tokio::test]
 async fn vector_search_uses_the_index_and_agrees_with_a_scan() {
     let (storage, data_dir) = temp_storage("vectors").await;
     let workspace = storage.create_workspace("Vectors").await.unwrap();
