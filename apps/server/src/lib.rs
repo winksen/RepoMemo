@@ -24,6 +24,7 @@ mod errors;
 mod events;
 mod health;
 mod indexing;
+mod load;
 mod logs;
 mod mail;
 mod maintenance;
@@ -149,6 +150,8 @@ struct AppState {
     jwt_secret: String,
     /// The largest workspace archive an import accepts.
     max_import_bytes: u64,
+    /// The requests being served now, and the cap on them (`REPOMEMO_MAX_IN_FLIGHT`).
+    load: Arc<load::LoadGate>,
     /// The largest file an upload or a new version accepts.
     max_upload_bytes: u64,
     /// Room for uploads in flight, one permit for each KiB (`REPOMEMO_UPLOAD_INFLIGHT_MB`).
@@ -441,6 +444,10 @@ async fn build_state(
         core,
         jwt_secret: config.jwt_secret.clone(),
         max_import_bytes: config.max_import_bytes,
+        load: Arc::new(load::LoadGate::new(
+            config.max_in_flight,
+            config.max_in_flight_per_account,
+        )),
         max_upload_bytes: config.max_upload_bytes as u64,
         upload_gate: Arc::new(tokio::sync::Semaphore::new(
             (config.upload_inflight_bytes / 1024).clamp(1, u32::MAX as u64) as usize,
@@ -896,6 +903,9 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route("/v1/workspaces/{workspace_id}/events", get(workspace_events))
         .route("/v1/system/events", get(system_events))
         .layer(middleware::from_fn_with_state(state.clone(), web_session::web_session))
+        // Past the cap on requests being served a request is refused at once (health checks, sign-in and
+        // the event streams are outside the count).
+        .layer(middleware::from_fn_with_state(state.clone(), load::shed_load))
         .layer(CatchPanicLayer::custom(panic_response))
         .layer(middleware::from_fn_with_state(
             security::HeaderPolicy {

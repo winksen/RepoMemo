@@ -78,6 +78,12 @@ pub struct ServerConfig {
     pub embedding_concurrency: usize,
     /// Database connections that serve reads (`REPOMEMO_DB_READ_CONNECTIONS`).
     pub db_read_connections: u32,
+    /// Requests served at once, all accounts together (`REPOMEMO_MAX_IN_FLIGHT`, 0 for no limit).
+    /// Past it a request is refused at once with `503`.
+    pub max_in_flight: usize,
+    /// Requests served at once for one account (`REPOMEMO_MAX_IN_FLIGHT_PER_ACCOUNT`, 0 for no
+    /// limit). Past it a request is refused at once with `429`.
+    pub max_in_flight_per_account: usize,
     /// The page cache of each read connection, in MiB (`REPOMEMO_SQLITE_CACHE_MB`, 0 keeps SQLite's own).
     pub db_read_cache_mb: u32,
     /// Memory-mapped reads of each read connection, in MiB (`REPOMEMO_SQLITE_MMAP_MB`, 0 turns them off).
@@ -333,6 +339,16 @@ impl ServerConfig {
             index_concurrency: env_parse::<usize>("REPOMEMO_INDEX_CONCURRENCY", 2)?.clamp(1, 16),
             embedding_concurrency: env_parse::<usize>("REPOMEMO_EMBEDDING_CONCURRENCY", 1)?.clamp(1, 8),
             db_read_connections: env_parse::<u32>("REPOMEMO_DB_READ_CONNECTIONS", 4)?.clamp(1, 64),
+            max_in_flight: env_parse::<usize>(
+                "REPOMEMO_MAX_IN_FLIGHT",
+                (env_parse::<usize>("REPOMEMO_DB_READ_CONNECTIONS", 4)?.clamp(1, 64) * 16).max(32),
+            )?
+            .min(100_000),
+            max_in_flight_per_account: env_parse::<usize>(
+                "REPOMEMO_MAX_IN_FLIGHT_PER_ACCOUNT",
+                (env_parse::<usize>("REPOMEMO_DB_READ_CONNECTIONS", 4)?.clamp(1, 64) * 8).max(16),
+            )?
+            .min(100_000),
             db_read_cache_mb: env_parse::<u32>("REPOMEMO_SQLITE_CACHE_MB", repomemo_storage::DEFAULT_READ_CACHE_MB)?
                 .min(4 * 1024),
             db_read_mmap_mb: env_parse::<u32>("REPOMEMO_SQLITE_MMAP_MB", repomemo_storage::DEFAULT_READ_MMAP_MB)?
@@ -437,6 +453,8 @@ impl ServerConfig {
             index_concurrency: 2,
             embedding_concurrency: 1,
             db_read_connections: 4,
+            max_in_flight: 256,
+            max_in_flight_per_account: 128,
             db_read_cache_mb: repomemo_storage::DEFAULT_READ_CACHE_MB,
             db_read_mmap_mb: repomemo_storage::DEFAULT_READ_MMAP_MB,
             vector_index_mb: 64,

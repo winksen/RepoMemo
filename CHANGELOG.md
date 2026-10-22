@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.161 (2026-10-21)
+
+When the server is full it says so at once, instead of letting requests queue until they time out.
+
+### Changed
+- **Load shedding (P21):** past the database's read connections and its one writer, requests queued until the request timeout, so a flood (or one script making hundreds of calls at once) made every other person wait. The server now counts the requests it is serving. Past `REPOMEMO_MAX_IN_FLIGHT` (16 for each read connection, 64 by default) a new request is refused at once with `503 overloaded` and `Retry-After: 1`; past `REPOMEMO_MAX_IN_FLIGHT_PER_ACCOUNT` (8 for each read connection, 32 by default) a new request of the same account or personal access token is refused at once with `429` and `Retry-After`, while the others are served. `0` turns either cap off.
+- **What keeps room of its own:** health checks (`/health*`), sign-in and the other `/v1/auth/*` calls, setup, invitation links and the event streams are outside the count, so a busy server can still be checked, signed in to and watched. The refusal costs a counter and no database read; the account is read from the session token's signature (a forged token cannot spend another account's share) or the personal access token, as the request arrives.
+- **Counted and shown:** `repomemo_requests_in_flight`, `repomemo_requests_shed_server_total` and `repomemo_requests_shed_account_total` in `GET /v1/system/metrics`, and both caps in System › Overview with the other concurrency settings.
+- **Why not `tower`'s `ConcurrencyLimit`:** it makes the next request wait for a place; the point is not to wait, so a small counting middleware (`load.rs`) refuses instead.
+- **Tests (written, not run):** `requests_past_the_cap_are_refused_at_once_and_health_and_sign_in_keep_room` (two uploads held open: a second request of the same account gets `429`, another account is served, a third account gets `503` once the server is full, health and sign-in still answer, and everything is served again when the uploads end, with the refusals in the metrics).
+- **Checks run on this release:** `cargo check` of the server with its tests compiles; `rustfmt` shows nothing for the lines changed; `docs:check` and `version:check` pass. **Not run:** the tests, as asked.
+
+### Upgrading
+- Nothing to do. A script that makes more than 32 calls at once for one account retries after the `Retry-After` it is given, or the cap is raised (`REPOMEMO_MAX_IN_FLIGHT_PER_ACCOUNT`).
+
 ## V0.2.160 (2026-10-21)
 
 JSON answers are compressed for a client that asks, without a proxy in front.

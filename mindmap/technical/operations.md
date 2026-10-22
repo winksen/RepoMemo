@@ -255,6 +255,8 @@ All are run-time settings (System › Settings) with an environment default; `0`
 | `REPOMEMO_DOCUMENT_TIMEOUT_SECONDS` | 60 | A document that takes forever to read: its reader process is killed |
 | `REPOMEMO_DOCUMENT_MEMORY_MB` | 1,024 | A document that eats memory: its reader process stops (`0` is no limit) |
 | `REPOMEMO_VECTOR_INDEX_MB` | 512 | Memory held for meaning search |
+| `REPOMEMO_MAX_IN_FLIGHT` | 64 | Requests served at once. Past it a request is refused at once with `503` and `Retry-After`, so a flood is answered quickly and the others keep their turn. Health checks, sign-in and the event streams are outside the count. `0` turns it off |
+| `REPOMEMO_MAX_IN_FLIGHT_PER_ACCOUNT` | 32 | Requests served at once for one account (or personal access token): a script with too many at a time gets `429` and `Retry-After`; the others are not slowed. `0` turns it off |
 | `REPOMEMO_SQLITE_CACHE_MB` | 32 | Page cache of each of the read connections (`REPOMEMO_DB_READ_CONNECTIONS`, 4): up to that many times this much memory for searching a large database. 0 keeps SQLite's own |
 | `REPOMEMO_SQLITE_MMAP_MB` | 256 | Memory-mapped reads of each read connection; 0 turns them off. Lower it on a host with little memory or a network-mounted data folder |
 

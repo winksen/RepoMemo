@@ -484,6 +484,22 @@ impl InstanceInfo {
             ("Embedding workspaces at once", config.embedding_concurrency.to_string()),
             ("Database read connections", config.db_read_connections.to_string()),
             (
+                "Requests served at once",
+                if config.max_in_flight == 0 {
+                    "no limit".to_owned()
+                } else {
+                    config.max_in_flight.to_string()
+                },
+            ),
+            (
+                "Requests served at once for one account",
+                if config.max_in_flight_per_account == 0 {
+                    "no limit".to_owned()
+                } else {
+                    config.max_in_flight_per_account.to_string()
+                },
+            ),
+            (
                 "Page cache of each read connection",
                 if config.db_read_cache_mb == 0 {
                     "SQLite's own (about 2 MiB)".to_owned()
@@ -2148,6 +2164,22 @@ pub(crate) async fn metrics(
         "repomemo_vector_index_workspaces",
         "Workspaces with a vector index.",
         vector_workspaces,
+    );
+    out.gauge(
+        "repomemo_requests_in_flight",
+        "Requests being served now (health checks, sign-in and event streams are not counted).",
+        state.load.in_flight(),
+    );
+    let (shed_server, shed_account) = state.load.shed();
+    out.counter(
+        "repomemo_requests_shed_server",
+        "Requests refused with 503 because the server was serving as many as REPOMEMO_MAX_IN_FLIGHT allows.",
+        shed_server,
+    );
+    out.counter(
+        "repomemo_requests_shed_account",
+        "Requests refused with 429 because one account was already serving as many as REPOMEMO_MAX_IN_FLIGHT_PER_ACCOUNT allows.",
+        shed_account,
     );
     out.gauge(
         "repomemo_abandoned_document_readings",
