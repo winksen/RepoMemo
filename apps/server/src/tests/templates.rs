@@ -156,6 +156,14 @@ async fn the_four_first_templates_are_offered_and_each_creates_its_folders() {
             id == "software-engineering",
             "{id}"
         );
+        // Evidence nobody has touched (V0.2.182): Operations after 90 days, the Knowledge base after 180, nobody else.
+        let days = match id {
+            "operations" => json!(90),
+            "knowledge-base" => json!(180),
+            _ => Value::Null,
+        };
+        assert_eq!(view["health"]["stale_after_days"], days, "{id}");
+        assert_eq!(checks.contains(&json!("stale_evidence")), !days.is_null(), "{id}");
         // Ranking (V0.2.178): Operations and Knowledge base favour verified evidence more.
         let factor = if id == "operations" || id == "knowledge-base" {
             1.15

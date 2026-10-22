@@ -1339,6 +1339,60 @@ async fn the_times_files_were_last_changed_are_read_for_the_files_asked_about_on
 }
 
 #[tokio::test]
+async fn the_time_a_file_was_last_marked_verified_is_read_for_verified_files_only() {
+    use repomemo_domain::ArtifactType;
+    let (storage, data_dir) = temp_storage("verified-times").await;
+    let workspace = storage.create_workspace("Verified").await.unwrap();
+    let source = storage.create_or_get_source(&workspace.id, SourceType::Folder, "fixture", Some("fixture")).await.unwrap();
+    let mut ids = Vec::new();
+    for path in ["checked.md", "plain.md"] {
+        let bytes = path.as_bytes();
+        let content_hash = StorageEngine::content_hash(bytes);
+        storage.store_blob(&content_hash, bytes, None).await.unwrap();
+        let artifact = storage
+            .store_artifact(NewArtifact {
+                workspace_id: workspace.id.clone(),
+                source_id: source.id.clone(),
+                artifact_type: ArtifactType::MarkdownDoc,
+                title: path.to_owned(),
+                path: path.to_owned(),
+                content_hash,
+                mime_type: None,
+                language: None,
+                size_bytes: bytes.len() as i64,
+                metadata: json!({}),
+            })
+            .await
+            .unwrap()
+            .artifact;
+        ids.push(artifact.id);
+    }
+    assert!(storage.verified_times(&workspace.id).await.unwrap().is_empty());
+    let reviewer = storage.create_user("verifier@example.com", "Verifier", "hash").await.unwrap();
+    storage
+        .save_artifact_lifecycle(
+            &ids[0],
+            &reviewer.id,
+            crate::SaveArtifactLifecycle {
+                status: "verified".to_owned(),
+                owner_user_id: None,
+                review_note: "Checked.".to_owned(),
+                superseded_by_artifact_id: None,
+            },
+        )
+        .await
+        .unwrap();
+    let times = storage.verified_times(&workspace.id).await.unwrap();
+    assert_eq!(times.len(), 1);
+    assert!(times.contains_key(&ids[0]) && !times.contains_key(&ids[1]));
+    assert!(chrono::DateTime::parse_from_rfc3339(&times[&ids[0]]).is_ok());
+
+    storage.pool.close().await;
+    drop(storage);
+    let _ = std::fs::remove_dir_all(data_dir);
+}
+
+#[tokio::test]
 async fn vector_search_uses_the_index_and_agrees_with_a_scan() {
     let (storage, data_dir) = temp_storage("vectors").await;
     let workspace = storage.create_workspace("Vectors").await.unwrap();

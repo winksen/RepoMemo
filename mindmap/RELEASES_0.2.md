@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.2 → 0.3
 
-> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.181` (2026-10-22) · **Next:** `V0.2.182`
+> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.182` (2026-10-22) · **Next:** `V0.2.183`
 > **Previous line:** [Releases 0.1 → 0.2](RELEASES_0.1.md) · **Related:** [Roadmap, Road to V0.3.0](ROADMAP.md#-road-to-v030) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
 Every release of the 0.2 line, shipped and planned, one row each. The plan comes from the [Road to V0.3.0](ROADMAP.md#-road-to-v030): **one change per release**, each shippable alone, with the security rules for a new outside connection in the release that opens it. Planned rows are proposals until decisions 7–14 in the roadmap are agreed; tracks L and M waited on decisions 20–23, and track N on decisions 24–28 (taken as proposed).
@@ -219,7 +219,7 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | **V0.2.179** | ✅ 2026-10-22 |N. Workspace templates |🔧 Enhancement | Search | Boosts by type, document kind and folder pattern, bounded | A clearly better match still wins; 16 matching rules stay under the cap |
 | **V0.2.180** | ✅ 2026-10-22 |N. Workspace templates |🔧 Enhancement | Search | A preference for recent evidence, within the same bounds | A month-old runbook edges out a year-old one of equal relevance |
 | **V0.2.181** | ✅ 2026-10-22 |N. Workspace templates |🔧 Enhancement | Health | The health checks that run, and their order, follow the template | A detector left out is not run; General runs all |
-| **V0.2.182** | 🔜 Planned | N. Workspace templates | ✨ Feature | Health | A check for stale evidence, with the age set by the template | Flagged at 91 days and not at 89; General reports none |
+| **V0.2.182** | ✅ 2026-10-22 |N. Workspace templates |✨ Feature | Health | A check for stale evidence, with the age set by the template | Flagged at 91 days and not at 89; General reports none |
 | **V0.2.183** | 🔜 Planned | N. Workspace templates | 🔧 Enhancement | Review | The review queue lists what the template cares about first | Operations lists health findings first; General keeps today's order |
 | **V0.2.184** | 🔜 Planned | N. Workspace templates | 🔧 Enhancement | Map | The knowledge map puts the template's kinds of evidence first | Software engineering shows repositories and symbols first |
 | **V0.2.185** | 🔜 Planned | N. Workspace templates | 🔧 Enhancement | Assistant | The assistant recognises a template's phrases and knows what the workspace is for | General's Ask prompt is byte-identical to before; no rule is loosened |

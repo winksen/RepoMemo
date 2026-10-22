@@ -364,6 +364,8 @@ pub struct TemplateRanking {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TemplateHealth {
     pub detectors: Vec<String>,
+    /// For `stale_evidence`: after how many days without a change or a verification evidence is stale.
+    pub stale_after_days: Option<u32>,
 }
 
 /// A template as a person looks at it before choosing it: what it arranges and names, without any workspace's choice.
@@ -1405,6 +1407,9 @@ pub enum HealthDetector {
     /// A file with no close neighbour by meaning and no memory citing it.
     /// A weak signal: shown as information, never as a removal.
     Unconnected,
+    /// A file nobody has changed or verified for as long as the workspace's template allows. Only run where the
+    /// template asks for it (V0.2.182).
+    StaleEvidence,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -1449,6 +1454,7 @@ impl HealthDetector {
             Self::IndexFailed => "index_failed",
             Self::StaleMemoryCitation => "stale_memory_citation",
             Self::Unconnected => "unconnected",
+            Self::StaleEvidence => "stale_evidence",
         }
     }
 
@@ -1457,7 +1463,21 @@ impl HealthDetector {
         Self::ALL.into_iter().find(|detector| detector.as_str() == id)
     }
 
-    pub const ALL: [HealthDetector; 7] = [
+    /// Every check there is, in the order they are listed.
+    pub const ALL: [HealthDetector; 8] = [
+        Self::OlderVersionActive,
+        Self::DuplicateContent,
+        Self::RemovedSymbolMentioned,
+        Self::OutdatedEvidenceReferenced,
+        Self::StaleMemoryCitation,
+        Self::IndexFailed,
+        Self::Unconnected,
+        Self::StaleEvidence,
+    ];
+
+    /// The checks a workspace runs when its template does not choose: the seven Health has always had. The check for
+    /// evidence nobody has touched (V0.2.182) is only run where a template asks for it.
+    pub const DEFAULT: [HealthDetector; 7] = [
         Self::OlderVersionActive,
         Self::DuplicateContent,
         Self::RemovedSymbolMentioned,

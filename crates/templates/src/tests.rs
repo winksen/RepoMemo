@@ -1325,8 +1325,12 @@ fn with_health(block: &str) -> String {
 
 #[test]
 fn every_health_check_runs_in_the_usual_order_unless_a_template_chooses() {
-    assert_eq!(general().health_detectors(), HEALTH_DETECTORS);
-    assert_eq!(parse(VALID).unwrap().health_detectors(), HEALTH_DETECTORS);
+    // The seven checks Health has always had; the check for stale evidence runs only where a template names it.
+    assert_eq!(general().health_detectors(), DEFAULT_DETECTORS);
+    assert_eq!(parse(VALID).unwrap().health_detectors(), DEFAULT_DETECTORS);
+    assert!(!DEFAULT_DETECTORS.contains(&"stale_evidence") && HEALTH_DETECTORS.contains(&"stale_evidence"));
+    assert_eq!(&HEALTH_DETECTORS[..7], DEFAULT_DETECTORS.as_slice());
+    assert_eq!(general().stale_after_days(), None);
     let chosen = parse(&with_health(
         r#"{ "detectors": ["outdated_evidence_referenced", "stale_memory_citation"] }"#,
     ))
@@ -1337,7 +1341,7 @@ fn every_health_check_runs_in_the_usual_order_unless_a_template_chooses() {
     );
     assert_eq!(parse(&serde_json::to_string(&chosen).unwrap()).unwrap(), chosen);
     assert!(!serde_json::to_string(&general()).unwrap().contains("health"));
-    assert_eq!(HEALTH_DETECTORS.len(), 7);
+    assert_eq!(HEALTH_DETECTORS.len(), 8);
 }
 
 #[test]
@@ -1363,6 +1367,63 @@ fn a_health_check_must_exist_be_listed_once_and_at_least_one_must_run() {
 }
 
 #[test]
+fn the_check_for_stale_evidence_needs_its_days_and_the_days_need_the_check() {
+    let ok = parse(&with_health(
+        r#"{ "detectors": ["stale_evidence", "index_failed"], "stale_after_days": 90 }"#,
+    ))
+    .unwrap();
+    assert_eq!(ok.stale_after_days(), Some(90));
+    assert_eq!(parse(&serde_json::to_string(&ok).unwrap()).unwrap(), ok);
+    for (block, path) in [
+        (r#"{ "detectors": ["stale_evidence"] }"#, "health.stale_after_days"),
+        (
+            r#"{ "detectors": ["index_failed"], "stale_after_days": 90 }"#,
+            "health.stale_after_days",
+        ),
+        (
+            r#"{ "detectors": ["stale_evidence"], "stale_after_days": 6 }"#,
+            "health.stale_after_days",
+        ),
+        (
+            r#"{ "detectors": ["stale_evidence"], "stale_after_days": 3651 }"#,
+            "health.stale_after_days",
+        ),
+    ] {
+        assert_eq!(parse(&with_health(block)).unwrap_err()[0].path, path, "{block}");
+    }
+    for days in [STALE_DAYS_MIN, STALE_DAYS_MAX] {
+        let block = format!(r#"{{ "detectors": ["stale_evidence"], "stale_after_days": {days} }}"#);
+        assert!(parse(&with_health(&block)).is_ok(), "{days}");
+    }
+    assert!(
+        parse(&with_health(
+            r#"{ "detectors": ["stale_evidence"], "stale_after_days": 90.5 }"#
+        ))
+        .is_err(),
+        "whole days"
+    );
+}
+
+#[test]
+fn operations_and_the_knowledge_base_check_for_stale_evidence_and_the_others_do_not() {
+    let catalogue = Catalogue::builtin();
+    let operations = catalogue.get("operations").unwrap();
+    assert_eq!(operations.health_detectors()[0], "stale_evidence", "first in the list");
+    assert_eq!(operations.stale_after_days(), Some(90));
+    let knowledge = catalogue.get("knowledge-base").unwrap();
+    assert_eq!(knowledge.stale_after_days(), Some(180));
+    assert!(knowledge.health_detectors().contains(&"stale_evidence".to_owned()));
+    for id in ["software-engineering", "product-decisions"] {
+        let template = catalogue.get(id).unwrap();
+        assert!(
+            !template.health_detectors().contains(&"stale_evidence".to_owned()),
+            "{id}"
+        );
+        assert_eq!(template.stale_after_days(), None, "{id}");
+    }
+}
+
+#[test]
 fn the_four_first_templates_run_the_checks_their_teams_need_and_keep_indexing_failures() {
     let catalogue = Catalogue::builtin();
     let checks = |id: &str| catalogue.get(id).unwrap().health_detectors();
@@ -1377,7 +1438,12 @@ fn the_four_first_templates_run_the_checks_their_teams_need_and_keep_indexing_fa
     );
     assert_eq!(
         checks("operations"),
-        ["outdated_evidence_referenced", "stale_memory_citation", "index_failed"]
+        [
+            "stale_evidence",
+            "outdated_evidence_referenced",
+            "stale_memory_citation",
+            "index_failed"
+        ]
     );
     assert_eq!(
         checks("product-decisions"),
@@ -1393,6 +1459,7 @@ fn the_four_first_templates_run_the_checks_their_teams_need_and_keep_indexing_fa
         [
             "older_version_active",
             "duplicate_content",
+            "stale_evidence",
             "outdated_evidence_referenced",
             "index_failed"
         ]

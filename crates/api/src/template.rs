@@ -95,6 +95,7 @@ pub fn detail_of(template: &TemplateDefinition) -> TemplateDetail {
         },
         health: TemplateHealth {
             detectors: template.health_detectors(),
+            stale_after_days: template.stale_after_days(),
         },
         ranking: {
             let ranking = template.ranking();
@@ -542,6 +543,11 @@ mod tests {
         use repomemo_domain::HealthDetector;
         let ids: Vec<&str> = HealthDetector::ALL.iter().map(|detector| detector.as_str()).collect();
         assert_eq!(ids, repomemo_templates::HEALTH_DETECTORS);
+        let defaults: Vec<&str> = HealthDetector::DEFAULT
+            .iter()
+            .map(|detector| detector.as_str())
+            .collect();
+        assert_eq!(defaults, repomemo_templates::DEFAULT_DETECTORS);
         for detector in HealthDetector::ALL {
             assert_eq!(HealthDetector::from_id(detector.as_str()), Some(detector));
             assert_eq!(serde_json::to_value(detector).unwrap(), json!(detector.as_str()));

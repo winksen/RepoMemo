@@ -27,6 +27,7 @@ const DETECTORS: Record<HealthDetector, { label: string; looksFor: string; icon:
   outdated_evidence_referenced: { label: "Outdated references", looksFor: "Files naming a file marked outdated or superseded.", icon: <LinkOff size={ICON_SIZE.md} /> },
   stale_memory_citation: { label: "Stale memory", looksFor: "Memory cards whose cited passages changed, disappeared or were retired.", icon: <LinkOff size={ICON_SIZE.md} /> },
   index_failed: { label: "Indexing failures", looksFor: "Files search cannot see because indexing failed.", icon: <FileAlert size={ICON_SIZE.md} /> },
+  stale_evidence: { label: "Stale evidence", looksFor: "Files nobody has changed or marked verified for as long as this workspace's template allows.", icon: <Versions size={ICON_SIZE.md} /> },
   unconnected: { label: "Unconnected", looksFor: "Files close in meaning to nothing else and cited by no memory. Information only.", icon: <Unconnected size={ICON_SIZE.md} /> },
 };
 

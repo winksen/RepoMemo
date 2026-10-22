@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.182 (2026-10-22)
+
+A new health check finds evidence nobody has touched for as long as the template allows.
+
+### Added
+- **Stale evidence:** a file is stale when more than `stale_after_days` whole days have passed since it was last changed and since it was last marked verified. A file verified within the limit is not stale, a repository's overview is never checked, and a report lists the 200 longest-untouched files at most. With a limit of 90 days a file is flagged at 91 days and not at 89. A finding is a normal one: a warning titled with the age, the file, and the actions Health already has (ask for a review, mark outdated, make a task, dismiss); to verify the file, open it from the finding. It appears in Workspace Health and in the Review queue like any other finding.
+- **Only where a template asks:** the check is `stale_evidence` in the `health` block's list, with `health.stale_after_days` (7 to 3650) required beside it and refused without it. No workspace runs it unless its template lists it, so **General reports none**. *Operations and incidents* runs it first, at 90 days; the *Knowledge base* runs it third, at 180.
+- **A new check, an old list:** `HealthDetector` has an eighth check. `HealthDetector::DEFAULT` stays the seven that have always run (it is what a workspace without a template runs) and `ALL` has all eight. The cached Health answer is keyed by the days as well as by the checks, so changing the limit is never answered from the cache.
+- **Tests (written, not run):** two in the templates crate (the days required with the check, bounded to 7 to 3650 whole days and refused without it; which templates run it), four in the api crate (the plan carries the days and keys the cache; flagged at 91 days and not at 89 or exactly 90, the oldest first, with the usual actions; evidence verified within the limit is not stale, the age counts from the last verification, a repository is never checked, a time that cannot be read is left out; a report lists the oldest 200 only), one in storage (the time a file was last marked verified, for verified files only), and the server's and the web's template tests check the days. The earlier checks' tests follow the new list.
+- **Checks run on this release:** `cargo check` of the templates, storage, api and server crates with their tests compiles; `rustfmt` shows nothing for the lines changed; `types:check`, `typecheck`, `styles:check`, `a11y:check`, `docs:check` and `version:check` pass. **Not run:** the tests, as asked.
+
+### Upgrading
+- Nothing to do. No workspace runs the new check until an administrator chooses a template that lists it.
+
 ## V0.2.181 (2026-10-22)
 
 The health checks that run, and their order, follow the workspace's template.

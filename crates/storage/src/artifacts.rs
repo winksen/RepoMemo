@@ -1258,6 +1258,21 @@ impl StorageEngine {
             .collect())
     }
 
+    /// `artifact id -> when it was last marked verified` (V0.2.182), for the check on evidence nobody has touched. A
+    /// file that is not verified now is not in it.
+    pub async fn verified_times(&self, workspace_id: &str) -> Result<HashMap<String, String>> {
+        let rows = sqlx::query(
+            "SELECT artifact_id, COALESCE(reviewed_at, updated_at) AS verified_at FROM artifact_lifecycle WHERE workspace_id = ?1 AND status = 'verified'",
+        )
+        .bind(workspace_id)
+        .fetch_all(self.reader())
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|row| (row.get("artifact_id"), row.get("verified_at")))
+            .collect())
+    }
+
     /// Files marked *needs review*, with the note left when they were, the
     /// longest-waiting first: `(artifact id, title, path, note, since)`.
     pub async fn artifacts_needing_review(

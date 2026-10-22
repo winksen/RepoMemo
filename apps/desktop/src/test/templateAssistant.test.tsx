@@ -57,7 +57,7 @@ function templateWith(assistant: WorkspaceTemplateView["assistant"]): WorkspaceT
     template: { id: "operations", version: 1, name: "Operations and incidents", summary: "", icon: "heartbeat" },
     source: "workspace", reason: null, chosen_id: "operations", overrides: null,
     sections: { primary: [], more: [], landing: "overview" }, labels: { sections: {}, artifact_types: {} }, overview: { cards: [] },
-    evidence: { default_view: "grid", types_first: [] }, assistant, retrieval: { type_chips: [] }, ranking: { verified: 1.1, boosts: [], recency: null }, health: { detectors: ["index_failed"] },
+    evidence: { default_view: "grid", types_first: [] }, assistant, retrieval: { type_chips: [] }, ranking: { verified: 1.1, boosts: [], recency: null }, health: { detectors: ["index_failed"], stale_after_days: null },
   };
 }
 

@@ -310,6 +310,8 @@ export interface TemplateRanking {
 /** The health checks that run in a workspace, in the order their findings are listed. For `general`: every check. */
 export interface TemplateHealth {
   detectors: string[];
+  /** For `stale_evidence`: after how many days without a change or a verification evidence is stale. */
+  stale_after_days: number | null;
 }
 
 /** A template as a person looks at it before choosing it: what it arranges and names, without any workspace's choice. */
@@ -1209,7 +1211,8 @@ export type HealthDetector =
   | "outdated_evidence_referenced"
   | "index_failed"
   | "stale_memory_citation"
-  | "unconnected";
+  | "unconnected"
+  | "stale_evidence";
 
 export type HealthSeverity =
   | "warning"

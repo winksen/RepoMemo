@@ -36,7 +36,7 @@ pub use catalogue::{Catalogue, SourceProblem};
 pub use evidence::{EvidenceBlock, ResolvedEvidence, DEFAULT_VIEW, EVIDENCE_VIEWS, FILE_TYPES};
 pub use folders::StarterFolder;
 pub use general::{general, GENERAL_ID};
-pub use health::{HealthBlock, HEALTH_DETECTORS};
+pub use health::{HealthBlock, DEFAULT_DETECTORS, HEALTH_DETECTORS, STALE_DAYS_MAX, STALE_DAYS_MIN};
 pub use issue::TemplateIssue;
 pub use labels::{LabelsBlock, ARTIFACT_TYPES};
 pub use meta::{TemplateMeta, WORKSPACE_ICONS};
@@ -181,6 +181,11 @@ impl TemplateDefinition {
     /// The health checks that run, in the order their findings are listed.
     pub fn health_detectors(&self) -> Vec<String> {
         HealthBlock::resolved(self.health.as_ref())
+    }
+
+    /// After how many days without a change or a verification evidence is stale, when the template checks for it.
+    pub fn stale_after_days(&self) -> Option<u32> {
+        self.health.as_ref().and_then(|health| health.stale_after_days)
     }
 
     /// How search weighs what it finds, complete.

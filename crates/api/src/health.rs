@@ -38,24 +38,28 @@ const UNCONNECTED_MAX_FILES: usize = 2_000;
 const UNCONNECTED_MAX_SHARE: f64 = 0.15;
 
 /// Which checks run in a workspace and in what order their findings are listed (V0.2.181): its template's choice, or
-/// every check in the usual order.
+/// the seven checks Health has always run.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HealthPlan {
     detectors: Vec<HealthDetector>,
+    /// For `stale_evidence` (V0.2.182): after how many days without a change or a verification evidence is stale.
+    stale_after_days: Option<u32>,
 }
 
 impl HealthPlan {
     /// The plan of a template: the checks it names, in its order. A name this server does not know is skipped.
-    pub fn from_ids(ids: &[String]) -> Self {
+    pub fn from_ids(ids: &[String], stale_after_days: Option<u32>) -> Self {
         Self {
             detectors: ids.iter().filter_map(|id| HealthDetector::from_id(id)).collect(),
+            stale_after_days,
         }
     }
 
-    /// Every check in the usual order: what a workspace without a template runs.
+    /// What a workspace without a template runs: the seven checks Health has always had, in the usual order.
     pub fn all() -> Self {
         Self {
-            detectors: HealthDetector::ALL.to_vec(),
+            detectors: HealthDetector::DEFAULT.to_vec(),
+            stale_after_days: None,
         }
     }
 
@@ -76,11 +80,16 @@ impl HealthPlan {
 
     /// What a cached answer was made for: a change of plan must not be answered from the cache.
     pub fn cache_key(&self) -> String {
-        self.detectors
+        let checks = self
+            .detectors
             .iter()
             .map(|detector| detector.as_str())
             .collect::<Vec<_>>()
-            .join(",")
+            .join(",");
+        match self.stale_after_days {
+            Some(days) => format!("{checks}@{days}"),
+            None => checks,
+        }
     }
 }
 
@@ -89,7 +98,10 @@ impl RepoMemoCore {
     /// be the reason Health says nothing.
     pub async fn health_plan(&self, workspace_id: &str) -> HealthPlan {
         match self.effective_template(workspace_id).await {
-            Ok(effective) => HealthPlan::from_ids(&effective.template.health_detectors()),
+            Ok(effective) => HealthPlan::from_ids(
+                &effective.template.health_detectors(),
+                effective.template.stale_after_days(),
+            ),
             Err(_) => HealthPlan::all(),
         }
     }
@@ -153,6 +165,9 @@ impl RepoMemoCore {
         if plan.runs(HealthDetector::IndexFailed) {
             findings.extend(self.index_failures(workspace_id, &retired, &by_id).await?);
         }
+        if let (true, Some(days)) = (plan.runs(HealthDetector::StaleEvidence), plan.stale_after_days) {
+            findings.extend(self.stale_evidence(workspace_id, &live_items, days).await?);
+        }
         // Without the check there is nothing to say about similarity either.
         let similarity_available = if plan.runs(HealthDetector::Unconnected) {
             match self
@@ -206,6 +221,18 @@ impl RepoMemoCore {
             checked_file_count: live.len() as i64,
             similarity_available,
         })
+    }
+
+    /// Files nobody has changed or verified for `days` days (V0.2.182), the longest-untouched first. A repository's
+    /// overview is not a document anyone edits, so it is left out.
+    async fn stale_evidence(
+        &self,
+        workspace_id: &str,
+        live_items: &[&ArtifactSummary],
+        days: u32,
+    ) -> Result<Vec<HealthFinding>> {
+        let verified = self.storage.verified_times(workspace_id).await?;
+        Ok(stale_files(live_items, &verified, days, chrono::Utc::now()))
     }
 
     /// Documents that still mention a symbol the latest version of a code
@@ -689,16 +716,23 @@ fn duplicates(live: &[&ArtifactSummary]) -> Vec<HealthFinding> {
 
 #[cfg(test)]
 mod plan_tests {
-    use super::HealthPlan;
-    use repomemo_domain::HealthDetector;
+    use std::collections::HashMap;
+
+    use chrono::{Duration, TimeZone, Utc};
+    use repomemo_domain::{ArtifactSummary, ArtifactType, HealthAction, HealthDetector};
+
+    use super::{stale_files, HealthPlan, MAX_STALE_FINDINGS};
 
     #[test]
     fn a_plan_runs_what_the_template_names_in_its_order_and_skips_what_it_does_not_know() {
-        let plan = HealthPlan::from_ids(&[
-            "outdated_evidence_referenced".to_owned(),
-            "mind_reading".to_owned(),
-            "index_failed".to_owned(),
-        ]);
+        let plan = HealthPlan::from_ids(
+            &[
+                "outdated_evidence_referenced".to_owned(),
+                "mind_reading".to_owned(),
+                "index_failed".to_owned(),
+            ],
+            None,
+        );
         assert_eq!(
             plan.detectors(),
             [HealthDetector::OutdatedEvidenceReferenced, HealthDetector::IndexFailed]
@@ -707,15 +741,188 @@ mod plan_tests {
         assert_eq!(plan.cache_key(), "outdated_evidence_referenced,index_failed");
         assert_eq!(plan.rank(HealthDetector::IndexFailed), 1);
         assert_eq!(plan.rank(HealthDetector::Unconnected), usize::MAX);
-        // Every check, in the usual order, is what a workspace without a template runs; the key tells plans apart.
+        // The seven checks Health has always had, in the usual order, are what a workspace without a template runs
+        // (the check for stale evidence is not among them); the key tells plans apart, the days included.
         let all = HealthPlan::all();
-        assert_eq!(all.detectors(), HealthDetector::ALL);
+        assert_eq!(all.detectors(), HealthDetector::DEFAULT);
+        assert!(!all.runs(HealthDetector::StaleEvidence));
         assert_eq!(
-            HealthPlan::from_ids(&repomemo_templates::HEALTH_DETECTORS.map(str::to_owned)),
+            HealthPlan::from_ids(&repomemo_templates::DEFAULT_DETECTORS.map(str::to_owned), None),
             all
         );
         assert_ne!(all.cache_key(), plan.cache_key());
+        let ninety = HealthPlan::from_ids(&["stale_evidence".to_owned()], Some(90));
+        assert_eq!(ninety.cache_key(), "stale_evidence@90");
+        assert_ne!(
+            ninety.cache_key(),
+            HealthPlan::from_ids(&["stale_evidence".to_owned()], Some(180)).cache_key()
+        );
     }
+
+    fn file(id: &str, kind: ArtifactType, updated_at: chrono::DateTime<Utc>) -> ArtifactSummary {
+        ArtifactSummary {
+            id: id.to_owned(),
+            workspace_id: "w".to_owned(),
+            source_id: "s".to_owned(),
+            source_name: "upload".to_owned(),
+            artifact_type: kind,
+            title: format!("Runbook {id}"),
+            path: format!("runbooks/{id}.md"),
+            content_hash: id.to_owned(),
+            mime_type: None,
+            language: None,
+            size_bytes: 1,
+            created_at: updated_at.to_rfc3339(),
+            updated_at: updated_at.to_rfc3339(),
+            indexed_at: None,
+        }
+    }
+
+    #[test]
+    fn evidence_is_stale_after_the_days_the_template_allows_and_not_before() {
+        let now = Utc.with_ymd_and_hms(2026, 10, 22, 12, 0, 0).unwrap();
+        let ago = |days: i64| now - Duration::days(days);
+        let files = [
+            file("old", ArtifactType::Runbook, ago(91)),
+            file("edge", ArtifactType::Runbook, ago(90)),
+            file("fresh", ArtifactType::Runbook, ago(89)),
+            file("older", ArtifactType::Runbook, ago(400)),
+        ];
+        let refs: Vec<&ArtifactSummary> = files.iter().collect();
+        let found = stale_files(&refs, &HashMap::new(), 90, now);
+        // Flagged at 91 days and not at 89 (nor at exactly 90), the longest-untouched first.
+        assert_eq!(
+            found
+                .iter()
+                .map(|f| f.files[0].artifact_id.as_str())
+                .collect::<Vec<_>>(),
+            ["older", "old"]
+        );
+        assert_eq!(found[1].fingerprint, "stale_evidence:old");
+        assert_eq!(found[1].detector, HealthDetector::StaleEvidence);
+        assert!(found[1].title.contains("91 days") && found[1].detail.contains("after 90"));
+        // A finding is a normal one: it offers the existing actions and keeps no file by default.
+        assert_eq!(
+            found[1].actions,
+            [
+                HealthAction::NeedsReview,
+                HealthAction::MarkOutdated,
+                HealthAction::CreateTask,
+                HealthAction::Dismiss
+            ]
+        );
+        assert!(found[1].keep_artifact_id.is_none() && found[1].evidence.is_empty());
+        // The limit is the template's: at 180 days only the oldest is stale; at 30 all four are.
+        assert_eq!(stale_files(&refs, &HashMap::new(), 180, now).len(), 1);
+        assert_eq!(stale_files(&refs, &HashMap::new(), 30, now).len(), 4);
+    }
+
+    #[test]
+    fn evidence_marked_verified_within_the_limit_is_not_stale_and_a_repository_is_never_checked() {
+        let now = Utc.with_ymd_and_hms(2026, 10, 22, 12, 0, 0).unwrap();
+        let ago = |days: i64| now - Duration::days(days);
+        let files = [
+            file("checked", ArtifactType::Runbook, ago(400)),
+            file("long-ago", ArtifactType::Runbook, ago(400)),
+            file("repository", ArtifactType::Repository, ago(400)),
+        ];
+        let refs: Vec<&ArtifactSummary> = files.iter().collect();
+        let verified = HashMap::from([
+            ("checked".to_owned(), ago(10).to_rfc3339()),
+            ("long-ago".to_owned(), ago(200).to_rfc3339()),
+        ]);
+        let found = stale_files(&refs, &verified, 90, now);
+        assert_eq!(
+            found
+                .iter()
+                .map(|f| f.files[0].artifact_id.as_str())
+                .collect::<Vec<_>>(),
+            ["long-ago"]
+        );
+        assert!(
+            found[0].title.contains("200 days"),
+            "the age counts from the last verification: {}",
+            found[0].title
+        );
+        // A time that cannot be read is left out rather than guessed.
+        let mut broken = file("broken", ArtifactType::Runbook, ago(400));
+        broken.updated_at = "not a date".to_owned();
+        assert!(stale_files(&[&broken], &HashMap::new(), 90, now).is_empty());
+    }
+
+    #[test]
+    fn a_report_lists_the_oldest_untouched_files_only() {
+        let now = Utc.with_ymd_and_hms(2026, 10, 22, 12, 0, 0).unwrap();
+        let files: Vec<ArtifactSummary> = (0..MAX_STALE_FINDINGS + 25)
+            .map(|n| {
+                file(
+                    &format!("f{n:04}"),
+                    ArtifactType::Note,
+                    now - Duration::days(100 + n as i64),
+                )
+            })
+            .collect();
+        let refs: Vec<&ArtifactSummary> = files.iter().collect();
+        let found = stale_files(&refs, &HashMap::new(), 90, now);
+        assert_eq!(found.len(), MAX_STALE_FINDINGS);
+        assert_eq!(
+            found[0].files[0].artifact_id,
+            format!("f{:04}", MAX_STALE_FINDINGS + 24),
+            "the oldest comes first"
+        );
+    }
+}
+
+/// How many untouched files one report lists: the oldest, so a workspace of old documents is not a wall of findings.
+const MAX_STALE_FINDINGS: usize = 200;
+
+/// The files whose last change, and last verification, are both more than `days` days before `now`. Pure, so the
+/// edge (flagged at 91 days, not at 89 when the limit is 90) is a test and not an afternoon.
+pub(crate) fn stale_files(
+    files: &[&ArtifactSummary],
+    verified: &HashMap<String, String>,
+    days: u32,
+    now: chrono::DateTime<chrono::Utc>,
+) -> Vec<HealthFinding> {
+    let age_in_days = |stamp: &str| {
+        chrono::DateTime::parse_from_rfc3339(stamp)
+            .ok()
+            .map(|time| (now - time.with_timezone(&chrono::Utc)).num_days())
+    };
+    let mut stale: Vec<(i64, &ArtifactSummary)> = files
+        .iter()
+        .copied()
+        .filter(|artifact| artifact.artifact_type != ArtifactType::Repository)
+        .filter_map(|artifact| {
+            let changed = age_in_days(&artifact.updated_at)?;
+            let checked = verified.get(&artifact.id).and_then(|stamp| age_in_days(stamp));
+            let age = checked.map_or(changed, |checked| changed.min(checked));
+            (age > i64::from(days)).then_some((age, artifact))
+        })
+        .collect();
+    stale.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.title.cmp(&b.1.title)));
+    stale.truncate(MAX_STALE_FINDINGS);
+    stale
+        .into_iter()
+        .map(|(age, artifact)| HealthFinding {
+            fingerprint: format!("{}:{}", HealthDetector::StaleEvidence.as_str(), artifact.id),
+            detector: HealthDetector::StaleEvidence,
+            severity: HealthSeverity::Warning,
+            title: format!("{} has not been touched for {age} days", artifact.title),
+            detail: format!(
+                "Nobody has changed it or marked it verified for {age} days, and this workspace treats evidence as stale after {days}. Open it to check that it still holds and mark it verified, or mark it outdated, ask for a review or make a task.",
+            ),
+            files: vec![health_file(artifact)],
+            evidence: Vec::new(),
+            keep_artifact_id: None,
+            actions: vec![
+                HealthAction::NeedsReview,
+                HealthAction::MarkOutdated,
+                HealthAction::CreateTask,
+                HealthAction::Dismiss,
+            ],
+        })
+        .collect()
 }
 
 fn health_file(artifact: &ArtifactSummary) -> HealthFile {

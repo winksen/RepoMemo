@@ -15,6 +15,7 @@ type Previewable = Pick<TemplateDetail, "sections" | "labels" | "overview" | "as
 export const HEALTH_NAMES: Record<string, string> = {
   older_version_active: "Older versions", duplicate_content: "Duplicates", removed_symbol_mentioned: "Removed code",
   outdated_evidence_referenced: "Outdated references", stale_memory_citation: "Stale memory", index_failed: "Indexing failures", unconnected: "Unconnected",
+  stale_evidence: "Stale evidence",
 };
 
 const isSection = (value: string): value is WorkspaceSection => (WORKSPACE_SECTIONS as string[]).includes(value);
@@ -47,7 +48,7 @@ export function previewLines(template: Previewable): Array<{ label: string; text
     { label: "Opens on", text: name(template.sections.landing) },
     { label: "Renamed", text: renamed.length ? renamed.join(", ") : "nothing" },
     { label: "Overview cards", text: cards.join(", ") },
-    { label: "Health checks", text: template.health.detectors.map((detector) => HEALTH_NAMES[detector] ?? detector).join(", ") },
+    { label: "Health checks", text: template.health.detectors.map((detector) => detector === "stale_evidence" && template.health.stale_after_days ? `${HEALTH_NAMES[detector]} (${template.health.stale_after_days} days)` : HEALTH_NAMES[detector] ?? detector).join(", ") },
     { label: "Search favours", text: favoured(template.ranking) },
     { label: "The assistant suggests", text: template.assistant.suggestions.length ? `${template.assistant.suggestions.length} question${template.assistant.suggestions.length === 1 ? "" : "s"}` : "nothing" },
   ];
