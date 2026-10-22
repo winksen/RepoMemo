@@ -59,6 +59,7 @@ impl EffectiveTemplate {
             ranking: detail.ranking,
             health: detail.health,
             review: detail.review,
+            map: detail.map,
         }
     }
 }
@@ -93,6 +94,13 @@ pub fn detail_of(template: &TemplateDefinition) -> TemplateDetail {
         },
         retrieval: TemplateRetrieval {
             type_chips: template.retrieval().type_chips,
+        },
+        map: {
+            let map = template.map_emphasis();
+            TemplateMap {
+                coverage_first: map.coverage_first,
+                relations_first: map.relations_first,
+            }
         },
         review: TemplateReview {
             order: template.review_order(),
@@ -539,6 +547,22 @@ mod tests {
         );
 
         let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    /// The kinds of link a template can put first are the knowledge map's edge kinds.
+    #[test]
+    fn the_links_a_template_can_put_first_are_the_maps_edge_kinds() {
+        use repomemo_domain::KnowledgeEdgeKind;
+        let id = |kind: &KnowledgeEdgeKind| match kind {
+            KnowledgeEdgeKind::Similar => "similar",
+            KnowledgeEdgeKind::Cites => "cites",
+        };
+        let every = [KnowledgeEdgeKind::Similar, KnowledgeEdgeKind::Cites];
+        let named: Vec<&str> = every.iter().map(id).collect();
+        assert_eq!(named, repomemo_templates::MAP_RELATIONS);
+        for kind in &every {
+            assert_eq!(serde_json::to_value(kind).unwrap(), json!(id(kind)));
+        }
     }
 
     /// The health checks a template can choose are exactly the API's detectors, in the order Health has always had.

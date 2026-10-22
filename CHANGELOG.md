@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.184 (2026-10-22)
+
+The knowledge map puts the template's kinds of evidence first.
+
+### Changed
+- **The `map` block:** `coverage_first` lists file types (the twelve of the evidence ledger's filter, each once) whose rows of the *Coverage by kind of file* table come first, in that order; the others follow as they were. `relations_first` lists the kinds of link to put first: `similar` (files that mean alike) and `cites` (a memory card citing a file). A preferred kind is listed first in the table of links and drawn last in the graph, so it lies on top of the others; without a preference similar files come before memory citations, as before. It is presentation only: the map's data is unchanged, nothing is left out, and the server's cached map needs no new key. `GET /v1/workspaces/{id}/template` and the preview answer both lists as `map` (empty for General), and Settings › Template says what the map shows first.
+- **The four templates:** *Software engineering* puts repositories and code first and prefers memory citations; *Operations and incidents* puts Markdown, notes and text first and prefers memory citations (the lessons they cite); *Product and decisions* puts Markdown, notes and Word first and prefers memory citations, then similar files; the *Knowledge base* puts Word, PDF, Excel and PowerPoint first and prefers similar files.
+- **A difference from the plan:** the plan said Software engineering's map shows "repositories and symbols first". Symbols are not a kind of file on the map, so its coverage puts repositories and code first.
+- **A guard on the kinds of link:** the kinds a template can put first are the map's edge kinds; a test in the api crate matches on every `KnowledgeEdgeKind`, so adding one stops it compiling until the list in `repomemo-templates` has it too.
+- **Tests (written, not run):** three in the templates crate (nothing first without a block and a chosen emphasis written back; unknown or repeated file types and links refused; the four templates' choices), one in the api crate (the links a template can put first are the map's edge kinds), six in a new web test file (the coverage rows in their order, with the preferred kinds first in the template's order, with an unknown kind ignored and the rows untouched; the links' ranks, the table's order and the graph's drawing order), and the server's and the web's template tests check the field.
+- **Checks run on this release:** `cargo check` of the templates, api and server crates with their tests compiles; `rustfmt` shows nothing for the lines changed; `types:check`, `typecheck`, `styles:check`, `a11y:check`, `docs:check` and `version:check` pass. **Not run:** the tests, as asked.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.183 (2026-10-22)
 
 The review queue lists what the template cares about first.

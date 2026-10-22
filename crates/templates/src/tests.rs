@@ -1409,6 +1409,68 @@ fn with_review(block: &str) -> String {
     VALID.replacen("\"format\": 1,", &format!("\"format\": 1,\n  \"review\": {block},"), 1)
 }
 
+/// The valid file with a `map` block written as JSON.
+fn with_map(block: &str) -> String {
+    VALID.replacen("\"format\": 1,", &format!("\"format\": 1,\n  \"map\": {block},"), 1)
+}
+
+#[test]
+fn the_map_puts_nothing_first_unless_a_template_chooses() {
+    assert_eq!(general().map_emphasis(), MapBlock::default());
+    assert_eq!(parse(VALID).unwrap().map_emphasis(), MapBlock::default());
+    assert_eq!(parse(&with_map("{}")).unwrap().map_emphasis(), MapBlock::default());
+    let chosen = parse(&with_map(
+        r#"{ "coverage_first": ["repository", "code"], "relations_first": ["cites"] }"#,
+    ))
+    .unwrap();
+    assert_eq!(chosen.map_emphasis().coverage_first, ["repository", "code"]);
+    assert_eq!(chosen.map_emphasis().relations_first, ["cites"]);
+    assert_eq!(parse(&serde_json::to_string(&chosen).unwrap()).unwrap(), chosen);
+    assert!(!serde_json::to_string(&general()).unwrap().contains("\"map\""));
+    assert_eq!(MAP_RELATIONS, ["similar", "cites"]);
+}
+
+#[test]
+fn a_map_emphasis_names_known_file_types_and_links_once_each() {
+    let unknown_type = parse(&with_map(r#"{ "coverage_first": ["code", "spreadsheet"] }"#)).unwrap_err();
+    assert_eq!(unknown_type[0].path, "map.coverage_first[1]");
+    let repeated = parse(&with_map(r#"{ "coverage_first": ["code", "code"] }"#)).unwrap_err();
+    assert_eq!(repeated[0].path, "map.coverage_first[1]");
+    let unknown_link = parse(&with_map(r#"{ "relations_first": ["similar", "mentions"] }"#)).unwrap_err();
+    assert_eq!(unknown_link[0].path, "map.relations_first[1]");
+    let repeated_link = parse(&with_map(r#"{ "relations_first": ["cites", "cites"] }"#)).unwrap_err();
+    assert_eq!(repeated_link[0].path, "map.relations_first[1]");
+    let unknown_key = parse(&with_map(r#"{ "colour": "red" }"#)).unwrap_err();
+    assert!(
+        unknown_key[0].message.contains("unknown field `colour`"),
+        "{}",
+        unknown_key[0]
+    );
+}
+
+#[test]
+fn software_engineering_puts_repositories_and_code_first_on_its_map() {
+    let catalogue = Catalogue::builtin();
+    let software = catalogue.get("software-engineering").unwrap().map_emphasis();
+    assert_eq!(software.coverage_first, ["repository", "code"]);
+    assert_eq!(
+        catalogue.get("knowledge-base").unwrap().map_emphasis().coverage_first[0],
+        "word"
+    );
+    for id in [
+        "software-engineering",
+        "operations",
+        "product-decisions",
+        "knowledge-base",
+    ] {
+        let map = catalogue.get(id).unwrap().map_emphasis();
+        assert!(
+            !map.coverage_first.is_empty() && !map.relations_first.is_empty(),
+            "{id}"
+        );
+    }
+}
+
 #[test]
 fn the_review_queue_is_mixed_unless_a_template_names_the_kinds_to_list_first() {
     assert!(general().review_order().is_empty());

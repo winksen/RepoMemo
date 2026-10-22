@@ -41,5 +41,6 @@
       { "path": "README*", "factor": 1.15 }
     ]
   },
-  "health": { "detectors": ["removed_symbol_mentioned", "outdated_evidence_referenced", "stale_memory_citation", "index_failed"] }
+  "health": { "detectors": ["removed_symbol_mentioned", "outdated_evidence_referenced", "stale_memory_citation", "index_failed"] },
+  "map": { "coverage_first": ["repository", "code"], "relations_first": ["cites"] }
 }

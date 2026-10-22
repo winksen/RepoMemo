@@ -20,6 +20,7 @@ mod health;
 mod issue;
 mod labels;
 pub mod limits;
+mod map;
 mod meta;
 mod overrides;
 mod overview;
@@ -40,6 +41,7 @@ pub use general::{general, GENERAL_ID};
 pub use health::{HealthBlock, DEFAULT_DETECTORS, HEALTH_DETECTORS, STALE_DAYS_MAX, STALE_DAYS_MIN};
 pub use issue::TemplateIssue;
 pub use labels::{LabelsBlock, ARTIFACT_TYPES};
+pub use map::{MapBlock, MAP_RELATIONS};
 pub use meta::{TemplateMeta, WORKSPACE_ICONS};
 pub use overrides::Overrides;
 pub use overview::{OverviewBlock, CARDS_MAX, DEFAULT_CARDS, PULSE_CARDS};
@@ -95,6 +97,9 @@ pub struct TemplateDefinition {
     /// What the review queue lists first (V0.2.183); mixed, oldest first, when left out.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub review: Option<ReviewBlock>,
+    /// What the knowledge map puts first (V0.2.184); as today when left out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub map: Option<MapBlock>,
 }
 
 impl TemplateDefinition {
@@ -174,6 +179,9 @@ impl TemplateDefinition {
         if let Some(review) = &self.review {
             review::validate(review, &mut issues);
         }
+        if let Some(map) = &self.map {
+            map::validate(map, &mut issues);
+        }
         issues
     }
 
@@ -189,6 +197,11 @@ impl TemplateDefinition {
     /// The health checks that run, in the order their findings are listed.
     pub fn health_detectors(&self) -> Vec<String> {
         HealthBlock::resolved(self.health.as_ref())
+    }
+
+    /// What the knowledge map puts first; nothing for the usual map.
+    pub fn map_emphasis(&self) -> MapBlock {
+        self.map.clone().unwrap_or_default()
     }
 
     /// The groups the review queue lists, in order; empty for the usual mixed list.

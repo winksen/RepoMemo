@@ -232,6 +232,8 @@ export interface WorkspaceTemplateView {
   health: TemplateHealth;
   /** What the review queue lists first. */
   review: TemplateReview;
+  /** What the knowledge map puts first. */
+  map: TemplateMap;
 }
 
 /**
@@ -324,6 +326,15 @@ export interface TemplateReview {
   order: string[];
 }
 
+/**
+ * What the knowledge map puts first: the file types whose coverage rows come first and the kinds of link listed first
+ * and drawn on top. Both empty for `general`. Presentation only: nothing is left out of the map.
+ */
+export interface TemplateMap {
+  coverage_first: string[];
+  relations_first: string[];
+}
+
 /** A template as a person looks at it before choosing it: what it arranges and names, without any workspace's choice. */
 export interface TemplateDetail {
   template: TemplateSummary;
@@ -336,6 +347,7 @@ export interface TemplateDetail {
   ranking: TemplateRanking;
   health: TemplateHealth;
   review: TemplateReview;
+  map: TemplateMap;
 }
 
 /**

@@ -286,6 +286,8 @@ pub struct WorkspaceTemplateView {
     pub health: TemplateHealth,
     /// What the review queue lists first.
     pub review: TemplateReview,
+    /// What the knowledge map puts first.
+    pub map: TemplateMap,
 }
 
 /// The tabs of a workspace and the sections kept under *More*, as its template arranges them. Every section is in
@@ -377,6 +379,14 @@ pub struct TemplateReview {
     pub order: Vec<String>,
 }
 
+/// What the knowledge map puts first: the file types whose coverage rows come first and the kinds of link listed first
+/// and drawn on top. Both empty for `general`. Presentation only: nothing is left out of the map.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TemplateMap {
+    pub coverage_first: Vec<String>,
+    pub relations_first: Vec<String>,
+}
+
 /// A template as a person looks at it before choosing it: what it arranges and names, without any workspace's choice.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TemplateDetail {
@@ -390,6 +400,7 @@ pub struct TemplateDetail {
     pub ranking: TemplateRanking,
     pub health: TemplateHealth,
     pub review: TemplateReview,
+    pub map: TemplateMap,
 }
 
 /// Chooses a workspace's template; `null` returns the workspace to the default. `overrides` are the adjustments

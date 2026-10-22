@@ -42,5 +42,6 @@
     ]
   },
   "health": { "detectors": ["outdated_evidence_referenced", "older_version_active", "stale_memory_citation", "index_failed"] },
-  "review": { "order": ["memory_card", "evidence", "health_finding"] }
+  "review": { "order": ["memory_card", "evidence", "health_finding"] },
+  "map": { "coverage_first": ["markdown", "note", "word"], "relations_first": ["cites", "similar"] }
 }

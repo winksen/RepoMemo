@@ -12,6 +12,7 @@ import { RelationGraph } from "./RelationGraph";
 import { workspaceKeys } from "../../lib/queryClient";
 import { useServerState } from "../../lib/useServerState";
 import { useErrorToast } from "../../lib/useErrorToast";
+import { useTemplate } from "../workspace/data";
 
 /** Activity that can change the map. */
 const MAP_ACTIONS = /^(evidence_|artifact_|memory_|repository_|folder_)/;
@@ -54,6 +55,7 @@ export function KnowledgeMapPanel({
     },
   });
   useErrorToast(query.error, "The knowledge map could not be loaded.");
+  const [template] = useTemplate(accessToken, workspaceId);
   // Only a refresh the person (or a live event) asked for shows as busy, not the reads while indexing runs.
   const [isRefreshing, setIsRefreshing] = useState(false);
   async function load() {
@@ -73,7 +75,7 @@ export function KnowledgeMapPanel({
       <Button disabled={isRefreshing} onClick={() => void load()} type="button" variant="secondary"><Refresh size={ICON_SIZE.sm} /> Refresh</Button>
     </div>
     <Pipeline canConfigure={canConfigure} map={map} onOpenEvidence={onOpenEvidence} onOpenSettings={onOpenSettings} />
-    <Coverage map={map} />
-    <RelationGraph canConfigure={canConfigure} map={map} onOpenArtifact={onOpenArtifact} onOpenMemoryCard={onOpenMemoryCard} onOpenSettings={onOpenSettings} />
+    <Coverage first={template?.map.coverage_first} map={map} />
+    <RelationGraph canConfigure={canConfigure} first={template?.map.relations_first} map={map} onOpenArtifact={onOpenArtifact} onOpenMemoryCard={onOpenMemoryCard} onOpenSettings={onOpenSettings} />
   </section>;
 }

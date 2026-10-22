@@ -6,8 +6,9 @@ import { Table } from "../../components/ui/table";
 import { PanelHeading } from "../../components/ui/panel-heading";
 import { ICON_SIZE } from "../../components/ui/icon";
 import { percent, HoverTip } from "./shared";
+import { orderCoverage } from "./emphasis";
 
-export function Coverage({ map }: { map: KnowledgeMap }) {
+export function Coverage({ first, map }: { first?: string[]; map: KnowledgeMap }) {
   const [tooltip, setTooltip] = useState<HoverTip | null>(null);
   const container = useRef<HTMLDivElement>(null);
   const embeddingOn = map.pipeline.embedded_count !== null;
@@ -27,7 +28,7 @@ export function Coverage({ map }: { map: KnowledgeMap }) {
     {map.coverage.length ? <Table ref={container} onMouseLeave={() => setTooltip(null)} overlay={tooltip ? <div className="rm-map-tooltip" role="tooltip" style={{ left: tooltip.x, top: tooltip.y }}>{tooltip.content}</div> : null}>
       
         <thead><tr><th scope="col">Kind</th><th className="rm-table-number" scope="col">Files</th><th scope="col">Indexing</th><th className="rm-table-number" scope="col">Passages</th><th className="rm-table-number" scope="col">By meaning</th></tr></thead>
-        <tbody>{map.coverage.map((row) => {
+        <tbody>{orderCoverage(map.coverage, first).map((row) => {
           const segments = [
             { key: "indexed", count: row.indexed_count, label: "indexed" },
             { key: "pending", count: row.pending_count, label: "waiting" },

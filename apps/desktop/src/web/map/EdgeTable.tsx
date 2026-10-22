@@ -1,8 +1,10 @@
 import type { KnowledgeEdge, KnowledgeNode } from "../../types";
 import { Table } from "../../components/ui/table";
+import { orderLinks } from "./emphasis";
 
-export function EdgeTable({ edges, nodeById, onSelect }: { edges: KnowledgeEdge[]; nodeById: Map<string, KnowledgeNode>; onSelect: (id: string) => void }) {
-  const rows = [...edges].sort((a, b) => a.kind === b.kind ? b.weight - a.weight : a.kind === "similar" ? -1 : 1);
+export function EdgeTable({ edges, first, nodeById, onSelect }: { edges: KnowledgeEdge[]; first?: string[]; nodeById: Map<string, KnowledgeNode>; onSelect: (id: string) => void }) {
+  // Strongest first inside a kind; the kinds in the template's order (similar files before memory citations otherwise).
+  const rows = orderLinks([...edges].sort((a, b) => b.weight - a.weight), first);
   if (!rows.length) return <p className="shared-muted-copy">No links to list with the current filters.</p>;
   return <Table>
     

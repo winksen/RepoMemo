@@ -26,5 +26,6 @@ pub fn general() -> TemplateDefinition {
         ranking: None,
         health: None,
         review: None,
+        map: None,
     }
 }

@@ -9,7 +9,18 @@ export const SECTION_NAMES: Record<WorkspaceSection, string> = {
   health: "Health", review: "Review", memory: "Memory", tasks: "Tasks", people: "People & Activity", settings: "Settings",
 };
 
-type Previewable = Pick<TemplateDetail, "sections" | "labels" | "overview" | "assistant" | "ranking" | "health" | "review">;
+type Previewable = Pick<TemplateDetail, "sections" | "labels" | "overview" | "assistant" | "ranking" | "health" | "review" | "map">;
+
+/** What the map's kinds of link are called. */
+const LINK_NAMES: Record<string, string> = { similar: "similar files", cites: "memory citations" };
+
+/** What the knowledge map puts first, in words. */
+function mapFirst(map: TemplateDetail["map"]): string {
+  const types = map.coverage_first.map((type) => FILE_CATEGORIES.find((category) => category.value === type)?.label ?? type);
+  const links = map.relations_first.map((link) => LINK_NAMES[link] ?? link);
+  const parts = [types.join(", "), links.join(", ")].filter(Boolean);
+  return parts.length ? parts.join("; ") : "nothing in particular";
+}
 
 /** What the review queue calls its three kinds of item, in the plural. */
 const REVIEW_NAMES: Record<string, string> = { evidence: "files", memory_card: "memory cards", health_finding: "open health findings" };
@@ -51,6 +62,7 @@ export function previewLines(template: Previewable): Array<{ label: string; text
     { label: "Opens on", text: name(template.sections.landing) },
     { label: "Renamed", text: renamed.length ? renamed.join(", ") : "nothing" },
     { label: "Overview cards", text: cards.join(", ") },
+    { label: "Map shows first", text: mapFirst(template.map) },
     { label: "Review lists", text: template.review.order.length ? template.review.order.map((source) => REVIEW_NAMES[source] ?? source).join(", then ") : "everything mixed, the oldest first" },
     { label: "Health checks", text: template.health.detectors.map((detector) => detector === "stale_evidence" && template.health.stale_after_days ? `${HEALTH_NAMES[detector]} (${template.health.stale_after_days} days)` : HEALTH_NAMES[detector] ?? detector).join(", ") },
     { label: "Search favours", text: favoured(template.ranking) },

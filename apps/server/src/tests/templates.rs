@@ -156,6 +156,17 @@ async fn the_four_first_templates_are_offered_and_each_creates_its_folders() {
             id == "software-engineering",
             "{id}"
         );
+        // The map (V0.2.184): Software engineering puts repositories and code first.
+        let coverage_first = view["map"]["coverage_first"].get(0).cloned().unwrap_or(Value::Null);
+        assert_eq!(
+            coverage_first,
+            match id {
+                "software-engineering" => json!("repository"),
+                "operations" | "product-decisions" => json!("markdown"),
+                _ => json!("word"),
+            },
+            "{id}"
+        );
         // The review queue (V0.2.183): Operations lists health findings first; Software engineering keeps the mixed list.
         let review_first = view["review"]["order"].get(0).cloned().unwrap_or(Value::Null);
         assert_eq!(

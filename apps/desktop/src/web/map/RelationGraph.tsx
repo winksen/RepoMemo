@@ -22,8 +22,9 @@ import {
 } from "./shared";
 import { SelectionPanel } from "./SelectionPanel";
 import { EdgeTable } from "./EdgeTable";
+import { orderLinks } from "./emphasis";
 
-export function RelationGraph({ canConfigure, map, onOpenArtifact, onOpenMemoryCard, onOpenSettings }: { canConfigure: boolean; map: KnowledgeMap; onOpenArtifact: (artifactId: string) => void; onOpenMemoryCard: (cardId: string) => void; onOpenSettings: () => void }) {
+export function RelationGraph({ canConfigure, first, map, onOpenArtifact, onOpenMemoryCard, onOpenSettings }: { canConfigure: boolean; first?: string[]; map: KnowledgeMap; onOpenArtifact: (artifactId: string) => void; onOpenMemoryCard: (cardId: string) => void; onOpenSettings: () => void }) {
   const [showSimilar, setShowSimilar] = useState(true);
   const [showCites, setShowCites] = useState(true);
   const [view, setView] = useState<"graph" | "table">("graph");
@@ -194,7 +195,7 @@ export function RelationGraph({ canConfigure, map, onOpenArtifact, onOpenMemoryC
       <span><i className="rm-map-dot hollow" /> Not indexed yet</span>
     </div>
     {!map.nodes.length ? <div className="shared-empty-state"><Graph size={25} /><strong>Nothing to map yet</strong><span>Add files in Evidence or Documents; they appear here once stored.</span></div>
-      : view === "table" ? <EdgeTable edges={edges} nodeById={nodeById} onSelect={(id) => { setSelectedId(id); setView("graph"); }} />
+      : view === "table" ? <EdgeTable edges={edges} first={first} nodeById={nodeById} onSelect={(id) => { setSelectedId(id); setView("graph"); }} />
       : <div className="rm-map-graph">
         <div className="rm-map-canvas" ref={canvas} onMouseLeave={() => setTooltip(null)}>
           <div className="rm-map-zoom" role="group" aria-label="Zoom">
@@ -215,7 +216,7 @@ export function RelationGraph({ canConfigure, map, onOpenArtifact, onOpenMemoryC
             role="img"
             viewBox={`${vp.x} ${vp.y} ${CANVAS_WIDTH / vp.k} ${CANVAS_HEIGHT / vp.k}`}
           >
-            <g>{edges.map((edge) => {
+            <g>{orderLinks(edges, first, true).map((edge) => {
               const from = positions.get(edge.source)!;
               const to = positions.get(edge.target)!;
               const active = !selectedId || edge.source === selectedId || edge.target === selectedId;
