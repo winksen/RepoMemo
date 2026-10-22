@@ -1275,6 +1275,70 @@ async fn a_workspace_made_from_a_template_starts_with_its_choice_and_folders_or_
 }
 
 #[tokio::test]
+async fn the_times_files_were_last_changed_are_read_for_the_files_asked_about_only() {
+    let (storage, data_dir) = temp_storage("updated-times").await;
+    let workspace = storage.create_workspace("Times").await.unwrap();
+    let other = storage.create_workspace("Other").await.unwrap();
+    let source = storage
+        .create_or_get_source(&workspace.id, SourceType::Folder, "fixture", Some("fixture"))
+        .await
+        .unwrap();
+    let other_source = storage
+        .create_or_get_source(&other.id, SourceType::Folder, "fixture", Some("fixture"))
+        .await
+        .unwrap();
+    let mut ids = Vec::new();
+    for (workspace_id, source_id, path) in [
+        (&workspace.id, &source.id, "a.md"),
+        (&workspace.id, &source.id, "b.md"),
+        (&other.id, &other_source.id, "c.md"),
+    ] {
+        let bytes = path.as_bytes();
+        let content_hash = StorageEngine::content_hash(bytes);
+        storage.store_blob(&content_hash, bytes, None).await.unwrap();
+        let artifact = storage
+            .store_artifact(NewArtifact {
+                workspace_id: workspace_id.clone(),
+                source_id: source_id.clone(),
+                artifact_type: ArtifactType::MarkdownDoc,
+                title: path.to_owned(),
+                path: path.to_owned(),
+                content_hash,
+                mime_type: None,
+                language: None,
+                size_bytes: bytes.len() as i64,
+                metadata: json!({}),
+            })
+            .await
+            .unwrap()
+            .artifact;
+        ids.push(artifact);
+    }
+    let asked = vec![ids[0].id.clone(), ids[2].id.clone(), "no-such-file".to_owned()];
+    let times = storage.artifact_updated_times(&workspace.id, &asked).await.unwrap();
+    // The file asked about is there with its time; the other workspace's file and the missing one are not.
+    assert_eq!(times.len(), 1);
+    assert_eq!(times[&ids[0].id], ids[0].updated_at);
+    assert!(storage
+        .artifact_updated_times(&workspace.id, &[])
+        .await
+        .unwrap()
+        .is_empty());
+    assert_eq!(
+        storage
+            .artifact_updated_times(&workspace.id, &[ids[1].id.clone()])
+            .await
+            .unwrap()
+            .len(),
+        1
+    );
+
+    storage.pool.close().await;
+    drop(storage);
+    let _ = std::fs::remove_dir_all(data_dir);
+}
+
+#[tokio::test]
 async fn vector_search_uses_the_index_and_agrees_with_a_scan() {
     let (storage, data_dir) = temp_storage("vectors").await;
     let workspace = storage.create_workspace("Vectors").await.unwrap();

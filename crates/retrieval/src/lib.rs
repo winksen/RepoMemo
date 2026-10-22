@@ -85,6 +85,25 @@ impl RetrievalService {
                 .map(|(artifact_id, (status, _))| (artifact_id, status))
                 .collect();
         }
+        if profile.reads_ages() {
+            let mut ids: Vec<String> = results.iter().map(|result| result.artifact_id.clone()).collect();
+            ids.sort();
+            ids.dedup();
+            let Ok(times) = self.storage.artifact_updated_times(workspace_id, &ids).await else {
+                return;
+            };
+            let now = chrono::Utc::now();
+            facts.age_days = times
+                .into_iter()
+                .filter_map(|(artifact_id, updated_at)| {
+                    let changed = chrono::DateTime::parse_from_rfc3339(&updated_at).ok()?;
+                    Some((
+                        artifact_id,
+                        (now - changed.with_timezone(&chrono::Utc)).num_seconds().max(0) as f64 / 86_400.0,
+                    ))
+                })
+                .collect();
+        }
         apply_profile(results, profile, &facts);
     }
 }
@@ -100,26 +119,57 @@ pub enum RankingRule {
     DocumentKind { kind: String, factor: f64 },
     /// Passages of files whose path a folder pattern matches ([`path_matches`]).
     Path { pattern: String, factor: f64 },
+    /// Recent evidence (V0.2.180): a file changed just now gets `max_factor`, and the preference halves every
+    /// `half_life_days` until it is 1. A file whose age is not known gets 1.
+    Recency { half_life_days: f64, max_factor: f64 },
 }
 
 impl RankingRule {
-    fn factor(&self) -> f64 {
+    /// Whether the rule can never change a score.
+    fn is_neutral(&self) -> bool {
         match self {
             RankingRule::Lifecycle { factor, .. }
             | RankingRule::ArtifactType { factor, .. }
             | RankingRule::DocumentKind { factor, .. }
-            | RankingRule::Path { factor, .. } => *factor,
+            | RankingRule::Path { factor, .. } => *factor == 1.0,
+            RankingRule::Recency { max_factor, .. } => *max_factor == 1.0,
         }
     }
 
-    fn matches(&self, result: &SearchResult, facts: &RankingFacts) -> bool {
-        match self {
-            RankingRule::Lifecycle { status, .. } => facts.lifecycle.get(&result.artifact_id) == Some(status),
-            RankingRule::ArtifactType { artifact_type, .. } => result.artifact_type == *artifact_type,
-            RankingRule::DocumentKind { kind, .. } => document_kind(&result.artifact_type, &result.path) == kind,
-            RankingRule::Path { pattern, .. } => path_matches(pattern, &result.path),
+    /// What the rule makes of one passage: its factor if it matches, otherwise 1.
+    fn weigh(&self, result: &SearchResult, facts: &RankingFacts) -> f64 {
+        let (matches, factor) = match self {
+            RankingRule::Lifecycle { status, factor } => {
+                (facts.lifecycle.get(&result.artifact_id) == Some(status), *factor)
+            }
+            RankingRule::ArtifactType { artifact_type, factor } => (result.artifact_type == *artifact_type, *factor),
+            RankingRule::DocumentKind { kind, factor } => {
+                (document_kind(&result.artifact_type, &result.path) == kind, *factor)
+            }
+            RankingRule::Path { pattern, factor } => (path_matches(pattern, &result.path), *factor),
+            RankingRule::Recency {
+                half_life_days,
+                max_factor,
+            } => match facts.age_days.get(&result.artifact_id) {
+                Some(age) => return recency_factor(*age, *half_life_days, *max_factor),
+                None => (false, 1.0),
+            },
+        };
+        if matches {
+            factor
+        } else {
+            1.0
         }
     }
+}
+
+/// The preference for recent evidence: `max_factor` for a file changed just now, halving the part above 1 every
+/// `half_life_days`. With a half-life of 90 days and a maximum of 1.2, a month-old file gets 1.16 and a year-old one 1.01.
+pub fn recency_factor(age_days: f64, half_life_days: f64, max_factor: f64) -> f64 {
+    if half_life_days <= 0.0 {
+        return 1.0;
+    }
+    1.0 + (max_factor - 1.0) * 0.5_f64.powf(age_days.max(0.0) / half_life_days)
 }
 
 /// The product of the factors that match one passage is held between this and its inverse, so a pile of boosts
@@ -190,6 +240,15 @@ impl RankingProfile {
         self
     }
 
+    /// Prefers recent evidence: see [`RankingRule::Recency`].
+    pub fn prefer_recent(mut self, half_life_days: f64, max_factor: f64) -> Self {
+        self.rules.push(RankingRule::Recency {
+            half_life_days,
+            max_factor,
+        });
+        self
+    }
+
     /// Adds a boost for the files a folder pattern matches.
     pub fn boost_path(mut self, pattern: &str, factor: f64) -> Self {
         self.rules.push(RankingRule::Path {
@@ -213,13 +272,19 @@ impl RankingProfile {
 
     /// True when no rule can change a score, so the results need no second look.
     pub fn is_neutral(&self) -> bool {
-        self.rules.iter().all(|rule| rule.factor() == 1.0)
+        self.rules.iter().all(RankingRule::is_neutral)
     }
 
     fn reads_lifecycle(&self) -> bool {
         self.rules
             .iter()
             .any(|rule| matches!(rule, RankingRule::Lifecycle { .. }))
+    }
+
+    fn reads_ages(&self) -> bool {
+        self.rules
+            .iter()
+            .any(|rule| matches!(rule, RankingRule::Recency { .. }))
     }
 
     /// Whether the profile has any rule at all (the usual one included).
@@ -230,12 +295,7 @@ impl RankingProfile {
     /// What the rules make of one passage: the product of the factors of the rules it matches, held between
     /// [`MAX_PRODUCT`] and its inverse.
     fn multiplier(&self, result: &SearchResult, facts: &RankingFacts) -> f64 {
-        let product: f64 = self
-            .rules
-            .iter()
-            .filter(|rule| rule.matches(result, facts))
-            .map(RankingRule::factor)
-            .product();
+        let product: f64 = self.rules.iter().map(|rule| rule.weigh(result, facts)).product();
         product.clamp(1.0 / MAX_PRODUCT, MAX_PRODUCT)
     }
 }
@@ -251,6 +311,8 @@ impl Default for RankingProfile {
 pub struct RankingFacts {
     /// Artifact id to its lifecycle status, for files whose lifecycle was ever set.
     pub lifecycle: HashMap<String, String>,
+    /// Artifact id to how many days ago the file was last changed (V0.2.180).
+    pub age_days: HashMap<String, f64>,
 }
 
 /// Multiplies the score of each passage by what the profile makes of it, then rescales so no score passes 1 and the
@@ -445,6 +507,7 @@ mod tests {
                 .iter()
                 .map(|artifact| ((*artifact).to_owned(), "verified".to_owned()))
                 .collect(),
+            ..Default::default()
         }
     }
 
@@ -649,6 +712,89 @@ mod tests {
         assert_eq!(document_kind(&ArtifactType::Runbook, "runbooks/restart.md"), "text");
         // A document format wins over the evidence's own type, as in the ledger.
         assert_eq!(document_kind(&ArtifactType::Decision, "decisions/0001.docx"), "word");
+    }
+
+    fn aged(days: &[(&str, f64)]) -> super::RankingFacts {
+        super::RankingFacts {
+            age_days: days
+                .iter()
+                .map(|(artifact, age)| ((*artifact).to_owned(), *age))
+                .collect(),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn the_preference_for_recent_evidence_halves_with_the_half_life_and_never_goes_below_one() {
+        use super::recency_factor;
+        assert!(
+            (recency_factor(0.0, 90.0, 1.2) - 1.2).abs() < 1e-12,
+            "changed just now gets the maximum"
+        );
+        assert!(
+            (recency_factor(90.0, 90.0, 1.2) - 1.1).abs() < 1e-12,
+            "one half-life: half of the nudge"
+        );
+        assert!((recency_factor(180.0, 90.0, 1.2) - 1.05).abs() < 1e-12);
+        let month = recency_factor(30.0, 90.0, 1.2);
+        let year = recency_factor(365.0, 90.0, 1.2);
+        assert!(
+            (month - 1.159).abs() < 0.001 && (year - 1.012).abs() < 0.001,
+            "{month} {year}"
+        );
+        assert!(year > 1.0 && recency_factor(100_000.0, 90.0, 1.2) >= 1.0);
+        assert_eq!(
+            recency_factor(-5.0, 90.0, 1.2),
+            1.2,
+            "a clock in the past is a file changed just now"
+        );
+        assert_eq!(recency_factor(10.0, 0.0, 1.2), 1.0, "no half-life, no preference");
+    }
+
+    #[test]
+    fn a_month_old_runbook_edges_out_a_year_old_one_of_equal_relevance_and_nothing_changes_with_the_rule_off() {
+        use super::{apply_profile, RankingProfile};
+        let list = || {
+            vec![
+                typed("old", "year", 0.90, ArtifactType::Runbook, "runbooks/a.md"),
+                typed("new", "month", 0.90, ArtifactType::Runbook, "runbooks/b.md"),
+            ]
+        };
+        let facts = aged(&[("old", 365.0), ("new", 30.0)]);
+        let mut preferred = list();
+        apply_profile(
+            &mut preferred,
+            &RankingProfile::with_verified(1.0).prefer_recent(90.0, 1.2),
+            &facts,
+        );
+        assert_eq!(preferred[0].chunk_id, "month");
+        assert!(preferred[0].score > preferred[1].score);
+        // The rule off: untouched, the order they came in.
+        let mut off = list();
+        apply_profile(&mut off, &RankingProfile::with_verified(1.0), &facts);
+        assert_eq!(
+            off.iter().map(|r| r.chunk_id.as_str()).collect::<Vec<_>>(),
+            ["year", "month"]
+        );
+        assert!(RankingProfile::with_verified(1.0).prefer_recent(90.0, 1.0).is_neutral());
+        // A far better old match still wins, and a file whose age is not known is not touched.
+        let mut far = vec![
+            typed("old", "year", 1.0, ArtifactType::Runbook, "a.md"),
+            typed("new", "month", 0.7, ArtifactType::Runbook, "b.md"),
+        ];
+        apply_profile(
+            &mut far,
+            &RankingProfile::with_verified(1.0).prefer_recent(90.0, 1.2),
+            &facts,
+        );
+        assert_eq!(far[0].chunk_id, "year");
+        let mut unknown = vec![typed("x", "unknown", 0.5, ArtifactType::Note, "x.md")];
+        apply_profile(
+            &mut unknown,
+            &RankingProfile::with_verified(1.0).prefer_recent(90.0, 1.2),
+            &aged(&[]),
+        );
+        assert_eq!(unknown[0].score, 0.5);
     }
 
     #[test]

@@ -24,7 +24,7 @@ const operationsDetail: TemplateDetail = {
   evidence: { default_view: "list", types_first: [] },
   assistant: { order: [], suggestions: ["What is the runbook for…"] },
   retrieval: { type_chips: [] },
-  ranking: { verified: 1.15, boosts: [{ artifact_type: "runbook", document_kind: null, path: null, factor: 1.2 }, { artifact_type: null, document_kind: "pdf", path: null, factor: 1.15 }, { artifact_type: null, document_kind: null, path: "docs/adr/**", factor: 1.15 }] },
+  ranking: { verified: 1.15, recency: { half_life_days: 90, max_factor: 1.2 }, boosts: [{ artifact_type: "runbook", document_kind: null, path: null, factor: 1.2 }, { artifact_type: null, document_kind: "pdf", path: null, factor: 1.15 }, { artifact_type: null, document_kind: null, path: "docs/adr/**", factor: 1.15 }] },
 };
 const knowledgeDetail: TemplateDetail = {
   ...operationsDetail,
@@ -63,7 +63,7 @@ describe("the lines that preview a template", () => {
       "Renamed": "Tasks → Actions",
       "Overview cards": "Fresh evidence, At risk",
       "The assistant suggests": "1 question",
-      "Search favours": "verified evidence by 15 %, Runbook by 20 %, PDF by 15 %, docs/adr/** by 15 %",
+      "Search favours": "verified evidence by 15 %, Runbook by 20 %, PDF by 15 %, docs/adr/** by 15 %, recent evidence by up to 20 %",
     });
   });
 
@@ -73,9 +73,9 @@ describe("the lines that preview a template", () => {
     expect(lines["Under More"]).toBe("nothing");
     expect(lines["The assistant suggests"]).toBe("nothing");
     expect(lines["Opens on"]).toBe("Documents");
-    expect(Object.fromEntries(previewLines({ ...knowledgeDetail, ranking: { verified: 1.1, boosts: [] } }).map((line) => [line.label, line.text]))["Search favours"]).toBe("verified evidence by 10 %");
-    expect(Object.fromEntries(previewLines({ ...knowledgeDetail, ranking: { verified: 0.9, boosts: [] } }).map((line) => [line.label, line.text]))["Search favours"]).toBe("verified evidence by -10 %");
-    expect(Object.fromEntries(previewLines({ ...knowledgeDetail, ranking: { verified: 1, boosts: [] } }).map((line) => [line.label, line.text]))["Search favours"]).toBe("nothing in particular");
+    expect(Object.fromEntries(previewLines({ ...knowledgeDetail, ranking: { verified: 1.1, boosts: [], recency: null } }).map((line) => [line.label, line.text]))["Search favours"]).toBe("verified evidence by 10 %");
+    expect(Object.fromEntries(previewLines({ ...knowledgeDetail, ranking: { verified: 0.9, boosts: [], recency: null } }).map((line) => [line.label, line.text]))["Search favours"]).toBe("verified evidence by -10 %");
+    expect(Object.fromEntries(previewLines({ ...knowledgeDetail, ranking: { verified: 1, boosts: [], recency: null } }).map((line) => [line.label, line.text]))["Search favours"]).toBe("nothing in particular");
   });
 });
 

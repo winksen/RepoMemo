@@ -1234,6 +1234,30 @@ impl StorageEngine {
             .collect())
     }
 
+    /// `artifact id -> updated_at` for the given files of a workspace (V0.2.180), for the ranking's preference for
+    /// recent evidence. A file that is not in the workspace is left out.
+    pub async fn artifact_updated_times(
+        &self,
+        workspace_id: &str,
+        artifact_ids: &[String],
+    ) -> Result<HashMap<String, String>> {
+        if artifact_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        let ids = serde_json::to_string(artifact_ids)?;
+        let rows = sqlx::query(
+            "SELECT id, updated_at FROM artifacts WHERE workspace_id = ?1 AND id IN (SELECT value FROM json_each(?2))",
+        )
+        .bind(workspace_id)
+        .bind(ids)
+        .fetch_all(self.reader())
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|row| (row.get("id"), row.get("updated_at")))
+            .collect())
+    }
+
     /// Files marked *needs review*, with the note left when they were, the
     /// longest-waiting first: `(artifact id, title, path, note, since)`.
     pub async fn artifacts_needing_review(

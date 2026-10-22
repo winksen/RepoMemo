@@ -287,11 +287,22 @@ export interface TemplateBoost {
   factor: number;
 }
 
+/**
+ * A preference for recent evidence: a file changed just now is favoured by `max_factor`, and the nudge halves every
+ * `half_life_days`.
+ */
+export interface TemplateRecency {
+  half_life_days: number;
+  max_factor: number;
+}
+
 /** How search weighs what it finds. For `general`: verified evidence ranks a tenth higher and nothing else. */
 export interface TemplateRanking {
   /** The factor for passages of verified files. */
   verified: number;
   boosts: TemplateBoost[];
+  /** Absent when the template does not prefer recent evidence. */
+  recency: TemplateRecency | null;
 }
 
 /** A template as a person looks at it before choosing it: what it arranges and names, without any workspace's choice. */

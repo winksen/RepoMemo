@@ -1268,6 +1268,72 @@ fn the_four_first_templates_boost_what_their_teams_look_for() {
 }
 
 #[test]
+fn a_template_may_prefer_recent_evidence_and_it_is_off_without_the_block() {
+    assert!(general().ranking().recency.is_none());
+    assert!(parse(&with_ranking("{}")).unwrap().ranking().recency.is_none());
+    let template = parse(&with_ranking(
+        r#"{ "recency": { "half_life_days": 90, "max_factor": 1.2 } }"#,
+    ))
+    .unwrap();
+    let recency = template.ranking().recency.expect("the block was given");
+    assert_eq!((recency.half_life_days, recency.max_factor), (90, 1.2));
+    assert_eq!(parse(&serde_json::to_string(&template).unwrap()).unwrap(), template);
+    assert!(!serde_json::to_string(&general()).unwrap().contains("recency"));
+}
+
+#[test]
+fn the_half_life_and_the_most_a_file_may_be_favoured_by_stay_within_bounds() {
+    for good in [(HALF_LIFE_MIN, 1.2), (HALF_LIFE_MAX, 1.01), (90, 1.2)] {
+        let block = format!(
+            r#"{{ "recency": {{ "half_life_days": {}, "max_factor": {} }} }}"#,
+            good.0, good.1
+        );
+        assert!(parse(&with_ranking(&block)).is_ok(), "{good:?} should be valid");
+    }
+    for (days, factor, path) in [
+        (HALF_LIFE_MIN - 1, "1.2", "ranking.recency.half_life_days"),
+        (HALF_LIFE_MAX + 1, "1.2", "ranking.recency.half_life_days"),
+        (90, "1.0", "ranking.recency.max_factor"),
+        (90, "0.9", "ranking.recency.max_factor"),
+        (90, "1.21", "ranking.recency.max_factor"),
+    ] {
+        let block = format!(r#"{{ "recency": {{ "half_life_days": {days}, "max_factor": {factor} }} }}"#);
+        assert_eq!(
+            parse(&with_ranking(&block)).unwrap_err()[0].path,
+            path,
+            "{days} {factor}"
+        );
+    }
+    assert!(
+        parse(&with_ranking(r#"{ "recency": { "half_life_days": 90 } }"#)).is_err(),
+        "both keys are required"
+    );
+    assert!(
+        parse(&with_ranking(
+            r#"{ "recency": { "half_life_days": 90.5, "max_factor": 1.1 } }"#
+        ))
+        .is_err(),
+        "whole days"
+    );
+    assert_eq!(RECENCY_MAX, 1.2);
+}
+
+#[test]
+fn only_operations_prefers_recent_evidence() {
+    let catalogue = Catalogue::builtin();
+    let recency = catalogue
+        .get("operations")
+        .unwrap()
+        .ranking()
+        .recency
+        .expect("Operations prefers recent runbooks");
+    assert_eq!((recency.half_life_days, recency.max_factor), (90, 1.2));
+    for id in ["software-engineering", "product-decisions", "knowledge-base"] {
+        assert!(catalogue.get(id).unwrap().ranking().recency.is_none(), "{id}");
+    }
+}
+
+#[test]
 fn operations_and_the_knowledge_base_favour_verified_evidence_more() {
     let catalogue = Catalogue::builtin();
     let verified = |id: &str| catalogue.get(id).unwrap().ranking().verified;

@@ -25,6 +25,7 @@ function favoured(ranking: TemplateDetail["ranking"]): string {
       : boost.path ?? "";
     if (what) parts.push(`${what} by ${byShare(boost.factor)}`);
   }
+  if (ranking.recency) parts.push(`recent evidence by up to ${byShare(ranking.recency.max_factor)}`);
   return parts.length ? parts.join(", ") : "nothing in particular";
 }
 

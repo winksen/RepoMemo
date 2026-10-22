@@ -41,8 +41,8 @@ pub use meta::{TemplateMeta, WORKSPACE_ICONS};
 pub use overrides::Overrides;
 pub use overview::{OverviewBlock, CARDS_MAX, DEFAULT_CARDS, PULSE_CARDS};
 pub use ranking::{
-    pattern_problem, Boost, RankingBlock, ResolvedRanking, BOOSTS_MAX, DEFAULT_VERIFIED, FACTOR_MAX, FACTOR_MIN,
-    PRODUCT_MAX,
+    pattern_problem, Boost, RankingBlock, Recency, ResolvedRanking, BOOSTS_MAX, DEFAULT_VERIFIED, FACTOR_MAX,
+    FACTOR_MIN, HALF_LIFE_MAX, HALF_LIFE_MIN, PRODUCT_MAX, RECENCY_MAX,
 };
 pub use resolve::{Origin, Resolution};
 pub use retrieval::{RetrievalBlock, TYPE_CHIPS_MAX};

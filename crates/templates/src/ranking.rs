@@ -21,6 +21,24 @@ pub const PATTERN_SEGMENTS_MAX: usize = 12;
 /// this much more (and to its inverse as the least), so no pile of boosts can bury a clearly better match.
 pub const PRODUCT_MAX: f64 = 1.5;
 
+/// How long the preference for recent evidence takes to halve, in days.
+pub const HALF_LIFE_MIN: u32 = 7;
+pub const HALF_LIFE_MAX: u32 = 3650;
+
+/// The most a file changed just now may be favoured by (V0.2.180).
+pub const RECENCY_MAX: f64 = 1.2;
+
+/// A preference for recent evidence (V0.2.180): a file changed just now gets `max_factor`, and the nudge halves every
+/// `half_life_days` until it is 1. Off when the block is left out.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Recency {
+    /// From 7 to 3650.
+    pub half_life_days: u32,
+    /// Above 1 and at most 1.2.
+    pub max_factor: f64,
+}
+
 /// One boost (V0.2.179): a factor for the passages of one kind of evidence, one kind of document or one folder. Exactly
 /// one of the three selectors is given.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -49,6 +67,9 @@ pub struct RankingBlock {
     /// Boosts by kind of evidence, kind of document or folder (V0.2.179), at most 16.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub boosts: Vec<Boost>,
+    /// A preference for recent evidence (V0.2.180); none when left out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recency: Option<Recency>,
 }
 
 /// What the ranking is told: always complete.
@@ -56,6 +77,7 @@ pub struct RankingBlock {
 pub struct ResolvedRanking {
     pub verified: f64,
     pub boosts: Vec<Boost>,
+    pub recency: Option<Recency>,
 }
 
 impl ResolvedRanking {
@@ -63,6 +85,7 @@ impl ResolvedRanking {
         Self {
             verified: block.and_then(|block| block.verified).unwrap_or(DEFAULT_VERIFIED),
             boosts: block.map(|block| block.boosts.clone()).unwrap_or_default(),
+            recency: block.and_then(|block| block.recency.clone()),
         }
     }
 }
@@ -70,6 +93,26 @@ impl ResolvedRanking {
 pub(crate) fn validate(block: &RankingBlock, issues: &mut Vec<TemplateIssue>) {
     if let Some(factor) = block.verified {
         issues.extend(factor_problem(factor).map(|problem| TemplateIssue::new("ranking.verified", problem)));
+    }
+    if let Some(recency) = &block.recency {
+        if !(HALF_LIFE_MIN..=HALF_LIFE_MAX).contains(&recency.half_life_days) {
+            issues.push(TemplateIssue::new(
+                "ranking.recency.half_life_days",
+                format!(
+                    "the half-life is {} days; it is {HALF_LIFE_MIN} to {HALF_LIFE_MAX}",
+                    recency.half_life_days
+                ),
+            ));
+        }
+        if !recency.max_factor.is_finite() || recency.max_factor <= 1.0 || recency.max_factor > RECENCY_MAX {
+            issues.push(TemplateIssue::new(
+                "ranking.recency.max_factor",
+                format!(
+                    "the factor is {}; it is above 1 and at most {RECENCY_MAX}",
+                    recency.max_factor
+                ),
+            ));
+        }
     }
     if block.boosts.len() > BOOSTS_MAX {
         issues.push(TemplateIssue::new(

@@ -106,6 +106,10 @@ pub fn detail_of(template: &TemplateDefinition) -> TemplateDetail {
                         factor: boost.factor,
                     })
                     .collect(),
+                recency: ranking.recency.map(|recency| TemplateRecency {
+                    half_life_days: recency.half_life_days,
+                    max_factor: recency.max_factor,
+                }),
             }
         },
     }
@@ -254,6 +258,9 @@ impl RepoMemoCore {
                     } else if let Some(pattern) = &boost.path {
                         profile = profile.boost_path(pattern, boost.factor);
                     }
+                }
+                if let Some(recency) = &ranking.recency {
+                    profile = profile.prefer_recent(f64::from(recency.half_life_days), recency.max_factor);
                 }
                 profile
             }
@@ -717,7 +724,7 @@ mod tests {
                 { "artifact_type": "runbook", "factor": 1.25 },
                 { "document_kind": "pdf", "factor": 1.1 },
                 { "path": "docs/adr/**", "factor": 1.15 }
-            ] }
+            ], "recency": { "half_life_days": 60, "max_factor": 1.1 } }
         }"#;
         let (catalogue, problems) = Catalogue::load([("operations.json", file)]);
         assert!(problems.is_empty(), "{problems:?}");
@@ -736,7 +743,11 @@ mod tests {
         // Its boosts become rules of the profile, each by what it selects.
         use repomemo_domain::ArtifactType;
         use repomemo_retrieval::RankingRule;
-        assert_eq!(profile.rules().len(), 4);
+        assert_eq!(profile.rules().len(), 5);
+        assert!(profile.rules().contains(&RankingRule::Recency {
+            half_life_days: 60.0,
+            max_factor: 1.1
+        }));
         assert!(profile.rules().contains(&RankingRule::ArtifactType {
             artifact_type: ArtifactType::Runbook,
             factor: 1.25

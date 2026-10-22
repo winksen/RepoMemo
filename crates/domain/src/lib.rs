@@ -340,12 +340,22 @@ pub struct TemplateBoost {
     pub factor: f64,
 }
 
+/// A preference for recent evidence: a file changed just now is favoured by `max_factor`, and the nudge halves every
+/// `half_life_days`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TemplateRecency {
+    pub half_life_days: u32,
+    pub max_factor: f64,
+}
+
 /// How search weighs what it finds. For `general`: verified evidence ranks a tenth higher and nothing else.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TemplateRanking {
     /// The factor for passages of verified files.
     pub verified: f64,
     pub boosts: Vec<TemplateBoost>,
+    /// Absent when the template does not prefer recent evidence.
+    pub recency: Option<TemplateRecency>,
 }
 
 /// A template as a person looks at it before choosing it: what it arranges and names, without any workspace's choice.

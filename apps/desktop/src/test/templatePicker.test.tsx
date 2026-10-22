@@ -62,7 +62,7 @@ describe("the template hooks", () => {
       evidence: { default_view: "grid", types_first: [] },
       assistant: { order: [], suggestions: [] },
       retrieval: { type_chips: [] },
-      ranking: { verified: 1.1, boosts: [] },
+      ranking: { verified: 1.1, boosts: [], recency: null },
     };
     vi.mocked(getSharedWorkspaceTemplate).mockResolvedValue(view);
 

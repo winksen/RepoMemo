@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.180 (2026-10-22)
+
+A template can prefer recent evidence, within the same bounds as other boosts.
+
+### Changed
+- **`ranking.recency`:** a half-life (`half_life_days`, 7 to 3650 whole days) and a maximum (`max_factor`, above 1 and at most 1.2). A file changed just now is favoured by the maximum, and the part above 1 halves every half-life, so with 90 days and 1.2 a file changed a month ago gets 1.16 and one changed a year ago 1.01: a month-old runbook edges out a year-old one of equal relevance, and a far better old match still wins. Off when the block is left out, so General and any template without it are unchanged. `GET /v1/workspaces/{id}/template` and the preview answer it as `ranking.recency` (`null` when off), and Settings › Template says "recent evidence by up to 20 %".
+- **Cheap and bounded:** the files' times are read for the results of one search only, in one query over their ids (`StorageEngine::artifact_updated_times`), and a file whose time cannot be read is left as it is. The factor joins the product of the other rules, so the cap of 1.5 holds for it too.
+- **The templates:** *Operations and incidents* prefers recent evidence (90 days, up to 20 %), because a runbook touched this quarter is more likely to be right; the other three do not.
+- **Tests (written, not run):** three in the templates crate (off without the block and written back; the half-life 7 to 3650 whole days and a maximum above 1 up to 1.2; only Operations prefers recent evidence), two in the retrieval crate (the factor halves with the half-life and never goes below 1; a month-old runbook edges out a year-old one of equal relevance, nothing changes with the rule off, a far better old match still wins and a file of unknown age is not touched), one in storage (the times of the files asked about, not those of another workspace or of a missing file), the api test now builds the rule from a template, and the server's and the web's template tests check the new field.
+- **Checks run on this release:** `cargo check` of the templates, storage, retrieval, api and server crates with their tests compiles; `rustfmt` shows nothing for the lines changed; `types:check`, `typecheck`, `styles:check`, `a11y:check`, `docs:check` and `version:check` pass. **Not run:** the tests, as asked.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.179 (2026-10-22)
 
 Evidence of the kinds, documents and folders a template cares about ranks a little higher, never above a clearly better match.

@@ -40,6 +40,7 @@
     "boosts": [
       { "artifact_type": "runbook", "factor": 1.2 },
       { "artifact_type": "incident", "factor": 1.2 }
-    ]
+    ],
+    "recency": { "half_life_days": 90, "max_factor": 1.2 }
   }
 }
