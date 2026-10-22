@@ -1,5 +1,6 @@
 import type { TemplateDetail } from "../generated/domain";
-import { WORKSPACE_SECTIONS, type WorkspaceSection } from "./constants";
+import { FILE_CATEGORIES, WORKSPACE_SECTIONS, type WorkspaceSection } from "./constants";
+import { artifactTypeLabel } from "./format";
 import { isPulseCard, PULSE_CARD_TITLES } from "./workspace/pulseCards";
 
 /** The words for the sections as the tabs use them when a template renames none. */
@@ -12,10 +13,19 @@ type Previewable = Pick<TemplateDetail, "sections" | "labels" | "overview" | "as
 
 const isSection = (value: string): value is WorkspaceSection => (WORKSPACE_SECTIONS as string[]).includes(value);
 
-/** What search favours, in words: verified evidence by a share, or nothing in particular. */
-function favoured(verified: number): string {
-  const share = Math.round((verified - 1) * 100);
-  return share === 0 ? "nothing in particular" : `verified evidence by ${share} %`;
+const byShare = (factor: number) => `${Math.round((factor - 1) * 100)} %`;
+
+/** What search favours, in words: verified evidence and each boost by a share, or nothing in particular. */
+function favoured(ranking: TemplateDetail["ranking"]): string {
+  const parts: string[] = [];
+  if (Math.round((ranking.verified - 1) * 100) !== 0) parts.push(`verified evidence by ${byShare(ranking.verified)}`);
+  for (const boost of ranking.boosts) {
+    const what = boost.artifact_type ? artifactTypeLabel(boost.artifact_type as Parameters<typeof artifactTypeLabel>[0])
+      : boost.document_kind ? (FILE_CATEGORIES.find((category) => category.value === boost.document_kind)?.label ?? boost.document_kind)
+      : boost.path ?? "";
+    if (what) parts.push(`${what} by ${byShare(boost.factor)}`);
+  }
+  return parts.length ? parts.join(", ") : "nothing in particular";
 }
 
 /** What a template would make of a workspace, in lines a person can read before choosing it: one line for each thing it arranges. */
@@ -30,7 +40,7 @@ export function previewLines(template: Previewable): Array<{ label: string; text
     { label: "Opens on", text: name(template.sections.landing) },
     { label: "Renamed", text: renamed.length ? renamed.join(", ") : "nothing" },
     { label: "Overview cards", text: cards.join(", ") },
-    { label: "Search favours", text: favoured(template.ranking.verified) },
+    { label: "Search favours", text: favoured(template.ranking) },
     { label: "The assistant suggests", text: template.assistant.suggestions.length ? `${template.assistant.suggestions.length} question${template.assistant.suggestions.length === 1 ? "" : "s"}` : "nothing" },
   ];
 }

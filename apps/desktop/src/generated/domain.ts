@@ -276,10 +276,22 @@ export interface TemplateRetrieval {
   type_chips: string[];
 }
 
-/** How search weighs what it finds. For `general`: verified evidence ranks a tenth higher. */
+/**
+ * A factor for the passages of one kind of evidence, one kind of document or one folder: exactly one of the three
+ * selectors is given.
+ */
+export interface TemplateBoost {
+  artifact_type: string | null;
+  document_kind: string | null;
+  path: string | null;
+  factor: number;
+}
+
+/** How search weighs what it finds. For `general`: verified evidence ranks a tenth higher and nothing else. */
 export interface TemplateRanking {
   /** The factor for passages of verified files. */
   verified: number;
+  boosts: TemplateBoost[];
 }
 
 /** A template as a person looks at it before choosing it: what it arranges and names, without any workspace's choice. */

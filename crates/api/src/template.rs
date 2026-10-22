@@ -92,8 +92,21 @@ pub fn detail_of(template: &TemplateDefinition) -> TemplateDetail {
         retrieval: TemplateRetrieval {
             type_chips: template.retrieval().type_chips,
         },
-        ranking: TemplateRanking {
-            verified: template.ranking().verified,
+        ranking: {
+            let ranking = template.ranking();
+            TemplateRanking {
+                verified: ranking.verified,
+                boosts: ranking
+                    .boosts
+                    .into_iter()
+                    .map(|boost| TemplateBoost {
+                        artifact_type: boost.artifact_type,
+                        document_kind: boost.document_kind,
+                        path: boost.path,
+                        factor: boost.factor,
+                    })
+                    .collect(),
+            }
         },
     }
 }
@@ -226,7 +239,24 @@ impl RepoMemoCore {
     /// cannot be read (a ranking must never be the reason a search fails).
     pub(crate) async fn ranking_profile(&self, workspace_id: &str) -> RankingProfile {
         match self.effective_template(workspace_id).await {
-            Ok(effective) => RankingProfile::with_verified(effective.template.ranking().verified),
+            Ok(effective) => {
+                let ranking = effective.template.ranking();
+                let mut profile = RankingProfile::with_verified(ranking.verified);
+                for boost in &ranking.boosts {
+                    // A selector this server cannot read is skipped; the template was validated, so it is only a
+                    // file written for a newer server.
+                    if let Some(kind) = &boost.artifact_type {
+                        if let Ok(artifact_type) = serde_json::from_value(serde_json::json!(kind)) {
+                            profile = profile.boost_type(artifact_type, boost.factor);
+                        }
+                    } else if let Some(kind) = &boost.document_kind {
+                        profile = profile.boost_document_kind(kind, boost.factor);
+                    } else if let Some(pattern) = &boost.path {
+                        profile = profile.boost_path(pattern, boost.factor);
+                    }
+                }
+                profile
+            }
             Err(_) => RankingProfile::general(),
         }
     }
@@ -683,7 +713,11 @@ mod tests {
         let file = r#"{
             "format": 1,
             "meta": { "id": "operations", "version": 1, "name": "Operations", "summary": "Runbooks.", "icon": "heartbeat" },
-            "ranking": { "verified": 1.2 }
+            "ranking": { "verified": 1.2, "boosts": [
+                { "artifact_type": "runbook", "factor": 1.25 },
+                { "document_kind": "pdf", "factor": 1.1 },
+                { "path": "docs/adr/**", "factor": 1.15 }
+            ] }
         }"#;
         let (catalogue, problems) = Catalogue::load([("operations.json", file)]);
         assert!(problems.is_empty(), "{problems:?}");
@@ -697,7 +731,24 @@ mod tests {
         core.set_workspace_template(&workspace.id, Some("operations"), None)
             .await
             .unwrap();
-        assert_eq!(core.ranking_profile(&workspace.id).await.verified_factor(), Some(1.2));
+        let profile = core.ranking_profile(&workspace.id).await;
+        assert_eq!(profile.verified_factor(), Some(1.2));
+        // Its boosts become rules of the profile, each by what it selects.
+        use repomemo_domain::ArtifactType;
+        use repomemo_retrieval::RankingRule;
+        assert_eq!(profile.rules().len(), 4);
+        assert!(profile.rules().contains(&RankingRule::ArtifactType {
+            artifact_type: ArtifactType::Runbook,
+            factor: 1.25
+        }));
+        assert!(profile.rules().contains(&RankingRule::DocumentKind {
+            kind: "pdf".to_owned(),
+            factor: 1.1
+        }));
+        assert!(profile.rules().contains(&RankingRule::Path {
+            pattern: "docs/adr/**".to_owned(),
+            factor: 1.15
+        }));
         // General named on purpose, and a workspace that does not exist: the usual one.
         core.set_workspace_template(&workspace.id, Some(GENERAL_ID), None)
             .await

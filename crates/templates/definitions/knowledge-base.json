@@ -34,5 +34,13 @@
     ]
   },
   "retrieval": { "type_chips": ["file", "markdown_doc"] },
-  "ranking": { "verified": 1.15 }
+  "ranking": {
+    "verified": 1.15,
+    "boosts": [
+      { "document_kind": "word", "factor": 1.15 },
+      { "document_kind": "pdf", "factor": 1.15 },
+      { "document_kind": "excel", "factor": 1.15 },
+      { "document_kind": "powerpoint", "factor": 1.15 }
+    ]
+  }
 }

@@ -31,5 +31,14 @@
       "Which services call the billing API?"
     ]
   },
-  "retrieval": { "type_chips": ["code_file", "markdown_doc", "api_spec"] }
+  "retrieval": { "type_chips": ["code_file", "markdown_doc", "api_spec"] },
+  "ranking": {
+    "boosts": [
+      { "artifact_type": "code_file", "factor": 1.1 },
+      { "artifact_type": "api_spec", "factor": 1.1 },
+      { "artifact_type": "decision", "factor": 1.1 },
+      { "path": "docs/adr/**", "factor": 1.15 },
+      { "path": "README*", "factor": 1.15 }
+    ]
+  }
 }

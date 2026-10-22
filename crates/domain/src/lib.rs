@@ -330,11 +330,22 @@ pub struct TemplateRetrieval {
     pub type_chips: Vec<String>,
 }
 
-/// How search weighs what it finds. For `general`: verified evidence ranks a tenth higher.
+/// A factor for the passages of one kind of evidence, one kind of document or one folder: exactly one of the three
+/// selectors is given.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TemplateBoost {
+    pub artifact_type: Option<String>,
+    pub document_kind: Option<String>,
+    pub path: Option<String>,
+    pub factor: f64,
+}
+
+/// How search weighs what it finds. For `general`: verified evidence ranks a tenth higher and nothing else.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TemplateRanking {
     /// The factor for passages of verified files.
     pub verified: f64,
+    pub boosts: Vec<TemplateBoost>,
 }
 
 /// A template as a person looks at it before choosing it: what it arranges and names, without any workspace's choice.

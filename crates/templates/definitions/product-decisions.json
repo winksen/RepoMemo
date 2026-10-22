@@ -33,5 +33,12 @@
       "Summarize the latest meeting notes"
     ]
   },
-  "retrieval": { "type_chips": ["decision", "note", "markdown_doc"] }
+  "retrieval": { "type_chips": ["decision", "note", "markdown_doc"] },
+  "ranking": {
+    "boosts": [
+      { "artifact_type": "decision", "factor": 1.15 },
+      { "artifact_type": "note", "factor": 1.15 },
+      { "document_kind": "markdown", "factor": 1.15 }
+    ]
+  }
 }

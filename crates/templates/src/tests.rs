@@ -1128,6 +1128,145 @@ fn a_factor_stays_between_eight_tenths_and_one_and_three_tenths() {
     assert_eq!((FACTOR_MIN, FACTOR_MAX), (0.8, 1.3));
 }
 
+fn boosts(list: &str) -> String {
+    with_ranking(&format!(r#"{{ "boosts": {list} }}"#))
+}
+
+#[test]
+fn a_template_lists_boosts_by_kind_of_evidence_kind_of_document_and_folder() {
+    let template = parse(&boosts(
+        r#"[ { "artifact_type": "runbook", "factor": 1.2 }, { "document_kind": "pdf", "factor": 1.15 }, { "path": "docs/adr/**", "factor": 1.15 } ]"#,
+    ))
+    .unwrap();
+    let ranking = template.ranking();
+    assert_eq!(ranking.boosts.len(), 3);
+    assert_eq!(ranking.boosts[0].artifact_type.as_deref(), Some("runbook"));
+    assert_eq!(ranking.boosts[1].document_kind.as_deref(), Some("pdf"));
+    assert_eq!(ranking.boosts[2].path.as_deref(), Some("docs/adr/**"));
+    assert_eq!(ranking.verified, DEFAULT_VERIFIED);
+    assert_eq!(parse(&serde_json::to_string(&template).unwrap()).unwrap(), template);
+    assert!(general().ranking().boosts.is_empty());
+}
+
+#[test]
+fn a_boost_names_exactly_one_selector_that_exists_with_a_factor_in_bounds() {
+    for (text, path) in [
+        (r#"[ { "factor": 1.2 } ]"#, "ranking.boosts[0]"),
+        (
+            r#"[ { "artifact_type": "runbook", "path": "docs/**", "factor": 1.2 } ]"#,
+            "ranking.boosts[0]",
+        ),
+        (
+            r#"[ { "artifact_type": "spreadsheet", "factor": 1.2 } ]"#,
+            "ranking.boosts[0].artifact_type",
+        ),
+        (
+            r#"[ { "document_kind": "spreadsheet", "factor": 1.2 } ]"#,
+            "ranking.boosts[0].document_kind",
+        ),
+        (
+            r#"[ { "artifact_type": "runbook", "factor": 1.6 } ]"#,
+            "ranking.boosts[0].factor",
+        ),
+        (
+            r#"[ { "artifact_type": "runbook", "factor": 0.5 } ]"#,
+            "ranking.boosts[0].factor",
+        ),
+        (r#"[ { "path": "(a|b).md", "factor": 1.2 } ]"#, "ranking.boosts[0].path"),
+    ] {
+        let issues = parse(&boosts(text)).unwrap_err();
+        assert_eq!(issues[0].path, path, "{text}");
+    }
+    assert!(
+        parse(&boosts(r#"[ { "artifact_type": "runbook" } ]"#)).is_err(),
+        "a factor is required"
+    );
+    let unknown = parse(&boosts(
+        r#"[ { "artifact_type": "runbook", "factor": 1.2, "colour": "red" } ]"#,
+    ))
+    .unwrap_err();
+    assert!(unknown[0].message.contains("unknown field `colour`"), "{}", unknown[0]);
+}
+
+#[test]
+fn at_most_sixteen_boosts_and_a_pattern_is_never_a_regular_expression() {
+    let boost = r#"{ "artifact_type": "note", "factor": 1.1 }"#;
+    let sixteen = vec![boost; BOOSTS_MAX].join(",");
+    assert!(parse(&boosts(&format!("[{sixteen}]"))).is_ok());
+    let seventeen = vec![boost; BOOSTS_MAX + 1].join(",");
+    assert_eq!(
+        parse(&boosts(&format!("[{seventeen}]"))).unwrap_err()[0].path,
+        "ranking.boosts"
+    );
+    for good in [
+        "docs/adr/**",
+        "README*",
+        "*.lock",
+        "src/**/*.rs",
+        "Meeting notes/*",
+        "a-b_c.d/e@f+g",
+    ] {
+        assert_eq!(pattern_problem(good), None, "{good} should be valid");
+    }
+    let long = "x".repeat(121);
+    for bad in [
+        "",
+        "/docs",
+        "docs/",
+        "docs//adr",
+        "../secrets",
+        "./x",
+        "a**b",
+        "(a|b)",
+        "a?b",
+        "[ab]",
+        "{a,b}",
+        "a^b",
+        "a$",
+        "back\\slash",
+        "tab\there",
+        long.as_str(),
+        "a/b/c/d/e/f/g/h/i/j/k/l/m",
+    ] {
+        assert!(pattern_problem(bad).is_some(), "{bad:?} should be refused");
+    }
+    assert_eq!(PRODUCT_MAX, 1.5);
+}
+
+#[test]
+fn the_four_first_templates_boost_what_their_teams_look_for() {
+    let catalogue = Catalogue::builtin();
+    let boosts = |id: &str| catalogue.get(id).unwrap().ranking().boosts;
+    let operations = boosts("operations");
+    assert_eq!(
+        operations
+            .iter()
+            .filter_map(|boost| boost.artifact_type.as_deref())
+            .collect::<Vec<_>>(),
+        ["runbook", "incident"]
+    );
+    assert!(operations.iter().all(|boost| boost.factor == 1.2));
+    let software = boosts("software-engineering");
+    assert!(software
+        .iter()
+        .any(|boost| boost.path.as_deref() == Some("docs/adr/**") && boost.factor == 1.15));
+    assert!(software.iter().any(|boost| boost.path.as_deref() == Some("README*")));
+    assert!(software
+        .iter()
+        .any(|boost| boost.artifact_type.as_deref() == Some("api_spec")));
+    let documents = boosts("knowledge-base");
+    assert_eq!(
+        documents
+            .iter()
+            .filter_map(|boost| boost.document_kind.as_deref())
+            .collect::<Vec<_>>(),
+        ["word", "pdf", "excel", "powerpoint"]
+    );
+    assert!(boosts("product-decisions")
+        .iter()
+        .any(|boost| boost.document_kind.as_deref() == Some("markdown")));
+}
+
 #[test]
 fn operations_and_the_knowledge_base_favour_verified_evidence_more() {
     let catalogue = Catalogue::builtin();

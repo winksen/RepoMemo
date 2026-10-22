@@ -35,5 +35,11 @@
     ]
   },
   "retrieval": { "type_chips": ["runbook", "incident", "note"] },
-  "ranking": { "verified": 1.15 }
+  "ranking": {
+    "verified": 1.15,
+    "boosts": [
+      { "artifact_type": "runbook", "factor": 1.2 },
+      { "artifact_type": "incident", "factor": 1.2 }
+    ]
+  }
 }

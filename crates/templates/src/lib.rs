@@ -40,7 +40,10 @@ pub use labels::{LabelsBlock, ARTIFACT_TYPES};
 pub use meta::{TemplateMeta, WORKSPACE_ICONS};
 pub use overrides::Overrides;
 pub use overview::{OverviewBlock, CARDS_MAX, DEFAULT_CARDS, PULSE_CARDS};
-pub use ranking::{RankingBlock, ResolvedRanking, DEFAULT_VERIFIED, FACTOR_MAX, FACTOR_MIN};
+pub use ranking::{
+    pattern_problem, Boost, RankingBlock, ResolvedRanking, BOOSTS_MAX, DEFAULT_VERIFIED, FACTOR_MAX, FACTOR_MIN,
+    PRODUCT_MAX,
+};
 pub use resolve::{Origin, Resolution};
 pub use retrieval::{RetrievalBlock, TYPE_CHIPS_MAX};
 pub use sections::{ResolvedSections, SectionsBlock, ADMIN_ONLY_SECTIONS, DEFAULT_LANDING, WORKSPACE_SECTIONS};

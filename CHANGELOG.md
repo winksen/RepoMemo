@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.179 (2026-10-22)
+
+Evidence of the kinds, documents and folders a template cares about ranks a little higher, never above a clearly better match.
+
+### Changed
+- **Boosts:** `ranking.boosts` lists up to 16 rules for the ranking profile. Each names exactly one thing and a factor from 0.8 to 1.3: a **kind of evidence** (`artifact_type`: runbook, incident, decision, API specification…), a **kind of document** (`document_kind`: the ledger's file types, so a document format by its extension first, then the evidence's own type) or a **folder** (`path`). A passage that several rules match gets the product of their factors, and that product is held between 1/1.5 and 1.5, so a pile of boosts, all the 16 of them at 1.3 included, cannot bury a clearly better match: a passage that scores 0.6 cannot pass one that scores 1.0, and a passage that scores 0.50 with the full boost (0.75) still loses to one that scores 0.80. A boost can lower as well as raise.
+- **Folder patterns, never regular expressions:** a pattern is written with `/` between folders, `*` inside a name and `**` as a whole folder name for any number of folders. It may start anywhere in the path (`docs/adr/**` finds `docs/adr/0001.md` and `payments/docs/adr/0003.md`; `README*` finds the README of any folder) and ignores case. Up to 120 characters and 12 folders; `( ) [ ] { } | ? ^ $`, a backslash, an empty folder name, `.` and `..` are refused when the template is read, and the matcher is a plain walk over the folders, so a pattern costs no more than its length.
+- **The four templates:** *Operations and incidents* boosts runbooks and incidents by 20 % (and verified evidence by 15 %); *Software engineering* boosts code, API specifications and decisions by 10 % and `docs/adr/**` and `README*` by 15 %; *Product and decisions* boosts decisions, notes and Markdown by 15 %; the *Knowledge base* boosts Word, PDF, Excel and PowerPoint documents by 15 %. General has none.
+- **Settings › Template and the API:** `GET …/template` and the preview answer the boosts as `ranking.boosts`, and the preview lists what search favours ("verified evidence by 15 %, Runbook by 20 %, docs/adr/** by 15 %").
+- **No extra lookup:** the kind of evidence and the path are already on every search result, so a boost reads nothing more from the database.
+- **Tests (written, not run):** four in the templates crate (the three selectors read and written back; exactly one selector, a known kind and a factor in bounds; at most sixteen boosts and a pattern that is never a regular expression; the four templates' boosts), nine in the retrieval crate (folder patterns wherever they start, name patterns, patterns with folders, case and slashes with nothing a regular expression; a runbook outranking an equally good note while a far better note wins; a document kind and a folder boosting what they match; the cap with sixteen rules that all match, up and down; rules that stack; the kind of document as the ledger classifies it), the api test now builds a profile from a template's boosts, and the server's template test checks the boosts of General and of the four.
+- **Checks run on this release:** `cargo check` of the templates, retrieval, api and server crates with their tests compiles; `rustfmt` shows nothing for the lines changed; `types:check`, `typecheck`, `styles:check`, `a11y:check`, `docs:check` and `version:check` pass. **Not run:** the tests, as asked.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.178 (2026-10-22)
 
 Search ranking is described by a profile that comes from the workspace's template; General ranks exactly as before.

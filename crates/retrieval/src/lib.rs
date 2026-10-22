@@ -1,8 +1,12 @@
 use std::collections::HashMap;
 
 use anyhow::{bail, Result};
-use repomemo_domain::{SearchRequest, SearchResult};
+use repomemo_domain::{ArtifactType, SearchRequest, SearchResult};
 use repomemo_storage::StorageEngine;
+
+mod pattern;
+
+pub use pattern::path_matches;
 
 #[derive(Debug, Clone)]
 pub struct RetrievalService {
@@ -90,6 +94,61 @@ impl RetrievalService {
 pub enum RankingRule {
     /// Passages of files in a lifecycle state (`verified`) have their score multiplied by `factor`.
     Lifecycle { status: String, factor: f64 },
+    /// Passages of one kind of evidence (V0.2.179).
+    ArtifactType { artifact_type: ArtifactType, factor: f64 },
+    /// Passages of one kind of document, as the ledger's file types name them: `pdf`, `word`, `markdown`…
+    DocumentKind { kind: String, factor: f64 },
+    /// Passages of files whose path a folder pattern matches ([`path_matches`]).
+    Path { pattern: String, factor: f64 },
+}
+
+impl RankingRule {
+    fn factor(&self) -> f64 {
+        match self {
+            RankingRule::Lifecycle { factor, .. }
+            | RankingRule::ArtifactType { factor, .. }
+            | RankingRule::DocumentKind { factor, .. }
+            | RankingRule::Path { factor, .. } => *factor,
+        }
+    }
+
+    fn matches(&self, result: &SearchResult, facts: &RankingFacts) -> bool {
+        match self {
+            RankingRule::Lifecycle { status, .. } => facts.lifecycle.get(&result.artifact_id) == Some(status),
+            RankingRule::ArtifactType { artifact_type, .. } => result.artifact_type == *artifact_type,
+            RankingRule::DocumentKind { kind, .. } => document_kind(&result.artifact_type, &result.path) == kind,
+            RankingRule::Path { pattern, .. } => path_matches(pattern, &result.path),
+        }
+    }
+}
+
+/// The product of the factors that match one passage is held between this and its inverse, so a pile of boosts
+/// cannot bury a clearly better match (V0.2.179).
+pub const MAX_PRODUCT: f64 = 1.5;
+
+/// The kind of document a passage comes from, by the names the evidence ledger's file-type filter uses: a document
+/// format by its extension first, then the evidence's own type, and plain text is whatever is left.
+pub fn document_kind(artifact_type: &ArtifactType, path: &str) -> &'static str {
+    if *artifact_type == ArtifactType::Repository {
+        return "repository";
+    }
+    let extension = path.rsplit('.').next().map(str::to_ascii_lowercase).unwrap_or_default();
+    match extension.as_str() {
+        "doc" | "docx" => return "word",
+        "xlsx" | "xlsm" | "xls" => return "excel",
+        "pptx" | "ppt" => return "powerpoint",
+        "pdf" => return "pdf",
+        "one" => return "onenote",
+        "eml" | "msg" => return "email",
+        _ => {}
+    }
+    match artifact_type {
+        ArtifactType::Image => "image",
+        ArtifactType::CodeFile => "code",
+        ArtifactType::Note => "note",
+        ArtifactType::MarkdownDoc => "markdown",
+        _ => "text",
+    }
 }
 
 /// How a workspace weighs its search results (V0.2.178): a list of rules, each a factor for what it matches. The
@@ -116,6 +175,30 @@ impl RankingProfile {
         }
     }
 
+    /// Adds a boost for one kind of evidence.
+    pub fn boost_type(mut self, artifact_type: ArtifactType, factor: f64) -> Self {
+        self.rules.push(RankingRule::ArtifactType { artifact_type, factor });
+        self
+    }
+
+    /// Adds a boost for one kind of document.
+    pub fn boost_document_kind(mut self, kind: &str, factor: f64) -> Self {
+        self.rules.push(RankingRule::DocumentKind {
+            kind: kind.to_owned(),
+            factor,
+        });
+        self
+    }
+
+    /// Adds a boost for the files a folder pattern matches.
+    pub fn boost_path(mut self, pattern: &str, factor: f64) -> Self {
+        self.rules.push(RankingRule::Path {
+            pattern: pattern.to_owned(),
+            factor,
+        });
+        self
+    }
+
     pub fn rules(&self) -> &[RankingRule] {
         &self.rules
     }
@@ -124,15 +207,13 @@ impl RankingProfile {
     pub fn verified_factor(&self) -> Option<f64> {
         self.rules.iter().find_map(|rule| match rule {
             RankingRule::Lifecycle { status, factor } if status == "verified" => Some(*factor),
-            RankingRule::Lifecycle { .. } => None,
+            _ => None,
         })
     }
 
     /// True when no rule can change a score, so the results need no second look.
     pub fn is_neutral(&self) -> bool {
-        self.rules.iter().all(|rule| match rule {
-            RankingRule::Lifecycle { factor, .. } => *factor == 1.0,
-        })
+        self.rules.iter().all(|rule| rule.factor() == 1.0)
     }
 
     fn reads_lifecycle(&self) -> bool {
@@ -141,20 +222,21 @@ impl RankingProfile {
             .any(|rule| matches!(rule, RankingRule::Lifecycle { .. }))
     }
 
-    /// What the rules make of one passage: the product of the factors of the rules it matches.
+    /// Whether the profile has any rule at all (the usual one included).
+    pub fn is_empty(&self) -> bool {
+        self.rules.is_empty()
+    }
+
+    /// What the rules make of one passage: the product of the factors of the rules it matches, held between
+    /// [`MAX_PRODUCT`] and its inverse.
     fn multiplier(&self, result: &SearchResult, facts: &RankingFacts) -> f64 {
-        self.rules
+        let product: f64 = self
+            .rules
             .iter()
-            .map(|rule| match rule {
-                RankingRule::Lifecycle { status, factor } => {
-                    if facts.lifecycle.get(&result.artifact_id) == Some(status) {
-                        *factor
-                    } else {
-                        1.0
-                    }
-                }
-            })
-            .product()
+            .filter(|rule| rule.matches(result, facts))
+            .map(RankingRule::factor)
+            .product();
+        product.clamp(1.0 / MAX_PRODUCT, MAX_PRODUCT)
     }
 }
 
@@ -442,6 +524,131 @@ mod tests {
         let mut clear = vec![result("plain", "p", 1.0), result("checked", "v", 0.6)];
         apply_profile(&mut clear, &RankingProfile::with_verified(1.3), &verified(&["checked"]));
         assert_eq!(clear[0].chunk_id, "p");
+    }
+
+    fn typed(artifact: &str, chunk: &str, score: f64, artifact_type: ArtifactType, path: &str) -> SearchResult {
+        SearchResult {
+            artifact_id: artifact.to_owned(),
+            score,
+            artifact_type,
+            path: path.to_owned(),
+            ..hit(chunk)
+        }
+    }
+
+    #[test]
+    fn evidence_of_the_kinds_a_template_cares_about_ranks_a_little_higher() {
+        use super::{apply_profile, RankingFacts, RankingProfile};
+        // Operations: a runbook outranks an equally good match from a note.
+        let operations = RankingProfile::with_verified(1.15)
+            .boost_type(ArtifactType::Runbook, 1.2)
+            .boost_type(ArtifactType::Incident, 1.2);
+        let mut equal = vec![
+            typed("n", "note", 0.90, ArtifactType::Note, "notes/today.md"),
+            typed("r", "runbook", 0.90, ArtifactType::Runbook, "runbooks/restart.md"),
+        ];
+        apply_profile(&mut equal, &operations, &RankingFacts::default());
+        assert_eq!(equal[0].chunk_id, "runbook");
+        assert!((equal[0].score - 1.0).abs() < 1e-12, "rescaled so the best is 1");
+        // A far better note still wins.
+        let mut far = vec![
+            typed("r", "runbook", 0.60, ArtifactType::Runbook, "runbooks/restart.md"),
+            typed("n", "note", 1.00, ArtifactType::Note, "notes/today.md"),
+        ];
+        apply_profile(&mut far, &operations, &RankingFacts::default());
+        assert_eq!(far[0].chunk_id, "note");
+    }
+
+    #[test]
+    fn a_document_kind_and_a_folder_pattern_boost_what_they_match() {
+        use super::{apply_profile, RankingFacts, RankingProfile};
+        let profile = RankingProfile::with_verified(1.0)
+            .boost_document_kind("pdf", 1.2)
+            .boost_path("docs/adr/**", 1.2);
+        let mut results = vec![
+            typed("a", "plain", 0.80, ArtifactType::File, "misc/plain.txt"),
+            typed("b", "pdf", 0.70, ArtifactType::File, "contracts/Lease.PDF"),
+            typed("c", "adr", 0.69, ArtifactType::MarkdownDoc, "payments/docs/adr/0003.md"),
+        ];
+        apply_profile(&mut results, &profile, &RankingFacts::default());
+        assert_eq!(
+            results.iter().map(|r| r.chunk_id.as_str()).collect::<Vec<_>>(),
+            ["pdf", "adr", "plain"]
+        );
+        assert!((results[0].score - 0.84).abs() < 1e-12 && (results[1].score - 0.828).abs() < 1e-12);
+    }
+
+    #[test]
+    fn the_product_of_all_the_factors_that_match_is_held_to_one_and_a_half() {
+        use super::{apply_profile, RankingFacts, RankingProfile, MAX_PRODUCT};
+        assert_eq!(MAX_PRODUCT, 1.5);
+        // Sixteen rules that all match one passage, each 1.3: 1.3^16 is far above 1.5.
+        let mut profile = RankingProfile::with_verified(1.0);
+        for _ in 0..16 {
+            profile = profile.boost_type(ArtifactType::Runbook, 1.3);
+        }
+        assert_eq!(profile.rules().len(), 17);
+        let mut results = vec![
+            typed("a", "boosted", 0.50, ArtifactType::Runbook, "r.md"),
+            typed("b", "other", 0.74, ArtifactType::Note, "n.md"),
+        ];
+        apply_profile(&mut results, &profile, &RankingFacts::default());
+        // 0.50 x 1.5 = 0.75 beats 0.74, and no more than that: the cap, not the pile, decides.
+        assert_eq!(results[0].chunk_id, "boosted");
+        assert!((results[0].score - 0.75).abs() < 1e-12);
+        let mut clear = vec![
+            typed("a", "boosted", 0.50, ArtifactType::Runbook, "r.md"),
+            typed("b", "other", 0.80, ArtifactType::Note, "n.md"),
+        ];
+        apply_profile(&mut clear, &profile, &RankingFacts::default());
+        assert_eq!(clear[0].chunk_id, "other", "a clearly better match still wins");
+        // The same holds downwards: sixteen 0.8s do not bury a passage below two thirds.
+        let mut lowered = RankingProfile::with_verified(1.0);
+        for _ in 0..16 {
+            lowered = lowered.boost_type(ArtifactType::Note, 0.8);
+        }
+        let mut sunk = vec![
+            typed("a", "note", 0.90, ArtifactType::Note, "n.md"),
+            typed("b", "other", 0.58, ArtifactType::File, "o.txt"),
+        ];
+        apply_profile(&mut sunk, &lowered, &RankingFacts::default());
+        assert!((sunk.iter().find(|r| r.chunk_id == "note").unwrap().score - 0.60).abs() < 1e-12);
+    }
+
+    #[test]
+    fn rules_that_stack_multiply_and_the_general_profile_adds_nothing() {
+        use super::{apply_profile, RankingFacts, RankingProfile};
+        let profile = RankingProfile::with_verified(1.1).boost_type(ArtifactType::Runbook, 1.2);
+        let mut facts = RankingFacts::default();
+        facts.lifecycle.insert("r".to_owned(), "verified".to_owned());
+        let mut results = vec![
+            typed("r", "both", 0.60, ArtifactType::Runbook, "r.md"),
+            typed("p", "plain", 0.70, ArtifactType::File, "p.txt"),
+        ];
+        apply_profile(&mut results, &profile, &facts);
+        assert_eq!(results[0].chunk_id, "both");
+        assert!((results[0].score - 0.60 * 1.1 * 1.2).abs() < 1e-12);
+        assert!(RankingProfile::general().rules().len() == 1 && !RankingProfile::general().is_empty());
+    }
+
+    #[test]
+    fn the_kind_of_document_follows_the_ledgers_own_rules() {
+        use super::document_kind;
+        assert_eq!(document_kind(&ArtifactType::File, "contracts/Lease.PDF"), "pdf");
+        assert_eq!(document_kind(&ArtifactType::File, "a/budget.xlsx"), "excel");
+        assert_eq!(document_kind(&ArtifactType::File, "a/deck.pptx"), "powerpoint");
+        assert_eq!(document_kind(&ArtifactType::File, "a/memo.docx"), "word");
+        assert_eq!(document_kind(&ArtifactType::File, "a/mail.eml"), "email");
+        assert_eq!(document_kind(&ArtifactType::File, "a/notes.one"), "onenote");
+        assert_eq!(document_kind(&ArtifactType::MarkdownDoc, "docs/guide.md"), "markdown");
+        assert_eq!(document_kind(&ArtifactType::Note, "notes/idea"), "note");
+        assert_eq!(document_kind(&ArtifactType::CodeFile, "src/lib.rs"), "code");
+        assert_eq!(document_kind(&ArtifactType::Image, "img/logo.png"), "image");
+        assert_eq!(document_kind(&ArtifactType::Repository, "payments"), "repository");
+        assert_eq!(document_kind(&ArtifactType::File, "notes.txt"), "text");
+        assert_eq!(document_kind(&ArtifactType::Runbook, "runbooks/restart.md"), "text");
+        // A document format wins over the evidence's own type, as in the ledger.
+        assert_eq!(document_kind(&ArtifactType::Decision, "decisions/0001.docx"), "word");
     }
 
     #[test]
