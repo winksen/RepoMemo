@@ -1,4 +1,5 @@
-use crate::{general, limits, TemplateDefinition, TemplateIssue, FORMAT, GENERAL_ID, WORKSPACE_ICONS};
+use crate::catalogue::BUILTIN_SOURCES;
+use crate::{general, limits, Catalogue, TemplateDefinition, TemplateIssue, FORMAT, GENERAL_ID, WORKSPACE_ICONS};
 
 const VALID: &str = r#"{
   "format": 1,
@@ -253,4 +254,120 @@ fn the_icon_list_is_the_one_the_web_client_draws() {
         keys, WORKSPACE_ICONS,
         "workspaceIcons.tsx and repomemo-templates list different icons"
     );
+}
+
+/// A valid template file with the given id and name.
+fn template_file(id: &str, name: &str) -> String {
+    VALID
+        .replace("\"operations\"", &format!("\"{id}\""))
+        .replace("Operations and incidents", name)
+}
+
+fn ids(catalogue: &Catalogue) -> Vec<&str> {
+    catalogue.list().iter().map(|template| template.id()).collect()
+}
+
+#[test]
+fn the_built_in_catalogue_has_general_first_and_every_file_of_the_folder() {
+    let catalogue = Catalogue::builtin();
+    assert!(
+        Catalogue::builtin_problems().is_empty(),
+        "{:?}",
+        Catalogue::builtin_problems()
+    );
+    assert_eq!(catalogue.list()[0], general());
+    assert_eq!(catalogue.get(GENERAL_ID), Some(&general()));
+    assert!(catalogue.get("no-such-template").is_none());
+
+    // Each file of the folder is registered, with no Rust edited to say so.
+    let folder = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("definitions");
+    let mut files: Vec<String> = std::fs::read_dir(folder)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .filter(|name| name.ends_with(".json") && !name.starts_with('_'))
+        .collect();
+    files.sort();
+    let registered: Vec<&str> = BUILTIN_SOURCES.iter().map(|(name, _)| *name).collect();
+    assert_eq!(registered, files);
+    assert_eq!(catalogue.list().len(), 1 + files.len());
+
+    // Every id is unique and every list is in the same order every time.
+    let mut seen = ids(catalogue);
+    seen.sort();
+    seen.dedup();
+    assert_eq!(seen.len(), catalogue.list().len());
+    assert_eq!(ids(catalogue), ids(Catalogue::builtin()));
+}
+
+#[test]
+fn a_valid_file_added_to_the_folder_appears_in_the_catalogue() {
+    // The folder's own files plus one more, as a copy would hold them.
+    let mut sources: Vec<(String, String)> = BUILTIN_SOURCES
+        .iter()
+        .map(|(name, text)| (name.to_string(), text.to_string()))
+        .collect();
+    sources.push(("support.json".to_owned(), template_file("support", "Support desk")));
+    let (catalogue, problems) = Catalogue::load(sources.iter().map(|(name, text)| (name.as_str(), text.as_str())));
+    assert!(problems.is_empty(), "{problems:?}");
+    assert!(ids(&catalogue).contains(&"support"));
+    assert_eq!(catalogue.get("support").unwrap().meta.name, "Support desk");
+    assert_eq!(catalogue.list().len(), BUILTIN_SOURCES.len() + 2);
+    assert_eq!(catalogue.list()[0].id(), GENERAL_ID);
+}
+
+#[test]
+fn templates_follow_general_by_name_whatever_the_order_they_arrive_in() {
+    let zebra = template_file("zebra", "Zebra");
+    let apple = template_file("apple", "apple pie");
+    let mango = template_file("mango", "Mango");
+    let forward = [
+        ("apple.json", apple.as_str()),
+        ("mango.json", mango.as_str()),
+        ("zebra.json", zebra.as_str()),
+    ];
+    let backward = [
+        ("zebra.json", zebra.as_str()),
+        ("mango.json", mango.as_str()),
+        ("apple.json", apple.as_str()),
+    ];
+    let (first, _) = Catalogue::load(forward);
+    let (second, _) = Catalogue::load(backward);
+    assert_eq!(ids(&first), ["general", "apple", "mango", "zebra"]);
+    assert_eq!(first, second);
+}
+
+#[test]
+fn a_file_that_cannot_be_used_is_left_out_and_named_and_the_others_stay() {
+    let good = template_file("good", "Good");
+    let bad = VALID.replace("heartbeat", "dragon");
+    let misnamed = template_file("other", "Other");
+    let first = template_file("twin", "First twin");
+    let second = template_file("twin", "Second twin");
+    let shadow = template_file(GENERAL_ID, "Not general");
+    let (catalogue, problems) = Catalogue::load([
+        ("good.json", good.as_str()),
+        ("bad.json", bad.as_str()),
+        ("misnamed.json", misnamed.as_str()),
+        ("twin.json", first.as_str()),
+        ("twin.json", second.as_str()),
+        ("general.json", shadow.as_str()),
+    ]);
+    assert_eq!(ids(&catalogue), ["general", "good", "twin"]);
+    assert_eq!(catalogue.get("twin").unwrap().meta.name, "First twin");
+    assert_eq!(catalogue.get(GENERAL_ID), Some(&general()));
+
+    let named: Vec<&str> = problems.iter().map(|problem| problem.source.as_str()).collect();
+    assert_eq!(named, ["bad.json", "general.json", "misnamed.json", "twin.json"]);
+    assert_eq!(problems[0].issues[0].path, "meta.icon");
+    assert!(problems[1].issues[0].message.contains("cannot be replaced"));
+    assert!(problems[2].issues[0].message.contains("named after its id"));
+    assert!(problems[3].issues[0].message.contains("already has the id"));
+}
+
+#[test]
+fn a_catalogue_of_nothing_is_general_alone() {
+    let (catalogue, problems) = Catalogue::load([]);
+    assert!(problems.is_empty());
+    assert_eq!(catalogue, Catalogue::general_only());
+    assert_eq!(ids(&catalogue), ["general"]);
 }

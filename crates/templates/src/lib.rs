@@ -11,6 +11,7 @@
 //! unknown key, an unknown value or a value out of its bound makes a file
 //! invalid; there is no "ignore what you do not know".
 
+mod catalogue;
 mod general;
 mod issue;
 pub mod limits;
@@ -19,6 +20,7 @@ mod meta;
 #[cfg(test)]
 mod tests;
 
+pub use catalogue::{Catalogue, SourceProblem};
 pub use general::{general, GENERAL_ID};
 pub use issue::TemplateIssue;
 pub use meta::{TemplateMeta, WORKSPACE_ICONS};

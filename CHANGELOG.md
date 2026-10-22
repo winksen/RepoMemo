@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.165 (2026-10-22)
+
+The templates a server knows are the JSON files of one folder.
+
+### Added
+- **The built-in catalogue:** `crates/templates/definitions/` holds the built-in templates, one JSON file each, named after the template's id. `build.rs` lists the folder when the crate is built (every `*.json` whose name does not start with `_`, in file-name order) and includes each file in the binary, so adding a template is adding a file and no Rust is edited. `Catalogue::builtin()` is the result; `get(id)` finds a template and `list()` returns them with `general` first and the others by name.
+- **A file that cannot be used is left out and named, never fatal:** `Catalogue::load` skips a file that does not validate, is not named after its id, repeats an id, or tries to replace `general` (which is defined in code, so no file can remove or replace it), and returns what was wrong with it. `Catalogue::builtin_problems()` shows those for the built-in folder; a test fails while there are any. The same loader will read the operator's folder (V0.2.189).
+- **The folder is empty of templates for now:** the four first templates arrive in V0.2.170, so the catalogue holds `general` alone and nothing a person sees changes.
+- **Tests (written, not run):** 5 more unit tests, 18 in all: the built-in catalogue has `general` first and every file of the folder registered; a valid file added to the folder's own files appears in the catalogue with no other edit; the order is by name whatever order the files arrive in; an invalid, misnamed, repeated or `general`-shadowing file is left out and named while the others stay; a catalogue of nothing is `general` alone.
+- **Checks run on this release:** `cargo check` of the crate with its tests compiles; `docs:check` and `version:check` pass. **Not run:** the tests, as asked.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.164 (2026-10-22)
 
 The first code of track N: the crate that holds the template format, its limits and its validation.
