@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../lib/sharedApi", () => ({ querySharedArtifacts: vi.fn(), searchSharedMemoryCards: vi.fn() }));
+vi.mock("../web/workspace/data", () => ({ useTemplate: () => [null] }));
 vi.mock("../web/router", async (original) => ({ ...(await original<typeof import("../web/router")>()), navigate: vi.fn() }));
 
 import { querySharedArtifacts, searchSharedMemoryCards } from "../lib/sharedApi";

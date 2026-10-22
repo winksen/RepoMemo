@@ -1,6 +1,7 @@
-import { type AgentCapability, type ArtifactSummary, type MemoryCardSummary, type SharedWorkspace } from "../types";
+import { type AgentCapability, type ArtifactSummary, type MemoryCardSummary, type SharedWorkspace, type WorkspaceTemplateView } from "../types";
 import { ADMIN_WORKSPACE_SECTIONS, SYSTEM_SECTIONS, WORKSPACE_SECTIONS, type WorkspaceSection } from "./constants";
-import { routePath } from "./router";
+import { routePath, workspaceHomePath } from "./router";
+import { arrangeSections } from "./templateSections";
 
 export type PaletteGroup = "Assistant" | "Files" | "Memory" | "This workspace" | "Workspaces" | "Pages" | "System";
 
@@ -40,6 +41,8 @@ export type PaletteInput = {
   files: ArtifactSummary[];
   cards: MemoryCardSummary[];
   canAdministerSystem: boolean;
+  /** How the current workspace's template arranges its sections: the palette lists them in that order (V0.2.172). */
+  sections?: WorkspaceTemplateView["sections"] | null;
 };
 
 function terms(text: string): string[] {
@@ -99,8 +102,9 @@ export function paletteEntries(input: PaletteInput): PaletteEntry[] {
 
   if (workspace) {
     const mayAdminister = workspace.role === "owner" || workspace.role === "admin";
-    WORKSPACE_SECTIONS
-      .filter((section) => mayAdminister || !ADMIN_WORKSPACE_SECTIONS.has(section))
+    // The tabs in the template's order, then the sections it keeps under More.
+    const arranged = arrangeSections(input.sections, "overview", mayAdminister);
+    [...arranged.tabs, ...arranged.more]
       .filter((section) => matchesAll(words, SECTION_LABELS[section], workspace.workspace.name))
       .forEach((section) => add({
         id: `section:${section}`,
@@ -118,7 +122,7 @@ export function paletteEntries(input: PaletteInput): PaletteEntry[] {
       group: "Workspaces",
       label: entry.workspace.name,
       hint: `Open workspace · ${entry.role}`,
-      action: { kind: "navigate", to: routePath({ name: "workspace", workspaceId: entry.workspace.id, section: "overview" }) },
+      action: { kind: "navigate", to: workspaceHomePath(entry.workspace.id) },
     }));
 
   [

@@ -126,6 +126,13 @@ async fn the_four_first_templates_are_offered_and_each_creates_its_folders() {
         assert_eq!(primary.len() + more.len(), 12, "{id}");
         assert_eq!(&primary[primary.len() - 2..], ["people", "settings"], "{id}");
         assert_eq!(primary[0], "overview", "{id}");
+        let landing = match id {
+            "operations" => "review",
+            "product-decisions" => "memory",
+            "knowledge-base" => "documents",
+            _ => "overview",
+        };
+        assert_eq!(view["sections"]["landing"], landing, "{id}");
         assert!(!more.is_empty(), "{id}");
         for page in ["overview", "metrics", "capabilities"] {
             let opened = send(
@@ -333,6 +340,7 @@ async fn templates_are_listed_read_by_members_and_changed_only_by_administrators
         ])
     );
     assert_eq!(by_default["sections"]["more"], json!([]));
+    assert_eq!(by_default["sections"]["landing"], "overview");
     assert_eq!(
         send("GET", template_uri.clone(), outsider.clone(), json!(null))
             .await

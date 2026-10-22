@@ -53,6 +53,7 @@ impl EffectiveTemplate {
                 TemplateSections {
                     primary: sections.primary,
                     more: sections.more,
+                    landing: sections.landing,
                 }
             },
         }

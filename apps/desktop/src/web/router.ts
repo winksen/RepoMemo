@@ -51,7 +51,7 @@ export type Route =
   | { name: "profile" }
   | { name: "notifications" }
   | { name: "system"; section: SystemSection }
-  | { name: "workspace"; workspaceId: string; section: WorkspaceSection }
+  | { name: "workspace"; workspaceId: string; section: WorkspaceSection; landing?: true }
   | { name: "artifact"; workspaceId: string; artifactId: string }
   | { name: "memory-card"; workspaceId: string; cardId: string }
   /** An address that names nothing; `workspaceId` is set when it sits under a workspace. */
@@ -80,7 +80,8 @@ export function parseRoute(pathname: string): Route {
     return { name: "not-found", workspaceId: null };
   }
   if (first === "workspaces") {
-    if (parts.length === 2) return { name: "workspace", workspaceId: second, section: "overview" };
+    // No section named: the workspace opens on its template's landing section (`landing` says to look it up).
+    if (parts.length === 2) return { name: "workspace", workspaceId: second, section: "overview", landing: true };
     if (parts.length === 3 && (WORKSPACE_SECTIONS as readonly string[]).includes(third)) {
       return { name: "workspace", workspaceId: second, section: third as WorkspaceSection };
     }
@@ -89,6 +90,11 @@ export function parseRoute(pathname: string): Route {
     return { name: "not-found", workspaceId: second };
   }
   return { name: "not-found", workspaceId: null };
+}
+
+/** The address that opens a workspace on its landing section: no section named. */
+export function workspaceHomePath(workspaceId: string): string {
+  return `/workspaces/${encodeURIComponent(workspaceId)}`;
 }
 
 /** The pathname of a route; the inverse of [`parseRoute`]. */

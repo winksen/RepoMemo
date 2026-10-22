@@ -3,7 +3,7 @@ import { SystemAdminPanel, SystemNavigation } from "./system/SystemAdminPanel";
 import type { Organization, SharedSession, SharedWorkspace } from "../types";
 import type { SystemSection } from "./constants";
 import { OrganizationRail } from "./Organization";
-import { navigate } from "./router";
+import { navigate, workspaceHomePath } from "./router";
 
 /** The System area. Loaded on demand: most people never open it. */
 export default function SystemArea({
@@ -36,7 +36,7 @@ export default function SystemArea({
         accessToken={accessToken}
         key={section}
         onNavigateSection={(next) => navigate(`/system/${next}`)}
-        onOpenWorkspace={(id) => navigate(`/workspaces/${encodeURIComponent(id)}/overview`)}
+        onOpenWorkspace={(id) => navigate(workspaceHomePath(id))}
         section={section}
         session={session}
         workspaces={workspaces}

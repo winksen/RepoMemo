@@ -15,6 +15,7 @@
   ],
   "sections": {
     "order": ["overview", "memory", "evidence", "retrieval", "tasks", "review", "documents"],
-    "more": ["health", "map", "repositories"]
+    "more": ["health", "map", "repositories"],
+    "landing": "memory"
   }
 }

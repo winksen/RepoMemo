@@ -29,7 +29,7 @@ pub use general::{general, GENERAL_ID};
 pub use issue::TemplateIssue;
 pub use meta::{TemplateMeta, WORKSPACE_ICONS};
 pub use resolve::{Origin, Resolution};
-pub use sections::{ResolvedSections, SectionsBlock, WORKSPACE_SECTIONS};
+pub use sections::{ResolvedSections, SectionsBlock, ADMIN_ONLY_SECTIONS, DEFAULT_LANDING, WORKSPACE_SECTIONS};
 
 use serde::{Deserialize, Serialize};
 

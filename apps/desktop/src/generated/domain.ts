@@ -225,6 +225,8 @@ export interface WorkspaceTemplateView {
 export interface TemplateSections {
   primary: string[];
   more: string[];
+  /** The section a workspace opens on when its address names none. */
+  landing: string;
 }
 
 /** Chooses a workspace's template; `null` returns the workspace to the default. */

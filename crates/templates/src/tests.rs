@@ -1,7 +1,7 @@
 use crate::catalogue::BUILTIN_SOURCES;
 use crate::{
-    general, limits, Catalogue, Origin, TemplateDefinition, TemplateIssue, FORMAT, GENERAL_ID, WORKSPACE_ICONS,
-    WORKSPACE_SECTIONS,
+    general, limits, Catalogue, Origin, TemplateDefinition, TemplateIssue, ADMIN_ONLY_SECTIONS, FORMAT, GENERAL_ID,
+    WORKSPACE_ICONS, WORKSPACE_SECTIONS,
 };
 
 const VALID: &str = r#"{
@@ -613,6 +613,31 @@ fn a_section_must_exist_and_be_named_once() {
 }
 
 #[test]
+fn a_workspace_opens_on_overview_unless_the_template_names_a_landing_section() {
+    assert_eq!(general().sections().landing, "overview");
+    assert_eq!(parse(&with_sections("{}")).unwrap().sections().landing, "overview");
+    for landing in ["review", "documents", "map", "overview"] {
+        let sections = parse(&with_sections(&format!(
+            r#"{{ "more": ["map"], "landing": "{landing}" }}"#
+        )))
+        .unwrap()
+        .sections();
+        assert_eq!(sections.landing, landing);
+    }
+    // A landing section can be one kept under More, and the open section is then shown as a tab by the client.
+    let unknown = parse(&with_sections(r#"{ "landing": "dashboard" }"#)).unwrap_err();
+    assert_eq!(unknown[0].path, "sections.landing");
+    for admin_only in ADMIN_ONLY_SECTIONS {
+        let refused = parse(&with_sections(&format!(r#"{{ "landing": "{admin_only}" }}"#))).unwrap_err();
+        assert_eq!(refused[0].path, "sections.landing", "{admin_only}");
+        assert!(refused[0].message.contains("administrators"), "{}", refused[0]);
+    }
+    assert_eq!(ADMIN_ONLY_SECTIONS, ["people", "settings"]);
+    let template = parse(&with_sections(r#"{ "landing": "review" }"#)).unwrap();
+    assert_eq!(parse(&serde_json::to_string(&template).unwrap()).unwrap(), template);
+}
+
+#[test]
 fn the_section_list_is_the_one_the_web_client_has_pages_for() {
     let client = include_str!("../../../apps/desktop/src/web/constants.ts");
     let line = client
@@ -699,6 +724,12 @@ fn the_four_first_templates_put_their_lesser_sections_under_more() {
         assert_eq!(names(&sections.primary), primary, "{id}");
         assert_eq!(names(&sections.more), more, "{id}");
     }
+    // Where each opens (V0.2.172): Operations on Review, Product and decisions on Memory, Knowledge base on Documents.
+    let lands_on = |id: &str| catalogue.get(id).unwrap().sections().landing;
+    assert_eq!(lands_on("software-engineering"), "overview");
+    assert_eq!(lands_on("operations"), "review");
+    assert_eq!(lands_on("product-decisions"), "memory");
+    assert_eq!(lands_on("knowledge-base"), "documents");
 }
 
 fn catalogue_with_operations(version: u32) -> Catalogue {

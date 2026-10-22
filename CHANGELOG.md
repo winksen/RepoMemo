@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.172 (2026-10-22)
+
+A workspace opens on its template's landing section, and the command palette lists the sections in the template's order.
+
+### Changed
+- **`sections.landing`:** a template may name the section a workspace opens on when it is opened without naming one. It is any of the twelve sections except People and Settings (a member would be sent to a page they may not open), and may be one kept under More. Without it a workspace opens on Overview, as always. `GET /v1/workspaces/{id}/template` answers it as `sections.landing`.
+- **Opening a workspace:** the dashboard, the workspace list, the side rail, the System area and the command palette now open a workspace by `/workspaces/<id>`, with no section. The page asks for the workspace's template and replaces that address with the landing section (so Back leaves the workspace and does not return to the redirect); if the template cannot be read it opens on Overview. An address that names a section, such as a bookmark of `/workspaces/<id>/map` or an invitation link, opens that section and is not redirected.
+- **The command palette:** the sections of the open workspace are listed in the template's order, the sections kept under More after the tabs; People and Settings are still left out for anyone who does not administer the workspace.
+- **The four templates:** *Operations and incidents* opens on Review, *Product and decisions* on Memory and *Knowledge base* on Documents; *Software engineering* and General open on Overview.
+- **Tests (written, not run):** one in the templates crate (Overview by default, a named landing section, an unknown or administrators-only one refused, where each of the four lands), seven in the web client (the landing section and its fallbacks, the address that names no section and its parsing, the redirect after the template arrives and its fallback to Overview, the palette's order with and without a template and for a member, the palette opening a workspace on its landing section), the server's template test now checks the landing of General and of each of the four, and the router and palette tests follow the new address.
+- **Checks run on this release:** `cargo check` of the templates and server crates with their tests compiles; `rustfmt` shows nothing for the lines changed; `types:check`, `typecheck`, `styles:check`, `a11y:check`, `docs:check` and `version:check` pass. **Not run:** the tests, as asked.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.171 (2026-10-22)
 
 The workspace tabs follow the template's order, and the lesser sections sit under a More menu.

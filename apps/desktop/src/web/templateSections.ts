@@ -6,6 +6,12 @@ export type SectionArrangement = { tabs: WorkspaceSection[]; more: WorkspaceSect
 
 const isSection = (value: string): value is WorkspaceSection => (WORKSPACE_SECTIONS as string[]).includes(value);
 
+/** The section a workspace opens on when its address names none: its template's, or Overview when there is none or this client has no such page. */
+export function landingSection(sections: Pick<TemplateSections, "landing"> | null | undefined): WorkspaceSection {
+  const landing = sections?.landing ?? "overview";
+  return isSection(landing) && !ADMIN_WORKSPACE_SECTIONS.has(landing) ? landing : "overview";
+}
+
 /**
  * Arranges the sections as the workspace's template asks. The template is only an order: a section it does not
  * name still has a tab, one this client has no page for is ignored, the administrators' sections stay for

@@ -11,7 +11,8 @@ describe("parseRoute", () => {
   });
 
   it("reads workspace sections, artifacts and memory cards", () => {
-    expect(parseRoute("/workspaces/w1")).toEqual({ name: "workspace", workspaceId: "w1", section: "overview" });
+    expect(parseRoute("/workspaces/w1")).toEqual({ name: "workspace", workspaceId: "w1", section: "overview", landing: true });
+    expect(parseRoute("/workspaces/w1/overview")).toEqual({ name: "workspace", workspaceId: "w1", section: "overview" });
     expect(parseRoute("/workspaces/w1/memory")).toEqual({ name: "workspace", workspaceId: "w1", section: "memory" });
     expect(parseRoute("/workspaces/w%201/artifacts/a%2F1")).toEqual({ name: "artifact", workspaceId: "w 1", artifactId: "a/1" });
     expect(parseRoute("/workspaces/w1/memory-cards/c1")).toEqual({ name: "memory-card", workspaceId: "w1", cardId: "c1" });

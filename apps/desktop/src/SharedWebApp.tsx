@@ -19,7 +19,7 @@ import { VerifyEmailPage } from "./components/VerifyEmailPage";
 import { SharedLayout, initialSharedTheme } from "./components/SharedLayout";
 import { type PageState } from "./web/constants";
 import { apiMessage } from "./web/format";
-import { currentLinkSecret, currentLocation, currentPathname, navigate, parseRoute, routePath } from "./web/router";
+import { currentLinkSecret, currentLocation, currentPathname, navigate, parseRoute, routePath, workspaceHomePath } from "./web/router";
 import { SystemArea } from "./web/lazy";
 import { OrganizationNavigationProvider } from "./web/navigation";
 import { LoadingCanvas } from "./web/common";
@@ -28,6 +28,7 @@ import { SharedProfile } from "./web/Profile";
 import { SharedNotifications } from "./web/Notifications";
 import { SharedDashboard, SharedWorkspaceHome } from "./web/Dashboard";
 import { SharedWorkspaceDetail } from "./web/WorkspaceDetail";
+import { WorkspaceLanding } from "./web/WorkspaceLanding";
 import { SharedArtifactDetail } from "./web/ArtifactDetail";
 import { SharedMemoryCardDetail, SharedRouteNotFound } from "./web/MemoryCardDetail";
 import { CommandPalette } from "./web/CommandPalette";
@@ -266,7 +267,7 @@ function SharedWebAppContent() {
   const workspaceOrganization = workspace
     ? organizations.find((organization) => organization.id === workspace.organization_id)
     : undefined;
-  const openWorkspace = (id: string) => navigate(routePath({ name: "workspace", workspaceId: id, section: "overview" }));
+  const openWorkspace = (id: string) => navigate(workspaceHomePath(id));
   const openArtifact = (artifactId: string) => navigate(routePath({ name: "artifact", workspaceId: routedWorkspaceId!, artifactId }));
   const notFound = (backTo: string, scope: { workspace?: SharedWorkspace; organization?: Organization } = {}) => (
     <SharedRouteNotFound apiAvailable={apiAvailable} onBack={() => navigate(backTo)} organization={scope.organization} organizations={organizations} session={session} signOut={signOut} workspace={scope.workspace} workspaces={workspaces} />
@@ -297,6 +298,7 @@ function SharedWebAppContent() {
 
     case "workspace":
       if (!workspace) return notFound("/workspaces");
+      if (route.landing) return <WorkspaceLanding accessToken={accessToken} key={workspace.workspace.id} workspaceId={workspace.workspace.id} />;
       return (
         <SharedWorkspaceDetail
           accessToken={accessToken}

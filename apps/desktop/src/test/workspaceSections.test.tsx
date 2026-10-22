@@ -2,11 +2,15 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../web/workspace/data", () => ({ useTemplate: vi.fn() }));
+vi.mock("../web/router", async (original) => ({ ...(await original<typeof import("../web/router")>()), navigate: vi.fn() }));
 
 import type { SharedWorkspace, WorkspaceTemplateView } from "../types";
 import { WORKSPACE_SECTIONS } from "../web/constants";
 import { WorkspaceTopbar } from "../web/Organization";
-import { arrangeSections } from "../web/templateSections";
+import { paletteEntries } from "../web/paletteEntries";
+import { navigate, parseRoute, workspaceHomePath } from "../web/router";
+import { arrangeSections, landingSection } from "../web/templateSections";
+import { WorkspaceLanding } from "../web/WorkspaceLanding";
 import { useTemplate } from "../web/workspace/data";
 
 beforeEach(() => { vi.clearAllMocks(); });
@@ -15,6 +19,7 @@ afterEach(cleanup);
 const knowledgeBase = {
   primary: ["overview", "documents", "retrieval", "evidence", "review", "health", "memory", "tasks", "people", "settings"],
   more: ["map", "repositories"],
+  landing: "documents",
 };
 
 describe("arrangeSections", () => {
@@ -34,7 +39,7 @@ describe("arrangeSections", () => {
     expect(arranged.tabs).toEqual(knowledgeBase.primary.filter((section) => section !== "people" && section !== "settings"));
     expect(arranged.tabs.concat(arranged.more)).not.toContain("settings");
     // Even a template that puts them under More does not show them to a member.
-    expect(arrangeSections({ primary: ["overview"], more: ["people", "settings", "map"] }, "overview", false).more).toEqual(["map"]);
+    expect(arrangeSections({ primary: ["overview"], more: ["people", "settings", "map"], landing: "overview" }, "overview", false).more).toEqual(["map"]);
   });
 
   it("shows the open section as a tab even when the template keeps it under More", () => {
@@ -46,16 +51,75 @@ describe("arrangeSections", () => {
   });
 
   it("gives a tab to a section the template does not name, ignores one this client has no page for and drops repeats", () => {
-    const arranged = arrangeSections({ primary: ["review", "dashboard", "review"], more: ["map"] }, "overview", true);
+    const arranged = arrangeSections({ primary: ["review", "dashboard", "review"], more: ["map"], landing: "review" }, "overview", true);
     expect(arranged.tabs.slice(0, 1)).toEqual(["review"]);
     expect(arranged.tabs).toContain("overview");
     expect(arranged.tabs).not.toContain("dashboard" as never);
     expect(arranged.tabs.filter((section) => section === "review")).toHaveLength(1);
     expect([...arranged.tabs, ...arranged.more].sort()).toEqual([...WORKSPACE_SECTIONS].sort());
     // A section named in both lists (a server never sends that) is kept under More only.
-    const both = arrangeSections({ primary: ["map"], more: ["map"] }, "overview", true);
+    const both = arrangeSections({ primary: ["map"], more: ["map"], landing: "overview" }, "overview", true);
     expect(both.more).toEqual(["map"]);
     expect(both.tabs).not.toContain("map");
+  });
+});
+
+describe("landingSection", () => {
+  it("is the template's landing section, or Overview when there is none, it is unknown, or it is for administrators", () => {
+    expect(landingSection(knowledgeBase)).toBe("documents");
+    expect(landingSection(null)).toBe("overview");
+    expect(landingSection(undefined)).toBe("overview");
+    expect(landingSection({ landing: "dashboard" })).toBe("overview");
+    expect(landingSection({ landing: "settings" })).toBe("overview");
+    expect(landingSection({ landing: "people" })).toBe("overview");
+  });
+});
+
+describe("opening a workspace by its address alone", () => {
+  const query = (isError: boolean) => ({ isError }) as never;
+
+  it("names no section in the address that opens a workspace, and reads one without a section as the landing request", () => {
+    expect(workspaceHomePath("w 1")).toBe("/workspaces/w%201");
+    expect(parseRoute("/workspaces/w1")).toMatchObject({ name: "workspace", workspaceId: "w1", landing: true });
+    expect(parseRoute("/workspaces/w1/review")).toEqual({ name: "workspace", workspaceId: "w1", section: "review" });
+  });
+
+  it("waits for the template, then replaces its own address with the landing section", () => {
+    vi.mocked(useTemplate).mockReturnValue([null, vi.fn(), query(false)]);
+    const { rerender } = render(<WorkspaceLanding accessToken="t" workspaceId="w1" />);
+    expect(screen.getByRole("status").textContent).toContain("Opening the workspace");
+    expect(navigate).not.toHaveBeenCalled();
+    vi.mocked(useTemplate).mockReturnValue([templateView(knowledgeBase), vi.fn(), query(false)]);
+    rerender(<WorkspaceLanding accessToken="t" workspaceId="w1" />);
+    expect(navigate).toHaveBeenCalledWith("/workspaces/w1/documents", true);
+  });
+
+  it("opens on Overview when the template cannot be read, as it always did", () => {
+    vi.mocked(useTemplate).mockReturnValue([null, vi.fn(), query(true)]);
+    render(<WorkspaceLanding accessToken="t" workspaceId="w1" />);
+    expect(navigate).toHaveBeenCalledWith("/workspaces/w1/overview", true);
+  });
+});
+
+describe("the command palette's sections", () => {
+  const input = (role: SharedWorkspace["role"], sections?: WorkspaceTemplateView["sections"]) => ({
+    query: "", workspaces: [workspace(role)], assistantWorkspace: undefined, currentWorkspace: workspace(role),
+    files: [], cards: [], canAdministerSystem: false, sections,
+  });
+  const labels = (entries: ReturnType<typeof paletteEntries>) => entries.filter((entry) => entry.group === "This workspace").map((entry) => entry.label);
+
+  it("lists them in the usual order without a template", () => {
+    expect(labels(paletteEntries(input("owner")))).toEqual(["Overview", "Evidence", "Documents", "Repositories", "Retrieval", "Map", "Health", "Review queue", "Memory", "Tasks", "People", "Workspace settings"]);
+  });
+
+  it("lists the tabs in the template's order and the sections kept under More after them", () => {
+    expect(labels(paletteEntries(input("owner", knowledgeBase)))).toEqual(["Overview", "Documents", "Retrieval", "Evidence", "Review queue", "Health", "Memory", "Tasks", "People", "Workspace settings", "Map", "Repositories"]);
+    expect(labels(paletteEntries(input("member", knowledgeBase)))).toEqual(["Overview", "Documents", "Retrieval", "Evidence", "Review queue", "Health", "Memory", "Tasks", "Map", "Repositories"]);
+  });
+
+  it("opens a workspace from the palette on its landing section", () => {
+    const entry = paletteEntries(input("owner")).find((candidate) => candidate.group === "Workspaces");
+    expect(entry?.action).toEqual({ kind: "navigate", to: "/workspaces/w1" });
   });
 });
 

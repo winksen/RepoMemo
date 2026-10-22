@@ -7,6 +7,7 @@ import { EmptyState } from "../components/ui/empty-state";
 import { SearchField } from "../components/ui/search-field";
 import { navigate } from "./router";
 import { paletteEntries, type PaletteEntry } from "./paletteEntries";
+import { useTemplate } from "./workspace/data";
 
 const CARD_SEARCH_DELAY_MS = 200;
 const FILE_SEARCH_LIMIT = 50;
@@ -80,9 +81,11 @@ export function CommandPalette({ accessToken, assistantWorkspaceId, canAdministe
     return () => { cancelled = true; window.clearTimeout(timer); };
   }, [accessToken, currentWorkspaceId, open, query]);
 
+  const [template] = useTemplate(accessToken, currentWorkspaceId ?? "", open && Boolean(currentWorkspaceId));
+  const sections = template?.sections;
   const entries = useMemo(
-    () => paletteEntries({ query, workspaces, assistantWorkspace, currentWorkspace, files, cards, canAdministerSystem }),
-    [query, workspaces, assistantWorkspace, currentWorkspace, files, cards, canAdministerSystem],
+    () => paletteEntries({ query, workspaces, assistantWorkspace, currentWorkspace, files, cards, canAdministerSystem, sections }),
+    [query, workspaces, assistantWorkspace, currentWorkspace, files, cards, canAdministerSystem, sections],
   );
   const activeIndex = Math.min(active, Math.max(entries.length - 1, 0));
 

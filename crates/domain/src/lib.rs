@@ -277,6 +277,8 @@ pub struct WorkspaceTemplateView {
 pub struct TemplateSections {
     pub primary: Vec<String>,
     pub more: Vec<String>,
+    /// The section a workspace opens on when its address names none.
+    pub landing: String,
 }
 
 /// Chooses a workspace's template; `null` returns the workspace to the default.

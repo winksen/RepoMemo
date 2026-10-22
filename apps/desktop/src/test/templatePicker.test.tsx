@@ -56,7 +56,7 @@ describe("the template hooks", () => {
     vi.mocked(listSharedTemplates).mockResolvedValue([general, operations]);
     const view: WorkspaceTemplateView = {
       template: general, source: "default", reason: null, chosen_id: null, overrides: null,
-      sections: { primary: ["overview", "evidence"], more: [] },
+      sections: { primary: ["overview", "evidence"], more: [], landing: "overview" },
     };
     vi.mocked(getSharedWorkspaceTemplate).mockResolvedValue(view);
 

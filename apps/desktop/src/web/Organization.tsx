@@ -19,7 +19,7 @@ import { arrangeSections } from "./templateSections";
 import { useTemplate } from "./workspace/data";
 import { ADMIN_WORKSPACE_SECTIONS, type WorkspaceSection } from "./constants";
 import { apiMessage } from "./format";
-import { navigate } from "./router";
+import { navigate, workspaceHomePath } from "./router";
 import { useOrganizationNavigation } from "./navigation";
 import { ICON_SIZE } from "../components/ui/icon";
 import { WorkspaceIcon } from "./workspaceIcons";
@@ -129,7 +129,7 @@ export function OrganizationRail({
         const organization = organizations.find((entry) => entry.id === workspace.organization_id);
         const label = organizations.length > 1 ? `${organization?.name ?? "Organization"} / ${workspace.workspace.name}` : workspace.workspace.name;
         const isCurrent = workspace.workspace.id === workspaceId;
-        return <Button aria-current={isCurrent ? "page" : undefined} className={`shared-rail-workspace${isCurrent ? " active" : ""}`} key={workspace.workspace.id} onClick={() => navigate(`/workspaces/${encodeURIComponent(workspace.workspace.id)}/overview`)} type="button" variant="secondary"><WorkspaceIcon size={ICON_SIZE.md} workspace={workspace.workspace} /><span>{label}</span></Button>;
+        return <Button aria-current={isCurrent ? "page" : undefined} className={`shared-rail-workspace${isCurrent ? " active" : ""}`} key={workspace.workspace.id} onClick={() => navigate(workspaceHomePath(workspace.workspace.id))} type="button" variant="secondary"><WorkspaceIcon size={ICON_SIZE.md} workspace={workspace.workspace} /><span>{label}</span></Button>;
       })}</div> : <p className="shared-rail-empty">No accessible workspaces yet.</p>}
     </section> : null}
     {canManageOrganizations ? <section className="shared-rail-organizations" aria-label="Organization management">

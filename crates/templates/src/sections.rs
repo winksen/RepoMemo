@@ -21,7 +21,14 @@ pub const WORKSPACE_SECTIONS: [&str; 12] = [
     "settings",
 ];
 
-/// How a template arranges the sections of a workspace (V0.2.171). Both lists are optional.
+/// The sections only owners and administrators see. A template cannot make one the landing section, because a
+/// member would be sent to a page they may not open.
+pub const ADMIN_ONLY_SECTIONS: [&str; 2] = ["people", "settings"];
+
+/// The section a workspace opens on when its address names none.
+pub const DEFAULT_LANDING: &str = "overview";
+
+/// How a template arranges the sections of a workspace (V0.2.171). Every key is optional.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SectionsBlock {
@@ -32,6 +39,10 @@ pub struct SectionsBlock {
     /// shown as a tab.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub more: Vec<String>,
+    /// The section a workspace opens on when its address names none (V0.2.172); `overview` when left out. It may
+    /// be one of the tabs or one under *More*, but not People or Settings.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub landing: Option<String>,
 }
 
 /// The tabs and the *More* menu of a workspace, complete: every section is in one of the two lists.
@@ -39,6 +50,8 @@ pub struct SectionsBlock {
 pub struct ResolvedSections {
     pub primary: Vec<String>,
     pub more: Vec<String>,
+    /// The section a workspace opens on when its address names none.
+    pub landing: String,
 }
 
 impl ResolvedSections {
@@ -48,6 +61,7 @@ impl ResolvedSections {
             return Self {
                 primary: WORKSPACE_SECTIONS.map(str::to_owned).to_vec(),
                 more: Vec::new(),
+                landing: DEFAULT_LANDING.to_owned(),
             };
         };
         let mut primary = block.order.clone();
@@ -60,11 +74,25 @@ impl ResolvedSections {
         Self {
             primary,
             more: block.more.clone(),
+            landing: block.landing.clone().unwrap_or_else(|| DEFAULT_LANDING.to_owned()),
         }
     }
 }
 
 pub(crate) fn validate(block: &SectionsBlock, issues: &mut Vec<TemplateIssue>) {
+    if let Some(landing) = &block.landing {
+        if !WORKSPACE_SECTIONS.contains(&landing.as_str()) {
+            issues.push(TemplateIssue::new(
+                "sections.landing",
+                format!("`{landing}` is not a workspace section"),
+            ));
+        } else if ADMIN_ONLY_SECTIONS.contains(&landing.as_str()) {
+            issues.push(TemplateIssue::new(
+                "sections.landing",
+                format!("`{landing}` is only for administrators, so a member could not open it"),
+            ));
+        }
+    }
     let mut named = HashSet::new();
     for (list, sections) in [("order", &block.order), ("more", &block.more)] {
         for (index, section) in sections.iter().enumerate() {
