@@ -449,6 +449,12 @@ export interface RepoSyncReport {
   indexed: number;
   index_failed: number;
   cancelled: boolean;
+  /**
+   * The sync stopped after resolving the commit: it, the settings and the
+   * indexer were the same as at the last complete sync, and nothing was left
+   * to index.
+   */
+  nothing_changed: boolean;
 }
 
 /**

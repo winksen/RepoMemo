@@ -75,6 +75,7 @@ export function repoSyncJob(event: LiveEvent): IndexingJobStatus | null {
 }
 
 export function reportSummary(report: RepoSyncReport) {
+  if (report.nothing_changed) return "Nothing changed";
   const parts = [
     report.added + report.restored ? `${report.added + report.restored} added` : "",
     report.updated ? `${report.updated} updated` : "",

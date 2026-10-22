@@ -530,6 +530,11 @@ pub struct RepoSyncReport {
     pub indexed: usize,
     pub index_failed: usize,
     pub cancelled: bool,
+    /// The sync stopped after resolving the commit: it, the settings and the
+    /// indexer were the same as at the last complete sync, and nothing was left
+    /// to index.
+    #[serde(default)]
+    pub nothing_changed: bool,
 }
 
 /// A git repository connected to a workspace. Its files are kept in step with

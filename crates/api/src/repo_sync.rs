@@ -67,6 +67,12 @@ pub(crate) struct RepoSourceMetadata {
     /// The artifact that stands for the whole repository.
     #[serde(default)]
     pub(crate) overview_artifact_id: Option<String>,
+    /// The settings and the indexer version of the last complete sync. A sync whose commit, settings
+    /// and indexer version are all the same has nothing to do (`nothing_to_sync`).
+    #[serde(default)]
+    pub(crate) last_synced_settings: Option<RepoSettings>,
+    #[serde(default)]
+    pub(crate) last_synced_indexer_version: Option<i64>,
     /// The last AI summary, kept until it is regenerated.
     #[serde(default)]
     pub(crate) summary: Option<RepoSummary>,
@@ -432,6 +438,60 @@ impl RepoMemoCore {
         }
     }
 
+    /// The report of a sync that has nothing to do, or `None` when it has some. A sync has nothing
+    /// to do when the commit, the include and exclude rules and the indexer version are those of the
+    /// last complete sync (which left no file failed and was not stopped), and no file of the
+    /// repository, nor the item standing for it, is waiting to be indexed.
+    async fn nothing_to_sync(
+        &self,
+        source_id: &str,
+        metadata: &RepoSourceMetadata,
+        commit: &str,
+    ) -> Result<Option<RepoSyncReport>> {
+        let Some(previous) = metadata.last_report.as_ref() else {
+            return Ok(None);
+        };
+        let same = metadata
+            .last_synced_commit
+            .as_ref()
+            .is_some_and(|synced| synced.sha == commit)
+            && metadata.last_synced_settings.as_ref() == Some(&metadata.settings)
+            && metadata.last_synced_indexer_version == Some(INDEXER_VERSION)
+            && !previous.cancelled
+            && previous.index_failed == 0;
+        if !same {
+            return Ok(None);
+        }
+        if !self
+            .storage
+            .list_repo_artifacts_needing_index(source_id, INDEXER_VERSION)
+            .await?
+            .is_empty()
+        {
+            return Ok(None);
+        }
+        if let Some(artifact_id) = metadata.overview_artifact_id.as_deref() {
+            if self
+                .storage
+                .get_artifact_summary(artifact_id)
+                .await?
+                .indexed_at
+                .is_none()
+            {
+                return Ok(None);
+            }
+        }
+        Ok(Some(RepoSyncReport {
+            commit_sha: commit.to_owned(),
+            files_in_tree: previous.files_in_tree,
+            unchanged: previous.files_in_tree.saturating_sub(previous.skipped),
+            skipped: previous.skipped,
+            skipped_by_reason: previous.skipped_by_reason.clone(),
+            nothing_changed: true,
+            ..Default::default()
+        }))
+    }
+
     async fn sync_repo(&self, source_id: &str, job_id: &str) -> Result<RepoSyncReport> {
         let source = self.repo_source_row(source_id).await?;
         let mut metadata = RepoSourceMetadata::of(&source);
@@ -456,6 +516,17 @@ impl RepoMemoCore {
         };
         let branch = metadata.settings.branch.clone();
         let commit = repo.resolve_commit(branch.as_deref()).await?;
+        // The same commit, rules and indexer as the last complete sync, and nothing waiting to be
+        // indexed: there is nothing to list, compare, read or write.
+        if let Some(report) = self.nothing_to_sync(source_id, &metadata, &commit).await? {
+            metadata.last_synced_at = Some(chrono_now());
+            metadata.last_report = Some(report.clone());
+            metadata.last_error = None;
+            self.storage
+                .update_source(source_id, &source.name, "ready", &metadata.to_value(), true)
+                .await?;
+            return Ok(report);
+        }
         let info = repo.commit_info(&commit).await?;
         let branch = match branch {
             Some(branch) => Some(branch),
@@ -715,6 +786,8 @@ impl RepoMemoCore {
                 )
                 .await?;
             metadata.last_synced_commit = Some(synced_commit);
+            metadata.last_synced_settings = Some(metadata.settings.clone());
+            metadata.last_synced_indexer_version = Some(INDEXER_VERSION);
             metadata.last_synced_at = Some(chrono_now());
             metadata.overview = Some(overview);
             metadata.overview_artifact_id = Some(overview_artifact_id);
@@ -1064,6 +1137,87 @@ mod tests {
     async fn sync(core: &RepoMemoCore, source_id: &str) -> RepoSyncReport {
         let job = core.begin_repo_sync(source_id).await.unwrap();
         core.run_repo_sync(source_id, &job.id).await.unwrap()
+    }
+
+    /// V0.2.156: a sync whose commit, rules and indexer are those of the last
+    /// complete one stops after resolving the commit.
+    #[tokio::test]
+    async fn a_sync_with_nothing_new_stops_after_the_commit_is_resolved() {
+        let repo_dir = unique_dir("repo-nothing-new-repo");
+        let data_dir = unique_dir("repo-nothing-new-data");
+        std::fs::create_dir_all(&repo_dir).unwrap();
+        git(&repo_dir, &["init", "--quiet", "--initial-branch=main"]);
+        write(&repo_dir, "README.md", "# Payments\n\nHow refunds work.\n");
+        write(
+            &repo_dir,
+            "src/refund.rs",
+            "pub fn issue_refund(amount: u64) -> u64 {\n    amount\n}\n",
+        );
+        write(&repo_dir, "notes.txt", "kept out by a rule later");
+        git(&repo_dir, &["add", "."]);
+        git(&repo_dir, &["commit", "--quiet", "-m", "Initial"]);
+
+        let core = RepoMemoCore::boot(data_dir.clone()).await.unwrap();
+        let workspace = core.create_workspace("Repo".to_owned()).await.unwrap();
+        let source = core
+            .connect_local_repo(
+                &workspace.id,
+                &repo_dir.to_string_lossy(),
+                None,
+                RepoSettings::default(),
+            )
+            .await
+            .unwrap();
+
+        let first = sync(&core, &source.id).await;
+        assert!(!first.nothing_changed);
+        assert_eq!(first.added, 3);
+
+        // The same commit, rules and indexer: nothing is read, written or indexed.
+        let second = sync(&core, &source.id).await;
+        assert!(second.nothing_changed);
+        assert_eq!(
+            (second.added, second.updated, second.removed, second.indexed),
+            (0, 0, 0, 0)
+        );
+        assert_eq!(second.files_in_tree, first.files_in_tree);
+        assert_eq!(second.commit_sha, first.commit_sha);
+        assert!(!core.repo_head(&source.id).await.unwrap().moved());
+        assert_eq!(core.list_repo_files(&source.id).await.unwrap().len(), 3);
+
+        // New rules are a change, though the commit is the same.
+        core.update_repo_source(
+            &source.id,
+            None,
+            RepoSettings {
+                exclude: vec!["notes.txt".to_owned()],
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        let third = sync(&core, &source.id).await;
+        assert!(!third.nothing_changed, "a changed rule is worked through");
+        assert_eq!(third.removed, 1);
+        assert!(
+            sync(&core, &source.id).await.nothing_changed,
+            "and then there is nothing again"
+        );
+
+        // A new commit is a change.
+        write(
+            &repo_dir,
+            "src/refund.rs",
+            "pub fn issue_refund(amount: u64) -> u64 {\n    amount + 1\n}\n",
+        );
+        git(&repo_dir, &["commit", "--quiet", "-am", "Edit"]);
+        let fifth = sync(&core, &source.id).await;
+        assert!(!fifth.nothing_changed);
+        assert_eq!(fifth.updated, 1);
+
+        drop(core);
+        let _ = std::fs::remove_dir_all(data_dir);
+        let _ = std::fs::remove_dir_all(repo_dir);
     }
 
     #[tokio::test]

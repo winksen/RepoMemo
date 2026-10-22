@@ -2,6 +2,19 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.156 (2026-10-21)
+
+A repository sync with nothing new stops after finding the commit.
+
+### Changed
+- **A sync with nothing to do stops early (P16):** every sync listed the whole tree, read up to 20,000 commits for the last authors, read `CODEOWNERS` and loaded every stored file of the repository, only to find nothing to change. A sync now resolves the commit first and stops there when the commit, the include and exclude rules (and the branch) and the indexer version are those recorded at the last complete sync, that sync was not stopped and failed no file, no file of the repository is waiting to be indexed and the item standing for the repository is indexed. It records the time and a report that says nothing changed, the job completes, and the web client shows *Nothing changed*. A pushed commit, a changed rule or branch, a new indexer version, an interrupted pass or a failed file make the sync a full one as before. The webhook and the poll go through the same path.
+- **What is recorded:** the settings and the indexer version of each complete sync (`last_synced_settings`, `last_synced_indexer_version` in the source's metadata, no migration), and `RepoSyncReport.nothing_changed` (a new field, empty in older reports). A repository from before this release has no recorded settings, so its first sync after the upgrade is a full one.
+- **Tests (written, not run):** `a_sync_with_nothing_new_stops_after_the_commit_is_resolved` (a second sync on the same commit changes nothing and says so; a changed rule is worked through, then nothing again; a new commit is worked through). `repo_sync_at_scale` already syncs a repository with nothing changed; its figure for 100,000 files (target under a second) is the maintainer's to record.
+- **Checks run on this release:** `cargo check` of the api and server crates with their tests compiles; `rustfmt` shows nothing for the lines changed; `npm run typecheck`, `types:check`, `docs:check` and `version:check` pass. **Not run:** the tests and the release-build run, as asked.
+
+### Upgrading
+- Nothing to do. The first sync of each repository after the upgrade is a full one.
+
 ## V0.2.155 (2026-10-21)
 
 The web client stops asking for a workspace's whole file list.
