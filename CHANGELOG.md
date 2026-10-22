@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.163 (2026-10-22)
+
+Workspace templates are designed and written down before any code reads one. This opens track N (V0.2.163–V0.2.193).
+
+### Changed
+- **The design page:** [technical/workspace-templates.md](mindmap/technical/workspace-templates.md) defines a template as a JSON file that names modules RepoMemo already has (sections, health detectors, assistant capabilities, pulse cards, artifact types, ranking signals) and gives them an order, an emphasis or a weight. It lists the blocks of the format with their limits and the release that builds each, what a template can never do (grant or hide a right, run anything, lose evidence, make a clearly better match lose, be required), how the parts fit (one crate, one resolver, no template id in code), how a workspace's template is resolved and falls back to `general`, and how a template is added.
+- **The decision record:** [0005](docs/decisions/0005-templates-are-data-over-a-closed-set-of-modules.md), *Templates are data over a closed set of modules*.
+- **Decisions 24–28 are taken as proposed:** the track is numbered V0.2.163–V0.2.193 so the tag waits for it and the feature freeze is lifted for it (V0.2.193 restores it); templates are JSON built into the binary plus an optional operator folder; a template never touches rights; existing workspaces stay on `general`; `general` and four templates ship first.
+- **No code changes:** no route, setting or migration changes, and no workspace looks or behaves differently.
+- **Checks run on this release:** `docs:check` and `version:check` pass. **Not run:** the tests, as asked.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.162 (2026-10-21)
 
 The release checks are repeated after tracks L and M, the fifth security review is closed, and the feature freeze is back on until the tag.

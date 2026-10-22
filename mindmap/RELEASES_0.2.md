@@ -1,9 +1,9 @@
 # RepoMemo releases: 0.2 → 0.3
 
-> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.162` (2026-10-21) · **Next:** `V0.3.0`
+> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.163` (2026-10-22) · **Next:** `V0.2.164`
 > **Previous line:** [Releases 0.1 → 0.2](RELEASES_0.1.md) · **Related:** [Roadmap, Road to V0.3.0](ROADMAP.md#-road-to-v030) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
-Every release of the 0.2 line, shipped and planned, one row each. The plan comes from the [Road to V0.3.0](ROADMAP.md#-road-to-v030): **one change per release**, each shippable alone, with the security rules for a new outside connection in the release that opens it. Planned rows are proposals until decisions 7–14 in the roadmap are agreed; tracks L and M wait on decisions 20–23.
+Every release of the 0.2 line, shipped and planned, one row each. The plan comes from the [Road to V0.3.0](ROADMAP.md#-road-to-v030): **one change per release**, each shippable alone, with the security rules for a new outside connection in the release that opens it. Planned rows are proposals until decisions 7–14 in the roadmap are agreed; tracks L and M waited on decisions 20–23, and track N on decisions 24–28 (taken as proposed).
 
 **Type:** ✨ Feature · 🔧 Enhancement · 🐞 Fix · 🔒 Security · 📘 Update (docs, process, dependencies, release). Releases whose purpose is a security rule or a review finding are marked 🔒 here; the roadmap's plan table files them under the kind of work instead. · 🧹 Refactor · 🧪 Test
 **Status:** ✅ shipped (with its date) · 🔄 in progress · 🔜 planned
@@ -29,6 +29,7 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | V0.2.57–V0.2.129 | K. Frontend polish | Tokens, layers and the cascade; building blocks; React foundations; every page on the shared pieces; behaviour; checks and DESIGN.md ([plan](plans/2026-10-17-frontend-polish.md)) |
 | V0.2.130–V0.2.148 | L. Security and dependencies | TLS, spreadsheet and web toolchain advisories; pinned CI and images; the container's git; Office previews opt-in and locked down; provider addresses; token powers; events by role; organization roles; who creates organizations; refresh across tabs; sign-in limits; input and link rules; container hardening ([review](security/2026-10-21-security-review.md)) |
 | V0.2.149–V0.2.162 | M. Backend hardening and performance | Rights before reading; stored text for the artifact page; jobs through the queue; body limits; streamed uploads; the file list paged; syncs with nothing to do; parallel cross-workspace search; SQLite tuning; compression; load shedding; release checks |
+| V0.2.163–V0.2.193 | N. Workspace templates *(started 2026-10-22)* | A data format over a closed set of modules; templates chosen at creation or in Settings; tab order, landing section, labels and Overview cards; ranking boosts, health checks, review, map and assistant phrases; four first templates; a checker, an operator folder and a download for adding more ([plan](plans/2026-10-22-workspace-templates.md)) |
 | V0.3.0 | — | *Connected* |
 
 ---
@@ -199,4 +200,35 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | **V0.2.160** | ✅ 2026-10-21 |M. Backend hardening and performance |🔧 Enhancement | API | Compressed JSON answers (P20) | Search answers compressed; event streams unchanged |
 | **V0.2.161** | ✅ 2026-10-21 |M. Backend hardening and performance |🔧 Enhancement | API | Load shedding with `Retry-After` (P21) | Past the cap, refused at once instead of queued to a timeout |
 | **V0.2.162** | ✅ 2026-10-21 |M. Backend hardening and performance |📘 Update | Release | Release checks repeated, the fifth review closed, the freeze restored (R13) | Every check passes; no high or medium finding open |
-| **V0.3.0** | 🔜 Planned | — | 📘 Update | Connected | The version set to `0.3.0` and tagged `v0.3.0`, after tracks K, L and M and the clean-machine install | Tag `v0.3.0` |
+| **V0.2.163** | ✅ 2026-10-22 |N. Workspace templates |📘 Update | Templates | The design, the decisions 24–28 and the format written down | The technical page and the ADR match the plan |
+| **V0.2.164** | 🔜 Planned | N. Workspace templates | ✨ Feature | Templates | A template crate: the identity block, limits and validation; General defined | Every limit and refusal has a unit test |
+| **V0.2.165** | 🔜 Planned | N. Workspace templates | ✨ Feature | Templates | The built-in catalogue: the JSON files of one folder, registered without code | A valid file added to the folder appears with no other edit |
+| **V0.2.166** | 🔜 Planned | N. Workspace templates | ✨ Feature | Templates | A workspace remembers its template; one resolver, General when it cannot | A missing template resolves to General with a reason; export and import keep the choice |
+| **V0.2.167** | 🔜 Planned | N. Workspace templates | ✨ Feature | API | Routes to list templates and to read and change a workspace's template | A viewer reads and cannot change; a read-and-write token gets `403` on the change |
+| **V0.2.168** | 🔜 Planned | N. Workspace templates | ✨ Feature | Workspaces | Create a workspace from a template, with its starter folders | A template's folders exist after creation; General creates none |
+| **V0.2.169** | 🔜 Planned | N. Workspace templates | 🔧 Enhancement | Web | Template types and a picker in the create dialog and the setup wizard | The dialog creates a workspace with the chosen template |
+| **V0.2.170** | 🔜 Planned | N. Workspace templates | ✨ Feature | Templates | Four templates ship: Software engineering, Operations and incidents, Product and decisions, Knowledge base | The picker lists five; each creates its folders |
+| **V0.2.171** | 🔜 Planned | N. Workspace templates | 🔧 Enhancement | Web | Workspace tabs follow the template's order, with the lesser sections under More | Map is under More in a Knowledge base workspace and its address still opens |
+| **V0.2.172** | 🔜 Planned | N. Workspace templates | 🔧 Enhancement | Web | A workspace opens on its landing section; the palette follows the template's order | An Operations workspace opens on Review |
+| **V0.2.173** | 🔜 Planned | N. Workspace templates | 🔧 Enhancement | Web | Sections and evidence types named by the template | Operations shows *Actions* for Tasks in the tab, title and palette |
+| **V0.2.174** | 🔜 Planned | N. Workspace templates | 🔧 Enhancement | Web | The Overview shows the cards its template asks for, in its order | Software engineering shows symbols and repositories in sync first |
+| **V0.2.175** | 🔜 Planned | N. Workspace templates | 🔧 Enhancement | Web | The evidence ledger opens in the template's view and offers its types first | A person's own view choice wins over the default |
+| **V0.2.176** | 🔜 Planned | N. Workspace templates | 🔧 Enhancement | Web | Assistant suggestions and Retrieval defaults from the template | Clicking a suggestion fills the box and sends nothing |
+| **V0.2.177** | 🔜 Planned | N. Workspace templates | ✨ Feature | Web | Settings › Template: choose, preview, adjust and reset | A change shows on the next navigation and in the activity feed |
+| **V0.2.178** | 🔜 Planned | N. Workspace templates | 🔧 Enhancement | Search | Ranking described by a profile from the template; General ranks exactly as before | The V0.2.162 search fixtures give the same order and scores under General |
+| **V0.2.179** | 🔜 Planned | N. Workspace templates | 🔧 Enhancement | Search | Boosts by type, document kind and folder pattern, bounded | A clearly better match still wins; 16 matching rules stay under the cap |
+| **V0.2.180** | 🔜 Planned | N. Workspace templates | 🔧 Enhancement | Search | A preference for recent evidence, within the same bounds | A month-old runbook edges out a year-old one of equal relevance |
+| **V0.2.181** | 🔜 Planned | N. Workspace templates | 🔧 Enhancement | Health | The health checks that run, and their order, follow the template | A detector left out is not run; General runs all |
+| **V0.2.182** | 🔜 Planned | N. Workspace templates | ✨ Feature | Health | A check for stale evidence, with the age set by the template | Flagged at 91 days and not at 89; General reports none |
+| **V0.2.183** | 🔜 Planned | N. Workspace templates | 🔧 Enhancement | Review | The review queue lists what the template cares about first | Operations lists health findings first; General keeps today's order |
+| **V0.2.184** | 🔜 Planned | N. Workspace templates | 🔧 Enhancement | Map | The knowledge map puts the template's kinds of evidence first | Software engineering shows repositories and symbols first |
+| **V0.2.185** | 🔜 Planned | N. Workspace templates | 🔧 Enhancement | Assistant | The assistant recognises a template's phrases and knows what the workspace is for | General's Ask prompt is byte-identical to before; no rule is loosened |
+| **V0.2.186** | 🔜 Planned | N. Workspace templates | 🔧 Enhancement | Repositories | The repository link form offers include and exclude rules from the template | The saved link records what the person kept |
+| **V0.2.187** | 🔜 Planned | N. Workspace templates | 🔧 Enhancement | Dashboard | Workspace cards name their template and show its headline figure | No extra call per workspace; General shows no badge |
+| **V0.2.188** | 🔜 Planned | N. Workspace templates | 📘 Update | Templates | A checker and a guide for writing a template | A bad value, an unknown key or a template id in code fails with the file and line |
+| **V0.2.189** | 🔜 Planned | N. Workspace templates | ✨ Feature | Templates | Templates from an operator's folder (`REPOMEMO_TEMPLATES_DIR`) | A valid file appears after a restart; a bad one is named and ignored |
+| **V0.2.190** | 🔜 Planned | N. Workspace templates | 🔧 Enhancement | Console | Console commands for templates and a loaded-templates list in System | `validate` prints the errors the server would |
+| **V0.2.191** | 🔜 Planned | N. Workspace templates | ✨ Feature | Templates | A workspace's adjusted setup downloaded as a template file | The file passes the checker and gives the same sections, labels and boosts elsewhere |
+| **V0.2.192** | 🔜 Planned | N. Workspace templates | 🔒 Security | Security | Security pass on the new surface | No high or medium finding open |
+| **V0.2.193** | 🔜 Planned | N. Workspace templates | 📘 Update | Release | Release checks repeated after workspace templates; the freeze restored | Every check passes |
+| **V0.3.0** | 🔜 Planned | — | 📘 Update | Connected | The version set to `0.3.0` and tagged `v0.3.0`, after tracks K, L, M and N and the clean-machine install | Tag `v0.3.0` |

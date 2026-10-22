@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.162` (2026-10-21), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next:** the clean-machine install (R6, the maintainer's) and the `v0.2.0` tag; tracks L and M, security and backend hardening, are built (V0.2.130–V0.2.162) · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.163` (2026-10-22), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next:** the clean-machine install (R6, the maintainer's) and the `v0.2.0` tag; tracks L and M, security and backend hardening, are built (V0.2.130–V0.2.162) and track N, workspace templates, is under way (V0.2.163–V0.2.193) · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Security review 2026-10-16 (V0.2.52)](security/2026-10-16-security-review.md) · [Security and backend review 2026-10-21 (V0.2.129)](security/2026-10-21-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -50,7 +50,8 @@ timeline
     V0.2.49 to V0.2.56 : One client, release candidate
     V0.2.57 to V0.2.129 : Frontend polish (track K)
     V0.2.130 to V0.2.148 : Security and dependencies (track L)
-    V0.2.149 to V0.2.162 : Backend hardening and performance (track M) : V0.3.0 Connected
+    V0.2.149 to V0.2.162 : Backend hardening and performance (track M)
+    V0.2.163 to V0.2.193 : Workspace templates (track N) : V0.3.0 Connected
 ```
 
 | Stage | Status |
@@ -65,6 +66,7 @@ timeline
 | Security and backend review 2026-10-21 (fifth pass) | ✅ Closed at V0.2.162: 2 high, 9 medium, 15 low and 4 info findings, none high, medium or low open, plus 11 performance findings built (P12–P21); the review's table names the release of each fix; [review](security/2026-10-21-security-review.md) |
 | Track L: security and dependencies (V0.2.130–V0.2.148) | ✅ V0.2.130–V0.2.148 built; decisions 20–23 taken as proposed |
 | Track M: backend hardening and performance (V0.2.149–V0.2.162) | ✅ V0.2.149–V0.2.162 built; decisions 20–23 taken as proposed |
+| Track N: workspace templates (V0.2.163–V0.2.193) | 🔄 Started 2026-10-22; decisions 24–28 taken as proposed; [plan](plans/2026-10-22-workspace-templates.md) · [format](technical/workspace-templates.md) |
 | V0.4.0 and later: scale-out, single sign-on, hosted | 💭 Direction |
 
 ---
@@ -312,7 +314,7 @@ V0.2.0 made RepoMemo trustworthy on its own server. **V0.3.0, *Connected*,** pro
 - **Shippable alone:** each release passes CI, carries its tests, updates the mindmaps, the changelog and its row in [RELEASES_0.2.md](RELEASES_0.2.md), and is committed as `Update V0.2.N` with a short list.
 - **Security comes with the surface:** the rules for a new outside connection (mail, remote git, webhooks, connectors) are part of the release that opens it, never a later one.
 - **Fixes ride along** with the next release when they are small; a fix that needs its own release gets one (decision 6 named the format, not a fixes-only rule).
-- **Feature freeze from V0.2.52:** only the release candidate's checks and their fixes until V0.3.0, **lifted for track K** (decision 15): the frontend polish adds building blocks and fixes, no product feature, and V0.2.129 repeated the release checks and **restored the freeze**: from V0.2.129 until the tag, only the checks of the clean install and the fixes it finds go in. **Lifted again for tracks L and M** (decision 20): security fixes, dependency updates and backend hardening, no product feature; V0.2.162 repeated the release checks and **restored the freeze**: from V0.2.162 until the tag, only the checks of the clean install and the fixes it finds go in.
+- **Feature freeze from V0.2.52:** only the release candidate's checks and their fixes until V0.3.0, **lifted for track K** (decision 15): the frontend polish adds building blocks and fixes, no product feature, and V0.2.129 repeated the release checks and **restored the freeze**: from V0.2.129 until the tag, only the checks of the clean install and the fixes it finds go in. **Lifted again for tracks L and M** (decision 20): security fixes, dependency updates and backend hardening, no product feature; V0.2.162 repeated the release checks and **restored the freeze**: from V0.2.162 until the tag, only the checks of the clean install and the fixes it finds go in. **Lifted a third time for track N** (decision 24): workspace templates, one block of the format per release, with the same restoring release (V0.2.193).
 
 ### Release plan
 
@@ -425,7 +427,7 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 | **V0.2.54** ✅ | 📘 | Performance | Performance run at 50,000 passages plus a 100,000-file remote repository and 10,000 issues | R10 | The V0.2.0 targets still hold; results in the release notes |
 | **V0.2.55** ✅ | 📘 | Documentation | Mindmaps, branch pages (`repository-sources`, a new `connectors` page, `operations`), changelog and upgrade notes from 0.2.x | R11 | Every page matches the code |
 | **V0.2.56** ✅ | 📘 | Release | Clean-machine install with mail and a remote repository, following only the guide | R12 | Installed without a workaround; ready to tag |
-| **V0.3.0** | — | — | *Connected*, after tracks K, L and M | — | Tag `v0.3.0` |
+| **V0.3.0** | — | — | *Connected*, after tracks K, L, M and N | — | Tag `v0.3.0` |
 
 #### Track K: Frontend polish (V0.2.57–V0.2.129)
 
@@ -486,6 +488,52 @@ Planned on 2026-10-21 from §4 of the [fifth review](security/2026-10-21-securit
 | **V0.2.160** ✅ | 🔧 | API | JSON answers compressed when the client asks; event streams and file downloads untouched | P20 | A search answer arrives compressed; an event stream still delivers each event at once |
 | **V0.2.161** ✅ | 🔧 | API | Load shedding: a cap on requests in flight, for the server and per account, answered with `503` or `429` and `Retry-After` | P21 | Past the cap a request is refused at once instead of queuing until its timeout; health checks and sign-in keep room of their own |
 | **V0.2.162** ✅ | 📘 | Release | Release checks repeated after tracks L and M; the fifth review closed; the freeze restored | R13 | `cargo deny`, `npm audit` (development included) and every CI check pass; the review's status table has no open high or medium; the performance figures before and after are recorded (the maintainer's run) |
+
+#### Track N: Workspace templates (V0.2.163–V0.2.193)
+
+Proposed and started on 2026-10-22, with decisions 24–28 taken as proposed. Every workspace is organized the same way today: twelve sections in one order, one ranking rule, one set of health checks, one set of assistant suggestions. A **template** is a small JSON file that tells the backend, the engine and the web client which modules matter most in a workspace and how they are shown: the order and landing of the sections, their names, the Overview cards, ranking boosts, which health checks run, the review queue and map emphasis, the assistant's phrases, and the folders a new workspace starts with. Templates choose and order modules that exist in code; they never add code, never touch rights and never move stored evidence. `general` reproduces today's behaviour exactly, and every existing workspace stays on it until an administrator chooses. Four templates ship (Software engineering, Operations and incidents, Product and decisions, Knowledge base), and the last part of the track (V0.2.188–V0.2.191) is how more are added: a checker and a guide, an operator folder read at start, console commands, and a download of a workspace's adjusted setup. The audit of the code, the format, the first templates and a brief for each release are in **[the workspace templates plan](plans/2026-10-22-workspace-templates.md)**.
+
+| Part | Theme | Releases | Count |
+|---|---|---|---|
+| N1 | The model: format, catalogue, assignment, routes, creation | V0.2.163–V0.2.168 | 6 |
+| N2 | The web client: picker, first templates, tabs, labels, cards, settings | V0.2.169–V0.2.177 | 9 |
+| N3 | The engine: ranking, health, review, map, assistant, link defaults | V0.2.178–V0.2.187 | 10 |
+| N4 | Adding templates later: checker, operator folder, console, download | V0.2.188–V0.2.191 | 4 |
+| N5 | Closing: security pass, release checks | V0.2.192–V0.2.193 | 2 |
+
+| Release | Type | Section | The one change | IDs | Done when |
+|---|---|---|---|---|---|
+| **V0.2.163** ✅ | 📘 | Templates | The design, decisions 24–28 and the format written down (`technical/workspace-templates.md`, an ADR) | F26a, decisions 24–28 | The page and the ADR match the plan |
+| **V0.2.164** | ✨ | Templates | A template crate: identity block, limits, validation; `general` defined | F26a | Every limit and refusal has a unit test |
+| **V0.2.165** | ✨ | Templates | The built-in catalogue: the JSON files of one folder, registered without code | F26a | A valid file added to the folder appears with no other edit |
+| **V0.2.166** | ✨ | Templates | A workspace remembers its template (a workspace setting); one resolver, `general` when it cannot; export and import keep it | F26a | A missing template resolves to `general` with a reason; an imported workspace keeps its template |
+| **V0.2.167** | ✨ | API | `GET /v1/templates`, `GET` and `PUT /v1/workspaces/{id}/template`; a change is in the activity feed | F26a, decision 26 | A viewer reads and cannot change; a read-and-write token gets `403` on the change |
+| **V0.2.168** | ✨ | Workspaces | Create a workspace from a template, with its starter folders | F26b | A template's folders exist after creation; `general` creates none |
+| **V0.2.169** | 🔧 | Web | Template types and a picker in the create dialog and the setup wizard | F26b | The dialog creates a workspace with the chosen template |
+| **V0.2.170** | ✨ | Templates | Four templates ship: Software engineering, Operations and incidents, Product and decisions, Knowledge base | F26b, decision 28 | The picker lists five; each creates its folders |
+| **V0.2.171** | 🔧 | Web | Tab order from the template, lesser sections under More | F26c | Map is under More in a Knowledge base workspace and its address still opens |
+| **V0.2.172** | 🔧 | Web | A landing section per template; the palette follows the order | F26c | An Operations workspace opens on Review |
+| **V0.2.173** | 🔧 | Web | Sections and evidence types named by the template | F26c | Operations shows *Actions* for Tasks in tab, title and palette |
+| **V0.2.174** | 🔧 | Web | Overview cards chosen and ordered by the template | F26c | Software engineering shows symbols and repositories in sync first |
+| **V0.2.175** | 🔧 | Web | The evidence ledger's default view and the types offered first | F26c | A person's own view choice wins |
+| **V0.2.176** | 🔧 | Web | Assistant suggestions and Retrieval defaults | F26c | A suggestion fills the box and sends nothing |
+| **V0.2.177** | ✨ | Web | Settings › Template: choose, preview, adjust, reset | F26c | A change shows on the next navigation and in the activity feed |
+| **V0.2.178** | 🔧 | Search | Ranking as a profile from the template; `general` ranks exactly as before | F26d | The V0.2.162 search fixtures give the same order and scores under `general` |
+| **V0.2.179** | 🔧 | Search | Boosts by type, document kind and folder pattern, bounded (0.8–1.3 each, 1.5 together) | F26d | A clearly better match still wins; 16 matching rules stay under the cap |
+| **V0.2.180** | 🔧 | Search | A preference for recent evidence | F26d | A month-old runbook edges out a year-old one of equal relevance |
+| **V0.2.181** | 🔧 | Health | The health checks that run, and their order, from the template | F26e | A detector left out is not run; `general` runs all |
+| **V0.2.182** | ✨ | Health | A stale-evidence check with the age set by the template | F26e | Flagged at 91 days and not at 89; `general` reports none |
+| **V0.2.183** | 🔧 | Review | The review queue's order from the template | F26e | Operations lists health findings first |
+| **V0.2.184** | 🔧 | Map | The map's emphasis from the template | F26e | Software engineering shows repositories and symbols first |
+| **V0.2.185** | 🔧 | Assistant | A template's phrases for the router and one line of focus for Ask | F26f | `general`'s Ask prompt is byte-identical to before; no rule is loosened |
+| **V0.2.186** | 🔧 | Repositories | Include and exclude rules offered by the link form | F26f | The saved link records what the person kept |
+| **V0.2.187** | 🔧 | Dashboard | Workspace cards name their template and show its headline figure | F26f | No extra call per workspace |
+| **V0.2.188** | 📘 | Templates | `npm run templates:check` and `docs/TEMPLATES.md` | F26g | A bad value, an unknown key or a template id in code fails with the file and line |
+| **V0.2.189** | ✨ | Templates | Templates from `REPOMEMO_TEMPLATES_DIR` | F26g, decision 25 | A valid file appears after a restart; a bad one is named and ignored |
+| **V0.2.190** | 🔧 | Console | `repomemo-console templates list\|show\|validate` and a loaded-templates list in System | F26g | `validate` prints the errors the server would |
+| **V0.2.191** | ✨ | Templates | Download a workspace's adjusted setup as a template file | F26g | The file passes the checker and loads on another server |
+| **V0.2.192** | 📘 | Security | Security pass on the new surface, with its fixes | R14 | No high or medium finding open |
+| **V0.2.193** | 📘 | Release | Release checks repeated after workspace templates; the freeze restored | R14 | Every check passes |
 
 ### Release checklists (0.2.x)
 
@@ -1078,6 +1126,42 @@ One box per release, with what to change and where. The finding behind each, wit
 - [x] **V0.2.161** A `ConcurrencyLimit` for the API (`REPOMEMO_MAX_IN_FLIGHT`, default from the read pool size) that answers `503` with `Retry-After` through `load_shed`, and a per-account in-flight count answering `429`; `/health*`, `/v1/auth/*` and the event streams are outside it. Counted in `/v1/system/metrics`. Done: `load.rs`: a `LoadGate` (an atomic count for the server and a map for accounts), a `Place` freed when dropped and a `shed_load` middleware outside `web_session`, so a refused request costs a counter and no database read; the account is the signature-checked user of a session token or a personal access token; `/health*`, `/v1/auth/*`, `/v1/setup*`, `/v1/invitations/*` and `…/events` are not counted. `REPOMEMO_MAX_IN_FLIGHT` (default 16 for each read connection, at least 32) answers `503 overloaded` with `Retry-After: 1`; `REPOMEMO_MAX_IN_FLIGHT_PER_ACCOUNT` (8 for each read connection, at least 16) answers `429` with `Retry-After`; `0` turns either off. Both are shown in System › Overview; `repomemo_requests_in_flight` and the counters `repomemo_requests_shed_server_total` and `repomemo_requests_shed_account_total` are in `/v1/system/metrics`. The roadmap's `ConcurrencyLimit` queues rather than refuses, so a counting middleware stands in for it and `load_shed`. `requests_past_the_cap_are_refused_at_once_and_health_and_sign_in_keep_room` holds two uploads open and checks the `429`, the `503`, health, sign-in and the metrics. Compiles; the test was not run
 - [x] **V0.2.162** Release checks repeated (typecheck, styles, accessibility, types, versions, documentation, container, migrations); `cargo deny check` and `npm audit` with development packages clean; the fifth review's table updated with the release of each fix; decision 20's freeze restored. The performance runs before and after track M are the maintainer's. Done: typecheck, `styles:check`, `a11y:check`, `types:check`, `version:check`, `docs:check`, `container:check` and `migrations:check` pass; `cargo deny check` reports advisories, bans, licenses and sources ok, and `npm audit` (development packages included) finds 0 vulnerabilities; the fifth review's status is closed, with its fixes listed by release and no high, medium or low finding open (S5-11 tracked and S5-12 accepted, both informational); the clean-install page gains the notes for V0.3.0 on tracks L and M and a checklist line for what only a run can show; the freeze is restored. The performance runs before and after track M are the maintainer's; no test of track M was run here
 
+#### Track N: Workspace templates (planned)
+
+The brief of each release (change, files, done when, commit line) is in the [plan](plans/2026-10-22-workspace-templates.md#6-the-releases). Tick a box when the release is built and say in it what was built and what was not run.
+
+- [x] **V0.2.163** `technical/workspace-templates.md` and the ADR; decisions 24–28 recorded. Done: `mindmap/technical/workspace-templates.md` (terms, the blocks and the release that builds each, what a template can never do, how the parts fit, resolution, how to add one, decisions 24–28 as agreed) and `docs/decisions/0005-templates-are-data-over-a-closed-set-of-modules.md`; the plan, the roadmap and the release index say decisions 24–28 are taken as proposed and the freeze is lifted for the track. No code changes
+- [ ] **V0.2.164** `crates/templates`: `TemplateDefinition` (meta block), limits, `validate`, `general()`
+- [ ] **V0.2.165** `definitions/*.json` registered by `build.rs`; `Catalogue::{get, list}`
+- [ ] **V0.2.166** workspace setting `template`; `effective_template` cached in `DerivedCache`; archive export and import carry it
+- [ ] **V0.2.167** `GET /v1/templates`, `GET` and `PUT /v1/workspaces/{id}/template`; `workspace_template_changed` activity
+- [ ] **V0.2.168** `CreateWorkspaceRequest.template_id`; `starter_folders` block
+- [ ] **V0.2.169** `useTemplate`, `useTemplateCatalogue`; picker in the create dialog and the setup wizard
+- [ ] **V0.2.170** the four first templates, `meta` and `starter_folders`
+- [ ] **V0.2.171** `sections` block (order, More); `WorkspaceTopbar`
+- [ ] **V0.2.172** `sections.landing`; palette order
+- [ ] **V0.2.173** `labels` block
+- [ ] **V0.2.174** `overview` block
+- [ ] **V0.2.175** `evidence` block
+- [ ] **V0.2.176** `assistant` order and suggestions; Retrieval defaults
+- [ ] **V0.2.177** Settings › Template panel; overrides and reset
+- [ ] **V0.2.178** `RankingProfile` with the lifecycle rule; `general` pinned to the V0.2.162 order
+- [ ] **V0.2.179** boosts by type, document kind and path; caps
+- [ ] **V0.2.180** `recency` rule
+- [ ] **V0.2.181** `health` block: detectors and order
+- [ ] **V0.2.182** `HealthDetector::StaleEvidence`
+- [ ] **V0.2.183** `review` block
+- [ ] **V0.2.184** `map` block
+- [ ] **V0.2.185** assistant `phrases` and `focus`
+- [ ] **V0.2.186** `repositories` block in the link form
+- [ ] **V0.2.187** template badge and headline figure on workspace cards
+- [ ] **V0.2.188** `npm run templates:check`, `docs/TEMPLATES.md`, `definitions/_example.json`, a CI step
+- [ ] **V0.2.189** `REPOMEMO_TEMPLATES_DIR`
+- [ ] **V0.2.190** console `templates` commands; System › Overview list
+- [ ] **V0.2.191** download as a template file
+- [ ] **V0.2.192** security pass (`security/` page)
+- [ ] **V0.2.193** release checks; decision 24's freeze restored
+
 ### Decisions to agree before work starts
 
 | # | Decision | Needed by | Proposal |
@@ -1099,6 +1183,11 @@ One box per release, with what to change and where. The finding behind each, wit
 | 21 | **Office previews off by default** (E1) | V0.2.137 | `REPOMEMO_OFFICE_PREVIEWS` off by default, so an upgraded server stops converting until its operator turns it on, and then only with a LibreOffice at or above the fixed releases. Text previews are not affected. Named in `UPGRADING.md` |
 | 22 | **Who creates organizations and links local repositories** (E3, E4) | V0.2.143 | Two system settings: *Who can create organizations* (`administrators` by default, or `everyone`) and *Who can link local repositories* (system administrators by default, or workspace administrators). The setup wizard asks both |
 | 23 | **What a read-and-write token may do** (E5) | V0.2.140 | Content work stays (evidence, notes, tasks, comments, memory, searches). Granting access, deleting, AI settings, repository and connector links, webhooks, export and import need a session or a new `admin` scope that a person grants on purpose. Existing tokens keep their scope and lose those routes; `UPGRADING.md` says so |
+| 24 | **Where track N goes, and the freeze** | V0.2.163 | Lift the freeze for track N as decisions 15 and 20 did and number the releases V0.2.163–V0.2.193, so the tag waits for them; V0.2.193 repeats the release checks and restores the freeze. *Alternative:* tag `v0.3.0` first and number the track V0.3.1–V0.3.31 with a new `RELEASES_0.3.md` |
+| 25 | **What a template is made of** | V0.2.164 | JSON files checked against closed vocabularies, built into the binary from `crates/templates/definitions/`, plus an optional operator folder (`REPOMEMO_TEMPLATES_DIR`) of the same format; no new dependency |
+| 26 | **Templates and rights** | V0.2.167 | A template never reads or changes a right, the AI policy, a quota or what leaves the server. Choosing one needs a workspace administrator with a session or the `admin` token scope (decision 23); every change is in the activity feed |
+| 27 | **Existing workspaces** | V0.2.166 | They stay on `general` and nothing changes until an administrator chooses; a new workspace asks at creation, with `general` preselected |
+| 28 | **What ships first** | V0.2.170 | `general` plus Software engineering, Operations and incidents, Product and decisions and Knowledge base, as data. Organization-defined templates are V0.4.0 direction |
 
 ---
 
@@ -1133,6 +1222,7 @@ Every item of both roads, with the release it is planned for. The evidence behin
 | F23 | **Review queue:** evidence needing review, stale memory cards and open health findings in one list | S–M | ✅ V0.2.37 |
 | F24 | **Version history** of a file, viewable and comparable | M | ✅ V0.2.38 |
 | F25 | **`@mention` suggestions** in comments | S | ✅ V0.2.39 |
+| F26 | **Workspace templates:** the model, catalogue, assignment and routes (26a), creation with starter folders and the four first templates (26b), the web client (26c), ranking (26d), health, review and map (26e), assistant, link defaults and dashboard (26f), adding templates later (26g) | L | V0.2.163–V0.2.191 (decisions 24–28) |
 | F20 | **Desktop as a server client** (20a ✅ V0.2.49), export to a server (20b ✅ V0.2.50), local edition retired (20c ✅ V0.2.51) | M | ✅ V0.2.49–V0.2.51 (decision 13) |
 
 ### Security
@@ -1219,6 +1309,7 @@ Every item of both roads, with the release it is planned for. The evidence behin
 | R5 | Mindmaps, branch pages, changelog, upgrade notes | M | ✅ V0.1.76 |
 | R6 follow-up | Corrections from the clean-machine install | S | V0.2.1 |
 | R13 | Release checks repeated after tracks L and M, the fifth review closed, the freeze restored | S | V0.2.162 |
+| R14 | Security pass on workspace templates, release checks repeated, the freeze restored | S | V0.2.192, V0.2.193 |
 | R7–R12 | Release candidate for V0.3.0: freeze and fourth security pass (R7 ✅, R8 ✅ V0.2.52), upgrade from 0.2.0 (R9 ✅ V0.2.53), performance with remote sources (R10: harnesses V0.2.54, run pending), documentation (R11 ✅ V0.2.55), clean install (R12: runbook V0.2.56, install pending) | M | V0.2.52–V0.2.56 |
 
 ### Experience
