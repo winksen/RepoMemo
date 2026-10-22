@@ -632,6 +632,90 @@ async fn a_received_file_is_hashed_as_it_arrives_and_moved_into_the_blob_store()
     let _ = std::fs::remove_dir_all(data_dir);
 }
 
+/// V0.2.154: a page of a workspace's files is read in SQL, newest change first,
+/// with the total; the folders and repositories of a page come for its ids only.
+#[tokio::test]
+async fn a_page_of_files_is_read_in_sql_with_the_total() {
+    let (storage, data_dir) = temp_storage("file-pages").await;
+    let workspace = storage.create_workspace("Pages").await.unwrap();
+    let source = storage
+        .create_or_get_source(&workspace.id, SourceType::Folder, "fixture", Some("fixture"))
+        .await
+        .unwrap();
+    let bytes = b"one shared file";
+    let content_hash = StorageEngine::content_hash(bytes);
+    storage
+        .store_blob(&content_hash, bytes, Some("text/markdown"))
+        .await
+        .unwrap();
+    let first = storage
+        .store_artifact(NewArtifact {
+            workspace_id: workspace.id.clone(),
+            source_id: source.id.clone(),
+            artifact_type: ArtifactType::MarkdownDoc,
+            title: "Seed".to_owned(),
+            path: "seed.md".to_owned(),
+            content_hash: content_hash.clone(),
+            mime_type: Some("text/markdown".to_owned()),
+            language: Some("Markdown".to_owned()),
+            size_bytes: bytes.len() as i64,
+            metadata: json!({}),
+        })
+        .await
+        .unwrap()
+        .artifact;
+    // 2,099 more rows of the same kind, made in one statement; the dates differ so the order is a real one.
+    sqlx::query(
+        r#"
+        WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 2099)
+        INSERT INTO artifacts (id, workspace_id, source_id, type, title, path, content_hash, mime_type, language,
+                               size_bytes, created_at, updated_at, indexed_at, metadata_json)
+        SELECT 'bulk-' || n.i, a.workspace_id, a.source_id, a.type, 'Bulk ' || n.i, 'bulk/' || n.i || '.md',
+               a.content_hash, a.mime_type, a.language, a.size_bytes, a.created_at,
+               printf('2020-%02d-%02dT00:00:00+00:00', n.i % 12 + 1, n.i % 28 + 1), NULL, '{}'
+        FROM n, artifacts a WHERE a.id = ?1
+        "#,
+    )
+    .bind(&first.id)
+    .execute(&storage.pool)
+    .await
+    .unwrap();
+
+    let (page, total) = storage.list_artifacts_page(&workspace.id, 2_000, 0).await.unwrap();
+    assert_eq!(
+        (page.len(), total),
+        (2_000, 2_100),
+        "a page is capped at its size and the total is all of them"
+    );
+    let all = storage.list_artifacts(&workspace.id).await.unwrap();
+    assert_eq!(
+        page.iter().map(|artifact| artifact.id.as_str()).collect::<Vec<_>>(),
+        all.iter()
+            .take(2_000)
+            .map(|artifact| artifact.id.as_str())
+            .collect::<Vec<_>>(),
+        "the same order as the whole list"
+    );
+    let (rest, total) = storage.list_artifacts_page(&workspace.id, 50, 2_090).await.unwrap();
+    assert_eq!((rest.len(), total), (10, 2_100));
+    let (nothing, total) = storage.list_artifacts_page(&workspace.id, 50, 5_000).await.unwrap();
+    assert_eq!((nothing.len(), total), (0, 2_100));
+
+    // Folders and repositories are looked up for the ids of a page only.
+    let folder = storage.create_folder(&workspace.id, None, "Plans", None).await.unwrap();
+    storage.set_artifact_folder(&first.id, Some(&folder.id)).await.unwrap();
+    let ids = vec![first.id.clone(), "bulk-7".to_owned()];
+    let folders = storage.artifact_folder_ids_for(&ids).await.unwrap();
+    assert_eq!(folders.len(), 1);
+    assert_eq!(folders.get(&first.id), Some(&folder.id));
+    assert!(storage.repo_artifact_sources_for(&ids).await.unwrap().is_empty());
+    assert!(storage.artifact_folder_ids_for(&[]).await.unwrap().is_empty());
+
+    storage.pool.close().await;
+    drop(storage);
+    let _ = std::fs::remove_dir_all(data_dir);
+}
+
 #[tokio::test]
 async fn unreferenced_blobs_are_collected_after_the_grace_period() {
     let (storage, data_dir) = temp_storage("blob-gc").await;
@@ -1154,6 +1238,57 @@ async fn performance_at_scale() {
         .await
         .unwrap();
     println!("artifact query: {:?} ({} of {total})", started.elapsed(), page.len());
+
+    // A page of the file list in a workspace of many files (V0.2.154, target under 100 ms at
+    // 100,000 files). The files are bare rows made in one statement; `REPOMEMO_PERF_LISTED_FILES`
+    // sets how many (default 100,000).
+    let listed: usize = std::env::var("REPOMEMO_PERF_LISTED_FILES")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(100_000);
+    let seed_id: String = sqlx::query_scalar("SELECT id FROM artifacts WHERE workspace_id = ?1 LIMIT 1")
+        .bind(&workspace.id)
+        .fetch_one(&storage.pool)
+        .await
+        .unwrap();
+    sqlx::query(
+        r#"
+        WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ?2)
+        INSERT INTO artifacts (id, workspace_id, source_id, type, title, path, content_hash, mime_type, language,
+                               size_bytes, created_at, updated_at, indexed_at, metadata_json)
+        SELECT 'listed-' || n.i, a.workspace_id, a.source_id, a.type, 'Listed ' || n.i, 'listed/' || n.i || '.md',
+               a.content_hash, a.mime_type, a.language, a.size_bytes, a.created_at,
+               printf('2020-%02d-%02dT00:00:00+00:00', n.i % 12 + 1, n.i % 28 + 1), NULL, '{}'
+        FROM n, artifacts a WHERE a.id = ?1
+        "#,
+    )
+    .bind(&seed_id)
+    .bind(listed as i64)
+    .execute(&storage.pool)
+    .await
+    .unwrap();
+    let mut samples = Vec::new();
+    for _ in 0..20 {
+        let started = Instant::now();
+        let (page, total) = storage.list_artifacts_page(&workspace.id, 50, 0).await.unwrap();
+        let ids: Vec<String> = page.iter().map(|artifact| artifact.id.clone()).collect();
+        storage.artifact_folder_ids_for(&ids).await.unwrap();
+        storage.repo_artifact_sources_for(&ids).await.unwrap();
+        samples.push(started.elapsed().as_millis());
+        assert_eq!(page.len(), 50);
+        assert!(total >= listed as i64);
+    }
+    println!(
+        "file list, a page of 50 among {listed}+ files, p95: {} ms (target 100 ms)",
+        percentile(samples)
+    );
+    let started = Instant::now();
+    let (page, total) = storage.list_artifacts_page(&workspace.id, 50, 50_000).await.unwrap();
+    println!(
+        "file list, a page at offset 50,000: {:?} ({} of {total})",
+        started.elapsed(),
+        page.len()
+    );
 
     storage.pool.close().await;
     drop(storage);

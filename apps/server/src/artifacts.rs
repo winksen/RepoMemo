@@ -16,6 +16,9 @@ pub(crate) async fn list_artifact_index_failures(
         .map_err(map_storage_error)
 }
 
+/// The most files a call to the file list returns when it does not ask for a page.
+const UNPAGED_ARTIFACT_CAP: i64 = 2_000;
+
 pub(crate) async fn list_artifacts(
     subject: AuthenticatedSubject,
     State(state): State<AppState>,
@@ -23,18 +26,39 @@ pub(crate) async fn list_artifacts(
     Query(page): Query<PageQuery>,
 ) -> Result<(HeaderMap, Json<Vec<SharedArtifactSummary>>), ApiError> {
     require_workspace_read(&state, &subject, &workspace_id).await?;
+    // The page is cut in SQL, and only its files' folders and repositories are looked up. A call
+    // without `limit` gets the first `UNPAGED_ARTIFACT_CAP` files and a header that says so.
+    let (limit, capped) = match page.limit {
+        Some(limit) => (limit.clamp(1, MAX_PAGE_SIZE) as i64, false),
+        None => (UNPAGED_ARTIFACT_CAP, true),
+    };
+    let (artifacts, total) = state
+        .storage
+        .list_artifacts_page(&workspace_id, limit, page.offset.unwrap_or(0) as i64)
+        .await
+        .map_err(map_storage_error)?;
+    let ids: Vec<String> = artifacts.iter().map(|summary| summary.id.clone()).collect();
     let folder_ids = state
         .storage
-        .artifact_folder_ids(&workspace_id)
+        .artifact_folder_ids_for(&ids)
         .await
         .map_err(map_storage_error)?;
     let repository_ids = state
         .storage
-        .repo_artifact_sources(&workspace_id)
+        .repo_artifact_sources_for(&ids)
         .await
         .map_err(map_storage_error)?;
-    let artifacts = state.core.list_artifacts(workspace_id).await.map_err(map_core_error)?;
-    let (headers, artifacts) = page.apply(artifacts);
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        HeaderName::from_static("x-total-count"),
+        HeaderValue::from(total.max(0) as u64),
+    );
+    if capped && total > limit {
+        headers.insert(
+            HeaderName::from_static("x-repomemo-truncated"),
+            HeaderValue::from_static("true"),
+        );
+    }
     Ok((
         headers,
         Json(

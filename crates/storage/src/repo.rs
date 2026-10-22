@@ -7,7 +7,7 @@ use anyhow::Result;
 use chrono::Utc;
 use repomemo_domain::{ArtifactSummary, ArtifactType, IndexingJobStatus, RepoFile, Source, SourceType};
 use serde_json::Value;
-use sqlx::Row;
+use sqlx::{QueryBuilder, Row, Sqlite};
 use uuid::Uuid;
 
 use super::{
@@ -611,6 +611,25 @@ impl StorageEngine {
 
     /// `artifact id -> repository source id` for every repository file of a
     /// workspace, including files that left their repository.
+    /// The repository of each of these artifacts that belongs to one (a page's
+    /// worth, not the workspace's).
+    pub async fn repo_artifact_sources_for(&self, artifact_ids: &[String]) -> Result<HashMap<String, String>> {
+        let mut found = HashMap::new();
+        for ids in artifact_ids.chunks(500) {
+            let mut builder =
+                QueryBuilder::<Sqlite>::new("SELECT artifact_id, source_id FROM repo_files WHERE artifact_id IN (");
+            let mut separated = builder.separated(", ");
+            for id in ids {
+                separated.push_bind(id.clone());
+            }
+            builder.push(")");
+            for row in builder.build().fetch_all(self.reader()).await? {
+                found.insert(row.get("artifact_id"), row.get("source_id"));
+            }
+        }
+        Ok(found)
+    }
+
     pub async fn repo_artifact_sources(&self, workspace_id: &str) -> Result<HashMap<String, String>> {
         let rows = sqlx::query_as::<_, (String, String)>(
             r#"

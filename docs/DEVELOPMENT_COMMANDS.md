@@ -217,7 +217,7 @@ not settings: `REPOMEMO_GIT_ASKPASS`, `REPOMEMO_GIT_USERNAME` and
 `REPOMEMO_GIT_SECRET` (the credential handed to one git command, through the server's own
 program acting as git's askpass) and `REPOMEMO_READER_MEMORY_MB` (the memory cap of a document
 reader). Do not set them. The performance runs read `REPOMEMO_PERF_PASSAGES`,
-`REPOMEMO_PERF_FILES` and `REPOMEMO_PERF_ISSUES`, only in tests.
+`REPOMEMO_PERF_FILES`, `REPOMEMO_PERF_ISSUES` and `REPOMEMO_PERF_LISTED_FILES` (the files of the file-list case, 100,000), only in tests.
 
 | Variable | Default | What it does |
 |---|---|---|

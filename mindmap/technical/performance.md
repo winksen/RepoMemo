@@ -22,7 +22,8 @@ RepoMemo promises that a workspace stays quick when it is large. The numbers it 
 All four are `#[ignore]`d tests that print their timings, so they never run in CI. Use **release** builds: the debug numbers of V0.1.74 were ten times slower and are not a verdict. Each leaves its data in the system temp folder only while it runs.
 
 ```powershell
-# 50,000 passages: search, the dashboard's queries, the first search that builds the vector index
+# 50,000 passages: search, the dashboard's queries, the first search that builds the vector index, and (V0.2.154) a page of
+# the file list among 100,000 files (REPOMEMO_PERF_LISTED_FILES sets how many)
 cargo test -p repomemo-storage --release performance_at_scale -- --ignored --nocapture
 
 # 50,000 passages: the knowledge map and health, first load, cached, and after one changed file (REPOMEMO_PERF_PASSAGES sets the size)
@@ -62,6 +63,7 @@ Record a run here when it is made: the date, the machine, the commit, the build 
 | 10,000 issues: passes and time to read them | | | *to record* |
 | …time to index them | | | *to record* |
 | …search p95 / dashboard / map / health | 300 ms / 500 ms / 2 s / 2 s | | *to record* |
+| A page of 50 in the file list (`GET …/artifacts`), 100,000 files in the workspace, p95 | 100 ms | | *to record (V0.2.154)* |
 
 ## 4. Where to look when a number is missed
 

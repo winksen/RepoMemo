@@ -783,3 +783,87 @@ async fn a_job_is_cancelled_by_its_starter_or_an_administrator() {
     assert_eq!(administrator.status(), 200, "an administrator can");
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+/// V0.2.154: the file list is paged in SQL, with the total in `X-Total-Count`,
+/// and the folder of each file on the page comes with it.
+#[tokio::test]
+async fn the_file_list_is_paged_in_sql_with_its_total() {
+    let data_dir = temp_data_dir("paged-files");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let (owner, _) = register_account(&app, "paged-owner@example.com").await;
+    let workspace_id = create_workspace(&app, &owner).await;
+    let folder = response_json(
+        call(
+            &app,
+            "POST",
+            &format!("/v1/workspaces/{workspace_id}/folders"),
+            &owner,
+            json!({"name": "Plans"}),
+        )
+        .await,
+    )
+    .await;
+    let folder_id = folder["id"].as_str().unwrap().to_owned();
+    for (index, title) in ["First", "Second", "Third", "Fourth"].iter().enumerate() {
+        let note = call(
+            &app,
+            "POST",
+            &format!("/v1/workspaces/{workspace_id}/artifacts/text"),
+            &owner,
+            json!({"title": title, "content": format!("Note {index}."), "folder_id": if index == 2 { json!(folder_id) } else { json!(null) }}),
+        )
+        .await;
+        assert_eq!(note.status(), 201);
+        tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+    }
+
+    let everything = call(
+        &app,
+        "GET",
+        &format!("/v1/workspaces/{workspace_id}/artifacts"),
+        &owner,
+        json!(null),
+    )
+    .await;
+    assert_eq!(everything.status(), 200);
+    assert_eq!(everything.headers()["x-total-count"], "4");
+    assert!(everything.headers().get("x-repomemo-truncated").is_none());
+    let everything = response_json(everything).await;
+    let everything = everything.as_array().unwrap();
+    assert_eq!(everything.len(), 4);
+
+    // A page is a slice of the same order, with the total of all of them.
+    let page = call(
+        &app,
+        "GET",
+        &format!("/v1/workspaces/{workspace_id}/artifacts?limit=2&offset=1"),
+        &owner,
+        json!(null),
+    )
+    .await;
+    assert_eq!(page.headers()["x-total-count"], "4");
+    let page = response_json(page).await;
+    let page = page.as_array().unwrap();
+    assert_eq!(page.len(), 2);
+    assert_eq!(page[0]["id"], everything[1]["id"]);
+    assert_eq!(page[1]["id"], everything[2]["id"]);
+
+    // The folder of a file comes with its page, and only a file in a folder has one.
+    let in_folder: Vec<&Value> = everything
+        .iter()
+        .filter(|item| item["folder_id"] == folder_id)
+        .collect();
+    assert_eq!(in_folder.len(), 1);
+    assert_eq!(in_folder[0]["title"], "Third");
+    let past_the_end = call(
+        &app,
+        "GET",
+        &format!("/v1/workspaces/{workspace_id}/artifacts?limit=10&offset=40"),
+        &owner,
+        json!(null),
+    )
+    .await;
+    assert_eq!(past_the_end.headers()["x-total-count"], "4");
+    assert!(response_json(past_the_end).await.as_array().unwrap().is_empty());
+    let _ = std::fs::remove_dir_all(data_dir);
+}

@@ -346,6 +346,52 @@ impl StorageEngine {
         Ok(rows.into_iter().map(ArtifactSummary::from).collect())
     }
 
+    /// One page of a workspace's files in the order of `list_artifacts` (newest
+    /// change first), read in SQL, with the number of files there are in all.
+    /// `idx_artifacts_workspace_updated` holds that order, so a page is found by
+    /// reading its first rows and not by sorting the workspace.
+    pub async fn list_artifacts_page(
+        &self,
+        workspace_id: &str,
+        limit: i64,
+        offset: i64,
+    ) -> Result<(Vec<ArtifactSummary>, i64)> {
+        let rows = sqlx::query_as::<_, ArtifactSummaryRow>(
+            r#"
+            SELECT
+              artifacts.id,
+              artifacts.workspace_id,
+              artifacts.source_id,
+              sources.name AS source_name,
+              artifacts.type AS artifact_type,
+              artifacts.title,
+              artifacts.path,
+              artifacts.content_hash,
+              artifacts.mime_type,
+              artifacts.language,
+              artifacts.size_bytes,
+              artifacts.created_at,
+              artifacts.updated_at,
+              artifacts.indexed_at
+            FROM artifacts
+            JOIN sources ON sources.id = artifacts.source_id
+            WHERE artifacts.workspace_id = ?1
+            ORDER BY artifacts.updated_at DESC, artifacts.path ASC
+            LIMIT ?2 OFFSET ?3
+            "#,
+        )
+        .bind(workspace_id)
+        .bind(limit.max(0))
+        .bind(offset.max(0))
+        .fetch_all(self.reader())
+        .await?;
+        let total = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM artifacts WHERE workspace_id = ?1")
+            .bind(workspace_id)
+            .fetch_one(self.reader())
+            .await?;
+        Ok((rows.into_iter().map(ArtifactSummary::from).collect(), total))
+    }
+
     /// Artifacts whose index is missing or was produced by an older indexer,
     /// oldest first. Images are only listed while they have never been
     /// indexed, so a version bump never re-runs paid vision analysis.
@@ -1118,6 +1164,26 @@ impl StorageEngine {
             .into_iter()
             .map(|row| (row.get("id"), row.get("folder_id")))
             .collect())
+    }
+
+    /// The folder of each of these artifacts that sits inside one (a page's
+    /// worth, not the workspace's).
+    pub async fn artifact_folder_ids_for(&self, artifact_ids: &[String]) -> Result<HashMap<String, String>> {
+        let mut found = HashMap::new();
+        for ids in artifact_ids.chunks(500) {
+            let mut builder = QueryBuilder::<Sqlite>::new(
+                "SELECT id, folder_id FROM artifacts WHERE folder_id IS NOT NULL AND id IN (",
+            );
+            let mut separated = builder.separated(", ");
+            for id in ids {
+                separated.push_bind(id.clone());
+            }
+            builder.push(")");
+            for row in builder.build().fetch_all(self.reader()).await? {
+                found.insert(row.get("id"), row.get("folder_id"));
+            }
+        }
+        Ok(found)
     }
 
     pub async fn record_index_failure(&self, artifact_id: &str, message: &str, attempts: i64) -> Result<()> {

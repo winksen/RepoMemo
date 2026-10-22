@@ -442,8 +442,8 @@ pub(crate) struct TokenGrant {
     pub(crate) system: bool,
 }
 
-/// Optional `limit`/`offset` paging for list endpoints. Without `limit` the
-/// full list is returned, so existing clients keep working.
+/// Optional `limit`/`offset` paging for list endpoints. The file list cuts the page in SQL
+/// (`StorageEngine::list_artifacts_page`) and caps a call without `limit`.
 #[derive(Debug, Default, Deserialize)]
 pub(crate) struct PageQuery {
     pub(crate) limit: Option<usize>,
@@ -451,24 +451,6 @@ pub(crate) struct PageQuery {
 }
 
 pub(crate) const MAX_PAGE_SIZE: usize = 500;
-
-impl PageQuery {
-    /// Returns the requested page plus an `X-Total-Count` header when paged.
-    pub(crate) fn apply<T>(&self, items: Vec<T>) -> (HeaderMap, Vec<T>) {
-        let mut headers = HeaderMap::new();
-        let Some(limit) = self.limit else {
-            return (headers, items);
-        };
-        let total = items.len();
-        headers.insert(HeaderName::from_static("x-total-count"), HeaderValue::from(total));
-        let page = items
-            .into_iter()
-            .skip(self.offset.unwrap_or(0))
-            .take(limit.clamp(1, MAX_PAGE_SIZE))
-            .collect();
-        (headers, page)
-    }
-}
 
 pub(crate) const FILE_LINK_ISSUER: &str = "repomemo-file-link";
 

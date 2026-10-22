@@ -1,19 +1,5 @@
 use super::*;
 
-#[test]
-fn page_query_slices_and_reports_total() {
-    let page = crate::PageQuery {
-        limit: Some(2),
-        offset: Some(3),
-    };
-    let (headers, items) = page.apply((0..10).collect::<Vec<_>>());
-    assert_eq!(items, vec![3, 4]);
-    assert_eq!(headers.get("x-total-count").unwrap(), "10");
-    let (headers, items) = crate::PageQuery::default().apply((0..10).collect::<Vec<_>>());
-    assert_eq!(items.len(), 10);
-    assert!(headers.get("x-total-count").is_none());
-}
-
 #[tokio::test]
 async fn protects_and_serves_shared_evidence_flow() {
     let data_dir = std::env::temp_dir().join(format!("repomemo-server-flow-{}", uuid::Uuid::new_v4()));

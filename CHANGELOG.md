@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.154 (2026-10-21)
+
+The file list of a workspace is read a page at a time, in SQL, so a workspace of 100,000 files no longer sends them all on every refresh.
+
+### Changed
+- **`GET /v1/workspaces/{id}/artifacts` pages in SQL (P15a):** it loaded every file row, two whole-workspace maps (folders and repositories) and cut the page in memory, which on a large repository meant tens of megabytes read and thrown away for each page. It now reads one page (`StorageEngine::list_artifacts_page`, with a count), and looks up the folders and repositories of the files on that page only. A new index (migration 0041, `idx_artifacts_workspace_updated` on workspace, change date and path) holds the order the list is in, so a page is the first rows of the index and not a sort of the workspace. The order is unchanged: newest change first, then path.
+- **`X-Total-Count` on every answer, and a cap without `limit`:** a call that asks for a page gets at most 500 files (as before); one that does not gets the first 2,000, with `X-RepoMemo-Truncated: true` when there were more. The web client still asks for the full list until V0.2.155, so a workspace of more than 2,000 files shows its 2,000 newest in the meantime.
+- **`PageQuery::apply` is gone** (its only user was this route) with its unit test.
+- **A case in `performance_at_scale`:** it adds `REPOMEMO_PERF_LISTED_FILES` bare files (100,000 by default) in one statement and prints the p95 of a page with its folders and repositories (target 100 ms in a release build) and the time of a page at offset 50,000. The figure is the maintainer's to record in `performance.md`.
+- **Tests (written, not run):** `a_page_of_files_is_read_in_sql_with_the_total` (storage: 2,100 files, a page capped at its size, the same order as the whole list, the last and an empty page, folders and repositories for given ids) and `the_file_list_is_paged_in_sql_with_its_total` (server: the total, a slice of the same order, a file's folder on its page, an offset past the end).
+- **Checks run on this release:** `cargo check` of the storage and server crates with their tests compiles; `rustfmt` shows nothing for the lines changed; `docs:check`, `version:check` and `migrations:check` pass. **Not run:** the tests and the release-build run, as asked.
+
+### Upgrading
+- Migration 0041 adds one index and runs on first start. A script that read the whole file list in one call now gets at most 2,000 files and a header that says so: ask in pages (`limit` up to 500, `offset`) or through `POST …/artifacts/query`.
+
 ## V0.2.153 (2026-10-21)
 
 Uploads stop being held whole in memory, and the bytes arriving at once get a cap.

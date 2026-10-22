@@ -482,7 +482,11 @@ fn cors_layer(config: &ServerConfig) -> CorsLayer {
                 HeaderName::from_static("x-repomemo-folder-id"),
                 HeaderName::from_static("x-repomemo-client"),
             ])
-            .expose_headers([HeaderName::from_static("x-total-count"), header::RETRY_AFTER])
+            .expose_headers([
+                HeaderName::from_static("x-total-count"),
+                HeaderName::from_static("x-repomemo-truncated"),
+                header::RETRY_AFTER,
+            ])
             // The web app's refresh cookie crosses ports of the same site.
             .allow_credentials(true)
     }
