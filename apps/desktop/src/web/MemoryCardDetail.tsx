@@ -183,7 +183,7 @@ export function SharedMemoryCardDetail({
   }
 
   return (
-    <SharedRecordLayout activeSection="memory" apiAvailable={apiAvailable} organization={organization} organizations={organizations} session={session} signOut={signOut} title={card?.card.title ?? "Memory card"} subtitle={card ? `Source: ${card.card.source}` : "Loading durable team memory…"} workspace={workspace} workspaces={workspaces}>
+    <SharedRecordLayout accessToken={accessToken} activeSection="memory" apiAvailable={apiAvailable} organization={organization} organizations={organizations} session={session} signOut={signOut} title={card?.card.title ?? "Memory card"} subtitle={card ? `Source: ${card.card.source}` : "Loading durable team memory…"} workspace={workspace} workspaces={workspaces}>
       <div className="shared-detail-actions">{canWrite ? <><Button disabled={isLoading || isMutating} onClick={() => { if (!isEditing) startEditing(); else void canLeave().then((leave) => { if (leave) setIsEditing(false); }); }} variant="secondary"><Pencil size={ICON_SIZE.md} /> {isEditing ? "Cancel edit" : "Edit"}</Button><Button className="shared-danger-action" disabled={isLoading || isMutating} onClick={() => void removeCard()} variant="secondary"><Trash size={ICON_SIZE.md} /> Delete</Button></> : null}<Button busy={isExporting} disabled={isLoading || isMutating} onClick={() => void exportCard()} variant="main"><FileText size={ICON_SIZE.md} /> Export Markdown</Button></div>
       <Toast kind="error" message={error} />
       {!card && isLoading ? <LoadingState label="Loading the memory card" /> : null}
@@ -195,6 +195,7 @@ export function SharedMemoryCardDetail({
 }
 
 export function SharedRecordLayout({
+  accessToken,
   activeSection,
   apiAvailable,
   children,
@@ -207,6 +208,7 @@ export function SharedRecordLayout({
   workspace,
   workspaces,
 }: {
+  accessToken: string;
   activeSection: WorkspaceSection;
   apiAvailable: boolean | null;
   children: ReactNode;
@@ -220,7 +222,7 @@ export function SharedRecordLayout({
   workspaces: SharedWorkspace[];
 }) {
   return (
-    <SharedLayout apiAvailable={apiAvailable} onNavigate={navigate} session={session} signOut={signOut} sidebar={<OrganizationRail organizationId={organization?.id} organizations={organizations} workspaceId={workspace.workspace.id} workspaces={workspaces} />} workspaceNavigation={<WorkspaceTopbar activeSection={activeSection} onNavigate={(section) => navigate(`/workspaces/${encodeURIComponent(workspace.workspace.id)}/${section}`)} workspace={workspace} />}>
+    <SharedLayout apiAvailable={apiAvailable} onNavigate={navigate} session={session} signOut={signOut} sidebar={<OrganizationRail organizationId={organization?.id} organizations={organizations} workspaceId={workspace.workspace.id} workspaces={workspaces} />} workspaceNavigation={<WorkspaceTopbar accessToken={accessToken} activeSection={activeSection} onNavigate={(section) => navigate(`/workspaces/${encodeURIComponent(workspace.workspace.id)}/${section}`)} workspace={workspace} />}>
       <section className="shared-detail-shell">
         <PageHeader description={subtitle} title={title} />
         <div className="shared-record-content">{children}</div>

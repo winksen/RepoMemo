@@ -11,5 +11,9 @@
     { "name": "Architecture" },
     { "name": "Decisions" },
     { "name": "Runbooks" }
-  ]
+  ],
+  "sections": {
+    "order": ["overview", "repositories", "retrieval", "evidence", "map", "health", "review", "memory", "tasks"],
+    "more": ["documents"]
+  }
 }

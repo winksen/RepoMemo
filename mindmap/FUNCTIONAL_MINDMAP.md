@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.2.170` (2026-10-22). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, and the retired local workspace are described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.2.171` (2026-10-22). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, and the retired local workspace are described briefly in [§12](#12-desktop-app).
 
 ---
 
@@ -283,7 +283,7 @@ A **template** says which parts of RepoMemo matter most in a workspace and how t
 | **Product and decisions** | Specs, decisions, research, meeting notes | Decisions, Specs, Research, Meeting notes |
 | **Knowledge base** | Policies, contracts, reports, business documents | Policies, Contracts, Reports, Archive |
 
-The template is chosen when the workspace is created (the form on the dashboard and the setup wizard list the templates once the server offers more than General) and read through `GET /v1/workspaces/{id}/template`; an owner or administrator can change it through the API. Today a template gives a new workspace its folders; the releases of track N make it order the tabs, rename sections, choose the Overview cards, weigh search results, pick the health checks and more, one block at a time ([technical/workspace-templates.md](technical/workspace-templates.md)).
+The template is chosen when the workspace is created (the form on the dashboard and the setup wizard list the templates once the server offers more than General) and read through `GET /v1/workspaces/{id}/template`; an owner or administrator can change it through the API. A template gives a new workspace its folders and **orders the tabs** (V0.2.171): the sections it cares about come first, in its order, and the lesser ones sit under a **More** menu at the end of the row; the section that is open is always a tab, every address still opens, and People and Settings stay for administrators. The releases of track N go on to make it rename sections, choose the Overview cards, weigh search results, pick the health checks and more, one block at a time ([technical/workspace-templates.md](technical/workspace-templates.md)).
 
 ### Workspace pulse (Overview)
 
@@ -567,7 +567,7 @@ The local workspace and a server keep **separate data**.
 
 ---
 
-## 13. Known functional gaps (at V0.2.170)
+## 13. Known functional gaps (at V0.2.171)
 
 These are observed in the code and are useful for prioritizing. The roadmap item that addresses each one is in brackets.
 

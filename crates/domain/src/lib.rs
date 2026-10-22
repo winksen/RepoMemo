@@ -267,6 +267,16 @@ pub struct WorkspaceTemplateView {
     pub chosen_id: Option<String>,
     /// The adjustments saved on top of the template (none can be saved yet).
     pub overrides: Value,
+    /// The tabs and what is kept under *More*.
+    pub sections: TemplateSections,
+}
+
+/// The tabs of a workspace and the sections kept under *More*, as its template arranges them. Every section is in
+/// one of the two lists; for `general` that is the usual twelve in the usual order and none under *More*.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TemplateSections {
+    pub primary: Vec<String>,
+    pub more: Vec<String>,
 }
 
 /// Chooses a workspace's template; `null` returns the workspace to the default.

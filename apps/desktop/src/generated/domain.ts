@@ -214,6 +214,17 @@ export interface WorkspaceTemplateView {
   chosen_id: string | null;
   /** The adjustments saved on top of the template (none can be saved yet). */
   overrides: unknown;
+  /** The tabs and what is kept under *More*. */
+  sections: TemplateSections;
+}
+
+/**
+ * The tabs of a workspace and the sections kept under *More*, as its template arranges them. Every section is in
+ * one of the two lists; for `general` that is the usual twelve in the usual order and none under *More*.
+ */
+export interface TemplateSections {
+  primary: string[];
+  more: string[];
 }
 
 /** Chooses a workspace's template; `null` returns the workspace to the default. */

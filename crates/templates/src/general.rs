@@ -17,5 +17,6 @@ pub fn general() -> TemplateDefinition {
             icon: "stack".to_owned(),
         },
         starter_folders: Vec::new(),
+        sections: None,
     }
 }

@@ -1,6 +1,6 @@
 # Workspace templates: the format, the rules, how to add one
 
-> **Branch of:** [TECHNICAL_MINDMAP.md](../TECHNICAL_MINDMAP.md) · **Roadmap:** [track N, V0.2.163–V0.2.193](../ROADMAP.md#track-n-workspace-templates-v02163v02193), decisions 24–28 · **Plan:** [the workspace templates plan](../plans/2026-10-22-workspace-templates.md) · **Decision record:** [0005](../../docs/decisions/0005-templates-are-data-over-a-closed-set-of-modules.md) · **Status:** designed at V0.2.163; the crate with the `format` and `meta` keys and `general` exists since V0.2.164, the built-in catalogue since V0.2.165, a workspace's choice and its resolver since V0.2.166, the routes since V0.2.167, and creating a workspace from a template since V0.2.168, the picker since V0.2.169, and the first four templates since V0.2.170; each other block below is built by the release in its table row, and a block that no release has built yet is not read by anything.
+> **Branch of:** [TECHNICAL_MINDMAP.md](../TECHNICAL_MINDMAP.md) · **Roadmap:** [track N, V0.2.163–V0.2.193](../ROADMAP.md#track-n-workspace-templates-v02163v02193), decisions 24–28 · **Plan:** [the workspace templates plan](../plans/2026-10-22-workspace-templates.md) · **Decision record:** [0005](../../docs/decisions/0005-templates-are-data-over-a-closed-set-of-modules.md) · **Status:** designed at V0.2.163; the crate with the `format` and `meta` keys and `general` exists since V0.2.164, the built-in catalogue since V0.2.165, a workspace's choice and its resolver since V0.2.166, the routes since V0.2.167, and creating a workspace from a template since V0.2.168, the picker since V0.2.169, the first four templates since V0.2.170, and the tab order since V0.2.171; each other block below is built by the release in its table row, and a block that no release has built yet is not read by anything.
 
 Every workspace used to be organized the same way: twelve sections in one fixed order, one ranking rule (verified evidence gets 10 % more), one set of health checks, one set of assistant suggestions. A **workspace template** is a small piece of data that tells the backend, the engine and the web client *which modules matter most in this workspace and how they are shown*. It chooses and orders; it never adds code and never touches rights.
 
@@ -102,15 +102,21 @@ The `starter_folders` block lists folders and, for each, the names of the folder
 - `web/workspace/data.ts`: `useTemplate(accessToken, workspaceId)` (cache key `workspaceKeys.template`) and `useTemplateCatalogue(accessToken)` (`serverKeys.templates`, kept five minutes: the catalogue changes only when the server restarts). A page and its sections that call the same hook share one request, like `useCapabilities`.
 - `components/TemplatePicker.tsx`: a group of radio cards (icon, name, summary), used by the create-workspace form on the dashboard and by the first workspace of the setup wizard. It renders nothing while the catalogue holds `general` alone, and the form then sends no template id, so a server without other templates behaves as it did. General is preselected.
 
-## 8. The first templates
+## 8. Sections: the tabs and the More menu
 
-`general` is defined in code. Four more are JSON files in `crates/templates/definitions/`: `software-engineering`, `operations`, `product-decisions` and `knowledge-base`, each with its `meta` (icon `code`, `heartbeat`, `compass` and `book`) and `starter_folders` as in the plan's table. The catalogue lists `general` first and the others by name, so the picker shows General, Knowledge base, Operations and incidents, Product and decisions, Software engineering. Every later block is filled in these four files by the release that reads it; nothing in code names one of them.
+The `sections` block has two lists, `order` and `more`, both optional, drawing on the twelve workspace sections (`overview`, `evidence`, `documents`, `repositories`, `retrieval`, `map`, `health`, `review`, `memory`, `tasks`, `people`, `settings`; a test compares the list with the web client's `WORKSPACE_SECTIONS`). A section may be named once in all. `ResolvedSections::from_block` completes the arrangement: the tabs are `order` followed by every section named in neither list, in the usual order, and the rest are `more`. With no block it is the usual twelve and nothing under More, which is what `general` has. `GET /v1/workspaces/{id}/template` answers it as `sections: { primary, more }`.
 
-## 9. Adding a template
+The web client (`arrangeSections`, `WorkspaceTopbar`, `WorkspaceMoreMenu`) shows `primary` as tabs and `more` as a **More** menu at the end of the row. It never trusts the arrangement for rights: People and Settings are dropped for anyone who is not an owner or administrator, a section this client has no page for is ignored, a section the template does not name still gets a tab, and the section that is open is always a tab. Routes are untouched, so a section under More still opens by its address.
+
+## 9. The first templates
+
+`general` is defined in code. Four more are JSON files in `crates/templates/definitions/`: `software-engineering`, `operations`, `product-decisions` and `knowledge-base`, each with its `meta` (icon `code`, `heartbeat`, `compass` and `book`) and `starter_folders` as in the plan's table. The catalogue lists `general` first and the others by name, so the picker shows General, Knowledge base, Operations and incidents, Product and decisions, Software engineering. Every later block is filled in these four files by the release that reads it; nothing in code names one of them. Since V0.2.171 each has its `sections`: Software engineering leads with Overview, Repositories and Retrieval and keeps Documents under More; Operations and incidents leads with Overview, Evidence and Review and keeps Map, Repositories and Documents under More; Product and decisions leads with Overview, Memory and Evidence and keeps Health, Map and Repositories under More; Knowledge base leads with Overview, Documents and Retrieval and keeps Map and Repositories under More.
+
+## 10. Adding a template
 
 Until V0.2.188 the only way is a release: add a JSON file named after the template's id (`operations.json` for `"id": "operations"`) to `crates/templates/definitions/`, and `build.rs` registers it (every `*.json` whose name does not start with `_`, in file-name order). No Rust is edited. `Catalogue::load` leaves out and names a file that does not validate, is not named after its id, repeats an id or tries to replace `general`; the test over the folder fails while any such file exists. The catalogue lists `general` first and the others by name. From V0.2.188 the guide `docs/TEMPLATES.md` and `npm run templates:check` cover the same steps, and from V0.2.189 an operator can drop a file in `REPOMEMO_TEMPLATES_DIR` with no release.
 
-## 10. Decisions 24–28
+## 11. Decisions 24–28
 
 | # | Decision | As agreed (V0.2.163) |
 |---|---|---|
@@ -120,6 +126,6 @@ Until V0.2.188 the only way is a release: add a JSON file named after the templa
 | 27 | Existing workspaces | They stay on `general`; a new workspace asks at creation with `general` preselected |
 | 28 | What ships first | `general` plus Software engineering, Operations and incidents, Product and decisions and Knowledge base, as data. Organization-defined templates are V0.4.0 direction |
 
-## 11. Not in the track
+## 12. Not in the track
 
 Organization-defined templates, new sections or modules defined by a template, per-user layouts, different chunking or indexing per template, installing a template from a URL, AI-written templates and moving existing evidence into starter folders are listed with their reasons in the plan's [section 7](../plans/2026-10-22-workspace-templates.md#7-not-in-this-track).

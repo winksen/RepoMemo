@@ -1,6 +1,7 @@
 use crate::catalogue::BUILTIN_SOURCES;
 use crate::{
     general, limits, Catalogue, Origin, TemplateDefinition, TemplateIssue, FORMAT, GENERAL_ID, WORKSPACE_ICONS,
+    WORKSPACE_SECTIONS,
 };
 
 const VALID: &str = r#"{
@@ -522,6 +523,182 @@ fn the_first_four_templates_ship_as_data_with_the_folders_a_new_workspace_starts
     }
     // General stays defined in code, with none.
     assert!(catalogue.get(GENERAL_ID).unwrap().starter_folders.is_empty());
+}
+
+/// The valid file with a `sections` block written as JSON.
+fn with_sections(block: &str) -> String {
+    VALID.replacen(
+        "\"format\": 1,",
+        &format!("\"format\": 1,\n  \"sections\": {block},"),
+        1,
+    )
+}
+
+fn names(sections: &[String]) -> Vec<&str> {
+    sections.iter().map(String::as_str).collect()
+}
+
+#[test]
+fn a_template_without_a_sections_block_arranges_the_twelve_as_they_always_were() {
+    let usual = general().sections();
+    assert_eq!(names(&usual.primary), WORKSPACE_SECTIONS);
+    assert!(usual.more.is_empty());
+    assert!(parse(VALID).unwrap().sections().more.is_empty());
+    assert_eq!(names(&parse(VALID).unwrap().sections().primary), WORKSPACE_SECTIONS);
+    // An empty block says the same.
+    let empty = parse(&with_sections("{}")).unwrap().sections();
+    assert_eq!(names(&empty.primary), WORKSPACE_SECTIONS);
+    assert!(empty.more.is_empty());
+}
+
+#[test]
+fn the_order_leads_and_a_section_named_nowhere_follows_in_the_usual_order() {
+    let sections = parse(&with_sections(
+        r#"{ "order": ["review", "overview"], "more": ["map", "documents"] }"#,
+    ))
+    .unwrap()
+    .sections();
+    assert_eq!(
+        names(&sections.primary),
+        [
+            "review",
+            "overview",
+            "evidence",
+            "repositories",
+            "retrieval",
+            "health",
+            "memory",
+            "tasks",
+            "people",
+            "settings"
+        ]
+    );
+    assert_eq!(names(&sections.more), ["map", "documents"]);
+    // Every section is in exactly one list.
+    let mut all: Vec<&str> = names(&sections.primary)
+        .into_iter()
+        .chain(names(&sections.more))
+        .collect();
+    all.sort();
+    let mut every = WORKSPACE_SECTIONS.to_vec();
+    every.sort();
+    assert_eq!(all, every);
+    // Only `more`: the rest keep their usual order.
+    let only_more = parse(&with_sections(r#"{ "more": ["overview"] }"#)).unwrap().sections();
+    assert_eq!(names(&only_more.primary)[0], "evidence");
+    assert_eq!(names(&only_more.more), ["overview"]);
+}
+
+#[test]
+fn a_section_must_exist_and_be_named_once() {
+    let unknown = parse(&with_sections(r#"{ "order": ["overview", "dashboard"] }"#)).unwrap_err();
+    assert_eq!(unknown[0].path, "sections.order[1]");
+    assert!(unknown[0].message.contains("dashboard"));
+    let in_more = parse(&with_sections(r#"{ "more": ["Map"] }"#)).unwrap_err();
+    assert_eq!(in_more[0].path, "sections.more[0]");
+    let twice = parse(&with_sections(r#"{ "order": ["map", "map"] }"#)).unwrap_err();
+    assert_eq!(twice[0].path, "sections.order[1]");
+    let both = parse(&with_sections(r#"{ "order": ["map"], "more": ["overview", "map"] }"#)).unwrap_err();
+    assert_eq!(both[0].path, "sections.more[1]");
+    let unknown_key = parse(&with_sections(r#"{ "order": ["map"], "colour": "map" }"#)).unwrap_err();
+    assert!(
+        unknown_key[0].message.contains("unknown field `colour`"),
+        "{}",
+        unknown_key[0]
+    );
+    // The block is written back as it was read.
+    let template = parse(&with_sections(r#"{ "order": ["review"], "more": ["map"] }"#)).unwrap();
+    assert_eq!(parse(&serde_json::to_string(&template).unwrap()).unwrap(), template);
+    assert!(!serde_json::to_string(&general()).unwrap().contains("sections"));
+}
+
+#[test]
+fn the_section_list_is_the_one_the_web_client_has_pages_for() {
+    let client = include_str!("../../../apps/desktop/src/web/constants.ts");
+    let line = client
+        .lines()
+        .find(|line| line.starts_with("export const WORKSPACE_SECTIONS"))
+        .expect("the client lists the sections");
+    let listed: Vec<&str> = line.split('"').skip(1).step_by(2).collect();
+    assert_eq!(
+        listed, WORKSPACE_SECTIONS,
+        "constants.ts and repomemo-templates list different sections"
+    );
+}
+
+#[test]
+fn the_four_first_templates_put_their_lesser_sections_under_more() {
+    let catalogue = Catalogue::builtin();
+    let expected: [(&str, &[&str], &[&str]); 4] = [
+        (
+            "software-engineering",
+            &[
+                "overview",
+                "repositories",
+                "retrieval",
+                "evidence",
+                "map",
+                "health",
+                "review",
+                "memory",
+                "tasks",
+                "people",
+                "settings",
+            ],
+            &["documents"],
+        ),
+        (
+            "operations",
+            &[
+                "overview",
+                "evidence",
+                "review",
+                "health",
+                "retrieval",
+                "tasks",
+                "memory",
+                "people",
+                "settings",
+            ],
+            &["map", "repositories", "documents"],
+        ),
+        (
+            "product-decisions",
+            &[
+                "overview",
+                "memory",
+                "evidence",
+                "retrieval",
+                "tasks",
+                "review",
+                "documents",
+                "people",
+                "settings",
+            ],
+            &["health", "map", "repositories"],
+        ),
+        (
+            "knowledge-base",
+            &[
+                "overview",
+                "documents",
+                "retrieval",
+                "evidence",
+                "review",
+                "health",
+                "memory",
+                "tasks",
+                "people",
+                "settings",
+            ],
+            &["map", "repositories"],
+        ),
+    ];
+    for (id, primary, more) in expected {
+        let sections = catalogue.get(id).unwrap().sections();
+        assert_eq!(names(&sections.primary), primary, "{id}");
+        assert_eq!(names(&sections.more), more, "{id}");
+    }
 }
 
 fn catalogue_with_operations(version: u32) -> Catalogue {

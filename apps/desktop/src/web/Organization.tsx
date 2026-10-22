@@ -1,5 +1,5 @@
-import { type FormEvent, type ReactNode, useEffect, useState } from "react";
-import { IconBook2 as Book, IconBuildingCommunity as Building, IconChartDots3 as MapIcon, IconChecklist as Checklist, IconEyeCheck as ReviewIcon, IconFileText as FileText, IconGitBranch as RepositoryIcon, IconLayoutDashboard as Dashboard, IconPlus as Plus, IconSearch as Search, IconSettings as Settings, IconStethoscope as HealthIcon, IconTrash as Trash, IconUsers as Users } from "@tabler/icons-react";
+import { type FormEvent, useEffect, useState } from "react";
+import { IconBook2 as Book, IconBuildingCommunity as Building, IconChartDots3 as MapIcon, IconChecklist as Checklist, IconEyeCheck as ReviewIcon, IconFileText as FileText, IconGitBranch as RepositoryIcon, IconLayoutDashboard as Dashboard, IconPlus as Plus, IconSearch as Search, IconSettings as Settings, IconStethoscope as HealthIcon, IconTrash as Trash, IconUsers as Users, type TablerIcon } from "@tabler/icons-react";
 import { SharedApiError, listSharedOrganizationMembers, removeSharedOrganizationMember, transferSharedOrganizationOwnership, updateSharedOrganization, upsertSharedOrganizationMember } from "../lib/sharedApi";
 import { type Organization, type OrganizationMember, type OrganizationRole, type SharedWorkspace } from "../types";
 import { UserAvatar } from "../components/UserAvatar";
@@ -14,6 +14,9 @@ import { IconButton } from "../components/ui/icon-button";
 import { Input } from "../components/ui/input";
 import { Toast, showToast } from "../components/ui/toast";
 import { InviteMembers } from "../components/InviteMembers";
+import { WorkspaceMoreMenu } from "../components/WorkspaceMoreMenu";
+import { arrangeSections } from "./templateSections";
+import { useTemplate } from "./workspace/data";
 import { ADMIN_WORKSPACE_SECTIONS, type WorkspaceSection } from "./constants";
 import { apiMessage } from "./format";
 import { navigate } from "./router";
@@ -137,37 +140,53 @@ export function OrganizationRail({
   </div>;
 }
 
+/** What each section shows in the row of tabs. */
+const TABS: Record<WorkspaceSection, { label: string; icon: TablerIcon }> = {
+  overview: { label: "Overview", icon: Dashboard },
+  evidence: { label: "Evidence", icon: FileText },
+  documents: { label: "Documents", icon: FileText },
+  repositories: { label: "Repositories", icon: RepositoryIcon },
+  retrieval: { label: "Retrieval", icon: Search },
+  map: { label: "Map", icon: MapIcon },
+  health: { label: "Health", icon: HealthIcon },
+  review: { label: "Review", icon: ReviewIcon },
+  memory: { label: "Memory", icon: Book },
+  tasks: { label: "Tasks", icon: Checklist },
+  people: { label: "People & Activity", icon: Users },
+  settings: { label: "Settings", icon: Settings },
+};
+
 export function WorkspaceTopbar({
+  accessToken,
   activeSection = "overview",
   onNavigate,
   workspace,
 }: {
+  /** Lets the tabs follow the workspace's template; without it they are in the usual order. */
+  accessToken?: string;
   activeSection?: WorkspaceSection;
   onNavigate?: (section: WorkspaceSection) => void;
   workspace: SharedWorkspace;
 }) {
   const isWorkspaceAdmin = workspace.role === "owner" || workspace.role === "admin";
-  const workspaceTab = (section: WorkspaceSection, label: string, icon: ReactNode) => {
+  const [template] = useTemplate(accessToken ?? "", workspace.workspace.id, Boolean(accessToken));
+  const { tabs, more } = arrangeSections(template?.sections, activeSection, isWorkspaceAdmin);
+  const sectionIcon = (section: WorkspaceSection) => {
+    const Icon = TABS[section].icon;
+    return <Icon size={ICON_SIZE.md} />;
+  };
+  const workspaceTab = (section: WorkspaceSection) => {
+    const { label } = TABS[section];
+    const icon = sectionIcon(section);
     const isAdminOnly = ADMIN_WORKSPACE_SECTIONS.has(section);
-    if (isAdminOnly && !isWorkspaceAdmin) return null;
     const isActive = activeSection === section;
-    return <Button aria-current={isActive ? "page" : undefined} className={isActive ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.(section)} type="button" variant="secondary">{icon}<span className="shared-workspace-tab-label">{label}{isAdminOnly ? <span className="shared-workspace-tab-restricted">Admin</span> : null}</span></Button>;
+    return <Button aria-current={isActive ? "page" : undefined} className={isActive ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.(section)} type="button" key={section} variant="secondary">{icon}<span className="shared-workspace-tab-label">{label}{isAdminOnly ? <span className="shared-workspace-tab-restricted">Admin</span> : null}</span></Button>;
   };
 
   return <nav aria-label="Workspace sections" className="shared-workspace-topbar">
     <div className="shared-workspace-tabs">
-      {workspaceTab("overview", "Overview", <Dashboard size={ICON_SIZE.md} />)}
-      {workspaceTab("evidence", "Evidence", <FileText size={ICON_SIZE.md} />)}
-      {workspaceTab("documents", "Documents", <FileText size={ICON_SIZE.md} />)}
-      {workspaceTab("repositories", "Repositories", <RepositoryIcon size={ICON_SIZE.md} />)}
-      {workspaceTab("retrieval", "Retrieval", <Search size={ICON_SIZE.md} />)}
-      {workspaceTab("map", "Map", <MapIcon size={ICON_SIZE.md} />)}
-      {workspaceTab("health", "Health", <HealthIcon size={ICON_SIZE.md} />)}
-      {workspaceTab("review", "Review", <ReviewIcon size={ICON_SIZE.md} />)}
-      {workspaceTab("memory", "Memory", <Book size={ICON_SIZE.md} />)}
-      {workspaceTab("tasks", "Tasks", <Checklist size={ICON_SIZE.md} />)}
-      {workspaceTab("people", "People & Activity", <Users size={ICON_SIZE.md} />)}
-      {workspaceTab("settings", "Settings", <Settings size={ICON_SIZE.md} />)}
+      {tabs.map(workspaceTab)}
+      {onNavigate ? <WorkspaceMoreMenu items={more.map((section) => ({ icon: sectionIcon(section), label: TABS[section].label, onSelect: () => onNavigate(section), section }))} /> : null}
     </div>
   </nav>;
 }

@@ -12,5 +12,9 @@
     { "name": "Contracts" },
     { "name": "Reports" },
     { "name": "Archive" }
-  ]
+  ],
+  "sections": {
+    "order": ["overview", "documents", "retrieval", "evidence", "review", "health", "memory", "tasks"],
+    "more": ["map", "repositories"]
+  }
 }

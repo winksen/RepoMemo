@@ -54,7 +54,10 @@ describe("TemplatePicker", () => {
 describe("the template hooks", () => {
   it("load the catalogue once for everyone who asks, and a workspace's template under its own key", async () => {
     vi.mocked(listSharedTemplates).mockResolvedValue([general, operations]);
-    const view: WorkspaceTemplateView = { template: general, source: "default", reason: null, chosen_id: null, overrides: null };
+    const view: WorkspaceTemplateView = {
+      template: general, source: "default", reason: null, chosen_id: null, overrides: null,
+      sections: { primary: ["overview", "evidence"], more: [] },
+    };
     vi.mocked(getSharedWorkspaceTemplate).mockResolvedValue(view);
 
     const catalogue = renderHook(() => useTemplateCatalogue("token"), { wrapper });

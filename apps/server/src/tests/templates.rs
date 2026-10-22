@@ -113,6 +113,20 @@ async fn the_four_first_templates_are_offered_and_each_creates_its_folders() {
             (view["source"].as_str(), view["template"]["id"].as_str()),
             (Some("workspace"), Some(id))
         );
+        // Every section is in the tabs or under More, once; the administrators' sections follow the others.
+        let list = |key: &str| -> Vec<String> {
+            view["sections"][key]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|s| s.as_str().unwrap().to_owned())
+                .collect()
+        };
+        let (primary, more) = (list("primary"), list("more"));
+        assert_eq!(primary.len() + more.len(), 12, "{id}");
+        assert_eq!(&primary[primary.len() - 2..], ["people", "settings"], "{id}");
+        assert_eq!(primary[0], "overview", "{id}");
+        assert!(!more.is_empty(), "{id}");
         for page in ["overview", "metrics", "capabilities"] {
             let opened = send(
                 "GET",
@@ -300,6 +314,25 @@ async fn templates_are_listed_read_by_members_and_changed_only_by_administrators
     assert_eq!(by_default["template"]["id"], "general");
     assert_eq!(by_default["source"], "default");
     assert!(by_default["reason"].is_null() && by_default["chosen_id"].is_null());
+    // General arranges the twelve sections as they always were, with nothing under More.
+    assert_eq!(
+        by_default["sections"]["primary"],
+        json!([
+            "overview",
+            "evidence",
+            "documents",
+            "repositories",
+            "retrieval",
+            "map",
+            "health",
+            "review",
+            "memory",
+            "tasks",
+            "people",
+            "settings"
+        ])
+    );
+    assert_eq!(by_default["sections"]["more"], json!([]));
     assert_eq!(
         send("GET", template_uri.clone(), outsider.clone(), json!(null))
             .await

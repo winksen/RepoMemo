@@ -12,5 +12,9 @@
     { "name": "Specs" },
     { "name": "Research" },
     { "name": "Meeting notes" }
-  ]
+  ],
+  "sections": {
+    "order": ["overview", "memory", "evidence", "retrieval", "tasks", "review", "documents"],
+    "more": ["health", "map", "repositories"]
+  }
 }

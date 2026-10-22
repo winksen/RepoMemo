@@ -18,6 +18,7 @@ mod issue;
 pub mod limits;
 mod meta;
 mod resolve;
+mod sections;
 
 #[cfg(test)]
 mod tests;
@@ -28,6 +29,7 @@ pub use general::{general, GENERAL_ID};
 pub use issue::TemplateIssue;
 pub use meta::{TemplateMeta, WORKSPACE_ICONS};
 pub use resolve::{Origin, Resolution};
+pub use sections::{ResolvedSections, SectionsBlock, WORKSPACE_SECTIONS};
 
 use serde::{Deserialize, Serialize};
 
@@ -45,6 +47,9 @@ pub struct TemplateDefinition {
     /// Folders made when a workspace is created from the template (V0.2.168); none when left out.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub starter_folders: Vec<StarterFolder>,
+    /// The order of the tabs and the sections kept under *More* (V0.2.171); as today when left out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sections: Option<SectionsBlock>,
 }
 
 impl TemplateDefinition {
@@ -97,11 +102,19 @@ impl TemplateDefinition {
         }
         self.meta.validate(&mut issues);
         folders::validate(&self.starter_folders, &mut issues);
+        if let Some(sections) = &self.sections {
+            sections::validate(sections, &mut issues);
+        }
         issues
     }
 
     pub fn id(&self) -> &str {
         &self.meta.id
+    }
+
+    /// The tabs and the *More* menu this template asks for, complete.
+    pub fn sections(&self) -> ResolvedSections {
+        ResolvedSections::from_block(self.sections.as_ref())
     }
 }
 

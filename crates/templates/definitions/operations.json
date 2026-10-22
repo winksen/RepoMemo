@@ -12,5 +12,9 @@
     { "name": "Incidents" },
     { "name": "Postmortems" },
     { "name": "On-call" }
-  ]
+  ],
+  "sections": {
+    "order": ["overview", "evidence", "review", "health", "retrieval", "tasks", "memory"],
+    "more": ["map", "repositories", "documents"]
+  }
 }

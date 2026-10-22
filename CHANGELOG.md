@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.171 (2026-10-22)
+
+The workspace tabs follow the template's order, and the lesser sections sit under a More menu.
+
+### Changed
+- **The `sections` block:** a template may list the sections it wants as tabs (`order`) and the ones to keep under *More* (`more`), drawing on the twelve sections a workspace has. A section is named once in all; an unknown or repeated name makes the template invalid. A section named in neither list follows the tabs in the usual order, so nothing disappears. `GET /v1/workspaces/{id}/template` now answers the arrangement as `sections: { primary, more }`; for General that is the usual twelve in the usual order and nothing under More.
+- **The tabs:** the row of tabs shows the template's order and ends with a **More** menu holding the lesser sections. The section that is open is always a tab, even when its template keeps it under More, so a person never loses their place. Every section still opens by its address (`/workspaces/:id/map` in a Knowledge base workspace works), and People and Settings stay for owners and administrators whatever a template says; a section this client has no page for is ignored. While the template is still loading the tabs show the usual order.
+- **The four templates arrange themselves:** *Software engineering* leads with Overview, Repositories, Retrieval and Evidence and keeps Documents under More; *Operations and incidents* leads with Overview, Evidence, Review and Health and keeps Map, Repositories and Documents under More; *Product and decisions* leads with Overview, Memory, Evidence and Retrieval and keeps Health, Map and Repositories under More; *Knowledge base* leads with Overview, Documents, Retrieval and Evidence and keeps Map and Repositories under More.
+- **Workspaces made before templates are unchanged:** they are on General.
+- **Tests (written, not run):** five in the templates crate (a template without the block arranges the twelve as always, the order leads and the rest follows, an unknown or repeated section is refused, the list equals the web client's, the four templates' tabs), eight in the web client (the arrangement without a template, in the template's order, for someone who does not administer, with the open section under More, with unknown and repeated sections; the tabs in the usual order, following the template with a More menu, and showing the open section), and the server's template test now checks the arrangement of General and of each of the four.
+- **Checks run on this release:** `cargo check` of the templates and server crates with their tests compiles; `rustfmt` shows nothing for the lines changed; `types:check`, `typecheck`, `styles:check`, `a11y:check`, `docs:check` and `version:check` pass. **Not run:** the tests, as asked.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.170 (2026-10-22)
 
 Four templates ship with RepoMemo, as data.
