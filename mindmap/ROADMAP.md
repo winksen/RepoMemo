@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.148` (2026-10-21), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next:** tracks L and M, security and backend hardening (V0.2.130–V0.2.162, planned 2026-10-21) · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.149` (2026-10-21), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next:** tracks L and M, security and backend hardening (V0.2.130–V0.2.162, planned 2026-10-21) · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Security review 2026-10-16 (V0.2.52)](security/2026-10-16-security-review.md) · [Security and backend review 2026-10-21 (V0.2.129)](security/2026-10-21-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -64,7 +64,7 @@ timeline
 | Track K: frontend polish (V0.2.57–V0.2.129) | ✅ V0.2.57–V0.2.129 built (K1 to K6 done); decisions 15–19 taken as proposed; [plan](plans/2026-10-17-frontend-polish.md) |
 | Security and backend review 2026-10-21 (fifth pass) | 🔄 In progress: 2 high, 9 medium, 15 low, 4 info, plus 11 performance findings; the review's table names the release of each fix; [review](security/2026-10-21-security-review.md) |
 | Track L: security and dependencies (V0.2.130–V0.2.148) | ✅ V0.2.130–V0.2.148 built; decisions 20–23 taken as proposed |
-| Track M: backend hardening and performance (V0.2.149–V0.2.162) | 🔜 Planned 2026-10-21 |
+| Track M: backend hardening and performance (V0.2.149–V0.2.162) | 🔄 V0.2.149 built; decisions 20–23 taken as proposed |
 | V0.4.0 and later: scale-out, single sign-on, hosted | 💭 Direction |
 
 ---
@@ -472,7 +472,7 @@ Planned on 2026-10-21 from §4 of the [fifth review](security/2026-10-21-securit
 
 | Release | Type | Section | The one change | IDs | Done when |
 |---|---|---|---|---|---|
-| **V0.2.149** | 🐞 | Artifact routes | Every artifact route reads the summary and checks rights before any other work; no document is read to find its workspace | E7a, P12 | A non-member asking for a large PDF gets `403` with no reader started; a test per route counts the readings |
+| **V0.2.149** ✅ | 🐞 | Artifact routes | Every artifact route reads the summary and checks rights before any other work; no document is read to find its workspace | E7a, P12 | A non-member asking for a large PDF gets `403` with no reader started; a test per route counts the readings |
 | **V0.2.150** | 🔧 | Artifact page | The artifact page shows the text indexing already stored, read off the runtime | E7b, P13 | Opening an indexed document's page starts no reader; one not indexed yet is read once, on the blocking pool |
 | **V0.2.151** | 🔧 | Jobs | A single-file re-index goes through the indexing queue, one per file; a job is cancelled by the person who started it or an administrator | E8, S5-9 | Ten requests for one file make one job; a member cannot cancel an administrator's re-index |
 | **V0.2.152** | 🐞 | API | Body limits per route: 1 MiB for JSON, the upload limit only on uploads, new versions and import | S5-5 | A 2 MiB comment is `413` whatever the upload limit; an upload up to the limit still works |
@@ -1063,7 +1063,7 @@ One box per release, with what to change and where. The finding behind each, wit
 
 #### Track M: Backend hardening and performance (planned)
 
-- [ ] **V0.2.149** In `apps/server/src/artifacts.rs`, every handler that calls `state.core.get_artifact` for its workspace uses `readable_artifact_workspace` (or a writing twin) on the summary first, and loads the detail only where it returns it. Add a counter of readings to the ingestion test hooks and assert that a refused request starts none
+- [x] **V0.2.149** In `apps/server/src/artifacts.rs`, every handler that calls `state.core.get_artifact` for its workspace uses `readable_artifact_workspace` (or a writing twin) on the summary first, and loads the detail only where it returns it. Add a counter of readings to the ingestion test hooks and assert that a refused request starts none. Done: `artifacts.rs` gets `readable_artifact_summary` and `writable_artifact_summary` (the summary, then the rights); `move`, `update`, `delete`, the lifecycle reads and writes, the lifecycle history, `index` and `versions` (upload, list, text, compare) use them, `GET /v1/artifacts/{id}` reads the summary and the rights before the detail, and the comment and task routes of `collaboration.rs` read the summary instead of the whole artifact. The ingestion crate counts readings (`started_readings`, `recent_readings_of`, re-exported by `repomemo-api`). `a_refused_artifact_request_starts_no_document_reader` calls fifteen routes as a non-member. Compiles; the test was not run
 - [ ] **V0.2.150** `RepoMemoCore::get_artifact` builds the preview text from the stored passages (in order) when the file is indexed and unchanged, and otherwise calls `extract_document_text` inside `spawn_blocking`; the 120,000-character cap stays. Test: the page of an indexed PDF starts no reader
 - [ ] **V0.2.151** `index_artifact` calls `state.index_queue.enqueue` (deduplicated per artifact) and answers `202` with the queued job; `cancel_job` allows the job's starter (`indexing_jobs.started_by`, migration 0040, null for older jobs) or an administrator
 - [ ] **V0.2.152** The router's `DefaultBodyLimit` becomes 1 MiB; `upload_artifact`, `upload_artifact_version` and `import_workspace` get `DefaultBodyLimit::max(config.max_upload_bytes)` as a route layer (avatars keep theirs). Test: a 2 MiB JSON body is `413` with the upload limit at 100 MiB

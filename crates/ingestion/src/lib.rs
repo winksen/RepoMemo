@@ -20,7 +20,8 @@ pub use reader::{
     DEFAULT_MEMORY_LIMIT_MB, MEMORY_EXIT_CODE, READER_ARGUMENT,
 };
 pub use documents::{
-    document_extensions, document_kind, document_preview, extract_document_text, is_document, DocumentKind,
+    document_extensions, document_kind, document_preview, extract_document_text, is_document, recent_readings_of,
+    started_readings, DocumentKind,
 };
 
 const DEFAULT_MAX_FILE_BYTES: u64 = 5 * 1024 * 1024;

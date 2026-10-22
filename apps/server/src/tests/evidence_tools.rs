@@ -604,3 +604,95 @@ async fn the_console_starts_workspace_work_as_dry_runs_then_audited_jobs() {
     );
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+/// V0.2.149: rights come from the artifact's summary, so a refused request
+/// never starts a document reader (review E7a, P12).
+#[tokio::test]
+async fn a_refused_artifact_request_starts_no_document_reader() {
+    let data_dir = temp_data_dir("refused-readings");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let (_, _) = register_account(&app, "readings-admin@example.com").await;
+    let (owner, _) = register_account(&app, "readings-owner@example.com").await;
+    let (outsider, _) = register_account(&app, "readings-outsider@example.com").await;
+    let workspace_id = create_workspace(&app, &owner).await;
+
+    // A name no other test uses, so only this test's readings are counted.
+    let name = format!("readings-{}.eml", uuid::Uuid::new_v4());
+    let eml = "From: Ada <ada@example.com>\r\nTo: bob@example.com\r\nSubject: Plan\r\nContent-Type: text/plain\r\n\r\nPlease review.\r\n";
+    let upload = |who: &str, uri: String| {
+        Request::builder()
+            .method("POST")
+            .uri(uri)
+            .header("authorization", who)
+            .header("x-repomemo-filename", name.clone())
+            .header("content-type", "message/rfc822")
+            .body(Body::from(eml))
+            .unwrap()
+    };
+    let uploaded = app
+        .clone()
+        .oneshot(upload(
+            &owner,
+            format!("/v1/workspaces/{workspace_id}/artifacts/upload"),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(uploaded.status(), 201);
+    let artifact_id = response_json(uploaded).await["id"].as_str().unwrap().to_owned();
+    // The background indexing reads the file once; let it finish before counting.
+    wait_for_indexed_artifacts(&app, &owner, &workspace_id, 1).await;
+    let before = repomemo_api::recent_readings_of(&name);
+
+    let artifact = format!("/v1/artifacts/{artifact_id}");
+    let lifecycle =
+        json!({"status": "verified", "owner_user_id": null, "review_note": "", "superseded_by_artifact_id": null});
+    let routes: Vec<(&str, String, Value)> = vec![
+        ("GET", artifact.clone(), json!(null)),
+        ("PUT", artifact.clone(), json!({"title": "Taken"})),
+        ("DELETE", artifact.clone(), json!(null)),
+        ("PUT", format!("{artifact}/folder"), json!({"folder_id": null})),
+        ("GET", format!("{artifact}/lifecycle"), json!(null)),
+        ("PUT", format!("{artifact}/lifecycle"), lifecycle),
+        ("GET", format!("{artifact}/lifecycle/history"), json!(null)),
+        ("POST", format!("{artifact}/index"), json!({})),
+        ("GET", format!("{artifact}/versions"), json!(null)),
+        ("GET", format!("{artifact}/versions/1"), json!(null)),
+        ("GET", format!("{artifact}/comments"), json!(null)),
+        ("POST", format!("{artifact}/comments"), json!({"body": "hello"})),
+        ("GET", format!("{artifact}/file"), json!(null)),
+        ("GET", format!("{artifact}/document-preview"), json!(null)),
+        ("POST", format!("{artifact}/open-link"), json!({})),
+    ];
+    for (method, uri, body) in routes {
+        let answer = app
+            .clone()
+            .oneshot(json_request(method, &uri, &outsider, body))
+            .await
+            .unwrap();
+        assert_eq!(answer.status(), 403, "{method} {uri} for a non-member");
+    }
+    let new_version = app
+        .clone()
+        .oneshot(upload(&outsider, format!("{artifact}/versions")))
+        .await
+        .unwrap();
+    assert_eq!(new_version.status(), 403, "a new version from a non-member");
+    assert_eq!(
+        repomemo_api::recent_readings_of(&name),
+        before,
+        "a refused request started a reader"
+    );
+
+    // A member's request still reads the document, once.
+    let shown = app
+        .clone()
+        .oneshot(auth_request("GET", &artifact, &owner))
+        .await
+        .unwrap();
+    assert_eq!(shown.status(), 200);
+    assert!(response_json(shown).await["content_preview"]
+        .as_str()
+        .is_some_and(|text| text.contains("Please review")));
+    assert_eq!(repomemo_api::recent_readings_of(&name), before + 1);
+    let _ = std::fs::remove_dir_all(data_dir);
+}

@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.149 (2026-10-21)
+
+Rights before reading: a request for a file the caller may not see no longer starts a document reader.
+
+### Security
+- **Every artifact route checks rights on the summary first (E7a, P12):** ten handlers (`GET`, `PUT` and `DELETE /v1/artifacts/{id}`, the move, the lifecycle read, write and history, the re-index and the new-version upload) loaded the whole artifact to learn its workspace. For a Word, Excel, PowerPoint, PDF, OneNote or email file that meant reading and extracting the document, in a reader process, on a runtime worker thread, and only then asking whether the caller was a member. They now read the artifact's one summary row, check the caller's role, and only then do the rest. `GET /v1/artifacts/{id}` still reads the document for a caller who may see it. A non-member asking for a large PDF gets `403` before any reader starts.
+- **The comment and task routes read the summary too:** listing and adding comments, and attaching evidence to a task, no longer load the artifact's passages to find its workspace.
+
+### Changed
+- **A counter of readings:** the ingestion crate counts the readings it starts (`started_readings`) and keeps the file names of the last 512 (`recent_readings_of`), re-exported by `repomemo-api`, so a test can show that a request started none. Nothing outside tests reads them.
+- **Tests (written, not run):** `a_refused_artifact_request_starts_no_document_reader` uploads an email file, waits for its indexing, then calls fifteen routes as an account outside the workspace; each answers `403` and no reading of the file is started; the owner's own `GET` then reads it once.
+- **Checks run on this release:** `cargo check` of the server with its tests compiles; `rustfmt` shows nothing for the files changed and `clippy` nothing new; `docs:check` and `version:check` pass. **Not run:** the tests, as asked.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.148 (2026-10-21)
 
 The container layout stops giving a document that escapes LibreOffice the database, the key file and the network. This closes track L.

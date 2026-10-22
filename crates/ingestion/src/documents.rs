@@ -6,9 +6,11 @@
 //! bounded ZIP reader in the parent module, so a hostile file cannot expand
 //! without limit.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::io::{Cursor, Read};
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Mutex;
 
 use anyhow::{bail, Context, Result};
 use quick_xml::events::{BytesStart, Event};
@@ -28,6 +30,34 @@ const MAX_INDEX_CHARS: usize = 3 * 1024 * 1024;
 const MAX_STREAM_BYTES: u64 = 8 * 1024 * 1024;
 
 const PREVIEW_ROWS: usize = 100;
+
+/// File names of the last readings that were started, for tests that must show
+/// a request started none.
+const RECENT_READINGS: usize = 512;
+static STARTED_READINGS: AtomicU64 = AtomicU64::new(0);
+static RECENT_NAMES: Mutex<VecDeque<String>> = Mutex::new(VecDeque::new());
+
+/// Readings (text or preview) started since the program began.
+pub fn started_readings() -> u64 {
+    STARTED_READINGS.load(Ordering::Relaxed)
+}
+
+/// How many of the last readings were of a file with this name.
+pub fn recent_readings_of(name: &str) -> usize {
+    RECENT_NAMES
+        .lock()
+        .map_or(0, |names| names.iter().filter(|recent| recent.as_str() == name).count())
+}
+
+fn note_reading(name: &str) {
+    STARTED_READINGS.fetch_add(1, Ordering::Relaxed);
+    if let Ok(mut names) = RECENT_NAMES.lock() {
+        if names.len() >= RECENT_READINGS {
+            names.pop_front();
+        }
+        names.push_back(name.to_owned());
+    }
+}
 const PREVIEW_COLUMNS: usize = 30;
 const PREVIEW_CELL_CHARS: usize = 200;
 const PREVIEW_SHEETS: usize = 10;
@@ -88,6 +118,7 @@ pub fn extract_document_text(path: &Path, bytes: &[u8]) -> Result<Option<String>
         return Ok(None);
     }
     let name = file_name(path);
+    note_reading(&name);
     if let Some(answer) = read_in_process(RequestKind::Text, "document reader", &name, bytes) {
         let answer = answer?;
         return serde_json::from_slice::<Option<String>>(&answer)
@@ -139,6 +170,7 @@ pub fn document_preview(path: &Path, bytes: &[u8]) -> DocumentPreview {
         return unavailable("This file type has no preview.");
     }
     let name = file_name(path);
+    note_reading(&name);
     if let Some(answer) = read_in_process(RequestKind::Preview, "preview reader", &name, bytes) {
         return answer
             .and_then(|answer| {

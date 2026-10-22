@@ -340,10 +340,10 @@ pub(crate) async fn normalize_collaboration_task(
     if let Some(artifact_id) = request.artifact_id.as_deref() {
         let artifact = state
             .storage
-            .get_artifact(artifact_id)
+            .get_artifact_summary(artifact_id)
             .await
             .map_err(map_storage_error)?;
-        if artifact.summary.workspace_id != workspace_id {
+        if artifact.workspace_id != workspace_id {
             return Err(ApiError::bad_request("Task evidence must belong to this workspace."));
         }
     }
@@ -369,10 +369,10 @@ pub(crate) async fn list_artifact_comments(
 ) -> Result<Json<Vec<ArtifactComment>>, ApiError> {
     let artifact = state
         .storage
-        .get_artifact(&artifact_id)
+        .get_artifact_summary(&artifact_id)
         .await
         .map_err(map_storage_error)?;
-    require_workspace_read(&state, &subject, &artifact.summary.workspace_id).await?;
+    require_workspace_read(&state, &subject, &artifact.workspace_id).await?;
     state
         .storage
         .list_artifact_comments(&artifact_id)
@@ -389,22 +389,22 @@ pub(crate) async fn create_artifact_comment(
 ) -> Result<(StatusCode, Json<ArtifactComment>), ApiError> {
     let artifact = state
         .storage
-        .get_artifact(&artifact_id)
+        .get_artifact_summary(&artifact_id)
         .await
         .map_err(map_storage_error)?;
-    require_workspace_write(&state, &subject, &artifact.summary.workspace_id).await?;
+    require_workspace_write(&state, &subject, &artifact.workspace_id).await?;
     let body = validate_comment_body(&request.body)?;
     let comment = state
         .storage
-        .create_artifact_comment(&artifact.summary.workspace_id, &artifact_id, &subject.user_id, &body)
+        .create_artifact_comment(&artifact.workspace_id, &artifact_id, &subject.user_id, &body)
         .await
         .map_err(map_storage_error)?;
     notify_artifact_mentions(
         &state,
         &subject.user_id,
-        &artifact.summary.workspace_id,
+        &artifact.workspace_id,
         &artifact_id,
-        &artifact.summary.title,
+        &artifact.title,
         &body,
     )
     .await;
@@ -415,7 +415,7 @@ pub(crate) async fn create_artifact_comment(
         "comment_added",
         "artifact",
         Some(&artifact_id),
-        format!("Commented on evidence: {}.", artifact.summary.title),
+        format!("Commented on evidence: {}.", artifact.title),
     )
     .await;
     Ok((StatusCode::CREATED, Json(comment)))

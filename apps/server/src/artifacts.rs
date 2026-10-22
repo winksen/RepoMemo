@@ -381,13 +381,8 @@ pub(crate) async fn move_artifact(
     Path(artifact_id): Path<String>,
     Json(request): Json<MoveArtifactRequest>,
 ) -> Result<Json<SharedArtifactSummary>, ApiError> {
-    let current = state
-        .core
-        .get_artifact(artifact_id.clone())
-        .await
-        .map_err(map_core_error)?;
-    let workspace_id = current.summary.workspace_id.clone();
-    require_workspace_write(&state, &subject, &workspace_id).await?;
+    let current = writable_artifact_summary(&state, &subject, &artifact_id).await?;
+    let workspace_id = current.workspace_id.clone();
     let folder_id = validate_folder(&state, &workspace_id, request.folder_id.as_deref()).await?;
     state
         .storage
@@ -401,11 +396,11 @@ pub(crate) async fn move_artifact(
         "evidence_moved",
         "artifact",
         Some(&artifact_id),
-        format!("Moved evidence: {}.", current.summary.title),
+        format!("Moved evidence: {}.", current.title),
     )
     .await;
     Ok(Json(SharedArtifactSummary {
-        summary: current.summary,
+        summary: current,
         folder_id,
         repository_id: None,
     }))
@@ -609,8 +604,14 @@ pub(crate) async fn get_artifact(
     State(state): State<AppState>,
     Path(artifact_id): Path<String>,
 ) -> Result<Json<ArtifactDetail>, ApiError> {
+    // The summary and the rights first; the detail (and a document's reading) only for a caller who may see it.
+    let summary = state
+        .storage
+        .get_artifact_summary(&artifact_id)
+        .await
+        .map_err(map_storage_error)?;
+    let role = require_workspace_read(&state, &subject, &summary.workspace_id).await?;
     let mut artifact = state.core.get_artifact(artifact_id).await.map_err(map_core_error)?;
-    let role = require_workspace_read(&state, &subject, &artifact.summary.workspace_id).await?;
     // Stored chunks are an administrative view of the index. Everyone else
     // works with the artifact content and search results.
     if !capabilities_for_role(role, false).can_inspect_index {
@@ -685,12 +686,7 @@ pub(crate) async fn update_artifact(
     Path(artifact_id): Path<String>,
     Json(request): Json<UpdateArtifactRequest>,
 ) -> Result<Json<ArtifactSummary>, ApiError> {
-    let current = state
-        .core
-        .get_artifact(artifact_id.clone())
-        .await
-        .map_err(map_core_error)?;
-    require_workspace_write(&state, &subject, &current.summary.workspace_id).await?;
+    writable_artifact_summary(&state, &subject, &artifact_id).await?;
     repositories::ensure_not_repository_file(&state, &artifact_id).await?;
     let artifact = state
         .core
@@ -715,15 +711,10 @@ pub(crate) async fn delete_artifact(
     State(state): State<AppState>,
     Path(artifact_id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
-    let current = state
-        .core
-        .get_artifact(artifact_id.clone())
-        .await
-        .map_err(map_core_error)?;
-    require_workspace_write(&state, &subject, &current.summary.workspace_id).await?;
+    let current = writable_artifact_summary(&state, &subject, &artifact_id).await?;
     repositories::ensure_not_repository_file(&state, &artifact_id).await?;
-    let title = current.summary.title;
-    let workspace_id = current.summary.workspace_id;
+    let title = current.title;
+    let workspace_id = current.workspace_id;
     state
         .core
         .delete_artifact(artifact_id.clone())
@@ -747,12 +738,7 @@ pub(crate) async fn get_artifact_lifecycle(
     State(state): State<AppState>,
     Path(artifact_id): Path<String>,
 ) -> Result<Json<ArtifactLifecycle>, ApiError> {
-    let artifact = state
-        .core
-        .get_artifact(artifact_id.clone())
-        .await
-        .map_err(map_core_error)?;
-    require_workspace_read(&state, &subject, &artifact.summary.workspace_id).await?;
+    readable_artifact_summary(&state, &subject, &artifact_id).await?;
     state
         .storage
         .get_artifact_lifecycle(&artifact_id)
@@ -767,12 +753,7 @@ pub(crate) async fn update_artifact_lifecycle(
     Path(artifact_id): Path<String>,
     Json(request): Json<SaveArtifactLifecycleRequest>,
 ) -> Result<Json<ArtifactLifecycle>, ApiError> {
-    let artifact = state
-        .core
-        .get_artifact(artifact_id.clone())
-        .await
-        .map_err(map_core_error)?;
-    require_workspace_write(&state, &subject, &artifact.summary.workspace_id).await?;
+    let artifact = writable_artifact_summary(&state, &subject, &artifact_id).await?;
     let status = request.status.trim().to_ascii_lowercase();
     if !matches!(
         status.as_str(),
@@ -788,7 +769,7 @@ pub(crate) async fn update_artifact_lifecycle(
     if let Some(owner_user_id) = owner_user_id.as_deref() {
         if state
             .storage
-            .workspace_role_for_user(owner_user_id, &artifact.summary.workspace_id)
+            .workspace_role_for_user(owner_user_id, &artifact.workspace_id)
             .await
             .map_err(map_storage_error)?
             .is_none()
@@ -809,11 +790,11 @@ pub(crate) async fn update_artifact_lifecycle(
             return Err(ApiError::bad_request("Evidence cannot supersede itself."));
         }
         let replacement = state
-            .core
-            .get_artifact(replacement_id.to_owned())
+            .storage
+            .get_artifact_summary(replacement_id)
             .await
-            .map_err(map_core_error)?;
-        if replacement.summary.workspace_id != artifact.summary.workspace_id {
+            .map_err(map_storage_error)?;
+        if replacement.workspace_id != artifact.workspace_id {
             return Err(ApiError::bad_request(
                 "Replacement evidence must belong to this workspace.",
             ));
@@ -835,15 +816,12 @@ pub(crate) async fn update_artifact_lifecycle(
         .map_err(map_storage_error)?;
     record_workspace_activity(
         &state,
-        &artifact.summary.workspace_id,
+        &artifact.workspace_id,
         &subject.user_id,
         "evidence_lifecycle_updated",
         "artifact",
         Some(&artifact_id),
-        format!(
-            "Updated evidence lifecycle for {} to {}.",
-            artifact.summary.title, status
-        ),
+        format!("Updated evidence lifecycle for {} to {}.", artifact.title, status),
     )
     .await;
     Ok(Json(lifecycle))
@@ -854,12 +832,7 @@ pub(crate) async fn list_artifact_lifecycle_events(
     State(state): State<AppState>,
     Path(artifact_id): Path<String>,
 ) -> Result<Json<Vec<ArtifactLifecycleEvent>>, ApiError> {
-    let artifact = state
-        .core
-        .get_artifact(artifact_id.clone())
-        .await
-        .map_err(map_core_error)?;
-    require_workspace_read(&state, &subject, &artifact.summary.workspace_id).await?;
+    readable_artifact_summary(&state, &subject, &artifact_id).await?;
     state
         .storage
         .list_artifact_lifecycle_events(&artifact_id)
@@ -876,12 +849,7 @@ pub(crate) async fn index_artifact(
     State(state): State<AppState>,
     Path(artifact_id): Path<String>,
 ) -> Result<(StatusCode, Json<IndexingJobStatus>), ApiError> {
-    let artifact = state
-        .core
-        .get_artifact(artifact_id.clone())
-        .await
-        .map_err(map_core_error)?;
-    require_workspace_write(&state, &subject, &artifact.summary.workspace_id).await?;
+    let artifact = writable_artifact_summary(&state, &subject, &artifact_id).await?;
     let pending = state
         .core
         .begin_index_artifact(artifact_id)
@@ -891,7 +859,7 @@ pub(crate) async fn index_artifact(
     let worker = state.clone();
     let actor = subject.user_id.clone();
     tokio::spawn(async move {
-        let workspace_id = artifact.summary.workspace_id.clone();
+        let workspace_id = artifact.workspace_id.clone();
         match worker.core.finish_index_artifact(pending).await {
             Ok(_) => {
                 worker.embedding_queue.request(&workspace_id);
@@ -901,13 +869,13 @@ pub(crate) async fn index_artifact(
                     &actor,
                     "artifact_indexed",
                     "artifact",
-                    Some(&artifact.summary.id),
-                    format!("Indexed evidence: {}.", artifact.summary.title),
+                    Some(&artifact.id),
+                    format!("Indexed evidence: {}.", artifact.title),
                 )
                 .await;
             }
             // The job already carries the reason; the log is for the operator.
-            Err(error) => tracing::warn!(error = %error, artifact_id = %artifact.summary.id, "Manual indexing failed"),
+            Err(error) => tracing::warn!(error = %error, artifact_id = %artifact.id, "Manual indexing failed"),
         }
     });
     Ok((StatusCode::ACCEPTED, Json(job)))
@@ -1177,13 +1145,8 @@ pub(crate) async fn upload_artifact_version(
     headers: HeaderMap,
     body: Bytes,
 ) -> Result<Json<SharedArtifactSummary>, ApiError> {
-    let current = state
-        .core
-        .get_artifact(artifact_id.clone())
-        .await
-        .map_err(map_core_error)?;
-    let workspace_id = current.summary.workspace_id.clone();
-    require_workspace_write(&state, &subject, &workspace_id).await?;
+    let current = writable_artifact_summary(&state, &subject, &artifact_id).await?;
+    let workspace_id = current.workspace_id;
     repositories::ensure_not_repository_file(&state, &artifact_id).await?;
     let filename = headers
         .get("x-repomemo-filename")
@@ -1227,19 +1190,36 @@ pub(crate) struct CompareVersionsQuery {
     to: i64,
 }
 
-/// The workspace of an artifact the caller may read.
-async fn readable_artifact_workspace(
+/// The summary of an artifact the caller may read. Every route that names an
+/// artifact starts here: the summary is one row, and no document is read (and
+/// no reader started) before the caller's rights are known.
+async fn readable_artifact_summary(
     state: &AppState,
     subject: &AuthenticatedSubject,
     artifact_id: &str,
-) -> Result<String, ApiError> {
+) -> Result<ArtifactSummary, ApiError> {
     let summary = state
         .storage
         .get_artifact_summary(artifact_id)
         .await
         .map_err(map_storage_error)?;
     require_workspace_read(state, subject, &summary.workspace_id).await?;
-    Ok(summary.workspace_id)
+    Ok(summary)
+}
+
+/// The summary of an artifact the caller may change.
+async fn writable_artifact_summary(
+    state: &AppState,
+    subject: &AuthenticatedSubject,
+    artifact_id: &str,
+) -> Result<ArtifactSummary, ApiError> {
+    let summary = state
+        .storage
+        .get_artifact_summary(artifact_id)
+        .await
+        .map_err(map_storage_error)?;
+    require_workspace_write(state, subject, &summary.workspace_id).await?;
+    Ok(summary)
 }
 
 /// Every version of an uploaded file, the current one first.
@@ -1248,7 +1228,7 @@ pub(crate) async fn list_artifact_versions(
     State(state): State<AppState>,
     Path(artifact_id): Path<String>,
 ) -> Result<Json<Vec<repomemo_domain::ArtifactVersion>>, ApiError> {
-    readable_artifact_workspace(&state, &subject, &artifact_id).await?;
+    readable_artifact_summary(&state, &subject, &artifact_id).await?;
     state
         .core
         .list_artifact_versions(&artifact_id)
@@ -1263,7 +1243,7 @@ pub(crate) async fn get_artifact_version_text(
     State(state): State<AppState>,
     Path((artifact_id, version)): Path<(String, i64)>,
 ) -> Result<Json<repomemo_domain::ArtifactVersionText>, ApiError> {
-    readable_artifact_workspace(&state, &subject, &artifact_id).await?;
+    readable_artifact_summary(&state, &subject, &artifact_id).await?;
     state
         .core
         .artifact_version_text(&artifact_id, version)
@@ -1279,7 +1259,7 @@ pub(crate) async fn compare_artifact_versions(
     Path(artifact_id): Path<String>,
     Query(query): Query<CompareVersionsQuery>,
 ) -> Result<Json<repomemo_domain::VersionComparison>, ApiError> {
-    readable_artifact_workspace(&state, &subject, &artifact_id).await?;
+    readable_artifact_summary(&state, &subject, &artifact_id).await?;
     consume_heavy_quota(&state, &subject)?;
     state
         .core
