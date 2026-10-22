@@ -683,9 +683,19 @@ if (!named.length) {
   }
 }
 
-for (const note of notes) console.log(`note: ${note}`);
+// What a file makes a message quote (a key, a word) is shown with its control characters written out and cut short, so a
+// template cannot put a line of its own in a CI log (a line that starts with "::" is a command to GitHub Actions) or a
+// terminal escape on a screen (V0.2.192).
+const shown = (text) => {
+  const plain = String(text).replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, (character) =>
+    character === "\n" ? "\\n" : `\\u{${character.codePointAt(0).toString(16)}}`,
+  );
+  return plain.length > 300 ? `${plain.slice(0, 300)}…` : plain;
+};
+
+for (const note of notes) console.log(`note: ${shown(note)}`);
 if (problems.length) {
-  for (const problem of problems) console.error(`${problem.file}:${problem.line}:${problem.column}  ${problem.path ? `${problem.path}  ` : ""}${problem.message}`);
+  for (const problem of problems) console.error(`${shown(problem.file)}:${problem.line}:${problem.column}  ${problem.path ? `${shown(problem.path)}  ` : ""}${shown(problem.message)}`);
   console.error(`\n${problems.length} problem${problems.length === 1 ? "" : "s"} in the templates.`);
   process.exit(1);
 }

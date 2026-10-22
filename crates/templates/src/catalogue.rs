@@ -1,7 +1,7 @@
 use std::collections::{BTreeSet, HashSet};
 use std::sync::OnceLock;
 
-use crate::{general, TemplateDefinition, TemplateIssue, GENERAL_ID};
+use crate::{clean_text, general, TemplateDefinition, TemplateIssue, GENERAL_ID};
 
 include!(concat!(env!("OUT_DIR"), "/builtin_templates.rs"));
 
@@ -33,7 +33,7 @@ fn admit(sources: Vec<(&str, &str)>, reserved: &HashSet<String>) -> (Vec<Templat
             Ok(template) => template,
             Err(issues) => {
                 problems.push(SourceProblem {
-                    source: name.to_owned(),
+                    source: clean_text(name),
                     issues,
                 });
                 continue;
@@ -58,7 +58,7 @@ fn admit(sources: Vec<(&str, &str)>, reserved: &HashSet<String>) -> (Vec<Templat
         };
         match problem {
             Some(message) => problems.push(SourceProblem {
-                source: name.to_owned(),
+                source: clean_text(name),
                 issues: vec![TemplateIssue::new("meta.id", message)],
             }),
             None => {

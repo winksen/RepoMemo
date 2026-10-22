@@ -1,8 +1,8 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.191` (2026-10-22), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next:** the clean-machine install (R6, the maintainer's) and the `v0.2.0` tag; tracks L and M, security and backend hardening, are built (V0.2.130–V0.2.162) and track N, workspace templates, is under way (V0.2.163–V0.2.193) · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.192` (2026-10-22), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next:** the clean-machine install (R6, the maintainer's) and the `v0.2.0` tag; tracks L and M, security and backend hardening, are built (V0.2.130–V0.2.162) and track N, workspace templates, is under way (V0.2.163–V0.2.193) · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
-> **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Security review 2026-10-16 (V0.2.52)](security/2026-10-16-security-review.md) · [Security and backend review 2026-10-21 (V0.2.129)](security/2026-10-21-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
+> **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Security review 2026-10-16 (V0.2.52)](security/2026-10-16-security-review.md) · [Security and backend review 2026-10-21 (V0.2.129)](security/2026-10-21-security-review.md) · [Security review of workspace templates 2026-10-22 (V0.2.192)](security/2026-10-22-workspace-templates-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
 RepoMemo started as a local-first desktop workbench. It is now a **self-hosted team product**: a shared API server with a web client, organizations and roles, collaboration, git repositories as living sources, business documents, and optional AI grounded in cited evidence. A server can be installed and administered entirely from the browser (environment menu, first-run setup, System area, admin console).
 
@@ -64,6 +64,7 @@ timeline
 | Road to V0.3.0 (V0.2.1–V0.2.56, one change each) | ✅ V0.2.1–V0.2.56 built; the clean-machine install (R6, R12) is the maintainer's |
 | Track K: frontend polish (V0.2.57–V0.2.129) | ✅ V0.2.57–V0.2.129 built (K1 to K6 done); decisions 15–19 taken as proposed; [plan](plans/2026-10-17-frontend-polish.md) |
 | Security and backend review 2026-10-21 (fifth pass) | ✅ Closed at V0.2.162: 2 high, 9 medium, 15 low and 4 info findings, none high, medium or low open, plus 11 performance findings built (P12–P21); the review's table names the release of each fix; [review](security/2026-10-21-security-review.md) |
+| Security review of workspace templates 2026-10-22 (sixth pass, new surface only) | ✅ Closed at V0.2.192: 0 high, 2 medium, 2 low and 4 info findings, none medium or low open; [review](security/2026-10-22-workspace-templates-security-review.md) |
 | Track L: security and dependencies (V0.2.130–V0.2.148) | ✅ V0.2.130–V0.2.148 built; decisions 20–23 taken as proposed |
 | Track M: backend hardening and performance (V0.2.149–V0.2.162) | ✅ V0.2.149–V0.2.162 built; decisions 20–23 taken as proposed |
 | Track N: workspace templates (V0.2.163–V0.2.193) | 🔄 Started 2026-10-22; decisions 24–28 taken as proposed; [plan](plans/2026-10-22-workspace-templates.md) · [format](technical/workspace-templates.md) |
@@ -532,7 +533,7 @@ Proposed and started on 2026-10-22, with decisions 24–28 taken as proposed. Ev
 | **V0.2.189** ✅ | ✨ | Templates | Templates from `REPOMEMO_TEMPLATES_DIR` | F26g, decision 25 | A valid file appears after a restart; a bad one is named and ignored |
 | **V0.2.190** ✅ | 🔧 | Console | `repomemo-console templates list\|show\|validate` and a loaded-templates list in System | F26g | `validate` prints the errors the server would |
 | **V0.2.191** ✅ | ✨ | Templates | Download a workspace's adjusted setup as a template file | F26g | The file passes the checker and loads on another server |
-| **V0.2.192** | 📘 | Security | Security pass on the new surface, with its fixes | R14 | No high or medium finding open |
+| **V0.2.192** ✅ | 📘 | Security | Security pass on the new surface, with its fixes | R14 | No high or medium finding open |
 | **V0.2.193** | 📘 | Release | Release checks repeated after workspace templates; the freeze restored | R14 | Every check passes |
 
 ### Release checklists (0.2.x)
@@ -1159,7 +1160,7 @@ The brief of each release (change, files, done when, commit line) is in the [pla
 - [x] **V0.2.189** `REPOMEMO_TEMPLATES_DIR`. Done: `read_folder` (64 files, 64 KiB, no link followed, `_` files and other kinds skipped) and `Catalogue::extended` (same validation, an id never taken from a built-in or `general`, marked custom, listed by name) in the templates crate; `REPOMEMO_TEMPLATES_DIR` read once at start; `custom` on every template summary; `template_files` in System › Overview and a row in the server check; a Custom tag in the picker and a Template files panel in System › Overview. 9 tests written (7 templates, 1 server, 1 web) and the picker fixtures updated, not run; compile and typecheck
 - [x] **V0.2.190** console `templates` commands; System › Overview list. Done: `templates list` and `templates show <template>` on the server's console (the web console too); `templates validate <file>` run by `repomemo-console` itself with the server's own rules (`read_template_file`, `Catalogue::extended`), no server or sign-in needed; `template_files.templates` and the line and column of a problem in `GET /v1/system/overview`; a Templates panel in System › Overview. 9 tests written (1 templates, 5 console, 3 web), the server's test extended, not run; compile and typecheck
 - [x] **V0.2.191** download as a template file. Done: `GET /v1/workspaces/{ws}/template/file?id=&name=` (`export_workspace_template`: the effective template with the adjustments folded in, version 1, parsed again before it is sent; a taken id `409`, a bad id or name `400`); a *Download as template file* group in Settings › Template with the id and name to choose; `saveBlob`. 5 tests written (1 api, 1 server, 3 web), not run; compile and typecheck
-- [ ] **V0.2.192** security pass (`security/` page)
+- [x] **V0.2.192** security pass (`security/` page). Done: the review page (who may read and change a template, the operator's folder, the ranking bounds, the activity records, what `GET` answers a viewer, the download, the console and the checker); T1 `path_matches` in time proportional to the pattern times the path; T2 a work limit in the repository pattern matcher; T3 `clean_text` for messages and the names of files left out; T4 the checker's output cleaned; T5 said in the guide and the setting. 4 tests written (retrieval, ingestion, templates, checker), not run; compile and checks pass
 - [ ] **V0.2.193** release checks; decision 24's freeze restored
 
 ### Decisions to agree before work starts
@@ -1246,6 +1247,7 @@ Every item of both roads, with the release it is planned for. The evidence behin
 | — | Fourth pass | Mail, webhooks, remote clones, connectors, export and import, desktop client | ✅ V0.2.52 (R8): [review of 2026-10-16](security/2026-10-16-security-review.md), 3 medium and 4 low fixed, 5 informational |
 | — | Review of 2026-10-14 (V0.2.6) | E1–E22: 2 high, 7 medium, 9 low, 4 info | Not tracked until 2026-10-21. E1–E19 still open or partly fixed: tracks L and M |
 | — | Fifth pass | Dependencies (S5-1, S5-2, S5-3, S5-10), sessions (S5-4), body limits (S5-5), container (S5-7, S5-8), jobs (S5-9), and E1–E19 above | V0.2.130–V0.2.152: [review of 2026-10-21](security/2026-10-21-security-review.md), 2 high, 9 medium, 15 low, 4 info |
+| — | Sixth pass | Workspace templates (T1–T8): the folder pattern matchers (T1, T2), what messages quote (T3, T4), who sees a template (T5) | V0.2.192: [review of 2026-10-22](security/2026-10-22-workspace-templates-security-review.md), 0 high, 2 medium, 2 low, 4 info |
 
 ### Platform performance
 

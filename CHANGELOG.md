@@ -2,6 +2,25 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.192 (2026-10-22)
+
+Security review of workspace templates with its fixes.
+
+### Security
+- **Review:** [mindmap/security/2026-10-22-workspace-templates-security-review.md](mindmap/security/2026-10-22-workspace-templates-security-review.md) reads who may read and change a template, the operator's folder (path handling, size, depth, links, shadowing), the ranking bounds, the activity records, what `GET` answers a viewer, the download, the console and the checker. **0 high, 2 medium, 2 low, 4 info; none medium or low is open.** Nothing was built, started or attacked.
+- **T1 (medium), ranking patterns:** the matcher that applies a boost's folder pattern took time that grew with every `**`, so one template file could stall every search of the workspaces that use it. Its work is now the pattern's folders times the path's, whatever the pattern says.
+- **T2 (medium), repository patterns:** the matcher of a repository's include and exclude patterns had the same shape with `*` and `**`, and a template now offers such patterns in the link form. A pattern gives up after 100,000 steps on one path and matches nothing; a sensible pattern is nowhere near the limit.
+- **T3 (low), messages:** messages about a template file quote it (an unknown key, a word outside a list, the file's name). Control and reordering characters are now written out (`\n`, `\u{1b}`) and a text is cut at 300 characters, so a key cannot forge a log line, put an escape on an administrator's terminal or fill System › Overview.
+- **T4 (low), the checker:** `npm run templates:check` writes out control characters and cuts long texts before it prints, so a template cannot put a line of its own in a CI log (a line that starts with `::` is a command to GitHub Actions).
+- **T5 to T8 (info):** accepted or tracked. Every signed-in account can read every template and the `focus` line goes to the AI provider, so **a template holds no secrets, names or addresses**: said in `docs/TEMPLATES.md` and in the description of `REPOMEMO_TEMPLATES_DIR`. The operator's folder is trusted as its owner is, the resolver's cache of 256 answers stays, and the suggested questions an administrator saves are text like any message.
+
+### Changed
+- **Tests (written, not run):** four: a pattern of eleven `**` against a path of eighty folders, and one of many stars in a name (`repomemo-retrieval`); a pattern of many stars that gives up (`repomemo-ingestion`); a message that quotes a key with a line break, an escape and a reordering character, a word of five thousand characters and a file name with an escape (`repomemo-templates`); and a key that tries to forge an Actions command in the checker's output (`scripts/check-templates.test.mjs`).
+- **Checks run on this release:** `cargo check` of the retrieval, ingestion and templates crates with their tests compiles; `rustfmt` shows nothing for the lines changed; `templates:check`, `types:check`, `typecheck`, `styles:check`, `a11y:check`, `docs:check` and `version:check` pass. **Not run:** the tests, as asked.
+
+### Upgrading
+- Nothing to do. A repository pattern that needs more than 100,000 steps to decide on one path (none that a person would write does) now matches nothing instead of taking the sync's time.
+
 ## V0.2.191 (2026-10-22)
 
 A workspace's adjusted setup can be downloaded as a template file.

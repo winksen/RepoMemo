@@ -1791,6 +1791,46 @@ fn a_link_in_the_folder_is_not_followed() {
     let _ = std::fs::remove_dir_all(&elsewhere);
 }
 
+/// V0.2.192: what a message quotes from a file is made safe to show.
+#[test]
+fn a_message_that_quotes_the_file_carries_no_control_character_and_is_not_long() {
+    let nasty_key = "bad\\n::error::forged\\u001b[2Jkey\\u202e";
+    let issues = parse(&VALID.replace("\"format\": 1,", &format!("\"format\": 1, \"{nasty_key}\": 1,"))).unwrap_err();
+    let shown = issues[0].to_string();
+    assert!(shown.contains("unknown field"), "{shown}");
+    assert!(
+        !shown
+            .chars()
+            .any(|character| character.is_control() || character == '\u{202e}'),
+        "{shown:?}"
+    );
+    assert!(shown.contains("\\n") || shown.contains("\\u{1b}"), "{shown:?}");
+    // A word of a list that is a megabyte long is quoted cut off.
+    let long = "x".repeat(5_000);
+    let issues = parse(&with_meta("icon", &format!("\"{long}\""))).unwrap_err();
+    assert!(
+        issues[0].message.chars().count() <= 320,
+        "{}",
+        issues[0].message.chars().count()
+    );
+    assert!(issues[0].message.ends_with('…'));
+    // The name of a file is cleaned in the same way, in the problems of a catalogue and of a folder.
+    let (_, problems) =
+        Catalogue::builtin().extended([("a\u{1b}[2Jb.json", VALID.replace("operations", "other").as_str())]);
+    assert_eq!(problems.len(), 1);
+    assert!(
+        !problems[0].source.chars().any(char::is_control),
+        "{:?}",
+        problems[0].source
+    );
+    assert!(problems[0].source.contains("\\u{1b}"));
+    // Plain text is left as it is.
+    assert_eq!(
+        TemplateIssue::new("meta.id", "`x` is not a section — try \"y\"").message,
+        "`x` is not a section — try \"y\""
+    );
+}
+
 /// The example a template author copies (V0.2.188): valid, using every block, and not one of the built-in templates.
 #[test]
 fn the_example_is_valid_uses_every_block_and_is_not_a_built_in_template() {

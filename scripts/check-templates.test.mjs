@@ -56,6 +56,14 @@ describe("the template checker", () => {
     assert.match(result.stderr, /odd-key\.json:\d+:\d+ {2}colour {2}unknown key `colour`/);
   });
 
+  it("writes out what a file makes a message quote, so it cannot put a line or a terminal escape of its own in the output", () => {
+    const result = run(template("forging", (value) => (value["x\n::error::forged\u001b[2J"] = 1)));
+    assert.equal(result.status, 1);
+    assert.ok(!result.stderr.split("\n").some((line) => line.startsWith("::")), result.stderr);
+    assert.ok(!result.stderr.includes("\u001b"), "no raw escape reaches the output");
+    assert.match(result.stderr, /unknown key `x\\n::error::forged\\u\{1b\}\[2J`/);
+  });
+
   it("refuses a pattern that looks like a regular expression, a headline it cannot count and a repeated entry", () => {
     const result = run(
       template("several", (value) => {

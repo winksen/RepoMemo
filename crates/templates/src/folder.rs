@@ -12,7 +12,7 @@ use std::fs;
 use std::io::Read;
 use std::path::Path;
 
-use crate::{limits, SourceProblem, TemplateIssue};
+use crate::{clean_text, limits, SourceProblem, TemplateIssue};
 
 /// A folder gives at most this many files.
 pub const FOLDER_FILES_MAX: usize = 64;
@@ -26,7 +26,7 @@ pub struct FolderRead {
 
 fn problem(source: &str, message: String) -> SourceProblem {
     SourceProblem {
-        source: source.to_owned(),
+        source: clean_text(source),
         issues: vec![TemplateIssue::new("", message)],
     }
 }

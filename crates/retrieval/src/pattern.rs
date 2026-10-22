@@ -5,27 +5,38 @@
 //! finds the README of any folder. Case does not matter.
 
 /// Whether `path` (folders and file name, separated by `/`) is matched by `pattern`.
+///
+/// The work is the number of folders in the pattern times the number of folders in the path, whatever the pattern says
+/// (V0.2.192): a template is a file anyone may write, and a pattern of many `**` must not be able to stall a search.
 pub fn path_matches(pattern: &str, path: &str) -> bool {
-    let pattern: Vec<String> = pattern.split('/').map(str::to_lowercase).collect();
-    let pattern: Vec<&str> = pattern.iter().map(String::as_str).collect();
+    let mut pattern: Vec<String> = pattern.split('/').map(str::to_lowercase).collect();
+    // "May start anywhere in the path" is a `**` in front, and two `**` in a row are one.
+    pattern.insert(0, "**".to_owned());
+    pattern.dedup_by(|later, earlier| later == "**" && earlier == "**");
     let path: Vec<String> = path
         .split(['/', '\\'])
         .filter(|part| !part.is_empty())
         .map(str::to_lowercase)
         .collect();
-    let path: Vec<&str> = path.iter().map(String::as_str).collect();
-    (0..=path.len()).any(|start| segments_match(&pattern, &path[start..]))
-}
-
-fn segments_match(pattern: &[&str], path: &[&str]) -> bool {
-    match pattern.split_first() {
-        None => path.is_empty(),
-        Some((&"**", rest)) => (0..=path.len()).any(|skip| segments_match(rest, &path[skip..])),
-        Some((first, rest)) => match path.split_first() {
-            Some((name, tail)) => name_matches(first, name) && segments_match(rest, tail),
-            None => false,
-        },
+    // `reach[j]`: the pattern's folders so far match exactly the first `j` folders of the path.
+    let mut reach = vec![false; path.len() + 1];
+    reach[0] = true;
+    for segment in &pattern {
+        let mut next = vec![false; path.len() + 1];
+        if segment == "**" {
+            let mut open = false;
+            for (j, slot) in next.iter_mut().enumerate() {
+                open |= reach[j];
+                *slot = open;
+            }
+        } else {
+            for j in 1..=path.len() {
+                next[j] = reach[j - 1] && name_matches(segment, &path[j - 1]);
+            }
+        }
+        reach = next;
     }
+    reach[path.len()]
 }
 
 /// One name against one pattern segment, where `*` is any run of characters.
@@ -85,6 +96,25 @@ mod tests {
         assert!(path_matches("src/**/*.rs", "crates/api/src/deep/er/lib.rs"));
         assert!(path_matches("**/*.md", "a/b/c.md"));
         assert!(path_matches("**", "anything/at/all"));
+    }
+
+    /// V0.2.192: many `**` used to take time that grew with every one of them; now the work is the pattern times the path.
+    #[test]
+    fn a_pattern_of_many_double_stars_cannot_stall_a_search() {
+        let long_path = (0..80).map(|n| format!("folder{n}")).collect::<Vec<_>>().join("/");
+        let stacked = format!("{}x.md", "**/".repeat(11));
+        assert!(!path_matches(&stacked, &format!("{long_path}/y.md")));
+        assert!(path_matches(&stacked, &format!("{long_path}/x.md")));
+        assert!(!path_matches("**/a/**/b/**/c/**/d/**/e/**/f/**/z", &long_path));
+        assert!(path_matches("**/folder3/**/folder40/**/folder79", &long_path));
+        // Several stars in a name are bounded by the length of the name.
+        assert!(!path_matches("*a*a*a*a*a*a*a*a*a*b", &"a".repeat(200)));
+        // Two `**` in a row mean one, and a leading one changes nothing.
+        assert_eq!(
+            path_matches("**/**/docs/**", "x/docs/y.md"),
+            path_matches("docs/**", "x/docs/y.md")
+        );
+        assert!(path_matches("**/**", "a/b"));
     }
 
     #[test]

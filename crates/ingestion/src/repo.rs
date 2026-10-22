@@ -180,11 +180,21 @@ pub fn pattern_matches(pattern: &str, path: &str) -> bool {
     glob_matches(pattern.trim_start_matches('/'), path)
 }
 
+/// The most steps one pattern may take on one path (V0.2.192). A pattern with many `*` or `**` can take time that grows
+/// with each of them, and the patterns come from a person's form or from a template file; one that needs more than
+/// this is not a sensible pattern, and it matches nothing.
+const GLOB_STEPS_MAX: usize = 100_000;
+
 fn glob_matches(pattern: &str, text: &str) -> bool {
-    glob_matches_bytes(pattern.as_bytes(), text.as_bytes())
+    let mut budget = GLOB_STEPS_MAX;
+    glob_matches_bytes(pattern.as_bytes(), text.as_bytes(), &mut budget)
 }
 
-fn glob_matches_bytes(pattern: &[u8], text: &[u8]) -> bool {
+fn glob_matches_bytes(pattern: &[u8], text: &[u8], budget: &mut usize) -> bool {
+    if *budget == 0 {
+        return false;
+    }
+    *budget -= 1;
     let Some((&first, rest)) = pattern.split_first() else {
         return text.is_empty();
     };
@@ -192,24 +202,39 @@ fn glob_matches_bytes(pattern: &[u8], text: &[u8]) -> bool {
         b'*' if rest.first() == Some(&b'*') => {
             let rest = &rest[1..];
             // "**/" also matches zero directories.
-            if rest.first() == Some(&b'/') && glob_matches_bytes(&rest[1..], text) {
+            if rest.first() == Some(&b'/') && glob_matches_bytes(&rest[1..], text, budget) {
                 return true;
             }
-            (0..=text.len()).any(|start| glob_matches_bytes(rest, &text[start..]))
+            (0..=text.len()).any(|start| glob_matches_bytes(rest, &text[start..], budget))
         }
         b'*' => {
             // A single star stays within one path segment.
             let segment_end = text.iter().position(|byte| *byte == b'/').unwrap_or(text.len());
-            (0..=segment_end).any(|start| glob_matches_bytes(rest, &text[start..]))
+            (0..=segment_end).any(|start| glob_matches_bytes(rest, &text[start..], budget))
         }
-        b'?' => text.first().is_some_and(|byte| *byte != b'/') && glob_matches_bytes(rest, &text[1..]),
-        _ => text.first() == Some(&first) && glob_matches_bytes(rest, &text[1..]),
+        b'?' => text.first().is_some_and(|byte| *byte != b'/') && glob_matches_bytes(rest, &text[1..], budget),
+        _ => text.first() == Some(&first) && glob_matches_bytes(rest, &text[1..], budget),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// V0.2.192: a pattern with many stars used to take time that grew with every one of them; it now gives up after a
+    /// fixed amount of work and matches nothing, and a sensible pattern is not affected.
+    #[test]
+    fn a_pattern_of_many_stars_gives_up_instead_of_stalling_a_sync() {
+        let path = format!("{}/file.txt", "a".repeat(200));
+        assert!(!pattern_matches("*a*a*a*a*a*a*a*a*a*a*a*a*a*a*b", &path));
+        assert!(!pattern_matches("**/**/**/**/**/**/**/**/**/**/x", &"d/".repeat(100)));
+        assert!(!pattern_matches("a**a**a**a**a**a**a**a**a**a**b", &"a".repeat(300)));
+        // Ordinary patterns, long paths included, are well inside the limit.
+        let deep = format!("{}file.md", "folder/".repeat(60));
+        assert!(pattern_matches("**/*.md", &deep));
+        assert!(pattern_matches("folder/**/file.md", &deep));
+        assert!(pattern_matches("*.min.js", "web/static/app.min.js"));
+    }
 
     #[test]
     fn patterns_follow_gitignore_conventions() {
