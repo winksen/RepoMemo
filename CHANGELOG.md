@@ -2,6 +2,25 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.162 (2026-10-21)
+
+The release checks are repeated after tracks L and M, the fifth security review is closed, and the feature freeze is back on until the tag.
+
+### Changed
+- **Checks run on this release:** `npm run typecheck`, `styles:check`, `a11y:check`, `types:check`, `version:check`, `docs:check`, `container:check` and `migrations:check` pass; `cargo deny check` reports *advisories ok, bans ok, licenses ok, sources ok* (it still warns about crates present in two versions, as the policy allows); `npm audit`, development packages included, finds 0 vulnerabilities; `cargo check` of the workspace's server, api, storage, git and ingestion crates with their tests compiled at each release of the track. **Not run in the whole of tracks L and M:** `cargo test`, the web tests, a build, the container and the performance runs, as this repository's rules ask; every test written in the track is listed in its release and waits for the maintainer.
+- **The fifth review is closed:** every high, medium and low finding is fixed and its release is in the review's table (S5-1 to S5-10 and E1 to E19); the two informational findings that remain are tracked (S5-11, unmaintained crates with no fixed release) and accepted (S5-12, the access token in `sessionStorage`). The eleven performance findings (P12 to P21) were built in V0.2.149–V0.2.161; their before and after figures are the maintainer's runs.
+- **The feature freeze is restored (decision 20):** from this release until the `v0.2.0` tag only the checks of the clean install and the fixes it finds go in.
+- **The clean-install page** has the notes for the V0.3.0 changelog on tracks L and M (below) and one more line in its checklist for what only a run can show.
+- **A tidy-up in the review:** the release cell of finding E1 was written twice by V0.2.148 and is written once.
+
+### Notes for the V0.3.0 changelog: tracks L and M (V0.2.130–V0.2.162)
+- **Security:** the TLS stack and a spreadsheet library were updated and the web toolchain moved to Vite 8, so `cargo deny` and `npm audit` are clean; LibreOffice previews are opt-in, need a fixed release, run with a locked profile and, in the container, in a container of their own with no network; the server container is read-only with no capabilities; AI provider addresses are limited to a host and a port; the `admin` token scope, activity by role, organization roles that reach only their own workspaces, refresh tokens that do not sign a person out everywhere, IPv6 limits by /64, stricter new addresses and names, escaped logs and a cleared git environment; links that leave the site say so; every artifact route checks rights before it reads a document; jobs are cancelled by their starter or an administrator; JSON bodies stop at 1 MiB.
+- **Speed and memory:** uploads stream to disk; the file list pages in SQL and the web client holds one page; the artifact page uses the stored text; a repository sync with nothing new, and the last-author pass, read almost nothing; a search across workspaces runs in parallel with one embedding call; read connections cache and map more; JSON is compressed; a full server refuses at once.
+- **Operations:** new settings `REPOMEMO_PREVIEW_ROOT`, `REPOMEMO_UPLOAD_INFLIGHT_MB`, `REPOMEMO_SQLITE_CACHE_MB`, `REPOMEMO_SQLITE_MMAP_MB`, `REPOMEMO_MAX_IN_FLIGHT` and `REPOMEMO_MAX_IN_FLIGHT_PER_ACCOUNT`; migrations 0037 to 0041; the `previews` compose profile.
+
+### Upgrading
+- Nothing to do. [UPGRADING.md](UPGRADING.md) lists, release by release, what changed for an operator in tracks L and M.
+
 ## V0.2.161 (2026-10-21)
 
 When the server is full it says so at once, instead of letting requests queue until they time out.

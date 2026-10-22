@@ -1,6 +1,6 @@
 # Clean-machine install: the run before the tag
 
-> **Branch of:** [TECHNICAL_MINDMAP.md](../TECHNICAL_MINDMAP.md) · **Roadmap:** [R6 (V0.2.0)](../ROADMAP.md#v020-team-ready), [R12 (V0.2.56)](../ROADMAP.md) · **Guide followed:** [operations.md](operations.md) · **Status:** V0.2.129 (the polish track K added a browser pass to §3 and its notes to §5). The run itself is the maintainer's (it needs a second machine and a running server, which this repository's rules keep from the automated work), so the result table at the end is empty until it is made.
+> **Branch of:** [TECHNICAL_MINDMAP.md](../TECHNICAL_MINDMAP.md) · **Roadmap:** [R6 (V0.2.0)](../ROADMAP.md#v020-team-ready), [R12 (V0.2.56)](../ROADMAP.md) · **Guide followed:** [operations.md](operations.md) · **Status:** V0.2.162 (track K added a browser pass to §3 and its notes to §5; tracks L and M added a line to §3 and their notes to §6). The run itself is the maintainer's (it needs a second machine and a running server, which this repository's rules keep from the automated work), so the result table at the end is empty until it is made.
 
 `V0.3.0` is tagged when a person who has nothing of RepoMemo on their machine installs it **following only the production guide**, with mail and a remote repository, and meets **no workaround**. A workaround is anything done that the guide does not say: a command guessed, a setting found in the code, a retry after a message that should have said why. Each one is written down and becomes a fix of the guide or the server (the way V0.2.1 came from the first run), and the run is made again.
 
@@ -48,6 +48,7 @@ The releases of the 0.2.x line were written and compiled without running the ser
 - [ ] **The desktop app** is tried against a server: connect, sign in, upload, open a PDF, a link in an answer, *Change server*, and *Move a workspace to a server* (V0.2.49, V0.2.50).
 - [ ] **The security fixes** of V0.2.52 are tried against a running server (the spot checks above).
 - [ ] **The two images** of the container route are built and started once (V0.2.45).
+- [ ] **Tracks L and M** (V0.2.130–V0.2.162) are tried: the container comes up with the read-only root and the converter (and again with `COMPOSE_PROFILES=previews`, a Word file opening as a PDF); a 500 MiB upload leaves the server's memory flat and two uploads at once with `REPOMEMO_UPLOAD_INFLIGHT_MB=1` make the second wait (`503`); a repository sync with nothing new says *Nothing changed*; the web client's workspace page of a workspace with more than 500 files shows the notice and finds an old file by name; `GET /v1/system/metrics` shows the in-flight and shed counters; and the `performance_at_scale` run is made twice (read tuning off and on) and recorded in [performance.md](performance.md).
 - [ ] The open items in the checklists of the roadmap's releases are read once more, and each is either done, accepted or moved.
 
 ## 4. Result
@@ -76,3 +77,19 @@ A draft for the entry; the [plan](../plans/2026-10-17-frontend-polish.md) and th
 - `npm run styles:check` refuses a new bare element style, raw colour, raw layer or raw control height; 111 older cases are listed in `scripts/styles-baseline.json` and can only shrink.
 
 **Not done:** none of this was seen on screen or run as tests while it was written; §3 lists the browser pass and CI.
+
+## 6. Notes for the V0.3.0 changelog: security and backend (V0.2.130–V0.2.162)
+
+A draft for the entry; the [fifth review](../security/2026-10-21-security-review.md), [UPGRADING.md](../../UPGRADING.md) and the [release index](../RELEASES_0.2.md) have the detail. No product feature was added.
+
+**What an operator gets**
+- `cargo deny` and `npm audit` (development packages included) are clean; the TLS stack, the spreadsheet reader and the web toolchain were updated.
+- The container's server has a read-only root and no capabilities; LibreOffice previews are opt-in, need a fixed release and, in the container, run in a container of their own with no network (`COMPOSE_PROFILES=previews`).
+- Uploads stream to disk, JSON bodies stop at 1 MiB, answers are compressed for a client that asks, and a full server refuses at once (`503` or `429` with `Retry-After`); the counts are in `/v1/system/metrics`.
+- New settings: `REPOMEMO_PREVIEW_ROOT`, `REPOMEMO_UPLOAD_INFLIGHT_MB`, `REPOMEMO_SQLITE_CACHE_MB`, `REPOMEMO_SQLITE_MMAP_MB`, `REPOMEMO_MAX_IN_FLIGHT`, `REPOMEMO_MAX_IN_FLIGHT_PER_ACCOUNT`; migrations 0037 to 0041.
+
+**What a person sees**
+- A workspace page holds the 500 newest files and finds the others by searching; the command palette searches the server; a repository sync with nothing new says *Nothing changed*.
+- Links that leave the site say so; Office files that can carry macros are not opened in their application; a job is stopped by whoever started it or an administrator.
+
+**Not done:** none of this was run as tests, built or seen while it was written; §3 lists what to try, and the performance runs (before and after, [performance.md](performance.md)) are the maintainer's.
