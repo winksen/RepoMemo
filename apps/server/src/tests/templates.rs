@@ -1,5 +1,133 @@
 use super::*;
 
+/// V0.2.170: the four first templates are offered, and a workspace made from each has exactly its folders and
+/// opens as any workspace does.
+#[tokio::test]
+async fn the_four_first_templates_are_offered_and_each_creates_its_folders() {
+    let data_dir = temp_data_dir("templates-first-four");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let send = |method: &'static str, uri: String, who: String, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, &who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let (_, _) = register_account(&app, "templates-four-admin@example.com").await;
+    let (owner, _) = register_account(&app, "templates-four-owner@example.com").await;
+    let organization = response_json(
+        send(
+            "POST",
+            "/v1/organizations".to_owned(),
+            owner.clone(),
+            json!({"name": "Team"}),
+        )
+        .await,
+    )
+    .await["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+
+    let listed = response_json(send("GET", "/v1/templates".to_owned(), owner.clone(), json!(null)).await).await;
+    let ids: Vec<&str> = listed
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|template| template["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        ids,
+        [
+            "general",
+            "knowledge-base",
+            "operations",
+            "product-decisions",
+            "software-engineering"
+        ]
+    );
+    assert!(listed
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|template| template["name"].as_str().is_some_and(|name| !name.is_empty())));
+
+    let expected: [(&str, &[&str]); 4] = [
+        ("software-engineering", &["Architecture", "Decisions", "Runbooks"]),
+        ("operations", &["Incidents", "On-call", "Postmortems", "Runbooks"]),
+        (
+            "product-decisions",
+            &["Decisions", "Meeting notes", "Research", "Specs"],
+        ),
+        ("knowledge-base", &["Archive", "Contracts", "Policies", "Reports"]),
+    ];
+    for (id, folders) in expected {
+        let created = send(
+            "POST",
+            "/v1/workspaces".to_owned(),
+            owner.clone(),
+            json!({"organization_id": organization, "name": format!("From {id}"), "template_id": id}),
+        )
+        .await;
+        assert_eq!(created.status(), 201, "{id}");
+        let workspace = response_json(created).await["workspace"]["id"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+
+        let made = response_json(
+            send(
+                "GET",
+                format!("/v1/workspaces/{workspace}/folders"),
+                owner.clone(),
+                json!(null),
+            )
+            .await,
+        )
+        .await;
+        let mut names: Vec<&str> = made
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|folder| folder["name"].as_str().unwrap())
+            .collect();
+        names.sort();
+        assert_eq!(names, folders, "{id}");
+        assert!(
+            made.as_array()
+                .unwrap()
+                .iter()
+                .all(|folder| folder["parent_id"].is_null()),
+            "{id}"
+        );
+
+        let view = response_json(
+            send(
+                "GET",
+                format!("/v1/workspaces/{workspace}/template"),
+                owner.clone(),
+                json!(null),
+            )
+            .await,
+        )
+        .await;
+        assert_eq!(
+            (view["source"].as_str(), view["template"]["id"].as_str()),
+            (Some("workspace"), Some(id))
+        );
+        for page in ["overview", "metrics", "capabilities"] {
+            let opened = send(
+                "GET",
+                format!("/v1/workspaces/{workspace}/{page}"),
+                owner.clone(),
+                json!(null),
+            )
+            .await;
+            assert_eq!(opened.status(), 200, "{id} {page}");
+        }
+    }
+
+    let _ = std::fs::remove_dir_all(data_dir);
+}
+
 /// V0.2.168: a workspace can be created with a template; `general` saves the choice and makes no folders, no
 /// template saves nothing as before, and a template the server lacks is refused before anything is made.
 #[tokio::test]

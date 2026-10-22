@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.2.169` (2026-10-22). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, and the retired local workspace are described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.2.170` (2026-10-22). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, and the retired local workspace are described briefly in [§12](#12-desktop-app).
 
 ---
 
@@ -270,6 +270,20 @@ A workspace is opened at `/workspaces/:id/<section>` and has **twelve sections**
 | **Tasks** | Team action board | Everyone |
 | **People** | Members, invitations, a summary of *your* capabilities, and the activity feed (user or AI activity) with a 365-day calendar; the live updates carry that feed to owners and administrators only (everyone else is told that something changed, not who changed it) | Owner and admin |
 | **Settings** | The workspace's **icon** (one of 32, saved on click and shown on the dashboard, the workspace lists and the organization menu), members, AI providers and who may use AI, repository links, **export as an archive**, rename or delete | Owner and admin (rename and delete are owner only) |
+
+### Workspace templates (V0.2.163–)
+
+A **template** says which parts of RepoMemo matter most in a workspace and how they are shown. It chooses and orders what already exists; it never changes who may see or do anything, and never moves or deletes evidence. A workspace made before templates, or made without choosing one, uses **General**, which is RepoMemo as it always was.
+
+| Template | For | New workspaces start with the folders |
+|---|---|---|
+| **General** | Today's behaviour, unchanged | none |
+| **Software engineering** | Code, repositories, design notes | Architecture, Decisions, Runbooks |
+| **Operations and incidents** | Runbooks, incidents, on-call knowledge | Runbooks, Incidents, Postmortems, On-call |
+| **Product and decisions** | Specs, decisions, research, meeting notes | Decisions, Specs, Research, Meeting notes |
+| **Knowledge base** | Policies, contracts, reports, business documents | Policies, Contracts, Reports, Archive |
+
+The template is chosen when the workspace is created (the form on the dashboard and the setup wizard list the templates once the server offers more than General) and read through `GET /v1/workspaces/{id}/template`; an owner or administrator can change it through the API. Today a template gives a new workspace its folders; the releases of track N make it order the tabs, rename sections, choose the Overview cards, weigh search results, pick the health checks and more, one block at a time ([technical/workspace-templates.md](technical/workspace-templates.md)).
 
 ### Workspace pulse (Overview)
 
@@ -553,7 +567,7 @@ The local workspace and a server keep **separate data**.
 
 ---
 
-## 13. Known functional gaps (at V0.2.169)
+## 13. Known functional gaps (at V0.2.170)
 
 These are observed in the code and are useful for prioritizing. The roadmap item that addresses each one is in brackets.
 

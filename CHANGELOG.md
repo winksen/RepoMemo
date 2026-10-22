@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.170 (2026-10-22)
+
+Four templates ship with RepoMemo, as data.
+
+### Added
+- **Four templates:** *Software engineering* (code, repositories, design notes; starts with the folders Architecture, Decisions and Runbooks), *Operations and incidents* (runbooks, incidents, on-call knowledge; Runbooks, Incidents, Postmortems and On-call), *Product and decisions* (specs, decisions, research, meeting notes; Decisions, Specs, Research and Meeting notes) and *Knowledge base* (policies, contracts, reports, business documents; Policies, Contracts, Reports and Archive). Each is a JSON file in `crates/templates/definitions/` with its identity block and its starter folders, registered by the build with no Rust edited. Their other blocks arrive with the release that reads each (the tab order is V0.2.171).
+- **The picker lists five:** General first, then the four by name. A new workspace made from one has exactly its folders at the top level; General and no template make none. The functional mindmap has a table of the templates.
+- **Nothing is required:** existing workspaces stay on General, and a workspace made from a template opens as any workspace does; the folders can be renamed, moved or deleted like any others.
+- **Tests (written, not run):** `the_first_four_templates_ship_as_data_with_the_folders_a_new_workspace_starts_with` (the catalogue lists General and the four in order, each validates, names and folders as listed, General has none) and `the_four_first_templates_are_offered_and_each_creates_its_folders` (the route lists five; a workspace made from each has exactly its folders at the top level, reads back its template and opens its overview, metrics and capabilities).
+- **Checks run on this release:** `cargo check` of the templates and server crates with their tests compiles; `docs:check` and `version:check` pass. **Not run:** the tests, as asked.
+
+### Upgrading
+- Nothing to do. Existing workspaces are unchanged; a person who wants a template's folders in one can create them by hand.
+
 ## V0.2.169 (2026-10-22)
 
 The create-workspace form and the setup wizard offer the templates a server has.

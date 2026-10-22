@@ -1,0 +1,16 @@
+{
+  "format": 1,
+  "meta": {
+    "id": "knowledge-base",
+    "version": 1,
+    "name": "Knowledge base",
+    "summary": "Policies, contracts, reports and other business documents.",
+    "icon": "book"
+  },
+  "starter_folders": [
+    { "name": "Policies" },
+    { "name": "Contracts" },
+    { "name": "Reports" },
+    { "name": "Archive" }
+  ]
+}

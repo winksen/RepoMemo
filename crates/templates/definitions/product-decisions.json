@@ -1,0 +1,16 @@
+{
+  "format": 1,
+  "meta": {
+    "id": "product-decisions",
+    "version": 1,
+    "name": "Product and decisions",
+    "summary": "Specs, decisions, research and meeting notes.",
+    "icon": "compass"
+  },
+  "starter_folders": [
+    { "name": "Decisions" },
+    { "name": "Specs" },
+    { "name": "Research" },
+    { "name": "Meeting notes" }
+  ]
+}

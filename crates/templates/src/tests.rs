@@ -464,6 +464,66 @@ fn two_folders_beside_each_other_cannot_share_a_name() {
     assert!(parse(&with_folders(apart)).is_ok());
 }
 
+#[test]
+fn the_first_four_templates_ship_as_data_with_the_folders_a_new_workspace_starts_with() {
+    let catalogue = Catalogue::builtin();
+    assert!(
+        Catalogue::builtin_problems().is_empty(),
+        "{:?}",
+        Catalogue::builtin_problems()
+    );
+    // General first, then the four by name.
+    assert_eq!(
+        ids(catalogue),
+        [
+            "general",
+            "knowledge-base",
+            "operations",
+            "product-decisions",
+            "software-engineering"
+        ]
+    );
+    let expected: [(&str, &str, &[&str]); 4] = [
+        (
+            "software-engineering",
+            "Software engineering",
+            &["Architecture", "Decisions", "Runbooks"],
+        ),
+        (
+            "operations",
+            "Operations and incidents",
+            &["Runbooks", "Incidents", "Postmortems", "On-call"],
+        ),
+        (
+            "product-decisions",
+            "Product and decisions",
+            &["Decisions", "Specs", "Research", "Meeting notes"],
+        ),
+        (
+            "knowledge-base",
+            "Knowledge base",
+            &["Policies", "Contracts", "Reports", "Archive"],
+        ),
+    ];
+    for (id, name, folders) in expected {
+        let template = catalogue.get(id).unwrap_or_else(|| panic!("{id} is built in"));
+        assert_eq!(template.meta.name, name);
+        assert!(template.validate().is_empty(), "{id}: {:?}", template.validate());
+        let made: Vec<&str> = template
+            .starter_folders
+            .iter()
+            .map(|folder| folder.name.as_str())
+            .collect();
+        assert_eq!(made, folders, "{id}");
+        assert!(
+            template.starter_folders.iter().all(|folder| folder.children.is_empty()),
+            "{id}"
+        );
+    }
+    // General stays defined in code, with none.
+    assert!(catalogue.get(GENERAL_ID).unwrap().starter_folders.is_empty());
+}
+
 fn catalogue_with_operations(version: u32) -> Catalogue {
     let file = VALID.replace("\"version\": 2", &format!("\"version\": {version}"));
     let (catalogue, problems) = Catalogue::load([("operations.json", file.as_str())]);

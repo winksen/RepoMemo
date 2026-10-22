@@ -1,0 +1,16 @@
+{
+  "format": 1,
+  "meta": {
+    "id": "operations",
+    "version": 1,
+    "name": "Operations and incidents",
+    "summary": "Runbooks, incidents, postmortems and on-call knowledge.",
+    "icon": "heartbeat"
+  },
+  "starter_folders": [
+    { "name": "Runbooks" },
+    { "name": "Incidents" },
+    { "name": "Postmortems" },
+    { "name": "On-call" }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "format": 1,
+  "meta": {
+    "id": "software-engineering",
+    "version": 1,
+    "name": "Software engineering",
+    "summary": "Code, repositories, design notes and the decisions behind them.",
+    "icon": "code"
+  },
+  "starter_folders": [
+    { "name": "Architecture" },
+    { "name": "Decisions" },
+    { "name": "Runbooks" }
+  ]
+}
