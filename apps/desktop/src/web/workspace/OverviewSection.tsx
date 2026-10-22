@@ -5,8 +5,9 @@ import { type WorkspaceAiOverview } from "../../types";
 import { Button } from "../../components/ui/button";
 import { PanelHeading } from "../../components/ui/panel-heading";
 import { apiMessage, formatBytes } from "../format";
+import { pulseCard, pulseCardIds } from "./pulseCards";
 import { EvidenceUsed, MetricBars, MetricTimeline } from "../common";
-import { useCapabilities, useMetrics, useOverview } from "./data";
+import { useCapabilities, useMetrics, useOverview, useTemplate } from "./data";
 import { type WorkspacePage, sectionState } from "./page";
 import { ICON_SIZE } from "../../components/ui/icon";
 
@@ -15,6 +16,7 @@ export function OverviewSection({ page }: { page: WorkspacePage }) {
   const useS = sectionState(page.store, "overview");
   const [aiOverview, setAiOverview] = useS<WorkspaceAiOverview | null>("aiOverview", null);
   const [overview] = useOverview(accessToken, workspaceId);
+  const [template] = useTemplate(accessToken, workspaceId);
   const [workspaceMetrics] = useMetrics(accessToken, workspaceId);
   const [capabilities] = useCapabilities(accessToken, workspaceId);
   async function generateAiOverview() {
@@ -30,15 +32,7 @@ export function OverviewSection({ page }: { page: WorkspacePage }) {
         <section className="shared-metrics-dashboard" aria-labelledby="workspace-metrics-heading">
           <PanelHeading description={workspaceMetrics ? "Live API snapshot" : "Loading metrics…"} icon={Chart} id="workspace-metrics-heading" title="Workspace pulse" />
           <div className="shared-metric-highlights">
-            <div><span>Index coverage</span><strong>{workspaceMetrics ? `${workspaceMetrics.artifact_count ? Math.round((workspaceMetrics.indexed_artifact_count / workspaceMetrics.artifact_count) * 100) : 0}%` : "—"}</strong><small>{workspaceMetrics ? `${workspaceMetrics.indexed_artifact_count} of ${workspaceMetrics.artifact_count} artifacts` : "Waiting for server data"}</small></div>
-            <div><span>Indexed storage</span><strong>{workspaceMetrics ? formatBytes(workspaceMetrics.indexed_artifact_bytes) : "—"}</strong><small>{workspaceMetrics ? `${formatBytes(workspaceMetrics.pending_artifact_bytes)} pending` : "Waiting for server data"}</small></div>
-            <div><span>Fresh evidence</span><strong>{workspaceMetrics?.artifacts_updated_last_7_days ?? "—"}</strong><small>{workspaceMetrics ? `${workspaceMetrics.artifacts_created_last_7_days} added in 7 days` : "Waiting for server data"}</small></div>
-            <div><span>Knowledge density</span><strong>{workspaceMetrics ? `${workspaceMetrics.indexed_artifact_count ? Math.round(workspaceMetrics.chunk_count / workspaceMetrics.indexed_artifact_count) : 0}` : "—"}</strong><small>retrieval chunks per indexed file</small></div>
-            <div><span>Code symbols</span><strong>{workspaceMetrics?.symbol_count ?? "—"}</strong><small>extracted from evidence</small></div>
-            <div><span>Team access</span><strong>{workspaceMetrics?.member_count ?? "—"}</strong><small>people with workspace access</small></div>
-            <div><span>Active tasks</span><strong>{workspaceMetrics ? workspaceMetrics.open_task_count + workspaceMetrics.in_progress_task_count : "—"}</strong><small>{workspaceMetrics?.in_progress_task_count ?? 0} currently in progress</small></div>
-            <div><span>At risk</span><strong>{workspaceMetrics?.blocked_task_count ?? "—"}</strong><small>{workspaceMetrics?.overdue_task_count ?? 0} overdue action items</small></div>
-            <div><span>Team discussion</span><strong>{workspaceMetrics?.comment_count ?? "—"}</strong><small>{workspaceMetrics?.completed_task_count ?? 0} tasks completed</small></div>
+            {pulseCardIds(template?.overview.cards).map((id) => pulseCard(id, workspaceMetrics, overview))}
           </div>
           <div className="shared-metric-visuals">
             <section className="shared-metric-panel shared-metric-coverage"><div><h3>Indexing coverage</h3><span>{workspaceMetrics ? `${workspaceMetrics.pending_artifact_count} waiting to be indexed` : "Loading…"}</span></div><div className="shared-coverage-track" aria-label="Artifact indexing coverage" role="img"><span style={{ width: `${workspaceMetrics?.artifact_count ? (workspaceMetrics.indexed_artifact_count / workspaceMetrics.artifact_count) * 100 : 0}%` }} /></div><div className="shared-coverage-legend"><span>Indexed {workspaceMetrics?.indexed_artifact_count ?? 0}</span><span>Pending {workspaceMetrics?.pending_artifact_count ?? 0}</span></div></section>

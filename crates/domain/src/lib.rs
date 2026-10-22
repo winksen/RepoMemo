@@ -272,6 +272,8 @@ pub struct WorkspaceTemplateView {
     pub sections: TemplateSections,
     /// The names the template gives to sections and kinds of evidence.
     pub labels: TemplateLabels,
+    /// The pulse cards of the Overview.
+    pub overview: TemplateOverview,
 }
 
 /// The tabs of a workspace and the sections kept under *More*, as its template arranges them. Every section is in
@@ -290,6 +292,12 @@ pub struct TemplateSections {
 pub struct TemplateLabels {
     pub sections: BTreeMap<String, String>,
     pub artifact_types: BTreeMap<String, String>,
+}
+
+/// The pulse cards the Overview shows, in order, as the template chooses; for `general` the usual nine.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TemplateOverview {
+    pub cards: Vec<String>,
 }
 
 /// Chooses a workspace's template; `null` returns the workspace to the default.

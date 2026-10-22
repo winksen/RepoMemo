@@ -132,7 +132,7 @@ function workspace(role: SharedWorkspace["role"]): SharedWorkspace {
 function templateView(sections: WorkspaceTemplateView["sections"], labels: WorkspaceTemplateView["labels"] = { sections: {}, artifact_types: {} }): WorkspaceTemplateView {
   return {
     template: { id: "knowledge-base", version: 1, name: "Knowledge base", summary: "", icon: "book" },
-    source: "workspace", reason: null, chosen_id: "knowledge-base", overrides: null, sections, labels,
+    source: "workspace", reason: null, chosen_id: "knowledge-base", overrides: null, sections, labels, overview: { cards: ["index_coverage"] },
   };
 }
 

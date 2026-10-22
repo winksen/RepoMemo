@@ -218,6 +218,8 @@ export interface WorkspaceTemplateView {
   sections: TemplateSections;
   /** The names the template gives to sections and kinds of evidence. */
   labels: TemplateLabels;
+  /** The pulse cards of the Overview. */
+  overview: TemplateOverview;
 }
 
 /**
@@ -238,6 +240,11 @@ export interface TemplateSections {
 export interface TemplateLabels {
   sections: Record<string, string>;
   artifact_types: Record<string, string>;
+}
+
+/** The pulse cards the Overview shows, in order, as the template chooses; for `general` the usual nine. */
+export interface TemplateOverview {
+  cards: string[];
 }
 
 /** Chooses a workspace's template; `null` returns the workspace to the default. */

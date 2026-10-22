@@ -18,6 +18,7 @@ mod issue;
 mod labels;
 pub mod limits;
 mod meta;
+mod overview;
 mod resolve;
 mod sections;
 
@@ -30,6 +31,7 @@ pub use general::{general, GENERAL_ID};
 pub use issue::TemplateIssue;
 pub use labels::{LabelsBlock, ARTIFACT_TYPES};
 pub use meta::{TemplateMeta, WORKSPACE_ICONS};
+pub use overview::{OverviewBlock, CARDS_MAX, DEFAULT_CARDS, PULSE_CARDS};
 pub use resolve::{Origin, Resolution};
 pub use sections::{ResolvedSections, SectionsBlock, ADMIN_ONLY_SECTIONS, DEFAULT_LANDING, WORKSPACE_SECTIONS};
 
@@ -55,6 +57,9 @@ pub struct TemplateDefinition {
     /// The names shown for sections and kinds of evidence (V0.2.173); the usual names when left out.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub labels: Option<LabelsBlock>,
+    /// The pulse cards the Overview shows, and their order (V0.2.174); the usual nine when left out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub overview: Option<OverviewBlock>,
 }
 
 impl TemplateDefinition {
@@ -113,6 +118,9 @@ impl TemplateDefinition {
         if let Some(labels) = &self.labels {
             labels::validate(labels, &mut issues);
         }
+        if let Some(overview) = &self.overview {
+            overview::validate(overview, &mut issues);
+        }
         issues
     }
 
@@ -123,6 +131,11 @@ impl TemplateDefinition {
     /// The names this template gives to sections and kinds of evidence; empty for the usual names.
     pub fn labels(&self) -> LabelsBlock {
         self.labels.clone().unwrap_or_default()
+    }
+
+    /// The pulse cards the Overview shows, in order.
+    pub fn overview_cards(&self) -> Vec<String> {
+        OverviewBlock::resolved(self.overview.as_ref())
     }
 
     /// The tabs and the *More* menu this template asks for, complete.

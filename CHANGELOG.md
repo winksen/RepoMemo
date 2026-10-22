@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.174 (2026-10-22)
+
+The Overview shows the pulse cards its template asks for, in its order.
+
+### Changed
+- **The `overview` block:** a template lists the cards of the Overview's *Workspace pulse* (`overview.cards`): one to eight of eleven, each once, from the figures the page already loads (index coverage, indexed storage, fresh evidence, knowledge density, code symbols, sources, memory cards, team access, active tasks, at risk, team discussion). A card not listed is not shown, the charts below stay, and nothing new is counted or requested. `sources` and `memory_cards` are new cards, drawn from numbers the page had already (the number of sources and of memory cards). Without the block the nine cards that have always been shown appear in their order, so General is unchanged. `GET /v1/workspaces/{id}/template` answers the resolved list as `overview.cards`.
+- **The four templates:** *Software engineering* shows code symbols, sources, index coverage, tasks at risk and fresh evidence; *Operations and incidents* fresh evidence, active tasks, tasks at risk and memory cards; *Product and decisions* memory cards, active tasks, fresh evidence and index coverage; *Knowledge base* index coverage, indexed storage, fresh evidence and knowledge density.
+- **A difference from the plan:** the plan's first proposal named figures the metrics do not carry (repositories in sync, evidence reviewed in 90 days, needing review, duplicates, documents by kind). The templates use the closest figures that exist; a figure the metrics gain later becomes a card with the release that adds it.
+- **In the client:** the nine cards moved from the Overview into `pulseCards.tsx` with the same words; an id this client cannot draw is ignored, a repeated one is drawn once, and if nothing is left the usual nine appear.
+- **Tests (written, not run):** three in the templates crate (the usual nine without a block and a chosen list written back; an unknown, repeated, missing or ninth card refused; the list equal to the web client's and the four templates' cards), five in the web client (the usual nine and their words, the template's order, unknown and repeated ids with the fallback, every card drawn from loaded figures, a dash before they arrive), and the server's template test now checks the cards of General and of each of the four.
+- **Checks run on this release:** `cargo check` of the templates, api and server crates with their tests compiles; `rustfmt` shows nothing for the lines changed; `types:check`, `typecheck`, `styles:check`, `a11y:check`, `docs:check` and `version:check` pass. **Not run:** the tests, as asked.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.173 (2026-10-22)
 
 A template can name sections and kinds of evidence the way a team says them.

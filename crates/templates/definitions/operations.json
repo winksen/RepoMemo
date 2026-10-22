@@ -20,5 +20,8 @@
   },
   "labels": {
     "sections": { "evidence": "Runbooks and incidents", "tasks": "Actions", "memory": "Lessons" }
+  },
+  "overview": {
+    "cards": ["fresh_evidence", "active_tasks", "at_risk", "memory_cards"]
   }
 }

@@ -20,5 +20,8 @@
   },
   "labels": {
     "sections": { "evidence": "Library" }
+  },
+  "overview": {
+    "cards": ["index_coverage", "indexed_storage", "fresh_evidence", "knowledge_density"]
   }
 }

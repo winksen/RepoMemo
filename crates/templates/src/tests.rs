@@ -1,8 +1,5 @@
 use crate::catalogue::BUILTIN_SOURCES;
-use crate::{
-    general, limits, Catalogue, Origin, TemplateDefinition, TemplateIssue, ADMIN_ONLY_SECTIONS, ARTIFACT_TYPES, FORMAT,
-    GENERAL_ID, WORKSPACE_ICONS, WORKSPACE_SECTIONS,
-};
+use crate::*;
 
 const VALID: &str = r#"{
   "format": 1,
@@ -710,6 +707,98 @@ fn the_four_first_templates_name_what_their_teams_call_things() {
     assert_eq!(
         (kinds["api_spec"].as_str(), kinds["pr"].as_str()),
         ("API spec", "Pull request")
+    );
+}
+
+/// The valid file with an `overview` block written as JSON.
+fn with_overview(block: &str) -> String {
+    VALID.replacen(
+        "\"format\": 1,",
+        &format!("\"format\": 1,\n  \"overview\": {block},"),
+        1,
+    )
+}
+
+#[test]
+fn the_overview_shows_the_usual_nine_cards_unless_a_template_chooses() {
+    assert_eq!(general().overview_cards(), DEFAULT_CARDS);
+    assert_eq!(parse(VALID).unwrap().overview_cards(), DEFAULT_CARDS);
+    for card in DEFAULT_CARDS {
+        assert!(PULSE_CARDS.contains(&card), "{card} is a pulse card");
+    }
+    let chosen = parse(&with_overview(
+        r#"{ "cards": ["memory_cards", "at_risk", "fresh_evidence"] }"#,
+    ))
+    .unwrap();
+    assert_eq!(chosen.overview_cards(), ["memory_cards", "at_risk", "fresh_evidence"]);
+    assert_eq!(parse(&serde_json::to_string(&chosen).unwrap()).unwrap(), chosen);
+    assert!(!serde_json::to_string(&general()).unwrap().contains("overview"));
+}
+
+#[test]
+fn a_card_must_exist_be_listed_once_and_there_are_at_most_eight() {
+    let unknown = parse(&with_overview(r#"{ "cards": ["at_risk", "revenue"] }"#)).unwrap_err();
+    assert_eq!(unknown[0].path, "overview.cards[1]");
+    let twice = parse(&with_overview(r#"{ "cards": ["at_risk", "at_risk"] }"#)).unwrap_err();
+    assert_eq!(twice[0].path, "overview.cards[1]");
+    let none = parse(&with_overview("{}")).unwrap_err();
+    assert_eq!(none[0].path, "overview.cards");
+    let eight: Vec<String> = PULSE_CARDS
+        .iter()
+        .take(CARDS_MAX)
+        .map(|card| format!("\"{card}\""))
+        .collect();
+    assert!(parse(&with_overview(&format!(r#"{{ "cards": [{}] }}"#, eight.join(",")))).is_ok());
+    let nine: Vec<String> = PULSE_CARDS
+        .iter()
+        .take(CARDS_MAX + 1)
+        .map(|card| format!("\"{card}\""))
+        .collect();
+    let too_many = parse(&with_overview(&format!(r#"{{ "cards": [{}] }}"#, nine.join(",")))).unwrap_err();
+    assert_eq!(too_many[0].path, "overview.cards");
+    let unknown_key = parse(&with_overview(r#"{ "cards": ["at_risk"], "colour": "red" }"#)).unwrap_err();
+    assert!(
+        unknown_key[0].message.contains("unknown field `colour`"),
+        "{}",
+        unknown_key[0]
+    );
+}
+
+#[test]
+fn the_card_list_is_the_one_the_web_client_draws_and_the_four_templates_choose_theirs() {
+    let client = include_str!("../../../apps/desktop/src/web/workspace/pulseCards.tsx");
+    let line = client
+        .lines()
+        .find(|line| line.starts_with("export const PULSE_CARD_IDS"))
+        .expect("the client lists the cards");
+    let listed: Vec<&str> = line.split('"').skip(1).step_by(2).collect();
+    assert_eq!(
+        listed, PULSE_CARDS,
+        "pulseCards.tsx and repomemo-templates list different cards"
+    );
+
+    let catalogue = Catalogue::builtin();
+    let cards = |id: &str| catalogue.get(id).unwrap().overview_cards();
+    assert_eq!(
+        cards("software-engineering"),
+        ["code_symbols", "sources", "index_coverage", "at_risk", "fresh_evidence"]
+    );
+    assert_eq!(
+        cards("operations"),
+        ["fresh_evidence", "active_tasks", "at_risk", "memory_cards"]
+    );
+    assert_eq!(
+        cards("product-decisions"),
+        ["memory_cards", "active_tasks", "fresh_evidence", "index_coverage"]
+    );
+    assert_eq!(
+        cards("knowledge-base"),
+        [
+            "index_coverage",
+            "indexed_storage",
+            "fresh_evidence",
+            "knowledge_density"
+        ]
     );
 }
 

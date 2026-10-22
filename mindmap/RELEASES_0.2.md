@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.2 → 0.3
 
-> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.173` (2026-10-22) · **Next:** `V0.2.174`
+> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.174` (2026-10-22) · **Next:** `V0.2.175`
 > **Previous line:** [Releases 0.1 → 0.2](RELEASES_0.1.md) · **Related:** [Roadmap, Road to V0.3.0](ROADMAP.md#-road-to-v030) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
 Every release of the 0.2 line, shipped and planned, one row each. The plan comes from the [Road to V0.3.0](ROADMAP.md#-road-to-v030): **one change per release**, each shippable alone, with the security rules for a new outside connection in the release that opens it. Planned rows are proposals until decisions 7–14 in the roadmap are agreed; tracks L and M waited on decisions 20–23, and track N on decisions 24–28 (taken as proposed).
@@ -211,7 +211,7 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | **V0.2.171** | ✅ 2026-10-22 |N. Workspace templates |🔧 Enhancement | Web | Workspace tabs follow the template's order, with the lesser sections under More | Map is under More in a Knowledge base workspace and its address still opens |
 | **V0.2.172** | ✅ 2026-10-22 |N. Workspace templates |🔧 Enhancement | Web | A workspace opens on its landing section; the palette follows the template's order | An Operations workspace opens on Review |
 | **V0.2.173** | ✅ 2026-10-22 |N. Workspace templates |🔧 Enhancement | Web | Sections and evidence types named by the template | Operations shows *Actions* for Tasks in the tab, title and palette |
-| **V0.2.174** | 🔜 Planned | N. Workspace templates | 🔧 Enhancement | Web | The Overview shows the cards its template asks for, in its order | Software engineering shows symbols and repositories in sync first |
+| **V0.2.174** | ✅ 2026-10-22 |N. Workspace templates |🔧 Enhancement | Web | The Overview shows the cards its template asks for, in its order | Software engineering shows symbols and repositories in sync first |
 | **V0.2.175** | 🔜 Planned | N. Workspace templates | 🔧 Enhancement | Web | The evidence ledger opens in the template's view and offers its types first | A person's own view choice wins over the default |
 | **V0.2.176** | 🔜 Planned | N. Workspace templates | 🔧 Enhancement | Web | Assistant suggestions and Retrieval defaults from the template | Clicking a suggestion fills the box and sends nothing |
 | **V0.2.177** | 🔜 Planned | N. Workspace templates | ✨ Feature | Web | Settings › Template: choose, preview, adjust and reset | A change shows on the next navigation and in the activity feed |

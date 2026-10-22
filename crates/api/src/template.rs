@@ -10,7 +10,9 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
-use repomemo_domain::{TemplateLabels, TemplateSections, TemplateSummary, WorkspaceTemplateRef, WorkspaceTemplateView};
+use repomemo_domain::{
+    TemplateLabels, TemplateOverview, TemplateSections, TemplateSummary, WorkspaceTemplateRef, WorkspaceTemplateView,
+};
 use repomemo_storage::StarterSetup;
 use repomemo_templates::{Catalogue, Origin, TemplateDefinition};
 
@@ -55,6 +57,9 @@ impl EffectiveTemplate {
                     more: sections.more,
                     landing: sections.landing,
                 }
+            },
+            overview: TemplateOverview {
+                cards: self.template.overview_cards(),
             },
             labels: {
                 let labels = self.template.labels();

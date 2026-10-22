@@ -133,6 +133,18 @@ async fn the_four_first_templates_are_offered_and_each_creates_its_folders() {
             _ => "overview",
         };
         assert_eq!(view["sections"]["landing"], landing, "{id}");
+        // The Overview's cards (V0.2.174): Software engineering leads with the code symbols.
+        let cards = view["overview"]["cards"].as_array().unwrap();
+        assert!(!cards.is_empty() && cards.len() <= 8, "{id}");
+        assert_eq!(
+            cards[0],
+            if id == "software-engineering" {
+                "code_symbols"
+            } else {
+                cards[0].as_str().unwrap()
+            },
+            "{id}"
+        );
         // The names it gives (V0.2.173): Operations calls Tasks "Actions"; Software engineering names two kinds of evidence.
         assert_eq!(
             view["labels"]["sections"]["tasks"],
@@ -362,6 +374,20 @@ async fn templates_are_listed_read_by_members_and_changed_only_by_administrators
     assert_eq!(by_default["sections"]["landing"], "overview");
     // General renames nothing.
     assert_eq!(by_default["labels"], json!({"sections": {}, "artifact_types": {}}));
+    assert_eq!(
+        by_default["overview"]["cards"],
+        json!([
+            "index_coverage",
+            "indexed_storage",
+            "fresh_evidence",
+            "knowledge_density",
+            "code_symbols",
+            "team_access",
+            "active_tasks",
+            "at_risk",
+            "team_discussion"
+        ])
+    );
     assert_eq!(
         send("GET", template_uri.clone(), outsider.clone(), json!(null))
             .await
