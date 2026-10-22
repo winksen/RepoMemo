@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.151 (2026-10-21)
+
+A job can be stopped only by the person who started it or an administrator, and a re-index of one file no longer starts a task of its own for every request.
+
+### Security
+- **Who may cancel a job (S5-9):** any workspace writer could cancel any job of the workspace, an administrator's whole-workspace re-index included. A job now records who started it (migration 0040, `indexing_jobs.started_by`), and `POST /v1/jobs/{id}/cancel` accepts that person or an owner or administrator of the workspace (a system administrator counts as one), and answers `403` to everyone else. A job nobody started (a webhook or scheduled sync, a restart) and the jobs of earlier versions have no starter, so only an administrator stops them. The whole-workspace re-index, a repository sync and a connector sync started by a person record them as the starter.
+
+### Changed
+- **A re-index of one file goes through the indexing queue (E8):** `POST /v1/artifacts/{id}/index` started a background task for every request, with no limit and no check for one already running. The file now joins the queue the uploads use, behind the same cap on files indexed at once, once per file. The answer is still `202` with the job, made when the request arrives; asking again while that job waits or runs returns the same job, so ten requests make one. If an automatic pass for the same file is waiting or running, it takes the work, or the file is queued again when that pass ends. A failed manual re-index is not retried (the job carries the reason; ask again), as before.
+- **Tests (written, not run):** `ten_requests_for_one_file_make_one_job` (a queue whose worker has not started: ten requests, one job, one entry in the queue, the starter recorded, another file with a job of its own) and `a_job_is_cancelled_by_its_starter_or_an_administrator` (a member cannot cancel an administrator's re-index or another member's; the starter and an administrator can).
+- **Checks run on this release:** `cargo check` of the storage, api and server crates with their tests compiles; `rustfmt` shows nothing for the lines changed; `docs:check`, `version:check` and `migrations:check` pass. **Not run:** the tests, as asked; so the new migration has not run against a real database here.
+
+### Upgrading
+- Migration 0040 adds a nullable column and runs on first start. Jobs started before it have no starter, so only an owner or administrator cancels one that is still running.
+
 ## V0.2.150 (2026-10-21)
 
 The artifact page stops reading a document again every time it opens.

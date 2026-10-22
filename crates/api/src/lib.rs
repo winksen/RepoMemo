@@ -1309,9 +1309,16 @@ struct ArtifactIndexResult {
 /// One artifact that has been checked and has a running job, but is not
 /// indexed yet: what a caller holds between `begin_index_artifact` and
 /// `finish_index_artifact` (an HTTP handler answers `202` in between).
+#[derive(Clone)]
 pub struct PendingArtifactIndex {
     pub job: IndexingJobStatus,
     summary: ArtifactSummary,
+}
+
+impl PendingArtifactIndex {
+    pub fn summary(&self) -> &ArtifactSummary {
+        &self.summary
+    }
 }
 
 /// A workspace re-index that has found what is stale and has a running job.
@@ -1320,8 +1327,6 @@ pub struct PendingWorkspaceIndex {
     artifacts: Vec<ArtifactSummary>,
 }
 
-/// Splits consecutive sections into parts of at most `max_chars` (a single
-/// longer section forms its own part), returning section indices per part.
 /// A document's text as indexing stored it, in order, for the artifact page.
 /// `None` when the file has no stored passages to trust (not indexed yet, or
 /// changed since: a new version clears `indexed_at`); `Some(None)` when it was
@@ -1341,6 +1346,8 @@ fn stored_document_text(detail: &ArtifactDetail) -> Option<Option<String>> {
     Some((!text.is_empty()).then_some(text))
 }
 
+/// Splits consecutive sections into parts of at most `max_chars` (a single
+/// longer section forms its own part), returning section indices per part.
 fn group_sections(sections: &[String], max_chars: usize) -> Vec<Vec<usize>> {
     let mut parts: Vec<Vec<usize>> = Vec::new();
     let mut size = 0_usize;

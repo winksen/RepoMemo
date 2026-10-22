@@ -98,6 +98,10 @@ impl ConnectorRunner {
                 return Err(error);
             }
         };
+        if let Some(actor) = actor_user_id.as_deref() {
+            // A failure to record the starter only leaves the job to administrators.
+            let _ = self.core.storage().set_job_started_by(&job.id, actor).await;
+        }
         let runner = self.clone();
         let source = source.clone();
         let job_id = job.id.clone();

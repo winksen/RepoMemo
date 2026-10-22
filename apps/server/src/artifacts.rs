@@ -841,43 +841,21 @@ pub(crate) async fn list_artifact_lifecycle_events(
         .map_err(map_storage_error)
 }
 
-/// Re-indexes one artifact. Answers `202 Accepted` with the running job at
-/// once; the work happens in the background and its progress and result arrive
-/// on the job (`GET /v1/jobs/{id}`, the event streams).
+/// Re-indexes one artifact. Answers `202 Accepted` with the job at once; the
+/// file goes through the indexing queue (one place, one cap, one entry per file),
+/// and its progress and result arrive on the job (`GET /v1/jobs/{id}`, the event
+/// streams). Asking again while the job is waiting or running returns that job.
 pub(crate) async fn index_artifact(
     subject: AuthenticatedSubject,
     State(state): State<AppState>,
     Path(artifact_id): Path<String>,
 ) -> Result<(StatusCode, Json<IndexingJobStatus>), ApiError> {
-    let artifact = writable_artifact_summary(&state, &subject, &artifact_id).await?;
-    let pending = state
-        .core
-        .begin_index_artifact(artifact_id)
+    writable_artifact_summary(&state, &subject, &artifact_id).await?;
+    let job = state
+        .index_queue
+        .enqueue_manual(&artifact_id, &subject.user_id)
         .await
         .map_err(map_core_error)?;
-    let job = pending.job.clone();
-    let worker = state.clone();
-    let actor = subject.user_id.clone();
-    tokio::spawn(async move {
-        let workspace_id = artifact.workspace_id.clone();
-        match worker.core.finish_index_artifact(pending).await {
-            Ok(_) => {
-                worker.embedding_queue.request(&workspace_id);
-                record_workspace_activity(
-                    &worker,
-                    &workspace_id,
-                    &actor,
-                    "artifact_indexed",
-                    "artifact",
-                    Some(&artifact.id),
-                    format!("Indexed evidence: {}.", artifact.title),
-                )
-                .await;
-            }
-            // The job already carries the reason; the log is for the operator.
-            Err(error) => tracing::warn!(error = %error, artifact_id = %artifact.id, "Manual indexing failed"),
-        }
-    });
     Ok((StatusCode::ACCEPTED, Json(job)))
 }
 
@@ -913,6 +891,11 @@ pub(crate) async fn index_workspace(
         .begin_index_workspace(workspace_id.clone())
         .await
         .map_err(map_core_error)?;
+    state
+        .storage
+        .set_job_started_by(&pending.job.id, &subject.user_id)
+        .await
+        .map_err(map_storage_error)?;
     let job = pending.job.clone();
     let worker = state.clone();
     let actor = subject.user_id.clone();
@@ -981,7 +964,15 @@ pub(crate) async fn cancel_job(
         .await
         .map_err(map_storage_error)?
         .ok_or_else(|| ApiError::not_found("The job was not found."))?;
-    require_workspace_write(&state, &subject, &job.workspace_id).await?;
+    let role = require_workspace_write(&state, &subject, &job.workspace_id).await?;
+    // The person who started a job, or an administrator. A job nobody started
+    // (the server's own work, an older job) is an administrator's to stop.
+    if !matches!(role, WorkspaceRole::Owner | WorkspaceRole::Admin) {
+        let started_by = state.storage.job_started_by(&job_id).await.map_err(map_storage_error)?;
+        if started_by.as_deref() != Some(subject.user_id.as_str()) {
+            return Err(ApiError::forbidden());
+        }
+    }
     let updated = state
         .storage
         .request_job_cancel(&job_id)

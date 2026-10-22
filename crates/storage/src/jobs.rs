@@ -200,6 +200,29 @@ impl StorageEngine {
         .rows_affected())
     }
 
+    /// Records who started a job, for the rule on who may cancel it. A job
+    /// left without a starter (the server's own work, older jobs) is cancelled
+    /// by an administrator only.
+    pub async fn set_job_started_by(&self, job_id: &str, user_id: &str) -> Result<()> {
+        sqlx::query("UPDATE indexing_jobs SET started_by = ?1 WHERE id = ?2")
+            .bind(user_id)
+            .bind(job_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// The account that started a job, if one did.
+    pub async fn job_started_by(&self, job_id: &str) -> Result<Option<String>> {
+        Ok(
+            sqlx::query_scalar::<_, Option<String>>("SELECT started_by FROM indexing_jobs WHERE id = ?1")
+                .bind(job_id)
+                .fetch_optional(self.reader())
+                .await?
+                .flatten(),
+        )
+    }
+
     pub async fn is_job_cancel_requested(&self, job_id: &str) -> Result<bool> {
         let value = sqlx::query_scalar::<_, i64>("SELECT cancel_requested FROM indexing_jobs WHERE id = ?1")
             .bind(job_id)

@@ -6,13 +6,13 @@
 //! [`IndexQueue::resume_pending`].
 
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     sync::{Arc, Mutex},
     time::Duration,
 };
 
-use repomemo_api::RepoMemoCore;
-use repomemo_domain::ArtifactSummary;
+use repomemo_api::{PendingArtifactIndex, RepoMemoCore};
+use repomemo_domain::{ArtifactSummary, IndexingJobStatus};
 use tokio::sync::{mpsc, Semaphore};
 
 use crate::embedding::EmbeddingQueue;
@@ -43,10 +43,23 @@ struct IndexRequest {
     record_activity: bool,
 }
 
+/// A person's re-index of one file: its job (made when it was asked for, so the
+/// answer can carry it) and, until a worker picks the file up, the work itself.
+/// The entry stays until the work is done, so asking again meanwhile gets the
+/// same job instead of starting another.
+struct ManualIndex {
+    job: IndexingJobStatus,
+    pending: Option<PendingArtifactIndex>,
+    actor_user_id: String,
+}
+
+type ManualIndexes = Arc<tokio::sync::Mutex<HashMap<String, ManualIndex>>>;
+
 #[derive(Clone)]
 pub struct IndexQueue {
     sender: mpsc::UnboundedSender<IndexRequest>,
     queued: Arc<Mutex<HashSet<String>>>,
+    manual: ManualIndexes,
     core: RepoMemoCore,
 }
 
@@ -60,15 +73,22 @@ impl IndexQueue {
     pub fn start(core: RepoMemoCore, embeddings: EmbeddingQueue, concurrency: usize) -> Self {
         let (sender, receiver) = mpsc::unbounded_channel();
         let queued = Arc::new(Mutex::new(HashSet::new()));
+        let manual = ManualIndexes::default();
         tokio::spawn(run_worker(
             core.clone(),
             embeddings,
             queued.clone(),
+            manual.clone(),
             sender.clone(),
             receiver,
             concurrency.max(1),
         ));
-        Self { sender, queued, core }
+        Self {
+            sender,
+            queued,
+            manual,
+            core,
+        }
     }
 
     /// Schedules a newly stored artifact for indexing unless it is already
@@ -81,26 +101,39 @@ impl IndexQueue {
     }
 
     fn push(&self, artifact: &ArtifactSummary, actor_user_id: Option<&str>) {
-        let newly_queued = self
-            .queued
-            .lock()
-            .map(|mut queued| queued.insert(artifact.id.clone()))
-            .unwrap_or(false);
-        if !newly_queued {
-            return;
+        queue_request(&self.queued, &self.sender, artifact, actor_user_id);
+    }
+
+    /// A person's request to index one file again. The file goes through this
+    /// queue, behind the same cap as every other, and the answer is the job that
+    /// will carry its progress. Asking again while that job is waiting or running
+    /// gives the same job, so ten requests make one.
+    pub async fn enqueue_manual(&self, artifact_id: &str, actor_user_id: &str) -> anyhow::Result<IndexingJobStatus> {
+        // Held across the job's creation, so two requests at once make one job.
+        let mut manual = self.manual.lock().await;
+        if let Some(entry) = manual.get(artifact_id) {
+            return Ok(entry.job.clone());
         }
-        let request = IndexRequest {
-            attempt: 0,
-            artifact_id: artifact.id.clone(),
-            workspace_id: artifact.workspace_id.clone(),
-            title: artifact.title.clone(),
-            actor_user_id: actor_user_id.map(str::to_owned),
-            record_activity: artifact.indexed_at.is_none(),
-        };
-        if self.sender.send(request).is_err() {
-            tracing::error!(artifact_id = %artifact.id, "Indexing queue is closed");
-            forget(&self.queued, &artifact.id);
-        }
+        let pending = self.core.begin_index_artifact(artifact_id.to_owned()).await?;
+        self.core
+            .storage()
+            .set_job_started_by(&pending.job.id, actor_user_id)
+            .await?;
+        let job = pending.job.clone();
+        let summary = pending.summary().clone();
+        manual.insert(
+            artifact_id.to_owned(),
+            ManualIndex {
+                job: job.clone(),
+                pending: Some(pending),
+                actor_user_id: actor_user_id.to_owned(),
+            },
+        );
+        drop(manual);
+        // If the file is already waiting (or running) for an automatic pass, that
+        // pass takes this work when its turn comes, or the worker queues it again.
+        queue_request(&self.queued, &self.sender, &summary, Some(actor_user_id));
+        Ok(job)
     }
 
     /// Artifacts waiting for indexing or for a retry.
@@ -129,10 +162,39 @@ impl IndexQueue {
     }
 }
 
+/// Puts a file in the queue unless it is already waiting or running there.
+fn queue_request(
+    queued: &Mutex<HashSet<String>>,
+    sender: &mpsc::UnboundedSender<IndexRequest>,
+    artifact: &ArtifactSummary,
+    actor_user_id: Option<&str>,
+) {
+    let newly_queued = queued
+        .lock()
+        .map(|mut queued| queued.insert(artifact.id.clone()))
+        .unwrap_or(false);
+    if !newly_queued {
+        return;
+    }
+    let request = IndexRequest {
+        attempt: 0,
+        artifact_id: artifact.id.clone(),
+        workspace_id: artifact.workspace_id.clone(),
+        title: artifact.title.clone(),
+        actor_user_id: actor_user_id.map(str::to_owned),
+        record_activity: artifact.indexed_at.is_none(),
+    };
+    if sender.send(request).is_err() {
+        tracing::error!(artifact_id = %artifact.id, "Indexing queue is closed");
+        forget(queued, &artifact.id);
+    }
+}
+
 async fn run_worker(
     core: RepoMemoCore,
     embeddings: EmbeddingQueue,
     queued: Arc<Mutex<HashSet<String>>>,
+    manual: ManualIndexes,
     sender: mpsc::UnboundedSender<IndexRequest>,
     mut receiver: mpsc::UnboundedReceiver<IndexRequest>,
     concurrency: usize,
@@ -145,13 +207,32 @@ async fn run_worker(
         let core = core.clone();
         let embeddings = embeddings.clone();
         let queued = queued.clone();
+        let manual = manual.clone();
         let sender = sender.clone();
         tokio::spawn(async move {
-            let retry_pending = index_one(&core, &embeddings, &request, &sender).await;
+            let retry_pending = index_one(&core, &embeddings, &request, &sender, &manual).await;
             // A request waiting for its retry stays "queued" so duplicates are
             // not added; the permit is released so other files keep moving.
             if !retry_pending {
                 forget(&queued, &request.artifact_id);
+                // A person's request that arrived after this file was picked up
+                // has not been taken by anyone: queue the file again for it.
+                let waiting = {
+                    let mut manual = manual.lock().await;
+                    match manual.get(&request.artifact_id) {
+                        Some(entry) => match entry.pending.as_ref() {
+                            Some(pending) => Some((pending.summary().clone(), entry.actor_user_id.clone())),
+                            None => {
+                                manual.remove(&request.artifact_id);
+                                None
+                            }
+                        },
+                        None => None,
+                    }
+                };
+                if let Some((summary, actor)) = waiting {
+                    queue_request(&queued, &sender, &summary, Some(&actor));
+                }
             }
             drop(permit);
         });
@@ -164,7 +245,41 @@ async fn index_one(
     embeddings: &EmbeddingQueue,
     request: &IndexRequest,
     sender: &mpsc::UnboundedSender<IndexRequest>,
+    manual: &ManualIndexes,
 ) -> bool {
+    // A person asked for this file and has its job already: do that work, with
+    // no retry (they ask again if it fails) and an activity entry in their name.
+    let claimed = manual.lock().await.get_mut(&request.artifact_id).and_then(|entry| {
+        entry
+            .pending
+            .take()
+            .map(|pending| (pending, entry.actor_user_id.clone()))
+    });
+    if let Some((pending, actor)) = claimed {
+        match core.finish_index_artifact(pending).await {
+            Ok(_) => {
+                embeddings.request(&request.workspace_id);
+                if let Err(error) = core
+                    .storage()
+                    .record_workspace_activity(
+                        &request.workspace_id,
+                        Some(&actor),
+                        "artifact_indexed",
+                        "artifact",
+                        Some(&request.artifact_id),
+                        &format!("Indexed evidence: {}.", request.title),
+                    )
+                    .await
+                {
+                    tracing::error!(error = %error, "Failed to record indexing activity");
+                }
+            }
+            // The job already carries the reason; the log is for the operator.
+            Err(error) => tracing::warn!(error = %error, artifact_id = %request.artifact_id, "Manual indexing failed"),
+        }
+        manual.lock().await.remove(&request.artifact_id);
+        return false;
+    }
     let result = core.index_artifact(request.artifact_id.clone()).await;
     if result.is_ok() {
         embeddings.request(&request.workspace_id);
@@ -229,5 +344,75 @@ async fn index_one(
 fn forget(queued: &Mutex<HashSet<String>>, artifact_id: &str) {
     if let Ok(mut queued) = queued.lock() {
         queued.remove(artifact_id);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// V0.2.151: a person's re-index of one file is one job however often it is
+    /// asked for while the file waits, and the job remembers who started it.
+    #[tokio::test]
+    async fn ten_requests_for_one_file_make_one_job() {
+        let data_dir = std::env::temp_dir().join(format!("repomemo-index-queue-{}", uuid::Uuid::new_v4()));
+        let core = RepoMemoCore::boot(data_dir.clone()).await.unwrap();
+        let workspace = core.create_workspace("Queue".to_owned()).await.unwrap();
+        let artifact = core
+            .import_text(
+                workspace.id.clone(),
+                "Queued".to_owned(),
+                "One passage.".to_owned(),
+                Some("Markdown".to_owned()),
+            )
+            .await
+            .unwrap();
+        let other = core
+            .import_text(
+                workspace.id.clone(),
+                "Other".to_owned(),
+                "Another passage.".to_owned(),
+                Some("Markdown".to_owned()),
+            )
+            .await
+            .unwrap();
+
+        // A queue whose worker has not started: the requests stay where they were put.
+        let (sender, mut receiver) = mpsc::unbounded_channel();
+        let queue = IndexQueue {
+            sender,
+            queued: Arc::default(),
+            manual: ManualIndexes::default(),
+            core: core.clone(),
+        };
+        let first = queue.enqueue_manual(&artifact.id, "user-1").await.unwrap();
+        for _ in 0..9 {
+            let again = queue.enqueue_manual(&artifact.id, "user-2").await.unwrap();
+            assert_eq!(again.id, first.id, "the same job comes back while the file waits");
+        }
+        assert_eq!(receiver.try_recv().unwrap().artifact_id, artifact.id);
+        assert!(receiver.try_recv().is_err(), "the file is in the queue once");
+        let jobs = core
+            .storage()
+            .list_workspace_jobs(&workspace.id, Some("indexing"), None, 50)
+            .await
+            .unwrap();
+        assert_eq!(jobs.len(), 1, "one job for ten requests");
+        assert_eq!(
+            core.storage().job_started_by(&first.id).await.unwrap().as_deref(),
+            Some("user-1")
+        );
+
+        // Another file has a job of its own.
+        let second = queue.enqueue_manual(&other.id, "user-2").await.unwrap();
+        assert_ne!(second.id, first.id);
+        assert_eq!(
+            core.storage().job_started_by(&second.id).await.unwrap().as_deref(),
+            Some("user-2")
+        );
+
+        drop(queue);
+        drop(core);
+        let _ = std::fs::remove_dir_all(data_dir);
     }
 }

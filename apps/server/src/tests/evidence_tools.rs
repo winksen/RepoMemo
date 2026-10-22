@@ -696,3 +696,90 @@ async fn a_refused_artifact_request_starts_no_document_reader() {
     assert_eq!(repomemo_api::recent_readings_of(&name), before);
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+/// V0.2.151: a job is cancelled by the person who started it or by an
+/// administrator, not by any other writer (review S5-9).
+#[tokio::test]
+async fn a_job_is_cancelled_by_its_starter_or_an_administrator() {
+    let data_dir = temp_data_dir("job-owners");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let (_, _) = register_account(&app, "jobs-admin@example.com").await;
+    let (owner, _) = register_account(&app, "jobs-owner@example.com").await;
+    let (ada, _) = register_account(&app, "jobs-ada@example.com").await;
+    let (bob, _) = register_account(&app, "jobs-bob@example.com").await;
+    let workspace_id = create_workspace(&app, &owner).await;
+    join(
+        &app,
+        &owner,
+        "workspaces",
+        &workspace_id,
+        "jobs-ada@example.com",
+        "member",
+    )
+    .await;
+    join(
+        &app,
+        &owner,
+        "workspaces",
+        &workspace_id,
+        "jobs-bob@example.com",
+        "member",
+    )
+    .await;
+
+    let note = call(
+        &app,
+        "POST",
+        &format!("/v1/workspaces/{workspace_id}/artifacts/text"),
+        &owner,
+        json!({"title": "Queued note", "content": "Line one\nLine two", "language": "Markdown"}),
+    )
+    .await;
+    assert_eq!(note.status(), 201);
+    let artifact_id = response_json(note).await["id"].as_str().unwrap().to_owned();
+    wait_for_indexed_artifacts(&app, &owner, &workspace_id, 1).await;
+
+    // An administrator's re-index of the whole workspace is not a member's to stop.
+    let whole = call(
+        &app,
+        "POST",
+        &format!("/v1/workspaces/{workspace_id}/index"),
+        &owner,
+        json!({}),
+    )
+    .await;
+    assert_eq!(whole.status(), 202);
+    let whole_job = response_json(whole).await["id"].as_str().unwrap().to_owned();
+    let refused = call(&app, "POST", &format!("/v1/jobs/{whole_job}/cancel"), &ada, json!({})).await;
+    assert_eq!(
+        refused.status(),
+        403,
+        "a member cannot cancel an administrator's re-index"
+    );
+
+    // A member's own re-index of one file: theirs and an administrator's to stop, no other member's.
+    let single = call(
+        &app,
+        "POST",
+        &format!("/v1/artifacts/{artifact_id}/index"),
+        &ada,
+        json!({}),
+    )
+    .await;
+    assert_eq!(single.status(), 202);
+    let single_job = response_json(single).await["id"].as_str().unwrap().to_owned();
+    let other_member = call(&app, "POST", &format!("/v1/jobs/{single_job}/cancel"), &bob, json!({})).await;
+    assert_eq!(other_member.status(), 403, "another member cannot cancel it");
+    let starter = call(&app, "POST", &format!("/v1/jobs/{single_job}/cancel"), &ada, json!({})).await;
+    assert_eq!(starter.status(), 200, "the person who started it can");
+    let administrator = call(
+        &app,
+        "POST",
+        &format!("/v1/jobs/{single_job}/cancel"),
+        &owner,
+        json!({}),
+    )
+    .await;
+    assert_eq!(administrator.status(), 200, "an administrator can");
+    let _ = std::fs::remove_dir_all(data_dir);
+}
