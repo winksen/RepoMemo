@@ -195,6 +195,8 @@ export function SharedWorkspaceDetail({
     if (LEDGER_ACTIONS.has(activityEvent.action)) queueLiveRefresh({ ledger: true });
     if (MEMORY_ACTIONS.has(activityEvent.action)) queueLiveRefresh({ memory: true });
     if (TASK_ACTIONS.has(activityEvent.action)) queueLiveRefresh({ tasks: true });
+    // A change of the workspace's template (here or on another device) is picked up by the next page that reads it.
+    if (activityEvent.action === "workspace_template_changed") void queryClient.invalidateQueries({ queryKey: workspaceKeys.template(workspaceId) });
     if (isActivityView && canManageMembers) {
       queryClient.setQueryData<WorkspaceActivityEvent[]>(workspaceKeys.activity(workspaceId), (current) => [activityEvent, ...(current ?? []).filter((entry) => entry.id !== activityEvent.id)].slice(0, 100));
     }

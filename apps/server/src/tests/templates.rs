@@ -194,6 +194,157 @@ async fn the_four_first_templates_are_offered_and_each_creates_its_folders() {
     let _ = std::fs::remove_dir_all(data_dir);
 }
 
+/// V0.2.177: a template can be looked at before it is chosen, and an administrator can adjust the landing section, what
+/// is under More and the suggested questions, then reset them; a bad adjustment is refused and the feed records each change.
+#[tokio::test]
+async fn a_template_can_be_previewed_and_its_adjustments_saved_and_reset() {
+    let data_dir = temp_data_dir("templates-adjust");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let send = |method: &'static str, uri: String, who: String, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, &who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let (_, _) = register_account(&app, "templates-adjust-admin@example.com").await;
+    let (owner, _) = register_account(&app, "templates-adjust-owner@example.com").await;
+    let (viewer, _) = register_account(&app, "templates-adjust-viewer@example.com").await;
+    let workspace = create_workspace(&app, &owner).await;
+    join(
+        &app,
+        &owner,
+        "workspaces",
+        &workspace,
+        "templates-adjust-viewer@example.com",
+        "viewer",
+    )
+    .await;
+    let uri = format!("/v1/workspaces/{workspace}/template");
+
+    // The preview: what a template arranges and names, for anyone signed in; an unknown id is 404.
+    let detail = response_json(
+        send(
+            "GET",
+            "/v1/templates/operations".to_owned(),
+            viewer.clone(),
+            json!(null),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(detail["template"]["id"], "operations");
+    assert_eq!(detail["sections"]["landing"], "review");
+    assert_eq!(detail["labels"]["sections"]["tasks"], "Actions");
+    assert!(detail["overview"]["cards"].as_array().unwrap().len() >= 1 && detail.get("source").is_none());
+    assert_eq!(
+        send(
+            "GET",
+            "/v1/templates/no-such-template".to_owned(),
+            viewer.clone(),
+            json!(null)
+        )
+        .await
+        .status(),
+        404
+    );
+    let unsigned = Request::builder()
+        .method("GET")
+        .uri("/v1/templates/operations")
+        .body(Body::empty())
+        .unwrap();
+    assert_eq!(app.clone().oneshot(unsigned).await.unwrap().status(), 401);
+
+    // Adjust: Operations opens on Memory, keeps only Tasks under More and asks its own question.
+    let adjustments = json!({"landing": "memory", "more": ["tasks"], "suggestions": ["Who owns the pager?"]});
+    let saved = send(
+        "PUT",
+        uri.clone(),
+        owner.clone(),
+        json!({"template_id": "operations", "overrides": adjustments}),
+    )
+    .await;
+    assert_eq!(saved.status(), 200);
+    let saved = response_json(saved).await;
+    assert_eq!(saved["sections"]["landing"], "memory");
+    assert_eq!(saved["sections"]["more"], json!(["tasks"]));
+    assert_eq!(saved["assistant"]["suggestions"], json!(["Who owns the pager?"]));
+    assert_eq!(saved["overrides"], adjustments);
+    assert_eq!(saved["source"], "workspace");
+    let read = response_json(send("GET", uri.clone(), viewer.clone(), json!(null)).await).await;
+    assert_eq!(
+        read["sections"]["landing"], "memory",
+        "a member sees the adjusted template"
+    );
+
+    // A bad adjustment is 400 and changes nothing; a viewer cannot adjust.
+    let bad = send(
+        "PUT",
+        uri.clone(),
+        owner.clone(),
+        json!({"template_id": "operations", "overrides": {"landing": "settings"}}),
+    )
+    .await;
+    assert_eq!(bad.status(), 400);
+    assert!(response_json(bad).await["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("overrides.landing"));
+    assert_eq!(
+        response_json(send("GET", uri.clone(), owner.clone(), json!(null)).await).await["sections"]["landing"],
+        "memory"
+    );
+    assert_eq!(
+        send(
+            "PUT",
+            uri.clone(),
+            viewer.clone(),
+            json!({"template_id": "operations", "overrides": {}})
+        )
+        .await
+        .status(),
+        403
+    );
+
+    // Reset: an empty object clears the adjustments and the template's own values return.
+    let reset = response_json(
+        send(
+            "PUT",
+            uri.clone(),
+            owner.clone(),
+            json!({"template_id": "operations", "overrides": {}}),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(reset["sections"]["landing"], "review");
+    assert!(reset["overrides"].is_null());
+
+    // The feed has the choice (saved with its adjustments) and the reset, each once.
+    let feed = response_json(
+        send(
+            "GET",
+            format!("/v1/workspaces/{workspace}/activity"),
+            owner.clone(),
+            json!(null),
+        )
+        .await,
+    )
+    .await;
+    let summaries: Vec<&str> = feed
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|event| event["action"] == "workspace_template_changed")
+        .map(|event| event["summary"].as_str().unwrap())
+        .collect();
+    assert_eq!(summaries.len(), 2, "{summaries:?}");
+    assert!(summaries
+        .iter()
+        .any(|summary| summary.contains("Changed the workspace template to Operations and incidents")));
+    assert!(summaries.contains(&"Reset the workspace template's adjustments."));
+
+    let _ = std::fs::remove_dir_all(data_dir);
+}
+
 /// V0.2.168: a workspace can be created with a template; `general` saves the choice and makes no folders, no
 /// template saves nothing as before, and a template the server lacks is refused before anything is made.
 #[tokio::test]

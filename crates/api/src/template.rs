@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 use anyhow::Result;
 use repomemo_domain::*;
 use repomemo_storage::StarterSetup;
-use repomemo_templates::{Catalogue, Origin, TemplateDefinition};
+use repomemo_templates::{Catalogue, Origin, Overrides, TemplateDefinition};
 
 use crate::RepoMemoCore;
 
@@ -38,8 +38,9 @@ impl EffectiveTemplate {
             Origin::Workspace => ("workspace", None),
             Origin::Fallback { reason } => ("fallback", Some(reason.clone())),
         };
+        let detail = detail_of(&self.template);
         WorkspaceTemplateView {
-            template: summary_of(&self.template),
+            template: detail.template,
             source: source.to_owned(),
             reason,
             chosen_id: self.reference.as_ref().map(|reference| reference.id.clone()),
@@ -48,42 +49,47 @@ impl EffectiveTemplate {
                 .as_ref()
                 .map(|reference| reference.overrides.clone())
                 .unwrap_or_default(),
-            sections: {
-                let sections = self.template.sections();
-                TemplateSections {
-                    primary: sections.primary,
-                    more: sections.more,
-                    landing: sections.landing,
-                }
-            },
-            assistant: {
-                let assistant = self.template.assistant();
-                TemplateAssistant {
-                    order: assistant.order,
-                    suggestions: assistant.suggestions,
-                }
-            },
-            retrieval: TemplateRetrieval {
-                type_chips: self.template.retrieval().type_chips,
-            },
-            evidence: {
-                let evidence = self.template.evidence();
-                TemplateEvidence {
-                    default_view: evidence.default_view,
-                    types_first: evidence.types_first,
-                }
-            },
-            overview: TemplateOverview {
-                cards: self.template.overview_cards(),
-            },
-            labels: {
-                let labels = self.template.labels();
-                TemplateLabels {
-                    sections: labels.sections,
-                    artifact_types: labels.artifact_types,
-                }
-            },
+            sections: detail.sections,
+            labels: detail.labels,
+            overview: detail.overview,
+            evidence: detail.evidence,
+            assistant: detail.assistant,
+            retrieval: detail.retrieval,
         }
+    }
+}
+
+/// A template as a person looks at it: everything it arranges and names, resolved (V0.2.177).
+pub fn detail_of(template: &TemplateDefinition) -> TemplateDetail {
+    let sections = template.sections();
+    let labels = template.labels();
+    let evidence = template.evidence();
+    let assistant = template.assistant();
+    TemplateDetail {
+        template: summary_of(template),
+        sections: TemplateSections {
+            primary: sections.primary,
+            more: sections.more,
+            landing: sections.landing,
+        },
+        labels: TemplateLabels {
+            sections: labels.sections,
+            artifact_types: labels.artifact_types,
+        },
+        overview: TemplateOverview {
+            cards: template.overview_cards(),
+        },
+        evidence: TemplateEvidence {
+            default_view: evidence.default_view,
+            types_first: evidence.types_first,
+        },
+        assistant: TemplateAssistant {
+            order: assistant.order,
+            suggestions: assistant.suggestions,
+        },
+        retrieval: TemplateRetrieval {
+            type_chips: template.retrieval().type_chips,
+        },
     }
 }
 
@@ -103,6 +109,8 @@ pub fn summary_of(template: &TemplateDefinition) -> TemplateSummary {
 pub struct TemplateChange {
     /// False when the workspace was already on that template (nothing to record).
     pub changed: bool,
+    /// True when the adjustments saved on the template are not what they were.
+    pub adjusted: bool,
     pub effective: EffectiveTemplate,
 }
 
@@ -135,8 +143,17 @@ impl TemplateResolver {
             .as_ref()
             .map(|reference| (reference.id.as_str(), reference.version));
         let resolution = self.catalogue.resolve(chosen);
+        // The adjustments saved on the workspace's own template are laid over it; those saved on a template this
+        // server could not use are not applied.
+        let mut template = resolution.template;
+        if let (Origin::Workspace, Some(reference)) = (&resolution.origin, &reference) {
+            let overrides = Overrides::from_stored(&reference.overrides);
+            if !overrides.is_empty() {
+                template = template.with_overrides(&overrides);
+            }
+        }
         let answer = EffectiveTemplate {
-            template: resolution.template,
+            template,
             origin: resolution.origin,
             reference: reference.clone(),
         };
@@ -200,6 +217,11 @@ impl RepoMemoCore {
         })
     }
 
+    /// A template of the catalogue as a person looks at it before choosing it, or `None` when there is no such one.
+    pub fn template_detail(&self, template_id: &str) -> Option<TemplateDetail> {
+        self.templates.catalogue.get(template_id).map(detail_of)
+    }
+
     /// The catalogue as a picker lists it.
     pub fn template_summaries(&self) -> Vec<TemplateSummary> {
         self.templates.catalogue.list().iter().map(summary_of).collect()
@@ -212,6 +234,7 @@ impl RepoMemoCore {
         &self,
         workspace_id: &str,
         template_id: Option<&str>,
+        overrides: Option<&serde_json::Value>,
     ) -> Result<TemplateChange> {
         let before = self.storage.workspace_template_ref(workspace_id).await?;
         let after = match template_id {
@@ -220,11 +243,25 @@ impl RepoMemoCore {
                 let Some(template) = self.templates.catalogue.get(id) else {
                     repomemo_domain::bail_not_found!("That template was not found.");
                 };
-                let overrides = before
-                    .as_ref()
-                    .filter(|reference| reference.id == id)
-                    .map(|reference| reference.overrides.clone())
-                    .unwrap_or_default();
+                let overrides = match overrides {
+                    // Left out: the adjustments stay when the same template is chosen again.
+                    None => before
+                        .as_ref()
+                        .filter(|reference| reference.id == id)
+                        .map(|reference| reference.overrides.clone())
+                        .unwrap_or_default(),
+                    // Nothing, or an empty object: no adjustments.
+                    Some(value) if value.is_null() || value.as_object().is_some_and(|map| map.is_empty()) => {
+                        serde_json::Value::Null
+                    }
+                    Some(value) => match Overrides::parse(value) {
+                        Ok(parsed) => serde_json::to_value(parsed)?,
+                        Err(issues) => {
+                            let message = issues.iter().map(ToString::to_string).collect::<Vec<_>>().join("; ");
+                            repomemo_domain::bail_invalid!("{message}");
+                        }
+                    },
+                };
                 Some(WorkspaceTemplateRef {
                     id: id.to_owned(),
                     version: template.meta.version,
@@ -238,8 +275,16 @@ impl RepoMemoCore {
                 .await?;
         }
         let changed = before.as_ref().map(|reference| &reference.id) != after.as_ref().map(|reference| &reference.id);
+        let overrides_of = |reference: &Option<WorkspaceTemplateRef>| {
+            reference
+                .as_ref()
+                .map(|reference| reference.overrides.clone())
+                .unwrap_or_default()
+        };
+        let adjusted = overrides_of(&before) != overrides_of(&after);
         Ok(TemplateChange {
             changed,
+            adjusted,
             effective: self.effective_template(workspace_id).await?,
         })
     }
@@ -325,7 +370,7 @@ mod tests {
 
         // An id the catalogue lacks is not found, and nothing is written.
         let error = core
-            .set_workspace_template(&workspace.id, Some("no-such-template"))
+            .set_workspace_template(&workspace.id, Some("no-such-template"), None)
             .await
             .unwrap_err();
         assert!(error.to_string().contains("not found"), "{error}");
@@ -334,13 +379,13 @@ mod tests {
             None
         );
         assert!(core
-            .set_workspace_template("no-such-workspace", Some(GENERAL_ID))
+            .set_workspace_template("no-such-workspace", Some(GENERAL_ID), None)
             .await
             .is_err());
 
         // Choosing a template changes the workspace once; choosing it again changes nothing.
         let first = core
-            .set_workspace_template(&workspace.id, Some(GENERAL_ID))
+            .set_workspace_template(&workspace.id, Some(GENERAL_ID), None)
             .await
             .unwrap();
         assert!(first.changed);
@@ -353,7 +398,7 @@ mod tests {
         assert_eq!(view.template.id, GENERAL_ID);
         assert!(view.reason.is_none());
         let again = core
-            .set_workspace_template(&workspace.id, Some(GENERAL_ID))
+            .set_workspace_template(&workspace.id, Some(GENERAL_ID), None)
             .await
             .unwrap();
         assert!(!again.changed);
@@ -368,17 +413,23 @@ mod tests {
             .set_workspace_template_ref(&workspace.id, Some(&adjusted))
             .await
             .unwrap();
-        core.set_workspace_template(&workspace.id, Some(GENERAL_ID))
+        core.set_workspace_template(&workspace.id, Some(GENERAL_ID), None)
             .await
             .unwrap();
         let kept = core.storage().workspace_template_ref(&workspace.id).await.unwrap();
         assert_eq!(kept, Some(adjusted));
 
         // Back to the default.
-        let reset = core.set_workspace_template(&workspace.id, None).await.unwrap();
+        let reset = core.set_workspace_template(&workspace.id, None, None).await.unwrap();
         assert!(reset.changed);
         assert_eq!(reset.effective.view().source, "default");
-        assert!(!core.set_workspace_template(&workspace.id, None).await.unwrap().changed);
+        assert!(
+            !core
+                .set_workspace_template(&workspace.id, None, None)
+                .await
+                .unwrap()
+                .changed
+        );
 
         // The catalogue as a picker lists it: General first.
         assert_eq!(core.template_summaries()[0].id, GENERAL_ID);
@@ -495,6 +546,121 @@ mod tests {
         // And the id is what the API writes for it.
         for kind in &every {
             assert_eq!(serde_json::to_value(kind).unwrap(), json!(id(kind)));
+        }
+    }
+
+    #[tokio::test]
+    async fn adjustments_are_checked_saved_laid_over_the_template_kept_cleared_and_dropped_with_it() {
+        let (core, data_dir) = core("adjust").await;
+        let workspace = core.create_workspace("Runbooks".to_owned()).await.unwrap();
+        let adjustments = json!({ "landing": "review", "more": ["map"], "suggestions": ["Who is on call?"] });
+
+        // Invalid adjustments are refused and nothing is written.
+        for bad in [
+            json!({ "landing": "settings" }),
+            json!({ "more": ["nowhere"] }),
+            json!({ "colour": "red" }),
+            json!("review"),
+        ] {
+            let error = core
+                .set_workspace_template(&workspace.id, Some(GENERAL_ID), Some(&bad))
+                .await
+                .unwrap_err();
+            assert!(
+                error.to_string().contains("overrides") || error.to_string().contains("invalid"),
+                "{error}"
+            );
+        }
+        assert_eq!(
+            core.storage().workspace_template_ref(&workspace.id).await.unwrap(),
+            None
+        );
+
+        // Saved, they are laid over the template, and recorded as an adjustment (not a change of template).
+        let saved = core
+            .set_workspace_template(&workspace.id, Some(GENERAL_ID), Some(&adjustments))
+            .await
+            .unwrap();
+        assert!(saved.changed && saved.adjusted);
+        let view = saved.effective.view();
+        assert_eq!(view.sections.landing, "review");
+        assert_eq!(view.sections.more, ["map"]);
+        assert_eq!(view.assistant.suggestions, ["Who is on call?"]);
+        assert_eq!(view.overrides, adjustments);
+
+        // Chosen again without adjustments, they stay; with an empty object they are cleared.
+        let again = core
+            .set_workspace_template(&workspace.id, Some(GENERAL_ID), None)
+            .await
+            .unwrap();
+        assert!(!again.changed && !again.adjusted);
+        assert_eq!(again.effective.view().sections.landing, "review");
+        let changed_only = json!({ "landing": "memory" });
+        let second = core
+            .set_workspace_template(&workspace.id, Some(GENERAL_ID), Some(&changed_only))
+            .await
+            .unwrap();
+        assert!(!second.changed && second.adjusted);
+        let cleared = core
+            .set_workspace_template(&workspace.id, Some(GENERAL_ID), Some(&json!({})))
+            .await
+            .unwrap();
+        assert!(!cleared.changed && cleared.adjusted);
+        assert_eq!(cleared.effective.view().sections.landing, "overview");
+        assert!(cleared.effective.view().overrides.is_null());
+
+        // Returning to the default drops them with the choice.
+        core.set_workspace_template(&workspace.id, Some(GENERAL_ID), Some(&adjustments))
+            .await
+            .unwrap();
+        let reset = core
+            .set_workspace_template(&workspace.id, None, Some(&adjustments))
+            .await
+            .unwrap();
+        assert_eq!(reset.effective.view().source, "default");
+        assert_eq!(reset.effective.view().sections.landing, "overview");
+
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn adjustments_saved_on_a_template_this_server_cannot_use_are_not_applied() {
+        let resolver = TemplateResolver::default();
+        let ghost = WorkspaceTemplateRef {
+            id: "ghost".to_owned(),
+            version: 1,
+            overrides: json!({ "landing": "review" }),
+        };
+        let view = resolver.resolve("w", Some(ghost)).view();
+        assert_eq!(view.source, "fallback");
+        assert_eq!(view.sections.landing, "overview");
+        // A stale key is dropped and a good one applies.
+        let stale = WorkspaceTemplateRef {
+            id: GENERAL_ID.to_owned(),
+            version: 1,
+            overrides: json!({ "landing": "review", "more": ["nowhere"] }),
+        };
+        let view = resolver.resolve("w2", Some(stale)).view();
+        assert_eq!(view.sections.landing, "review");
+        assert!(view.sections.more.is_empty());
+    }
+
+    #[test]
+    fn a_template_can_be_looked_at_before_it_is_chosen() {
+        let resolver = TemplateResolver::default();
+        let general = detail_of(&resolver.catalogue.get(GENERAL_ID).unwrap().clone());
+        assert_eq!(general.template.id, GENERAL_ID);
+        assert_eq!(general.sections.primary.len(), 12);
+        assert_eq!(general.overview.cards.len(), 9);
+        for template in resolver.catalogue.list() {
+            let detail = detail_of(template);
+            assert_eq!(detail.template.id, template.id());
+            assert_eq!(
+                detail.sections.primary.len() + detail.sections.more.len(),
+                12,
+                "{}",
+                template.id()
+            );
         }
     }
 

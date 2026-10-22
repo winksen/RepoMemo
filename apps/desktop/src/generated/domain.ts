@@ -274,9 +274,25 @@ export interface TemplateRetrieval {
   type_chips: string[];
 }
 
-/** Chooses a workspace's template; `null` returns the workspace to the default. */
+/** A template as a person looks at it before choosing it: what it arranges and names, without any workspace's choice. */
+export interface TemplateDetail {
+  template: TemplateSummary;
+  sections: TemplateSections;
+  labels: TemplateLabels;
+  overview: TemplateOverview;
+  evidence: TemplateEvidence;
+  assistant: TemplateAssistant;
+  retrieval: TemplateRetrieval;
+}
+
+/**
+ * Chooses a workspace's template; `null` returns the workspace to the default. `overrides` are the adjustments
+ * saved on it (`landing`, `more`, `suggestions`): left out they stay when the same template is chosen again, an
+ * empty object clears them, and choosing another template drops them.
+ */
 export interface UpdateWorkspaceTemplateRequest {
   template_id: string | null;
+  overrides: unknown | null;
 }
 
 export interface WorkspaceOverview {

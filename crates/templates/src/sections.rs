@@ -29,7 +29,7 @@ pub const ADMIN_ONLY_SECTIONS: [&str; 2] = ["people", "settings"];
 pub const DEFAULT_LANDING: &str = "overview";
 
 /// How a template arranges the sections of a workspace (V0.2.171). Every key is optional.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SectionsBlock {
     /// The sections shown as tabs, in this order. A section named in neither list follows these, in the usual order.

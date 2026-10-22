@@ -178,5 +178,16 @@ th > .rm-badge,
 .shared-assistant-suggestions, .shared-retrieval-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .shared-assistant-suggestions .rm-button, .shared-retrieval-chips .rm-button { padding: 4px 10px; font-size: 12px; font-weight: 600; text-align: left; }
 .shared-retrieval-chips .rm-button.active, .shared-retrieval-chips .rm-button.active:hover:not(:disabled) { color: var(--color-text); background: var(--color-surface-3); border-color: var(--color-text); }
+/* Settings › Template: the preview of what a template arranges and the adjustments saved on top of it. */
+.rm-template-preview { display: grid; gap: 4px; max-width: 70ch; margin: 12px 0; }
+.rm-template-preview > div { display: grid; grid-template-columns: minmax(120px, 160px) 1fr; gap: 12px; font-size: 13px; }
+.rm-template-preview dt { color: var(--color-text-muted); font-weight: 700; }
+.rm-template-preview dd { margin: 0; }
+.rm-template-adjust { display: grid; gap: 12px; max-width: 70ch; margin: 16px 0 0; padding: 14px 0 0; border: 0; border-top: 1px solid var(--color-border); }
+.rm-template-adjust legend { padding: 0 8px 0 0; font-size: 13px; font-weight: 700; }
+.rm-template-adjust-field { display: grid; gap: 4px; font-size: 13px; font-weight: 700; }
+.rm-template-adjust-field small { color: var(--color-text-muted); font-weight: 400; }
+.rm-template-adjust-more { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px 12px; }
+.rm-template-adjust-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .rm-mention-links { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .rm-option > svg { flex: none; }

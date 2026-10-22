@@ -328,10 +328,26 @@ pub struct TemplateRetrieval {
     pub type_chips: Vec<String>,
 }
 
-/// Chooses a workspace's template; `null` returns the workspace to the default.
+/// A template as a person looks at it before choosing it: what it arranges and names, without any workspace's choice.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TemplateDetail {
+    pub template: TemplateSummary,
+    pub sections: TemplateSections,
+    pub labels: TemplateLabels,
+    pub overview: TemplateOverview,
+    pub evidence: TemplateEvidence,
+    pub assistant: TemplateAssistant,
+    pub retrieval: TemplateRetrieval,
+}
+
+/// Chooses a workspace's template; `null` returns the workspace to the default. `overrides` are the adjustments
+/// saved on it (`landing`, `more`, `suggestions`): left out they stay when the same template is chosen again, an
+/// empty object clears them, and choosing another template drops them.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpdateWorkspaceTemplateRequest {
     pub template_id: Option<String>,
+    #[serde(default)]
+    pub overrides: Option<Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

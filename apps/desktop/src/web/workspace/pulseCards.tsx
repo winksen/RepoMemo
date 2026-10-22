@@ -9,6 +9,13 @@ export type PulseCardId = typeof PULSE_CARD_IDS[number];
 /** The nine cards a workspace has always shown, in their order; General and a template without an `overview` block use them. */
 export const DEFAULT_PULSE_CARDS: PulseCardId[] = ["index_coverage", "indexed_storage", "fresh_evidence", "knowledge_density", "code_symbols", "team_access", "active_tasks", "at_risk", "team_discussion"];
 
+/** What a card is called, for a person choosing between templates. */
+export const PULSE_CARD_TITLES: Record<PulseCardId, string> = {
+  index_coverage: "Index coverage", indexed_storage: "Indexed storage", fresh_evidence: "Fresh evidence", knowledge_density: "Knowledge density",
+  code_symbols: "Code symbols", sources: "Sources", memory_cards: "Memory cards", team_access: "Team access", active_tasks: "Active tasks",
+  at_risk: "At risk", team_discussion: "Team discussion",
+};
+
 export const isPulseCard = (value: string): value is PulseCardId => (PULSE_CARD_IDS as readonly string[]).includes(value);
 
 /** The ids to draw: the template's list without any this client cannot draw; the usual nine if nothing is left. */

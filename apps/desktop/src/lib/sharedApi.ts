@@ -67,6 +67,7 @@ import type {
   WorkspaceAiOverview,
   WorkspaceCapabilities,
   SharedWorkspace,
+  TemplateDetail,
   TemplateSummary,
   WorkspaceTemplateView,
   WorkspaceOverview,
@@ -507,11 +508,19 @@ export function getSharedWorkspaceTemplate(accessToken: string, workspaceId: str
   return request<WorkspaceTemplateView>(`/v1/workspaces/${workspaceId}/template`, {}, accessToken);
 }
 
-/** Chooses the workspace's template (`null` for the default). Administrators and owners only. */
-export function saveSharedWorkspaceTemplate(accessToken: string, workspaceId: string, templateId: string | null): Promise<WorkspaceTemplateView> {
+/** A template of the catalogue as a person looks at it before choosing it. */
+export function getSharedTemplate(accessToken: string, templateId: string): Promise<TemplateDetail> {
+  return request<TemplateDetail>(`/v1/templates/${encodeURIComponent(templateId)}`, {}, accessToken);
+}
+
+/**
+ * Chooses the workspace's template (`null` for the default). `overrides` are the adjustments saved on it
+ * (`landing`, `more`, `suggestions`): left out they stay, an empty object clears them. Administrators and owners only.
+ */
+export function saveSharedWorkspaceTemplate(accessToken: string, workspaceId: string, templateId: string | null, overrides?: Record<string, unknown>): Promise<WorkspaceTemplateView> {
   return request<WorkspaceTemplateView>(`/v1/workspaces/${workspaceId}/template`, {
     method: "PUT",
-    body: JSON.stringify({ template_id: templateId }),
+    body: JSON.stringify({ template_id: templateId, ...(overrides === undefined ? {} : { overrides }) }),
   }, accessToken);
 }
 

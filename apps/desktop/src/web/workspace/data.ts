@@ -1,6 +1,6 @@
 import {
   getSharedRetrievalFacets, getSharedWorkspaceActivityCalendar, getSharedWorkspaceCapabilities, getSharedWorkspaceMetrics,
-  getSharedWorkspaceOverview, getSharedWorkspaceTemplate, listSharedArtifactWindow, listSharedCollaborationTasks, listSharedFolders, listSharedIndexFailures,
+  getSharedTemplate, getSharedWorkspaceOverview, getSharedWorkspaceTemplate, listSharedArtifactWindow, listSharedCollaborationTasks, listSharedFolders, listSharedIndexFailures,
   listSharedMemoryCards, listSharedSavedSearches, listSharedTemplates, listSharedWorkspaceActivity, listSharedWorkspaceAiProviders,
   listSharedWorkspaceJobs, listSharedWorkspaceMembers, querySharedArtifactPage, querySharedArtifacts, ARTIFACT_WINDOW,
 } from "../../lib/sharedApi";
@@ -12,7 +12,7 @@ import { serverKeys, workspaceKeys } from "../../lib/queryClient";
 import { useServerState } from "../../lib/useServerState";
 import {
   type ArtifactIndexFailure, type ArtifactSummary, type CollaborationTask, type Folder, type IndexingJobStatus,
-  type MemoryCardSummary, type RetrievalFacets, type SavedSearch, type SharedAiProviderSettings, type TemplateSummary,
+  type MemoryCardSummary, type RetrievalFacets, type SavedSearch, type SharedAiProviderSettings, type TemplateDetail, type TemplateSummary,
   type WorkspaceActivityCalendar, type WorkspaceActivityEvent, type WorkspaceCapabilities, type WorkspaceMember,
   type WorkspaceMetrics, type WorkspaceOverview, type WorkspaceTemplateView,
 } from "../../types";
@@ -33,6 +33,13 @@ export function useCapabilities(accessToken: string, workspaceId: string) {
 export function useTemplate(accessToken: string, workspaceId: string, enabled = true) {
   return useServerState<WorkspaceTemplateView | null>({
     key: workspaceKeys.template(workspaceId), fetch: () => getSharedWorkspaceTemplate(accessToken, workspaceId), initial: null, enabled,
+  });
+}
+
+/** A template of the catalogue as a person looks at it before choosing it (V0.2.177); `null` until it arrives. */
+export function useTemplateDetail(accessToken: string, templateId: string, enabled = true) {
+  return useServerState<TemplateDetail | null>({
+    key: serverKeys.template(templateId), fetch: () => getSharedTemplate(accessToken, templateId), initial: null, enabled, staleTime: 5 * 60_000,
   });
 }
 

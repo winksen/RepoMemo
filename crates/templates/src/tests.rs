@@ -1006,6 +1006,93 @@ fn the_four_first_templates_suggest_what_their_teams_ask() {
     }
 }
 
+fn overrides(text: &str) -> Result<Overrides, Vec<TemplateIssue>> {
+    Overrides::parse(&serde_json::from_str(text).unwrap())
+}
+
+#[test]
+fn an_administrator_may_adjust_the_landing_section_what_is_under_more_and_the_suggestions() {
+    let adjusted =
+        overrides(r#"{ "landing": "review", "more": ["map", "documents"], "suggestions": ["Who is on call?"] }"#)
+            .unwrap();
+    assert!(!adjusted.is_empty());
+    assert!(Overrides::default().is_empty() && overrides("{}").unwrap().is_empty());
+    assert_eq!(
+        serde_json::from_str::<Overrides>(&serde_json::to_string(&adjusted).unwrap()).unwrap(),
+        adjusted
+    );
+
+    // Laid over General: the landing section changes, the two sections leave the tabs and the questions are given.
+    let template = general().with_overrides(&adjusted);
+    let sections = template.sections();
+    assert_eq!(sections.landing, "review");
+    assert_eq!(names(&sections.more), ["map", "documents"]);
+    assert!(!names(&sections.primary).contains(&"map") && !names(&sections.primary).contains(&"documents"));
+    assert_eq!(sections.primary.len() + sections.more.len(), 12);
+    assert_eq!(template.assistant().suggestions, ["Who is on call?"]);
+    // Nothing else of the template changes.
+    assert_eq!(template.meta, general().meta);
+    assert_eq!(template.overview_cards(), general().overview_cards());
+    assert_eq!(general().with_overrides(&Overrides::default()), general());
+}
+
+#[test]
+fn adjustments_replace_what_the_template_says_for_that_key_only() {
+    let catalogue = Catalogue::builtin();
+    let operations = catalogue.get("operations").unwrap();
+    // Landing alone leaves the template's tabs and questions.
+    let landing = operations.with_overrides(&overrides(r#"{ "landing": "memory" }"#).unwrap());
+    assert_eq!(landing.sections().landing, "memory");
+    assert_eq!(landing.sections().primary, operations.sections().primary);
+    assert_eq!(landing.assistant().suggestions, operations.assistant().suggestions);
+    // Under More is the exact list: a section the template kept there that is not named comes back as a tab.
+    let more = operations.with_overrides(&overrides(r#"{ "more": ["tasks"] }"#).unwrap());
+    assert_eq!(names(&more.sections().more), ["tasks"]);
+    assert!(names(&more.sections().primary).contains(&"map"), "Map is a tab again");
+    assert!(!names(&more.sections().primary).contains(&"tasks"));
+    assert_eq!(more.sections().landing, "review", "the template's landing stays");
+    // An empty list under More brings every section back.
+    let none = operations.with_overrides(&overrides(r#"{ "more": [] }"#).unwrap());
+    assert!(none.sections().more.is_empty());
+    assert_eq!(none.sections().primary.len(), 12);
+}
+
+#[test]
+fn adjustments_follow_the_rules_of_the_blocks_they_adjust() {
+    for (text, path) in [
+        (r#"{ "landing": "dashboard" }"#, "overrides.landing"),
+        (r#"{ "landing": "settings" }"#, "overrides.landing"),
+        (r#"{ "more": ["map", "nowhere"] }"#, "overrides.more[1]"),
+        (r#"{ "more": ["map", "map"] }"#, "overrides.more[1]"),
+        (r#"{ "suggestions": [""] }"#, "overrides.suggestions[0]"),
+        (r#"{ "suggestions": ["Same", "same"] }"#, "overrides.suggestions[1]"),
+    ] {
+        let issues = overrides(text).unwrap_err();
+        assert_eq!(issues[0].path, path, "{text}");
+    }
+    let seven: Vec<String> = (0..=SUGGESTIONS_MAX).map(|n| format!("\"Question {n}\"")).collect();
+    let too_many = overrides(&format!(r#"{{ "suggestions": [{}] }}"#, seven.join(","))).unwrap_err();
+    assert_eq!(too_many[0].path, "overrides.suggestions");
+    let unknown = overrides(r#"{ "ranking": {} }"#).unwrap_err();
+    assert!(unknown[0].message.contains("unknown field `ranking`"), "{}", unknown[0]);
+    assert!(Overrides::parse(&serde_json::json!("landing")).is_err());
+}
+
+#[test]
+fn a_stored_adjustment_that_is_no_longer_valid_is_dropped_and_the_others_are_kept() {
+    let stored = serde_json::json!({ "landing": "review", "more": ["map", "nowhere"], "suggestions": ["Who is on call?"], "colour": "red" });
+    let kept = Overrides::from_stored(&stored);
+    assert_eq!(kept.landing.as_deref(), Some("review"));
+    assert_eq!(
+        kept.more, None,
+        "a list with a section this server lacks is dropped whole"
+    );
+    assert_eq!(kept.suggestions.as_deref(), Some(&["Who is on call?".to_owned()][..]));
+    assert!(Overrides::from_stored(&serde_json::json!(null)).is_empty());
+    assert!(Overrides::from_stored(&serde_json::json!("landing")).is_empty());
+    assert!(Overrides::from_stored(&serde_json::json!({})).is_empty());
+}
+
 #[test]
 fn the_section_list_is_the_one_the_web_client_has_pages_for() {
     let client = include_str!("../../../apps/desktop/src/web/constants.ts");

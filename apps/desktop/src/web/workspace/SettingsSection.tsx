@@ -13,6 +13,7 @@ import { AiProviderForm } from "../../components/AiProviderForm";
 import { ConnectorSettings } from "../../components/ConnectorsPanel";
 import { WorkspaceExportSettings } from "../../components/WorkspaceExportSettings";
 import { WorkspaceIconSettings } from "../../components/WorkspaceIconSettings";
+import { TemplateSettings } from "../../components/TemplateSettings";
 import { RepositorySettings } from "../lazy";
 import { INDEX_POLL_ATTEMPTS, INDEX_POLL_INTERVAL_MS } from "../constants";
 import { apiMessage } from "../format";
@@ -93,6 +94,7 @@ export function SettingsSection({ page }: { page: WorkspacePage }) {
             {canManageMembers ? <>
               <div className="shared-settings-policy"><Settings size={ICON_SIZE.lg} /><div><strong>Administrative workspace controls</strong><span>Changes are enforced by the shared API. Administrators can manage people and integrations; owner-only workspace actions are explicitly marked.</span></div></div>
               <WorkspaceIconSettings accessToken={accessToken} onSaved={onWorkspaceUpdated} workspace={workspace.workspace} />
+              <TemplateSettings accessToken={accessToken} key={`template-${workspace.workspace.id}`} workspaceId={workspace.workspace.id} />
               <AiProviderForm accessToken={accessToken} onSaved={onProviderSaved} providers={aiProviders} purpose="text" workspaceId={workspace.workspace.id} />
               <AiProviderForm accessToken={accessToken} onSaved={onProviderSaved} providers={aiProviders} purpose="vision" workspaceId={workspace.workspace.id} />
               <AiProviderForm accessToken={accessToken} onSaved={onProviderSaved} providers={aiProviders} purpose="embedding" status={embeddingStatus} workspaceId={workspace.workspace.id} />

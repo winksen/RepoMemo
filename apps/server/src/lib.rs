@@ -628,6 +628,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         )
         .route("/v1/workspaces/{workspace_id}/icon", put(update_workspace_icon))
         .route("/v1/templates", get(templates::list_templates))
+        .route("/v1/templates/{template_id}", get(templates::template_detail))
         .route(
             "/v1/workspaces/{workspace_id}/template",
             get(templates::workspace_template).put(templates::update_workspace_template),

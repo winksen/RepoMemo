@@ -95,6 +95,7 @@ export type {
   MailSettingsView,
 } from "./generated/domain";
 export type {
+  TemplateDetail,
   TemplateSummary,
   WorkspaceTemplateView,
 } from "./generated/domain";

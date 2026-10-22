@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.177 (2026-10-22)
+
+Owners and administrators choose and adjust a workspace's template in Settings.
+
+### Added
+- **Settings › Template:** the panel shows the template the workspace uses (and why General is in use when its template cannot be used on this server), lists every template as a card, and previews the one picked in lines a person can read: the tabs, what is under More, where the workspace opens, what is renamed, the Overview cards and how many questions are suggested. Choosing one asks first ("Nothing stored is moved, created or deleted, and nobody gains or loses access"); the change shows on the next navigation and the open pages pick it up through the live event. Errors and successes are toasts.
+- **`GET /v1/templates/{id}`:** a template as a person looks at it before choosing it (`TemplateDetail`): the same resolved blocks as a workspace's own answer without any workspace's choice. Any signed-in caller may ask; an id the catalogue lacks is `404`.
+- **Adjustments:** an administrator may save three things on top of the template, and only what differs from the template is saved, so its later improvements still reach every workspace for what was not adjusted: the section the workspace opens on (`landing`, not People or Settings), exactly which sections sit under More (`more`) and the suggested questions (`suggestions`, replacing the template's, up to six). `PUT /v1/workspaces/{id}/template` takes them as `overrides`: left out they stay when the same template is chosen again, an empty object clears them (*Reset to template*), choosing another template or returning to the default drops them, and a bad one is `400` naming its key (`overrides.landing`). They use the rules of the blocks they adjust.
+- **How they are applied:** the resolver lays the adjustments over the template before the answer is made, ignores them when the workspace fell back to General (they belong to a template this server cannot use) and drops a stale key by itself instead of failing a page.
+- **In the feed:** "Changed the workspace template to…", "Adjusted the workspace template." and "Reset the workspace template's adjustments." Choosing the same template with the same adjustments records nothing.
+- **Tests (written, not run):** four in the templates crate (adjustments laid over General and over Operations, replacing only their own key, refused when invalid, stale ones dropped one by one), three in the api crate (adjustments checked, saved, laid over, kept, cleared and dropped with the choice; ignored on a fallback; a template looked at before it is chosen), one on the server (the preview and its 404, an adjustment saved and read by a member, a bad one refused with 400, a viewer refused, the reset, the feed), thirteen in the web client in a new file (the preview lines, the adjustments to save, the questions typed, the panel before the template arrives, with its preview, changing only after the confirmation and not when cancelled, saving only what differs, six questions at most, resetting, a fallback explained, the error as a toast), and the earlier template calls follow the new argument.
+- **Checks run on this release:** `cargo check` of the templates, api and server crates with their tests compiles; `rustfmt` shows nothing for the lines changed; `types:check`, `typecheck`, `styles:check`, `a11y:check`, `docs:check` and `version:check` pass. **Not run:** the tests, as asked.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.176 (2026-10-22)
 
 The assistant suggests questions that fit the workspace, and Retrieval suggests the kinds of evidence a team looks for.

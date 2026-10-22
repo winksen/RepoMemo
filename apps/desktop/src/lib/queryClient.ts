@@ -65,6 +65,7 @@ export const repositoryKeys = {
 /** Cache keys of what the server offers to everyone who is signed in. The cache is cleared when the session ends. */
 export const serverKeys = {
   templates: () => ["server", "templates"] as const,
+  template: (templateId: string) => ["server", "templates", templateId] as const,
 };
 
 /** Cache keys of what belongs to the signed-in person, not to a workspace. The cache is cleared when the session ends. */
