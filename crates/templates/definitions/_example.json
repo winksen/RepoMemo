@@ -1,0 +1,68 @@
+{
+  "format": 1,
+  "meta": {
+    "id": "example",
+    "version": 1,
+    "name": "Customer support",
+    "summary": "Playbooks, macros and case notes for a support team.",
+    "icon": "messages"
+  },
+  "starter_folders": [
+    { "name": "Playbooks", "children": ["Escalations", "Refunds"] },
+    { "name": "Macros" }
+  ],
+  "sections": {
+    "order": ["overview", "evidence", "review", "memory"],
+    "more": ["map", "repositories"],
+    "landing": "evidence"
+  },
+  "labels": {
+    "sections": { "memory": "Lessons" },
+    "artifact_types": { "note": "Case note" }
+  },
+  "overview": {
+    "cards": ["fresh_evidence", "active_tasks", "at_risk", "memory_cards"],
+    "headline": "active_tasks"
+  },
+  "evidence": {
+    "default_view": "list",
+    "types_first": ["markdown", "note"]
+  },
+  "assistant": {
+    "order": ["ask_question", "find_files", "search_content"],
+    "suggestions": [
+      "How do we escalate a refund?",
+      "Which macro answers a billing question?"
+    ],
+    "phrases": [
+      { "phrase": "macro for", "capability": "find_files" },
+      { "phrase": "playbook", "capability": "find_files" }
+    ],
+    "focus": "This workspace holds support playbooks, macros and case notes for a customer support team."
+  },
+  "retrieval": {
+    "type_chips": ["note", "runbook"]
+  },
+  "ranking": {
+    "verified": 1.1,
+    "boosts": [
+      { "path": "playbooks/**", "factor": 1.15 },
+      { "document_kind": "markdown", "factor": 1.05 }
+    ],
+    "recency": { "half_life_days": 180, "max_factor": 1.1 }
+  },
+  "health": {
+    "detectors": ["stale_evidence", "outdated_evidence_referenced", "index_failed"],
+    "stale_after_days": 120
+  },
+  "review": {
+    "order": ["evidence", "health_finding", "memory_card"]
+  },
+  "map": {
+    "coverage_first": ["markdown", "note"],
+    "relations_first": ["cites"]
+  },
+  "repositories": {
+    "exclude": ["*.log", "**/exports/**"]
+  }
+}

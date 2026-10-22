@@ -1581,6 +1581,36 @@ fn software_engineering_puts_repositories_and_code_first_on_its_map() {
     }
 }
 
+/// The example a template author copies (V0.2.188): valid, using every block, and not one of the built-in templates.
+#[test]
+fn the_example_is_valid_uses_every_block_and_is_not_a_built_in_template() {
+    let example = parse(include_str!("../definitions/_example.json")).unwrap();
+    assert_eq!(example.id(), "example");
+    assert!(Catalogue::builtin().get("example").is_none());
+    // Listing every field without `..` stops this compiling when a block is added to the format, until the example
+    // (and this list) has it too.
+    let TemplateDefinition {
+        format: _,
+        meta: _,
+        starter_folders,
+        sections,
+        labels,
+        overview,
+        evidence,
+        assistant,
+        retrieval,
+        ranking,
+        health,
+        review,
+        map,
+        repositories,
+    } = example;
+    assert!(!starter_folders.is_empty());
+    assert!(sections.is_some() && labels.is_some() && overview.is_some() && evidence.is_some());
+    assert!(assistant.is_some() && retrieval.is_some() && ranking.is_some() && health.is_some());
+    assert!(review.is_some() && map.is_some() && repositories.is_some());
+}
+
 #[test]
 fn a_template_names_a_headline_for_the_dashboard_from_the_cards_one_count_can_answer() {
     assert_eq!(general().overview_headline(), None);

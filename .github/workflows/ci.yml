@@ -1,6 +1,6 @@
 # Every push to main and every pull request (roadmap C8).
 #
-# Blocking: versions agree, released migrations unchanged, a 0.2.0 environment upgrades, Rust tests on Linux and Windows, the web type
+# Blocking: versions agree, workspace templates valid, released migrations unchanged, a 0.2.0 environment upgrades, Rust tests on Linux and Windows, the web type
 # check, web tests, accessibility rules and generated types, rustfmt and clippy, and security
 # advisories for the server's dependencies and the web client's production
 # dependencies.
@@ -35,7 +35,10 @@ jobs:
     name: Versions agree
     runs-on: ubuntu-latest
     steps:
+      # The whole history, so a changed template can be compared with the file before it.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
@@ -46,6 +49,10 @@ jobs:
         run: node scripts/check-migrations.mjs
       - name: Documentation matches the code
         run: node scripts/check-docs.mjs
+      - name: Templates are valid, and a changed one has a new version
+        run: node scripts/check-templates.mjs --base "${{ github.event.pull_request.base.sha || github.event.before }}"
+      - name: The template checker refuses what it should
+        run: node --test scripts/check-templates.test.mjs
 
   web:
     name: Web client

@@ -88,6 +88,8 @@ npm run styles:check      # stylesheet size and order, and no new bare element s
 npm run a11y:check        # accessibility rules and colour contrast, reading files only (CI runs this)
 npm run migrations:check  # no released database migration was edited or removed, every one is locked (CI runs this)
 npm run docs:check        # routes, settings, versions, releases and links of the documents agree with the code (CI runs this)
+npm run templates:check   # every workspace template file is valid, a changed one has a new version, and no template id is written in code (CI runs this; --base <ref> compares with another commit)
+npm run templates:test    # the checker's own tests (Node's test runner; CI runs this)
 ```
 
 **Performance runs** (release builds, `#[ignore]`d, they print timings): `cargo test -p repomemo-storage --release performance_at_scale -- --ignored --nocapture`, `cargo test -p repomemo-api --release map_and_health_at_scale -- --ignored --nocapture`, `cargo test -p repomemo-api --release repo_sync_at_scale -- --ignored --nocapture` (a repository of 100,000 files, `REPOMEMO_PERF_FILES`) and `cargo test -p repomemo-server --release ten_thousand_issues -- --ignored --nocapture` (10,000 issues through a connector, `REPOMEMO_PERF_ISSUES`). Targets, what each measures and where to record the figures: [mindmap/technical/performance.md](../mindmap/technical/performance.md).
