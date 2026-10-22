@@ -276,6 +276,10 @@ pub struct WorkspaceTemplateView {
     pub overview: TemplateOverview,
     /// How the evidence ledger opens and which file types it lists first.
     pub evidence: TemplateEvidence,
+    /// The assistant's order and suggestions.
+    pub assistant: TemplateAssistant,
+    /// What the Retrieval page suggests.
+    pub retrieval: TemplateRetrieval,
 }
 
 /// The tabs of a workspace and the sections kept under *More*, as its template arranges them. Every section is in
@@ -308,6 +312,20 @@ pub struct TemplateOverview {
 pub struct TemplateEvidence {
     pub default_view: String,
     pub types_first: Vec<String>,
+}
+
+/// What the assistant shows first and the questions it suggests. Both empty for `general`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TemplateAssistant {
+    /// Capabilities listed before the others, in this order; the rest follow in the server's order.
+    pub order: Vec<String>,
+    pub suggestions: Vec<String>,
+}
+
+/// The kinds of evidence the Retrieval page suggests as chips. Empty for `general`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TemplateRetrieval {
+    pub type_chips: Vec<String>,
 }
 
 /// Chooses a workspace's template; `null` returns the workspace to the default.

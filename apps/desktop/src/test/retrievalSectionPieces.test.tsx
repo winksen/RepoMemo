@@ -12,6 +12,7 @@ vi.mock("../lib/sharedApi", () => ({
 vi.mock("../components/ui/toast", () => ({ Toast: () => null, showToast: vi.fn() }));
 vi.mock("../web/workspace/data", () => ({
   useFolders: () => [[]],
+  useTemplate: () => [null],
   useRetrievalFacets: () => [{ artifact_types: [], languages: ["Rust"], sources: [] }],
   useSavedSearches: () => [saved.list, vi.fn()],
 }));

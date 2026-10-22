@@ -881,6 +881,131 @@ fn the_file_types_are_the_ones_the_ledger_filters_by_and_the_four_templates_choo
     assert_eq!(evidence("product-decisions").types_first, ["markdown", "note", "word"]);
 }
 
+/// The valid file with an `assistant` block written as JSON.
+fn with_assistant(block: &str) -> String {
+    VALID.replacen(
+        "\"format\": 1,",
+        &format!("\"format\": 1,\n  \"assistant\": {block},"),
+        1,
+    )
+}
+
+/// The valid file with a `retrieval` block written as JSON.
+fn with_retrieval(block: &str) -> String {
+    VALID.replacen(
+        "\"format\": 1,",
+        &format!("\"format\": 1,\n  \"retrieval\": {block},"),
+        1,
+    )
+}
+
+#[test]
+fn the_assistant_keeps_its_usual_buttons_and_suggests_nothing_unless_a_template_chooses() {
+    assert!(general().assistant().order.is_empty() && general().assistant().suggestions.is_empty());
+    assert!(general().retrieval().type_chips.is_empty());
+    assert!(parse(VALID).unwrap().assistant().suggestions.is_empty());
+    let chosen = parse(&with_assistant(r#"{ "order": ["ask_question", "find_files"], "suggestions": ["What is the runbook for…", "Who is on call?"] }"#)).unwrap();
+    assert_eq!(chosen.assistant().order, ["ask_question", "find_files"]);
+    assert_eq!(chosen.assistant().suggestions[0], "What is the runbook for…");
+    assert_eq!(parse(&serde_json::to_string(&chosen).unwrap()).unwrap(), chosen);
+    assert!(!serde_json::to_string(&general()).unwrap().contains("assistant"));
+    assert!(!serde_json::to_string(&general()).unwrap().contains("retrieval"));
+    assert_eq!(CAPABILITIES.len(), 6);
+}
+
+#[test]
+fn the_assistants_order_and_suggestions_follow_the_rules_of_a_name() {
+    let unknown = parse(&with_assistant(r#"{ "order": ["ask_question", "book_flights"] }"#)).unwrap_err();
+    assert_eq!(unknown[0].path, "assistant.order[1]");
+    let twice = parse(&with_assistant(r#"{ "order": ["find_files", "find_files"] }"#)).unwrap_err();
+    assert_eq!(twice[0].path, "assistant.order[1]");
+    let longest = "q".repeat(SUGGESTION_MAX);
+    assert!(parse(&with_assistant(&format!(r#"{{ "suggestions": ["{longest}"] }}"#))).is_ok());
+    let too_long = "q".repeat(SUGGESTION_MAX + 1);
+    for bad in ["", "  ", too_long.as_str(), " padded", "two\\nlines"] {
+        let issues = parse(&with_assistant(&format!(r#"{{ "suggestions": ["{bad}"] }}"#))).unwrap_err();
+        assert_eq!(issues[0].path, "assistant.suggestions[0]", "{bad:?} should be refused");
+    }
+    let repeated = parse(&with_assistant(
+        r#"{ "suggestions": ["Who is on call?", "who is on call?"] }"#,
+    ))
+    .unwrap_err();
+    assert_eq!(repeated[0].path, "assistant.suggestions[1]");
+    let seven: Vec<String> = (0..=SUGGESTIONS_MAX).map(|n| format!("\"Question {n}\"")).collect();
+    let too_many = parse(&with_assistant(&format!(
+        r#"{{ "suggestions": [{}] }}"#,
+        seven.join(",")
+    )))
+    .unwrap_err();
+    assert_eq!(too_many[0].path, "assistant.suggestions");
+    let unknown_key = parse(&with_assistant(r#"{ "phrases": [] }"#)).unwrap_err();
+    assert!(
+        unknown_key[0].message.contains("unknown field `phrases`"),
+        "{}",
+        unknown_key[0]
+    );
+}
+
+#[test]
+fn retrieval_chips_are_kinds_of_evidence_listed_once_and_at_most_six() {
+    let chosen = parse(&with_retrieval(r#"{ "type_chips": ["runbook", "incident"] }"#)).unwrap();
+    assert_eq!(chosen.retrieval().type_chips, ["runbook", "incident"]);
+    assert_eq!(parse(&serde_json::to_string(&chosen).unwrap()).unwrap(), chosen);
+    assert!(parse(&with_retrieval("{}")).unwrap().retrieval().type_chips.is_empty());
+    let unknown = parse(&with_retrieval(r#"{ "type_chips": ["runbook", "spreadsheet"] }"#)).unwrap_err();
+    assert_eq!(unknown[0].path, "retrieval.type_chips[1]");
+    let twice = parse(&with_retrieval(r#"{ "type_chips": ["note", "note"] }"#)).unwrap_err();
+    assert_eq!(twice[0].path, "retrieval.type_chips[1]");
+    let seven: Vec<String> = ARTIFACT_TYPES
+        .iter()
+        .take(TYPE_CHIPS_MAX + 1)
+        .map(|kind| format!("\"{kind}\""))
+        .collect();
+    let too_many = parse(&with_retrieval(&format!(
+        r#"{{ "type_chips": [{}] }}"#,
+        seven.join(",")
+    )))
+    .unwrap_err();
+    assert_eq!(too_many[0].path, "retrieval.type_chips");
+}
+
+#[test]
+fn the_four_first_templates_suggest_what_their_teams_ask() {
+    let catalogue = Catalogue::builtin();
+    let operations = catalogue.get("operations").unwrap();
+    assert_eq!(
+        operations.assistant().order,
+        ["ask_question", "search_content", "find_files"]
+    );
+    assert!(operations
+        .assistant()
+        .suggestions
+        .iter()
+        .any(|suggestion| suggestion.starts_with("What is the runbook for")));
+    assert_eq!(operations.retrieval().type_chips, ["runbook", "incident", "note"]);
+    assert_eq!(
+        catalogue.get("software-engineering").unwrap().assistant().order[0],
+        "find_symbol"
+    );
+    assert_eq!(
+        catalogue.get("knowledge-base").unwrap().assistant().order[0],
+        "find_files"
+    );
+    for id in [
+        "software-engineering",
+        "operations",
+        "product-decisions",
+        "knowledge-base",
+    ] {
+        let template = catalogue.get(id).unwrap();
+        assert!(
+            !template.assistant().suggestions.is_empty() && template.assistant().suggestions.len() <= SUGGESTIONS_MAX,
+            "{id}"
+        );
+        assert!(!template.retrieval().type_chips.is_empty(), "{id}");
+    }
+}
+
 #[test]
 fn the_section_list_is_the_one_the_web_client_has_pages_for() {
     let client = include_str!("../../../apps/desktop/src/web/constants.ts");

@@ -2,6 +2,7 @@ import { type AgentCapability, type ArtifactSummary, type MemoryCardSummary, typ
 import { ADMIN_WORKSPACE_SECTIONS, SYSTEM_SECTIONS, WORKSPACE_SECTIONS, type WorkspaceSection } from "./constants";
 import { routePath, workspaceHomePath } from "./router";
 import { arrangeSections } from "./templateSections";
+import { orderCapabilities } from "./templateAssistant";
 
 export type PaletteGroup = "Assistant" | "Files" | "Memory" | "This workspace" | "Workspaces" | "Pages" | "System";
 
@@ -45,6 +46,8 @@ export type PaletteInput = {
   sections?: WorkspaceTemplateView["sections"] | null;
   /** The names the template gives to sections (V0.2.173): the palette lists and matches them under that name. */
   labels?: WorkspaceTemplateView["labels"]["sections"] | null;
+  /** The assistant's jobs the template prefers first (V0.2.176): the palette lists its assistant commands in that order. */
+  assistantOrder?: string[] | null;
 };
 
 function terms(text: string): string[] {
@@ -73,10 +76,15 @@ export function paletteEntries(input: PaletteInput): PaletteEntry[] {
       hint: name,
       action: { kind: "assistant", capability, message: query },
     });
-    add(assistant("ask_question", "Ask the assistant:", "Ask the assistant a question"));
-    add(assistant("find_files", "Find files named", "Find files with the assistant"));
-    add(assistant("search_content", "Search content for", "Search content with the assistant"));
-    add(assistant("find_symbol", "Find the symbol", "Find a code symbol with the assistant"));
+    // In the order the workspace's template prefers (V0.2.176); the usual order without one.
+    const commands = [
+      assistant("ask_question", "Ask the assistant:", "Ask the assistant a question"),
+      assistant("find_files", "Find files named", "Find files with the assistant"),
+      assistant("search_content", "Search content for", "Search content with the assistant"),
+      assistant("find_symbol", "Find the symbol", "Find a code symbol with the assistant"),
+    ];
+    orderCapabilities(commands.map((entry) => ({ id: entry.id.replace("assistant:", ""), entry })), input.assistantOrder ? { order: input.assistantOrder } : null)
+      .forEach(({ entry }) => add(entry));
     if (matchesAll(words, "summarize workspace overview")) {
       add({ id: "assistant:overview", group: "Assistant", label: "Give a workspace overview", hint: name, action: { kind: "assistant", capability: "workspace_overview", message: "" } });
     }

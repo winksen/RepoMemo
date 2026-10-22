@@ -11,6 +11,7 @@
 //! unknown key, an unknown value or a value out of its bound makes a file
 //! invalid; there is no "ignore what you do not know".
 
+mod assistant;
 mod catalogue;
 mod evidence;
 mod folders;
@@ -21,11 +22,13 @@ pub mod limits;
 mod meta;
 mod overview;
 mod resolve;
+mod retrieval;
 mod sections;
 
 #[cfg(test)]
 mod tests;
 
+pub use assistant::{AssistantBlock, CAPABILITIES, SUGGESTIONS_MAX, SUGGESTION_MAX};
 pub use catalogue::{Catalogue, SourceProblem};
 pub use evidence::{EvidenceBlock, ResolvedEvidence, DEFAULT_VIEW, EVIDENCE_VIEWS, FILE_TYPES};
 pub use folders::StarterFolder;
@@ -35,6 +38,7 @@ pub use labels::{LabelsBlock, ARTIFACT_TYPES};
 pub use meta::{TemplateMeta, WORKSPACE_ICONS};
 pub use overview::{OverviewBlock, CARDS_MAX, DEFAULT_CARDS, PULSE_CARDS};
 pub use resolve::{Origin, Resolution};
+pub use retrieval::{RetrievalBlock, TYPE_CHIPS_MAX};
 pub use sections::{ResolvedSections, SectionsBlock, ADMIN_ONLY_SECTIONS, DEFAULT_LANDING, WORKSPACE_SECTIONS};
 
 use serde::{Deserialize, Serialize};
@@ -65,6 +69,12 @@ pub struct TemplateDefinition {
     /// How the evidence ledger opens and which file types its filter lists first (V0.2.175); as today when left out.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub evidence: Option<EvidenceBlock>,
+    /// The order of the assistant's buttons and the questions it suggests (V0.2.176); as today when left out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub assistant: Option<AssistantBlock>,
+    /// The kinds of evidence the Retrieval page suggests as chips (V0.2.176); none when left out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retrieval: Option<RetrievalBlock>,
 }
 
 impl TemplateDefinition {
@@ -129,6 +139,12 @@ impl TemplateDefinition {
         if let Some(evidence) = &self.evidence {
             evidence::validate(evidence, &mut issues);
         }
+        if let Some(assistant) = &self.assistant {
+            assistant::validate(assistant, &mut issues);
+        }
+        if let Some(retrieval) = &self.retrieval {
+            retrieval::validate(retrieval, &mut issues);
+        }
         issues
     }
 
@@ -139,6 +155,16 @@ impl TemplateDefinition {
     /// The names this template gives to sections and kinds of evidence; empty for the usual names.
     pub fn labels(&self) -> LabelsBlock {
         self.labels.clone().unwrap_or_default()
+    }
+
+    /// What the assistant shows first and suggests; empty for the usual buttons and no suggestion.
+    pub fn assistant(&self) -> AssistantBlock {
+        self.assistant.clone().unwrap_or_default()
+    }
+
+    /// The kinds of evidence the Retrieval page suggests as chips; none for the usual page.
+    pub fn retrieval(&self) -> RetrievalBlock {
+        self.retrieval.clone().unwrap_or_default()
     }
 
     /// How the evidence ledger opens and which file types it lists first, complete.

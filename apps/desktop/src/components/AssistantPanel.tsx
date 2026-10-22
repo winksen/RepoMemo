@@ -20,6 +20,8 @@ import {
 import { deleteSharedAgentConversation, getSharedAgentCapabilities, getSharedAgentConversation, listSharedAgentConversations, renameSharedAgentConversation, sendSharedAgentMessage } from "../lib/sharedApi";
 import type { AgentCapabilities, AgentCapability, AgentConversation, AgentMessage, AgentReply, AgentTurn } from "../types";
 import { ViewAtCommit } from "../web/common";
+import { useTemplate } from "../web/workspace/data";
+import { orderCapabilities, suggestedQuestions } from "../web/templateAssistant";
 import { ActionMenu } from "./ui/action-menu";
 import { Button } from "./ui/button";
 import { Dialog, DialogCancel } from "./ui/dialog";
@@ -93,6 +95,7 @@ export function AssistantPanel({ accessToken, onOpenArtifact, workspaceId }: { a
     staleTime: 0,
   });
   useErrorToast(capabilitiesQuery.error ?? chatsQuery.error, "The assistant is unavailable.");
+  const [template] = useTemplate(accessToken, workspaceId);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [turns, setTurns] = useState<ThreadTurn[]>([]);
   const [isLoadingChat, setIsLoadingChat] = useState(false);
@@ -303,11 +306,14 @@ export function AssistantPanel({ accessToken, onOpenArtifact, workspaceId }: { a
       </div>
       <form className="shared-assistant-composer" onSubmit={submit}>
         <div className="shared-assistant-actions" role="group" aria-label="Assistant actions">
-          {(capabilities?.capabilities ?? []).map((capability) => {
+          {orderCapabilities(capabilities?.capabilities ?? [], template?.assistant).map((capability) => {
             const Icon = CAPABILITY_ICONS[capability.id];
             return <Button aria-pressed={selected === capability.id} className={selected === capability.id ? "active" : ""} disabled={!capability.available || isBusy || isLoadingChat} key={capability.id} onClick={() => choose(capability.id)} title={capability.available ? capability.description : `${capability.description} Needs an AI provider enabled in Settings.`} type="button" variant="secondary"><Icon size={ICON_SIZE.sm} />{capability.label}</Button>;
           })}
         </div>
+        {!draft.trim() && !turns.length && suggestedQuestions(template?.assistant).length ? <div aria-label="Suggested questions" className="shared-assistant-suggestions" role="group">
+          {suggestedQuestions(template?.assistant).map((question) => <Button disabled={isBusy || isLoadingChat} key={question} onClick={() => { setDraft(question); input.current?.focus(); }} type="button" variant="secondary">{question}</Button>)}
+        </div> : null}
         <div className="shared-assistant-input">
           <Textarea aria-label="Message the assistant" onChange={(event) => setDraft(event.target.value)} onKeyDown={onComposerKey} placeholder={selectedInfo?.placeholder ?? "Ask, search, or name a file…"} ref={input} rows={2} value={draft} />
           <Button aria-label="Send" busy={isBusy} disabled={isLoadingChat || !draft.trim()} type="submit" variant="main"><Send size={ICON_SIZE.md} /></Button>

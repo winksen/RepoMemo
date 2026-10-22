@@ -84,9 +84,10 @@ export function CommandPalette({ accessToken, assistantWorkspaceId, canAdministe
   const [template] = useTemplate(accessToken, currentWorkspaceId ?? "", open && Boolean(currentWorkspaceId));
   const sections = template?.sections;
   const labels = template?.labels.sections;
+  const assistantOrder = template?.assistant.order;
   const entries = useMemo(
-    () => paletteEntries({ query, workspaces, assistantWorkspace, currentWorkspace, files, cards, canAdministerSystem, sections, labels }),
-    [query, workspaces, assistantWorkspace, currentWorkspace, files, cards, canAdministerSystem, sections, labels],
+    () => paletteEntries({ query, workspaces, assistantWorkspace, currentWorkspace, files, cards, canAdministerSystem, sections, labels, assistantOrder }),
+    [query, workspaces, assistantWorkspace, currentWorkspace, files, cards, canAdministerSystem, sections, labels, assistantOrder],
   );
   const activeIndex = Math.min(active, Math.max(entries.length - 1, 0));
 

@@ -17,6 +17,7 @@ import { RETRIEVAL_STATES, type RetrievalState } from "../constants";
 import { apiMessage, artifactTypeLabel, citationLines, lastChangeLabel } from "../format";
 import { EvidenceUsed, renderHighlightedSnippet } from "../common";
 import { useFolders, useRetrievalFacets, useSavedSearches, useTemplate } from "./data";
+import { retrievalChips } from "../templateAssistant";
 import { type WorkspacePage, sectionState } from "./page";
 import { ICON_SIZE } from "../../components/ui/icon";
 import { showToast } from "../../components/ui/toast";
@@ -46,6 +47,7 @@ export function RetrievalSection({ page }: { page: WorkspacePage }) {
   const [retrievalFacets] = useRetrievalFacets(accessToken, workspaceId);
   const [template] = useTemplate(accessToken, workspaceId);
   const typeLabels = template?.labels.artifact_types;
+  const chips = retrievalChips(template?.retrieval.type_chips, retrievalFacets?.artifact_types);
   const [folders] = useFolders(accessToken, workspaceId);
   const [savedSearches, setSavedSearches] = useSavedSearches(accessToken, workspaceId, true);
   // A new search, filter, folder or section starts again from the first page.
@@ -120,6 +122,7 @@ export function RetrievalSection({ page }: { page: WorkspacePage }) {
             <><PanelHeading icon={Search} title="Retrieve" />
             <form className="shared-retrieval-search" onSubmit={runSearch}>
               <SearchField aria-label="Search indexed evidence" onValueChange={setQuery} placeholder="Search indexed evidence" value={query} />
+              {chips.length ? <div aria-label="Suggested file types" className="shared-retrieval-chips" role="group">{chips.map((kind) => <Button aria-pressed={retrievalArtifactType === kind} className={retrievalArtifactType === kind ? "active" : ""} key={kind} onClick={() => setRetrievalArtifactType(retrievalArtifactType === kind ? "all" : kind as ArtifactType)} type="button" variant="secondary">{artifactTypeLabel(kind as ArtifactType, typeLabels)}</Button>)}</div> : null}
               <div className="shared-retrieval-filter-row">
                 <Field label="File type">{(control) => <Dropdown id={control.id} onValueChange={(value) => setRetrievalArtifactType(value as ArtifactType | "all")} options={[{ label: "All file types", value: "all" }, ...(retrievalFacets?.artifact_types ?? []).map((type) => ({ label: artifactTypeLabel(type, typeLabels), value: type }))]} value={retrievalArtifactType} />}</Field>
                 <Field label="Language">{(control) => <Dropdown id={control.id} onValueChange={setRetrievalLanguage} options={[{ label: "All languages", value: "all" }, ...(retrievalFacets?.languages ?? []).map((language) => ({ label: language, value: language }))]} value={retrievalLanguage} />}</Field>

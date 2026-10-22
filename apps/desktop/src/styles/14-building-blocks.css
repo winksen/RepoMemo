@@ -174,5 +174,9 @@ th > .rm-badge,
 .rm-template-text strong { font-size: 13px; }
 .rm-template-text span { color: var(--color-text-muted); font-size: 12px; line-height: 1.4; }
 .rm-template-picker:disabled .rm-template-option { cursor: default; opacity: 0.6; }
+/* What a workspace's template suggests: questions for the assistant, kinds of evidence for Retrieval. */
+.shared-assistant-suggestions, .shared-retrieval-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.shared-assistant-suggestions .rm-button, .shared-retrieval-chips .rm-button { padding: 4px 10px; font-size: 12px; font-weight: 600; text-align: left; }
+.shared-retrieval-chips .rm-button.active, .shared-retrieval-chips .rm-button.active:hover:not(:disabled) { color: var(--color-text); background: var(--color-surface-3); border-color: var(--color-text); }
 .rm-mention-links { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .rm-option > svg { flex: none; }

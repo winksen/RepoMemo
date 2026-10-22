@@ -24,5 +24,14 @@
   "overview": {
     "cards": ["memory_cards", "active_tasks", "fresh_evidence", "index_coverage"]
   },
-  "evidence": { "types_first": ["markdown", "note", "word"] }
+  "evidence": { "types_first": ["markdown", "note", "word"] },
+  "assistant": {
+    "order": ["ask_question", "find_files", "summarize_file"],
+    "suggestions": [
+      "What did we decide about…",
+      "Which specs mention…",
+      "Summarize the latest meeting notes"
+    ]
+  },
+  "retrieval": { "type_chips": ["decision", "note", "markdown_doc"] }
 }

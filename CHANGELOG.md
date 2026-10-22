@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.176 (2026-10-22)
+
+The assistant suggests questions that fit the workspace, and Retrieval suggests the kinds of evidence a team looks for.
+
+### Changed
+- **The `assistant` block:** a template may list the assistant's jobs to show first (`order`, from the six it has, each once) and up to six suggested questions of up to 120 characters (`suggestions`). The assistant's buttons and the command palette's assistant commands put the template's jobs first in its order and keep the others after them in the order the server gave. The suggestions appear as buttons above the message box while it is empty and no chat has begun; **choosing one fills the box and sends nothing**, and the person sends the message. The citation guard, the "insufficient context" answer and the AI policy are not touched: a suggestion is text for a box.
+- **The `retrieval` block:** a template may suggest up to six kinds of evidence (`type_chips`) as chips above the Retrieval search, only for kinds the workspace has files of. Choosing a chip filters the search to that kind and choosing it again clears the filter; nothing is applied before. It is a block of its own because the plan's table had no key for it. `GET /v1/workspaces/{id}/template` answers both blocks as `assistant` and `retrieval`.
+- **The four templates:** *Software engineering* looks up symbols first and suggests questions about where things are implemented and who calls the billing API, with chips for code, Markdown and API specifications; *Operations and incidents* asks and searches first ("What is the runbook for…", "What happened in the last incident?", "Who is on call for…") with chips for runbooks, incidents and notes; *Product and decisions* asks first ("What did we decide about…", "Which specs mention…") with chips for decisions, notes and Markdown; *Knowledge base* finds files first ("Which contracts mention…", "What does our policy say about…") with chips for files and Markdown. General suggests nothing.
+- **A guard on the list of jobs:** the jobs a template can order are the assistant's capabilities; a test in the api crate matches on every `AgentCapability`, so adding one stops it compiling until the list in `repomemo-templates` has it too.
+- **Tests (written, not run):** four in the templates crate (the usual buttons and no suggestion without a block; an unknown or repeated job and empty, long, padded, repeated or too many suggestions refused; the Retrieval chips; the four templates' choices), one in the api crate (the jobs are the capabilities), nine in a new web test file (the buttons in the server's order and in the template's, an unknown job ignored, the suggested questions trimmed, the real assistant panel in the template's order with suggestions that fill the box and send nothing and with none for a workspace without a template, the Retrieval chips, the palette's assistant order), and the server's template test now checks the assistant and Retrieval of General and of each of the four. The Retrieval and Evidence section tests' mocks of the data hooks gained `useTemplate`, which those sections have read since V0.2.173 (the mocks were missed there).
+- **Checks run on this release:** `cargo check` of the templates, api and server crates with their tests compiles; `rustfmt` shows nothing for the lines changed; `types:check`, `typecheck`, `styles:check`, `a11y:check`, `docs:check` and `version:check` pass. **Not run:** the tests, as asked.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.175 (2026-10-22)
 
 The evidence ledger opens the way its template says and lists its preferred file types first.

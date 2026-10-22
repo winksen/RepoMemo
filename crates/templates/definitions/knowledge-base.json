@@ -24,5 +24,14 @@
   "overview": {
     "cards": ["index_coverage", "indexed_storage", "fresh_evidence", "knowledge_density"]
   },
-  "evidence": { "default_view": "list", "types_first": ["word", "pdf", "excel", "powerpoint"] }
+  "evidence": { "default_view": "list", "types_first": ["word", "pdf", "excel", "powerpoint"] },
+  "assistant": {
+    "order": ["find_files", "ask_question", "summarize_file"],
+    "suggestions": [
+      "Which contracts mention…",
+      "What does our policy say about…",
+      "Find the latest report on…"
+    ]
+  },
+  "retrieval": { "type_chips": ["file", "markdown_doc"] }
 }

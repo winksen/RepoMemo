@@ -18,6 +18,7 @@ vi.mock("../web/workspace/data", () => ({
   useEvidencePage: () => [{ items: artifacts.list, total: artifacts.list.length }],
   useFolders: () => [[], vi.fn()],
   useIndexFailures: () => [{}],
+  useTemplate: () => [null],
 }));
 vi.mock("../web/lazy", () => ({
   DocumentViewer: () => null,

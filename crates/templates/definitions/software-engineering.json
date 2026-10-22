@@ -22,5 +22,14 @@
   "overview": {
     "cards": ["code_symbols", "sources", "index_coverage", "at_risk", "fresh_evidence"]
   },
-  "evidence": { "types_first": ["code", "markdown", "repository"] }
+  "evidence": { "types_first": ["code", "markdown", "repository"] },
+  "assistant": {
+    "order": ["find_symbol", "ask_question", "search_content"],
+    "suggestions": [
+      "Where is the payment retry implemented?",
+      "What did we decide about the database?",
+      "Which services call the billing API?"
+    ]
+  },
+  "retrieval": { "type_chips": ["code_file", "markdown_doc", "api_spec"] }
 }

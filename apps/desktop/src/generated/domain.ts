@@ -222,6 +222,10 @@ export interface WorkspaceTemplateView {
   overview: TemplateOverview;
   /** How the evidence ledger opens and which file types it lists first. */
   evidence: TemplateEvidence;
+  /** The assistant's order and suggestions. */
+  assistant: TemplateAssistant;
+  /** What the Retrieval page suggests. */
+  retrieval: TemplateRetrieval;
 }
 
 /**
@@ -256,6 +260,18 @@ export interface TemplateOverview {
 export interface TemplateEvidence {
   default_view: string;
   types_first: string[];
+}
+
+/** What the assistant shows first and the questions it suggests. Both empty for `general`. */
+export interface TemplateAssistant {
+  /** Capabilities listed before the others, in this order; the rest follow in the server's order. */
+  order: string[];
+  suggestions: string[];
+}
+
+/** The kinds of evidence the Retrieval page suggests as chips. Empty for `general`. */
+export interface TemplateRetrieval {
+  type_chips: string[];
 }
 
 /** Chooses a workspace's template; `null` returns the workspace to the default. */

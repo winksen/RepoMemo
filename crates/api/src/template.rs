@@ -56,6 +56,16 @@ impl EffectiveTemplate {
                     landing: sections.landing,
                 }
             },
+            assistant: {
+                let assistant = self.template.assistant();
+                TemplateAssistant {
+                    order: assistant.order,
+                    suggestions: assistant.suggestions,
+                }
+            },
+            retrieval: TemplateRetrieval {
+                type_chips: self.template.retrieval().type_chips,
+            },
             evidence: {
                 let evidence = self.template.evidence();
                 TemplateEvidence {
@@ -418,6 +428,33 @@ mod tests {
         );
 
         let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    /// What the assistant can be told to do is exactly what the API's capabilities are (V0.2.176).
+    #[test]
+    fn the_jobs_a_template_can_order_are_the_assistants_capabilities() {
+        use repomemo_domain::AgentCapability;
+        let id = |job: &AgentCapability| match job {
+            AgentCapability::FindFiles => "find_files",
+            AgentCapability::FindSymbol => "find_symbol",
+            AgentCapability::SearchContent => "search_content",
+            AgentCapability::SummarizeFile => "summarize_file",
+            AgentCapability::AskQuestion => "ask_question",
+            AgentCapability::WorkspaceOverview => "workspace_overview",
+        };
+        let every = [
+            AgentCapability::FindFiles,
+            AgentCapability::FindSymbol,
+            AgentCapability::SearchContent,
+            AgentCapability::SummarizeFile,
+            AgentCapability::AskQuestion,
+            AgentCapability::WorkspaceOverview,
+        ];
+        let named: Vec<&str> = every.iter().map(id).collect();
+        assert_eq!(named, repomemo_templates::CAPABILITIES);
+        for job in &every {
+            assert_eq!(serde_json::to_value(job).unwrap(), json!(id(job)));
+        }
     }
 
     /// The kinds of evidence a template can rename are exactly the ones the API has: adding an `ArtifactType`

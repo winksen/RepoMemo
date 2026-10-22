@@ -24,5 +24,15 @@
   "overview": {
     "cards": ["fresh_evidence", "active_tasks", "at_risk", "memory_cards"]
   },
-  "evidence": { "default_view": "list", "types_first": ["markdown", "note", "text"] }
+  "evidence": { "default_view": "list", "types_first": ["markdown", "note", "text"] },
+  "assistant": {
+    "order": ["ask_question", "search_content", "find_files"],
+    "suggestions": [
+      "What is the runbook for…",
+      "What happened in the last incident?",
+      "Who is on call for…",
+      "What are the steps to roll back…"
+    ]
+  },
+  "retrieval": { "type_chips": ["runbook", "incident", "note"] }
 }

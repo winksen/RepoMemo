@@ -142,6 +142,12 @@ async fn the_four_first_templates_are_offered_and_each_creates_its_folders() {
             "{id}"
         );
         assert!(!view["evidence"]["types_first"].as_array().unwrap().is_empty(), "{id}");
+        // The assistant and Retrieval (V0.2.176): every template suggests questions and chips; Operations asks first.
+        assert!(!view["assistant"]["suggestions"].as_array().unwrap().is_empty(), "{id}");
+        assert!(!view["retrieval"]["type_chips"].as_array().unwrap().is_empty(), "{id}");
+        if id == "operations" {
+            assert_eq!(view["assistant"]["order"][0], "ask_question");
+        }
         let cards = view["overview"]["cards"].as_array().unwrap();
         assert!(!cards.is_empty() && cards.len() <= 8, "{id}");
         assert_eq!(
@@ -386,6 +392,8 @@ async fn templates_are_listed_read_by_members_and_changed_only_by_administrators
         by_default["evidence"],
         json!({"default_view": "grid", "types_first": []})
     );
+    assert_eq!(by_default["assistant"], json!({"order": [], "suggestions": []}));
+    assert_eq!(by_default["retrieval"], json!({"type_chips": []}));
     assert_eq!(
         by_default["overview"]["cards"],
         json!([
