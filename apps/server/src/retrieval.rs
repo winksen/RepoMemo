@@ -3,6 +3,8 @@ use crate::*;
 /// Workspaces one search across workspaces will read; the rest are counted
 /// in `not_searched`.
 const CROSS_SEARCH_MAX_WORKSPACES: usize = 30;
+/// Workspaces searched at the same time.
+const CROSS_SEARCH_PARALLEL: usize = 4;
 const CROSS_SEARCH_DEFAULT_LIMIT: i64 = 20;
 const CROSS_SEARCH_MAX_LIMIT: i64 = 50;
 
@@ -57,8 +59,10 @@ pub(crate) async fn search_all_workspaces(
     .map_err(ApiError::internal)?;
 
     let started = std::time::Instant::now();
-    // (score, rank in its workspace, workspace name) order the merged list.
-    let mut merged: Vec<(f64, usize, String, CrossSearchResult)> = Vec::new();
+    // The caller's rights and each workspace's AI policy are settled for every workspace first; the
+    // searches then run a few at a time, with the query embedded once for each provider and model.
+    let mut chosen = Vec::new();
+    let mut inputs = Vec::new();
     for entry in listing {
         let workspace = entry.workspace;
         if !request.workspace_ids.is_empty() && !request.workspace_ids.contains(&workspace.id) {
@@ -69,25 +73,31 @@ pub(crate) async fn search_all_workspaces(
         else {
             continue;
         };
-        if response.workspaces.len() >= CROSS_SEARCH_MAX_WORKSPACES {
+        if chosen.len() >= CROSS_SEARCH_MAX_WORKSPACES {
             response.not_searched += 1;
             continue;
         }
         let min_role = ai_access::workspace_ai_min_role(&state, &workspace.id).await?;
         let by_meaning_allowed = min_role.allows(&role);
-        let searched = state
-            .core
-            .search_workspace_detailed(
-                SearchRequest {
-                    workspace_id: workspace.id.clone(),
-                    query: query.clone(),
-                    limit: Some(limit),
-                    lifecycle_statuses: request.lifecycle_statuses.clone(),
-                    ..Default::default()
-                },
-                by_meaning_allowed,
-            )
-            .await;
+        inputs.push((
+            SearchRequest {
+                workspace_id: workspace.id.clone(),
+                query: query.clone(),
+                limit: Some(limit),
+                lifecycle_statuses: request.lifecycle_statuses.clone(),
+                ..Default::default()
+            },
+            by_meaning_allowed,
+        ));
+        chosen.push((workspace, by_meaning_allowed));
+    }
+    let outcomes = state
+        .core
+        .search_workspaces_detailed(inputs, CROSS_SEARCH_PARALLEL)
+        .await;
+    // (score, rank in its workspace, workspace name) order the merged list.
+    let mut merged: Vec<(f64, usize, String, CrossSearchResult)> = Vec::new();
+    for ((workspace, by_meaning_allowed), searched) in chosen.into_iter().zip(outcomes) {
         let (results, by_meaning, note) = match searched {
             Ok((results, by_meaning)) => {
                 let note = (!by_meaning_allowed).then(|| {

@@ -2,6 +2,19 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.158 (2026-10-21)
+
+Search across workspaces stops reading the workspaces one after another and stops embedding the query again in each.
+
+### Changed
+- **Workspaces searched in parallel (P18):** up to 30 workspaces were searched one after another. The caller's role and each workspace's AI policy are now settled for every workspace first, then the searches run four at a time (`CROSS_SEARCH_PARALLEL`). The answers come back in the order of the workspaces, so the merged list, its order and the per-workspace notes are what they were.
+- **One embedding call for each provider (P18):** the query was embedded again in every workspace, so 30 workspaces on one provider made 30 calls to it. It is now embedded once for each provider the workspaces use (the same kind, address, embedding model and key), and the vector is handed to each workspace's search. A workspace whose AI policy keeps meaning search from the caller still never has the query sent to its provider; a provider that fails leaves its workspaces on keywords, as before.
+- **Tests (written, not run):** `a_search_across_workspaces_embeds_the_query_once_per_provider` (five workspaces with the same embedding provider: one embedding call for the search, every workspace answered by meaning, and the same results as searching each workspace alone).
+- **Checks run on this release:** `cargo check` of the api and server crates with their tests compiles; `rustfmt` shows nothing for the lines changed; `docs:check` and `version:check` pass. **Not run:** the tests, as asked.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.157 (2026-10-21)
 
 The last-author pass reads the new commits, not the whole history, on each sync.

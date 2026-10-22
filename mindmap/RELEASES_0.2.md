@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.2 → 0.3
 
-> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.157` (2026-10-21) · **Next:** `V0.2.158`
+> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.158` (2026-10-21) · **Next:** `V0.2.159`
 > **Previous line:** [Releases 0.1 → 0.2](RELEASES_0.1.md) · **Related:** [Roadmap, Road to V0.3.0](ROADMAP.md#-road-to-v030) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
 Every release of the 0.2 line, shipped and planned, one row each. The plan comes from the [Road to V0.3.0](ROADMAP.md#-road-to-v030): **one change per release**, each shippable alone, with the security rules for a new outside connection in the release that opens it. Planned rows are proposals until decisions 7–14 in the roadmap are agreed; tracks L and M wait on decisions 20–23.
@@ -194,7 +194,7 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | **V0.2.155** | ✅ 2026-10-21 |M. Backend hardening and performance |🔧 Enhancement | Web data | The workspace pages off the full file list; pickers and the palette ask the server (P15b) | No web request for an unpaged file list |
 | **V0.2.156** | ✅ 2026-10-21 |M. Backend hardening and performance |🔧 Enhancement | Repositories | A sync with nothing new stops early (P16) | Under a second on 100,000 files |
 | **V0.2.157** | ✅ 2026-10-21 |M. Backend hardening and performance |🔧 Enhancement | Repositories | The last-author pass reads only new commits (P17) | One new commit reads one commit of history |
-| **V0.2.158** | 🔜 Planned | M. Backend hardening and performance | 🔧 Enhancement | Search | Cross-workspace search in parallel, one embedding per model (P18) | 30 workspaces on one provider make one embedding call |
+| **V0.2.158** | ✅ 2026-10-21 |M. Backend hardening and performance |🔧 Enhancement | Search | Cross-workspace search in parallel, one embedding per model (P18) | 30 workspaces on one provider make one embedding call |
 | **V0.2.159** | 🔜 Planned | M. Backend hardening and performance | 🔧 Enhancement | Storage | SQLite read tuning (P19) | `performance_at_scale` no slower anywhere; figures recorded |
 | **V0.2.160** | 🔜 Planned | M. Backend hardening and performance | 🔧 Enhancement | API | Compressed JSON answers (P20) | Search answers compressed; event streams unchanged |
 | **V0.2.161** | 🔜 Planned | M. Backend hardening and performance | 🔧 Enhancement | API | Load shedding with `Retry-After` (P21) | Past the cap, refused at once instead of queued to a timeout |

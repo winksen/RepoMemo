@@ -760,6 +760,14 @@ impl RepoMemoCore {
         } else {
             None
         };
+        self.search_with_embedding(request, embedding).await
+    }
+
+    async fn search_with_embedding(
+        &self,
+        request: SearchRequest,
+        embedding: Option<(String, Vec<f32>)>,
+    ) -> Result<(Vec<SearchResult>, bool)> {
         let (results, _) = self
             .retrieval
             .hybrid_search(
@@ -771,6 +779,81 @@ impl RepoMemoCore {
             )
             .await?;
         Ok((results, embedding.is_some()))
+    }
+
+    /// [`RepoMemoCore::search_workspace_detailed`] for several workspaces at once, `concurrency` of
+    /// them at a time. Each input is a search and whether it may be by meaning; the answers come back
+    /// in the order of the inputs. A query that is searched by meaning is embedded once for each
+    /// provider (the same kind, address and model, and key) the workspaces use, not once for each
+    /// workspace; a provider that fails leaves its workspaces on keywords.
+    pub async fn search_workspaces_detailed(
+        &self,
+        inputs: Vec<(SearchRequest, bool)>,
+        concurrency: usize,
+    ) -> Vec<Result<(Vec<SearchResult>, bool)>> {
+        let mut shared_embeddings: std::collections::HashMap<String, Option<(String, Vec<f32>)>> =
+            std::collections::HashMap::new();
+        let mut keys: Vec<Option<String>> = Vec::with_capacity(inputs.len());
+        for (request, by_meaning) in &inputs {
+            let mut key = None;
+            if *by_meaning && !request.query.trim().is_empty() {
+                if let Ok(Some(settings)) = self.embedding_provider_for_workspace(&request.workspace_id).await {
+                    let shared = format!(
+                        "{}\u{1f}{}\u{1f}{}\u{1f}{}\u{1f}{}",
+                        settings.provider_type,
+                        settings.base_url.as_deref().unwrap_or_default(),
+                        settings.embedding_model_name(),
+                        settings.api_key.as_deref().unwrap_or_default(),
+                        request.query
+                    );
+                    if !shared_embeddings.contains_key(&shared) {
+                        let model = settings.embedding_model_name().to_owned();
+                        let embedded = match provider_from_settings(settings) {
+                            Ok(provider) => provider
+                                .embed(vec![request.query.clone()], json!({}))
+                                .await
+                                .ok()
+                                .and_then(|vectors| vectors.into_iter().next())
+                                .filter(|vector| !vector.is_empty())
+                                .map(|vector| (model, vector)),
+                            Err(_) => None,
+                        };
+                        shared_embeddings.insert(shared.clone(), embedded);
+                    }
+                    key = Some(shared);
+                }
+            }
+            keys.push(key);
+        }
+        let count = inputs.len();
+        let gate = std::sync::Arc::new(tokio::sync::Semaphore::new(concurrency.max(1)));
+        let mut running = tokio::task::JoinSet::new();
+        for (index, (request, _)) in inputs.into_iter().enumerate() {
+            let embedding = keys[index]
+                .as_ref()
+                .and_then(|key| shared_embeddings.get(key).cloned().flatten());
+            let core = self.clone();
+            let gate = gate.clone();
+            running.spawn(async move {
+                let _turn = gate.acquire_owned().await;
+                let outcome = if request.query.trim().is_empty() {
+                    Ok((Vec::new(), false))
+                } else {
+                    core.search_with_embedding(request, embedding).await
+                };
+                (index, outcome)
+            });
+        }
+        let mut outcomes: Vec<Option<Result<(Vec<SearchResult>, bool)>>> = (0..count).map(|_| None).collect();
+        while let Some(finished) = running.join_next().await {
+            if let Ok((index, outcome)) = finished {
+                outcomes[index] = Some(outcome);
+            }
+        }
+        outcomes
+            .into_iter()
+            .map(|outcome| outcome.unwrap_or_else(|| Err(anyhow::anyhow!("the search of a workspace did not finish"))))
+            .collect()
     }
 
     pub async fn list_symbols(&self, artifact_id: String) -> Result<Vec<Symbol>> {

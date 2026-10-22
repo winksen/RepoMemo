@@ -12,6 +12,7 @@ mod ai;
 mod auth;
 mod connectors;
 mod connectors_gitlab;
+mod cross_search;
 mod evidence;
 mod evidence_tools;
 mod memory;
