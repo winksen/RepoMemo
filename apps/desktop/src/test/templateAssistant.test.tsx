@@ -72,7 +72,7 @@ function renderPanel() {
 
 describe("the assistant panel with a template", () => {
   it("lists its jobs in the template's order and suggests its questions, which fill the box and send nothing", async () => {
-    vi.mocked(useTemplate).mockReturnValue([templateWith({ order: ["ask_question", "find_files"], suggestions: ["What is the runbook for…", "Who is on call?"] }), vi.fn(), {} as never]);
+    vi.mocked(useTemplate).mockReturnValue([templateWith({ order: ["ask_question", "find_files"], suggestions: ["What is the runbook for…", "Who is on call?"], phrases: [], focus: null }), vi.fn(), {} as never]);
     renderPanel();
     const actions = await screen.findByRole("group", { name: "Assistant actions" });
     await waitFor(() => expect(within(actions).getAllByRole("button").map((button) => button.textContent)).toEqual(["ask question", "find files", "search content"]));

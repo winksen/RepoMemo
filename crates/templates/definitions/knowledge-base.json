@@ -31,7 +31,13 @@
       "Which contracts mention…",
       "What does our policy say about…",
       "Find the latest report on…"
-    ]
+    ],
+    "phrases": [
+      { "phrase": "policy", "capability": "find_files" },
+      { "phrase": "contract", "capability": "find_files" },
+      { "phrase": "report on", "capability": "find_files" }
+    ],
+    "focus": "This workspace holds policies, contracts, reports and other business documents."
   },
   "retrieval": { "type_chips": ["file", "markdown_doc"] },
   "ranking": {

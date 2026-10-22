@@ -66,8 +66,8 @@ impl Overrides {
         }
         if let Some(suggestions) = &self.suggestions {
             let block = AssistantBlock {
-                order: Vec::new(),
                 suggestions: suggestions.clone(),
+                ..Default::default()
             };
             assistant::validate(&block, &mut found);
         }

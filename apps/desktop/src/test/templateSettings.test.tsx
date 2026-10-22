@@ -22,7 +22,7 @@ const operationsDetail: TemplateDetail = {
   labels: { sections: { tasks: "Actions" }, artifact_types: {} },
   overview: { cards: ["fresh_evidence", "at_risk"] },
   evidence: { default_view: "list", types_first: [] },
-  assistant: { order: [], suggestions: ["What is the runbook for…"] },
+  assistant: { order: [], suggestions: ["What is the runbook for…"], phrases: [{ phrase: "runbook", capability: "find_files" }], focus: "This workspace holds runbooks." },
   retrieval: { type_chips: [] },
   review: { order: ["health_finding", "evidence", "memory_card"] },
   map: { coverage_first: ["markdown", "note"], relations_first: ["cites"] },
@@ -35,7 +35,7 @@ const knowledgeDetail: TemplateDetail = {
   sections: { primary: ["overview", "documents", "people", "settings"], more: [], landing: "documents" },
   labels: { sections: { evidence: "Library" }, artifact_types: {} },
   overview: { cards: ["index_coverage"] },
-  assistant: { order: [], suggestions: [] },
+  assistant: { order: [], suggestions: [], phrases: [], focus: null },
 };
 
 function current(overrides: WorkspaceTemplateView["overrides"] = null, base: TemplateDetail = operationsDetail): WorkspaceTemplateView {
@@ -65,7 +65,7 @@ describe("the lines that preview a template", () => {
       "Opens on": "Review",
       "Renamed": "Tasks → Actions",
       "Overview cards": "Fresh evidence, At risk",
-      "The assistant suggests": "1 question",
+      "The assistant suggests": "1 question, 1 phrase it recognises",
       "Map shows first": "Markdown, Note; memory citations",
       "Review lists": "open health findings, then files, then memory cards",
       "Health checks": "Stale evidence (90 days), Outdated references, Stale memory, Indexing failures",

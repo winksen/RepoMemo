@@ -156,6 +156,14 @@ async fn the_four_first_templates_are_offered_and_each_creates_its_folders() {
             id == "software-engineering",
             "{id}"
         );
+        // The assistant's phrases and focus (V0.2.185): every template gives some.
+        assert!(!view["assistant"]["phrases"].as_array().unwrap().is_empty(), "{id}");
+        assert!(
+            view["assistant"]["focus"]
+                .as_str()
+                .is_some_and(|focus| focus.starts_with("This workspace holds")),
+            "{id}"
+        );
         // The map (V0.2.184): Software engineering puts repositories and code first.
         let coverage_first = view["map"]["coverage_first"].get(0).cloned().unwrap_or(Value::Null);
         assert_eq!(
@@ -600,7 +608,10 @@ async fn templates_are_listed_read_by_members_and_changed_only_by_administrators
         by_default["evidence"],
         json!({"default_view": "grid", "types_first": []})
     );
-    assert_eq!(by_default["assistant"], json!({"order": [], "suggestions": []}));
+    assert_eq!(
+        by_default["assistant"],
+        json!({"order": [], "suggestions": [], "phrases": [], "focus": null})
+    );
     assert_eq!(by_default["retrieval"], json!({"type_chips": []}));
     assert_eq!(
         by_default["ranking"],

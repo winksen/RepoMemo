@@ -328,6 +328,17 @@ pub struct TemplateAssistant {
     /// Capabilities listed before the others, in this order; the rest follow in the server's order.
     pub order: Vec<String>,
     pub suggestions: Vec<String>,
+    /// Phrases the keyword router recognises after its own rules.
+    pub phrases: Vec<TemplatePhrase>,
+    /// One line about what the workspace is for, given to Ask as context.
+    pub focus: Option<String>,
+}
+
+/// A phrase the assistant's router recognises and the job it maps onto.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TemplatePhrase {
+    pub phrase: String,
+    pub capability: String,
 }
 
 /// The kinds of evidence the Retrieval page suggests as chips. Empty for `general`.

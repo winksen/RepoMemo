@@ -32,7 +32,14 @@
       "What happened in the last incident?",
       "Who is on call for…",
       "What are the steps to roll back…"
-    ]
+    ],
+    "phrases": [
+      { "phrase": "runbook", "capability": "find_files" },
+      { "phrase": "postmortem", "capability": "find_files" },
+      { "phrase": "on-call", "capability": "find_files" },
+      { "phrase": "incident", "capability": "search_content" }
+    ],
+    "focus": "This workspace holds runbooks, incident reports and on-call knowledge for running a service."
   },
   "retrieval": { "type_chips": ["runbook", "incident", "note"] },
   "ranking": {

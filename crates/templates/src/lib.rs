@@ -33,7 +33,9 @@ mod sections;
 #[cfg(test)]
 mod tests;
 
-pub use assistant::{AssistantBlock, CAPABILITIES, SUGGESTIONS_MAX, SUGGESTION_MAX};
+pub use assistant::{
+    AssistantBlock, Phrase, CAPABILITIES, FOCUS_MAX, PHRASES_MAX, PHRASE_MAX, SUGGESTIONS_MAX, SUGGESTION_MAX,
+};
 pub use catalogue::{Catalogue, SourceProblem};
 pub use evidence::{EvidenceBlock, ResolvedEvidence, DEFAULT_VIEW, EVIDENCE_VIEWS, FILE_TYPES};
 pub use folders::StarterFolder;

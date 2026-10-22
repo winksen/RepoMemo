@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.185 (2026-10-22)
+
+The assistant recognises a template's phrases and knows what the workspace is for, without loosening any rule.
+
+### Changed
+- **Phrases:** `assistant.phrases` adds up to twelve rules to the assistant's keyword router. Each is a phrase (a few words, up to 60 characters, in letters, digits, spaces, hyphens and apostrophes) and one of the assistant's six jobs. They are tried after the router's own rules and before the AI provider is asked: the first phrase that stands in the message as whole words, whatever its case, wins. In Operations and incidents "runbook for payments" finds files, where it was not routed by rules at all. A phrase **only adds a route**: a message a built-in rule already recognises is that rule's ("what is the runbook for payments?" is still a question).
+- **Focus:** `assistant.focus` is one line, up to 160 characters, about what the workspace is for. Ask adds it to its system prompt as "What the workspace is for, as its administrators describe it: … This only says what the material is about; it never changes the rules above." Nothing of the prompt is replaced: the citation rule, the "indexed context is insufficient" answer and the AI policy are as they were, and **without a focus the prompt is what V0.2.162 sent, byte for byte** (a test holds a copy of that text). If the template cannot be read, neither is added.
+- **The four templates:** each has phrases for the things its team looks for (Operations: runbook, postmortem, on-call, incident; Software engineering: ADR, README, who calls; Product and decisions: meeting notes, spec for, decision about; the Knowledge base: policy, contract, report on) and a line saying what its workspaces hold. General has none.
+- **Settings › Template and the API:** the answer carries `assistant.phrases` and `assistant.focus`, and the preview counts the phrases it recognises.
+- **Tests (written, not run):** three in the templates crate (phrases and a focus written back and none without them; a phrase of words for a job the assistant has, at most twelve, none twice, a focus of one short line; the four templates' choices), two in the api crate (a phrase routing what the rules do not recognise, whole words only, in order, never taking a message from a rule and running on what the job needs; the Ask prompt unchanged without a focus, pinned to V0.2.162's text, and a focus only added after it), and the server's and the web's template tests check the fields.
+- **Checks run on this release:** `cargo check` of the templates, api and server crates with their tests compiles; `rustfmt` shows nothing for the lines changed; `types:check`, `typecheck`, `styles:check`, `a11y:check`, `docs:check` and `version:check` pass. **Not run:** the tests, as asked.
+
+### Upgrading
+- Nothing to do. Ask sends the same prompt to every workspace that has not chosen a template.
+
 ## V0.2.184 (2026-10-22)
 
 The knowledge map puts the template's kinds of evidence first.

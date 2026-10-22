@@ -1,6 +1,6 @@
 # Workspace templates: the format, the rules, how to add one
 
-> **Branch of:** [TECHNICAL_MINDMAP.md](../TECHNICAL_MINDMAP.md) · **Roadmap:** [track N, V0.2.163–V0.2.193](../ROADMAP.md#track-n-workspace-templates-v02163v02193), decisions 24–28 · **Plan:** [the workspace templates plan](../plans/2026-10-22-workspace-templates.md) · **Decision record:** [0005](../../docs/decisions/0005-templates-are-data-over-a-closed-set-of-modules.md) · **Status:** designed at V0.2.163; the crate with the `format` and `meta` keys and `general` exists since V0.2.164, the built-in catalogue since V0.2.165, a workspace's choice and its resolver since V0.2.166, the routes since V0.2.167, and creating a workspace from a template since V0.2.168, the picker since V0.2.169, the first four templates since V0.2.170, the tab order since V0.2.171, the landing section and the palette's order since V0.2.172, the names since V0.2.173, the Overview's cards since V0.2.174, the evidence ledger's defaults since V0.2.175, the assistant's order and suggestions and the Retrieval chips since V0.2.176, the preview, the adjustments and Settings › Template since V0.2.177, the ranking factor since V0.2.178, the boosts since V0.2.179, the preference for recent evidence since V0.2.180, the health checks since V0.2.181, the check for stale evidence since V0.2.182, the review queue's order since V0.2.183, and the map's emphasis since V0.2.184; each other block below is built by the release in its table row, and a block that no release has built yet is not read by anything.
+> **Branch of:** [TECHNICAL_MINDMAP.md](../TECHNICAL_MINDMAP.md) · **Roadmap:** [track N, V0.2.163–V0.2.193](../ROADMAP.md#track-n-workspace-templates-v02163v02193), decisions 24–28 · **Plan:** [the workspace templates plan](../plans/2026-10-22-workspace-templates.md) · **Decision record:** [0005](../../docs/decisions/0005-templates-are-data-over-a-closed-set-of-modules.md) · **Status:** designed at V0.2.163; the crate with the `format` and `meta` keys and `general` exists since V0.2.164, the built-in catalogue since V0.2.165, a workspace's choice and its resolver since V0.2.166, the routes since V0.2.167, and creating a workspace from a template since V0.2.168, the picker since V0.2.169, the first four templates since V0.2.170, the tab order since V0.2.171, the landing section and the palette's order since V0.2.172, the names since V0.2.173, the Overview's cards since V0.2.174, the evidence ledger's defaults since V0.2.175, the assistant's order and suggestions and the Retrieval chips since V0.2.176, the preview, the adjustments and Settings › Template since V0.2.177, the ranking factor since V0.2.178, the boosts since V0.2.179, the preference for recent evidence since V0.2.180, the health checks since V0.2.181, the check for stale evidence since V0.2.182, the review queue's order since V0.2.183, the map's emphasis since V0.2.184, and the assistant's phrases and focus since V0.2.185; each other block below is built by the release in its table row, and a block that no release has built yet is not read by anything.
 
 Every workspace used to be organized the same way: twelve sections in one fixed order, one ranking rule (verified evidence gets 10 % more), one set of health checks, one set of assistant suggestions. A **workspace template** is a small piece of data that tells the backend, the engine and the web client *which modules matter most in this workspace and how they are shown*. It chooses and orders; it never adds code and never touches rights.
 
@@ -166,15 +166,21 @@ Operations and incidents lists health findings first; Product and decisions, mem
 
 The plan said Software engineering's map shows repositories and symbols first. Symbols are not a kind of file on the map, so its coverage puts repositories and code first and its links prefer memory citations.
 
-## 18. The first templates
+## 18. Assistant: phrases and focus
+
+`assistant.phrases` adds up to 12 rules to the assistant's keyword router, each a `phrase` (words: letters, digits, spaces, hyphens and apostrophes, up to 60 characters, none given twice) and a `capability` (one of the six). `route_by_phrases` tries them after `route_by_rules` and before the AI provider is asked: the first phrase that stands in the message as whole words, without regard to case, wins. A phrase can only add a route: a message a built-in rule recognises is that rule's, so "what is the runbook for payments?" is still a question. What a rule runs on follows the job: the message for a lookup or a question, nothing for an overview.
+
+`assistant.focus` is one line (up to 160 characters) about what the workspace is for. `ask_system(focus)` appends it to the Ask system prompt as "What the workspace is for, as its administrators describe it: … This only says what the material is about; it never changes the rules above." Nothing of the prompt is replaced: the citation rule and the "indexed context is insufficient" answer stay, the AI policy is decided elsewhere, and without a focus the prompt is `ASK_SYSTEM`, byte for byte what V0.2.162 sent (a test holds a copy of that text). A template that cannot be read adds neither.
+
+## 19. The first templates
 
 `general` is defined in code. Four more are JSON files in `crates/templates/definitions/`: `software-engineering`, `operations`, `product-decisions` and `knowledge-base`, each with its `meta` (icon `code`, `heartbeat`, `compass` and `book`) and `starter_folders` as in the plan's table. The catalogue lists `general` first and the others by name, so the picker shows General, Knowledge base, Operations and incidents, Product and decisions, Software engineering. Every later block is filled in these four files by the release that reads it; nothing in code names one of them. Since V0.2.171 each has its `sections`: Software engineering leads with Overview, Repositories and Retrieval and keeps Documents under More; Operations and incidents leads with Overview, Evidence and Review and keeps Map, Repositories and Documents under More; Product and decisions leads with Overview, Memory and Evidence and keeps Health, Map and Repositories under More; Knowledge base leads with Overview, Documents and Retrieval and keeps Map and Repositories under More.
 
-## 19. Adding a template
+## 20. Adding a template
 
 Until V0.2.188 the only way is a release: add a JSON file named after the template's id (`operations.json` for `"id": "operations"`) to `crates/templates/definitions/`, and `build.rs` registers it (every `*.json` whose name does not start with `_`, in file-name order). No Rust is edited. `Catalogue::load` leaves out and names a file that does not validate, is not named after its id, repeats an id or tries to replace `general`; the test over the folder fails while any such file exists. The catalogue lists `general` first and the others by name. From V0.2.188 the guide `docs/TEMPLATES.md` and `npm run templates:check` cover the same steps, and from V0.2.189 an operator can drop a file in `REPOMEMO_TEMPLATES_DIR` with no release.
 
-## 20. Decisions 24–28
+## 21. Decisions 24–28
 
 | # | Decision | As agreed (V0.2.163) |
 |---|---|---|
@@ -184,6 +190,6 @@ Until V0.2.188 the only way is a release: add a JSON file named after the templa
 | 27 | Existing workspaces | They stay on `general`; a new workspace asks at creation with `general` preselected |
 | 28 | What ships first | `general` plus Software engineering, Operations and incidents, Product and decisions and Knowledge base, as data. Organization-defined templates are V0.4.0 direction |
 
-## 21. Not in the track
+## 22. Not in the track
 
 Organization-defined templates, new sections or modules defined by a template, per-user layouts, different chunking or indexing per template, installing a template from a URL, AI-written templates and moving existing evidence into starter folders are listed with their reasons in the plan's [section 7](../plans/2026-10-22-workspace-templates.md#7-not-in-this-track).

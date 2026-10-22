@@ -1288,9 +1288,14 @@ impl RepoMemoCore {
             })
             .collect::<Vec<_>>()
             .join("\n\n");
+        // What the workspace is for, from its template (V0.2.185); nothing is added without one.
+        let focus = match self.effective_template(&request.workspace_id).await {
+            Ok(effective) => effective.template.assistant().focus,
+            Err(_) => None,
+        };
         let answer_markdown = provider
             .generate(GenerateRequest {
-                system: Some("You answer questions about a workspace of technical material using only the numbered passages supplied. Cite the passages you rely on as [1], [2] and so on. If the passages do not answer the question, say that the indexed context is insufficient instead of guessing. Earlier turns of the conversation may be shown before the question; they only tell what words such as \"it\" or \"that file\" refer to and are never evidence.".to_owned()),
+                system: Some(agent::ask_system(focus.as_deref())),
                 prompt: format!("{}Question: {}", agent::render_history(history), request.question),
                 context,
                 options: json!({ "temperature": 0.1 }),

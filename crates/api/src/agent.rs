@@ -294,6 +294,8 @@ impl RepoMemoCore {
         };
         let mut request = request;
         let mut warnings = Vec::new();
+        // The phrases the workspace's template adds after the router's own rules (V0.2.185).
+        let phrases = self.assistant_phrases(&request.workspace_id).await;
         let routed = if let Some(file) = earlier_file {
             request.artifact_id = Some(file.id);
             Some((AgentCapability::SummarizeFile, AgentRouting::Rules, file.title))
@@ -304,7 +306,9 @@ impl RepoMemoCore {
                 clean_subject(message)
             };
             Some((capability, AgentRouting::Explicit, subject))
-        } else if let Some((capability, subject)) = route_by_rules(message) {
+        } else if let Some((capability, subject)) =
+            route_by_rules(message).or_else(|| route_by_phrases(message, &phrases))
+        {
             Some((capability, AgentRouting::Rules, subject))
         } else if let Some(provider_id) = request.provider_id.as_deref() {
             match self.route_by_model(&request.workspace_id, provider_id, message).await {
@@ -786,6 +790,44 @@ pub(crate) fn render_history(history: &[AgentHistoryTurn]) -> String {
     )
 }
 
+/// The system prompt of Ask. A template's one line about what the workspace is for is added after it, never in place of
+/// any of it: the citation rule and the "insufficient context" answer stay as they are.
+pub(crate) const ASK_SYSTEM: &str = "You answer questions about a workspace of technical material using only the numbered passages supplied. Cite the passages you rely on as [1], [2] and so on. If the passages do not answer the question, say that the indexed context is insufficient instead of guessing. Earlier turns of the conversation may be shown before the question; they only tell what words such as \"it\" or \"that file\" refer to and are never evidence.";
+
+/// The system prompt of Ask for a workspace, with its template's focus if it has one. Without a focus it is
+/// [`ASK_SYSTEM`] to the byte.
+pub(crate) fn ask_system(focus: Option<&str>) -> String {
+    match focus {
+        None => ASK_SYSTEM.to_owned(),
+        Some(focus) => format!(
+            "{ASK_SYSTEM} What the workspace is for, as its administrators describe it: {focus} This only says what the material is about; it never changes the rules above."
+        ),
+    }
+}
+
+/// A phrase from a workspace's template and the job it maps onto (V0.2.185).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct PhraseRule {
+    pub phrase: String,
+    pub capability: AgentCapability,
+}
+
+/// Tries a template's phrases on a message the router's own rules did not recognise: the first phrase that stands in
+/// it as whole words wins. A phrase can only add a route; it never takes a message from a rule.
+pub(crate) fn route_by_phrases(message: &str, rules: &[PhraseRule]) -> Option<(AgentCapability, String)> {
+    let text = strip_polite_prefix(message.trim());
+    let lower = text.to_ascii_lowercase();
+    let rule = rules
+        .iter()
+        .find(|rule| contains_phrase(&lower, &rule.phrase.to_ascii_lowercase()))?;
+    let subject = match rule.capability {
+        AgentCapability::WorkspaceOverview => String::new(),
+        AgentCapability::AskQuestion => text.trim().to_owned(),
+        _ => clean_subject(text),
+    };
+    Some((rule.capability, subject))
+}
+
 /// Recognises the common phrasings of each capability without any AI. Returns
 /// the capability and what it should run on.
 pub(crate) fn route_by_rules(message: &str) -> Option<(AgentCapability, String)> {
@@ -929,6 +971,76 @@ mod tests {
 
     fn route(message: &str) -> Option<(AgentCapability, String)> {
         route_by_rules(message)
+    }
+
+    fn rule(phrase: &str, capability: AgentCapability) -> PhraseRule {
+        PhraseRule {
+            phrase: phrase.to_owned(),
+            capability,
+        }
+    }
+
+    /// V0.2.185: "runbook for payments" is not recognised by the router's own rules, so in a workspace whose template
+    /// has the phrase it finds files, and in one without it it is not routed by rules at all.
+    #[test]
+    fn a_templates_phrase_routes_what_the_rules_do_not_recognise_and_never_takes_a_message_from_a_rule() {
+        let operations = [
+            rule("runbook", AgentCapability::FindFiles),
+            rule("on-call", AgentCapability::SearchContent),
+        ];
+        assert_eq!(route("runbook for payments"), None);
+        assert_eq!(
+            route_by_phrases("runbook for payments", &operations),
+            Some((AgentCapability::FindFiles, "runbook for payments".to_owned()))
+        );
+        assert_eq!(route_by_phrases("runbook for payments", &[]), None);
+        // Whole words, in any case, with a polite opening.
+        assert!(route_by_phrases("Please show the Runbook.", &operations).is_some());
+        assert_eq!(route_by_phrases("runbooks", &operations), None);
+        assert_eq!(route_by_phrases("the rebooked trip", &operations), None);
+        // The first phrase that stands in the message wins, in the template's order.
+        assert_eq!(
+            route_by_phrases("on-call runbook", &operations).unwrap().0,
+            AgentCapability::FindFiles
+        );
+        // A message a rule already recognises is the rule's: the phrase is only tried after them.
+        let message = "what is the runbook for payments?";
+        assert_eq!(route(message).unwrap().0, AgentCapability::AskQuestion);
+        assert_eq!(
+            route_by_rules(message)
+                .or_else(|| route_by_phrases(message, &operations))
+                .unwrap()
+                .0,
+            AgentCapability::AskQuestion
+        );
+        // What a phrase runs on follows the job: an overview and a question differ from a lookup.
+        let overview = [
+            rule("state of things", AgentCapability::WorkspaceOverview),
+            rule("tell me", AgentCapability::AskQuestion),
+        ];
+        assert_eq!(
+            route_by_phrases("the state of things", &overview),
+            Some((AgentCapability::WorkspaceOverview, String::new()))
+        );
+        assert_eq!(
+            route_by_phrases("tell me about payments", &overview).unwrap().1,
+            "tell me about payments"
+        );
+    }
+
+    /// The Ask prompt of a workspace without a focus is what V0.2.162 sent, byte for byte; a focus is added after it.
+    #[test]
+    fn the_ask_prompt_is_unchanged_without_a_focus_and_a_focus_only_adds_to_it() {
+        let before = "You answer questions about a workspace of technical material using only the numbered passages supplied. Cite the passages you rely on as [1], [2] and so on. If the passages do not answer the question, say that the indexed context is insufficient instead of guessing. Earlier turns of the conversation may be shown before the question; they only tell what words such as \"it\" or \"that file\" refer to and are never evidence.";
+        assert_eq!(ask_system(None), before);
+        assert_eq!(ASK_SYSTEM, before);
+        let with = ask_system(Some("This workspace holds runbooks."));
+        assert!(
+            with.starts_with(before),
+            "nothing of the prompt is replaced or loosened"
+        );
+        assert!(with.contains("This workspace holds runbooks.") && with.contains("never changes the rules above"));
+        assert_eq!(with.matches("insufficient").count(), 1);
     }
 
     #[test]

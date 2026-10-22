@@ -275,6 +275,16 @@ export interface TemplateAssistant {
   /** Capabilities listed before the others, in this order; the rest follow in the server's order. */
   order: string[];
   suggestions: string[];
+  /** Phrases the keyword router recognises after its own rules. */
+  phrases: TemplatePhrase[];
+  /** One line about what the workspace is for, given to Ask as context. */
+  focus: string | null;
+}
+
+/** A phrase the assistant's router recognises and the job it maps onto. */
+export interface TemplatePhrase {
+  phrase: string;
+  capability: string;
 }
 
 /** The kinds of evidence the Retrieval page suggests as chips. Empty for `general`. */

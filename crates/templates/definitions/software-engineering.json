@@ -29,7 +29,13 @@
       "Where is the payment retry implemented?",
       "What did we decide about the database?",
       "Which services call the billing API?"
-    ]
+    ],
+    "phrases": [
+      { "phrase": "adr", "capability": "find_files" },
+      { "phrase": "readme", "capability": "find_files" },
+      { "phrase": "who calls", "capability": "search_content" }
+    ],
+    "focus": "This workspace holds source code, repositories and the design notes and decisions behind them."
   },
   "retrieval": { "type_chips": ["code_file", "markdown_doc", "api_spec"] },
   "ranking": {

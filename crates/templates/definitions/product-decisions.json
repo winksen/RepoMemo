@@ -31,7 +31,13 @@
       "What did we decide about…",
       "Which specs mention…",
       "Summarize the latest meeting notes"
-    ]
+    ],
+    "phrases": [
+      { "phrase": "meeting notes", "capability": "find_files" },
+      { "phrase": "spec for", "capability": "find_files" },
+      { "phrase": "decision about", "capability": "search_content" }
+    ],
+    "focus": "This workspace holds the specs, decisions, research and meeting notes of a product team."
   },
   "retrieval": { "type_chips": ["decision", "note", "markdown_doc"] },
   "ranking": {

@@ -91,6 +91,15 @@ pub fn detail_of(template: &TemplateDefinition) -> TemplateDetail {
         assistant: TemplateAssistant {
             order: assistant.order,
             suggestions: assistant.suggestions,
+            phrases: assistant
+                .phrases
+                .into_iter()
+                .map(|rule| TemplatePhrase {
+                    phrase: rule.phrase,
+                    capability: rule.capability,
+                })
+                .collect(),
+            focus: assistant.focus,
         },
         retrieval: TemplateRetrieval {
             type_chips: template.retrieval().type_chips,
@@ -254,6 +263,26 @@ impl RepoMemoCore {
                 .map(|folder| (folder.name.clone(), folder.children.clone()))
                 .collect(),
         })
+    }
+
+    /// The phrases the workspace's template adds to the assistant's router (V0.2.185). If the template cannot be read
+    /// there are none: the router's own rules are all there is.
+    pub(crate) async fn assistant_phrases(&self, workspace_id: &str) -> Vec<crate::agent::PhraseRule> {
+        let Ok(effective) = self.effective_template(workspace_id).await else {
+            return Vec::new();
+        };
+        effective
+            .template
+            .assistant()
+            .phrases
+            .into_iter()
+            .filter_map(|rule| {
+                Some(crate::agent::PhraseRule {
+                    capability: serde_json::from_value(serde_json::json!(rule.capability)).ok()?,
+                    phrase: rule.phrase,
+                })
+            })
+            .collect()
     }
 
     /// How the workspace's search weighs what it finds: its template's ranking, or the usual one when the template

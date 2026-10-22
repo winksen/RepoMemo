@@ -11,6 +11,16 @@ export const SECTION_NAMES: Record<WorkspaceSection, string> = {
 
 type Previewable = Pick<TemplateDetail, "sections" | "labels" | "overview" | "assistant" | "ranking" | "health" | "review" | "map">;
 
+/** What the assistant suggests and recognises, in words. */
+function assistantLine(assistant: TemplateDetail["assistant"]): string {
+  const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`;
+  const parts = [
+    assistant.suggestions.length ? plural(assistant.suggestions.length, "question") : "",
+    assistant.phrases.length ? `${plural(assistant.phrases.length, "phrase")} it recognises` : "",
+  ].filter(Boolean);
+  return parts.length ? parts.join(", ") : "nothing";
+}
+
 /** What the map's kinds of link are called. */
 const LINK_NAMES: Record<string, string> = { similar: "similar files", cites: "memory citations" };
 
@@ -66,7 +76,7 @@ export function previewLines(template: Previewable): Array<{ label: string; text
     { label: "Review lists", text: template.review.order.length ? template.review.order.map((source) => REVIEW_NAMES[source] ?? source).join(", then ") : "everything mixed, the oldest first" },
     { label: "Health checks", text: template.health.detectors.map((detector) => detector === "stale_evidence" && template.health.stale_after_days ? `${HEALTH_NAMES[detector]} (${template.health.stale_after_days} days)` : HEALTH_NAMES[detector] ?? detector).join(", ") },
     { label: "Search favours", text: favoured(template.ranking) },
-    { label: "The assistant suggests", text: template.assistant.suggestions.length ? `${template.assistant.suggestions.length} question${template.assistant.suggestions.length === 1 ? "" : "s"}` : "nothing" },
+    { label: "The assistant suggests", text: assistantLine(template.assistant) },
   ];
 }
 

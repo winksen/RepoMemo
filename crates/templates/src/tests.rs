@@ -938,12 +938,122 @@ fn the_assistants_order_and_suggestions_follow_the_rules_of_a_name() {
     )))
     .unwrap_err();
     assert_eq!(too_many[0].path, "assistant.suggestions");
-    let unknown_key = parse(&with_assistant(r#"{ "phrases": [] }"#)).unwrap_err();
+    let unknown_key = parse(&with_assistant(r#"{ "colour": "red" }"#)).unwrap_err();
     assert!(
-        unknown_key[0].message.contains("unknown field `phrases`"),
+        unknown_key[0].message.contains("unknown field `colour`"),
         "{}",
         unknown_key[0]
     );
+}
+
+#[test]
+fn a_template_may_add_phrases_to_the_router_and_one_line_about_what_the_workspace_is_for() {
+    assert!(general().assistant().phrases.is_empty() && general().assistant().focus.is_none());
+    let chosen = parse(&with_assistant(
+        r#"{ "phrases": [ { "phrase": "runbook for", "capability": "find_files" }, { "phrase": "on-call", "capability": "search_content" } ],
+             "focus": "Runbooks, incidents and on-call knowledge." }"#,
+    ))
+    .unwrap();
+    let assistant = chosen.assistant();
+    assert_eq!(assistant.phrases.len(), 2);
+    assert_eq!(
+        (
+            assistant.phrases[0].phrase.as_str(),
+            assistant.phrases[0].capability.as_str()
+        ),
+        ("runbook for", "find_files")
+    );
+    assert_eq!(
+        assistant.focus.as_deref(),
+        Some("Runbooks, incidents and on-call knowledge.")
+    );
+    assert_eq!(parse(&serde_json::to_string(&chosen).unwrap()).unwrap(), chosen);
+    assert!(!serde_json::to_string(&general()).unwrap().contains("focus"));
+}
+
+#[test]
+fn a_phrase_is_a_few_words_for_a_job_the_assistant_has_and_the_focus_is_one_short_line() {
+    let phrase = |text: &str, capability: &str| {
+        with_assistant(&format!(
+            r#"{{ "phrases": [ {{ "phrase": "{text}", "capability": "{capability}" }} ] }}"#
+        ))
+    };
+    assert!(parse(&phrase("meeting notes", "find_files")).is_ok());
+    assert!(parse(&phrase("what's the", "ask_question")).is_ok());
+    let longest = "p".repeat(PHRASE_MAX);
+    assert!(parse(&phrase(&longest, "find_files")).is_ok());
+    let too_long = "p".repeat(PHRASE_MAX + 1);
+    for bad in [
+        "",
+        "  ",
+        " padded",
+        too_long.as_str(),
+        "a.*b",
+        "(a|b)",
+        "a/b",
+        "two\\nlines",
+        "[x]",
+    ] {
+        assert_eq!(
+            parse(&phrase(bad, "find_files")).unwrap_err()[0].path,
+            "assistant.phrases[0].phrase",
+            "{bad:?}"
+        );
+    }
+    assert_eq!(
+        parse(&phrase("runbook", "book_flights")).unwrap_err()[0].path,
+        "assistant.phrases[0].capability"
+    );
+    let twice = parse(&with_assistant(
+        r#"{ "phrases": [ { "phrase": "Runbook", "capability": "find_files" }, { "phrase": "runbook", "capability": "search_content" } ] }"#,
+    ))
+    .unwrap_err();
+    assert_eq!(twice[0].path, "assistant.phrases[1].phrase");
+    let many: Vec<String> = (0..=PHRASES_MAX)
+        .map(|n| format!(r#"{{ "phrase": "word{n}", "capability": "find_files" }}"#))
+        .collect();
+    assert_eq!(
+        parse(&with_assistant(&format!(r#"{{ "phrases": [{}] }}"#, many.join(",")))).unwrap_err()[0].path,
+        "assistant.phrases"
+    );
+    let focus = |text: &str| with_assistant(&format!(r#"{{ "focus": "{text}" }}"#));
+    assert!(parse(&focus(&"f".repeat(FOCUS_MAX))).is_ok());
+    for bad in ["", "  ", " padded", "two\\nlines"] {
+        assert_eq!(parse(&focus(bad)).unwrap_err()[0].path, "assistant.focus", "{bad:?}");
+    }
+    assert_eq!(
+        parse(&focus(&"f".repeat(FOCUS_MAX + 1))).unwrap_err()[0].path,
+        "assistant.focus"
+    );
+}
+
+#[test]
+fn the_four_first_templates_know_what_their_workspaces_are_for() {
+    let catalogue = Catalogue::builtin();
+    for id in [
+        "software-engineering",
+        "operations",
+        "product-decisions",
+        "knowledge-base",
+    ] {
+        let assistant = catalogue.get(id).unwrap().assistant();
+        assert!(
+            !assistant.phrases.is_empty() && assistant.phrases.len() <= PHRASES_MAX,
+            "{id}"
+        );
+        assert!(
+            assistant
+                .focus
+                .as_deref()
+                .is_some_and(|focus| focus.starts_with("This workspace holds")),
+            "{id}"
+        );
+    }
+    let operations = catalogue.get("operations").unwrap().assistant();
+    assert!(operations
+        .phrases
+        .iter()
+        .any(|rule| rule.phrase == "runbook" && rule.capability == "find_files"));
 }
 
 #[test]
