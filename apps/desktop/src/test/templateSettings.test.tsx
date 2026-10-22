@@ -24,6 +24,7 @@ const operationsDetail: TemplateDetail = {
   evidence: { default_view: "list", types_first: [] },
   assistant: { order: [], suggestions: ["What is the runbook for…"] },
   retrieval: { type_chips: [] },
+  review: { order: ["health_finding", "evidence", "memory_card"] },
   health: { detectors: ["stale_evidence", "outdated_evidence_referenced", "stale_memory_citation", "index_failed"], stale_after_days: 90 },
   ranking: { verified: 1.15, recency: { half_life_days: 90, max_factor: 1.2 }, boosts: [{ artifact_type: "runbook", document_kind: null, path: null, factor: 1.2 }, { artifact_type: null, document_kind: "pdf", path: null, factor: 1.15 }, { artifact_type: null, document_kind: null, path: "docs/adr/**", factor: 1.15 }] },
 };
@@ -64,6 +65,7 @@ describe("the lines that preview a template", () => {
       "Renamed": "Tasks → Actions",
       "Overview cards": "Fresh evidence, At risk",
       "The assistant suggests": "1 question",
+      "Review lists": "open health findings, then files, then memory cards",
       "Health checks": "Stale evidence (90 days), Outdated references, Stale memory, Indexing failures",
       "Search favours": "verified evidence by 15 %, Runbook by 20 %, PDF by 15 %, docs/adr/** by 15 %, recent evidence by up to 20 %",
     });
@@ -75,6 +77,7 @@ describe("the lines that preview a template", () => {
     expect(lines["Under More"]).toBe("nothing");
     expect(lines["The assistant suggests"]).toBe("nothing");
     expect(lines["Opens on"]).toBe("Documents");
+    expect(lines["Review lists"]).toBe("everything mixed, the oldest first");
     expect(Object.fromEntries(previewLines({ ...knowledgeDetail, ranking: { verified: 1.1, boosts: [], recency: null } }).map((line) => [line.label, line.text]))["Search favours"]).toBe("verified evidence by 10 %");
     expect(Object.fromEntries(previewLines({ ...knowledgeDetail, ranking: { verified: 0.9, boosts: [], recency: null } }).map((line) => [line.label, line.text]))["Search favours"]).toBe("verified evidence by -10 %");
     expect(Object.fromEntries(previewLines({ ...knowledgeDetail, ranking: { verified: 1, boosts: [], recency: null } }).map((line) => [line.label, line.text]))["Search favours"]).toBe("nothing in particular");

@@ -43,5 +43,6 @@
     ],
     "recency": { "half_life_days": 90, "max_factor": 1.2 }
   },
-  "health": { "detectors": ["stale_evidence", "outdated_evidence_referenced", "stale_memory_citation", "index_failed"], "stale_after_days": 90 }
+  "health": { "detectors": ["stale_evidence", "outdated_evidence_referenced", "stale_memory_citation", "index_failed"], "stale_after_days": 90 },
+  "review": { "order": ["health_finding", "evidence", "memory_card"] }
 }

@@ -58,6 +58,7 @@ impl EffectiveTemplate {
             retrieval: detail.retrieval,
             ranking: detail.ranking,
             health: detail.health,
+            review: detail.review,
         }
     }
 }
@@ -92,6 +93,9 @@ pub fn detail_of(template: &TemplateDefinition) -> TemplateDetail {
         },
         retrieval: TemplateRetrieval {
             type_chips: template.retrieval().type_chips,
+        },
+        review: TemplateReview {
+            order: template.review_order(),
         },
         health: TemplateHealth {
             detectors: template.health_detectors(),

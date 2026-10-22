@@ -9,7 +9,10 @@ export const SECTION_NAMES: Record<WorkspaceSection, string> = {
   health: "Health", review: "Review", memory: "Memory", tasks: "Tasks", people: "People & Activity", settings: "Settings",
 };
 
-type Previewable = Pick<TemplateDetail, "sections" | "labels" | "overview" | "assistant" | "ranking" | "health">;
+type Previewable = Pick<TemplateDetail, "sections" | "labels" | "overview" | "assistant" | "ranking" | "health" | "review">;
+
+/** What the review queue calls its three kinds of item, in the plural. */
+const REVIEW_NAMES: Record<string, string> = { evidence: "files", memory_card: "memory cards", health_finding: "open health findings" };
 
 /** What each health check is called on the Health page. */
 export const HEALTH_NAMES: Record<string, string> = {
@@ -48,6 +51,7 @@ export function previewLines(template: Previewable): Array<{ label: string; text
     { label: "Opens on", text: name(template.sections.landing) },
     { label: "Renamed", text: renamed.length ? renamed.join(", ") : "nothing" },
     { label: "Overview cards", text: cards.join(", ") },
+    { label: "Review lists", text: template.review.order.length ? template.review.order.map((source) => REVIEW_NAMES[source] ?? source).join(", then ") : "everything mixed, the oldest first" },
     { label: "Health checks", text: template.health.detectors.map((detector) => detector === "stale_evidence" && template.health.stale_after_days ? `${HEALTH_NAMES[detector]} (${template.health.stale_after_days} days)` : HEALTH_NAMES[detector] ?? detector).join(", ") },
     { label: "Search favours", text: favoured(template.ranking) },
     { label: "The assistant suggests", text: template.assistant.suggestions.length ? `${template.assistant.suggestions.length} question${template.assistant.suggestions.length === 1 ? "" : "s"}` : "nothing" },

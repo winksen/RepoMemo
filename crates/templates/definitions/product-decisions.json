@@ -41,5 +41,6 @@
       { "document_kind": "markdown", "factor": 1.15 }
     ]
   },
-  "health": { "detectors": ["outdated_evidence_referenced", "older_version_active", "stale_memory_citation", "index_failed"] }
+  "health": { "detectors": ["outdated_evidence_referenced", "older_version_active", "stale_memory_citation", "index_failed"] },
+  "review": { "order": ["memory_card", "evidence", "health_finding"] }
 }

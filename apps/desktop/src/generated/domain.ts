@@ -230,6 +230,8 @@ export interface WorkspaceTemplateView {
   ranking: TemplateRanking;
   /** The health checks that run. */
   health: TemplateHealth;
+  /** What the review queue lists first. */
+  review: TemplateReview;
 }
 
 /**
@@ -314,6 +316,14 @@ export interface TemplateHealth {
   stale_after_days: number | null;
 }
 
+/**
+ * The groups the review queue lists, in order, each with the oldest first. Empty for `general`: the items are mixed,
+ * oldest first, with the health findings after what has waited.
+ */
+export interface TemplateReview {
+  order: string[];
+}
+
 /** A template as a person looks at it before choosing it: what it arranges and names, without any workspace's choice. */
 export interface TemplateDetail {
   template: TemplateSummary;
@@ -325,6 +335,7 @@ export interface TemplateDetail {
   retrieval: TemplateRetrieval;
   ranking: TemplateRanking;
   health: TemplateHealth;
+  review: TemplateReview;
 }
 
 /**

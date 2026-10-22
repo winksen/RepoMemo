@@ -26,6 +26,7 @@ mod overview;
 mod ranking;
 mod resolve;
 mod retrieval;
+mod review;
 mod sections;
 
 #[cfg(test)]
@@ -48,6 +49,7 @@ pub use ranking::{
 };
 pub use resolve::{Origin, Resolution};
 pub use retrieval::{RetrievalBlock, TYPE_CHIPS_MAX};
+pub use review::{ReviewBlock, REVIEW_SOURCES};
 pub use sections::{ResolvedSections, SectionsBlock, ADMIN_ONLY_SECTIONS, DEFAULT_LANDING, WORKSPACE_SECTIONS};
 
 use serde::{Deserialize, Serialize};
@@ -90,6 +92,9 @@ pub struct TemplateDefinition {
     /// The health checks that run and their order (V0.2.181); every check in the usual order when left out.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub health: Option<HealthBlock>,
+    /// What the review queue lists first (V0.2.183); mixed, oldest first, when left out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review: Option<ReviewBlock>,
 }
 
 impl TemplateDefinition {
@@ -166,6 +171,9 @@ impl TemplateDefinition {
         if let Some(health) = &self.health {
             health::validate(health, &mut issues);
         }
+        if let Some(review) = &self.review {
+            review::validate(review, &mut issues);
+        }
         issues
     }
 
@@ -181,6 +189,11 @@ impl TemplateDefinition {
     /// The health checks that run, in the order their findings are listed.
     pub fn health_detectors(&self) -> Vec<String> {
         HealthBlock::resolved(self.health.as_ref())
+    }
+
+    /// The groups the review queue lists, in order; empty for the usual mixed list.
+    pub fn review_order(&self) -> Vec<String> {
+        ReviewBlock::resolved(self.review.as_ref())
     }
 
     /// After how many days without a change or a verification evidence is stale, when the template checks for it.

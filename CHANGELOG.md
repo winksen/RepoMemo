@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.183 (2026-10-22)
+
+The review queue lists what the template cares about first.
+
+### Changed
+- **The `review` block:** `review.order` names the kinds of item the queue lists first, from the three it has: files marked needing review (`evidence`), memory cards whose evidence changed (`memory_card`) and open health findings (`health_finding`). Each is a group: inside it the item that has waited longest comes first, and findings keep Health's order. A kind the template does not name follows. At least one is named and none twice. `GET /v1/workspaces/{id}/template` answers it, completed to the three kinds, as `review.order`.
+- **The mixed list stays the default:** without the block the queue is what it has always been, all three kinds mixed with the oldest first and the findings, which have no date, after what has waited. General and *Software engineering* keep it. Rights are untouched: who may resolve an item is still decided by its kind and the caller's role.
+- **The templates:** *Operations and incidents* lists open health findings first, then files, then memory cards; *Product and decisions* lists memory cards first; the *Knowledge base* lists files first.
+- **The preview:** Settings › Template says what the queue lists ("open health findings, then files, then memory cards", or "everything mixed, the oldest first").
+- **Tests (written, not run):** three in the templates crate (mixed without a block and unnamed kinds completed after the named ones, written back; an unknown, repeated or empty list refused; the four templates' choices), four on the server (the old mixed order; a template's groups with the oldest first inside each; a kind not named following and findings keeping Health's order; the kinds a template can name are the review item kinds, which stops compiling if one is added), and the server's and the web's template tests check the field.
+- **Checks run on this release:** `cargo check` of the templates, api and server crates with their tests compiles; `rustfmt` shows nothing for the lines changed; `types:check`, `typecheck`, `styles:check`, `a11y:check`, `docs:check` and `version:check` pass. **Not run:** the tests, as asked.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.182 (2026-10-22)
 
 A new health check finds evidence nobody has touched for as long as the template allows.

@@ -284,6 +284,8 @@ pub struct WorkspaceTemplateView {
     pub ranking: TemplateRanking,
     /// The health checks that run.
     pub health: TemplateHealth,
+    /// What the review queue lists first.
+    pub review: TemplateReview,
 }
 
 /// The tabs of a workspace and the sections kept under *More*, as its template arranges them. Every section is in
@@ -368,6 +370,13 @@ pub struct TemplateHealth {
     pub stale_after_days: Option<u32>,
 }
 
+/// The groups the review queue lists, in order, each with the oldest first. Empty for `general`: the items are mixed,
+/// oldest first, with the health findings after what has waited.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TemplateReview {
+    pub order: Vec<String>,
+}
+
 /// A template as a person looks at it before choosing it: what it arranges and names, without any workspace's choice.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TemplateDetail {
@@ -380,6 +389,7 @@ pub struct TemplateDetail {
     pub retrieval: TemplateRetrieval,
     pub ranking: TemplateRanking,
     pub health: TemplateHealth,
+    pub review: TemplateReview,
 }
 
 /// Chooses a workspace's template; `null` returns the workspace to the default. `overrides` are the adjustments

@@ -156,6 +156,18 @@ async fn the_four_first_templates_are_offered_and_each_creates_its_folders() {
             id == "software-engineering",
             "{id}"
         );
+        // The review queue (V0.2.183): Operations lists health findings first; Software engineering keeps the mixed list.
+        let review_first = view["review"]["order"].get(0).cloned().unwrap_or(Value::Null);
+        assert_eq!(
+            review_first,
+            match id {
+                "operations" => json!("health_finding"),
+                "product-decisions" => json!("memory_card"),
+                "knowledge-base" => json!("evidence"),
+                _ => Value::Null,
+            },
+            "{id}"
+        );
         // Evidence nobody has touched (V0.2.182): Operations after 90 days, the Knowledge base after 180, nobody else.
         let days = match id {
             "operations" => json!(90),

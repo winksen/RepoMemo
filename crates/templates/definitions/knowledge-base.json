@@ -43,5 +43,6 @@
       { "document_kind": "powerpoint", "factor": 1.15 }
     ]
   },
-  "health": { "detectors": ["older_version_active", "duplicate_content", "stale_evidence", "outdated_evidence_referenced", "index_failed"], "stale_after_days": 180 }
+  "health": { "detectors": ["older_version_active", "duplicate_content", "stale_evidence", "outdated_evidence_referenced", "index_failed"], "stale_after_days": 180 },
+  "review": { "order": ["evidence", "memory_card", "health_finding"] }
 }

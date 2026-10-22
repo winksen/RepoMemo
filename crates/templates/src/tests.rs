@@ -1404,6 +1404,68 @@ fn the_check_for_stale_evidence_needs_its_days_and_the_days_need_the_check() {
     );
 }
 
+/// The valid file with a `review` block written as JSON.
+fn with_review(block: &str) -> String {
+    VALID.replacen("\"format\": 1,", &format!("\"format\": 1,\n  \"review\": {block},"), 1)
+}
+
+#[test]
+fn the_review_queue_is_mixed_unless_a_template_names_the_kinds_to_list_first() {
+    assert!(general().review_order().is_empty());
+    assert!(parse(VALID).unwrap().review_order().is_empty());
+    // A kind the template does not name follows the named ones, in the usual order.
+    let health_first = parse(&with_review(r#"{ "order": ["health_finding"] }"#)).unwrap();
+    assert_eq!(
+        health_first.review_order(),
+        ["health_finding", "evidence", "memory_card"]
+    );
+    let cards_then_files = parse(&with_review(r#"{ "order": ["memory_card", "evidence"] }"#)).unwrap();
+    assert_eq!(
+        cards_then_files.review_order(),
+        ["memory_card", "evidence", "health_finding"]
+    );
+    assert_eq!(
+        parse(&serde_json::to_string(&cards_then_files).unwrap()).unwrap(),
+        cards_then_files
+    );
+    assert!(!serde_json::to_string(&general()).unwrap().contains("review"));
+    assert_eq!(REVIEW_SOURCES, ["evidence", "memory_card", "health_finding"]);
+}
+
+#[test]
+fn a_review_kind_must_exist_be_listed_once_and_at_least_one_must_be_named() {
+    assert_eq!(
+        parse(&with_review(r#"{ "order": ["files"] }"#)).unwrap_err()[0].path,
+        "review.order[0]"
+    );
+    assert_eq!(
+        parse(&with_review(r#"{ "order": ["evidence", "evidence"] }"#)).unwrap_err()[0].path,
+        "review.order[1]"
+    );
+    assert_eq!(
+        parse(&with_review(r#"{ "order": [] }"#)).unwrap_err()[0].path,
+        "review.order"
+    );
+    assert_eq!(parse(&with_review("{}")).unwrap_err()[0].path, "review.order");
+    let unknown = parse(&with_review(r#"{ "order": ["evidence"], "colour": "red" }"#)).unwrap_err();
+    assert!(unknown[0].message.contains("unknown field `colour`"), "{}", unknown[0]);
+}
+
+#[test]
+fn operations_lists_health_findings_first_and_software_engineering_keeps_the_mixed_list() {
+    let catalogue = Catalogue::builtin();
+    assert_eq!(
+        catalogue.get("operations").unwrap().review_order(),
+        ["health_finding", "evidence", "memory_card"]
+    );
+    assert_eq!(
+        catalogue.get("product-decisions").unwrap().review_order()[0],
+        "memory_card"
+    );
+    assert_eq!(catalogue.get("knowledge-base").unwrap().review_order()[0], "evidence");
+    assert!(catalogue.get("software-engineering").unwrap().review_order().is_empty());
+}
+
 #[test]
 fn operations_and_the_knowledge_base_check_for_stale_evidence_and_the_others_do_not() {
     let catalogue = Catalogue::builtin();

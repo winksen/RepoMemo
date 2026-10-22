@@ -19,6 +19,7 @@ repomemo-api.workspace = true
 repomemo-git.workspace = true
 repomemo-mail.workspace = true
 repomemo-storage.workspace = true
+repomemo-templates.workspace = true
 ring.workspace = true
 hex.workspace = true
 serde.workspace = true

@@ -25,5 +25,6 @@ pub fn general() -> TemplateDefinition {
         retrieval: None,
         ranking: None,
         health: None,
+        review: None,
     }
 }
