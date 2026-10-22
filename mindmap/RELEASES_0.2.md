@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.2 → 0.3
 
-> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.192` (2026-10-22) · **Next:** `V0.2.193`
+> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.193` (2026-10-22) · **Next:** `R6 clean install, then the tag`
 > **Previous line:** [Releases 0.1 → 0.2](RELEASES_0.1.md) · **Related:** [Roadmap, Road to V0.3.0](ROADMAP.md#-road-to-v030) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
 Every release of the 0.2 line, shipped and planned, one row each. The plan comes from the [Road to V0.3.0](ROADMAP.md#-road-to-v030): **one change per release**, each shippable alone, with the security rules for a new outside connection in the release that opens it. Planned rows are proposals until decisions 7–14 in the roadmap are agreed; tracks L and M waited on decisions 20–23, and track N on decisions 24–28 (taken as proposed).
@@ -29,7 +29,7 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | V0.2.57–V0.2.129 | K. Frontend polish | Tokens, layers and the cascade; building blocks; React foundations; every page on the shared pieces; behaviour; checks and DESIGN.md ([plan](plans/2026-10-17-frontend-polish.md)) |
 | V0.2.130–V0.2.148 | L. Security and dependencies | TLS, spreadsheet and web toolchain advisories; pinned CI and images; the container's git; Office previews opt-in and locked down; provider addresses; token powers; events by role; organization roles; who creates organizations; refresh across tabs; sign-in limits; input and link rules; container hardening ([review](security/2026-10-21-security-review.md)) |
 | V0.2.149–V0.2.162 | M. Backend hardening and performance | Rights before reading; stored text for the artifact page; jobs through the queue; body limits; streamed uploads; the file list paged; syncs with nothing to do; parallel cross-workspace search; SQLite tuning; compression; load shedding; release checks |
-| V0.2.163–V0.2.193 | N. Workspace templates *(started 2026-10-22)* | A data format over a closed set of modules; templates chosen at creation or in Settings; tab order, landing section, labels and Overview cards; ranking boosts, health checks, review, map and assistant phrases; four first templates; a checker, an operator folder and a download for adding more ([plan](plans/2026-10-22-workspace-templates.md)) |
+| V0.2.163–V0.2.193 | N. Workspace templates *(built 2026-10-22)* | A data format over a closed set of modules; templates chosen at creation or in Settings; tab order, landing section, labels and Overview cards; ranking boosts, health checks, review, map and assistant phrases; four first templates; a checker, an operator folder and a download for adding more ([plan](plans/2026-10-22-workspace-templates.md)) |
 | V0.3.0 | — | *Connected* |
 
 ---
@@ -230,5 +230,5 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | **V0.2.190** | ✅ 2026-10-22 |N. Workspace templates |🔧 Enhancement | Console | Console commands for templates and a loaded-templates list in System | `validate` prints the errors the server would |
 | **V0.2.191** | ✅ 2026-10-22 |N. Workspace templates |✨ Feature | Templates | A workspace's adjusted setup downloaded as a template file | The file passes the checker and gives the same sections, labels and boosts elsewhere |
 | **V0.2.192** | ✅ 2026-10-22 |N. Workspace templates |🔒 Security | Security | Security pass on the new surface | No high or medium finding open |
-| **V0.2.193** | 🔜 Planned | N. Workspace templates | 📘 Update | Release | Release checks repeated after workspace templates; the freeze restored | Every check passes |
+| **V0.2.193** | ✅ 2026-10-22 |N. Workspace templates |📘 Update | Release | Release checks repeated after workspace templates; the freeze restored | Every check passes |
 | **V0.3.0** | 🔜 Planned | — | 📘 Update | Connected | The version set to `0.3.0` and tagged `v0.3.0`, after tracks K, L, M and N and the clean-machine install | Tag `v0.3.0` |

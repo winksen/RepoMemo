@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.2.192` (2026-10-22). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, and the retired local workspace are described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.2.193` (2026-10-22). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, and the retired local workspace are described briefly in [§12](#12-desktop-app).
 
 ---
 
@@ -567,7 +567,7 @@ The local workspace and a server keep **separate data**.
 
 ---
 
-## 13. Known functional gaps (at V0.2.192)
+## 13. Known functional gaps (at V0.2.193)
 
 These are observed in the code and are useful for prioritizing. The roadmap item that addresses each one is in brackets.
 
@@ -583,6 +583,17 @@ These are observed in the code and are useful for prioritizing. The roadmap item
 | Accounts are never deleted | They are deactivated (V0.2.16) and anonymized (V0.2.17); the account row stays as *Former member*. Log files and earlier backups keep the old address until they age out. |
 | Archives are not a sync | A workspace exports (V0.2.40, Settings) and imports as a new workspace (V0.2.41, dashboard); it is a copy, not a link: nothing keeps the two in step, and importing the same archive twice makes two workspaces. Earlier versions of a file, saved searches, assistant chats and the activity feed are not in the archive. The retired local workspace of the desktop app moves the same way (V0.2.50) [O2, F20b]. |
 | The retired local workspace is still in the app | It moves to a server as an archive (V0.2.50) and is labelled retired (V0.2.51), but is only removed in a 0.3.x release; until then it gets security fixes only. The move is a copy, not a link, and only an organization owner or administrator can import it [F20c]. |
+
+**What workspace templates do not do (V0.2.163–V0.2.193).** A template orders, names and weighs what RepoMemo already has, and the rows below are the edges of that:
+
+| Gap | Impact |
+|---|---|
+| Templates are not an organization's own | An organization cannot save a template for all its workspaces. An operator loads files from `REPOMEMO_TEMPLATES_DIR` (V0.2.189, read at start, so a change needs a restart) and a workspace's setup downloads as a file (V0.2.191); organization-defined templates are a V0.4.0 direction (decision 28). |
+| A template adds nothing | No new section or module is defined by a template, there are no per-user layouts, nothing is indexed or chunked differently per template, no template is installed from a URL, none is written by an AI, and existing evidence is never moved into a template's starter folders. A template never changes who can see or do anything. |
+| Existing workspaces stay on General | Nothing is moved to a template on upgrade; an owner or administrator chooses one in Settings › Template, and General reproduces the behaviour from before templates (checked by tests against V0.2.162's figures). |
+| A dashboard card shows one of four figures | The headline is memory cards, active tasks, code symbols or sources, because the dashboard answers for every workspace in one request (V0.2.187); the narrow navigation rail does not show templates. |
+| The Overview cards are the closest figures that exist | A template names cards of the metrics the page already loads, so "repositories in sync", "evidence reviewed in 90 days", "needing review" and "duplicates" are not cards yet (V0.2.174). Software engineering's map puts repositories and code first because symbols are not a kind of file on the map (V0.2.184). |
+| A template is readable by everyone who signs in | A template holds no secrets, and its focus line reaches the AI provider of the workspace (security review T5). |
 
 Invitation links and administrator reset links, gaps until V0.1.62, shipped in V0.1.63.
 

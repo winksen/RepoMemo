@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.193 (2026-10-22)
+
+Release checks repeated after workspace templates; the freeze restored.
+
+### Checks
+- **Passing:** `npm run typecheck`, `styles:check`, `a11y:check`, `types:check`, `version:check`, `docs:check`, `container:check`, `migrations:check` (41 migrations, every one locked and unchanged since its release) and `templates:check` (the four templates and the example, no template id in code). `cargo check` of every crate the track touched compiles with its tests.
+- **In CI:** `templates:check` and the checker's own tests run in *Versions agree* since V0.2.188, with the whole history checked out and the pull request's base.
+- **Dependencies:** the track added no package. Comparing `Cargo.lock` and `package-lock.json` with V0.2.162, where `cargo deny check` and `npm audit` with development packages were last reported clean, nothing is added, removed or changed (675 external Rust packages, 410 npm packages, the same versions). The two commands were **not run** here, because they reach the advisory database and the npm registry; CI runs both on every push, and the maintainer can run `cargo deny check` and `npm audit` before the tag.
+- **Tests:** none was run, as asked. The track wrote them (templates 89, retrieval 21, ingestion 21, console 14, server 194, web 334, the checker 9) and compiled them.
+
+### Changed
+- **The documents match the code:** the test counts of the technical mindmap had drifted from the source (at V0.2.162 its server row said 156 where the source had 184, and the web row 182 where it had far more); they are now the number of test attributes and `it(` calls in the source, and say so. The gaps table of the functional mindmap lists what templates do not do (organizations' own templates, new modules, per-user layouts, different indexing, installing from a URL, AI-written templates, moving evidence, the four-figure dashboard headline, the closest-figure Overview cards, who can read a template). UPGRADING.md says workspaces stay on General and where custom templates go; `technical/workspace-templates.md`, the roadmap and the release index say the track is built.
+- **The freeze is restored (decision 24):** from V0.2.193 until the tag, only the checks of the clean install and the fixes it finds go in. Track N is complete: V0.2.163–V0.2.193, one block of the format per release, the engine, the checker, the operator's folder, the console and System views, the download of a setup as a file, and the security pass.
+
+### Upgrading
+- Nothing to do. See UPGRADING.md for what the templates changed and what they did not.
+
 ## V0.2.192 (2026-10-22)
 
 Security review of workspace templates with its fixes.
