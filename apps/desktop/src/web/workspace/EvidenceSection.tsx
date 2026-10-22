@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useMemo } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { IconAlertCircle as AlertCircle, IconBook2 as Book, IconChevronDown as ChevronDown, IconChevronRight as ChevronRight, IconFileText as FileText, IconFilter as Filter, IconFolder as FolderIcon, IconFolderPlus as FolderPlus, IconFolderSymlink as FolderMove, IconLayoutGrid as Grid, IconList as List, IconMarkdown as Markdown, IconNote as Note, IconPencil as Pencil, IconPlus as Plus, IconSearch as Search, IconShieldLock as Shield, IconTrash as Trash, IconUpload as Upload } from "@tabler/icons-react";
 import { bulkSharedArtifacts, moveSharedFolder, createSharedFolder, createSharedTextArtifact, deleteSharedArtifact, deleteSharedFolder, moveSharedArtifact, renameSharedFolder, uploadSharedArtifact } from "../../lib/sharedApi";
 import { type ArtifactSummary, type Folder } from "../../types";
@@ -24,7 +24,7 @@ import { useUnsavedChanges } from "../../lib/unsavedChanges";
 import { submitHint } from "../../lib/submitShortcut";
 import { parseRoute } from "../router";
 import { fileCategoryIcon } from "../common";
-import { useArtifacts, useFolders, useIndexFailures } from "./data";
+import { useArtifactSearch, useArtifacts, useFolders, useIndexFailures } from "./data";
 import { type WorkspacePage, sectionState } from "./page";
 import { ICON_SIZE } from "../../components/ui/icon";
 
@@ -57,7 +57,20 @@ export function EvidenceSection({ page }: { page: WorkspacePage }) {
   // Several files at once: pick them, then move, change their state or delete them together.
   const [selecting, setSelecting] = useS("selecting", false);
   const [selectedIds, setSelectedIds] = useS<Set<string>>("selectedIds", new Set());
-  const [artifacts, setArtifacts] = useArtifacts(accessToken, workspaceId);
+  const [windowArtifacts, setArtifacts, , artifactTotal] = useArtifacts(accessToken, workspaceId);
+  // More files than a page: what is typed in the search asks the server too, so older files are found.
+  const moreThanAPage = artifactTotal > windowArtifacts.length;
+  const [searchedText, setSearchedText] = useState("");
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSearchedText(artifactQuery.trim()), 250);
+    return () => window.clearTimeout(timer);
+  }, [artifactQuery]);
+  const [searchedArtifacts] = useArtifactSearch(accessToken, workspaceId, searchedText, moreThanAPage);
+  const artifacts = useMemo(() => {
+    if (!moreThanAPage || !searchedText || searchedText !== artifactQuery.trim()) return windowArtifacts;
+    const known = new Set(windowArtifacts.map((artifact) => artifact.id));
+    return [...windowArtifacts, ...searchedArtifacts.filter((artifact) => !known.has(artifact.id))];
+  }, [artifactQuery, moreThanAPage, searchedArtifacts, searchedText, windowArtifacts]);
   const [indexFailures] = useIndexFailures(accessToken, workspaceId);
   const [folders, setFolders] = useFolders(accessToken, workspaceId);
   const displayedArtifacts = useMemo(() => {
@@ -361,6 +374,7 @@ export function EvidenceSection({ page }: { page: WorkspacePage }) {
           <section className="shared-detail-panel">
             <div className="shared-artifact-browser">
               {itemDialogs}
+              {moreThanAPage ? <p className="shared-muted-copy">Showing the {windowArtifacts.length} newest of {artifactTotal} files. Searching by name or path finds the others.</p> : null}
               <div className="shared-artifact-filters">
                 <SearchField aria-label="Search evidence files" onValueChange={setArtifactQuery} placeholder="Search file name or path" value={artifactQuery} />
                 <details className="shared-artifact-type-menu">

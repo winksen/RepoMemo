@@ -1,7 +1,7 @@
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { SafeMarkdown } from "../components/SafeMarkdown";
 import { IconArrowLeft as ArrowLeft, IconFileText as FileText, IconMarkdown as Markdown, IconPencil as Pencil, IconTrash as Trash } from "@tabler/icons-react";
-import { deleteSharedMemoryCard, exportSharedMemoryCard, getSharedMemoryCard, listSharedArtifacts, updateSharedMemoryCard } from "../lib/sharedApi";
+import { deleteSharedMemoryCard, exportSharedMemoryCard, getSharedMemoryCard, updateSharedMemoryCard } from "../lib/sharedApi";
 import { type ArtifactSummary, type MemoryCardDetail, type Organization, type SharedSession, type SharedWorkspace } from "../types";
 import { Button } from "../components/ui/button";
 import { PageHeader } from "../components/ui/page-header";
@@ -17,6 +17,7 @@ import { SharedLayout } from "../components/SharedLayout";
 import { invalidateKeys, queryClient, workspaceKeys } from "../lib/queryClient";
 import { useLiveEventHub, useLiveEvents } from "../lib/liveEvents";
 import { useServerState } from "../lib/useServerState";
+import { useArtifacts } from "./workspace/data";
 import { useUnsavedChanges } from "../lib/unsavedChanges";
 import { LEDGER_ACTIONS, LIVE_REFRESH_DELAY_MS, type WorkspaceSection } from "./constants";
 import { apiMessage, citationLines } from "./format";
@@ -96,10 +97,8 @@ export function SharedMemoryCardDetail({
     title !== card!.card.title || bodyMarkdown !== card!.card.body_markdown || source !== card!.card.source || citationKey(citations) !== citationKey(citedEvidence)
   );
   const canLeave = useUnsavedChanges(isDirty, { subject: "your edits to this memory card" });
-  // The evidence a card can cite is the workspace's file list, read when editing starts.
-  const [artifacts] = useServerState<ArtifactSummary[]>({
-    key: workspaceKeys.artifacts(workspaceId), fetch: () => listSharedArtifacts(accessToken, workspaceId), initial: [], enabled: isEditing,
-  });
+  // The evidence a card can cite is the workspace's newest files, read when editing starts.
+  const [artifacts] = useArtifacts(accessToken, workspaceId, isEditing);
 
   async function load() {
     setIsReloading(true); setError(null);

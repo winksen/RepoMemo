@@ -737,8 +737,12 @@ export function listSharedIndexFailures(accessToken: string, workspaceId: string
   return request<ArtifactIndexFailure[]>(`/v1/workspaces/${workspaceId}/artifacts/index-failures`, {}, accessToken);
 }
 
-export function listSharedArtifacts(accessToken: string, workspaceId: string): Promise<ArtifactSummary[]> {
-  return request<ArtifactSummary[]>(`/v1/workspaces/${workspaceId}/artifacts`, {}, accessToken);
+/** How many of a workspace's newest files a page holds; the others are reached by searching. The server pages at 500 at most. */
+export const ARTIFACT_WINDOW = 500;
+
+/** The newest files of a workspace: one page of the paged list, with the number of files in all. */
+export function listSharedArtifactWindow(accessToken: string, workspaceId: string): Promise<{ items: ArtifactSummary[]; total: number }> {
+  return listSharedArtifactsPage(accessToken, workspaceId, { limit: ARTIFACT_WINDOW, offset: 0 });
 }
 
 /** One server-side page of the artifact list, with the total across all pages. */
@@ -761,8 +765,11 @@ export function querySharedArtifacts(accessToken: string, workspaceId: string, i
   languages?: string[];
   sourceIds?: string[];
   indexed?: boolean;
+  /** At most this many matches (the server allows 500); the newest first. */
+  limit?: number;
 }): Promise<ArtifactSummary[]> {
-  return request<ArtifactSummary[]>(`/v1/workspaces/${workspaceId}/artifacts/query`, {
+  const paging = input.limit ? `?limit=${Math.min(Math.max(Math.floor(input.limit), 1), ARTIFACT_WINDOW)}` : "";
+  return request<ArtifactSummary[]>(`/v1/workspaces/${workspaceId}/artifacts/query${paging}`, {
     method: "POST",
     body: JSON.stringify({
       query: input.query,

@@ -149,7 +149,7 @@
 | POST | `/v1/artifacts/{artifact_id}/open-link` | auth | require_workspace_read | — | FileLinkResponse |
 | GET | `/v1/shared-files/{token}/{filename}` | signed link | link token, first client only | — | — |
 | GET | `/v1/workspaces/{workspace_id}/artifacts/index-failures` | auth | require_workspace_read | — | Vec<ArtifactIndexFailure |
-| POST | `/v1/workspaces/{workspace_id}/artifacts/query` | reading | require_workspace_read | QueryArtifactsRequest | Vec<ArtifactSummary |
+| POST | `/v1/workspaces/{workspace_id}/artifacts/query` | reading | require_workspace_read | QueryArtifactsRequest | Vec<SharedArtifactSummary |
 | POST | `/v1/workspaces/{workspace_id}/artifacts/text` | auth | require_workspace_write | CreateTextArtifactRequest | SharedArtifactSummary |
 | POST | `/v1/workspaces/{workspace_id}/artifacts/upload` | auth | require_workspace_write | — | SharedArtifactSummary |
 | GET | `/v1/artifacts/{artifact_id}` | auth | require_workspace_read | — | ArtifactDetail |

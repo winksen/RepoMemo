@@ -1,9 +1,10 @@
 import {
   getSharedRetrievalFacets, getSharedWorkspaceActivityCalendar, getSharedWorkspaceCapabilities, getSharedWorkspaceMetrics,
-  getSharedWorkspaceOverview, listSharedArtifacts, listSharedCollaborationTasks, listSharedFolders, listSharedIndexFailures,
+  getSharedWorkspaceOverview, listSharedArtifactWindow, listSharedCollaborationTasks, listSharedFolders, listSharedIndexFailures,
   listSharedMemoryCards, listSharedSavedSearches, listSharedWorkspaceActivity, listSharedWorkspaceAiProviders,
-  listSharedWorkspaceJobs, listSharedWorkspaceMembers,
+  listSharedWorkspaceJobs, listSharedWorkspaceMembers, querySharedArtifacts, ARTIFACT_WINDOW,
 } from "../../lib/sharedApi";
+import { useCallback, type SetStateAction } from "react";
 import { workspaceKeys } from "../../lib/queryClient";
 import { useServerState } from "../../lib/useServerState";
 import {
@@ -37,9 +38,32 @@ export function useMetrics(accessToken: string, workspaceId: string) {
   });
 }
 
-export function useArtifacts(accessToken: string, workspaceId: string) {
+/** The newest files of the workspace (one page) and how many files it has in all. */
+export type ArtifactWindow = { items: ArtifactSummary[]; total: number };
+
+/**
+ * The files a workspace page holds: the newest `ARTIFACT_WINDOW`, one request, which a live event
+ * fetches again as one page. `[files, setFiles, query, total]`: when `total` is more than the files,
+ * the others are reached with `useArtifactSearch`. The setter changes the files only.
+ */
+export function useArtifacts(accessToken: string, workspaceId: string, enabled = true) {
+  const [held, setHeld, query] = useServerState<ArtifactWindow>({
+    key: workspaceKeys.artifacts(workspaceId), fetch: () => listSharedArtifactWindow(accessToken, workspaceId), initial: { items: [], total: 0 }, enabled,
+  });
+  const setItems = useCallback((next: SetStateAction<ArtifactSummary[]>) => {
+    setHeld((current) => ({ items: typeof next === "function" ? next(current.items) : next, total: current.total }));
+  }, [setHeld]);
+  return [held.items, setItems, query, held.total] as const;
+}
+
+/** The files whose name or path holds `text`, from the server, newest first: how a workspace with more files than a page is searched. */
+export function useArtifactSearch(accessToken: string, workspaceId: string, text: string, enabled: boolean) {
   return useServerState<ArtifactSummary[]>({
-    key: workspaceKeys.artifacts(workspaceId), fetch: () => listSharedArtifacts(accessToken, workspaceId), initial: [],
+    key: [...workspaceKeys.artifacts(workspaceId), "search", text],
+    fetch: () => querySharedArtifacts(accessToken, workspaceId, { query: text, limit: ARTIFACT_WINDOW }),
+    initial: [],
+    enabled: enabled && text.length > 0,
+    keepPrevious: true,
   });
 }
 

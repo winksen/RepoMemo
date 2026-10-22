@@ -1,10 +1,10 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../lib/sharedApi", () => ({ listSharedArtifacts: vi.fn(), searchSharedMemoryCards: vi.fn() }));
+vi.mock("../lib/sharedApi", () => ({ querySharedArtifacts: vi.fn(), searchSharedMemoryCards: vi.fn() }));
 vi.mock("../web/router", async (original) => ({ ...(await original<typeof import("../web/router")>()), navigate: vi.fn() }));
 
-import { listSharedArtifacts, searchSharedMemoryCards } from "../lib/sharedApi";
+import { querySharedArtifacts, searchSharedMemoryCards } from "../lib/sharedApi";
 import { takeAssistantCommand } from "../lib/assistantBridge";
 import { navigate } from "../web/router";
 import { CommandPalette } from "../web/CommandPalette";
@@ -82,7 +82,7 @@ describe("paletteEntries", () => {
 
 describe("CommandPalette", () => {
   beforeEach(() => {
-    vi.mocked(listSharedArtifacts).mockResolvedValue([file("a1", "Retry policy", "docs/retry-policy.md")]);
+    vi.mocked(querySharedArtifacts).mockResolvedValue([file("a1", "Retry policy", "docs/retry-policy.md")]);
     vi.mocked(searchSharedMemoryCards).mockResolvedValue([]);
     vi.mocked(navigate).mockClear();
     takeAssistantCommand();

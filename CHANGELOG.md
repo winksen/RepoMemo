@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.155 (2026-10-21)
+
+The web client stops asking for a workspace's whole file list.
+
+### Changed
+- **A page holds the newest 500 files (P15b):** every workspace page, section, picker and the command palette called `GET …/artifacts` without a limit, and again after each live event, so a workspace of 100,000 files moved tens of megabytes on each refresh. The web client now reads one page of 500 files and the total (`listSharedArtifactWindow`, `useArtifacts`), and a live event fetches that one page again. When the workspace has more files than that, the evidence section says *Showing the 500 newest of N files* and what is typed in its search also asks the server (`useArtifactSearch`, through `POST …/artifacts/query` with a limit), so older files are found by name or path.
+- **The command palette searches the server (P15b):** it read the whole file list every time it opened. It now sends the longest word typed (after a short pause) and keeps the files that hold every word, at most 50.
+- **`POST …/artifacts/query` answers like the list:** each file carries its folder and repository (`SharedArtifactSummary`, additive), `X-Total-Count` is on every answer, and a call without `limit` gets the first 2,000 matches with `X-RepoMemo-Truncated: true` when there were more, as the file list does since V0.2.154.
+- **Not done in this release:** the `Combobox` search (`onSearch`) for the memory card, task and replacement pickers, which offer the 500 newest files, and server-side folder and file-type views with folder counts and 24-row paging in the evidence section, which still work from the files held. A workspace of more than 500 files shows its newest 500 in those views and the rest by search. The roadmap box says so.
+- **Tests (written, not run):** `test/artifactWindow.test.ts` (one page of 500 with the total; a search always carries a limit the server accepts) and `test/commandPalette.test.tsx` (the palette mocks the search).
+- **Checks run on this release:** `npm run typecheck`, `styles:check`, `a11y:check`, `types:check`, `docs:check` and `version:check` pass; `cargo check` of the server with its tests compiles. **Not run:** the web tests, as asked.
+
+### Upgrading
+- Nothing to do. A script that read `POST …/artifacts/query` without a limit now gets at most 2,000 matches and a header that says so.
+
 ## V0.2.154 (2026-10-21)
 
 The file list of a workspace is read a page at a time, in SQL, so a workspace of 100,000 files no longer sends them all on every refresh.

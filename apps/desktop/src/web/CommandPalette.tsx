@@ -1,5 +1,5 @@
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
-import { listSharedArtifacts, searchSharedMemoryCards } from "../lib/sharedApi";
+import { querySharedArtifacts, searchSharedMemoryCards } from "../lib/sharedApi";
 import { onOpenCommandPalette, sendToAssistant } from "../lib/assistantBridge";
 import { type ArtifactSummary, type MemoryCardSummary, type SharedWorkspace } from "../types";
 import { Dialog, DialogCancel } from "../components/ui/dialog";
@@ -9,12 +9,13 @@ import { navigate } from "./router";
 import { paletteEntries, type PaletteEntry } from "./paletteEntries";
 
 const CARD_SEARCH_DELAY_MS = 200;
+const FILE_SEARCH_LIMIT = 50;
 
 /**
  * A keyboard command palette (Ctrl or Cmd with K): jump to a workspace, one of
  * its sections, a file, a memory card or a system page, or start an assistant
- * action, without the mouse. Files come from the open workspace's list and
- * memory cards from its search, both read with the person's own access.
+ * action, without the mouse. Files and memory cards come from the open
+ * workspace's searches as the person types, both read with the person's own access.
  */
 export function CommandPalette({ accessToken, assistantWorkspaceId, canAdministerSystem, currentWorkspaceId, workspaces }: {
   accessToken: string;
@@ -53,15 +54,19 @@ export function CommandPalette({ accessToken, assistantWorkspaceId, canAdministe
     setCards([]);
   }, [open]);
 
-  // The open workspace's files, read each time the palette opens so the list is current.
+  // Files are searched by name or path as the person types, whatever the workspace's size. The server
+  // takes the longest word; the palette then keeps the files that hold every word.
   useEffect(() => {
-    if (!open || !currentWorkspaceId) { setFiles([]); return; }
+    const word = query.trim().split(/\s+/).reduce((longest, next) => next.length > longest.length ? next : longest, "");
+    if (!open || !currentWorkspaceId || !word) { setFiles([]); return; }
     let cancelled = false;
-    listSharedArtifacts(accessToken, currentWorkspaceId)
-      .then((next) => { if (!cancelled) setFiles(next); })
-      .catch(() => { if (!cancelled) setFiles([]); });
-    return () => { cancelled = true; };
-  }, [accessToken, currentWorkspaceId, open]);
+    const timer = window.setTimeout(() => {
+      querySharedArtifacts(accessToken, currentWorkspaceId, { query: word, limit: FILE_SEARCH_LIMIT })
+        .then((next) => { if (!cancelled) setFiles(next); })
+        .catch(() => { if (!cancelled) setFiles([]); });
+    }, CARD_SEARCH_DELAY_MS);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [accessToken, currentWorkspaceId, open, query]);
 
   useEffect(() => {
     const text = query.trim();

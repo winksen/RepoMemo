@@ -458,10 +458,14 @@ pub(crate) async fn query_artifacts(
     Path(workspace_id): Path<String>,
     Query(page): Query<PageQuery>,
     Json(request): Json<QueryArtifactsRequest>,
-) -> Result<(HeaderMap, Json<Vec<ArtifactSummary>>), ApiError> {
+) -> Result<(HeaderMap, Json<Vec<SharedArtifactSummary>>), ApiError> {
     require_workspace_read(&state, &subject, &workspace_id).await?;
     consume_heavy_quota(&state, &subject)?;
     let started = std::time::Instant::now();
+    // A call without `limit` gets the first `UNPAGED_ARTIFACT_CAP` matches, as the file list does.
+    let limit = page
+        .limit
+        .map_or(UNPAGED_ARTIFACT_CAP, |limit| limit.clamp(1, MAX_PAGE_SIZE) as i64);
     let (artifacts, total) = state
         .storage
         .query_artifacts(&ArtifactQuery {
@@ -471,19 +475,42 @@ pub(crate) async fn query_artifacts(
             languages: request.languages,
             source_ids: request.source_ids,
             indexed: request.indexed,
-            limit: page.limit.map(|limit| limit.clamp(1, MAX_PAGE_SIZE) as i64),
+            limit: Some(limit),
             offset: page.offset.unwrap_or(0) as i64,
         })
         .await
         .map_err(map_storage_error)?;
     record_timing("artifact_query", &workspace_id, started, artifacts.len());
     let mut headers = HeaderMap::new();
-    if page.limit.is_some() {
+    headers.insert(
+        HeaderName::from_static("x-total-count"),
+        HeaderValue::from(total.max(0) as u64),
+    );
+    if page.limit.is_none() && total > limit {
         headers.insert(
-            HeaderName::from_static("x-total-count"),
-            HeaderValue::from(total.max(0) as u64),
+            HeaderName::from_static("x-repomemo-truncated"),
+            HeaderValue::from_static("true"),
         );
     }
+    let ids: Vec<String> = artifacts.iter().map(|summary| summary.id.clone()).collect();
+    let folder_ids = state
+        .storage
+        .artifact_folder_ids_for(&ids)
+        .await
+        .map_err(map_storage_error)?;
+    let repository_ids = state
+        .storage
+        .repo_artifact_sources_for(&ids)
+        .await
+        .map_err(map_storage_error)?;
+    let artifacts = artifacts
+        .into_iter()
+        .map(|summary| SharedArtifactSummary {
+            folder_id: folder_ids.get(&summary.id).cloned(),
+            repository_id: repository_ids.get(&summary.id).cloned(),
+            summary,
+        })
+        .collect();
     Ok((headers, Json(artifacts)))
 }
 
