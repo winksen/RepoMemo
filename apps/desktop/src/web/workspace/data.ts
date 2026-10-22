@@ -4,7 +4,7 @@ import {
   listSharedMemoryCards, listSharedSavedSearches, listSharedWorkspaceActivity, listSharedWorkspaceAiProviders,
   listSharedWorkspaceJobs, listSharedWorkspaceMembers, querySharedArtifacts, ARTIFACT_WINDOW,
 } from "../../lib/sharedApi";
-import { useCallback, type SetStateAction } from "react";
+import { useCallback, useRef, useState, type SetStateAction } from "react";
 import { workspaceKeys } from "../../lib/queryClient";
 import { useServerState } from "../../lib/useServerState";
 import {
@@ -65,6 +65,23 @@ export function useArtifactSearch(accessToken: string, workspaceId: string, text
     enabled: enabled && text.length > 0,
     keepPrevious: true,
   });
+}
+
+/**
+ * The files a picker offers: the newest ones while nothing is typed, and the server's matches for what
+ * is typed, so a file of any age can be chosen. `find` and `known` also answer for files chosen earlier
+ * and no longer listed. `[search]` goes to the picker's `onSearch`.
+ */
+export function useArtifactPicker(accessToken: string, workspaceId: string, enabled = true) {
+  const [newest, , query] = useArtifacts(accessToken, workspaceId, enabled);
+  const [text, search] = useState("");
+  const [matches] = useArtifactSearch(accessToken, workspaceId, text, enabled && text.length > 0);
+  const seen = useRef(new Map<string, ArtifactSummary>());
+  for (const artifact of [...newest, ...matches]) seen.current.set(artifact.id, artifact);
+  const files = text ? matches : newest;
+  const find = useCallback((id: string) => seen.current.get(id), []);
+  const known = useCallback(() => [...seen.current.values()], []);
+  return { files, search, find, known, query };
 }
 
 export function useIndexFailures(accessToken: string, workspaceId: string) {

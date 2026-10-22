@@ -181,6 +181,26 @@ describe("Combobox", () => {
     fireEvent.keyDown(search, { key: "Enter" });
     expect(onValueChange).toHaveBeenCalledWith("3");
   });
+
+  it("asks the caller for the matches of what is typed, shows them as given and keeps the chosen label", async () => {
+    const onSearch = vi.fn();
+    function Searching() {
+      const [value, setValue] = useState("");
+      const [shown, setShown] = useState(options);
+      return <Combobox aria-label="File" onSearch={(text) => { onSearch(text); setShown(text ? [{ label: "Old archive", value: "9" }] : options); }} onValueChange={setValue} options={shown} value={value} />;
+    }
+    render(<Searching />);
+    fireEvent.click(screen.getByRole("button", { name: "File" }));
+    const search = await screen.findByRole("combobox", { name: "Search: File" });
+    await waitFor(() => expect(onSearch).toHaveBeenCalledWith(""));
+    // The text is not matched against the options here: the caller's answer is what is listed.
+    fireEvent.change(search, { target: { value: "archive" } });
+    await waitFor(() => expect(onSearch).toHaveBeenCalledWith("archive"));
+    await waitFor(() => expect(screen.getByRole("option").textContent).toContain("Old archive"));
+    fireEvent.keyDown(search, { key: "Enter" });
+    // Closed, the list goes back to the newest files, and the chosen one is still named.
+    await waitFor(() => expect(screen.getByRole("button", { name: "File" }).textContent).toContain("Old archive"));
+  });
 });
 
 describe("SearchField", () => {

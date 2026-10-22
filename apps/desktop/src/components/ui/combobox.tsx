@@ -1,6 +1,6 @@
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { IconCheck, IconChevronDown } from "@tabler/icons-react";
-import { useId, useMemo, useState, type KeyboardEvent } from "react";
+import { useEffect, useId, useMemo, useState, type KeyboardEvent } from "react";
 import { cn } from "../../lib/utils";
 import { ICON_SIZE } from "./icon";
 
@@ -20,6 +20,12 @@ export interface ComboboxProps {
   id?: string;
   /** Adds a first option with an empty value that clears the choice, and names it. */
   noneLabel?: string;
+  /**
+   * For a list too long to hold: called (after a short pause) with the typed text, and with an empty
+   * string when the list opens or closes, so the caller can fetch the matches. The options are then
+   * shown as given, not filtered again here.
+   */
+  onSearch?: (query: string) => void;
   onValueChange: (value: string) => void;
   options: ComboboxOption[];
   /** Shown while nothing is chosen. */
@@ -30,31 +36,41 @@ export interface ComboboxProps {
 
 /** The most rows drawn at once; the rest appear as the typed text narrows the list. */
 const VISIBLE_ROWS = 100;
+/** How long typing pauses before `onSearch` asks. */
+const SEARCH_DELAY_MS = 250;
 
 /**
  * Chooses one item out of many by typing part of its name. Use a `Dropdown` for a handful of
  * options and a `Combobox` where scrolling the whole list would be slow: files, people, tasks.
  * Arrow keys move through the matches, Enter chooses, Escape closes.
  */
-export function Combobox({ "aria-label": ariaLabel, className, disabled, emptyLabel = "Nothing matches", id, noneLabel, onValueChange, options: items, placeholder = "Choose…", value }: ComboboxProps) {
+export function Combobox({ "aria-label": ariaLabel, className, disabled, emptyLabel = "Nothing matches", id, noneLabel, onSearch, onValueChange, options: items, placeholder = "Choose…", value }: ComboboxProps) {
   const listId = useId();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const options = useMemo(() => (noneLabel ? [{ label: noneLabel, value: "" }, ...items] : items), [items, noneLabel]);
-  const selected = options.find((option) => option.value === value);
+  // The chosen option is kept, so its label shows although a search no longer lists it.
+  const [remembered, setRemembered] = useState<ComboboxOption | undefined>();
+  const selected = options.find((option) => option.value === value) ?? (remembered?.value === value && value ? remembered : undefined);
+  useEffect(() => {
+    if (!onSearch) return;
+    const timer = window.setTimeout(() => onSearch(open ? query.trim() : ""), open && query.trim() ? SEARCH_DELAY_MS : 0);
+    return () => window.clearTimeout(timer);
+  }, [onSearch, open, query]);
   const matches = useMemo(() => {
     const words = query.toLowerCase().split(/\s+/).filter(Boolean);
-    if (!words.length) return options;
+    if (!words.length || onSearch) return options;
     return options.filter((option) => {
       const haystack = `${option.label} ${option.description ?? ""}`.toLowerCase();
       return words.every((word) => haystack.includes(word));
     });
-  }, [options, query]);
+  }, [onSearch, options, query]);
   const shown = matches.slice(0, VISIBLE_ROWS);
 
   function choose(option: ComboboxOption | undefined) {
     if (!option) return;
+    setRemembered(option);
     onValueChange(option.value);
     setOpen(false);
   }
