@@ -9,6 +9,7 @@ members = [
   "crates/storage",
   "crates/api",
   "crates/mail",
+  "crates/templates",
   "apps/server",
   "apps/console",
   "apps/desktop/src-tauri"
@@ -19,7 +20,7 @@ resolver = "2"
 # The product version: the server reports it (System › Overview, the console).
 # Set it everywhere at once with `npm run version:set -- <version>`; CI checks
 # that Cargo.toml, Cargo.lock, package.json and tauri.conf.json agree.
-version = "0.2.163"
+version = "0.2.164"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/repomemo/repomemo"
@@ -75,6 +76,7 @@ repomemo-git = { path = "crates/git" }
 repomemo-ingestion = { path = "crates/ingestion" }
 repomemo-indexer = { path = "crates/indexer" }
 repomemo-mail = { path = "crates/mail" }
+repomemo-templates = { path = "crates/templates" }
 repomemo-retrieval = { path = "crates/retrieval" }
 repomemo-storage = { path = "crates/storage" }
 

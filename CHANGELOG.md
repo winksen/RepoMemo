@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.164 (2026-10-22)
+
+The first code of track N: the crate that holds the template format, its limits and its validation.
+
+### Added
+- **`crates/templates` (`repomemo-templates`):** a file has a `format` number (`1`) and a `meta` block (`id`, `version`, `name`, `summary`, `icon`). `TemplateDefinition::parse` reads one: it refuses a file over 64 KiB or nested more than 8 levels, an unknown key anywhere (naming the key and its line), a missing key, and then checks the values. `validate` is also usable on a template built in code. Every problem found is returned at once, with its key (`meta.id`) and, when the JSON reader found it, its line and column.
+- **Limits, in one module:** an id is 2 to 40 characters of `a-z`, `0-9` and `-` (not starting or ending with `-`, no `--`); a version is a whole number from 1; a name is up to 40 characters and a summary up to 160, one line with no control character; the icon is one of the 32 workspace icons; a format other than the one this server reads is refused with the side that is newer.
+- **`general()`:** the template every workspace has today, defined in code and not in a file, so no catalogue or folder can lose it. It leaves out every block, which means "as today".
+- **Nothing reads it yet:** no server, route or page uses the crate, so no workspace changes. The catalogue is V0.2.165, the workspace's choice V0.2.166.
+- **Tests (written, not run):** 13 unit tests: a valid file; `general` valid and read back unchanged; an unknown key at the top and inside `meta` with its line; a missing block and key; text that is not JSON; the format number; each limit of the id, version, name, summary and icon (valid at the bound, refused one past it, characters counted and not bytes); all problems reported together; file size and depth; and the icon list equal to `web/workspaceIcons.tsx`.
+- **Checks run on this release:** `cargo check` of the crate with its tests compiles; `docs:check` and `version:check` pass. **Not run:** the tests, as asked.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.163 (2026-10-22)
 
 Workspace templates are designed and written down before any code reads one. This opens track N (V0.2.163–V0.2.193).

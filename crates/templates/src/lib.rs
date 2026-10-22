@@ -1,0 +1,123 @@
+//! Workspace templates for RepoMemo (roadmap F26a, track N).
+//!
+//! A template is a small JSON file that names modules RepoMemo already has and
+//! gives them an order, an emphasis or a weight. This crate holds the format,
+//! its limits and its validation. It knows nothing of the database, the
+//! server or the web client: whatever reads a template receives values that
+//! were checked here.
+//!
+//! The format grows one block at a time, and a block is added in the release
+//! that also reads it, so the format never has a key without a reader. An
+//! unknown key, an unknown value or a value out of its bound makes a file
+//! invalid; there is no "ignore what you do not know".
+
+mod general;
+mod issue;
+pub mod limits;
+mod meta;
+
+#[cfg(test)]
+mod tests;
+
+pub use general::{general, GENERAL_ID};
+pub use issue::TemplateIssue;
+pub use meta::{TemplateMeta, WORKSPACE_ICONS};
+
+use serde::{Deserialize, Serialize};
+
+/// The format number this crate reads. A file written for another number is
+/// refused with a message that says which side is newer.
+pub const FORMAT: u32 = 1;
+
+/// One template, as written in a JSON file.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TemplateDefinition {
+    /// The format number the file is written for ([`FORMAT`]).
+    pub format: u32,
+    pub meta: TemplateMeta,
+}
+
+impl TemplateDefinition {
+    /// Reads and checks one file. Every problem found is returned, so a person
+    /// fixing a file sees them all at once; the ones the JSON reader finds
+    /// carry the line and column.
+    pub fn parse(text: &str) -> Result<Self, Vec<TemplateIssue>> {
+        if text.len() > limits::FILE_BYTES {
+            return Err(vec![TemplateIssue::new(
+                "",
+                format!(
+                    "the file is {} bytes; a template is at most {}",
+                    text.len(),
+                    limits::FILE_BYTES
+                ),
+            )]);
+        }
+        let depth = nesting_depth(text);
+        if depth > limits::NESTING {
+            return Err(vec![TemplateIssue::new(
+                "",
+                format!(
+                    "the file is nested {depth} levels deep; a template is at most {}",
+                    limits::NESTING
+                ),
+            )]);
+        }
+        let definition: Self = serde_json::from_str(text).map_err(|error| vec![TemplateIssue::from_json(&error)])?;
+        let issues = definition.validate();
+        if issues.is_empty() {
+            Ok(definition)
+        } else {
+            Err(issues)
+        }
+    }
+
+    /// The problems of a template that was read, built in code or edited: an
+    /// empty list means it is valid.
+    pub fn validate(&self) -> Vec<TemplateIssue> {
+        let mut issues = Vec::new();
+        if self.format != FORMAT {
+            let side = if self.format > FORMAT { "newer" } else { "older" };
+            issues.push(TemplateIssue::new(
+                "format",
+                format!(
+                    "the file is written for format {}, which is {side} than the format {FORMAT} this server reads",
+                    self.format
+                ),
+            ));
+        }
+        self.meta.validate(&mut issues);
+        issues
+    }
+
+    pub fn id(&self) -> &str {
+        &self.meta.id
+    }
+}
+
+/// How deeply `{` and `[` nest in a JSON text, ignoring brackets inside strings.
+fn nesting_depth(text: &str) -> usize {
+    let (mut depth, mut deepest) = (0usize, 0usize);
+    let (mut in_string, mut escaped) = (false, false);
+    for character in text.chars() {
+        if in_string {
+            match (escaped, character) {
+                (true, _) => escaped = false,
+                (false, '\\') => escaped = true,
+                (false, '"') => in_string = false,
+                _ => {}
+            }
+            continue;
+        }
+        match character {
+            '"' => in_string = true,
+            '{' | '[' => {
+                depth += 1;
+                deepest = deepest.max(depth);
+            }
+            '}' | ']' => depth = depth.saturating_sub(1),
+            _ => {}
+        }
+    }
+    deepest
+}

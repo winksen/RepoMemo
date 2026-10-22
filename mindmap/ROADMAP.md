@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.163` (2026-10-22), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next:** the clean-machine install (R6, the maintainer's) and the `v0.2.0` tag; tracks L and M, security and backend hardening, are built (V0.2.130–V0.2.162) and track N, workspace templates, is under way (V0.2.163–V0.2.193) · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
+> **Current version:** `V0.2.164` (2026-10-22), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next:** the clean-machine install (R6, the maintainer's) and the `v0.2.0` tag; tracks L and M, security and backend hardening, are built (V0.2.130–V0.2.162) and track N, workspace templates, is under way (V0.2.163–V0.2.193) · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
 > **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Security review 2026-10-16 (V0.2.52)](security/2026-10-16-security-review.md) · [Security and backend review 2026-10-21 (V0.2.129)](security/2026-10-21-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -504,7 +504,7 @@ Proposed and started on 2026-10-22, with decisions 24–28 taken as proposed. Ev
 | Release | Type | Section | The one change | IDs | Done when |
 |---|---|---|---|---|---|
 | **V0.2.163** ✅ | 📘 | Templates | The design, decisions 24–28 and the format written down (`technical/workspace-templates.md`, an ADR) | F26a, decisions 24–28 | The page and the ADR match the plan |
-| **V0.2.164** | ✨ | Templates | A template crate: identity block, limits, validation; `general` defined | F26a | Every limit and refusal has a unit test |
+| **V0.2.164** ✅ | ✨ | Templates | A template crate: identity block, limits, validation; `general` defined | F26a | Every limit and refusal has a unit test |
 | **V0.2.165** | ✨ | Templates | The built-in catalogue: the JSON files of one folder, registered without code | F26a | A valid file added to the folder appears with no other edit |
 | **V0.2.166** | ✨ | Templates | A workspace remembers its template (a workspace setting); one resolver, `general` when it cannot; export and import keep it | F26a | A missing template resolves to `general` with a reason; an imported workspace keeps its template |
 | **V0.2.167** | ✨ | API | `GET /v1/templates`, `GET` and `PUT /v1/workspaces/{id}/template`; a change is in the activity feed | F26a, decision 26 | A viewer reads and cannot change; a read-and-write token gets `403` on the change |
@@ -1131,7 +1131,7 @@ One box per release, with what to change and where. The finding behind each, wit
 The brief of each release (change, files, done when, commit line) is in the [plan](plans/2026-10-22-workspace-templates.md#6-the-releases). Tick a box when the release is built and say in it what was built and what was not run.
 
 - [x] **V0.2.163** `technical/workspace-templates.md` and the ADR; decisions 24–28 recorded. Done: `mindmap/technical/workspace-templates.md` (terms, the blocks and the release that builds each, what a template can never do, how the parts fit, resolution, how to add one, decisions 24–28 as agreed) and `docs/decisions/0005-templates-are-data-over-a-closed-set-of-modules.md`; the plan, the roadmap and the release index say decisions 24–28 are taken as proposed and the freeze is lifted for the track. No code changes
-- [ ] **V0.2.164** `crates/templates`: `TemplateDefinition` (meta block), limits, `validate`, `general()`
+- [x] **V0.2.164** `crates/templates`: `TemplateDefinition` (meta block), limits, `validate`, `general()`. Done: `crates/templates`: `TemplateDefinition { format, meta }` with `parse` (size, nesting depth, unknown keys refused with their line, then `validate`) and `validate` (format number, id, version, name, summary, icon), `TemplateIssue` (path, message, line, column), `limits`, `WORKSPACE_ICONS` (the 32 keys of the web client) and `general()`; added to the workspace, no dependency yet. 13 unit tests, one for each limit and refusal; compiles with its tests, not run
 - [ ] **V0.2.165** `definitions/*.json` registered by `build.rs`; `Catalogue::{get, list}`
 - [ ] **V0.2.166** workspace setting `template`; `effective_template` cached in `DerivedCache`; archive export and import carry it
 - [ ] **V0.2.167** `GET /v1/templates`, `GET` and `PUT /v1/workspaces/{id}/template`; `workspace_template_changed` activity
