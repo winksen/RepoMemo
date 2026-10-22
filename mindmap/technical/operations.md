@@ -70,6 +70,10 @@ server {
 
     client_max_body_size 64m;          # at least REPOMEMO_MAX_UPLOAD_MB
 
+    # The server compresses its own JSON and text (gzip or Brotli, when the client asks) since V0.2.160,
+    # so no `gzip on;` is needed here for the API; leave it off for /v1/ and let the answers through as
+    # they come. Static files of the web app can still be compressed by the proxy.
+
     # Importing a workspace archive (POST /v1/workspaces/import) sends one body
     # as large as REPOMEMO_MAX_IMPORT_MB. Give that path its own limit and let
     # nginx stream it instead of buffering it:

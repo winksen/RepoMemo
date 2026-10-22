@@ -13,6 +13,7 @@ mod backup;
 mod backup_copy;
 mod backup_crypto;
 mod collaboration;
+mod compression;
 mod config;
 mod connectors;
 mod conversion;
@@ -907,6 +908,8 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         ))
         .layer(middleware::from_fn_with_state(state.clone(), system::track_requests))
         .layer(TraceLayer::new_for_http().make_span_with(security::redacted_span))
+        // JSON and text are compressed for a client that asks; streams and downloads are left alone.
+        .layer(compression::layer())
         .layer(DefaultBodyLimit::max(JSON_BODY_BYTES))
         .with_state(state)
 }

@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.160 (2026-10-21)
+
+JSON answers are compressed for a client that asks, without a proxy in front.
+
+### Changed
+- **Compressed answers (P20):** the server sent every answer as it was; only the container's Caddy compressed, so direct use and the nginx recipe moved large JSON (a search, a file list, a page) uncompressed. A client that sends `Accept-Encoding: gzip` or `br` now gets JSON, newline-delimited JSON, OpenMetrics and text answers of 1 KiB or more compressed (`Content-Encoding`, `Vary: Accept-Encoding`).
+- **What is left alone:** event streams (each event must arrive at once), downloads (`Content-Disposition: attachment`), answers to range requests, files and formats that are compressed already (PDF, images, archives), and answers under 1 KiB. An answer that carries a `Content-Encoding` already is not compressed again, so behind Caddy nothing doubles.
+- **Dependencies:** `tower-http`'s `compression-gzip` and `compression-br` features add three small crates, `async-compression`, `compression-codecs` and `compression-core` (the compressors themselves, `flate2` and `brotli`, were in the lock already). `cargo deny` was not run here.
+- **Tests (written, not run):** `json_is_compressed_for_a_client_that_asks_and_streams_and_downloads_are_not` (the same long answer plain, with gzip and with Brotli, each at least four times smaller; a short answer, a download and an event stream carry no encoding).
+- **Checks run on this release:** `cargo check` of the server with its tests compiles; `rustfmt` shows nothing for the lines changed; `docs:check` and `version:check` pass. **Not run:** the tests and `cargo deny check`, as asked.
+
+### Upgrading
+- Nothing to do. Behind nginx or another proxy that compresses, leave compression off for `/v1/` (the operations guide says so).
+
 ## V0.2.159 (2026-10-21)
 
 The connections that read the database get a larger cache and memory-mapped reads.

@@ -110,6 +110,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-compression"
+version = "0.4.51"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d5755640120b24961f8231e05892e4a4f7e0d04e8aeca161508c9c397946970"
+dependencies = [
+ "compression-codecs",
+ "compression-core",
+ "pin-project-lite",
+ "tokio",
+]
+
+[[package]]
 name = "async-io"
 version = "2.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -702,6 +714,24 @@ dependencies = [
  "bytes",
  "memchr",
 ]
+
+[[package]]
+name = "compression-codecs"
+version = "0.4.46"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cae36683101b2899f48bd31f8db9839437356188e3b1ff23096e73dab09ba8fe"
+dependencies = [
+ "brotli",
+ "compression-core",
+ "flate2",
+ "memchr",
+]
+
+[[package]]
+name = "compression-core"
+version = "0.4.34"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ebdda89edc534bf8d5dd2857562633b6495557e5846552ade994b99ed13c36a"
 
 [[package]]
 name = "concurrent-queue"
@@ -4011,7 +4041,7 @@ checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
 name = "repomemo-ai"
-version = "0.2.159"
+version = "0.2.160"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -4025,7 +4055,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-api"
-version = "0.2.159"
+version = "0.2.160"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4046,7 +4076,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-console"
-version = "0.2.159"
+version = "0.2.160"
 dependencies = [
  "nu-ansi-term",
  "repomemo-domain",
@@ -4060,7 +4090,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-desktop"
-version = "0.2.159"
+version = "0.2.160"
 dependencies = [
  "chrono",
  "keyring",
@@ -4078,7 +4108,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-domain"
-version = "0.2.159"
+version = "0.2.160"
 dependencies = [
  "anyhow",
  "serde",
@@ -4087,7 +4117,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-git"
-version = "0.2.159"
+version = "0.2.160"
 dependencies = [
  "anyhow",
  "repomemo-domain",
@@ -4096,7 +4126,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-indexer"
-version = "0.2.159"
+version = "0.2.160"
 dependencies = [
  "anyhow",
  "hex",
@@ -4116,7 +4146,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-ingestion"
-version = "0.2.159"
+version = "0.2.160"
 dependencies = [
  "anyhow",
  "calamine",
@@ -4131,7 +4161,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-mail"
-version = "0.2.159"
+version = "0.2.160"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -4147,7 +4177,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-retrieval"
-version = "0.2.159"
+version = "0.2.160"
 dependencies = [
  "anyhow",
  "repomemo-domain",
@@ -4156,7 +4186,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-server"
-version = "0.2.159"
+version = "0.2.160"
 dependencies = [
  "anyhow",
  "argon2",
@@ -4186,7 +4216,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-storage"
-version = "0.2.159"
+version = "0.2.160"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -5988,14 +6018,17 @@ version = "0.6.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4cfcf7e2740e6fc6d4d688b4ef00650406bb94adf4731e43c096c3a19fe40840"
 dependencies = [
+ "async-compression",
  "bitflags 2.13.2",
  "bytes",
+ "futures-core",
  "futures-util",
  "http",
  "http-body",
  "http-body-util",
  "pin-project-lite",
  "tokio",
+ "tokio-util",
  "tower",
  "tower-layer",
  "tower-service",
