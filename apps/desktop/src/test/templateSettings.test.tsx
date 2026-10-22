@@ -26,6 +26,7 @@ const operationsDetail: TemplateDetail = {
   retrieval: { type_chips: [] },
   review: { order: ["health_finding", "evidence", "memory_card"] },
   map: { coverage_first: ["markdown", "note"], relations_first: ["cites"] },
+  repositories: { include: [], exclude: ["*.tfstate", "*.log"] },
   health: { detectors: ["stale_evidence", "outdated_evidence_referenced", "stale_memory_citation", "index_failed"], stale_after_days: 90 },
   ranking: { verified: 1.15, recency: { half_life_days: 90, max_factor: 1.2 }, boosts: [{ artifact_type: "runbook", document_kind: null, path: null, factor: 1.2 }, { artifact_type: null, document_kind: "pdf", path: null, factor: 1.15 }, { artifact_type: null, document_kind: null, path: "docs/adr/**", factor: 1.15 }] },
 };
@@ -36,6 +37,7 @@ const knowledgeDetail: TemplateDetail = {
   labels: { sections: { evidence: "Library" }, artifact_types: {} },
   overview: { cards: ["index_coverage"] },
   assistant: { order: [], suggestions: [], phrases: [], focus: null },
+  repositories: { include: ["**/*.pdf"], exclude: [] },
 };
 
 function current(overrides: WorkspaceTemplateView["overrides"] = null, base: TemplateDetail = operationsDetail): WorkspaceTemplateView {
@@ -66,6 +68,7 @@ describe("the lines that preview a template", () => {
       "Renamed": "Tasks → Actions",
       "Overview cards": "Fresh evidence, At risk",
       "The assistant suggests": "1 question, 1 phrase it recognises",
+      "Repository links start with": "2 exclude rules",
       "Map shows first": "Markdown, Note; memory citations",
       "Review lists": "open health findings, then files, then memory cards",
       "Health checks": "Stale evidence (90 days), Outdated references, Stale memory, Indexing failures",
@@ -78,6 +81,8 @@ describe("the lines that preview a template", () => {
     expect(lines["Renamed"]).toBe("nothing");
     expect(lines["Under More"]).toBe("nothing");
     expect(lines["The assistant suggests"]).toBe("nothing");
+    expect(lines["Repository links start with"]).toBe("1 include rule");
+    expect(Object.fromEntries(previewLines({ ...knowledgeDetail, repositories: { include: [], exclude: [] } }).map((line) => [line.label, line.text]))["Repository links start with"]).toBe("nothing");
     expect(lines["Opens on"]).toBe("Documents");
     expect(lines["Review lists"]).toBe("everything mixed, the oldest first");
     expect(lines["Map shows first"]).toBe("nothing in particular");

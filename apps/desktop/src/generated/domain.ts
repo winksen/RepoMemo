@@ -234,6 +234,8 @@ export interface WorkspaceTemplateView {
   review: TemplateReview;
   /** What the knowledge map puts first. */
   map: TemplateMap;
+  /** The include and exclude patterns the repository link form is filled in with. */
+  repositories: TemplateRepositories;
 }
 
 /**
@@ -345,6 +347,15 @@ export interface TemplateMap {
   relations_first: string[];
 }
 
+/**
+ * The patterns the repository link form is filled in with: an offer the person may keep, edit or clear. Both empty for
+ * `general`, and for a repository that is already linked nothing changes.
+ */
+export interface TemplateRepositories {
+  include: string[];
+  exclude: string[];
+}
+
 /** A template as a person looks at it before choosing it: what it arranges and names, without any workspace's choice. */
 export interface TemplateDetail {
   template: TemplateSummary;
@@ -358,6 +369,7 @@ export interface TemplateDetail {
   health: TemplateHealth;
   review: TemplateReview;
   map: TemplateMap;
+  repositories: TemplateRepositories;
 }
 
 /**

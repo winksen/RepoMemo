@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.186 (2026-10-22)
+
+The repository link form starts with the include and exclude rules its template offers.
+
+### Changed
+- **Repositories block:** `repositories.include` and `repositories.exclude` are lists of up to sixteen patterns each, in the same small grammar as the ranking block's folders: names, `*` inside a name and `**` for any number of folders. A regular expression, a leading, trailing or doubled slash, `..` and a pattern listed twice in its list make the file invalid, naming the pattern. They mean what a repository's own include and exclude patterns mean, and the defaults every repository has still apply.
+- **The link form:** Workspace Settings › Repositories fills **Add a repository link** with the rules, and says under Include only and Exclude that they come from the template while the fields still hold them. They are an offer: the person keeps, edits or clears them, Check access and Link and sync send what the fields hold, and the link records that, not a reference to the template. What someone typed before the template arrived is never overwritten, and after a link is made the form starts again from the offer. The edit dialog of a linked repository is not filled in, and **no template changes what an existing repository indexes**.
+- **The four templates:** Software engineering leaves out snapshot, test-data and generated files; Operations leaves out Terraform state and logs, since state files can hold secrets; Product and decisions and the Knowledge base ask for documents only. General offers nothing: the form is empty, as it was.
+- **Settings › Template and the API:** the answer carries `repositories` (`include` and `exclude`), and the preview has a line "Repository links start with".
+- **Tests (written, not run):** three in the templates crate (no rules unless a template chooses and a round trip; a folder pattern listed once, at most sixteen, never a regular expression, an unknown key refused; the four templates' offers), one in the api crate (each template's rules run through the matcher that decides which files a repository indexes: snapshots, state files and logs left out, documents kept), the server's template test and the web's template tests check the field, and six web tests in `repositoryOffer.test.tsx` (the offer as lines of text, the note under the fields, the form filled in and still editable, empty for General or before the template arrives, never overwriting what was typed, linking with what was kept and starting again from the offer).
+- **Checks run on this release:** `cargo check` of the templates, api and server crates with their tests compiles; `rustfmt` shows nothing for the lines changed; `types:check`, `typecheck`, `styles:check`, `a11y:check`, `docs:check` and `version:check` pass. **Not run:** the tests, as asked.
+
+### Upgrading
+- Nothing to do. A workspace on General sees the same empty form, and no linked repository changes.
+
 ## V0.2.185 (2026-10-22)
 
 The assistant recognises a template's phrases and knows what the workspace is for, without loosening any rule.

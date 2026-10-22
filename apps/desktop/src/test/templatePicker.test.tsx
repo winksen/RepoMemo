@@ -62,7 +62,7 @@ describe("the template hooks", () => {
       evidence: { default_view: "grid", types_first: [] },
       assistant: { order: [], suggestions: [], phrases: [], focus: null },
       retrieval: { type_chips: [] },
-      ranking: { verified: 1.1, boosts: [], recency: null }, health: { detectors: ["index_failed"], stale_after_days: null }, review: { order: [] }, map: { coverage_first: [], relations_first: [] },
+      ranking: { verified: 1.1, boosts: [], recency: null }, health: { detectors: ["index_failed"], stale_after_days: null }, review: { order: [] }, map: { coverage_first: [], relations_first: [] }, repositories: { include: [], exclude: [] },
     };
     vi.mocked(getSharedWorkspaceTemplate).mockResolvedValue(view);
 

@@ -60,6 +60,7 @@ impl EffectiveTemplate {
             health: detail.health,
             review: detail.review,
             map: detail.map,
+            repositories: detail.repositories,
         }
     }
 }
@@ -113,6 +114,13 @@ pub fn detail_of(template: &TemplateDefinition) -> TemplateDetail {
         },
         review: TemplateReview {
             order: template.review_order(),
+        },
+        repositories: {
+            let rules = template.repository_rules();
+            TemplateRepositories {
+                include: rules.include,
+                exclude: rules.exclude,
+            }
         },
         health: TemplateHealth {
             detectors: template.health_detectors(),
@@ -592,6 +600,41 @@ mod tests {
         for kind in &every {
             assert_eq!(serde_json::to_value(kind).unwrap(), json!(id(kind)));
         }
+    }
+
+    /// V0.2.186: the patterns a template offers the link form mean to the sync what they say. Each one is run through
+    /// the matcher that decides which files a repository indexes.
+    #[test]
+    fn the_rules_a_template_offers_the_link_form_do_what_they_say_when_a_sync_applies_them() {
+        use repomemo_ingestion::repo::{classify_repo_file, RepoFileRules};
+        let catalogue = Catalogue::builtin();
+        let kept = |id: &str, path: &str| {
+            let rules = catalogue.get(id).unwrap().repository_rules();
+            let rules = RepoFileRules {
+                include: rules.include,
+                exclude: rules.exclude,
+            };
+            classify_repo_file(path, 2_000, &rules).is_ok()
+        };
+        // Software engineering: snapshots and generated files are left out, the code stays.
+        assert!(!kept("software-engineering", "src/__snapshots__/app.test.snap"));
+        assert!(!kept("software-engineering", "ui/button.snap"));
+        assert!(!kept("software-engineering", "api/types.generated.ts"));
+        assert!(!kept("software-engineering", "pkg/testdata/case.json"));
+        assert!(kept("software-engineering", "src/main.rs"));
+        // Operations: state and logs are left out, runbooks and infrastructure code stay.
+        assert!(!kept("operations", "infra/prod.tfstate"));
+        assert!(!kept("operations", "infra/prod.tfstate.backup"));
+        assert!(!kept("operations", "var/deploy.log"));
+        assert!(kept("operations", "runbooks/restart-payments.md"));
+        assert!(kept("operations", "infra/main.tf"));
+        // The documents-first templates ask for documents only, in any folder and at the top.
+        assert!(kept("product-decisions", "README.md"));
+        assert!(kept("product-decisions", "specs/2026/billing.docx"));
+        assert!(!kept("product-decisions", "src/main.rs"));
+        assert!(kept("knowledge-base", "policies/security.pdf"));
+        assert!(kept("knowledge-base", "finance.xlsx"));
+        assert!(!kept("knowledge-base", "src/main.rs"));
     }
 
     /// The health checks a template can choose are exactly the API's detectors, in the order Health has always had.

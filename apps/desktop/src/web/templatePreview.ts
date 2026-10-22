@@ -9,7 +9,7 @@ export const SECTION_NAMES: Record<WorkspaceSection, string> = {
   health: "Health", review: "Review", memory: "Memory", tasks: "Tasks", people: "People & Activity", settings: "Settings",
 };
 
-type Previewable = Pick<TemplateDetail, "sections" | "labels" | "overview" | "assistant" | "ranking" | "health" | "review" | "map">;
+type Previewable = Pick<TemplateDetail, "sections" | "labels" | "overview" | "assistant" | "ranking" | "health" | "review" | "map" | "repositories">;
 
 /** What the assistant suggests and recognises, in words. */
 function assistantLine(assistant: TemplateDetail["assistant"]): string {
@@ -17,6 +17,16 @@ function assistantLine(assistant: TemplateDetail["assistant"]): string {
   const parts = [
     assistant.suggestions.length ? plural(assistant.suggestions.length, "question") : "",
     assistant.phrases.length ? `${plural(assistant.phrases.length, "phrase")} it recognises` : "",
+  ].filter(Boolean);
+  return parts.length ? parts.join(", ") : "nothing";
+}
+
+/** What the link form is filled in with, in words. */
+function repositoryRules(repositories: TemplateDetail["repositories"]): string {
+  const rules = (count: number, kind: string) => `${count} ${kind} rule${count === 1 ? "" : "s"}`;
+  const parts = [
+    repositories.include.length ? rules(repositories.include.length, "include") : "",
+    repositories.exclude.length ? rules(repositories.exclude.length, "exclude") : "",
   ].filter(Boolean);
   return parts.length ? parts.join(", ") : "nothing";
 }
@@ -77,6 +87,7 @@ export function previewLines(template: Previewable): Array<{ label: string; text
     { label: "Health checks", text: template.health.detectors.map((detector) => detector === "stale_evidence" && template.health.stale_after_days ? `${HEALTH_NAMES[detector]} (${template.health.stale_after_days} days)` : HEALTH_NAMES[detector] ?? detector).join(", ") },
     { label: "Search favours", text: favoured(template.ranking) },
     { label: "The assistant suggests", text: assistantLine(template.assistant) },
+    { label: "Repository links start with", text: repositoryRules(template.repositories) },
   ];
 }
 

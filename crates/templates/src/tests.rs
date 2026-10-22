@@ -1581,6 +1581,128 @@ fn software_engineering_puts_repositories_and_code_first_on_its_map() {
     }
 }
 
+/// The valid file with a `repositories` block written as JSON.
+fn with_repositories(block: &str) -> String {
+    VALID.replacen(
+        "\"format\": 1,",
+        &format!("\"format\": 1,\n  \"repositories\": {block},"),
+        1,
+    )
+}
+
+#[test]
+fn the_link_form_is_offered_no_rules_unless_a_template_chooses() {
+    assert_eq!(general().repository_rules(), RepositoriesBlock::default());
+    assert_eq!(parse(VALID).unwrap().repository_rules(), RepositoriesBlock::default());
+    assert_eq!(
+        parse(&with_repositories("{}")).unwrap().repository_rules(),
+        RepositoriesBlock::default()
+    );
+    let chosen = parse(&with_repositories(
+        r#"{ "include": ["docs/**", "**/*.md"], "exclude": ["**/__snapshots__/**", "*.snap"] }"#,
+    ))
+    .unwrap();
+    assert_eq!(chosen.repository_rules().include, ["docs/**", "**/*.md"]);
+    assert_eq!(chosen.repository_rules().exclude, ["**/__snapshots__/**", "*.snap"]);
+    assert_eq!(parse(&serde_json::to_string(&chosen).unwrap()).unwrap(), chosen);
+    assert!(!serde_json::to_string(&general()).unwrap().contains("repositories"));
+}
+
+#[test]
+fn a_repository_pattern_is_a_folder_pattern_listed_once_and_there_are_at_most_sixteen() {
+    let include = |pattern: &str| with_repositories(&format!(r#"{{ "include": ["{pattern}"] }}"#));
+    for good in ["docs/**", "**/*.md", "*.tfstate", "src/**/generated", "Dockerfile"] {
+        assert!(parse(&include(good)).is_ok(), "{good}");
+    }
+    // Never a regular expression, and the same grammar as the ranking's folders.
+    for bad in [
+        "",
+        "(a|b)",
+        "docs/",
+        "/docs",
+        "../secrets",
+        "a//b",
+        "src/**x",
+        "[ab].rs",
+        "a\\\\b",
+    ] {
+        assert_eq!(
+            parse(&include(bad)).unwrap_err()[0].path,
+            "repositories.include[0]",
+            "{bad:?}"
+        );
+    }
+    let exclude = parse(&with_repositories(r#"{ "exclude": ["*.log", "build/*", "(x)"] }"#)).unwrap_err();
+    assert_eq!(exclude.len(), 1);
+    assert_eq!(exclude[0].path, "repositories.exclude[2]");
+    let twice = parse(&with_repositories(r#"{ "include": ["docs/**", "docs/**"] }"#)).unwrap_err();
+    assert_eq!(twice[0].path, "repositories.include[1]");
+    // The same pattern may stand in both lists: they say different things.
+    assert!(parse(&with_repositories(
+        r#"{ "include": ["docs/**"], "exclude": ["docs/**"] }"#
+    ))
+    .is_ok());
+    let patterns = |count: usize| {
+        (0..count)
+            .map(|n| format!("\"dir{n}/**\""))
+            .collect::<Vec<_>>()
+            .join(",")
+    };
+    assert!(parse(&with_repositories(&format!(
+        r#"{{ "exclude": [{}] }}"#,
+        patterns(REPOSITORY_PATTERNS_MAX)
+    )))
+    .is_ok());
+    let many = parse(&with_repositories(&format!(
+        r#"{{ "exclude": [{}] }}"#,
+        patterns(REPOSITORY_PATTERNS_MAX + 1)
+    )))
+    .unwrap_err();
+    assert_eq!(many[0].path, "repositories.exclude");
+    let unknown_key = parse(&with_repositories(r#"{ "branch": "main" }"#)).unwrap_err();
+    assert!(
+        unknown_key[0].message.contains("unknown field `branch`"),
+        "{}",
+        unknown_key[0]
+    );
+}
+
+#[test]
+fn the_four_first_templates_offer_rules_that_fit_the_repositories_their_teams_link() {
+    let catalogue = Catalogue::builtin();
+    let rules = |id: &str| catalogue.get(id).unwrap().repository_rules();
+    // Code teams leave out generated and snapshot files, and keep everything else.
+    assert!(rules("software-engineering").include.is_empty());
+    assert!(rules("software-engineering")
+        .exclude
+        .iter()
+        .any(|pattern| pattern == "*.snap"));
+    // Operations never indexes Terraform state, which can hold secrets.
+    assert!(rules("operations").exclude.iter().any(|pattern| pattern == "*.tfstate"));
+    // Documents-first teams link repositories for their documents.
+    assert!(rules("product-decisions")
+        .include
+        .iter()
+        .any(|pattern| pattern == "**/*.md"));
+    assert!(rules("knowledge-base")
+        .include
+        .iter()
+        .any(|pattern| pattern == "**/*.pdf"));
+    for id in [
+        "software-engineering",
+        "operations",
+        "product-decisions",
+        "knowledge-base",
+    ] {
+        let rules = rules(id);
+        assert!(!rules.include.is_empty() || !rules.exclude.is_empty(), "{id}");
+        assert!(
+            rules.include.len() <= REPOSITORY_PATTERNS_MAX && rules.exclude.len() <= REPOSITORY_PATTERNS_MAX,
+            "{id}"
+        );
+    }
+}
+
 #[test]
 fn the_review_queue_is_mixed_unless_a_template_names_the_kinds_to_list_first() {
     assert!(general().review_order().is_empty());

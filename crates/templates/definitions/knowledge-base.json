@@ -51,5 +51,6 @@
   },
   "health": { "detectors": ["older_version_active", "duplicate_content", "stale_evidence", "outdated_evidence_referenced", "index_failed"], "stale_after_days": 180 },
   "review": { "order": ["evidence", "memory_card", "health_finding"] },
-  "map": { "coverage_first": ["word", "pdf", "excel", "powerpoint"], "relations_first": ["similar"] }
+  "map": { "coverage_first": ["word", "pdf", "excel", "powerpoint"], "relations_first": ["similar"] },
+  "repositories": { "include": ["**/*.pdf", "**/*.docx", "**/*.xlsx", "**/*.pptx", "**/*.md"] }
 }

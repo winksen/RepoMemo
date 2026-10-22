@@ -25,6 +25,7 @@ mod meta;
 mod overrides;
 mod overview;
 mod ranking;
+mod repositories;
 mod resolve;
 mod retrieval;
 mod review;
@@ -51,6 +52,7 @@ pub use ranking::{
     pattern_problem, Boost, RankingBlock, Recency, ResolvedRanking, BOOSTS_MAX, DEFAULT_VERIFIED, FACTOR_MAX,
     FACTOR_MIN, HALF_LIFE_MAX, HALF_LIFE_MIN, PRODUCT_MAX, RECENCY_MAX,
 };
+pub use repositories::{RepositoriesBlock, REPOSITORY_PATTERNS_MAX};
 pub use resolve::{Origin, Resolution};
 pub use retrieval::{RetrievalBlock, TYPE_CHIPS_MAX};
 pub use review::{ReviewBlock, REVIEW_SOURCES};
@@ -102,6 +104,9 @@ pub struct TemplateDefinition {
     /// What the knowledge map puts first (V0.2.184); as today when left out.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub map: Option<MapBlock>,
+    /// The include and exclude patterns the repository link form is filled in with (V0.2.186); none when left out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repositories: Option<RepositoriesBlock>,
 }
 
 impl TemplateDefinition {
@@ -184,6 +189,9 @@ impl TemplateDefinition {
         if let Some(map) = &self.map {
             map::validate(map, &mut issues);
         }
+        if let Some(repositories) = &self.repositories {
+            repositories::validate(repositories, &mut issues);
+        }
         issues
     }
 
@@ -204,6 +212,11 @@ impl TemplateDefinition {
     /// What the knowledge map puts first; nothing for the usual map.
     pub fn map_emphasis(&self) -> MapBlock {
         self.map.clone().unwrap_or_default()
+    }
+
+    /// The patterns the repository link form is filled in with; none for the usual empty form.
+    pub fn repository_rules(&self) -> RepositoriesBlock {
+        self.repositories.clone().unwrap_or_default()
     }
 
     /// The groups the review queue lists, in order; empty for the usual mixed list.

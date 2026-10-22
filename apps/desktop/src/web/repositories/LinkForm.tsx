@@ -30,6 +30,7 @@ export function RepositoryFields({
   showLink,
   remote = false,
   replacingToken = false,
+  offeredBy = null,
 }: {
   form: RepoForm;
   onChange: (form: RepoForm) => void;
@@ -37,9 +38,12 @@ export function RepositoryFields({
   /** The repository is a remote one (an existing link, in the edit form). */
   remote?: boolean;
   replacingToken?: boolean;
+  /** The name of the template whose rules the include and exclude fields still hold, as they were offered. */
+  offeredBy?: string | null;
 }) {
   const set = (key: keyof RepoForm) => (event: { target: { value: string } }) => onChange({ ...form, [key]: event.target.value });
   const sshLink = showLink ? isSshLink(form.link) : replacingToken && isSshLink(form.link);
+  const offeredNote = offeredBy ? <> Filled in from the {offeredBy} template; change or clear them as you like.</> : null;
   const asksForToken = showLink ? isRemoteLink(form.link) && !sshLink : remote && !sshLink;
   return <>
     {showLink ? <Field hint="A folder on the server, anywhere inside the repository, or the https address of a repository on a host the server operator allows." label="Repository link">
@@ -65,10 +69,10 @@ export function RepositoryFields({
       <Field label="Name"><Input onChange={set("name")} placeholder={showLink ? "The folder name" : ""} value={form.name} /></Field>
       <Field label="Branch"><Input onChange={set("branch")} placeholder="The checked-out branch" value={form.branch} /></Field>
     </FieldRow>
-    <Field hint="One pattern per line. Leave empty to index everything." label="Include only">
+    <Field hint={<>One pattern per line. Leave empty to index everything.{offeredNote}</>} label="Include only">
       <Textarea onChange={set("include")} placeholder={"docs/**\nsrc/"} rows={3} value={form.include} />
     </Field>
-    <Field hint={<>Added to the defaults: lock files, minified files, <code>node_modules/</code>, <code>vendor/</code>, <code>dist/</code>, <code>build/</code>, <code>target/</code>, images and files over 1 MB.</>} label="Exclude">
+    <Field hint={<>Added to the defaults: lock files, minified files, <code>node_modules/</code>, <code>vendor/</code>, <code>dist/</code>, <code>build/</code>, <code>target/</code>, images and files over 1 MB.{offeredNote}</>} label="Exclude">
       <Textarea onChange={set("exclude")} placeholder={"**/*.test.ts\nfixtures/"} rows={3} value={form.exclude} />
     </Field>
   </>;

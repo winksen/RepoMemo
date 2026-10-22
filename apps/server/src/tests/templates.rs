@@ -164,6 +164,16 @@ async fn the_four_first_templates_are_offered_and_each_creates_its_folders() {
                 .is_some_and(|focus| focus.starts_with("This workspace holds")),
             "{id}"
         );
+        // The link form's rules (V0.2.186): code teams leave files out, documents-first teams ask for documents.
+        let offered = |key: &str| view["repositories"][key].as_array().map_or(0, Vec::len);
+        assert!(
+            match id {
+                "software-engineering" | "operations" => offered("exclude") > 0 && offered("include") == 0,
+                _ => offered("include") > 0 && offered("exclude") == 0,
+            },
+            "{id}: {}",
+            view["repositories"]
+        );
         // The map (V0.2.184): Software engineering puts repositories and code first.
         let coverage_first = view["map"]["coverage_first"].get(0).cloned().unwrap_or(Value::Null);
         assert_eq!(
@@ -613,6 +623,8 @@ async fn templates_are_listed_read_by_members_and_changed_only_by_administrators
         json!({"order": [], "suggestions": [], "phrases": [], "focus": null})
     );
     assert_eq!(by_default["retrieval"], json!({"type_chips": []}));
+    // General offers the link form nothing.
+    assert_eq!(by_default["repositories"], json!({"include": [], "exclude": []}));
     assert_eq!(
         by_default["ranking"],
         json!({"verified": 1.1, "boosts": [], "recency": null})

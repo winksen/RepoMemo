@@ -1,5 +1,5 @@
 import type { BadgeTone } from "../../components/ui/badge";
-import type { RepoSource, RepoSyncReport, IndexingJobStatus, LiveEvent } from "../../types";
+import type { RepoSource, RepoSyncReport, IndexingJobStatus, LiveEvent, WorkspaceTemplateView } from "../../types";
 
 export const POLL_INTERVAL_MS = 1500;
 /** With the workspace event stream open, polling is only a safety net. */
@@ -36,6 +36,24 @@ export type RepoForm = {
 };
 
 export const EMPTY_FORM: RepoForm = { link: "", name: "", branch: "", include: "", exclude: "", token: "", tokenUsername: "", deployKey: "", hostKey: "" };
+
+/** The include and exclude rules a workspace's template offers the link form (V0.2.186), as the form's own lines of text. */
+export type RepoOffer = { include: string; exclude: string; templateName: string | null };
+
+export const NO_OFFER: RepoOffer = { include: "", exclude: "", templateName: null };
+
+/** What the template offers; nothing for a template that has no rules (`general`), so its form is empty as ever. */
+export function repoOffer(template: WorkspaceTemplateView | null): RepoOffer {
+  if (!template) return NO_OFFER;
+  const { include, exclude } = template.repositories;
+  if (!include.length && !exclude.length) return NO_OFFER;
+  return { include: include.join("\n"), exclude: exclude.join("\n"), templateName: template.template.name };
+}
+
+/** An empty form carrying the offer; the person keeps, edits or clears it before anything is linked. */
+export function formWithOffer(offer: RepoOffer): RepoForm {
+  return { ...EMPTY_FORM, include: offer.include, exclude: offer.exclude };
+}
 
 /** An ssh address: `ssh://…` or the `git@host:owner/repo` form. */
 export function isSshLink(link: string) {

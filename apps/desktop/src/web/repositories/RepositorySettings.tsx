@@ -1,5 +1,5 @@
 import type { FormEvent } from "react";
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { IconGitBranch as GitBranch, IconPencil as Pencil, IconPlus as Plus, IconRefresh as Refresh, IconSettings as Settings, IconTrash as Trash } from "@tabler/icons-react";
 import {
   checkSharedRepository,
@@ -20,7 +20,8 @@ import { PanelHeading } from "../../components/ui/panel-heading";
 import { Dialog, DialogCancel } from "../../components/ui/dialog";
 import { showToast } from "../../components/ui/toast";
 import { ICON_SIZE } from "../../components/ui/icon";
-import { STATUS_LABEL, RepoForm, EMPTY_FORM, isSshLink, formToken, formSettings } from "./shared";
+import { STATUS_LABEL, RepoForm, EMPTY_FORM, NO_OFFER, isSshLink, formToken, formSettings, formWithOffer, repoOffer } from "./shared";
+import { useTemplate } from "../workspace/data";
 import { useRepositories } from "./useRepositories";
 import { RepositoryCheckResult, RepositoryFields } from "./LinkForm";
 
@@ -37,7 +38,11 @@ export function RepositorySettings({
   workspaceId: string;
 }) {
   const { repositories, load, track } = useRepositories(accessToken, workspaceId, onChanged);
+  const [template] = useTemplate(accessToken, workspaceId);
+  const offer = useMemo(() => repoOffer(template), [template]);
   const [form, setForm] = useState<RepoForm>(EMPTY_FORM);
+  // The rules the form was last filled in with: a form still holding them is untouched, and only that one is refilled.
+  const offered = useRef(NO_OFFER);
   const [check, setCheck] = useState<RepoAccessCheck | null>(null);
   // The form values the check was run with; any change asks for a new check.
   const [checkedFor, setCheckedFor] = useState("");
@@ -48,6 +53,13 @@ export function RepositorySettings({
   // Shown once, when a webhook is made or renewed.
   const [webhookSecret, setWebhookSecret] = useState<{ secret: string; address: string } | null>(null);
 
+  useEffect(() => {
+    const before = offered.current;
+    offered.current = offer;
+    setForm((current) => (current.include === before.include && current.exclude === before.exclude ? { ...current, include: offer.include, exclude: offer.exclude } : current));
+  }, [offer]);
+
+  const stillOffered = offer.templateName !== null && form.include === offer.include && form.exclude === offer.exclude;
   const formKey = JSON.stringify([form.link.trim(), formSettings(form), form.token, form.tokenUsername, form.deployKey, form.hostKey]);
   const checkIsCurrent = check !== null && checkedFor === formKey;
   // The repository being edited as the list holds it now (a webhook made in
@@ -79,7 +91,7 @@ export function RepositorySettings({
         ...formSettings(form),
       });
       track(repository.id, job?.id);
-      setForm(EMPTY_FORM);
+      setForm(formWithOffer(offer));
       setCheck(null);
       showToast("success", `Linked ${repository.name}. The first sync has started.`);
       await load();
@@ -206,7 +218,7 @@ export function RepositorySettings({
 
     <form className="rm-repo-form" onSubmit={runCheck}>
       <h3>Add a repository link</h3>
-      <RepositoryFields form={form} onChange={setForm} showLink />
+      <RepositoryFields form={form} offeredBy={stillOffered ? offer.templateName : null} onChange={setForm} showLink />
       {checkIsCurrent && check ? <RepositoryCheckResult check={check} /> : null}
       <div className="rm-health-actions">
         <Button busy={busy && !checkIsCurrent} disabled={busy || !form.link.trim()} type="submit" variant={checkIsCurrent ? "secondary" : "main"}><Refresh size={ICON_SIZE.sm} /> {checkIsCurrent ? "Check again" : "Check access"}</Button>

@@ -288,6 +288,8 @@ pub struct WorkspaceTemplateView {
     pub review: TemplateReview,
     /// What the knowledge map puts first.
     pub map: TemplateMap,
+    /// The include and exclude patterns the repository link form is filled in with.
+    pub repositories: TemplateRepositories,
 }
 
 /// The tabs of a workspace and the sections kept under *More*, as its template arranges them. Every section is in
@@ -398,6 +400,14 @@ pub struct TemplateMap {
     pub relations_first: Vec<String>,
 }
 
+/// The patterns the repository link form is filled in with: an offer the person may keep, edit or clear. Both empty for
+/// `general`, and for a repository that is already linked nothing changes.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TemplateRepositories {
+    pub include: Vec<String>,
+    pub exclude: Vec<String>,
+}
+
 /// A template as a person looks at it before choosing it: what it arranges and names, without any workspace's choice.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TemplateDetail {
@@ -412,6 +422,7 @@ pub struct TemplateDetail {
     pub health: TemplateHealth,
     pub review: TemplateReview,
     pub map: TemplateMap,
+    pub repositories: TemplateRepositories,
 }
 
 /// Chooses a workspace's template; `null` returns the workspace to the default. `overrides` are the adjustments
