@@ -78,6 +78,10 @@ pub struct ServerConfig {
     pub embedding_concurrency: usize,
     /// Database connections that serve reads (`REPOMEMO_DB_READ_CONNECTIONS`).
     pub db_read_connections: u32,
+    /// The page cache of each read connection, in MiB (`REPOMEMO_SQLITE_CACHE_MB`, 0 keeps SQLite's own).
+    pub db_read_cache_mb: u32,
+    /// Memory-mapped reads of each read connection, in MiB (`REPOMEMO_SQLITE_MMAP_MB`, 0 turns them off).
+    pub db_read_mmap_mb: u32,
     /// Memory for in-memory vector indexes, in MiB (`REPOMEMO_VECTOR_INDEX_MB`,
     /// 0 turns them off).
     pub vector_index_mb: u32,
@@ -329,6 +333,10 @@ impl ServerConfig {
             index_concurrency: env_parse::<usize>("REPOMEMO_INDEX_CONCURRENCY", 2)?.clamp(1, 16),
             embedding_concurrency: env_parse::<usize>("REPOMEMO_EMBEDDING_CONCURRENCY", 1)?.clamp(1, 8),
             db_read_connections: env_parse::<u32>("REPOMEMO_DB_READ_CONNECTIONS", 4)?.clamp(1, 64),
+            db_read_cache_mb: env_parse::<u32>("REPOMEMO_SQLITE_CACHE_MB", repomemo_storage::DEFAULT_READ_CACHE_MB)?
+                .min(4 * 1024),
+            db_read_mmap_mb: env_parse::<u32>("REPOMEMO_SQLITE_MMAP_MB", repomemo_storage::DEFAULT_READ_MMAP_MB)?
+                .min(64 * 1024),
             vector_index_mb: env_parse::<u32>("REPOMEMO_VECTOR_INDEX_MB", repomemo_storage::DEFAULT_VECTOR_INDEX_MB)?
                 .min(64 * 1024),
             document_time_limit: Duration::from_secs(env_parse("REPOMEMO_DOCUMENT_TIMEOUT_SECONDS", 60)?),
@@ -429,6 +437,8 @@ impl ServerConfig {
             index_concurrency: 2,
             embedding_concurrency: 1,
             db_read_connections: 4,
+            db_read_cache_mb: repomemo_storage::DEFAULT_READ_CACHE_MB,
+            db_read_mmap_mb: repomemo_storage::DEFAULT_READ_MMAP_MB,
             vector_index_mb: 64,
             document_time_limit: Duration::from_secs(60),
             document_memory_mb: repomemo_api::DEFAULT_MEMORY_LIMIT_MB,

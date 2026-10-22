@@ -227,6 +227,8 @@ async fn build_state(
         master_key: config.secret_key.clone(),
         read_connections: config.db_read_connections,
         vector_index_mb: config.vector_index_mb,
+        read_cache_mb: config.db_read_cache_mb,
+        read_mmap_mb: config.db_read_mmap_mb,
     })
     .await?;
 

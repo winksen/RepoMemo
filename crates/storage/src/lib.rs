@@ -99,6 +99,10 @@ pub struct StorageConfig {
     /// Memory the in-memory vector indexes may hold, in MiB; 0 turns them off
     /// and meaning searches scan the database.
     pub vector_index_mb: u32,
+    /// The page cache of each read connection, in MiB (SQLite's own is about 2 MiB); 0 keeps SQLite's.
+    pub read_cache_mb: u32,
+    /// How much of the database each read connection may map into memory, in MiB; 0 turns it off.
+    pub read_mmap_mb: u32,
 }
 
 impl StorageConfig {
@@ -108,9 +112,17 @@ impl StorageConfig {
             master_key: None,
             read_connections: DEFAULT_READ_CONNECTIONS,
             vector_index_mb: DEFAULT_VECTOR_INDEX_MB,
+            read_cache_mb: DEFAULT_READ_CACHE_MB,
+            read_mmap_mb: DEFAULT_READ_MMAP_MB,
         }
     }
 }
+
+/// The page cache of each read connection unless the operator says otherwise.
+pub const DEFAULT_READ_CACHE_MB: u32 = 32;
+
+/// Memory-mapped reads of each read connection unless the operator says otherwise.
+pub const DEFAULT_READ_MMAP_MB: u32 = 256;
 
 /// How many connections serve reads unless the operator says otherwise.
 pub const DEFAULT_READ_CONNECTIONS: u32 = 4;
@@ -717,9 +729,22 @@ impl StorageEngine {
 
         MIGRATOR.run(&pool).await?;
 
+        // The readers do the searching, so they get a larger page cache, memory-mapped reads and
+        // temporary tables in memory; the connection that writes keeps SQLite's defaults.
+        let mut read_options = options
+            .read_only(true)
+            .create_if_missing(false)
+            .pragma("temp_store", "MEMORY");
+        if config.read_cache_mb > 0 {
+            // A negative `cache_size` is a size in KiB.
+            read_options = read_options.pragma("cache_size", format!("-{}", u64::from(config.read_cache_mb) * 1024));
+        }
+        if config.read_mmap_mb > 0 {
+            read_options = read_options.pragma("mmap_size", (u64::from(config.read_mmap_mb) * 1024 * 1024).to_string());
+        }
         let read_pool = SqlitePoolOptions::new()
             .max_connections(config.read_connections.clamp(1, 64))
-            .connect_with(options.read_only(true).create_if_missing(false))
+            .connect_with(read_options)
             .await?;
 
         let engine = Self {

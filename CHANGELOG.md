@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.159 (2026-10-21)
+
+The connections that read the database get a larger cache and memory-mapped reads.
+
+### Changed
+- **SQLite read tuning (P19):** the connections that serve reads ran with SQLite's defaults: a page cache of about 2 MiB, no memory-mapped reads and temporary tables on disk. Each read connection now has a page cache of 32 MiB, may map up to 256 MiB of the database into memory and keeps its temporary tables in memory. The connection that writes keeps SQLite's defaults.
+- **Two new settings, both in System › Overview:** `REPOMEMO_SQLITE_CACHE_MB` (32; 0 keeps SQLite's own cache; at most 4,096) and `REPOMEMO_SQLITE_MMAP_MB` (256; 0 turns mapping off; at most 65,536). The cache is per read connection, so four readers hold up to four times the setting. Both are documented in the commands reference and the production guide.
+- **The restore proof opens the restored database without them** (it reads one connection and closes it).
+- **Tests (written, not run):** `read_connections_get_a_larger_cache_memory_mapped_reads_and_memory_temporaries` (the three pragmas as a reader reports them, the writer without them, the operator's values, and 0).
+- **Checks run on this release:** `cargo check` of the storage and server crates with their tests compiles; `rustfmt` shows nothing for the lines changed; `docs:check` and `version:check` pass. **Not run:** the tests, and `performance_at_scale` in a release build with and without the settings, which is the maintainer's run; `performance.md` has the row to fill (below).
+
+### Upgrading
+- Nothing to do. On a host with little memory, lower `REPOMEMO_SQLITE_CACHE_MB` and `REPOMEMO_SQLITE_MMAP_MB`. Try: run `cargo test -p repomemo-storage --release performance_at_scale -- --ignored --nocapture` with both settings at `0` and again with the defaults, and record the figures in `performance.md`.
+
 ## V0.2.158 (2026-10-21)
 
 Search across workspaces stops reading the workspaces one after another and stops embedding the query again in each.

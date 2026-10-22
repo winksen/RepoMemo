@@ -241,6 +241,8 @@ reader). Do not set them. The performance runs read `REPOMEMO_PERF_PASSAGES`,
 | `REPOMEMO_INDEX_CONCURRENCY` | `2` | Artifacts indexed at once (1–16). Indexing may call a vision provider. |
 | `REPOMEMO_EMBEDDING_CONCURRENCY` | `1` | Workspaces embedded at once (1–8). Raise it only for a provider that can take it. |
 | `REPOMEMO_DB_READ_CONNECTIONS` | `4` | Read-only database connections (1–64). Writes always use one. |
+| `REPOMEMO_SQLITE_CACHE_MB` | `32` | Page cache of each read connection, in MiB (0 keeps SQLite's own, about 2 MiB; at most 4,096). Four readers hold up to four times this. Shown in System › Overview. |
+| `REPOMEMO_SQLITE_MMAP_MB` | `256` | How much of the database each read connection may map into memory, in MiB (0 turns it off; at most 65,536). It is address space shared with the page cache of the system, not memory the server holds. Shown in System › Overview. |
 | `REPOMEMO_WORKSPACE_STORAGE_MB` | `20480` | Evidence one workspace may hold, in MiB; uploads and notes beyond it answer `413`. `0` is unlimited. Also a run-time setting. |
 | `REPOMEMO_UPLOADS_PER_HOUR` | `600` | Files and new versions one person may upload per hour; `0` is unlimited. Also a run-time setting. |
 | `REPOMEMO_WORKSPACES_PER_PERSON` | `25` | Workspaces one person may own; `0` is unlimited. Also a run-time setting. |

@@ -251,6 +251,8 @@ All are run-time settings (System › Settings) with an environment default; `0`
 | `REPOMEMO_DOCUMENT_TIMEOUT_SECONDS` | 60 | A document that takes forever to read: its reader process is killed |
 | `REPOMEMO_DOCUMENT_MEMORY_MB` | 1,024 | A document that eats memory: its reader process stops (`0` is no limit) |
 | `REPOMEMO_VECTOR_INDEX_MB` | 512 | Memory held for meaning search |
+| `REPOMEMO_SQLITE_CACHE_MB` | 32 | Page cache of each of the read connections (`REPOMEMO_DB_READ_CONNECTIONS`, 4): up to that many times this much memory for searching a large database. 0 keeps SQLite's own |
+| `REPOMEMO_SQLITE_MMAP_MB` | 256 | Memory-mapped reads of each read connection; 0 turns them off. Lower it on a host with little memory or a network-mounted data folder |
 
 Plan disk as: stored files + database (roughly a tenth of the text) + the cached previews + **each backup's new files**. Keep the free-disk floor above the size of one backup.
 

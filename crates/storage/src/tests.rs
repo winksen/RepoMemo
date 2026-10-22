@@ -716,6 +716,71 @@ async fn a_page_of_files_is_read_in_sql_with_the_total() {
     let _ = std::fs::remove_dir_all(data_dir);
 }
 
+/// V0.2.159: the read connections get a larger page cache, memory-mapped reads and temporary
+/// tables in memory; the connection that writes keeps SQLite's defaults.
+#[tokio::test]
+async fn read_connections_get_a_larger_cache_memory_mapped_reads_and_memory_temporaries() {
+    let pragma = |engine: &StorageEngine, name: &'static str, writer: bool| {
+        let pool = if writer {
+            engine.pool.clone()
+        } else {
+            engine.read_pool.clone()
+        };
+        async move {
+            sqlx::query_scalar::<_, i64>(&format!("PRAGMA {name}"))
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+        }
+    };
+    let (storage, data_dir) = temp_storage("read-tuning").await;
+    assert_eq!(
+        pragma(&storage, "cache_size", false).await,
+        -32 * 1024,
+        "32 MiB by default"
+    );
+    assert_eq!(
+        pragma(&storage, "mmap_size", false).await,
+        256 * 1024 * 1024,
+        "256 MiB by default"
+    );
+    assert_eq!(pragma(&storage, "temp_store", false).await, 2, "in memory");
+    assert_ne!(
+        pragma(&storage, "cache_size", true).await,
+        -32 * 1024,
+        "the writer keeps SQLite's default"
+    );
+    assert_ne!(pragma(&storage, "mmap_size", true).await, 256 * 1024 * 1024);
+    storage.pool.close().await;
+    drop(storage);
+    let _ = std::fs::remove_dir_all(data_dir);
+
+    // Set by the operator, and 0 leaves SQLite's own default.
+    let data_dir = std::env::temp_dir().join(format!("repomemo-read-tuning-set-{}", uuid::Uuid::new_v4()));
+    let mut config = StorageConfig::new(data_dir.clone());
+    config.read_cache_mb = 64;
+    config.read_mmap_mb = 0;
+    let storage = StorageEngine::open(config).await.unwrap();
+    assert_eq!(pragma(&storage, "cache_size", false).await, -64 * 1024);
+    assert_eq!(pragma(&storage, "mmap_size", false).await, 0, "memory-mapped reads off");
+    storage.pool.close().await;
+    drop(storage);
+    let _ = std::fs::remove_dir_all(data_dir);
+
+    let data_dir = std::env::temp_dir().join(format!("repomemo-read-tuning-off-{}", uuid::Uuid::new_v4()));
+    let mut config = StorageConfig::new(data_dir.clone());
+    config.read_cache_mb = 0;
+    let storage = StorageEngine::open(config).await.unwrap();
+    assert_ne!(
+        pragma(&storage, "cache_size", false).await,
+        -32 * 1024,
+        "0 keeps SQLite's default cache"
+    );
+    storage.pool.close().await;
+    drop(storage);
+    let _ = std::fs::remove_dir_all(data_dir);
+}
+
 #[tokio::test]
 async fn unreferenced_blobs_are_collected_after_the_grace_period() {
     let (storage, data_dir) = temp_storage("blob-gc").await;

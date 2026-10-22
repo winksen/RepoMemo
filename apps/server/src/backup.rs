@@ -674,6 +674,8 @@ async fn restore_backup(state: &AppState, name: &str, environment: &str) -> anyh
         master_key: crate::config::env_text("REPOMEMO_SECRET_KEY"),
         read_connections: 1,
         vector_index_mb: 0,
+        read_cache_mb: 0,
+        read_mmap_mb: 0,
     })
     .await;
     let engine = match opened {

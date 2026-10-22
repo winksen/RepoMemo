@@ -64,6 +64,7 @@ Record a run here when it is made: the date, the machine, the commit, the build 
 | …time to index them | | | *to record* |
 | …search p95 / dashboard / map / health | 300 ms / 500 ms / 2 s / 2 s | | *to record* |
 | A page of 50 in the file list (`GET …/artifacts`), 100,000 files in the workspace, p95 | 100 ms | | *to record (V0.2.154)* |
+| SQLite read tuning (V0.2.159): keyword search p95, figures and file list, with `REPOMEMO_SQLITE_CACHE_MB=0` and `REPOMEMO_SQLITE_MMAP_MB=0` (SQLite's defaults) and then with the new defaults (32 and 256) | no slower anywhere | | *to record (V0.2.159): run `performance_at_scale` twice, once for each setting, and write both columns here* |
 
 ## 4. Where to look when a number is missed
 

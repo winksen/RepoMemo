@@ -484,6 +484,22 @@ impl InstanceInfo {
             ("Embedding workspaces at once", config.embedding_concurrency.to_string()),
             ("Database read connections", config.db_read_connections.to_string()),
             (
+                "Page cache of each read connection",
+                if config.db_read_cache_mb == 0 {
+                    "SQLite's own (about 2 MiB)".to_owned()
+                } else {
+                    format!("{} MiB", config.db_read_cache_mb)
+                },
+            ),
+            (
+                "Memory-mapped reads of each read connection",
+                if config.db_read_mmap_mb == 0 {
+                    "off".to_owned()
+                } else {
+                    format!("{} MiB", config.db_read_mmap_mb)
+                },
+            ),
+            (
                 "Memory for vector indexes",
                 if config.vector_index_mb == 0 {
                     "off (meaning search scans the database)".to_owned()
