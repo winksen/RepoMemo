@@ -160,5 +160,19 @@ th > .rm-badge,
 .rm-option-row > .rm-option { flex: 1; min-width: 0; }
 .rm-option-row > .rm-option:hover:not(:disabled) { background: transparent; }
 .rm-option-row.active strong { font-weight: 700; }
+/* Template picker: one card for each template a new workspace can start with. */
+.rm-template-picker { flex-basis: 100%; min-width: 0; margin: 0; padding: 0; border: 0; }
+.rm-template-picker legend { padding: 0; margin-bottom: 6px; color: var(--color-text-muted); font-size: 12px; font-weight: 700; }
+.rm-template-options { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+.rm-template-option { position: relative; display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; color: var(--color-text); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px; cursor: pointer; }
+.rm-template-option:hover { background: var(--color-surface-hover); }
+.rm-template-option:has(.rm-template-radio:checked) { background: var(--color-surface-3); border-color: var(--color-text-muted); }
+.rm-template-option:has(.rm-template-radio:focus-visible) { outline: 2px solid var(--color-focus); outline-offset: 1px; }
+.rm-template-radio { position: absolute; opacity: 0; pointer-events: none; }
+.rm-template-option > svg { flex: none; margin-top: 2px; }
+.rm-template-option .rm-template-text { display: grid; gap: 2px; min-width: 0; margin: 0; }
+.rm-template-text strong { font-size: 13px; }
+.rm-template-text span { color: var(--color-text-muted); font-size: 12px; line-height: 1.4; }
+.rm-template-picker:disabled .rm-template-option { cursor: default; opacity: 0.6; }
 .rm-mention-links { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .rm-option > svg { flex: none; }

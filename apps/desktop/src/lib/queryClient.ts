@@ -39,6 +39,7 @@ export const workspaceKeys = {
   repositories: (workspaceId: string) => ["workspace", workspaceId, "repositories"] as const,
   connectors: (workspaceId: string) => ["workspace", workspaceId, "connectors"] as const,
   knowledgeMap: (workspaceId: string) => ["workspace", workspaceId, "knowledge-map"] as const,
+  template: (workspaceId: string) => ["workspace", workspaceId, "template"] as const,
   assistantCapabilities: (workspaceId: string) => ["workspace", workspaceId, "assistant-capabilities"] as const,
   assistantChats: (workspaceId: string) => ["workspace", workspaceId, "assistant-chats"] as const,
   // What the document viewer reads about one file.
@@ -59,6 +60,11 @@ export const workspaceKeys = {
 export const repositoryKeys = {
   detail: (repositoryId: string) => ["repository", repositoryId, "detail"] as const,
   files: (repositoryId: string, commit: string | undefined, indexedFiles: number) => ["repository", repositoryId, "files", commit ?? "", indexedFiles] as const,
+};
+
+/** Cache keys of what the server offers to everyone who is signed in. The cache is cleared when the session ends. */
+export const serverKeys = {
+  templates: () => ["server", "templates"] as const,
 };
 
 /** Cache keys of what belongs to the signed-in person, not to a workspace. The cache is cleared when the session ends. */

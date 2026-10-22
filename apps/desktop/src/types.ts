@@ -95,6 +95,10 @@ export type {
   MailSettingsView,
 } from "./generated/domain";
 export type {
+  TemplateSummary,
+  WorkspaceTemplateView,
+} from "./generated/domain";
+export type {
   AgentCapability,
   AgentCapabilityInfo,
   AgentConversation,

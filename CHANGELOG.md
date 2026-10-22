@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.169 (2026-10-22)
+
+The create-workspace form and the setup wizard offer the templates a server has.
+
+### Added
+- **A template picker:** when the server offers a template besides General, the form that creates a workspace on the dashboard lists the templates as cards (icon, name and what it is for) with General chosen, and the first workspace of the setup wizard does the same once a name is typed. The workspace is created with the chosen template (`template_id`), so it starts with the template's folders. A server that offers General alone shows no picker, and the form sends no template, exactly as before.
+- **Types and hooks:** `useTemplate(accessToken, workspaceId)` reads the template a workspace uses and where it came from, and `useTemplateCatalogue(accessToken)` the catalogue (kept for five minutes, because it changes only when the server restarts), both on the query cache so a page and its sections share one request. The client has `listSharedTemplates`, `getSharedWorkspaceTemplate` and `saveSharedWorkspaceTemplate`, and the types come from the Rust domain crate.
+- **Nothing else changes yet:** no section reads the template (the tab order is V0.2.171), and the catalogue holds General alone until V0.2.170, so a person sees no difference.
+- **Tests (written, not run):** five in the web client: the picker shows nothing for General alone, offers one radio card for each template with General checked, reports the choice and cannot be changed while busy; the hooks share one catalogue request and keep a workspace's template under its own key, and do not ask when the page has no use for the answer.
+- **Checks run on this release:** `typecheck`, `styles:check`, `a11y:check`, `docs:check` and `version:check` pass. **Not run:** the web tests, as asked.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.168 (2026-10-22)
 
 A workspace can be created from a template, with the folders the template starts it with.

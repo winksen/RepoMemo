@@ -1,20 +1,20 @@
 import {
   getSharedRetrievalFacets, getSharedWorkspaceActivityCalendar, getSharedWorkspaceCapabilities, getSharedWorkspaceMetrics,
-  getSharedWorkspaceOverview, listSharedArtifactWindow, listSharedCollaborationTasks, listSharedFolders, listSharedIndexFailures,
-  listSharedMemoryCards, listSharedSavedSearches, listSharedWorkspaceActivity, listSharedWorkspaceAiProviders,
+  getSharedWorkspaceOverview, getSharedWorkspaceTemplate, listSharedArtifactWindow, listSharedCollaborationTasks, listSharedFolders, listSharedIndexFailures,
+  listSharedMemoryCards, listSharedSavedSearches, listSharedTemplates, listSharedWorkspaceActivity, listSharedWorkspaceAiProviders,
   listSharedWorkspaceJobs, listSharedWorkspaceMembers, querySharedArtifactPage, querySharedArtifacts, ARTIFACT_WINDOW,
 } from "../../lib/sharedApi";
 import { DEFAULT_PAGE_SIZE } from "../../components/ui/pagination";
 import { categoryKind, documentCategory, DOCUMENT_KIND } from "../../lib/evidenceView";
 import { type FileCategory } from "../constants";
 import { useCallback, useRef, useState, type SetStateAction } from "react";
-import { workspaceKeys } from "../../lib/queryClient";
+import { serverKeys, workspaceKeys } from "../../lib/queryClient";
 import { useServerState } from "../../lib/useServerState";
 import {
   type ArtifactIndexFailure, type ArtifactSummary, type CollaborationTask, type Folder, type IndexingJobStatus,
-  type MemoryCardSummary, type RetrievalFacets, type SavedSearch, type SharedAiProviderSettings,
+  type MemoryCardSummary, type RetrievalFacets, type SavedSearch, type SharedAiProviderSettings, type TemplateSummary,
   type WorkspaceActivityCalendar, type WorkspaceActivityEvent, type WorkspaceCapabilities, type WorkspaceMember,
-  type WorkspaceMetrics, type WorkspaceOverview,
+  type WorkspaceMetrics, type WorkspaceOverview, type WorkspaceTemplateView,
 } from "../../types";
 
 /**
@@ -26,6 +26,20 @@ import {
 export function useCapabilities(accessToken: string, workspaceId: string) {
   return useServerState<WorkspaceCapabilities | null>({
     key: workspaceKeys.capabilities(workspaceId), fetch: () => getSharedWorkspaceCapabilities(accessToken, workspaceId), initial: null,
+  });
+}
+
+/** The template the workspace uses, where it came from and what it asks of the pages (V0.2.169). `null` until it arrives. */
+export function useTemplate(accessToken: string, workspaceId: string, enabled = true) {
+  return useServerState<WorkspaceTemplateView | null>({
+    key: workspaceKeys.template(workspaceId), fetch: () => getSharedWorkspaceTemplate(accessToken, workspaceId), initial: null, enabled,
+  });
+}
+
+/** The templates the server offers, `general` first; empty until they arrive. */
+export function useTemplateCatalogue(accessToken: string, enabled = true) {
+  return useServerState<TemplateSummary[]>({
+    key: serverKeys.templates(), fetch: () => listSharedTemplates(accessToken), initial: [], enabled, staleTime: 5 * 60_000,
   });
 }
 

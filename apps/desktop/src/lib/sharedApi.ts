@@ -67,6 +67,8 @@ import type {
   WorkspaceAiOverview,
   WorkspaceCapabilities,
   SharedWorkspace,
+  TemplateSummary,
+  WorkspaceTemplateView,
   WorkspaceOverview,
   WorkspaceMetrics,
   RepoAccessCheck,
@@ -482,14 +484,34 @@ export function listSharedWorkspaces(accessToken: string): Promise<SharedWorkspa
   return request<SharedWorkspace[]>("/v1/workspaces", {}, accessToken);
 }
 
+/** Creates a workspace. With a template id the workspace starts with that template and its folders (`general` and no id start with none). */
 export function createSharedWorkspace(
   accessToken: string,
   organizationId: string,
   name: string,
+  templateId?: string,
 ): Promise<SharedWorkspace> {
   return request<SharedWorkspace>("/v1/workspaces", {
     method: "POST",
-    body: JSON.stringify({ organization_id: organizationId, name }),
+    body: JSON.stringify({ organization_id: organizationId, name, ...(templateId ? { template_id: templateId } : {}) }),
+  }, accessToken);
+}
+
+/** The templates this server offers, `general` first. */
+export function listSharedTemplates(accessToken: string): Promise<TemplateSummary[]> {
+  return request<TemplateSummary[]>("/v1/templates", {}, accessToken);
+}
+
+/** The template the workspace uses and where it came from. */
+export function getSharedWorkspaceTemplate(accessToken: string, workspaceId: string): Promise<WorkspaceTemplateView> {
+  return request<WorkspaceTemplateView>(`/v1/workspaces/${workspaceId}/template`, {}, accessToken);
+}
+
+/** Chooses the workspace's template (`null` for the default). Administrators and owners only. */
+export function saveSharedWorkspaceTemplate(accessToken: string, workspaceId: string, templateId: string | null): Promise<WorkspaceTemplateView> {
+  return request<WorkspaceTemplateView>(`/v1/workspaces/${workspaceId}/template`, {
+    method: "PUT",
+    body: JSON.stringify({ template_id: templateId }),
   }, accessToken);
 }
 

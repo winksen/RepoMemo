@@ -2,6 +2,8 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { IconArrowLeft as ArrowLeft, IconArrowRight as ArrowRight, IconBuilding as Building, IconCircleCheck as CircleCheck } from "@tabler/icons-react";
 import { createSharedOrganization, createSharedWorkspace } from "../../lib/sharedApi";
+import { TemplatePicker } from "../../components/TemplatePicker";
+import { useTemplateCatalogue } from "../workspace/data";
 import { Button } from "../../components/ui/button";
 import { Field } from "../../components/ui/field";
 import { Input } from "../../components/ui/input";
@@ -19,13 +21,15 @@ export function OrganizationStep({ accessToken, created, onBack, onCreated, onNe
 }) {
   const [organization, setOrganization] = useState("");
   const [workspace, setWorkspace] = useState("");
+  const [templateId, setTemplateId] = useState("general");
+  const [templates] = useTemplateCatalogue(accessToken);
   const [isBusy, setIsBusy] = useState(false);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsBusy(true);
     try {
       const createdOrganization = await createSharedOrganization(accessToken, organization.trim());
-      const createdWorkspace = workspace.trim() ? await createSharedWorkspace(accessToken, createdOrganization.id, workspace.trim()) : null;
+      const createdWorkspace = workspace.trim() ? await createSharedWorkspace(accessToken, createdOrganization.id, workspace.trim(), templates.length > 1 ? templateId : undefined) : null;
       onCreated({ organization: createdOrganization.name, workspace: createdWorkspace?.workspace.name ?? null });
       onNext();
     } catch (error) { showToast("error", apiMessage(error, "The organization could not be created.")); }
@@ -39,6 +43,7 @@ export function OrganizationStep({ accessToken, created, onBack, onCreated, onNe
     {created ? <div className="rm-setup-actions"><Button onClick={onBack} type="button" variant="secondary"><ArrowLeft size={ICON_SIZE.md} /> Back</Button><Button onClick={onNext} type="button" variant="main"><ArrowRight size={ICON_SIZE.md} /> Continue</Button></div> : <form className="shared-setup-form" onSubmit={submit}>
       <Field label="Organization name" required><Input maxLength={120} onChange={(event) => setOrganization(event.target.value)} placeholder="Acme Engineering" value={organization} /></Field>
       <Field label="Workspace name (optional)"><Input maxLength={120} onChange={(event) => setWorkspace(event.target.value)} placeholder="Payments service" value={workspace} /></Field>
+      {workspace.trim() ? <TemplatePicker disabled={isBusy} name="setup-template" onChange={setTemplateId} templates={templates} value={templateId} /> : null}
       <div className="rm-setup-actions">
         <Button disabled={isBusy} onClick={onBack} variant="secondary"><ArrowLeft size={ICON_SIZE.md} /> Back</Button>
         <span className="rm-setup-actions-end"><Button disabled={isBusy} onClick={onNext} variant="secondary">Skip</Button><Button busy={isBusy} disabled={!organization.trim()} type="submit" variant="main"><Building size={ICON_SIZE.md} /> Create and continue</Button></span>
