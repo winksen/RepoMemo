@@ -13,6 +13,7 @@ path = "src/main.rs"
 
 [dependencies]
 repomemo-domain.workspace = true
+repomemo-templates.workspace = true
 reqwest.workspace = true
 rpassword = "7"
 rustyline = "14"

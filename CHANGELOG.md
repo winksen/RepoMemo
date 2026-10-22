@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.190 (2026-10-22)
+
+Templates can be listed and checked from the console, and System shows which are loaded.
+
+### Added
+- **`templates list`:** the workspace templates the server offers, with their id, name, version and source (built into the server, or the custom file), and a row for each file of `REPOMEMO_TEMPLATES_DIR` it left out, with the place and the reason. `templates` alone runs it. It works in the web console as well.
+- **`templates show <template>`:** what one template arranges, in one list of facts: its tabs and what is under More, where it opens, what it renames, the Overview cards and the dashboard headline, the ledger, the assistant, search weights, health checks, review order, map and repository rules. An id the server lacks is a `404`.
+- **`repomemo-console templates validate <file>`:** checks a template file on your machine with the rules the server applies to its folder (the same code reads the file: 64 KiB, UTF-8, a link not followed, the format, the lists and bounds, a file named after its id, no built-in id). It prints the server's own messages, with the place in the template and the line and column of broken JSON, and exits 1 when the file would be left out. It needs **no server and no sign-in**. A name starting with `_` is checked for its content and said to be a file the server leaves alone. Sent to the server, as in the web console, the command answers that it runs in the terminal client.
+- **System › Overview › Templates:** a panel that is always shown. It lists every template the server offers with its version and source, tags the custom ones, names the folder (or that none is set) and lists each file that was left out with where it went wrong and why; the answer of `GET /v1/system/overview` carries `template_files.templates` and the line and column of a problem.
+
+### Changed
+- **Tests (written, not run):** one in the templates crate (one file read the way the folder's files are, and what is named when it cannot be), five in the console (only a `templates validate` line is taken; a valid file; the server's messages for a misspelled section, another name, a built-in id, an unknown key and broken JSON; a file the server leaves alone; a file that cannot be read), three for the web (the list with sources and the Custom tag, files left out with the place and the reason, no folder set), and the server's template test now covers the list, the console commands and `templates validate` sent to the server.
+- **Checks run on this release:** `cargo check` of the templates, server and console crates with their tests compiles; `rustfmt` shows nothing for the lines changed; `templates:check`, `types:check`, `typecheck`, `styles:check`, `a11y:check`, `docs:check` and `version:check` pass. **Not run:** the tests, as asked.
+
+### Upgrading
+- Nothing to do. The console gains three commands; nothing else changes for a server without `REPOMEMO_TEMPLATES_DIR`, whose Templates panel lists the built-in templates.
+
 ## V0.2.189 (2026-10-22)
 
 Operators can add templates in a folder without a release; invalid files are named and ignored.

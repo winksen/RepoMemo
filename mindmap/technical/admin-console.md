@@ -109,6 +109,9 @@ flowchart LR
 | `workspace reindex <workspace>` | **yes** | `POST /v1/workspaces/{id}/index` (V0.2.6: `202` with the job); the dry run counts the files the current indexer has not indexed (system administrators) |
 | `repo list [--workspace w]` | no | the linked repositories with their sync state (system administrators) |
 | `repo sync <repository>` | **yes** | the repository sync runner, as `POST /v1/repositories/{id}/sync` does; `409` while it is syncing (system administrators) |
+| `templates list` | no | *V0.2.190.* the workspace templates the server offers (built into the server and from `REPOMEMO_TEMPLATES_DIR`) with their version and source, and a row for each file of that folder it left out, with the place and the reason; `templates` alone runs it |
+| `templates show <template>` | no | *V0.2.190.* what one template arranges (tabs, cards, assistant, search weights, health checks, review order, map, repository rules); `404` for an id the server lacks |
+| `templates validate <file>` | no | *V0.2.190.* checks a template file with the rules the server applies to `REPOMEMO_TEMPLATES_DIR`. The file is on the console's machine, so `repomemo-console` runs this one itself, with no server and no sign-in (it reads the file as the server reads its folder and prints the messages System › Overview would show; exit `0` valid, `1` not); sent to the server (the web console) it is a `400` that says to use the terminal client |
 | `embeddings rebuild <workspace>` | **yes** | removes the workspace's vectors (`StorageEngine::clear_workspace_embeddings`) and queues the embedding pass; the dry run reports the passages, the model and the provider calls against the daily allowance, and a pass already running is a `409` (system administrators) |
 
 A *workspace* or *repository* is given by its id or by its name when only one has it; two with the same name are refused with their ids.

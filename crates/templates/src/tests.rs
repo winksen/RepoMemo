@@ -1740,6 +1740,42 @@ fn a_folder_gives_at_most_sixty_four_files() {
     let _ = std::fs::remove_dir_all(&folder);
 }
 
+/// V0.2.190: the console checks one file with the rules the folder's files are read by.
+#[test]
+fn a_single_file_is_read_the_way_the_folders_files_are() {
+    let folder = scratch_folder("single");
+    let file = folder.join("support.json");
+    std::fs::write(&file, custom("support", "Customer support")).unwrap();
+    let read = read_template_file(&file);
+    assert!(read.problems.is_empty(), "{:?}", read.problems);
+    assert_eq!(read.sources.len(), 1);
+    assert_eq!(read.sources[0].0, "support.json");
+    // A name that starts with _ is still read: whether the server loads it is the catalogue's business, not the reader's.
+    let underscored = folder.join("_support.json");
+    std::fs::write(&underscored, custom("support", "Customer support")).unwrap();
+    assert_eq!(read_template_file(&underscored).sources.len(), 1);
+    // What the folder would leave out is named: a folder, a missing file, a file that is too big or not text.
+    let nested = folder.join("nested.json");
+    std::fs::create_dir(&nested).unwrap();
+    assert!(read_template_file(&nested).problems[0].issues[0]
+        .message
+        .contains("not a file"));
+    assert!(read_template_file(&folder.join("missing.json")).problems[0].issues[0]
+        .message
+        .contains("cannot be read"));
+    let big = folder.join("big.json");
+    std::fs::write(&big, vec![b' '; limits::FILE_BYTES + 1]).unwrap();
+    assert!(read_template_file(&big).problems[0].issues[0]
+        .message
+        .contains("at most"));
+    let text = folder.join("text.json");
+    std::fs::write(&text, [0xff, 0xfe]).unwrap();
+    assert!(read_template_file(&text).problems[0].issues[0]
+        .message
+        .contains("UTF-8"));
+    let _ = std::fs::remove_dir_all(&folder);
+}
+
 #[cfg(unix)]
 #[test]
 fn a_link_in_the_folder_is_not_followed() {

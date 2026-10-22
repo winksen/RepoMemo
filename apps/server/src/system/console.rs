@@ -76,6 +76,9 @@ const COMMANDS: &[CommandSpec] = &[
     CommandSpec { name: "workspace reindex", usage: "workspace reindex <workspace> --yes", summary: "Re-indexes the files of a workspace that the current indexer has not indexed, as a background job (system administrators). The workspace is its id or its name.", changes: true, arguments: 1, flags: &[] },
     CommandSpec { name: "repo list", usage: "repo list [--workspace id-or-name]", summary: "Linked repositories across the server, or in one workspace, with their sync state (system administrators).", changes: false, arguments: 0, flags: &["workspace"] },
     CommandSpec { name: "repo sync", usage: "repo sync <repository> --yes", summary: "Syncs a linked repository now, as a background job (system administrators). The repository is its id or its name.", changes: true, arguments: 1, flags: &[] },
+    CommandSpec { name: "templates list", usage: "templates list", summary: "The workspace templates this server offers, built in and from REPOMEMO_TEMPLATES_DIR, and the files of that folder it left out.", changes: false, arguments: 0, flags: &[] },
+    CommandSpec { name: "templates show", usage: "templates show <template>", summary: "What one template arranges: its tabs, cards, assistant, search weights, checks, map and repository rules.", changes: false, arguments: 1, flags: &[] },
+    CommandSpec { name: "templates validate", usage: "templates validate <file>", summary: "Checks a template file on your machine with the rules the server applies to REPOMEMO_TEMPLATES_DIR. It runs in repomemo-console, which needs no sign-in for it.", changes: false, arguments: 1, flags: &[] },
     CommandSpec { name: "embeddings rebuild", usage: "embeddings rebuild <workspace> --yes", summary: "Removes a workspace's stored vectors and embeds every passage again with its embedding provider, in the background (system administrators).", changes: true, arguments: 1, flags: &[] },
 ];
 
@@ -90,6 +93,7 @@ const GROUP_DEFAULTS: &[(&str, &str)] = &[
     ("mail", "mail status"),
     ("workspace", "workspace list"),
     ("repo", "repo list"),
+    ("templates", "templates list"),
 ];
 
 // ---------------------------------------------------------------------------
@@ -356,6 +360,29 @@ fn maintenance_facts(status: &MaintenanceStatus) -> Value {
     ])
 }
 
+/// Where a template came from, in words.
+fn template_source(template: &crate::templates::TemplateListed) -> String {
+    match (template.source, &template.file) {
+        ("custom", Some(file)) => format!("custom ({file})"),
+        ("code", _) => "built into the server (code)".to_owned(),
+        _ => "built into the server".to_owned(),
+    }
+}
+
+/// A problem of a template file, with the place in the file and in the template when they are known.
+fn template_issue_text(issue: &crate::templates::TemplateFileIssue) -> String {
+    let place = match (issue.line, issue.column) {
+        (Some(line), Some(column)) => format!(" (line {line}, column {column})"),
+        (Some(line), None) => format!(" (line {line})"),
+        _ => String::new(),
+    };
+    if issue.path.is_empty() {
+        format!("{}{place}", issue.message)
+    } else {
+        format!("{}: {}{place}", issue.path, issue.message)
+    }
+}
+
 /// Finds an account by email, or by id.
 async fn find_account(state: &AppState, who: &str) -> Result<repomemo_domain::SharedUser, ApiError> {
     let by_email = state
@@ -516,6 +543,163 @@ async fn execute(
                 Value::Array(rows),
             ))
         }
+
+        "templates list" => {
+            let files = &state.template_files;
+            let mut rows: Vec<Value> = files
+                .templates
+                .iter()
+                .map(|template| {
+                    json!({
+                        "id": template.id,
+                        "name": template.name,
+                        "version": template.version,
+                        "source": template_source(template),
+                        "state": "available",
+                    })
+                })
+                .collect();
+            for problem in &files.problems {
+                for issue in &problem.issues {
+                    rows.push(json!({
+                        "id": "-",
+                        "name": problem.file,
+                        "version": "-",
+                        "source": "custom file",
+                        "state": format!("left out: {}", template_issue_text(issue)),
+                    }));
+                }
+            }
+            let left_out = files.problems.len();
+            let summary = format!(
+                "{} template(s) available{}{}.",
+                files.templates.len(),
+                match &files.folder {
+                    Some(folder) => format!(", {} added from {folder}", files.loaded.len()),
+                    None => ", no REPOMEMO_TEMPLATES_DIR set".to_owned(),
+                },
+                if left_out > 0 {
+                    format!("; {left_out} file(s) left out")
+                } else {
+                    String::new()
+                }
+            );
+            Ok(answer(
+                spec,
+                summary,
+                View::Table {
+                    columns: &["id", "name", "version", "source", "state"],
+                },
+                Value::Array(rows),
+            ))
+        }
+
+        "templates show" => {
+            let id = arguments[0].to_lowercase();
+            let detail = state.core.template_detail(&id).ok_or_else(|| {
+                ApiError::not_found(format!(
+                    "No template has the id {}. templates list shows them.",
+                    arguments[0]
+                ))
+            })?;
+            let listed = state.template_files.templates.iter().find(|template| template.id == id);
+            let source = listed.map_or_else(|| "unknown".to_owned(), template_source);
+            let list = |items: &[String]| {
+                if items.is_empty() {
+                    "none".to_owned()
+                } else {
+                    items.join(", ")
+                }
+            };
+            let renamed: Vec<String> = detail
+                .labels
+                .sections
+                .iter()
+                .chain(&detail.labels.artifact_types)
+                .map(|(from, to)| format!("{from} → {to}"))
+                .collect();
+            let boosts = detail.ranking.boosts.len();
+            let facts = json!([
+                ["Name", detail.template.name],
+                ["Id · version", format!("{} · {}", detail.template.id, detail.template.version)],
+                ["Source", source],
+                ["Summary", detail.template.summary],
+                ["Tabs", list(&detail.sections.primary)],
+                ["Under More", list(&detail.sections.more)],
+                ["Opens on", detail.sections.landing],
+                ["Renamed", list(&renamed)],
+                ["Overview cards", list(&detail.overview.cards)],
+                ["Dashboard headline", detail.overview.headline.clone().unwrap_or_else(|| "none".to_owned())],
+                [
+                    "Evidence ledger",
+                    format!("{} view; first: {}", detail.evidence.default_view, list(&detail.evidence.types_first))
+                ],
+                [
+                    "Assistant",
+                    format!(
+                        "first: {}; {} suggestion(s); {} phrase(s); {}",
+                        list(&detail.assistant.order),
+                        detail.assistant.suggestions.len(),
+                        detail.assistant.phrases.len(),
+                        detail.assistant.focus.as_deref().map_or("no focus line".to_owned(), |focus| format!("focus: {focus}"))
+                    )
+                ],
+                ["Retrieval chips", list(&detail.retrieval.type_chips)],
+                [
+                    "Search",
+                    format!(
+                        "verified x{}; {boosts} boost(s){}",
+                        detail.ranking.verified,
+                        detail.ranking.recency.as_ref().map_or(String::new(), |recency| format!(
+                            "; recent evidence up to x{} (half-life {} days)",
+                            recency.max_factor, recency.half_life_days
+                        ))
+                    )
+                ],
+                [
+                    "Health checks",
+                    format!(
+                        "{}{}",
+                        list(&detail.health.detectors),
+                        detail.health.stale_after_days.map_or(String::new(), |days| format!(" (stale after {days} days)"))
+                    )
+                ],
+                [
+                    "Review queue",
+                    if detail.review.order.is_empty() {
+                        "mixed, oldest first".to_owned()
+                    } else {
+                        list(&detail.review.order)
+                    }
+                ],
+                [
+                    "Map first",
+                    format!(
+                        "files: {}; links: {}",
+                        list(&detail.map.coverage_first),
+                        list(&detail.map.relations_first)
+                    )
+                ],
+                [
+                    "Repository links",
+                    format!(
+                        "{} include, {} exclude pattern(s)",
+                        detail.repositories.include.len(),
+                        detail.repositories.exclude.len()
+                    )
+                ],
+            ]);
+            Ok(answer(
+                spec,
+                format!("{} ({}).", detail.template.name, detail.template.id),
+                View::Facts,
+                facts,
+            ))
+        }
+
+        "templates validate" => Err(ApiError::bad_request(
+            "templates validate checks a file on your machine, so it runs in repomemo-console (it needs no sign-in): repomemo-console templates validate <file>.",
+        )),
 
         "status" => {
             let overview = to_json(super::overview(who, state_).await?.0)?;

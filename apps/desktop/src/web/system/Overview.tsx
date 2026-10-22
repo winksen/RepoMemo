@@ -18,21 +18,39 @@ function officePreviewsText(previews: SystemOverview["background"]["office_previ
   return previews.requested ? "turned on, release being checked" : "installed, previews off (REPOMEMO_OFFICE_PREVIEWS)";
 }
 
-/** The templates the operator's folder added and the files it left out, each with why (V0.2.189). */
-function TemplateFilesPanel({ files }: { files: SystemTemplateFiles }) {
+/** What a template says about where it came from, in words. */
+function templateSource(template: SystemTemplateFiles["templates"][number]): string {
+  if (template.source === "custom") return `Custom · ${template.file ?? "a file"}`;
+  return template.source === "code" ? "Built into the server (code)" : "Built into the server";
+}
+
+/** The place of a problem: where in the template, and where in the file when the JSON reader knows. */
+function issuePlace(issue: SystemTemplateFiles["problems"][number]["issues"][number]): string {
+  const inFile = issue.line ? `line ${issue.line}${issue.column ? `, column ${issue.column}` : ""}` : "";
+  return [issue.path, inFile].filter(Boolean).join(" · ") || "the file";
+}
+
+/** Every template the server offers and where it came from, and the files of REPOMEMO_TEMPLATES_DIR it left out, each with why (V0.2.189, V0.2.190). */
+export function TemplatesPanel({ files }: { files: SystemTemplateFiles }) {
+  const custom = files.templates.filter((template) => template.source === "custom").length;
   return <section className="shared-settings-group">
-    <PanelHeading description={`${files.loaded.length} added · ${files.problems.length} left out`} icon={Template} title="Template files" />
-    <Facts items={[
-      ["Folder", <code key="folder">{files.folder}</code>],
-      ["Added", files.loaded.length ? files.loaded.map((template) => `${template.name} (${template.file})`).join(" · ") : "none"],
-    ]} />
-    {files.problems.length ? <Table>
-      <thead><tr><th scope="col">File</th><th scope="col">Where</th><th scope="col">What is wrong</th></tr></thead>
-      <tbody>{files.problems.flatMap((problem) => problem.issues.map((issue, index) => <tr key={`${problem.file}-${index}`}>
-        <th scope="row">{problem.file}</th><td>{issue.path ? <code>{issue.path}</code> : "the file"}</td><td>{issue.message}</td>
-      </tr>))}</tbody>
-    </Table> : <p className="shared-muted-copy">Every file in the folder was loaded. A change needs a restart.</p>}
-    {files.problems.length ? <p className="shared-muted-copy">A file that is left out never stops the server. Fix it and restart to load it.</p> : null}
+    <PanelHeading description={`${files.templates.length} available · ${custom} custom${files.problems.length ? ` · ${files.problems.length} file${files.problems.length === 1 ? "" : "s"} left out` : ""}`} icon={Template} title="Templates" />
+    <Facts items={[["Folder for custom templates", files.folder ? <code key="folder">{files.folder}</code> : "not set (REPOMEMO_TEMPLATES_DIR)"]]} />
+    <Table>
+      <thead><tr><th scope="col">Template</th><th scope="col">Id</th><th scope="col">Version</th><th scope="col">Source</th></tr></thead>
+      <tbody>{files.templates.map((template) => <tr key={template.id}>
+        <th scope="row">{template.name}{template.source === "custom" ? <Badge>Custom</Badge> : null}</th><td><code>{template.id}</code></td><td>{template.version}</td><td>{templateSource(template)}</td>
+      </tr>)}</tbody>
+    </Table>
+    {files.problems.length ? <>
+      <Table>
+        <thead><tr><th scope="col">File left out</th><th scope="col">Where</th><th scope="col">What is wrong</th></tr></thead>
+        <tbody>{files.problems.flatMap((problem) => problem.issues.map((issue, index) => <tr key={`${problem.file}-${index}`}>
+          <th scope="row">{problem.file}</th><td>{issuePlace(issue)}</td><td>{issue.message}</td>
+        </tr>))}</tbody>
+      </Table>
+      <p className="shared-muted-copy">A file that is left out never stops the server. Fix it and restart to load it; <code>repomemo-console templates validate &lt;file&gt;</code> shows the same messages before a restart.</p>
+    </> : files.folder ? <p className="shared-muted-copy">Every file in the folder was loaded. A change needs a restart.</p> : null}
   </section>;
 }
 
@@ -108,7 +126,7 @@ export function OverviewSection({ accessToken }: { accessToken: string }) {
         <div className="rm-system-chart"><p className="rm-system-chart-title">Requests per minute, last hour</p><BarStrip label="Requests per minute over the last hour" values={minuteBars} /></div>
       </section>
     </div>
-    {overview.template_files.folder ? <TemplateFilesPanel files={overview.template_files} /> : null}
+    <TemplatesPanel files={overview.template_files} />
     <section className="shared-settings-group">
       <PanelHeading description="seen in the last 24 hours" icon={World} title="Front-end clients" />
       {overview.clients.length ? <Table>

@@ -11,6 +11,7 @@
 mod client;
 mod prompt;
 mod render;
+mod templates;
 
 use std::{
     io::{self, IsTerminal, Write},
@@ -48,6 +49,7 @@ Examples:
   repomemo-console status
   repomemo-console jobs list --status failed --json
   repomemo-console settings set log_http_level debug --yes
+  repomemo-console templates validate my-template.json     (checks a file here; needs no server)
 ";
 
 /// The server refused the command (usage, rights, conflict).
@@ -262,8 +264,27 @@ fn follow_request(line: &str) -> Option<String> {
     )
 }
 
+/// `templates validate <file>`: the file is on this machine, so it is checked here with the server's own rules.
+fn validate_template(paint: &Paint, path: &str) -> Outcome {
+    match templates::validate_file(path) {
+        Ok(said) => {
+            println!("{} {said}", paint.accent("ok"));
+            Outcome::Done
+        }
+        Err(problems) => {
+            for problem in &problems {
+                eprintln!("{}", paint.error(problem));
+            }
+            Outcome::Refused
+        }
+    }
+}
+
 /// Runs one line and prints its answer.
 async fn execute(client: &mut Client, paint: &Paint, line: &str) -> Outcome {
+    if let Some(path) = templates::validate_request(line) {
+        return validate_template(paint, &path);
+    }
     if let Some(command) = follow_request(line) {
         return follow_logs(client, paint, &command).await;
     }
@@ -376,6 +397,15 @@ async fn main() -> ExitCode {
         );
     }
     let single = !options.command.is_empty();
+    // A file on this machine is checked here: no server, no sign-in.
+    if single {
+        if let Some(path) = templates::validate_request(&join_words(&options.command)) {
+            return match validate_template(&paint, &path) {
+                Outcome::Done => ExitCode::SUCCESS,
+                _ => ExitCode::from(EXIT_REFUSED),
+            };
+        }
+    }
     let mut client = Client::new(&options.server, non_empty_env("REPOMEMO_TOKEN"));
     if !single {
         println!("\n{}", render::banner(&paint));

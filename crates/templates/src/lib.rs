@@ -40,7 +40,7 @@ pub use assistant::{
 };
 pub use catalogue::{Catalogue, SourceProblem};
 pub use evidence::{EvidenceBlock, ResolvedEvidence, DEFAULT_VIEW, EVIDENCE_VIEWS, FILE_TYPES};
-pub use folder::{read_folder, FolderRead, FOLDER_FILES_MAX};
+pub use folder::{read_folder, read_template_file, FolderRead, FOLDER_FILES_MAX};
 pub use folders::StarterFolder;
 pub use general::{general, GENERAL_ID};
 pub use health::{HealthBlock, DEFAULT_DETECTORS, HEALTH_DETECTORS, STALE_DAYS_MAX, STALE_DAYS_MIN};

@@ -14,10 +14,47 @@ use crate::*;
 pub(crate) struct TemplateFiles {
     /// The folder (`REPOMEMO_TEMPLATES_DIR`), when one is set.
     pub(crate) folder: Option<String>,
+    /// Every template this server offers, `general` first, and where each came from (V0.2.190).
+    pub(crate) templates: Vec<TemplateListed>,
     /// The templates it added.
     pub(crate) loaded: Vec<TemplateFileLoaded>,
     /// The files it left out, and why.
     pub(crate) problems: Vec<TemplateFileProblem>,
+}
+
+/// One template of the catalogue, as System › Overview and the console list it.
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct TemplateListed {
+    pub(crate) id: String,
+    pub(crate) name: String,
+    pub(crate) version: u32,
+    /// `code` for general, `built-in` for the server's own files, `custom` for the operator's folder.
+    pub(crate) source: &'static str,
+    /// The file it came from, for a custom template.
+    pub(crate) file: Option<String>,
+}
+
+fn listed(catalogue: &Catalogue) -> Vec<TemplateListed> {
+    catalogue
+        .list()
+        .iter()
+        .map(|template| {
+            let custom = catalogue.is_custom(template.id());
+            TemplateListed {
+                id: template.id().to_owned(),
+                name: template.meta.name.clone(),
+                version: template.meta.version,
+                source: if custom {
+                    "custom"
+                } else if template.id() == repomemo_templates::GENERAL_ID {
+                    "code"
+                } else {
+                    "built-in"
+                },
+                file: custom.then(|| format!("{}.json", template.id())),
+            }
+        })
+        .collect()
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -38,6 +75,9 @@ pub(crate) struct TemplateFileIssue {
     /// Where in the template the problem is (`sections.order[1]`); empty for the file as a whole.
     pub(crate) path: String,
     pub(crate) message: String,
+    /// Where the JSON reader found it, when it did.
+    pub(crate) line: Option<usize>,
+    pub(crate) column: Option<usize>,
 }
 
 /// The templates this server offers: its own, and the valid files of the operator's folder. A file that is not valid
@@ -45,7 +85,13 @@ pub(crate) struct TemplateFileIssue {
 pub(crate) fn load_catalogue(folder: Option<&std::path::Path>) -> (Catalogue, TemplateFiles) {
     let builtin = Catalogue::builtin();
     let Some(folder) = folder else {
-        return (builtin.clone(), TemplateFiles::default());
+        return (
+            builtin.clone(),
+            TemplateFiles {
+                templates: listed(builtin),
+                ..TemplateFiles::default()
+            },
+        );
     };
     let read = read_folder(folder);
     let (catalogue, refused) = builtin.extended(read.sources.iter().map(|(name, text)| (name.as_str(), text.as_str())));
@@ -71,6 +117,8 @@ pub(crate) fn load_catalogue(folder: Option<&std::path::Path>) -> (Catalogue, Te
                 .map(|issue| TemplateFileIssue {
                     path: issue.path.clone(),
                     message: issue.message.clone(),
+                    line: issue.line,
+                    column: issue.column,
                 })
                 .collect(),
         })
@@ -86,10 +134,12 @@ pub(crate) fn load_catalogue(folder: Option<&std::path::Path>) -> (Catalogue, Te
             tracing::warn!(file = %problem.file, "A template file was left out: {}{place}", issue.message);
         }
     }
+    let templates = listed(&catalogue);
     (
         catalogue,
         TemplateFiles {
             folder: Some(folder.display().to_string()),
+            templates,
             loaded,
             problems,
         },

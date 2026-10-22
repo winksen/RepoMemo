@@ -841,6 +841,30 @@ async fn a_folder_of_templates_adds_the_valid_files_and_names_the_rest() {
         files["loaded"],
         json!([{"id": "support", "name": "Customer support", "file": "support.json"}])
     );
+    // The list names every template and where it came from (V0.2.190).
+    let sources: Vec<(String, String)> = files["templates"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|template| {
+            (
+                template["id"].as_str().unwrap().to_owned(),
+                template["source"].as_str().unwrap().to_owned(),
+            )
+        })
+        .collect();
+    assert_eq!(sources[0], ("general".to_owned(), "code".to_owned()));
+    assert!(sources.contains(&("operations".to_owned(), "built-in".to_owned())));
+    assert!(sources.contains(&("support".to_owned(), "custom".to_owned())));
+    assert_eq!(
+        files["templates"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|template| template["id"] == "support")
+            .unwrap()["file"],
+        "support.json"
+    );
     let problems = files["problems"].as_array().unwrap();
     let problem = |file: &str| {
         problems
@@ -854,6 +878,57 @@ async fn a_folder_of_templates_adds_the_valid_files_and_names_the_rest() {
         .unwrap()
         .contains("built into this server"));
     assert_eq!(problem("typo.json")["issues"][0]["path"], "sections.order[0]");
+
+    // The console lists the same templates and the same problems, shows one, and sends validate to the terminal client.
+    let console = |command: &'static str| {
+        let request = json_request("POST", "/v1/system/console", &admin, json!({ "command": command }));
+        let app = app.clone();
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let listed_in_console = response_json(console("templates list").await).await;
+    assert_eq!(listed_in_console["command"], "templates list");
+    let rows = listed_in_console["data"].as_array().unwrap();
+    let row = |id: &str| rows.iter().find(|row| row["id"] == id).unwrap_or(&Value::Null);
+    assert_eq!(row("support")["source"], "custom (support.json)");
+    assert_eq!(row("operations")["source"], "built into the server");
+    assert_eq!(row("general")["source"], "built into the server (code)");
+    assert_eq!(
+        rows.iter().filter(|row| row["id"] == "-").count(),
+        2,
+        "one row for each problem"
+    );
+    assert!(rows
+        .iter()
+        .any(|row| row["name"] == "typo.json" && row["state"].as_str().unwrap().contains("sections.order[0]")));
+    assert!(listed_in_console["summary"]
+        .as_str()
+        .unwrap()
+        .contains("2 file(s) left out"));
+    // A group name alone runs its first command.
+    assert_eq!(
+        response_json(console("templates").await).await["command"],
+        "templates list"
+    );
+    let shown = response_json(console("templates show support").await).await;
+    assert_eq!(shown["view"]["kind"], "facts");
+    let facts = shown["data"].as_array().unwrap();
+    let fact = |label: &str| {
+        facts.iter().find(|pair| pair[0] == label).unwrap()[1]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    };
+    assert_eq!(fact("Source"), "custom (support.json)");
+    assert!(fact("Tabs").starts_with("review"));
+    assert_eq!(fact("Id · version"), "support · 1");
+    let missing = console("templates show no-such-template").await;
+    assert_eq!(missing.status(), 404);
+    let validate = console("templates validate support.json").await;
+    assert_eq!(validate.status(), 400);
+    assert!(response_json(validate).await["error"]["message"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("repomemo-console"));
 
     // A workspace made from the custom template uses it as any other, and says it is custom.
     let organization = response_json(
@@ -909,6 +984,10 @@ async fn a_folder_of_templates_adds_the_valid_files_and_names_the_rest() {
     .await;
     assert!(overview["template_files"]["folder"].is_null());
     assert_eq!(overview["template_files"]["problems"], json!([]));
+    // It still lists the templates it has, none of them custom.
+    let plain_templates = overview["template_files"]["templates"].as_array().unwrap();
+    assert_eq!(plain_templates[0]["id"], "general");
+    assert!(plain_templates.len() >= 5 && plain_templates.iter().all(|template| template["source"] != "custom"));
 
     let _ = std::fs::remove_dir_all(data_dir);
     let _ = std::fs::remove_dir_all(folder);

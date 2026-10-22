@@ -717,8 +717,10 @@ export interface SystemOverview {
 /** What REPOMEMO_TEMPLATES_DIR gave: the templates it added and the files it left out, each with why. */
 export interface SystemTemplateFiles {
   folder: string | null;
+  /** Every template the server offers, `general` first. */
+  templates: { id: string; name: string; version: number; source: "code" | "built-in" | "custom"; file: string | null }[];
   loaded: { id: string; name: string; file: string }[];
-  problems: { file: string; issues: { path: string; message: string }[] }[];
+  problems: { file: string; issues: { path: string; message: string; line: number | null; column: number | null }[] }[];
 }
 
 export interface SystemUsage {
