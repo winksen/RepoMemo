@@ -255,6 +255,32 @@ impl RepoMemoCore {
         self.templates.resolve(&workspace.id, reference)
     }
 
+    /// The workspace's setup as a template file (V0.2.191): the template in force with the adjustments saved on it
+    /// folded in, under an id and a name chosen for the new template, at version 1, as JSON that passes the checks
+    /// every template file passes. It holds what a template holds (sections, names, cards, suggestions, weights) and
+    /// nothing of the workspace: no evidence, no people, no settings, no rights. The id must not be one this server
+    /// already has, since the file would be refused when it is loaded here.
+    pub async fn export_workspace_template(&self, workspace_id: &str, id: &str, name: &str) -> Result<String> {
+        let effective = self.effective_template(workspace_id).await?;
+        let mut template = effective.template;
+        template.meta.id = id.trim().to_owned();
+        template.meta.name = name.trim().to_owned();
+        template.meta.version = 1;
+        if self.templates.catalogue.get(&template.meta.id).is_some() {
+            repomemo_domain::bail_conflict!(
+                "The id {} is already a template of this server. Choose another id for the new template.",
+                template.meta.id
+            );
+        }
+        let mut text = serde_json::to_string_pretty(&template)?;
+        text.push('\n');
+        if let Err(issues) = TemplateDefinition::parse(&text) {
+            let message = issues.iter().map(ToString::to_string).collect::<Vec<_>>().join("; ");
+            repomemo_domain::bail_invalid!("{message}");
+        }
+        Ok(text)
+    }
+
     /// The templates this server offers, `general` first.
     pub fn template_catalogue(&self) -> &Catalogue {
         &self.templates.catalogue
@@ -745,6 +771,109 @@ mod tests {
         for kind in &every {
             assert_eq!(serde_json::to_value(kind).unwrap(), json!(id(kind)));
         }
+    }
+
+    /// V0.2.191: a workspace's setup leaves as a template file that carries its adjustments and nothing of the workspace,
+    /// and loading that file gives the same arrangement.
+    #[tokio::test]
+    async fn a_workspaces_setup_is_exported_as_a_template_that_loads_back_the_same() {
+        let (core, data_dir) = core("export").await;
+        let workspace = core.create_workspace("Runbooks".to_owned()).await.unwrap();
+        core.set_workspace_template(&workspace.id, Some("operations"), None)
+            .await
+            .unwrap();
+        let adjustments = json!({ "landing": "memory", "more": ["map", "health"], "suggestions": ["Who is on call?"] });
+        core.set_workspace_template(&workspace.id, Some("operations"), Some(&adjustments))
+            .await
+            .unwrap();
+
+        let text = core
+            .export_workspace_template(&workspace.id, "night-shift", "Night shift")
+            .await
+            .unwrap();
+        let exported =
+            TemplateDefinition::parse(&text).expect("the exported file passes the checks of every template file");
+        assert_eq!(
+            (exported.id(), exported.meta.version, exported.meta.name.as_str()),
+            ("night-shift", 1, "Night shift")
+        );
+        // Nothing but a template is in it: no workspace id, no name of the workspace, no setting but the blocks.
+        assert!(!text.contains(&workspace.id) && !text.contains("Runbooks"), "{text}");
+        let keys: Vec<String> = serde_json::from_str::<serde_json::Map<String, serde_json::Value>>(&text)
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
+        assert!(
+            keys.iter().all(|key| [
+                "format",
+                "meta",
+                "starter_folders",
+                "sections",
+                "labels",
+                "overview",
+                "evidence",
+                "assistant",
+                "retrieval",
+                "ranking",
+                "health",
+                "review",
+                "map",
+                "repositories"
+            ]
+            .contains(&key.as_str())),
+            "{keys:?}"
+        );
+
+        // Loaded by a server that has it, the file gives the arrangement the workspace had, adjustments included.
+        let (catalogue, problems) = Catalogue::builtin().extended([("night-shift.json", text.as_str())]);
+        assert!(problems.is_empty(), "{problems:?}");
+        let there = catalogue.get("night-shift").unwrap();
+        let here = core.effective_template(&workspace.id).await.unwrap().template;
+        assert_eq!(there.sections(), here.sections());
+        assert_eq!(there.sections().landing, "memory");
+        assert_eq!(there.sections().more, ["map", "health"]);
+        assert_eq!(there.labels(), here.labels());
+        assert_eq!(there.assistant().suggestions, ["Who is on call?"]);
+        assert_eq!(there.ranking(), here.ranking());
+        assert_eq!(there.health_detectors(), here.health_detectors());
+        assert_eq!(there.overview_cards(), here.overview_cards());
+        assert!(catalogue.is_custom("night-shift"));
+
+        // An id this server has, a bad id and a bad name are refused with the reason, and nothing is exported.
+        let taken = core
+            .export_workspace_template(&workspace.id, "operations", "Operations")
+            .await
+            .unwrap_err();
+        assert!(
+            taken.to_string().contains("already a template of this server"),
+            "{taken}"
+        );
+        let general = core
+            .export_workspace_template(&workspace.id, "general", "General")
+            .await
+            .unwrap_err();
+        assert!(general.to_string().contains("already a template"), "{general}");
+        for (bad_id, bad_name) in [
+            ("Night Shift", "Night shift"),
+            ("x", "Night shift"),
+            ("night-shift", ""),
+            ("night-shift", &"n".repeat(41)),
+        ] {
+            let error = core
+                .export_workspace_template(&workspace.id, bad_id, bad_name)
+                .await
+                .unwrap_err();
+            assert!(error.to_string().contains("meta."), "{bad_id:?} {bad_name:?}: {error}");
+        }
+        // A workspace on General exports General under the new id, and the file still passes.
+        let plain = core.create_workspace("Plain".to_owned()).await.unwrap();
+        let general_copy = core
+            .export_workspace_template(&plain.id, "my-general", "My general")
+            .await
+            .unwrap();
+        assert!(TemplateDefinition::parse(&general_copy).is_ok());
+        let _ = std::fs::remove_dir_all(data_dir);
     }
 
     #[tokio::test]

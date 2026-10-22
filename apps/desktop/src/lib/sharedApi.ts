@@ -524,6 +524,24 @@ export function saveSharedWorkspaceTemplate(accessToken: string, workspaceId: st
   }, accessToken);
 }
 
+/**
+ * The workspace's setup as a template file (V0.2.191): the template in force with its adjustments, under the id and
+ * name given, ready for the folder an operator names in REPOMEMO_TEMPLATES_DIR. Nothing of the workspace's content is
+ * in it. Administrators and owners only.
+ */
+export async function downloadSharedWorkspaceTemplateFile(accessToken: string, workspaceId: string, input: { id: string; name: string }): Promise<{ blob: Blob; filename: string }> {
+  const query = new URLSearchParams({ id: input.id, name: input.name });
+  const response = await authFetch(`${API_URL}/v1/workspaces/${workspaceId}/template/file?${query}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null) as { error?: { message?: string } } | null;
+    throw new SharedApiError(response.status, payload?.error?.message ?? `The shared API returned ${response.status}.`);
+  }
+  const named = /filename="([^"]+)"/.exec(response.headers.get("Content-Disposition") ?? "");
+  return { blob: await response.blob(), filename: named?.[1] ?? `${input.id}.json` };
+}
+
 export function updateSharedWorkspace(accessToken: string, workspaceId: string, name: string) {
   return request<SharedWorkspace["workspace"]>(`/v1/workspaces/${workspaceId}`, {
     method: "PUT",

@@ -182,6 +182,37 @@ pub(crate) async fn workspace_template(
     Ok(Json(effective.view()))
 }
 
+/// The id and the name a workspace's setup is exported under.
+#[derive(Debug, Deserialize)]
+pub(crate) struct TemplateFileQuery {
+    id: String,
+    name: String,
+}
+
+/// The workspace's setup as a template file to download (V0.2.191), for an owner or administrator. It is the template
+/// in force with the adjustments saved on it, under the id and name asked for, and nothing of the workspace.
+pub(crate) async fn export_workspace_template(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+    Query(query): Query<TemplateFileQuery>,
+) -> Result<Response, ApiError> {
+    require_workspace_admin(&state, &subject, &workspace_id).await?;
+    let text = state
+        .core
+        .export_workspace_template(&workspace_id, &query.id, &query.name)
+        .await
+        .map_err(map_core_error)?;
+    let mut headers = HeaderMap::new();
+    headers.insert(header::CONTENT_TYPE, HeaderValue::from_static("application/json"));
+    // The id passed the checks of a template id, so it is safe in a file name.
+    if let Ok(value) = HeaderValue::from_str(&format!("attachment; filename=\"{}.json\"", query.id.trim())) {
+        headers.insert(header::CONTENT_DISPOSITION, value);
+    }
+    headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    Ok((StatusCode::OK, headers, text).into_response())
+}
+
 /// Chooses the workspace's template, or returns it to the default. A change is in the activity feed.
 pub(crate) async fn update_workspace_template(
     ManagingSubject(subject): ManagingSubject,

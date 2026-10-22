@@ -1,14 +1,16 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../lib/sharedApi", () => ({ saveSharedWorkspaceTemplate: vi.fn() }));
+vi.mock("../lib/sharedApi", () => ({ downloadSharedWorkspaceTemplateFile: vi.fn(), saveSharedWorkspaceTemplate: vi.fn() }));
+vi.mock("../lib/saveBlob", () => ({ saveBlob: vi.fn() }));
 vi.mock("../components/ui/toast", () => ({ Toast: () => null, showToast: vi.fn() }));
 vi.mock("../web/workspace/data", () => ({ useTemplate: vi.fn(), useTemplateCatalogue: vi.fn(), useTemplateDetail: vi.fn() }));
 
 import { TemplateSettings } from "../components/TemplateSettings";
 import { ConfirmProvider } from "../components/ui/confirm-dialog";
 import { showToast } from "../components/ui/toast";
-import { saveSharedWorkspaceTemplate } from "../lib/sharedApi";
+import { saveBlob } from "../lib/saveBlob";
+import { downloadSharedWorkspaceTemplateFile, saveSharedWorkspaceTemplate } from "../lib/sharedApi";
 import type { TemplateDetail, TemplateSummary, WorkspaceTemplateView } from "../types";
 import { adjustmentsFrom, previewLines, questionsFromText } from "../web/templatePreview";
 import { useTemplate, useTemplateCatalogue, useTemplateDetail } from "../web/workspace/data";
@@ -167,6 +169,37 @@ describe("Settings › Template", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save adjustments" }));
     await waitFor(() => expect(saveSharedWorkspaceTemplate).toHaveBeenCalledWith("t", "w1", "operations", { more: ["map", "tasks"], suggestions: ["Who owns the pager?", "Who is on call?"] }));
     expect(showToast).toHaveBeenCalledWith("success", "The adjustments were saved.");
+  });
+
+  it("downloads the setup as a template file under the id and name typed, and says where it goes", async () => {
+    show(current());
+    const file = new Blob(["{}"]);
+    vi.mocked(downloadSharedWorkspaceTemplateFile).mockResolvedValue({ blob: file, filename: "night-shift.json" });
+    expect((screen.getByLabelText(/Id of the new template/) as HTMLInputElement).value).toBe("operations-custom");
+    expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("Operations and incidents (custom)");
+    fireEvent.change(screen.getByLabelText(/Id of the new template/), { target: { value: " night-shift " } });
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Night shift" } });
+    fireEvent.click(screen.getByRole("button", { name: "Download as template file" }));
+    await waitFor(() => expect(downloadSharedWorkspaceTemplateFile).toHaveBeenCalledWith("t", "w1", { id: "night-shift", name: "Night shift" }));
+    await waitFor(() => expect(saveBlob).toHaveBeenCalledWith(file, "night-shift.json"));
+    expect(showToast).toHaveBeenCalledWith("success", expect.stringContaining("REPOMEMO_TEMPLATES_DIR"));
+  });
+
+  it("says why when the server refuses the file, and saves nothing", async () => {
+    show(current());
+    vi.mocked(downloadSharedWorkspaceTemplateFile).mockRejectedValue(new Error("The id operations is already a template of this server."));
+    fireEvent.click(screen.getByRole("button", { name: "Download as template file" }));
+    await waitFor(() => expect(showToast).toHaveBeenCalledWith("error", expect.stringContaining("already a template of this server")));
+    expect(saveBlob).not.toHaveBeenCalled();
+  });
+
+  it("asks for an id and a name before it downloads anything", () => {
+    show(current());
+    fireEvent.change(screen.getByLabelText(/Id of the new template/), { target: { value: "  " } });
+    expect((screen.getByRole("button", { name: "Download as template file" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText(/Id of the new template/), { target: { value: "night-shift" } });
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "" } });
+    expect((screen.getByRole("button", { name: "Download as template file" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("refuses more than six questions before asking the server", () => {

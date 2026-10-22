@@ -137,6 +137,7 @@
 | GET | `/v1/templates/{template_id}` | auth | — | — | TemplateDetail |
 | GET | `/v1/workspaces/{workspace_id}/template` | auth | require_workspace_read | — | WorkspaceTemplateView |
 | PUT | `/v1/workspaces/{workspace_id}/template` | managing | require_workspace_admin | UpdateWorkspaceTemplateRequest | WorkspaceTemplateView |
+| GET | `/v1/workspaces/{workspace_id}/template/file` | auth | require_workspace_admin | query: id, name | a template file (JSON download) |
 
 ## Evidence, folders and files
 

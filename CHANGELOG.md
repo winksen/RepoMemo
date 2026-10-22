@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.191 (2026-10-22)
+
+A workspace's adjusted setup can be downloaded as a template file.
+
+### Added
+- **Download as template file:** in Settings › Template, for owners and administrators. The file is the template the workspace uses with the adjustments saved on it (the section it opens on, what is under More, the suggested questions) already folded in, under the id and name chosen (the form offers `<template>-custom` and `<name> (custom)`), at version 1, as JSON ready for the folder `REPOMEMO_TEMPLATES_DIR` names. After the download the page says where it goes: the templates folder of a server, then a restart.
+- **`GET /v1/workspaces/{ws}/template/file?id=&name=`:** the route behind it, with `Content-Disposition: attachment; filename="<id>.json"`. The file is parsed with the rules of every template file before it is sent, so it passes `npm run templates:check`. A value a template file refuses (`meta.id`, `meta.name`) is a `400` that names it. The id of a template this server already has, `general` and the built-in and custom ones, is a `409`: the file would be refused when it is loaded here, so choose another id (the file is meant for another server's folder, or this one's under a new id).
+- **Nothing of the workspace is in it.** The file holds what a template holds: tabs, names, cards, the ledger's view, the assistant's questions, phrases and focus, search weights, checks, review order, map and repository rules. There is no evidence, person, setting or right; the workspace's id, its name and addresses are not in the text.
+
+### Changed
+- **Tests (written, not run):** one in the api crate (the exported file passes the checks, carries the adjustments, has no trace of the workspace and, loaded, gives the same sections, labels, suggestions, ranking, checks and cards; a taken id, `general`, a bad id and a bad name are refused; a workspace on General exports General), one on the server (the headers, the adjustments, no trace of the workspace, a taken id `409`, a bad id or name `400`, a stranger and no sign-in refused) and three for the web (the file downloaded under the id and name typed with the note where it goes, the server's reason when it refuses, nothing without an id and a name).
+- **Checks run on this release:** `cargo check` of the api and server crates with their tests compiles; `rustfmt` shows nothing for the lines changed; `templates:check`, `types:check`, `typecheck`, `styles:check`, `a11y:check`, `docs:check` and `version:check` pass. **Not run:** the tests, as asked.
+
+### Upgrading
+- Nothing to do. The route and the group in Settings › Template are new; no behaviour changes for a workspace that does not use them.
+
 ## V0.2.190 (2026-10-22)
 
 Templates can be listed and checked from the console, and System shows which are loaded.

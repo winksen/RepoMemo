@@ -993,3 +993,107 @@ async fn a_folder_of_templates_adds_the_valid_files_and_names_the_rest() {
     let _ = std::fs::remove_dir_all(folder);
     let _ = std::fs::remove_dir_all(plain_dir);
 }
+
+/// V0.2.191: an owner downloads the workspace's setup as a template file; it carries the adjustments and nothing of
+/// the workspace, it is refused for an id the server has and for someone who does not administer the workspace.
+#[tokio::test]
+async fn a_workspaces_setup_downloads_as_a_template_file() {
+    let data_dir = temp_data_dir("templates-file");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let send = |method: &'static str, uri: String, who: String, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, &who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let (_, _) = register_account(&app, "templates-file-admin@example.com").await;
+    let (owner, _) = register_account(&app, "templates-file-owner@example.com").await;
+    let (stranger, _) = register_account(&app, "templates-file-stranger@example.com").await;
+    let organization = response_json(
+        send(
+            "POST",
+            "/v1/organizations".to_owned(),
+            owner.clone(),
+            json!({"name": "Team"}),
+        )
+        .await,
+    )
+    .await["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let created = send(
+        "POST",
+        "/v1/workspaces".to_owned(),
+        owner.clone(),
+        json!({"organization_id": organization, "name": "Night desk", "template_id": "operations"}),
+    )
+    .await;
+    assert_eq!(created.status(), 201);
+    let workspace = response_json(created).await["workspace"]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let adjust = send(
+        "PUT",
+        format!("/v1/workspaces/{workspace}/template"),
+        owner.clone(),
+        json!({"template_id": "operations", "overrides": {"landing": "memory", "suggestions": ["Who is on call tonight?"]}}),
+    )
+    .await;
+    assert_eq!(adjust.status(), 200);
+
+    let uri = |id: &str, name: &str| format!("/v1/workspaces/{workspace}/template/file?id={id}&name={name}");
+    let file = send("GET", uri("night-shift", "Night%20shift"), owner.clone(), json!(null)).await;
+    assert_eq!(file.status(), 200);
+    assert_eq!(file.headers()["content-type"], "application/json");
+    assert_eq!(
+        file.headers()["content-disposition"],
+        "attachment; filename=\"night-shift.json\""
+    );
+    let bytes = axum::body::to_bytes(file.into_body(), usize::MAX).await.unwrap();
+    let text = String::from_utf8(bytes.to_vec()).unwrap();
+    let exported: Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(exported["meta"]["id"], "night-shift");
+    assert_eq!(exported["meta"]["name"], "Night shift");
+    assert_eq!(exported["meta"]["version"], 1);
+    // The adjustments are folded in, and nothing of the workspace is in the file.
+    assert_eq!(exported["sections"]["landing"], "memory");
+    assert_eq!(exported["assistant"]["suggestions"], json!(["Who is on call tonight?"]));
+    assert!(
+        !text.contains(&workspace) && !text.contains("Night desk") && !text.contains("example.com"),
+        "{text}"
+    );
+
+    // The id of a template the server has, an id that is not one and a name that is empty are refused with the reason.
+    let taken = send("GET", uri("operations", "Operations"), owner.clone(), json!(null)).await;
+    assert_eq!(taken.status(), 409);
+    assert!(response_json(taken).await["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("already a template"));
+    let bad_id = send("GET", uri("Night%20Shift", "Night"), owner.clone(), json!(null)).await;
+    assert_eq!(bad_id.status(), 400);
+    assert!(response_json(bad_id).await["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("meta.id"));
+    let no_name = send("GET", uri("night-shift", "%20"), owner.clone(), json!(null)).await;
+    assert_eq!(no_name.status(), 400);
+
+    // Someone outside the workspace gets nothing, and so does a request without a sign-in.
+    let outsider = send("GET", uri("night-shift", "Night"), stranger.clone(), json!(null)).await;
+    assert!(matches!(outsider.status().as_u16(), 403 | 404), "{}", outsider.status());
+    let anonymous = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(uri("night-shift", "Night"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(anonymous.status(), 401);
+
+    let _ = std::fs::remove_dir_all(data_dir);
+}

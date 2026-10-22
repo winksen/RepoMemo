@@ -638,6 +638,10 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             "/v1/workspaces/{workspace_id}/template",
             get(templates::workspace_template).put(templates::update_workspace_template),
         )
+        .route(
+            "/v1/workspaces/{workspace_id}/template/file",
+            get(templates::export_workspace_template),
+        )
         .route("/v1/workspaces/{workspace_id}/overview", get(workspace_overview))
         .route("/v1/workspaces/{workspace_id}/metrics", get(workspace_metrics))
         .route(
