@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.173 (2026-10-22)
+
+A template can name sections and kinds of evidence the way a team says them.
+
+### Changed
+- **The `labels` block:** a template may give a section a different name (`labels.sections`, for example Tasks → *Actions*) and a kind of evidence a different name (`labels.artifact_types`, for example `pr` → *Pull request*). A name is 1 to 24 characters on one line; an id that is not one of the twelve sections or twelve kinds of evidence, or a bad name, makes the template invalid. It is display text only: addresses, rights, the API and the documentation keep the product's own names. `GET /v1/workspaces/{id}/template` answers `labels` with only the names the template changes.
+- **Where the names show:** on the tab (the usual name stays as its tooltip), in the page title and what a screen reader hears after a move, in the command palette (listed and matched under the new name), and on the type tags of the evidence ledger and the Retrieval page. A section's own heading, the cross-workspace search and the System area keep the usual words.
+- **The four templates:** *Operations and incidents* calls Tasks *Actions*, Evidence *Runbooks and incidents* and Memory *Lessons*; *Product and decisions* calls Memory *Decisions and memory*; *Knowledge base* calls Evidence *Library*; *Software engineering* writes *API spec* and *Pull request* for two kinds of evidence. General renames nothing.
+- **A guard on the list of kinds:** the kinds of evidence a template can name are the API's artifact types; a test in the api crate matches on every `ArtifactType`, so adding one stops it compiling until the list in `repomemo-templates` has it too.
+- **Tests (written, not run):** three in the templates crate (renaming sections and kinds with the block written back, unknown ids and bad names refused, the four templates' names), one in the api crate (the kinds a template can name are the artifact types, and their ids are what the API writes), four in the web client (kinds of evidence renamed and the others unchanged, the page title, the palette's listing and matching, the tabs with the usual name as tooltip), and the server's template test now checks the names of General and of each of the four.
+- **Checks run on this release:** `cargo check` of the templates, api and server crates with their tests compiles; `rustfmt` shows nothing for the lines changed; `types:check`, `typecheck`, `styles:check`, `a11y:check`, `docs:check` and `version:check` pass. **Not run:** the tests, as asked.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.172 (2026-10-22)
 
 A workspace opens on its template's landing section, and the command palette lists the sections in the template's order.

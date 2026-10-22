@@ -32,8 +32,7 @@ import { WorkspaceLanding } from "./web/WorkspaceLanding";
 import { SharedArtifactDetail } from "./web/ArtifactDetail";
 import { SharedMemoryCardDetail, SharedRouteNotFound } from "./web/MemoryCardDetail";
 import { CommandPalette } from "./web/CommandPalette";
-import { RouteAnnouncer } from "./web/RouteAnnouncer";
-import { pageKey, pageTitle } from "./web/pageTitle";
+import { PageAnnouncer } from "./web/PageAnnouncer";
 import { ConfirmProvider } from "./components/ui/confirm-dialog";
 import { watchFocusLoss } from "./lib/focusReturn";
 
@@ -349,7 +348,7 @@ function SharedWebAppContent() {
 
   // The palette is on every signed-in page; the assistant can be started from it where one is docked.
   return <>
-    <RouteAnnouncer pageKey={pageKey(route)} title={pageTitle(route, { workspace: workspace?.workspace.name })} />
+    <PageAnnouncer accessToken={accessToken} route={route} workspaceName={workspace?.workspace.name} />
     {renderPage()}
     <CommandPalette accessToken={accessToken} assistantWorkspaceId={route.name === "workspace" ? route.workspaceId : null} canAdministerSystem={Boolean(session.is_system_admin || session.is_app_admin)} currentWorkspaceId={workspace ? workspace.workspace.id : null} workspaces={workspaces} />
   </>;

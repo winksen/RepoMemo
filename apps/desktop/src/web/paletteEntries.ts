@@ -43,6 +43,8 @@ export type PaletteInput = {
   canAdministerSystem: boolean;
   /** How the current workspace's template arranges its sections: the palette lists them in that order (V0.2.172). */
   sections?: WorkspaceTemplateView["sections"] | null;
+  /** The names the template gives to sections (V0.2.173): the palette lists and matches them under that name. */
+  labels?: WorkspaceTemplateView["labels"]["sections"] | null;
 };
 
 function terms(text: string): string[] {
@@ -104,12 +106,13 @@ export function paletteEntries(input: PaletteInput): PaletteEntry[] {
     const mayAdminister = workspace.role === "owner" || workspace.role === "admin";
     // The tabs in the template's order, then the sections it keeps under More.
     const arranged = arrangeSections(input.sections, "overview", mayAdminister);
+    const nameOf = (section: WorkspaceSection) => input.labels?.[section] ?? SECTION_LABELS[section];
     [...arranged.tabs, ...arranged.more]
-      .filter((section) => matchesAll(words, SECTION_LABELS[section], workspace.workspace.name))
+      .filter((section) => matchesAll(words, nameOf(section), workspace.workspace.name))
       .forEach((section) => add({
         id: `section:${section}`,
         group: "This workspace",
-        label: SECTION_LABELS[section],
+        label: nameOf(section),
         hint: workspace.workspace.name,
         action: { kind: "navigate", to: routePath({ name: "workspace", workspaceId: workspace.workspace.id, section }) },
       }));

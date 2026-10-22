@@ -15,6 +15,7 @@ mod catalogue;
 mod folders;
 mod general;
 mod issue;
+mod labels;
 pub mod limits;
 mod meta;
 mod resolve;
@@ -27,6 +28,7 @@ pub use catalogue::{Catalogue, SourceProblem};
 pub use folders::StarterFolder;
 pub use general::{general, GENERAL_ID};
 pub use issue::TemplateIssue;
+pub use labels::{LabelsBlock, ARTIFACT_TYPES};
 pub use meta::{TemplateMeta, WORKSPACE_ICONS};
 pub use resolve::{Origin, Resolution};
 pub use sections::{ResolvedSections, SectionsBlock, ADMIN_ONLY_SECTIONS, DEFAULT_LANDING, WORKSPACE_SECTIONS};
@@ -50,6 +52,9 @@ pub struct TemplateDefinition {
     /// The order of the tabs and the sections kept under *More* (V0.2.171); as today when left out.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sections: Option<SectionsBlock>,
+    /// The names shown for sections and kinds of evidence (V0.2.173); the usual names when left out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub labels: Option<LabelsBlock>,
 }
 
 impl TemplateDefinition {
@@ -105,11 +110,19 @@ impl TemplateDefinition {
         if let Some(sections) = &self.sections {
             sections::validate(sections, &mut issues);
         }
+        if let Some(labels) = &self.labels {
+            labels::validate(labels, &mut issues);
+        }
         issues
     }
 
     pub fn id(&self) -> &str {
         &self.meta.id
+    }
+
+    /// The names this template gives to sections and kinds of evidence; empty for the usual names.
+    pub fn labels(&self) -> LabelsBlock {
+        self.labels.clone().unwrap_or_default()
     }
 
     /// The tabs and the *More* menu this template asks for, complete.

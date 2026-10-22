@@ -1,7 +1,7 @@
 use crate::catalogue::BUILTIN_SOURCES;
 use crate::{
-    general, limits, Catalogue, Origin, TemplateDefinition, TemplateIssue, ADMIN_ONLY_SECTIONS, FORMAT, GENERAL_ID,
-    WORKSPACE_ICONS, WORKSPACE_SECTIONS,
+    general, limits, Catalogue, Origin, TemplateDefinition, TemplateIssue, ADMIN_ONLY_SECTIONS, ARTIFACT_TYPES, FORMAT,
+    GENERAL_ID, WORKSPACE_ICONS, WORKSPACE_SECTIONS,
 };
 
 const VALID: &str = r#"{
@@ -635,6 +635,82 @@ fn a_workspace_opens_on_overview_unless_the_template_names_a_landing_section() {
     assert_eq!(ADMIN_ONLY_SECTIONS, ["people", "settings"]);
     let template = parse(&with_sections(r#"{ "landing": "review" }"#)).unwrap();
     assert_eq!(parse(&serde_json::to_string(&template).unwrap()).unwrap(), template);
+}
+
+/// The valid file with a `labels` block written as JSON.
+fn with_labels(block: &str) -> String {
+    VALID.replacen("\"format\": 1,", &format!("\"format\": 1,\n  \"labels\": {block},"), 1)
+}
+
+#[test]
+fn a_template_can_rename_sections_and_kinds_of_evidence() {
+    let template = parse(&with_labels(
+        r#"{ "sections": { "tasks": "Actions", "memory": "Lessons" }, "artifact_types": { "pr": "Pull request" } }"#,
+    ))
+    .unwrap();
+    let labels = template.labels();
+    assert_eq!(labels.sections["tasks"], "Actions");
+    assert_eq!(labels.sections.len(), 2);
+    assert_eq!(labels.artifact_types["pr"], "Pull request");
+    // Without the block there are no new names, and General has none.
+    assert!(general().labels().sections.is_empty() && general().labels().artifact_types.is_empty());
+    assert!(parse(VALID).unwrap().labels().sections.is_empty());
+    assert!(parse(&with_labels("{}")).unwrap().labels().artifact_types.is_empty());
+    // Written back as it was read.
+    assert_eq!(parse(&serde_json::to_string(&template).unwrap()).unwrap(), template);
+    assert!(!serde_json::to_string(&general()).unwrap().contains("labels"));
+}
+
+#[test]
+fn a_name_must_be_for_a_known_section_or_kind_and_follow_the_rules_of_a_name() {
+    let unknown_section = parse(&with_labels(r#"{ "sections": { "dashboard": "Home" } }"#)).unwrap_err();
+    assert_eq!(unknown_section[0].path, "labels.sections.dashboard");
+    let unknown_kind = parse(&with_labels(r#"{ "artifact_types": { "spreadsheet": "Sheet" } }"#)).unwrap_err();
+    assert_eq!(unknown_kind[0].path, "labels.artifact_types.spreadsheet");
+    let longest = "l".repeat(limits::LABEL_MAX);
+    assert!(parse(&with_labels(&format!(
+        r#"{{ "sections": {{ "tasks": "{longest}" }} }}"#
+    )))
+    .is_ok());
+    let too_long = "l".repeat(limits::LABEL_MAX + 1);
+    for bad in ["", "   ", too_long.as_str(), " Padded", "Padded ", "two\\nlines"] {
+        let issues = parse(&with_labels(&format!(r#"{{ "sections": {{ "tasks": "{bad}" }} }}"#))).unwrap_err();
+        assert_eq!(issues[0].path, "labels.sections.tasks", "{bad:?} should be refused");
+    }
+    let unknown_key = parse(&with_labels(r#"{ "colours": {} }"#)).unwrap_err();
+    assert!(
+        unknown_key[0].message.contains("unknown field `colours`"),
+        "{}",
+        unknown_key[0]
+    );
+    // The kinds of evidence a template can name: twelve, with no repeat.
+    let mut kinds = ARTIFACT_TYPES.to_vec();
+    kinds.sort();
+    kinds.dedup();
+    assert_eq!(kinds.len(), 12);
+}
+
+#[test]
+fn the_four_first_templates_name_what_their_teams_call_things() {
+    let catalogue = Catalogue::builtin();
+    let section = |id: &str, key: &str| catalogue.get(id).unwrap().labels().sections.get(key).cloned();
+    assert_eq!(section("operations", "tasks").as_deref(), Some("Actions"));
+    assert_eq!(
+        section("operations", "evidence").as_deref(),
+        Some("Runbooks and incidents")
+    );
+    assert_eq!(section("operations", "memory").as_deref(), Some("Lessons"));
+    assert_eq!(
+        section("product-decisions", "memory").as_deref(),
+        Some("Decisions and memory")
+    );
+    assert_eq!(section("knowledge-base", "evidence").as_deref(), Some("Library"));
+    assert_eq!(section("software-engineering", "tasks"), None);
+    let kinds = catalogue.get("software-engineering").unwrap().labels().artifact_types;
+    assert_eq!(
+        (kinds["api_spec"].as_str(), kinds["pr"].as_str()),
+        ("API spec", "Pull request")
+    );
 }
 
 #[test]

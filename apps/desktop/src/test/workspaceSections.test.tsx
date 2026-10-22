@@ -7,6 +7,8 @@ vi.mock("../web/router", async (original) => ({ ...(await original<typeof import
 import type { SharedWorkspace, WorkspaceTemplateView } from "../types";
 import { WORKSPACE_SECTIONS } from "../web/constants";
 import { WorkspaceTopbar } from "../web/Organization";
+import { artifactKindLabel, artifactTypeLabel } from "../web/format";
+import { pageTitle } from "../web/pageTitle";
 import { paletteEntries } from "../web/paletteEntries";
 import { navigate, parseRoute, workspaceHomePath } from "../web/router";
 import { arrangeSections, landingSection } from "../web/templateSections";
@@ -127,12 +129,58 @@ function workspace(role: SharedWorkspace["role"]): SharedWorkspace {
   return { workspace: { id: "w1", name: "Ops", created_at: "", updated_at: "", settings: {} }, organization_id: "o1", role };
 }
 
-function templateView(sections: WorkspaceTemplateView["sections"]): WorkspaceTemplateView {
+function templateView(sections: WorkspaceTemplateView["sections"], labels: WorkspaceTemplateView["labels"] = { sections: {}, artifact_types: {} }): WorkspaceTemplateView {
   return {
     template: { id: "knowledge-base", version: 1, name: "Knowledge base", summary: "", icon: "book" },
-    source: "workspace", reason: null, chosen_id: "knowledge-base", overrides: null, sections,
+    source: "workspace", reason: null, chosen_id: "knowledge-base", overrides: null, sections, labels,
   };
 }
+
+const operationsNames = { sections: { tasks: "Actions", memory: "Lessons" }, artifact_types: { pr: "Pull request", api_spec: "API spec" } };
+
+describe("the names a template gives", () => {
+  it("rename a kind of evidence wherever it is named, and leave the others as they were", () => {
+    expect(artifactTypeLabel("pr")).toBe("Pr");
+    expect(artifactTypeLabel("pr", operationsNames.artifact_types)).toBe("Pull request");
+    expect(artifactTypeLabel("api_spec", operationsNames.artifact_types)).toBe("API spec");
+    expect(artifactTypeLabel("runbook", operationsNames.artifact_types)).toBe("Runbook");
+    expect(artifactTypeLabel("pr", null)).toBe("Pr");
+    // The tag of a file is its language when it has one; otherwise the (renamed) kind, and a note and a repository keep their own tags unless renamed.
+    expect(artifactKindLabel({ artifact_type: "pr", language: null }, operationsNames.artifact_types)).toBe("Pull request");
+    expect(artifactKindLabel({ artifact_type: "pr", language: "Markdown" }, operationsNames.artifact_types)).toBe("Markdown");
+    expect(artifactKindLabel({ artifact_type: "note", language: null })).toBe("Note");
+    expect(artifactKindLabel({ artifact_type: "note", language: null }, { note: "Field note" })).toBe("Field note");
+    expect(artifactKindLabel({ artifact_type: "repository", language: null })).toBe("Git repository");
+  });
+
+  it("are in the title of the page and what a screen reader hears after a move", () => {
+    const route = { name: "workspace", workspaceId: "w1", section: "tasks" } as const;
+    expect(pageTitle(route, { workspace: "Ops" })).toBe("Ops · Tasks");
+    expect(pageTitle(route, { workspace: "Ops", sectionLabels: operationsNames.sections })).toBe("Ops · Actions");
+    expect(pageTitle({ ...route, section: "people" }, { workspace: "Ops", sectionLabels: operationsNames.sections })).toBe("Ops · People & Activity");
+  });
+
+  it("are how the command palette lists a section and what it matches", () => {
+    const base = { workspaces: [workspace("owner")], assistantWorkspace: undefined, currentWorkspace: workspace("owner"), files: [], cards: [], canAdministerSystem: false };
+    const named = paletteEntries({ ...base, query: "", labels: operationsNames.sections }).filter((entry) => entry.group === "This workspace").map((entry) => entry.label);
+    expect(named).toContain("Actions");
+    expect(named).toContain("Lessons");
+    expect(named).not.toContain("Tasks");
+    expect(paletteEntries({ ...base, query: "actions", labels: operationsNames.sections }).some((entry) => entry.id === "section:tasks")).toBe(true);
+    expect(paletteEntries({ ...base, query: "tasks", labels: operationsNames.sections }).some((entry) => entry.id === "section:tasks")).toBe(false);
+  });
+
+  it("show on the tabs, with the usual name kept as the tooltip", () => {
+    vi.mocked(useTemplate).mockReturnValue([templateView(knowledgeBase, operationsNames), vi.fn(), {} as never]);
+    render(<WorkspaceTopbar accessToken="t" activeSection="overview" onNavigate={vi.fn()} workspace={workspace("owner")} />);
+    const renamed = screen.getByRole("button", { name: /Actions/ });
+    expect(renamed.getAttribute("title")).toBe("Tasks");
+    expect(screen.getByRole("button", { name: /Lessons/ }).getAttribute("title")).toBe("Memory");
+    expect(screen.queryByRole("button", { name: /^Tasks$/ })).toBeNull();
+    // A tab that keeps its name has no tooltip.
+    expect(screen.getByRole("button", { name: /Retrieval/ }).getAttribute("title")).toBeNull();
+  });
+});
 
 describe("the workspace tabs", () => {
   const tabNames = () => screen.getAllByRole("button").map((button) => button.textContent?.replace("Admin", "").trim());

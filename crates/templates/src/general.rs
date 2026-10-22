@@ -18,5 +18,6 @@ pub fn general() -> TemplateDefinition {
         },
         starter_folders: Vec::new(),
         sections: None,
+        labels: None,
     }
 }

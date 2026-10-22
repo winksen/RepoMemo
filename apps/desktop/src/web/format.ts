@@ -96,7 +96,9 @@ export function formatMetricDay(value: string) {
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-export function artifactTypeLabel(type: ArtifactType) {
+/** The name of a kind of evidence; `labels` are the names the workspace's template gives (V0.2.173). */
+export function artifactTypeLabel(type: ArtifactType, labels?: Record<string, string> | null) {
+  if (labels?.[type]) return labels[type];
   if (type === "markdown_doc") return "Markdown";
   if (type === "code_file") return "Code";
   if (type === "note") return "Shared note";
@@ -104,10 +106,10 @@ export function artifactTypeLabel(type: ArtifactType) {
 }
 
 /** One tag per file: the language or format when known, otherwise the artifact type. */
-export function artifactKindLabel(artifact: { artifact_type: ArtifactType; language: string | null }) {
-  if (artifact.artifact_type === "note") return "Note";
-  if (artifact.artifact_type === "repository") return "Git repository";
-  return artifact.language && artifact.language !== "Unspecified" ? artifact.language : artifactTypeLabel(artifact.artifact_type);
+export function artifactKindLabel(artifact: { artifact_type: ArtifactType; language: string | null }, labels?: Record<string, string> | null) {
+  if (artifact.artifact_type === "note") return labels?.note ?? "Note";
+  if (artifact.artifact_type === "repository") return labels?.repository ?? "Git repository";
+  return artifact.language && artifact.language !== "Unspecified" ? artifact.language : artifactTypeLabel(artifact.artifact_type, labels);
 }
 
 export function isAiActivity(event: WorkspaceActivityEvent) {

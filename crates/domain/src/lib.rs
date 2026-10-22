@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::BTreeMap;
 
 mod archive;
 mod archive_import;
@@ -269,6 +270,8 @@ pub struct WorkspaceTemplateView {
     pub overrides: Value,
     /// The tabs and what is kept under *More*.
     pub sections: TemplateSections,
+    /// The names the template gives to sections and kinds of evidence.
+    pub labels: TemplateLabels,
 }
 
 /// The tabs of a workspace and the sections kept under *More*, as its template arranges them. Every section is in
@@ -279,6 +282,14 @@ pub struct TemplateSections {
     pub more: Vec<String>,
     /// The section a workspace opens on when its address names none.
     pub landing: String,
+}
+
+/// The names a template gives to sections and kinds of evidence. Only the ones it renames are here; every other
+/// keeps its usual name. Display text only: ids and addresses do not change.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TemplateLabels {
+    pub sections: BTreeMap<String, String>,
+    pub artifact_types: BTreeMap<String, String>,
 }
 
 /// Chooses a workspace's template; `null` returns the workspace to the default.

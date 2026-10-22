@@ -133,6 +133,25 @@ async fn the_four_first_templates_are_offered_and_each_creates_its_folders() {
             _ => "overview",
         };
         assert_eq!(view["sections"]["landing"], landing, "{id}");
+        // The names it gives (V0.2.173): Operations calls Tasks "Actions"; Software engineering names two kinds of evidence.
+        assert_eq!(
+            view["labels"]["sections"]["tasks"],
+            if id == "operations" {
+                json!("Actions")
+            } else {
+                Value::Null
+            },
+            "{id}"
+        );
+        assert_eq!(
+            view["labels"]["artifact_types"]["pr"],
+            if id == "software-engineering" {
+                json!("Pull request")
+            } else {
+                Value::Null
+            },
+            "{id}"
+        );
         assert!(!more.is_empty(), "{id}");
         for page in ["overview", "metrics", "capabilities"] {
             let opened = send(
@@ -341,6 +360,8 @@ async fn templates_are_listed_read_by_members_and_changed_only_by_administrators
     );
     assert_eq!(by_default["sections"]["more"], json!([]));
     assert_eq!(by_default["sections"]["landing"], "overview");
+    // General renames nothing.
+    assert_eq!(by_default["labels"], json!({"sections": {}, "artifact_types": {}}));
     assert_eq!(
         send("GET", template_uri.clone(), outsider.clone(), json!(null))
             .await

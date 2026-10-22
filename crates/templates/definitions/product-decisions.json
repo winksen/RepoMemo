@@ -17,5 +17,8 @@
     "order": ["overview", "memory", "evidence", "retrieval", "tasks", "review", "documents"],
     "more": ["health", "map", "repositories"],
     "landing": "memory"
+  },
+  "labels": {
+    "sections": { "memory": "Decisions and memory" }
   }
 }

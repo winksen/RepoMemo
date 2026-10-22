@@ -19,3 +19,6 @@ pub const SUMMARY_MAX: usize = 160;
 pub const STARTER_FOLDERS_MAX: usize = 12;
 /// The name of a starter folder, in characters.
 pub const FOLDER_NAME_MAX: usize = 40;
+
+/// The name a template gives a section or a kind of evidence, in characters.
+pub const LABEL_MAX: usize = 24;

@@ -216,6 +216,8 @@ export interface WorkspaceTemplateView {
   overrides: unknown;
   /** The tabs and what is kept under *More*. */
   sections: TemplateSections;
+  /** The names the template gives to sections and kinds of evidence. */
+  labels: TemplateLabels;
 }
 
 /**
@@ -227,6 +229,15 @@ export interface TemplateSections {
   more: string[];
   /** The section a workspace opens on when its address names none. */
   landing: string;
+}
+
+/**
+ * The names a template gives to sections and kinds of evidence. Only the ones it renames are here; every other
+ * keeps its usual name. Display text only: ids and addresses do not change.
+ */
+export interface TemplateLabels {
+  sections: Record<string, string>;
+  artifact_types: Record<string, string>;
 }
 
 /** Chooses a workspace's template; `null` returns the workspace to the default. */

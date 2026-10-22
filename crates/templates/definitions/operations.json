@@ -17,5 +17,8 @@
     "order": ["overview", "evidence", "review", "health", "retrieval", "tasks", "memory"],
     "more": ["map", "repositories", "documents"],
     "landing": "review"
+  },
+  "labels": {
+    "sections": { "evidence": "Runbooks and incidents", "tasks": "Actions", "memory": "Lessons" }
   }
 }

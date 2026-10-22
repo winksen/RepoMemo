@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
-use repomemo_domain::{TemplateSections, TemplateSummary, WorkspaceTemplateRef, WorkspaceTemplateView};
+use repomemo_domain::{TemplateLabels, TemplateSections, TemplateSummary, WorkspaceTemplateRef, WorkspaceTemplateView};
 use repomemo_storage::StarterSetup;
 use repomemo_templates::{Catalogue, Origin, TemplateDefinition};
 
@@ -54,6 +54,13 @@ impl EffectiveTemplate {
                     primary: sections.primary,
                     more: sections.more,
                     landing: sections.landing,
+                }
+            },
+            labels: {
+                let labels = self.template.labels();
+                TemplateLabels {
+                    sections: labels.sections,
+                    artifact_types: labels.artifact_types,
                 }
             },
         }
@@ -401,6 +408,47 @@ mod tests {
         );
 
         let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    /// The kinds of evidence a template can rename are exactly the ones the API has: adding an `ArtifactType`
+    /// stops this from compiling until the list in `repomemo-templates` has it too.
+    #[test]
+    fn the_kinds_of_evidence_a_template_can_name_are_the_artifact_types() {
+        use repomemo_domain::ArtifactType;
+        let id = |kind: &ArtifactType| match kind {
+            ArtifactType::File => "file",
+            ArtifactType::MarkdownDoc => "markdown_doc",
+            ArtifactType::CodeFile => "code_file",
+            ArtifactType::Image => "image",
+            ArtifactType::Issue => "issue",
+            ArtifactType::Pr => "pr",
+            ArtifactType::Decision => "decision",
+            ArtifactType::Incident => "incident",
+            ArtifactType::Runbook => "runbook",
+            ArtifactType::ApiSpec => "api_spec",
+            ArtifactType::Note => "note",
+            ArtifactType::Repository => "repository",
+        };
+        let every = [
+            ArtifactType::File,
+            ArtifactType::MarkdownDoc,
+            ArtifactType::CodeFile,
+            ArtifactType::Image,
+            ArtifactType::Issue,
+            ArtifactType::Pr,
+            ArtifactType::Decision,
+            ArtifactType::Incident,
+            ArtifactType::Runbook,
+            ArtifactType::ApiSpec,
+            ArtifactType::Note,
+            ArtifactType::Repository,
+        ];
+        let named: Vec<&str> = every.iter().map(id).collect();
+        assert_eq!(named, repomemo_templates::ARTIFACT_TYPES);
+        // And the id is what the API writes for it.
+        for kind in &every {
+            assert_eq!(serde_json::to_value(kind).unwrap(), json!(id(kind)));
+        }
     }
 
     #[test]

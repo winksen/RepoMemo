@@ -6,19 +6,19 @@ const SECTION_LABEL: Record<string, string> = {
   audit: "Audit trail",
 };
 
-function sectionLabel(section: string): string {
-  return SECTION_LABEL[section] ?? `${section.charAt(0).toUpperCase()}${section.slice(1)}`;
+function sectionLabel(section: string, renamed?: Record<string, string>): string {
+  return renamed?.[section] ?? SECTION_LABEL[section] ?? `${section.charAt(0).toUpperCase()}${section.slice(1)}`;
 }
 
 /** What a page is called to someone who cannot see it: the tab title and the announcement after a move. */
-export function pageTitle(route: Route, names: { workspace?: string; artifact?: string; card?: string } = {}): string {
+export function pageTitle(route: Route, names: { workspace?: string; artifact?: string; card?: string; sectionLabels?: Record<string, string> } = {}): string {
   switch (route.name) {
     case "workspaces": return "Workspaces";
     case "dashboard": return "Dashboard";
     case "profile": return "Profile";
     case "notifications": return "Notifications";
     case "system": return `System · ${sectionLabel(route.section)}`;
-    case "workspace": return `${names.workspace ?? "Workspace"} · ${sectionLabel(route.section)}`;
+    case "workspace": return `${names.workspace ?? "Workspace"} · ${sectionLabel(route.section, names.sectionLabels)}`;
     case "artifact": return `${names.artifact ?? "Evidence file"} · ${names.workspace ?? "Workspace"}`;
     case "memory-card": return `${names.card ?? "Memory card"} · ${names.workspace ?? "Workspace"}`;
     case "not-found": return "Page not found";

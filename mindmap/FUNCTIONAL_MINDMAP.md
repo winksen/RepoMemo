@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.2.172` (2026-10-22). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, and the retired local workspace are described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.2.173` (2026-10-22). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, and the retired local workspace are described briefly in [§12](#12-desktop-app).
 
 ---
 
@@ -283,7 +283,7 @@ A **template** says which parts of RepoMemo matter most in a workspace and how t
 | **Product and decisions** | Specs, decisions, research, meeting notes | Decisions, Specs, Research, Meeting notes |
 | **Knowledge base** | Policies, contracts, reports, business documents | Policies, Contracts, Reports, Archive |
 
-The template is chosen when the workspace is created (the form on the dashboard and the setup wizard list the templates once the server offers more than General) and read through `GET /v1/workspaces/{id}/template`; an owner or administrator can change it through the API. A template gives a new workspace its folders and **orders the tabs** (V0.2.171): the sections it cares about come first, in its order, and the lesser ones sit under a **More** menu at the end of the row; the section that is open is always a tab, every address still opens, and People and Settings stay for administrators. A workspace **opens on its template's landing section** (Operations on Review, Product and decisions on Memory, Knowledge base on Documents) when it is opened without naming a section, from the dashboard, the workspace list, the side rail or the command palette; an address that names a section still opens that section. The command palette lists the sections in the template's order, the ones under More after the tabs (V0.2.172). The releases of track N go on to make it rename sections, choose the Overview cards, weigh search results, pick the health checks and more, one block at a time ([technical/workspace-templates.md](technical/workspace-templates.md)).
+The template is chosen when the workspace is created (the form on the dashboard and the setup wizard list the templates once the server offers more than General) and read through `GET /v1/workspaces/{id}/template`; an owner or administrator can change it through the API. A template gives a new workspace its folders and **orders the tabs** (V0.2.171): the sections it cares about come first, in its order, and the lesser ones sit under a **More** menu at the end of the row; the section that is open is always a tab, every address still opens, and People and Settings stay for administrators. A workspace **opens on its template's landing section** (Operations on Review, Product and decisions on Memory, Knowledge base on Documents) when it is opened without naming a section, from the dashboard, the workspace list, the side rail or the command palette; an address that names a section still opens that section. The command palette lists the sections in the template's order, the ones under More after the tabs (V0.2.172). A template can also **rename** sections and kinds of evidence (V0.2.173): Operations and incidents calls Tasks *Actions*, Evidence *Runbooks and incidents* and Memory *Lessons*; Product and decisions calls Memory *Decisions and memory*; Knowledge base calls Evidence *Library*; Software engineering writes *API spec* and *Pull request* for two kinds of evidence. The new name shows on the tab (the usual name is its tooltip), in the page title, in the command palette and on the type tags of the evidence and search pages. Only the words change: addresses, rights and the API keep the product's own names. The releases of track N go on to make it rename sections, choose the Overview cards, weigh search results, pick the health checks and more, one block at a time ([technical/workspace-templates.md](technical/workspace-templates.md)).
 
 ### Workspace pulse (Overview)
 
@@ -567,7 +567,7 @@ The local workspace and a server keep **separate data**.
 
 ---
 
-## 13. Known functional gaps (at V0.2.172)
+## 13. Known functional gaps (at V0.2.173)
 
 These are observed in the code and are useful for prioritizing. The roadmap item that addresses each one is in brackets.
 

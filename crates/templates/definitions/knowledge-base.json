@@ -17,5 +17,8 @@
     "order": ["overview", "documents", "retrieval", "evidence", "review", "health", "memory", "tasks"],
     "more": ["map", "repositories"],
     "landing": "documents"
+  },
+  "labels": {
+    "sections": { "evidence": "Library" }
   }
 }

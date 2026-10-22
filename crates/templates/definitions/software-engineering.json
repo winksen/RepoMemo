@@ -15,5 +15,8 @@
   "sections": {
     "order": ["overview", "repositories", "retrieval", "evidence", "map", "health", "review", "memory", "tasks"],
     "more": ["documents"]
+  },
+  "labels": {
+    "artifact_types": { "api_spec": "API spec", "pr": "Pull request" }
   }
 }

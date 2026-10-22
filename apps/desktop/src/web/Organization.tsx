@@ -171,22 +171,24 @@ export function WorkspaceTopbar({
   const isWorkspaceAdmin = workspace.role === "owner" || workspace.role === "admin";
   const [template] = useTemplate(accessToken ?? "", workspace.workspace.id, Boolean(accessToken));
   const { tabs, more } = arrangeSections(template?.sections, activeSection, isWorkspaceAdmin);
+  // The workspace's own names for its sections (V0.2.173); the usual name stays as the tooltip of a renamed tab.
+  const nameOf = (section: WorkspaceSection) => template?.labels.sections[section] ?? TABS[section].label;
   const sectionIcon = (section: WorkspaceSection) => {
     const Icon = TABS[section].icon;
     return <Icon size={ICON_SIZE.md} />;
   };
   const workspaceTab = (section: WorkspaceSection) => {
-    const { label } = TABS[section];
+    const label = nameOf(section);
     const icon = sectionIcon(section);
     const isAdminOnly = ADMIN_WORKSPACE_SECTIONS.has(section);
     const isActive = activeSection === section;
-    return <Button aria-current={isActive ? "page" : undefined} className={isActive ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.(section)} type="button" key={section} variant="secondary">{icon}<span className="shared-workspace-tab-label">{label}{isAdminOnly ? <span className="shared-workspace-tab-restricted">Admin</span> : null}</span></Button>;
+    return <Button aria-current={isActive ? "page" : undefined} className={isActive ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.(section)} type="button" key={section} title={label !== TABS[section].label ? TABS[section].label : undefined} variant="secondary">{icon}<span className="shared-workspace-tab-label">{label}{isAdminOnly ? <span className="shared-workspace-tab-restricted">Admin</span> : null}</span></Button>;
   };
 
   return <nav aria-label="Workspace sections" className="shared-workspace-topbar">
     <div className="shared-workspace-tabs">
       {tabs.map(workspaceTab)}
-      {onNavigate ? <WorkspaceMoreMenu items={more.map((section) => ({ icon: sectionIcon(section), label: TABS[section].label, onSelect: () => onNavigate(section), section }))} /> : null}
+      {onNavigate ? <WorkspaceMoreMenu items={more.map((section) => ({ icon: sectionIcon(section), label: nameOf(section), onSelect: () => onNavigate(section), section }))} /> : null}
     </div>
   </nav>;
 }
