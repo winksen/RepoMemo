@@ -2,6 +2,19 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.157 (2026-10-21)
+
+The last-author pass reads the new commits, not the whole history, on each sync.
+
+### Changed
+- **Incremental last authors (P17):** every sync read the history from the head (up to 20,000 commits) to learn who last changed each file. After an earlier sync it now reads only `previous..commit`, found ancestor by ancestor with `git merge-base --is-ancestor`, and lays those commits over the author, date and commit stored with each file: a one-commit change reads one commit. A file changed in the range takes the newest commit that lists it; the others keep what is stored.
+- **When the full pass still decides:** there is no earlier sync, the previous commit is not behind the new one (a force-push or a rewritten history, or a commit that is no longer in the server's copy), or the new commits fill the 20,000-commit window so some might not be reached.
+- **Tests (written, not run):** `the_last_authors_of_a_range_of_commits_are_read_without_the_rest_of_the_history` (git: one new commit gives one file; nothing new gives an empty answer; the newest of two commits wins; a full window, a rewritten history and an unknown commit give none) and `the_last_authors_after_a_new_commit_keep_what_was_stored` (api: the file the commit changed takes it and the other keeps the stored one; a squashed history is read in full).
+- **Checks run on this release:** `cargo check` of the git and api crates with their tests compiles; `rustfmt` shows nothing for the lines changed; `docs:check` and `version:check` pass. **Not run:** the tests, as asked.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.156 (2026-10-21)
 
 A repository sync with nothing new stops after finding the commit.

@@ -492,6 +492,46 @@ impl RepoMemoCore {
         }))
     }
 
+    /// Who last changed each file at `commit`. After an earlier sync only the commits since it are
+    /// read (`git log previous..commit`) and laid over the authors stored with the files; with no
+    /// earlier sync, a history that no longer holds it, or too many new commits for the window, the
+    /// full pass over the latest `LAST_CHANGE_COMMITS` commits decides.
+    async fn last_changes_for_sync(
+        &self,
+        repo: &GitRepo,
+        source_id: &str,
+        metadata: &RepoSourceMetadata,
+        commit: &str,
+    ) -> Result<HashMap<String, LastChange>> {
+        if let Some(previous) = metadata.last_synced_commit.as_ref() {
+            if let Some(delta) = repo
+                .last_changes_since(&previous.sha, commit, LAST_CHANGE_COMMITS)
+                .await
+                .unwrap_or(None)
+            {
+                let mut merged = self
+                    .storage
+                    .list_repo_file_entries(source_id)
+                    .await?
+                    .into_iter()
+                    .filter_map(|file| {
+                        Some((
+                            file.path,
+                            LastChange {
+                                sha: file.last_change_commit?,
+                                author_name: file.last_author?,
+                                authored_at: file.last_changed_at?,
+                            },
+                        ))
+                    })
+                    .collect::<HashMap<_, _>>();
+                merged.extend(delta);
+                return Ok(merged);
+            }
+        }
+        repo.last_changes(commit, LAST_CHANGE_COMMITS).await
+    }
+
     async fn sync_repo(&self, source_id: &str, job_id: &str) -> Result<RepoSyncReport> {
         let source = self.repo_source_row(source_id).await?;
         let mut metadata = RepoSourceMetadata::of(&source);
@@ -533,9 +573,11 @@ impl RepoMemoCore {
             None => repo.current_branch().await?,
         };
         let tree = repo.list_files(&commit).await?;
-        // One pass over the history for the whole sync. Without it the files
-        // are indexed all the same, only without an author.
-        let last_changes = match repo.last_changes(&commit, LAST_CHANGE_COMMITS).await {
+        // Who last changed each file: the commits since the previous sync, merged into what is
+        // stored, or one pass over the whole history when there is no earlier sync or its commit is
+        // not behind this one (a rewritten history). Without either, the files are indexed all the
+        // same, only without an author.
+        let last_changes = match self.last_changes_for_sync(&repo, source_id, &metadata, &commit).await {
             Ok(changes) => changes,
             Err(error) => {
                 tracing::warn!(repository = %source_id, error = %format!("{error:#}"), "Who last changed each file could not be read");
@@ -1137,6 +1179,76 @@ mod tests {
     async fn sync(core: &RepoMemoCore, source_id: &str) -> RepoSyncReport {
         let job = core.begin_repo_sync(source_id).await.unwrap();
         core.run_repo_sync(source_id, &job.id).await.unwrap()
+    }
+
+    /// V0.2.157: after a sync, the last authors come from the commits since
+    /// it, merged with what was stored; a rewritten history is read in full.
+    #[tokio::test]
+    async fn the_last_authors_after_a_new_commit_keep_what_was_stored() {
+        let repo_dir = unique_dir("repo-authors-repo");
+        let data_dir = unique_dir("repo-authors-data");
+        std::fs::create_dir_all(&repo_dir).unwrap();
+        git(&repo_dir, &["init", "--quiet", "--initial-branch=main"]);
+        write(&repo_dir, "a.md", "a\n");
+        write(&repo_dir, "b.md", "b\n");
+        git(&repo_dir, &["add", "."]);
+        git(&repo_dir, &["commit", "--quiet", "-m", "first"]);
+        let first_commit = String::from_utf8(
+            Command::new("git")
+                .arg("-C")
+                .arg(&repo_dir)
+                .args(["rev-parse", "HEAD"])
+                .output()
+                .unwrap()
+                .stdout,
+        )
+        .unwrap()
+        .trim()
+        .to_owned();
+
+        let core = RepoMemoCore::boot(data_dir.clone()).await.unwrap();
+        let workspace = core.create_workspace("Authors".to_owned()).await.unwrap();
+        let source = core
+            .connect_local_repo(
+                &workspace.id,
+                &repo_dir.to_string_lossy(),
+                None,
+                RepoSettings::default(),
+            )
+            .await
+            .unwrap();
+        sync(&core, &source.id).await;
+        let files = core.list_repo_files(&source.id).await.unwrap();
+        assert!(files
+            .iter()
+            .all(|file| file.last_change_commit.as_deref() == Some(first_commit.as_str())));
+
+        // A commit that changes one file: that file has the new commit, the other keeps the stored one.
+        write(&repo_dir, "a.md", "a changed\n");
+        git(&repo_dir, &["commit", "--quiet", "-am", "second"]);
+        let report = sync(&core, &source.id).await;
+        assert_eq!(report.updated, 1);
+        let files = core.list_repo_files(&source.id).await.unwrap();
+        let a = files.iter().find(|file| file.path == "a.md").unwrap();
+        let b = files.iter().find(|file| file.path == "b.md").unwrap();
+        assert_eq!(a.last_change_commit.as_deref(), Some(report.commit_sha.as_str()));
+        assert_eq!(b.last_change_commit.as_deref(), Some(first_commit.as_str()));
+        assert_eq!(b.last_author.as_deref(), Some("Test"));
+
+        // A rewritten history is read in full: the files take the commits it now names.
+        git(&repo_dir, &["checkout", "--quiet", "--orphan", "fresh"]);
+        git(&repo_dir, &["add", "."]);
+        git(&repo_dir, &["commit", "--quiet", "-m", "squashed"]);
+        git(&repo_dir, &["branch", "--quiet", "-M", "main"]);
+        let squashed = sync(&core, &source.id).await;
+        let files = core.list_repo_files(&source.id).await.unwrap();
+        assert!(files
+            .iter()
+            .all(|file| file.last_change_commit.as_deref() == Some(squashed.commit_sha.as_str())));
+
+        drop(core);
+        let _ = std::fs::remove_dir_all(data_dir);
+        let _ = std::fs::remove_dir_all(repo_dir);
     }
 
     /// V0.2.156: a sync whose commit, rules and indexer are those of the last

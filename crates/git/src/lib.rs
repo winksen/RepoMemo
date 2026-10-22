@@ -335,6 +335,51 @@ impl GitRepo {
         Ok(parse_last_changes(&String::from_utf8_lossy(&output.stdout)))
     }
 
+    /// [`GitRepo::last_changes`] for the commits after `since` only (`git log since..commit`), the
+    /// commits a sync has not seen. `None` when the full pass must decide instead: `since` is not an
+    /// ancestor of `commit` (the history was rewritten, or the commit is no longer in this copy) or
+    /// there are `max_commits` or more new commits, so the window might not reach them all.
+    pub async fn last_changes_since(
+        &self,
+        since: &str,
+        commit: &str,
+        max_commits: usize,
+    ) -> Result<Option<std::collections::HashMap<String, LastChange>>> {
+        for revision in [since, commit] {
+            if revision.is_empty() || !revision.chars().all(|value| value.is_ascii_hexdigit()) {
+                bail!("{revision:?} is not a commit id.");
+            }
+        }
+        let ancestor = git_command(&self.root)
+            .args(["merge-base", "--is-ancestor", since, commit])
+            .output()
+            .await?;
+        if ancestor.status.code() != Some(0) {
+            return Ok(None);
+        }
+        let output = git_command(&self.root)
+            .args([
+                "log",
+                "--name-only",
+                "--no-renames",
+                "--no-color",
+                &format!("--max-count={max_commits}"),
+                "--format=%x1e%H%x1f%an%x1f%aI",
+                &format!("{since}..{commit}"),
+                "--",
+            ])
+            .output()
+            .await?;
+        if !output.status.success() {
+            return Ok(None);
+        }
+        let text = String::from_utf8_lossy(&output.stdout);
+        if text.matches('\u{1e}').count() >= max_commits {
+            return Ok(None);
+        }
+        Ok(Some(parse_last_changes(&text)))
+    }
+
     /// The content of `path` as it was at `commit`, without reading the work
     /// tree. Fails with a plain message when the commit or the file is not
     /// there (a force-push can drop commits, and a partial clone does not hold
@@ -724,6 +769,71 @@ mod tests {
                 },
             ]
         );
+    }
+
+    /// V0.2.157: only the commits after the last sync are read, and a rewritten
+    /// history, or too many new commits, is left to the full pass.
+    #[tokio::test]
+    async fn the_last_authors_of_a_range_of_commits_are_read_without_the_rest_of_the_history() {
+        let dir = std::env::temp_dir().join(format!(
+            "repomemo-git-range-{}",
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        git(&dir, &["init", "--quiet", "--initial-branch=main"]);
+        std::fs::write(dir.join("a.md"), "a\n").unwrap();
+        std::fs::write(dir.join("b.md"), "b\n").unwrap();
+        git(&dir, &["add", "."]);
+        git(&dir, &["commit", "--quiet", "-m", "first"]);
+        let repo = GitRepo::open(&dir).await.unwrap();
+        let first = repo.resolve_commit(None).await.unwrap();
+
+        std::fs::write(dir.join("a.md"), "a changed\n").unwrap();
+        git(&dir, &["commit", "--quiet", "-am", "second"]);
+        let second = repo.resolve_commit(None).await.unwrap();
+
+        // One new commit reads one commit: only the file it changed is in the answer.
+        let delta = repo.last_changes_since(&first, &second, 100).await.unwrap().unwrap();
+        assert_eq!(delta.len(), 1);
+        assert_eq!(delta["a.md"].sha, second);
+        // Nothing new is an empty answer, not a reason to read the history again.
+        assert!(repo
+            .last_changes_since(&second, &second, 100)
+            .await
+            .unwrap()
+            .unwrap()
+            .is_empty());
+
+        // Two commits after `first`: the newest one wins for a file both touched.
+        std::fs::write(dir.join("a.md"), "a changed again\n").unwrap();
+        std::fs::write(dir.join("b.md"), "b changed\n").unwrap();
+        git(&dir, &["commit", "--quiet", "-am", "third"]);
+        let third = repo.resolve_commit(None).await.unwrap();
+        let delta = repo.last_changes_since(&first, &third, 100).await.unwrap().unwrap();
+        assert_eq!(
+            (delta["a.md"].sha.as_str(), delta["b.md"].sha.as_str()),
+            (third.as_str(), third.as_str())
+        );
+
+        // More new commits than the window holds: the full pass decides.
+        assert!(repo.last_changes_since(&first, &third, 2).await.unwrap().is_none());
+
+        // A history that was rewritten no longer holds the old commit: the full pass decides.
+        git(&dir, &["checkout", "--quiet", "--orphan", "rewritten"]);
+        git(&dir, &["commit", "--quiet", "-m", "rewritten", "--allow-empty"]);
+        let rewritten = repo.resolve_commit(Some("rewritten")).await.unwrap();
+        assert!(repo
+            .last_changes_since(&third, &rewritten, 100)
+            .await
+            .unwrap()
+            .is_none());
+        assert!(repo
+            .last_changes_since("deadbeefdeadbeef", &rewritten, 100)
+            .await
+            .unwrap()
+            .is_none());
+        assert!(repo.last_changes_since("--oops", &rewritten, 100).await.is_err());
+        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[tokio::test]

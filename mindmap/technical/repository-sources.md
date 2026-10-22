@@ -94,6 +94,8 @@ The source itself is a `sources` row with `type = 'git_repo'`, `root_uri` = the 
 }
 ```
 
+**The last author of each file reads only the new commits** (V0.2.157, review P17). `GitRepo::last_changes_since` runs `git merge-base --is-ancestor <previous> <commit>` and then `git log --name-only <previous>..<commit>`; `last_changes_for_sync` lays that range over the author, date and commit stored with each file, so a one-commit change reads one commit of history. When there is no earlier sync, the previous commit is not behind the new one (a force-push or rewritten history), or the new commits fill the 20,000-commit window, the full pass over the latest commits decides, as before.
+
 **A sync with nothing new stops early** (V0.2.156, review P16). After the commit is resolved, `nothing_to_sync` compares it, the settings and the indexer version with those recorded at the last complete sync (`last_synced_commit`, `last_synced_settings`, `last_synced_indexer_version`). When all three are the same, the last report was not cancelled and had no failed file, no file of the repository is waiting to be indexed and the item standing for it is indexed, the sync lists no tree, reads no history or `CODEOWNERS`, loads no stored file and writes nothing: it records the time and a report with `nothing_changed: true`, and the job completes. A source from before this release has no recorded settings, so its first sync is a full one.
 
 A repository artifact's own `metadata_json` records `origin: "git_repo"`, the repository root, the commit and the blob id.
