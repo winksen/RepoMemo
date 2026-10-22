@@ -20,7 +20,7 @@ const operationsDetail: TemplateDetail = {
   template: catalogue[2],
   sections: { primary: ["overview", "evidence", "review", "tasks", "people", "settings"], more: ["map"], landing: "review" },
   labels: { sections: { tasks: "Actions" }, artifact_types: {} },
-  overview: { cards: ["fresh_evidence", "at_risk"] },
+  overview: { cards: ["fresh_evidence", "at_risk"], headline: "active_tasks" },
   evidence: { default_view: "list", types_first: [] },
   assistant: { order: [], suggestions: ["What is the runbook for…"], phrases: [{ phrase: "runbook", capability: "find_files" }], focus: "This workspace holds runbooks." },
   retrieval: { type_chips: [] },
@@ -35,7 +35,7 @@ const knowledgeDetail: TemplateDetail = {
   template: catalogue[1],
   sections: { primary: ["overview", "documents", "people", "settings"], more: [], landing: "documents" },
   labels: { sections: { evidence: "Library" }, artifact_types: {} },
-  overview: { cards: ["index_coverage"] },
+  overview: { cards: ["index_coverage"], headline: null },
   assistant: { order: [], suggestions: [], phrases: [], focus: null },
   repositories: { include: ["**/*.pdf"], exclude: [] },
 };
@@ -67,6 +67,7 @@ describe("the lines that preview a template", () => {
       "Opens on": "Review",
       "Renamed": "Tasks → Actions",
       "Overview cards": "Fresh evidence, At risk",
+      "Workspace card shows": "Active tasks",
       "The assistant suggests": "1 question, 1 phrase it recognises",
       "Repository links start with": "2 exclude rules",
       "Map shows first": "Markdown, Note; memory citations",
@@ -84,6 +85,7 @@ describe("the lines that preview a template", () => {
     expect(lines["Repository links start with"]).toBe("1 include rule");
     expect(Object.fromEntries(previewLines({ ...knowledgeDetail, repositories: { include: [], exclude: [] } }).map((line) => [line.label, line.text]))["Repository links start with"]).toBe("nothing");
     expect(lines["Opens on"]).toBe("Documents");
+    expect(lines["Workspace card shows"]).toBe("its name only");
     expect(lines["Review lists"]).toBe("everything mixed, the oldest first");
     expect(lines["Map shows first"]).toBe("nothing in particular");
     expect(Object.fromEntries(previewLines({ ...knowledgeDetail, ranking: { verified: 1.1, boosts: [], recency: null } }).map((line) => [line.label, line.text]))["Search favours"]).toBe("verified evidence by 10 %");

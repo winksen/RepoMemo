@@ -76,12 +76,14 @@ export function previewLines(template: Previewable): Array<{ label: string; text
   const visible = (sections: string[]) => sections.filter((section) => section !== "people" && section !== "settings").map(name);
   const renamed = Object.entries(template.labels.sections).map(([section, label]) => `${isSection(section) ? SECTION_NAMES[section] : section} → ${label}`);
   const cards = template.overview.cards.filter(isPulseCard).map((card) => PULSE_CARD_TITLES[card]);
+  const headline = template.overview.headline && isPulseCard(template.overview.headline) ? PULSE_CARD_TITLES[template.overview.headline] : "its name only";
   return [
     { label: "Tabs", text: visible(template.sections.primary).join(", ") },
     { label: "Under More", text: template.sections.more.length ? visible(template.sections.more).join(", ") : "nothing" },
     { label: "Opens on", text: name(template.sections.landing) },
     { label: "Renamed", text: renamed.length ? renamed.join(", ") : "nothing" },
     { label: "Overview cards", text: cards.join(", ") },
+    { label: "Workspace card shows", text: headline },
     { label: "Map shows first", text: mapFirst(template.map) },
     { label: "Review lists", text: template.review.order.length ? template.review.order.map((source) => REVIEW_NAMES[source] ?? source).join(", then ") : "everything mixed, the oldest first" },
     { label: "Health checks", text: template.health.detectors.map((detector) => detector === "stale_evidence" && template.health.stale_after_days ? `${HEALTH_NAMES[detector]} (${template.health.stale_after_days} days)` : HEALTH_NAMES[detector] ?? detector).join(", ") },

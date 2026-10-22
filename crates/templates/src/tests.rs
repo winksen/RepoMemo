@@ -1581,6 +1581,50 @@ fn software_engineering_puts_repositories_and_code_first_on_its_map() {
     }
 }
 
+#[test]
+fn a_template_names_a_headline_for_the_dashboard_from_the_cards_one_count_can_answer() {
+    assert_eq!(general().overview_headline(), None);
+    let chosen = parse(&with_overview(
+        r#"{ "cards": ["sources"], "headline": "code_symbols" }"#,
+    ))
+    .unwrap();
+    assert_eq!(chosen.overview_headline().as_deref(), Some("code_symbols"));
+    assert_eq!(parse(&serde_json::to_string(&chosen).unwrap()).unwrap(), chosen);
+    // Without one the card carries the name only, and nothing is written for it.
+    let without = parse(&with_overview(r#"{ "cards": ["sources"] }"#)).unwrap();
+    assert_eq!(without.overview_headline(), None);
+    assert!(!serde_json::to_string(&without).unwrap().contains("headline"));
+    for good in HEADLINE_CARDS {
+        assert!(
+            parse(&with_overview(&format!(
+                r#"{{ "cards": ["sources"], "headline": "{good}" }}"#
+            )))
+            .is_ok(),
+            "{good}"
+        );
+    }
+    // Every headline is a pulse card, but not every pulse card can be one: the dashboard counts them for all of its
+    // workspaces at once.
+    assert!(HEADLINE_CARDS.iter().all(|card| PULSE_CARDS.contains(card)));
+    for bad in ["index_coverage", "no_such_card", ""] {
+        let issues = parse(&with_overview(&format!(
+            r#"{{ "cards": ["sources"], "headline": "{bad}" }}"#
+        )))
+        .unwrap_err();
+        assert_eq!(issues[0].path, "overview.headline", "{bad:?}");
+    }
+}
+
+#[test]
+fn the_four_first_templates_each_put_one_countable_figure_on_their_workspace_cards() {
+    let catalogue = Catalogue::builtin();
+    let headline = |id: &str| catalogue.get(id).unwrap().overview_headline();
+    assert_eq!(headline("software-engineering").as_deref(), Some("code_symbols"));
+    assert_eq!(headline("operations").as_deref(), Some("active_tasks"));
+    assert_eq!(headline("product-decisions").as_deref(), Some("memory_cards"));
+    assert_eq!(headline("knowledge-base").as_deref(), Some("sources"));
+}
+
 /// The valid file with a `repositories` block written as JSON.
 fn with_repositories(block: &str) -> String {
     VALID.replacen(

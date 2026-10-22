@@ -65,6 +65,25 @@ pub struct DashboardCounts {
     pub memory_cards: i64,
 }
 
+/// A figure the dashboard counts for a workspace beyond the ones in [`DashboardCounts`], named so that the table it reads
+/// is never text from outside.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DashboardCount {
+    /// Symbols extracted from the workspace's code.
+    Symbols,
+    /// Uploads and linked repositories.
+    Sources,
+}
+
+impl DashboardCount {
+    fn table(self) -> &'static str {
+        match self {
+            Self::Symbols => "symbols",
+            Self::Sources => "sources",
+        }
+    }
+}
+
 fn push_in<'a, T>(query: &mut QueryBuilder<'a, Sqlite>, column: &str, values: Vec<T>)
 where
     T: 'a + sqlx::Encode<'a, Sqlite> + sqlx::Type<Sqlite> + Send,
@@ -301,6 +320,32 @@ impl StorageEngine {
             }
         }
         Ok(workspace_ids.iter().filter_map(|id| by_workspace.remove(id)).collect())
+    }
+
+    /// One more figure of the dashboard for several workspaces, in one query: the workspaces that have none are not in
+    /// the answer.
+    pub async fn dashboard_count(
+        &self,
+        what: DashboardCount,
+        workspace_ids: &[String],
+    ) -> Result<HashMap<String, i64>> {
+        if workspace_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        let mut query = QueryBuilder::<Sqlite>::new(format!(
+            "SELECT workspace_id, COUNT(*) AS total FROM {} WHERE workspace_id IN (",
+            what.table()
+        ));
+        let mut separated = query.separated(", ");
+        for id in workspace_ids {
+            separated.push_bind(id.clone());
+        }
+        separated.push_unseparated(") GROUP BY workspace_id");
+        let mut counts = HashMap::new();
+        for row in query.build().fetch_all(self.reader()).await? {
+            counts.insert(row.get::<String, _>("workspace_id"), row.get::<i64, _>("total"));
+        }
+        Ok(counts)
     }
 
     /// Bytes of evidence a workspace holds: its files' sizes, and the earlier

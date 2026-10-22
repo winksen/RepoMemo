@@ -48,6 +48,51 @@ async fn the_dashboard_is_one_request_and_only_lists_your_workspaces() {
     assert_eq!(entries[0]["memory_card_count"], 0);
     assert_eq!(entries[0]["active_task_count"], 1);
 
+    // A workspace on General carries no template; one made from a template names it and its headline figure, all in
+    // the same single request.
+    assert!(entries[0]["template"].is_null());
+    let organization = response_json(
+        app.clone()
+            .oneshot(auth_request("GET", "/v1/workspaces", &owner))
+            .await
+            .unwrap(),
+    )
+    .await[0]["organization_id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let software = response_json(
+        app.clone()
+            .oneshot(json_request(
+                "POST",
+                "/v1/workspaces",
+                &owner,
+                json!({"organization_id": organization, "name": "Code", "template_id": "software-engineering"}),
+            ))
+            .await
+            .unwrap(),
+    )
+    .await["workspace"]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let both = response_json(
+        app.clone()
+            .oneshot(auth_request("GET", "/v1/dashboard", &owner))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let both = both["workspaces"].as_array().unwrap();
+    assert_eq!(both.len(), 2);
+    let general = both.iter().find(|entry| entry["workspace_id"] == workspace_id).unwrap();
+    let coded = both.iter().find(|entry| entry["workspace_id"] == software).unwrap();
+    assert!(general["template"].is_null());
+    assert_eq!(
+        coded["template"],
+        json!({"id": "software-engineering", "name": "Software engineering", "headline": {"card": "code_symbols", "value": 0}})
+    );
+
     let theirs = response_json(
         app.clone()
             .oneshot(auth_request("GET", "/v1/dashboard", &stranger))

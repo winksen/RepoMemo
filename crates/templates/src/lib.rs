@@ -47,7 +47,7 @@ pub use labels::{LabelsBlock, ARTIFACT_TYPES};
 pub use map::{MapBlock, MAP_RELATIONS};
 pub use meta::{TemplateMeta, WORKSPACE_ICONS};
 pub use overrides::Overrides;
-pub use overview::{OverviewBlock, CARDS_MAX, DEFAULT_CARDS, PULSE_CARDS};
+pub use overview::{OverviewBlock, CARDS_MAX, DEFAULT_CARDS, HEADLINE_CARDS, PULSE_CARDS};
 pub use ranking::{
     pattern_problem, Boost, RankingBlock, Recency, ResolvedRanking, BOOSTS_MAX, DEFAULT_VERIFIED, FACTOR_MAX,
     FACTOR_MIN, HALF_LIFE_MAX, HALF_LIFE_MIN, PRODUCT_MAX, RECENCY_MAX,
@@ -252,6 +252,11 @@ impl TemplateDefinition {
     /// The pulse cards the Overview shows, in order.
     pub fn overview_cards(&self) -> Vec<String> {
         OverviewBlock::resolved(self.overview.as_ref())
+    }
+
+    /// The figure shown on the workspace's card on the dashboard; none when the template names no headline.
+    pub fn overview_headline(&self) -> Option<String> {
+        self.overview.as_ref().and_then(|overview| overview.headline.clone())
     }
 
     /// The tabs and the *More* menu this template asks for, complete.

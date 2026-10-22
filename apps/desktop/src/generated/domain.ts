@@ -261,6 +261,8 @@ export interface TemplateLabels {
 /** The pulse cards the Overview shows, in order, as the template chooses; for `general` the usual nine. */
 export interface TemplateOverview {
   cards: string[];
+  /** The figure the dashboard shows on the workspace's card, if the template names one. */
+  headline: string | null;
 }
 
 /**

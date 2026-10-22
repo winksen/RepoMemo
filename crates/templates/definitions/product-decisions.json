@@ -22,7 +22,8 @@
     "sections": { "memory": "Decisions and memory" }
   },
   "overview": {
-    "cards": ["memory_cards", "active_tasks", "fresh_evidence", "index_coverage"]
+    "cards": ["memory_cards", "active_tasks", "fresh_evidence", "index_coverage"],
+    "headline": "memory_cards"
   },
   "evidence": { "types_first": ["markdown", "note", "word"] },
   "assistant": {

@@ -22,7 +22,8 @@
     "sections": { "evidence": "Library" }
   },
   "overview": {
-    "cards": ["index_coverage", "indexed_storage", "fresh_evidence", "knowledge_density"]
+    "cards": ["index_coverage", "indexed_storage", "fresh_evidence", "knowledge_density"],
+    "headline": "sources"
   },
   "evidence": { "default_view": "list", "types_first": ["word", "pdf", "excel", "powerpoint"] },
   "assistant": {

@@ -547,6 +547,14 @@ export function getSharedWorkspaceOverview(accessToken: string, workspaceId: str
   return request<WorkspaceOverview>(`/v1/workspaces/${workspaceId}/overview`, {}, accessToken);
 }
 
+/** What names a workspace's template on its card; absent for General. */
+export interface DashboardTemplate {
+  id: string;
+  name: string;
+  /** The one figure the template puts on the card (a pulse card and its count), when it names one. */
+  headline: { card: string; value: number } | null;
+}
+
 /** The dashboard's figures for every workspace the person can open. */
 export interface DashboardWorkspaceFigures {
   workspace_id: string;
@@ -554,6 +562,7 @@ export interface DashboardWorkspaceFigures {
   /** Tasks that are open or in progress. */
   active_task_count: number;
   memory_card_count: number;
+  template: DashboardTemplate | null;
 }
 
 export function getSharedDashboard(accessToken: string): Promise<{ workspaces: DashboardWorkspaceFigures[] }> {

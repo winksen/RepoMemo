@@ -33,6 +33,10 @@ pub const DEFAULT_CARDS: [&str; 9] = [
     "team_discussion",
 ];
 
+/// The pulse cards the dashboard can show as a workspace's headline figure (V0.2.187): the ones one grouped count over
+/// the dashboard's workspaces answers, so the dashboard asks for no workspace one by one.
+pub const HEADLINE_CARDS: [&str; 4] = ["memory_cards", "active_tasks", "code_symbols", "sources"];
+
 /// How many cards a template may list.
 pub const CARDS_MAX: usize = 8;
 
@@ -43,6 +47,9 @@ pub const CARDS_MAX: usize = 8;
 pub struct OverviewBlock {
     #[serde(default)]
     pub cards: Vec<String>,
+    /// The figure shown on the workspace's card on the dashboard, one of [`HEADLINE_CARDS`]; none when left out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub headline: Option<String>,
 }
 
 impl OverviewBlock {
@@ -56,6 +63,17 @@ impl OverviewBlock {
 }
 
 pub(crate) fn validate(block: &OverviewBlock, issues: &mut Vec<TemplateIssue>) {
+    if let Some(headline) = &block.headline {
+        if !HEADLINE_CARDS.contains(&headline.as_str()) {
+            issues.push(TemplateIssue::new(
+                "overview.headline",
+                format!(
+                    "`{headline}` cannot be a headline; it is one of {}",
+                    HEADLINE_CARDS.join(", ")
+                ),
+            ));
+        }
+    }
     if block.cards.is_empty() {
         issues.push(TemplateIssue::new(
             "overview.cards",

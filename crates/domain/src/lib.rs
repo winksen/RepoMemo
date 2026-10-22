@@ -314,6 +314,8 @@ pub struct TemplateLabels {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TemplateOverview {
     pub cards: Vec<String>,
+    /// The figure the dashboard shows on the workspace's card, if the template names one.
+    pub headline: Option<String>,
 }
 
 /// How the evidence ledger opens (`grid` or `list`, which a person's own choice overrides) and the file types its

@@ -20,7 +20,8 @@
     "artifact_types": { "api_spec": "API spec", "pr": "Pull request" }
   },
   "overview": {
-    "cards": ["code_symbols", "sources", "index_coverage", "at_risk", "fresh_evidence"]
+    "cards": ["code_symbols", "sources", "index_coverage", "at_risk", "fresh_evidence"],
+    "headline": "code_symbols"
   },
   "evidence": { "types_first": ["code", "markdown", "repository"] },
   "assistant": {

@@ -164,6 +164,17 @@ async fn the_four_first_templates_are_offered_and_each_creates_its_folders() {
                 .is_some_and(|focus| focus.starts_with("This workspace holds")),
             "{id}"
         );
+        // The headline of the dashboard's card (V0.2.187): the figure each template counts.
+        assert_eq!(
+            view["overview"]["headline"],
+            match id {
+                "software-engineering" => json!("code_symbols"),
+                "operations" => json!("active_tasks"),
+                "product-decisions" => json!("memory_cards"),
+                _ => json!("sources"),
+            },
+            "{id}"
+        );
         // The link form's rules (V0.2.186): code teams leave files out, documents-first teams ask for documents.
         let offered = |key: &str| view["repositories"][key].as_array().map_or(0, Vec::len);
         assert!(
@@ -623,6 +634,8 @@ async fn templates_are_listed_read_by_members_and_changed_only_by_administrators
         json!({"order": [], "suggestions": [], "phrases": [], "focus": null})
     );
     assert_eq!(by_default["retrieval"], json!({"type_chips": []}));
+    // General names no headline for the dashboard.
+    assert!(by_default["overview"]["headline"].is_null());
     // General offers the link form nothing.
     assert_eq!(by_default["repositories"], json!({"include": [], "exclude": []}));
     assert_eq!(

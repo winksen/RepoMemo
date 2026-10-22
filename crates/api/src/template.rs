@@ -84,6 +84,7 @@ pub fn detail_of(template: &TemplateDefinition) -> TemplateDetail {
         },
         overview: TemplateOverview {
             cards: template.overview_cards(),
+            headline: template.overview_headline(),
         },
         evidence: TemplateEvidence {
             default_view: evidence.default_view,
@@ -237,6 +238,16 @@ impl RepoMemoCore {
     pub async fn effective_template(&self, workspace_id: &str) -> Result<EffectiveTemplate> {
         let reference = self.storage.workspace_template_ref(workspace_id).await?;
         Ok(self.templates.resolve(workspace_id, reference))
+    }
+
+    /// The template a workspace uses, settled from the settings that were loaded with it: no read of the database, so a
+    /// list of workspaces (the dashboard) is not a read for each (V0.2.187).
+    pub fn effective_template_of(&self, workspace: &Workspace) -> EffectiveTemplate {
+        let reference = workspace
+            .settings
+            .get("template")
+            .and_then(WorkspaceTemplateRef::from_setting);
+        self.templates.resolve(&workspace.id, reference)
     }
 
     /// The templates this server offers, `general` first.

@@ -300,6 +300,24 @@ pub(crate) struct DashboardWorkspace {
     /// Tasks that are open or in progress.
     pub(crate) active_task_count: i64,
     pub(crate) memory_card_count: i64,
+    /// The workspace's template, or `null` for `general` (V0.2.187).
+    pub(crate) template: Option<DashboardTemplate>,
+}
+
+/// What names a workspace's template on its card.
+#[derive(Debug, Serialize)]
+pub(crate) struct DashboardTemplate {
+    pub(crate) id: String,
+    pub(crate) name: String,
+    /// The one figure the template puts on the card, when it names one.
+    pub(crate) headline: Option<DashboardHeadline>,
+}
+
+/// A pulse card and its figure for one workspace.
+#[derive(Debug, Serialize)]
+pub(crate) struct DashboardHeadline {
+    pub(crate) card: String,
+    pub(crate) value: i64,
 }
 
 #[derive(Debug, Serialize)]

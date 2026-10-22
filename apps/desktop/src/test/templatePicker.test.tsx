@@ -58,7 +58,7 @@ describe("the template hooks", () => {
       template: general, source: "default", reason: null, chosen_id: null, overrides: null,
       sections: { primary: ["overview", "evidence"], more: [], landing: "overview" },
       labels: { sections: {}, artifact_types: {} },
-      overview: { cards: ["index_coverage"] },
+      overview: { cards: ["index_coverage"], headline: null },
       evidence: { default_view: "grid", types_first: [] },
       assistant: { order: [], suggestions: [], phrases: [], focus: null },
       retrieval: { type_chips: [] },

@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.187 (2026-10-22)
+
+Workspace cards name their template and show its headline figure.
+
+### Changed
+- **Headline:** `overview.headline` names the one figure a workspace's card shows beside its template's name. It is one of `memory_cards`, `active_tasks`, `code_symbols` and `sources`: the pulse cards one grouped count can answer for all the dashboard's workspaces at once. The other cards need each workspace's metrics, which are a request for each workspace, and the dashboard makes none. Anything else is refused, naming `overview.headline`.
+- **The dashboard's request:** `GET /v1/dashboard` carries `template` for each workspace: `null` for General, so General shows no badge, and otherwise `{id, name, headline: {card, value}}`. The template is settled from the settings that came with the list of workspaces, so there is no read for each; a headline that needs a count the dashboard did not have (`code_symbols`, `sources`) is one more grouped query, for the workspaces that name it only. Nothing is asked for each workspace.
+- **The cards:** a workspace's card on the Dashboard names its template next to its access, and shows the headline among its figures in bold (active tasks, which every card has, is that figure made bold). The organization's Workspaces page lists the same, sharing the dashboard's request. The narrow navigation rail does not: it is on every page, and the figures would add a request to each.
+- **The four templates:** Software engineering shows code symbols, Operations and incidents active tasks, Product and decisions memory cards and the Knowledge base sources.
+- **Settings › Template and the API:** the answer carries `overview.headline`, and the preview has a line "Workspace card shows".
+- **Tests (written, not run):** two in the templates crate (a headline is one of four pulse cards, none by default and nothing written for it, anything else refused; the four templates' headlines), the dashboard's server test (a General workspace has no template, one made from Software engineering names it and its code symbols in the same single request), the server's template test and the web's template tests check the field, and three web tests in `dashboardFigures.test.ts` (the name, the headline in words with the pulse card's own name, the figures on a card).
+- **Checks run on this release:** `cargo check` of the templates, storage, api and server crates with their tests compiles; `rustfmt` shows nothing for the lines changed; `types:check`, `typecheck`, `styles:check`, `a11y:check`, `docs:check` and `version:check` pass. **Not run:** the tests, as asked.
+
+### Upgrading
+- Nothing to do. A workspace on General looks as it did, and a client that ignores `template` keeps working.
+
 ## V0.2.186 (2026-10-22)
 
 The repository link form starts with the include and exclude rules its template offers.

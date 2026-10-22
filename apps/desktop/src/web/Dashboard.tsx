@@ -1,11 +1,9 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { IconBuildingCommunity as Building, IconChevronRight as ChevronRight, IconLayoutDashboard as Dashboard, IconLoader2 as Loader, IconPlus as Plus, IconShieldLock as Shield, IconStack2 as Layers } from "@tabler/icons-react";
-import { createSharedOrganization, createSharedWorkspace, type DashboardWorkspaceFigures, getSharedDashboard } from "../lib/sharedApi";
+import { createSharedOrganization, createSharedWorkspace, type DashboardWorkspaceFigures } from "../lib/sharedApi";
 import { WorkspaceImport } from "../components/WorkspaceImport";
 import { TemplatePicker } from "../components/TemplatePicker";
 import { type Organization, type SharedSession, type SharedWorkspace } from "../types";
-import { accountKeys } from "../lib/queryClient";
-import { useServerState } from "../lib/useServerState";
 import { Button } from "../components/ui/button";
 import { PageHeader } from "../components/ui/page-header";
 import { Input } from "../components/ui/input";
@@ -17,6 +15,7 @@ import { useOrganizationNavigation } from "./navigation";
 import { CrossWorkspaceSearch } from "./CrossSearch";
 import { OrganizationAdministration, OrganizationRail } from "./Organization";
 import { useTemplateCatalogue } from "./workspace/data";
+import { cardFigures, headlineText, templateName, useDashboardFigures } from "./dashboardFigures";
 import { ICON_SIZE } from "../components/ui/icon";
 import { WorkspaceIcon } from "./workspaceIcons";
 
@@ -40,13 +39,7 @@ export function SharedDashboard({
   const [error, setError] = useState<string | null>(null);
   // The figures come from the query cache: shown at once when the page was open
   // before, refetched on every visit, and again when the workspace list changes.
-  const workspaceIds = useMemo(() => workspaces.map((entry) => entry.workspace.id).join(","), [workspaces]);
-  const [metricsByWorkspace, , figuresQuery] = useServerState<Record<string, DashboardWorkspaceFigures>>({
-    key: accountKeys.dashboard(workspaceIds),
-    fetch: async () => Object.fromEntries((await getSharedDashboard(accessToken)).workspaces.map((entry) => [entry.workspace_id, entry])),
-    initial: {},
-    staleTime: 0,
-  });
+  const [metricsByWorkspace, , figuresQuery] = useDashboardFigures(accessToken, workspaces);
   const isLoading = figuresQuery.isLoading;
   useEffect(() => { setError(figuresQuery.error ? apiMessage(figuresQuery.error) : null); }, [figuresQuery.error]);
 
@@ -78,8 +71,7 @@ export function SharedDashboard({
             <div className="shared-dashboard-organization-heading"><div><span className="shared-dashboard-organization-mark"><Building size={ICON_SIZE.md} /></span><div><h2>{organization.name}</h2><p>{organizationWorkspaces.length} workspace{organizationWorkspaces.length === 1 ? "" : "s"}{organizationMetrics.length ? ` · ${artifacts} artifacts · ${activeTasks} active tasks` : ""}{organization.guest ? " · Guest: only the workspaces you were added to" : ""}</p></div></div><Button onClick={() => navigate(`/workspaces?organization=${encodeURIComponent(organization.id)}`)} type="button" variant="secondary">View workspaces <ChevronRight size={ICON_SIZE.md} /></Button></div>
             {organizationWorkspaces.length ? <div className="shared-dashboard-workspace-list">{organizationWorkspaces.map((entry) => {
               const metrics = metricsByWorkspace[entry.workspace.id];
-              const activeWorkspaceTasks = metrics ? metrics.active_task_count : null;
-              return <Button className="shared-dashboard-workspace" key={entry.workspace.id} onClick={() => onOpenWorkspace(entry)} type="button" variant="secondary"><span className="shared-workspace-icon"><WorkspaceIcon size={ICON_SIZE.md} workspace={entry.workspace} /></span><span><strong>{entry.workspace.name}</strong><small>{entry.role} access · updated {new Date(entry.workspace.updated_at).toLocaleDateString()}</small></span><span className="shared-dashboard-workspace-metrics">{metrics ? <><span>{metrics.artifact_count} artifacts</span><span>{activeWorkspaceTasks} active tasks</span></> : <span>Loading workspace data</span>}</span><ChevronRight size={ICON_SIZE.md} /></Button>;
+              return <Button className="shared-dashboard-workspace" key={entry.workspace.id} onClick={() => onOpenWorkspace(entry)} type="button" variant="secondary"><span className="shared-workspace-icon"><WorkspaceIcon size={ICON_SIZE.md} workspace={entry.workspace} /></span><span><strong>{entry.workspace.name}</strong><small>{entry.role} access{templateName(metrics) ? ` · ${templateName(metrics)}` : ""} · updated {new Date(entry.workspace.updated_at).toLocaleDateString()}</small></span><span className="shared-dashboard-workspace-metrics">{metrics ? cardFigures(metrics).map((figure) => figure.headline ? <b key={figure.key}>{figure.text}</b> : <span key={figure.key}>{figure.text}</span>) : <span>Loading workspace data</span>}</span><ChevronRight size={ICON_SIZE.md} /></Button>;
             })}</div> : <p className="shared-muted-copy">No accessible workspaces in this organization yet.</p>}
           </section>;
         }) : <div className="shared-empty-state"><Building size={26} /><strong>No organizations yet</strong>{session.can_create_organizations === false ? <span>Ask a system administrator to create one or to invite you to one.</span> : <><span>Create an organization to start a shared workspace boundary.</span><Button onClick={() => navigate("/workspaces?createOrganization=1")} type="button" variant="main"><Plus size={ICON_SIZE.md} /> Create organization</Button></>}</div>}
@@ -128,6 +120,8 @@ export function SharedWorkspaceHome({
   );
   const canManageOrganization = currentOrganization?.role === "owner" || currentOrganization?.role === "admin";
   const [templates] = useTemplateCatalogue(accessToken, canManageOrganization);
+  // The same request as the dashboard's, so the list below can say which template each workspace uses.
+  const [figures] = useDashboardFigures(accessToken, workspaces);
 
   async function createOrganization(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -167,7 +161,7 @@ export function SharedWorkspaceHome({
           {showOrganizationForm ? <form className="shared-setup-form" onSubmit={createOrganization}><label>Organization name<Input autoFocus onChange={(event) => setOrganizationName(event.target.value)} placeholder="Engineering" required value={organizationName} /></label><div className="shared-setup-actions"><Button disabled={isSubmitting} type="submit" variant="main">{isSubmitting ? <Loader className="spin" size={ICON_SIZE.md} /> : <Plus size={ICON_SIZE.md} />} Create organization</Button>{organizations.length ? <Button disabled={isSubmitting} onClick={organizationNavigation.cancelOrganizationCreation} type="button" variant="secondary">Cancel</Button> : null}</div></form> : <>
             {canManageOrganization ? <form className="shared-create-workspace" onSubmit={createWorkspace}><div><strong>Create a workspace</strong><span>Start a bounded memory space for a repository, system, or initiative.</span></div><label className="sr-only" htmlFor="shared-workspace-name">Workspace name</label><Input id="shared-workspace-name" onChange={(event) => setWorkspaceName(event.target.value)} placeholder="Payments platform" required value={workspaceName} /><Button disabled={isSubmitting} type="submit" variant="main">{isSubmitting ? <Loader className="spin" size={ICON_SIZE.md} /> : <Plus size={ICON_SIZE.md} />} Create workspace</Button><TemplatePicker disabled={isSubmitting} name="dashboard-template" onChange={setTemplateId} templates={templates} value={templateId} /></form> : <p className="shared-muted-copy">Your organization role grants access to its workspaces but not workspace creation.</p>}
             {canManageOrganization ? <WorkspaceImport accessToken={accessToken} key={`import-${organizationId}`} onImported={(workspace) => setWorkspaces((current) => [workspace, ...current])} organizationId={organizationId} /> : null}
-            <div className="shared-workspace-list">{workspaces.filter((workspace) => workspace.organization_id === organizationId).map((entry) => <article className="shared-workspace-row" key={entry.workspace.id}><span className="shared-workspace-icon"><WorkspaceIcon size={ICON_SIZE.lg} workspace={entry.workspace} /></span><div><h2>{entry.workspace.name}</h2><p>Created {new Date(entry.workspace.created_at).toLocaleDateString()} · Your role: {entry.role}</p></div><Button aria-label={`Open ${entry.workspace.name}`} className="shared-workspace-open" onClick={() => onOpenWorkspace(entry)} type="button" variant="secondary"><ChevronRight size={ICON_SIZE.lg} /></Button></article>)}{workspaces.filter((workspace) => workspace.organization_id === organizationId).length === 0 ? <div className="shared-empty-state"><Layers size={26} /><strong>No workspaces yet</strong><span>Create the first shared workspace for {currentOrganization?.name}.</span></div> : null}</div>
+            <div className="shared-workspace-list">{workspaces.filter((workspace) => workspace.organization_id === organizationId).map((entry) => <article className="shared-workspace-row" key={entry.workspace.id}><span className="shared-workspace-icon"><WorkspaceIcon size={ICON_SIZE.lg} workspace={entry.workspace} /></span><div><h2>{entry.workspace.name}</h2><p>Created {new Date(entry.workspace.created_at).toLocaleDateString()} · Your role: {entry.role}{templateName(figures[entry.workspace.id]) ? ` · ${templateName(figures[entry.workspace.id])}` : ""}{headlineText(figures[entry.workspace.id]?.template) ? ` · ${headlineText(figures[entry.workspace.id]?.template)}` : ""}</p></div><Button aria-label={`Open ${entry.workspace.name}`} className="shared-workspace-open" onClick={() => onOpenWorkspace(entry)} type="button" variant="secondary"><ChevronRight size={ICON_SIZE.lg} /></Button></article>)}{workspaces.filter((workspace) => workspace.organization_id === organizationId).length === 0 ? <div className="shared-empty-state"><Layers size={26} /><strong>No workspaces yet</strong><span>Create the first shared workspace for {currentOrganization?.name}.</span></div> : null}</div>
             {currentOrganization && canManageOrganization ? <OrganizationAdministration accessToken={accessToken} onOrganizationUpdated={(updated) => setOrganizations((current) => current.map((organization) => organization.id === updated.id ? updated : organization))} organization={currentOrganization} /> : null}
           </>}
           <Toast kind="error" message={formError} />

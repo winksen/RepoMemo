@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.2.186` (2026-10-22). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, and the retired local workspace are described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.2.187` (2026-10-22). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, and the retired local workspace are described briefly in [§12](#12-desktop-app).
 
 ---
 
@@ -246,7 +246,7 @@ A **System** button in the header opens `/system`, with these pages:
 
 ## 3. Organizations and the dashboard
 
-- **Dashboard** (`/dashboard`): every organization you belong to, its workspaces, and aggregate totals (artifacts, active tasks, memory cards), loaded in one request.
+- **Dashboard** (`/dashboard`): every organization you belong to, its workspaces, and aggregate totals (artifacts, active tasks, memory cards), loaded in one request. A workspace that uses a template other than General names it on its card, with the one figure the template chose as its headline (V0.2.187): code symbols for Software engineering, active tasks for Operations and incidents, memory cards for Product and decisions, sources for the Knowledge base. The organization's Workspaces page lists the same. General shows no badge, and the headline arrives with the same request: nothing is asked for each workspace.
 - **Workspace directory** (`/workspaces`): pick an organization, create workspaces (owner or admin; once the server offers a template besides General, the form lists the templates as cards, with General chosen, and the first workspace of the setup wizard does the same, V0.2.169), **import a workspace from an archive** (owner or admin, checked first; see §10), and create a new organization.
 - **Organization administration**: list members, add a registered user by email with a role, and remove members, subject to the rules in §1.
 
@@ -567,7 +567,7 @@ The local workspace and a server keep **separate data**.
 
 ---
 
-## 13. Known functional gaps (at V0.2.186)
+## 13. Known functional gaps (at V0.2.187)
 
 These are observed in the code and are useful for prioritizing. The roadmap item that addresses each one is in brackets.
 

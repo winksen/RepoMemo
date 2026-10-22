@@ -68,15 +68,70 @@ pub(crate) async fn dashboard(
         .map(|entry| entry.workspace.id.clone())
         .collect::<Vec<_>>();
     let counts = state.storage.dashboard_counts(&ids).await.map_err(map_storage_error)?;
+    // The template of each workspace comes from the settings that were listed with it: no read for each. A headline
+    // that needs a count beyond the three is counted once for all the workspaces that name it.
+    let templates = workspaces
+        .iter()
+        .map(|entry| {
+            (
+                entry.workspace.id.clone(),
+                state.core.effective_template_of(&entry.workspace),
+            )
+        })
+        .collect::<std::collections::HashMap<_, _>>();
+    let headline_of = |workspace_id: &str| {
+        templates
+            .get(workspace_id)
+            .and_then(|effective| effective.template.overview_headline())
+    };
+    let mut extra = std::collections::HashMap::new();
+    for (card, what) in [
+        ("code_symbols", repomemo_storage::DashboardCount::Symbols),
+        ("sources", repomemo_storage::DashboardCount::Sources),
+    ] {
+        let wanting = ids
+            .iter()
+            .filter(|id| headline_of(id).as_deref() == Some(card))
+            .cloned()
+            .collect::<Vec<_>>();
+        if !wanting.is_empty() {
+            extra.insert(
+                card,
+                state
+                    .storage
+                    .dashboard_count(what, &wanting)
+                    .await
+                    .map_err(map_storage_error)?,
+            );
+        }
+    }
     record_timing("dashboard", "all", started, ids.len());
     Ok(Json(DashboardResponse {
         workspaces: counts
             .into_iter()
-            .map(|counts| DashboardWorkspace {
-                workspace_id: counts.workspace_id,
-                artifact_count: counts.artifacts,
-                active_task_count: counts.active_tasks,
-                memory_card_count: counts.memory_cards,
+            .map(|counts| {
+                let template = templates
+                    .get(&counts.workspace_id)
+                    .filter(|effective| effective.template.id() != repomemo_templates::GENERAL_ID)
+                    .map(|effective| DashboardTemplate {
+                        id: effective.template.id().to_owned(),
+                        name: effective.template.meta.name.clone(),
+                        headline: headline_of(&counts.workspace_id).and_then(|card| {
+                            let value = match card.as_str() {
+                                "memory_cards" => counts.memory_cards,
+                                "active_tasks" => counts.active_tasks,
+                                other => extra.get(other)?.get(&counts.workspace_id).copied().unwrap_or(0),
+                            };
+                            Some(DashboardHeadline { card, value })
+                        }),
+                    });
+                DashboardWorkspace {
+                    workspace_id: counts.workspace_id,
+                    artifact_count: counts.artifacts,
+                    active_task_count: counts.active_tasks,
+                    memory_card_count: counts.memory_cards,
+                    template,
+                }
             })
             .collect(),
     }))

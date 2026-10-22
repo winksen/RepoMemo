@@ -60,7 +60,7 @@ use secrets::SecretBox;
 pub use secrets::{restrict_to_owner, KEY_FILE_NAME as SECRET_KEY_FILE_NAME, MIN_MASTER_KEY_CHARS};
 pub use setup::SetupState;
 pub use staging::{StagedBlob, StagedBlobWriter};
-pub use stats::{ArtifactQuery, ArtifactStats, DashboardCounts, KindFilter};
+pub use stats::{ArtifactQuery, ArtifactStats, DashboardCount, DashboardCounts, KindFilter};
 pub use system::{StoredSystemSetting, UserAccess};
 pub use users::RefreshOutcome;
 
