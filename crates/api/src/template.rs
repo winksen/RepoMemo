@@ -29,6 +29,8 @@ pub struct EffectiveTemplate {
     pub origin: Origin,
     /// The choice as saved, whether or not it could be used.
     pub reference: Option<WorkspaceTemplateRef>,
+    /// True when the template in force came from the operator's folder.
+    pub custom: bool,
 }
 
 impl EffectiveTemplate {
@@ -39,7 +41,7 @@ impl EffectiveTemplate {
             Origin::Workspace => ("workspace", None),
             Origin::Fallback { reason } => ("fallback", Some(reason.clone())),
         };
-        let detail = detail_of(&self.template);
+        let detail = detail_of(&self.template, self.custom);
         WorkspaceTemplateView {
             template: detail.template,
             source: source.to_owned(),
@@ -66,13 +68,13 @@ impl EffectiveTemplate {
 }
 
 /// A template as a person looks at it: everything it arranges and names, resolved (V0.2.177).
-pub fn detail_of(template: &TemplateDefinition) -> TemplateDetail {
+pub fn detail_of(template: &TemplateDefinition, custom: bool) -> TemplateDetail {
     let sections = template.sections();
     let labels = template.labels();
     let evidence = template.evidence();
     let assistant = template.assistant();
     TemplateDetail {
-        template: summary_of(template),
+        template: summary_of(template, custom),
         sections: TemplateSections {
             primary: sections.primary,
             more: sections.more,
@@ -151,13 +153,14 @@ pub fn detail_of(template: &TemplateDefinition) -> TemplateDetail {
 }
 
 /// What identifies a template, for a list.
-pub fn summary_of(template: &TemplateDefinition) -> TemplateSummary {
+pub fn summary_of(template: &TemplateDefinition, custom: bool) -> TemplateSummary {
     TemplateSummary {
         id: template.meta.id.clone(),
         version: template.meta.version,
         name: template.meta.name.clone(),
         summary: template.meta.summary.clone(),
         icon: template.meta.icon.clone(),
+        custom,
     }
 }
 
@@ -209,10 +212,12 @@ impl TemplateResolver {
                 template = template.with_overrides(&overrides);
             }
         }
+        let custom = matches!(resolution.origin, Origin::Workspace) && self.catalogue.is_custom(template.id());
         let answer = EffectiveTemplate {
             template,
             origin: resolution.origin,
             reference: reference.clone(),
+            custom,
         };
         if let Ok(mut kept) = self.kept.lock() {
             if kept.len() >= MAX_CACHED && !kept.contains_key(workspace_id) {
@@ -335,12 +340,20 @@ impl RepoMemoCore {
 
     /// A template of the catalogue as a person looks at it before choosing it, or `None` when there is no such one.
     pub fn template_detail(&self, template_id: &str) -> Option<TemplateDetail> {
-        self.templates.catalogue.get(template_id).map(detail_of)
+        let catalogue = &self.templates.catalogue;
+        catalogue
+            .get(template_id)
+            .map(|template| detail_of(template, catalogue.is_custom(template_id)))
     }
 
     /// The catalogue as a picker lists it.
     pub fn template_summaries(&self) -> Vec<TemplateSummary> {
-        self.templates.catalogue.list().iter().map(summary_of).collect()
+        let catalogue = &self.templates.catalogue;
+        catalogue
+            .list()
+            .iter()
+            .map(|template| summary_of(template, catalogue.is_custom(template.id())))
+            .collect()
     }
 
     /// Chooses the workspace's template, or returns it to the default with `None`. An id the catalogue lacks is
@@ -833,12 +846,12 @@ mod tests {
     #[test]
     fn a_template_can_be_looked_at_before_it_is_chosen() {
         let resolver = TemplateResolver::default();
-        let general = detail_of(&resolver.catalogue.get(GENERAL_ID).unwrap().clone());
+        let general = detail_of(&resolver.catalogue.get(GENERAL_ID).unwrap().clone(), false);
         assert_eq!(general.template.id, GENERAL_ID);
         assert_eq!(general.sections.primary.len(), 12);
         assert_eq!(general.overview.cards.len(), 9);
         for template in resolver.catalogue.list() {
-            let detail = detail_of(template);
+            let detail = detail_of(template, false);
             assert_eq!(detail.template.id, template.id());
             assert_eq!(
                 detail.sections.primary.len() + detail.sections.more.len(),

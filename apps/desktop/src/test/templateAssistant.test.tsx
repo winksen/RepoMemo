@@ -54,7 +54,7 @@ describe("the suggested questions", () => {
 
 function templateWith(assistant: WorkspaceTemplateView["assistant"]): WorkspaceTemplateView {
   return {
-    template: { id: "operations", version: 1, name: "Operations and incidents", summary: "", icon: "heartbeat" },
+    template: { id: "operations", version: 1, name: "Operations and incidents", summary: "", icon: "heartbeat", custom: false },
     source: "workspace", reason: null, chosen_id: "operations", overrides: null,
     sections: { primary: [], more: [], landing: "overview" }, labels: { sections: {}, artifact_types: {} }, overview: { cards: [], headline: null },
     evidence: { default_view: "grid", types_first: [] }, assistant, retrieval: { type_chips: [] }, ranking: { verified: 1.1, boosts: [], recency: null }, health: { detectors: ["index_failed"], stale_after_days: null }, review: { order: [] }, map: { coverage_first: [], relations_first: [] }, repositories: { include: [], exclude: [] },

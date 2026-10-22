@@ -13,7 +13,7 @@ import type { TemplateDetail, TemplateSummary, WorkspaceTemplateView } from "../
 import { adjustmentsFrom, previewLines, questionsFromText } from "../web/templatePreview";
 import { useTemplate, useTemplateCatalogue, useTemplateDetail } from "../web/workspace/data";
 
-const summary = (id: string, name: string): TemplateSummary => ({ id, version: 1, name, summary: `${name} summary`, icon: "book" });
+const summary = (id: string, name: string): TemplateSummary => ({ id, version: 1, name, summary: `${name} summary`, icon: "book", custom: false });
 const catalogue = [summary("general", "General"), summary("knowledge-base", "Knowledge base"), summary("operations", "Operations and incidents")];
 
 const operationsDetail: TemplateDetail = {

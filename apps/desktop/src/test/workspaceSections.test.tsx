@@ -131,7 +131,7 @@ function workspace(role: SharedWorkspace["role"]): SharedWorkspace {
 
 function templateView(sections: WorkspaceTemplateView["sections"], labels: WorkspaceTemplateView["labels"] = { sections: {}, artifact_types: {} }): WorkspaceTemplateView {
   return {
-    template: { id: "knowledge-base", version: 1, name: "Knowledge base", summary: "", icon: "book" },
+    template: { id: "knowledge-base", version: 1, name: "Knowledge base", summary: "", icon: "book", custom: false },
     source: "workspace", reason: null, chosen_id: "knowledge-base", overrides: null, sections, labels, overview: { cards: ["index_coverage"], headline: null }, evidence: { default_view: "grid", types_first: [] }, assistant: { order: [], suggestions: [], phrases: [], focus: null }, retrieval: { type_chips: [] }, ranking: { verified: 1.1, boosts: [], recency: null }, health: { detectors: ["index_failed"], stale_after_days: null }, review: { order: [] }, map: { coverage_first: [], relations_first: [] }, repositories: { include: [], exclude: [] },
   };
 }

@@ -15,8 +15,9 @@ import { getSharedWorkspaceTemplate, listSharedTemplates } from "../lib/sharedAp
 import type { TemplateSummary, WorkspaceTemplateView } from "../types";
 import { useTemplate, useTemplateCatalogue } from "../web/workspace/data";
 
-const general: TemplateSummary = { id: "general", version: 1, name: "General", summary: "Every section in its usual order.", icon: "stack" };
-const operations: TemplateSummary = { id: "operations", version: 2, name: "Operations and incidents", summary: "Runbooks and incidents.", icon: "heartbeat" };
+const general: TemplateSummary = { id: "general", version: 1, name: "General", summary: "Every section in its usual order.", icon: "stack", custom: false };
+const operations: TemplateSummary = { id: "operations", version: 2, name: "Operations and incidents", summary: "Runbooks and incidents.", icon: "heartbeat", custom: false };
+const support: TemplateSummary = { id: "support", version: 1, name: "Customer support", summary: "Playbooks and macros.", icon: "messages", custom: true };
 const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
 
 beforeEach(() => { vi.clearAllMocks(); queryClient.clear(); });
@@ -38,6 +39,14 @@ describe("TemplatePicker", () => {
     expect((screen.getByRole("radio", { name: /General/ }) as HTMLInputElement).checked).toBe(true);
     expect((screen.getByRole("radio", { name: /Operations and incidents/ }) as HTMLInputElement).checked).toBe(false);
     expect(screen.getByText("Runbooks and incidents.")).toBeTruthy();
+  });
+
+  it("tags a template from the operator's folder as Custom, and only that one", () => {
+    render(<TemplatePicker name="t" onChange={vi.fn()} templates={[general, operations, support]} value="general" />);
+    expect(screen.getAllByText("Custom")).toHaveLength(1);
+    expect(screen.getByRole("radio", { name: /Customer support/ }).closest("label")?.textContent).toContain("Custom");
+    expect(screen.getByRole("radio", { name: /Operations and incidents/ }).closest("label")?.textContent).not.toContain("Custom");
+    expect(screen.getByRole("radio", { name: /General/ }).closest("label")?.textContent).not.toContain("Custom");
   });
 
   it("reports the template that was chosen, and cannot be changed while the form is busy", () => {

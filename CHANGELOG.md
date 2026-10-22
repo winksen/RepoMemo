@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.189 (2026-10-22)
+
+Operators can add templates in a folder without a release; invalid files are named and ignored.
+
+### Added
+- **`REPOMEMO_TEMPLATES_DIR`:** a folder of workspace template files. The server reads its `*.json` files once, when it starts, and offers the valid ones next to the built-in templates; a change needs a restart. Files whose name starts with `_` are left alone, as in the built-in folder.
+- **The same rules:** a file is held to what every template is. It is at most 64 KiB (checked on its size and again while reading), at most 64 files are read, JSON nests at most 8 deep, a link is never followed and a folder is not entered, a file is named after its id, and its id cannot be one of the built-in templates or `general`: `operations.json` cannot replace Operations.
+- **A bad file never stops the server:** it is left out and named in System › Overview (a *Template files* panel with the file, the place in it, such as `sections.order[0]`, and what is wrong), in the server check (a *Template files* row, a warning when a file was left out) and in the log. A folder that cannot be read is one such problem.
+- **Custom tag:** a template from the folder carries *Custom* in the picker. `GET /v1/templates`, a template's detail and a workspace's own template carry `custom`.
+- **Settings:** `REPOMEMO_TEMPLATES_DIR` is described in the development commands, and the upgrade notes mention it.
+
+### Changed
+- **Tests (written, not run):** seven in the templates crate (files added are custom and sorted among the built-in ones, in any order; a file cannot take the id of a built-in template or `general`, must be named after its id and is named when refused; a folder is read in name order and the rest left alone; a folder that cannot be read is a problem and not an error; the size limit and bad text; at most 64 files; a link not followed, on Unix), one on the server (a folder with a valid file, a file named like a built-in, an unknown section and a text file: the picker, System › Overview and a workspace made from the custom template; a server with no folder says nothing about one) and one for the web (the Custom tag, on one template only).
+- **Checks run on this release:** `cargo check` of the templates, api and server crates with their tests compiles; `rustfmt` shows nothing for the lines changed; `templates:check`, `types:check`, `typecheck`, `styles:check`, `a11y:check`, `docs:check` and `version:check` pass. **Not run:** the tests, as asked.
+
+### Upgrading
+- Nothing to do. Without `REPOMEMO_TEMPLATES_DIR` the server offers the templates it was built with, as before.
+
 ## V0.2.188 (2026-10-22)
 
 A checker and a guide for writing a template.

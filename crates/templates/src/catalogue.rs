@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 use std::sync::OnceLock;
 
 use crate::{general, TemplateDefinition, TemplateIssue, GENERAL_ID};
@@ -18,6 +18,56 @@ pub struct SourceProblem {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Catalogue {
     templates: Vec<TemplateDefinition>,
+    /// The ids that came from the operator's folder rather than from this server's own files (V0.2.189).
+    custom: BTreeSet<String>,
+}
+
+/// Reads the files in order and keeps the valid ones. `reserved` holds the ids that are already taken (the built-in
+/// templates, when files are added to them); the returned templates are in file-name order.
+fn admit(sources: Vec<(&str, &str)>, reserved: &HashSet<String>) -> (Vec<TemplateDefinition>, Vec<SourceProblem>) {
+    let mut problems = Vec::new();
+    let mut loaded: Vec<TemplateDefinition> = Vec::new();
+    let mut taken: HashSet<String> = HashSet::new();
+    for (name, text) in sources {
+        let template = match TemplateDefinition::parse(text) {
+            Ok(template) => template,
+            Err(issues) => {
+                problems.push(SourceProblem {
+                    source: name.to_owned(),
+                    issues,
+                });
+                continue;
+            }
+        };
+        let id = template.id().to_owned();
+        let mismatch = name.strip_suffix(".json") != Some(id.as_str());
+        let problem = if id == GENERAL_ID {
+            Some("general is defined by the server and cannot be replaced".to_owned())
+        } else if reserved.contains(&id) {
+            Some(format!(
+                "{id} is a template built into this server; a file cannot replace it"
+            ))
+        } else if mismatch {
+            Some(format!(
+                "the file is named {name} and the id is {id}; a file is named after its id"
+            ))
+        } else if taken.contains(&id) {
+            Some(format!("another file already has the id {id}"))
+        } else {
+            None
+        };
+        match problem {
+            Some(message) => problems.push(SourceProblem {
+                source: name.to_owned(),
+                issues: vec![TemplateIssue::new("meta.id", message)],
+            }),
+            None => {
+                taken.insert(id);
+                loaded.push(template);
+            }
+        }
+    }
+    (loaded, problems)
 }
 
 impl Catalogue {
@@ -25,6 +75,7 @@ impl Catalogue {
     pub fn general_only() -> Self {
         Self {
             templates: vec![general()],
+            custom: BTreeSet::new(),
         }
     }
 
@@ -35,48 +86,40 @@ impl Catalogue {
     pub fn load<'a>(sources: impl IntoIterator<Item = (&'a str, &'a str)>) -> (Self, Vec<SourceProblem>) {
         let mut sources: Vec<(&str, &str)> = sources.into_iter().collect();
         sources.sort();
-        let mut problems = Vec::new();
-        let mut loaded: Vec<TemplateDefinition> = Vec::new();
-        let mut taken: HashSet<String> = HashSet::from([GENERAL_ID.to_owned()]);
-        for (name, text) in sources {
-            let template = match TemplateDefinition::parse(text) {
-                Ok(template) => template,
-                Err(issues) => {
-                    problems.push(SourceProblem {
-                        source: name.to_owned(),
-                        issues,
-                    });
-                    continue;
-                }
-            };
-            let id = template.id().to_owned();
-            let mismatch = name.strip_suffix(".json") != Some(id.as_str());
-            let problem = if id == GENERAL_ID {
-                Some("general is defined by the server and cannot be replaced".to_owned())
-            } else if mismatch {
-                Some(format!(
-                    "the file is named {name} and the id is {id}; a file is named after its id"
-                ))
-            } else if taken.contains(&id) {
-                Some(format!("another file already has the id {id}"))
-            } else {
-                None
-            };
-            match problem {
-                Some(message) => problems.push(SourceProblem {
-                    source: name.to_owned(),
-                    issues: vec![TemplateIssue::new("meta.id", message)],
-                }),
-                None => {
-                    taken.insert(id);
-                    loaded.push(template);
-                }
-            }
-        }
+        let (mut loaded, problems) = admit(sources, &HashSet::new());
         loaded.sort_by_cached_key(|template| (template.meta.name.to_lowercase(), template.meta.id.clone()));
         let mut templates = vec![general()];
         templates.extend(loaded);
-        (Self { templates }, problems)
+        (
+            Self {
+                templates,
+                custom: BTreeSet::new(),
+            },
+            problems,
+        )
+    }
+
+    /// This catalogue and the templates of more files (the operator's folder, V0.2.189), which are marked custom. The
+    /// files are held to the rules of every template file, and an id of this catalogue (`general` and the built-in
+    /// templates included) cannot be taken by a file: it is left out and returned as a problem, the others are kept.
+    /// The result does not depend on the order of the pairs.
+    pub fn extended<'a>(&self, sources: impl IntoIterator<Item = (&'a str, &'a str)>) -> (Self, Vec<SourceProblem>) {
+        let mut sources: Vec<(&str, &str)> = sources.into_iter().collect();
+        sources.sort();
+        let reserved: HashSet<String> = self.templates.iter().map(|template| template.id().to_owned()).collect();
+        let (added, problems) = admit(sources, &reserved);
+        let mut custom = self.custom.clone();
+        custom.extend(added.iter().map(|template| template.id().to_owned()));
+        let mut rest: Vec<TemplateDefinition> = self.templates.iter().skip(1).cloned().chain(added).collect();
+        rest.sort_by_cached_key(|template| (template.meta.name.to_lowercase(), template.meta.id.clone()));
+        let mut templates = vec![general()];
+        templates.extend(rest);
+        (Self { templates, custom }, problems)
+    }
+
+    /// Whether the template came from the operator's folder rather than from this server's own files.
+    pub fn is_custom(&self, id: &str) -> bool {
+        self.custom.contains(id)
     }
 
     /// The templates built into this server.

@@ -200,6 +200,8 @@ export interface TemplateSummary {
   name: string;
   summary: string;
   icon: string;
+  /** True for a template that came from the operator's folder rather than from the server's own files. */
+  custom: boolean;
 }
 
 /** The template a workspace uses and where it came from. */

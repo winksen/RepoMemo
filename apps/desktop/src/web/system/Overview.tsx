@@ -1,6 +1,6 @@
-import { IconActivity as Activity, IconDatabase as Database, IconServer as Server, IconShieldCheck as ShieldCheck, IconUsers as Users, IconWorld as World } from "@tabler/icons-react";
+import { IconActivity as Activity, IconDatabase as Database, IconServer as Server, IconShieldCheck as ShieldCheck, IconTemplate as Template, IconUsers as Users, IconWorld as World } from "@tabler/icons-react";
 import { getSystemOverview } from "../../lib/sharedApi";
-import type { MaintenanceStatus, SystemOverview } from "../../types";
+import type { MaintenanceStatus, SystemOverview, SystemTemplateFiles } from "../../types";
 import { Badge } from "../../components/ui/badge";
 import { Table } from "../../components/ui/table";
 import { PanelHeading } from "../../components/ui/panel-heading";
@@ -16,6 +16,24 @@ function officePreviewsText(previews: SystemOverview["background"]["office_previ
   if (previews.refused) return `refused: ${previews.refused}`;
   if (!previews.installed) return previews.requested ? "turned on, but not found" : "not installed";
   return previews.requested ? "turned on, release being checked" : "installed, previews off (REPOMEMO_OFFICE_PREVIEWS)";
+}
+
+/** The templates the operator's folder added and the files it left out, each with why (V0.2.189). */
+function TemplateFilesPanel({ files }: { files: SystemTemplateFiles }) {
+  return <section className="shared-settings-group">
+    <PanelHeading description={`${files.loaded.length} added · ${files.problems.length} left out`} icon={Template} title="Template files" />
+    <Facts items={[
+      ["Folder", <code key="folder">{files.folder}</code>],
+      ["Added", files.loaded.length ? files.loaded.map((template) => `${template.name} (${template.file})`).join(" · ") : "none"],
+    ]} />
+    {files.problems.length ? <Table>
+      <thead><tr><th scope="col">File</th><th scope="col">Where</th><th scope="col">What is wrong</th></tr></thead>
+      <tbody>{files.problems.flatMap((problem) => problem.issues.map((issue, index) => <tr key={`${problem.file}-${index}`}>
+        <th scope="row">{problem.file}</th><td>{issue.path ? <code>{issue.path}</code> : "the file"}</td><td>{issue.message}</td>
+      </tr>))}</tbody>
+    </Table> : <p className="shared-muted-copy">Every file in the folder was loaded. A change needs a restart.</p>}
+    {files.problems.length ? <p className="shared-muted-copy">A file that is left out never stops the server. Fix it and restart to load it.</p> : null}
+  </section>;
 }
 
 export function OverviewSection({ accessToken }: { accessToken: string }) {
@@ -90,6 +108,7 @@ export function OverviewSection({ accessToken }: { accessToken: string }) {
         <div className="rm-system-chart"><p className="rm-system-chart-title">Requests per minute, last hour</p><BarStrip label="Requests per minute over the last hour" values={minuteBars} /></div>
       </section>
     </div>
+    {overview.template_files.folder ? <TemplateFilesPanel files={overview.template_files} /> : null}
     <section className="shared-settings-group">
       <PanelHeading description="seen in the last 24 hours" icon={World} title="Front-end clients" />
       {overview.clients.length ? <Table>

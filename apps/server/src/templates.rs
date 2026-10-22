@@ -4,8 +4,97 @@
 //! session or an `admin` token.
 
 use repomemo_domain::{TemplateDetail, TemplateSummary, UpdateWorkspaceTemplateRequest, WorkspaceTemplateView};
+use repomemo_templates::{read_folder, Catalogue};
 
 use crate::*;
+
+/// What the operator's folder of templates gave (V0.2.189), kept from the start of the server: shown in System ›
+/// Overview and in the server check.
+#[derive(Debug, Clone, Default, Serialize)]
+pub(crate) struct TemplateFiles {
+    /// The folder (`REPOMEMO_TEMPLATES_DIR`), when one is set.
+    pub(crate) folder: Option<String>,
+    /// The templates it added.
+    pub(crate) loaded: Vec<TemplateFileLoaded>,
+    /// The files it left out, and why.
+    pub(crate) problems: Vec<TemplateFileProblem>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct TemplateFileLoaded {
+    pub(crate) id: String,
+    pub(crate) name: String,
+    pub(crate) file: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct TemplateFileProblem {
+    pub(crate) file: String,
+    pub(crate) issues: Vec<TemplateFileIssue>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct TemplateFileIssue {
+    /// Where in the template the problem is (`sections.order[1]`); empty for the file as a whole.
+    pub(crate) path: String,
+    pub(crate) message: String,
+}
+
+/// The templates this server offers: its own, and the valid files of the operator's folder. A file that is not valid
+/// is left out and named; nothing here can stop the server.
+pub(crate) fn load_catalogue(folder: Option<&std::path::Path>) -> (Catalogue, TemplateFiles) {
+    let builtin = Catalogue::builtin();
+    let Some(folder) = folder else {
+        return (builtin.clone(), TemplateFiles::default());
+    };
+    let read = read_folder(folder);
+    let (catalogue, refused) = builtin.extended(read.sources.iter().map(|(name, text)| (name.as_str(), text.as_str())));
+    let loaded: Vec<TemplateFileLoaded> = catalogue
+        .list()
+        .iter()
+        .filter(|template| catalogue.is_custom(template.id()))
+        .map(|template| TemplateFileLoaded {
+            id: template.id().to_owned(),
+            name: template.meta.name.clone(),
+            file: format!("{}.json", template.id()),
+        })
+        .collect();
+    let problems: Vec<TemplateFileProblem> = read
+        .problems
+        .into_iter()
+        .chain(refused)
+        .map(|problem| TemplateFileProblem {
+            file: problem.source,
+            issues: problem
+                .issues
+                .into_iter()
+                .map(|issue| TemplateFileIssue {
+                    path: issue.path.clone(),
+                    message: issue.message.clone(),
+                })
+                .collect(),
+        })
+        .collect();
+    tracing::info!(folder = %folder.display(), added = loaded.len(), left_out = problems.len(), "Template files read");
+    for problem in &problems {
+        for issue in &problem.issues {
+            let place = if issue.path.is_empty() {
+                String::new()
+            } else {
+                format!(" ({})", issue.path)
+            };
+            tracing::warn!(file = %problem.file, "A template file was left out: {}{place}", issue.message);
+        }
+    }
+    (
+        catalogue,
+        TemplateFiles {
+            folder: Some(folder.display().to_string()),
+            loaded,
+            problems,
+        },
+    )
+}
 
 /// The templates this server offers, `general` first.
 pub(crate) async fn list_templates(

@@ -710,6 +710,15 @@ export interface SystemOverview {
   };
   clients: SystemClient[];
   logs: { capturing: boolean; buffered: number };
+  /** The operator's folder of workspace templates and what became of its files. */
+  template_files: SystemTemplateFiles;
+}
+
+/** What REPOMEMO_TEMPLATES_DIR gave: the templates it added and the files it left out, each with why. */
+export interface SystemTemplateFiles {
+  folder: string | null;
+  loaded: { id: string; name: string; file: string }[];
+  problems: { file: string; issues: { path: string; message: string }[] }[];
 }
 
 export interface SystemUsage {

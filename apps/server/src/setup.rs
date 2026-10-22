@@ -593,6 +593,29 @@ pub(crate) async fn checks(
         ),
     });
 
+    // Only when an operator set a folder of templates: without one there is nothing to check.
+    let template_files = &state.template_files;
+    if let Some(folder) = &template_files.folder {
+        let left_out = template_files.problems.len();
+        checks.push(SetupCheck {
+            key: "template_files",
+            label: "Template files",
+            status: if left_out == 0 { CheckStatus::Ok } else { CheckStatus::Warning },
+            detail: format!(
+                "{} added from {folder}{}.",
+                template_files.loaded.len(),
+                if left_out == 0 {
+                    String::new()
+                } else {
+                    format!(", {left_out} left out: {}", template_files.problems.iter().map(|problem| problem.file.as_str()).collect::<Vec<_>>().join(", "))
+                }
+            ),
+            advice: (left_out > 0).then_some(
+                "System › Overview says what is wrong with each file. A file that is left out never stops the server; fix it and restart to load it.",
+            ),
+        });
+    }
+
     checks.push(SetupCheck {
         key: "log_files",
         label: "Log files",

@@ -162,6 +162,8 @@ struct AppState {
     backup_key: Option<Arc<str>>,
     /// Where each backup is copied to and checked, when set.
     backup_copy_dir: Option<PathBuf>,
+    /// The templates the operator's folder added, and the files it left out (V0.2.189).
+    template_files: Arc<templates::TemplateFiles>,
     event_bus: WorkspaceEventBus,
     index_queue: IndexQueue,
     embedding_queue: EmbeddingQueue,
@@ -352,7 +354,9 @@ async fn build_state(
     // observers registered here also fire for writes that happen inside
     // `RepoMemoCore`. Without this the two halves would each hold their own
     // pool and SSE would only see writes the server layer performed directly.
+    let (template_catalogue, template_files) = templates::load_catalogue(config.templates_dir.as_deref());
     let core = RepoMemoCore::from_storage(storage.clone())
+        .with_template_catalogue(template_catalogue)
         .with_repo_link_policy(repo_policy)
         .with_remote_git_policy(remote_git_policy);
     runtime.share_background_limit(core.background_ai_budget().limit_handle());
@@ -456,6 +460,7 @@ async fn build_state(
         upload_gate_bytes: config.upload_inflight_bytes,
         backup_key: config.backup_key.as_deref().map(Arc::from),
         backup_copy_dir: config.backup_copy_dir.clone(),
+        template_files: Arc::new(template_files),
         event_bus,
         index_queue,
         embedding_queue,

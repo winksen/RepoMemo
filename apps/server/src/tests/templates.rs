@@ -771,3 +771,146 @@ async fn templates_are_listed_read_by_members_and_changed_only_by_administrators
 
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+/// V0.2.189: the operator's folder adds its valid files, names the others in System › Overview and never stops the
+/// server; a file named like a built-in template is refused.
+#[tokio::test]
+async fn a_folder_of_templates_adds_the_valid_files_and_names_the_rest() {
+    let data_dir = temp_data_dir("templates-folder");
+    let folder = temp_data_dir("templates-folder-files");
+    std::fs::create_dir_all(&folder).unwrap();
+    let file = |id: &str, name: &str, extra: &str| {
+        format!(
+            r#"{{ "format": 1, "meta": {{ "id": "{id}", "version": 1, "name": "{name}", "summary": "From the operator's folder.", "icon": "messages" }}{extra} }}"#
+        )
+    };
+    std::fs::write(
+        folder.join("support.json"),
+        file(
+            "support",
+            "Customer support",
+            r#", "sections": { "order": ["review"] }"#,
+        ),
+    )
+    .unwrap();
+    std::fs::write(
+        folder.join("operations.json"),
+        file("operations", "Operations, my way", ""),
+    )
+    .unwrap();
+    std::fs::write(
+        folder.join("typo.json"),
+        file("typo", "Typo", r#", "sections": { "order": ["evidnce"] }"#),
+    )
+    .unwrap();
+    std::fs::write(folder.join("readme.txt"), "not a template").unwrap();
+
+    let mut config = ServerConfig::for_test(data_dir.clone());
+    config.templates_dir = Some(folder.clone());
+    let app = router(config).await.unwrap();
+    let send = |method: &'static str, uri: String, who: String, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, &who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let (admin, _) = register_account(&app, "templates-folder-admin@example.com").await;
+    let (owner, _) = register_account(&app, "templates-folder-owner@example.com").await;
+
+    // The valid file is offered, tagged custom; the built-in templates are not, and operations is still the built-in one.
+    let listed = response_json(send("GET", "/v1/templates".to_owned(), owner.clone(), json!(null)).await).await;
+    let listed = listed.as_array().unwrap();
+    let find = |id: &str| {
+        listed
+            .iter()
+            .filter(|template| template["id"] == id)
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(find("support").len(), 1);
+    assert_eq!(find("support")[0]["custom"], true);
+    assert_eq!(find("operations").len(), 1);
+    assert_eq!(find("operations")[0]["custom"], false);
+    assert_eq!(find("operations")[0]["name"], "Operations and incidents");
+    assert!(find("typo").is_empty());
+    assert_eq!(find("general")[0]["custom"], false);
+
+    // System › Overview names the folder, what it added and each file it left out with the place and the reason.
+    let overview = response_json(send("GET", "/v1/system/overview".to_owned(), admin.clone(), json!(null)).await).await;
+    let files = &overview["template_files"];
+    assert_eq!(files["folder"], folder.display().to_string());
+    assert_eq!(
+        files["loaded"],
+        json!([{"id": "support", "name": "Customer support", "file": "support.json"}])
+    );
+    let problems = files["problems"].as_array().unwrap();
+    let problem = |file: &str| {
+        problems
+            .iter()
+            .find(|problem| problem["file"] == file)
+            .unwrap_or(&Value::Null)
+    };
+    assert_eq!(problems.len(), 2, "{problems:?}");
+    assert!(problem("operations.json")["issues"][0]["message"]
+        .as_str()
+        .unwrap()
+        .contains("built into this server"));
+    assert_eq!(problem("typo.json")["issues"][0]["path"], "sections.order[0]");
+
+    // A workspace made from the custom template uses it as any other, and says it is custom.
+    let organization = response_json(
+        send(
+            "POST",
+            "/v1/organizations".to_owned(),
+            owner.clone(),
+            json!({"name": "Team"}),
+        )
+        .await,
+    )
+    .await["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let created = send(
+        "POST",
+        "/v1/workspaces".to_owned(),
+        owner.clone(),
+        json!({"organization_id": organization, "name": "Help desk", "template_id": "support"}),
+    )
+    .await;
+    assert_eq!(created.status(), 201);
+    let workspace = response_json(created).await["workspace"]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let view = response_json(
+        send(
+            "GET",
+            format!("/v1/workspaces/{workspace}/template"),
+            owner.clone(),
+            json!(null),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(view["template"]["id"], "support");
+    assert_eq!(view["template"]["custom"], true);
+    assert_eq!(view["sections"]["primary"][0], "review");
+
+    // A server without a folder says nothing about one.
+    let plain_dir = temp_data_dir("templates-no-folder");
+    let plain = router(ServerConfig::for_test(plain_dir.clone())).await.unwrap();
+    let (plain_admin, _) = register_account(&plain, "templates-plain-admin@example.com").await;
+    let overview = response_json(
+        plain
+            .clone()
+            .oneshot(json_request("GET", "/v1/system/overview", &plain_admin, json!(null)))
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert!(overview["template_files"]["folder"].is_null());
+    assert_eq!(overview["template_files"]["problems"], json!([]));
+
+    let _ = std::fs::remove_dir_all(data_dir);
+    let _ = std::fs::remove_dir_all(folder);
+    let _ = std::fs::remove_dir_all(plain_dir);
+}

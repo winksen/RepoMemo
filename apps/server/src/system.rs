@@ -940,6 +940,8 @@ pub(crate) struct OverviewResponse {
     traffic: TrafficView,
     clients: Vec<ClientSighting>,
     logs: LogsView,
+    /// The operator's folder of templates, and what became of its files (V0.2.189).
+    template_files: crate::templates::TemplateFiles,
 }
 
 #[derive(Debug, Serialize)]
@@ -1116,6 +1118,7 @@ pub(crate) async fn overview(
             capturing: logs::buffer().is_some(),
             buffered: logs::buffer().map_or(0, |buffer| buffer.len()),
         },
+        template_files: (*state.template_files).clone(),
     }))
 }
 

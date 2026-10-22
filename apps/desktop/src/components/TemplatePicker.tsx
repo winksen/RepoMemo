@@ -1,6 +1,7 @@
 import { WORKSPACE_ICONS } from "../web/workspaceIcons";
 import { ICON_SIZE } from "./ui/icon";
 import type { TemplateSummary } from "../types";
+import { Badge } from "./ui/badge";
 
 /**
  * Which template a new workspace starts with: one card for each, with its icon, name and what it is for.
@@ -25,7 +26,7 @@ export function TemplatePicker({ disabled = false, name, onChange, templates, va
             <label className="rm-template-option" key={template.id}>
               <input checked={value === template.id} className="rm-template-radio" name={name} onChange={() => onChange(template.id)} type="radio" value={template.id} />
               <Icon size={ICON_SIZE.md} />
-              <span className="rm-template-text"><strong>{template.name}</strong><span>{template.summary}</span></span>
+              <span className="rm-template-text"><strong>{template.name}{template.custom ? <> <Badge>Custom</Badge></> : null}</strong><span>{template.summary}</span></span>
             </label>
           );
         })}

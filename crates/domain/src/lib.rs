@@ -253,6 +253,8 @@ pub struct TemplateSummary {
     pub name: String,
     pub summary: String,
     pub icon: String,
+    /// True for a template that came from the operator's folder rather than from the server's own files.
+    pub custom: bool,
 }
 
 /// The template a workspace uses and where it came from.

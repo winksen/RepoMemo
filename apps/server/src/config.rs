@@ -35,6 +35,9 @@ pub struct ServerConfig {
     /// Another folder (a network share, say) every backup is copied to and checked in
     /// (`REPOMEMO_BACKUP_COPY_DIR`).
     pub backup_copy_dir: Option<std::path::PathBuf>,
+    /// A folder of workspace template files added to the built-in ones (`REPOMEMO_TEMPLATES_DIR`, V0.2.189); read
+    /// once, when the server starts.
+    pub templates_dir: Option<std::path::PathBuf>,
     /// Anyone may create an account. When false, only the very first account
     /// can be registered; everyone else is added by an administrator after
     /// registering while it was open, or by the operator.
@@ -320,6 +323,7 @@ impl ServerConfig {
             secret_key,
             backup_key,
             backup_copy_dir: env_text("REPOMEMO_BACKUP_COPY_DIR").map(std::path::PathBuf::from),
+            templates_dir: env_text("REPOMEMO_TEMPLATES_DIR").map(std::path::PathBuf::from),
             // Closed by default: people join with invitation links (review M1).
             allow_registration: env_flag("REPOMEMO_ALLOW_REGISTRATION", false)?,
             organization_creators: "administrators".to_owned(),
@@ -435,6 +439,7 @@ impl ServerConfig {
             secret_key: None,
             backup_key: None,
             backup_copy_dir: None,
+            templates_dir: None,
             allow_registration: true,
             // The tests of everything else sign in as ordinary people who create their own organizations
             // and link folders; the tests of these two settings set them to the server's defaults.

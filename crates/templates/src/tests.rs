@@ -1581,6 +1581,180 @@ fn software_engineering_puts_repositories_and_code_first_on_its_map() {
     }
 }
 
+/// The valid file written for another template: its id and name replaced.
+fn custom(id: &str, name: &str) -> String {
+    VALID
+        .replace("\"operations\"", &format!("\"{id}\""))
+        .replace("Operations and incidents", name)
+}
+
+#[test]
+fn files_added_to_the_built_in_templates_are_custom_and_sorted_among_them() {
+    let builtin = Catalogue::builtin();
+    let support = custom("support", "Customer support");
+    let zebra = custom("zebra", "Zebra herding");
+    let (extended, problems) = builtin.extended([("zebra.json", zebra.as_str()), ("support.json", support.as_str())]);
+    assert!(problems.is_empty(), "{problems:?}");
+    let ids: Vec<&str> = extended.list().iter().map(TemplateDefinition::id).collect();
+    assert_eq!(ids[0], GENERAL_ID);
+    assert!(ids.contains(&"operations") && ids.contains(&"support") && ids.contains(&"zebra"));
+    // Built-in and custom templates are listed together, by name.
+    let names: Vec<String> = extended.list()[1..]
+        .iter()
+        .map(|template| template.meta.name.to_lowercase())
+        .collect();
+    assert!(names.windows(2).all(|pair| pair[0] <= pair[1]), "{names:?}");
+    assert!(extended.is_custom("support") && extended.is_custom("zebra"));
+    assert!(!extended.is_custom("operations") && !extended.is_custom(GENERAL_ID));
+    assert!(
+        !builtin.is_custom("support") && builtin.get("support").is_none(),
+        "the built-in catalogue is not changed"
+    );
+    // The same files in another order give the same catalogue.
+    let (other_order, _) = builtin.extended([("support.json", support.as_str()), ("zebra.json", zebra.as_str())]);
+    assert_eq!(extended, other_order);
+    // Adding nothing leaves the catalogue as it was.
+    assert_eq!(builtin.extended([]).0, *builtin);
+}
+
+#[test]
+fn a_file_cannot_take_the_id_of_a_built_in_template_or_general_and_is_named_when_refused() {
+    let builtin = Catalogue::builtin();
+    let shadow = custom("operations", "Operations, my way");
+    let general_text = custom(GENERAL_ID, "General, my way");
+    let renamed = custom("support", "Customer support");
+    let broken = VALID
+        .replace("\"format\": 1,", "\"format\": 1, \"colour\": \"red\",")
+        .replace("operations", "other");
+    let (extended, problems) = builtin.extended([
+        ("operations.json", shadow.as_str()),
+        ("general.json", general_text.as_str()),
+        ("some-other-name.json", renamed.as_str()),
+        ("other.json", broken.as_str()),
+    ]);
+    let by_file = |file: &str| problems.iter().find(|problem| problem.source == file).unwrap();
+    assert!(by_file("operations.json").issues[0]
+        .message
+        .contains("built into this server"));
+    assert!(by_file("general.json").issues[0].message.contains("cannot be replaced"));
+    assert!(by_file("some-other-name.json").issues[0]
+        .message
+        .contains("named after its id"));
+    assert!(by_file("other.json").issues[0].message.contains("colour"));
+    assert_eq!(problems.len(), 4);
+    // Nothing was added and the built-in templates are as they were.
+    assert_eq!(extended, *builtin);
+    assert_eq!(extended.get("operations"), builtin.get("operations"));
+    // Two files cannot share an id; the first by name is kept.
+    let (twice, repeated) = builtin.extended([("support.json", renamed.as_str()), ("support.json", renamed.as_str())]);
+    assert_eq!(repeated.len(), 1);
+    assert!(twice.is_custom("support"));
+}
+
+/// A folder of its own under the temporary folder.
+fn scratch_folder(label: &str) -> std::path::PathBuf {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    static COUNT: AtomicUsize = AtomicUsize::new(0);
+    let folder = std::env::temp_dir().join(format!(
+        "repomemo-templates-{label}-{}-{}",
+        std::process::id(),
+        COUNT.fetch_add(1, Ordering::Relaxed)
+    ));
+    let _ = std::fs::remove_dir_all(&folder);
+    std::fs::create_dir_all(&folder).unwrap();
+    folder
+}
+
+#[test]
+fn a_folder_gives_its_json_files_in_name_order_and_leaves_the_rest_alone() {
+    let folder = scratch_folder("read");
+    std::fs::write(folder.join("b-team.json"), custom("b-team", "B team")).unwrap();
+    std::fs::write(folder.join("a-team.json"), custom("a-team", "A team")).unwrap();
+    std::fs::write(folder.join("_example.json"), custom("example", "Example")).unwrap();
+    std::fs::write(folder.join("notes.txt"), "not a template").unwrap();
+    std::fs::create_dir(folder.join("nested.json")).unwrap();
+    std::fs::write(folder.join("nested.json").join("deep.json"), custom("deep", "Deep")).unwrap();
+    let read = read_folder(&folder);
+    assert!(read.problems.is_empty(), "{:?}", read.problems);
+    let names: Vec<&str> = read.sources.iter().map(|(name, _)| name.as_str()).collect();
+    assert_eq!(names, ["a-team.json", "b-team.json"]);
+    assert!(read.sources[0].1.contains("a-team"));
+    let _ = std::fs::remove_dir_all(&folder);
+}
+
+#[test]
+fn a_folder_that_cannot_be_read_is_a_problem_and_never_an_error() {
+    let missing = std::env::temp_dir().join(format!("repomemo-templates-missing-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&missing);
+    let read = read_folder(&missing);
+    assert!(read.sources.is_empty());
+    assert_eq!(read.problems.len(), 1);
+    assert!(read.problems[0].issues[0].message.contains("cannot be read"));
+    // A file where a folder should be is the same.
+    let folder = scratch_folder("file");
+    let file = folder.join("not-a-folder");
+    std::fs::write(&file, "x").unwrap();
+    assert_eq!(read_folder(&file).problems.len(), 1);
+    let _ = std::fs::remove_dir_all(&folder);
+}
+
+#[test]
+fn a_file_over_the_size_limit_is_left_out_and_named_and_the_others_are_read() {
+    let folder = scratch_folder("size");
+    std::fs::write(folder.join("big.json"), vec![b' '; limits::FILE_BYTES + 1]).unwrap();
+    std::fs::write(folder.join("just-fits.json"), vec![b' '; limits::FILE_BYTES]).unwrap();
+    std::fs::write(folder.join("fine.json"), custom("fine", "Fine")).unwrap();
+    std::fs::write(folder.join("latin.json"), [0xff, 0xfe, 0x00]).unwrap();
+    let read = read_folder(&folder);
+    let names: Vec<&str> = read.sources.iter().map(|(name, _)| name.as_str()).collect();
+    assert_eq!(names, ["fine.json", "just-fits.json"]);
+    let problems: Vec<(&str, &str)> = read
+        .problems
+        .iter()
+        .map(|problem| (problem.source.as_str(), problem.issues[0].message.as_str()))
+        .collect();
+    assert_eq!(problems.len(), 2);
+    assert!(problems
+        .iter()
+        .any(|(file, message)| *file == "big.json" && message.contains("at most")));
+    assert!(problems
+        .iter()
+        .any(|(file, message)| *file == "latin.json" && message.contains("UTF-8")));
+    let _ = std::fs::remove_dir_all(&folder);
+}
+
+#[test]
+fn a_folder_gives_at_most_sixty_four_files() {
+    let folder = scratch_folder("count");
+    for number in 0..FOLDER_FILES_MAX + 3 {
+        std::fs::write(folder.join(format!("t{number:03}.json")), "{}").unwrap();
+    }
+    let read = read_folder(&folder);
+    assert_eq!(read.sources.len(), FOLDER_FILES_MAX);
+    assert_eq!(read.problems.len(), 3);
+    assert!(read
+        .problems
+        .iter()
+        .all(|problem| problem.issues[0].message.contains("more than 64")));
+    assert_eq!(read.problems[0].source, "t064.json");
+    let _ = std::fs::remove_dir_all(&folder);
+}
+
+#[cfg(unix)]
+#[test]
+fn a_link_in_the_folder_is_not_followed() {
+    let folder = scratch_folder("link");
+    let elsewhere = scratch_folder("link-target");
+    std::fs::write(elsewhere.join("outside.json"), custom("outside", "Outside")).unwrap();
+    std::os::unix::fs::symlink(elsewhere.join("outside.json"), folder.join("outside.json")).unwrap();
+    let read = read_folder(&folder);
+    assert!(read.sources.is_empty());
+    assert_eq!(read.problems.len(), 1);
+    assert!(read.problems[0].issues[0].message.contains("link"));
+    let _ = std::fs::remove_dir_all(&folder);
+    let _ = std::fs::remove_dir_all(&elsewhere);
+}
+
 /// The example a template author copies (V0.2.188): valid, using every block, and not one of the built-in templates.
 #[test]
 fn the_example_is_valid_uses_every_block_and_is_not_a_built_in_template() {
