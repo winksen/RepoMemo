@@ -33,5 +33,6 @@
       "Find the latest report on…"
     ]
   },
-  "retrieval": { "type_chips": ["file", "markdown_doc"] }
+  "retrieval": { "type_chips": ["file", "markdown_doc"] },
+  "ranking": { "verified": 1.15 }
 }

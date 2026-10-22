@@ -773,6 +773,7 @@ impl RepoMemoCore {
         request: SearchRequest,
         embedding: Option<(String, Vec<f32>)>,
     ) -> Result<(Vec<SearchResult>, bool)> {
+        let profile = self.ranking_profile(&request.workspace_id).await;
         let (results, _) = self
             .retrieval
             .hybrid_search(
@@ -781,6 +782,7 @@ impl RepoMemoCore {
                 embedding
                     .as_ref()
                     .map(|(model, vector)| (model.as_str(), vector.as_slice())),
+                &profile,
             )
             .await?;
         Ok((results, embedding.is_some()))
@@ -1201,6 +1203,7 @@ impl RepoMemoCore {
                 None
             }
         };
+        let profile = self.ranking_profile(&request.workspace_id).await;
         let (candidates, used_embeddings) = self
             .retrieval
             .hybrid_search(
@@ -1217,6 +1220,7 @@ impl RepoMemoCore {
                 query_embedding
                     .as_ref()
                     .map(|(model, vector)| (model.as_str(), vector.as_slice())),
+                &profile,
             )
             .await?;
         if candidates.is_empty() {

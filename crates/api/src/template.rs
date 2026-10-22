@@ -11,6 +11,7 @@ use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
 use repomemo_domain::*;
+use repomemo_retrieval::RankingProfile;
 use repomemo_storage::StarterSetup;
 use repomemo_templates::{Catalogue, Origin, Overrides, TemplateDefinition};
 
@@ -55,6 +56,7 @@ impl EffectiveTemplate {
             evidence: detail.evidence,
             assistant: detail.assistant,
             retrieval: detail.retrieval,
+            ranking: detail.ranking,
         }
     }
 }
@@ -89,6 +91,9 @@ pub fn detail_of(template: &TemplateDefinition) -> TemplateDetail {
         },
         retrieval: TemplateRetrieval {
             type_chips: template.retrieval().type_chips,
+        },
+        ranking: TemplateRanking {
+            verified: template.ranking().verified,
         },
     }
 }
@@ -215,6 +220,15 @@ impl RepoMemoCore {
                 .map(|folder| (folder.name.clone(), folder.children.clone()))
                 .collect(),
         })
+    }
+
+    /// How the workspace's search weighs what it finds: its template's ranking, or the usual one when the template
+    /// cannot be read (a ranking must never be the reason a search fails).
+    pub(crate) async fn ranking_profile(&self, workspace_id: &str) -> RankingProfile {
+        match self.effective_template(workspace_id).await {
+            Ok(effective) => RankingProfile::with_verified(effective.template.ranking().verified),
+            Err(_) => RankingProfile::general(),
+        }
     }
 
     /// A template of the catalogue as a person looks at it before choosing it, or `None` when there is no such one.
@@ -662,6 +676,38 @@ mod tests {
                 template.id()
             );
         }
+    }
+
+    #[tokio::test]
+    async fn a_workspace_ranks_by_its_templates_factor_and_by_the_usual_one_without() {
+        let file = r#"{
+            "format": 1,
+            "meta": { "id": "operations", "version": 1, "name": "Operations", "summary": "Runbooks.", "icon": "heartbeat" },
+            "ranking": { "verified": 1.2 }
+        }"#;
+        let (catalogue, problems) = Catalogue::load([("operations.json", file)]);
+        assert!(problems.is_empty(), "{problems:?}");
+        let (core, data_dir) = core("ranking").await;
+        let core = core.with_template_catalogue(catalogue);
+        let workspace = core.create_workspace("Runbooks".to_owned()).await.unwrap();
+        // No choice: the ranking every workspace had before templates.
+        assert_eq!(core.ranking_profile(&workspace.id).await, RankingProfile::general());
+        assert_eq!(core.ranking_profile(&workspace.id).await.verified_factor(), Some(1.1));
+        // Operations: its factor.
+        core.set_workspace_template(&workspace.id, Some("operations"), None)
+            .await
+            .unwrap();
+        assert_eq!(core.ranking_profile(&workspace.id).await.verified_factor(), Some(1.2));
+        // General named on purpose, and a workspace that does not exist: the usual one.
+        core.set_workspace_template(&workspace.id, Some(GENERAL_ID), None)
+            .await
+            .unwrap();
+        assert_eq!(core.ranking_profile(&workspace.id).await, RankingProfile::general());
+        assert_eq!(
+            core.ranking_profile("no-such-workspace").await,
+            RankingProfile::general()
+        );
+        let _ = std::fs::remove_dir_all(data_dir);
     }
 
     #[test]

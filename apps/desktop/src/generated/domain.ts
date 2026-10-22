@@ -226,6 +226,8 @@ export interface WorkspaceTemplateView {
   assistant: TemplateAssistant;
   /** What the Retrieval page suggests. */
   retrieval: TemplateRetrieval;
+  /** How search weighs what it finds. */
+  ranking: TemplateRanking;
 }
 
 /**
@@ -274,6 +276,12 @@ export interface TemplateRetrieval {
   type_chips: string[];
 }
 
+/** How search weighs what it finds. For `general`: verified evidence ranks a tenth higher. */
+export interface TemplateRanking {
+  /** The factor for passages of verified files. */
+  verified: number;
+}
+
 /** A template as a person looks at it before choosing it: what it arranges and names, without any workspace's choice. */
 export interface TemplateDetail {
   template: TemplateSummary;
@@ -283,6 +291,7 @@ export interface TemplateDetail {
   evidence: TemplateEvidence;
   assistant: TemplateAssistant;
   retrieval: TemplateRetrieval;
+  ranking: TemplateRanking;
 }
 
 /**

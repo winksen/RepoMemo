@@ -8,9 +8,15 @@ export const SECTION_NAMES: Record<WorkspaceSection, string> = {
   health: "Health", review: "Review", memory: "Memory", tasks: "Tasks", people: "People & Activity", settings: "Settings",
 };
 
-type Previewable = Pick<TemplateDetail, "sections" | "labels" | "overview" | "assistant">;
+type Previewable = Pick<TemplateDetail, "sections" | "labels" | "overview" | "assistant" | "ranking">;
 
 const isSection = (value: string): value is WorkspaceSection => (WORKSPACE_SECTIONS as string[]).includes(value);
+
+/** What search favours, in words: verified evidence by a share, or nothing in particular. */
+function favoured(verified: number): string {
+  const share = Math.round((verified - 1) * 100);
+  return share === 0 ? "nothing in particular" : `verified evidence by ${share} %`;
+}
 
 /** What a template would make of a workspace, in lines a person can read before choosing it: one line for each thing it arranges. */
 export function previewLines(template: Previewable): Array<{ label: string; text: string }> {
@@ -24,6 +30,7 @@ export function previewLines(template: Previewable): Array<{ label: string; text
     { label: "Opens on", text: name(template.sections.landing) },
     { label: "Renamed", text: renamed.length ? renamed.join(", ") : "nothing" },
     { label: "Overview cards", text: cards.join(", ") },
+    { label: "Search favours", text: favoured(template.ranking.verified) },
     { label: "The assistant suggests", text: template.assistant.suggestions.length ? `${template.assistant.suggestions.length} question${template.assistant.suggestions.length === 1 ? "" : "s"}` : "nothing" },
   ];
 }

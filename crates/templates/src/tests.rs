@@ -1093,6 +1093,51 @@ fn a_stored_adjustment_that_is_no_longer_valid_is_dropped_and_the_others_are_kep
     assert!(Overrides::from_stored(&serde_json::json!({})).is_empty());
 }
 
+/// The valid file with a `ranking` block written as JSON.
+fn with_ranking(block: &str) -> String {
+    VALID.replacen("\"format\": 1,", &format!("\"format\": 1,\n  \"ranking\": {block},"), 1)
+}
+
+#[test]
+fn search_ranks_as_it_always_has_unless_a_template_chooses() {
+    assert_eq!(general().ranking().verified, DEFAULT_VERIFIED);
+    assert_eq!(DEFAULT_VERIFIED, 1.1);
+    assert_eq!(parse(VALID).unwrap().ranking().verified, 1.1);
+    assert_eq!(parse(&with_ranking("{}")).unwrap().ranking().verified, 1.1);
+    let chosen = parse(&with_ranking(r#"{ "verified": 1.15 }"#)).unwrap();
+    assert_eq!(chosen.ranking().verified, 1.15);
+    assert_eq!(parse(&serde_json::to_string(&chosen).unwrap()).unwrap(), chosen);
+    assert!(!serde_json::to_string(&general()).unwrap().contains("ranking"));
+}
+
+#[test]
+fn a_factor_stays_between_eight_tenths_and_one_and_three_tenths() {
+    for good in ["0.8", "1.0", "1.3", "0.95"] {
+        assert!(
+            parse(&with_ranking(&format!(r#"{{ "verified": {good} }}"#))).is_ok(),
+            "{good} should be valid"
+        );
+    }
+    for bad in ["0.79", "1.31", "0", "-1", "1.6", "100"] {
+        let issues = parse(&with_ranking(&format!(r#"{{ "verified": {bad} }}"#))).unwrap_err();
+        assert_eq!(issues[0].path, "ranking.verified", "{bad} should be refused");
+    }
+    assert!(parse(&with_ranking(r#"{ "verified": "high" }"#)).is_err());
+    let unknown = parse(&with_ranking(r#"{ "colour": 1 }"#)).unwrap_err();
+    assert!(unknown[0].message.contains("unknown field `colour`"), "{}", unknown[0]);
+    assert_eq!((FACTOR_MIN, FACTOR_MAX), (0.8, 1.3));
+}
+
+#[test]
+fn operations_and_the_knowledge_base_favour_verified_evidence_more() {
+    let catalogue = Catalogue::builtin();
+    let verified = |id: &str| catalogue.get(id).unwrap().ranking().verified;
+    assert_eq!(verified("operations"), 1.15);
+    assert_eq!(verified("knowledge-base"), 1.15);
+    assert_eq!(verified("software-engineering"), 1.1);
+    assert_eq!(verified("product-decisions"), 1.1);
+}
+
 #[test]
 fn the_section_list_is_the_one_the_web_client_has_pages_for() {
     let client = include_str!("../../../apps/desktop/src/web/constants.ts");

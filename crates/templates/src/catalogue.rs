@@ -15,7 +15,7 @@ pub struct SourceProblem {
 
 /// The templates a server knows. `general` is always there and always first;
 /// the others follow by name.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Catalogue {
     templates: Vec<TemplateDefinition>,
 }

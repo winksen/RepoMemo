@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.178 (2026-10-22)
+
+Search ranking is described by a profile that comes from the workspace's template; General ranks exactly as before.
+
+### Changed
+- **A ranking profile:** after search has found passages by words and by meaning and fused the two lists, it weighs them with the workspace's **ranking profile**, a list of rules where each is a factor for the passages it matches. The product of the factors that match a passage multiplies its score, the scores are rescaled to at most 1 and the list is sorted again. `RankingProfile` and `apply_profile` replace the fixed "verified x 1.1" step (`favour_verified`, `apply_verified_boost`); `hybrid_search` takes the profile from its caller, and search, Ask, the assistant and the search across workspaces each pass their workspace's. The profile's first rule is *lifecycle*: passages of verified files by a factor.
+- **The `ranking` block:** `ranking.verified` is that factor, from 0.8 to 1.3 (1.1 when left out). A factor can lower as well as raise a kind of evidence, but the bounds keep it a nudge: at 1.3 a passage scoring 0.6 still cannot pass one scoring 1.0. `GET /v1/workspaces/{id}/template` and the preview (`TemplateDetail`) answer it as `ranking.verified`, and Settings › Template says it ("verified evidence by 15 %").
+- **General is unchanged:** a workspace on General (or with no template) has the one rule that has always been there, verified x 1.1, and a test pins the profile's results against the figures V0.2.162 produced for the same lists. If a workspace's template cannot be read the usual profile is used, so a ranking is never the reason a search fails.
+- **The four templates:** *Operations and incidents* and the *Knowledge base* favour verified evidence by 15 %; *Software engineering* and *Product and decisions* keep 10 %.
+- **A consequence in the code:** the template types hold a number with a fraction now, so they no longer derive `Eq` (they still compare with `==`).
+- **Tests (written, not run):** three in the templates crate (the usual factor without a block and a chosen one written back, 0.8 to 1.3 allowed and anything else refused, the four templates' factors), four in the retrieval crate (a verified boost that stays within one, General ranking exactly as V0.2.162 did, another verified factor changing the order and the scores, what a profile changes), one in the api crate (a workspace ranking by its template's factor and by the usual one without), and the server's and the web's template tests extended with the factor.
+- **Checks run on this release:** `cargo check` of the templates, retrieval, api and server crates with their tests compiles; `rustfmt` shows nothing for the lines changed; `types:check`, `typecheck`, `styles:check`, `a11y:check`, `docs:check` and `version:check` pass. **Not run:** the tests (the V0.2.162 search fixtures included), as asked.
+
+### Upgrading
+- Nothing to do. Search results are in the order they were in for every workspace that has not chosen a template.
+
 ## V0.2.177 (2026-10-22)
 
 Owners and administrators choose and adjust a workspace's template in Settings.

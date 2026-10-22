@@ -12,7 +12,7 @@ pub enum Origin {
 }
 
 /// The template to use for one workspace and where it came from.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Resolution {
     pub template: TemplateDefinition,
     pub origin: Origin,

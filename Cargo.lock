@@ -4041,7 +4041,7 @@ checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
 name = "repomemo-ai"
-version = "0.2.177"
+version = "0.2.178"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -4055,7 +4055,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-api"
-version = "0.2.177"
+version = "0.2.178"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4077,7 +4077,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-console"
-version = "0.2.177"
+version = "0.2.178"
 dependencies = [
  "nu-ansi-term",
  "repomemo-domain",
@@ -4091,7 +4091,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-desktop"
-version = "0.2.177"
+version = "0.2.178"
 dependencies = [
  "chrono",
  "keyring",
@@ -4109,7 +4109,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-domain"
-version = "0.2.177"
+version = "0.2.178"
 dependencies = [
  "anyhow",
  "serde",
@@ -4118,7 +4118,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-git"
-version = "0.2.177"
+version = "0.2.178"
 dependencies = [
  "anyhow",
  "repomemo-domain",
@@ -4127,7 +4127,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-indexer"
-version = "0.2.177"
+version = "0.2.178"
 dependencies = [
  "anyhow",
  "hex",
@@ -4147,7 +4147,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-ingestion"
-version = "0.2.177"
+version = "0.2.178"
 dependencies = [
  "anyhow",
  "calamine",
@@ -4162,7 +4162,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-mail"
-version = "0.2.177"
+version = "0.2.178"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -4178,7 +4178,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-retrieval"
-version = "0.2.177"
+version = "0.2.178"
 dependencies = [
  "anyhow",
  "repomemo-domain",
@@ -4187,7 +4187,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-server"
-version = "0.2.177"
+version = "0.2.178"
 dependencies = [
  "anyhow",
  "argon2",
@@ -4217,7 +4217,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-storage"
-version = "0.2.177"
+version = "0.2.178"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -4235,7 +4235,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-templates"
-version = "0.2.177"
+version = "0.2.178"
 dependencies = [
  "serde",
  "serde_json",

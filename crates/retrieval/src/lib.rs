@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use anyhow::{bail, Result};
 use repomemo_domain::{SearchRequest, SearchResult};
 use repomemo_storage::StorageEngine;
@@ -42,6 +44,7 @@ impl RetrievalService {
         request: SearchRequest,
         mode: KeywordMode,
         query_embedding: Option<(&str, &[f32])>,
+        profile: &RankingProfile,
     ) -> Result<(Vec<SearchResult>, bool)> {
         let limit = request.limit.unwrap_or(12).clamp(1, 100);
         let deep = SearchRequest {
@@ -55,42 +58,128 @@ impl RetrievalService {
         };
         let used_embeddings = !semantic.is_empty();
         let mut fused = fuse_by_rank(keyword, semantic);
-        self.favour_verified(&request.workspace_id, &mut fused).await;
+        self.rank(&request.workspace_id, profile, &mut fused).await;
         fused.truncate(limit as usize);
         Ok((fused, used_embeddings))
     }
 }
 
 impl RetrievalService {
-    /// Evidence a person marked verified ranks a little above equally
-    /// relevant passages: the boost is small enough that a clearly better
-    /// match from an unverified file still wins.
-    async fn favour_verified(&self, workspace_id: &str, results: &mut [SearchResult]) {
-        if results.is_empty() {
+    /// Weighs the results by the workspace's ranking profile. Evidence a person marked verified ranks a little above
+    /// equally relevant passages: the boost is small enough that a clearly better match still wins.
+    async fn rank(&self, workspace_id: &str, profile: &RankingProfile, results: &mut [SearchResult]) {
+        if results.is_empty() || profile.is_neutral() {
             return;
         }
-        let Ok(states) = self.storage.workspace_lifecycle_states(workspace_id).await else {
-            return;
-        };
-        let verified = states
-            .iter()
-            .filter(|(_, (status, _))| status == "verified")
-            .map(|(artifact_id, _)| artifact_id.as_str())
-            .collect::<std::collections::HashSet<_>>();
-        apply_verified_boost(results, &verified);
+        let mut facts = RankingFacts::default();
+        if profile.reads_lifecycle() {
+            let Ok(states) = self.storage.workspace_lifecycle_states(workspace_id).await else {
+                return;
+            };
+            facts.lifecycle = states
+                .into_iter()
+                .map(|(artifact_id, (status, _))| (artifact_id, status))
+                .collect();
+        }
+        apply_profile(results, profile, &facts);
     }
 }
 
-/// Multiplies the score of verified passages by [`VERIFIED_BOOST`], then
-/// rescales so no score passes 1 and the order of the rest is kept.
-pub fn apply_verified_boost(results: &mut [SearchResult], verified: &std::collections::HashSet<&str>) {
-    if verified.is_empty() {
+/// One rule of how search results are weighed once they are found.
+#[derive(Debug, Clone, PartialEq)]
+pub enum RankingRule {
+    /// Passages of files in a lifecycle state (`verified`) have their score multiplied by `factor`.
+    Lifecycle { status: String, factor: f64 },
+}
+
+/// How a workspace weighs its search results (V0.2.178): a list of rules, each a factor for what it matches. The
+/// product of the factors that match a passage multiplies its score, then scores are rescaled to at most 1. The
+/// profile of a workspace on `general` is the one rule that has always been there: verified evidence ranks 10 % higher.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RankingProfile {
+    rules: Vec<RankingRule>,
+}
+
+impl RankingProfile {
+    /// The ranking every workspace had before templates.
+    pub fn general() -> Self {
+        Self::with_verified(VERIFIED_BOOST)
+    }
+
+    /// Verified evidence by `factor`, and nothing else.
+    pub fn with_verified(factor: f64) -> Self {
+        Self {
+            rules: vec![RankingRule::Lifecycle {
+                status: "verified".to_owned(),
+                factor,
+            }],
+        }
+    }
+
+    pub fn rules(&self) -> &[RankingRule] {
+        &self.rules
+    }
+
+    /// The factor given to verified evidence, if the profile has that rule.
+    pub fn verified_factor(&self) -> Option<f64> {
+        self.rules.iter().find_map(|rule| match rule {
+            RankingRule::Lifecycle { status, factor } if status == "verified" => Some(*factor),
+            RankingRule::Lifecycle { .. } => None,
+        })
+    }
+
+    /// True when no rule can change a score, so the results need no second look.
+    pub fn is_neutral(&self) -> bool {
+        self.rules.iter().all(|rule| match rule {
+            RankingRule::Lifecycle { factor, .. } => *factor == 1.0,
+        })
+    }
+
+    fn reads_lifecycle(&self) -> bool {
+        self.rules
+            .iter()
+            .any(|rule| matches!(rule, RankingRule::Lifecycle { .. }))
+    }
+
+    /// What the rules make of one passage: the product of the factors of the rules it matches.
+    fn multiplier(&self, result: &SearchResult, facts: &RankingFacts) -> f64 {
+        self.rules
+            .iter()
+            .map(|rule| match rule {
+                RankingRule::Lifecycle { status, factor } => {
+                    if facts.lifecycle.get(&result.artifact_id) == Some(status) {
+                        *factor
+                    } else {
+                        1.0
+                    }
+                }
+            })
+            .product()
+    }
+}
+
+impl Default for RankingProfile {
+    fn default() -> Self {
+        Self::general()
+    }
+}
+
+/// What the rules look at for the files in a result list.
+#[derive(Debug, Default)]
+pub struct RankingFacts {
+    /// Artifact id to its lifecycle status, for files whose lifecycle was ever set.
+    pub lifecycle: HashMap<String, String>,
+}
+
+/// Multiplies the score of each passage by what the profile makes of it, then rescales so no score passes 1 and the
+/// order of the rest is kept. A list the profile does not touch is left as it was.
+pub fn apply_profile(results: &mut [SearchResult], profile: &RankingProfile, facts: &RankingFacts) {
+    let multipliers: Vec<f64> = results.iter().map(|result| profile.multiplier(result, facts)).collect();
+    if multipliers.iter().all(|multiplier| *multiplier == 1.0) {
         return;
     }
-    for result in results.iter_mut() {
-        if verified.contains(result.artifact_id.as_str()) {
-            result.score *= VERIFIED_BOOST;
-        }
+    for (result, multiplier) in results.iter_mut().zip(multipliers) {
+        result.score *= multiplier;
     }
     let best = results.iter().map(|result| result.score).fold(1.0_f64, f64::max);
     for result in results.iter_mut() {
@@ -259,27 +348,113 @@ mod tests {
         assert_eq!(prepare_fts_query(" -- "), None);
     }
 
-    #[test]
-    fn verified_passages_get_a_small_boost_that_keeps_scores_within_one() {
-        use super::apply_verified_boost;
-        use std::collections::HashSet;
-        let result = |artifact: &str, chunk: &str, score: f64| SearchResult {
+    fn result(artifact: &str, chunk: &str, score: f64) -> SearchResult {
+        SearchResult {
             artifact_id: artifact.to_owned(),
             score,
             ..hit(chunk)
-        };
+        }
+    }
+
+    /// The facts of a workspace whose listed files are verified.
+    fn verified(artifacts: &[&str]) -> super::RankingFacts {
+        super::RankingFacts {
+            lifecycle: artifacts
+                .iter()
+                .map(|artifact| ((*artifact).to_owned(), "verified".to_owned()))
+                .collect(),
+        }
+    }
+
+    fn scores(results: &[SearchResult]) -> Vec<(String, f64)> {
+        results.iter().map(|r| (r.chunk_id.clone(), r.score)).collect()
+    }
+
+    #[test]
+    fn verified_passages_get_a_small_boost_that_keeps_scores_within_one() {
+        use super::{apply_profile, RankingProfile};
+        let general = RankingProfile::general();
         // Close scores: the verified file moves ahead.
         let mut close = vec![result("plain", "p", 0.80), result("checked", "v", 0.76)];
-        apply_verified_boost(&mut close, &HashSet::from(["checked"]));
+        apply_profile(&mut close, &general, &verified(&["checked"]));
         assert_eq!(close[0].chunk_id, "v");
         assert!(close.iter().all(|r| r.score <= 1.0));
         // A clearly better unverified match still wins.
         let mut far = vec![result("plain", "p", 1.0), result("checked", "v", 0.5)];
-        apply_verified_boost(&mut far, &HashSet::from(["checked"]));
+        apply_profile(&mut far, &general, &verified(&["checked"]));
         assert_eq!(far[0].chunk_id, "p");
         // Nothing verified: untouched.
         let mut none = vec![result("plain", "p", 0.4)];
-        apply_verified_boost(&mut none, &HashSet::new());
+        apply_profile(&mut none, &general, &verified(&[]));
         assert_eq!(none[0].score, 0.4);
+    }
+
+    /// V0.2.178: a workspace on General ranks exactly as V0.2.162 did. The expected figures below are what
+    /// V0.2.162's `apply_verified_boost` (verified x 1.1, rescale to at most 1, sort) made of the same lists.
+    #[test]
+    fn general_ranks_exactly_as_before() {
+        use super::{apply_profile, RankingProfile};
+        let general = RankingProfile::general();
+        assert_eq!(general.verified_factor(), Some(super::VERIFIED_BOOST));
+        assert_eq!(super::VERIFIED_BOOST, 1.1);
+        let close = [("plain", "p", 0.80), ("checked", "v", 0.76), ("other", "o", 0.40)];
+        let mut results: Vec<SearchResult> = close.iter().map(|(a, c, s)| result(a, c, *s)).collect();
+        apply_profile(&mut results, &general, &verified(&["checked"]));
+        let expected = [("v", 0.76 * 1.1), ("p", 0.80), ("o", 0.40)];
+        for ((chunk, score), (want_chunk, want)) in scores(&results).iter().zip(expected) {
+            assert_eq!(chunk, want_chunk);
+            assert!((score - want).abs() < 1e-12, "{chunk}: {score} against {want}");
+        }
+        // A list led by a perfect score is rescaled by what the boost made of it.
+        let mut led = vec![result("checked", "v", 1.0), result("plain", "p", 0.9)];
+        apply_profile(&mut led, &general, &verified(&["checked"]));
+        assert_eq!(led[0].chunk_id, "v");
+        assert!((led[0].score - 1.0).abs() < 1e-12 && (led[1].score - 0.9 / 1.1).abs() < 1e-12);
+        // The same list with the rule left out is untouched, and so is an empty one.
+        let mut same = vec![result("plain", "p", 0.9), result("checked", "v", 0.8)];
+        apply_profile(&mut same, &RankingProfile::with_verified(1.0), &verified(&["checked"]));
+        assert_eq!(scores(&same), vec![("p".to_owned(), 0.9), ("v".to_owned(), 0.8)]);
+        apply_profile(&mut [], &general, &verified(&["checked"]));
+    }
+
+    #[test]
+    fn a_template_with_another_verified_factor_changes_the_order_and_the_scores() {
+        use super::{apply_profile, RankingProfile};
+        let list = || vec![result("plain", "p", 0.80), result("checked", "v", 0.72)];
+        // At the usual 1.1 the verified passage is still behind (0.72 x 1.1 = 0.792 against 0.80).
+        let mut usual = list();
+        apply_profile(&mut usual, &RankingProfile::general(), &verified(&["checked"]));
+        assert_eq!(usual[0].chunk_id, "p");
+        // At 1.15 (Operations, Knowledge base) it moves ahead (0.828).
+        let mut operations = list();
+        apply_profile(
+            &mut operations,
+            &RankingProfile::with_verified(1.15),
+            &verified(&["checked"]),
+        );
+        assert_eq!(operations[0].chunk_id, "v");
+        assert!((operations[0].score - 0.72 * 1.15).abs() < 1e-12);
+        // Below 1 it ranks verified evidence a little lower.
+        let mut lower = vec![result("checked", "v", 0.80), result("plain", "p", 0.78)];
+        apply_profile(&mut lower, &RankingProfile::with_verified(0.9), &verified(&["checked"]));
+        assert_eq!(lower[0].chunk_id, "p");
+        // The bounds a template may use (0.8 to 1.3) never let a clearly better match lose.
+        let mut clear = vec![result("plain", "p", 1.0), result("checked", "v", 0.6)];
+        apply_profile(&mut clear, &RankingProfile::with_verified(1.3), &verified(&["checked"]));
+        assert_eq!(clear[0].chunk_id, "p");
+    }
+
+    #[test]
+    fn a_profile_says_whether_it_changes_anything() {
+        use super::{RankingProfile, RankingRule};
+        assert!(!RankingProfile::general().is_neutral());
+        assert!(RankingProfile::with_verified(1.0).is_neutral());
+        assert_eq!(RankingProfile::default(), RankingProfile::general());
+        assert_eq!(RankingProfile::general().rules().len(), 1);
+        assert!(matches!(
+            RankingProfile::general().rules()[0],
+            RankingRule::Lifecycle { .. }
+        ));
+        assert_eq!(RankingProfile::with_verified(1.15).verified_factor(), Some(1.15));
     }
 }

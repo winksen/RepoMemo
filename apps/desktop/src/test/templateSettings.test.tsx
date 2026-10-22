@@ -24,6 +24,7 @@ const operationsDetail: TemplateDetail = {
   evidence: { default_view: "list", types_first: [] },
   assistant: { order: [], suggestions: ["What is the runbook for…"] },
   retrieval: { type_chips: [] },
+  ranking: { verified: 1.15 },
 };
 const knowledgeDetail: TemplateDetail = {
   ...operationsDetail,
@@ -62,6 +63,7 @@ describe("the lines that preview a template", () => {
       "Renamed": "Tasks → Actions",
       "Overview cards": "Fresh evidence, At risk",
       "The assistant suggests": "1 question",
+      "Search favours": "verified evidence by 15 %",
     });
   });
 
@@ -71,6 +73,9 @@ describe("the lines that preview a template", () => {
     expect(lines["Under More"]).toBe("nothing");
     expect(lines["The assistant suggests"]).toBe("nothing");
     expect(lines["Opens on"]).toBe("Documents");
+    expect(Object.fromEntries(previewLines({ ...knowledgeDetail, ranking: { verified: 1.1 } }).map((line) => [line.label, line.text]))["Search favours"]).toBe("verified evidence by 10 %");
+    expect(Object.fromEntries(previewLines({ ...knowledgeDetail, ranking: { verified: 0.9 } }).map((line) => [line.label, line.text]))["Search favours"]).toBe("verified evidence by -10 %");
+    expect(Object.fromEntries(previewLines({ ...knowledgeDetail, ranking: { verified: 1 } }).map((line) => [line.label, line.text]))["Search favours"]).toBe("nothing in particular");
   });
 });
 

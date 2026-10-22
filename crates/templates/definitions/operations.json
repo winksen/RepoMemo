@@ -34,5 +34,6 @@
       "What are the steps to roll back…"
     ]
   },
-  "retrieval": { "type_chips": ["runbook", "incident", "note"] }
+  "retrieval": { "type_chips": ["runbook", "incident", "note"] },
+  "ranking": { "verified": 1.15 }
 }

@@ -148,6 +148,13 @@ async fn the_four_first_templates_are_offered_and_each_creates_its_folders() {
         if id == "operations" {
             assert_eq!(view["assistant"]["order"][0], "ask_question");
         }
+        // Ranking (V0.2.178): Operations and Knowledge base favour verified evidence more.
+        let factor = if id == "operations" || id == "knowledge-base" {
+            1.15
+        } else {
+            1.1
+        };
+        assert_eq!(view["ranking"]["verified"], json!(factor), "{id}");
         let cards = view["overview"]["cards"].as_array().unwrap();
         assert!(!cards.is_empty() && cards.len() <= 8, "{id}");
         assert_eq!(
@@ -545,6 +552,7 @@ async fn templates_are_listed_read_by_members_and_changed_only_by_administrators
     );
     assert_eq!(by_default["assistant"], json!({"order": [], "suggestions": []}));
     assert_eq!(by_default["retrieval"], json!({"type_chips": []}));
+    assert_eq!(by_default["ranking"], json!({"verified": 1.1}));
     assert_eq!(
         by_default["overview"]["cards"],
         json!([

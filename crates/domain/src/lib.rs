@@ -280,6 +280,8 @@ pub struct WorkspaceTemplateView {
     pub assistant: TemplateAssistant,
     /// What the Retrieval page suggests.
     pub retrieval: TemplateRetrieval,
+    /// How search weighs what it finds.
+    pub ranking: TemplateRanking,
 }
 
 /// The tabs of a workspace and the sections kept under *More*, as its template arranges them. Every section is in
@@ -328,6 +330,13 @@ pub struct TemplateRetrieval {
     pub type_chips: Vec<String>,
 }
 
+/// How search weighs what it finds. For `general`: verified evidence ranks a tenth higher.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TemplateRanking {
+    /// The factor for passages of verified files.
+    pub verified: f64,
+}
+
 /// A template as a person looks at it before choosing it: what it arranges and names, without any workspace's choice.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TemplateDetail {
@@ -338,6 +347,7 @@ pub struct TemplateDetail {
     pub evidence: TemplateEvidence,
     pub assistant: TemplateAssistant,
     pub retrieval: TemplateRetrieval,
+    pub ranking: TemplateRanking,
 }
 
 /// Chooses a workspace's template; `null` returns the workspace to the default. `overrides` are the adjustments

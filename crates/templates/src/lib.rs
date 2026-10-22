@@ -22,6 +22,7 @@ pub mod limits;
 mod meta;
 mod overrides;
 mod overview;
+mod ranking;
 mod resolve;
 mod retrieval;
 mod sections;
@@ -39,6 +40,7 @@ pub use labels::{LabelsBlock, ARTIFACT_TYPES};
 pub use meta::{TemplateMeta, WORKSPACE_ICONS};
 pub use overrides::Overrides;
 pub use overview::{OverviewBlock, CARDS_MAX, DEFAULT_CARDS, PULSE_CARDS};
+pub use ranking::{RankingBlock, ResolvedRanking, DEFAULT_VERIFIED, FACTOR_MAX, FACTOR_MIN};
 pub use resolve::{Origin, Resolution};
 pub use retrieval::{RetrievalBlock, TYPE_CHIPS_MAX};
 pub use sections::{ResolvedSections, SectionsBlock, ADMIN_ONLY_SECTIONS, DEFAULT_LANDING, WORKSPACE_SECTIONS};
@@ -50,7 +52,7 @@ use serde::{Deserialize, Serialize};
 pub const FORMAT: u32 = 1;
 
 /// One template, as written in a JSON file.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TemplateDefinition {
     /// The format number the file is written for ([`FORMAT`]).
@@ -77,6 +79,9 @@ pub struct TemplateDefinition {
     /// The kinds of evidence the Retrieval page suggests as chips (V0.2.176); none when left out.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub retrieval: Option<RetrievalBlock>,
+    /// How search weighs what it finds (V0.2.178); as today when left out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ranking: Option<RankingBlock>,
 }
 
 impl TemplateDefinition {
@@ -147,6 +152,9 @@ impl TemplateDefinition {
         if let Some(retrieval) = &self.retrieval {
             retrieval::validate(retrieval, &mut issues);
         }
+        if let Some(ranking) = &self.ranking {
+            ranking::validate(ranking, &mut issues);
+        }
         issues
     }
 
@@ -157,6 +165,11 @@ impl TemplateDefinition {
     /// The names this template gives to sections and kinds of evidence; empty for the usual names.
     pub fn labels(&self) -> LabelsBlock {
         self.labels.clone().unwrap_or_default()
+    }
+
+    /// How search weighs what it finds, complete.
+    pub fn ranking(&self) -> ResolvedRanking {
+        ResolvedRanking::from_block(self.ranking.as_ref())
     }
 
     /// What the assistant shows first and suggests; empty for the usual buttons and no suggestion.
