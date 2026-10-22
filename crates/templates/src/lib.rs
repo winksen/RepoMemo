@@ -12,6 +12,7 @@
 //! invalid; there is no "ignore what you do not know".
 
 mod catalogue;
+mod evidence;
 mod folders;
 mod general;
 mod issue;
@@ -26,6 +27,7 @@ mod sections;
 mod tests;
 
 pub use catalogue::{Catalogue, SourceProblem};
+pub use evidence::{EvidenceBlock, ResolvedEvidence, DEFAULT_VIEW, EVIDENCE_VIEWS, FILE_TYPES};
 pub use folders::StarterFolder;
 pub use general::{general, GENERAL_ID};
 pub use issue::TemplateIssue;
@@ -60,6 +62,9 @@ pub struct TemplateDefinition {
     /// The pulse cards the Overview shows, and their order (V0.2.174); the usual nine when left out.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub overview: Option<OverviewBlock>,
+    /// How the evidence ledger opens and which file types its filter lists first (V0.2.175); as today when left out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evidence: Option<EvidenceBlock>,
 }
 
 impl TemplateDefinition {
@@ -121,6 +126,9 @@ impl TemplateDefinition {
         if let Some(overview) = &self.overview {
             overview::validate(overview, &mut issues);
         }
+        if let Some(evidence) = &self.evidence {
+            evidence::validate(evidence, &mut issues);
+        }
         issues
     }
 
@@ -131,6 +139,11 @@ impl TemplateDefinition {
     /// The names this template gives to sections and kinds of evidence; empty for the usual names.
     pub fn labels(&self) -> LabelsBlock {
         self.labels.clone().unwrap_or_default()
+    }
+
+    /// How the evidence ledger opens and which file types it lists first, complete.
+    pub fn evidence(&self) -> ResolvedEvidence {
+        ResolvedEvidence::from_block(self.evidence.as_ref())
     }
 
     /// The pulse cards the Overview shows, in order.

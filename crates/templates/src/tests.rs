@@ -802,6 +802,85 @@ fn the_card_list_is_the_one_the_web_client_draws_and_the_four_templates_choose_t
     );
 }
 
+/// The valid file with an `evidence` block written as JSON.
+fn with_evidence(block: &str) -> String {
+    VALID.replacen(
+        "\"format\": 1,",
+        &format!("\"format\": 1,\n  \"evidence\": {block},"),
+        1,
+    )
+}
+
+#[test]
+fn the_ledger_opens_as_a_grid_with_no_preferred_types_unless_a_template_chooses() {
+    let usual = general().evidence();
+    assert_eq!(
+        (usual.default_view.as_str(), usual.types_first.is_empty()),
+        ("grid", true)
+    );
+    assert_eq!(parse(VALID).unwrap().evidence().default_view, "grid");
+    assert_eq!(parse(&with_evidence("{}")).unwrap().evidence().default_view, "grid");
+    let chosen = parse(&with_evidence(
+        r#"{ "default_view": "list", "types_first": ["pdf", "word"] }"#,
+    ))
+    .unwrap();
+    assert_eq!(chosen.evidence().default_view, "list");
+    assert_eq!(chosen.evidence().types_first, ["pdf", "word"]);
+    assert_eq!(parse(&serde_json::to_string(&chosen).unwrap()).unwrap(), chosen);
+    assert!(!serde_json::to_string(&general()).unwrap().contains("evidence"));
+}
+
+#[test]
+fn a_view_and_the_file_types_must_be_known_and_a_type_listed_once() {
+    let view = parse(&with_evidence(r#"{ "default_view": "documents" }"#)).unwrap_err();
+    assert_eq!(view[0].path, "evidence.default_view");
+    let unknown = parse(&with_evidence(r#"{ "types_first": ["pdf", "spreadsheet"] }"#)).unwrap_err();
+    assert_eq!(unknown[0].path, "evidence.types_first[1]");
+    let twice = parse(&with_evidence(r#"{ "types_first": ["pdf", "pdf"] }"#)).unwrap_err();
+    assert_eq!(twice[0].path, "evidence.types_first[1]");
+    let unknown_key = parse(&with_evidence(r#"{ "colour": "red" }"#)).unwrap_err();
+    assert!(
+        unknown_key[0].message.contains("unknown field `colour`"),
+        "{}",
+        unknown_key[0]
+    );
+    assert_eq!(EVIDENCE_VIEWS, ["grid", "list"]);
+    assert_eq!(FILE_TYPES.len(), 12);
+}
+
+#[test]
+fn the_file_types_are_the_ones_the_ledger_filters_by_and_the_four_templates_choose_theirs() {
+    let client = include_str!("../../../apps/desktop/src/web/constants.ts");
+    let start = client
+        .find("export const FILE_CATEGORIES")
+        .expect("the client lists the file types");
+    let block = &client[start..start + client[start..].find("];").unwrap()];
+    let listed: Vec<&str> = block
+        .split("value: \"")
+        .skip(1)
+        .filter_map(|rest| rest.split('"').next())
+        .collect();
+    assert_eq!(
+        listed, FILE_TYPES,
+        "constants.ts and repomemo-templates list different file types"
+    );
+
+    let catalogue = Catalogue::builtin();
+    let evidence = |id: &str| catalogue.get(id).unwrap().evidence();
+    assert_eq!(evidence("knowledge-base").default_view, "list");
+    assert_eq!(
+        evidence("knowledge-base").types_first,
+        ["word", "pdf", "excel", "powerpoint"]
+    );
+    assert_eq!(evidence("operations").default_view, "list");
+    assert_eq!(evidence("software-engineering").default_view, "grid");
+    assert_eq!(
+        evidence("software-engineering").types_first,
+        ["code", "markdown", "repository"]
+    );
+    assert_eq!(evidence("product-decisions").types_first, ["markdown", "note", "word"]);
+}
+
 #[test]
 fn the_section_list_is_the_one_the_web_client_has_pages_for() {
     let client = include_str!("../../../apps/desktop/src/web/constants.ts");

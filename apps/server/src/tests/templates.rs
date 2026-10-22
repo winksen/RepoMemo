@@ -134,6 +134,14 @@ async fn the_four_first_templates_are_offered_and_each_creates_its_folders() {
         };
         assert_eq!(view["sections"]["landing"], landing, "{id}");
         // The Overview's cards (V0.2.174): Software engineering leads with the code symbols.
+        // The ledger (V0.2.175): Knowledge base and Operations open as a list.
+        let list = id == "knowledge-base" || id == "operations";
+        assert_eq!(
+            view["evidence"]["default_view"],
+            if list { "list" } else { "grid" },
+            "{id}"
+        );
+        assert!(!view["evidence"]["types_first"].as_array().unwrap().is_empty(), "{id}");
         let cards = view["overview"]["cards"].as_array().unwrap();
         assert!(!cards.is_empty() && cards.len() <= 8, "{id}");
         assert_eq!(
@@ -374,6 +382,10 @@ async fn templates_are_listed_read_by_members_and_changed_only_by_administrators
     assert_eq!(by_default["sections"]["landing"], "overview");
     // General renames nothing.
     assert_eq!(by_default["labels"], json!({"sections": {}, "artifact_types": {}}));
+    assert_eq!(
+        by_default["evidence"],
+        json!({"default_view": "grid", "types_first": []})
+    );
     assert_eq!(
         by_default["overview"]["cards"],
         json!([

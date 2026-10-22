@@ -59,6 +59,7 @@ describe("the template hooks", () => {
       sections: { primary: ["overview", "evidence"], more: [], landing: "overview" },
       labels: { sections: {}, artifact_types: {} },
       overview: { cards: ["index_coverage"] },
+      evidence: { default_view: "grid", types_first: [] },
     };
     vi.mocked(getSharedWorkspaceTemplate).mockResolvedValue(view);
 

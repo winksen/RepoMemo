@@ -274,6 +274,8 @@ pub struct WorkspaceTemplateView {
     pub labels: TemplateLabels,
     /// The pulse cards of the Overview.
     pub overview: TemplateOverview,
+    /// How the evidence ledger opens and which file types it lists first.
+    pub evidence: TemplateEvidence,
 }
 
 /// The tabs of a workspace and the sections kept under *More*, as its template arranges them. Every section is in
@@ -298,6 +300,14 @@ pub struct TemplateLabels {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TemplateOverview {
     pub cards: Vec<String>,
+}
+
+/// How the evidence ledger opens (`grid` or `list`, which a person's own choice overrides) and the file types its
+/// filter lists first. For `general`: `grid` and no preference.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TemplateEvidence {
+    pub default_view: String,
+    pub types_first: Vec<String>,
 }
 
 /// Chooses a workspace's template; `null` returns the workspace to the default.

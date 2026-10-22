@@ -23,5 +23,6 @@
   },
   "overview": {
     "cards": ["memory_cards", "active_tasks", "fresh_evidence", "index_coverage"]
-  }
+  },
+  "evidence": { "types_first": ["markdown", "note", "word"] }
 }

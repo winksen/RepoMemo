@@ -23,5 +23,6 @@
   },
   "overview": {
     "cards": ["fresh_evidence", "active_tasks", "at_risk", "memory_cards"]
-  }
+  },
+  "evidence": { "default_view": "list", "types_first": ["markdown", "note", "text"] }
 }

@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.175 (2026-10-22)
+
+The evidence ledger opens the way its template says and lists its preferred file types first.
+
+### Changed
+- **The `evidence` block:** a template may choose the view the ledger opens in (`default_view`, `grid` or `list`) and the file types its *File types* filter lists first (`types_first`, each of the twelve once). Without the block the ledger opens as a grid with the usual order, so General is unchanged. `GET /v1/workspaces/{id}/template` answers both as `evidence`.
+- **A person's own choice wins:** the template's view is only where the ledger starts. Once someone picks a view themselves it stays for the visit, whatever the template says. The preferred file types move to the top of the filter in the template's order and the others follow in the usual order; a type this client does not list is ignored.
+- **The four templates:** *Knowledge base* opens the ledger as a list and lists Word, PDF, Excel and PowerPoint first; *Operations and incidents* opens it as a list and lists Markdown, Note and Text first; *Product and decisions* lists Markdown, Note and Word first; *Software engineering* lists Code, Markdown and Repository first.
+- **A difference from the plan:** the plan said "the types offered first in *Add*"; what the ledger offers by type is its file-type filter, so the order applies there.
+- **Tests (written, not run):** three in the templates crate (the grid and no preference without a block and a chosen view and types written back; an unknown view or type and a repeat refused; the type list equal to the web client's and the four templates' choices), four in the web client (the view without a template and when asked, the usual order, the preferred types first in the template's order, an unknown or repeated type ignored), and the server's template test now checks the ledger defaults of General and of each of the four.
+- **Checks run on this release:** `cargo check` of the templates, api and server crates with their tests compiles; `rustfmt` shows nothing for the lines changed; `types:check`, `typecheck`, `styles:check`, `a11y:check`, `docs:check` and `version:check` pass. **Not run:** the tests, as asked.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.174 (2026-10-22)
 
 The Overview shows the pulse cards its template asks for, in its order.

@@ -23,5 +23,6 @@
   },
   "overview": {
     "cards": ["index_coverage", "indexed_storage", "fresh_evidence", "knowledge_density"]
-  }
+  },
+  "evidence": { "default_view": "list", "types_first": ["word", "pdf", "excel", "powerpoint"] }
 }

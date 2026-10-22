@@ -21,5 +21,6 @@
   },
   "overview": {
     "cards": ["code_symbols", "sources", "index_coverage", "at_risk", "fresh_evidence"]
-  }
+  },
+  "evidence": { "types_first": ["code", "markdown", "repository"] }
 }

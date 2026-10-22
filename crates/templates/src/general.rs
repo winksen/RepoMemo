@@ -20,5 +20,6 @@ pub fn general() -> TemplateDefinition {
         sections: None,
         labels: None,
         overview: None,
+        evidence: None,
     }
 }

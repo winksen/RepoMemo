@@ -220,6 +220,8 @@ export interface WorkspaceTemplateView {
   labels: TemplateLabels;
   /** The pulse cards of the Overview. */
   overview: TemplateOverview;
+  /** How the evidence ledger opens and which file types it lists first. */
+  evidence: TemplateEvidence;
 }
 
 /**
@@ -245,6 +247,15 @@ export interface TemplateLabels {
 /** The pulse cards the Overview shows, in order, as the template chooses; for `general` the usual nine. */
 export interface TemplateOverview {
   cards: string[];
+}
+
+/**
+ * How the evidence ledger opens (`grid` or `list`, which a person's own choice overrides) and the file types its
+ * filter lists first. For `general`: `grid` and no preference.
+ */
+export interface TemplateEvidence {
+  default_view: string;
+  types_first: string[];
 }
 
 /** Chooses a workspace's template; `null` returns the workspace to the default. */

@@ -1,6 +1,6 @@
 # Workspace templates: the format, the rules, how to add one
 
-> **Branch of:** [TECHNICAL_MINDMAP.md](../TECHNICAL_MINDMAP.md) · **Roadmap:** [track N, V0.2.163–V0.2.193](../ROADMAP.md#track-n-workspace-templates-v02163v02193), decisions 24–28 · **Plan:** [the workspace templates plan](../plans/2026-10-22-workspace-templates.md) · **Decision record:** [0005](../../docs/decisions/0005-templates-are-data-over-a-closed-set-of-modules.md) · **Status:** designed at V0.2.163; the crate with the `format` and `meta` keys and `general` exists since V0.2.164, the built-in catalogue since V0.2.165, a workspace's choice and its resolver since V0.2.166, the routes since V0.2.167, and creating a workspace from a template since V0.2.168, the picker since V0.2.169, the first four templates since V0.2.170, the tab order since V0.2.171, the landing section and the palette's order since V0.2.172, the names since V0.2.173, and the Overview's cards since V0.2.174; each other block below is built by the release in its table row, and a block that no release has built yet is not read by anything.
+> **Branch of:** [TECHNICAL_MINDMAP.md](../TECHNICAL_MINDMAP.md) · **Roadmap:** [track N, V0.2.163–V0.2.193](../ROADMAP.md#track-n-workspace-templates-v02163v02193), decisions 24–28 · **Plan:** [the workspace templates plan](../plans/2026-10-22-workspace-templates.md) · **Decision record:** [0005](../../docs/decisions/0005-templates-are-data-over-a-closed-set-of-modules.md) · **Status:** designed at V0.2.163; the crate with the `format` and `meta` keys and `general` exists since V0.2.164, the built-in catalogue since V0.2.165, a workspace's choice and its resolver since V0.2.166, the routes since V0.2.167, and creating a workspace from a template since V0.2.168, the picker since V0.2.169, the first four templates since V0.2.170, the tab order since V0.2.171, the landing section and the palette's order since V0.2.172, the names since V0.2.173, the Overview's cards since V0.2.174, and the evidence ledger's defaults since V0.2.175; each other block below is built by the release in its table row, and a block that no release has built yet is not read by anything.
 
 Every workspace used to be organized the same way: twelve sections in one fixed order, one ranking rule (verified evidence gets 10 % more), one set of health checks, one set of assistant suggestions. A **workspace template** is a small piece of data that tells the backend, the engine and the web client *which modules matter most in this workspace and how they are shown*. It chooses and orders; it never adds code and never touches rights.
 
@@ -122,15 +122,21 @@ The client reads them in four places: the tab (and its tooltip, which keeps the 
 
 The plan's first proposal named figures the metrics do not carry (repositories in sync, evidence reviewed in 90 days, needing review, duplicates, documents by kind); the four templates use the closest figures that exist (sources, memory cards, index coverage, fresh evidence), and a figure the metrics gain later becomes a card with the release that adds it.
 
-## 11. The first templates
+## 11. Evidence: how the ledger opens
+
+`evidence.default_view` is `grid` or `list`; `evidence.types_first` lists, without repeats, the file types of the ledger's *File types* filter (`markdown`, `note`, `text`, `code`, `word`, `excel`, `powerpoint`, `pdf`, `onenote`, `email`, `image`, `repository`: the ledger's own file categories, which a test compares with `FILE_CATEGORIES` in the web client) to put before the others. Without a block the ledger opens as a grid with the usual order, which is what `general` has. `GET …/template` answers both as `evidence`.
+
+In the client the template's view is a default, not a rule: the ledger applies it until the person picks a view themselves, and that choice stays for the visit (the page store). `orderedFileCategories` puts the preferred types first in the template's order and the rest after them in the usual order; a type this client does not list is ignored. The plan called this block's second key "the types offered first in *Add*"; what the ledger offers by type is its filter, so that is where the order applies.
+
+## 12. The first templates
 
 `general` is defined in code. Four more are JSON files in `crates/templates/definitions/`: `software-engineering`, `operations`, `product-decisions` and `knowledge-base`, each with its `meta` (icon `code`, `heartbeat`, `compass` and `book`) and `starter_folders` as in the plan's table. The catalogue lists `general` first and the others by name, so the picker shows General, Knowledge base, Operations and incidents, Product and decisions, Software engineering. Every later block is filled in these four files by the release that reads it; nothing in code names one of them. Since V0.2.171 each has its `sections`: Software engineering leads with Overview, Repositories and Retrieval and keeps Documents under More; Operations and incidents leads with Overview, Evidence and Review and keeps Map, Repositories and Documents under More; Product and decisions leads with Overview, Memory and Evidence and keeps Health, Map and Repositories under More; Knowledge base leads with Overview, Documents and Retrieval and keeps Map and Repositories under More.
 
-## 12. Adding a template
+## 13. Adding a template
 
 Until V0.2.188 the only way is a release: add a JSON file named after the template's id (`operations.json` for `"id": "operations"`) to `crates/templates/definitions/`, and `build.rs` registers it (every `*.json` whose name does not start with `_`, in file-name order). No Rust is edited. `Catalogue::load` leaves out and names a file that does not validate, is not named after its id, repeats an id or tries to replace `general`; the test over the folder fails while any such file exists. The catalogue lists `general` first and the others by name. From V0.2.188 the guide `docs/TEMPLATES.md` and `npm run templates:check` cover the same steps, and from V0.2.189 an operator can drop a file in `REPOMEMO_TEMPLATES_DIR` with no release.
 
-## 13. Decisions 24–28
+## 14. Decisions 24–28
 
 | # | Decision | As agreed (V0.2.163) |
 |---|---|---|
@@ -140,6 +146,6 @@ Until V0.2.188 the only way is a release: add a JSON file named after the templa
 | 27 | Existing workspaces | They stay on `general`; a new workspace asks at creation with `general` preselected |
 | 28 | What ships first | `general` plus Software engineering, Operations and incidents, Product and decisions and Knowledge base, as data. Organization-defined templates are V0.4.0 direction |
 
-## 14. Not in the track
+## 15. Not in the track
 
 Organization-defined templates, new sections or modules defined by a template, per-user layouts, different chunking or indexing per template, installing a template from a URL, AI-written templates and moving existing evidence into starter folders are listed with their reasons in the plan's [section 7](../plans/2026-10-22-workspace-templates.md#7-not-in-this-track).
