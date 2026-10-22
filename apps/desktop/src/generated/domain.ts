@@ -228,6 +228,8 @@ export interface WorkspaceTemplateView {
   retrieval: TemplateRetrieval;
   /** How search weighs what it finds. */
   ranking: TemplateRanking;
+  /** The health checks that run. */
+  health: TemplateHealth;
 }
 
 /**
@@ -305,6 +307,11 @@ export interface TemplateRanking {
   recency: TemplateRecency | null;
 }
 
+/** The health checks that run in a workspace, in the order their findings are listed. For `general`: every check. */
+export interface TemplateHealth {
+  detectors: string[];
+}
+
 /** A template as a person looks at it before choosing it: what it arranges and names, without any workspace's choice. */
 export interface TemplateDetail {
   template: TemplateSummary;
@@ -315,6 +322,7 @@ export interface TemplateDetail {
   assistant: TemplateAssistant;
   retrieval: TemplateRetrieval;
   ranking: TemplateRanking;
+  health: TemplateHealth;
 }
 
 /**

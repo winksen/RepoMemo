@@ -33,11 +33,16 @@ pub(crate) async fn workspace_health(
 /// The caller has checked access and counted the request.
 pub(crate) async fn cached_workspace_health(state: &AppState, workspace_id: &str) -> Result<WorkspaceHealth, ApiError> {
     let started = std::time::Instant::now();
-    let version = state
+    // The answer depends on the content and on which checks run (the workspace's template), so both are in the key.
+    let content_version = state
         .storage
         .workspace_content_version(workspace_id)
         .await
         .map_err(map_storage_error)?;
+    let version = format!(
+        "{content_version}|{}",
+        state.core.health_plan(workspace_id).await.cache_key()
+    );
     if let Some(health) = state.derived.health(workspace_id, &version) {
         crate::record_timing(
             "health_cached",

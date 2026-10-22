@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.181 (2026-10-22)
+
+The health checks that run, and their order, follow the workspace's template.
+
+### Changed
+- **The `health` block:** `detectors` lists the checks that run and the order their findings are listed in, from the seven Workspace Health has: older versions, duplicates, removed code, outdated references, stale memory, indexing failures and unconnected files. At least one is named and none twice. Without the block every check runs in the usual order, so General is unchanged. `GET /v1/workspaces/{id}/template` and the preview answer it as `health.detectors`, and Settings › Template lists the checks.
+- **A check that is left out is not run:** it costs nothing, its findings are not listed and it is not in the statistics. What an administrator already decided about its earlier findings stays recorded and returns if the check does. The findings that are listed sort by severity and then by the template's order, on the Health page and in the Review queue alike.
+- **The cached answer follows the plan:** the server keeps Health between requests while a workspace's content is unchanged; the key now includes which checks run, so choosing another template is never answered from the cache. If the template cannot be read every check runs: a template must never be the reason Health says nothing.
+- **The four templates:** *Software engineering* runs removed code, outdated references and stale memory; *Operations and incidents* runs outdated references and stale memory; *Product and decisions* lists outdated references first, then older versions and stale memory, and runs no code check; the *Knowledge base* runs older versions, duplicates and outdated references. All four also run the indexing-failure check, which the plan's table had not listed: a file that search cannot see should always be reported.
+- **Tests (written, not run):** three in the templates crate (every check in the usual order without a block and a chosen list written back; an unknown, repeated or empty list refused; the four templates' checks, indexing failures included), two in the api crate (the checks a template can choose are the health detectors and their ids; a plan runs what the template names in its order, skips a name this server does not know and keys the cache), and the server's and the web's template tests check the field.
+- **Checks run on this release:** `cargo check` of the templates, api and server crates with their tests compiles; `rustfmt` shows nothing for the lines changed; `types:check`, `typecheck`, `styles:check`, `a11y:check`, `docs:check` and `version:check` pass. **Not run:** the tests, as asked.
+
+### Upgrading
+- Nothing to do. Every workspace still runs every check until an administrator chooses a template.
+
 ## V0.2.180 (2026-10-22)
 
 A template can prefer recent evidence, within the same bounds as other boosts.

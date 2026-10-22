@@ -42,6 +42,7 @@ pub use agent::{
 pub use archive::{read_archive_entries, write_workspace_archive, ArchiveEncoder, ArchiveReader};
 pub use budget::BackgroundAiBudget;
 pub use embeddings::{EmbeddingRebuildPlan, EmbeddingRun};
+pub use health::HealthPlan;
 pub use remote_policy::{RemoteGitPolicy, RemoteRepository, RemoteScheme};
 pub use remote_repo::{looks_remote, CloneLimitHandles, CloneSize, RemoteAuth, RemoteDeployKey, RemoteToken};
 pub use repo_policy::{is_network_path, RepoLinkPolicy};

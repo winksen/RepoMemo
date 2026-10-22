@@ -42,5 +42,6 @@
       { "document_kind": "excel", "factor": 1.15 },
       { "document_kind": "powerpoint", "factor": 1.15 }
     ]
-  }
+  },
+  "health": { "detectors": ["older_version_active", "duplicate_content", "outdated_evidence_referenced", "index_failed"] }
 }

@@ -40,5 +40,6 @@
       { "path": "docs/adr/**", "factor": 1.15 },
       { "path": "README*", "factor": 1.15 }
     ]
-  }
+  },
+  "health": { "detectors": ["removed_symbol_mentioned", "outdated_evidence_referenced", "stale_memory_citation", "index_failed"] }
 }

@@ -24,5 +24,6 @@ pub fn general() -> TemplateDefinition {
         assistant: None,
         retrieval: None,
         ranking: None,
+        health: None,
     }
 }

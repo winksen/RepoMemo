@@ -57,6 +57,7 @@ impl EffectiveTemplate {
             assistant: detail.assistant,
             retrieval: detail.retrieval,
             ranking: detail.ranking,
+            health: detail.health,
         }
     }
 }
@@ -91,6 +92,9 @@ pub fn detail_of(template: &TemplateDefinition) -> TemplateDetail {
         },
         retrieval: TemplateRetrieval {
             type_chips: template.retrieval().type_chips,
+        },
+        health: TemplateHealth {
+            detectors: template.health_detectors(),
         },
         ranking: {
             let ranking = template.ranking();
@@ -530,6 +534,19 @@ mod tests {
         );
 
         let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    /// The health checks a template can choose are exactly the API's detectors, in the order Health has always had.
+    #[test]
+    fn the_checks_a_template_can_choose_are_the_health_detectors() {
+        use repomemo_domain::HealthDetector;
+        let ids: Vec<&str> = HealthDetector::ALL.iter().map(|detector| detector.as_str()).collect();
+        assert_eq!(ids, repomemo_templates::HEALTH_DETECTORS);
+        for detector in HealthDetector::ALL {
+            assert_eq!(HealthDetector::from_id(detector.as_str()), Some(detector));
+            assert_eq!(serde_json::to_value(detector).unwrap(), json!(detector.as_str()));
+        }
+        assert_eq!(HealthDetector::from_id("mind_reading"), None);
     }
 
     /// What the assistant can be told to do is exactly what the API's capabilities are (V0.2.176).

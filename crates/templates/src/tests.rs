@@ -1318,6 +1318,98 @@ fn the_half_life_and_the_most_a_file_may_be_favoured_by_stay_within_bounds() {
     assert_eq!(RECENCY_MAX, 1.2);
 }
 
+/// The valid file with a `health` block written as JSON.
+fn with_health(block: &str) -> String {
+    VALID.replacen("\"format\": 1,", &format!("\"format\": 1,\n  \"health\": {block},"), 1)
+}
+
+#[test]
+fn every_health_check_runs_in_the_usual_order_unless_a_template_chooses() {
+    assert_eq!(general().health_detectors(), HEALTH_DETECTORS);
+    assert_eq!(parse(VALID).unwrap().health_detectors(), HEALTH_DETECTORS);
+    let chosen = parse(&with_health(
+        r#"{ "detectors": ["outdated_evidence_referenced", "stale_memory_citation"] }"#,
+    ))
+    .unwrap();
+    assert_eq!(
+        chosen.health_detectors(),
+        ["outdated_evidence_referenced", "stale_memory_citation"]
+    );
+    assert_eq!(parse(&serde_json::to_string(&chosen).unwrap()).unwrap(), chosen);
+    assert!(!serde_json::to_string(&general()).unwrap().contains("health"));
+    assert_eq!(HEALTH_DETECTORS.len(), 7);
+}
+
+#[test]
+fn a_health_check_must_exist_be_listed_once_and_at_least_one_must_run() {
+    let unknown = parse(&with_health(
+        r#"{ "detectors": ["outdated_evidence_referenced", "mind_reading"] }"#,
+    ))
+    .unwrap_err();
+    assert_eq!(unknown[0].path, "health.detectors[1]");
+    let twice = parse(&with_health(r#"{ "detectors": ["unconnected", "unconnected"] }"#)).unwrap_err();
+    assert_eq!(twice[0].path, "health.detectors[1]");
+    assert_eq!(
+        parse(&with_health(r#"{ "detectors": [] }"#)).unwrap_err()[0].path,
+        "health.detectors"
+    );
+    assert_eq!(parse(&with_health("{}")).unwrap_err()[0].path, "health.detectors");
+    let unknown_key = parse(&with_health(r#"{ "detectors": ["unconnected"], "colour": "red" }"#)).unwrap_err();
+    assert!(
+        unknown_key[0].message.contains("unknown field `colour`"),
+        "{}",
+        unknown_key[0]
+    );
+}
+
+#[test]
+fn the_four_first_templates_run_the_checks_their_teams_need_and_keep_indexing_failures() {
+    let catalogue = Catalogue::builtin();
+    let checks = |id: &str| catalogue.get(id).unwrap().health_detectors();
+    assert_eq!(
+        checks("software-engineering"),
+        [
+            "removed_symbol_mentioned",
+            "outdated_evidence_referenced",
+            "stale_memory_citation",
+            "index_failed"
+        ]
+    );
+    assert_eq!(
+        checks("operations"),
+        ["outdated_evidence_referenced", "stale_memory_citation", "index_failed"]
+    );
+    assert_eq!(
+        checks("product-decisions"),
+        [
+            "outdated_evidence_referenced",
+            "older_version_active",
+            "stale_memory_citation",
+            "index_failed"
+        ]
+    );
+    assert_eq!(
+        checks("knowledge-base"),
+        [
+            "older_version_active",
+            "duplicate_content",
+            "outdated_evidence_referenced",
+            "index_failed"
+        ]
+    );
+    for id in [
+        "software-engineering",
+        "operations",
+        "product-decisions",
+        "knowledge-base",
+    ] {
+        assert!(
+            checks(id).contains(&"index_failed".to_owned()),
+            "{id}: a file search cannot see is always reported"
+        );
+    }
+}
+
 #[test]
 fn only_operations_prefers_recent_evidence() {
     let catalogue = Catalogue::builtin();

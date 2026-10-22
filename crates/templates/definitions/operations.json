@@ -42,5 +42,6 @@
       { "artifact_type": "incident", "factor": 1.2 }
     ],
     "recency": { "half_life_days": 90, "max_factor": 1.2 }
-  }
+  },
+  "health": { "detectors": ["outdated_evidence_referenced", "stale_memory_citation", "index_failed"] }
 }

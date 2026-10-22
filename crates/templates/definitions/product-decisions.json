@@ -40,5 +40,6 @@
       { "artifact_type": "note", "factor": 1.15 },
       { "document_kind": "markdown", "factor": 1.15 }
     ]
-  }
+  },
+  "health": { "detectors": ["outdated_evidence_referenced", "older_version_active", "stale_memory_citation", "index_failed"] }
 }

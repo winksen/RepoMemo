@@ -282,6 +282,8 @@ pub struct WorkspaceTemplateView {
     pub retrieval: TemplateRetrieval,
     /// How search weighs what it finds.
     pub ranking: TemplateRanking,
+    /// The health checks that run.
+    pub health: TemplateHealth,
 }
 
 /// The tabs of a workspace and the sections kept under *More*, as its template arranges them. Every section is in
@@ -358,6 +360,12 @@ pub struct TemplateRanking {
     pub recency: Option<TemplateRecency>,
 }
 
+/// The health checks that run in a workspace, in the order their findings are listed. For `general`: every check.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TemplateHealth {
+    pub detectors: Vec<String>,
+}
+
 /// A template as a person looks at it before choosing it: what it arranges and names, without any workspace's choice.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TemplateDetail {
@@ -369,6 +377,7 @@ pub struct TemplateDetail {
     pub assistant: TemplateAssistant,
     pub retrieval: TemplateRetrieval,
     pub ranking: TemplateRanking,
+    pub health: TemplateHealth,
 }
 
 /// Chooses a workspace's template; `null` returns the workspace to the default. `overrides` are the adjustments
@@ -1441,6 +1450,11 @@ impl HealthDetector {
             Self::StaleMemoryCitation => "stale_memory_citation",
             Self::Unconnected => "unconnected",
         }
+    }
+
+    /// The check with this id (`as_str`), if there is one.
+    pub fn from_id(id: &str) -> Option<HealthDetector> {
+        Self::ALL.into_iter().find(|detector| detector.as_str() == id)
     }
 
     pub const ALL: [HealthDetector; 7] = [

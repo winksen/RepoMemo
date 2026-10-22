@@ -148,6 +148,14 @@ async fn the_four_first_templates_are_offered_and_each_creates_its_folders() {
         if id == "operations" {
             assert_eq!(view["assistant"]["order"][0], "ask_question");
         }
+        // Health (V0.2.181): a team runs the checks it needs; indexing failures are always reported.
+        let checks = view["health"]["detectors"].as_array().unwrap();
+        assert!(checks.len() >= 3 && checks.contains(&json!("index_failed")), "{id}");
+        assert_eq!(
+            checks.contains(&json!("removed_symbol_mentioned")),
+            id == "software-engineering",
+            "{id}"
+        );
         // Ranking (V0.2.178): Operations and Knowledge base favour verified evidence more.
         let factor = if id == "operations" || id == "knowledge-base" {
             1.15
@@ -566,6 +574,18 @@ async fn templates_are_listed_read_by_members_and_changed_only_by_administrators
     assert_eq!(
         by_default["ranking"],
         json!({"verified": 1.1, "boosts": [], "recency": null})
+    );
+    assert_eq!(
+        by_default["health"]["detectors"],
+        json!([
+            "older_version_active",
+            "duplicate_content",
+            "removed_symbol_mentioned",
+            "outdated_evidence_referenced",
+            "stale_memory_citation",
+            "index_failed",
+            "unconnected"
+        ])
     );
     assert_eq!(
         by_default["overview"]["cards"],

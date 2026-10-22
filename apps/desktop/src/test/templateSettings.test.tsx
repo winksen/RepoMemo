@@ -24,6 +24,7 @@ const operationsDetail: TemplateDetail = {
   evidence: { default_view: "list", types_first: [] },
   assistant: { order: [], suggestions: ["What is the runbook for…"] },
   retrieval: { type_chips: [] },
+  health: { detectors: ["outdated_evidence_referenced", "stale_memory_citation", "index_failed"] },
   ranking: { verified: 1.15, recency: { half_life_days: 90, max_factor: 1.2 }, boosts: [{ artifact_type: "runbook", document_kind: null, path: null, factor: 1.2 }, { artifact_type: null, document_kind: "pdf", path: null, factor: 1.15 }, { artifact_type: null, document_kind: null, path: "docs/adr/**", factor: 1.15 }] },
 };
 const knowledgeDetail: TemplateDetail = {
@@ -63,6 +64,7 @@ describe("the lines that preview a template", () => {
       "Renamed": "Tasks → Actions",
       "Overview cards": "Fresh evidence, At risk",
       "The assistant suggests": "1 question",
+      "Health checks": "Outdated references, Stale memory, Indexing failures",
       "Search favours": "verified evidence by 15 %, Runbook by 20 %, PDF by 15 %, docs/adr/** by 15 %, recent evidence by up to 20 %",
     });
   });

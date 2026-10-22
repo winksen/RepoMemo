@@ -16,6 +16,7 @@ mod catalogue;
 mod evidence;
 mod folders;
 mod general;
+mod health;
 mod issue;
 mod labels;
 pub mod limits;
@@ -35,6 +36,7 @@ pub use catalogue::{Catalogue, SourceProblem};
 pub use evidence::{EvidenceBlock, ResolvedEvidence, DEFAULT_VIEW, EVIDENCE_VIEWS, FILE_TYPES};
 pub use folders::StarterFolder;
 pub use general::{general, GENERAL_ID};
+pub use health::{HealthBlock, HEALTH_DETECTORS};
 pub use issue::TemplateIssue;
 pub use labels::{LabelsBlock, ARTIFACT_TYPES};
 pub use meta::{TemplateMeta, WORKSPACE_ICONS};
@@ -85,6 +87,9 @@ pub struct TemplateDefinition {
     /// How search weighs what it finds (V0.2.178); as today when left out.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ranking: Option<RankingBlock>,
+    /// The health checks that run and their order (V0.2.181); every check in the usual order when left out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub health: Option<HealthBlock>,
 }
 
 impl TemplateDefinition {
@@ -158,6 +163,9 @@ impl TemplateDefinition {
         if let Some(ranking) = &self.ranking {
             ranking::validate(ranking, &mut issues);
         }
+        if let Some(health) = &self.health {
+            health::validate(health, &mut issues);
+        }
         issues
     }
 
@@ -168,6 +176,11 @@ impl TemplateDefinition {
     /// The names this template gives to sections and kinds of evidence; empty for the usual names.
     pub fn labels(&self) -> LabelsBlock {
         self.labels.clone().unwrap_or_default()
+    }
+
+    /// The health checks that run, in the order their findings are listed.
+    pub fn health_detectors(&self) -> Vec<String> {
+        HealthBlock::resolved(self.health.as_ref())
     }
 
     /// How search weighs what it finds, complete.

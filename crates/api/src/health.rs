@@ -37,8 +37,65 @@ const UNCONNECTED_MAX_FILES: usize = 2_000;
 /// varied, and listing them would be noise rather than a signal.
 const UNCONNECTED_MAX_SHARE: f64 = 0.15;
 
+/// Which checks run in a workspace and in what order their findings are listed (V0.2.181): its template's choice, or
+/// every check in the usual order.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HealthPlan {
+    detectors: Vec<HealthDetector>,
+}
+
+impl HealthPlan {
+    /// The plan of a template: the checks it names, in its order. A name this server does not know is skipped.
+    pub fn from_ids(ids: &[String]) -> Self {
+        Self {
+            detectors: ids.iter().filter_map(|id| HealthDetector::from_id(id)).collect(),
+        }
+    }
+
+    /// Every check in the usual order: what a workspace without a template runs.
+    pub fn all() -> Self {
+        Self {
+            detectors: HealthDetector::ALL.to_vec(),
+        }
+    }
+
+    pub fn detectors(&self) -> &[HealthDetector] {
+        &self.detectors
+    }
+
+    pub fn runs(&self, detector: HealthDetector) -> bool {
+        self.detectors.contains(&detector)
+    }
+
+    fn rank(&self, detector: HealthDetector) -> usize {
+        self.detectors
+            .iter()
+            .position(|candidate| *candidate == detector)
+            .unwrap_or(usize::MAX)
+    }
+
+    /// What a cached answer was made for: a change of plan must not be answered from the cache.
+    pub fn cache_key(&self) -> String {
+        self.detectors
+            .iter()
+            .map(|detector| detector.as_str())
+            .collect::<Vec<_>>()
+            .join(",")
+    }
+}
+
 impl RepoMemoCore {
+    /// The checks that run in the workspace. If its template cannot be read every check runs: a template must never
+    /// be the reason Health says nothing.
+    pub async fn health_plan(&self, workspace_id: &str) -> HealthPlan {
+        match self.effective_template(workspace_id).await {
+            Ok(effective) => HealthPlan::from_ids(&effective.template.health_detectors()),
+            Err(_) => HealthPlan::all(),
+        }
+    }
+
     pub async fn workspace_health(&self, workspace_id: &str) -> Result<WorkspaceHealth> {
+        let plan = self.health_plan(workspace_id).await;
         let artifacts = self.storage.list_artifacts(workspace_id).await?;
         let lifecycle = self.storage.workspace_lifecycle_states(workspace_id).await?;
         let retired = artifacts
@@ -71,27 +128,45 @@ impl RepoMemoCore {
 
         let mut budget = MAX_MENTION_QUERIES;
         let mut findings = Vec::new();
-        findings.extend(older_versions(&versions, &retired));
-        findings.extend(duplicates(&live_items));
-        findings.extend(
-            self.removed_symbols(workspace_id, &versions, &retired, &by_id, &mut budget)
-                .await?,
-        );
-        findings.extend(
-            self.outdated_references(workspace_id, &artifacts, &lifecycle, &retired, &by_id, &mut budget)
-                .await?,
-        );
-        findings.extend(self.stale_memory_citations(workspace_id, &by_id).await?);
-        findings.extend(self.index_failures(workspace_id, &retired, &by_id).await?);
-        let similarity_available = match self
-            .unconnected(workspace_id, &artifacts, &live_items, &folded_into)
-            .await?
-        {
-            Some(unconnected) => {
-                findings.extend(unconnected);
-                true
+        // A check the template leaves out is not run; what was decided about its earlier findings stays recorded.
+        if plan.runs(HealthDetector::OlderVersionActive) {
+            findings.extend(older_versions(&versions, &retired));
+        }
+        if plan.runs(HealthDetector::DuplicateContent) {
+            findings.extend(duplicates(&live_items));
+        }
+        if plan.runs(HealthDetector::RemovedSymbolMentioned) {
+            findings.extend(
+                self.removed_symbols(workspace_id, &versions, &retired, &by_id, &mut budget)
+                    .await?,
+            );
+        }
+        if plan.runs(HealthDetector::OutdatedEvidenceReferenced) {
+            findings.extend(
+                self.outdated_references(workspace_id, &artifacts, &lifecycle, &retired, &by_id, &mut budget)
+                    .await?,
+            );
+        }
+        if plan.runs(HealthDetector::StaleMemoryCitation) {
+            findings.extend(self.stale_memory_citations(workspace_id, &by_id).await?);
+        }
+        if plan.runs(HealthDetector::IndexFailed) {
+            findings.extend(self.index_failures(workspace_id, &retired, &by_id).await?);
+        }
+        // Without the check there is nothing to say about similarity either.
+        let similarity_available = if plan.runs(HealthDetector::Unconnected) {
+            match self
+                .unconnected(workspace_id, &artifacts, &live_items, &folded_into)
+                .await?
+            {
+                Some(unconnected) => {
+                    findings.extend(unconnected);
+                    true
+                }
+                None => false,
             }
-            None => false,
+        } else {
+            true
         };
 
         let actions = self.storage.list_health_actions(workspace_id).await?;
@@ -103,11 +178,12 @@ impl RepoMemoCore {
         findings.sort_by(|a, b| {
             a.severity
                 .cmp(&b.severity)
-                .then_with(|| detector_rank(a.detector).cmp(&detector_rank(b.detector)))
+                .then_with(|| plan.rank(a.detector).cmp(&plan.rank(b.detector)))
                 .then_with(|| a.title.cmp(&b.title))
         });
 
-        let detectors = HealthDetector::ALL
+        let detectors = plan
+            .detectors()
             .iter()
             .map(|&detector| {
                 let recorded = actions.iter().filter(|(_, name, _)| name == detector.as_str());
@@ -611,11 +687,35 @@ fn duplicates(live: &[&ArtifactSummary]) -> Vec<HealthFinding> {
         .collect()
 }
 
-fn detector_rank(detector: HealthDetector) -> usize {
-    HealthDetector::ALL
-        .iter()
-        .position(|candidate| *candidate == detector)
-        .unwrap_or(usize::MAX)
+#[cfg(test)]
+mod plan_tests {
+    use super::HealthPlan;
+    use repomemo_domain::HealthDetector;
+
+    #[test]
+    fn a_plan_runs_what_the_template_names_in_its_order_and_skips_what_it_does_not_know() {
+        let plan = HealthPlan::from_ids(&[
+            "outdated_evidence_referenced".to_owned(),
+            "mind_reading".to_owned(),
+            "index_failed".to_owned(),
+        ]);
+        assert_eq!(
+            plan.detectors(),
+            [HealthDetector::OutdatedEvidenceReferenced, HealthDetector::IndexFailed]
+        );
+        assert!(plan.runs(HealthDetector::IndexFailed) && !plan.runs(HealthDetector::RemovedSymbolMentioned));
+        assert_eq!(plan.cache_key(), "outdated_evidence_referenced,index_failed");
+        assert_eq!(plan.rank(HealthDetector::IndexFailed), 1);
+        assert_eq!(plan.rank(HealthDetector::Unconnected), usize::MAX);
+        // Every check, in the usual order, is what a workspace without a template runs; the key tells plans apart.
+        let all = HealthPlan::all();
+        assert_eq!(all.detectors(), HealthDetector::ALL);
+        assert_eq!(
+            HealthPlan::from_ids(&repomemo_templates::HEALTH_DETECTORS.map(str::to_owned)),
+            all
+        );
+        assert_ne!(all.cache_key(), plan.cache_key());
+    }
 }
 
 fn health_file(artifact: &ArtifactSummary) -> HealthFile {
