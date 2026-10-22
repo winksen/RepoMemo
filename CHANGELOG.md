@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.168 (2026-10-22)
+
+A workspace can be created from a template, with the folders the template starts it with.
+
+### Added
+- **`template_id` when creating a workspace:** `POST /v1/workspaces` takes an optional `template_id`. With one, the choice is saved in the new workspace's settings and the template's starter folders are made; without one nothing is saved and no folder is made, exactly as before, and `general` (named on purpose) saves the choice and makes no folder. An id the server's catalogue lacks is refused with `400` before anything is created or counted against the quota.
+- **The `starter_folders` block:** a template may list folders (`{"name": "Incidents", "children": ["2026", "Postmortems"]}`): at most 12 folders in all, two levels, names of up to 40 characters with no slash, backslash or control character and no leading or trailing space, and no two folders beside each other with the same name (case aside), which a workspace refuses too. Nothing is created in an existing workspace: choosing a template later never creates, moves or deletes evidence.
+- **Made together or not at all:** `StorageEngine::create_shared_workspace_from` inserts the workspace, its saved choice, its starter folders and the "workspace created" activity in one transaction, with the checks a folder made by hand has, so a folder that cannot be made leaves no workspace behind. The feed reads "Created workspace Ops from the Operations and incidents template." for a workspace made from one.
+- **In the core:** `RepoMemoCore::workspace_starter(template_id)` turns a catalogue entry into what the storage needs, and `with_template_catalogue` replaces the catalogue (the operator's folder in V0.2.189, tests).
+- **No page uses it yet:** the create dialog's picker is V0.2.169 and the four templates that list folders arrive in V0.2.170, so no workspace changes yet.
+- **Tests (written, not run):** four in the templates crate (the block read and written back, its bounds in number and levels, the rules for a folder name, no repeated name beside another), one in storage (the folders exist nested as listed, the choice is saved and the feed says where the workspace came from; no folder and no choice without a template; three setups that cannot be made leave no workspace), one in the core (a starter from a catalogue with folders, General makes none, an unknown id makes nothing) and one on the server (no template saves nothing, General saves the choice and makes no folder, an unknown template is `400` and creates nothing).
+- **Checks run on this release:** `cargo check` of the templates, storage, api and server crates with their tests compiles; `rustfmt` shows nothing for the lines changed; `types:check`, `typecheck`, `docs:check` and `version:check` pass. **Not run:** the tests, as asked.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.167 (2026-10-22)
 
 Routes to list templates and to read and change a workspace's template.

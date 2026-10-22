@@ -11,6 +11,7 @@ use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
 use repomemo_domain::{TemplateSummary, WorkspaceTemplateRef, WorkspaceTemplateView};
+use repomemo_storage::StarterSetup;
 use repomemo_templates::{Catalogue, Origin, TemplateDefinition};
 
 use crate::RepoMemoCore;
@@ -133,6 +134,35 @@ impl RepoMemoCore {
     /// The templates this server offers, `general` first.
     pub fn template_catalogue(&self) -> &Catalogue {
         &self.templates.catalogue
+    }
+
+    /// Replaces the templates this server offers (the operator's folder, tests). The answers already kept are dropped.
+    pub fn with_template_catalogue(mut self, catalogue: Catalogue) -> Self {
+        self.templates = TemplateResolver {
+            catalogue: Arc::new(catalogue),
+            kept: Arc::default(),
+        };
+        self
+    }
+
+    /// What a workspace made from the template starts with (the choice to save and the folders to make), or `None`
+    /// when the catalogue has no such template. Nothing is written: the caller hands it to the storage with the
+    /// workspace, so the workspace and its folders are made together or not at all.
+    pub fn workspace_starter(&self, template_id: &str) -> Option<StarterSetup> {
+        let template = self.templates.catalogue.get(template_id)?;
+        Some(StarterSetup {
+            reference: WorkspaceTemplateRef {
+                id: template.meta.id.clone(),
+                version: template.meta.version,
+                overrides: serde_json::Value::Null,
+            },
+            template_name: template.meta.name.clone(),
+            folders: template
+                .starter_folders
+                .iter()
+                .map(|folder| (folder.name.clone(), folder.children.clone()))
+                .collect(),
+        })
     }
 
     /// The catalogue as a picker lists it.
@@ -318,6 +348,49 @@ mod tests {
         // The catalogue as a picker lists it: General first.
         assert_eq!(core.template_summaries()[0].id, GENERAL_ID);
         assert_eq!(core.template_summaries().len(), core.template_catalogue().list().len());
+
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn a_starter_comes_from_the_catalogue_and_carries_the_templates_folders() {
+        let file = r#"{
+            "format": 1,
+            "meta": { "id": "operations", "version": 2, "name": "Operations and incidents",
+                      "summary": "Runbooks and incidents.", "icon": "heartbeat" },
+            "starter_folders": [ { "name": "Runbooks" }, { "name": "Incidents", "children": ["2026", "Postmortems"] } ]
+        }"#;
+        let (catalogue, problems) = Catalogue::load([("operations.json", file)]);
+        assert!(problems.is_empty(), "{problems:?}");
+        let (core, data_dir) = core("starter").await;
+        let core = core.with_template_catalogue(catalogue);
+
+        let starter = core.workspace_starter("operations").expect("the catalogue has it");
+        assert_eq!(starter.reference.id, "operations");
+        assert_eq!(starter.reference.version, 2);
+        assert_eq!(starter.template_name, "Operations and incidents");
+        assert_eq!(
+            starter.folders,
+            [
+                ("Runbooks".to_owned(), vec![]),
+                (
+                    "Incidents".to_owned(),
+                    vec!["2026".to_owned(), "Postmortems".to_owned()]
+                )
+            ]
+        );
+        // General makes none, and an id the catalogue lacks makes nothing.
+        let general = core.workspace_starter(GENERAL_ID).unwrap();
+        assert!(general.folders.is_empty());
+        assert_eq!(general.reference.id, GENERAL_ID);
+        assert!(core.workspace_starter("no-such-template").is_none());
+        assert_eq!(
+            core.template_summaries()
+                .iter()
+                .map(|template| template.id.as_str())
+                .collect::<Vec<_>>(),
+            [GENERAL_ID, "operations"]
+        );
 
         let _ = std::fs::remove_dir_all(data_dir);
     }

@@ -52,6 +52,9 @@ pub(crate) struct UpsertOrganizationMemberRequest {
 pub(crate) struct CreateWorkspaceRequest {
     pub(crate) organization_id: String,
     pub(crate) name: String,
+    /// The template the workspace starts with (V0.2.168); none means `general`, with no folders and no choice saved.
+    #[serde(default)]
+    pub(crate) template_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

@@ -1175,6 +1175,106 @@ async fn a_workspace_remembers_its_template_and_an_import_keeps_it() {
 }
 
 #[tokio::test]
+async fn a_workspace_made_from_a_template_starts_with_its_choice_and_folders_or_not_at_all() {
+    use crate::StarterSetup;
+    use repomemo_domain::WorkspaceTemplateRef;
+
+    let (storage, data_dir) = temp_storage("starter-folders").await;
+    let owner = storage
+        .create_user("starter-owner@example.com", "Owner", "hash")
+        .await
+        .unwrap();
+    let organization = storage.create_organization(&owner.id, "Team").await.unwrap();
+    let setup = |folders: Vec<(&str, Vec<&str>)>| StarterSetup {
+        reference: WorkspaceTemplateRef {
+            id: "operations".to_owned(),
+            version: 2,
+            overrides: json!(null),
+        },
+        template_name: "Operations and incidents".to_owned(),
+        folders: folders
+            .into_iter()
+            .map(|(name, children)| (name.to_owned(), children.into_iter().map(str::to_owned).collect()))
+            .collect(),
+    };
+
+    // The template's folders exist, nested as listed, with the choice saved and the feed saying where it came from.
+    let from_template = setup(vec![("Runbooks", vec![]), ("Incidents", vec!["2026", "Postmortems"])]);
+    let created = storage
+        .create_shared_workspace_from(&owner.id, &organization.id, "Ops", Some(&from_template))
+        .await
+        .unwrap();
+    let id = created.workspace.id.clone();
+    let folders = storage.list_folders(&id).await.unwrap();
+    let incidents = folders.iter().find(|folder| folder.name == "Incidents").unwrap();
+    assert_eq!(folders.len(), 4);
+    assert!(folders
+        .iter()
+        .find(|folder| folder.name == "Runbooks")
+        .unwrap()
+        .parent_id
+        .is_none());
+    assert!(incidents.parent_id.is_none());
+    let mut below: Vec<&str> = folders
+        .iter()
+        .filter(|folder| folder.parent_id.as_deref() == Some(incidents.id.as_str()))
+        .map(|folder| folder.name.as_str())
+        .collect();
+    below.sort();
+    assert_eq!(below, ["2026", "Postmortems"]);
+    assert_eq!(
+        storage.workspace_template_ref(&id).await.unwrap(),
+        Some(from_template.reference.clone())
+    );
+    assert_eq!(created.workspace.settings["template"]["id"], json!("operations"));
+    let activity = storage.list_workspace_activity(&id, 10).await.unwrap();
+    assert!(
+        activity
+            .iter()
+            .any(|event| event.summary == "Created workspace Ops from the Operations and incidents template."),
+        "{activity:?}"
+    );
+
+    // Without a template there are no folders and no choice, as before.
+    let plain = storage
+        .create_shared_workspace(&owner.id, &organization.id, "Plain")
+        .await
+        .unwrap();
+    assert!(storage.list_folders(&plain.workspace.id).await.unwrap().is_empty());
+    assert_eq!(storage.workspace_template_ref(&plain.workspace.id).await.unwrap(), None);
+    assert_eq!(plain.workspace.settings, json!({}));
+    let empty_template = setup(vec![]);
+    let bare = storage
+        .create_shared_workspace_from(&owner.id, &organization.id, "Bare", Some(&empty_template))
+        .await
+        .unwrap();
+    assert!(storage.list_folders(&bare.workspace.id).await.unwrap().is_empty());
+    assert!(storage
+        .workspace_template_ref(&bare.workspace.id)
+        .await
+        .unwrap()
+        .is_some());
+
+    // A folder that cannot be made leaves no workspace behind: a repeated name, a slash.
+    let before = storage.list_workspaces().await.unwrap().len();
+    for broken in [
+        setup(vec![("Same", vec![]), ("same", vec![])]),
+        setup(vec![("Fine", vec!["Kid", "kid"])]),
+        setup(vec![("Fine", vec![]), ("a/b", vec![])]),
+    ] {
+        assert!(storage
+            .create_shared_workspace_from(&owner.id, &organization.id, "Broken", Some(&broken))
+            .await
+            .is_err());
+    }
+    assert_eq!(storage.list_workspaces().await.unwrap().len(), before);
+
+    storage.pool.close().await;
+    drop(storage);
+    let _ = std::fs::remove_dir_all(data_dir);
+}
+
+#[tokio::test]
 async fn vector_search_uses_the_index_and_agrees_with_a_scan() {
     let (storage, data_dir) = temp_storage("vectors").await;
     let workspace = storage.create_workspace("Vectors").await.unwrap();

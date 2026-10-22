@@ -16,5 +16,6 @@ pub fn general() -> TemplateDefinition {
             summary: "Every section in its usual order, with the usual ranking, checks and suggestions.".to_owned(),
             icon: "stack".to_owned(),
         },
+        starter_folders: Vec::new(),
     }
 }

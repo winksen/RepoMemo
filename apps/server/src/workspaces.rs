@@ -6,10 +6,25 @@ pub(crate) async fn create_workspace(
     Json(request): Json<CreateWorkspaceRequest>,
 ) -> Result<(StatusCode, Json<SharedWorkspace>), ApiError> {
     crate::verification::require_verified(&state, &subject.user_id).await?;
+    // A template this server does not have is refused before anything is made.
+    let setup = match request.template_id.as_deref() {
+        None => None,
+        Some(id) => Some(
+            state
+                .core
+                .workspace_starter(id)
+                .ok_or_else(|| ApiError::bad_request("That template was not found."))?,
+        ),
+    };
     quotas::check_new_workspace(&state, &subject).await?;
     let workspace = state
         .storage
-        .create_shared_workspace(&subject.user_id, &request.organization_id, &request.name)
+        .create_shared_workspace_from(
+            &subject.user_id,
+            &request.organization_id,
+            &request.name,
+            setup.as_ref(),
+        )
         .await
         .map_err(map_storage_error)?;
     Ok((StatusCode::CREATED, Json(workspace)))

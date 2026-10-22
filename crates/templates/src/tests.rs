@@ -374,6 +374,96 @@ fn a_catalogue_of_nothing_is_general_alone() {
     assert_eq!(ids(&catalogue), ["general"]);
 }
 
+/// The valid file with a `starter_folders` block written as JSON.
+fn with_folders(block: &str) -> String {
+    VALID.replacen(
+        "\"format\": 1,",
+        &format!("\"format\": 1,\n  \"starter_folders\": {block},"),
+        1,
+    )
+}
+
+#[test]
+fn a_template_lists_the_folders_a_new_workspace_starts_with() {
+    let template = parse(&with_folders(
+        r#"[ { "name": "Runbooks" }, { "name": "Incidents", "children": ["2026", "Postmortems"] } ]"#,
+    ))
+    .unwrap();
+    assert_eq!(template.starter_folders.len(), 2);
+    assert_eq!(template.starter_folders[0].name, "Runbooks");
+    assert!(template.starter_folders[0].children.is_empty());
+    assert_eq!(template.starter_folders[1].children, ["2026", "Postmortems"]);
+    // Written out and read back it is the same, and a template without the block writes none.
+    let text = serde_json::to_string(&template).unwrap();
+    assert_eq!(parse(&text).unwrap(), template);
+    assert!(!serde_json::to_string(&general()).unwrap().contains("starter_folders"));
+    assert!(general().starter_folders.is_empty());
+    // An empty list is a valid way to say none.
+    assert!(parse(&with_folders("[]")).unwrap().starter_folders.is_empty());
+}
+
+#[test]
+fn the_folders_are_bounded_in_number_and_in_levels() {
+    let twelve: Vec<String> = (0..limits::STARTER_FOLDERS_MAX)
+        .map(|n| format!("{{ \"name\": \"Folder {n}\" }}"))
+        .collect();
+    assert!(parse(&with_folders(&format!("[{}]", twelve.join(",")))).is_ok());
+    let thirteen: Vec<String> = (0..=limits::STARTER_FOLDERS_MAX)
+        .map(|n| format!("{{ \"name\": \"Folder {n}\" }}"))
+        .collect();
+    assert_eq!(
+        paths(parse(&with_folders(&format!("[{}]", thirteen.join(","))))),
+        ["starter_folders"]
+    );
+    // Children count with their parents: 4 folders with 2 children each is 12, one more is 13.
+    let family = |children: usize| {
+        let kids: Vec<String> = (0..children).map(|n| format!("\"Kid {n}\"")).collect();
+        format!("{{ \"name\": \"Parent\", \"children\": [{}] }}", kids.join(","))
+    };
+    assert!(parse(&with_folders(&format!("[{}]", family(limits::STARTER_FOLDERS_MAX - 1)))).is_ok());
+    assert!(parse(&with_folders(&format!("[{}]", family(limits::STARTER_FOLDERS_MAX)))).is_err());
+    // Only two levels: a child is a name, and a folder inside a child is not part of the format.
+    let deeper = r#"[ { "name": "A", "children": [ { "name": "B" } ] } ]"#;
+    assert!(parse(&with_folders(deeper)).is_err());
+    let unknown = r#"[ { "name": "A", "colour": "red" } ]"#;
+    let issues = parse(&with_folders(unknown)).unwrap_err();
+    assert!(issues[0].message.contains("unknown field `colour`"), "{}", issues[0]);
+}
+
+#[test]
+fn a_folder_name_follows_the_rules_of_a_workspace_folder() {
+    let longest = "f".repeat(limits::FOLDER_NAME_MAX);
+    assert!(parse(&with_folders(&format!(r#"[ {{ "name": "{longest}" }} ]"#))).is_ok());
+    let too_long = "f".repeat(limits::FOLDER_NAME_MAX + 1);
+    for bad in [
+        "",
+        "   ",
+        too_long.as_str(),
+        " Padded",
+        "Padded ",
+        "a/b",
+        "a\\\\b",
+        "two\\nlines",
+    ] {
+        let issues = parse(&with_folders(&format!(r#"[ {{ "name": "{bad}" }} ]"#))).unwrap_err();
+        assert_eq!(issues[0].path, "starter_folders[0].name", "{bad:?} should be refused");
+    }
+    let issues = parse(&with_folders(r#"[ { "name": "Ok", "children": ["fine", "a/b"] } ]"#)).unwrap_err();
+    assert_eq!(issues[0].path, "starter_folders[0].children[1]");
+}
+
+#[test]
+fn two_folders_beside_each_other_cannot_share_a_name() {
+    let top = parse(&with_folders(r#"[ { "name": "Runbooks" }, { "name": "runbooks" } ]"#)).unwrap_err();
+    assert_eq!(top[0].path, "starter_folders[1].name");
+    let below = parse(&with_folders(r#"[ { "name": "A", "children": ["x", "X"] } ]"#)).unwrap_err();
+    assert_eq!(below[0].path, "starter_folders[0].children[1]");
+    // The same name at another level, or under another parent, is fine.
+    let apart =
+        r#"[ { "name": "A", "children": ["Notes"] }, { "name": "B", "children": ["Notes"] }, { "name": "Notes" } ]"#;
+    assert!(parse(&with_folders(apart)).is_ok());
+}
+
 fn catalogue_with_operations(version: u32) -> Catalogue {
     let file = VALID.replace("\"version\": 2", &format!("\"version\": {version}"));
     let (catalogue, problems) = Catalogue::load([("operations.json", file.as_str())]);

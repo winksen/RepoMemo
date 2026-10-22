@@ -1,5 +1,127 @@
 use super::*;
 
+/// V0.2.168: a workspace can be created with a template; `general` saves the choice and makes no folders, no
+/// template saves nothing as before, and a template the server lacks is refused before anything is made.
+#[tokio::test]
+async fn a_workspace_is_created_from_a_template_or_not_at_all() {
+    let data_dir = temp_data_dir("templates-create");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let send = |method: &'static str, uri: String, who: String, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, &who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let (_, _) = register_account(&app, "templates-create-admin@example.com").await;
+    let (owner, _) = register_account(&app, "templates-create-owner@example.com").await;
+    let organization = response_json(
+        send(
+            "POST",
+            "/v1/organizations".to_owned(),
+            owner.clone(),
+            json!({"name": "Team"}),
+        )
+        .await,
+    )
+    .await["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let workspaces =
+        || async { response_json(send("GET", "/v1/workspaces".to_owned(), owner.clone(), json!(null)).await).await };
+
+    // No template: nothing is saved and no folder is made, as before.
+    let plain = response_json(
+        send(
+            "POST",
+            "/v1/workspaces".to_owned(),
+            owner.clone(),
+            json!({"organization_id": organization, "name": "Plain"}),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(plain["workspace"]["settings"], json!({}));
+    let plain_id = plain["workspace"]["id"].as_str().unwrap().to_owned();
+    let folders = response_json(
+        send(
+            "GET",
+            format!("/v1/workspaces/{plain_id}/folders"),
+            owner.clone(),
+            json!(null),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(folders, json!([]));
+    let view = response_json(
+        send(
+            "GET",
+            format!("/v1/workspaces/{plain_id}/template"),
+            owner.clone(),
+            json!(null),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(view["source"], "default");
+
+    // General, named on purpose: the choice is saved and General lists no folders.
+    let general = send(
+        "POST",
+        "/v1/workspaces".to_owned(),
+        owner.clone(),
+        json!({"organization_id": organization, "name": "General one", "template_id": "general"}),
+    )
+    .await;
+    assert_eq!(general.status(), 201);
+    let general = response_json(general).await;
+    assert_eq!(general["workspace"]["settings"]["template"]["id"], "general");
+    let general_id = general["workspace"]["id"].as_str().unwrap().to_owned();
+    let folders = response_json(
+        send(
+            "GET",
+            format!("/v1/workspaces/{general_id}/folders"),
+            owner.clone(),
+            json!(null),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(folders, json!([]));
+    let view = response_json(
+        send(
+            "GET",
+            format!("/v1/workspaces/{general_id}/template"),
+            owner.clone(),
+            json!(null),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(
+        (view["source"].as_str(), view["chosen_id"].as_str()),
+        (Some("workspace"), Some("general"))
+    );
+
+    // A template the server lacks is refused and nothing is made.
+    let before = workspaces().await.as_array().unwrap().len();
+    let refused = send(
+        "POST",
+        "/v1/workspaces".to_owned(),
+        owner.clone(),
+        json!({"organization_id": organization, "name": "Ghost", "template_id": "no-such-template"}),
+    )
+    .await;
+    assert_eq!(refused.status(), 400);
+    assert!(response_json(refused).await["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("template"));
+    assert_eq!(workspaces().await.as_array().unwrap().len(), before);
+
+    let _ = std::fs::remove_dir_all(data_dir);
+}
+
 /// V0.2.167: the catalogue is for anyone signed in, a workspace's template is read by its members, and
 /// only an owner or administrator with a session or an `admin` token changes it (decision 26); a change
 /// is in the activity feed, an unknown template writes nothing and choosing the same one again records nothing.

@@ -50,6 +50,7 @@ pub use accounts::{Anonymization, Deactivation, OwnedPlace, FORMER_MEMBER};
 pub use archive_import::{ImportedWorkspace, PendingPassage};
 pub use connectors::{ConnectorItemOutcome, ConnectorItemWrite};
 pub use mentions::{MentionRow, MentionWrite, WorkspaceFileIndex};
+pub use organizations::StarterSetup;
 pub use credentials::{RepoCredentialInfo, RepoSecret, RepoWebhookInfo};
 pub use repo::RepoLastChange;
 pub use environment::{inspect_environment, EnvironmentState};

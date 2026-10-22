@@ -2,6 +2,51 @@ use repomemo_domain::WorkspaceTemplateRef;
 
 use super::*;
 
+/// What a workspace made from a template starts with: the choice to save and the folders to make.
+#[derive(Debug, Clone, PartialEq)]
+pub struct StarterSetup {
+    pub reference: WorkspaceTemplateRef,
+    /// For the activity feed: "Created workspace X from the {name} template."
+    pub template_name: String,
+    /// Folders, each with the names of the folders one level below it.
+    pub folders: Vec<(String, Vec<String>)>,
+}
+
+/// Inserts one starter folder inside the transaction that makes the workspace, with the checks a folder made by hand
+/// has: a name that is valid and not already taken beside it.
+async fn insert_starter_folder(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    workspace_id: &str,
+    parent_id: Option<&str>,
+    name: &str,
+    created_by: &str,
+    created_at: &str,
+) -> Result<String> {
+    let name = validate_folder_name(name)?;
+    let duplicate: Option<i64> = sqlx::query_scalar(
+        "SELECT 1 FROM folders WHERE workspace_id = ?1 AND COALESCE(parent_id, '') = COALESCE(?2, '') AND name = ?3 COLLATE NOCASE",
+    )
+    .bind(workspace_id)
+    .bind(parent_id)
+    .bind(name)
+    .fetch_optional(&mut **tx)
+    .await?;
+    if duplicate.is_some() {
+        repomemo_domain::bail_conflict!("A folder with this name already exists here.");
+    }
+    let id = Uuid::new_v4().to_string();
+    sqlx::query("INSERT INTO folders (id, workspace_id, parent_id, name, created_by, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)")
+        .bind(&id)
+        .bind(workspace_id)
+        .bind(parent_id)
+        .bind(name)
+        .bind(created_by)
+        .bind(created_at)
+        .execute(&mut **tx)
+        .await?;
+    Ok(id)
+}
+
 /// Key of the workspace's template in its settings object.
 pub(crate) const TEMPLATE_SETTING: &str = "template";
 
@@ -491,21 +536,48 @@ impl StorageEngine {
         organization_id: &str,
         name: &str,
     ) -> Result<SharedWorkspace> {
+        self.create_shared_workspace_from(creator_id, organization_id, name, None)
+            .await
+    }
+
+    /// Creates a workspace that starts with a template (V0.2.168): its choice saved in the settings and its starter
+    /// folders made, all in the transaction that makes the workspace, so a folder that cannot be made leaves no
+    /// workspace behind.
+    pub async fn create_shared_workspace_from(
+        &self,
+        creator_id: &str,
+        organization_id: &str,
+        name: &str,
+        setup: Option<&StarterSetup>,
+    ) -> Result<SharedWorkspace> {
         let creator_role = self.require_workspace_creator(creator_id, organization_id).await?;
         let id = Uuid::new_v4().to_string();
         let now = Utc::now().to_rfc3339();
         let name = require_name(name, "Workspace name")?;
+        let settings = match setup {
+            Some(setup) => serde_json::json!({ TEMPLATE_SETTING: serde_json::to_value(&setup.reference)? }),
+            None => Value::Object(Default::default()),
+        };
         let mut tx = self.pool.begin().await?;
 
         sqlx::query(
-            "INSERT INTO workspaces (id, name, created_at, updated_at, settings_json) VALUES (?1, ?2, ?3, ?4, '{}')",
+            "INSERT INTO workspaces (id, name, created_at, updated_at, settings_json) VALUES (?1, ?2, ?3, ?4, ?5)",
         )
         .bind(&id)
         .bind(&name)
         .bind(&now)
         .bind(&now)
+        .bind(serde_json::to_string(&settings)?)
         .execute(&mut *tx)
         .await?;
+        if let Some(setup) = setup {
+            for (folder, children) in &setup.folders {
+                let parent = insert_starter_folder(&mut tx, &id, None, folder, creator_id, &now).await?;
+                for child in children {
+                    insert_starter_folder(&mut tx, &id, Some(&parent), child, creator_id, &now).await?;
+                }
+            }
+        }
         sqlx::query("INSERT INTO workspace_organizations (workspace_id, organization_id) VALUES (?1, ?2)")
             .bind(&id)
             .bind(organization_id)
@@ -521,7 +593,10 @@ impl StorageEngine {
             .bind(Uuid::new_v4().to_string())
             .bind(&id)
             .bind(creator_id)
-            .bind(format!("Created workspace {name}."))
+            .bind(match setup {
+                Some(setup) => format!("Created workspace {name} from the {} template.", setup.template_name),
+                None => format!("Created workspace {name}."),
+            })
             .bind(&now)
             .execute(&mut *tx)
             .await?;
@@ -533,7 +608,7 @@ impl StorageEngine {
                 name,
                 created_at: now.clone(),
                 updated_at: now,
-                settings: Value::Object(Default::default()),
+                settings,
             },
             organization_id: organization_id.to_owned(),
             role: organization_role_to_workspace_role(&creator_role),

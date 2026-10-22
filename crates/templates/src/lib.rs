@@ -12,6 +12,7 @@
 //! invalid; there is no "ignore what you do not know".
 
 mod catalogue;
+mod folders;
 mod general;
 mod issue;
 pub mod limits;
@@ -22,6 +23,7 @@ mod resolve;
 mod tests;
 
 pub use catalogue::{Catalogue, SourceProblem};
+pub use folders::StarterFolder;
 pub use general::{general, GENERAL_ID};
 pub use issue::TemplateIssue;
 pub use meta::{TemplateMeta, WORKSPACE_ICONS};
@@ -40,6 +42,9 @@ pub struct TemplateDefinition {
     /// The format number the file is written for ([`FORMAT`]).
     pub format: u32,
     pub meta: TemplateMeta,
+    /// Folders made when a workspace is created from the template (V0.2.168); none when left out.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub starter_folders: Vec<StarterFolder>,
 }
 
 impl TemplateDefinition {
@@ -91,6 +96,7 @@ impl TemplateDefinition {
             ));
         }
         self.meta.validate(&mut issues);
+        folders::validate(&self.starter_folders, &mut issues);
         issues
     }
 

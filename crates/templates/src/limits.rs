@@ -14,3 +14,8 @@ pub const VERSION_MAX: u32 = 1_000_000;
 /// Characters, not bytes.
 pub const NAME_MAX: usize = 40;
 pub const SUMMARY_MAX: usize = 160;
+
+/// A template creates at most this many folders in all, two levels deep.
+pub const STARTER_FOLDERS_MAX: usize = 12;
+/// The name of a starter folder, in characters.
+pub const FOLDER_NAME_MAX: usize = 40;
