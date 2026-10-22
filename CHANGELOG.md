@@ -2,6 +2,19 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.150 (2026-10-21)
+
+The artifact page stops reading a document again every time it opens.
+
+### Changed
+- **The page's text comes from what indexing stored (E7b, P13):** opening a Word, Excel, PowerPoint, PDF, OneNote or email file started a reader process on every view, although indexing had already stored the text as passages. For an indexed file the page now joins the stored passages in order, with the same 120,000-character cap and the same "shortened" mark, and starts no reader. A file that is not indexed yet, or has a new version waiting to be indexed (a new version clears the index mark), is read once, on the blocking pool rather than on an async worker thread. An indexed file with no text, such as a scanned PDF, shows no text without being read again.
+- **The stored file is no longer read whole for the preview:** the plain preview (`StorageEngine::get_artifact`) read the entire file into memory to show its first 120,000 bytes, and a document was then read a second time for its text. It now reads at most the first 120,001 bytes.
+- **Tests (written, not run):** `the_page_of_an_indexed_document_starts_no_reader` (in `repomemo-api`) uploads an email file and shows its page is read once before indexing, not at all after it, and once again after a new version; the server's test of V0.2.149 now expects no reading for an owner's page of an indexed file.
+- **Checks run on this release:** `cargo check` of the storage, api and server crates with their tests compiles; `rustfmt` and `clippy` show nothing new for the lines changed; `docs:check` and `version:check` pass. **Not run:** the tests, as asked.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.2.149 (2026-10-21)
 
 Rights before reading: a request for a file the caller may not see no longer starts a document reader.

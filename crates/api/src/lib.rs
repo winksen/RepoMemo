@@ -62,6 +62,8 @@ const ASK_PASSAGE_CHARS: usize = 2_500;
 const SUMMARY_SINGLE_PASS_CHARS: usize = 14_000;
 const SUMMARY_PART_CHARS: usize = 12_000;
 const SUMMARY_MAX_PARTS: usize = 8;
+/// Longest text the artifact page shows for a document.
+const DOCUMENT_PREVIEW_CHARS: usize = 120_000;
 
 #[derive(Debug, Clone)]
 pub struct RepoMemoCore {
@@ -390,14 +392,21 @@ impl RepoMemoCore {
     pub async fn get_artifact(&self, artifact_id: String) -> Result<ArtifactDetail> {
         let mut detail = self.storage.get_artifact(&artifact_id).await?;
         if is_document(Path::new(&detail.summary.path)) {
-            let bytes = self.storage.read_artifact_blob(&detail.summary.id).await?;
+            let text = match stored_document_text(&detail) {
+                Some(text) => text,
+                None => {
+                    // Not indexed yet (or changed since): read it once, off the async threads.
+                    let bytes = self.storage.read_artifact_blob(&detail.summary.id).await?;
+                    let path = detail.summary.path.clone();
+                    tokio::task::spawn_blocking(move || extract_document_text(Path::new(&path), &bytes).ok().flatten())
+                        .await
+                        .context("the document reading task failed")?
+                }
+            }
             // An unreadable document still opens; it just has no text preview.
-            let text = extract_document_text(Path::new(&detail.summary.path), &bytes)
-                .ok()
-                .flatten()
-                .filter(|value| !value.trim().is_empty());
-            detail.content_truncated = text.as_ref().is_some_and(|value| value.len() > 120_000);
-            detail.content_preview = text.map(|value| value.chars().take(120_000).collect());
+            .filter(|value| !value.trim().is_empty());
+            detail.content_truncated = text.as_ref().is_some_and(|value| value.len() > DOCUMENT_PREVIEW_CHARS);
+            detail.content_preview = text.map(|value| value.chars().take(DOCUMENT_PREVIEW_CHARS).collect());
         }
         Ok(detail)
     }
@@ -1313,6 +1322,25 @@ pub struct PendingWorkspaceIndex {
 
 /// Splits consecutive sections into parts of at most `max_chars` (a single
 /// longer section forms its own part), returning section indices per part.
+/// A document's text as indexing stored it, in order, for the artifact page.
+/// `None` when the file has no stored passages to trust (not indexed yet, or
+/// changed since: a new version clears `indexed_at`); `Some(None)` when it was
+/// indexed and has no text (a scanned PDF).
+fn stored_document_text(detail: &ArtifactDetail) -> Option<Option<String>> {
+    detail.summary.indexed_at.as_ref()?;
+    let mut text = String::new();
+    for chunk in &detail.chunks {
+        if text.len() > DOCUMENT_PREVIEW_CHARS {
+            break;
+        }
+        if !text.is_empty() {
+            text.push('\n');
+        }
+        text.push_str(&chunk.text);
+    }
+    Some((!text.is_empty()).then_some(text))
+}
+
 fn group_sections(sections: &[String], max_chars: usize) -> Vec<Vec<usize>> {
     let mut parts: Vec<Vec<usize>> = Vec::new();
     let mut size = 0_usize;
@@ -1415,7 +1443,7 @@ fn sanitize_filename(title: &str, extension: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{evenly_spaced, group_sections, read_archive_entries, RepoMemoCore};
+    use super::{evenly_spaced, group_sections, read_archive_entries, recent_readings_of, RepoMemoCore};
     use repomemo_domain::{Citation, CreateMemoryCardRequest};
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -1781,7 +1809,9 @@ Document {file} section {index} covers topic{} and the deploy_{} function.
             .await
             .unwrap();
         core.index_workspace(workspace.id.clone()).await.unwrap();
-        let chunk_id = core.get_artifact(artifact.id.clone()).await.unwrap().chunks[0].id.clone();
+        let chunk_id = core.get_artifact(artifact.id.clone()).await.unwrap().chunks[0]
+            .id
+            .clone();
         core.create_memory_card(CreateMemoryCardRequest {
             workspace_id: workspace.id.clone(),
             title: "Local-first decision".to_owned(),
@@ -1805,9 +1835,15 @@ Document {file} section {index} covers topic{} and the deploy_{} function.
         let exports = data_dir.join("exports");
         std::fs::create_dir_all(&exports).unwrap();
         let destination = exports.join("local-notes.tar.gz");
-        let manifest = core.export_workspace_archive(&workspace.id, &destination).await.unwrap();
+        let manifest = core
+            .export_workspace_archive(&workspace.id, &destination)
+            .await
+            .unwrap();
         assert!(destination.is_file());
-        assert!(!destination.with_extension("part").exists(), "no half-written file is left");
+        assert!(
+            !destination.with_extension("part").exists(),
+            "no half-written file is left"
+        );
         assert_eq!(manifest.workspace_name, "Local notes");
         assert_eq!(manifest.counts.artifacts, 1);
         assert_eq!(manifest.counts.blobs, 1);
@@ -1823,12 +1859,18 @@ Document {file} section {index} covers topic{} and the deploy_{} function.
         assert_eq!(entries.len(), 3);
         let written: repomemo_domain::ArchiveManifest = serde_json::from_slice(&entries["manifest.json"]).unwrap();
         assert_eq!(written.format, repomemo_domain::ARCHIVE_FORMAT);
-        assert_eq!(repomemo_storage::StorageEngine::content_hash(&entries["workspace.json"]), written.data_sha256);
+        assert_eq!(
+            repomemo_storage::StorageEngine::content_hash(&entries["workspace.json"]),
+            written.data_sha256
+        );
         let blob = &written.blobs[0];
         assert_eq!(entries[&format!("blobs/{}", blob.hash)], b"Keep the evidence local.");
         let data: repomemo_domain::WorkspaceArchiveData = serde_json::from_slice(&entries["workspace.json"]).unwrap();
         assert_eq!(data.memory_cards[0].title, "Local-first decision");
-        assert!(data.memory_cards[0].citations[0].chunk.is_some(), "the cited passage is named");
+        assert!(
+            data.memory_cards[0].citations[0].chunk.is_some(),
+            "the cited passage is named"
+        );
 
         drop(core);
         let _ = std::fs::remove_dir_all(data_dir);
@@ -1851,15 +1893,26 @@ Document {file} section {index} covers topic{} and the deploy_{} function.
             )
             .await
             .unwrap();
-        let hash = core.get_artifact(artifact.id.clone()).await.unwrap().summary.content_hash;
+        let hash = core
+            .get_artifact(artifact.id.clone())
+            .await
+            .unwrap()
+            .summary
+            .content_hash;
         std::fs::remove_file(core.storage().blob_path_for_hash(&hash)).unwrap();
 
         let destination = data_dir.join("damaged.tar.gz");
-        let error = core.export_workspace_archive(&workspace.id, &destination).await.unwrap_err();
+        let error = core
+            .export_workspace_archive(&workspace.id, &destination)
+            .await
+            .unwrap_err();
         assert!(error.to_string().contains("no stored content"), "{error}");
         assert!(!destination.exists());
         assert!(!destination.with_extension("part").exists());
-        assert!(core.export_workspace_archive("no-such-workspace", &destination).await.is_err());
+        assert!(core
+            .export_workspace_archive("no-such-workspace", &destination)
+            .await
+            .is_err());
 
         drop(core);
         let _ = std::fs::remove_dir_all(data_dir);
@@ -1908,6 +1961,64 @@ One."
         // A forced re-index of unchanged content keeps chunk identity too.
         core.index_artifact(first.id.clone()).await.unwrap();
         assert_eq!(chunk_ids(core.get_artifact(first.id).await.unwrap()), indexed_ids);
+
+        drop(core);
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    /// V0.2.150: the artifact page of an indexed document shows the stored
+    /// passages and starts no reader; one not indexed yet is read once.
+    #[tokio::test]
+    async fn the_page_of_an_indexed_document_starts_no_reader() {
+        let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let data_dir = std::env::temp_dir().join(format!("repomemo-page-readings-{nanos}"));
+        let core = RepoMemoCore::boot(data_dir.clone()).await.unwrap();
+        let workspace = core.create_workspace("Readings".to_owned()).await.unwrap();
+        // A name no other test uses, so only this test's readings are counted.
+        let name = format!("page-{nanos}.eml");
+        let email = "From: Ada <ada@example.com>\r\nTo: bob@example.com\r\nSubject: Plan\r\nContent-Type: text/plain\r\n\r\nPlease review the plan.\r\n";
+        let artifact = core
+            .import_upload(workspace.id.clone(), name.clone(), email.as_bytes().to_vec(), None)
+            .await
+            .unwrap();
+
+        // Not indexed yet: the file is read for the page, once.
+        let before = recent_readings_of(&name);
+        let page = core.get_artifact(artifact.id.clone()).await.unwrap();
+        assert!(page
+            .content_preview
+            .as_deref()
+            .is_some_and(|text| text.contains("Please review the plan")));
+        assert_eq!(recent_readings_of(&name), before + 1);
+
+        // Indexed: the page is built from the stored passages.
+        core.index_workspace(workspace.id.clone()).await.unwrap();
+        let indexed = core.get_artifact(artifact.id.clone()).await.unwrap();
+        assert!(!indexed.chunks.is_empty());
+        let before = recent_readings_of(&name);
+        let page = core.get_artifact(artifact.id.clone()).await.unwrap();
+        assert_eq!(
+            recent_readings_of(&name),
+            before,
+            "an indexed document is not read again"
+        );
+        assert!(page
+            .content_preview
+            .as_deref()
+            .is_some_and(|text| text.contains("Please review the plan")));
+        assert!(!page.content_truncated);
+
+        // A new version clears the index, so the page reads the new file.
+        let changed = "From: Ada <ada@example.com>\r\nTo: bob@example.com\r\nSubject: Plan\r\nContent-Type: text/plain\r\n\r\nA different plan.\r\n";
+        core.replace_artifact_version(&artifact.id, &name, changed.as_bytes().to_vec(), None)
+            .await
+            .unwrap();
+        let page = core.get_artifact(artifact.id).await.unwrap();
+        assert!(page
+            .content_preview
+            .as_deref()
+            .is_some_and(|text| text.contains("A different plan")));
+        assert_eq!(recent_readings_of(&name), before + 1);
 
         drop(core);
         let _ = std::fs::remove_dir_all(data_dir);

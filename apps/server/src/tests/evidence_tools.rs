@@ -683,7 +683,7 @@ async fn a_refused_artifact_request_starts_no_document_reader() {
         "a refused request started a reader"
     );
 
-    // A member's request still reads the document, once.
+    // A member sees the text from the stored passages (V0.2.150), with no new reading.
     let shown = app
         .clone()
         .oneshot(auth_request("GET", &artifact, &owner))
@@ -693,6 +693,6 @@ async fn a_refused_artifact_request_starts_no_document_reader() {
     assert!(response_json(shown).await["content_preview"]
         .as_str()
         .is_some_and(|text| text.contains("Please review")));
-    assert_eq!(repomemo_api::recent_readings_of(&name), before + 1);
+    assert_eq!(repomemo_api::recent_readings_of(&name), before);
     let _ = std::fs::remove_dir_all(data_dir);
 }

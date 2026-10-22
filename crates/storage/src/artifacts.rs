@@ -415,10 +415,20 @@ impl StorageEngine {
 
         let summary = ArtifactSummary::from(row.summary_row());
         let metadata = serde_json::from_str(&row.metadata_json).unwrap_or_else(|_| Value::Object(Default::default()));
-        let bytes = tokio::fs::read(self.blob_path(&row.content_hash))
-            .await
-            .unwrap_or_default();
+        // Only the start of the file is wanted: the page never shows more, and a
+        // large upload is not read whole to show a few thousand characters.
         let preview_limit = 120_000;
+        let blob_path = self.blob_path(&row.content_hash);
+        let bytes = tokio::task::spawn_blocking(move || {
+            use std::io::Read;
+            let mut bytes = Vec::new();
+            if let Ok(file) = std::fs::File::open(blob_path) {
+                let _ = file.take(preview_limit as u64 + 1).read_to_end(&mut bytes);
+            }
+            bytes
+        })
+        .await
+        .unwrap_or_default();
         let content_truncated = bytes.len() > preview_limit;
         let preview_bytes = if content_truncated {
             &bytes[..preview_limit]
