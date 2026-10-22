@@ -485,6 +485,9 @@ fn cors_layer(config: &ServerConfig) -> CorsLayer {
 /// endpoints (small JSON documents). The upload limit (`REPOMEMO_MAX_UPLOAD_MB`, up to 1 GiB) is
 /// for signed-in callers: without this, anyone could make the server hold that much per request.
 const PUBLIC_BODY_BYTES: usize = 64 * 1024;
+/// The body of every other route, JSON documents. The upload limit applies only to the routes that
+/// take a file (an upload, a new version, an import): a comment or a search is never that large.
+const JSON_BODY_BYTES: usize = 1024 * 1024;
 
 fn routes(state: AppState, config: &ServerConfig) -> Router {
     Router::new()
@@ -728,7 +731,10 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             "/v1/workspaces/{workspace_id}/artifacts/text",
             post(create_text_artifact),
         )
-        .route("/v1/workspaces/{workspace_id}/artifacts/upload", post(upload_artifact))
+        .route(
+            "/v1/workspaces/{workspace_id}/artifacts/upload",
+            post(upload_artifact).layer(DefaultBodyLimit::max(config.max_upload_bytes)),
+        )
         .route(
             "/v1/artifacts/{artifact_id}",
             get(get_artifact).put(update_artifact).delete(delete_artifact),
@@ -831,9 +837,10 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             "/v1/workspaces/{workspace_id}/folders/{folder_id}/move",
             post(move_folder),
         )
+        .route("/v1/artifacts/{artifact_id}/versions", get(list_artifact_versions))
         .route(
             "/v1/artifacts/{artifact_id}/versions",
-            get(list_artifact_versions).post(upload_artifact_version),
+            post(upload_artifact_version).layer(DefaultBodyLimit::max(config.max_upload_bytes)),
         )
         .route(
             "/v1/artifacts/{artifact_id}/versions/{version}",
@@ -872,7 +879,10 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
                 config.request_timeout
             },
         ))
-        .route("/v1/workspaces/import", post(workspace_import::import_workspace))
+        .route(
+            "/v1/workspaces/import",
+            post(workspace_import::import_workspace).layer(DefaultBodyLimit::max(config.max_upload_bytes)),
+        )
         .route("/v1/workspaces/{workspace_id}/events", get(workspace_events))
         .route("/v1/system/events", get(system_events))
         .layer(middleware::from_fn_with_state(state.clone(), web_session::web_session))
@@ -888,7 +898,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         ))
         .layer(middleware::from_fn_with_state(state.clone(), system::track_requests))
         .layer(TraceLayer::new_for_http().make_span_with(security::redacted_span))
-        .layer(DefaultBodyLimit::max(config.max_upload_bytes))
+        .layer(DefaultBodyLimit::max(JSON_BODY_BYTES))
         .with_state(state)
 }
 

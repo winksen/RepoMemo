@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.152 (2026-10-21)
+
+Request bodies get a limit that fits the route: a comment or a search is never as large as an upload.
+
+### Security
+- **Body limits per route (S5-5):** the server took a body of up to `REPOMEMO_MAX_UPLOAD_MB` (up to 1 GiB) on every route of a signed-in caller, so a request for a comment or a search could make it hold that much. The limit is now 1 MiB for every JSON route, and the upload limit applies only to the three routes that take a file: a new file (`POST /v1/workspaces/{id}/artifacts/upload`), a new version (`POST /v1/artifacts/{id}/versions`) and a workspace import (`POST /v1/workspaces/import`). Above its limit a request is answered `413`. The public routes (64 KiB), the webhook receivers (1 MiB) and the avatar (512 KiB) keep their own.
+
+### Changed
+- **Notes are JSON, so a note above 1 MiB is refused** (`POST …/artifacts/text`); a larger text goes up as a file.
+- **`scripts/list-routes.mjs` reads a route layer whose limit is a setting** (`DefaultBodyLimit::max(config.max_upload_bytes)`), and the new-version route is registered as two `.route` calls (`GET` and `POST`) so the listing, and `docs:check` with it, still see all of them.
+- **Tests (written, not run):** `json_bodies_stop_at_a_mebibyte_and_files_keep_the_upload_limit` sends 2 MiB of JSON (a comment, a note, a search) with the upload limit at 4 MiB and gets `413` each time, then an ordinary comment (`201`), a 3 MiB file and a 3 MiB new version (accepted) and a 5 MiB file and a 5 MiB new version (`413`).
+- **Checks run on this release:** `cargo check` of the server with its tests compiles; `rustfmt` shows nothing for the lines changed; `docs:check` and `version:check` pass. **Not run:** the tests, as asked.
+
+### Upgrading
+- A script that posts a note of more than 1 MiB as JSON now gets `413`: upload it as a file. Nothing else changes, and `REPOMEMO_MAX_UPLOAD_MB` keeps its meaning for files.
+
 ## V0.2.151 (2026-10-21)
 
 A job can be stopped only by the person who started it or an administrator, and a re-index of one file no longer starts a task of its own for every request.

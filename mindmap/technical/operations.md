@@ -242,7 +242,7 @@ All are run-time settings (System › Settings) with an environment default; `0`
 | `REPOMEMO_UPLOADS_PER_HOUR` | 600 | One person flooding uploads (`429`) |
 | `REPOMEMO_WORKSPACES_PER_PERSON` | 25 | Workspaces created without end (`409 workspace_limit`) |
 | `REPOMEMO_DISK_FLOOR_MB` | 1,024 | A full disk: uploads stop (`507 disk_low`) while less than this is free. The overview shows free space |
-| `REPOMEMO_MAX_UPLOAD_MB` | 10 | The size of one upload (environment only) |
+| `REPOMEMO_MAX_UPLOAD_MB` | 10 | The size of one file: an upload, a new version or a workspace import. Other request bodies stop at 1 MiB (environment only) |
 | `REPOMEMO_MAX_IMPORT_MB` | 2,048 | The size of one workspace archive to import (environment only); read from a temporary file, never held in memory |
 | `REPOMEMO_HEAVY_REQUESTS_PER_MINUTE` | 240 | Searches and reports, per person |
 | `REPOMEMO_AI_REQUESTS_PER_HOUR` | 120 | Interactive AI, per person |

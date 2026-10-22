@@ -232,7 +232,7 @@ reader). Do not set them. The performance runs read `REPOMEMO_PERF_PASSAGES`,
 | `REPOMEMO_TRUST_PROXY` | `false` | Read the client address from `X-Forwarded-For` / `X-Real-IP`, but only when the TCP peer is loopback or listed in `REPOMEMO_TRUSTED_PROXIES`; the rightmost address no trusted proxy added wins. Also accepted as proof of a TLS proxy for non-loopback binds. |
 | `REPOMEMO_TRUSTED_PROXIES` | unset | Comma-separated proxy addresses besides loopback whose forwarding headers are believed. |
 | `REPOMEMO_ALLOW_INSECURE_HTTP` | `false` | Lets the server listen beyond loopback over plain HTTP with no proxy in front. For a trusted network only; without it (and without an `https://` public URL or proxy trust) the server refuses to start. |
-| `REPOMEMO_MAX_UPLOAD_MB` | `10` | Largest request body (uploads). |
+| `REPOMEMO_MAX_UPLOAD_MB` | `10` | Largest file: an upload, a new version or a workspace import. Every other request body stops at 1 MiB. |
 | `REPOMEMO_MAX_IMPORT_MB` | `2048` | Largest workspace archive an import accepts (1–1,048,576). The archive is received into a temporary file in `<data dir>/imports/`, not into memory, so the disk needs that much room while it is read; a proxy in front must allow a body this large on `POST /v1/workspaces/import`. |
 | `REPOMEMO_REQUEST_TIMEOUT_SECONDS` | `120` | How long a request may take before it is answered `408`. Live event streams are not limited. `0` turns it off. |
 | `REPOMEMO_HEADER_TIMEOUT_SECONDS` | `30` | How long a client has to send its request headers; a slower one is disconnected. `0` turns it off. |

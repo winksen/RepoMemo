@@ -37,11 +37,12 @@ for (const [path, text] of Object.entries(texts)) {
 
 const lib = texts[join(root, "lib.rs")];
 const routes = [];
-// A handler may carry a layer of its own (`post(login).layer(DefaultBodyLimit::max(LIMIT))`, V0.2.52).
-const routePattern = /\.route\(\s*"([^"]+)",\s*((?:\s*[a-z]+\([\w:]+\)(?:\.layer\(\w+::\w+\([\w:]+\)\))?\s*\.?)+)\s*,?\s*\)/g;
+// A handler may carry a layer of its own (`post(login).layer(DefaultBodyLimit::max(LIMIT))`, V0.2.52; the limit may be
+// a setting, `config.max_upload_bytes`, V0.2.152).
+const routePattern = /\.route\(\s*"([^"]+)",\s*((?:\s*[a-z]+\([\w:]+\)(?:\.layer\(\w+::\w+\([\w:.]+\)\))?\s*\.?)+)\s*,?\s*\)/g;
 let route;
 while ((route = routePattern.exec(lib))) {
-  for (const call of route[2].replace(/\.layer\(\w+::\w+\([\w:]+\)\)/g, "").matchAll(/([a-z]+)\(([\w:]+)\)/g)) {
+  for (const call of route[2].replace(/\.layer\(\w+::\w+\([\w:.]+\)\)/g, "").matchAll(/([a-z]+)\(([\w:]+)\)/g)) {
     routes.push({ method: call[1].toUpperCase(), path: route[1], handler: call[2] });
   }
 }

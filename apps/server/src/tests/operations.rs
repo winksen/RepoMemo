@@ -480,6 +480,102 @@ async fn uploads_stop_when_the_disk_is_nearly_full() {
     let _ = std::fs::remove_dir_all(data_dir);
 }
 
+/// V0.2.152: a JSON body stops at 1 MiB whatever the upload limit is; only the
+/// routes that take a file (an upload, a new version) use that limit.
+#[tokio::test]
+async fn json_bodies_stop_at_a_mebibyte_and_files_keep_the_upload_limit() {
+    let data_dir = temp_data_dir("body-limits");
+    let mut config = ServerConfig::for_test(data_dir.clone());
+    config.max_upload_bytes = 4 * 1024 * 1024;
+    let app = router(config).await.unwrap();
+    let (owner, _) = register_account(&app, "limits-owner@example.com").await;
+    let workspace_id = create_workspace(&app, &owner).await;
+    let note = app
+        .clone()
+        .oneshot(json_request(
+            "POST",
+            &format!("/v1/workspaces/{workspace_id}/artifacts/text"),
+            &owner,
+            json!({"title": "Small note", "content": "A short note."}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(note.status(), 201);
+    let artifact_id = response_json(note).await["id"].as_str().unwrap().to_owned();
+
+    // Two mebibytes of JSON are refused on a route that takes JSON, with the upload limit at four.
+    let long = "x".repeat(2 * 1024 * 1024);
+    let comment = app
+        .clone()
+        .oneshot(json_request(
+            "POST",
+            &format!("/v1/artifacts/{artifact_id}/comments"),
+            &owner,
+            json!({ "body": long }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(comment.status(), 413, "a 2 MiB comment");
+    let long_note = app
+        .clone()
+        .oneshot(json_request(
+            "POST",
+            &format!("/v1/workspaces/{workspace_id}/artifacts/text"),
+            &owner,
+            json!({ "title": "Long note", "content": long }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(long_note.status(), 413, "a 2 MiB note");
+    let search = app
+        .clone()
+        .oneshot(json_request(
+            "POST",
+            &format!("/v1/workspaces/{workspace_id}/search"),
+            &owner,
+            json!({ "query": long }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(search.status(), 413, "a 2 MiB search");
+    let ordinary = app
+        .clone()
+        .oneshot(json_request(
+            "POST",
+            &format!("/v1/artifacts/{artifact_id}/comments"),
+            &owner,
+            json!({"body": "Looks right."}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(ordinary.status(), 201, "an ordinary comment");
+
+    // A file may be as large as the upload limit, as a first upload or as a new version, and no larger.
+    assert_eq!(
+        upload(&app, &owner, &workspace_id, "three.txt", vec![b'a'; 3 * 1024 * 1024]).await,
+        201
+    );
+    assert_eq!(
+        upload(&app, &owner, &workspace_id, "five.txt", vec![b'a'; 5 * 1024 * 1024]).await,
+        413
+    );
+    let version = |bytes: Vec<u8>| {
+        Request::builder()
+            .method("POST")
+            .uri(format!("/v1/artifacts/{artifact_id}/versions"))
+            .header("authorization", &owner)
+            .header("x-repomemo-filename", "note.txt")
+            .body(Body::from(bytes))
+            .unwrap()
+    };
+    // The note was stored as plain text, so the new version keeps that extension.
+    let big_version = app.clone().oneshot(version(vec![b'b'; 5 * 1024 * 1024])).await.unwrap();
+    assert_eq!(big_version.status(), 413, "a new version above the upload limit");
+    let version_within = app.clone().oneshot(version(vec![b'b'; 3 * 1024 * 1024])).await.unwrap();
+    assert_eq!(version_within.status(), 200, "a new version within it");
+    let _ = std::fs::remove_dir_all(data_dir);
+}
+
 #[tokio::test]
 async fn metrics_are_open_metrics_for_system_administrators() {
     let data_dir = temp_data_dir("metrics");

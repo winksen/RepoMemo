@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.2 → 0.3
 
-> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.151` (2026-10-21) · **Next:** `V0.2.152`
+> **Line:** `V0.2.1` to `V0.3.0` *Connected* · **Current:** `V0.2.152` (2026-10-21) · **Next:** `V0.2.153`
 > **Previous line:** [Releases 0.1 → 0.2](RELEASES_0.1.md) · **Related:** [Roadmap, Road to V0.3.0](ROADMAP.md#-road-to-v030) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
 Every release of the 0.2 line, shipped and planned, one row each. The plan comes from the [Road to V0.3.0](ROADMAP.md#-road-to-v030): **one change per release**, each shippable alone, with the security rules for a new outside connection in the release that opens it. Planned rows are proposals until decisions 7–14 in the roadmap are agreed; tracks L and M wait on decisions 20–23.
@@ -188,7 +188,7 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | **V0.2.149** | ✅ 2026-10-21 |M. Backend hardening and performance |🔒 Security | Artifact routes | Rights checked on the summary before any document is read (E7a, P12) | A non-member's request starts no reader |
 | **V0.2.150** | ✅ 2026-10-21 |M. Backend hardening and performance |🔧 Enhancement | Artifact page | The page's text from stored passages, read off the runtime (E7b, P13) | Opening an indexed document's page starts no reader |
 | **V0.2.151** | ✅ 2026-10-21 |M. Backend hardening and performance |🔒 Security | Jobs | Single-file re-index through the queue; cancel by the starter or an administrator (E8, S5-9) | Ten requests for one file make one job |
-| **V0.2.152** | 🔜 Planned | M. Backend hardening and performance | 🔒 Security | API | 1 MiB for JSON bodies, the upload limit only where files arrive (S5-5) | A 2 MiB comment is `413` whatever the upload limit |
+| **V0.2.152** | ✅ 2026-10-21 |M. Backend hardening and performance |🔒 Security | API | 1 MiB for JSON bodies, the upload limit only where files arrive (S5-5) | A 2 MiB comment is `413` whatever the upload limit |
 | **V0.2.153** | 🔜 Planned | M. Backend hardening and performance | 🔧 Enhancement | Uploads | Uploads streamed to disk and hashed as they arrive (P14) | A 500 MiB upload holds no more than a buffer in memory |
 | **V0.2.154** | 🔜 Planned | M. Backend hardening and performance | 🔧 Enhancement | Evidence API | The file list paged in SQL (P15a) | A page of a 100,000-file workspace in under 100 ms |
 | **V0.2.155** | 🔜 Planned | M. Backend hardening and performance | 🔧 Enhancement | Web data | The workspace pages off the full file list; pickers and the palette ask the server (P15b) | No web request for an unpaged file list |
