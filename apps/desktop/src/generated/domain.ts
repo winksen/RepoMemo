@@ -285,6 +285,8 @@ export interface Folder {
   parent_id: string | null;
   name: string;
   created_at: string;
+  /** Files sitting directly in this folder (not in its subfolders); filled by the folder list. */
+  file_count: number;
 }
 
 /** Why an artifact could not be indexed, after every retry was used. */

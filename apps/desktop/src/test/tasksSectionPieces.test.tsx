@@ -14,7 +14,7 @@ vi.mock("../lib/sharedApi", () => ({
 }));
 vi.mock("../components/ui/toast", () => ({ Toast: () => null, showToast: vi.fn() }));
 vi.mock("../web/workspace/data", () => ({
-  useArtifacts: () => [[{ id: "a1", title: "Runbook" }]],
+  useArtifactPicker: () => ({ files: [{ id: "a1", title: "Runbook" }], search: () => undefined, find: () => undefined, known: () => [] }),
   useMembers: () => [[{ user: { id: "u1", display_name: "Ada" } }]],
   useMetrics: () => [null, vi.fn()],
   useTasks: () => [data.tasks, vi.fn()],

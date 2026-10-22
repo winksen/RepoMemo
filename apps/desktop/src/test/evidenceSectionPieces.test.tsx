@@ -15,7 +15,7 @@ vi.mock("../lib/sharedApi", () => ({
 }));
 vi.mock("../components/ui/toast", () => ({ Toast: () => null, showToast: vi.fn() }));
 vi.mock("../web/workspace/data", () => ({
-  useArtifacts: () => [artifacts.list, vi.fn()],
+  useEvidencePage: () => [{ items: artifacts.list, total: artifacts.list.length }],
   useFolders: () => [[], vi.fn()],
   useIndexFailures: () => [{}],
 }));

@@ -781,6 +781,151 @@ async fn read_connections_get_a_larger_cache_memory_mapped_reads_and_memory_temp
     let _ = std::fs::remove_dir_all(data_dir);
 }
 
+/// V0.2.155 Bis: the artifact query also filters by folder, leaves out repository files and takes
+/// kinds of file (a type, an extension), which a view of the evidence section is made of.
+#[tokio::test]
+async fn the_artifact_query_filters_by_folder_repository_and_kind_and_folders_count_their_files() {
+    let (storage, data_dir) = temp_storage("query-views").await;
+    let workspace = storage.create_workspace("Views").await.unwrap();
+    let source = storage
+        .create_or_get_source(&workspace.id, SourceType::Folder, "fixture", Some("fixture"))
+        .await
+        .unwrap();
+    let mut ids = std::collections::HashMap::new();
+    for (path, artifact_type) in [
+        ("plan.docx", ArtifactType::File),
+        ("budget.xlsx", ArtifactType::File),
+        ("notes.txt", ArtifactType::File),
+        ("guide.md", ArtifactType::MarkdownDoc),
+        ("main.rs", ArtifactType::CodeFile),
+    ] {
+        let bytes = path.as_bytes();
+        let content_hash = StorageEngine::content_hash(bytes);
+        storage.store_blob(&content_hash, bytes, None).await.unwrap();
+        let artifact = storage
+            .store_artifact(NewArtifact {
+                workspace_id: workspace.id.clone(),
+                source_id: source.id.clone(),
+                artifact_type,
+                title: path.to_owned(),
+                path: path.to_owned(),
+                content_hash,
+                mime_type: None,
+                language: None,
+                size_bytes: bytes.len() as i64,
+                metadata: json!({}),
+            })
+            .await
+            .unwrap()
+            .artifact;
+        ids.insert(path, artifact.id);
+    }
+    let folder = storage.create_folder(&workspace.id, None, "Plans", None).await.unwrap();
+    storage
+        .set_artifact_folder(&ids["plan.docx"], Some(&folder.id))
+        .await
+        .unwrap();
+    storage
+        .set_artifact_folder(&ids["notes.txt"], Some(&folder.id))
+        .await
+        .unwrap();
+    // A repository file: tracked by a repo_files row.
+    sqlx::query(
+        "INSERT INTO repo_files (source_id, path, artifact_id, blob_sha, commit_sha, updated_at) VALUES (?1, 'main.rs', ?2, 'b', 'c', 'now')",
+    )
+    .bind(&source.id)
+    .bind(&ids["main.rs"])
+    .execute(&storage.pool)
+    .await
+    .unwrap();
+
+    let titles = |found: Vec<repomemo_domain::ArtifactSummary>| {
+        let mut titles: Vec<String> = found.into_iter().map(|artifact| artifact.title).collect();
+        titles.sort();
+        titles
+    };
+    let ask = |query: super::ArtifactQuery| {
+        let storage = &storage;
+        async move { storage.query_artifacts(&query).await.unwrap() }
+    };
+    let base = || super::ArtifactQuery {
+        workspace_id: workspace.id.clone(),
+        ..Default::default()
+    };
+
+    // A folder, the top level, and no repository files.
+    let (found, total) = ask(super::ArtifactQuery {
+        in_folder: Some(folder.id.clone()),
+        ..base()
+    })
+    .await;
+    assert_eq!(
+        (titles(found), total),
+        (vec!["notes.txt".to_owned(), "plan.docx".to_owned()], 2)
+    );
+    let (found, _) = ask(super::ArtifactQuery {
+        top_level_only: true,
+        ledger_only: true,
+        ..base()
+    })
+    .await;
+    assert_eq!(
+        titles(found),
+        ["budget.xlsx", "guide.md"],
+        "the repository file is left out"
+    );
+
+    // Kinds are alternatives: Word files, or Markdown.
+    let word = super::KindFilter {
+        extensions: vec!["doc".into(), "docx".into()],
+        ..Default::default()
+    };
+    let markdown = super::KindFilter {
+        artifact_types: vec![ArtifactType::MarkdownDoc],
+        ..Default::default()
+    };
+    let (found, _) = ask(super::ArtifactQuery {
+        kinds: vec![word.clone(), markdown],
+        ..base()
+    })
+    .await;
+    assert_eq!(titles(found), ["guide.md", "plan.docx"]);
+    // Plain text is a file that is not one of the document formats.
+    let text = super::KindFilter {
+        artifact_types: vec![ArtifactType::File],
+        not_extensions: vec!["docx".into(), "xlsx".into()],
+        ..Default::default()
+    };
+    let (found, _) = ask(super::ArtifactQuery {
+        kinds: vec![text],
+        ..base()
+    })
+    .await;
+    assert_eq!(titles(found), ["notes.txt"]);
+    // A value that is not an extension cannot reach the query as a pattern.
+    let odd = super::KindFilter {
+        extensions: vec!["%".into(), "docx'--".into()],
+        ..Default::default()
+    };
+    let (found, _) = ask(super::ArtifactQuery {
+        kinds: vec![odd],
+        ..base()
+    })
+    .await;
+    assert_eq!(titles(found), ["plan.docx"], "only the letters and digits count: docx");
+
+    // A folder knows how many files sit directly in it.
+    let folders = storage.list_folders(&workspace.id).await.unwrap();
+    assert_eq!(
+        folders.iter().find(|entry| entry.id == folder.id).unwrap().file_count,
+        2
+    );
+
+    storage.pool.close().await;
+    drop(storage);
+    let _ = std::fs::remove_dir_all(data_dir);
+}
+
 #[tokio::test]
 async fn unreferenced_blobs_are_collected_after_the_grace_period() {
     let (storage, data_dir) = temp_storage("blob-gc").await;

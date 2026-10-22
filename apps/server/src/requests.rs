@@ -181,6 +181,31 @@ pub(crate) struct QueryArtifactsRequest {
     #[serde(default)]
     pub(crate) source_ids: Vec<String>,
     pub(crate) indexed: Option<bool>,
+    /// Only the files in this folder.
+    #[serde(default)]
+    pub(crate) folder_id: Option<String>,
+    /// Only the files that are in no folder.
+    #[serde(default)]
+    pub(crate) top_level: bool,
+    /// Leave out the files a repository tracks.
+    #[serde(default)]
+    pub(crate) ledger_only: bool,
+    /// Kinds of file, any one of which a file may be (a view of the evidence section).
+    #[serde(default)]
+    pub(crate) kinds: Vec<KindRequest>,
+}
+
+/// One kind of file: all of these hold together.
+#[derive(Debug, Default, Deserialize)]
+pub(crate) struct KindRequest {
+    #[serde(default)]
+    pub(crate) artifact_types: Vec<repomemo_domain::ArtifactType>,
+    #[serde(default)]
+    pub(crate) not_artifact_types: Vec<repomemo_domain::ArtifactType>,
+    #[serde(default)]
+    pub(crate) extensions: Vec<String>,
+    #[serde(default)]
+    pub(crate) not_extensions: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]

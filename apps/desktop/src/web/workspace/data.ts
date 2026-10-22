@@ -2,8 +2,11 @@ import {
   getSharedRetrievalFacets, getSharedWorkspaceActivityCalendar, getSharedWorkspaceCapabilities, getSharedWorkspaceMetrics,
   getSharedWorkspaceOverview, listSharedArtifactWindow, listSharedCollaborationTasks, listSharedFolders, listSharedIndexFailures,
   listSharedMemoryCards, listSharedSavedSearches, listSharedWorkspaceActivity, listSharedWorkspaceAiProviders,
-  listSharedWorkspaceJobs, listSharedWorkspaceMembers, querySharedArtifacts, ARTIFACT_WINDOW,
+  listSharedWorkspaceJobs, listSharedWorkspaceMembers, querySharedArtifactPage, querySharedArtifacts, ARTIFACT_WINDOW,
 } from "../../lib/sharedApi";
+import { DEFAULT_PAGE_SIZE } from "../../components/ui/pagination";
+import { categoryKind, documentCategory, DOCUMENT_KIND } from "../../lib/evidenceView";
+import { type FileCategory } from "../constants";
 import { useCallback, useRef, useState, type SetStateAction } from "react";
 import { workspaceKeys } from "../../lib/queryClient";
 import { useServerState } from "../../lib/useServerState";
@@ -54,6 +57,34 @@ export function useArtifacts(accessToken: string, workspaceId: string, enabled =
     setHeld((current) => ({ items: typeof next === "function" ? next(current.items) : next, total: current.total }));
   }, [setHeld]);
   return [held.items, setItems, query, held.total] as const;
+}
+
+/** What the evidence section shows: one page of a folder, or of the whole ledger when a name or a type is chosen. */
+export interface EvidenceView {
+  query: string;
+  categories: FileCategory[];
+  /** A folder, `null` for the top level, `undefined` for anywhere. */
+  folderId: string | null | undefined;
+  documentsOnly: boolean;
+  page: number;
+}
+
+/** One page (24 files) of an evidence view, cut by the server. Any change to the workspace's files refetches it. */
+export function useEvidencePage(accessToken: string, workspaceId: string, view: EvidenceView) {
+  const documentCategories = view.categories.filter((category) => documentCategory(category));
+  // The documents view with only file types that are not documents shows nothing; the server is not asked.
+  const empty = view.documentsOnly && view.categories.length > 0 && documentCategories.length === 0;
+  const chosen = view.documentsOnly ? documentCategories : view.categories;
+  const kinds = chosen.length ? chosen.map(categoryKind) : view.documentsOnly ? [DOCUMENT_KIND] : [];
+  return useServerState<ArtifactWindow>({
+    key: [...workspaceKeys.artifacts(workspaceId), "evidence", { ...view, categories: chosen }],
+    fetch: () => querySharedArtifactPage(accessToken, workspaceId, {
+      query: view.query, kinds, folderId: view.folderId, ledgerOnly: true, limit: DEFAULT_PAGE_SIZE, offset: view.page * DEFAULT_PAGE_SIZE,
+    }),
+    initial: { items: [], total: 0 },
+    enabled: !empty,
+    keepPrevious: true,
+  });
 }
 
 /** The files whose name or path holds `text`, from the server, newest first: how a workspace with more files than a page is searched. */

@@ -107,7 +107,7 @@ use repomemo_domain::{
     WorkspaceMember, WorkspaceOverview, WorkspaceRole,
 };
 use repomemo_storage::{
-    ArtifactQuery, NewCollaborationTask, NewSavedSearch, NewSharedNotification, NewTaskChecklistItem,
+    ArtifactQuery, KindFilter, NewCollaborationTask, NewSavedSearch, NewSharedNotification, NewTaskChecklistItem,
     SaveArtifactLifecycle, StorageConfig, StorageEngine,
 };
 use tokio_stream::{

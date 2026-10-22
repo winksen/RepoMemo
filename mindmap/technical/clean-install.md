@@ -48,7 +48,7 @@ The releases of the 0.2.x line were written and compiled without running the ser
 - [ ] **The desktop app** is tried against a server: connect, sign in, upload, open a PDF, a link in an answer, *Change server*, and *Move a workspace to a server* (V0.2.49, V0.2.50).
 - [ ] **The security fixes** of V0.2.52 are tried against a running server (the spot checks above).
 - [ ] **The two images** of the container route are built and started once (V0.2.45).
-- [ ] **Tracks L and M** (V0.2.130–V0.2.162) are tried: the container comes up with the read-only root and the converter (and again with `COMPOSE_PROFILES=previews`, a Word file opening as a PDF); a 500 MiB upload leaves the server's memory flat and two uploads at once with `REPOMEMO_UPLOAD_INFLIGHT_MB=1` make the second wait (`503`); a repository sync with nothing new says *Nothing changed*; the web client's workspace page of a workspace with more than 500 files shows the notice and finds an old file by name; `GET /v1/system/metrics` shows the in-flight and shed counters; and the `performance_at_scale` run is made twice (read tuning off and on) and recorded in [performance.md](performance.md).
+- [ ] **Tracks L and M** (V0.2.130–V0.2.162) are tried: the container comes up with the read-only root and the converter (and again with `COMPOSE_PROFILES=previews`, a Word file opening as a PDF); a 500 MiB upload leaves the server's memory flat and two uploads at once with `REPOMEMO_UPLOAD_INFLIGHT_MB=1` make the second wait (`503`); a repository sync with nothing new says *Nothing changed*; the evidence section of a workspace with more than 500 files pages by folder, by file type and by name, and a picker (memory card, task, replacement evidence) finds an old file by typing its name; `GET /v1/system/metrics` shows the in-flight and shed counters; and the `performance_at_scale` run is made twice (read tuning off and on) and recorded in [performance.md](performance.md).
 - [ ] The open items in the checklists of the roadmap's releases are read once more, and each is either done, accepted or moved.
 
 ## 4. Result
@@ -89,7 +89,7 @@ A draft for the entry; the [fifth review](../security/2026-10-21-security-review
 - New settings: `REPOMEMO_PREVIEW_ROOT`, `REPOMEMO_UPLOAD_INFLIGHT_MB`, `REPOMEMO_SQLITE_CACHE_MB`, `REPOMEMO_SQLITE_MMAP_MB`, `REPOMEMO_MAX_IN_FLIGHT`, `REPOMEMO_MAX_IN_FLIGHT_PER_ACCOUNT`; migrations 0037 to 0041.
 
 **What a person sees**
-- A workspace page holds the 500 newest files and finds the others by searching; the command palette searches the server; a repository sync with nothing new says *Nothing changed*.
+- The evidence section is cut by the server, 24 files a page, by folder, file type and name, the pickers and the command palette search the server, and the workspace page holds only the 500 newest files for its indexing indicator; a repository sync with nothing new says *Nothing changed*.
 - Links that leave the site say so; Office files that can carry macros are not opened in their application; a job is stopped by whoever started it or an administrator.
 
 **Not done:** none of this was run as tests, built or seen while it was written; §3 lists what to try, and the performance runs (before and after, [performance.md](performance.md)) are the maintainer's.

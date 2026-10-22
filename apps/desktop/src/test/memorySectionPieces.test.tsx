@@ -7,7 +7,10 @@ vi.mock("../lib/sharedApi", () => ({
 }));
 vi.mock("../components/ui/toast", () => ({ Toast: () => null, showToast: vi.fn() }));
 vi.mock("../web/workspace/data", () => ({
-  useArtifacts: () => [[{ id: "a1", title: "Runbook", path: "docs/runbook.md" }, { id: "a2", title: "Design notes", path: "docs/design.md" }]],
+  useArtifactPicker: () => {
+    const files = [{ id: "a1", title: "Runbook", path: "docs/runbook.md" }, { id: "a2", title: "Design notes", path: "docs/design.md" }];
+    return { files, search: () => undefined, find: (id: string) => files.find((entry) => entry.id === id), known: () => files };
+  },
   useMemoryCards: () => [[]],
 }));
 

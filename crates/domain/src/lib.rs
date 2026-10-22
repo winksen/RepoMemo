@@ -340,6 +340,9 @@ pub struct Folder {
     pub parent_id: Option<String>,
     pub name: String,
     pub created_at: String,
+    /// Files sitting directly in this folder (not in its subfolders); filled by the folder list.
+    #[serde(default)]
+    pub file_count: i64,
 }
 
 /// Why an artifact could not be indexed, after every retry was used.

@@ -18,6 +18,9 @@ pub(crate) async fn list_artifact_index_failures(
 
 /// The most files a call to the file list returns when it does not ask for a page.
 const UNPAGED_ARTIFACT_CAP: i64 = 2_000;
+/// What one query may ask for in kinds of file: a view names a dozen, no more.
+const MAX_KIND_FILTERS: usize = 16;
+const MAX_KIND_EXTENSIONS: usize = 32;
 
 pub(crate) async fn list_artifacts(
     subject: AuthenticatedSubject,
@@ -475,6 +478,20 @@ pub(crate) async fn query_artifacts(
             languages: request.languages,
             source_ids: request.source_ids,
             indexed: request.indexed,
+            in_folder: request.folder_id.filter(|id| !id.is_empty()),
+            top_level_only: request.top_level,
+            ledger_only: request.ledger_only,
+            kinds: request
+                .kinds
+                .into_iter()
+                .take(MAX_KIND_FILTERS)
+                .map(|kind| KindFilter {
+                    artifact_types: kind.artifact_types,
+                    not_artifact_types: kind.not_artifact_types,
+                    extensions: kind.extensions.into_iter().take(MAX_KIND_EXTENSIONS).collect(),
+                    not_extensions: kind.not_extensions.into_iter().take(MAX_KIND_EXTENSIONS).collect(),
+                })
+                .collect(),
             limit: Some(limit),
             offset: page.offset.unwrap_or(0) as i64,
         })

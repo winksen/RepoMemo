@@ -16,6 +16,11 @@ const KIND_BY_EXTENSION: Record<string, DocumentKind> = {
   msg: "email",
 };
 
+/** The extensions of one kind of document, or of all of them. */
+export function documentExtensions(kind?: DocumentKind): string[] {
+  return Object.entries(KIND_BY_EXTENSION).filter(([, own]) => !kind || own === kind).map(([extension]) => extension);
+}
+
 export const DOCUMENT_ACCEPT = Object.keys(KIND_BY_EXTENSION).map((extension) => `.${extension}`).join(",");
 
 export const DOCUMENT_KIND_LABEL: Record<DocumentKind, string> = {

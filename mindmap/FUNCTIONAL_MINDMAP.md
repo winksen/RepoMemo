@@ -559,7 +559,6 @@ These are observed in the code and are useful for prioritizing. The roadmap item
 
 | Gap | Impact |
 |---|---|
-| A workspace page holds its newest 500 files | The web client reads one page of 500 files and the total (V0.2.155). Searching the evidence section or the command palette (Ctrl K) reaches every file by name or path; folder and file-type views, folder counts and the pickers for memory cards, tasks and replacement evidence work from the 500 newest, and the evidence section says when there are more [F-list: server-side folder views and a searching picker]. |
 | Only GitHub and GitLab are connected | Issues (V0.2.27) and pull or merge requests (V0.2.28, GitLab V0.2.29) with their comments, reviews and commits are evidence (Settings › Issues and pull requests), and the files, symbols and commits they name are linked both ways (V0.2.30). A connector can have a webhook (V0.2.31) and pauses itself when the tracker asks to wait or refuses the token [F17]. |
 | A citation's old text is opened from the server's copy | *View at commit* (V0.2.26) shows a cited file as it was at the commit it names, while that commit is still in the repository's copy; memory-card links and repository summaries do not offer it yet [F16d]. |
 | `CODEOWNERS` owners are hints only | They show on a repository file's page since V0.2.25 but are not matched to workspace members, assigned or notified [F16c]. |

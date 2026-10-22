@@ -16,9 +16,29 @@ pub struct ArtifactQuery {
     pub source_ids: Vec<String>,
     /// Only indexed (`true`) or only not yet indexed (`false`) files.
     pub indexed: Option<bool>,
+    /// Only the files in this folder.
+    pub in_folder: Option<String>,
+    /// Only the files that are in no folder (ignored when `in_folder` is set).
+    pub top_level_only: bool,
+    /// Leave out the files a repository tracks (they are browsed with the repository).
+    pub ledger_only: bool,
+    /// Kinds of file, any one of which a file may be (empty for every kind).
+    pub kinds: Vec<KindFilter>,
     /// A page of this many files; `None` returns every match.
     pub limit: Option<i64>,
     pub offset: i64,
+}
+
+/// One kind of file: all of these hold together. A web view of the evidence section (Word files,
+/// Markdown, plain text) is a kind; several kinds are alternatives.
+#[derive(Debug, Clone, Default)]
+pub struct KindFilter {
+    pub artifact_types: Vec<ArtifactType>,
+    pub not_artifact_types: Vec<ArtifactType>,
+    /// The path ends in one of these (letters and digits only, without the dot).
+    pub extensions: Vec<String>,
+    /// The path ends in none of these.
+    pub not_extensions: Vec<String>,
 }
 
 /// Counts and sizes of a workspace's artifacts.
@@ -100,6 +120,69 @@ fn push_artifact_filters<'a>(query: &mut QueryBuilder<'a, Sqlite>, request: &'a 
         }
         None => {}
     }
+    if let Some(folder) = &request.in_folder {
+        query.push(" AND artifacts.folder_id = ");
+        query.push_bind(folder);
+    } else if request.top_level_only {
+        query.push(" AND artifacts.folder_id IS NULL");
+    }
+    if request.ledger_only {
+        query.push(" AND NOT EXISTS (SELECT 1 FROM repo_files WHERE repo_files.artifact_id = artifacts.id)");
+    }
+    if !request.kinds.is_empty() {
+        query.push(" AND (");
+        for (index, kind) in request.kinds.iter().enumerate() {
+            query.push(if index == 0 { "(1 = 1" } else { " OR (1 = 1" });
+            if !kind.artifact_types.is_empty() {
+                push_in(
+                    query,
+                    "artifacts.type",
+                    kind.artifact_types.iter().map(artifact_type_to_db).collect(),
+                );
+            }
+            if !kind.not_artifact_types.is_empty() {
+                query.push(" AND artifacts.type NOT IN (");
+                let mut separated = query.separated(", ");
+                for artifact_type in &kind.not_artifact_types {
+                    separated.push_bind(artifact_type_to_db(artifact_type));
+                }
+                separated.push_unseparated(")");
+            }
+            push_extensions(query, &kind.extensions, false);
+            push_extensions(query, &kind.not_extensions, true);
+            query.push(")");
+        }
+        query.push(")");
+    }
+}
+
+/// `AND (path ends in one of these)`, or with `negate` none of them. Only letters and digits of an
+/// extension are used, so what arrives from a client can never be a pattern of its own.
+fn push_extensions<'a>(query: &mut QueryBuilder<'a, Sqlite>, extensions: &[String], negate: bool) {
+    let patterns: Vec<String> = extensions
+        .iter()
+        .map(|extension| {
+            extension
+                .chars()
+                .filter(char::is_ascii_alphanumeric)
+                .collect::<String>()
+                .to_ascii_lowercase()
+        })
+        .filter(|extension| !extension.is_empty())
+        .map(|extension| format!("%.{extension}"))
+        .collect();
+    if patterns.is_empty() {
+        return;
+    }
+    query.push(if negate { " AND NOT (" } else { " AND (" });
+    for (index, pattern) in patterns.into_iter().enumerate() {
+        if index > 0 {
+            query.push(" OR ");
+        }
+        query.push("lower(artifacts.path) LIKE ");
+        query.push_bind(pattern);
+    }
+    query.push(")");
 }
 
 impl StorageEngine {

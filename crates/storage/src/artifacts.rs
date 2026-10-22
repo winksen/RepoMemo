@@ -784,9 +784,15 @@ impl StorageEngine {
     pub async fn list_folders(&self, workspace_id: &str) -> Result<Vec<Folder>> {
         let rows = sqlx::query(
             r#"
-            SELECT id, workspace_id, parent_id, name, created_at
-            FROM folders WHERE workspace_id = ?1
-            ORDER BY name COLLATE NOCASE
+            SELECT folders.id, folders.workspace_id, folders.parent_id, folders.name, folders.created_at,
+                   COALESCE(counts.files, 0) AS file_count
+            FROM folders
+            LEFT JOIN (
+              SELECT folder_id, COUNT(*) AS files FROM artifacts
+              WHERE workspace_id = ?1 AND folder_id IS NOT NULL GROUP BY folder_id
+            ) counts ON counts.folder_id = folders.id
+            WHERE folders.workspace_id = ?1
+            ORDER BY folders.name COLLATE NOCASE
             "#,
         )
         .bind(workspace_id)

@@ -759,6 +759,48 @@ export async function listSharedArtifactsPage(accessToken: string, workspaceId: 
   return { items, total: Number.isFinite(total) && total > 0 ? total : items.length };
 }
 
+/** One kind of file: all of these hold together; several kinds are alternatives. */
+export interface ArtifactKindFilter {
+  artifact_types?: ArtifactType[];
+  not_artifact_types?: ArtifactType[];
+  /** The path ends in one of these (letters and digits, no dot). */
+  extensions?: string[];
+  /** The path ends in none of these. */
+  not_extensions?: string[];
+}
+
+/**
+ * One page of a view of the evidence section, cut by the server: files that match a name, kinds of file, and
+ * a folder (`null` for the top level, `undefined` for anywhere), with the number that match in all.
+ */
+export async function querySharedArtifactPage(accessToken: string, workspaceId: string, input: {
+  query: string;
+  kinds?: ArtifactKindFilter[];
+  folderId?: string | null;
+  ledgerOnly?: boolean;
+  limit: number;
+  offset: number;
+}): Promise<{ items: ArtifactSummary[]; total: number }> {
+  const response = await authFetch(`${API_URL}/v1/workspaces/${workspaceId}/artifacts/query?limit=${input.limit}&offset=${input.offset}`, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify({
+      query: input.query,
+      kinds: input.kinds ?? [],
+      folder_id: typeof input.folderId === "string" ? input.folderId : null,
+      top_level: input.folderId === null,
+      ledger_only: input.ledgerOnly ?? false,
+    }),
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null) as { error?: { message?: string } } | null;
+    throw new SharedApiError(response.status, payload?.error?.message ?? `The shared API returned ${response.status}.`);
+  }
+  const items = await response.json() as ArtifactSummary[];
+  const header = response.headers.get("X-Total-Count");
+  return { items, total: header === null || !Number.isFinite(Number(header)) ? items.length : Number(header) };
+}
+
 export function querySharedArtifacts(accessToken: string, workspaceId: string, input: {
   query: string;
   artifactTypes?: ArtifactType[];
