@@ -80,7 +80,6 @@ use argon2::{
     Argon2,
 };
 use axum::{
-    body::Bytes,
     extract::{DefaultBodyLimit, FromRequestParts, Path, Query, State},
     http::{header, request::Parts, HeaderMap, HeaderName, HeaderValue, Method, StatusCode},
     middleware,
@@ -149,6 +148,11 @@ struct AppState {
     jwt_secret: String,
     /// The largest workspace archive an import accepts.
     max_import_bytes: u64,
+    /// The largest file an upload or a new version accepts.
+    max_upload_bytes: u64,
+    /// Room for uploads in flight, one permit for each KiB (`REPOMEMO_UPLOAD_INFLIGHT_MB`).
+    upload_gate: Arc<tokio::sync::Semaphore>,
+    upload_gate_bytes: u64,
     /// The passphrase backups are sealed with, when one is set.
     backup_key: Option<Arc<str>>,
     /// Where each backup is copied to and checked, when set.
@@ -434,6 +438,11 @@ async fn build_state(
         core,
         jwt_secret: config.jwt_secret.clone(),
         max_import_bytes: config.max_import_bytes,
+        max_upload_bytes: config.max_upload_bytes as u64,
+        upload_gate: Arc::new(tokio::sync::Semaphore::new(
+            (config.upload_inflight_bytes / 1024).clamp(1, u32::MAX as u64) as usize,
+        )),
+        upload_gate_bytes: config.upload_inflight_bytes,
         backup_key: config.backup_key.as_deref().map(Arc::from),
         backup_copy_dir: config.backup_copy_dir.clone(),
         event_bus,
@@ -485,8 +494,9 @@ fn cors_layer(config: &ServerConfig) -> CorsLayer {
 /// endpoints (small JSON documents). The upload limit (`REPOMEMO_MAX_UPLOAD_MB`, up to 1 GiB) is
 /// for signed-in callers: without this, anyone could make the server hold that much per request.
 const PUBLIC_BODY_BYTES: usize = 64 * 1024;
-/// The body of every other route, JSON documents. The upload limit applies only to the routes that
-/// take a file (an upload, a new version, an import): a comment or a search is never that large.
+/// The body of every other route, JSON documents. Files are not bound by it: an upload and a new
+/// version are streamed to disk and stopped at `REPOMEMO_MAX_UPLOAD_MB` as they arrive, and an
+/// import at `REPOMEMO_MAX_IMPORT_MB`; a comment or a search is never that large.
 const JSON_BODY_BYTES: usize = 1024 * 1024;
 
 fn routes(state: AppState, config: &ServerConfig) -> Router {
@@ -731,10 +741,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             "/v1/workspaces/{workspace_id}/artifacts/text",
             post(create_text_artifact),
         )
-        .route(
-            "/v1/workspaces/{workspace_id}/artifacts/upload",
-            post(upload_artifact).layer(DefaultBodyLimit::max(config.max_upload_bytes)),
-        )
+        .route("/v1/workspaces/{workspace_id}/artifacts/upload", post(upload_artifact))
         .route(
             "/v1/artifacts/{artifact_id}",
             get(get_artifact).put(update_artifact).delete(delete_artifact),
@@ -837,10 +844,9 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             "/v1/workspaces/{workspace_id}/folders/{folder_id}/move",
             post(move_folder),
         )
-        .route("/v1/artifacts/{artifact_id}/versions", get(list_artifact_versions))
         .route(
             "/v1/artifacts/{artifact_id}/versions",
-            post(upload_artifact_version).layer(DefaultBodyLimit::max(config.max_upload_bytes)),
+            get(list_artifact_versions).post(upload_artifact_version),
         )
         .route(
             "/v1/artifacts/{artifact_id}/versions/{version}",
@@ -879,10 +885,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
                 config.request_timeout
             },
         ))
-        .route(
-            "/v1/workspaces/import",
-            post(workspace_import::import_workspace).layer(DefaultBodyLimit::max(config.max_upload_bytes)),
-        )
+        .route("/v1/workspaces/import", post(workspace_import::import_workspace))
         .route("/v1/workspaces/{workspace_id}/events", get(workspace_events))
         .route("/v1/system/events", get(system_events))
         .layer(middleware::from_fn_with_state(state.clone(), web_session::web_session))

@@ -1,4 +1,6 @@
 use crate::*;
+use axum::body::Body;
+use repomemo_storage::StagedBlob;
 
 pub(crate) async fn list_artifact_index_failures(
     subject: AuthenticatedSubject,
@@ -503,12 +505,78 @@ pub(crate) async fn create_text_artifact(
     ))
 }
 
+/// A file received into a temporary file, with the room it holds in the upload
+/// gate until it has been stored (or refused).
+struct ReceivedUpload {
+    staged: StagedBlob,
+    _room: tokio::sync::OwnedSemaphorePermit,
+}
+
+fn upload_too_large(limit: u64) -> ApiError {
+    ApiError::new(
+        StatusCode::PAYLOAD_TOO_LARGE,
+        "payload_too_large",
+        format!(
+            "This file is larger than the {} this server accepts. An administrator can raise REPOMEMO_MAX_UPLOAD_MB.",
+            quotas::format_bytes(limit)
+        ),
+    )
+}
+
+/// The size a request says its body has, when it says.
+fn declared_length(headers: &HeaderMap) -> Option<u64> {
+    headers
+        .get(header::CONTENT_LENGTH)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.parse().ok())
+}
+
+/// Streams an upload to a temporary file while it is hashed and counted, so a
+/// large file is never held whole in memory: what is in memory is one chunk.
+/// The bytes of uploads in flight are capped together (`REPOMEMO_UPLOAD_INFLIGHT_MB`):
+/// past it the answer is `503` with `Retry-After`. The file stops at
+/// `REPOMEMO_MAX_UPLOAD_MB` however it announces its size.
+async fn receive_upload(state: &AppState, headers: &HeaderMap, body: Body) -> Result<ReceivedUpload, ApiError> {
+    let limit = state.max_upload_bytes;
+    let declared = declared_length(headers);
+    if declared.is_some_and(|length| length > limit) {
+        return Err(upload_too_large(limit));
+    }
+    // A body of unknown length is reserved at the largest size it may reach; one larger than the
+    // whole gate takes all of it, and waits for the others to end.
+    let room = declared.unwrap_or(limit).clamp(1, state.upload_gate_bytes.max(1));
+    let permit = state
+        .upload_gate
+        .clone()
+        .try_acquire_many_owned(u32::try_from(room.div_ceil(1024)).unwrap_or(u32::MAX))
+        .map_err(|_| {
+            let mut error = ApiError::new(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "uploads_busy",
+                "The server is receiving as many uploads as it can hold. Try again in a few seconds.",
+            );
+            error.retry_after = Some(5);
+            error
+        })?;
+    let mut writer = state.storage.begin_staged_blob().await.map_err(ApiError::internal)?;
+    let mut stream = body.into_data_stream();
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|_| ApiError::bad_request("The upload was interrupted."))?;
+        if writer.size() + chunk.len() as u64 > limit {
+            return Err(upload_too_large(limit));
+        }
+        writer.write(&chunk).await.map_err(ApiError::internal)?;
+    }
+    let staged = writer.finish().await.map_err(ApiError::internal)?;
+    Ok(ReceivedUpload { staged, _room: permit })
+}
+
 pub(crate) async fn upload_artifact(
     subject: AuthenticatedSubject,
     State(state): State<AppState>,
     Path(workspace_id): Path<String>,
     headers: HeaderMap,
-    body: Bytes,
+    body: Body,
 ) -> Result<(StatusCode, Json<SharedArtifactSummary>), ApiError> {
     require_workspace_write(&state, &subject, &workspace_id).await?;
     let requested_folder = headers
@@ -525,19 +593,20 @@ pub(crate) async fn upload_artifact(
             "File names must be at most {MAX_UPLOAD_FILENAME_CHARS} characters long, without control characters."
         )));
     }
-    let mime_type = headers
-        .get(header::CONTENT_TYPE)
-        .and_then(|value| value.to_str().ok())
-        .map(str::to_owned);
     state
         .core
         .ensure_upload_allowed(&workspace_id, &filename)
         .await
         .map_err(map_core_error)?;
-    quotas::check_incoming(&state, &subject, &workspace_id, body.len() as u64, true).await?;
+    // Room and the hourly count are checked against what the request says it holds, before any of it
+    // is read; the room again, against what arrived, once it has.
+    let declared = declared_length(&headers).unwrap_or(0);
+    quotas::check_incoming(&state, &subject, &workspace_id, declared, true).await?;
+    let received = receive_upload(&state, &headers, body).await?;
+    quotas::check_incoming(&state, &subject, &workspace_id, received.staged.size_bytes, false).await?;
     let artifact = state
         .core
-        .import_upload(workspace_id.clone(), filename, body.to_vec(), mime_type)
+        .import_staged_upload(workspace_id.clone(), filename, received.staged)
         .await
         .map_err(map_core_error)?;
     // Start rendering the faithful preview now so it is ready when opened.
@@ -1134,7 +1203,7 @@ pub(crate) async fn upload_artifact_version(
     State(state): State<AppState>,
     Path(artifact_id): Path<String>,
     headers: HeaderMap,
-    body: Bytes,
+    body: Body,
 ) -> Result<Json<SharedArtifactSummary>, ApiError> {
     let current = writable_artifact_summary(&state, &subject, &artifact_id).await?;
     let workspace_id = current.workspace_id;
@@ -1149,10 +1218,13 @@ pub(crate) async fn upload_artifact_version(
             "The file name is too long or has control characters.",
         ));
     }
-    quotas::check_incoming(&state, &subject, &workspace_id, body.len() as u64, true).await?;
+    let declared = declared_length(&headers).unwrap_or(0);
+    quotas::check_incoming(&state, &subject, &workspace_id, declared, true).await?;
+    let received = receive_upload(&state, &headers, body).await?;
+    quotas::check_incoming(&state, &subject, &workspace_id, received.staged.size_bytes, false).await?;
     let artifact = state
         .core
-        .replace_artifact_version(&artifact_id, &filename, body.to_vec(), Some(&subject.user_id))
+        .replace_artifact_version_staged(&artifact_id, &filename, received.staged, Some(&subject.user_id))
         .await
         .map_err(map_core_error)?;
     state.converter.ensure(state.storage.clone(), artifact.clone());

@@ -40,6 +40,7 @@ mod repo;
 mod search;
 mod secrets;
 mod setup;
+mod staging;
 mod stats;
 mod system;
 mod users;
@@ -57,6 +58,7 @@ pub use repo::{RepoFileRecord, RepoFileWrite};
 use secrets::SecretBox;
 pub use secrets::{restrict_to_owner, KEY_FILE_NAME as SECRET_KEY_FILE_NAME, MIN_MASTER_KEY_CHARS};
 pub use setup::SetupState;
+pub use staging::{StagedBlob, StagedBlobWriter};
 pub use stats::{ArtifactQuery, ArtifactStats, DashboardCounts};
 pub use system::{StoredSystemSetting, UserAccess};
 pub use users::RefreshOutcome;
@@ -689,6 +691,8 @@ impl StorageEngine {
 
         let blob_dir = config.data_dir.join("blobs");
         tokio::fs::create_dir_all(&blob_dir).await?;
+        // Files that were being received when the last process stopped.
+        let _ = tokio::fs::remove_dir_all(config.data_dir.join("tmp")).await;
 
         let secrets = SecretBox::load(&config.data_dir, config.master_key.as_deref())?;
 

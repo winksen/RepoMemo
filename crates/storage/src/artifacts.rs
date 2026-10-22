@@ -80,6 +80,34 @@ impl StorageEngine {
         })
     }
 
+    /// The blob's row is written (or refreshed) before its file: `created_at`
+    /// doubles as "last stored at", so garbage collection treats a blob that is
+    /// being stored again as fresh even if no artifact references it yet. The
+    /// caller holds `blob_lock`.
+    pub(crate) async fn record_blob(
+        &self,
+        content_hash: &str,
+        storage_uri: &str,
+        size_bytes: i64,
+        mime_type: Option<&str>,
+    ) -> Result<()> {
+        sqlx::query(
+            r#"
+            INSERT INTO blobs (hash, storage_uri, size_bytes, mime_type, created_at)
+            VALUES (?1, ?2, ?3, ?4, ?5)
+            ON CONFLICT(hash) DO UPDATE SET created_at = excluded.created_at
+            "#,
+        )
+        .bind(content_hash)
+        .bind(storage_uri)
+        .bind(size_bytes)
+        .bind(mime_type)
+        .bind(Utc::now().to_rfc3339())
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
     pub async fn store_blob(&self, content_hash: &str, bytes: &[u8], mime_type: Option<&str>) -> Result<String> {
         if content_hash.len() < 4 || !content_hash.chars().all(|value| value.is_ascii_alphanumeric()) {
             bail!("content hash is invalid");
@@ -91,26 +119,10 @@ impl StorageEngine {
         }
 
         let storage_uri = self.blob_storage_uri(content_hash);
-        let now = Utc::now().to_rfc3339();
 
         let _guard = self.blob_lock.lock().await;
-        // The row is written (or refreshed) first: `created_at` doubles as
-        // "last stored at", so garbage collection treats a blob that is being
-        // stored again as fresh even if no artifact references it yet.
-        sqlx::query(
-            r#"
-            INSERT INTO blobs (hash, storage_uri, size_bytes, mime_type, created_at)
-            VALUES (?1, ?2, ?3, ?4, ?5)
-            ON CONFLICT(hash) DO UPDATE SET created_at = excluded.created_at
-            "#,
-        )
-        .bind(content_hash)
-        .bind(&storage_uri)
-        .bind(bytes.len() as i64)
-        .bind(mime_type)
-        .bind(&now)
-        .execute(&self.pool)
-        .await?;
+        self.record_blob(content_hash, &storage_uri, bytes.len() as i64, mime_type)
+            .await?;
 
         if tokio::fs::metadata(&blob_path).await.is_err() {
             // Write to a temporary name and rename, so a crash mid-write never

@@ -574,6 +574,64 @@ async fn ending_sessions_bumps_the_version_and_revokes_refresh_tokens() {
     let _ = std::fs::remove_dir_all(data_dir);
 }
 
+/// V0.2.153: a received file is written to `<data>/tmp/` and hashed as it
+/// arrives, then moved into the blob store; nothing is left behind.
+#[tokio::test]
+async fn a_received_file_is_hashed_as_it_arrives_and_moved_into_the_blob_store() {
+    let data_dir = std::env::temp_dir().join(format!(
+        "repomemo-staged-blob-test-{}",
+        SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+    ));
+    let storage = StorageEngine::open(StorageConfig::new(data_dir.clone())).await.unwrap();
+    let leftovers = || {
+        std::fs::read_dir(data_dir.join("tmp"))
+            .map(|entries| entries.count())
+            .unwrap_or(0)
+    };
+    let bytes: Vec<u8> = (0..300_000_u32).map(|n| (n % 251) as u8).collect();
+
+    let mut writer = storage.begin_staged_blob().await.unwrap();
+    for chunk in bytes.chunks(64 * 1024) {
+        writer.write(chunk).await.unwrap();
+    }
+    assert_eq!(writer.size(), bytes.len() as u64);
+    let staged = writer.finish().await.unwrap();
+    assert_eq!(staged.content_hash, StorageEngine::content_hash(&bytes));
+    assert_eq!(staged.size_bytes, bytes.len() as u64);
+    let hash = staged.content_hash.clone();
+    storage
+        .store_staged_blob(staged, Some("application/octet-stream"))
+        .await
+        .unwrap();
+    assert_eq!(std::fs::read(storage.blob_path_for_hash(&hash)).unwrap(), bytes);
+    assert_eq!(leftovers(), 0, "the received file moved, it was not copied");
+
+    // The same content again keeps the one stored file and deletes the received copy.
+    let mut again = storage.begin_staged_blob().await.unwrap();
+    again.write(&bytes).await.unwrap();
+    storage
+        .store_staged_blob(again.finish().await.unwrap(), Some("application/octet-stream"))
+        .await
+        .unwrap();
+    assert_eq!(std::fs::read(storage.blob_path_for_hash(&hash)).unwrap(), bytes);
+    assert_eq!(leftovers(), 0);
+
+    // An upload that stops half way, or a received file nobody stores, leaves nothing.
+    let mut stopped = storage.begin_staged_blob().await.unwrap();
+    stopped.write(b"partial").await.unwrap();
+    assert_eq!(leftovers(), 1);
+    drop(stopped);
+    let mut unused = storage.begin_staged_blob().await.unwrap();
+    unused.write(b"complete but unused").await.unwrap();
+    let unused = unused.finish().await.unwrap();
+    assert_eq!(leftovers(), 1);
+    drop(unused);
+    assert_eq!(leftovers(), 0);
+
+    drop(storage);
+    let _ = std::fs::remove_dir_all(data_dir);
+}
+
 #[tokio::test]
 async fn unreferenced_blobs_are_collected_after_the_grace_period() {
     let (storage, data_dir) = temp_storage("blob-gc").await;

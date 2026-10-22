@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.2.153 (2026-10-21)
+
+Uploads stop being held whole in memory, and the bytes arriving at once get a cap.
+
+### Changed
+- **An upload or a new version is streamed to disk (P14):** `POST …/artifacts/upload` and `POST /v1/artifacts/{id}/versions` read the whole body into memory, copied it (`body.to_vec()`), then hashed and wrote it, so a 500 MiB upload held up to three copies at once. The body is now written chunk by chunk to a temporary file in `<data>/tmp/`, hashed and counted as it arrives, and moved into the blob store with a rename, under the same hash and the same `blobs` row as before (an identical file already stored keeps its blob and the received copy is deleted). What the server holds in memory is one chunk. A refused or interrupted upload leaves nothing in the folder, which is also emptied at start.
+- **Room is checked twice (P14):** against the announced `Content-Length` before any of the body is read (this check also counts toward the hourly upload limit), then against the bytes that arrived. The limit `REPOMEMO_MAX_UPLOAD_MB` is enforced as the bytes come, whatever the request announces, and answers a JSON `413` (`payload_too_large`); an announced size above it is refused before the body is read.
+- **A cap on uploads in flight (P14, new setting `REPOMEMO_UPLOAD_INFLIGHT_MB`, 512):** each upload takes room in a semaphore (one permit a KiB) for its announced size, the largest allowed when it announces none, until it is stored or refused. When the room is taken the answer is `503 uploads_busy` with `Retry-After: 5`, instead of the server taking on more than it can write.
+- **Correction to V0.2.152:** that release put the upload limit on the workspace import as a route layer. An import streams its body and is bound by `REPOMEMO_MAX_IMPORT_MB`, which `DefaultBodyLimit` never applied to, so the layer did nothing and is gone; the upload routes' layers went the same way, since the limit is now enforced as the body is received.
+- **Tests (written, not run):** `a_received_file_is_hashed_as_it_arrives_and_moved_into_the_blob_store` (storage: a file in pieces, its hash, a rename and not a copy, the same content twice, an abandoned or unused file leaves nothing) and `uploads_are_streamed_to_disk_and_the_bytes_in_flight_are_capped` (server: a file in six pieces stored with the right hash and bytes, a body that grows past the limit and an announced size above it refused with `413`, a second upload refused with `503` and `Retry-After` while a first one still arrives, and accepted once it ends).
+- **Checks run on this release:** `cargo check` of the storage, api and server crates with their tests compiles; `rustfmt` shows nothing for the lines changed; `docs:check` and `version:check` pass. **Not run:** the tests, and an upload of 500 MiB with the memory watched, as asked; that is the maintainer's try (below).
+
+### Upgrading
+- A new setting, `REPOMEMO_UPLOAD_INFLIGHT_MB` (512), is read at start; nothing needs to change. A script or proxy that gave up on a `503` should retry after `Retry-After`. Try: upload a file of a few hundred MiB (with `REPOMEMO_MAX_UPLOAD_MB` raised) and watch the server's memory stay flat; start two at once with the new setting at `1` and see the second one wait.
+
 ## V0.2.152 (2026-10-21)
 
 Request bodies get a limit that fits the route: a comment or a search is never as large as an upload.

@@ -577,6 +577,145 @@ async fn json_bodies_stop_at_a_mebibyte_and_files_keep_the_upload_limit() {
 }
 
 #[tokio::test]
+async fn uploads_are_streamed_to_disk_and_the_bytes_in_flight_are_capped() {
+    let data_dir = temp_data_dir("streamed-uploads");
+    let mut config = ServerConfig::for_test(data_dir.clone());
+    config.max_upload_bytes = 4 * 1024 * 1024;
+    config.upload_inflight_bytes = 1024 * 1024;
+    let app = router(config).await.unwrap();
+    let (owner, _) = register_account(&app, "streams-owner@example.com").await;
+    let workspace_id = create_workspace(&app, &owner).await;
+    let uri = format!("/v1/workspaces/{workspace_id}/artifacts/upload");
+    let leftovers = || {
+        std::fs::read_dir(data_dir.join("tmp"))
+            .map(|entries| entries.count())
+            .unwrap_or(0)
+    };
+
+    // A file that arrives in pieces is stored whole, with the hash of what arrived.
+    let pieces: Vec<Result<Vec<u8>, std::io::Error>> = (0..6).map(|n| Ok(vec![b'a' + n as u8; 100 * 1024])).collect();
+    let sent: Vec<u8> = pieces
+        .iter()
+        .flat_map(|piece| piece.as_ref().unwrap().clone())
+        .collect();
+    let streamed = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(&uri)
+                .header("authorization", &owner)
+                .header("x-repomemo-filename", "pieces.txt")
+                .body(Body::from_stream(tokio_stream::iter(pieces)))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(streamed.status(), 201);
+    let streamed = response_json(streamed).await;
+    assert_eq!(streamed["size_bytes"], sent.len());
+    let content_hash = streamed["content_hash"].as_str().unwrap().to_owned();
+    assert_eq!(content_hash, repomemo_storage::StorageEngine::content_hash(&sent));
+    let file = app
+        .clone()
+        .oneshot(auth_request(
+            "GET",
+            &format!("/v1/artifacts/{}/file", streamed["id"].as_str().unwrap()),
+            &owner,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(to_bytes(file.into_body(), usize::MAX).await.unwrap(), sent);
+    assert_eq!(leftovers(), 0, "nothing stays in the temporary folder");
+
+    // A body that says it is small and is not, or has no size and grows past the limit, is stopped.
+    let endless = tokio_stream::iter((0..8).map(|_| Ok::<_, std::io::Error>(vec![b'z'; 1024 * 1024])));
+    let too_big = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(&uri)
+                .header("authorization", &owner)
+                .header("x-repomemo-filename", "endless.txt")
+                .body(Body::from_stream(endless))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(too_big.status(), 413);
+    assert_eq!(leftovers(), 0, "a refused upload leaves nothing behind");
+    let announced = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(&uri)
+                .header("authorization", &owner)
+                .header("x-repomemo-filename", "announced.txt")
+                .header("content-length", (5 * 1024 * 1024).to_string())
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        announced.status(),
+        413,
+        "a size above the limit is refused before the body is read"
+    );
+
+    // An upload still arriving holds its room; another that would not fit is told to wait.
+    let (sender, receiver) = tokio::sync::mpsc::channel::<Result<Vec<u8>, std::io::Error>>(4);
+    let slow = Request::builder()
+        .method("POST")
+        .uri(&uri)
+        .header("authorization", &owner)
+        .header("x-repomemo-filename", "slow.txt")
+        .header("content-length", (800 * 1024).to_string())
+        .body(Body::from_stream(tokio_stream::wrappers::ReceiverStream::new(receiver)))
+        .unwrap();
+    let slow = tokio::spawn(app.clone().oneshot(slow));
+    sender.send(Ok(b"the first part".to_vec())).await.unwrap();
+    let mut refused = None;
+    for _ in 0..40 {
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        let second = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(&uri)
+                    .header("authorization", &owner)
+                    .header("x-repomemo-filename", "second.txt")
+                    .header("content-length", (400 * 1024).to_string())
+                    .body(Body::from(vec![b's'; 400 * 1024]))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        if second.status() == 503 {
+            refused = Some(second);
+            break;
+        }
+    }
+    let refused = refused.expect("a second upload is refused while the first holds the room");
+    assert!(refused.headers().contains_key("retry-after"));
+    assert_eq!(response_json(refused).await["error"]["code"], "uploads_busy");
+
+    // When the first ends, its room is free again.
+    sender.send(Ok(b" and the rest".to_vec())).await.unwrap();
+    drop(sender);
+    assert_eq!(slow.await.unwrap().unwrap().status(), 201);
+    assert_eq!(
+        upload(&app, &owner, &workspace_id, "after.txt", vec![b'x'; 400 * 1024]).await,
+        201
+    );
+    assert_eq!(leftovers(), 0);
+    let _ = std::fs::remove_dir_all(data_dir);
+}
+
+#[tokio::test]
 async fn metrics_are_open_metrics_for_system_administrators() {
     let data_dir = temp_data_dir("metrics");
     let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();

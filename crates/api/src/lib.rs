@@ -14,7 +14,7 @@ use repomemo_ingestion::{
     is_document, ImportCandidate, ImportOptions,
 };
 use repomemo_retrieval::{KeywordMode, RetrievalService};
-use repomemo_storage::{NewArtifact, StorageConfig, StorageEngine};
+use repomemo_storage::{NewArtifact, StagedBlob, StorageConfig, StorageEngine};
 use serde_json::json;
 
 mod agent;
@@ -64,6 +64,43 @@ const SUMMARY_PART_CHARS: usize = 12_000;
 const SUMMARY_MAX_PARTS: usize = 8;
 /// Longest text the artifact page shows for a document.
 const DOCUMENT_PREVIEW_CHARS: usize = 120_000;
+
+/// What an upload holds: bytes in memory, or a file already received into a
+/// temporary file and hashed.
+enum UploadContent {
+    Bytes(Vec<u8>),
+    Staged(StagedBlob),
+}
+
+impl UploadContent {
+    fn size_bytes(&self) -> u64 {
+        match self {
+            Self::Bytes(bytes) => bytes.len() as u64,
+            Self::Staged(staged) => staged.size_bytes,
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.size_bytes() == 0
+    }
+
+    fn content_hash(&self) -> String {
+        match self {
+            Self::Bytes(bytes) => StorageEngine::content_hash(bytes),
+            Self::Staged(staged) => staged.content_hash.clone(),
+        }
+    }
+
+    async fn store(self, storage: &StorageEngine, content_hash: &str, mime_type: &str) -> Result<()> {
+        match self {
+            Self::Bytes(bytes) => storage
+                .store_blob(content_hash, &bytes, Some(mime_type))
+                .await
+                .map(|_| ()),
+            Self::Staged(staged) => storage.store_staged_blob(staged, Some(mime_type)).await.map(|_| ()),
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct RepoMemoCore {
@@ -296,10 +333,33 @@ impl RepoMemoCore {
         // What the uploader claimed; ignored, see `served_mime_type`.
         _claimed_mime_type: Option<String>,
     ) -> Result<ArtifactSummary> {
+        self.import_upload_content(workspace_id, filename, UploadContent::Bytes(bytes))
+            .await
+    }
+
+    /// The same as [`RepoMemoCore::import_upload`] for a file received into a
+    /// temporary file (see `StorageEngine::begin_staged_blob`), which is moved
+    /// into the blob store without being read into memory.
+    pub async fn import_staged_upload(
+        &self,
+        workspace_id: String,
+        filename: String,
+        staged: StagedBlob,
+    ) -> Result<ArtifactSummary> {
+        self.import_upload_content(workspace_id, filename, UploadContent::Staged(staged))
+            .await
+    }
+
+    async fn import_upload_content(
+        &self,
+        workspace_id: String,
+        filename: String,
+        content: UploadContent,
+    ) -> Result<ArtifactSummary> {
         if workspace_id.trim().is_empty() {
             repomemo_domain::bail_invalid!("Workspace id is required.");
         }
-        if bytes.is_empty() {
+        if content.is_empty() {
             repomemo_domain::bail_invalid!("Uploaded files cannot be empty.");
         }
         if !self.storage.workspace_exists(&workspace_id).await? {
@@ -324,10 +384,10 @@ impl RepoMemoCore {
             .create_or_get_source(&workspace_id, SourceType::Upload, "Shared uploads", None)
             .await
             .with_context(|| "failed to create shared-uploads source")?;
-        let content_hash = StorageEngine::content_hash(&bytes);
-        let size_bytes = bytes.len() as i64;
+        let content_hash = content.content_hash();
+        let size_bytes = content.size_bytes() as i64;
 
-        self.storage.store_blob(&content_hash, &bytes, Some(&mime_type)).await?;
+        content.store(&self.storage, &content_hash, &mime_type).await?;
         self.storage
             .store_artifact(NewArtifact {
                 workspace_id,
@@ -355,7 +415,31 @@ impl RepoMemoCore {
         bytes: Vec<u8>,
         uploaded_by: Option<&str>,
     ) -> Result<ArtifactSummary> {
-        if bytes.is_empty() {
+        self.replace_artifact_content_with(artifact_id, filename, UploadContent::Bytes(bytes), uploaded_by)
+            .await
+    }
+
+    /// [`RepoMemoCore::replace_artifact_version`] for a file received into a
+    /// temporary file, moved into the blob store without being read into memory.
+    pub async fn replace_artifact_version_staged(
+        &self,
+        artifact_id: &str,
+        filename: &str,
+        staged: StagedBlob,
+        uploaded_by: Option<&str>,
+    ) -> Result<ArtifactSummary> {
+        self.replace_artifact_content_with(artifact_id, filename, UploadContent::Staged(staged), uploaded_by)
+            .await
+    }
+
+    async fn replace_artifact_content_with(
+        &self,
+        artifact_id: &str,
+        filename: &str,
+        content: UploadContent,
+        uploaded_by: Option<&str>,
+    ) -> Result<ArtifactSummary> {
+        if content.is_empty() {
             repomemo_domain::bail_invalid!("Uploaded files cannot be empty.");
         }
         let current = self.storage.get_artifact_summary(artifact_id).await?;
@@ -372,16 +456,11 @@ impl RepoMemoCore {
             );
         }
         let mime_type = served_mime_type(Path::new(&current.path)).to_owned();
-        let content_hash = StorageEngine::content_hash(&bytes);
-        self.storage.store_blob(&content_hash, &bytes, Some(&mime_type)).await?;
+        let content_hash = content.content_hash();
+        let size_bytes = content.size_bytes() as i64;
+        content.store(&self.storage, &content_hash, &mime_type).await?;
         self.storage
-            .replace_artifact_content(
-                artifact_id,
-                &content_hash,
-                bytes.len() as i64,
-                Some(&mime_type),
-                uploaded_by,
-            )
+            .replace_artifact_content(artifact_id, &content_hash, size_bytes, Some(&mime_type), uploaded_by)
             .await
     }
 

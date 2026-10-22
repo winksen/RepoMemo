@@ -242,7 +242,8 @@ All are run-time settings (System › Settings) with an environment default; `0`
 | `REPOMEMO_UPLOADS_PER_HOUR` | 600 | One person flooding uploads (`429`) |
 | `REPOMEMO_WORKSPACES_PER_PERSON` | 25 | Workspaces created without end (`409 workspace_limit`) |
 | `REPOMEMO_DISK_FLOOR_MB` | 1,024 | A full disk: uploads stop (`507 disk_low`) while less than this is free. The overview shows free space |
-| `REPOMEMO_MAX_UPLOAD_MB` | 10 | The size of one file: an upload, a new version or a workspace import. Other request bodies stop at 1 MiB (environment only) |
+| `REPOMEMO_MAX_UPLOAD_MB` | 10 | The size of one file, an upload or a new version; it is received into a temporary file and never held in memory. Other request bodies stop at 1 MiB (environment only) |
+| `REPOMEMO_UPLOAD_INFLIGHT_MB` | 512 | Uploads arriving at once, together: past it a new upload answers `503` with `Retry-After` and the sender tries again (environment only) |
 | `REPOMEMO_MAX_IMPORT_MB` | 2,048 | The size of one workspace archive to import (environment only); read from a temporary file, never held in memory |
 | `REPOMEMO_HEAVY_REQUESTS_PER_MINUTE` | 240 | Searches and reports, per person |
 | `REPOMEMO_AI_REQUESTS_PER_HOUR` | 120 | Interactive AI, per person |
@@ -401,6 +402,7 @@ Environments from V0.1.40 and later upgrade in place.
 | Provider keys "missing" after a restore or a move | `REPOMEMO_SECRET_KEY` differs, or `secret.key` was not carried over. Enter the keys again |
 | Uploads answer `507` | Free disk is under the floor: free space or lower `REPOMEMO_DISK_FLOOR_MB` |
 | Uploads answer `413 workspace_full` | The workspace is at its allowance: delete evidence or raise `REPOMEMO_WORKSPACE_STORAGE_MB` |
+| Uploads answer `503 uploads_busy` | More uploads are arriving than `REPOMEMO_UPLOAD_INFLIGHT_MB` allows together; the sender retries after the `Retry-After` seconds, or an administrator raises the setting |
 | Everyone shares one rate limit | The proxy's address is used: set `REPOMEMO_TRUST_PROXY=true` and have the proxy send `X-Forwarded-For` |
 | Live updates stop after a minute | The proxy buffers or times out event streams: use the `location` in §3 |
 | Searches slow after a restart | The first search per workspace builds the vector index; later ones are quick |
