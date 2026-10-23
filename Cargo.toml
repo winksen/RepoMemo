@@ -30,7 +30,7 @@ rust-version = "1.88"
 anyhow = "1"
 argon2 = "0.5"
 axum = "0.8"
-base64 = "0.22"
+base64 = "0.23"
 chrono = { version = "0.4", features = ["serde"] }
 calamine = { version = "0.37", default-features = false }
 cfb = "0.7"
