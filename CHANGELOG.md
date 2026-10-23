@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.3.1 (2026-10-24)
+
+The fixes that the tests of 0.3.0 found: none. No code changed in this release.
+
+### Checks
+- **Reported by the maintainer on 2026-10-24:** the tests of the clean install came out good, with no step failing and no finding to correct. V0.3.1 therefore has nothing to fix; its row closes with the record of that, and the numbers after it do not move (the roadmap said a finding that needs a release of its own would push them down).
+- **Run for this release:** `version:check` (version `0.3.1` everywhere). **Not run:** the tests and the other checks, which V0.2.193 last reported; V0.3.2 compiles the tests and hands them over.
+
+### Changed
+- **The version** is `0.3.1` in `Cargo.toml`, `Cargo.lock`, `package.json`, `package-lock.json`, the desktop `package.json` and `tauri.conf.json`.
+- **The 0.3.x line is under way:** decisions 29 to 32 of the roadmap are taken as proposed, since the maintainer asked on 2026-10-24 for the releases to be built one by one up to V0.3.27 (no separate `v0.2.0` tag, the 0.3.x rules, the local edition removed in V0.3.5–V0.3.7, track Q as listed). Decision 33, the theme of V0.4.0, is still to be recorded in V0.3.27. The roadmap gains a *Release checklists (0.3.x)* section, and `mindmap/RELEASES_0.3.md` marks the row.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.3.0 (2026-10-24)
 
 *Connected.* The version is set to `0.3.0` after the maintainer's tests of the clean-machine install. No code changed in this release.

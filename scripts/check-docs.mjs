@@ -7,9 +7,10 @@
 //   1. Every route of the server (node scripts/list-routes.mjs) has a row in
 //      mindmap/technical/api-reference.md.
 //   2. Every REPOMEMO_* variable the Rust code reads is described in docs/DEVELOPMENT_COMMANDS.md.
-//   3. The version the mindmaps and the release index say they describe is the product's version.
-//   4. Every release of the index marked done has an entry in CHANGELOG.md, and every entry of the
-//      changelog from 0.2.1 on has a row in the index.
+//   3. The version the mindmaps and the current release index (0.3) say they describe is the
+//      product's version.
+//   4. Every release of an index (0.2, 0.3) marked done has an entry in CHANGELOG.md, and every
+//      entry of the changelog from 0.2.1 on has a row in its index.
 //   5. Every relative link of the documents points at a file that exists and, in a Markdown file,
 //      at a heading that exists.
 
@@ -62,7 +63,7 @@ const stamps = [
   ["mindmap/FUNCTIONAL_MINDMAP.md", /reflects the code at `V([\d.]+)`/],
   ["mindmap/TECHNICAL_MINDMAP.md", /code at `V([\d.]+)`/],
   ["mindmap/ROADMAP.md", /\*\*Current version:\*\* `V([\d.]+)`/],
-  ["mindmap/RELEASES_0.2.md", /\*\*Current:\*\* `V([\d.]+)`/],
+  ["mindmap/RELEASES_0.3.md", /\*\*Current:\*\* `V([\d.]+)`/],
 ];
 for (const [path, pattern] of stamps) {
   const found = pattern.exec(read(path))?.[1];
@@ -72,15 +73,19 @@ if (!new RegExp(`^## V${version.replace(/\./g, "\\.")} \\(`, "m").test(read("CHA
 
 // 4. Releases ---------------------------------------------------------------
 const changelog = read("CHANGELOG.md");
-const entries = new Set([...changelog.matchAll(/^## V(0\.2\.\d+) \(/gm)].map((match) => match[1]));
-const index = read("mindmap/RELEASES_0.2.md");
-const done = new Set();
-for (const match of index.matchAll(/^\| \*\*V(0\.2\.\d+)\*\* \| (✅|🔜)/gm)) {
-  if (match[2] === "✅") done.add(match[1]);
-  if (match[2] === "✅" && !entries.has(match[1]) && match[1] !== "0.2.0") problems.push(`mindmap/RELEASES_0.2.md marks V${match[1]} done and CHANGELOG.md has no entry for it`);
-}
-for (const entry of entries) {
-  if (entry !== "0.2.0" && !done.has(entry)) problems.push(`CHANGELOG.md has an entry for V${entry} and mindmap/RELEASES_0.2.md does not mark it done`);
+// One index for each minor line; the line's first number (0.2.0, 0.3.0) is the previous line's last.
+for (const [line, file] of [["2", "mindmap/RELEASES_0.2.md"], ["3", "mindmap/RELEASES_0.3.md"]]) {
+  const first = `0.${line}.0`;
+  const entries = new Set([...changelog.matchAll(new RegExp(`^## V(0\\.${line}\\.\\d+) \\(`, "gm"))].map((match) => match[1]));
+  const index = read(file);
+  const done = new Set();
+  for (const match of index.matchAll(new RegExp(`^\\| \\*\\*V(0\\.${line}\\.\\d+)\\*\\* \\| (✅|🔜)`, "gm"))) {
+    if (match[2] === "✅") done.add(match[1]);
+    if (match[2] === "✅" && !entries.has(match[1]) && match[1] !== first) problems.push(`${file} marks V${match[1]} done and CHANGELOG.md has no entry for it`);
+  }
+  for (const entry of entries) {
+    if (entry !== first && !done.has(entry)) problems.push(`CHANGELOG.md has an entry for V${entry} and ${file} does not mark it done`);
+  }
 }
 
 // 5. Links ------------------------------------------------------------------

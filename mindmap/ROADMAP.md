@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.3.0` *Connected* (2026-10-24), released after the maintainer's tests of the clean install (R6, R12) · **Next:** [Road to V0.4.0](#-road-to-v040), the 0.3.x releases V0.3.1–V0.3.27 in tracks O to T (proposed 2026-10-24, decisions 29–33 to confirm) · **Built before the tag:** tracks K to N (V0.2.57–V0.2.193) · **Next minor after it:** `V0.4.0`, its theme still to be chosen (decision 33)
+> **Current version:** `V0.3.1` (2026-10-24), after `V0.3.0` *Connected*, released after the maintainer's tests of the clean install (R6, R12) · **Next:** [Road to V0.4.0](#-road-to-v040), the 0.3.x releases V0.3.2–V0.3.27 in tracks O to T (decisions 29–32 taken as proposed, 33 recorded in V0.3.27) · **Built before the tag:** tracks K to N (V0.2.57–V0.2.193) · **Next minor after it:** `V0.4.0`, its theme still to be chosen (decision 33)
 > **Feature freeze (V0.1.76 to the `v0.3.0` tag):** lifted by the tag on 2026-10-24. The 0.3.x releases follow the rules of [Road to V0.4.0](#-road-to-v040).
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Security review 2026-10-16 (V0.2.52)](security/2026-10-16-security-review.md) · [Security and backend review 2026-10-21 (V0.2.129)](security/2026-10-21-security-review.md) · [Security review of workspace templates 2026-10-22 (V0.2.192)](security/2026-10-22-workspace-templates-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -77,7 +77,7 @@ timeline
 | Track M: backend hardening and performance (V0.2.149–V0.2.162) | ✅ V0.2.149–V0.2.162 built; decisions 20–23 taken as proposed |
 | Track N: workspace templates (V0.2.163–V0.2.193) | ✅ V0.2.163–V0.2.193 built; decisions 24–28 taken as proposed; [plan](plans/2026-10-22-workspace-templates.md) · [format](technical/workspace-templates.md) |
 | **V0.3.0 *Connected*** | ✅ Released 2026-10-24: the version set to `0.3.0` and tagged `v0.3.0` after tracks K to N and the clean-machine install |
-| Road to V0.4.0 (V0.3.1–V0.3.27, tracks O to T) | 🔜 Proposed 2026-10-24: fixes and the record, the local edition removed, small gaps closed, portability and connector depth, operations, security pass; decisions 29–33 to confirm |
+| Road to V0.4.0 (V0.3.1–V0.3.27, tracks O to T) | 🔄 Under way since 2026-10-24: fixes and the record, the local edition removed, small gaps closed, portability and connector depth, operations, security pass; decisions 29–32 taken as proposed, 33 to record in V0.3.27. Built so far: V0.3.1 |
 | V0.4.0 and later: scale-out, single sign-on, hosted | 💭 Direction (the theme is decision 33) |
 
 ---
@@ -1199,10 +1199,10 @@ The brief of each release (change, files, done when, commit line) is in the [pla
 | 26 | **Templates and rights** | V0.2.167 | A template never reads or changes a right, the AI policy, a quota or what leaves the server. Choosing one needs a workspace administrator with a session or the `admin` token scope (decision 23); every change is in the activity feed |
 | 27 | **Existing workspaces** | V0.2.166 | They stay on `general` and nothing changes until an administrator chooses; a new workspace asks at creation, with `general` preselected |
 | 28 | **What ships first** | V0.2.170 | `general` plus Software engineering, Operations and incidents, Product and decisions and Knowledge base, as data. Organization-defined templates are V0.4.0 direction |
-| 29 | **Tags** | V0.3.0 | Tag `v0.3.0` only. R6 and R12 were one run, so there is no retroactive `v0.2.0` tag; the changelog's V0.2.0 entry stays as the record of that promise. *Proposed 2026-10-24, to confirm* |
-| 30 | **The 0.3.x rules** | V0.3.1 | The freeze ends at the tag. One change per release as in 0.2.x, committed as `Update V0.3.N`, each with its changelog entry, mindmap updates and its row in `RELEASES_0.3.md`; security rules come with a new surface; the release checks are repeated at the end of the line (V0.3.27) rather than after each track. *Proposed, to confirm* |
-| 31 | **Removing the retired local edition** (F20d) | V0.3.5 | Remove it in three releases (V0.3.5–V0.3.7), the move to a server included. `UPGRADING.md` says the last release that can move a local workspace is V0.3.4, so anyone who still needs it moves it before upgrading. *Alternative:* keep the move one more minor and remove only the local app. *Proposed, to confirm* |
-| 32 | **The size and order of track Q** | V0.3.8 | Track Q (V0.3.8–V0.3.18) is eleven independent gaps from the functional mindmap, ordered by how often a team meets them. Drop, reorder or defer any of them; nothing depends on another. *Proposed, to confirm* |
+| 29 | **Tags** | V0.3.0 | Tag `v0.3.0` only. R6 and R12 were one run, so there is no retroactive `v0.2.0` tag; the changelog's V0.2.0 entry stays as the record of that promise. *Taken as proposed (V0.3.1)* |
+| 30 | **The 0.3.x rules** | V0.3.1 | The freeze ends at the tag. One change per release as in 0.2.x, committed as `Update V0.3.N`, each with its changelog entry, mindmap updates and its row in `RELEASES_0.3.md`; security rules come with a new surface; the release checks are repeated at the end of the line (V0.3.27) rather than after each track. *Taken as proposed (V0.3.1)* |
+| 31 | **Removing the retired local edition** (F20d) | V0.3.5 | Remove it in three releases (V0.3.5–V0.3.7), the move to a server included. `UPGRADING.md` says the last release that can move a local workspace is V0.3.4, so anyone who still needs it moves it before upgrading. *Alternative:* keep the move one more minor and remove only the local app. *Taken as proposed (V0.3.1)* |
+| 32 | **The size and order of track Q** | V0.3.8 | Track Q (V0.3.8–V0.3.18) is eleven independent gaps from the functional mindmap, ordered by how often a team meets them. Drop, reorder or defer any of them; nothing depends on another. *Taken as proposed (V0.3.1)* |
 | 33 | **The theme of V0.4.0** | V0.3.27 | Not decided. The candidates are in [Later](#-later-v040-and-beyond): single sign-on and enterprise controls, a scale-out server (PostgreSQL, object storage, a worker), more connectors, or assistant actions. *Recommendation:* single sign-on (OIDC) first, because the single-node server already holds the performance targets and sign-in is what blocks a larger organization sooner. Record the choice in the V0.3.27 release |
 
 ---
@@ -1356,7 +1356,7 @@ Design and limits: [technical/repository-sources.md](technical/repository-source
 
 ## 🎯 Road to V0.4.0
 
-> **Status:** proposed on 2026-10-24, right after `V0.3.0`; not started. Decisions 29–33 above need confirming. The releases are numbered V0.3.1–V0.3.27, and `V0.4.0` is cut when the theme of decision 33 is ready, after V0.3.27.
+> **Status:** proposed on 2026-10-24, right after `V0.3.0`, and under way the same day: decisions 29–32 above are taken as proposed (the maintainer asked for the releases to be built one by one up to V0.3.27), and decision 33 is recorded in V0.3.27. The releases are numbered V0.3.1–V0.3.27, and `V0.4.0` is cut when the theme of decision 33 is ready, after V0.3.27. Built so far: V0.3.1.
 
 ### What this line is
 
@@ -1387,7 +1387,7 @@ Design and limits: [technical/repository-sources.md](technical/repository-source
 
 | Release | Type | Section | The one change | IDs | Done when |
 |---|---|---|---|---|---|
-| **V0.3.1** | 🐞 | Fixes | Corrections that the maintainer's tests of 0.3.0 found. This row is the first; a finding that needs its own release gets the next number and pushes the rest down | R15 | The step that failed passes on a second run |
+| **V0.3.1** ✅ | 🐞 | Fixes | Corrections that the maintainer's tests of 0.3.0 found. This row is the first; a finding that needs its own release gets the next number and pushes the rest down | R15 | The step that failed passes on a second run |
 | **V0.3.2** | 🐞 | Tests | Every test written since V0.2.46 is run once; those that fail are corrected, in the test or in the code | R15b | `cargo test --workspace --exclude repomemo-desktop` and `npm run test:web` pass (the maintainer's run) |
 | **V0.3.3** | 📘 | Process | `cargo fmt --all --check` and clippy made clean in one formatting release, then blocking in CI. Line endings of CRLF files are kept | C8 follow-up | CI's formatting step passes on `main`; a second formatting run changes nothing |
 | **V0.3.4** | 📘 | Release record | The recorded figures: the performance runs before and after track M, the browser pass (axe or Lighthouse, 375 px and 768 px, both themes), the desktop app tried against a server; the result table of the clean install filled and §3 of its page ticked | R6 follow-up, R10 | [performance.md](technical/performance.md) and [clean-install.md](technical/clean-install.md) hold the figures; no box is left unticked without a reason |
@@ -1444,7 +1444,11 @@ Each row closes a line of the functional mindmap's gaps table or of a release ch
 | **V0.3.26** | 🔒 | Security | Security pass over what 0.3.x added (restored versions, mentions, owner matching, the import job, redelivery) and over the removal of the local edition, with its fixes | R16 | No high or medium finding open |
 | **V0.3.27** | 📘 | Release | Release checks repeated; the theme of V0.4.0 recorded (decision 33); the line closed | R16 | Every check passes; the next plan is written |
 
-Release checklists for the 0.3.x line are added under this section as each release is built: say what was built and what was not run.
+### Release checklists (0.3.x)
+
+One box per release, added as each release is built. Say what was built and what was not run (the tests are the maintainer's to run).
+
+- [x] **V0.3.1** the maintainer's tests of 0.3.0 found nothing to correct. Done: the version set to `0.3.1` everywhere; the list of findings recorded as empty, so no step needs a second run and the numbers after it do not move; decisions 29–32 taken as proposed; this checklist added. No code changed; `version:check` passes. **Not run:** the tests
 
 ---
 

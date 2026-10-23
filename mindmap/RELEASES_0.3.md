@@ -1,9 +1,9 @@
 # RepoMemo releases: 0.3 → 0.4
 
-> **Line:** `V0.3.1` to `V0.3.27`, then `V0.4.0` (theme to be chosen, decision 33) · **Current:** `V0.3.0` *Connected* (2026-10-24) · **Next:** `V0.3.1`, the fixes the tests of 0.3.0 found
+> **Line:** `V0.3.1` to `V0.3.27`, then `V0.4.0` (theme to be chosen, decision 33) · **Current:** `V0.3.1` (2026-10-24) · **Next:** `V0.3.2`, every test written since V0.2.46 compiled and handed over
 > **Previous line:** [Releases 0.2 → 0.3](RELEASES_0.2.md) · **Related:** [Roadmap, Road to V0.4.0](ROADMAP.md#-road-to-v040) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
-Every release of the 0.3 line, planned and later shipped, one row each. The plan comes from the [Road to V0.4.0](ROADMAP.md#-road-to-v040), proposed on 2026-10-24: **one change per release**, each shippable alone, committed as `Update V0.3.N`. Decisions 29–33 of the roadmap are still to confirm, so any row can move, change or go.
+Every release of the 0.3 line, planned and later shipped, one row each. The plan comes from the [Road to V0.4.0](ROADMAP.md#-road-to-v040), proposed on 2026-10-24: **one change per release**, each shippable alone, committed as `Update V0.3.N`. Decisions 29–32 of the roadmap are taken as proposed (V0.3.1); decision 33, the theme of V0.4.0, is recorded in V0.3.27.
 
 **Type:** ✨ Feature · 🔧 Enhancement · 🐞 Fix · 🔒 Security · 📘 Update (docs, process, dependencies, release).
 **Status:** ✅ shipped (with its date) · 🔄 in progress · 🔜 planned
@@ -30,7 +30,7 @@ When a release ships, set its status to ✅ with the date and make *What changes
 
 | Release | Status | Track | Type | Area | What changes | Done when |
 |---|---|---|---|---|---|---|
-| **V0.3.1** | 🔜 Planned | O. After 0.3.0 | 🐞 Fix | Fixes | Corrections that the maintainer's tests of 0.3.0 found; a finding that needs its own release takes the next number | The step that failed passes on a second run |
+| **V0.3.1** | ✅ 2026-10-24 | O. After 0.3.0 | 🐞 Fix | Fixes | The maintainer's tests of 0.3.0 found nothing to correct; recorded, the version set to `0.3.1`, decisions 29–32 taken as proposed | No step failed, so there is no step to repeat |
 | **V0.3.2** | 🔜 Planned | O. After 0.3.0 | 🐞 Fix | Tests | Every test written since V0.2.46 is run once; those that fail are corrected, in the test or in the code | `cargo test --workspace --exclude repomemo-desktop` and `npm run test:web` pass (the maintainer's run) |
 | **V0.3.3** | 🔜 Planned | O. After 0.3.0 | 📘 Update | Process | `cargo fmt --all --check` and clippy made clean in one formatting release, then blocking in CI; line endings kept | CI's formatting step passes on `main`; a second formatting run changes nothing |
 | **V0.3.4** | 🔜 Planned | O. After 0.3.0 | 📘 Update | Release record | The performance runs, the browser pass and the desktop try recorded; the clean-install result table filled and its pre-tag list ticked | The figures are in `performance.md` and `clean-install.md`; no box is left unticked without a reason |
