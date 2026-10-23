@@ -1,16 +1,16 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.2.193` (2026-10-22), after `V0.2.0` *Team-ready*, which waits for the clean-machine install (R6) before its tag · **Next:** the clean-machine install (R6, the maintainer's) and the `v0.2.0` tag; tracks L and M, security and backend hardening, are built (V0.2.130–V0.2.162) and track N, workspace templates, is built (V0.2.163–V0.2.193) · **Next minor after it:** `V0.3.0` *Connected* (proposed 2026-10-14)
-> **Feature freeze (V0.1.76 to the `v0.2.0` tag):** only fixes from the clean install go into 0.2.0. The 0.2.x releases of [Road to V0.3.0](#-road-to-v030) follow the tag.
+> **Current version:** `V0.3.0` *Connected* (2026-10-24), released after the maintainer's tests of the clean install (R6, R12) · **Next:** [Road to V0.4.0](#-road-to-v040), the 0.3.x releases V0.3.1–V0.3.27 in tracks O to T (proposed 2026-10-24, decisions 29–33 to confirm) · **Built before the tag:** tracks K to N (V0.2.57–V0.2.193) · **Next minor after it:** `V0.4.0`, its theme still to be chosen (decision 33)
+> **Feature freeze (V0.1.76 to the `v0.3.0` tag):** lifted by the tag on 2026-10-24. The 0.3.x releases follow the rules of [Road to V0.4.0](#-road-to-v040).
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Security review 2026-10-16 (V0.2.52)](security/2026-10-16-security-review.md) · [Security and backend review 2026-10-21 (V0.2.129)](security/2026-10-21-security-review.md) · [Security review of workspace templates 2026-10-22 (V0.2.192)](security/2026-10-22-workspace-templates-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
 RepoMemo started as a local-first desktop workbench. It is now a **self-hosted team product**: a shared API server with a web client, organizations and roles, collaboration, git repositories as living sources, business documents, and optional AI grounded in cited evidence. A server can be installed and administered entirely from the browser (environment menu, first-run setup, System area, admin console).
 
 Between V0.1.32 and V0.1.62 the work went into **depth and operability**. V0.1.63 added **onboarding without an account** (invitation links, reset links, personal access tokens). V0.1.64 and V0.1.65 fixed the most urgent security findings: bundle S1, and a second pass that included a stored XSS.
 
-**V0.2.0 is proposed as the first *team-ready* release**: a server a team can install, expose and trust with its knowledge. That means secure by default, deployable and recoverable, checked on every commit, and keeping its core promise that memory stays true. The plan to get there is [Road to V0.2.0](#-road-to-v020); every release of it is built and only the clean-machine install (R6) remains before the tag.
+**V0.2.0 is proposed as the first *team-ready* release**: a server a team can install, expose and trust with its knowledge. That means secure by default, deployable and recoverable, checked on every commit, and keeping its core promise that memory stays true. The plan to get there is [Road to V0.2.0](#-road-to-v020); every release of it is built, and the clean-machine install (R6) was made with the V0.3.0 tests; no separate `v0.2.0` tag is made (decision 29).
 
-**V0.3.0, *Connected*,** is proposed next: remote repositories, mail, issues and pull requests, an assistant that remembers the conversation, portable workspaces and one client, reached through 56 single-purpose releases (V0.2.1–V0.2.56). The plan is [Road to V0.3.0](#-road-to-v030).
+**V0.3.0, *Connected*,** was released on 2026-10-24: remote repositories, mail, issues and pull requests, an assistant that remembers the conversation, portable workspaces and one client, reached through 193 single-purpose releases (V0.2.1–V0.2.193): 56 for the promise itself, then frontend polish, security and backend hardening, and workspace templates. The plan is [Road to V0.3.0](#-road-to-v030).
 
 Before the tag, **tracks L and M** (V0.2.130–V0.2.162, planned 2026-10-21) act on the [fifth review](security/2026-10-21-security-review.md): CI's blocking dependency check fails on `main`, two high and six medium findings of the 2026-10-14 review were never closed, and the backend does work it could skip (whole documents read for a rights check, whole file lists on every workspace page, repository syncs with nothing to do).
 
@@ -51,7 +51,15 @@ timeline
     V0.2.57 to V0.2.129 : Frontend polish (track K)
     V0.2.130 to V0.2.148 : Security and dependencies (track L)
     V0.2.149 to V0.2.162 : Backend hardening and performance (track M)
-    V0.2.163 to V0.2.193 : Workspace templates (track N) : V0.3.0 Connected
+    V0.2.163 to V0.2.193 : Workspace templates (track N)
+  section V0.3.0 Connected (released 2026-10-24)
+    V0.3.0 : Tagged after the clean-machine install
+  section Road to V0.4.0 (proposed, one change per release)
+    V0.3.1 to V0.3.4 : After 0.3.0 (fixes from the tests, test debt, formatting, the record)
+    V0.3.5 to V0.3.7 : The retired local edition removed
+    V0.3.8 to V0.3.18 : Small gaps closed (versions, mentions, review, assistant, search, palette, citations, owners, symbols, template cards)
+    V0.3.19 to V0.3.25 : Portable archives, connector depth, container and backup operations, accessibility
+    V0.3.26 to V0.3.27 : Security pass and release checks
 ```
 
 | Stage | Status |
@@ -60,15 +68,17 @@ timeline
 | Phase S: Shared team mode | ✅ Complete |
 | Phase D: Depth and operability (V0.1.33–V0.1.65) | ✅ Complete |
 | Security review 2026-10-10, second and third passes | ✅ Every finding fixed, mitigated or accepted in writing (V0.1.76); R2-4 and R2-5 scheduled for V0.2.8 |
-| Road to V0.2.0 (V0.1.66–V0.1.76) | 🔄 Built and versioned `0.2.0`; R6 (clean install) and the tag are the maintainer's |
-| Road to V0.3.0 (V0.2.1–V0.2.56, one change each) | ✅ V0.2.1–V0.2.56 built; the clean-machine install (R6, R12) is the maintainer's |
+| Road to V0.2.0 (V0.1.66–V0.1.76) | ✅ Built and versioned `0.2.0`; R6 (clean install) passed with the V0.3.0 tests (2026-10-24); no separate `v0.2.0` tag (decision 29) |
+| Road to V0.3.0 (V0.2.1–V0.2.56, one change each) | ✅ V0.2.1–V0.2.56 built; the clean-machine install (R6, R12) was made by the maintainer, who reported the tests good on 2026-10-24 |
 | Track K: frontend polish (V0.2.57–V0.2.129) | ✅ V0.2.57–V0.2.129 built (K1 to K6 done); decisions 15–19 taken as proposed; [plan](plans/2026-10-17-frontend-polish.md) |
 | Security and backend review 2026-10-21 (fifth pass) | ✅ Closed at V0.2.162: 2 high, 9 medium, 15 low and 4 info findings, none high, medium or low open, plus 11 performance findings built (P12–P21); the review's table names the release of each fix; [review](security/2026-10-21-security-review.md) |
 | Security review of workspace templates 2026-10-22 (sixth pass, new surface only) | ✅ Closed at V0.2.192: 0 high, 2 medium, 2 low and 4 info findings, none medium or low open; [review](security/2026-10-22-workspace-templates-security-review.md) |
 | Track L: security and dependencies (V0.2.130–V0.2.148) | ✅ V0.2.130–V0.2.148 built; decisions 20–23 taken as proposed |
 | Track M: backend hardening and performance (V0.2.149–V0.2.162) | ✅ V0.2.149–V0.2.162 built; decisions 20–23 taken as proposed |
 | Track N: workspace templates (V0.2.163–V0.2.193) | ✅ V0.2.163–V0.2.193 built; decisions 24–28 taken as proposed; [plan](plans/2026-10-22-workspace-templates.md) · [format](technical/workspace-templates.md) |
-| V0.4.0 and later: scale-out, single sign-on, hosted | 💭 Direction |
+| **V0.3.0 *Connected*** | ✅ Released 2026-10-24: the version set to `0.3.0` and tagged `v0.3.0` after tracks K to N and the clean-machine install |
+| Road to V0.4.0 (V0.3.1–V0.3.27, tracks O to T) | 🔜 Proposed 2026-10-24: fixes and the record, the local edition removed, small gaps closed, portability and connector depth, operations, security pass; decisions 29–33 to confirm |
+| V0.4.0 and later: scale-out, single sign-on, hosted | 💭 Direction (the theme is decision 33) |
 
 ---
 
@@ -278,20 +288,20 @@ Each proposal below was accepted as written. They shape the releases named in th
 - [x] **R3** `environments_from_older_versions_upgrade_in_place` (storage tests): V0.1.40, V0.1.52 and V0.1.65 schemas rebuilt from the migration files up to 13, 17 and 23, filled, upgraded and checked. The fixtures are synthesized from the migrations, not captured from old binaries
 - [x] **R4** release-build run at 50,000 passages: meaning search p95 112 ms, keyword search p95 63 ms (target 300 ms), figures p95 6 ms and the dashboard's three grouped queries (target 500 ms), map 0.5 s and health 0.4 s on first load (target 2 s). Debug-build numbers (V0.1.74) were 10 times slower, which is why they were not the verdict
 - [x] **R5** [api-reference](technical/api-reference.md) (generated), [auth-and-authorization](technical/auth-and-authorization.md), [operations](technical/operations.md), both mindmaps, `CHANGELOG.md`, [UPGRADING.md](../UPGRADING.md)
-- [ ] **R6** a clean-machine install following only the production guide. **Needs the maintainer:** it needs a second machine and a running server, which this repository's rules keep from the automated work. `node scripts/smoke-test.mjs` is the checklist's last step; record the result here and fix what the guide got wrong before tagging 0.2.0
+- [x] **R6** (made with the V0.3.0 tests; the maintainer reported them good on 2026-10-24 and the per-step results were not recorded) a clean-machine install following only the production guide. **Needed the maintainer:** it needs a second machine and a running server, which this repository's rules keep from the automated work. `node scripts/smoke-test.mjs` is the checklist's last step; record the result here and fix what the guide got wrong before tagging 0.2.0
 
 #### V0.2.0: Team-ready
 
 - [x] The version is `0.2.0` everywhere (`npm run version:set -- 0.2.0`); the candidate's checks left nothing to fix
 - [x] The changelog's V0.2.0 entry names the part of the promise each release delivered; V0.1.66–V0.1.76 stay as its detailed notes
-- [ ] **R6** the clean-machine install (above); what it finds becomes V0.2.1
-- [ ] Tag `v0.2.0` once R6 passes
+- [x] **R6** the clean-machine install (above); what it finds becomes V0.2.1 (and, for the install made with the V0.3.0 tests, V0.3.1)
+- [x] Tag `v0.2.0`: not made. `v0.3.0` is the first tag after R6 (decision 29)
 
 ---
 
 ## 🎯 Road to V0.3.0
 
-> **Status:** proposed on 2026-10-14, revised the same day into single-purpose releases; not started. Work begins after `v0.2.0` is tagged. Decisions 7–14 below need agreeing first.
+> **Status:** ✅ released on 2026-10-24 as `V0.3.0`. Proposed on 2026-10-14 and revised the same day into single-purpose releases, built as V0.2.1–V0.2.193 with decisions 7–28 taken as proposed. The next plan is [Road to V0.4.0](#-road-to-v040).
 
 ### What V0.3.0 means
 
@@ -428,7 +438,7 @@ Pays off what V0.2.0 left in the web client and the background work, while it is
 | **V0.2.54** ✅ | 📘 | Performance | Performance run at 50,000 passages plus a 100,000-file remote repository and 10,000 issues | R10 | The V0.2.0 targets still hold; results in the release notes |
 | **V0.2.55** ✅ | 📘 | Documentation | Mindmaps, branch pages (`repository-sources`, a new `connectors` page, `operations`), changelog and upgrade notes from 0.2.x | R11 | Every page matches the code |
 | **V0.2.56** ✅ | 📘 | Release | Clean-machine install with mail and a remote repository, following only the guide | R12 | Installed without a workaround; ready to tag |
-| **V0.3.0** | — | — | *Connected*, after tracks K, L, M and N | — | Tag `v0.3.0` |
+| **V0.3.0** ✅ | 📘 | Release | *Connected*: the version set to `0.3.0` after tracks K, L, M and N and the clean-machine install | R6, R12 | Tag `v0.3.0` (2026-10-24) |
 
 #### Track K: Frontend polish (V0.2.57–V0.2.129)
 
@@ -989,7 +999,7 @@ Proposed and started on 2026-10-22, with decisions 24–28 taken as proposed. Ev
 - [x] **R12** [technical/clean-install.md](technical/clean-install.md): the run before the tag as fourteen steps, each with the guide section it follows and what to see: get the server, the settings, proxy and service, first-run setup, the smoke test, mail (test mail, an invitation, a reset, verification), a remote repository, a push webhook, a tracker, a backup and its restore, an upgrade, the desktop app, and spot checks of the fourth security pass. A workaround is anything the guide does not say; each becomes a fix and the run is made again
 - [x] `scripts/smoke-test.mjs` checks, besides what it did, that sign-in refuses a 200 KiB body and a webhook that cannot be verified answers `401`; and, with an administrator, the mail settings, a test mail sent to `REPOMEMO_SMOKE_MAIL` until it leaves the outbox, and that a remote repository can be linked (`REPOMEMO_SMOKE_REMOTE_REPO`, `REPOMEMO_SMOKE_WORKSPACE`, `REPOMEMO_SMOKE_REMOTE_TOKEN`; the check stores nothing)
 - [x] The page ends with **what must be done before the tag**: CI green, the desktop crate's tests, the performance runs, a browser pass for accessibility and narrow screens, the desktop app tried, the security fixes tried, the container images built once, and the open lines of every release read again; and a result table, empty
-- [ ] **The install itself, which is R6 and R12.** It needs a second machine, a mail account and a running server, which this repository's rules keep from the automated work. **`V0.3.0` is not ready to tag**: the release is prepared, not passed. Many tests of V0.2.46 to V0.2.55 were compiled and never executed, the performance runs and the browser passes have not been made, and the app has not been started (each is in its release's checklist and in the page's pre-tag list)
+- [x] **The install itself, which is R6 and R12** (made by the maintainer with the V0.3.0 tests, reported good on 2026-10-24; what follows is what was written at V0.2.56). It needs a second machine, a mail account and a running server, which this repository's rules keep from the automated work. **`V0.3.0` is not ready to tag**: the release is prepared, not passed. Many tests of V0.2.46 to V0.2.55 were compiled and never executed, the performance runs and the browser passes have not been made, and the app has not been started (each is in its release's checklist and in the page's pre-tag list)
 
 #### Track K: Frontend polish (planned)
 
@@ -1189,6 +1199,11 @@ The brief of each release (change, files, done when, commit line) is in the [pla
 | 26 | **Templates and rights** | V0.2.167 | A template never reads or changes a right, the AI policy, a quota or what leaves the server. Choosing one needs a workspace administrator with a session or the `admin` token scope (decision 23); every change is in the activity feed |
 | 27 | **Existing workspaces** | V0.2.166 | They stay on `general` and nothing changes until an administrator chooses; a new workspace asks at creation, with `general` preselected |
 | 28 | **What ships first** | V0.2.170 | `general` plus Software engineering, Operations and incidents, Product and decisions and Knowledge base, as data. Organization-defined templates are V0.4.0 direction |
+| 29 | **Tags** | V0.3.0 | Tag `v0.3.0` only. R6 and R12 were one run, so there is no retroactive `v0.2.0` tag; the changelog's V0.2.0 entry stays as the record of that promise. *Proposed 2026-10-24, to confirm* |
+| 30 | **The 0.3.x rules** | V0.3.1 | The freeze ends at the tag. One change per release as in 0.2.x, committed as `Update V0.3.N`, each with its changelog entry, mindmap updates and its row in `RELEASES_0.3.md`; security rules come with a new surface; the release checks are repeated at the end of the line (V0.3.27) rather than after each track. *Proposed, to confirm* |
+| 31 | **Removing the retired local edition** (F20d) | V0.3.5 | Remove it in three releases (V0.3.5–V0.3.7), the move to a server included. `UPGRADING.md` says the last release that can move a local workspace is V0.3.4, so anyone who still needs it moves it before upgrading. *Alternative:* keep the move one more minor and remove only the local app. *Proposed, to confirm* |
+| 32 | **The size and order of track Q** | V0.3.8 | Track Q (V0.3.8–V0.3.18) is eleven independent gaps from the functional mindmap, ordered by how often a team meets them. Drop, reorder or defer any of them; nothing depends on another. *Proposed, to confirm* |
+| 33 | **The theme of V0.4.0** | V0.3.27 | Not decided. The candidates are in [Later](#-later-v040-and-beyond): single sign-on and enterprise controls, a scale-out server (PostgreSQL, object storage, a worker), more connectors, or assistant actions. *Recommendation:* single sign-on (OIDC) first, because the single-node server already holds the performance targets and sign-in is what blocks a larger organization sooner. Record the choice in the V0.3.27 release |
 
 ---
 
@@ -1339,9 +1354,103 @@ Design and limits: [technical/repository-sources.md](technical/repository-source
 
 ---
 
+## 🎯 Road to V0.4.0
+
+> **Status:** proposed on 2026-10-24, right after `V0.3.0`; not started. Decisions 29–33 above need confirming. The releases are numbered V0.3.1–V0.3.27, and `V0.4.0` is cut when the theme of decision 33 is ready, after V0.3.27.
+
+### What this line is
+
+`V0.3.0` promised that RepoMemo reaches where a team's knowledge already lives. The 0.3.x line does not add a pillar. It **pays off what 0.3.0 left**: the fixes the first real installs find, the tests that were written and never run, the retired local edition still sitting in the desktop app, and the small gaps the functional mindmap lists ([§13](FUNCTIONAL_MINDMAP.md#13-known-functional-gaps-at-v030)). It ends with a security pass and the release checks, and with the choice of what V0.4.0 is.
+
+### How the 0.3.x releases are cut
+
+- **One change per release**, as in 0.2.x: one fix, one feature, or one enhancement of one section. A title that needs "and" is two releases.
+- **Shippable alone:** each release passes CI, carries its tests, updates the mindmaps, the changelog and its row in [RELEASES_0.3.md](RELEASES_0.3.md), and is committed as `Update V0.3.N` with a short list.
+- **Fixes first, then removal, then features:** the fixes and the record (track O) come before anything is built, and the local edition goes (track P) before new surface is added.
+- **Security comes with the surface:** a release that opens a new path (restoring a version, mentions in new places, owner matching, the import job) states its rules in the release itself; V0.3.26 reads the whole line once more.
+- **Tests:** written and compiled with each release; the maintainer runs them, and V0.3.2 runs everything that has never been run.
+
+### Release plan
+
+**Type:** 🐞 fix · ✨ feature · 🔧 enhancement · 📘 update (docs, process, dependencies) · 🔒 security
+
+| Part | Theme | Releases | Count |
+|---|---|---|---|
+| O | After 0.3.0: fixes, test debt, formatting, the record | V0.3.1–V0.3.4 | 4 |
+| P | The retired local edition removed | V0.3.5–V0.3.7 | 3 |
+| Q | Small gaps closed | V0.3.8–V0.3.18 | 11 |
+| R | Portable archives and connector depth | V0.3.19–V0.3.22 | 4 |
+| S | Operations and experience | V0.3.23–V0.3.25 | 3 |
+| T | Closing: security pass, release checks | V0.3.26–V0.3.27 | 2 |
+
+#### Track O: After 0.3.0 (V0.3.1–V0.3.4)
+
+| Release | Type | Section | The one change | IDs | Done when |
+|---|---|---|---|---|---|
+| **V0.3.1** | 🐞 | Fixes | Corrections that the maintainer's tests of 0.3.0 found. This row is the first; a finding that needs its own release gets the next number and pushes the rest down | R15 | The step that failed passes on a second run |
+| **V0.3.2** | 🐞 | Tests | Every test written since V0.2.46 is run once; those that fail are corrected, in the test or in the code | R15b | `cargo test --workspace --exclude repomemo-desktop` and `npm run test:web` pass (the maintainer's run) |
+| **V0.3.3** | 📘 | Process | `cargo fmt --all --check` and clippy made clean in one formatting release, then blocking in CI. Line endings of CRLF files are kept | C8 follow-up | CI's formatting step passes on `main`; a second formatting run changes nothing |
+| **V0.3.4** | 📘 | Release record | The recorded figures: the performance runs before and after track M, the browser pass (axe or Lighthouse, 375 px and 768 px, both themes), the desktop app tried against a server; the result table of the clean install filled and §3 of its page ticked | R6 follow-up, R10 | [performance.md](technical/performance.md) and [clean-install.md](technical/clean-install.md) hold the figures; no box is left unticked without a reason |
+
+#### Track P: The retired local edition removed (V0.3.5–V0.3.7)
+
+Decision 31. Design notes for the removal are in the V0.2.51 checklist ("Left for the removal release").
+
+| Release | Type | Section | The one change | IDs | Done when |
+|---|---|---|---|---|---|
+| **V0.3.5** | 🔧 | Desktop | `LocalDesktopApp` (`App.tsx`, about 2,700 lines), `lib/repomemoApi.ts` and the local-only styles deleted; the app opens on the server address screen only | F20d | No local-workspace code under `apps/desktop/src`; the app connects, signs in and shows the web client as before |
+| **V0.3.6** | 🔧 | Desktop shell | The 26 local Tauri commands, `RepoMemoCore::boot` in the shell, the move's commands (`handoff.rs`) and the `repomemo-api` dependency removed | F20d | The shell holds only the server-client commands (credential store, HTTP); `cargo tree -p repomemo-desktop` no longer reaches `repomemo-api` |
+| **V0.3.7** | 📘 | Documents | `UPGRADING.md` names V0.3.4 as the last release that can move a local workspace; both mindmaps, the user guide and `DEVELOPMENT_COMMANDS.md` stop describing a local workspace | F20d | No document except `UPGRADING.md` and the changelog mentions the local workspace |
+
+#### Track Q: Small gaps closed (V0.3.8–V0.3.18)
+
+Each row closes a line of the functional mindmap's gaps table or of a release checklist. They do not depend on each other (decision 32).
+
+| Release | Type | Section | The one change | IDs | Done when |
+|---|---|---|---|---|---|
+| **V0.3.8** | ✨ | Artifact page | Restore an earlier version of a file: it becomes a new version with that text | F24b | Restoring version 2 of three makes a fourth with version 2's text; the history keeps all four |
+| **V0.3.9** | 🔧 | Discussion | `@mentions` in task descriptions and memory cards; organization members who are not yet in the workspace are not suggested | F25b | A mention in a task notifies that member; a non-member is neither suggested nor notified |
+| **V0.3.10** | ✨ | Review | A count in the Review tab and a snooze for an item | F23b | A snoozed item leaves the list and returns on its date; the tab shows the count |
+| **V0.3.11** | 🔧 | Assistant | Lookups and searches read earlier turns ("search for it") | F5c | "Find the file about login" then "search for it" searches what the first message named |
+| **V0.3.12** | 🔧 | Retrieval | Search across workspaces takes filters (type, language, date) and finds memory cards | F5d | Each result is still checked against its workspace's role and AI policy |
+| **V0.3.13** | 🔧 | Web shell | The command palette keeps recent items and offers *New note* | F19b | Recent items survive a reload; *New note* opens the editor in the open workspace |
+| **V0.3.14** | 🔧 | Citations | *View at commit* offered from memory-card links and repository summaries | F16e | A card's link opens the cited text at the commit it names, labelled as such |
+| **V0.3.15** | ✨ | Artifact page | `CODEOWNERS` owners matched to workspace members | F16f | A matched owner shows as a member and can be asked to review; an unmatched one stays a hint |
+| **V0.3.16** | 🔧 | Assistant | Answers and citations name the last author and date of a repository file | F16g | A citation of a repository file shows who last changed it |
+| **V0.3.17** | 🔧 | Indexing | More code symbols: Go `const`, `var` and type aliases; Java fields; C# properties; PHP properties and constants | F21c | Each is found in the Code symbols box |
+| **V0.3.18** | 🔧 | Templates | The Overview cards the templates wanted and could not name: repositories in sync, evidence reviewed in 90 days, needing review, duplicates | F26h | A template can list them; General's nine cards are unchanged |
+
+#### Track R: Portable archives and connector depth (V0.3.19–V0.3.22)
+
+| Release | Type | Section | The one change | IDs | Done when |
+|---|---|---|---|---|---|
+| **V0.3.19** | 🔧 | Archives | Archives carry earlier file versions and saved searches | O2c | An export imported on another server shows the version history and the saved searches |
+| **V0.3.20** | 🔧 | Import | Import runs as a background job with progress, and the browser no longer holds the whole archive | O2d | A 1 GiB archive imports with a progress bar and flat browser memory |
+| **V0.3.21** | 🔧 | Connectors | Issue references (`#12`) and mentions between items are read; approvals of a pull request are shown | F17f | A pull request that names `#12` links to that issue |
+| **V0.3.22** | 🔧 | Connectors | Webhook deliveries are listed and can be sent again from the connector's page | F17g | A failed delivery is listed with its reason and sent again by a writer |
+
+#### Track S: Operations and experience (V0.3.23–V0.3.25)
+
+| Release | Type | Section | The one change | IDs | Done when |
+|---|---|---|---|---|---|
+| **V0.3.23** | 🔧 | Container | `docker compose up` is tested in CI, and an `arm64` image job is added | O7b | CI starts the compose file and `/health/ready` answers |
+| **V0.3.24** | 🔧 | Backups | A backup passphrase can be rotated: new backups use the new one, old ones are re-sealed on request | O6c | A backup sealed with the old passphrase opens only after re-sealing, or with the old one |
+| **V0.3.25** | 🔧 | Web client | Accessibility residuals: a skip link in dialogs, roles for the note editor's toolbar, icon buttons of at least 24 px | X1b | `a11y:check` covers the three; a screen reader pass finds no serious issue |
+
+#### Track T: Closing (V0.3.26–V0.3.27)
+
+| Release | Type | Section | The one change | IDs | Done when |
+|---|---|---|---|---|---|
+| **V0.3.26** | 🔒 | Security | Security pass over what 0.3.x added (restored versions, mentions, owner matching, the import job, redelivery) and over the removal of the local edition, with its fixes | R16 | No high or medium finding open |
+| **V0.3.27** | 📘 | Release | Release checks repeated; the theme of V0.4.0 recorded (decision 33); the line closed | R16 | Every check passes; the next plan is written |
+
+Release checklists for the 0.3.x line are added under this section as each release is built: say what was built and what was not run.
+
+---
+
 ## 💭 Later: V0.4.0 and beyond
 
-What V0.3.0 leaves out. The order is not decided.
+What the 0.3.x line leaves out. The order is not decided (decision 33).
 
 | Direction | Scope |
 |---|---|

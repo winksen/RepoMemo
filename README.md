@@ -78,6 +78,7 @@ The documentation starts in the **[`mindmap/`](mindmap/)** folder:
 
 | Document | For | What it covers |
 |---|---|---|
+| 📖 **[User guide](docs/USER_GUIDE.md)** | Users and admins | A light tour of what RepoMemo offers, with diagrams |
 | 🧭 **[Functional mindmap](mindmap/FUNCTIONAL_MINDMAP.md)** | Everyone | What RepoMemo does: roles, features, workflows, product principles, known gaps |
 | 🛠️ **[Technical mindmap](mindmap/TECHNICAL_MINDMAP.md)** | Engineers | Architecture, the full API reference, pipelines, data model, risks |
 | 🗺️ **[Roadmap](mindmap/ROADMAP.md)** | Everyone | What has shipped, what is next, and the longer-term direction |

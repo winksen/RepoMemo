@@ -2,6 +2,33 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.3.0 (2026-10-24)
+
+*Connected.* The version is set to `0.3.0` after the maintainer's tests of the clean-machine install. No code changed in this release.
+
+### What 0.3.0 delivers
+- **Reaches remote code:** repositories over `https` and `ssh` with stored credentials, push webhooks, last author, `CODEOWNERS` hints and a citation at its commit (V0.2.19–V0.2.26).
+- **Talks by mail:** invitations, "Forgot your password?", mentions, assignments, address verification, notification preferences and a daily digest (V0.2.9–V0.2.15).
+- **Links the work around the code:** GitHub and GitLab issues and pull or merge requests as evidence, linked to the files and symbols they name (V0.2.27–V0.2.31).
+- **Remembers the conversation:** an assistant that reads earlier turns, search across workspaces, a command palette, a review queue and file version history (V0.2.32–V0.2.39).
+- **Portable:** workspace export and import, encrypted backups with a second copy, a container image, and an audit trail export (V0.2.40–V0.2.46).
+- **One client:** the desktop app opens a server; the local edition is retired (V0.2.49–V0.2.51).
+- **Still team-ready:** accessibility and narrow screens (V0.2.47–V0.2.48), and a security pass after each new surface (the fourth, fifth and sixth reviews).
+- **Beyond the promise:** one look for every page (track K, V0.2.57–V0.2.129); security and dependency fixes and backend hardening (tracks L and M, V0.2.130–V0.2.162); workspace templates (track N, V0.2.163–V0.2.193).
+
+### Checks
+- **Reported by the maintainer on 2026-10-24:** the tests of the clean install came out good. The per-step results of the clean-install page were not recorded, so its table and the pre-tag list are not ticked; V0.3.4 records them.
+- **Run for this release:** `version:check` (version `0.3.0` everywhere). **Not run:** the tests, `cargo deny`, `npm audit` and the other checks, which V0.2.193 last reported.
+
+### Changed
+- **The version** is `0.3.0` in `Cargo.toml`, `Cargo.lock`, `package.json`, `package-lock.json`, the desktop `package.json` and `tauri.conf.json`. The tag `v0.3.0` is the maintainer's to create (decision 29: there is no separate `v0.2.0` tag).
+- **A user guide** for people, `docs/USER_GUIDE.md`: a light tour of what the product offers, for team members, workspace admins and system admins, with diagrams.
+- **The plan after the tag:** the roadmap's *Road to V0.4.0* proposes V0.3.1–V0.3.27 in tracks O to T (fixes and the record, the retired local edition removed, small gaps closed, portable archives and connector depth, operations, a security pass), with decisions 29–33 to confirm. A new release index, `mindmap/RELEASES_0.3.md`, lists them.
+- **The documents** say `V0.3.0`: the roadmap's status tables, the release indexes, both mindmaps' scope lines and the functional gaps table.
+
+### Upgrading
+- Nothing to do. See UPGRADING.md, *From 0.2.0 to 0.3.0*, for what stays off until turned on and what changed in behaviour. The desktop app's local workspace goes in V0.3.5–V0.3.7 as planned: move any you need to a server before then.
+
 ## V0.2.193 (2026-10-22)
 
 Release checks repeated after workspace templates; the freeze restored.
