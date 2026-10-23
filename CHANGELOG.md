@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.3.2 (2026-10-24)
+
+Every test written since V0.2.46 compiled and handed over for the one run they have never had. No code changed in this release.
+
+### Checks
+- **Compiled:** `cargo check --workspace --exclude repomemo-desktop --tests --locked` finishes with no error or warning, so every Rust test of every crate and of the server builds. `npm run typecheck` passes, and so do the web tests' types.
+- **Counted from the source** (test attributes and `it(` calls): 547 Rust tests (ai 12, api 96, domain 3, git 15, indexer 24, ingestion 21, mail 15, retrieval 21, storage 43, templates 89, server 194, console 14), 334 web tests and 9 for the template checker.
+- **Not run, as asked:** the tests themselves. Nothing was started or built beyond the compile.
+
+### For the maintainer
+- Run once, in this order, and send back what fails: `cargo test --workspace --exclude repomemo-desktop`, `npm run test:web` and `npm run templates:test`. A failing test is corrected in the test or in the code and takes the next number if it needs a release of its own.
+
+### Changed
+- **The version** is `0.3.2` everywhere. The roadmap's *Done when* for this release (both commands pass) waits for that run.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.3.1 (2026-10-24)
 
 The fixes that the tests of 0.3.0 found: none. No code changed in this release.
