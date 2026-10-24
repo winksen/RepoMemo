@@ -275,6 +275,45 @@ impl StorageEngine {
         Ok(stats)
     }
 
+    /// The repositories, the reviews of the last days and the copies of files a workspace holds (V0.3.18).
+    /// `reviewed_since` is an RFC 3339 time.
+    pub async fn workspace_review_figures(
+        &self,
+        workspace_id: &str,
+        reviewed_since: &str,
+    ) -> Result<WorkspaceReviewFigures> {
+        let (repositories, in_sync) = sqlx::query_as::<_, (i64, i64)>(
+            "SELECT COUNT(*), COALESCE(SUM(status = 'ready'), 0) FROM sources WHERE workspace_id = ?1 AND type = 'git_repo'",
+        )
+        .bind(workspace_id)
+        .fetch_one(self.reader())
+        .await?;
+        let reviewed_recently = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM artifact_lifecycle WHERE workspace_id = ?1 AND reviewed_at IS NOT NULL AND reviewed_at >= ?2",
+        )
+        .bind(workspace_id)
+        .bind(reviewed_since)
+        .fetch_one(self.reader())
+        .await?;
+        // A repository's own overview is not a file that repeats another.
+        let duplicate_files = sqlx::query_scalar::<_, i64>(
+            r#"SELECT COALESCE(SUM(copies - 1), 0) FROM (
+                 SELECT COUNT(*) AS copies FROM artifacts
+                 WHERE workspace_id = ?1 AND type != 'repository'
+                 GROUP BY content_hash HAVING COUNT(*) > 1
+               )"#,
+        )
+        .bind(workspace_id)
+        .fetch_one(self.reader())
+        .await?;
+        Ok(WorkspaceReviewFigures {
+            repositories,
+            repositories_in_sync: in_sync,
+            reviewed_recently,
+            duplicate_files,
+        })
+    }
+
     /// The dashboard figures of several workspaces in three queries.
     pub async fn dashboard_counts(&self, workspace_ids: &[String]) -> Result<Vec<DashboardCounts>> {
         if workspace_ids.is_empty() {

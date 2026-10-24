@@ -770,3 +770,143 @@ async fn search_across_workspaces_takes_filters_and_finds_memory_cards_of_readab
     assert!(beta_only["memory_cards"].as_array().unwrap().is_empty());
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn the_metrics_count_repositories_in_sync_reviews_of_ninety_days_what_needs_review_and_duplicates() {
+    let base = std::env::temp_dir().join(format!("repomemo-server-pulse-{}", uuid::Uuid::new_v4()));
+    let repo_dir = base.join("repos").join("payments");
+    let data_dir = base.join("data");
+    std::fs::create_dir_all(&repo_dir).unwrap();
+    let git = |args: &[&str]| {
+        let status = std::process::Command::new("git")
+            .arg("-C")
+            .arg(&repo_dir)
+            .args(["-c", "user.name=Test", "-c", "user.email=test@example.com"])
+            .args(args)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .unwrap();
+        assert!(status.success());
+    };
+    git(&["init", "--quiet", "--initial-branch=main"]);
+    std::fs::write(
+        repo_dir.join("README.md"),
+        "# Payments\n\nRefunds are issued by the ledger.\n",
+    )
+    .unwrap();
+    git(&["add", "."]);
+    git(&["commit", "--quiet", "-m", "Initial"]);
+    let mut config = ServerConfig::for_test(data_dir.clone());
+    config.repo_roots = vec![base.join("repos")];
+    let app = router(config).await.unwrap();
+    let (_, _) = register_account(&app, "pulse-admin@example.com").await;
+    let (owner, _) = register_account(&app, "pulse-owner@example.com").await;
+    let workspace_id = create_workspace(&app, &owner).await;
+    let call = |method: &'static str, uri: String, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, &owner, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let metrics = || {
+        let request = auth_request("GET", &format!("/v1/workspaces/{workspace_id}/metrics"), &owner);
+        let app = app.clone();
+        async move { response_json(app.oneshot(request).await.unwrap()).await }
+    };
+
+    // An empty workspace has none of the four figures.
+    let empty = metrics().await;
+    for key in [
+        "repository_count",
+        "repositories_in_sync",
+        "reviewed_last_90_days",
+        "needing_review_files",
+        "needing_review_cards",
+        "duplicate_file_count",
+    ] {
+        assert_eq!(empty[key], 0, "{key}: {empty}");
+    }
+
+    // Three notes, two of them with the same text; one marked for review, one verified.
+    let mut ids = Vec::new();
+    for (title, content) in [
+        ("Runbook", "# Runbook\nRun the migration first."),
+        ("Runbook copy", "# Runbook\nRun the migration first."),
+        ("Retry notes", "# Retry\nUploads use a backoff budget."),
+    ] {
+        let created = response_json(
+            call(
+                "POST",
+                format!("/v1/workspaces/{workspace_id}/artifacts/text"),
+                json!({"title": title, "content": content, "language": "Markdown"}),
+            )
+            .await,
+        )
+        .await;
+        ids.push(created["id"].as_str().unwrap().to_owned());
+    }
+    wait_for_indexed_artifacts(&app, &owner, &workspace_id, 3).await;
+    assert_eq!(
+        call(
+            "PUT",
+            format!("/v1/artifacts/{}/lifecycle", ids[0]),
+            json!({"status": "needs_review", "review_note": "Stale?"})
+        )
+        .await
+        .status(),
+        200
+    );
+    assert_eq!(
+        call(
+            "PUT",
+            format!("/v1/artifacts/{}/lifecycle", ids[2]),
+            json!({"status": "verified", "review_note": "Checked."})
+        )
+        .await
+        .status(),
+        200
+    );
+    let connected = call(
+        "POST",
+        format!("/v1/workspaces/{workspace_id}/repositories"),
+        json!({"link": repo_dir.display().to_string()}),
+    )
+    .await;
+    assert_eq!(connected.status(), 201);
+    let repository_id = response_json(connected).await["repository"]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    for _ in 0..100 {
+        let repository = response_json(
+            app.clone()
+                .oneshot(auth_request(
+                    "GET",
+                    &format!("/v1/repositories/{repository_id}"),
+                    &owner,
+                ))
+                .await
+                .unwrap(),
+        )
+        .await;
+        if repository["status"] == "ready" && repository["active_job"].is_null() {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+
+    let after = metrics().await;
+    assert_eq!(after["repository_count"], 1, "{after}");
+    assert_eq!(after["repositories_in_sync"], 1, "a repository whose sync finished");
+    assert_eq!(after["needing_review_files"], 1, "the file marked for review");
+    assert_eq!(after["needing_review_cards"], 0);
+    assert!(
+        after["reviewed_last_90_days"].as_i64().unwrap() >= 1,
+        "the file just reviewed: {after}"
+    );
+    assert_eq!(
+        after["duplicate_file_count"], 1,
+        "one file repeats another's text; the repository's own overview does not count"
+    );
+    let _ = std::fs::remove_dir_all(base);
+}

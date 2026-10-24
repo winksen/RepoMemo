@@ -6,7 +6,7 @@ use crate::TemplateIssue;
 
 /// The figures the Overview can show as a card, by id. Every one is already in the metrics the page loads
 /// (`web/workspace/pulseCards.tsx` draws them; a test compares the two lists).
-pub const PULSE_CARDS: [&str; 11] = [
+pub const PULSE_CARDS: [&str; 15] = [
     "index_coverage",
     "indexed_storage",
     "fresh_evidence",
@@ -18,6 +18,10 @@ pub const PULSE_CARDS: [&str; 11] = [
     "active_tasks",
     "at_risk",
     "team_discussion",
+    "repositories_in_sync",
+    "reviewed_90_days",
+    "needing_review",
+    "duplicates",
 ];
 
 /// The cards a workspace shows when its template does not choose, in the order they have always had.

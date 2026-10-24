@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.3.17` (2026-10-24). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.3.18` (2026-10-24). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ---
 
@@ -583,7 +583,7 @@ These are observed in the code and are useful for prioritizing. The roadmap item
 | A template adds nothing | No new section or module is defined by a template, there are no per-user layouts, nothing is indexed or chunked differently per template, no template is installed from a URL, none is written by an AI, and existing evidence is never moved into a template's starter folders. A template never changes who can see or do anything. |
 | Existing workspaces stay on General | Nothing is moved to a template on upgrade; an owner or administrator chooses one in Settings › Template, and General reproduces the behaviour from before templates (checked by tests against V0.2.162's figures). |
 | A dashboard card shows one of four figures | The headline is memory cards, active tasks, code symbols or sources, because the dashboard answers for every workspace in one request (V0.2.187); the narrow navigation rail does not show templates. |
-| The Overview cards are the closest figures that exist | A template names cards of the metrics the page already loads, so "repositories in sync", "evidence reviewed in 90 days", "needing review" and "duplicates" are not cards yet (V0.2.174). Software engineering's map puts repositories and code first because symbols are not a kind of file on the map (V0.2.184). |
+| The Overview cards are figures the metrics already carry | A template names cards of the metrics the page loads. Since V0.3.18 four more exist: **Repositories in sync** (linked repositories whose last sync finished), **Reviewed in 90 days** (files whose lifecycle was reviewed), **Needing review** (files marked for review plus stale memory cards) and **Duplicates** (files that repeat another's exact content); the built-in templates keep the figures they chose, and documents by kind is still not a card (V0.2.174). Software engineering's map puts repositories and code first because symbols are not a kind of file on the map (V0.2.184). |
 | A template is readable by everyone who signs in | A template holds no secrets, and its focus line reaches the AI provider of the workspace (security review T5). |
 
 Invitation links and administrator reset links, gaps until V0.1.62, shipped in V0.1.63.

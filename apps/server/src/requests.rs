@@ -362,6 +362,16 @@ pub(crate) struct WorkspaceMetricsResponse {
     pub(crate) recent_activity_count: i64,
     pub(crate) artifacts_created_last_7_days: i64,
     pub(crate) artifacts_updated_last_7_days: i64,
+    /// Linked git repositories, and how many finished their last sync (V0.3.18).
+    pub(crate) repository_count: i64,
+    pub(crate) repositories_in_sync: i64,
+    /// Files whose lifecycle was reviewed in the last 90 days.
+    pub(crate) reviewed_last_90_days: i64,
+    /// Files marked *needs review*, and memory cards gone stale: what the Review queue holds for evidence and memory.
+    pub(crate) needing_review_files: i64,
+    pub(crate) needing_review_cards: i64,
+    /// Files that repeat the exact content of another file.
+    pub(crate) duplicate_file_count: i64,
     pub(crate) activity_actions: Vec<WorkspaceMetricBreakdown>,
     pub(crate) activity_by_day: Vec<WorkspaceMetricBreakdown>,
     pub(crate) member_roles: Vec<WorkspaceMetricBreakdown>,

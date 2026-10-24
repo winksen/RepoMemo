@@ -278,6 +278,23 @@ pub(crate) async fn workspace_metrics(
         .workspace_collaboration_counts(&workspace_id)
         .await
         .map_err(map_storage_error)?;
+    let review_figures = state
+        .storage
+        .workspace_review_figures(&workspace_id, &(Utc::now() - ChronoDuration::days(90)).to_rfc3339())
+        .await
+        .map_err(map_storage_error)?;
+    let needing_review_files = state
+        .storage
+        .artifacts_needing_review(&workspace_id)
+        .await
+        .map_err(map_storage_error)?
+        .len() as i64;
+    let needing_review_cards = state
+        .storage
+        .memory_cards_needing_review(&workspace_id)
+        .await
+        .map_err(map_storage_error)?
+        .len() as i64;
     let mut artifact_types = BTreeMap::<String, i64>::new();
     let mut artifact_bytes_by_type = BTreeMap::<String, i64>::new();
     let mut languages = BTreeMap::<String, i64>::new();
@@ -352,6 +369,12 @@ pub(crate) async fn workspace_metrics(
         recent_activity_count: activity.len() as i64,
         artifacts_created_last_7_days,
         artifacts_updated_last_7_days,
+        repository_count: review_figures.repositories,
+        repositories_in_sync: review_figures.repositories_in_sync,
+        reviewed_last_90_days: review_figures.reviewed_recently,
+        needing_review_files,
+        needing_review_cards,
+        duplicate_file_count: review_figures.duplicate_files,
         activity_actions: metric_breakdown(activity_actions),
         activity_by_day: metric_timeline(activity_by_day),
         member_roles: metric_breakdown(member_roles),

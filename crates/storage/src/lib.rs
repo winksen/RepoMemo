@@ -468,6 +468,18 @@ pub struct WorkspaceCollaborationCounts {
     pub comments: i64,
 }
 
+/// Figures for the Overview that no other count carries (V0.3.18).
+#[derive(Debug, Clone, Default)]
+pub struct WorkspaceReviewFigures {
+    /// Linked git repositories, and how many of them finished their last sync.
+    pub repositories: i64,
+    pub repositories_in_sync: i64,
+    /// Files whose lifecycle was reviewed since the day asked for.
+    pub reviewed_recently: i64,
+    /// Files that repeat the exact content of another file of the workspace (the second and later copies).
+    pub duplicate_files: i64,
+}
+
 #[derive(Debug, Clone)]
 pub struct SaveArtifactLifecycle {
     pub status: String,

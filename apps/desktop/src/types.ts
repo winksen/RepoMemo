@@ -316,6 +316,16 @@ export interface WorkspaceMetrics {
   recent_activity_count: number;
   artifacts_created_last_7_days: number;
   artifacts_updated_last_7_days: number;
+  /** Linked git repositories, and how many finished their last sync. */
+  repository_count: number;
+  repositories_in_sync: number;
+  /** Files whose lifecycle was reviewed in the last 90 days. */
+  reviewed_last_90_days: number;
+  /** Files marked needs review, and memory cards gone stale. */
+  needing_review_files: number;
+  needing_review_cards: number;
+  /** Files that repeat the exact content of another file. */
+  duplicate_file_count: number;
   activity_actions: WorkspaceMetricBreakdown[];
   activity_by_day: WorkspaceMetricBreakdown[];
   member_roles: WorkspaceMetricBreakdown[];

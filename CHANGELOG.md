@@ -2,6 +2,30 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.3.18 (2026-10-24)
+
+The Overview cards the templates wanted and could not name.
+
+### Added
+- **Four pulse cards** a template can list in `overview.cards` (now 15 ids; one to eight per template, as before):
+  - `repositories_in_sync`: linked repositories whose last sync finished, *of N linked*.
+  - `reviewed_90_days`: files whose lifecycle was reviewed in the last 90 days, *of N files*.
+  - `needing_review`: files marked *needs review* plus memory cards gone stale, *N files, M memory cards*.
+  - `duplicates`: files that repeat the exact content of another file (the second and later copies; a repository's own overview is not counted).
+- **Six figures in `GET /v1/workspaces/{id}/metrics`** carry them: `repository_count`, `repositories_in_sync`, `reviewed_last_90_days`, `needing_review_files`, `needing_review_cards`, `duplicate_file_count`. The page already loads this answer, so choosing a card still asks the server for nothing more.
+
+### Changed
+- **General's nine cards are unchanged**, and so are the four built-in templates, which keep the figures they chose; the four new cards appear only where a template names them. The template checker (`templates:check`) and the authoring guide know the 15 ids. A client that cannot draw an id still ignores it.
+- **The documents:** the authoring guide, the templates page, the functional mindmap's gap row, the technical mindmap's metrics route and test counts (server 204, web 359). The V0.2.174 gap is closed for these four; documents by kind is still not a card.
+- **The version** is `0.3.18` everywhere.
+
+### Checks
+- **Compiled and linted:** `cargo clippy -D warnings` over the templates, storage and server crates with their tests, `cargo fmt --all --check`, `templates:check`, `typecheck`, `docs:check`, `version:check`.
+- **Tests written, not run:** a server test (an empty workspace has none of the six; three notes of which two repeat each other, one marked for review, one verified and a synced local repository give the repositories, the file needing review, the review of the day and the single duplicate) and a web test of the four cards (figures, notes, the dash before data, the template's list, and that none is a default).
+
+### Upgrading
+- Nothing to do. No migration; the figures are read from tables that exist.
+
 ## V0.3.17 (2026-10-24)
 
 More code symbols.
