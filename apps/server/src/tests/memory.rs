@@ -619,3 +619,154 @@ async fn a_snoozed_review_item_leaves_the_persons_list_and_the_count_until_it_is
     );
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn search_across_workspaces_takes_filters_and_finds_memory_cards_of_readable_workspaces_only() {
+    let data_dir = temp_data_dir("cross-search-filters");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let (_, _) = register_account(&app, "cross-admin@example.com").await;
+    let (owner, _) = register_account(&app, "cross-owner@example.com").await;
+    let (stranger, _) = register_account(&app, "cross-stranger@example.com").await;
+    let alpha = create_workspace(&app, &owner).await;
+    let beta = create_workspace(&app, &owner).await;
+    let hidden = create_workspace(&app, &stranger).await;
+    let call = |method: &'static str, uri: String, who: &str, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let add_note =
+        |workspace: String, who: String, title: &'static str, content: &'static str, language: &'static str| {
+            let call = &call;
+            async move {
+                let created = call(
+                    "POST",
+                    format!("/v1/workspaces/{workspace}/artifacts/text"),
+                    &who,
+                    json!({"title": title, "content": content, "language": language}),
+                )
+                .await;
+                assert_eq!(created.status(), 201);
+            }
+        };
+    add_note(
+        alpha.clone(),
+        owner.clone(),
+        "Login flow",
+        "# Login\nA session ends after a week.",
+        "Markdown",
+    )
+    .await;
+    add_note(
+        alpha.clone(),
+        owner.clone(),
+        "Session store",
+        "// the session store\nfn open_session() {}",
+        "Rust",
+    )
+    .await;
+    add_note(
+        beta.clone(),
+        owner.clone(),
+        "Billing session",
+        "# Billing\nThe billing session closes at midnight.",
+        "Markdown",
+    )
+    .await;
+    add_note(
+        hidden.clone(),
+        stranger.clone(),
+        "Secret session",
+        "# Secret\nA session nobody else may read.",
+        "Markdown",
+    )
+    .await;
+    for (workspace, who, count) in [(&alpha, &owner, 2), (&beta, &owner, 1), (&hidden, &stranger, 1)] {
+        wait_for_indexed_artifacts(&app, who, workspace, count).await;
+    }
+    for (workspace, who, title) in [
+        (&alpha, &owner, "Session rule"),
+        (&hidden, &stranger, "Secret session rule"),
+    ] {
+        let card = call(
+            "POST",
+            format!("/v1/workspaces/{workspace}/memory-cards"),
+            who,
+            json!({"title": title, "body_markdown": "A session ends after a week.", "source": "manual", "citations": []}),
+        )
+        .await;
+        assert_eq!(card.status(), 201);
+    }
+    let search = |body: Value| {
+        let call = &call;
+        let owner = owner.clone();
+        async move {
+            let response = call("POST", "/v1/search".to_owned(), &owner, body).await;
+            let status = response.status().as_u16();
+            (status, response_json(response).await)
+        }
+    };
+    let titles = |found: &Value| {
+        let mut titles: Vec<String> = found["results"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|hit| hit["result"]["title"].as_str().unwrap().to_owned())
+            .collect();
+        titles.sort();
+        titles
+    };
+
+    // Files of every workspace the caller reads, and memory cards of those workspaces only.
+    let (status, all) = search(json!({"query": "session"})).await;
+    assert_eq!(status, 200);
+    let found = titles(&all);
+    assert!(
+        found.contains(&"Login flow".to_owned()) && found.contains(&"Billing session".to_owned()),
+        "{found:?}"
+    );
+    assert!(
+        !found.contains(&"Secret session".to_owned()),
+        "a workspace the caller cannot read stays out"
+    );
+    let cards: Vec<&str> = all["memory_cards"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|entry| entry["card"]["title"].as_str().unwrap())
+        .collect();
+    assert_eq!(cards, ["Session rule"], "{all}");
+    assert_eq!(all["memory_cards"][0]["workspace_id"], alpha);
+
+    // A language keeps to files in it, and leaves cards out.
+    let (_, rust) = search(json!({"query": "session", "languages": ["Rust"]})).await;
+    assert_eq!(titles(&rust), ["Session store"], "{rust}");
+    assert!(rust["memory_cards"].as_array().unwrap().is_empty());
+    // A kind of file nobody has gives nothing.
+    let (_, images) = search(json!({"query": "session", "artifact_types": ["image"]})).await;
+    assert!(images["results"].as_array().unwrap().is_empty() && images["memory_cards"].as_array().unwrap().is_empty());
+    // Days: from the future and up to the past find nothing; from today finds what was just written.
+    let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+    for body in [
+        json!({"query": "session", "modified_after": "2999-01-01"}),
+        json!({"query": "session", "modified_before": "2000-01-01"}),
+    ] {
+        let (_, none) = search(body.clone()).await;
+        assert!(none["results"].as_array().unwrap().is_empty(), "{body}");
+        assert!(none["memory_cards"].as_array().unwrap().is_empty(), "{body}");
+    }
+    let (_, recent) = search(json!({"query": "session", "modified_after": today, "modified_before": today})).await;
+    assert_eq!(titles(&recent), found, "what was written today");
+    assert_eq!(recent["memory_cards"].as_array().unwrap().len(), 1);
+    // Cards can be turned off, and a bad day is refused.
+    let (_, without) = search(json!({"query": "session", "memory_cards": false})).await;
+    assert!(without["memory_cards"].as_array().unwrap().is_empty());
+    assert_eq!(titles(&without), found);
+    let (status, _) = search(json!({"query": "session", "modified_after": "yesterday"})).await;
+    assert_eq!(status, 400);
+    // Only the workspaces named are searched, cards included.
+    let (_, beta_only) = search(json!({"query": "session", "workspace_ids": [beta]})).await;
+    assert_eq!(titles(&beta_only), ["Billing session"]);
+    assert!(beta_only["memory_cards"].as_array().unwrap().is_empty());
+    let _ = std::fs::remove_dir_all(data_dir);
+}

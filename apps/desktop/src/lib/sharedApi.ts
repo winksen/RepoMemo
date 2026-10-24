@@ -1263,10 +1263,33 @@ export function searchSharedWorkspace(accessToken: string, workspaceId: string, 
 }
 
 /** Searches every workspace the account can read; results are merged by score and name their workspace. */
-export function searchAllWorkspaces(accessToken: string, input: { query: string; workspaceIds?: string[]; limit?: number }): Promise<import("../types").CrossSearchResponse> {
+export function searchAllWorkspaces(accessToken: string, input: {
+  query: string;
+  workspaceIds?: string[];
+  limit?: number;
+  /** Only these kinds of file (V0.3.12). */
+  artifactTypes?: string[];
+  /** Only files in these languages or formats. */
+  languages?: string[];
+  /** Only evidence updated on or after this day (YYYY-MM-DD) … */
+  modifiedAfter?: string;
+  /** … and on or before this one. */
+  modifiedBefore?: string;
+  /** Also look in memory cards; they are left out when a type or a language is given. */
+  memoryCards?: boolean;
+}): Promise<import("../types").CrossSearchResponse> {
   return request<import("../types").CrossSearchResponse>("/v1/search", {
     method: "POST",
-    body: JSON.stringify({ query: input.query, workspace_ids: input.workspaceIds ?? [], limit: input.limit ?? 20 }),
+    body: JSON.stringify({
+      query: input.query,
+      workspace_ids: input.workspaceIds ?? [],
+      limit: input.limit ?? 20,
+      artifact_types: input.artifactTypes ?? [],
+      languages: input.languages ?? [],
+      modified_after: input.modifiedAfter || null,
+      modified_before: input.modifiedBefore || null,
+      memory_cards: input.memoryCards ?? true,
+    }),
   }, accessToken);
 }
 

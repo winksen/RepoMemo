@@ -243,6 +243,21 @@ pub(crate) struct SearchAllRequest {
     pub(crate) workspace_ids: Vec<String>,
     #[serde(default)]
     pub(crate) lifecycle_statuses: Vec<String>,
+    /// Only these kinds of file, in every workspace searched (V0.3.12).
+    #[serde(default)]
+    pub(crate) artifact_types: Vec<ArtifactType>,
+    /// Only files in these languages or formats, as the file lists name them.
+    #[serde(default)]
+    pub(crate) languages: Vec<String>,
+    /// Only evidence updated on or after this day (`YYYY-MM-DD`) …
+    #[serde(default)]
+    pub(crate) modified_after: Option<String>,
+    /// … and on or before this one.
+    #[serde(default)]
+    pub(crate) modified_before: Option<String>,
+    /// Also look in memory cards (the default); ignored when a type or language is asked for.
+    #[serde(default)]
+    pub(crate) memory_cards: Option<bool>,
     /// Results in the merged list (20 by default, at most 50).
     pub(crate) limit: Option<i64>,
 }

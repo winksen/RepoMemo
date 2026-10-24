@@ -1113,10 +1113,22 @@ export interface CrossSearchWorkspace {
   note: string | null;
 }
 
+/** A memory card found by a search across workspaces (V0.3.12). */
+export interface CrossMemoryCard {
+  workspace_id: string;
+  workspace_name: string;
+  card: MemoryCardSummary;
+}
+
 /** A search over every workspace the caller can read. */
 export interface CrossSearchResponse {
   /** Merged by score, best first. */
   results: CrossSearchResult[];
+  /**
+   * Memory cards whose title or text match, workspace by workspace in the order the workspaces were
+   * searched; none when a file type or language was asked for, since cards are not files.
+   */
+  memory_cards: CrossMemoryCard[];
   workspaces: CrossSearchWorkspace[];
   /** Workspaces left out because the search is capped. */
   not_searched: number;

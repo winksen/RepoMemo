@@ -1250,11 +1250,23 @@ pub struct CrossSearchWorkspace {
     pub note: Option<String>,
 }
 
+/// A memory card found by a search across workspaces (V0.3.12).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CrossMemoryCard {
+    pub workspace_id: String,
+    pub workspace_name: String,
+    pub card: MemoryCardSummary,
+}
+
 /// A search over every workspace the caller can read.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrossSearchResponse {
     /// Merged by score, best first.
     pub results: Vec<CrossSearchResult>,
+    /// Memory cards whose title or text match, workspace by workspace in the order the workspaces were
+    /// searched; none when a file type or language was asked for, since cards are not files.
+    #[serde(default)]
+    pub memory_cards: Vec<CrossMemoryCard>,
     pub workspaces: Vec<CrossSearchWorkspace>,
     /// Workspaces left out because the search is capped.
     pub not_searched: i64,

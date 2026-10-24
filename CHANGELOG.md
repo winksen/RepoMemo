@@ -2,6 +2,29 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.3.12 (2026-10-24)
+
+Search across workspaces takes filters and finds memory cards.
+
+### Added
+- **Filters on the dashboard search:** a kind of file, a language, and the days evidence was updated from and to. The server passes them to each workspace's own search, so every result is still read under that workspace's role and AI policy.
+- **Memory cards:** the search also looks in the memory cards of the workspaces the caller can read, by keywords (at most ten in all, in the order the workspaces were searched), and lists them under the files with their workspace, an excerpt and whether they need review; each opens its card. A card is not a file, so a kind of file or a language leaves cards out, and the days filter applies to when a card was last written. An *Include memory cards* box turns them off.
+- **`POST /v1/search`** takes `artifact_types`, `languages`, `modified_after`, `modified_before` (`YYYY-MM-DD`; another form is `400`) and `memory_cards`, and answers a new `memory_cards` list; a client that sends none of them gets what it got before, plus the cards.
+
+### Security
+- Nothing new is reached: cards are looked up only in workspaces the caller's role already lets them read (the same check that admits their files), by keywords, so a workspace's AI policy has nothing to keep back; a workspace the caller cannot read contributes neither files nor cards.
+
+### Checks
+- **Compiled and linted:** `cargo clippy -D warnings` over the domain and server crates with their tests, `cargo fmt --all --check`, `typecheck`, `types:check` (152 types), `styles:check`, `a11y:check`, `docs:check`, `version:check`.
+- **Tests written, not run:** a server test (files and cards of readable workspaces only, a language, a kind nobody has, days from the future and up to the past, today, cards off, a bad day refused, a named workspace) and four web tests (files and cards with no filter, opening each, the language and days sent, cards left out for a language or when turned off).
+
+### Changed
+- **The documents:** the functional mindmap's gap row, the technical mindmap's route and test counts (server 202, web 337), the user guide. The V0.2.33 gap about filters and memory cards is closed.
+- **The version** is `0.3.12` everywhere.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.3.11 (2026-10-24)
 
 Assistant lookups and searches read the turn before.

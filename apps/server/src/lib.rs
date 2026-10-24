@@ -99,7 +99,7 @@ use rand_core::OsRng;
 use repomemo_api::{served_mime_type, RemoteGitPolicy, RepoLinkPolicy, RepoMemoCore};
 use repomemo_domain::{
     ArtifactComment, ArtifactDetail, ArtifactIndexFailure, ArtifactLifecycle, ArtifactLifecycleEvent, ArtifactSummary,
-    ArtifactType, AskAnswer, AskRequest, Chunk, Citation, CollaborationTask, CreateMemoryCardRequest,
+    ArtifactType, AskAnswer, AskRequest, Chunk, Citation, CollaborationTask, CreateMemoryCardRequest, CrossMemoryCard,
     CrossSearchResponse, CrossSearchResult, CrossSearchWorkspace, DocumentPreview, ErrorKind, Folder,
     IndexingJobStatus, KnowledgeMap, MemoryCard, MemoryCardDetail, MemoryCardSummary, Organization, OrganizationMember,
     OrganizationRole, ProviderSettings, ProviderTestResult, SavedSearch, SearchRequest, SearchResult,

@@ -7,6 +7,27 @@ const CROSS_SEARCH_MAX_WORKSPACES: usize = 30;
 const CROSS_SEARCH_PARALLEL: usize = 4;
 const CROSS_SEARCH_DEFAULT_LIMIT: i64 = 20;
 const CROSS_SEARCH_MAX_LIMIT: i64 = 50;
+/// Memory cards in one search across workspaces.
+const CROSS_SEARCH_MEMORY_LIMIT: usize = 10;
+
+/// A day filter written `YYYY-MM-DD`, or empty.
+fn check_day(day: &Option<String>) -> Result<(), ApiError> {
+    match day.as_deref().filter(|day| !day.is_empty()) {
+        Some(day) if chrono::NaiveDate::parse_from_str(day, "%Y-%m-%d").is_err() => {
+            Err(ApiError::bad_request("Dates are written YYYY-MM-DD."))
+        }
+        _ => Ok(()),
+    }
+}
+
+/// Whether a card last written at `updated_at` (RFC 3339) is inside the days asked for.
+pub(crate) fn card_in_days(updated_at: &str, after: Option<&str>, before: Option<&str>) -> bool {
+    let day = updated_at.get(..10).unwrap_or(updated_at);
+    after.filter(|after| !after.is_empty()).is_none_or(|after| day >= after)
+        && before
+            .filter(|before| !before.is_empty())
+            .is_none_or(|before| day <= before)
+}
 
 fn check_lifecycle_statuses(statuses: &[String]) -> Result<(), ApiError> {
     for status in statuses {
@@ -35,11 +56,17 @@ pub(crate) async fn search_all_workspaces(
 ) -> Result<Json<CrossSearchResponse>, ApiError> {
     consume_heavy_quota(&state, &subject)?;
     check_lifecycle_statuses(&request.lifecycle_statuses)?;
+    check_day(&request.modified_after)?;
+    check_day(&request.modified_before)?;
     let mut response = CrossSearchResponse {
         results: Vec::new(),
+        memory_cards: Vec::new(),
         workspaces: Vec::new(),
         not_searched: 0,
     };
+    // Cards are not files: a type or a language leaves them out.
+    let with_cards =
+        request.memory_cards.unwrap_or(true) && request.artifact_types.is_empty() && request.languages.is_empty();
     let query = request.query.trim().to_owned();
     if query.is_empty() {
         return Ok(Json(response));
@@ -85,6 +112,10 @@ pub(crate) async fn search_all_workspaces(
                 query: query.clone(),
                 limit: Some(limit),
                 lifecycle_statuses: request.lifecycle_statuses.clone(),
+                artifact_types: request.artifact_types.clone(),
+                languages: request.languages.clone(),
+                modified_after: request.modified_after.clone().filter(|day| !day.is_empty()),
+                modified_before: request.modified_before.clone().filter(|day| !day.is_empty()),
                 ..Default::default()
             },
             by_meaning_allowed,
@@ -114,6 +145,37 @@ pub(crate) async fn search_all_workspaces(
                 )
             }
         };
+        // Memory cards need the same right as the files of the workspace: the caller can read it, which was
+        // settled above. A card is found by keywords only, so the workspace's AI policy has nothing to keep back.
+        if with_cards && response.memory_cards.len() < CROSS_SEARCH_MEMORY_LIMIT {
+            match state
+                .core
+                .search_memory_cards(workspace.id.clone(), query.clone())
+                .await
+            {
+                Ok(cards) => {
+                    for card in cards {
+                        if response.memory_cards.len() >= CROSS_SEARCH_MEMORY_LIMIT {
+                            break;
+                        }
+                        if card_in_days(
+                            &card.updated_at,
+                            request.modified_after.as_deref(),
+                            request.modified_before.as_deref(),
+                        ) {
+                            response.memory_cards.push(CrossMemoryCard {
+                                workspace_id: workspace.id.clone(),
+                                workspace_name: workspace.name.clone(),
+                                card,
+                            });
+                        }
+                    }
+                }
+                Err(error) => {
+                    tracing::warn!(workspace_id = %workspace.id, "search across workspaces skipped memory cards: {error:#}")
+                }
+            }
+        }
         response.workspaces.push(CrossSearchWorkspace {
             workspace_id: workspace.id.clone(),
             name: workspace.name.clone(),

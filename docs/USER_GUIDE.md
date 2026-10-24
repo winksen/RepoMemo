@@ -202,7 +202,7 @@ Search ranks verified evidence a little higher and, by default, leaves outdated 
 - Filter by file type, language, source, folder, evidence state or date. A **Code symbols** box finds where a function, class or method is defined.
 - Results show highlighted snippets, the path and the line range; click to open.
 - **Save a search** to share it with the team.
-- On the dashboard, one search box covers **every workspace you can read**, each under its own rules.
+- On the dashboard, one search box covers **every workspace you can read**, each under its own rules. It can be narrowed to a kind of file, a language and a range of days, and it also finds **memory cards** (not while you narrow to a kind of file or a language, since cards are not files).
 
 ### Ask your evidence
 
