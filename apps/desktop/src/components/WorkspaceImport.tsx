@@ -18,6 +18,9 @@ export function describeArchive(report: ArchiveImportReport): string {
     part(counts.memory_cards, "memory card", "memory cards"),
     part(counts.tasks, "task", "tasks"),
     part(counts.comments, "comment", "comments"),
+    // Archives of format 2 (V0.3.19) also carry earlier file versions and saved searches; older ones do not say.
+    ...(counts.versions ? [part(counts.versions, "earlier version", "earlier versions")] : []),
+    ...(counts.saved_searches ? [part(counts.saved_searches, "saved search", "saved searches")] : []),
   ].join(", ");
 }
 

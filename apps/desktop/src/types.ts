@@ -973,6 +973,10 @@ export interface ArchiveCounts {
   comments: number;
   lifecycle_events: number;
   omitted_citations: number;
+  /** Earlier versions of uploaded files; absent from an archive of format 1. */
+  versions?: number;
+  /** Saved searches; absent from an archive of format 1. */
+  saved_searches?: number;
 }
 
 /** The answer to importing a workspace archive, or to checking one first (`dry_run`). */

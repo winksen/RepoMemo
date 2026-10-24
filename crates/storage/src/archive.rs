@@ -7,8 +7,8 @@
 
 use repomemo_domain::{
     ArchiveArtifact, ArchiveChecklistItem, ArchiveChunkRef, ArchiveCitation, ArchiveComment, ArchiveFolder,
-    ArchiveLifecycle, ArchiveLifecycleEvent, ArchiveMemoryCard, ArchivePerson, ArchiveSource, ArchiveTask,
-    ArchiveWorkspace, SharedUser, WorkspaceArchiveData,
+    ArchiveLifecycle, ArchiveLifecycleEvent, ArchiveMemoryCard, ArchivePerson, ArchiveSavedSearch, ArchiveSource,
+    ArchiveTask, ArchiveVersion, ArchiveWorkspace, SharedUser, WorkspaceArchiveData,
 };
 
 use super::*;
@@ -111,6 +111,8 @@ impl StorageEngine {
         let (memory_cards, omitted_citations) = self.export_memory_cards(workspace_id).await?;
         let tasks = self.export_tasks(workspace_id).await?;
         let comments = self.export_comments(workspace_id).await?;
+        let versions = self.export_versions(workspace_id).await?;
+        let saved_searches = self.export_saved_searches(workspace_id).await?;
 
         Ok(WorkspaceArchiveData {
             workspace,
@@ -122,7 +124,67 @@ impl StorageEngine {
             tasks,
             comments,
             omitted_citations,
+            versions,
+            saved_searches,
         })
+    }
+
+    /// The earlier versions of the workspace's files, each file's oldest first (V0.3.19).
+    async fn export_versions(&self, workspace_id: &str) -> Result<Vec<ArchiveVersion>> {
+        Ok(sqlx::query(
+            r#"
+            SELECT version.artifact_id, version.version, version.content_hash, version.size_bytes, version.mime_type,
+                   version.became_current_at, version.replaced_at,
+                   uploader.display_name AS uploader_name, uploader.email AS uploader_email
+            FROM artifact_versions AS version
+            LEFT JOIN users AS uploader ON uploader.id = version.replaced_by_user_id
+            WHERE version.workspace_id = ?1
+            ORDER BY version.artifact_id ASC, version.version ASC
+            "#,
+        )
+        .bind(workspace_id)
+        .fetch_all(self.reader())
+        .await?
+        .into_iter()
+        .map(|row| ArchiveVersion {
+            artifact_id: row.get("artifact_id"),
+            version: row.get("version"),
+            content_hash: row.get("content_hash"),
+            size_bytes: row.get("size_bytes"),
+            mime_type: row.get("mime_type"),
+            became_current_at: row.get("became_current_at"),
+            replaced_at: row.get("replaced_at"),
+            replaced_by: optional_person(row.get("uploader_name"), row.get("uploader_email")),
+        })
+        .collect())
+    }
+
+    /// The workspace's saved searches, oldest first (V0.3.19).
+    async fn export_saved_searches(&self, workspace_id: &str) -> Result<Vec<ArchiveSavedSearch>> {
+        let mut searches = self.list_saved_searches(workspace_id).await?;
+        searches.sort_by(|left, right| {
+            left.created_at
+                .cmp(&right.created_at)
+                .then_with(|| left.name.cmp(&right.name))
+        });
+        Ok(searches
+            .into_iter()
+            .map(|search| ArchiveSavedSearch {
+                name: search.name,
+                query: search.query,
+                artifact_types: search
+                    .artifact_types
+                    .iter()
+                    .map(|artifact_type| artifact_type_to_db(artifact_type).to_owned())
+                    .collect(),
+                languages: search.languages,
+                source_ids: search.source_ids,
+                result_limit: search.result_limit,
+                created_by: person_from_user(search.created_by),
+                created_at: search.created_at,
+                updated_at: search.updated_at,
+            })
+            .collect())
     }
 
     async fn export_lifecycle(&self, workspace_id: &str) -> Result<Vec<ArchiveLifecycle>> {

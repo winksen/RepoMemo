@@ -12,8 +12,9 @@ use serde_json::Value;
 
 /// The `format` field of a manifest.
 pub const ARCHIVE_FORMAT: &str = "repomemo-workspace-archive";
-/// Bumped when an archive written by a newer server cannot be read by an older one.
-pub const ARCHIVE_FORMAT_VERSION: u32 = 1;
+/// Bumped when an archive written by a newer server cannot be read by an older one. Version 2 (V0.3.19) adds the
+/// earlier versions of files and the saved searches; a server reads versions 1 and 2.
+pub const ARCHIVE_FORMAT_VERSION: u32 = 2;
 pub const ARCHIVE_MANIFEST_ENTRY: &str = "manifest.json";
 pub const ARCHIVE_DATA_ENTRY: &str = "workspace.json";
 pub const ARCHIVE_BLOB_PREFIX: &str = "blobs/";
@@ -40,6 +41,12 @@ pub struct ArchiveCounts {
     pub lifecycle_events: u64,
     /// Citations left out because what they cite no longer exists.
     pub omitted_citations: u64,
+    /// Earlier versions of uploaded files (format 2).
+    #[serde(default)]
+    pub versions: u64,
+    /// Saved searches (format 2).
+    #[serde(default)]
+    pub saved_searches: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -203,6 +210,36 @@ pub struct ArchiveLifecycle {
     pub events: Vec<ArchiveLifecycleEvent>,
 }
 
+/// An earlier version of an uploaded file (format 2): the content it had until a newer upload replaced it. The current
+/// content is the artifact's own. Whoever uploaded the next version is carried as a name, as everywhere in an archive.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArchiveVersion {
+    pub artifact_id: String,
+    /// 1 for the first upload; the artifact holds the highest.
+    pub version: i64,
+    /// The `blobs/` entry holding this version's bytes.
+    pub content_hash: String,
+    pub size_bytes: i64,
+    pub mime_type: Option<String>,
+    pub became_current_at: String,
+    pub replaced_at: String,
+    pub replaced_by: Option<ArchivePerson>,
+}
+
+/// A saved search (format 2). The sources it keeps to are named by the archive's own source ids.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArchiveSavedSearch {
+    pub name: String,
+    pub query: String,
+    pub artifact_types: Vec<String>,
+    pub languages: Vec<String>,
+    pub source_ids: Vec<String>,
+    pub result_limit: i64,
+    pub created_by: ArchivePerson,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
 /// The content of `workspace.json`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkspaceArchiveData {
@@ -217,9 +254,36 @@ pub struct WorkspaceArchiveData {
     /// Citations dropped because what they cite is gone.
     #[serde(default)]
     pub omitted_citations: u64,
+    /// Earlier versions of uploaded files, oldest first within a file (format 2).
+    #[serde(default)]
+    pub versions: Vec<ArchiveVersion>,
+    /// The workspace's saved searches (format 2).
+    #[serde(default)]
+    pub saved_searches: Vec<ArchiveSavedSearch>,
 }
 
 impl WorkspaceArchiveData {
+    /// Every stored file the records name, as `(content hash, what to call it in a message)`: the files themselves,
+    /// then their earlier versions. A hash can repeat; the archive holds each once.
+    pub fn stored_files(&self) -> Vec<(&str, String)> {
+        let files = self
+            .artifacts
+            .iter()
+            .map(|artifact| (artifact.content_hash.as_str(), artifact.path.clone()));
+        let versions = self.versions.iter().map(|version| {
+            let path = self
+                .artifacts
+                .iter()
+                .find(|artifact| artifact.id == version.artifact_id)
+                .map_or(version.artifact_id.as_str(), |artifact| artifact.path.as_str());
+            (
+                version.content_hash.as_str(),
+                format!("{path} (version {})", version.version),
+            )
+        });
+        files.chain(versions).collect()
+    }
+
     /// What the archive holds, for its manifest.
     pub fn counts(&self, blobs: u64) -> ArchiveCounts {
         ArchiveCounts {
@@ -234,6 +298,8 @@ impl WorkspaceArchiveData {
             comments: self.comments.len() as u64,
             lifecycle_events: self.lifecycle.iter().map(|entry| entry.events.len() as u64).sum(),
             omitted_citations: self.omitted_citations,
+            versions: self.versions.len() as u64,
+            saved_searches: self.saved_searches.len() as u64,
         }
     }
 }

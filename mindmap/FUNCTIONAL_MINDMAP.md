@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.3.18` (2026-10-24). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.3.19` (2026-10-24). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ---
 
@@ -573,7 +573,7 @@ These are observed in the code and are useful for prioritizing. The roadmap item
 | Search across workspaces is plain | The dashboard search (V0.2.33) merges every readable workspace by score; since V0.3.12 it takes a kind of file, a language and a range of days, and also finds memory cards (left out while a kind of file or a language is chosen). It does not cover code symbols or Ask, which stay inside one workspace [F5b, F5d]. The assistant remembers a chat since V0.2.32, for questions and summaries, and since V0.3.11 for lookups and searches too: "search for it" after "find the file about login" searches for *login* (the model's routing still reads a message alone). |
 | Mail is optional, and without it links are passed on by hand | Mail delivery exists since V0.2.9 (System › Settings › Mail, over TLS): invitations are mailed since V0.2.10, "Forgot your password?" works by mail since V0.2.11, task assignments and mentions are mailed since V0.2.12, and addresses are verified since V0.2.13 (an account that registered on an open server waits for its link before creating organizations or workspaces; an invitation counts), which is why registration is closed by default. One address is sent at most 12 messages an hour and one person causes at most 60 (V0.2.52). Without mail set up, invitation and reset links are shown to copy [F6 in V0.2.9–V0.2.12, F12 in V0.2.11, F13 in V0.2.13]. |
 | Accounts are never deleted | They are deactivated (V0.2.16) and anonymized (V0.2.17); the account row stays as *Former member*. Log files and earlier backups keep the old address until they age out. |
-| Archives are not a sync | A workspace exports (V0.2.40, Settings) and imports as a new workspace (V0.2.41, dashboard); it is a copy, not a link: nothing keeps the two in step, and importing the same archive twice makes two workspaces. Earlier versions of a file, saved searches, assistant chats and the activity feed are not in the archive. [O2, F20b]. |
+| Archives are not a sync | A workspace exports (V0.2.40, Settings) and imports as a new workspace (V0.2.41, dashboard); it is a copy, not a link: nothing keeps the two in step, and importing the same archive twice makes two workspaces. Since V0.3.19 the archive carries a file's earlier versions and the saved searches too; assistant chats and the activity feed are not in it. [O2, F20b]. |
 
 **What workspace templates do not do (V0.2.163–V0.2.193).** A template orders, names and weighs what RepoMemo already has, and the rows below are the edges of that:
 

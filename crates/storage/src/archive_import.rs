@@ -185,6 +185,63 @@ impl StorageEngine {
             imported.artifact_ids.insert(artifact.id.clone(), id);
         }
 
+        // Earlier versions of the files: their numbers and dates as exported, nobody credited by account.
+        for version in &data.versions {
+            let Some(artifact_id) = imported.artifact_ids.get(&version.artifact_id) else {
+                continue;
+            };
+            sqlx::query(
+                r#"
+                INSERT INTO artifact_versions (
+                  id, artifact_id, workspace_id, version, content_hash, size_bytes, mime_type,
+                  became_current_at, replaced_at, replaced_by_user_id
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, NULL)
+                "#,
+            )
+            .bind(Uuid::new_v4().to_string())
+            .bind(artifact_id)
+            .bind(workspace_id)
+            .bind(version.version)
+            .bind(&version.content_hash)
+            .bind(version.size_bytes)
+            .bind(&version.mime_type)
+            .bind(&version.became_current_at)
+            .bind(&version.replaced_at)
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        // Saved searches belong to the person who imports, with the author's name in the title of the copy kept as
+        // the name it had; the sources they keep to are the new ones.
+        for search in &data.saved_searches {
+            let kept_sources = search
+                .source_ids
+                .iter()
+                .filter_map(|old| source_ids.get(old.as_str()).cloned())
+                .collect::<Vec<_>>();
+            let artifact_types = search
+                .artifact_types
+                .iter()
+                .map(|name| artifact_type_to_db(&artifact_type_from_db(name)).to_owned())
+                .collect::<Vec<_>>();
+            sqlx::query(
+                "INSERT INTO workspace_saved_searches (id, workspace_id, created_by_user_id, name, query, artifact_types_json, languages_json, source_ids_json, result_limit, created_at, updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)",
+            )
+            .bind(Uuid::new_v4().to_string())
+            .bind(workspace_id)
+            .bind(importer_user_id)
+            .bind(&search.name)
+            .bind(&search.query)
+            .bind(serde_json::to_string(&artifact_types)?)
+            .bind(serde_json::to_string(&search.languages)?)
+            .bind(serde_json::to_string(&kept_sources)?)
+            .bind(search.result_limit)
+            .bind(&search.created_at)
+            .bind(&search.updated_at)
+            .execute(&mut *tx)
+            .await?;
+        }
+
         // Lifecycle and its history.
         for entry in &data.lifecycle {
             let Some(artifact_id) = imported.artifact_ids.get(&entry.artifact_id) else {

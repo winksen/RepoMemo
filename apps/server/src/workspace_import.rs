@@ -253,9 +253,9 @@ async fn read_archive(
         }
     }
     let unlisted = data
-        .artifacts
+        .stored_files()
         .iter()
-        .filter(|artifact| !expected.contains_key(artifact.content_hash.as_str()))
+        .filter(|(hash, _)| !expected.contains_key(hash))
         .count();
     if unlisted > 0 {
         problems.push(format!(
@@ -273,6 +273,11 @@ async fn read_archive(
     for artifact in &data.artifacts {
         if let Some(mime) = artifact.mime_type.as_deref() {
             mimes.entry(artifact.content_hash.as_str()).or_insert(mime);
+        }
+    }
+    for version in &data.versions {
+        if let Some(mime) = version.mime_type.as_deref() {
+            mimes.entry(version.content_hash.as_str()).or_insert(mime);
         }
     }
     let mut seen = HashSet::new();

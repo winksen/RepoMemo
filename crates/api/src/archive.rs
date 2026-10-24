@@ -240,15 +240,15 @@ pub async fn write_workspace_archive(
     // The distinct stored files with their sizes on disk.
     let mut sizes: BTreeMap<String, u64> = BTreeMap::new();
     let mut missing = Vec::new();
-    for artifact in &data.artifacts {
-        if sizes.contains_key(&artifact.content_hash) {
+    for (hash, name) in data.stored_files() {
+        if sizes.contains_key(hash) {
             continue;
         }
-        match tokio::fs::metadata(storage.blob_path_for_hash(&artifact.content_hash)).await {
+        match tokio::fs::metadata(storage.blob_path_for_hash(hash)).await {
             Ok(metadata) if metadata.is_file() => {
-                sizes.insert(artifact.content_hash.clone(), metadata.len());
+                sizes.insert(hash.to_owned(), metadata.len());
             }
-            _ => missing.push(artifact.path.clone()),
+            _ => missing.push(name),
         }
     }
     if let Some(first) = missing.first() {

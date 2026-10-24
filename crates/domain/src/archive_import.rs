@@ -199,6 +199,55 @@ impl WorkspaceArchiveData {
             ));
         }
 
+        // Earlier versions: of a file in the archive, numbered once, with a valid content hash.
+        let stray_versions = self
+            .versions
+            .iter()
+            .filter(|version| !artifacts.contains(version.artifact_id.as_str()))
+            .count();
+        if stray_versions > 0 {
+            check.warnings.push(format!(
+                "{stray_versions} earlier version(s) are of a file that is not in the archive and will be left out."
+            ));
+        }
+        let mut numbered = HashSet::new();
+        let version_problems = self
+            .versions
+            .iter()
+            .filter(|version| artifacts.contains(version.artifact_id.as_str()))
+            .filter_map(|version| {
+                if version.version < 1 {
+                    return Some(format!(
+                        "An earlier version of {} has no valid number.",
+                        version.artifact_id
+                    ));
+                }
+                if version.content_hash.len() < 4 || !version.content_hash.chars().all(|c| c.is_ascii_hexdigit()) {
+                    return Some(format!(
+                        "Version {} of {} has no valid content hash.",
+                        version.version, version.artifact_id
+                    ));
+                }
+                (!numbered.insert((version.artifact_id.as_str(), version.version))).then(|| {
+                    format!(
+                        "Version {} of {} is listed twice.",
+                        version.version, version.artifact_id
+                    )
+                })
+            })
+            .collect::<Vec<_>>();
+        limited(&mut check, version_problems, "earlier versions");
+        let lost_sources = self
+            .saved_searches
+            .iter()
+            .filter(|search| search.source_ids.iter().any(|id| !sources.contains(id.as_str())))
+            .count();
+        if lost_sources > 0 {
+            check.warnings.push(format!(
+                "{lost_sources} saved search(es) keep to a source that is not in the archive; the source is dropped from them."
+            ));
+        }
+
         let lifecycle = self
             .lifecycle
             .iter()

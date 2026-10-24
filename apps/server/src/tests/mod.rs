@@ -9,6 +9,7 @@ use serde_json::{json, Value};
 use tower::ServiceExt;
 
 mod ai;
+mod archive_history;
 mod auth;
 mod code_owners;
 mod compression;

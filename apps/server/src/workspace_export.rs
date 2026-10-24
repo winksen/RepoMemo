@@ -121,8 +121,8 @@ pub(crate) async fn export_workspace(
 async fn distinct_blobs(storage: &StorageEngine, data: &WorkspaceArchiveData) -> Result<Vec<ArchiveBlob>, ApiError> {
     let mut sizes: BTreeMap<&str, u64> = BTreeMap::new();
     let mut missing = Vec::new();
-    for artifact in &data.artifacts {
-        let hash = artifact.content_hash.as_str();
+    // The files and, since format 2, their earlier versions.
+    for (hash, name) in data.stored_files() {
         if sizes.contains_key(hash) {
             continue;
         }
@@ -130,7 +130,7 @@ async fn distinct_blobs(storage: &StorageEngine, data: &WorkspaceArchiveData) ->
             Ok(metadata) if metadata.is_file() => {
                 sizes.insert(hash, metadata.len());
             }
-            _ => missing.push(artifact.path.clone()),
+            _ => missing.push(name),
         }
     }
     if !missing.is_empty() {

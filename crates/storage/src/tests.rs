@@ -2529,3 +2529,166 @@ async fn a_memory_card_keeps_the_commit_its_citation_names_and_ignores_one_that_
     drop(storage);
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn an_archive_carries_earlier_file_versions_and_saved_searches_and_an_import_restores_them() {
+    use crate::NewSavedSearch;
+
+    let (storage, data_dir) = temp_storage("archive-versions").await;
+    let author = storage
+        .create_user("archive-author@example.com", "Author", "hash")
+        .await
+        .unwrap();
+    let importer = storage
+        .create_user("archive-importer@example.com", "Importer", "hash")
+        .await
+        .unwrap();
+    let workspace = storage.create_workspace("Versions to move").await.unwrap();
+    let source = storage
+        .create_or_get_source(&workspace.id, SourceType::Upload, "Uploads", None)
+        .await
+        .unwrap();
+    let texts = [
+        "first edition",
+        "second edition, longer",
+        "third edition, longest of all",
+    ];
+    let mut hashes = Vec::new();
+    for text in texts {
+        let hash = StorageEngine::content_hash(text.as_bytes());
+        storage
+            .store_blob(&hash, text.as_bytes(), Some("text/plain"))
+            .await
+            .unwrap();
+        hashes.push(hash);
+    }
+    let artifact = storage
+        .store_artifact(NewArtifact {
+            workspace_id: workspace.id.clone(),
+            source_id: source.id.clone(),
+            artifact_type: ArtifactType::File,
+            title: "guide".to_owned(),
+            path: "guide.txt".to_owned(),
+            content_hash: hashes[0].clone(),
+            mime_type: Some("text/plain".to_owned()),
+            language: None,
+            size_bytes: texts[0].len() as i64,
+            metadata: json!({}),
+        })
+        .await
+        .unwrap()
+        .artifact;
+    for (index, hash) in hashes.iter().enumerate().skip(1) {
+        storage
+            .replace_artifact_content(
+                &artifact.id,
+                hash,
+                texts[index].len() as i64,
+                Some("text/plain"),
+                Some(&author.id),
+            )
+            .await
+            .unwrap();
+    }
+    storage
+        .create_saved_search(
+            &workspace.id,
+            &author.id,
+            NewSavedSearch {
+                name: "Login".to_owned(),
+                query: "login session".to_owned(),
+                artifact_types: vec![ArtifactType::File],
+                languages: vec!["Rust".to_owned()],
+                source_ids: vec![source.id.clone(), "a-source-that-is-gone".to_owned()],
+                result_limit: 20,
+            },
+        )
+        .await
+        .unwrap();
+
+    // The archive holds both, in the shape of the format.
+    let data = storage.export_workspace_data(&workspace.id).await.unwrap();
+    assert_eq!(
+        data.versions.iter().map(|version| version.version).collect::<Vec<_>>(),
+        [1, 2],
+        "the earlier versions, oldest first; the current content is the file's own"
+    );
+    assert_eq!(data.versions[0].content_hash, hashes[0]);
+    assert_eq!(
+        data.versions[1].replaced_by.as_ref().map(|person| person.name.as_str()),
+        Some("Author")
+    );
+    assert_eq!(data.saved_searches.len(), 1);
+    assert_eq!(data.saved_searches[0].artifact_types, ["file"]);
+    let counts = data.counts(3);
+    assert_eq!((counts.versions, counts.saved_searches), (2, 1));
+    let files: Vec<&str> = data.stored_files().into_iter().map(|(hash, _)| hash).collect();
+    assert!(
+        hashes.iter().all(|hash| files.contains(&hash.as_str())),
+        "every version's content is a stored file"
+    );
+    assert!(data.check().problems.is_empty(), "{:?}", data.check().problems);
+
+    // Importing it makes a workspace with the same history and the same searches.
+    let copy = storage.create_workspace("Copy").await.unwrap();
+    let imported = storage
+        .import_workspace_data(&copy.id, &importer.id, &data)
+        .await
+        .unwrap();
+    let new_id = &imported.artifact_ids[&artifact.id];
+    let history = storage.list_artifact_versions(new_id).await.unwrap();
+    assert_eq!(
+        history.iter().map(|version| version.version).collect::<Vec<_>>(),
+        [3, 2, 1]
+    );
+    assert_eq!(
+        history
+            .iter()
+            .map(|version| version.content_hash.clone())
+            .collect::<Vec<_>>(),
+        [hashes[2].clone(), hashes[1].clone(), hashes[0].clone()]
+    );
+    assert_eq!(storage.read_blob(&hashes[0]).await.unwrap(), texts[0].as_bytes());
+    // Nobody is credited by account.
+    assert!(history.iter().all(|version| version.uploaded_by.is_none()));
+    let searches = storage.list_saved_searches(&copy.id).await.unwrap();
+    assert_eq!(searches.len(), 1);
+    assert_eq!(
+        (searches[0].name.as_str(), searches[0].query.as_str()),
+        ("Login", "login session")
+    );
+    assert_eq!(searches[0].created_by.id, importer.id);
+    let copy_sources = storage
+        .list_sources_of_type(Some(&copy.id), SourceType::Upload)
+        .await
+        .unwrap();
+    assert_eq!(copy_sources.len(), 1);
+    assert_eq!(
+        searches[0].source_ids,
+        [copy_sources[0].id.clone()],
+        "the source it keeps to is the new one; the gone one is dropped"
+    );
+    // The earlier versions count against the allowance like any other file.
+    assert_eq!(
+        storage.workspace_stored_bytes(&copy.id).await.unwrap(),
+        (texts[2].len() + texts[0].len() + texts[1].len()) as i64
+    );
+
+    // An archive of format 1 has neither and still reads.
+    let mut older = serde_json::to_value(&data).unwrap();
+    older.as_object_mut().unwrap().remove("versions");
+    older.as_object_mut().unwrap().remove("saved_searches");
+    let older: repomemo_domain::WorkspaceArchiveData = serde_json::from_value(older).unwrap();
+    assert!(older.versions.is_empty() && older.saved_searches.is_empty());
+    assert!(older.check().problems.is_empty());
+    let empty = storage.create_workspace("Older archive").await.unwrap();
+    storage
+        .import_workspace_data(&empty.id, &importer.id, &older)
+        .await
+        .unwrap();
+    assert!(storage.list_saved_searches(&empty.id).await.unwrap().is_empty());
+
+    storage.pool.close().await;
+    drop(storage);
+    let _ = std::fs::remove_dir_all(data_dir);
+}

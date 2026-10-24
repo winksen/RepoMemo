@@ -2,6 +2,29 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.3.19 (2026-10-24)
+
+Archives carry earlier file versions and saved searches.
+
+### Added
+- **Earlier versions of files:** a workspace's archive now holds, for each uploaded file that took new versions, the content of every earlier version (each stored once under `blobs/`) and its record (number, size, type, when it became current and when it was replaced). An import writes them back with the same numbers and dates, so *Version history* shows the same list, each version readable and comparable. The size of the earlier versions counts in the archive and against the importing workspace's allowance like any other file.
+- **Saved searches:** the archive carries them (name, words, kinds, languages, the sources they keep to, the limit). An import puts them in the new workspace under the person who imports, with the sources replaced by the new ones; a source the archive does not hold is dropped from the search.
+- **The import report** says how many earlier versions and saved searches an archive holds (the dry run too).
+
+### Changed
+- **Archive format 2.** `format_version` is now 2 and `workspace.json` has `versions` and `saved_searches` (optional when reading, so an archive of format 1 still imports, with neither); a server that only reads format 1 refuses a format 2 archive with its usual message, rather than importing it without its history. The manifest's counts gain `versions` and `saved_searches`.
+- **Nobody is credited by account,** as for every other record: the person who uploaded each later version is kept as a name in the archive and not written back (the import has no account to give it to), so an imported history shows no uploader.
+- **Checks on the way in:** an earlier version of a file the archive does not hold is left out with a warning; a version number below 1, listed twice or with a bad content hash is a problem; every stored file a version names must be listed in the manifest and present in the archive, with the checksum it is named by.
+- **The documents:** the functional mindmap's archive row, the technical mindmap's test counts (storage 46, server 205, web 360). The O2 gap about versions and searches is closed; assistant chats, notifications, the activity feed, secrets and the links to a repository or a tracker are still not carried.
+- **The version** is `0.3.19` everywhere.
+
+### Checks
+- **Compiled and linted:** `cargo clippy -D warnings` over the domain, storage, api and server crates with their tests, `cargo fmt --all --check`, `typecheck`, `types:check`, `docs:check`, `version:check`.
+- **Tests written, not run:** a storage test (versions and searches exported, their blobs named among the stored files, an import restoring the numbers, hashes and contents, crediting nobody, moving the search to the importer and to the new source, and an archive of format 1 still importing), a server test over the whole route (a file with three editions and a search, the manifest and counts, a dry run, the import, the history and the texts and the search in the new workspace) and a web test of the report sentence; the existing export test now expects format 2.
+
+### Upgrading
+- Nothing to do. Archives made by earlier releases import as before; archives made now are format 2, which only 0.3.19 and later read.
+
 ## V0.3.18 (2026-10-24)
 
 The Overview cards the templates wanted and could not name.

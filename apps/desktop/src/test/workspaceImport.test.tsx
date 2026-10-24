@@ -27,6 +27,15 @@ describe("describeArchive", () => {
   it("says what the archive holds in the singular and the plural", () => {
     expect(describeArchive(report())).toBe("3 files, 1 folder, 1 memory card, 1 task, 2 comments");
   });
+
+  it("also names the earlier versions and the saved searches of an archive that carries them, and nothing for one that does not", () => {
+    const withHistory = report();
+    withHistory.counts = { ...withHistory.counts, versions: 4, saved_searches: 1 };
+    expect(describeArchive(withHistory)).toBe("3 files, 1 folder, 1 memory card, 1 task, 2 comments, 4 earlier versions, 1 saved search");
+    const none = report();
+    none.counts = { ...none.counts, versions: 0, saved_searches: 0 };
+    expect(describeArchive(none)).toBe("3 files, 1 folder, 1 memory card, 1 task, 2 comments");
+  });
 });
 
 describe("WorkspaceImport", () => {
