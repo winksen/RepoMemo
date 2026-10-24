@@ -83,6 +83,10 @@ async fn start_fake_gitlab(state: FakeGitLab) -> String {
             }),
         )
         .route(
+            "/api/v4/projects/acme%2Fapp/merge_requests/9/approvals",
+            get(|| async { axum::Json(json!({"approved_by": [{"user": {"username": "ana"}}, {"user": {"username": "cy"}}]})) }),
+        )
+        .route(
             "/api/v4/projects/acme%2Fapp/merge_requests/9/notes",
             get(|| async {
                 axum::Json(json!([
@@ -198,6 +202,8 @@ async fn gitlab_issues_and_merge_requests_follow_the_same_model() {
     .await;
     assert_eq!(detail["metadata"]["origin"], "gitlab_merge_request");
     assert_eq!(detail["metadata"]["state"], "merged");
+    // GitLab's approvals are read like reviews.
+    assert_eq!(detail["metadata"]["approved_by"], json!(["ana", "cy"]));
     assert_eq!(
         detail["metadata"]["commits"][0],
         "9f00000000000000000000000000000000000abc"

@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.3.20` (2026-10-24). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.3.21` (2026-10-24). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ---
 
@@ -565,7 +565,7 @@ These are observed in the code and are useful for prioritizing. The roadmap item
 
 | Gap | Impact |
 |---|---|
-| Only GitHub and GitLab are connected | Issues (V0.2.27) and pull or merge requests (V0.2.28, GitLab V0.2.29) with their comments, reviews and commits are evidence (Settings › Issues and pull requests), and the files, symbols and commits they name are linked both ways (V0.2.30). A connector can have a webhook (V0.2.31) and pauses itself when the tracker asks to wait or refuses the token [F17]. |
+| Only GitHub and GitLab are connected | Issues (V0.2.27) and pull or merge requests (V0.2.28, GitLab V0.2.29) with their comments, reviews and commits are evidence (Settings › Issues and pull requests), and the files, symbols and commits they name are linked both ways (V0.2.30), as are the other issues and pull requests they refer to by number (`#12`, `owner/repo#12`, a GitLab `!12`) or address (V0.3.21); a pull request shows who approved it and who asked for changes (V0.3.21). A connector can have a webhook (V0.2.31) and pauses itself when the tracker asks to wait or refuses the token [F17]. |
 | A citation's old text is opened from the server's copy | *View at commit* (V0.2.26) shows a cited file as it was at the commit it names, while that commit is still in the repository's copy; since V0.3.14 a memory card's linked evidence and the files a repository summary is based on offer it too, when the card's link named a commit (a citation saved from an answer does; one picked by hand does not) and the summary names the commit it describes [F16d, F16e]. |
 | `CODEOWNERS` owners are matched only by address | They show on a repository file's page since V0.2.25. Since V0.3.15 an owner written as an address that is a member's account address shows as that member, and a person who can change the file can **ask them to review** it (a task is assigned to them, once while it is open, and they are told like for any assignment). A `@handle` or team is the code host's, not RepoMemo's, so it stays a hint; nothing is assigned by itself, and owners are not shown in the file list or in search results [F16c, F16f]. |
 | Assistant answers name the last author only beside their citations | The last author and date of a repository file show on its page, in the file list and in search results since V0.2.24 [F16b], and, since V0.3.16, beside each citation of an answer, a summary or the assistant (*changed by Ada on Oct 1, 2026*). The text of an answer does not say it, and the author is not sent to the AI provider with the passages [F16g]. |

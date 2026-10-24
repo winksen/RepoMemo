@@ -186,6 +186,26 @@ fn pull_like(merge_request: &Value, detail: &Value, commits: &[Value]) -> Value 
     })
 }
 
+/// GitLab's approvals of a merge request as GitHub-shaped reviews: an approval carries no date or text.
+fn approvals_like(approvals: &Value) -> Vec<Value> {
+    approvals
+        .get("approved_by")
+        .and_then(Value::as_array)
+        .map(|list| {
+            list.iter()
+                .map(|entry| {
+                    json!({
+                        "user": {"login": entry.get("user").and_then(|user| user.get("username")).cloned().unwrap_or(json!("ghost"))},
+                        "state": "APPROVED",
+                        "submitted_at": "",
+                        "body": "",
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 fn commits_like(commits: &[Value]) -> Vec<Value> {
     commits
         .iter()
@@ -293,7 +313,7 @@ impl RepoMemoCore {
                     } else {
                         Vec::new()
                     };
-                    let (content, state, artifact_type, kind, path, origin, commit_ids) = if merge_requests {
+                    let (content, state, artifact_type, kind, path, origin, commit_ids, review) = if merge_requests {
                         report.pull_requests_seen += 1;
                         let (detail, _) = client.get(&format!("{base}/merge_requests/{iid}")).await?;
                         let commits = self
@@ -304,10 +324,17 @@ impl RepoMemoCore {
                             )
                             .await?;
                         let commits = commits_like(&commits);
+                        // Approvals are a nicety: a project that does not offer them, or a refusal here, must not
+                        // stop the sync or pause the connector.
+                        let approvals = client
+                            .get(&format!("{base}/merge_requests/{iid}/approvals"))
+                            .await
+                            .map(|(value, _)| value)
+                            .unwrap_or(Value::Null);
                         let pull = PullDetail {
                             pull: pull_like(&item, &detail, &commits),
                             commits,
-                            reviews: Vec::new(),
+                            reviews: approvals_like(&approvals),
                             review_comments: review_comments_like(&notes),
                             comments: comments_like(&notes),
                         };
@@ -326,6 +353,7 @@ impl RepoMemoCore {
                             format!("merge_requests/{iid}"),
                             "gitlab_merge_request",
                             pull.commit_ids(),
+                            pull.review_outcome(),
                         )
                     } else {
                         let state = if issue.get("state").and_then(Value::as_str) == Some("closed") {
@@ -341,6 +369,7 @@ impl RepoMemoCore {
                             format!("issues/{iid}"),
                             "gitlab_issue",
                             Vec::new(),
+                            ReviewOutcome::default(),
                         )
                     };
                     let content = content.into_bytes();
@@ -370,6 +399,8 @@ impl RepoMemoCore {
                             "closed_at": item.get("closed_at").cloned().unwrap_or(Value::Null),
                             "remote_updated_at": updated,
                             "commits": commit_ids,
+                            "approved_by": review.approved_by,
+                            "changes_requested_by": review.changes_requested_by,
                         }),
                     };
                     let (_, outcome) = self

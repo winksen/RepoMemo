@@ -172,7 +172,7 @@ flowchart LR
 
 ### Issues and pull requests
 
-Admins can connect **GitHub** and **GitLab** (including self-hosted) so that **issues and pull/merge requests**, with their comments, reviews and commits, become searchable evidence. Files, symbols and commits they mention link both ways, so a file shows the issues that name it.
+Admins can connect **GitHub** and **GitLab** (including self-hosted) so that **issues and pull/merge requests**, with their comments, reviews and commits, become searchable evidence. Files, symbols and commits they mention link both ways, so a file shows the issues that name it. So do the other issues and pull requests an item refers to (`#12` for the same repository, `owner/repo#12` for another connected one, `!12` for a GitLab merge request, or the item's address): a pull request that says "Fixes #12" is listed on issue 12 and links to it. A pull request's page says who approved it and who asked for changes.
 
 ### Versions and lifecycle
 

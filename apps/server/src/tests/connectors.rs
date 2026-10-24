@@ -51,7 +51,7 @@ async fn start_fake_github(state: FakeGitHub) -> String {
                          "body": "Round half up.", "labels": [], "assignees": []},
                         {"number": 3, "title": "Guard the ledger", "state": "open", "comments": 1, "pull_request": {"url": "x"},
                          "user": {"login": "cy"}, "created_at": "2026-01-04T00:00:00Z", "updated_at": "2026-01-04T00:00:00Z",
-                         "html_url": "https://github.com/acme/app/pull/3", "body": "Posts a refund once.",
+                         "html_url": "https://github.com/acme/app/pull/3", "body": "Posts a refund once. Fixes #1.",
                          "labels": [], "assignees": []}
                     ]))
                 } else {
@@ -62,7 +62,7 @@ async fn start_fake_github(state: FakeGitHub) -> String {
                          "labels": [], "assignees": []},
                         {"number": 3, "title": "Guard the ledger", "state": "closed", "comments": 1, "pull_request": {"url": "x"},
                          "user": {"login": "cy"}, "created_at": "2026-01-04T00:00:00Z", "updated_at": "2026-02-02T00:00:00Z",
-                         "html_url": "https://github.com/acme/app/pull/3", "body": "Posts a refund once.",
+                         "html_url": "https://github.com/acme/app/pull/3", "body": "Posts a refund once. Fixes #1.",
                          "labels": [], "assignees": []}
                     ]))
                 }
@@ -299,6 +299,9 @@ async fn github_issues_become_evidence_that_follows_the_tracker() {
     .await;
     assert_eq!(pull_detail["metadata"]["origin"], "github_pull_request");
     assert_eq!(pull_detail["metadata"]["state"], "open");
+    // The reviews say who approved it, in the data and in the text.
+    assert_eq!(pull_detail["metadata"]["approved_by"], json!(["ana"]));
+    assert_eq!(pull_detail["metadata"]["changes_requested_by"], json!([]));
     assert_eq!(
         pull_detail["metadata"]["commits"][0],
         "abc1230000000000000000000000000000000def"
@@ -551,6 +554,60 @@ async fn a_file_lists_the_issues_that_name_it() {
         .unwrap()
         .iter()
         .any(|mention| mention["artifact_id"] == file_id.as_str()));
+
+    // The pull request says "Fixes #1": it names the issue, and the issue is named in it.
+    let pull = artifacts
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|artifact| artifact["title"].as_str().unwrap().contains("Guard the ledger"))
+        .unwrap();
+    let from_pull = response_json(
+        call(
+            "GET",
+            format!("/v1/artifacts/{}/mentions", pull["id"].as_str().unwrap()),
+            json!({}),
+        )
+        .await,
+    )
+    .await;
+    assert!(
+        from_pull["mentions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|mention| mention["kind"] == "item"
+                && mention["label"] == "#1"
+                && mention["artifact_id"] == issue["id"]),
+        "{from_pull}"
+    );
+    assert!(
+        !from_pull["mentions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|mention| mention["artifact_id"] == pull["id"]),
+        "an item never names itself: {from_pull}"
+    );
+    let from_issue = response_json(
+        call(
+            "GET",
+            format!("/v1/artifacts/{}/mentions", issue["id"].as_str().unwrap()),
+            json!({}),
+        )
+        .await,
+    )
+    .await;
+    assert!(
+        from_issue["mentioned_in"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|mention| mention["kind"] == "item"
+                && mention["label"] == "#1"
+                && mention["artifact_id"] == pull["id"]),
+        "{from_issue}"
+    );
 
     // Outsiders cannot read them.
     let (outsider, _) = register_account(&app, "mention-outsider@example.com").await;

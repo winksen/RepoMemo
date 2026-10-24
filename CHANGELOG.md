@@ -2,6 +2,27 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.3.21 (2026-10-24)
+
+References between issues and pull requests, and the approvals of a pull request.
+
+### Added
+- **References between items:** the text of a connected issue or pull request (description, comments, reviews, commits) can refer to another item, and the reference is kept as a mention. `#12` means the item with that number in the same repository (on GitHub an issue or a pull request, on GitLab an issue), `!12` a GitLab merge request, `owner/repo#12` an item of another connected repository (also written after a host) and the address of an item, as the tracker shows it, the item itself. An issue's page lists the pull requests that refer to it under *Mentioned in*, and the pull request lists it under *Mentions*, both as "refers to #12".
+- **Approvals:** a pull request keeps who approved it and who asked for changes (each reviewer's latest word; comments change nothing and a dismissed review takes it back) in its data (`approved_by`, `changes_requested_by`), in a line of its text ("Review: approved by @ana · changes requested by @bo", so search and citations see it) and on its page. GitLab merge requests get theirs from GitLab's approvals.
+
+### Changed
+- **Nothing is guessed:** a reference is kept only when exactly one item has that number in that repository; a number nobody has, a name without an owner (`other#4`), a colour (`#123456` where no item has that number), `page#12`, `#12abc` and an item's reference to itself are left alone. The references are worked out again, with the file mentions, after a sync that changed something, so the order the items arrive in does not matter.
+- **GitLab approvals are optional:** if a project does not offer them or the tracker refuses the request, the merge request is stored without approvals and the connector is not paused.
+- **The documents:** the technical mindmap (the mentions route, the scope line, test counts: api 105, web 370), the functional mindmap, the user guide and the roadmap. The F17d gap about `#12` links is closed; mentions in comments written inside RepoMemo are still not read.
+- **The version** is `0.3.21` everywhere.
+
+### Checks
+- **Compiled and linted:** `cargo clippy -D warnings` over the api and server crates with their tests, `cargo fmt --all --check`, `typecheck`, `types:check`, `docs:check`, `version:check`.
+- **Tests written, not run:** unit tests of the references (a bare number, never the item itself, another repository, GitLab's `#` and `!`, addresses, and prose that is not a reference) and of the approvals (latest word, comments, dismissal, the text line); the server tests for GitHub and GitLab now also expect the approvals in the data, and the mentions test a pull request that says "Fixes #1" listed on the issue and linking to it; web tests of the review sentence and of the "refers to" mentions.
+
+### Upgrading
+- Nothing to do. Items already stored get their references at the next sync that changes something, and their approvals when the tracker next reports a change to the pull request.
+
 ## V0.3.20 (2026-10-24)
 
 Import runs as a background job with a progress bar.

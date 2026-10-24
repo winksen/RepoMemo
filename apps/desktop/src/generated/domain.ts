@@ -808,7 +808,7 @@ export interface ArtifactMention {
   title: string;
   artifact_type: ArtifactType;
   path: string;
-  /** `file`, `symbol` or `commit`: what the text named. */
+  /** `file`, `symbol`, `commit` or `item` (another issue or pull request): what the text named. */
   kind: string;
   /** The path, symbol or commit id as named. */
   label: string;

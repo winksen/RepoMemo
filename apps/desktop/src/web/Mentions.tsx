@@ -7,6 +7,7 @@ const KIND_LABEL: Record<string, string> = {
   file: "names the file",
   symbol: "names the symbol",
   commit: "names the commit",
+  item: "refers to",
 };
 
 function describe(mention: ArtifactMention) {
@@ -50,12 +51,12 @@ export function ArtifactMentionsPanel({
   return <section className="shared-record-panel">
     {mentions.mentioned_in.length ? <>
       <h2>Mentioned in</h2>
-      <p className="shared-muted-copy">Issues and pull requests whose text names this file, its symbols or the commit that last changed it.</p>
+      <p className="shared-muted-copy">Issues and pull requests whose text names this file, its symbols or the commit that last changed it, or that refer to this item by its number or address.</p>
       {list(mentions.mentioned_in)}
     </> : null}
     {mentions.mentions.length ? <>
       <h2>Mentions</h2>
-      <p className="shared-muted-copy">Files this item names, in its text or through its commits.</p>
+      <p className="shared-muted-copy">Files this item names, in its text or through its commits, and the issues and pull requests it refers to (such as #12).</p>
       {list(mentions.mentions)}
     </> : null}
   </section>;

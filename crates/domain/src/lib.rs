@@ -918,7 +918,7 @@ pub struct ArtifactMention {
     pub title: String,
     pub artifact_type: ArtifactType,
     pub path: String,
-    /// `file`, `symbol` or `commit`: what the text named.
+    /// `file`, `symbol`, `commit` or `item` (another issue or pull request): what the text named.
     pub kind: String,
     /// The path, symbol or commit id as named.
     pub label: String,

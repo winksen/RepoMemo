@@ -543,12 +543,73 @@ impl PullDetail {
             || self.pull.get("merged_at").is_some_and(|value| !value.is_null())
     }
 
+    /// The reviewers' standing: only an approval or a request for changes counts, a later one by the same
+    /// person replaces an earlier one, and a dismissed review takes the person's word back; comments alone
+    /// change nothing.
+    fn review_outcome(&self) -> ReviewOutcome {
+        let mut standing: Vec<(String, bool)> = Vec::new();
+        for review in &self.reviews {
+            let person = user_of(review, "user");
+            let approved = match text_of(review, "state").to_uppercase().as_str() {
+                "APPROVED" => true,
+                "CHANGES_REQUESTED" => false,
+                "DISMISSED" => {
+                    standing.retain(|(who, _)| *who != person);
+                    continue;
+                }
+                _ => continue,
+            };
+            standing.retain(|(who, _)| *who != person);
+            standing.push((person, approved));
+        }
+        let by = |wanted: bool| {
+            standing
+                .iter()
+                .filter(|(_, approved)| *approved == wanted)
+                .map(|(person, _)| person.clone())
+                .collect()
+        };
+        ReviewOutcome {
+            approved_by: by(true),
+            changes_requested_by: by(false),
+        }
+    }
+
     /// The full commit ids, oldest first as the tracker lists them.
     fn commit_ids(&self) -> Vec<String> {
         self.commits
             .iter()
             .filter_map(|commit| commit.get("sha").and_then(Value::as_str).map(str::to_owned))
             .collect()
+    }
+}
+
+/// Where a pull request stands with its reviewers: who approved it and who asked for changes, by each
+/// reviewer's latest word (V0.3.21).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct ReviewOutcome {
+    pub(crate) approved_by: Vec<String>,
+    pub(crate) changes_requested_by: Vec<String>,
+}
+
+impl ReviewOutcome {
+    /// The line the pull request's text carries; none when nobody has decided.
+    fn line(&self) -> Option<String> {
+        let names = |people: &[String]| {
+            people
+                .iter()
+                .map(|person| format!("@{person}"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        let mut parts = Vec::new();
+        if !self.approved_by.is_empty() {
+            parts.push(format!("approved by {}", names(&self.approved_by)));
+        }
+        if !self.changes_requested_by.is_empty() {
+            parts.push(format!("changes requested by {}", names(&self.changes_requested_by)));
+        }
+        (!parts.is_empty()).then(|| format!("Review: {}", parts.join(" · ")))
     }
 }
 
@@ -589,6 +650,9 @@ pub(crate) fn render_pull(owner: &str, repo: &str, issue: &Value, detail: &PullD
         figure("additions"),
         figure("deletions")
     ));
+    if let Some(line) = detail.review_outcome().line() {
+        out.push_str(&format!("\n{line}\n"));
+    }
     let url = text_of(issue, "html_url");
     if !url.is_empty() {
         out.push_str(&format!("\n{url}\n"));
@@ -622,11 +686,16 @@ pub(crate) fn render_pull(owner: &str, repo: &str, issue: &Value, detail: &PullD
         out.push_str("\n## Reviews\n");
         for review in &detail.reviews {
             let body = text_of(review, "body");
+            let when = text_of(review, "submitted_at");
             out.push_str(&format!(
-                "\n### @{} · {} · {}\n",
+                "\n### @{} · {}{}\n",
                 user_of(review, "user"),
                 text_of(review, "state").to_lowercase().replace('_', " "),
-                text_of(review, "submitted_at")
+                if when.is_empty() {
+                    String::new()
+                } else {
+                    format!(" · {when}")
+                }
             ));
             if !body.trim().is_empty() {
                 out.push_str(&format!("\n{}\n", clip(body.trim(), MAX_COMMENT_CHARS)));
@@ -981,7 +1050,7 @@ impl RepoMemoCore {
                 report.items_seen += 1;
                 let number = issue.get("number").and_then(Value::as_i64).unwrap_or(0);
                 let updated = text_of(&issue, "updated_at");
-                let (content, state, artifact_type, kind, path, origin, commits) = if is_pull {
+                let (content, state, artifact_type, kind, path, origin, commits, review) = if is_pull {
                     report.pull_requests_seen += 1;
                     let detail = self.github_pull(&client, &target, number, &issue).await?;
                     let state = if detail.merged() {
@@ -999,6 +1068,7 @@ impl RepoMemoCore {
                         format!("pulls/{number}"),
                         "github_pull_request",
                         detail.commit_ids(),
+                        detail.review_outcome(),
                     )
                 } else {
                     let comments = if issue.get("comments").and_then(Value::as_i64).unwrap_or(0) > 0 {
@@ -1019,6 +1089,7 @@ impl RepoMemoCore {
                         format!("issues/{number}"),
                         "github_issue",
                         Vec::new(),
+                        ReviewOutcome::default(),
                     )
                 };
                 let content = content.into_bytes();
@@ -1048,6 +1119,8 @@ impl RepoMemoCore {
                         "closed_at": issue.get("closed_at").cloned().unwrap_or(Value::Null),
                         "remote_updated_at": updated,
                         "commits": commits,
+                        "approved_by": review.approved_by,
+                        "changes_requested_by": review.changes_requested_by,
                     }),
                 };
                 let (_, outcome) = self
@@ -1290,6 +1363,44 @@ mod tests {
         assert!(text.contains("### @ana · changes requested · 2026-01-06T00:00:00Z\n\nAdd a test."));
         assert!(text.contains("### @ana on src/ledger.rs:42"));
         assert!(text.contains("## Discussion"));
+        assert!(text.contains("\nReview: changes requested by @ana\n"));
+    }
+
+    #[test]
+    fn approvals_are_each_reviewers_latest_word() {
+        let review =
+            |who: &str, state: &str| json!({"user": {"login": who}, "state": state, "submitted_at": "", "body": ""});
+        let detail = |reviews: Vec<Value>| PullDetail {
+            pull: json!({}),
+            commits: Vec::new(),
+            reviews,
+            review_comments: Vec::new(),
+            comments: Vec::new(),
+        };
+        // Ana asked for changes, then approved; Bo approved and later asked for changes; Cy only commented;
+        // Di approved and the review was dismissed.
+        let outcome = detail(vec![
+            review("ana", "CHANGES_REQUESTED"),
+            review("bo", "APPROVED"),
+            review("cy", "COMMENTED"),
+            review("ana", "APPROVED"),
+            review("di", "APPROVED"),
+            review("bo", "CHANGES_REQUESTED"),
+            review("di", "DISMISSED"),
+            review("ana", "COMMENTED"),
+        ])
+        .review_outcome();
+        assert_eq!(outcome.approved_by, vec!["ana".to_owned()]);
+        assert_eq!(outcome.changes_requested_by, vec!["bo".to_owned()]);
+        assert_eq!(
+            outcome.line().as_deref(),
+            Some("Review: approved by @ana · changes requested by @bo")
+        );
+        let nobody = detail(vec![review("cy", "COMMENTED"), review("cy", "PENDING")]).review_outcome();
+        assert_eq!(nobody, ReviewOutcome::default());
+        assert_eq!(nobody.line(), None);
+        let two = detail(vec![review("ana", "approved"), review("bo", "APPROVED")]).review_outcome();
+        assert_eq!(two.line().as_deref(), Some("Review: approved by @ana, @bo"));
     }
 
     #[test]
