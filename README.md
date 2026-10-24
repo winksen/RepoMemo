@@ -38,8 +38,7 @@ It is **evidence-first**. Storing, browsing, indexing and searching all work wit
 RepoMemo can be run two ways:
 
 - **Shared mode (primary).** A self-hosted API server and a web client for teams.
-- **Desktop app.** A Tauri window onto a server (since V0.2.49): it asks for the server's address, keeps the session in the system credential store and shows the same pages as the browser. The earlier local-only workspace is retired (labelled in the app, security fixes only) and will be removed in a 0.3.x release; it can be moved to a server.
-
+- **Desktop app.** A Tauri window onto a server (since V0.2.49): it asks for the server's address, keeps the session in the system credential store and shows the same pages as the browser.
 ## Quick start (shared mode)
 
 **Prerequisites:** Node.js 22.12+, npm 10+, and the stable Rust toolchain (1.88 or later). For Windows specifics, see [docs/WINDOWS_SETUP.md](docs/WINDOWS_SETUP.md).

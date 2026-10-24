@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.3.6` (2026-10-24). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, and the retired local workspace are described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.3.7` (2026-10-24). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ---
 
@@ -555,16 +555,6 @@ Create tasks from findings  ◄──────────────  Save 
 
 Since V0.2.49 the **desktop app is a window onto a server.** On first start it asks for the address of a RepoMemo server (`https://...`; plain `http://` only for a server on your own network), checks that a RepoMemo server answers there, and then shows exactly the pages the browser shows, after you sign in. The app talks to that server only and cannot be sent to another site (links to the outside open in your system browser). Your session is kept in the computer's credential store (Windows Credential Manager, macOS Keychain), so a restart does not ask for the password again; *Change server* in the left rail forgets the server and the session. Pages that open in a new tab or hand a file to Word in a browser save the file instead.
 
-Since V0.3.5 the app has **no local workspace**. The earlier desktop app's local workspace, the *Use the local workspace* button on the first screen and *Move a workspace to a server* (V0.2.50) are gone: the first screen asks for a server address and nothing else, and a window that had chosen the local workspace forgets that choice at its next start. A workspace that was only on this computer had to be moved before upgrading (V0.3.4 was the last release that could); the archive format and a server's *Import a workspace* on the dashboard are unchanged, so an archive made earlier still imports.
-
-### The local workspace (retired)
-
-The earlier desktop app, built with Tauri, is fully local: no accounts, no organizations and no collaboration features. It still has one thing the web app does not expose: a per-artifact **AI summary** button (on the web, the assistant summarizes a file). Symbol search exists on the web too since V0.1.72. Folder import and search by meaning, once desktop-only, now exist on the web too.
-
-It does **not** have the web app's notes, folders, business document previews, repositories, assistant, knowledge map, health checks or System area. It was retired (roadmap F20c, V0.2.51) and deleted from the app in V0.3.5.
-
-The local workspace and a server keep **separate data**.
-
 ---
 
 ## 13. Known functional gaps (at V0.3.0)
@@ -581,8 +571,7 @@ These are observed in the code and are useful for prioritizing. The roadmap item
 | Search across workspaces is plain | The dashboard search (V0.2.33) merges every readable workspace by score, but takes no filters and does not cover code symbols, memory cards or Ask, which stay inside one workspace [F5b]. The assistant remembers a chat since V0.2.32, for questions and summaries. |
 | Mail is optional, and without it links are passed on by hand | Mail delivery exists since V0.2.9 (System › Settings › Mail, over TLS): invitations are mailed since V0.2.10, "Forgot your password?" works by mail since V0.2.11, task assignments and mentions are mailed since V0.2.12, and addresses are verified since V0.2.13 (an account that registered on an open server waits for its link before creating organizations or workspaces; an invitation counts), which is why registration is closed by default. One address is sent at most 12 messages an hour and one person causes at most 60 (V0.2.52). Without mail set up, invitation and reset links are shown to copy [F6 in V0.2.9–V0.2.12, F12 in V0.2.11, F13 in V0.2.13]. |
 | Accounts are never deleted | They are deactivated (V0.2.16) and anonymized (V0.2.17); the account row stays as *Former member*. Log files and earlier backups keep the old address until they age out. |
-| Archives are not a sync | A workspace exports (V0.2.40, Settings) and imports as a new workspace (V0.2.41, dashboard); it is a copy, not a link: nothing keeps the two in step, and importing the same archive twice makes two workspaces. Earlier versions of a file, saved searches, assistant chats and the activity feed are not in the archive. The retired local workspace of the desktop app moves the same way (V0.2.50) [O2, F20b]. |
-| The local workspace is gone from the app | The app (V0.2.49–V0.2.51) kept a local workspace, retired in V0.2.51; it was deleted in V0.3.5, and the shell's commands for it in V0.3.6 (F20d). A workspace that was only on this computer had to be moved to a server before, as an archive (V0.2.50), which a server still imports [F20c]. |
+| Archives are not a sync | A workspace exports (V0.2.40, Settings) and imports as a new workspace (V0.2.41, dashboard); it is a copy, not a link: nothing keeps the two in step, and importing the same archive twice makes two workspaces. Earlier versions of a file, saved searches, assistant chats and the activity feed are not in the archive. [O2, F20b]. |
 
 **What workspace templates do not do (V0.2.163–V0.2.193).** A template orders, names and weighs what RepoMemo already has, and the rows below are the edges of that:
 

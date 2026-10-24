@@ -202,7 +202,7 @@ Tests: `repomemo-git` (tree parsing, reading a real repository), `repomemo-inges
 - **Syncs follow the branch by polling.** Every `REPOMEMO_REPO_POLL_SECONDS` (300 by default; `0` turns it off) the server resolves each branch with one `git rev-parse` and syncs the repositories whose branch moved. A sync towards the same commit is not retried within an hour, and a repository that never synced successfully waits for someone to press Sync now. There is no file watching.
 - **Remote links need a named host, and git resolves names itself.** For a name that points at a private address the host list is advisory: enforce it with an egress rule or a proxy.
 - **One branch per repository.** A repository root can be connected only once per workspace, so two branches of it cannot be indexed side by side yet.
-- The Repositories section is part of the web client, which the desktop app now shows against a server; the retired local workspace never had it.
+- The Repositories section is part of the web client, which the desktop app shows against a server.
 - A citation names the commit it was made at and *View at commit* shows that text while the server's copy still holds the commit (V0.2.26).
 
 ## Phases

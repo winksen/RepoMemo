@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.3.7 (2026-10-24)
+
+The documents say one client. Documents only; no code changed.
+
+### Changed
+- **The functional mindmap:** the paragraphs on the standalone workspace and its move are gone from the desktop-app section, the gaps table loses its row on it and a sentence on it, and the scope line says the app is a window onto a server.
+- **The technical mindmap:** the rows for the desktop shell (eight commands in two files), the archive writer (no caller since V0.3.6), accessibility and styling checks (no exemption, 13 stylesheets of about 2,700 lines, 89 baseline cases) and the risk table; the "local edition styles" row is removed.
+- **The other documents:** the user guide, `PRODUCT.md`, `README.md`, the clean-install page and `repository-sources.md` no longer describe a standalone mode. `docs/DEVELOPMENT_COMMANDS.md` already described only the server-client app. `UPGRADING.md` (*From 0.3.0 onward*, written in V0.3.5) names V0.3.4 as the last release that can move a local workspace.
+- **Left as the record:** the changelog, `UPGRADING.md`, the roadmap's release logs and checklists, the release indexes, the older decision records and architecture plans, and the technical mindmap's scope line, which lists what each release did.
+- **The version** is `0.3.7` everywhere.
+
+### Checks
+- **Passing:** `docs:check` (every link of 28 documents) and `version:check`.
+
+### Upgrading
+- Nothing to do. Track P (V0.3.5–V0.3.7) is complete.
+
 ## V0.3.6 (2026-10-24)
 
 The desktop shell holds only what a client of a server needs: its address, its session and its window.

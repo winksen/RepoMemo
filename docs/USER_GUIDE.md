@@ -371,7 +371,7 @@ flowchart LR
 
 ## 13. The desktop app
 
-The desktop app is **a window onto your server**. On first start it asks for the server address, checks it, then shows the same pages as the browser. Your session is kept in the system's secure credential store. The older **local, single-user workspace** is retired; it can be moved to a server (**Move a workspace to a server**) and will be removed in a later release.
+The desktop app is **a window onto your server**. On first start it asks for the server address, checks it, then shows the same pages as the browser. Your session is kept in the system's secure credential store. There is nothing to set up on your computer besides the app: your work lives on the server.
 
 ---
 

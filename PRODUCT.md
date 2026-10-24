@@ -24,7 +24,7 @@ RepoMemo is structured memory first and an AI interface second. Its source of tr
 
 The primary product is a shared server (Rust, SQLite) with a React web client. Teams work in organizations and workspaces with roles; they add evidence, review it (lifecycle status), discuss it, track work on a task board, search and ask with citations, explore a knowledge map and health checks, and use a docked assistant. Administrators set the server up in the browser, manage it in the System area and from a command console, and invite people by link.
 
-A Tauri desktop app with the same React code base is a window onto a server: it asks for the server's address and shows the web client. The fully local edition it replaced (no accounts or collaboration) is retired: it is labelled as such in the app, receives security fixes only, and is removed in a 0.3.x release.
+A Tauri desktop app with the same React code base is a window onto a server: it asks for the server's address and shows the web client. There is one client: the desktop app has no mode of its own and keeps nothing but the server's address and the session.
 
 The application is used as a focused technical workbench on desktop displays. Interaction should support dense scanning, keyboard-friendly operation, long paths, code-oriented content, large result sets, live progress, and both light and dark environments.
 
