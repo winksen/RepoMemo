@@ -1087,6 +1087,48 @@ impl StorageEngine {
         Ok(versions)
     }
 
+    /// Makes an earlier version of an uploaded file its current content again.
+    /// It is a new version, not a step back: the content being replaced is kept
+    /// as the next earlier version like any other upload, so the history only
+    /// grows and no version is lost. `restored_by` is recorded as it would be
+    /// for an upload.
+    pub async fn restore_artifact_version(
+        &self,
+        artifact_id: &str,
+        version: i64,
+        restored_by: Option<&str>,
+    ) -> Result<ArtifactSummary> {
+        let Some(found) = self
+            .list_artifact_versions(artifact_id)
+            .await?
+            .into_iter()
+            .find(|candidate| candidate.version == version)
+        else {
+            repomemo_domain::bail_not_found!("That version of this file was not found.");
+        };
+        if found.is_current {
+            repomemo_domain::bail_conflict!("That is already the current version of this file.");
+        }
+        if !self.blob_path(&found.content_hash).is_file() {
+            repomemo_domain::bail_conflict!("The stored content of that version is missing, so it cannot be restored.");
+        }
+        let mime_type = sqlx::query_scalar::<_, Option<String>>(
+            "SELECT mime_type FROM artifact_versions WHERE artifact_id = ?1 AND version = ?2",
+        )
+        .bind(artifact_id)
+        .bind(version)
+        .fetch_one(self.reader())
+        .await?;
+        self.replace_artifact_content(
+            artifact_id,
+            &found.content_hash,
+            found.size_bytes,
+            mime_type.as_deref(),
+            restored_by,
+        )
+        .await
+    }
+
     /// The stored bytes behind a content hash (a version's content).
     pub async fn read_blob(&self, content_hash: &str) -> Result<Vec<u8>> {
         if content_hash.len() < 4 || !content_hash.chars().all(|character| character.is_ascii_hexdigit()) {

@@ -1098,6 +1098,11 @@ export async function uploadSharedArtifact(accessToken: string, workspaceId: str
   return payload as ArtifactSummary;
 }
 
+/** Makes an earlier version of a file its current content again, as a new version (V0.3.8). */
+export function restoreSharedArtifactVersion(accessToken: string, artifactId: string, version: number): Promise<ArtifactSummary> {
+  return request<ArtifactSummary>(`/v1/artifacts/${artifactId}/versions/${version}/restore`, { method: "POST", body: "{}" }, accessToken);
+}
+
 /** A new version of a file, into the same artifact (comments, folder and memory links stay). */
 /** Every version of an uploaded file, the current one first. */
 export function listSharedArtifactVersions(accessToken: string, artifactId: string): Promise<import("../types").ArtifactVersion[]> {

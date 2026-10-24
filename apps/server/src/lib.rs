@@ -915,6 +915,10 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             "/v1/artifacts/{artifact_id}/versions/{version}",
             get(get_artifact_version_text),
         )
+        .route(
+            "/v1/artifacts/{artifact_id}/versions/{version}/restore",
+            post(restore_artifact_version),
+        )
         .route("/v1/artifacts/{artifact_id}/compare", get(compare_artifact_versions))
         .route(
             "/v1/workspaces/{workspace_id}/transfer-ownership",

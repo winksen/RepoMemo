@@ -176,7 +176,7 @@ Admins can connect **GitHub** and **GitLab** (including self-hosted) so that **i
 
 ### Versions and lifecycle
 
-- Upload a new version of a file and the **version history** keeps the old ones: see who uploaded each, read it, and compare any two line by line.
+- Upload a new version of a file and the **version history** keeps the old ones: see who uploaded each, read it, and compare any two line by line. If a newer version was a mistake, **Restore** an earlier one: it becomes a new version with that content, and nothing in the history is lost.
 - Every piece of evidence has a **status**, so you know what to trust:
 
 ```mermaid

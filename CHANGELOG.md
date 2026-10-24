@@ -2,6 +2,28 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.3.8 (2026-10-24)
+
+Restore an earlier version of a file.
+
+### Added
+- **`POST /v1/artifacts/{id}/versions/{n}/restore`:** makes version n the file's current content as a **new version**. The version it replaces is kept like after any upload, so restoring version 2 of three makes a fourth with version 2's text and the history keeps all four. The current version (`409`), an unknown one (`404`) and one whose stored content is missing (`409`) are refused; a viewer and an outsider are refused (`403`); a file from a repository is refused (its history is git's). The restored size is checked against the workspace's storage allowance (it is not counted as an upload); the activity feed says *Restored version n of …*; the file is converted and indexed again.
+- **A *Restore* button** on each earlier version in the artifact page's *Version history*, for people who can change the file. It asks first (*Version 2 becomes version 4 …*), then restores, shows a success toast and reloads the page.
+
+### Security
+- Same rights as uploading a version (`require_workspace_write` through the artifact, a session or a token that may change content); the route takes no body and no content from the caller, only a version number of the file named in the address, and reuses a stored blob by its hash, so it cannot reach another file's content. The allowance check stops a restore from growing a full workspace.
+
+### Checks
+- **Compiled and linted:** `cargo clippy -D warnings` over the storage, api and server crates with their tests, `cargo fmt --all --check`, `npm run typecheck`, `docs:check`, `version:check`.
+- **Tests written, not run:** the storage test extended (version 2 restored: four versions, the replaced content kept, the current and an unknown version refused, the allowance, no blob collected), a new server test (the same, over the API, with a viewer and an outsider refused, a second restore, and the restored text found by search), and four web tests (no button for a reader, a button for each earlier version, the confirmation before any call, a cancelled and a refused restore).
+
+### Changed
+- **The documents:** the API reference, the functional mindmap's version history, the technical mindmap's routes and test counts (server 195, web 329), and the user guide. The V0.2.38 gap about restoring is closed.
+- **The version** is `0.3.8` everywhere.
+
+### Upgrading
+- Nothing to do. No migration.
+
 ## V0.3.7 (2026-10-24)
 
 The documents say one client. Documents only; no code changed.

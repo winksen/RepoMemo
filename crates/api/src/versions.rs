@@ -6,7 +6,7 @@ use std::path::Path;
 
 use anyhow::{Context, Result};
 use repomemo_domain::{
-    ArtifactType, ArtifactVersion, ArtifactVersionText, DiffKind, VersionComparison, VersionDiffLine,
+    ArtifactSummary, ArtifactType, ArtifactVersion, ArtifactVersionText, DiffKind, VersionComparison, VersionDiffLine,
 };
 use repomemo_ingestion::{extract_document_text, is_document};
 
@@ -24,6 +24,19 @@ const DIFF_CONTEXT: usize = 3;
 impl RepoMemoCore {
     pub async fn list_artifact_versions(&self, artifact_id: &str) -> Result<Vec<ArtifactVersion>> {
         self.storage.list_artifact_versions(artifact_id).await
+    }
+
+    /// Restores an earlier version of a file as a new version with that content (V0.3.8). The caller has
+    /// already checked that the person may change the file; the file is indexed again by the caller.
+    pub async fn restore_artifact_version(
+        &self,
+        artifact_id: &str,
+        version: i64,
+        restored_by: Option<&str>,
+    ) -> Result<ArtifactSummary> {
+        self.storage
+            .restore_artifact_version(artifact_id, version, restored_by)
+            .await
     }
 
     pub async fn artifact_version_text(&self, artifact_id: &str, version: i64) -> Result<ArtifactVersionText> {

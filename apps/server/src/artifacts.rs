@@ -1315,6 +1315,50 @@ pub(crate) async fn upload_artifact_version(
     }))
 }
 
+/// Makes an earlier version of a file its current content again, as a new version (V0.3.8). The version
+/// being replaced is kept like after any upload, so nothing is lost; the file is indexed again.
+pub(crate) async fn restore_artifact_version(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path((artifact_id, version)): Path<(String, i64)>,
+) -> Result<Json<SharedArtifactSummary>, ApiError> {
+    let current = writable_artifact_summary(&state, &subject, &artifact_id).await?;
+    let workspace_id = current.workspace_id;
+    repositories::ensure_not_repository_file(&state, &artifact_id).await?;
+    // The restored content is a copy in the history's accounting: it counts against the allowance again.
+    let versions = state
+        .core
+        .list_artifact_versions(&artifact_id)
+        .await
+        .map_err(map_core_error)?;
+    let Some(wanted) = versions.iter().find(|candidate| candidate.version == version) else {
+        return Err(ApiError::not_found("That version of this file was not found."));
+    };
+    quotas::check_incoming(&state, &subject, &workspace_id, wanted.size_bytes.max(0) as u64, false).await?;
+    let artifact = state
+        .core
+        .restore_artifact_version(&artifact_id, version, Some(&subject.user_id))
+        .await
+        .map_err(map_core_error)?;
+    state.converter.ensure(state.storage.clone(), artifact.clone());
+    record_workspace_activity(
+        &state,
+        &workspace_id,
+        &subject.user_id,
+        "artifact_updated",
+        "artifact",
+        Some(&artifact.id),
+        format!("Restored version {version} of {}.", artifact.title),
+    )
+    .await;
+    state.index_queue.enqueue(&artifact, Some(&subject.user_id));
+    Ok(Json(SharedArtifactSummary {
+        summary: artifact,
+        folder_id: None,
+        repository_id: None,
+    }))
+}
+
 #[derive(Debug, Deserialize)]
 pub(crate) struct CompareVersionsQuery {
     from: i64,

@@ -5,10 +5,13 @@ vi.mock("../lib/sharedApi", () => ({
   compareSharedArtifactVersions: vi.fn(),
   getSharedArtifactVersionText: vi.fn(),
   listSharedArtifactVersions: vi.fn(),
+  restoreSharedArtifactVersion: vi.fn(),
 }));
 vi.mock("../components/ui/toast", () => ({ showToast: vi.fn() }));
 
-import { compareSharedArtifactVersions, getSharedArtifactVersionText, listSharedArtifactVersions } from "../lib/sharedApi";
+import { compareSharedArtifactVersions, getSharedArtifactVersionText, listSharedArtifactVersions, restoreSharedArtifactVersion } from "../lib/sharedApi";
+import { showToast } from "../components/ui/toast";
+import { ConfirmProvider } from "../components/ui/confirm-dialog";
 import { ArtifactVersionsPanel } from "../components/ArtifactVersionsPanel";
 import type { ArtifactVersion } from "../types";
 
@@ -25,8 +28,8 @@ const version = (number: number, overrides: Partial<ArtifactVersion> = {}): Arti
 
 const history = [version(3, { is_current: true }), version(2, { replaced_at: "2026-10-03T10:00:00Z" }), version(1, { replaced_at: "2026-10-02T10:00:00Z" })];
 
-function panel() {
-  return render(<ArtifactVersionsPanel accessToken="t" artifactId="a1" updatedAt="2026-10-03T10:00:00Z" />);
+function panel(extra: { canWrite?: boolean; onRestored?: () => void } = {}) {
+  return render(<ConfirmProvider><ArtifactVersionsPanel accessToken="t" artifactId="a1" updatedAt="2026-10-03T10:00:00Z" {...extra} /></ConfirmProvider>);
 }
 
 describe("ArtifactVersionsPanel", () => {
@@ -85,5 +88,46 @@ describe("ArtifactVersionsPanel", () => {
     expect(screen.getByText("Second edition.")).toBeTruthy();
     expect(screen.getByText("… 12 unchanged lines")).toBeTruthy();
     expect(screen.getByText("1 line removed, 1 added")).toBeTruthy();
+  });
+
+  it("offers no restore to someone who cannot change the file", async () => {
+    panel();
+    await screen.findByText("Version 3 · current");
+    expect(screen.queryByRole("button", { name: /Restore version/ })).toBeNull();
+  });
+
+  it("offers a restore for every earlier version but the current one", async () => {
+    panel({ canWrite: true });
+    await screen.findByText("Version 3 · current");
+    expect(screen.getByRole("button", { name: "Restore version 2" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Restore version 1" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Restore version 3" })).toBeNull();
+  });
+
+  it("asks first, restores the chosen version as a new one and tells the page", async () => {
+    vi.mocked(restoreSharedArtifactVersion).mockResolvedValue({} as never);
+    const onRestored = vi.fn();
+    panel({ canWrite: true, onRestored });
+    fireEvent.click(await screen.findByRole("button", { name: "Restore version 2" }));
+    // The question says what will happen, and nothing is sent before the answer.
+    expect(await screen.findByText(/Version 2 becomes version 4/)).toBeTruthy();
+    expect(restoreSharedArtifactVersion).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Restore" }));
+    await waitFor(() => expect(restoreSharedArtifactVersion).toHaveBeenCalledWith("t", "a1", 2));
+    await waitFor(() => expect(onRestored).toHaveBeenCalledTimes(1));
+    expect(showToast).toHaveBeenCalledWith("success", expect.stringContaining("Version 2 restored as version 4"));
+  });
+
+  it("sends nothing when the question is cancelled, and says why when the server refuses", async () => {
+    panel({ canWrite: true });
+    fireEvent.click(await screen.findByRole("button", { name: "Restore version 1" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByText(/Version 1 becomes version 4/)).toBeNull());
+    expect(restoreSharedArtifactVersion).not.toHaveBeenCalled();
+
+    vi.mocked(restoreSharedArtifactVersion).mockRejectedValueOnce(new Error("That is already the current version of this file."));
+    fireEvent.click(screen.getByRole("button", { name: "Restore version 1" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Restore" }));
+    await waitFor(() => expect(showToast).toHaveBeenCalledWith("error", expect.stringContaining("already the current version")));
   });
 });

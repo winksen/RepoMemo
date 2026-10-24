@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.3.7` (2026-10-24). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.3.8` (2026-10-24). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ---
 
@@ -332,7 +332,7 @@ Office files, PDFs and emails are previewed in the browser: text and tables for 
   - **indexing status**: *Indexing…* right after saving, then *Indexed*
   - for owners and admins only, an **Indexed chunks** button that opens a dialog with the stored passages, their line ranges, and a **Re-index** action
   - **rename** and **delete**, for writers
-  - **Version history** for an uploaded file that has taken a new version: each version with who uploaded it and when; its text can be read, and any version compared line by line with the one before it or with the current one. Earlier text stays readable for as long as the file exists
+  - **Version history** for an uploaded file that has taken a new version: each version with who uploaded it and when; its text can be read, and any version compared line by line with the one before it or with the current one. A person who can change the file can **restore** an earlier version (V0.3.8): after a confirmation it becomes a new version with that content, the version it replaces stays in the history (so nothing is lost and the history only grows), and the file is indexed again; the current version cannot be restored over itself, and restoring counts against the workspace's storage allowance like an upload. Earlier text stays readable for as long as the file exists
 - **Lifecycle review**: every artifact has a status:
   `active` → `needs_review` → `verified` / `outdated` / `superseded`
   Each artifact can also have an **owner** (a workspace member) and a **review note**. `superseded` requires choosing the replacement artifact. Every change is kept in a **lifecycle history**.

@@ -479,6 +479,143 @@ async fn folders_move_files_are_handled_in_bulk_and_files_take_new_versions() {
 }
 
 #[tokio::test]
+async fn restoring_an_earlier_version_makes_a_new_version_with_its_text_and_keeps_the_history() {
+    let data_dir = temp_data_dir("restore-version");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let (_, _) = register_account(&app, "restore-admin@example.com").await;
+    let (owner, _) = register_account(&app, "restore-owner@example.com").await;
+    let (viewer, _) = register_account(&app, "restore-viewer@example.com").await;
+    let (outsider, _) = register_account(&app, "restore-outsider@example.com").await;
+    let workspace_id = create_workspace(&app, &owner).await;
+    join(
+        &app,
+        &owner,
+        "workspaces",
+        &workspace_id,
+        "restore-viewer@example.com",
+        "viewer",
+    )
+    .await;
+    let upload = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/v1/workspaces/{workspace_id}/artifacts/upload"))
+                .header("authorization", &owner)
+                .header("content-type", "text/markdown")
+                .header("x-repomemo-filename", "guide.md")
+                .body(Body::from("# Guide\n\nFirst edition.\n"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(upload.status(), 201);
+    let guide_id = response_json(upload).await["id"].as_str().unwrap().to_owned();
+    for (name, body) in [
+        ("guide-v2.md", "# Guide\n\nSecond edition.\n"),
+        ("guide-v3.md", "# Guide\n\nThird edition.\n"),
+    ] {
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/v1/artifacts/{guide_id}/versions"))
+                    .header("authorization", &owner)
+                    .header("content-type", "text/markdown")
+                    .header("x-repomemo-filename", name)
+                    .body(Body::from(body))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), 200);
+    }
+    let restore = |version: i64, who: &str| {
+        let request = json_request(
+            "POST",
+            &format!("/v1/artifacts/{guide_id}/versions/{version}/restore"),
+            who,
+            json!({}),
+        );
+        let app = app.clone();
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let history = |who: String| {
+        let request = auth_request("GET", &format!("/v1/artifacts/{guide_id}/versions"), &who);
+        let app = app.clone();
+        async move { response_json(app.oneshot(request).await.unwrap()).await }
+    };
+
+    // Restoring version 2 of three makes a fourth with version 2's text.
+    let restored = restore(2, &owner).await;
+    assert_eq!(restored.status(), 200);
+    assert_eq!(response_json(restored).await["id"], guide_id, "the same file");
+    let after = history(owner.clone()).await;
+    let versions = after.as_array().unwrap();
+    assert_eq!(versions.len(), 4, "the history keeps all four: {after}");
+    assert_eq!(versions[0]["version"], 4);
+    assert_eq!(versions[0]["is_current"], true);
+    assert_eq!(versions[0]["uploaded_by"], "Person");
+    assert_eq!(
+        versions[0]["content_hash"], versions[2]["content_hash"],
+        "version 4 holds version 2's content"
+    );
+    for (position, number) in [(1, 3), (2, 2), (3, 1)] {
+        assert_eq!(versions[position]["version"], number);
+        assert_eq!(versions[position]["is_current"], false);
+    }
+    let text_of = |number: i64| {
+        let request = auth_request("GET", &format!("/v1/artifacts/{guide_id}/versions/{number}"), &owner);
+        let app = app.clone();
+        async move {
+            response_json(app.oneshot(request).await.unwrap()).await["text"]
+                .as_str()
+                .unwrap()
+                .to_owned()
+        }
+    };
+    assert!(text_of(4).await.contains("Second edition."));
+    assert!(
+        text_of(3).await.contains("Third edition."),
+        "the version it replaced is kept"
+    );
+    assert!(text_of(1).await.contains("First edition."));
+
+    // The current version cannot be restored over itself, an unknown one is not found.
+    assert_eq!(restore(4, &owner).await.status(), 409);
+    assert_eq!(restore(9, &owner).await.status(), 404);
+    // Restoring is changing the file: a viewer and an outsider are refused, and nothing moved.
+    assert_eq!(restore(1, &viewer).await.status(), 403);
+    assert_eq!(restore(1, &outsider).await.status(), 403);
+    assert_eq!(history(owner.clone()).await.as_array().unwrap().len(), 4);
+    // A version restored again is another new version.
+    assert_eq!(restore(3, &owner).await.status(), 200);
+    assert_eq!(history(owner.clone()).await.as_array().unwrap().len(), 5);
+    assert!(text_of(5).await.contains("Third edition."));
+
+    wait_for_indexed_artifacts(&app, &owner, &workspace_id, 1).await;
+    let hits = response_json(
+        call(
+            &app,
+            "POST",
+            &format!("/v1/workspaces/{workspace_id}/search"),
+            &owner,
+            json!({"query": "third edition"}),
+        )
+        .await,
+    )
+    .await;
+    assert!(hits
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|hit| hit["artifact_id"] == guide_id));
+    let _ = std::fs::remove_dir_all(data_dir);
+}
+
+#[tokio::test]
 async fn the_console_creates_reset_links_and_lists_tokens() {
     let data_dir = temp_data_dir("console-tools");
     let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();

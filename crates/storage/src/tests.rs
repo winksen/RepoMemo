@@ -2025,6 +2025,36 @@ async fn earlier_versions_are_kept_and_their_blobs_survive_collection() {
         (first.len() + "second text".len() + "third text, longer".len()) as i64
     );
 
+    // Restoring version 2 of three makes a fourth with its content; the history keeps all four (V0.3.8).
+    let restored = storage
+        .restore_artifact_version(&artifact.id, 2, Some(&user.id))
+        .await
+        .unwrap();
+    assert_eq!(restored.content_hash, hashes[1]);
+    let versions = storage.list_artifact_versions(&artifact.id).await.unwrap();
+    assert_eq!(
+        versions.iter().map(|version| version.version).collect::<Vec<_>>(),
+        [4, 3, 2, 1]
+    );
+    assert_eq!(versions[0].content_hash, hashes[1]);
+    assert_eq!(versions[1].content_hash, hashes[2], "the version it replaced is kept");
+    assert!(versions[0].is_current && !versions[1].is_current);
+    assert_eq!(versions[0].uploaded_by.as_deref(), Some("Versions"));
+    // The current version is not restored over itself, and an unknown one is not found.
+    assert!(storage.restore_artifact_version(&artifact.id, 4, None).await.is_err());
+    assert!(storage.restore_artifact_version(&artifact.id, 9, None).await.is_err());
+    assert_eq!(storage.list_artifact_versions(&artifact.id).await.unwrap().len(), 4);
+    // The restored content counts again in what the workspace holds, and no blob is lost.
+    assert_eq!(
+        storage.workspace_stored_bytes(&workspace.id).await.unwrap(),
+        (first.len() + 2 * "second text".len() + "third text, longer".len()) as i64
+    );
+    let collected = storage
+        .collect_orphan_blobs(chrono::Duration::seconds(-1), 100)
+        .await
+        .unwrap();
+    assert!(collected.removed.is_empty(), "{:?}", collected.removed);
+
     // Deleting the file lets them go.
     storage.delete_artifact(&artifact.id).await.unwrap();
     let collected = storage

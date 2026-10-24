@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { IconHistory as History, IconLoader2 as Loader } from "@tabler/icons-react";
-import { compareSharedArtifactVersions, getSharedArtifactVersionText, listSharedArtifactVersions } from "../lib/sharedApi";
+import { compareSharedArtifactVersions, getSharedArtifactVersionText, listSharedArtifactVersions, restoreSharedArtifactVersion } from "../lib/sharedApi";
 import type { ArtifactVersion, ArtifactVersionText, VersionComparison } from "../types";
 import { apiMessage, formatBytes } from "../web/format";
 import { Button } from "./ui/button";
 import { PanelHeading } from "./ui/panel-heading";
 import { Dialog, DialogCancel } from "./ui/dialog";
+import { useConfirm } from "./ui/confirm-dialog";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
 
@@ -21,11 +22,14 @@ function when(value: string) {
 /**
  * The versions of an uploaded file. Uploading a new version keeps the one it
  * replaces: each stays readable here, and any two can be compared line by
- * line. Shown only once a file has more than one.
+ * line. Shown only once a file has more than one. A person who can change the file can restore an earlier
+ * version (V0.3.8): it becomes a new version with that content, and the version it replaces stays in the list.
  */
-export function ArtifactVersionsPanel({ accessToken, artifactId, updatedAt }: { accessToken: string; artifactId: string; updatedAt: string }) {
+export function ArtifactVersionsPanel({ accessToken, artifactId, canWrite = false, onRestored, updatedAt }: { accessToken: string; artifactId: string; canWrite?: boolean; onRestored?: () => void; updatedAt: string }) {
   const [versions, setVersions] = useState<ArtifactVersion[] | null>(null);
   const [opened, setOpened] = useState<Opened | null>(null);
+  const [restoring, setRestoring] = useState<number | null>(null);
+  const confirm = useConfirm();
 
   // Read again whenever the file changes (a new version was uploaded).
   useEffect(() => {
@@ -44,6 +48,26 @@ export function ArtifactVersionsPanel({ accessToken, artifactId, updatedAt }: { 
     } catch (error) {
       setOpened(null);
       showToast("error", apiMessage(error, "That version could not be read."));
+    }
+  }
+
+  async function restore(version: number) {
+    const next = (versions?.[0]?.version ?? version) + 1;
+    const agreed = await confirm({
+      action: "Restore",
+      description: `Version ${version} becomes version ${next}, the new current version. The version it replaces stays in the history, and the file is indexed again.`,
+      title: `Restore version ${version}?`,
+    });
+    if (!agreed) return;
+    setRestoring(version);
+    try {
+      await restoreSharedArtifactVersion(accessToken, artifactId, version);
+      showToast("success", `Version ${version} restored as version ${next}. It is being indexed again.`);
+      onRestored?.();
+    } catch (error) {
+      showToast("error", apiMessage(error, "That version could not be restored."));
+    } finally {
+      setRestoring(null);
     }
   }
 
@@ -103,6 +127,7 @@ export function ArtifactVersionsPanel({ accessToken, artifactId, updatedAt }: { 
           <Button onClick={() => void viewText(version.version)} type="button" variant="secondary">View text</Button>
           {version.version > 1 ? <Button onClick={() => void compare(version.version - 1, version.version)} type="button" variant="secondary">What changed</Button> : null}
           {!version.is_current ? <Button onClick={() => void compare(version.version, current.version)} type="button" variant="secondary">Compare with current</Button> : null}
+          {canWrite && !version.is_current ? <Button aria-label={`Restore version ${version.version}`} busy={restoring === version.version} disabled={restoring !== null} onClick={() => void restore(version.version)} type="button" variant="secondary">Restore</Button> : null}
         </div>
       </li>)}
     </ul>
