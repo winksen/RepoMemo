@@ -2328,3 +2328,95 @@ async fn new_addresses_and_names_refuse_hidden_characters_but_lookups_stay_lenie
     drop(storage);
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn a_snoozed_review_item_is_kept_for_its_person_until_its_date() {
+    let (storage, data_dir) = temp_storage("review-snoozes").await;
+    let workspace = storage.create_workspace("Snoozes").await.unwrap();
+    let other = storage.create_workspace("Other").await.unwrap();
+    let ada = storage
+        .create_user("ada-snooze@example.com", "Ada", "hash")
+        .await
+        .unwrap();
+    let grace = storage
+        .create_user("grace-snooze@example.com", "Grace", "hash")
+        .await
+        .unwrap();
+    let soon = (chrono::Utc::now() + chrono::Duration::days(2)).to_rfc3339();
+    let later = (chrono::Utc::now() + chrono::Duration::days(9)).to_rfc3339();
+    let gone = (chrono::Utc::now() - chrono::Duration::days(1)).to_rfc3339();
+
+    storage
+        .snooze_review_item(&ada.id, &workspace.id, "evidence", "file-b", &later)
+        .await
+        .unwrap();
+    storage
+        .snooze_review_item(&ada.id, &workspace.id, "memory_card", "card-a", &soon)
+        .await
+        .unwrap();
+    // Her own list only: Grace and the other workspace see nothing.
+    let held = storage.review_snoozes(&ada.id, &workspace.id).await.unwrap();
+    assert_eq!(
+        held.iter()
+            .map(|(kind, id, _)| (kind.as_str(), id.as_str()))
+            .collect::<Vec<_>>(),
+        [("memory_card", "card-a"), ("evidence", "file-b")],
+        "the soonest to come back first"
+    );
+    assert!(storage
+        .review_snoozes(&grace.id, &workspace.id)
+        .await
+        .unwrap()
+        .is_empty());
+    assert!(storage.review_snoozes(&ada.id, &other.id).await.unwrap().is_empty());
+
+    // Snoozing again moves the date; it does not add a row.
+    storage
+        .snooze_review_item(&ada.id, &workspace.id, "memory_card", "card-a", &later)
+        .await
+        .unwrap();
+    assert_eq!(storage.review_snoozes(&ada.id, &workspace.id).await.unwrap().len(), 2);
+
+    // A snooze whose date has passed is no longer held, and is cleared when the person snoozes something.
+    sqlx::query("UPDATE review_snoozes SET until = ?1 WHERE item_id = 'file-b'")
+        .bind(&gone)
+        .execute(&storage.pool)
+        .await
+        .unwrap();
+    let held = storage.review_snoozes(&ada.id, &workspace.id).await.unwrap();
+    assert_eq!(held.len(), 1, "file-b came back by itself");
+    storage
+        .snooze_review_item(&ada.id, &workspace.id, "health_finding", "finding-c", &soon)
+        .await
+        .unwrap();
+    let rows: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM review_snoozes WHERE user_id = ?1")
+        .bind(&ada.id)
+        .fetch_one(&storage.pool)
+        .await
+        .unwrap();
+    assert_eq!(rows, 2, "the expired row was cleared");
+
+    // Bringing an item back is immediate, and an item that is not snoozed is not an error.
+    storage
+        .unsnooze_review_item(&ada.id, &workspace.id, "memory_card", "card-a")
+        .await
+        .unwrap();
+    storage
+        .unsnooze_review_item(&ada.id, &workspace.id, "memory_card", "card-a")
+        .await
+        .unwrap();
+    assert_eq!(storage.review_snoozes(&ada.id, &workspace.id).await.unwrap().len(), 1);
+
+    // Snoozes go with the workspace.
+    storage.delete_workspace(&workspace.id).await.unwrap();
+    let rows: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM review_snoozes WHERE workspace_id = ?1")
+        .bind(&workspace.id)
+        .fetch_one(&storage.pool)
+        .await
+        .unwrap();
+    assert_eq!(rows, 0);
+
+    storage.pool.close().await;
+    drop(storage);
+    let _ = std::fs::remove_dir_all(data_dir);
+}

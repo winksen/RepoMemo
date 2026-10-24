@@ -1,7 +1,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../web/workspace/data", () => ({ useTemplate: vi.fn() }));
+vi.mock("../web/workspace/data", () => ({ useTemplate: vi.fn(), useReviewQueue: vi.fn() }));
 vi.mock("../web/router", async (original) => ({ ...(await original<typeof import("../web/router")>()), navigate: vi.fn() }));
 
 import type { SharedWorkspace, WorkspaceTemplateView } from "../types";
@@ -13,9 +13,12 @@ import { paletteEntries } from "../web/paletteEntries";
 import { navigate, parseRoute, workspaceHomePath } from "../web/router";
 import { arrangeSections, landingSection } from "../web/templateSections";
 import { WorkspaceLanding } from "../web/WorkspaceLanding";
-import { useTemplate } from "../web/workspace/data";
+import { useReviewQueue, useTemplate } from "../web/workspace/data";
 
-beforeEach(() => { vi.clearAllMocks(); });
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.mocked(useReviewQueue).mockReturnValue([null, vi.fn(), {} as never]);
+});
 afterEach(cleanup);
 
 const knowledgeBase = {
@@ -205,5 +208,22 @@ describe("the workspace tabs", () => {
     cleanup();
     render(<WorkspaceTopbar workspace={workspace("member")} />);
     expect(useTemplate).toHaveBeenLastCalledWith("", "w1", false);
+  });
+
+  it("shows how many items wait on the Review tab, and nothing when none do", () => {
+    const waiting = (count: number) => ({ items: Array.from({ length: count }, (_, index) => ({ kind: "evidence", id: `a${index}` })), evidence_count: count, memory_card_count: 0, finding_count: 0, snoozed: [] }) as never;
+    vi.mocked(useTemplate).mockReturnValue([null, vi.fn(), {} as never]);
+    vi.mocked(useReviewQueue).mockReturnValue([waiting(3), vi.fn(), {} as never]);
+    render(<WorkspaceTopbar accessToken="t" activeSection="overview" onNavigate={vi.fn()} workspace={workspace("owner")} />);
+    expect(screen.getByRole("button", { name: /^Review/ }).textContent).toContain("3");
+    expect(screen.getByRole("button", { name: /^Review/ }).textContent).toContain("3 waiting");
+    expect(useReviewQueue).toHaveBeenCalledWith("t", "w1", true);
+    cleanup();
+    vi.mocked(useReviewQueue).mockReturnValue([waiting(0), vi.fn(), {} as never]);
+    render(<WorkspaceTopbar accessToken="t" activeSection="overview" onNavigate={vi.fn()} workspace={workspace("owner")} />);
+    expect(screen.queryByText("waiting")).toBeNull();
+    cleanup();
+    render(<WorkspaceTopbar workspace={workspace("owner")} />);
+    expect(useReviewQueue).toHaveBeenLastCalledWith("", "w1", false);
   });
 });

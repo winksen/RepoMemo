@@ -40,6 +40,7 @@ export const workspaceKeys = {
   connectors: (workspaceId: string) => ["workspace", workspaceId, "connectors"] as const,
   knowledgeMap: (workspaceId: string) => ["workspace", workspaceId, "knowledge-map"] as const,
   template: (workspaceId: string) => ["workspace", workspaceId, "template"] as const,
+  review: (workspaceId: string) => ["workspace", workspaceId, "review"] as const,
   assistantCapabilities: (workspaceId: string) => ["workspace", workspaceId, "assistant-capabilities"] as const,
   assistantChats: (workspaceId: string) => ["workspace", workspaceId, "assistant-chats"] as const,
   // What the document viewer reads about one file.

@@ -1,5 +1,5 @@
 import {
-  getSharedRetrievalFacets, getSharedWorkspaceActivityCalendar, getSharedWorkspaceCapabilities, getSharedWorkspaceMetrics,
+  getSharedReviewQueue, getSharedRetrievalFacets, getSharedWorkspaceActivityCalendar, getSharedWorkspaceCapabilities, getSharedWorkspaceMetrics,
   getSharedTemplate, getSharedWorkspaceOverview, getSharedWorkspaceTemplate, listSharedArtifactWindow, listSharedCollaborationTasks, listSharedFolders, listSharedIndexFailures,
   listSharedMemoryCards, listSharedSavedSearches, listSharedTemplates, listSharedWorkspaceActivity, listSharedWorkspaceAiProviders,
   listSharedWorkspaceJobs, listSharedWorkspaceMembers, querySharedArtifactPage, querySharedArtifacts, ARTIFACT_WINDOW,
@@ -12,7 +12,7 @@ import { serverKeys, workspaceKeys } from "../../lib/queryClient";
 import { useServerState } from "../../lib/useServerState";
 import {
   type ArtifactIndexFailure, type ArtifactSummary, type CollaborationTask, type Folder, type IndexingJobStatus,
-  type MemoryCardSummary, type RetrievalFacets, type SavedSearch, type SharedAiProviderSettings, type TemplateDetail, type TemplateSummary,
+  type MemoryCardSummary, type RetrievalFacets, type ReviewQueue, type SavedSearch, type SharedAiProviderSettings, type TemplateDetail, type TemplateSummary,
   type WorkspaceActivityCalendar, type WorkspaceActivityEvent, type WorkspaceCapabilities, type WorkspaceMember,
   type WorkspaceMetrics, type WorkspaceOverview, type WorkspaceTemplateView,
 } from "../../types";
@@ -22,6 +22,18 @@ import {
  * its sections call the same hook with the same arguments and share one entry:
  * the cache fetches once and every reader sees the same data.
  */
+
+/**
+ * What waits for the person in the workspace's review queue (V0.3.10), shared by the Review tab's count and the
+ * Review page. It is fetched again every minute while a page of the workspace is open; the page also writes its
+ * own answer here after it reads or changes the queue. `null` until it arrives.
+ */
+export function useReviewQueue(accessToken: string, workspaceId: string, enabled = true) {
+  return useServerState<ReviewQueue | null>({
+    key: workspaceKeys.review(workspaceId), fetch: () => getSharedReviewQueue(accessToken, workspaceId), initial: null, enabled,
+    staleTime: 30_000, refetchInterval: 60_000,
+  });
+}
 
 export function useCapabilities(accessToken: string, workspaceId: string) {
   return useServerState<WorkspaceCapabilities | null>({

@@ -478,3 +478,144 @@ async fn the_review_queue_lists_what_waits_and_empties_as_it_is_resolved() {
     assert_eq!(empty["finding_count"], 0);
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn a_snoozed_review_item_leaves_the_persons_list_and_the_count_until_it_is_brought_back() {
+    let data_dir = temp_data_dir("review-snooze");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let (_, _) = register_account(&app, "snooze-admin@example.com").await;
+    let (owner, _) = register_account(&app, "snooze-owner@example.com").await;
+    let (peer, _) = register_account(&app, "snooze-peer@example.com").await;
+    let (outsider, _) = register_account(&app, "snooze-outsider@example.com").await;
+    let workspace_id = create_workspace(&app, &owner).await;
+    join(
+        &app,
+        &owner,
+        "workspaces",
+        &workspace_id,
+        "snooze-peer@example.com",
+        "member",
+    )
+    .await;
+    let call = |method: &'static str, uri: String, who: &str, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let queue = |who: &str| {
+        let request = auth_request("GET", &format!("/v1/workspaces/{workspace_id}/review"), who);
+        let app = app.clone();
+        async move { response_json(app.oneshot(request).await.unwrap()).await }
+    };
+    let snooze_uri = format!("/v1/workspaces/{workspace_id}/review/snoozes");
+    let mut ids = Vec::new();
+    for title in ["Runbook", "Retry notes"] {
+        let created = response_json(
+            call(
+                "POST",
+                format!("/v1/workspaces/{workspace_id}/artifacts/text"),
+                &owner,
+                json!({"title": title, "content": format!("# {title}\nSomething to check."), "language": "Markdown"}),
+            )
+            .await,
+        )
+        .await;
+        let id = created["id"].as_str().unwrap().to_owned();
+        let marked = call(
+            "PUT",
+            format!("/v1/artifacts/{id}/lifecycle"),
+            &owner,
+            json!({"status": "needs_review", "review_note": format!("{title} may be stale.")}),
+        )
+        .await;
+        assert_eq!(marked.status(), 200);
+        ids.push(id);
+    }
+
+    let before = queue(&owner).await;
+    assert_eq!(before["items"].as_array().unwrap().len(), 2, "{before}");
+    assert_eq!(before["evidence_count"], 2);
+    assert!(before["snoozed"].as_array().unwrap().is_empty());
+
+    // A snoozed item leaves the list and the count, and waits in the snoozed list with its date.
+    let until = (chrono::Utc::now() + chrono::Duration::days(7))
+        .format("%Y-%m-%d")
+        .to_string();
+    let snoozed = call(
+        "PUT",
+        snooze_uri.clone(),
+        &owner,
+        json!({"kind": "evidence", "id": ids[0], "until": until}),
+    )
+    .await;
+    assert_eq!(snoozed.status(), 204);
+    let during = queue(&owner).await;
+    let waiting: Vec<_> = during["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|item| item["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(waiting, [ids[1].as_str()], "{during}");
+    assert_eq!(during["evidence_count"], 1);
+    assert_eq!(during["snoozed"].as_array().unwrap().len(), 1);
+    assert_eq!(during["snoozed"][0]["id"], ids[0]);
+    assert!(during["snoozed"][0]["snoozed_until"]
+        .as_str()
+        .unwrap()
+        .starts_with(&until));
+    // It is the person's own list: a colleague still sees both.
+    assert_eq!(queue(&peer).await["items"].as_array().unwrap().len(), 2);
+
+    // A past time, more than a year ahead, nonsense, another kind and an outsider are refused.
+    for body in [
+        json!({"kind": "evidence", "id": ids[1], "until": "2020-01-01"}),
+        json!({"kind": "evidence", "id": ids[1], "until": "2999-01-01"}),
+        json!({"kind": "evidence", "id": ids[1], "until": "someday"}),
+        json!({"kind": "task", "id": ids[1], "until": until}),
+        json!({"kind": "evidence", "id": "", "until": until}),
+    ] {
+        assert_eq!(
+            call("PUT", snooze_uri.clone(), &owner, body.clone()).await.status(),
+            400,
+            "{body}"
+        );
+    }
+    assert_eq!(
+        call(
+            "PUT",
+            snooze_uri.clone(),
+            &outsider,
+            json!({"kind": "evidence", "id": ids[1], "until": until}),
+        )
+        .await
+        .status(),
+        403
+    );
+    assert_eq!(
+        queue(&owner).await["items"].as_array().unwrap().len(),
+        1,
+        "nothing else moved"
+    );
+
+    // Bringing it back is immediate and keeps no trace.
+    let back = call(
+        "DELETE",
+        format!("{snooze_uri}?kind=evidence&id={}", ids[0]),
+        &owner,
+        json!({}),
+    )
+    .await;
+    assert_eq!(back.status(), 204);
+    let after = queue(&owner).await;
+    assert_eq!(after["items"].as_array().unwrap().len(), 2, "{after}");
+    assert_eq!(after["evidence_count"], 2);
+    assert!(after["snoozed"].as_array().unwrap().is_empty());
+    assert_eq!(
+        call("DELETE", format!("{snooze_uri}?kind=nonsense&id=x"), &owner, json!({}))
+            .await
+            .status(),
+        400
+    );
+    let _ = std::fs::remove_dir_all(data_dir);
+}

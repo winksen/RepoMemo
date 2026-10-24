@@ -236,6 +236,7 @@ input[type="file"] {
 .shared-workspace-tabs .rm-button:focus-visible { z-index: var(--layer-raised); border-color: var(--color-accent); }
 .shared-workspace-tab-label { display: inline-flex; align-items: center; gap: 6px; }
 .shared-workspace-tab-restricted { padding: 2px 5px; color: var(--color-text-muted); background: var(--color-surface-3); border: 1px solid var(--color-border); border-radius: 4px; font-size: 9px; font-weight: 700; line-height: 1; }
+.shared-workspace-tab-count { min-width: 18px; padding: 2px 6px; color: var(--color-text); background: var(--color-surface-3); border: 1px solid var(--color-border); border-radius: 999px; font-size: 11px; font-weight: 700; line-height: 1; text-align: center; }
 .shared-page-content,
 .shared-detail-shell { padding: var(--shared-content-inset); }
 .shared-page-content { min-height: 100%; }

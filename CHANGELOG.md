@@ -2,6 +2,31 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.3.10 (2026-10-24)
+
+A count in the Review tab and a snooze for an item.
+
+### Added
+- **A count on the Review tab:** the number of items waiting for the person, shown when there are any (and as *Review (n)* under *More*). It is read again every minute, shares its answer with the Review page, and follows the page when an item is snoozed or brought back.
+- **Snooze:** each item of the review queue has a *Snooze* choice (until tomorrow, for a week, for a month). The item leaves the person's list and the count and comes back by itself at the start of that local day. A snooze is the person's own: a colleague's list does not change, and anyone who can read the workspace can snooze.
+- **A *Snoozed* list** on the page, with the day each comes back and a *Bring back* button for an immediate return.
+- **`PUT` and `DELETE /v1/workspaces/{id}/review/snoozes`:** `PUT {kind, id, until}` (a date such as `2026-11-01`, read as the start of that UTC day, or an RFC 3339 time; the web client sends the start of the chosen local day), `DELETE ?kind=&id=` to bring back; both `204`. `GET …/review` leaves the person's snoozed items out of `items` and of the counts and lists them in `snoozed`, each with `snoozed_until`.
+- **Migration 0042 `review_snoozes`** `(user, workspace, kind, id) → until`: deleted with the person or the workspace; expired rows are ignored by reads and cleared when the person snoozes again.
+
+### Security
+- Only the caller's own rows are read or written; the route takes a kind from a closed list and an id of at most 200 characters without control characters, so nothing else reaches the table. A time in the past or more than 366 days ahead is refused, and a person holds at most 500 snoozes in a workspace, so the table cannot be grown without bound. Reading the queue is the right needed, as nothing in anyone else's view changes.
+
+### Checks
+- **Compiled and linted:** `cargo clippy -D warnings` over the whole workspace with its tests, `cargo fmt --all --check`, `typecheck`, `types:check` (types regenerated), `styles:check`, `a11y:check`, `migrations:check` (42 files, 0042 locked at 0.3.10), `docs:check`, `version:check`.
+- **Tests written, not run:** a storage test (kept per person and workspace, soonest first, snoozing again moves the date, an expired row is not held and is cleared, bringing back, removal with the workspace), a server test (a snoozed item leaves the list and the count and is listed with its date, a colleague still sees it, a past date, more than a year, nonsense, another kind and an outsider are refused, bringing it back), two unit tests (`split_snoozed`, `parse_snooze_until`), and five web tests (the count on the tab and none for zero, snoozing through the list with the day computed from the local start of the day and the answer shared with the tab, bringing back, a refused snooze, the day arithmetic).
+
+### Changed
+- **The documents:** the API reference, the functional mindmap's review section, the technical mindmap's routes, migration table and test counts (storage 44, server 200, web 333), the user guide. The V0.2.37 gap about a count and snoozing is closed.
+- **The version** is `0.3.10` everywhere.
+
+### Upgrading
+- Migration 0042 runs by itself on start. Nothing else to do.
+
 ## V0.3.9 (2026-10-24)
 
 `@mentions` in task descriptions and memory cards.

@@ -271,7 +271,7 @@ flowchart TD
 | A file connected to nothing | Make a task |
 | *Stale evidence* (Operations and Knowledge base templates) | Ask for a review, mark outdated |
 
-**Review queue.** One list for the whole workspace: files marked *needs review*, memory cards gone stale, and open health findings. Each says why it's waiting and since when, and opens where it's resolved. When you fix it, it leaves the list.
+**Review queue.** One list for the whole workspace: files marked *needs review*, memory cards gone stale, and open health findings. Each says why it's waiting and since when, and opens where it's resolved. When you fix it, it leaves the list. The **Review** tab shows how many items are waiting for you. Not now? **Snooze** an item (until tomorrow, for a week, for a month): it leaves your list and the count, comes back on the day you chose, and can be brought back at once from the *Snoozed* list. Snoozing is yours alone; colleagues still see the item.
 
 ---
 

@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.3.9` (2026-10-24). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.3.10` (2026-10-24). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ---
 
@@ -449,6 +449,8 @@ Everything in the workspace that waits for a person, in one list, without an AI 
 | **File marked for review** | A file whose state is *needs review* (set by a person or by a health action), with the note left | The file's page |
 | **Memory card gone stale** | A card whose cited file changed after the card was written, was retired, or whose cited passage is gone | The card's page |
 | **Health finding** | An open finding that was neither acted on nor dismissed (a stale-memory finding is shown as its card instead) | Health |
+
+**A count and a snooze (V0.3.10).** The *Review* tab shows how many items wait for the person (it is read again every minute and after any change on the page). Each item has a **Snooze** choice (until tomorrow, for a week, for a month): the item leaves that person's list and the count and comes back by itself at the start of the day chosen. A snooze is personal: a colleague's list does not change, and anyone who can read the workspace can snooze. The page lists what is snoozed, with the day it comes back and a **Bring back** button for an immediate return. An item is snoozed for a year at most, and a person holds up to 500 snoozes in a workspace.
 
 Each shows why it is waiting and since when, oldest first (findings have no date and follow). An item leaves the list when it is resolved where it is worked on: the file marked verified or active again, the card confirmed or edited, the finding acted on or dismissed. Members see the list; each item says who can resolve it.
 

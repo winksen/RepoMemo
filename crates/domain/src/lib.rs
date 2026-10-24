@@ -1705,6 +1705,9 @@ pub struct ReviewItem {
     /// When it started waiting; open findings have no date.
     pub since: Option<String>,
     pub resolver: ReviewResolver,
+    /// When a snoozed item comes back to the person's list (V0.3.10); `None` for an item that is waiting now.
+    #[serde(default)]
+    pub snoozed_until: Option<String>,
 }
 
 /// Everything in a workspace that needs a person's attention, in one list:
@@ -1713,11 +1716,14 @@ pub struct ReviewItem {
 /// worked on.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReviewQueue {
-    /// The oldest first; items without a date last.
+    /// The oldest first; items without a date last. Items the person snoozed are not here (V0.3.10).
     pub items: Vec<ReviewItem>,
     pub evidence_count: i64,
     pub memory_card_count: i64,
     pub finding_count: i64,
+    /// What the person snoozed and that is still waiting, soonest to come back first. Each has `snoozed_until`.
+    #[serde(default)]
+    pub snoozed: Vec<ReviewItem>,
 }
 
 /// A job the workspace assistant knows how to do. The assistant only ever runs

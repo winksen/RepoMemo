@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.3 → 0.4
 
-> **Line:** `V0.3.1` to `V0.3.27`, then `V0.4.0` (theme to be chosen, decision 33) · **Current:** `V0.3.9` (2026-10-24) · **Next:** `V0.3.10`, a count and a snooze in the Review tab
+> **Line:** `V0.3.1` to `V0.3.27`, then `V0.4.0` (theme to be chosen, decision 33) · **Current:** `V0.3.10` (2026-10-24) · **Next:** `V0.3.11`, lookups and searches that read earlier turns
 > **Previous line:** [Releases 0.2 → 0.3](RELEASES_0.2.md) · **Related:** [Roadmap, Road to V0.4.0](ROADMAP.md#-road-to-v040) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
 Every release of the 0.3 line, planned and later shipped, one row each. The plan comes from the [Road to V0.4.0](ROADMAP.md#-road-to-v040), proposed on 2026-10-24: **one change per release**, each shippable alone, committed as `Update V0.3.N`. Decisions 29–32 of the roadmap are taken as proposed (V0.3.1); decision 33, the theme of V0.4.0, is recorded in V0.3.27.
@@ -39,7 +39,7 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | **V0.3.7** | ✅ 2026-10-24 | P. Local edition removed | 📘 Update | Documents | `UPGRADING.md` names V0.3.4 as the last release that can move a local workspace (done in V0.3.5); both mindmaps, the user guide, `PRODUCT.md`, `README.md` and the clean-install page stop describing a standalone desktop mode; the commands page already did not | No document except `UPGRADING.md` and the changelog mentions the local workspace |
 | **V0.3.8** | ✅ 2026-10-24 | Q. Small gaps | ✨ Feature | Artifact page | Restore an earlier version of a file as a new version: `POST …/versions/{n}/restore` and a *Restore* button with a confirmation; the replaced version stays | Restoring version 2 of three makes a fourth with version 2's text; the history keeps all four |
 | **V0.3.9** | ✅ 2026-10-24 | Q. Small gaps | 🔧 Enhancement | Discussion | `@mentions` in task descriptions and memory cards (notices `task_mention` and `memory_mention`, `@` suggestions on both fields); only direct members of the workspace are told, a save tells only the people it adds | A mention in a task notifies that member; a non-member is neither suggested nor notified |
-| **V0.3.10** | 🔜 Planned | Q. Small gaps | ✨ Feature | Review | A count in the Review tab and a snooze for an item | A snoozed item returns on its date; the tab shows the count |
+| **V0.3.10** | ✅ 2026-10-24 | Q. Small gaps | ✨ Feature | Review | A count in the Review tab and a personal snooze for an item (migration 0042, `PUT` and `DELETE …/review/snoozes`, a *Snoozed* list) | A snoozed item returns on its date; the tab shows the count |
 | **V0.3.11** | 🔜 Planned | Q. Small gaps | 🔧 Enhancement | Assistant | Lookups and searches read earlier turns | "Find the file about login", then "search for it", searches what the first message named |
 | **V0.3.12** | 🔜 Planned | Q. Small gaps | 🔧 Enhancement | Retrieval | Search across workspaces takes filters (type, language, date) and finds memory cards | Each result is still checked against its workspace's role and AI policy |
 | **V0.3.13** | 🔜 Planned | Q. Small gaps | 🔧 Enhancement | Web shell | The command palette keeps recent items and offers *New note* | Recent items survive a reload; *New note* opens the editor in the open workspace |

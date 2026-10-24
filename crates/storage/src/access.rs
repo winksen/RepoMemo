@@ -658,7 +658,93 @@ impl StorageEngine {
         .await?;
         Ok(())
     }
+
+    /// Hides an item of the review queue from this person's list until `until` (RFC 3339), when it comes
+    /// back by itself (V0.3.10). Snoozing it again moves the date. Expired snoozes of the person in this
+    /// workspace are cleared first, and at most `REVIEW_SNOOZE_LIMIT` are kept.
+    pub async fn snooze_review_item(
+        &self,
+        user_id: &str,
+        workspace_id: &str,
+        kind: &str,
+        item_id: &str,
+        until: &str,
+    ) -> Result<()> {
+        let now = Utc::now().to_rfc3339();
+        let mut tx = self.pool.begin().await?;
+        sqlx::query("DELETE FROM review_snoozes WHERE user_id = ?1 AND workspace_id = ?2 AND until <= ?3")
+            .bind(user_id)
+            .bind(workspace_id)
+            .bind(&now)
+            .execute(&mut *tx)
+            .await?;
+        let held = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM review_snoozes WHERE user_id = ?1 AND workspace_id = ?2 AND NOT (item_kind = ?3 AND item_id = ?4)",
+        )
+        .bind(user_id)
+        .bind(workspace_id)
+        .bind(kind)
+        .bind(item_id)
+        .fetch_one(&mut *tx)
+        .await?;
+        if held >= REVIEW_SNOOZE_LIMIT {
+            repomemo_domain::bail_invalid!(
+                "You have snoozed {REVIEW_SNOOZE_LIMIT} items in this workspace. Bring some back before snoozing more."
+            );
+        }
+        sqlx::query(
+            r#"INSERT INTO review_snoozes (user_id, workspace_id, item_kind, item_id, until, created_at)
+               VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+               ON CONFLICT(user_id, workspace_id, item_kind, item_id) DO UPDATE SET until = excluded.until"#,
+        )
+        .bind(user_id)
+        .bind(workspace_id)
+        .bind(kind)
+        .bind(item_id)
+        .bind(until)
+        .bind(&now)
+        .execute(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// Brings a snoozed item back to the person's list now.
+    pub async fn unsnooze_review_item(
+        &self,
+        user_id: &str,
+        workspace_id: &str,
+        kind: &str,
+        item_id: &str,
+    ) -> Result<()> {
+        sqlx::query(
+            "DELETE FROM review_snoozes WHERE user_id = ?1 AND workspace_id = ?2 AND item_kind = ?3 AND item_id = ?4",
+        )
+        .bind(user_id)
+        .bind(workspace_id)
+        .bind(kind)
+        .bind(item_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// The items this person has snoozed in a workspace that have not come back yet, as
+    /// `(kind, id, until)`, the soonest to come back first.
+    pub async fn review_snoozes(&self, user_id: &str, workspace_id: &str) -> Result<Vec<(String, String, String)>> {
+        Ok(sqlx::query_as::<_, (String, String, String)>(
+            "SELECT item_kind, item_id, until FROM review_snoozes WHERE user_id = ?1 AND workspace_id = ?2 AND until > ?3 ORDER BY until ASC, item_id ASC",
+        )
+        .bind(user_id)
+        .bind(workspace_id)
+        .bind(Utc::now().to_rfc3339())
+        .fetch_all(self.reader())
+        .await?)
+    }
 }
+
+/// Snoozed items one person may hold in one workspace.
+pub const REVIEW_SNOOZE_LIMIT: i64 = 500;
 
 #[cfg(test)]
 mod tests {

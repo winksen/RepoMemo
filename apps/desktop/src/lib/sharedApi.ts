@@ -615,6 +615,16 @@ export function getSharedReviewQueue(accessToken: string, workspaceId: string): 
   return request<import("../types").ReviewQueue>(`/v1/workspaces/${workspaceId}/review`, {}, accessToken);
 }
 
+/** Hides an item of the review queue from the person's list until a time, when it comes back (V0.3.10). */
+export async function snoozeSharedReviewItem(accessToken: string, workspaceId: string, item: { kind: import("../types").ReviewItemKind; id: string }, until: string): Promise<void> {
+  await request<void>(`/v1/workspaces/${workspaceId}/review/snoozes`, { method: "PUT", body: JSON.stringify({ kind: item.kind, id: item.id, until }) }, accessToken);
+}
+
+/** Brings a snoozed item back to the person's list now. */
+export async function bringBackSharedReviewItem(accessToken: string, workspaceId: string, item: { kind: import("../types").ReviewItemKind; id: string }): Promise<void> {
+  await request<void>(`/v1/workspaces/${workspaceId}/review/snoozes?kind=${encodeURIComponent(item.kind)}&id=${encodeURIComponent(item.id)}`, { method: "DELETE" }, accessToken);
+}
+
 export function getSharedWorkspaceHealth(accessToken: string, workspaceId: string): Promise<WorkspaceHealth> {
   return request<WorkspaceHealth>(`/v1/workspaces/${workspaceId}/health`, {}, accessToken);
 }

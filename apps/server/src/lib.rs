@@ -690,6 +690,10 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         )
         .route("/v1/workspaces/{workspace_id}/review", get(review::review_queue))
         .route(
+            "/v1/workspaces/{workspace_id}/review/snoozes",
+            put(review::snooze_review_item).delete(review::bring_back_review_item),
+        )
+        .route(
             "/v1/workspaces/{workspace_id}/export",
             get(workspace_export::export_workspace),
         )

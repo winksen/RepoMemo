@@ -16,7 +16,7 @@ import { Toast, showToast } from "../components/ui/toast";
 import { InviteMembers } from "../components/InviteMembers";
 import { WorkspaceMoreMenu } from "../components/WorkspaceMoreMenu";
 import { arrangeSections } from "./templateSections";
-import { useTemplate } from "./workspace/data";
+import { useReviewQueue, useTemplate } from "./workspace/data";
 import { ADMIN_WORKSPACE_SECTIONS, type WorkspaceSection } from "./constants";
 import { apiMessage } from "./format";
 import { navigate, workspaceHomePath } from "./router";
@@ -170,6 +170,9 @@ export function WorkspaceTopbar({
 }) {
   const isWorkspaceAdmin = workspace.role === "owner" || workspace.role === "admin";
   const [template] = useTemplate(accessToken ?? "", workspace.workspace.id, Boolean(accessToken));
+  // How many items wait in the person's review list: shown on the Review tab when there are any (V0.3.10).
+  const [reviewQueue] = useReviewQueue(accessToken ?? "", workspace.workspace.id, Boolean(accessToken));
+  const waiting = reviewQueue?.items.length ?? 0;
   const { tabs, more } = arrangeSections(template?.sections, activeSection, isWorkspaceAdmin);
   // The workspace's own names for its sections (V0.2.173); the usual name stays as the tooltip of a renamed tab.
   const nameOf = (section: WorkspaceSection) => template?.labels.sections[section] ?? TABS[section].label;
@@ -182,13 +185,13 @@ export function WorkspaceTopbar({
     const icon = sectionIcon(section);
     const isAdminOnly = ADMIN_WORKSPACE_SECTIONS.has(section);
     const isActive = activeSection === section;
-    return <Button aria-current={isActive ? "page" : undefined} className={isActive ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.(section)} type="button" key={section} title={label !== TABS[section].label ? TABS[section].label : undefined} variant="secondary">{icon}<span className="shared-workspace-tab-label">{label}{isAdminOnly ? <span className="shared-workspace-tab-restricted">Admin</span> : null}</span></Button>;
+    return <Button aria-current={isActive ? "page" : undefined} className={isActive ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.(section)} type="button" key={section} title={label !== TABS[section].label ? TABS[section].label : undefined} variant="secondary">{icon}<span className="shared-workspace-tab-label">{label}{isAdminOnly ? <span className="shared-workspace-tab-restricted">Admin</span> : null}{section === "review" && waiting > 0 ? <span className="shared-workspace-tab-count">{waiting}<span className="sr-only"> waiting</span></span> : null}</span></Button>;
   };
 
   return <nav aria-label="Workspace sections" className="shared-workspace-topbar">
     <div className="shared-workspace-tabs">
       {tabs.map(workspaceTab)}
-      {onNavigate ? <WorkspaceMoreMenu items={more.map((section) => ({ icon: sectionIcon(section), label: nameOf(section), onSelect: () => onNavigate(section), section }))} /> : null}
+      {onNavigate ? <WorkspaceMoreMenu items={more.map((section) => ({ icon: sectionIcon(section), label: section === "review" && waiting > 0 ? `${nameOf(section)} (${waiting})` : nameOf(section), onSelect: () => onNavigate(section), section }))} /> : null}
     </div>
   </nav>;
 }

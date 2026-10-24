@@ -1429,6 +1429,8 @@ export interface ReviewItem {
   /** When it started waiting; open findings have no date. */
   since: string | null;
   resolver: ReviewResolver;
+  /** When a snoozed item comes back to the person's list (V0.3.10); `None` for an item that is waiting now. */
+  snoozed_until: string | null;
 }
 
 /**
@@ -1438,11 +1440,13 @@ export interface ReviewItem {
  * worked on.
  */
 export interface ReviewQueue {
-  /** The oldest first; items without a date last. */
+  /** The oldest first; items without a date last. Items the person snoozed are not here (V0.3.10). */
   items: ReviewItem[];
   evidence_count: number;
   memory_card_count: number;
   finding_count: number;
+  /** What the person snoozed and that is still waiting, soonest to come back first. Each has `snoozed_until`. */
+  snoozed: ReviewItem[];
 }
 
 /**
