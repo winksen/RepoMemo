@@ -228,7 +228,7 @@ One click on **Save as memory** turns a good answer into a memory card.
 
 ### The assistant
 
-The docked chat does one of five things per message: **find files**, **search content**, **summarize a file**, **ask a question**, or **give a workspace overview**. It remembers the conversation, so "and what about its timeout?" works as a follow-up. Finding and searching need no AI. Everything it writes with AI is labelled as such, and a template can teach it your team's vocabulary ("runbook for payments" finds files).
+The docked chat does one of five things per message: **find files**, **search content**, **summarize a file**, **ask a question**, or **give a workspace overview**. It remembers the conversation, so "and what about its timeout?" works as a follow-up, and a lookup that only points back works too: after "find the file about login", "search for it" searches for *login*. Finding and searching need no AI. Everything it writes with AI is labelled as such, and a template can teach it your team's vocabulary ("runbook for payments" finds files).
 
 ---
 

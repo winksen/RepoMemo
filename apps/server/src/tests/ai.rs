@@ -1067,3 +1067,83 @@ async fn a_search_across_workspaces_reads_only_what_each_workspace_allows() {
     assert_eq!(refused.status(), 400);
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn a_search_that_only_points_back_searches_what_the_turn_before_looked_for() {
+    let data_dir = temp_data_dir("agent-earlier-subject");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let (_, _) = register_account(&app, "earlier-admin@example.com").await;
+    let (owner, _) = register_account(&app, "earlier-owner@example.com").await;
+    let workspace_id = create_workspace(&app, &owner).await;
+    for (title, content) in [
+        (
+            "Login flow",
+            "# Login\nA person signs in with a password and a session.",
+        ),
+        ("Session notes", "# Sessions\nThe login session ends after a week."),
+        (
+            "Deploy runbook",
+            "# Deploy\nRun the migration before switching traffic.",
+        ),
+    ] {
+        let created = app
+            .clone()
+            .oneshot(json_request(
+                "POST",
+                &format!("/v1/workspaces/{workspace_id}/artifacts/text"),
+                &owner,
+                json!({"title": title, "content": content, "language": "Markdown"}),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(created.status(), 201);
+    }
+    wait_for_indexed_artifacts(&app, &owner, &workspace_id, 3).await;
+    let send = |body: Value| {
+        let app = app.clone();
+        let request = json_request(
+            "POST",
+            &format!("/v1/workspaces/{workspace_id}/agent/messages"),
+            &owner,
+            body,
+        );
+        async move {
+            let response = app.oneshot(request).await.unwrap();
+            assert_eq!(response.status(), 200);
+            response_json(response).await
+        }
+    };
+
+    let first = send(json!({"message": "Find the file about login"})).await;
+    let conversation_id = first["conversation"]["id"].as_str().unwrap().to_owned();
+    assert_eq!(first["turn"]["reply"]["capability"], "find_files");
+    assert_eq!(first["turn"]["reply"]["subject"], "login");
+
+    // "Search for it" is a search for what the first message named.
+    let searched = send(json!({"message": "search for it", "conversation_id": conversation_id})).await;
+    let reply = &searched["turn"]["reply"];
+    assert_eq!(reply["capability"], "search_content");
+    assert_eq!(reply["routing"], "rules");
+    assert_eq!(reply["subject"], "login", "{reply}");
+    let titles: Vec<&str> = reply["matches"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|hit| hit["title"].as_str().unwrap())
+        .collect();
+    assert!(
+        titles.contains(&"Login flow") && titles.contains(&"Session notes"),
+        "{titles:?}"
+    );
+    assert!(!titles.contains(&"Deploy runbook"));
+
+    // The same words in a chat of their own point at nothing: they are searched as typed.
+    let alone = send(json!({"message": "search for it"})).await;
+    assert_eq!(alone["turn"]["reply"]["subject"], "it");
+
+    // A message that names its subject keeps it, whatever came before.
+    let named = send(json!({"message": "search for migration", "conversation_id": conversation_id})).await;
+    assert_eq!(named["turn"]["reply"]["subject"], "migration");
+    assert_eq!(named["turn"]["reply"]["matches"][0]["title"], "Deploy runbook");
+    let _ = std::fs::remove_dir_all(data_dir);
+}

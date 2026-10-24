@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.3.11 (2026-10-24)
+
+Assistant lookups and searches read the turn before.
+
+### Changed
+- **"Search for it" means something:** a file lookup, a symbol lookup or a content search whose only subject is a reference ("search for it", "find that file", "look for those", "where is it defined?") is about what the latest earlier turn looked for. After "Find the file about login", "search for it" searches for *login*; the reply's subject says so. The earlier turn's subject is read by the router's own rules (a lookup, a symbol, a search, a summarized file or the question itself); turns that name nothing (an overview, another "search for it") are skipped, a turn that listed a file falls back to its title, and a message that names its subject itself, points at nothing, or has no earlier turn to read is left as typed.
+- **Where it applies:** the rules, the template's phrases, the model's routing and an explicit capability all end in the same step, so the subject is resolved after routing and before the lookup runs. The model's own classification still reads a message alone.
+- **No new setting, route or migration.** The history is the one the server already builds from the stored conversation (V0.2.32).
+- **The documents:** the functional mindmap's gap row and the technical mindmap's conversation memory (test counts: api 98, server 201), the user guide. The V0.2.32 gap about lookups is closed.
+- **The version** is `0.3.11` everywhere.
+
+### Checks
+- **Compiled and linted:** `cargo clippy -D warnings` over the api and server crates with their tests, `cargo fmt --all --check`, `docs:check`, `version:check`.
+- **Tests written, not run:** two unit tests (what a pointing lookup resolves to for each kind of earlier turn, layered turns, and what is left as typed) and a server test (after "Find the file about login", "search for it" finds the login files and not the deploy runbook; the same words in a chat of their own are searched as typed; a message that names its subject keeps it).
+
+### Upgrading
+- Nothing to do.
+
 ## V0.3.10 (2026-10-24)
 
 A count in the Review tab and a snooze for an item.

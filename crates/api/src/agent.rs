@@ -323,11 +323,21 @@ impl RepoMemoCore {
             None
         };
 
-        let Some((capability, routing, subject)) = routed else {
+        let Some((capability, routing, mut subject)) = routed else {
             let mut unmatched = reply("I can't help with that yet. Right now I can find files, search inside indexed files, summarize a file, answer questions from your evidence, and give a workspace overview. Pick one of those or rephrase your request.");
             unmatched.warnings = warnings;
             return Ok(unmatched);
         };
+
+        // "Search for it" after "find the file about login" searches for login (V0.3.11).
+        if matches!(
+            capability,
+            AgentCapability::FindFiles | AgentCapability::FindSymbol | AgentCapability::SearchContent
+        ) {
+            if let Some(earlier) = earlier_subject(message, &subject, &history) {
+                subject = earlier;
+            }
+        }
 
         let outcome = if requires_ai(capability) && request.provider_id.is_none() {
             Ok(reply(request.ai_unavailable_reason.as_deref().unwrap_or(
@@ -750,6 +760,44 @@ fn asks_for_earlier_file(message: &str) -> bool {
         && words
             .iter()
             .all(|word| REFERENCE_WORDS.contains(&word.as_str()) || REFERENCE_FILLERS.contains(&word.as_str()))
+}
+
+/// Words that make a lookup lean on what was said before: "search for it", "find that", "where is it defined".
+const LOOKUP_REFERENCES: &[&str] = &["it", "this", "that", "these", "those", "them", "same"];
+/// Characters of an earlier question that stand in for what it was about when it named nothing shorter.
+const EARLIER_SUBJECT_CHARS: usize = 120;
+
+/// What a lookup or a search that only points back ("search for it", "find that file") is about: what the latest
+/// earlier turn asked for, so "find the file about login" followed by "search for it" searches for `login`.
+/// `None` when the message names something itself, points at nothing, or no earlier turn names anything.
+pub(crate) fn earlier_subject(message: &str, subject: &str, history: &[AgentHistoryTurn]) -> Option<String> {
+    let words = words_of(message);
+    if !words.iter().any(|word| LOOKUP_REFERENCES.contains(&word.as_str())) {
+        return None;
+    }
+    let named = words_of(subject);
+    if !named
+        .iter()
+        .all(|word| REFERENCE_WORDS.contains(&word.as_str()) || REFERENCE_FILLERS.contains(&word.as_str()))
+    {
+        return None;
+    }
+    history.iter().rev().find_map(|turn| {
+        let from_question = match route_by_rules(&turn.question) {
+            Some((AgentCapability::AskQuestion, _)) => Some(shorten(turn.question.trim(), EARLIER_SUBJECT_CHARS)),
+            Some((AgentCapability::WorkspaceOverview, _)) => None,
+            Some((_, earlier)) => Some(earlier),
+            None => None,
+        };
+        let candidate = from_question
+            .filter(|text| !text.is_empty())
+            .or_else(|| turn.files.first().map(|file| file.title.clone()))?;
+        // An earlier "search for it" has nothing to give either: look further back.
+        let pointing = words_of(&candidate)
+            .iter()
+            .all(|word| REFERENCE_WORDS.contains(&word.as_str()) || REFERENCE_FILLERS.contains(&word.as_str()));
+        (!pointing).then_some(candidate)
+    })
 }
 
 /// Whether a question leans on what was said before: it is short or it uses
@@ -1268,6 +1316,85 @@ mod tests {
             turn("hello", "I can't help with that yet.", &[]),
         ];
         assert_eq!(last_file(&later).map(|file| file.id), Some("a1".to_owned()));
+    }
+
+    #[test]
+    fn a_search_that_only_points_back_is_about_what_the_turn_before_looked_for() {
+        let history = [turn(
+            "Find the file about login",
+            "Found 2 files whose name matches “login”.",
+            &[("f1", "login.rs"), ("f2", "login.md")],
+        )];
+        // The rules route it to a search for "it"; the earlier turn says what that is.
+        let (capability, subject) = route("search for it").unwrap();
+        assert_eq!((capability, subject.as_str()), (AgentCapability::SearchContent, "it"));
+        assert_eq!(
+            earlier_subject("search for it", &subject, &history).as_deref(),
+            Some("login")
+        );
+        // "find that file" cleans down to nothing, and still points back.
+        let (_, nothing) = route("find that file").unwrap();
+        assert_eq!(
+            earlier_subject("find that file", &nothing, &history).as_deref(),
+            Some("login")
+        );
+        assert_eq!(
+            earlier_subject("Where is it defined?", "it", &history).as_deref(),
+            Some("login")
+        );
+        // A symbol, a summary of a named file and a question each leave their own subject.
+        let symbol = [turn("find the function parse_config", "Found 1 definition.", &[])];
+        assert_eq!(
+            earlier_subject("search for that", "that", &symbol).as_deref(),
+            Some("parse_config")
+        );
+        let summary = [turn(
+            "summarize runbook.md",
+            "It covers restarts.",
+            &[("f9", "runbook.md")],
+        )];
+        assert_eq!(
+            earlier_subject("look for it", "it", &summary).as_deref(),
+            Some("runbook.md")
+        );
+        let question = [turn("How do uploads back off?", "With a retry budget [1].", &[])];
+        assert_eq!(
+            earlier_subject("search for it", "it", &question).as_deref(),
+            Some("How do uploads back off?")
+        );
+        // Turns that name nothing are skipped, and an earlier pointing turn too.
+        let layered = [
+            turn("Find the file about billing", "Found 1 file.", &[("f3", "billing.md")]),
+            turn("search for it", "1 passage mentions “billing”.", &[]),
+            turn("give me an overview", "This workspace holds…", &[]),
+        ];
+        assert_eq!(
+            earlier_subject("search for it again", "it again", &layered).as_deref(),
+            Some("billing")
+        );
+    }
+
+    #[test]
+    fn a_lookup_that_names_its_subject_or_points_at_nothing_is_left_as_typed() {
+        let history = [turn(
+            "Find the file about login",
+            "Found 2 files.",
+            &[("f1", "login.rs")],
+        )];
+        // It names something itself.
+        assert_eq!(earlier_subject("search for deploy keys", "deploy keys", &history), None);
+        assert_eq!(
+            earlier_subject("search for it in deploy.md", "it in deploy.md", &history),
+            None
+        );
+        // It points at nothing: no reference word, so the empty subject still asks which file.
+        assert_eq!(earlier_subject("find", "", &history), None);
+        // Nothing earlier to point at.
+        assert_eq!(earlier_subject("search for it", "it", &[]), None);
+        assert_eq!(
+            earlier_subject("search for it", "it", &[turn("give me an overview", "…", &[])]),
+            None
+        );
     }
 
     #[test]
