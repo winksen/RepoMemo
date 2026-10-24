@@ -227,6 +227,10 @@ What the compose file settles for you, from §2: the server listens on all inter
 - **Behind your own proxy** (nginx, Traefik, a load balancer): build and run only the `server` target, keep it on a private network, and use §3 for the proxy.
 - `node scripts/check-container.mjs` (`npm run container:check`, run by CI) checks the Dockerfile, the compose file, the Caddyfile and `.env.example` against each other and against the variables the server reads, asserts that the server image's git is one `is_patched_git` accepts, refuses a base image without a digest, a CI action not pinned to a commit and a Dependabot file that leaves an ecosystem out; it needs no Docker. *Since V0.3.23* it also asserts that CI has a job that runs `docker compose up --build --wait` and asks `/health/ready` through the proxy, takes the stack down again, and a job on an arm64 runner that builds the `server` and `proxy` stages for `linux/arm64`.
 
+### Checking a configuration (V0.4.2)
+
+`repomemo-server --check-config` reads the environment exactly as a start would, prints what the server would use (secrets only as "set, N characters" or "from the file …", never their values), looks at the data folder (it exists and is writable, or can be created) and exits **without serving**: `0` the configuration can start, `1` it is invalid (the first error is named), `2` the data folder cannot be used. A secret file that other accounts can read is a warning on Unix. In a container: `docker compose run --rm server --check-config`.
+
 ### Is it up?
 
 | Check | Answers |

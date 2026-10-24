@@ -2,6 +2,25 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.2 (2026-10-25)
+
+A configuration can be checked without starting the server.
+
+### Added
+- **`repomemo-server --check-config`:** reads the environment the way a start does (the same validation, so the same error messages), prints what the server would use and exits without binding a port or opening the database. The listening and public addresses, the allowed origins, proxy trust, where each secret comes from (the environment with its length, or the `_FILE` path) and never its value, the data folder, the backup and templates folders, backups and sign-up. The data folder is tried with a small file that is removed at once; a missing folder inside a writable one is "will be created". On Unix, a secret file that other accounts can read is a warning.
+- **Exit codes:** `0` the configuration can start (warnings do not change it), `1` it is invalid (the error goes to standard error), `2` the data folder is not a folder, not writable, or cannot be created. In a container: `docker compose run --rm server --check-config`.
+
+### Changed
+- **The documents:** the settings reference, the operations guide (§4), the technical mindmap, the roadmap and the release index.
+- **The version** is `0.4.2` everywhere.
+
+### Checks
+- **Compiled and linted:** `cargo clippy -D warnings` over the server with its tests, `cargo fmt --all --check`, `version:check`, `docs:check`.
+- **Tests written, not run:** four unit tests (a valid configuration described without its secret, an invalid one with exit code 1, a data folder that is a file with exit code 2, a missing folder that will be created).
+
+### Upgrading
+- Nothing to do.
+
 ## V0.4.1 (2026-10-25)
 
 Every secret can be given as a file, for Docker and Kubernetes secrets.
