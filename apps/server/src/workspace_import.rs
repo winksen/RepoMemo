@@ -67,6 +67,10 @@ const STALE_AFTER: std::time::Duration = std::time::Duration::from_secs(24 * 60 
 const MAX_RUNNING_IMPORTS: usize = 2;
 /// A finished job is kept this long for its owner to read.
 const FINISHED_KEPT: std::time::Duration = std::time::Duration::from_secs(60 * 60);
+/// Finished jobs kept for one person, and for the whole server: a report can be large, and a person who checks
+/// archives one after the other must not fill the server's memory for an hour (V0.3.26).
+const FINISHED_PER_OWNER: usize = 5;
+const FINISHED_IN_ALL: usize = 100;
 
 /// Where a background import is: kept in memory, read by its owner (V0.3.20).
 #[derive(Debug, Clone, Serialize)]
@@ -143,13 +147,37 @@ impl ImportJobs {
     }
 
     fn finish(&self, id: &str, report: Option<ArchiveImportReport>, error: Option<String>) {
-        if let Some(job) = self.lock().get_mut(id) {
-            job.finished = Some(Instant::now());
-            job.status.status = if error.is_some() { "failed" } else { "done" };
-            job.status.stage = "finished";
-            job.status.progress_current = job.status.progress_total;
-            job.status.report = report;
-            job.status.error = error;
+        let mut jobs = self.lock();
+        let Some(job) = jobs.get_mut(id) else {
+            return;
+        };
+        job.finished = Some(Instant::now());
+        job.status.status = if error.is_some() { "failed" } else { "done" };
+        job.status.stage = "finished";
+        job.status.progress_current = job.status.progress_total;
+        job.status.report = report;
+        job.status.error = error;
+        let owner = job.owner.clone();
+        // The oldest finished jobs of this person beyond five go, and then the oldest of all beyond a hundred.
+        let mut own: Vec<(Instant, String)> = jobs
+            .iter()
+            .filter(|(_, job)| job.owner == owner)
+            .filter_map(|(key, job)| job.finished.map(|at| (at, key.clone())))
+            .collect();
+        own.sort();
+        for (_, key) in own.iter().take(own.len().saturating_sub(FINISHED_PER_OWNER)) {
+            jobs.remove(key);
+        }
+        let all = jobs.values().filter(|job| job.finished.is_some()).count();
+        if all > FINISHED_IN_ALL {
+            let mut rest: Vec<(Instant, String)> = jobs
+                .iter()
+                .filter_map(|(key, job)| job.finished.map(|at| (at, key.clone())))
+                .collect();
+            rest.sort();
+            for (_, key) in rest.into_iter().take(all - FINISHED_IN_ALL) {
+                jobs.remove(&key);
+            }
         }
     }
 
@@ -236,10 +264,24 @@ pub(crate) async fn import_workspace(
     consume_heavy_quota(&state, &subject)?;
     let started = std::time::Instant::now();
 
-    let temporary = receive(&state, body).await?;
-    if query.background {
+    // A background import takes its place first, so a person's second archive, or one more than the server
+    // takes at once, is refused before the body is read (V0.3.26) and not after two gibibytes were sent.
+    let job = if query.background {
+        Some(state.import_jobs.start(&subject.user_id)?)
+    } else {
+        None
+    };
+    let temporary = match receive(&state, body).await {
+        Ok(temporary) => temporary,
+        Err(error) => {
+            if let Some(id) = &job {
+                state.import_jobs.finish(id, None, Some(error.message.clone()));
+            }
+            return Err(error);
+        }
+    };
+    if let Some(id) = job {
         // The checking and the writing run on their own; this answers as soon as the archive is here.
-        let id = state.import_jobs.start(&subject.user_id)?;
         let progress = Progress {
             jobs: state.import_jobs.clone(),
             id: Some(id.clone()),
@@ -295,7 +337,7 @@ fn summarize(problems: &[String]) -> String {
 /// `GET /v1/workspaces/import/jobs/{id}`: where a background import is. Only the person who started it
 /// (or a system administrator) can ask; anyone else is told there is no such job.
 pub(crate) async fn import_job(
-    subject: AuthenticatedSubject,
+    ManagingSubject(subject): ManagingSubject,
     State(state): State<AppState>,
     Path(job_id): Path<String>,
 ) -> Result<Json<ImportJobStatus>, ApiError> {
@@ -511,6 +553,14 @@ async fn read_archive(
         return Ok(report(&manifest, Some(&data), problems, warnings, query.dry_run));
     }
 
+    // The sizes the records state are the sizes of the files that were just read and checked.
+    let mut data = data;
+    let corrected = data.use_stored_sizes(&expected);
+    if corrected > 0 {
+        warnings.push(format!(
+            "{corrected} size(s) stated in the archive did not match the stored file and were corrected."
+        ));
+    }
     progress.stage("writing_records", 0);
     let mut finished = create_workspace(state, subject, query, &data).await?;
     let mut summary = report(&manifest, Some(&data), problems, warnings, false);
@@ -743,5 +793,54 @@ mod tests {
         let silent = Progress::none();
         silent.stage("storing_files", 5);
         silent.advance(5);
+    }
+
+    #[test]
+    fn finished_jobs_are_kept_five_to_a_person_and_a_hundred_in_all() {
+        let jobs = ImportJobs::default();
+        // One person checks archives one after the other: only the newest five reports stay.
+        let mut ids = Vec::new();
+        for _ in 0..8 {
+            let id = jobs.start("ada").unwrap();
+            jobs.finish(&id, None, None);
+            ids.push(id);
+            std::thread::sleep(std::time::Duration::from_millis(2));
+        }
+        let kept: Vec<bool> = ids
+            .iter()
+            .map(|id| jobs.status_for(id, "ada", false).is_some())
+            .collect();
+        assert_eq!(kept, vec![false, false, false, true, true, true, true, true]);
+        // Another person's jobs are their own to keep, and a running job is never dropped.
+        let running = jobs.start("grace").unwrap();
+        let other = jobs.start("grace").unwrap_err();
+        assert_eq!(other.status, StatusCode::CONFLICT);
+        assert!(jobs.status_for(&running, "grace", false).is_some());
+        jobs.finish(&running, None, None);
+        assert!(jobs.status_for(&ids[7], "ada", false).is_some());
+        assert!(jobs.status_for(&running, "grace", false).is_some());
+
+        // The whole server keeps a hundred, whoever they belong to.
+        let many = ImportJobs::default();
+        let mut first = None;
+        for person in 0..130 {
+            let owner = format!("person-{person}");
+            let id = many.start(&owner).unwrap();
+            many.finish(&id, None, None);
+            first.get_or_insert((owner, id));
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+        let (owner, id) = first.unwrap();
+        assert!(
+            many.status_for(&id, &owner, false).is_none(),
+            "the oldest of them is gone"
+        );
+        let left = (0..130)
+            .filter(|person| {
+                let owner = format!("person-{person}");
+                many.lock().values().any(|job| job.owner == owner)
+            })
+            .count();
+        assert_eq!(left, FINISHED_IN_ALL);
     }
 }

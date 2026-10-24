@@ -2,6 +2,33 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.3.26 (2026-10-24)
+
+Security pass over what 0.3.x added.
+
+The seventh review ([mindmap/security/2026-10-24-0.3-security-review.md](mindmap/security/2026-10-24-0.3-security-review.md)) read, in the code, what V0.3.1–V0.3.25 added: restoring a version, mentions, `CODEOWNERS` matching and review requests, the all-workspaces search, archive format 2, the import job, references and approvals, webhook deliveries and sending one again, the backup passphrase change, and the desktop shell without its local edition. **0 high, 1 medium, 6 low and 5 informational findings; every medium and low finding is fixed and none is open.**
+
+### Fixed
+- **A text of endless addresses could keep the server busy (medium):** the references between tracker items looked for the end of an address from every `http` in a text, so a comment of `http://` repeated without a space, written by anyone who can comment on a connected repository, made the refresh after a sync do quadratic work. Each address is now read once, to 300 characters at most, and a repository name over 300 characters is not read as one.
+- **A commit named many times:** the file mentions walked every file a commit last changed for each word that named it; reading now stops when an item has its fifty mentions.
+- **The import's place is taken before the upload:** a second archive from the same person, or one more than the server takes at once, is refused before the body is read, and a failed upload gives the place back.
+- **Finished import jobs are capped:** five for a person and a hundred in all, the oldest going first, so reports cannot fill the server's memory for an hour.
+- **Reading an import job asks for what starting one asks for:** a session or an `admin` token, not any token of its owner.
+- **An import takes the sizes from the stored files:** each file and each earlier version gets the size of the file it names, which the import has just read and checked, so an archive cannot understate its files to the storage allowance; the report warns how many were corrected.
+- **Recent places are forgotten at sign-out:** the command palette's list no longer stays in the browser's storage for the next person at a shared computer.
+
+### Changed
+- **The documents:** the review itself, the technical mindmap (its scope line, its list of reviews and the test counts: api 106, server 214, domain 4), the roadmap and the release index.
+- **The version** is `0.3.26` everywhere.
+
+### Checks
+- **Compiled and linted:** `cargo clippy -D warnings` over the domain, api and server crates with their tests, `cargo fmt --all --check`, `typecheck`, `docs:check`, `version:check`.
+- **Tests written, not run:** the reading of endless texts, the cap on finished jobs, the corrected sizes, and the import job's route among those that refuse tokens without the `admin` scope.
+- **Not done:** the review was a reading; nothing was built, started or attacked. A pass with the running server (the load of an import, a hostile tracker text) is still the maintainer's.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.3.25 (2026-10-24)
 
 Three accessibility gaps are closed, and the checker holds them.

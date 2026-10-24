@@ -1219,6 +1219,7 @@ async fn the_routes_that_grant_access_or_remove_things_need_a_session_or_an_admi
         ("DELETE", "/v1/connectors/any/webhook".to_owned(), json!({})),
         ("GET", format!("/v1/workspaces/{workspace}/export"), json!(null)),
         ("POST", "/v1/workspaces/import".to_owned(), json!({})),
+        ("GET", "/v1/workspaces/import/jobs/any".to_owned(), json!(null)),
     ];
     // The refusals come before anything is read or changed, so none of the requests below does anything.
     for (method, uri, body) in &routes {

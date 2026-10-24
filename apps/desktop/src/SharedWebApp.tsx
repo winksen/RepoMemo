@@ -9,6 +9,7 @@ FORM: The established RepoMemo operate composition, adapted into a protected bro
 import { useEffect, useState } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
+import { clearRecents } from "./lib/paletteRecents";
 import { SHARED_SESSION_STORAGE_KEY as SESSION_STORAGE_KEY, clearSharedSession, getPlatformStatus, getServerSetup, getSharedHealth, getSharedSession, listSharedOrganizations, listSharedWorkspaces, refreshSharedSession } from "./lib/sharedApi";
 import { type Organization, type ServerSetupStatus, type SharedSession, type SharedWorkspace } from "./types";
 import { PlatformSetup } from "./components/PlatformSetup";
@@ -155,6 +156,8 @@ function SharedWebAppContent() {
   }
 
   function signOut() {
+    // The recent places of the palette are the person's, not the computer's (V0.3.26).
+    if (session) clearRecents(session.user.id);
     clearSharedSession();
     setAccessToken(null);
     setSession(null);

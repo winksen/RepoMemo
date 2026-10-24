@@ -30,6 +30,9 @@ const MAX_MENTIONS: usize = 50;
 const MAX_ITEMS_PER_REFRESH: i64 = 5_000;
 /// A symbol defined in more places than this is too common to link.
 const MAX_SYMBOL_DEFINITIONS: usize = 3;
+/// The longest address or repository name a reference is read from: a text made of one endless "word" costs
+/// no more than a text of short ones (V0.3.26).
+const MAX_REFERENCE_CHARS: usize = 300;
 
 /// Files, symbols and commits of a workspace, ready to look names up in.
 #[derive(Debug, Default)]
@@ -169,7 +172,7 @@ pub(crate) fn find_references(items: &ItemIndex, from: &str, place_of_from: &Val
             .last()
             .map_or(position, |(start, _)| start);
         let token = before[token_start..].trim_matches(|c| matches!(c, '.' | '-' | '/'));
-        if token_start < position && token.is_empty() {
+        if (token_start < position && token.is_empty()) || token.len() > MAX_REFERENCE_CHARS {
             continue;
         }
         if token.is_empty() {
@@ -197,15 +200,26 @@ pub(crate) fn find_references(items: &ItemIndex, from: &str, place_of_from: &Val
         }
     }
 
-    // The address of an item, as the tracker shows it.
-    for (start, _) in text.match_indices("http") {
+    // The address of an item, as the tracker shows it. Each address is read once and the search goes on after
+    // it, and one is read to 300 characters at most, so a text of "http://" over and over is read in a single
+    // pass and not once for every one of them (V0.3.26).
+    let mut from = 0;
+    while let Some(offset) = text[from..].find("http") {
+        let start = from + offset;
         let rest = &text[start..];
         if !(rest.starts_with("http://") || rest.starts_with("https://")) {
+            from = start + 4;
             continue;
         }
         let end = rest
-            .find(|c: char| c.is_whitespace() || matches!(c, ')' | '>' | ']' | '"' | '\'' | '<' | '`'))
-            .unwrap_or(rest.len());
+            .char_indices()
+            .find(|(at, c)| {
+                *at >= MAX_REFERENCE_CHARS
+                    || c.is_whitespace()
+                    || matches!(*c, ')' | '>' | ']' | '"' | '\'' | '<' | '`')
+            })
+            .map_or(rest.len(), |(at, _)| at);
+        from = start + end.max(4);
         let address = rest[..end].trim_end_matches(['.', ',', ';', ':', '!', '?']);
         let address = address.split(['#', '?']).next().unwrap_or(address);
         if let Some(target) = items.by_url.get(&address.trim_end_matches('/').to_lowercase()) {
@@ -264,6 +278,11 @@ pub(crate) fn find_mentions(index: &MentionIndex, text: &str, own_commits: &[Str
     };
 
     for word in text.split(|c: char| !(c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '/' | '-'))) {
+        // An item that names fifty things names no more: a text of a million words, or one commit that
+        // touched a hundred thousand files, is not walked to the end.
+        if found.len() >= MAX_MENTIONS {
+            break;
+        }
         let word = word.strip_prefix("./").unwrap_or(word);
         let word = word.trim_matches(|c| c == '.' || c == '-').trim_start_matches('/');
         if word.len() < 3 {
@@ -290,6 +309,9 @@ pub(crate) fn find_mentions(index: &MentionIndex, text: &str, own_commits: &[Str
                     break;
                 }
                 for artifact in artifacts {
+                    if found.len() >= MAX_MENTIONS {
+                        break;
+                    }
                     push(
                         &mut found,
                         MentionWrite {
@@ -653,5 +675,54 @@ mod tests {
     fn an_empty_index_and_plain_prose_find_nothing() {
         assert!(find_mentions(&MentionIndex::default(), "src/ledger.rs `x`", &[]).is_empty());
         assert!(find_mentions(&index(), "Nothing to see here, version 1.2.3 and 2026-01-02.", &[]).is_empty());
+    }
+
+    #[test]
+    fn a_text_of_endless_addresses_or_repeated_words_is_read_in_one_pass_and_stops_when_the_item_is_full() {
+        // Text from a tracker is written by whoever can comment there (V0.3.26).
+        let (list, index) = items();
+        let started = std::time::Instant::now();
+        let endless = "http://".repeat(300_000);
+        assert!(refs(&list, &index, "p13", &endless).is_empty());
+        let long_name = format!("{}#12 #12", "a/".repeat(500_000));
+        assert_eq!(
+            refs(&list, &index, "p13", &long_name),
+            vec![("i12".to_owned(), "#12".to_owned())],
+            "a name too long to be a repository is skipped, a bare reference after it is not"
+        );
+        let hashes = "#1".repeat(500_000);
+        assert!(refs(&list, &index, "p13", &hashes).is_empty());
+        // An address is read to 300 characters, so one longer than that names nothing, even if it starts like an item.
+        let cut = format!("https://github.com/acme/app/issues/12{}", "x".repeat(400));
+        assert!(refs(&list, &index, "p13", &cut).is_empty());
+        assert!(
+            started.elapsed() < std::time::Duration::from_secs(20),
+            "{:?}",
+            started.elapsed()
+        );
+
+        // One commit that last changed a hundred thousand files, named a hundred thousand times, fills the item
+        // with fifty mentions and the rest of the text is not walked.
+        let files: Vec<(String, String, Option<String>)> = (0..100_000)
+            .map(|number| {
+                (
+                    format!("a{number}"),
+                    format!("src/file{number}.rs"),
+                    Some("0123456789abcdef0123456789abcdef01234567".to_owned()),
+                )
+            })
+            .collect();
+        let index = MentionIndex::new(WorkspaceFileIndex {
+            files,
+            symbols: HashMap::new(),
+        });
+        let started = std::time::Instant::now();
+        let found = find_mentions(&index, &"0123456 ".repeat(100_000), &[]);
+        assert_eq!(found.len(), MAX_MENTIONS);
+        assert!(
+            started.elapsed() < std::time::Duration::from_secs(20),
+            "{:?}",
+            started.elapsed()
+        );
     }
 }

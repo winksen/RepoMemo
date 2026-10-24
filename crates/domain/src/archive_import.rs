@@ -87,6 +87,39 @@ mod tests {
     }
 
     #[test]
+    fn a_record_that_states_another_size_than_its_stored_file_is_corrected() {
+        let mut data: WorkspaceArchiveData = serde_json::from_value(serde_json::json!({
+            "workspace": {"name": "Test", "created_at": "", "settings": {}},
+            "sources": [], "folders": [], "lifecycle": [], "memory_cards": [], "tasks": [], "comments": [],
+            "artifacts": [
+                {"id": "a1", "source_id": "s", "folder_id": null, "artifact_type": "text", "title": "One", "path": "one.txt",
+                 "content_hash": "aaaa", "mime_type": null, "language": null, "size_bytes": 3, "created_at": "", "updated_at": "", "metadata": {}},
+                {"id": "a2", "source_id": "s", "folder_id": null, "artifact_type": "text", "title": "Two", "path": "two.txt",
+                 "content_hash": "bbbb", "mime_type": null, "language": null, "size_bytes": 10, "created_at": "", "updated_at": "", "metadata": {}},
+                {"id": "a3", "source_id": "s", "folder_id": null, "artifact_type": "text", "title": "Three", "path": "three.txt",
+                 "content_hash": "cccc", "mime_type": null, "language": null, "size_bytes": 7, "created_at": "", "updated_at": "", "metadata": {}}
+            ],
+            "versions": [
+                {"artifact_id": "a1", "version": 1, "content_hash": "dddd", "size_bytes": 1, "mime_type": null,
+                 "became_current_at": "", "replaced_at": "", "replaced_by": null}
+            ]
+        }))
+        .unwrap();
+        let sizes: HashMap<&str, u64> = HashMap::from([("aaaa", 3), ("bbbb", 2_000_000), ("dddd", 400)]);
+        // "bbbb" and "dddd" were stated wrong; "aaaa" is right; "cccc" is not listed and is left to the checks.
+        assert_eq!(data.use_stored_sizes(&sizes), 2);
+        assert_eq!(
+            data.artifacts
+                .iter()
+                .map(|artifact| artifact.size_bytes)
+                .collect::<Vec<_>>(),
+            vec![3, 2_000_000, 7]
+        );
+        assert_eq!(data.versions[0].size_bytes, 400);
+        assert_eq!(data.use_stored_sizes(&sizes), 0, "nothing left to correct");
+    }
+
+    #[test]
     fn the_total_of_declared_sizes_saturates_instead_of_wrapping() {
         assert_eq!(manifest(&[10, 20]).blob_bytes(), 30);
         assert_eq!(manifest(&[u64::MAX / 2 + 1, u64::MAX / 2 + 1]).blob_bytes(), u64::MAX);
@@ -105,6 +138,30 @@ fn limited(check: &mut ArchiveCheck, found: Vec<String>, what: &str) {
 }
 
 impl WorkspaceArchiveData {
+    /// Replaces the size each record states with the size of the stored file it names, where `sizes` (the
+    /// archive's list of stored files, each checked against its hash while it was read) has that file; returns how
+    /// many records said otherwise. The workspace's storage allowance adds these figures up, and an archive could
+    /// state any (V0.3.26).
+    pub fn use_stored_sizes(&mut self, sizes: &HashMap<&str, u64>) -> usize {
+        let mut changed = 0;
+        let mut set = |hash: &str, stated: &mut i64| {
+            if let Some(size) = sizes.get(hash) {
+                let size = i64::try_from(*size).unwrap_or(i64::MAX);
+                if *stated != size {
+                    *stated = size;
+                    changed += 1;
+                }
+            }
+        };
+        for artifact in &mut self.artifacts {
+            set(&artifact.content_hash, &mut artifact.size_bytes);
+        }
+        for version in &mut self.versions {
+            set(&version.content_hash, &mut version.size_bytes);
+        }
+        changed
+    }
+
     /// Checks that the records agree with each other: every reference points
     /// at something in the archive, folders form a tree no deeper than the
     /// product allows, and states are ones this server knows.
