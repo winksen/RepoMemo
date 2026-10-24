@@ -155,9 +155,6 @@ function* sources(directory) {
   }
 }
 
-// App.tsx is the local desktop edition (retired in V0.2.51, to be removed in a 0.3.x release); the web client is everything else.
-const LOCAL_EDITION = new Set(["App.tsx", "main.tsx"]);
-
 const FIELDS = new Set(["input", "select", "textarea", "Input", "Textarea"]);
 const BUTTONS = new Set(["button", "Button"]);
 const ARIA_LABEL_OK = new Set(["button", "a", "input", "select", "textarea", "nav", "main", "aside", "header", "footer", "section", "form", "article", "table", "ul", "ol", "dl", "svg", "img", "dialog", "fieldset", "figure", "iframe", "details", "summary", "audio", "video", "canvas", "meter", "progress", "output", "search", "menu", "h1", "h2", "h3", "h4", "h5", "h6", "li", "td", "th", "tr", "tbody", "thead"]);
@@ -288,7 +285,6 @@ function checkFile(path) {
 
 let checked = 0;
 for (const path of sources(src)) {
-  if (dirname(path) === src && LOCAL_EDITION.has(path.slice(src.length + 1))) continue;
   checked += 1;
   checkFile(path);
 }

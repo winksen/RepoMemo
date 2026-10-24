@@ -95,11 +95,15 @@ Every 0.2.x release upgrades in place from the one before it, and an environment
 - The anonymous endpoints (sign-in, registration, refresh, reset, invitations, setup) take bodies of 64 KiB, and the webhook receivers 1 MiB (V0.2.52). An import needs a proxy that lets `POST /v1/workspaces/import` carry a body as large as your biggest archive, unbuffered.
 - **Workspaces can use a template** (V0.2.163–V0.2.193). Nothing changes for a workspace that exists: it stays on **General**, which is the behaviour of V0.2.162 (search ranking, health checks, sections, suggestions). An owner or administrator chooses another template in Settings › Template, or when creating a workspace; a template only orders, names and weighs what is there and never changes who can see or do anything. Choosing one moves no evidence. Your own template files go in a folder named by `REPOMEMO_TEMPLATES_DIR` (see above). The repository link form can start with include and exclude rules from the template; links already made are not touched.
 - Deactivating (V0.2.16) and anonymizing (V0.2.17) accounts exist. Log files and earlier backups keep a person's address until they age out.
-- The desktop app is a window onto a server (V0.2.49); its local workspace is retired and goes in a 0.3.x release (planned for V0.3.5–V0.3.7, so move any you need before then). Move any you need with *Move a workspace to a server* (V0.2.50). The server needs nothing.
+- The desktop app is a window onto a server (V0.2.49); its local workspace was retired (V0.2.51) and is deleted from the app in V0.3.5 (the move, *Move a workspace to a server* of V0.2.50, works up to V0.3.4). The server needs nothing.
 
 **If you build the server yourself:** build from a checkout with LF line endings, as CI does: a build with other line endings computes other migration checksums and refuses an environment another build made. The desktop crate pulls `tauri-plugin-http` and `keyring`.
 
 **A short path:** back up, replace the binary and the web app, start it, open System › Overview. Then, if you want any of the above, set it and restart. Rolling back is below; an environment already migrated by a newer release is refused by an older binary, so roll back with a backup.
+
+### From 0.3.0 onward (the 0.3.x releases)
+
+- **The desktop app has no local workspace from V0.3.5.** It opens on the saved server, or asks for a server address. **V0.3.4 is the last release that can move a local workspace to a server**, so move any you need *before* upgrading the app: the data of a local workspace stays in its folder on the computer, but nothing in the app opens it any more. An archive made by the move earlier still imports on the dashboard (*Import a workspace*). The server needs nothing.
 
 ## Rolling back
 

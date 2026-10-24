@@ -1,40 +1,32 @@
-import { type ReactNode, useEffect, useState } from "react";
-import { IconServer as Server } from "@tabler/icons-react";
+import { useEffect, useState } from "react";
 import { SharedWebApp } from "../SharedWebApp";
 import { LoadingCanvas } from "../web/common";
 import { desktopServer, installExternalLinkHandler } from "../lib/desktop";
 import { DesktopConnect, pointAtServer } from "./DesktopConnect";
-import { LocalMoveToServer } from "./LocalMoveToServer";
-import { Button } from "./ui/button";
-import { ICON_SIZE } from "./ui/icon";
 
-const MODE_KEY = "repomemo.desktop.mode";
+type Phase = "starting" | "connect" | "server";
 
-function chosenLocal(): boolean {
-  try { return window.localStorage.getItem(MODE_KEY) === "local"; } catch { return false; }
-}
+/** Keys the earlier desktop app kept in this window's storage for the local workspace and its move (removed in V0.3.5). */
+const RETIRED_KEYS = ["repomemo.desktop.mode", "repomemo.desktop.handoff"];
 
-function rememberMode(local: boolean) {
+function forgetRetiredChoices() {
   try {
-    if (local) window.localStorage.setItem(MODE_KEY, "local");
-    else window.localStorage.removeItem(MODE_KEY);
+    for (const key of RETIRED_KEYS) window.localStorage.removeItem(key);
   } catch { /* only a convenience */ }
 }
-
-type Phase = "starting" | "connect" | "server" | "local";
 
 /**
  * What the desktop window shows (V0.2.49). With a server chosen it shows the web client against that
  * server, the same pages the browser shows; without one it asks for an address. The local workspace of
- * the earlier desktop app is retired (V0.2.51): it stays reachable, labelled as retired, until it is
- * removed in a 0.3.x release, and is only chosen on purpose.
+ * the earlier desktop app is gone (V0.3.5).
  */
-export function DesktopApp({ local }: { local: ReactNode }) {
+export function DesktopApp() {
   const [phase, setPhase] = useState<Phase>("starting");
 
   useEffect(() => installExternalLinkHandler(), []);
 
   useEffect(() => {
+    forgetRetiredChoices();
     let cancelled = false;
     (async () => {
       try {
@@ -43,7 +35,7 @@ export function DesktopApp({ local }: { local: ReactNode }) {
         if (origin) {
           await pointAtServer(origin);
           if (!cancelled) setPhase("server");
-        } else setPhase(chosenLocal() ? "local" : "connect");
+        } else setPhase("connect");
       } catch {
         if (!cancelled) setPhase("connect");
       }
@@ -53,24 +45,5 @@ export function DesktopApp({ local }: { local: ReactNode }) {
 
   if (phase === "starting") return <LoadingCanvas label="Starting RepoMemo" />;
   if (phase === "server") return <SharedWebApp />;
-  if (phase === "local") {
-    // Leaves the local workspace for the server: the saved one, or the first screen when there is none yet.
-    const goToServer = async () => {
-      rememberMode(false);
-      try {
-        const origin = await desktopServer.current();
-        if (origin) { await pointAtServer(origin); setPhase("server"); return; }
-      } catch { /* the first screen asks again */ }
-      setPhase("connect");
-    };
-    return <div className="rm-desktop-local">
-      <div className="rm-desktop-retired" role="note">
-        <p><strong>The local workspace is retired.</strong> It stays available for now, receives security fixes only and will be removed in a 0.3.x release. Move your workspaces to a server.</p>
-        <LocalMoveToServer onGoToServer={() => void goToServer()} />
-        <Button onClick={() => void goToServer()} type="button" variant="secondary"><Server size={ICON_SIZE.sm} /> Connect to a server</Button>
-      </div>
-      <div className="rm-desktop-local-body">{local}</div>
-    </div>;
-  }
-  return <DesktopConnect onConnected={() => setPhase("server")} onUseLocal={() => { rememberMode(true); setPhase("local"); }} />;
+  return <DesktopConnect onConnected={() => setPhase("server")} />;
 }

@@ -459,10 +459,3 @@ tr.rm-system-row-inactive .rm-system-person img, tr.rm-system-row-inactive .rm-s
 .rm-desktop-server-host { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rm-desktop-server .rm-button { min-height: 28px; padding: 0 8px; font-size: 12px; }
 .shared-api-note + .rm-desktop-server { margin-top: 14px; }
-.rm-desktop-local { display: flex; flex-direction: column; height: 100vh; }
-.rm-desktop-retired { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 14px; color: var(--color-text); background: var(--color-warning-soft); border-bottom: 1px solid var(--color-warning); font-size: 13px; }
-.rm-desktop-retired p { flex: 1 1 320px; margin: 0; line-height: 1.45; }
-.rm-desktop-retired .rm-button { min-height: 32px; }
-.rm-desktop-local-body { flex: 1; min-height: 0; }
-.rm-desktop-local-body > .app-shell { height: 100%; }
-.shared-import-handoff { margin: 0 0 10px; padding: 10px 12px; color: var(--color-text-muted); background: var(--color-surface-2); border-radius: 8px; font-size: 13px; line-height: 1.5; }

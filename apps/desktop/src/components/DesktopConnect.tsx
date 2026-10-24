@@ -1,10 +1,9 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { IconArrowRight as ArrowRight, IconKey as Key, IconServer as Server, IconShieldLock as Shield } from "@tabler/icons-react";
+import { IconArrowRight as ArrowRight, IconKey as Key, IconShieldLock as Shield } from "@tabler/icons-react";
 import { configureDesktopApi, getSharedHealth } from "../lib/sharedApi";
 import { desktopServer } from "../lib/desktop";
 import { normalizeServerAddress } from "../lib/serverAddress";
-import { pendingHandoff } from "../lib/handoff";
 import { ThemeToggle } from "./SharedLayout";
 import { Button } from "./ui/button";
 import { Field } from "./ui/field";
@@ -30,10 +29,9 @@ function reason(error: unknown): string {
  * checks the address and lets this window call that server and no other; the page then asks the server for
  * its health, and only a server that answers is kept for the next start.
  */
-export function DesktopConnect({ onConnected, onUseLocal }: { onConnected: () => void; onUseLocal: () => void }) {
+export function DesktopConnect({ onConnected }: { onConnected: () => void }) {
   const [address, setAddress] = useState("");
   const [isConnecting, setIsConnecting] = useState(false);
-  const waiting = pendingHandoff();
 
   async function connect(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -86,7 +84,6 @@ export function DesktopConnect({ onConnected, onUseLocal }: { onConnected: () =>
             <h2>Which server?</h2>
             <p>Enter the address your administrator gave you, such as <code>repomemo.example.com</code>. Use <code>https://</code>; plain <code>http://</code> is only accepted for a server on your own network.</p>
           </div>
-          {waiting ? <p className="shared-auth-hint" role="status">Your workspace <strong>{waiting.workspace_name}</strong> is ready to move. Connect to the server you want it on, sign in, and the dashboard's <em>Import a workspace</em> checks it for you.</p> : null}
           <form className="shared-auth-form" onSubmit={connect}>
             <Field label="Server address" required><Input autoCapitalize="none" autoComplete="url" autoCorrect="off" autoFocus inputMode="url" onChange={(event) => setAddress(event.target.value)} placeholder="https://repomemo.example.com" spellCheck={false} type="text" value={address} /></Field>
             <Button busy={isConnecting} type="submit" variant="main">
@@ -94,9 +91,6 @@ export function DesktopConnect({ onConnected, onUseLocal }: { onConnected: () =>
               Connect
             </Button>
           </form>
-          <p className="shared-auth-hint">
-            Just looking around? <Button onClick={onUseLocal} type="button" variant="secondary"><Server size={ICON_SIZE.sm} /> Use the local workspace</Button> It stays on this computer only. It is retired: it gets security fixes only and will be removed in a 0.3.x release, so move your work to a server.
-          </p>
         </div>
       </section>
     </main>

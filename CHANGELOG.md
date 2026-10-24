@@ -2,6 +2,29 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.3.5 (2026-10-24)
+
+The local edition is removed from the desktop client: the app opens on the server address screen only.
+
+### Removed
+- **The local app:** `LocalDesktopApp` (`App.tsx`, 2,757 lines), `lib/repomemoApi.ts` (607 lines), `LocalMoveToServer.tsx`, `lib/handoff.ts` and the *Use the local workspace* button of the first screen. `App.tsx` is now twelve lines: the browser opens the web client, and the desktop window opens `DesktopApp`.
+- **The move's traces:** the notice of a workspace "ready to move" on the address screen, and the prepared-archive path of *Import a workspace* on the dashboard (it still imports any archive a person chooses, including one made earlier by the move).
+- **Styles:** every rule that only the local app's classes selected (about 870 rules, and 120 selectors trimmed from shared rules), the empty `08-evidence-instrument-tail.css`, two unused keyframes and the `.rm-desktop-local`, `.rm-desktop-retired` and `.shared-import-handoff` rules: 4,785 lines of CSS in all. `styles:check` and `a11y:check` lose their exemptions for the local edition; the style baseline shrinks from 111 to 89 older cases.
+- **Tests:** the nine tests of the move (`desktopHandoff.test.tsx`); the desktop test about the retired workspace is replaced by one that checks the address screen opens and the two old storage keys are forgotten.
+
+### Changed
+- **`DesktopApp`** opens the web client on the saved server or `DesktopConnect`, and removes the two storage keys the local app left (`repomemo.desktop.mode`, `repomemo.desktop.handoff`) at its next start.
+- **The Tauri shell is unchanged:** its 26 local commands, the move's four and the `repomemo-api` dependency go in V0.3.6, so nothing calls them now.
+- **The documents:** the functional mindmap's desktop section and gaps row say the local workspace is gone, and the technical mindmap's frontend, accessibility, styles and risk rows say so; the full pass over the documents is V0.3.7.
+- **The version** is `0.3.5` everywhere.
+
+### Checks
+- **Passing:** `npm run typecheck`, `styles:check`, `a11y:check` (123 components), `version:check` and `docs:check`.
+- **Not run:** the web tests (as asked) and the app itself.
+
+### Upgrading
+- A desktop window that had chosen the local workspace opens on the address screen. The data of a local workspace stays in its folder on the computer, untouched but no longer reachable from the app; V0.3.4 was the last release that could move one to a server. See UPGRADING.md.
+
 ## V0.3.4 (2026-10-24)
 
 The record of the clean install, the performance runs and the browser pass prepared for the maintainer to fill. Documents only; no code changed, and no figure was invented.

@@ -20,7 +20,7 @@ import { showToast } from "../components/ui/toast";
 const healthy = { service: "repomemo-server", status: "ok", authentication: "jwt" };
 
 function start() {
-  render(<DesktopApp local={<p>the local workspace</p>} />);
+  render(<DesktopApp />);
 }
 
 beforeEach(() => {
@@ -89,21 +89,14 @@ describe("the desktop app", () => {
     await waitFor(() => expect(showToast).toHaveBeenCalledWith("error", "That address cannot be used from here."));
   });
 
-  it("keeps the local workspace reachable on purpose, remembers the choice and offers the way back", async () => {
+  it("has no local workspace: a window that chose one before opens on the server address screen and forgets the choice", async () => {
+    window.localStorage.setItem("repomemo.desktop.mode", "local");
+    window.localStorage.setItem("repomemo.desktop.handoff", JSON.stringify({ path: "C:\\exports\\notes.tar.gz", file_name: "notes.tar.gz", workspace_name: "Notes" }));
     start();
-    fireEvent.click(await screen.findByRole("button", { name: /Use the local workspace/ }));
-    expect(screen.getByText("the local workspace")).toBeTruthy();
-    // It is labelled as retired, with the way out beside the notice.
-    expect(screen.getByRole("note").textContent).toContain("The local workspace is retired.");
-    expect(screen.getByRole("note").textContent).toContain("0.3.x");
-    expect(window.localStorage.getItem("repomemo.desktop.mode")).toBe("local");
-
-    cleanup();
-    start();
-    expect(await screen.findByText("the local workspace")).toBeTruthy();
-
-    fireEvent.click(screen.getByRole("button", { name: /Connect to a server/ }));
     expect(await screen.findByLabelText("Server address")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /local workspace/i })).toBeNull();
+    expect(screen.queryByRole("note")).toBeNull();
     expect(window.localStorage.getItem("repomemo.desktop.mode")).toBeNull();
+    expect(window.localStorage.getItem("repomemo.desktop.handoff")).toBeNull();
   });
 });

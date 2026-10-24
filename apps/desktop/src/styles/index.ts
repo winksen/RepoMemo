@@ -8,7 +8,6 @@ import "./04-import-lists-search-and-badges.css";
 import "./05-artifact-detail-and-viewports.css";
 import "./06-evidence-instrument-layout.css";
 import "./07-evidence-instrument-pages.css";
-import "./08-evidence-instrument-tail.css";
 import "./09-neutral-research-canvas.css";
 import "./10-quiet-evidence-desk-and-additions.css";
 import "./11-blueprint-primitives.css";

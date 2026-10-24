@@ -5,8 +5,7 @@
 //     `src/styles/` once, in the order of their numbers (the order is the cascade);
 //   - no bare `input`, `select`, `textarea` or `button` selector (alone, or at the end of a path
 //     such as `.page-form input`) outside the base reset (the top of 01-tokens-and-shared-web.css,
-//     before its "Shared web mode" comment) and the retired local edition (`.rm-local-edition`):
-//     a control is styled through its class (`.rm-input`, `.rm-button`…), never from a page;
+//     before its "Shared web mode" comment): a control is styled through its class (`.rm-input`, `.rm-button`…), never from a page;
 //   - no hex, rgb or hsl colour outside a `:root` or `[data-theme]` token block;
 //   - no `z-index` that is not a `var(--layer-*)` token (0, -1 and auto are allowed);
 //   - no `height` or `min-height` in pixels on a button, input, select or dropdown trigger:
@@ -102,19 +101,16 @@ function violationsIn(file, text) {
     if (rule.head.startsWith("@") || rule.parents.some((parent) => /^@(keyframes|font-face)/.test(parent))) continue;
     const selectors = rule.head.split(",").map((selector) => selector.replace(/\s+/g, " ").trim()).filter(Boolean);
     const inReset = rule.line < resetLines;
-    const local = rule.head.includes(".rm-local-edition");
     const add = (kind, selector, detail) => found.push(`${kind} | ${file} | ${selector} | ${detail}`);
 
-    if (!local) {
-      for (const selector of selectors) {
-        const last = selector.split(/[\s>+~]+/).filter(Boolean).pop() ?? "";
-        const pure = !/[\s>+~]/.test(selector);
-        if (BARE.test(last) && !(inReset && pure)) add("bare element", selector, "style it through its class");
-        if (inReset) continue;
-        const isControl = BARE.test(last) ? !last.startsWith("textarea") : (last.match(/\.[\w-]+/g) ?? []).some((name) => CONTROL_CLASS.test(name));
-        if (!isControl) continue;
-        for (const match of rule.body.matchAll(/(?:^|[;\s])((?:min-)?height)\s*:\s*(\d+px)\s*(?=;|$)/g)) add("control height", selector, `${match[1]}: ${match[2]}`);
-      }
+    for (const selector of selectors) {
+      const last = selector.split(/[\s>+~]+/).filter(Boolean).pop() ?? "";
+      const pure = !/[\s>+~]/.test(selector);
+      if (BARE.test(last) && !(inReset && pure)) add("bare element", selector, "style it through its class");
+      if (inReset) continue;
+      const isControl = BARE.test(last) ? !last.startsWith("textarea") : (last.match(/\.[\w-]+/g) ?? []).some((name) => CONTROL_CLASS.test(name));
+      if (!isControl) continue;
+      for (const match of rule.body.matchAll(/(?:^|[;\s])((?:min-)?height)\s*:\s*(\d+px)\s*(?=;|$)/g)) add("control height", selector, `${match[1]}: ${match[2]}`);
     }
     if (!selectors.every((selector) => TOKEN_BLOCK.test(selector))) {
       for (const match of rule.body.matchAll(COLOUR)) add("raw colour", selectors.join(", "), match[0]);
@@ -130,7 +126,7 @@ function violationsIn(file, text) {
 // The rules must keep catching what they exist for: a planted stylesheet has to trip each of them,
 // and its clean twin none.
 const PLANTED = [".page-form input { height: 40px; }", ".card { color: #ff0000; z-index: 5; }", ".rm-button.mine { min-height: 30px; }"].join(" ");
-const CLEAN = ":root { --ok: #123456; } .fine { color: var(--color-text); z-index: var(--layer-raised); min-height: var(--control-height); } .rm-local-edition input { height: 38px; }";
+const CLEAN = ":root { --ok: #123456; } .fine { color: var(--color-text); z-index: var(--layer-raised); min-height: var(--control-height); }";
 const caught = new Set(violationsIn("01-planted.css", PLANTED).map((violation) => violation.split(" | ")[0]));
 for (const kind of ["bare element", "raw colour", "raw layer", "control height"]) {
   if (!caught.has(kind)) problems.push(`the style check no longer catches a planted ${kind}`);

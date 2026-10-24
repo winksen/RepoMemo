@@ -115,54 +115,17 @@
 button:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
-select:focus-visible,
-.symbol-row:focus-visible {
+select:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
 
 /* Navigation stays compact for this desktop workbench, but gets one decisive
  * active state instead of an outlined, low-contrast selection. */
-.brand-glyph,
-.panel-icon,
-.workspace-row-mark,
-.import-card-icon,
-.artifact-block-icon,
-.memory-row-mark,
-.recent-artifact-row > span:first-child {
-  color: var(--color-text-muted);
-  background: var(--color-surface-3);
-  border: 0;
-}
-
-.nav-item {
-  border-radius: 999px;
-  transition: color 180ms var(--ease-standard), background 180ms var(--ease-standard), transform 180ms var(--ease-standard);
-}
-
-.nav-item:hover:not(:disabled) {
-  color: var(--color-text);
-  background: var(--color-surface-3);
-  transform: none;
-}
-
-.nav-item.active,
-.nav-item.active:hover:not(:disabled) {
-  color: var(--color-on-accent);
-  background: var(--color-accent);
-  border-color: transparent;
-  box-shadow: none;
-}
-
-.nav-item.active::before { display: none; }
 
 /* One action language: quiet ghost pills, cobalt primary pills, and outlined
  * card actions. The class names are retained to avoid behavior changes. */
-.button,
-.workspace-new-button,
-.workspace-create-button,
-.workspace-primary-action,
-.workspace-secondary-action {
+.button {
   min-height: 36px;
   padding: 0 16px;
   border: 2px solid transparent;
@@ -173,58 +136,33 @@ select:focus-visible,
   transition: color 180ms var(--ease-standard), background 180ms var(--ease-standard), border-color 180ms var(--ease-standard), box-shadow 180ms var(--ease-standard);
 }
 
-.button.primary,
-.workspace-new-button.primary,
-.workspace-primary-action {
+.button.primary {
   color: var(--color-on-accent);
   background: var(--color-accent);
   border-color: var(--color-accent);
   box-shadow: 0 2px 5px color-mix(in srgb, var(--color-accent) 20%, transparent);
 }
 
-.button.primary:hover:not(:disabled),
-.workspace-new-button.primary:hover:not(:disabled),
-.workspace-primary-action:hover:not(:disabled) {
+.button.primary:hover:not(:disabled) {
   color: var(--color-on-accent);
   background: var(--color-accent-hover);
   border-color: var(--color-accent-hover);
   box-shadow: 0 3px 8px color-mix(in srgb, var(--color-accent) 24%, transparent);
 }
 
-.button.secondary,
-.workspace-create-button,
-.workspace-secondary-action {
+.button.secondary {
   color: var(--color-text-muted);
   background: transparent;
   border-color: var(--color-border);
 }
 
-.button.secondary:hover:not(:disabled),
-.workspace-create-button:hover:not(:disabled),
-.workspace-secondary-action:hover:not(:disabled) {
+.button.secondary:hover:not(:disabled) {
   color: var(--color-on-accent);
   background: var(--color-accent);
   border-color: var(--color-accent);
 }
 
-.workspace-new-button.secondary {
-  color: var(--color-text-muted);
-  background: var(--color-surface-2);
-  border-color: transparent;
-  box-shadow: none;
-}
-
-.workspace-new-button.secondary:hover:not(:disabled) {
-  color: var(--color-text);
-  background: var(--color-surface-2);
-  border-color: var(--color-accent);
-}
-
-.button:disabled,
-.workspace-new-button:disabled,
-.workspace-create-button:disabled,
-.workspace-primary-action:disabled,
-.workspace-secondary-action:disabled {
+.button:disabled {
   color: var(--color-text-subtle);
   background: var(--color-surface-3);
   border-color: transparent;
@@ -250,35 +188,10 @@ select:focus-visible,
 
 /* Keep status information available, but stop treating every header state as
  * a second row of equally-weighted buttons. */
-.graphite-header .header-actions > .status-badge:nth-of-type(n + 2) { display: none; }
-
-.status-badge {
-  min-height: 26px;
-  padding: 0 9px;
-  color: var(--color-text-muted);
-  background: var(--color-surface-2);
-  border: 1px solid var(--color-border) !important;
-  border-radius: 8px;
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.status-badge.success { color: var(--color-success); background: var(--color-success-soft); border-color: transparent !important; }
-.status-badge.warning { color: var(--color-warning); background: var(--color-warning-soft); border-color: transparent !important; }
-.status-badge.danger { color: var(--color-danger); background: var(--color-danger-soft); border-color: transparent !important; }
-.status-badge.info,
-.status-badge.discovery { color: var(--color-info); background: var(--color-info-soft); border-color: transparent !important; }
 
 /* Cards and working regions use neutral surfaces, generous corners, and
  * borders rather than a stack of slightly different shadows. */
-.import-card,
 .notice,
-.report-panel,
-.image-preview-note,
-.provider-intro,
-.provider-state-card,
-.trust-callout,
-.ask-composer,
 .empty-state {
   background: var(--color-surface-2);
   border: 2px solid transparent;
@@ -286,91 +199,7 @@ select:focus-visible,
   box-shadow: none;
 }
 
-.import-card:hover:not(:disabled) {
-  background: var(--color-surface-2);
-  border-color: var(--color-accent);
-  box-shadow: none;
-  transform: none;
-}
-
-.artifact-row,
-.search-result,
-.memory-card-row,
-.workspace-row-v3 {
-  border: 2px solid transparent;
-  border-radius: 12px;
-  box-shadow: none;
-  transition: background 180ms var(--ease-standard), border-color 180ms var(--ease-standard);
-}
-
-.artifact-row:hover,
-.search-result:hover,
-.memory-card-row:hover,
-.workspace-row-v3:hover {
-  background: var(--color-surface-2);
-  border-color: var(--color-accent);
-  box-shadow: none;
-  transform: none;
-}
-
-.artifact-row.selected,
-.search-result.selected,
-.memory-card-row.selected,
-.workspace-row-v3.selected {
-  background: var(--color-surface-2);
-  border-color: transparent;
-  box-shadow: none;
-}
-
-.artifact-row.selected .artifact-block-icon,
-.workspace-row-v3.selected .workspace-row-mark {
-  color: var(--color-accent);
-  background: var(--color-surface);
-}
-
-.citation-list span {
-  color: var(--color-text-muted);
-  background: var(--color-surface-3);
-  border-radius: 8px;
-}
-
 /* Interface labels remain readable UI copy, not terminal-style decoration. */
-.provider-form label:not(.provider-toggle),
-:where(.rm-local-edition) .paste-language label,
-.result-group-label,
-.memory-search-label,
-.memory-create-form label > span {
-  font-family: var(--font-ui);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-:where(.rm-local-edition) input,
-:where(.rm-local-edition) textarea,
-:where(.rm-local-edition) select,
-:where(.rm-local-edition) .paste-language select,
-:where(.rm-local-edition) .workspace-create-controls input {
-  background: var(--color-surface);
-  border: 2px solid var(--color-border-strong);
-  border-radius: 10px;
-  box-shadow: none;
-  transition: border-color 180ms var(--ease-standard), background 180ms var(--ease-standard);
-}
-
-:where(.rm-local-edition) input:hover:not(:disabled),
-:where(.rm-local-edition) textarea:hover:not(:disabled),
-:where(.rm-local-edition) select:hover:not(:disabled) { border-color: var(--color-accent); }
-
-:where(.rm-local-edition) input:focus,
-:where(.rm-local-edition) textarea:focus,
-:where(.rm-local-edition) select:focus,
-:where(.rm-local-edition) .workspace-create-controls input:focus {
-  background: var(--color-surface);
-  border-color: var(--color-accent);
-  outline: none;
-}
 
 /* The shared primitives own form-control geometry and must retain a visible
  * two-pixel neutral boundary even where a page has more specific field rules. */
@@ -386,38 +215,7 @@ textarea.rm-textarea:focus {
   border-color: var(--color-accent);
 }
 
-:where(.rm-local-edition) .search-input-wrap {
-  background: var(--color-surface-2);
-  border: 2px solid transparent;
-  border-radius: 999px;
-  box-shadow: none;
-}
-
-:where(.rm-local-edition) .search-input-wrap:hover,
-:where(.rm-local-edition) .search-input-wrap:focus-within {
-  border-color: var(--color-accent);
-  box-shadow: none;
-}
-
-:where(.rm-local-edition) .search-input-wrap input,
-:where(.rm-local-edition) .search-input-wrap input:focus {
-  background: transparent;
-  border: 0;
-  outline: 0;
-}
-
 /* The right pane is contextual evidence, not a dashboard. */
-.workspace-inspector-v3,
-.evidence-rail,
-.detail-panel,
-.search-preview,
-.memory-rail {
-  background: var(--color-surface);
-}
-
-.workspace-metrics-v3,
-.workspace-pipeline,
-.workspace-evidence-path { display: none !important; }
 
 /* The legacy desktop canvas contains a small set of fixed light surfaces.
  * Keep them mapped to semantic roles so the same shared preference applies
@@ -426,95 +224,22 @@ textarea.rm-textarea:focus {
   color-scheme: dark;
 }
 
-:root[data-theme="dark"] body,
-:root[data-theme="dark"] .app-shell,
-:root[data-theme="dark"] .workbench {
+:root[data-theme="dark"] body {
   background: var(--color-canvas);
 }
 
 :root[data-theme="dark"] .sidebar,
-:root[data-theme="dark"] .workbench-header.workspace-header-v3.graphite-header,
-:root[data-theme="dark"] .workspace-page-v3,
-:root[data-theme="dark"] .workspace-directory,
-:root[data-theme="dark"] .workspace-inspector-v3,
-:root[data-theme="dark"] .workbench-grid,
-:root[data-theme="dark"] .artifact-layout,
-:root[data-theme="dark"] .search-layout,
-:root[data-theme="dark"] .intelligence-layout,
-:root[data-theme="dark"] .provider-layout,
-:root[data-theme="dark"] .panel,
-:root[data-theme="dark"] .evidence-rail,
-:root[data-theme="dark"] .detail-panel,
-:root[data-theme="dark"] .search-preview,
-:root[data-theme="dark"] .memory-rail {
+:root[data-theme="dark"] .panel {
   background: var(--color-surface);
 }
 
-:root[data-theme="dark"] .brand-glyph,
-:root[data-theme="dark"] .workspace-row-mark,
-:root[data-theme="dark"] .panel-icon,
-:root[data-theme="dark"] .workspace-create-heading > span {
-  color: var(--color-text-muted);
-  background: var(--color-surface-3);
-}
-
-:root[data-theme="dark"] .nav-item:hover:not(:disabled),
-:root[data-theme="dark"] .workspace-row-v3:hover {
-  color: var(--color-text);
-  background: var(--color-surface-hover);
-}
-
-:root[data-theme="dark"] .workspace-row-v3.selected .workspace-row-mark,
-:root[data-theme="dark"] .artifact-row.selected .artifact-block-icon {
-  color: var(--color-accent);
-  background: var(--color-surface);
-}
-
-:root[data-theme="dark"] .workspace-new-button.secondary,
-:root[data-theme="dark"] .button.secondary,
-:root[data-theme="dark"] .workspace-secondary-action,
-:root[data-theme="dark"] .status-badge {
+:root[data-theme="dark"] .button.secondary {
   background: var(--color-surface);
   border-color: var(--color-border);
 }
 
-:root[data-theme="dark"] :where(.rm-local-edition) .workspace-create-controls input,
-:root[data-theme="dark"] :where(.rm-local-edition) .paste-language select,
-:root[data-theme="dark"] :where(.rm-local-edition) input,
-:root[data-theme="dark"] :where(.rm-local-edition) textarea,
-:root[data-theme="dark"] :where(.rm-local-edition) select {
-  background: var(--color-surface);
-  border-color: var(--color-border-strong);
-}
-
-:root[data-theme="dark"] .import-card:hover:not(:disabled) {
-  background: var(--color-surface);
+:root[data-theme="dark"] .button.secondary:hover:not(:disabled) {
   border-color: var(--color-accent);
-}
-
-:root[data-theme="dark"] .workspace-local-badge,
-:root[data-theme="dark"] .import-card {
-  background: var(--color-surface-2);
-}
-
-:root[data-theme="dark"] .workspace-new-button.secondary:hover:not(:disabled),
-:root[data-theme="dark"] .button.secondary:hover:not(:disabled),
-:root[data-theme="dark"] .workspace-secondary-action:hover:not(:disabled),
-:root[data-theme="dark"] :where(.rm-local-edition) input:hover:not(:disabled),
-:root[data-theme="dark"] :where(.rm-local-edition) textarea:hover:not(:disabled),
-:root[data-theme="dark"] :where(.rm-local-edition) select:hover:not(:disabled),
-:root[data-theme="dark"] :where(.rm-local-edition) input:focus,
-:root[data-theme="dark"] :where(.rm-local-edition) textarea:focus,
-:root[data-theme="dark"] :where(.rm-local-edition) select:focus {
-  border-color: var(--color-accent);
-}
-
-:root[data-theme="dark"] .status-badge.success { color: var(--color-success); }
-:root[data-theme="dark"] .status-badge.warning { color: var(--color-warning); }
-:root[data-theme="dark"] .status-badge.danger { color: var(--color-danger); }
-
-@media (max-width: 900px) {
-  .graphite-header .header-actions > .status-badge { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
