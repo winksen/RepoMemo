@@ -231,14 +231,25 @@ mod tests {
     fn index() -> MentionIndex {
         MentionIndex::new(WorkspaceFileIndex {
             files: vec![
-                ("a1".into(), "src/ledger.rs".into(), Some("0123456789abcdef0123456789abcdef01234567".into())),
+                (
+                    "a1".into(),
+                    "src/ledger.rs".into(),
+                    Some("0123456789abcdef0123456789abcdef01234567".into()),
+                ),
                 ("a2".into(), "src/web/mod.rs".into(), None),
                 ("a3".into(), "src/db/mod.rs".into(), None),
-                ("a4".into(), "docs/guide.md".into(), Some("89abcdef0123456789abcdef0123456789abcdef".into())),
+                (
+                    "a4".into(),
+                    "docs/guide.md".into(),
+                    Some("89abcdef0123456789abcdef0123456789abcdef".into()),
+                ),
             ],
             symbols: HashMap::from([
                 ("post_refund".to_owned(), vec!["a1".to_owned()]),
-                ("common".to_owned(), vec!["a1".into(), "a2".into(), "a3".into(), "a4".into()]),
+                (
+                    "common".to_owned(),
+                    vec!["a1".into(), "a2".into(), "a3".into(), "a4".into()],
+                ),
             ]),
         })
     }
@@ -273,7 +284,10 @@ mod tests {
             "`Ledger::post_refund()` posts twice, post_refund without ticks is ignored. `common` is everywhere.",
             &[],
         );
-        assert_eq!(labels(&found), vec![("symbol".into(), "post_refund".into(), "a1".into())]);
+        assert_eq!(
+            labels(&found),
+            vec![("symbol".into(), "post_refund".into(), "a1".into())]
+        );
     }
 
     #[test]
@@ -287,8 +301,16 @@ mod tests {
         assert_eq!(
             commits,
             vec![
-                ("commit".into(), "0123456789abcdef0123456789abcdef01234567".into(), "a1".into()),
-                ("commit".into(), "89abcdef0123456789abcdef0123456789abcdef".into(), "a4".into()),
+                (
+                    "commit".into(),
+                    "0123456789abcdef0123456789abcdef01234567".into(),
+                    "a1".into()
+                ),
+                (
+                    "commit".into(),
+                    "89abcdef0123456789abcdef0123456789abcdef".into(),
+                    "a4".into()
+                ),
             ]
         );
     }

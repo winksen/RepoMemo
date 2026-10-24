@@ -40,12 +40,11 @@ impl StorageEngine {
     /// Everything `workspace_id` holds that an archive carries, except the
     /// files' bytes (the caller reads those by content hash).
     pub async fn export_workspace_data(&self, workspace_id: &str) -> Result<WorkspaceArchiveData> {
-        let workspace_row =
-            sqlx::query("SELECT name, created_at, settings_json FROM workspaces WHERE id = ?1")
-                .bind(workspace_id)
-                .fetch_optional(self.reader())
-                .await?
-                .ok_or_else(|| repomemo_domain::not_found!("Workspace was not found."))?;
+        let workspace_row = sqlx::query("SELECT name, created_at, settings_json FROM workspaces WHERE id = ?1")
+            .bind(workspace_id)
+            .fetch_optional(self.reader())
+            .await?
+            .ok_or_else(|| repomemo_domain::not_found!("Workspace was not found."))?;
         let workspace = ArchiveWorkspace {
             name: workspace_row.get("name"),
             created_at: workspace_row.get("created_at"),
@@ -272,14 +271,11 @@ impl StorageEngine {
             } else {
                 None
             };
-            citations
-                .entry(row.get("card_id"))
-                .or_default()
-                .push(ArchiveCitation {
-                    artifact_id,
-                    chunk,
-                    confidence: row.get("confidence"),
-                });
+            citations.entry(row.get("card_id")).or_default().push(ArchiveCitation {
+                artifact_id,
+                chunk,
+                confidence: row.get("confidence"),
+            });
         }
 
         let cards = cards

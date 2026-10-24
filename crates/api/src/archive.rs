@@ -176,7 +176,10 @@ impl<R: Read> ArchiveReader<R> {
                 self.finished = true;
                 break;
             }
-            let name_end = block[..NAME_BYTES].iter().position(|byte| *byte == 0).unwrap_or(NAME_BYTES);
+            let name_end = block[..NAME_BYTES]
+                .iter()
+                .position(|byte| *byte == 0)
+                .unwrap_or(NAME_BYTES);
             let name = String::from_utf8_lossy(&block[..name_end]).into_owned();
             let size_text = String::from_utf8_lossy(&block[124..135]).into_owned();
             let size = u64::from_str_radix(size_text.trim_matches('\0').trim(), 8)
@@ -324,7 +327,13 @@ mod tests {
         block
             .iter()
             .enumerate()
-            .map(|(index, byte)| if (148..156).contains(&index) { 32 } else { u32::from(*byte) })
+            .map(|(index, byte)| {
+                if (148..156).contains(&index) {
+                    32
+                } else {
+                    u32::from(*byte)
+                }
+            })
             .sum()
     }
 

@@ -78,7 +78,10 @@ mod tests {
             blobs: sizes
                 .iter()
                 .enumerate()
-                .map(|(index, size)| ArchiveBlob { hash: format!("{index:064x}"), size_bytes: *size })
+                .map(|(index, size)| ArchiveBlob {
+                    hash: format!("{index:064x}"),
+                    size_bytes: *size,
+                })
                 .collect(),
         }
     }
@@ -274,7 +277,11 @@ impl WorkspaceArchiveData {
         for entry in &self.lifecycle {
             entry.owner.iter().for_each(&mut add);
             entry.reviewed_by.iter().for_each(&mut add);
-            entry.events.iter().filter_map(|event| event.actor.as_ref()).for_each(&mut add);
+            entry
+                .events
+                .iter()
+                .filter_map(|event| event.actor.as_ref())
+                .for_each(&mut add);
         }
         people
     }

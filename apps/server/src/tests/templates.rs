@@ -320,7 +320,7 @@ async fn a_template_can_be_previewed_and_its_adjustments_saved_and_reset() {
     assert_eq!(detail["template"]["id"], "operations");
     assert_eq!(detail["sections"]["landing"], "review");
     assert_eq!(detail["labels"]["sections"]["tasks"], "Actions");
-    assert!(detail["overview"]["cards"].as_array().unwrap().len() >= 1 && detail.get("source").is_none());
+    assert!(!detail["overview"]["cards"].as_array().unwrap().is_empty() && detail.get("source").is_none());
     assert_eq!(
         send(
             "GET",

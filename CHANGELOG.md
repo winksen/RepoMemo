@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.3.3 (2026-10-24)
+
+The code formatted and clippy made clean in one release, so the two steps that CI already blocks on pass on `main`. No behaviour changed.
+
+### Changed
+- **Formatting:** `cargo fmt --all` rewrote 45 files, hunks only (1,638 lines added and 529 removed over the whole workspace); line endings are kept (rustfmt's `newline_style` is `Auto`, so CRLF files stay CRLF), and a second `cargo fmt --all --check` changes nothing.
+- **Clippy** (`cargo clippy --workspace --exclude repomemo-desktop --all-targets --locked -- -D warnings`) passed after these corrections, none of which changes what the code does: `map_or(true, …)` written as `is_none_or(…)` (the access, agent, meaning, backup, logs, security and streams code); `x % n == 0` written as `is_multiple_of` (the repository sync's progress and the embedding decoder); two redundant closures dropped in the workspace export; a type alias for a cached template answer and for a search outcome; `too_many_arguments` allowed on the one function that stores a repository blob; the test module of `review.rs` moved to the end of the file; and three test assertions written as `assert!(…)` and `is_empty()`.
+- **CI** needed no change: the *rustfmt and clippy* job already blocks on both, and now has a tree to pass on.
+- **The version** is `0.3.3` everywhere.
+
+### Checks
+- **Passing:** `cargo fmt --all --check`, `cargo clippy` as above (every crate, tests included), `version:check` and `docs:check`.
+- **Not run:** the tests, as asked; the lint corrections are the sort a test would catch, so the maintainer's run of V0.3.2 should be made on this tree.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.3.2 (2026-10-24)
 
 Every test written since V0.2.46 compiled and handed over for the one run they have never had. No code changed in this release.

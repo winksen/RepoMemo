@@ -62,7 +62,11 @@ impl StorageEngine {
         Ok(rows
             .into_iter()
             .map(|(kind, id, name)| OwnedPlace {
-                kind: if kind == "organization" { "organization" } else { "workspace" },
+                kind: if kind == "organization" {
+                    "organization"
+                } else {
+                    "workspace"
+                },
                 id,
                 name,
             })
@@ -114,14 +118,13 @@ impl StorageEngine {
             .bind(user_id)
             .execute(&mut *tx)
             .await?;
-        let personal_tokens = sqlx::query(
-            "UPDATE personal_access_tokens SET revoked_at = ?1 WHERE user_id = ?2 AND revoked_at IS NULL",
-        )
-        .bind(&now)
-        .bind(user_id)
-        .execute(&mut *tx)
-        .await?
-        .rows_affected();
+        let personal_tokens =
+            sqlx::query("UPDATE personal_access_tokens SET revoked_at = ?1 WHERE user_id = ?2 AND revoked_at IS NULL")
+                .bind(&now)
+                .bind(user_id)
+                .execute(&mut *tx)
+                .await?
+                .rows_affected();
         let invitations = sqlx::query(
             "UPDATE invitations SET revoked_at = ?1 WHERE invited_by_user_id = ?2 AND accepted_at IS NULL AND revoked_at IS NULL",
         )

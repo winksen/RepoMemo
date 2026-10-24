@@ -149,7 +149,10 @@ impl MailService {
         if kind != "test" {
             if self
                 .limits
-                .check(&format!("to:{}", to.to_ascii_lowercase()), Quota::per_hour(PER_RECIPIENT_PER_HOUR))
+                .check(
+                    &format!("to:{}", to.to_ascii_lowercase()),
+                    Quota::per_hour(PER_RECIPIENT_PER_HOUR),
+                )
                 .is_err()
             {
                 return Err(NotQueued::RateLimited);

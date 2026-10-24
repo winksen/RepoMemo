@@ -151,10 +151,7 @@ impl RemoteGitPolicy {
             path: "x".to_owned(),
         };
         if !self.allows(&probe) {
-            repomemo_domain::bail_invalid!(
-                "This server only connects trackers on: {}.",
-                self.allowed.join(", ")
-            );
+            repomemo_domain::bail_invalid!("This server only connects trackers on: {}.", self.allowed.join(", "));
         }
         Ok(())
     }
@@ -184,7 +181,10 @@ impl RemoteGitPolicy {
 fn split_entry(entry: &str) -> (String, Option<u16>) {
     if let Some(rest) = entry.strip_prefix('[') {
         if let Some((host, after)) = rest.split_once(']') {
-            return (host.to_owned(), after.strip_prefix(':').and_then(|port| port.parse().ok()));
+            return (
+                host.to_owned(),
+                after.strip_prefix(':').and_then(|port| port.parse().ok()),
+            );
         }
     }
     if entry.matches(':').count() == 1 {
@@ -207,7 +207,9 @@ fn parse(raw: &str) -> Result<RemoteRepository> {
     if text.is_empty() {
         return Err(refusal("Enter the address of the repository."));
     }
-    if text.chars().count() > MAX_ADDRESS_CHARS || text.chars().any(|c| c.is_control() || c.is_whitespace() || c == '\\') {
+    if text.chars().count() > MAX_ADDRESS_CHARS
+        || text.chars().any(|c| c.is_control() || c.is_whitespace() || c == '\\')
+    {
         return Err(refusal("That is not a repository address."));
     }
     // git's own transports (`ext::`, `fd::`, helpers) and options.
@@ -249,7 +251,11 @@ fn parse(raw: &str) -> Result<RemoteRepository> {
                 "Leave credentials out of the address: a token or key is entered separately, and is stored encrypted.",
             ));
         }
-        if !user.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.')) || user.starts_with('-') {
+        if !user
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.'))
+            || user.starts_with('-')
+        {
             return Err(refusal("That is not a valid account name for the address."));
         }
     }
@@ -257,7 +263,9 @@ fn parse(raw: &str) -> Result<RemoteRepository> {
     validate_host(&host)?;
     let path = path.trim_matches('/');
     if path.is_empty()
-        || path.split('/').any(|segment| segment.is_empty() || segment == "." || segment == "..")
+        || path
+            .split('/')
+            .any(|segment| segment.is_empty() || segment == "." || segment == "..")
         || path.contains(['?', '#'])
         || !path
             .chars()
@@ -344,7 +352,10 @@ mod tests {
         let https = policy.check("https://GitHub.com/acme/app.git/").unwrap();
         assert_eq!(https.url(), "https://github.com/acme/app.git");
         let scp = policy.check("git@github.com:acme/app.git").unwrap();
-        assert_eq!((scp.scheme, scp.url()), (RemoteScheme::Ssh, "ssh://git@github.com/acme/app.git".to_owned()));
+        assert_eq!(
+            (scp.scheme, scp.url()),
+            (RemoteScheme::Ssh, "ssh://git@github.com/acme/app.git".to_owned())
+        );
         assert!(policy.check("ssh://deploy@code.corp.example:22/team/app").is_ok());
         assert!(policy.check("https://git.internal:2222/team/app").is_ok());
         for refused in [
@@ -383,8 +394,14 @@ mod tests {
         let named = policy(&["10.1.2.3"]);
         assert!(named.check("https://10.1.2.3/acme/app").is_ok());
         assert!(named.check("https://10.1.2.4/acme/app").is_err());
-        assert!(policy(&["[2001:db8::1]"]).check("https://[2001:db8::1]:8443/a/b").is_ok());
-        assert!(policy(&["[2001:db8::1]:443"]).check("https://[2001:db8::1]:8443/a/b").is_err());
-        assert!(policy(&["[2001:db8::1]:443"]).check("https://[2001:db8::1]/a/b").is_ok());
+        assert!(policy(&["[2001:db8::1]"])
+            .check("https://[2001:db8::1]:8443/a/b")
+            .is_ok());
+        assert!(policy(&["[2001:db8::1]:443"])
+            .check("https://[2001:db8::1]:8443/a/b")
+            .is_err());
+        assert!(policy(&["[2001:db8::1]:443"])
+            .check("https://[2001:db8::1]/a/b")
+            .is_ok());
     }
 }

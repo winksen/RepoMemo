@@ -708,16 +708,25 @@ async fn a_deactivated_account_is_shut_out_everywhere_and_comes_back_when_reacti
     )
     .await;
     let invitation_token = invitation["token"].as_str().unwrap().to_owned();
-    assert_eq!(call("GET", "/v1/session".to_owned(), secret.clone(), json!({})).await.status(), 200);
+    assert_eq!(
+        call("GET", "/v1/session".to_owned(), secret.clone(), json!({}))
+            .await
+            .status(),
+        200
+    );
 
     // Only a system administrator, never oneself, and an owner transfers first.
     let deactivate = |id: &str| format!("/v1/system/users/{id}/deactivate");
     assert_eq!(
-        call("POST", deactivate(&member_id), owner.clone(), json!({})).await.status(),
+        call("POST", deactivate(&member_id), owner.clone(), json!({}))
+            .await
+            .status(),
         403
     );
     assert_eq!(
-        call("POST", deactivate(&admin_id), admin.clone(), json!({})).await.status(),
+        call("POST", deactivate(&admin_id), admin.clone(), json!({}))
+            .await
+            .status(),
         409,
         "not oneself"
     );
@@ -734,11 +743,24 @@ async fn a_deactivated_account_is_shut_out_everywhere_and_comes_back_when_reacti
     let ended = response_json(ended).await;
     assert_eq!(ended["personal_tokens_revoked"], 1);
     assert_eq!(ended["invitations_withdrawn"], 1);
-    assert_eq!(call("GET", "/v1/session".to_owned(), member.clone(), json!({})).await.status(), 401);
-    assert_eq!(call("GET", "/v1/session".to_owned(), secret.clone(), json!({})).await.status(), 401);
+    assert_eq!(
+        call("GET", "/v1/session".to_owned(), member.clone(), json!({}))
+            .await
+            .status(),
+        401
+    );
+    assert_eq!(
+        call("GET", "/v1/session".to_owned(), secret.clone(), json!({}))
+            .await
+            .status(),
+        401
+    );
     let refreshed = app
         .clone()
-        .oneshot(public_post("/v1/auth/refresh", json!({"refresh_token": member_refresh})))
+        .oneshot(public_post(
+            "/v1/auth/refresh",
+            json!({"refresh_token": member_refresh}),
+        ))
         .await
         .unwrap();
     assert_eq!(refreshed.status(), 401);
@@ -762,19 +784,29 @@ async fn a_deactivated_account_is_shut_out_everywhere_and_comes_back_when_reacti
     assert_eq!(wrong.status(), 401, "a wrong password says nothing about the account");
     let preview = app
         .clone()
-        .oneshot(public_post("/v1/invitations/preview", json!({"token": invitation_token})))
+        .oneshot(public_post(
+            "/v1/invitations/preview",
+            json!({"token": invitation_token}),
+        ))
         .await
         .unwrap();
     assert_eq!(preview.status(), 410, "the invitation they sent is withdrawn");
     assert_eq!(
-        call("POST", deactivate(&member_id), admin.clone(), json!({})).await.status(),
+        call("POST", deactivate(&member_id), admin.clone(), json!({}))
+            .await
+            .status(),
         409,
         "already deactivated"
     );
     assert_eq!(
-        call("POST", format!("/v1/system/users/{member_id}/password-reset"), admin.clone(), json!({}))
-            .await
-            .status(),
+        call(
+            "POST",
+            format!("/v1/system/users/{member_id}/password-reset"),
+            admin.clone(),
+            json!({})
+        )
+        .await
+        .status(),
         409,
         "no reset link for a deactivated account"
     );
@@ -792,16 +824,26 @@ async fn a_deactivated_account_is_shut_out_everywhere_and_comes_back_when_reacti
 
     // Reactivated, they sign in again with the same password.
     assert_eq!(
-        call("POST", format!("/v1/system/users/{owner_id}/reactivate"), admin.clone(), json!({}))
-            .await
-            .status(),
+        call(
+            "POST",
+            format!("/v1/system/users/{owner_id}/reactivate"),
+            admin.clone(),
+            json!({})
+        )
+        .await
+        .status(),
         409,
         "an active account is not reactivated"
     );
     assert_eq!(
-        call("POST", format!("/v1/system/users/{member_id}/reactivate"), admin.clone(), json!({}))
-            .await
-            .status(),
+        call(
+            "POST",
+            format!("/v1/system/users/{member_id}/reactivate"),
+            admin.clone(),
+            json!({})
+        )
+        .await
+        .status(),
         204
     );
     let back = app
@@ -814,7 +856,9 @@ async fn a_deactivated_account_is_shut_out_everywhere_and_comes_back_when_reacti
         .unwrap();
     assert_eq!(back.status(), 200);
     assert_eq!(
-        call("GET", "/v1/session".to_owned(), member.clone(), json!({})).await.status(),
+        call("GET", "/v1/session".to_owned(), member.clone(), json!({}))
+            .await
+            .status(),
         401,
         "the sessions that ended stay ended"
     );
@@ -869,32 +913,58 @@ async fn an_anonymized_account_loses_its_personal_data_and_what_it_wrote_stays()
     let anonymize = |confirm: &str| json!({"confirm": confirm});
     let path = format!("/v1/system/users/{member_id}/anonymize");
     assert_eq!(
-        call("POST", path.clone(), admin.clone(), anonymize("anonymize-member@example.com"))
-            .await
-            .status(),
+        call(
+            "POST",
+            path.clone(),
+            admin.clone(),
+            anonymize("anonymize-member@example.com")
+        )
+        .await
+        .status(),
         409,
         "deactivate first"
     );
     assert_eq!(
-        call("POST", format!("/v1/system/users/{member_id}/deactivate"), admin.clone(), json!({}))
-            .await
-            .status(),
+        call(
+            "POST",
+            format!("/v1/system/users/{member_id}/deactivate"),
+            admin.clone(),
+            json!({})
+        )
+        .await
+        .status(),
         200
     );
     assert_eq!(
-        call("POST", path.clone(), admin.clone(), anonymize("someone-else@example.com"))
-            .await
-            .status(),
+        call(
+            "POST",
+            path.clone(),
+            admin.clone(),
+            anonymize("someone-else@example.com")
+        )
+        .await
+        .status(),
         400,
         "the address is typed to confirm"
     );
     assert_eq!(
-        call("POST", path.clone(), owner.clone(), anonymize("anonymize-member@example.com"))
-            .await
-            .status(),
+        call(
+            "POST",
+            path.clone(),
+            owner.clone(),
+            anonymize("anonymize-member@example.com")
+        )
+        .await
+        .status(),
         403
     );
-    let done = call("POST", path.clone(), admin.clone(), anonymize("Anonymize-Member@example.com")).await;
+    let done = call(
+        "POST",
+        path.clone(),
+        admin.clone(),
+        anonymize("Anonymize-Member@example.com"),
+    )
+    .await;
     assert_eq!(done.status(), 200);
     let done = response_json(done).await;
     assert_eq!(done["memberships_removed"], 1);
@@ -921,9 +991,14 @@ async fn an_anonymized_account_loses_its_personal_data_and_what_it_wrote_stays()
         .unwrap();
     assert_eq!(signed_in.status(), 401);
     assert_eq!(
-        call("POST", format!("/v1/system/users/{member_id}/reactivate"), admin.clone(), json!({}))
-            .await
-            .status(),
+        call(
+            "POST",
+            format!("/v1/system/users/{member_id}/reactivate"),
+            admin.clone(),
+            json!({})
+        )
+        .await
+        .status(),
         409
     );
     assert_eq!(
@@ -936,13 +1011,25 @@ async fn an_anonymized_account_loses_its_personal_data_and_what_it_wrote_stays()
 
     // What they wrote stays, and nothing names them any more.
     let tasks = response_json(
-        call("GET", format!("/v1/workspaces/{workspace_id}/tasks"), owner.clone(), json!({})).await,
+        call(
+            "GET",
+            format!("/v1/workspaces/{workspace_id}/tasks"),
+            owner.clone(),
+            json!({}),
+        )
+        .await,
     )
     .await;
     assert!(tasks.to_string().contains("Written by the member"));
     assert!(!tasks.to_string().contains("anonymize-member@example.com"));
     let activity = response_json(
-        call("GET", format!("/v1/workspaces/{workspace_id}/activity"), owner.clone(), json!({})).await,
+        call(
+            "GET",
+            format!("/v1/workspaces/{workspace_id}/activity"),
+            owner.clone(),
+            json!({}),
+        )
+        .await,
     )
     .await;
     let text = activity.to_string();
@@ -981,16 +1068,30 @@ async fn the_audit_trail_downloads_for_a_date_range_and_the_download_is_audited(
     let (status, headers, body) = text(get("/v1/system/audit/export".to_owned(), &admin).await).await;
     assert_eq!(status, 200);
     assert_eq!(headers["content-type"], "application/x-ndjson");
-    assert_eq!(headers["content-disposition"], "attachment; filename=\"repomemo-audit-start-now.jsonl\"");
+    assert_eq!(
+        headers["content-disposition"],
+        "attachment; filename=\"repomemo-audit-start-now.jsonl\""
+    );
     let lines = body.lines().collect::<Vec<_>>();
     assert_eq!(lines.len().to_string(), headers["x-total-count"].to_str().unwrap());
     let events = lines
         .iter()
         .map(|line| serde_json::from_str::<Value>(line).unwrap())
         .collect::<Vec<_>>();
-    assert_eq!(events.iter().filter(|event| event["action"] == "maintenance_run").count(), 3);
-    assert!(events.windows(2).all(|pair| pair[0]["time"].as_str() <= pair[1]["time"].as_str()));
-    let run = events.iter().find(|event| event["action"] == "maintenance_run").unwrap();
+    assert_eq!(
+        events
+            .iter()
+            .filter(|event| event["action"] == "maintenance_run")
+            .count(),
+        3
+    );
+    assert!(events
+        .windows(2)
+        .all(|pair| pair[0]["time"].as_str() <= pair[1]["time"].as_str()));
+    let run = events
+        .iter()
+        .find(|event| event["action"] == "maintenance_run")
+        .unwrap();
     assert_eq!(run["actor"]["email"], "audit-admin@example.com");
     assert!(run["detail"].as_str().is_some_and(|detail| !detail.is_empty()));
 
@@ -1002,7 +1103,13 @@ async fn the_audit_trail_downloads_for_a_date_range_and_the_download_is_audited(
         .iter()
         .find(|event| event["action"] == "audit_exported")
         .expect("the export is audited");
-    assert!(recorded["detail"].as_str().unwrap().contains("from the start to now as jsonl"), "{recorded}");
+    assert!(
+        recorded["detail"]
+            .as_str()
+            .unwrap()
+            .contains("from the start to now as jsonl"),
+        "{recorded}"
+    );
     assert_eq!(recorded["actor"]["email"], "audit-admin@example.com");
     let (_, _, again) = text(get("/v1/system/audit/export?format=jsonl".to_owned(), &admin).await).await;
     assert!(again.lines().any(|line| line.contains("\"audit_exported\"")));
@@ -1014,16 +1121,30 @@ async fn the_audit_trail_downloads_for_a_date_range_and_the_download_is_audited(
     assert!(headers["content-disposition"].to_str().unwrap().ends_with(".csv\""));
     let rows = csv.split("\r\n").filter(|row| !row.is_empty()).collect::<Vec<_>>();
     assert_eq!(rows[0], "id,time,actor_id,actor_email,actor_name,action,detail");
-    assert_eq!(rows.len() - 1, headers["x-total-count"].to_str().unwrap().parse::<usize>().unwrap());
+    assert_eq!(
+        rows.len() - 1,
+        headers["x-total-count"].to_str().unwrap().parse::<usize>().unwrap()
+    );
     assert!(rows.iter().any(|row| row.contains(",maintenance_run,")));
 
     // A date range: today's events by day, none for a day long ago, and refusals.
     let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
-    let (status, headers, body) = text(get(format!("/v1/system/audit/export?from={today}&to={today}"), &admin).await).await;
+    let (status, headers, body) =
+        text(get(format!("/v1/system/audit/export?from={today}&to={today}"), &admin).await).await;
     assert_eq!(status, 200);
-    assert_eq!(headers["content-disposition"].to_str().unwrap(), format!("attachment; filename=\"repomemo-audit-{today}-{today}.jsonl\""));
+    assert_eq!(
+        headers["content-disposition"].to_str().unwrap(),
+        format!("attachment; filename=\"repomemo-audit-{today}-{today}.jsonl\"")
+    );
     assert!(body.lines().count() >= 3);
-    let (status, headers, body) = text(get("/v1/system/audit/export?from=2000-01-01&to=2000-01-31&format=csv".to_owned(), &admin).await).await;
+    let (status, headers, body) = text(
+        get(
+            "/v1/system/audit/export?from=2000-01-01&to=2000-01-31&format=csv".to_owned(),
+            &admin,
+        )
+        .await,
+    )
+    .await;
     assert_eq!(status, 200);
     assert_eq!(headers["x-total-count"], "0");
     assert_eq!(body, "id,time,actor_id,actor_email,actor_name,action,detail\r\n");

@@ -1550,7 +1550,10 @@ async fn a_workspace_exports_as_an_archive_that_holds_everything_it_has() {
     let (viewer, _) = register_account(&app, "export-grace@example.com").await;
     let (outsider, _) = register_account(&app, "export-eve@example.com").await;
     let workspace_id = create_workspace(&app, &owner).await;
-    for (email, role) in [("export-ada@example.com", "member"), ("export-grace@example.com", "viewer")] {
+    for (email, role) in [
+        ("export-ada@example.com", "member"),
+        ("export-grace@example.com", "viewer"),
+    ] {
         join(&app, &owner, "workspaces", &workspace_id, email, role).await;
     }
 
@@ -1571,7 +1574,10 @@ async fn a_workspace_exports_as_an_archive_that_holds_everything_it_has() {
     for (title, content) in [
         ("Refund policy", "Refunds are issued within fourteen days of purchase."),
         ("Shipping notes", "Parcels leave the warehouse every weekday."),
-        ("Refund policy copy", "Refunds are issued within fourteen days of purchase."),
+        (
+            "Refund policy copy",
+            "Refunds are issued within fourteen days of purchase.",
+        ),
     ] {
         let created = send(
             "POST",
@@ -1662,7 +1668,11 @@ async fn a_workspace_exports_as_an_archive_that_holds_everything_it_has() {
     // Only owners and administrators export.
     let export_uri = format!("/v1/workspaces/{workspace_id}/export");
     for who in [&writer, &viewer, &outsider] {
-        let denied = app.clone().oneshot(auth_request("GET", &export_uri, who)).await.unwrap();
+        let denied = app
+            .clone()
+            .oneshot(auth_request("GET", &export_uri, who))
+            .await
+            .unwrap();
         assert_eq!(denied.status(), 403);
     }
 
@@ -1734,16 +1744,10 @@ async fn a_workspace_exports_as_an_archive_that_holds_everything_it_has() {
     assert_eq!(outdated["events"][0]["actor"]["email"], "export-owner@example.com");
 
     let citations = data["memory_cards"][0]["citations"].as_array().unwrap();
-    let passage = citations
-        .iter()
-        .find(|citation| !citation["chunk"].is_null())
-        .unwrap();
+    let passage = citations.iter().find(|citation| !citation["chunk"].is_null()).unwrap();
     assert_eq!(passage["artifact_id"], ids[1]);
     assert!(passage["chunk"]["content_hash"].as_str().unwrap().len() >= 32);
-    let whole_file = citations
-        .iter()
-        .find(|citation| citation["chunk"].is_null())
-        .unwrap();
+    let whole_file = citations.iter().find(|citation| citation["chunk"].is_null()).unwrap();
     assert_eq!(whole_file["artifact_id"], ids[0]);
 
     assert_eq!(data["tasks"][0]["title"], "Check the policy");
@@ -1788,9 +1792,23 @@ async fn an_archive_imports_into_a_new_workspace_after_a_dry_run_that_writes_not
     let (owner, _) = register_account(&app, "import-owner@example.com").await;
     let (member, _) = register_account(&app, "import-ada@example.com").await;
     let workspace_id = create_workspace(&app, &owner).await;
-    let listed = response_json(app.clone().oneshot(auth_request("GET", "/v1/workspaces", &owner)).await.unwrap()).await;
+    let listed = response_json(
+        app.clone()
+            .oneshot(auth_request("GET", "/v1/workspaces", &owner))
+            .await
+            .unwrap(),
+    )
+    .await;
     let organization_id = listed[0]["organization_id"].as_str().unwrap().to_owned();
-    join(&app, &owner, "organizations", &organization_id, "import-ada@example.com", "member").await;
+    join(
+        &app,
+        &owner,
+        "organizations",
+        &organization_id,
+        "import-ada@example.com",
+        "member",
+    )
+    .await;
 
     // A workspace worth moving: a folder, two files, a card citing a passage
     // and a whole file, a lifecycle change, a task with a checklist, a comment.
@@ -1883,7 +1901,11 @@ async fn an_archive_imports_into_a_new_workspace_after_a_dry_run_that_writes_not
 
     let archive = to_bytes(
         app.clone()
-            .oneshot(auth_request("GET", &format!("/v1/workspaces/{workspace_id}/export"), &owner))
+            .oneshot(auth_request(
+                "GET",
+                &format!("/v1/workspaces/{workspace_id}/export"),
+                &owner,
+            ))
             .await
             .unwrap()
             .into_body(),
@@ -1897,7 +1919,9 @@ async fn an_archive_imports_into_a_new_workspace_after_a_dry_run_that_writes_not
         let app = app.clone();
         let request = Request::builder()
             .method("POST")
-            .uri(format!("/v1/workspaces/import?organization_id={organization_id}{query}"))
+            .uri(format!(
+                "/v1/workspaces/import?organization_id={organization_id}{query}"
+            ))
             .header("authorization", who)
             .header("content-type", "application/gzip")
             .body(Body::from(archive))
@@ -1907,7 +1931,13 @@ async fn an_archive_imports_into_a_new_workspace_after_a_dry_run_that_writes_not
     let workspace_count = || {
         let app = app.clone();
         let request = auth_request("GET", "/v1/workspaces", &owner);
-        async move { response_json(app.oneshot(request).await.unwrap()).await.as_array().unwrap().len() }
+        async move {
+            response_json(app.oneshot(request).await.unwrap())
+                .await
+                .as_array()
+                .unwrap()
+                .len()
+        }
     };
     assert_eq!(workspace_count().await, 1);
 
@@ -1929,7 +1959,9 @@ async fn an_archive_imports_into_a_new_workspace_after_a_dry_run_that_writes_not
     let mut damaged = repomemo_api::read_archive_entries(archive.as_slice(), 1 << 26).unwrap();
     for (name, bytes) in damaged.iter_mut() {
         if name == "workspace.json" {
-            let text = String::from_utf8(bytes.clone()).unwrap().replace("Dispatch rhythm", "Dispatch Rhythm");
+            let text = String::from_utf8(bytes.clone())
+                .unwrap()
+                .replace("Dispatch rhythm", "Dispatch Rhythm");
             *bytes = text.into_bytes();
         }
     }
@@ -1979,17 +2011,27 @@ async fn an_archive_imports_into_a_new_workspace_after_a_dry_run_that_writes_not
 
     let lifecycle = get(format!("/v1/artifacts/{}/lifecycle", refund["id"].as_str().unwrap())).await;
     assert_eq!(lifecycle["status"], "verified");
-    let history = get(format!("/v1/artifacts/{}/lifecycle/history", refund["id"].as_str().unwrap())).await;
+    let history = get(format!(
+        "/v1/artifacts/{}/lifecycle/history",
+        refund["id"].as_str().unwrap()
+    ))
+    .await;
     assert_eq!(history.as_array().unwrap().len(), 1);
     let comments = get(format!("/v1/artifacts/{}/comments", refund["id"].as_str().unwrap())).await;
     let body = comments[0]["body"].as_str().unwrap();
     assert!(body.starts_with("Originally written by Person on "), "{body}");
     assert!(body.ends_with("Looks right to me."), "{body}");
-    assert_eq!(comments[0]["author"]["email"], "import-owner@example.com", "credited to the importer");
+    assert_eq!(
+        comments[0]["author"]["email"], "import-owner@example.com",
+        "credited to the importer"
+    );
     let tasks = get(format!("/v1/workspaces/{new_id}/tasks")).await;
     assert_eq!(tasks[0]["title"], "Check the policy");
     assert_eq!(tasks[0]["artifact_id"], refund["id"]);
-    assert!(tasks[0]["description"].as_str().unwrap().contains("Created by Person in the exported workspace."));
+    assert!(tasks[0]["description"]
+        .as_str()
+        .unwrap()
+        .contains("Created by Person in the exported workspace."));
     let checklist = get(format!("/v1/tasks/{}/checklist", tasks[0]["id"].as_str().unwrap())).await;
     assert_eq!(checklist[0]["body"], "Read it twice");
 
@@ -1999,8 +2041,12 @@ async fn an_archive_imports_into_a_new_workspace_after_a_dry_run_that_writes_not
     assert_eq!(cards[0]["needs_review"], false);
     let card = get(format!("/v1/memory-cards/{}", cards[0]["id"].as_str().unwrap())).await;
     let evidence = card["evidence"].as_array().unwrap();
-    assert!(evidence.iter().any(|item| item["target_type"] == "chunk" && item["artifact_id"] == shipping["id"] && item["exists"] == true));
-    assert!(evidence.iter().any(|item| item["target_type"] == "artifact" && item["artifact_id"] == refund["id"]));
+    assert!(evidence
+        .iter()
+        .any(|item| item["target_type"] == "chunk" && item["artifact_id"] == shipping["id"] && item["exists"] == true));
+    assert!(evidence
+        .iter()
+        .any(|item| item["target_type"] == "artifact" && item["artifact_id"] == refund["id"]));
 
     // The new workspace answers searches, and the old one is untouched.
     let found = response_json(
@@ -2014,7 +2060,14 @@ async fn an_archive_imports_into_a_new_workspace_after_a_dry_run_that_writes_not
     )
     .await;
     assert_eq!(found[0]["title"], "Shipping notes");
-    assert_eq!(get(format!("/v1/workspaces/{workspace_id}/artifacts")).await.as_array().unwrap().len(), 2);
+    assert_eq!(
+        get(format!("/v1/workspaces/{workspace_id}/artifacts"))
+            .await
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
     let activity = get(format!("/v1/workspaces/{new_id}/activity")).await;
     assert!(activity
         .as_array()
@@ -2070,7 +2123,13 @@ async fn a_local_workspace_archived_by_the_desktop_app_imports_with_its_memory_a
     let (_, _) = register_account(&app, "laptop-admin@example.com").await;
     let (owner, _) = register_account(&app, "laptop-owner@example.com").await;
     let existing = create_workspace(&app, &owner).await;
-    let listed = response_json(app.clone().oneshot(auth_request("GET", "/v1/workspaces", &owner)).await.unwrap()).await;
+    let listed = response_json(
+        app.clone()
+            .oneshot(auth_request("GET", "/v1/workspaces", &owner))
+            .await
+            .unwrap(),
+    )
+    .await;
     let organization_id = listed[0]["organization_id"].as_str().unwrap().to_owned();
     assert!(!existing.is_empty());
 
@@ -2078,7 +2137,9 @@ async fn a_local_workspace_archived_by_the_desktop_app_imports_with_its_memory_a
         let app = app.clone();
         let request = Request::builder()
             .method("POST")
-            .uri(format!("/v1/workspaces/import?organization_id={organization_id}{query}"))
+            .uri(format!(
+                "/v1/workspaces/import?organization_id={organization_id}{query}"
+            ))
             .header("authorization", &owner)
             .header("content-type", "application/gzip")
             .body(Body::from(archive.clone()))
@@ -2123,7 +2184,6 @@ async fn a_local_workspace_archived_by_the_desktop_app_imports_with_its_memory_a
     let _ = std::fs::remove_dir_all(data_dir);
 }
 
-
 #[tokio::test]
 async fn an_archive_that_claims_far_more_than_it_is_made_of_is_refused_before_it_is_unpacked() {
     let data_dir = temp_data_dir("import-bomb");
@@ -2131,7 +2191,13 @@ async fn an_archive_that_claims_far_more_than_it_is_made_of_is_refused_before_it
     let (_, _) = register_account(&app, "bomb-admin@example.com").await;
     let (owner, _) = register_account(&app, "bomb-owner@example.com").await;
     let _ = create_workspace(&app, &owner).await;
-    let listed = response_json(app.clone().oneshot(auth_request("GET", "/v1/workspaces", &owner)).await.unwrap()).await;
+    let listed = response_json(
+        app.clone()
+            .oneshot(auth_request("GET", "/v1/workspaces", &owner))
+            .await
+            .unwrap(),
+    )
+    .await;
     let organization_id = listed[0]["organization_id"].as_str().unwrap().to_owned();
 
     // A few hundred bytes of archive whose manifest lists a file of 300 MiB.
@@ -2144,7 +2210,10 @@ async fn an_archive_that_claims_far_more_than_it_is_made_of_is_refused_before_it
         counts: repomemo_domain::ArchiveCounts::default(),
         data_sha256: String::new(),
         data_bytes: 10,
-        blobs: vec![repomemo_domain::ArchiveBlob { hash: "0".repeat(64), size_bytes: 300 * 1024 * 1024 }],
+        blobs: vec![repomemo_domain::ArchiveBlob {
+            hash: "0".repeat(64),
+            size_bytes: 300 * 1024 * 1024,
+        }],
     };
     let mut encoder = repomemo_api::ArchiveEncoder::new();
     encoder
@@ -2158,7 +2227,9 @@ async fn an_archive_that_claims_far_more_than_it_is_made_of_is_refused_before_it
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/v1/workspaces/import?organization_id={organization_id}&dry_run=true"))
+                .uri(format!(
+                    "/v1/workspaces/import?organization_id={organization_id}&dry_run=true"
+                ))
                 .header("authorization", &owner)
                 .header("content-type", "application/gzip")
                 .body(Body::from(archive))
@@ -2169,7 +2240,10 @@ async fn an_archive_that_claims_far_more_than_it_is_made_of_is_refused_before_it
     assert_eq!(response.status(), 200);
     let report = response_json(response).await;
     assert_eq!(report["ok"], false, "{report}");
-    assert!(report["problems"][0].as_str().unwrap().contains("compression bomb"), "{report}");
+    assert!(
+        report["problems"][0].as_str().unwrap().contains("compression bomb"),
+        "{report}"
+    );
     let _ = std::fs::remove_dir_all(data_dir);
 }
 

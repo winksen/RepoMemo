@@ -171,7 +171,10 @@ async fn github_issues_become_evidence_that_follows_the_tracker() {
     )
     .await;
     assert_eq!(off.status(), 400);
-    assert!(response_json(off).await.to_string().contains("REPOMEMO_GIT_ALLOWED_HOSTS"));
+    assert!(response_json(off)
+        .await
+        .to_string()
+        .contains("REPOMEMO_GIT_ALLOWED_HOSTS"));
     drop(app);
 
     let mut config = ServerConfig::for_test(data_dir.clone());
@@ -253,10 +256,20 @@ async fn github_issues_become_evidence_that_follows_the_tracker() {
     // First sync: two issues and a pull request; the closed issue is outdated.
     let first = wait(|connector| connector["last_report"]["added"] == 3).await;
     assert_eq!(first["last_report"]["pull_requests_seen"], 1);
-    assert_eq!((first["open_items"].as_i64(), first["closed_items"].as_i64()), (Some(2), Some(1)));
+    assert_eq!(
+        (first["open_items"].as_i64(), first["closed_items"].as_i64()),
+        (Some(2), Some(1))
+    );
     wait_for_indexed_artifacts(&app, &owner, &workspace_id, 3).await;
     let artifacts = response_json(
-        call(&app, "GET", format!("/v1/workspaces/{workspace_id}/artifacts"), owner.clone(), json!({})).await,
+        call(
+            &app,
+            "GET",
+            format!("/v1/workspaces/{workspace_id}/artifacts"),
+            owner.clone(),
+            json!({}),
+        )
+        .await,
     )
     .await;
     let artifact = |title_part: &str| {
@@ -274,14 +287,31 @@ async fn github_issues_become_evidence_that_follows_the_tracker() {
     assert_eq!(double["artifact_type"], "issue");
     assert_eq!(pull["artifact_type"], "pr");
     let pull_detail = response_json(
-        call(&app, "GET", format!("/v1/artifacts/{}", pull["id"].as_str().unwrap()), owner.clone(), json!({})).await,
+        call(
+            &app,
+            "GET",
+            format!("/v1/artifacts/{}", pull["id"].as_str().unwrap()),
+            owner.clone(),
+            json!({}),
+        )
+        .await,
     )
     .await;
     assert_eq!(pull_detail["metadata"]["origin"], "github_pull_request");
     assert_eq!(pull_detail["metadata"]["state"], "open");
-    assert_eq!(pull_detail["metadata"]["commits"][0], "abc1230000000000000000000000000000000def");
+    assert_eq!(
+        pull_detail["metadata"]["commits"][0],
+        "abc1230000000000000000000000000000000def"
+    );
     let detail = response_json(
-        call(&app, "GET", format!("/v1/artifacts/{}", double["id"].as_str().unwrap()), owner.clone(), json!({})).await,
+        call(
+            &app,
+            "GET",
+            format!("/v1/artifacts/{}", double["id"].as_str().unwrap()),
+            owner.clone(),
+            json!({}),
+        )
+        .await,
     )
     .await;
     assert_eq!(detail["metadata"]["origin"], "github_issue");
@@ -311,23 +341,51 @@ async fn github_issues_become_evidence_that_follows_the_tracker() {
     // The tracker changes: the sync asks only for what moved since, and a
     // reopened issue is active again.
     *fake.version.lock().unwrap() = 2;
-    let synced = call(&app, "POST", format!("/v1/connectors/{source_id}/sync"), owner.clone(), json!({})).await;
+    let synced = call(
+        &app,
+        "POST",
+        format!("/v1/connectors/{source_id}/sync"),
+        owner.clone(),
+        json!({}),
+    )
+    .await;
     assert_eq!(synced.status(), 200);
     let second = wait(|connector| connector["last_report"]["updated"] == 2).await;
     // The reopened issue is open; the merged pull request counts as closed but stays active.
-    assert_eq!((second["open_items"].as_i64(), second["closed_items"].as_i64()), (Some(2), Some(1)));
+    assert_eq!(
+        (second["open_items"].as_i64(), second["closed_items"].as_i64()),
+        (Some(2), Some(1))
+    );
     let merged = response_json(
-        call(&app, "GET", format!("/v1/artifacts/{}", pull["id"].as_str().unwrap()), owner.clone(), json!({})).await,
+        call(
+            &app,
+            "GET",
+            format!("/v1/artifacts/{}", pull["id"].as_str().unwrap()),
+            owner.clone(),
+            json!({}),
+        )
+        .await,
     )
     .await;
     assert_eq!(merged["metadata"]["state"], "merged");
     let merged_lifecycle = response_json(
-        call(&app, "GET", format!("/v1/artifacts/{}/lifecycle", pull["id"].as_str().unwrap()), owner.clone(), json!({})).await,
+        call(
+            &app,
+            "GET",
+            format!("/v1/artifacts/{}/lifecycle", pull["id"].as_str().unwrap()),
+            owner.clone(),
+            json!({}),
+        )
+        .await,
     )
     .await;
     assert_eq!(merged_lifecycle["status"], "active");
     assert!(
-        fake.queries.lock().unwrap().iter().any(|query| query.contains("since=2026-01-04")),
+        fake.queries
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|query| query.contains("since=2026-01-04")),
         "{:?}",
         fake.queries.lock().unwrap()
     );
@@ -346,13 +404,26 @@ async fn github_issues_become_evidence_that_follows_the_tracker() {
 
     // Removing the connector removes what it kept.
     assert_eq!(
-        call(&app, "DELETE", format!("/v1/connectors/{source_id}"), owner.clone(), json!({}))
-            .await
-            .status(),
+        call(
+            &app,
+            "DELETE",
+            format!("/v1/connectors/{source_id}"),
+            owner.clone(),
+            json!({})
+        )
+        .await
+        .status(),
         204
     );
     let left = response_json(
-        call(&app, "GET", format!("/v1/workspaces/{workspace_id}/artifacts"), owner.clone(), json!({})).await,
+        call(
+            &app,
+            "GET",
+            format!("/v1/workspaces/{workspace_id}/artifacts"),
+            owner.clone(),
+            json!({}),
+        )
+        .await,
     )
     .await;
     assert_eq!(left.as_array().unwrap().len(), 0);
@@ -434,7 +505,8 @@ async fn a_file_lists_the_issues_that_name_it() {
     let source_id = connected["connector"]["id"].as_str().unwrap().to_owned();
     for _ in 0..150 {
         let connector = response_json(call("GET", format!("/v1/connectors/{source_id}"), json!({})).await).await;
-        if connector["status"] == "ready" && connector["active_job"].is_null() && connector["last_report"]["added"] == 3 {
+        if connector["status"] == "ready" && connector["active_job"].is_null() && connector["last_report"]["added"] == 3
+        {
             break;
         }
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
@@ -445,7 +517,8 @@ async fn a_file_lists_the_issues_that_name_it() {
     assert!(
         named_in
             .iter()
-            .any(|mention| mention["kind"] == "file" && mention["title"].as_str().unwrap().contains("Refunds double post")),
+            .any(|mention| mention["kind"] == "file"
+                && mention["title"].as_str().unwrap().contains("Refunds double post")),
         "{mentions}"
     );
     assert!(
@@ -456,10 +529,8 @@ async fn a_file_lists_the_issues_that_name_it() {
     );
 
     // And the item lists what it names.
-    let artifacts = response_json(
-        call("GET", format!("/v1/workspaces/{workspace_id}/artifacts"), json!({})).await,
-    )
-    .await;
+    let artifacts =
+        response_json(call("GET", format!("/v1/workspaces/{workspace_id}/artifacts"), json!({})).await).await;
     let issue = artifacts
         .as_array()
         .unwrap()
@@ -467,7 +538,12 @@ async fn a_file_lists_the_issues_that_name_it() {
         .find(|artifact| artifact["title"].as_str().unwrap().contains("Refunds double post"))
         .unwrap();
     let from_issue = response_json(
-        call("GET", format!("/v1/artifacts/{}/mentions", issue["id"].as_str().unwrap()), json!({})).await,
+        call(
+            "GET",
+            format!("/v1/artifacts/{}/mentions", issue["id"].as_str().unwrap()),
+            json!({}),
+        )
+        .await,
     )
     .await;
     assert!(from_issue["mentions"]
@@ -480,7 +556,11 @@ async fn a_file_lists_the_issues_that_name_it() {
     let (outsider, _) = register_account(&app, "mention-outsider@example.com").await;
     let refused = app
         .clone()
-        .oneshot(auth_request("GET", &format!("/v1/artifacts/{file_id}/mentions"), &outsider))
+        .oneshot(auth_request(
+            "GET",
+            &format!("/v1/artifacts/{file_id}/mentions"),
+            &outsider,
+        ))
         .await
         .unwrap();
     assert_eq!(refused.status(), 403);
@@ -553,11 +633,16 @@ async fn a_tracker_that_asks_to_wait_or_refuses_the_token_pauses_the_connector()
     *fake.mode.lock().unwrap() = 2;
     *fake.version.lock().unwrap() = 2;
     assert_eq!(
-        call("POST", format!("/v1/connectors/{source_id}/sync"), json!({})).await.status(),
+        call("POST", format!("/v1/connectors/{source_id}/sync"), json!({}))
+            .await
+            .status(),
         200
     );
     let limited = paused(source_id.clone()).await;
-    assert!(limited["paused_reason"].as_str().unwrap().contains("rate limit"), "{limited}");
+    assert!(
+        limited["paused_reason"].as_str().unwrap().contains("rate limit"),
+        "{limited}"
+    );
     assert!(limited["paused_until"].is_string());
     let again = call("POST", format!("/v1/connectors/{source_id}/sync"), json!({})).await;
     assert_eq!(again.status(), 409);
@@ -576,24 +661,29 @@ async fn a_tracker_that_asks_to_wait_or_refuses_the_token_pauses_the_connector()
     let replaced = response_json(replaced).await;
     assert!(replaced["paused_reason"].is_null(), "{replaced}");
     assert_eq!(
-        call("POST", format!("/v1/connectors/{source_id}/sync"), json!({})).await.status(),
+        call("POST", format!("/v1/connectors/{source_id}/sync"), json!({}))
+            .await
+            .status(),
         200
     );
     let refused = paused(source_id.clone()).await;
-    assert!(refused["paused_reason"].as_str().unwrap().contains("refused the token"), "{refused}");
+    assert!(
+        refused["paused_reason"].as_str().unwrap().contains("refused the token"),
+        "{refused}"
+    );
     assert!(refused["paused_until"].is_null());
 
     // Webhooks: signed calls sync, others are refused alike.
     *fake.mode.lock().unwrap() = 0;
-    let created = response_json(
-        call("POST", format!("/v1/connectors/{source_id}/webhook"), json!({})).await,
-    )
-    .await;
+    let created = response_json(call("POST", format!("/v1/connectors/{source_id}/webhook"), json!({})).await).await;
     let secret = created["secret"].as_str().unwrap().to_owned();
     assert_eq!(created["path"], format!("/v1/webhooks/connectors/{source_id}"));
     let signature = |body: &str| {
         let key = ring::hmac::Key::new(ring::hmac::HMAC_SHA256, secret.as_bytes());
-        format!("sha256={}", hex::encode(ring::hmac::sign(&key, body.as_bytes()).as_ref()))
+        format!(
+            "sha256={}",
+            hex::encode(ring::hmac::sign(&key, body.as_bytes()).as_ref())
+        )
     };
     let send = |event: &'static str, signature: String| {
         let app = app.clone();

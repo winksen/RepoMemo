@@ -14,14 +14,14 @@ mod documents;
 mod reader;
 pub mod repo;
 pub use budget::{abandoned_readings, set_time_limit as set_document_time_limit};
+pub use documents::{
+    document_extensions, document_kind, document_preview, extract_document_text, is_document, recent_readings_of,
+    started_readings, DocumentKind,
+};
 pub use reader::{
     killed_readings, probe_reader, reads_in_a_process, run_as_document_reader_if_requested, serve_one_reading,
     set_memory_limit_mb as set_document_memory_limit_mb, set_reader_process, LimitedAllocator, Probe, ReaderProcess,
     DEFAULT_MEMORY_LIMIT_MB, MEMORY_EXIT_CODE, READER_ARGUMENT,
-};
-pub use documents::{
-    document_extensions, document_kind, document_preview, extract_document_text, is_document, recent_readings_of,
-    started_readings, DocumentKind,
 };
 
 const DEFAULT_MAX_FILE_BYTES: u64 = 5 * 1024 * 1024;

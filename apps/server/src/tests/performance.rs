@@ -270,14 +270,21 @@ async fn start_tracker_with_issues(count: usize) -> String {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
     // The Link header names the listener, which is only known now: serve a router that fills it in.
-    let app = app.layer(axum::middleware::map_response(move |mut response: axum::response::Response| async move {
-        if let Some(link) = response.headers().get("link").and_then(|value| value.to_str().ok()).map(str::to_owned) {
+    let app = app.layer(axum::middleware::map_response(
+        move |mut response: axum::response::Response| async move {
+            if let Some(link) = response
+                .headers()
+                .get("link")
+                .and_then(|value| value.to_str().ok())
+                .map(str::to_owned)
+            {
+                response
+                    .headers_mut()
+                    .insert("link", link.replace("{host}", &address.to_string()).parse().unwrap());
+            }
             response
-                .headers_mut()
-                .insert("link", link.replace("{host}", &address.to_string()).parse().unwrap());
-        }
-        response
-    }));
+        },
+    ));
     tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
     format!("http://{address}")
 }
@@ -327,14 +334,21 @@ async fn ten_thousand_issues_sync_and_stay_searchable() {
         let mut connector = Value::Null;
         for _ in 0..6_000 {
             connector = response_json(call("GET", format!("/v1/connectors/{source_id}"), json!({})).await).await;
-            if connector["status"] == "ready" && connector["active_job"].is_null() && connector["last_report"].is_object() {
+            if connector["status"] == "ready"
+                && connector["active_job"].is_null()
+                && connector["last_report"].is_object()
+            {
                 break;
             }
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
         passes += 1;
         let total = connector["open_items"].as_i64().unwrap_or(0) + connector["closed_items"].as_i64().unwrap_or(0);
-        println!("pass {passes}: {:?}, {total} issues so far, more to fetch: {}", pass.elapsed(), connector["last_report"]["more_to_fetch"]);
+        println!(
+            "pass {passes}: {:?}, {total} issues so far, more to fetch: {}",
+            pass.elapsed(),
+            connector["last_report"]["more_to_fetch"]
+        );
         if total as usize >= count {
             break;
         }
@@ -383,16 +397,29 @@ async fn ten_thousand_issues_sync_and_stay_searchable() {
     println!("asking again: {:?}", started.elapsed());
     assert!(p95 < Duration::from_millis(300), "search p95 {p95:?}");
     assert!(dashboard < Duration::from_millis(500), "dashboard {dashboard:?}");
-    assert!(map < Duration::from_secs(2) && health < Duration::from_secs(2), "map {map:?}, health {health:?}");
+    assert!(
+        map < Duration::from_secs(2) && health < Duration::from_secs(2),
+        "map {map:?}, health {health:?}"
+    );
     let _ = std::fs::remove_dir_all(data_dir);
 }
 
 /// Like `wait_for_indexed_artifacts`, for a run that takes minutes: polls every 100 ms, up to `polls` times.
-async fn wait_for_indexed_artifacts_for(app: &axum::Router, who: &str, workspace_id: &str, expected: usize, polls: usize) {
+async fn wait_for_indexed_artifacts_for(
+    app: &axum::Router,
+    who: &str,
+    workspace_id: &str,
+    expected: usize,
+    polls: usize,
+) {
     for _ in 0..polls {
         let response = response_json(
             app.clone()
-                .oneshot(auth_request("GET", &format!("/v1/workspaces/{workspace_id}/metrics"), who))
+                .oneshot(auth_request(
+                    "GET",
+                    &format!("/v1/workspaces/{workspace_id}/metrics"),
+                    who,
+                ))
                 .await
                 .unwrap(),
         )

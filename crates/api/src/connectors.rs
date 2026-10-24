@@ -143,14 +143,17 @@ impl ConnectorMetadata {
 /// shape. `http` is accepted for `localhost` and loopback addresses only.
 pub(crate) fn parse_github_link(link: &str) -> Result<TrackerTarget> {
     let text = link.trim().trim_end_matches('/');
-    let (scheme, rest) = text
-        .split_once("://")
-        .ok_or_else(|| repomemo_domain::invalid!("Enter the address of the repository, such as https://github.com/acme/app."))?;
+    let (scheme, rest) = text.split_once("://").ok_or_else(|| {
+        repomemo_domain::invalid!("Enter the address of the repository, such as https://github.com/acme/app.")
+    })?;
     let scheme = scheme.to_ascii_lowercase();
     if scheme != "https" && scheme != "http" {
         repomemo_domain::bail_invalid!("Only https addresses can be connected.");
     }
-    if text.chars().any(|c| c.is_control() || c.is_whitespace() || c == '?' || c == '#' || c == '@' || c == '\\') {
+    if text
+        .chars()
+        .any(|c| c.is_control() || c.is_whitespace() || c == '?' || c == '#' || c == '@' || c == '\\')
+    {
         repomemo_domain::bail_invalid!("That is not the address of a repository.");
     }
     let (authority, path) = rest
@@ -169,7 +172,10 @@ pub(crate) fn parse_github_link(link: &str) -> Result<TrackerTarget> {
     if scheme == "http" && !local {
         repomemo_domain::bail_invalid!("Only https addresses can be connected.");
     }
-    let segments = path.split('/').filter(|segment| !segment.is_empty()).collect::<Vec<_>>();
+    let segments = path
+        .split('/')
+        .filter(|segment| !segment.is_empty())
+        .collect::<Vec<_>>();
     let [owner, repo] = segments.as_slice() else {
         repomemo_domain::bail_invalid!("The address needs the owner and the repository after the host.");
     };
@@ -205,7 +211,11 @@ pub(crate) fn parse_github_link(link: &str) -> Result<TrackerTarget> {
         } else {
             host
         },
-        port: if host_is_github(&authority.to_ascii_lowercase()) { None } else { port },
+        port: if host_is_github(&authority.to_ascii_lowercase()) {
+            None
+        } else {
+            port
+        },
     })
 }
 
@@ -350,12 +360,18 @@ impl GitHub {
                 let seconds = retry_after.unwrap_or(60).clamp(1, MAX_PAUSE_SECS);
                 return Err(repomemo_domain::invalid!(
                     "The tracker's rate limit is reached. Syncing resumes in {}.",
-                    if seconds >= 120 { format!("{} minutes", seconds.div_ceil(60)) } else { format!("{seconds} seconds") }
+                    if seconds >= 120 {
+                        format!("{} minutes", seconds.div_ceil(60))
+                    } else {
+                        format!("{seconds} seconds")
+                    }
                 )
                 .context(Pause::RateLimited { seconds }));
             }
             if status.as_u16() == 403 {
-                repomemo_domain::bail_invalid!("The tracker refused the request: the token cannot read this repository's issues.");
+                repomemo_domain::bail_invalid!(
+                    "The tracker refused the request: the token cannot read this repository's issues."
+                );
             }
             if status.as_u16() == 404 {
                 repomemo_domain::bail_invalid!(
@@ -380,7 +396,11 @@ async fn read_capped(mut response: reqwest::Response) -> Result<Vec<u8>> {
         repomemo_domain::bail_invalid!("The tracker's answer is too large.");
     }
     let mut bytes = Vec::new();
-    while let Some(chunk) = response.chunk().await.context("the tracker's answer could not be read")? {
+    while let Some(chunk) = response
+        .chunk()
+        .await
+        .context("the tracker's answer could not be read")?
+    {
         if bytes.len() + chunk.len() > MAX_RESPONSE_BYTES {
             repomemo_domain::bail_invalid!("The tracker's answer is too large.");
         }
@@ -537,7 +557,11 @@ impl PullDetail {
 pub(crate) fn render_pull(owner: &str, repo: &str, issue: &Value, detail: &PullDetail) -> String {
     let pull = &detail.pull;
     let number = issue.get("number").and_then(Value::as_i64).unwrap_or(0);
-    let state = if detail.merged() { "merged".to_owned() } else { text_of(issue, "state") };
+    let state = if detail.merged() {
+        "merged".to_owned()
+    } else {
+        text_of(issue, "state")
+    };
     let branch = |side: &str| {
         pull.get(side)
             .and_then(|value| value.get("ref"))
@@ -677,7 +701,10 @@ impl RepoMemoCore {
             return self.check_gitlab(workspace_id, &target, token).await;
         }
         let mut client = self.github_for(None, &target).await?;
-        client.token = token.map(str::trim).filter(|token| !token.is_empty()).map(str::to_owned);
+        client.token = token
+            .map(str::trim)
+            .filter(|token| !token.is_empty())
+            .map(str::to_owned);
         let (repository, _) = client
             .get(&format!("{}/repos/{}/{}", client.api_base, target.owner, target.repo))
             .await?;
@@ -827,7 +854,11 @@ impl RepoMemoCore {
         let mut metadata = ConnectorMetadata::of(&source);
         if metadata.paused.take().is_some() || source.status == "error" {
             metadata.last_error = None;
-            let status = if metadata.last_synced_at.is_some() { "ready" } else { "pending" };
+            let status = if metadata.last_synced_at.is_some() {
+                "ready"
+            } else {
+                "pending"
+            };
             self.storage
                 .update_source(source_id, &source.name, status, &metadata.to_value(), false)
                 .await?;
@@ -845,7 +876,13 @@ impl RepoMemoCore {
         let source = self.connector_source_row(source_id).await?;
         let job = self
             .storage
-            .create_job(&source.workspace_id, Some(source_id), CONNECTOR_SYNC_JOB_KIND, "queued", None)
+            .create_job(
+                &source.workspace_id,
+                Some(source_id),
+                CONNECTOR_SYNC_JOB_KIND,
+                "queued",
+                None,
+            )
             .await?;
         self.storage.set_source_status(source_id, "syncing").await?;
         Ok(job)
@@ -969,7 +1006,11 @@ impl RepoMemoCore {
                     } else {
                         Vec::new()
                     };
-                    let state = if text_of(&issue, "state") == "closed" { "closed" } else { "open" };
+                    let state = if text_of(&issue, "state") == "closed" {
+                        "closed"
+                    } else {
+                        "open"
+                    };
                     (
                         render_issue(&target.owner, &target.repo, &issue, &comments),
                         state.to_owned(),
@@ -1116,18 +1157,36 @@ impl RepoMemoCore {
 
     /// A pull request's own record, commits, reviews, inline review comments
     /// and conversation.
-    async fn github_pull(&self, client: &GitHub, target: &TrackerTarget, number: i64, _issue: &Value) -> Result<PullDetail> {
+    async fn github_pull(
+        &self,
+        client: &GitHub,
+        target: &TrackerTarget,
+        number: i64,
+        _issue: &Value,
+    ) -> Result<PullDetail> {
         let base = format!("{}/repos/{}/{}", client.api_base, target.owner, target.repo);
         let (pull, _) = client.get(&format!("{base}/pulls/{number}")).await?;
         let commit_pages = MAX_PULL_COMMITS.div_ceil(PER_PAGE);
         let commits = self
-            .github_list(client, format!("{base}/pulls/{number}/commits?per_page={PER_PAGE}"), commit_pages)
+            .github_list(
+                client,
+                format!("{base}/pulls/{number}/commits?per_page={PER_PAGE}"),
+                commit_pages,
+            )
             .await?;
         let reviews = self
-            .github_list(client, format!("{base}/pulls/{number}/reviews?per_page={PER_PAGE}"), MAX_COMMENT_PAGES)
+            .github_list(
+                client,
+                format!("{base}/pulls/{number}/reviews?per_page={PER_PAGE}"),
+                MAX_COMMENT_PAGES,
+            )
             .await?;
         let review_comments = self
-            .github_list(client, format!("{base}/pulls/{number}/comments?per_page={PER_PAGE}"), MAX_COMMENT_PAGES)
+            .github_list(
+                client,
+                format!("{base}/pulls/{number}/comments?per_page={PER_PAGE}"),
+                MAX_COMMENT_PAGES,
+            )
             .await?;
         let comments = self.github_comments(client, target, number).await?;
         Ok(PullDetail {
@@ -1154,7 +1213,10 @@ mod tests {
 
         let enterprise = parse_github_link("https://ghe.corp.example:8443/team/svc").unwrap();
         assert_eq!(enterprise.api_base, "https://ghe.corp.example:8443/api/v3");
-        assert_eq!((enterprise.host.as_str(), enterprise.port), ("ghe.corp.example", Some(8443)));
+        assert_eq!(
+            (enterprise.host.as_str(), enterprise.port),
+            ("ghe.corp.example", Some(8443))
+        );
 
         let local = parse_github_link("http://127.0.0.1:9999/o/r").unwrap();
         assert_eq!(local.api_base, "http://127.0.0.1:9999/api/v3");
@@ -1182,7 +1244,8 @@ mod tests {
             "html_url": "https://github.com/acme/app/issues/7", "body": "Seen on staging.",
             "labels": [{"name": "bug"}, {"name": "payments"}], "assignees": [{"login": "bo"}]
         });
-        let comments = vec![json!({"user": {"login": "bo"}, "created_at": "2026-01-03T00:00:00Z", "body": "Fixed in #8."})];
+        let comments =
+            vec![json!({"user": {"login": "bo"}, "created_at": "2026-01-03T00:00:00Z", "body": "Fixed in #8."})];
         let text = render_issue("acme", "app", &issue, &comments);
         assert!(text.starts_with("# Refunds double post\n"));
         assert!(text.contains("Issue #7 in acme/app · closed · opened by @ana"));
@@ -1206,12 +1269,19 @@ mod tests {
             commits: vec![
                 json!({"sha": "0123456789abcdef0123456789abcdef01234567", "commit": {"message": "Guard the ledger\n\nlong", "author": {"name": "Bo"}}}),
             ],
-            reviews: vec![json!({"user": {"login": "ana"}, "state": "CHANGES_REQUESTED", "submitted_at": "2026-01-06T00:00:00Z", "body": "Add a test."})],
-            review_comments: vec![json!({"user": {"login": "ana"}, "path": "src/ledger.rs", "line": 42, "created_at": "2026-01-06T00:00:00Z", "body": "Why twice?"})],
+            reviews: vec![
+                json!({"user": {"login": "ana"}, "state": "CHANGES_REQUESTED", "submitted_at": "2026-01-06T00:00:00Z", "body": "Add a test."}),
+            ],
+            review_comments: vec![
+                json!({"user": {"login": "ana"}, "path": "src/ledger.rs", "line": 42, "created_at": "2026-01-06T00:00:00Z", "body": "Why twice?"}),
+            ],
             comments: vec![json!({"user": {"login": "bo"}, "created_at": "2026-01-06T01:00:00Z", "body": "Done."})],
         };
         assert!(detail.merged());
-        assert_eq!(detail.commit_ids(), vec!["0123456789abcdef0123456789abcdef01234567".to_owned()]);
+        assert_eq!(
+            detail.commit_ids(),
+            vec!["0123456789abcdef0123456789abcdef01234567".to_owned()]
+        );
         let text = render_pull("acme", "app", &issue, &detail);
         assert!(text.contains("Pull request #8 in acme/app · merged · opened by @bo"));
         assert!(text.contains("main ← fix-double · merged 2026-01-07T00:00:00Z"));

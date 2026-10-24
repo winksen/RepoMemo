@@ -564,7 +564,10 @@ pub(crate) async fn checks(
         ),
     });
 
-    let copy_dir = state.backup_copy_dir.as_ref().map(|folder| folder.display().to_string());
+    let copy_dir = state
+        .backup_copy_dir
+        .as_ref()
+        .map(|folder| folder.display().to_string());
     checks.push(SetupCheck {
         key: "backup_copy",
         label: "Second copy of backups",

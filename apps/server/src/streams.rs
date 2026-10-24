@@ -256,9 +256,8 @@ pub(crate) async fn watch_event_stream_access(
         }
         let expired = jsonwebtoken::get_current_timestamp() >= subject.expires_at;
         let access = state.storage.user_access(&subject.user_id).await.ok();
-        let session_valid = access.map_or(true, |access| {
-            access.is_some_and(|access| access.session_version == subject.session_version)
-        });
+        let session_valid =
+            access.is_none_or(|access| access.is_some_and(|access| access.session_version == subject.session_version));
         let is_system_admin = access.flatten().is_some_and(|access| access.is_system_admin);
         let role = effective_workspace_role(&state, &subject.user_id, is_system_admin, &workspace_id).await;
         // A failed lookup keeps the stream as it was; a missing membership ends it.

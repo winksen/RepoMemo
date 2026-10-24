@@ -474,16 +474,14 @@ impl LogQuery {
             .filter(|id| !id.is_empty())
             .map(|id| format!("workspace_id={id}"));
         level_rank(record.level) <= min_rank
-            && self.after.map_or(true, |after| record.sequence > after)
+            && self.after.is_none_or(|after| record.sequence > after)
             && self
                 .category
                 .as_deref()
                 .filter(|category| !category.is_empty())
-                .map_or(true, |category| record.category == category)
-            && workspace.map_or(true, |workspace| {
-                record.fields.split(' ').any(|field| field == workspace)
-            })
-            && needle.map_or(true, |needle| {
+                .is_none_or(|category| record.category == category)
+            && workspace.is_none_or(|workspace| record.fields.split(' ').any(|field| field == workspace))
+            && needle.is_none_or(|needle| {
                 record.message.to_lowercase().contains(&needle)
                     || record.target.to_lowercase().contains(&needle)
                     || record.fields.to_lowercase().contains(&needle)

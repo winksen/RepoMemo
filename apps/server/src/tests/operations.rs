@@ -190,7 +190,10 @@ async fn an_encrypted_backup_holds_nothing_readable_and_restores_only_with_its_k
     let app = router(config).await.unwrap();
     let (admin, _) = register_account(&app, "sealed-admin@example.com").await;
     let workspace_id = create_workspace(&app, &admin).await;
-    for (name, text) in [("plan.txt", "Ship on Friday, quietly"), ("notes.txt", "Rollback plan for the release")] {
+    for (name, text) in [
+        ("plan.txt", "Ship on Friday, quietly"),
+        ("notes.txt", "Rollback plan for the release"),
+    ] {
         assert_eq!(
             upload(&app, &admin, &workspace_id, name, text.as_bytes().to_vec()).await,
             201
@@ -210,7 +213,10 @@ async fn an_encrypted_backup_holds_nothing_readable_and_restores_only_with_its_k
     assert_eq!(backup["encryption"]["cipher"], "aes-256-gcm");
     assert_eq!(backup["encryption"]["kdf"], "pbkdf2-hmac-sha256");
     assert_eq!(backup["includes_key"], true);
-    assert!(!backup.to_string().contains("passphrase"), "the manifest never holds the key");
+    assert!(
+        !backup.to_string().contains("passphrase"),
+        "the manifest never holds the key"
+    );
 
     // Every file but the manifest is sealed: names say so and no text shows.
     let folder = data_dir.join("backups").join(&name);
@@ -277,7 +283,10 @@ async fn an_encrypted_backup_holds_nothing_readable_and_restores_only_with_its_k
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
     };
     assert_eq!(refused["status"]["succeeded"], false, "{refused}");
-    assert!(refused["status"]["message"].as_str().unwrap().contains("different key"), "{refused}");
+    assert!(
+        refused["status"]["message"].as_str().unwrap().contains("different key"),
+        "{refused}"
+    );
     let root = crate::environment::environments_root().unwrap();
     assert!(!root.join(&environment).exists());
     assert!(!root.join(format!("{environment}.restoring")).exists());
@@ -313,7 +322,10 @@ async fn each_backup_is_copied_to_a_second_place_and_checked() {
     let (admin, _) = register_account(&app, "copy-admin@example.com").await;
     let workspace_id = create_workspace(&app, &admin).await;
     for (name, text) in [("plan.txt", "Ship on Friday"), ("notes.txt", "Rollback plan")] {
-        assert_eq!(upload(&app, &admin, &workspace_id, name, text.as_bytes().to_vec()).await, 201);
+        assert_eq!(
+            upload(&app, &admin, &workspace_id, name, text.as_bytes().to_vec()).await,
+            201
+        );
     }
     let start = |path: &'static str| {
         let app = app.clone();
@@ -324,7 +336,10 @@ async fn each_backup_is_copied_to_a_second_place_and_checked() {
     let overview = wait_for_backup_work(&app, &admin).await;
     assert_eq!(overview["status"]["succeeded"], true, "{overview}");
     let message = overview["status"]["message"].as_str().unwrap();
-    assert!(message.contains("Copied 1 backup to") && message.contains("and checked it"), "{message}");
+    assert!(
+        message.contains("Copied 1 backup to") && message.contains("and checked it"),
+        "{message}"
+    );
     assert!(overview["copy_directory"].as_str().unwrap().contains("share"));
     let backup = &overview["backups"][0];
     let name = backup["name"].as_str().unwrap().to_owned();
@@ -338,7 +353,9 @@ async fn each_backup_is_copied_to_a_second_place_and_checked() {
     assert!(copy.join("repomemo.sqlite").is_file());
     let sums = std::fs::read_to_string(copy.join("SHA256SUMS")).unwrap();
     assert_eq!(sums.lines().count() as u64, backup["files"].as_u64().unwrap());
-    assert!(sums.lines().all(|line| line.split_once("  ").is_some_and(|(hash, _)| hash.len() == 64)));
+    assert!(sums
+        .lines()
+        .all(|line| line.split_once("  ").is_some_and(|(hash, _)| hash.len() == 64)));
     assert_eq!(
         std::fs::read(copy.join("repomemo.sqlite")).unwrap(),
         std::fs::read(data_dir.join("backups").join(&name).join("repomemo.sqlite")).unwrap()
@@ -359,7 +376,10 @@ async fn each_backup_is_copied_to_a_second_place_and_checked() {
         latest
     };
     assert_eq!(overview["status"]["succeeded"], true, "{overview}");
-    assert!(overview["backups"][0]["copy"]["linked"].as_u64().unwrap() >= 2, "{overview}");
+    assert!(
+        overview["backups"][0]["copy"]["linked"].as_u64().unwrap() >= 2,
+        "{overview}"
+    );
     assert_eq!(std::fs::read_dir(&copies).unwrap().count(), 2);
 
     // A destination that cannot be used is a failure to see, and the backup stays.
@@ -378,9 +398,22 @@ async fn each_backup_is_copied_to_a_second_place_and_checked() {
         .unwrap();
     let failed = wait_for_backup_work(&broken_app, &broken_admin).await;
     assert_eq!(failed["status"]["succeeded"], false, "{failed}");
-    assert!(failed["status"]["message"].as_str().unwrap().contains("Backed up to backup-"), "{failed}");
-    assert!(failed["status"]["message"].as_str().unwrap().contains("The copy to"), "{failed}");
-    assert_eq!(failed["backups"].as_array().unwrap().len(), 1, "the backup itself is kept");
+    assert!(
+        failed["status"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("Backed up to backup-"),
+        "{failed}"
+    );
+    assert!(
+        failed["status"]["message"].as_str().unwrap().contains("The copy to"),
+        "{failed}"
+    );
+    assert_eq!(
+        failed["backups"].as_array().unwrap().len(),
+        1,
+        "the backup itself is kept"
+    );
     assert!(failed["backups"][0].get("copy").is_none());
 
     // A second copy that is not set up cannot be asked for.
@@ -393,7 +426,13 @@ async fn each_backup_is_copied_to_a_second_place_and_checked() {
         .await
         .unwrap();
     assert_eq!(refused.status(), 400);
-    for path in [data_dir, copies.parent().unwrap().to_path_buf(), blocked, broken_data, plain_data] {
+    for path in [
+        data_dir,
+        copies.parent().unwrap().to_path_buf(),
+        blocked,
+        broken_data,
+        plain_data,
+    ] {
         let _ = std::fs::remove_dir_all(path);
     }
 }
@@ -1733,11 +1772,22 @@ async fn an_address_cannot_be_flooded_with_invitations_through_the_server() {
             json!({"email": "victim@example.com", "role": "viewer"}),
         )
         .await;
-        assert_eq!(invited.status(), 201, "the invitation itself is still made, with its link");
+        assert_eq!(
+            invited.status(),
+            201,
+            "the invitation itself is still made, with its link"
+        );
         answers.push(response_json(invited).await["mail"].as_str().unwrap().to_owned());
     }
-    assert_eq!(answers.iter().filter(|answer| *answer == "queued").count(), 12, "{answers:?}");
-    assert!(answers[12..].iter().all(|answer| answer == "rate_limited"), "{answers:?}");
+    assert_eq!(
+        answers.iter().filter(|answer| *answer == "queued").count(),
+        12,
+        "{answers:?}"
+    );
+    assert!(
+        answers[12..].iter().all(|answer| answer == "rate_limited"),
+        "{answers:?}"
+    );
 
     // Only twelve are in the outbox, and another address is not affected.
     let outbox = response_json(call("GET", "/v1/system/mail/outbox?limit=100".to_owned(), json!({})).await).await;

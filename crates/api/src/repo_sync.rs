@@ -683,7 +683,7 @@ impl RepoMemoCore {
 
         let mut reader = repo.blob_reader().await?;
         for (file, kind, change) in changes {
-            if progress % PROGRESS_EVERY == 0 && self.storage.is_job_cancel_requested(job_id).await? {
+            if progress.is_multiple_of(PROGRESS_EVERY) && self.storage.is_job_cancel_requested(job_id).await? {
                 report.cancelled = true;
                 break;
             }
@@ -745,7 +745,7 @@ impl RepoMemoCore {
                 }
             }
             progress += 1;
-            if progress % PROGRESS_EVERY == 0 {
+            if progress.is_multiple_of(PROGRESS_EVERY) {
                 self.storage
                     .update_indexing_job(job_id, "running", "storing_files", progress as i64, None)
                     .await?;
@@ -870,7 +870,7 @@ impl RepoMemoCore {
                     }
                 }
                 progress += 1;
-                if progress % PROGRESS_EVERY == 0 {
+                if progress.is_multiple_of(PROGRESS_EVERY) {
                     self.storage
                         .update_indexing_job(job_id, "running", "indexing", progress as i64, None)
                         .await?;
@@ -973,6 +973,7 @@ impl RepoMemoCore {
         Ok((overview, artifact_id))
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn store_repo_blob(
         &self,
         root: &str,
@@ -1347,9 +1348,13 @@ mod tests {
         write(&repo_dir, "src/old_name.py", "def settle():\n    return 1\n");
         write(&repo_dir, "package-lock.json", "{}");
         write(&repo_dir, "notes.txt", "kept out by the exclude pattern");
-        write(&repo_dir, "CODEOWNERS", "* @docs-team
+        write(
+            &repo_dir,
+            "CODEOWNERS",
+            "* @docs-team
 /src/ @payments lead@example.com
-");
+",
+        );
         git(&repo_dir, &["add", "."]);
         git(&repo_dir, &["commit", "--quiet", "-m", "Initial"]);
 
@@ -1393,10 +1398,15 @@ mod tests {
         let readme = core.storage().get_artifact(&files[0].artifact_id).await.unwrap();
         assert_eq!(readme.metadata["code_owners"], serde_json::json!(["@docs-team"]));
         let refund = core.storage().get_artifact(&files[2].artifact_id).await.unwrap();
-        assert_eq!(refund.metadata["code_owners"], serde_json::json!(["@payments", "lead@example.com"]));
+        assert_eq!(
+            refund.metadata["code_owners"],
+            serde_json::json!(["@payments", "lead@example.com"])
+        );
         // Who last changed each file comes from one pass over the history.
         assert!(files.iter().all(|file| file.last_author.as_deref() == Some("Test")));
-        assert!(files.iter().all(|file| file.last_change_commit.is_some() && file.last_changed_at.is_some()));
+        assert!(files
+            .iter()
+            .all(|file| file.last_change_commit.is_some() && file.last_changed_at.is_some()));
         let first_change = files[2].last_change_commit.clone();
         let refund_id = files[2].artifact_id.clone();
         let renamed_id = files[1].artifact_id.clone();
@@ -1455,7 +1465,10 @@ mod tests {
         let files = core.list_repo_files(&source.id).await.unwrap();
         let paths = files.iter().map(|file| file.path.as_str()).collect::<Vec<_>>();
         assert_eq!(paths, vec!["src/refund.rs", "src/settlement.py"]);
-        assert_ne!(files[0].last_change_commit, first_change, "the edited file names its new last change");
+        assert_ne!(
+            files[0].last_change_commit, first_change,
+            "the edited file names its new last change"
+        );
         let artifact = core.storage().get_artifact(&files[0].artifact_id).await.unwrap();
         assert_eq!(artifact.metadata["last_author"], "Test");
         assert_eq!(files[0].artifact_id, refund_id);
@@ -1578,7 +1591,11 @@ mod tests {
                 );
                 writeln!(out, "blob\nmark :{}\ndata {}\n{body}", index + 1, body.len()).unwrap();
             }
-            writeln!(out, "commit refs/heads/main\ncommitter Test <test@example.com> 1700000000 +0000\ndata 7\nInitial").unwrap();
+            writeln!(
+                out,
+                "commit refs/heads/main\ncommitter Test <test@example.com> 1700000000 +0000\ndata 7\nInitial"
+            )
+            .unwrap();
             for index in 0..files {
                 writeln!(out, "M 100644 :{} src/m{:04}/f{index}.rs", index + 1, index % 997).unwrap();
             }
@@ -1597,7 +1614,12 @@ mod tests {
         let core = RepoMemoCore::boot(data_dir.clone()).await.unwrap();
         let workspace = core.create_workspace("Scale".to_owned()).await.unwrap();
         let source = core
-            .connect_local_repo(&workspace.id, &repo_dir.to_string_lossy(), None, RepoSettings::default())
+            .connect_local_repo(
+                &workspace.id,
+                &repo_dir.to_string_lossy(),
+                None,
+                RepoSettings::default(),
+            )
             .await
             .unwrap();
 
@@ -1612,15 +1634,25 @@ mod tests {
         let started = Instant::now();
         let unchanged = sync(&core, &source.id).await;
         let nothing = started.elapsed();
-        println!("sync with nothing changed: {nothing:?} ({} added, {} updated)", unchanged.added, unchanged.updated);
+        println!(
+            "sync with nothing changed: {nothing:?} ({} added, {} updated)",
+            unchanged.added, unchanged.updated
+        );
 
-        write(&repo_dir, "src/m0001/f1.rs", "pub fn handler_1(input: u64) -> u64 {\n    input * 2\n}\n");
+        write(
+            &repo_dir,
+            "src/m0001/f1.rs",
+            "pub fn handler_1(input: u64) -> u64 {\n    input * 2\n}\n",
+        );
         git(&repo_dir, &["add", "src/m0001/f1.rs"]);
         git(&repo_dir, &["commit", "--quiet", "-m", "Change one file"]);
         let started = Instant::now();
         let changed = sync(&core, &source.id).await;
         let one_file = started.elapsed();
-        println!("sync after one changed file: {one_file:?} ({} updated)", changed.updated);
+        println!(
+            "sync after one changed file: {one_file:?} ({} updated)",
+            changed.updated
+        );
 
         // The workspace answers at this size (targets of V0.1.74: search under 300 ms, map and health under 2 s).
         let mut times = Vec::new();
@@ -1647,11 +1679,21 @@ mod tests {
         let started = Instant::now();
         let health = core.workspace_health(&workspace.id).await.unwrap();
         let health_time = started.elapsed();
-        println!("knowledge map, first load: {map_time:?} ({} nodes); health, first load: {health_time:?} ({} findings)", map.nodes.len(), health.findings.len());
+        println!(
+            "knowledge map, first load: {map_time:?} ({} nodes); health, first load: {health_time:?} ({} findings)",
+            map.nodes.len(),
+            health.findings.len()
+        );
 
         // A change touches one file; nothing about it should cost a tenth of the first run (as for the map in V0.2.8).
-        assert!(nothing * 10 < full, "a sync with nothing changed took {nothing:?} against {full:?} for the first");
-        assert!(one_file * 10 < full, "a sync after one changed file took {one_file:?} against {full:?} for the first");
+        assert!(
+            nothing * 10 < full,
+            "a sync with nothing changed took {nothing:?} against {full:?} for the first"
+        );
+        assert!(
+            one_file * 10 < full,
+            "a sync after one changed file took {one_file:?} against {full:?} for the first"
+        );
         assert!(p95 < std::time::Duration::from_millis(300), "search p95 {p95:?}");
         assert!(map_time < std::time::Duration::from_secs(2) && health_time < std::time::Duration::from_secs(2));
 

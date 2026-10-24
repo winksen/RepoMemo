@@ -67,13 +67,11 @@ impl StorageEngine {
     }
 
     pub async fn system_admin_count(&self) -> Result<i64> {
-        Ok(
-            sqlx::query_scalar::<_, i64>(
-                "SELECT COUNT(*) FROM users WHERE is_system_admin = 1 AND deactivated_at IS NULL",
-            )
-                .fetch_one(self.reader())
-                .await?,
+        Ok(sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM users WHERE is_system_admin = 1 AND deactivated_at IS NULL",
         )
+        .fetch_one(self.reader())
+        .await?)
     }
 
     /// Grants or removes the system-administrator role. The last system
@@ -583,7 +581,12 @@ mod tests {
         let mut after: Option<(String, String)> = None;
         loop {
             let page = storage
-                .list_system_events_page(from, until, after.as_ref().map(|(at, id)| (at.as_str(), id.as_str())), 1000)
+                .list_system_events_page(
+                    from,
+                    until,
+                    after.as_ref().map(|(at, id)| (at.as_str(), id.as_str())),
+                    1000,
+                )
                 .await
                 .unwrap();
             let Some(last) = page.last() else { break };
@@ -610,10 +613,15 @@ mod tests {
         let everything = read_pages(&storage, None, None).await;
         assert_eq!(everything.len(), 2_300);
         assert_eq!(storage.count_system_events(None, None).await.unwrap(), 2_300);
-        let ids = everything.iter().map(|event| event.id.clone()).collect::<std::collections::HashSet<_>>();
+        let ids = everything
+            .iter()
+            .map(|event| event.id.clone())
+            .collect::<std::collections::HashSet<_>>();
         assert_eq!(ids.len(), 2_300, "no event is read twice");
         assert!(
-            everything.windows(2).all(|pair| (&pair[0].created_at, &pair[0].id) <= (&pair[1].created_at, &pair[1].id)),
+            everything
+                .windows(2)
+                .all(|pair| (&pair[0].created_at, &pair[0].id) <= (&pair[1].created_at, &pair[1].id)),
             "oldest first"
         );
 
@@ -621,11 +629,22 @@ mod tests {
         let middle = &everything[1_000];
         let from_middle = read_pages(&storage, Some(&middle.created_at), None).await;
         assert_eq!(from_middle.first().unwrap().id, middle.id, "the start is included");
-        assert_eq!(storage.count_system_events(Some(&middle.created_at), None).await.unwrap() as usize, from_middle.len());
+        assert_eq!(
+            storage
+                .count_system_events(Some(&middle.created_at), None)
+                .await
+                .unwrap() as usize,
+            from_middle.len()
+        );
         let before_middle = read_pages(&storage, None, Some(&middle.created_at)).await;
-        assert!(before_middle.iter().all(|event| event.created_at < middle.created_at), "the end is left out");
+        assert!(
+            before_middle.iter().all(|event| event.created_at < middle.created_at),
+            "the end is left out"
+        );
         assert_eq!(before_middle.len() + from_middle.len(), 2_300);
-        assert!(read_pages(&storage, Some("2999-01-01T00:00:00+00:00"), None).await.is_empty());
+        assert!(read_pages(&storage, Some("2999-01-01T00:00:00+00:00"), None)
+            .await
+            .is_empty());
         storage.close().await;
         let _ = std::fs::remove_dir_all(data_dir);
     }

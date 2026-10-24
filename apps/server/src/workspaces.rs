@@ -181,10 +181,15 @@ pub(crate) async fn update_workspace_icon(
     Json(request): Json<UpdateWorkspaceIconRequest>,
 ) -> Result<Json<WorkspaceIconResponse>, ApiError> {
     require_workspace_admin(&state, &subject, &workspace_id).await?;
-    let icon = request.icon.map(|icon| icon.trim().to_owned()).filter(|icon| !icon.is_empty());
+    let icon = request
+        .icon
+        .map(|icon| icon.trim().to_owned())
+        .filter(|icon| !icon.is_empty());
     if let Some(icon) = &icon {
         let is_slug = icon.len() <= MAX_ICON_KEY_LENGTH
-            && icon.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-');
+            && icon
+                .chars()
+                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-');
         if !is_slug {
             return Err(ApiError::bad_request("That workspace icon is not valid."));
         }

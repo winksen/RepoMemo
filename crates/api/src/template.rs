@@ -178,8 +178,10 @@ pub struct TemplateChange {
 pub(crate) struct TemplateResolver {
     catalogue: Arc<Catalogue>,
     /// Per workspace: the saved choice the answer was made for, and the answer.
-    kept: Arc<Mutex<HashMap<String, (Option<WorkspaceTemplateRef>, EffectiveTemplate)>>>,
+    kept: Arc<Mutex<HashMap<String, KeptAnswer>>>,
 }
+
+type KeptAnswer = (Option<WorkspaceTemplateRef>, EffectiveTemplate);
 
 impl Default for TemplateResolver {
     fn default() -> Self {

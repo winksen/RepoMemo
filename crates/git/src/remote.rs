@@ -179,7 +179,11 @@ pub fn known_hosts_lines(host: &str, port: u16, pasted: &str) -> Result<String> 
         (false, port) => format!("[{host}]:{port}"),
     };
     let mut lines = Vec::new();
-    for line in pasted.lines().map(str::trim).filter(|line| !line.is_empty() && !line.starts_with('#')) {
+    for line in pasted
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with('#'))
+    {
         let tokens = line.split_whitespace().collect::<Vec<_>>();
         if tokens.first().is_some_and(|token| token.starts_with('@')) {
             repomemo_domain::bail_invalid!("A certificate authority or revoked key cannot be used as the host key.");
@@ -205,9 +209,7 @@ pub fn known_hosts_lines(host: &str, port: u16, pasted: &str) -> Result<String> 
         lines.push(format!("{pattern} {} {key}", tokens[at]));
     }
     if lines.is_empty() {
-        repomemo_domain::bail_invalid!(
-            "Enter the host's public key, as printed by: ssh-keyscan -t ed25519 {host}"
-        );
+        repomemo_domain::bail_invalid!("Enter the host's public key, as printed by: ssh-keyscan -t ed25519 {host}");
     }
     if lines.len() > 4 {
         repomemo_domain::bail_invalid!("Give at most four host keys.");
@@ -574,7 +576,8 @@ fn explain(stderr: &[u8], target: &RemoteTarget) -> String {
         || lower.contains("returned error: 403")
     {
         Some("The host refused the token, or the repository needs one: check that it is valid, not expired, and can read this repository.")
-    } else if lower.contains("host key verification failed") || lower.contains("remote host identification has changed") {
+    } else if lower.contains("host key verification failed") || lower.contains("remote host identification has changed")
+    {
         Some("The host's key is not the one pinned on this link. Check it with the host's operator and paste the right one.")
     } else if lower.contains("permission denied (publickey") || lower.contains("permission denied, please try again") {
         Some("The host refused the deploy key: check that it is added to the repository (or the account) and has read access.")
@@ -882,15 +885,7 @@ mod tests {
             assert!(is_patched_git(patched), "{patched}");
         }
         for unpatched in [
-            "2.50.0",
-            "2.49.0",
-            "2.48.1",
-            "2.43.0",
-            "2.43.6",
-            "2.39.5",
-            "1.9.0",
-            "",
-            "garbage",
+            "2.50.0", "2.49.0", "2.48.1", "2.43.0", "2.43.6", "2.39.5", "1.9.0", "", "garbage",
         ] {
             assert!(!is_patched_git(unpatched), "{unpatched}");
         }
@@ -948,7 +943,8 @@ mod tests {
             credential: None,
             ssh: Some(SshAuth::new(
                 key,
-                "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl\n".to_owned(),
+                "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl\n"
+                    .to_owned(),
             )),
         };
         let directory;
@@ -958,7 +954,12 @@ mod tests {
             let std_command = command.as_std();
             let environment = std_command
                 .get_envs()
-                .filter_map(|(name, value)| Some((name.to_string_lossy().into_owned(), value?.to_string_lossy().into_owned())))
+                .filter_map(|(name, value)| {
+                    Some((
+                        name.to_string_lossy().into_owned(),
+                        value?.to_string_lossy().into_owned(),
+                    ))
+                })
                 .collect::<std::collections::HashMap<_, _>>();
             let ssh = environment.get("GIT_SSH_COMMAND").unwrap();
             assert!(!ssh.contains("SECRETKEYMATERIAL"));
@@ -970,7 +971,9 @@ mod tests {
                 .map(|argument| argument.to_string_lossy().into_owned())
                 .collect::<Vec<_>>();
             assert!(arguments.iter().any(|argument| argument == "protocol.ssh.allow=always"));
-            assert!(!arguments.iter().any(|argument| argument == "protocol.https.allow=always"));
+            assert!(!arguments
+                .iter()
+                .any(|argument| argument == "protocol.https.allow=always"));
             let written = std::fs::read_to_string(directory.join("id")).unwrap();
             assert!(written.contains("SECRETKEYMATERIAL") && written.ends_with("-----\n"));
             assert!(directory.join("known_hosts").is_file());
@@ -993,11 +996,20 @@ mod tests {
             .map(|argument| argument.to_string_lossy().into_owned())
             .collect::<Vec<_>>();
         assert!(!arguments.iter().any(|argument| argument.contains("ghp_supersecret")));
-        assert!(arguments.iter().any(|argument| argument == "protocol.https.allow=always"));
-        assert!(arguments.iter().any(|argument| argument == "http.followRedirects=false"));
+        assert!(arguments
+            .iter()
+            .any(|argument| argument == "protocol.https.allow=always"));
+        assert!(arguments
+            .iter()
+            .any(|argument| argument == "http.followRedirects=false"));
         let environment = std_command
             .get_envs()
-            .filter_map(|(key, value)| Some((key.to_string_lossy().into_owned(), value?.to_string_lossy().into_owned())))
+            .filter_map(|(key, value)| {
+                Some((
+                    key.to_string_lossy().into_owned(),
+                    value?.to_string_lossy().into_owned(),
+                ))
+            })
             .collect::<std::collections::HashMap<_, _>>();
         assert!(!environment.contains_key("REPOMEMO_JWT_SECRET"));
         assert_eq!(environment.get("GIT_TERMINAL_PROMPT").map(String::as_str), Some("0"));

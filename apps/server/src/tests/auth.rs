@@ -1072,7 +1072,10 @@ async fn anonymous_endpoints_take_small_bodies_whatever_the_upload_limit_is() {
     ] {
         let response = app
             .clone()
-            .oneshot(public_post(uri, json!({ "email": "a@example.com", "password": padding })))
+            .oneshot(public_post(
+                uri,
+                json!({ "email": "a@example.com", "password": padding }),
+            ))
             .await
             .unwrap();
         assert_eq!(response.status(), 413, "{uri} accepted a body of 200 KiB from nobody");
@@ -1179,7 +1182,11 @@ async fn the_routes_that_grant_access_or_remove_things_need_a_session_or_an_admi
         ),
         ("PUT", format!("/v1/workspaces/{workspace}"), json!({"name": "Renamed"})),
         ("DELETE", format!("/v1/workspaces/{workspace}"), json!({})),
-        ("PUT", format!("/v1/workspaces/{workspace}/icon"), json!({"icon": "rocket"})),
+        (
+            "PUT",
+            format!("/v1/workspaces/{workspace}/icon"),
+            json!({"icon": "rocket"}),
+        ),
         (
             "PUT",
             format!("/v1/workspaces/{workspace}/template"),

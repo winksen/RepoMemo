@@ -85,11 +85,17 @@ impl StorageEngine {
             repomemo_domain::bail_invalid!("A token has no spaces or line breaks.");
         }
         if kind == "deploy_key" && !secret.starts_with("-----BEGIN ") {
-            repomemo_domain::bail_invalid!("A deploy key is a private key in PEM or OpenSSH form (it starts with -----BEGIN).");
+            repomemo_domain::bail_invalid!(
+                "A deploy key is a private key in PEM or OpenSSH form (it starts with -----BEGIN)."
+            );
         }
         let username = username.map(str::trim).filter(|name| !name.is_empty());
         if let Some(name) = username {
-            if name.len() > 100 || name.chars().any(|c| c.is_control() || c.is_whitespace() || c == ':' || c == '@') {
+            if name.len() > 100
+                || name
+                    .chars()
+                    .any(|c| c.is_control() || c.is_whitespace() || c == ':' || c == '@')
+            {
                 repomemo_domain::bail_invalid!("That account name is not valid.");
             }
         }
@@ -97,8 +103,8 @@ impl StorageEngine {
             "SELECT COUNT(*) FROM sources WHERE id = ?1 AND type IN ('git_repo', 'connector')",
         )
         .bind(source_id)
-            .fetch_one(self.reader())
-            .await?;
+        .fetch_one(self.reader())
+        .await?;
         if is_repository == 0 {
             repomemo_domain::bail_not_found!("Repository was not found.");
         }
@@ -171,9 +177,9 @@ impl StorageEngine {
         let exists = sqlx::query_scalar::<_, i64>(
             "SELECT COUNT(*) FROM sources WHERE id = ?1 AND type IN ('git_repo', 'connector')",
         )
-            .bind(source_id)
-            .fetch_one(self.reader())
-            .await?;
+        .bind(source_id)
+        .fetch_one(self.reader())
+        .await?;
         if exists == 0 {
             repomemo_domain::bail_not_found!("Repository was not found.");
         }
@@ -283,16 +289,37 @@ mod tests {
             .await
             .unwrap();
 
-        assert!(storage.set_repo_credential(&source_id, "token", None, "  ", None).await.is_err());
-        assert!(storage.set_repo_credential(&source_id, "token", None, "has a space", None).await.is_err());
-        assert!(storage.set_repo_credential(&source_id, "deploy_key", None, "not a key", None).await.is_err());
-        assert!(storage.set_repo_credential("missing", "token", None, "ghp_secretvalue", None).await.is_err());
+        assert!(storage
+            .set_repo_credential(&source_id, "token", None, "  ", None)
+            .await
+            .is_err());
+        assert!(storage
+            .set_repo_credential(&source_id, "token", None, "has a space", None)
+            .await
+            .is_err());
+        assert!(storage
+            .set_repo_credential(&source_id, "deploy_key", None, "not a key", None)
+            .await
+            .is_err());
+        assert!(storage
+            .set_repo_credential("missing", "token", None, "ghp_secretvalue", None)
+            .await
+            .is_err());
 
         let info = storage
-            .set_repo_credential(&source_id, "token", Some("x-access-token"), "ghp_secretvalue", Some(&owner.id))
+            .set_repo_credential(
+                &source_id,
+                "token",
+                Some("x-access-token"),
+                "ghp_secretvalue",
+                Some(&owner.id),
+            )
             .await
             .unwrap();
-        assert_eq!((info.kind.as_str(), info.username.as_deref()), ("token", Some("x-access-token")));
+        assert_eq!(
+            (info.kind.as_str(), info.username.as_deref()),
+            ("token", Some("x-access-token"))
+        );
         let stored: String = sqlx::query_scalar("SELECT sealed_secret FROM repo_credentials WHERE source_id = ?1")
             .bind(&source_id)
             .fetch_one(&storage.pool)
@@ -301,7 +328,10 @@ mod tests {
         assert!(!stored.contains("ghp_secretvalue"), "the secret is stored sealed");
         let opened = storage.open_repo_credential(&source_id).await.unwrap().unwrap();
         assert_eq!(opened.expose(), "ghp_secretvalue");
-        assert!(!format!("{opened:?}").contains("ghp_secretvalue"), "it cannot be printed by accident");
+        assert!(
+            !format!("{opened:?}").contains("ghp_secretvalue"),
+            "it cannot be printed by accident"
+        );
         assert_eq!(
             storage.repo_credential_info(&source_id).await.unwrap().unwrap().kind,
             "token"
@@ -336,13 +366,34 @@ mod tests {
             .await
             .unwrap();
         assert!(!stored.contains(&secret));
-        assert_eq!(storage.open_repo_webhook_secret(&source_id).await.unwrap().as_deref(), Some(secret.as_str()));
-        assert!(storage.repo_webhook_info(&source_id).await.unwrap().unwrap().last_received_at.is_none());
+        assert_eq!(
+            storage.open_repo_webhook_secret(&source_id).await.unwrap().as_deref(),
+            Some(secret.as_str())
+        );
+        assert!(storage
+            .repo_webhook_info(&source_id)
+            .await
+            .unwrap()
+            .unwrap()
+            .last_received_at
+            .is_none());
         storage.touch_repo_webhook(&source_id).await.unwrap();
-        assert!(storage.repo_webhook_info(&source_id).await.unwrap().unwrap().last_received_at.is_some());
+        assert!(storage
+            .repo_webhook_info(&source_id)
+            .await
+            .unwrap()
+            .unwrap()
+            .last_received_at
+            .is_some());
         let renewed = storage.create_repo_webhook(&source_id, None).await.unwrap();
         assert_ne!(renewed, secret);
-        assert!(storage.repo_webhook_info(&source_id).await.unwrap().unwrap().last_received_at.is_none());
+        assert!(storage
+            .repo_webhook_info(&source_id)
+            .await
+            .unwrap()
+            .unwrap()
+            .last_received_at
+            .is_none());
         assert!(storage.clear_repo_webhook(&source_id).await.unwrap());
         assert!(storage.open_repo_webhook_secret(&source_id).await.unwrap().is_none());
         storage.pool.close().await;

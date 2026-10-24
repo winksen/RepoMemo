@@ -25,13 +25,20 @@ fn readings_run_in_a_process_that_is_killed_when_it_overruns_and_that_crashes_al
 
     // A real reading goes through the process and comes back whole.
     assert_eq!(probe_reader(Probe::Echo).unwrap(), "echo");
-    let text = extract_document_text(std::path::Path::new("plan.eml"), EMAIL).unwrap().unwrap();
-    assert!(text.contains("Quarterly plan") && text.contains("Ship the release on Friday"), "{text}");
+    let text = extract_document_text(std::path::Path::new("plan.eml"), EMAIL)
+        .unwrap()
+        .unwrap();
+    assert!(
+        text.contains("Quarterly plan") && text.contains("Ship the release on Friday"),
+        "{text}"
+    );
     assert!(matches!(
         document_preview(std::path::Path::new("plan.eml"), EMAIL),
         DocumentPreview::Email { .. }
     ));
-    assert!(extract_document_text(std::path::Path::new("notes.txt"), b"plain").unwrap().is_none());
+    assert!(extract_document_text(std::path::Path::new("notes.txt"), b"plain")
+        .unwrap()
+        .is_none());
     // A file that is not what its name says is an error, not a crash.
     assert!(extract_document_text(std::path::Path::new("broken.pdf"), b"not a pdf").is_err());
     assert!(matches!(
@@ -56,7 +63,10 @@ fn readings_run_in_a_process_that_is_killed_when_it_overruns_and_that_crashes_al
     let started = Instant::now();
     let slow = probe_reader(Probe::Sleep).unwrap_err().to_string();
     assert!(slow.contains("took longer than 1 seconds"), "{slow}");
-    assert!(started.elapsed() < Duration::from_secs(10), "the reader was killed at once");
+    assert!(
+        started.elapsed() < Duration::from_secs(10),
+        "the reader was killed at once"
+    );
     assert_eq!(killed_readings(), before + 2);
     assert_eq!(abandoned_readings(), 0, "nothing is left running");
     set_document_time_limit(Duration::from_secs(20));
@@ -66,18 +76,27 @@ fn readings_run_in_a_process_that_is_killed_when_it_overruns_and_that_crashes_al
         let message = probe_reader(crash).unwrap_err().to_string();
         assert!(message.contains("stopped unexpectedly"), "{message}");
     }
-    assert_eq!(probe_reader(Probe::Echo).unwrap(), "echo", "the next reading is unharmed");
+    assert_eq!(
+        probe_reader(Probe::Echo).unwrap(),
+        "echo",
+        "the next reading is unharmed"
+    );
 
     // The reader has none of the server's secrets.
     std::env::set_var("REPOMEMO_SECRET_KEY", "a secret that must not reach the reader process");
     std::env::set_var("REPOMEMO_BACKUP_KEY", "another secret that stays here");
     let seen = probe_reader(Probe::Environment).unwrap();
-    assert!(!seen.contains("REPOMEMO_SECRET_KEY") && !seen.contains("REPOMEMO_BACKUP_KEY"), "{seen}");
+    assert!(
+        !seen.contains("REPOMEMO_SECRET_KEY") && !seen.contains("REPOMEMO_BACKUP_KEY"),
+        "{seen}"
+    );
     assert!(seen.contains("REPOMEMO_READER_MEMORY_MB"), "{seen}");
 
     // With no reader process, readings are on a thread again.
     set_reader_process(None);
     assert!(!reads_in_a_process());
     assert!(probe_reader(Probe::Echo).is_err());
-    assert!(extract_document_text(std::path::Path::new("plan.eml"), EMAIL).unwrap().is_some());
+    assert!(extract_document_text(std::path::Path::new("plan.eml"), EMAIL)
+        .unwrap()
+        .is_some());
 }

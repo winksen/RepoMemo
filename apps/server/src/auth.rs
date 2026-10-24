@@ -73,7 +73,11 @@ async fn registers_without_revealing(state: &AppState) -> bool {
         && state.storage.count_users().await.is_ok_and(|users| users > 0)
 }
 
-async fn register_without_revealing(state: &AppState, client: &ClientIp, request: RegisterRequest) -> Result<Response, ApiError> {
+async fn register_without_revealing(
+    state: &AppState,
+    client: &ClientIp,
+    request: RegisterRequest,
+) -> Result<Response, ApiError> {
     validate_registration(&request)?;
     let address = request.email.trim().to_lowercase();
     if !repomemo_mail::valid_address(&address) {
@@ -98,11 +102,7 @@ async fn register_without_revealing(state: &AppState, client: &ClientIp, request
                     crate::Quota::per_hour(KNOWN_ADDRESS_NOTICES_PER_HOUR),
                 )
                 .is_ok();
-            let deactivated = state
-                .storage
-                .is_deactivated(&account.user.id)
-                .await
-                .unwrap_or(true);
+            let deactivated = state.storage.is_deactivated(&account.user.id).await.unwrap_or(true);
             if within_limit && !deactivated {
                 let link = state.mail.link("/login").unwrap_or_default();
                 let body = format!(
@@ -113,7 +113,12 @@ async fn register_without_revealing(state: &AppState, client: &ClientIp, request
                 );
                 let _ = state
                     .mail
-                    .send_to(&address, "Someone tried to register with your address", &body, "registration_attempt")
+                    .send_to(
+                        &address,
+                        "Someone tried to register with your address",
+                        &body,
+                        "registration_attempt",
+                    )
                     .await;
             }
         }

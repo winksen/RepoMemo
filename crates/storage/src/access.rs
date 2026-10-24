@@ -473,7 +473,7 @@ impl StorageEngine {
             return Ok(None);
         }
         let stale = (now - Duration::minutes(LAST_USED_RESOLUTION_MINUTES)).to_rfc3339();
-        if last_used_at.map_or(true, |used| used < stale) {
+        if last_used_at.is_none_or(|used| used < stale) {
             sqlx::query("UPDATE personal_access_tokens SET last_used_at = ?1 WHERE id = ?2")
                 .bind(now.to_rfc3339())
                 .bind(&token_id)

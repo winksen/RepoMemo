@@ -1343,7 +1343,10 @@ async fn the_time_a_file_was_last_marked_verified_is_read_for_verified_files_onl
     use repomemo_domain::ArtifactType;
     let (storage, data_dir) = temp_storage("verified-times").await;
     let workspace = storage.create_workspace("Verified").await.unwrap();
-    let source = storage.create_or_get_source(&workspace.id, SourceType::Folder, "fixture", Some("fixture")).await.unwrap();
+    let source = storage
+        .create_or_get_source(&workspace.id, SourceType::Folder, "fixture", Some("fixture"))
+        .await
+        .unwrap();
     let mut ids = Vec::new();
     for path in ["checked.md", "plain.md"] {
         let bytes = path.as_bytes();
@@ -1368,7 +1371,10 @@ async fn the_time_a_file_was_last_marked_verified_is_read_for_verified_files_onl
         ids.push(artifact.id);
     }
     assert!(storage.verified_times(&workspace.id).await.unwrap().is_empty());
-    let reviewer = storage.create_user("verifier@example.com", "Verifier", "hash").await.unwrap();
+    let reviewer = storage
+        .create_user("verifier@example.com", "Verifier", "hash")
+        .await
+        .unwrap();
     storage
         .save_artifact_lifecycle(
             &ids[0],
@@ -2059,7 +2065,11 @@ async fn an_environment_made_by_v0_2_0_upgrades_in_place_and_keeps_its_data() {
         .create_if_missing(true)
         .foreign_keys(true)
         .journal_mode(SqliteJournalMode::Wal);
-    let pool = SqlitePoolOptions::new().max_connections(1).connect_with(options).await.unwrap();
+    let pool = SqlitePoolOptions::new()
+        .max_connections(1)
+        .connect_with(options)
+        .await
+        .unwrap();
     let mut released = sqlx::migrate::Migrator::DEFAULT;
     released.migrations = std::borrow::Cow::Owned(
         super::MIGRATOR
@@ -2069,12 +2079,32 @@ async fn an_environment_made_by_v0_2_0_upgrades_in_place_and_keeps_its_data() {
             .cloned()
             .collect(),
     );
-    assert_eq!(released.migrations.len() as i64, V0_2_0_LAST_MIGRATION, "no migration is missing or renumbered");
+    assert_eq!(
+        released.migrations.len() as i64,
+        V0_2_0_LAST_MIGRATION,
+        "no migration is missing or renumbered"
+    );
     released.run(&pool).await.unwrap();
-    sqlx::raw_sql(include_str!("../tests/fixtures/v0.2.0-seed.sql")).execute(&pool).await.unwrap();
+    sqlx::raw_sql(include_str!("../tests/fixtures/v0.2.0-seed.sql"))
+        .execute(&pool)
+        .await
+        .unwrap();
     pool.close().await;
-    for (bytes, hash) in [(REFUNDS, "25b9033a79705adbe5e5e258fee1e70adab08041373f9b0078fc0b9c3ffbe561"), (SHIPPING, "5eb51d20b9012cdff150b9825024a9ae9514028e20e158524e8e0861020df504")] {
-        assert_eq!(StorageEngine::content_hash(bytes), hash, "the seed names the file it holds");
+    for (bytes, hash) in [
+        (
+            REFUNDS,
+            "25b9033a79705adbe5e5e258fee1e70adab08041373f9b0078fc0b9c3ffbe561",
+        ),
+        (
+            SHIPPING,
+            "5eb51d20b9012cdff150b9825024a9ae9514028e20e158524e8e0861020df504",
+        ),
+    ] {
+        assert_eq!(
+            StorageEngine::content_hash(bytes),
+            hash,
+            "the seed names the file it holds"
+        );
         let place = data_dir.join("blobs").join(&hash[0..2]).join(&hash[2..4]);
         std::fs::create_dir_all(&place).unwrap();
         std::fs::write(place.join(hash), bytes).unwrap();
@@ -2090,10 +2120,17 @@ async fn an_environment_made_by_v0_2_0_upgrades_in_place_and_keeps_its_data() {
     .unwrap();
     assert_eq!(applied as usize, super::MIGRATOR.migrations.len());
     assert_eq!(failed, 0);
-    assert!(applied > V0_2_0_LAST_MIGRATION, "the migrations after 0.2.0 were applied");
+    assert!(
+        applied > V0_2_0_LAST_MIGRATION,
+        "the migrations after 0.2.0 were applied"
+    );
 
     // People, organization and workspace.
-    let grace = storage.find_user_by_email("grace@example.com").await.unwrap().expect("an account is kept");
+    let grace = storage
+        .find_user_by_email("grace@example.com")
+        .await
+        .unwrap()
+        .expect("an account is kept");
     assert_eq!(grace.display_name, "Grace");
     let workspaces = storage.list_workspaces().await.unwrap();
     assert_eq!(workspaces.len(), 1);
@@ -2103,13 +2140,21 @@ async fn an_environment_made_by_v0_2_0_upgrades_in_place_and_keeps_its_data() {
     let data = storage.export_workspace_data("w-atlas").await.unwrap();
     assert_eq!(data.folders.len(), 1);
     assert_eq!(data.artifacts.len(), 2);
-    let refunds = data.artifacts.iter().find(|artifact| artifact.title == "Refund policy").unwrap();
+    let refunds = data
+        .artifacts
+        .iter()
+        .find(|artifact| artifact.title == "Refund policy")
+        .unwrap();
     assert_eq!(refunds.folder_id.as_deref(), Some("f-policies"));
     assert_eq!(data.lifecycle.len(), 1);
     assert_eq!(data.lifecycle[0].status, "verified");
     assert_eq!(data.lifecycle[0].events.len(), 1);
     assert_eq!(data.memory_cards.len(), 1);
-    assert_eq!(data.memory_cards[0].citations.len(), 2, "the passage and the file it cites");
+    assert_eq!(
+        data.memory_cards[0].citations.len(),
+        2,
+        "the passage and the file it cites"
+    );
     assert_eq!(data.omitted_citations, 0);
     assert_eq!(data.tasks.len(), 1);
     assert_eq!(data.tasks[0].checklist.len(), 1);
@@ -2130,7 +2175,9 @@ async fn an_environment_made_by_v0_2_0_upgrades_in_place_and_keeps_its_data() {
 
     // The system setting and a first write after the upgrade.
     let settings = storage.list_system_settings().await.unwrap();
-    assert!(settings.iter().any(|setting| setting.key == "log_http_level" && setting.value == json!("debug")));
+    assert!(settings
+        .iter()
+        .any(|setting| setting.key == "log_http_level" && setting.value == json!("debug")));
     let added = storage.create_workspace("Added after the upgrade").await.unwrap();
     assert_eq!(storage.list_workspaces().await.unwrap().len(), 2);
     assert!(storage.workspace_exists(&added.id).await.unwrap());

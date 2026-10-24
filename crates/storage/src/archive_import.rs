@@ -54,7 +54,9 @@ fn with_note(text: &str, note: &str) -> String {
 impl StorageEngine {
     /// Refuses a person who may not create workspaces in the organization.
     pub async fn check_can_create_workspace(&self, creator_id: &str, organization_id: &str) -> Result<()> {
-        self.require_workspace_creator(creator_id, organization_id).await.map(|_| ())
+        self.require_workspace_creator(creator_id, organization_id)
+            .await
+            .map(|_| ())
     }
 
     /// Writes the archive's records into `workspace_id`, which must be empty.
@@ -196,7 +198,10 @@ impl StorageEngine {
                 note = with_note(&note, &format!("Owner in the exported workspace: {}.", credit(owner)));
             }
             if let Some(reviewer) = &entry.reviewed_by {
-                note = with_note(&note, &format!("Reviewed in the exported workspace by {}.", credit(reviewer)));
+                note = with_note(
+                    &note,
+                    &format!("Reviewed in the exported workspace by {}.", credit(reviewer)),
+                );
             }
             let superseded_by = entry
                 .superseded_by_artifact_id
@@ -350,8 +355,16 @@ impl StorageEngine {
                 };
                 match &citation.chunk {
                     None => {
-                        insert_citation_link_row(&mut tx, workspace_id, &id, artifact_id, "artifact", citation.confidence, &next_time())
-                            .await?
+                        insert_citation_link_row(
+                            &mut tx,
+                            workspace_id,
+                            &id,
+                            artifact_id,
+                            "artifact",
+                            citation.confidence,
+                            &next_time(),
+                        )
+                        .await?
                     }
                     Some(chunk) => imported.pending_passages.push(PendingPassage {
                         card_id: id.clone(),
@@ -371,11 +384,13 @@ impl StorageEngine {
             .and_then(Value::as_str)
             .filter(|value| matches!(*value, "viewer" | "member" | "admin"))
         {
-            sqlx::query("UPDATE workspaces SET settings_json = json_set(settings_json, '$.ai_min_role', ?1) WHERE id = ?2")
-                .bind(policy)
-                .bind(workspace_id)
-                .execute(&mut *tx)
-                .await?;
+            sqlx::query(
+                "UPDATE workspaces SET settings_json = json_set(settings_json, '$.ai_min_role', ?1) WHERE id = ?2",
+            )
+            .bind(policy)
+            .bind(workspace_id)
+            .execute(&mut *tx)
+            .await?;
         }
 
         // The template, by its reference: a server that lacks the template resolves it to `general` (V0.2.166).

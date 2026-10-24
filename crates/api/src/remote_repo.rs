@@ -211,7 +211,11 @@ impl RepoMemoCore {
     }
 
     /// A repository file's text as it was at the commit a citation names.
-    pub async fn repo_file_at_commit(&self, artifact_id: &str, commit: &str) -> Result<repomemo_domain::RepoFileAtCommit> {
+    pub async fn repo_file_at_commit(
+        &self,
+        artifact_id: &str,
+        commit: &str,
+    ) -> Result<repomemo_domain::RepoFileAtCommit> {
         const MAX_BYTES: u64 = 1024 * 1024;
         let Some((source_id, path)) = self.storage.repo_file_of_artifact(artifact_id).await? else {
             repomemo_domain::bail_not_found!("This is not a repository file.");
@@ -311,7 +315,10 @@ impl RepoMemoCore {
                 Ok(RemoteTarget {
                     url: repository.url(),
                     credential: None,
-                    ssh: Some(SshAuth::new(&key.private_key, pinned_host_keys(repository, &key.host_key)?)),
+                    ssh: Some(SshAuth::new(
+                        &key.private_key,
+                        pinned_host_keys(repository, &key.host_key)?,
+                    )),
                 })
             }
         }
@@ -399,7 +406,13 @@ impl RepoMemoCore {
         } else if let Some(token) = &auth.token {
             Some(
                 self.storage
-                    .set_repo_credential(&source.id, "token", token.username.as_deref(), &token.secret, actor_user_id)
+                    .set_repo_credential(
+                        &source.id,
+                        "token",
+                        token.username.as_deref(),
+                        &token.secret,
+                        actor_user_id,
+                    )
                     .await,
             )
         } else {
@@ -432,7 +445,13 @@ impl RepoMemoCore {
         };
         remote::remote_head(&target, metadata.settings.branch.as_deref()).await?;
         self.storage
-            .set_repo_credential(source_id, "token", token.username.as_deref(), &token.secret, actor_user_id)
+            .set_repo_credential(
+                source_id,
+                "token",
+                token.username.as_deref(),
+                &token.secret,
+                actor_user_id,
+            )
             .await?;
         Ok(())
     }
@@ -489,7 +508,9 @@ impl RepoMemoCore {
             repomemo_domain::bail_invalid!("Only a remote repository has a token.");
         };
         if self.remote_git_policy.check(&remote.url)?.scheme != RemoteScheme::Https {
-            repomemo_domain::bail_invalid!("An ssh repository needs its deploy key: replace it instead of removing it.");
+            repomemo_domain::bail_invalid!(
+                "An ssh repository needs its deploy key: replace it instead of removing it."
+            );
         }
         self.storage.clear_repo_credential(source_id).await
     }
@@ -510,7 +531,13 @@ mod tests {
         ] {
             assert!(looks_remote(remote), "{remote}");
         }
-        for local in ["C:\\code\\app", "/srv/code/app", "\"C:\\Users\\me\\app\"", "file:///srv/app", "../app"] {
+        for local in [
+            "C:\\code\\app",
+            "/srv/code/app",
+            "\"C:\\Users\\me\\app\"",
+            "file:///srv/app",
+            "../app",
+        ] {
             assert!(!looks_remote(local), "{local}");
         }
         assert_eq!(name_from_path("acme/app.git"), "app");
@@ -522,7 +549,11 @@ mod tests {
         let token = RemoteToken::new(Some("oauth2".to_owned()), " glpat-secret ".to_owned()).unwrap();
         assert!(!format!("{token:?}").contains("glpat-secret"));
         assert!(RemoteToken::new(None, "   ".to_owned()).is_none());
-        let key = RemoteDeployKey::new("-----BEGIN KEY-----\nPRIVATEBITS".to_owned(), "ssh-ed25519 AAAA".to_owned()).unwrap();
+        let key = RemoteDeployKey::new(
+            "-----BEGIN KEY-----\nPRIVATEBITS".to_owned(),
+            "ssh-ed25519 AAAA".to_owned(),
+        )
+        .unwrap();
         assert!(!format!("{key:?}").contains("PRIVATEBITS"));
         assert!(RemoteDeployKey::new("  ".to_owned(), String::new()).is_none());
     }

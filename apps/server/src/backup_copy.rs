@@ -92,7 +92,8 @@ fn hash_file(path: &Path) -> Result<(String, u64)> {
 /// Copies `from` to `to` and returns the SHA-256 of what was read.
 fn copy_hashing(from: &Path, to: &Path) -> Result<(String, u64)> {
     let mut input = BufReader::new(File::open(from).with_context(|| format!("{} could not be read", from.display()))?);
-    let mut output = BufWriter::new(File::create(to).with_context(|| format!("{} could not be written", to.display()))?);
+    let mut output =
+        BufWriter::new(File::create(to).with_context(|| format!("{} could not be written", to.display()))?);
     let mut digest = Digest::new(&SHA256);
     let mut buffer = vec![0u8; 256 * 1024];
     let mut size = 0_u64;
@@ -170,7 +171,9 @@ pub(crate) fn copy_backup(source: &Path, destination_root: &Path, expected: Opti
         .context("that is not a backup folder")?;
     std::fs::create_dir_all(destination_root)
         .with_context(|| format!("{} could not be created", destination_root.display()))?;
-    let destination_root = destination_root.canonicalize().unwrap_or_else(|_| destination_root.to_path_buf());
+    let destination_root = destination_root
+        .canonicalize()
+        .unwrap_or_else(|_| destination_root.to_path_buf());
     if let Ok(source) = source.canonicalize() {
         if destination_root.starts_with(&source) || source.starts_with(&destination_root) {
             bail!("The folder for second copies must be somewhere else than the backups themselves.");
@@ -220,7 +223,9 @@ fn copy_files_into(
         .find(|previous| previous.as_str() < name)
         .map(|previous| {
             let folder = destination_root.join(&previous);
-            let sums = std::fs::read_to_string(folder.join(SUMS_FILE)).map(|text| parse_sums(&text)).unwrap_or_default();
+            let sums = std::fs::read_to_string(folder.join(SUMS_FILE))
+                .map(|text| parse_sums(&text))
+                .unwrap_or_default();
             (folder, sums)
         });
 
@@ -282,7 +287,8 @@ fn copy_files_into(
         text.push_str(&format!("{hash}  {path}\n"));
     }
     std::fs::write(partial.join(SUMS_FILE), text)?;
-    std::fs::copy(source.join(MANIFEST_FILE), partial.join(MANIFEST_FILE)).context("the manifest could not be copied")?;
+    std::fs::copy(source.join(MANIFEST_FILE), partial.join(MANIFEST_FILE))
+        .context("the manifest could not be copied")?;
     Ok(report)
 }
 
@@ -290,7 +296,8 @@ fn copy_files_into(
 /// with its hash, and nothing else in the folder.
 pub(crate) fn verify_copy(folder: &Path) -> Result<CopyReport> {
     let sums = parse_sums(
-        &std::fs::read_to_string(folder.join(SUMS_FILE)).with_context(|| format!("{} has no {SUMS_FILE}", folder.display()))?,
+        &std::fs::read_to_string(folder.join(SUMS_FILE))
+            .with_context(|| format!("{} has no {SUMS_FILE}", folder.display()))?,
     );
     let present = backup_files(folder)?;
     if present.len() != sums.len() || present.iter().any(|path| !sums.contains_key(path)) {
@@ -363,7 +370,11 @@ mod tests {
         let first = backup(
             &backups,
             "backup-20261001-000000",
-            &[("repomemo.sqlite", b"database one"), ("blobs/ab/same", b"unchanged"), ("blobs/ab/empty", b"")],
+            &[
+                ("repomemo.sqlite", b"database one"),
+                ("blobs/ab/same", b"unchanged"),
+                ("blobs/ab/empty", b""),
+            ],
         );
         let report = copy_backup(&first, &copies, Some((3, 21))).unwrap();
         assert_eq!((report.files, report.bytes, report.linked), (3, 21, 0));
@@ -411,7 +422,11 @@ mod tests {
         let second = backup(
             &backups,
             "backup-20261002-000000",
-            &[("repomemo.sqlite", b"database two"), ("blobs/ab/same", b"unchanged"), ("blobs/cd/new", b"new file")],
+            &[
+                ("repomemo.sqlite", b"database two"),
+                ("blobs/ab/same", b"unchanged"),
+                ("blobs/cd/new", b"new file"),
+            ],
         );
         copy_backup(&first, &copies, None).unwrap();
         let report = copy_backup(&second, &copies, Some((3, 12 + 9 + 8))).unwrap();
@@ -435,7 +450,11 @@ mod tests {
         let (source, copies) = (folder("prune-src"), folder("prune-dst"));
         for day in 1..=4 {
             let name = format!("backup-2026100{day}-000000");
-            let made = backup(&source, &name, &[("repomemo.sqlite", format!("database {day}").as_bytes())]);
+            let made = backup(
+                &source,
+                &name,
+                &[("repomemo.sqlite", format!("database {day}").as_bytes())],
+            );
             copy_backup(&made, &copies, None).unwrap();
         }
         std::fs::create_dir_all(copies.join("backup-20261005-000000.partial")).unwrap();

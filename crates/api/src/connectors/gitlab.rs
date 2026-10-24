@@ -17,9 +17,9 @@ use super::*;
 /// the same shape; `http` only for this machine.
 pub(super) fn parse_gitlab_link(link: &str) -> Result<TrackerTarget> {
     let text = link.trim().trim_end_matches('/');
-    let (scheme, rest) = text
-        .split_once("://")
-        .ok_or_else(|| repomemo_domain::invalid!("Enter the address of the project, such as https://gitlab.com/group/project."))?;
+    let (scheme, rest) = text.split_once("://").ok_or_else(|| {
+        repomemo_domain::invalid!("Enter the address of the project, such as https://gitlab.com/group/project.")
+    })?;
     let scheme = scheme.to_ascii_lowercase();
     if scheme != "https" && scheme != "http" {
         repomemo_domain::bail_invalid!("Only https addresses can be connected.");
@@ -166,7 +166,12 @@ fn pull_like(merge_request: &Value, detail: &Value, commits: &[Value]) -> Value 
     let merged = merge_request.get("state").and_then(Value::as_str) == Some("merged");
     let figure = detail
         .get("changes_count")
-        .and_then(|value| value.as_str().map(str::to_owned).or_else(|| value.as_i64().map(|n| n.to_string())))
+        .and_then(|value| {
+            value
+                .as_str()
+                .map(str::to_owned)
+                .or_else(|| value.as_i64().map(|n| n.to_string()))
+        })
         .and_then(|text| text.trim_end_matches('+').parse::<i64>().ok())
         .unwrap_or(0);
     json!({
@@ -205,7 +210,10 @@ impl RepoMemoCore {
         token: Option<&str>,
     ) -> Result<ConnectorAccessCheck> {
         let mut client = self.github_for(None, target).await?;
-        client.token = token.map(str::trim).filter(|token| !token.is_empty()).map(str::to_owned);
+        client.token = token
+            .map(str::trim)
+            .filter(|token| !token.is_empty())
+            .map(str::to_owned);
         let (project, _) = client
             .get(&format!("{}/projects/{}", client.api_base, project_id(target)))
             .await?;
@@ -249,9 +257,8 @@ impl RepoMemoCore {
                 metadata.cursor.clone()
             };
             let mut url = Some({
-                let mut url = format!(
-                    "{base}/{endpoint}?scope=all&state=all&order_by=updated_at&sort=asc&per_page={PER_PAGE}"
-                );
+                let mut url =
+                    format!("{base}/{endpoint}?scope=all&state=all&order_by=updated_at&sort=asc&per_page={PER_PAGE}");
                 if let Some(since) = &cursor {
                     url.push_str(&format!("&updated_after={}", since.replace('+', "%2B")));
                 }
@@ -274,7 +281,9 @@ impl RepoMemoCore {
                     let iid = item.get("iid").and_then(Value::as_i64).unwrap_or(0);
                     let updated = text_of(&item, "updated_at");
                     let issue = issue_like(&item);
-                    let notes = if item.get("user_notes_count").and_then(Value::as_i64).unwrap_or(0) > 0 || merge_requests {
+                    let notes = if item.get("user_notes_count").and_then(Value::as_i64).unwrap_or(0) > 0
+                        || merge_requests
+                    {
                         self.github_list(
                             &client,
                             format!("{base}/{endpoint}/{iid}/notes?sort=asc&order_by=created_at&per_page={PER_PAGE}"),
@@ -395,7 +404,10 @@ mod tests {
     fn project_addresses_keep_their_groups() {
         let hosted = parse_gitlab_link("https://gitlab.com/acme/platform/ledger.git").unwrap();
         assert_eq!(hosted.api_base, "https://gitlab.com/api/v4");
-        assert_eq!((hosted.owner.as_str(), hosted.repo.as_str()), ("acme/platform", "ledger"));
+        assert_eq!(
+            (hosted.owner.as_str(), hosted.repo.as_str()),
+            ("acme/platform", "ledger")
+        );
         assert_eq!(project_id(&hosted), "acme%2Fplatform%2Fledger");
         assert_eq!(hosted.location, "https://gitlab.com/acme/platform/ledger");
 

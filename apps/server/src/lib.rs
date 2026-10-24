@@ -6,8 +6,8 @@ mod agent;
 mod ai;
 mod ai_access;
 mod artifacts;
-mod auth;
 mod audit_export;
+mod auth;
 mod avatars;
 mod backup;
 mod backup_copy;
@@ -116,11 +116,11 @@ use tokio_stream::{
     Stream, StreamExt,
 };
 
+use crate::connectors::ConnectorRunner;
 use crate::conversion::{Converter, ConverterStatus, RenderState};
 use crate::embedding::EmbeddingQueue;
 use crate::events::{BusActivityObserver, BusJobObserver, WorkspaceEventBus};
 use crate::indexing::IndexQueue;
-use crate::connectors::ConnectorRunner;
 use crate::repositories::RepoSyncRunner;
 use crate::security::{consume_heavy_quota, too_many_requests, wait_text, ClientIp, Guards};
 use crate::system::{InstanceInfo, MaintenanceStatus, SettingsCell, Telemetry};
@@ -524,23 +524,59 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route("/health", get(health))
         .route("/health/ready", get(readiness))
         .route("/v1/setup", get(setup::get_status))
-        .route("/v1/setup/verify-code", post(setup::verify_code).layer(DefaultBodyLimit::max(PUBLIC_BODY_BYTES)))
-        .route("/v1/setup/admin", post(setup::create_admin).layer(DefaultBodyLimit::max(PUBLIC_BODY_BYTES)))
+        .route(
+            "/v1/setup/verify-code",
+            post(setup::verify_code).layer(DefaultBodyLimit::max(PUBLIC_BODY_BYTES)),
+        )
+        .route(
+            "/v1/setup/admin",
+            post(setup::create_admin).layer(DefaultBodyLimit::max(PUBLIC_BODY_BYTES)),
+        )
         .route("/v1/setup/checks", get(setup::checks))
         .route("/v1/setup/complete", post(setup::complete))
-        .route("/v1/auth/register", post(register).layer(DefaultBodyLimit::max(PUBLIC_BODY_BYTES)))
-        .route("/v1/auth/login", post(login).layer(DefaultBodyLimit::max(PUBLIC_BODY_BYTES)))
-        .route("/v1/auth/refresh", post(refresh_session).layer(DefaultBodyLimit::max(PUBLIC_BODY_BYTES)))
-        .route("/v1/auth/logout", post(logout).layer(DefaultBodyLimit::max(PUBLIC_BODY_BYTES)))
+        .route(
+            "/v1/auth/register",
+            post(register).layer(DefaultBodyLimit::max(PUBLIC_BODY_BYTES)),
+        )
+        .route(
+            "/v1/auth/login",
+            post(login).layer(DefaultBodyLimit::max(PUBLIC_BODY_BYTES)),
+        )
+        .route(
+            "/v1/auth/refresh",
+            post(refresh_session).layer(DefaultBodyLimit::max(PUBLIC_BODY_BYTES)),
+        )
+        .route(
+            "/v1/auth/logout",
+            post(logout).layer(DefaultBodyLimit::max(PUBLIC_BODY_BYTES)),
+        )
         .route("/v1/auth/logout-all", post(logout_everywhere))
-        .route("/v1/auth/forgot-password", post(access::forgot_password).layer(DefaultBodyLimit::max(PUBLIC_BODY_BYTES)))
-        .route("/v1/auth/verify-email", post(verification::verify_email).layer(DefaultBodyLimit::max(PUBLIC_BODY_BYTES)))
+        .route(
+            "/v1/auth/forgot-password",
+            post(access::forgot_password).layer(DefaultBodyLimit::max(PUBLIC_BODY_BYTES)),
+        )
+        .route(
+            "/v1/auth/verify-email",
+            post(verification::verify_email).layer(DefaultBodyLimit::max(PUBLIC_BODY_BYTES)),
+        )
         .route("/v1/profile/email/verify", post(verification::resend))
         .route("/v1/profile/email", put(verification::change_email))
-        .route("/v1/auth/password-reset/preview", post(access::preview_password_reset).layer(DefaultBodyLimit::max(PUBLIC_BODY_BYTES)))
-        .route("/v1/auth/password-reset", post(access::complete_password_reset).layer(DefaultBodyLimit::max(PUBLIC_BODY_BYTES)))
-        .route("/v1/invitations/preview", post(access::preview_invitation).layer(DefaultBodyLimit::max(PUBLIC_BODY_BYTES)))
-        .route("/v1/invitations/accept", post(access::accept_invitation).layer(DefaultBodyLimit::max(PUBLIC_BODY_BYTES)))
+        .route(
+            "/v1/auth/password-reset/preview",
+            post(access::preview_password_reset).layer(DefaultBodyLimit::max(PUBLIC_BODY_BYTES)),
+        )
+        .route(
+            "/v1/auth/password-reset",
+            post(access::complete_password_reset).layer(DefaultBodyLimit::max(PUBLIC_BODY_BYTES)),
+        )
+        .route(
+            "/v1/invitations/preview",
+            post(access::preview_invitation).layer(DefaultBodyLimit::max(PUBLIC_BODY_BYTES)),
+        )
+        .route(
+            "/v1/invitations/accept",
+            post(access::accept_invitation).layer(DefaultBodyLimit::max(PUBLIC_BODY_BYTES)),
+        )
         .route("/v1/invitations/{invitation_id}", delete(access::revoke_invitation))
         .route(
             "/v1/profile/tokens",
@@ -557,18 +593,9 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             post(system::end_user_sessions),
         )
         .route("/v1/system/users/{user_id}/unlock", post(system::unlock_user))
-        .route(
-            "/v1/system/users/{user_id}/deactivate",
-            post(system::deactivate_user),
-        )
-        .route(
-            "/v1/system/users/{user_id}/reactivate",
-            post(system::reactivate_user),
-        )
-        .route(
-            "/v1/system/users/{user_id}/anonymize",
-            post(system::anonymize_user),
-        )
+        .route("/v1/system/users/{user_id}/deactivate", post(system::deactivate_user))
+        .route("/v1/system/users/{user_id}/reactivate", post(system::reactivate_user))
+        .route("/v1/system/users/{user_id}/anonymize", post(system::anonymize_user))
         .route(
             "/v1/system/users/{user_id}/password-reset",
             post(access::issue_password_reset),
@@ -657,9 +684,15 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             "/v1/workspaces/{workspace_id}/knowledge-map",
             get(workspace_knowledge_map),
         )
-        .route("/v1/workspaces/{workspace_id}/mention-suggestions", get(suggest_mentions))
+        .route(
+            "/v1/workspaces/{workspace_id}/mention-suggestions",
+            get(suggest_mentions),
+        )
         .route("/v1/workspaces/{workspace_id}/review", get(review::review_queue))
-        .route("/v1/workspaces/{workspace_id}/export", get(workspace_export::export_workspace))
+        .route(
+            "/v1/workspaces/{workspace_id}/export",
+            get(workspace_export::export_workspace),
+        )
         .route("/v1/workspaces/{workspace_id}/health", get(health::workspace_health))
         .route(
             "/v1/workspaces/{workspace_id}/health/actions",

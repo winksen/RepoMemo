@@ -35,7 +35,8 @@ use tokio_stream::StreamExt;
 
 use crate::quotas::{format_bytes, free_disk_bytes};
 use crate::{
-    consume_heavy_quota, map_storage_error, record_workspace_activity, ApiError, AppState, AuthenticatedSubject, ManagingSubject,
+    consume_heavy_quota, map_storage_error, record_workspace_activity, ApiError, AppState, AuthenticatedSubject,
+    ManagingSubject,
 };
 
 const MIB: u64 = 1024 * 1024;
@@ -101,8 +102,17 @@ pub(crate) async fn import_workspace(
     if !report.problems.is_empty() && !query.dry_run {
         return Err(ApiError::bad_request(summarize(&report.problems)));
     }
-    crate::record_timing("workspace_import", &query.organization_id, started, report.counts.artifacts as usize);
-    let status = if report.dry_run { StatusCode::OK } else { StatusCode::CREATED };
+    crate::record_timing(
+        "workspace_import",
+        &query.organization_id,
+        started,
+        report.counts.artifacts as usize,
+    );
+    let status = if report.dry_run {
+        StatusCode::OK
+    } else {
+        StatusCode::CREATED
+    };
     Ok((status, Json(report)).into_response())
 }
 
@@ -114,14 +124,18 @@ fn summarize(problems: &[String]) -> String {
 /// than the server accepts.
 async fn receive(state: &AppState, body: Body) -> Result<TempFile, ApiError> {
     let directory = state.storage.data_dir().join("imports");
-    tokio::fs::create_dir_all(&directory).await.map_err(ApiError::internal)?;
+    tokio::fs::create_dir_all(&directory)
+        .await
+        .map_err(ApiError::internal)?;
     remove_stale(&directory).await;
     let limit = state.max_import_bytes;
     static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let sequence = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let stamp = chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default();
     let temporary = TempFile(directory.join(format!("import-{stamp}-{sequence}.tmp")));
-    let mut file = tokio::fs::File::create(&temporary.0).await.map_err(ApiError::internal)?;
+    let mut file = tokio::fs::File::create(&temporary.0)
+        .await
+        .map_err(ApiError::internal)?;
     let mut stream = body.into_data_stream();
     let mut received = 0_u64;
     while let Some(chunk) = stream.next().await {
@@ -186,7 +200,8 @@ async fn read_archive(
     if name != ARCHIVE_MANIFEST_ENTRY {
         return Err(damaged("it does not start with a manifest"));
     }
-    let manifest: ArchiveManifest = serde_json::from_slice(&bytes).map_err(|_| damaged("its manifest cannot be read"))?;
+    let manifest: ArchiveManifest =
+        serde_json::from_slice(&bytes).map_err(|_| damaged("its manifest cannot be read"))?;
     let mut problems = manifest.check().problems;
     if !problems.is_empty() {
         // Nothing else in it can be trusted to mean what this server expects.
@@ -220,7 +235,9 @@ async fn read_archive(
         return Err(damaged("its data does not follow its manifest"));
     }
     if bytes.len() as u64 != manifest.data_bytes || StorageEngine::content_hash(&bytes) != manifest.data_sha256 {
-        return Err(damaged("its data does not match its checksum, so it was damaged or changed"));
+        return Err(damaged(
+            "its data does not match its checksum, so it was damaged or changed",
+        ));
     }
     let data: WorkspaceArchiveData = serde_json::from_slice(&bytes).map_err(|_| damaged("its data cannot be read"))?;
     drop(bytes);
@@ -241,7 +258,9 @@ async fn read_archive(
         .filter(|artifact| !expected.contains_key(artifact.content_hash.as_str()))
         .count();
     if unlisted > 0 {
-        problems.push(format!("{unlisted} file(s) are missing from the archive's list of stored files."));
+        problems.push(format!(
+            "{unlisted} file(s) are missing from the archive's list of stored files."
+        ));
     }
     problems.extend(room_problems(state, manifest.blob_bytes()));
     if !problems.is_empty() {
@@ -270,7 +289,9 @@ async fn read_archive(
         };
         read += bytes.len() as u64;
         if read > budget || bytes.len() as u64 != *size || StorageEngine::content_hash(&bytes) != hash {
-            problems.push(format!("The stored file {hash} does not match its checksum, so it was damaged or changed."));
+            problems.push(format!(
+                "The stored file {hash} does not match its checksum, so it was damaged or changed."
+            ));
             break;
         }
         if seen.insert(hash.to_owned()) && !query.dry_run {
@@ -284,7 +305,9 @@ async fn read_archive(
     if problems.is_empty() {
         let missing = expected.keys().filter(|hash| !seen.contains(**hash)).count();
         if missing > 0 {
-            problems.push(format!("{missing} stored file(s) listed in the manifest are not in the archive."));
+            problems.push(format!(
+                "{missing} stored file(s) listed in the manifest are not in the archive."
+            ));
         }
     }
     if !problems.is_empty() || query.dry_run {

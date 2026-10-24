@@ -7,12 +7,11 @@ use chrono::Utc;
 use repomemo_domain::{
     AgentConversation, AgentMessage, AgentReply, AgentTurn, ArtifactComment, ArtifactDetail, ArtifactIndexFailure,
     ArtifactLifecycle, ArtifactLifecycleEvent, ArtifactSummary, ArtifactType, ArtifactVersion, Chunk, Citation,
-    CollaborationTask,
-    Folder, IndexingJobStatus, MemoryCard, MemoryCardDetail, MemoryCardSummary, MemoryEvidence, MemoryReviewReason,
-    Organization, OrganizationMember, OrganizationRole, ProviderSettings, SavedSearch, SearchRequest, SearchResult,
-    SharedNotification, SharedUser, SharedWorkspace, Source, SourceType, Symbol, SymbolKind, SymbolSearchResult,
-    TaskChecklistItem, Workspace, WorkspaceActivityEvent, WorkspaceMember, WorkspaceMembership, WorkspaceOverview,
-    WorkspaceRole, MAX_FOLDER_DEPTH,
+    CollaborationTask, Folder, IndexingJobStatus, MemoryCard, MemoryCardDetail, MemoryCardSummary, MemoryEvidence,
+    MemoryReviewReason, Organization, OrganizationMember, OrganizationRole, ProviderSettings, SavedSearch,
+    SearchRequest, SearchResult, SharedNotification, SharedUser, SharedWorkspace, Source, SourceType, Symbol,
+    SymbolKind, SymbolSearchResult, TaskChecklistItem, Workspace, WorkspaceActivityEvent, WorkspaceMember,
+    WorkspaceMembership, WorkspaceOverview, WorkspaceRole, MAX_FOLDER_DEPTH,
 };
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -49,12 +48,12 @@ pub use access::{PasswordReset, PersonalTokenGrant, StoredInvitation, PERSONAL_T
 pub use accounts::{Anonymization, Deactivation, OwnedPlace, FORMER_MEMBER};
 pub use archive_import::{ImportedWorkspace, PendingPassage};
 pub use connectors::{ConnectorItemOutcome, ConnectorItemWrite};
-pub use mentions::{MentionRow, MentionWrite, WorkspaceFileIndex};
-pub use organizations::StarterSetup;
 pub use credentials::{RepoCredentialInfo, RepoSecret, RepoWebhookInfo};
-pub use repo::RepoLastChange;
 pub use environment::{inspect_environment, EnvironmentState};
 pub use mail::{DigestCandidate, DigestNotice, MailOutboxCounts, MailSettingsUpdate, QueuedMail, StoredMailSettings};
+pub use mentions::{MentionRow, MentionWrite, WorkspaceFileIndex};
+pub use organizations::StarterSetup;
+pub use repo::RepoLastChange;
 pub use repo::{RepoFileRecord, RepoFileWrite};
 use secrets::SecretBox;
 pub use secrets::{restrict_to_owner, KEY_FILE_NAME as SECRET_KEY_FILE_NAME, MIN_MASTER_KEY_CHARS};
@@ -1638,7 +1637,7 @@ fn push_search_filters<'a>(query: &mut QueryBuilder<'a, Sqlite>, request: &'a Se
 }
 
 pub fn decode_embedding(bytes: &[u8]) -> Option<Vec<f32>> {
-    if bytes.len() % 4 != 0 {
+    if !bytes.len().is_multiple_of(4) {
         return None;
     }
     Some(

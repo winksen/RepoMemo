@@ -55,7 +55,7 @@ pub(crate) async fn export_workspace(
         .await
         .map_err(map_storage_error)?;
     let blobs = distinct_blobs(&state.storage, &data).await?;
-    let data_bytes = serde_json::to_vec_pretty(&data).map_err(|error| ApiError::internal(error))?;
+    let data_bytes = serde_json::to_vec_pretty(&data).map_err(ApiError::internal)?;
     let manifest = ArchiveManifest {
         format: ARCHIVE_FORMAT.to_owned(),
         format_version: ARCHIVE_FORMAT_VERSION,
@@ -67,7 +67,7 @@ pub(crate) async fn export_workspace(
         data_bytes: data_bytes.len() as u64,
         blobs,
     };
-    let manifest_bytes = serde_json::to_vec_pretty(&manifest).map_err(|error| ApiError::internal(error))?;
+    let manifest_bytes = serde_json::to_vec_pretty(&manifest).map_err(ApiError::internal)?;
 
     let summary = format!(
         "Exported the workspace as an archive: {} files, {} memory cards, {} tasks, {} comments.",
@@ -203,7 +203,11 @@ fn archive_filename(workspace_name: &str) -> String {
     let slug = slug.trim_matches('-');
     let slug = if slug.is_empty() { "workspace" } else { slug };
     let slug: String = slug.chars().take(40).collect();
-    format!("repomemo-{}-{}.tar.gz", slug.trim_end_matches('-'), Utc::now().format("%Y%m%d"))
+    format!(
+        "repomemo-{}-{}.tar.gz",
+        slug.trim_end_matches('-'),
+        Utc::now().format("%Y%m%d")
+    )
 }
 
 #[cfg(test)]

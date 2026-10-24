@@ -1009,7 +1009,7 @@ async fn a_search_across_workspaces_reads_only_what_each_workspace_allows() {
     assert_eq!(found["workspaces"].as_array().unwrap().len(), 2);
     assert_eq!(workspace_entry(&found, &alpha)["by_meaning"], true);
     assert_eq!(workspace_entry(&found, &beta)["by_meaning"], true);
-    assert_eq!(found["results"][0]["workspace_name"].is_string(), true);
+    assert!(found["results"][0]["workspace_name"].is_string());
     assert!(found["results"]
         .as_array()
         .unwrap()

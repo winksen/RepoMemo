@@ -27,9 +27,9 @@ mod health;
 mod knowledge_map;
 mod meaning;
 mod mentions;
-mod repo_overview;
 mod remote_policy;
 mod remote_repo;
+mod repo_overview;
 mod repo_policy;
 mod repo_stack;
 mod repo_sync;
@@ -852,7 +852,8 @@ impl RepoMemoCore {
                 (index, outcome)
             });
         }
-        let mut outcomes: Vec<Option<Result<(Vec<SearchResult>, bool)>>> = (0..count).map(|_| None).collect();
+        type Outcome = Result<(Vec<SearchResult>, bool)>;
+        let mut outcomes: Vec<Option<Outcome>> = (0..count).map(|_| None).collect();
         while let Some(finished) = running.join_next().await {
             if let Ok((index, outcome)) = finished {
                 outcomes[index] = Some(outcome);

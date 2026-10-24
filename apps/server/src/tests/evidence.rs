@@ -1547,7 +1547,15 @@ async fn push_webhooks_queue_a_sync_only_when_they_are_signed_right() {
     let (owner, _) = register_account(&app, "hook-owner@example.com").await;
     let (member, _) = register_account(&app, "hook-member@example.com").await;
     let workspace_id = create_workspace(&app, &owner).await;
-    join(&app, &owner, "workspaces", &workspace_id, "hook-member@example.com", "member").await;
+    join(
+        &app,
+        &owner,
+        "workspaces",
+        &workspace_id,
+        "hook-member@example.com",
+        "member",
+    )
+    .await;
     let call = |method: &'static str, uri: String, who: String, body: Value| {
         let app = app.clone();
         let request = json_request(method, &uri, &who, body);
@@ -1578,7 +1586,10 @@ async fn push_webhooks_queue_a_sync_only_when_they_are_signed_right() {
     };
     let signature = |secret: &str, body: &str| {
         let key = ring::hmac::Key::new(ring::hmac::HMAC_SHA256, secret.as_bytes());
-        format!("sha256={}", hex::encode(ring::hmac::sign(&key, body.as_bytes()).as_ref()))
+        format!(
+            "sha256={}",
+            hex::encode(ring::hmac::sign(&key, body.as_bytes()).as_ref())
+        )
     };
     let push = r#"{"ref":"refs/heads/main"}"#;
 
@@ -1596,26 +1607,47 @@ async fn push_webhooks_queue_a_sync_only_when_they_are_signed_right() {
 
     // Only an administrator sets one up, and the secret is shown once.
     assert_eq!(
-        call("POST", format!("/v1/repositories/{source_id}/webhook"), member.clone(), json!({}))
-            .await
-            .status(),
+        call(
+            "POST",
+            format!("/v1/repositories/{source_id}/webhook"),
+            member.clone(),
+            json!({})
+        )
+        .await
+        .status(),
         403
     );
-    let created = call("POST", format!("/v1/repositories/{source_id}/webhook"), owner.clone(), json!({})).await;
+    let created = call(
+        "POST",
+        format!("/v1/repositories/{source_id}/webhook"),
+        owner.clone(),
+        json!({}),
+    )
+    .await;
     assert_eq!(created.status(), 201);
     let created = response_json(created).await;
     let secret = created["secret"].as_str().unwrap().to_owned();
     assert_eq!(created["path"], hook_path.as_str());
-    let shown = response_json(call("GET", format!("/v1/repositories/{source_id}"), owner.clone(), json!({})).await).await;
+    let shown =
+        response_json(call("GET", format!("/v1/repositories/{source_id}"), owner.clone(), json!({})).await).await;
     assert_eq!(shown["has_webhook"], true);
     assert!(!shown.to_string().contains(&secret));
 
     // Unsigned, wrongly signed, signed for other content: refused.
     for headers in [
         vec![],
-        vec![("x-hub-signature-256", signature("wrong", push)), ("x-github-event", "push".to_owned())],
-        vec![("x-hub-signature-256", signature(&secret, "{}")), ("x-github-event", "push".to_owned())],
-        vec![("x-gitlab-token", "wrong".to_owned()), ("x-gitlab-event", "Push Hook".to_owned())],
+        vec![
+            ("x-hub-signature-256", signature("wrong", push)),
+            ("x-github-event", "push".to_owned()),
+        ],
+        vec![
+            ("x-hub-signature-256", signature(&secret, "{}")),
+            ("x-github-event", "push".to_owned()),
+        ],
+        vec![
+            ("x-gitlab-token", "wrong".to_owned()),
+            ("x-gitlab-event", "Push Hook".to_owned()),
+        ],
     ] {
         let (status, _) = send(hook_path.clone(), headers, push).await;
         assert_eq!(status, 401);
@@ -1650,12 +1682,19 @@ async fn push_webhooks_queue_a_sync_only_when_they_are_signed_right() {
     let mut other = github("push");
     other.push(("x-github-delivery", "delivery-2".to_owned()));
     let (_, next) = send(hook_path.clone(), other, push).await;
-    assert_ne!(next["note"].as_str(), Some("already received"), "a new delivery is a new call");
+    assert_ne!(
+        next["note"].as_str(),
+        Some("already received"),
+        "a new delivery is a new call"
+    );
 
     // GitLab sends the secret itself; a generic sender signs like GitHub.
     let (status, _) = send(
         hook_path.clone(),
-        vec![("x-gitlab-token", secret.clone()), ("x-gitlab-event", "Push Hook".to_owned())],
+        vec![
+            ("x-gitlab-token", secret.clone()),
+            ("x-gitlab-event", "Push Hook".to_owned()),
+        ],
         push,
     )
     .await;
@@ -1667,21 +1706,33 @@ async fn push_webhooks_queue_a_sync_only_when_they_are_signed_right() {
     )
     .await;
     assert_eq!(status, 202);
-    let shown = response_json(call("GET", format!("/v1/repositories/{source_id}"), owner.clone(), json!({})).await).await;
+    let shown =
+        response_json(call("GET", format!("/v1/repositories/{source_id}"), owner.clone(), json!({})).await).await;
     assert!(shown["webhook_last_received_at"].is_string());
 
     // A new secret retires the old one; removing it ends the webhook.
     let renewed = response_json(
-        call("POST", format!("/v1/repositories/{source_id}/webhook"), owner.clone(), json!({})).await,
+        call(
+            "POST",
+            format!("/v1/repositories/{source_id}/webhook"),
+            owner.clone(),
+            json!({}),
+        )
+        .await,
     )
     .await;
     assert_ne!(renewed["secret"].as_str().unwrap(), secret);
     let (status, _) = send(hook_path.clone(), github("push"), push).await;
     assert_eq!(status, 401);
     assert_eq!(
-        call("DELETE", format!("/v1/repositories/{source_id}/webhook"), owner.clone(), json!({}))
-            .await
-            .status(),
+        call(
+            "DELETE",
+            format!("/v1/repositories/{source_id}/webhook"),
+            owner.clone(),
+            json!({})
+        )
+        .await
+        .status(),
         204
     );
     let (status, _) = send(
@@ -1763,22 +1814,42 @@ async fn a_citation_opens_the_file_as_it_was_at_the_commit_it_names() {
     .await;
     let source_id = connected["repository"]["id"].as_str().unwrap().to_owned();
     wait_ready(source_id.clone(), first.clone()).await;
-    let files = response_json(call("GET", format!("/v1/repositories/{source_id}/files"), owner.clone(), json!({})).await).await;
+    let files = response_json(
+        call(
+            "GET",
+            format!("/v1/repositories/{source_id}/files"),
+            owner.clone(),
+            json!({}),
+        )
+        .await,
+    )
+    .await;
     let artifact_id = files[0]["artifact_id"].as_str().unwrap().to_owned();
 
     std::fs::write(repo_dir.join("guide.md"), "# Guide\nsecond version\n").unwrap();
     git(&["commit", "--quiet", "-am", "Second"]);
     let second = git(&["rev-parse", "HEAD"]);
     assert_eq!(
-        call("POST", format!("/v1/repositories/{source_id}/sync"), owner.clone(), json!({}))
-            .await
-            .status(),
+        call(
+            "POST",
+            format!("/v1/repositories/{source_id}/sync"),
+            owner.clone(),
+            json!({})
+        )
+        .await
+        .status(),
         200
     );
     wait_ready(source_id.clone(), second.clone()).await;
 
     // The old text, labelled with its commit, and the commit the workspace holds now.
-    let old = call("GET", format!("/v1/artifacts/{artifact_id}/at/{}", &first[..12]), owner.clone(), json!({})).await;
+    let old = call(
+        "GET",
+        format!("/v1/artifacts/{artifact_id}/at/{}", &first[..12]),
+        owner.clone(),
+        json!({}),
+    )
+    .await;
     assert_eq!(old.status(), 200);
     let old = response_json(old).await;
     assert_eq!(old["commit"], first.as_str());
@@ -1789,7 +1860,13 @@ async fn a_citation_opens_the_file_as_it_was_at_the_commit_it_names() {
 
     // The current commit names no other version.
     let current = response_json(
-        call("GET", format!("/v1/artifacts/{artifact_id}/at/{second}"), owner.clone(), json!({})).await,
+        call(
+            "GET",
+            format!("/v1/artifacts/{artifact_id}/at/{second}"),
+            owner.clone(),
+            json!({}),
+        )
+        .await,
     )
     .await;
     assert!(current["current_commit"].is_null());
@@ -1797,13 +1874,28 @@ async fn a_citation_opens_the_file_as_it_was_at_the_commit_it_names() {
 
     // Unknown commits, odd input and people outside the workspace are refused.
     for commit in ["deadbeefdeadbeef", "zzzzzzzz", "--oops"] {
-        let refused = call("GET", format!("/v1/artifacts/{artifact_id}/at/{commit}"), owner.clone(), json!({})).await;
-        assert!(refused.status() == 404 || refused.status() == 400, "{commit}: {}", refused.status());
+        let refused = call(
+            "GET",
+            format!("/v1/artifacts/{artifact_id}/at/{commit}"),
+            owner.clone(),
+            json!({}),
+        )
+        .await;
+        assert!(
+            refused.status() == 404 || refused.status() == 400,
+            "{commit}: {}",
+            refused.status()
+        );
     }
     assert_eq!(
-        call("GET", format!("/v1/artifacts/{artifact_id}/at/{first}"), outsider, json!({}))
-            .await
-            .status(),
+        call(
+            "GET",
+            format!("/v1/artifacts/{artifact_id}/at/{first}"),
+            outsider,
+            json!({})
+        )
+        .await
+        .status(),
         403
     );
     let _ = std::fs::remove_dir_all(base);

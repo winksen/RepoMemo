@@ -506,7 +506,11 @@ impl StorageEngine {
 
     /// Fails unless `creator_id` may create workspaces in the organization:
     /// owners and administrators, and system administrators anywhere.
-    pub(crate) async fn require_workspace_creator(&self, creator_id: &str, organization_id: &str) -> Result<OrganizationRole> {
+    pub(crate) async fn require_workspace_creator(
+        &self,
+        creator_id: &str,
+        organization_id: &str,
+    ) -> Result<OrganizationRole> {
         let membership = self.organization_role_for_user(creator_id, organization_id).await?;
         let is_system_admin = self
             .user_access(creator_id)

@@ -83,9 +83,10 @@ impl SettingsCell {
         handles
             .max_mb
             .store(settings.repo_clone_max_mb, std::sync::atomic::Ordering::Relaxed);
-        handles
-            .timeout_minutes
-            .store(settings.repo_clone_timeout_minutes, std::sync::atomic::Ordering::Relaxed);
+        handles.timeout_minutes.store(
+            settings.repo_clone_timeout_minutes,
+            std::sync::atomic::Ordering::Relaxed,
+        );
         let _ = self.clone_limits.set(handles);
     }
 
@@ -109,9 +110,10 @@ impl SettingsCell {
             handles
                 .max_mb
                 .store(settings.repo_clone_max_mb, std::sync::atomic::Ordering::Relaxed);
-            handles
-                .timeout_minutes
-                .store(settings.repo_clone_timeout_minutes, std::sync::atomic::Ordering::Relaxed);
+            handles.timeout_minutes.store(
+                settings.repo_clone_timeout_minutes,
+                std::sync::atomic::Ordering::Relaxed,
+            );
         }
         let mut current = self.current.write().unwrap_or_else(|poisoned| poisoned.into_inner());
         *current = Arc::new(settings);
@@ -537,7 +539,10 @@ impl InstanceInfo {
                     if config.document_memory_mb == 0 {
                         "in a process of their own, no memory limit".to_owned()
                     } else {
-                        format!("in a process of their own, up to {} MiB each", config.document_memory_mb)
+                        format!(
+                            "in a process of their own, up to {} MiB each",
+                            config.document_memory_mb
+                        )
                     }
                 } else {
                     "on a thread of the server (no memory limit, cannot be killed)".to_owned()
@@ -1052,11 +1057,7 @@ pub(crate) async fn overview(
                 .fold((0, 0), |(count, bytes), metadata| (count + 1, bytes + metadata.len()))
         })
         .unwrap_or((0, 0));
-    let remote_clones = state
-        .core
-        .remote_clone_sizes(None)
-        .await
-        .map_err(map_storage_error)?;
+    let remote_clones = state.core.remote_clone_sizes(None).await.map_err(map_storage_error)?;
     let (event_channels, event_subscribers) = state.event_bus.stats();
     let (tracked_rate_limit_keys, locked_sign_in_keys) = state.guards.stats();
     Ok(Json(OverviewResponse {
@@ -1386,11 +1387,7 @@ pub(crate) async fn deactivate_user(
             "You cannot deactivate your own account. Ask another system administrator.",
         ));
     }
-    let owned = state
-        .storage
-        .owned_places(&user_id)
-        .await
-        .map_err(map_storage_error)?;
+    let owned = state.storage.owned_places(&user_id).await.map_err(map_storage_error)?;
     if !owned.is_empty() {
         return Err(ApiError::conflict(format!(
             "This account owns {}. Transfer the ownership first, then deactivate it.",

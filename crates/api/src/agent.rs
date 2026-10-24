@@ -915,12 +915,12 @@ fn contains_phrase(lower: &str, phrase: &str) -> bool {
 fn find_phrase(lower: &str, phrase: &str) -> Option<usize> {
     lower.match_indices(phrase).map(|(index, _)| index).find(|&index| {
         let before = lower[..index].chars().next_back();
-        before.map_or(true, |c| !c.is_alphanumeric()) && is_boundary(lower, index + phrase.len())
+        before.is_none_or(|c| !c.is_alphanumeric()) && is_boundary(lower, index + phrase.len())
     })
 }
 
 fn is_boundary(lower: &str, index: usize) -> bool {
-    lower[index..].chars().next().map_or(true, |c| !c.is_alphanumeric())
+    lower[index..].chars().next().is_none_or(|c| !c.is_alphanumeric())
 }
 
 /// Drops quotes, trailing punctuation and filler words around the part of a

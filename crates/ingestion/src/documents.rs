@@ -552,9 +552,7 @@ fn parse_sheet_rows(xml: &[u8], shared: &[String], date_styles: &[bool]) -> Resu
                     in_cell = true;
                     value.clear();
                     cell_type = attribute(&event, "t").unwrap_or_default();
-                    cell_style = attribute(&event, "s")
-                        .and_then(|value| value.parse().ok())
-                        .unwrap_or(0);
+                    cell_style = attribute(&event, "s").and_then(|value| value.parse().ok()).unwrap_or(0);
                     cell_column = attribute(&event, "r")
                         .and_then(|reference| column_index(&reference))
                         .unwrap_or(next_column);
@@ -563,9 +561,7 @@ fn parse_sheet_rows(xml: &[u8], shared: &[String], date_styles: &[bool]) -> Resu
                 "t" if in_cell => in_inline_text = true,
                 _ => {}
             },
-            Ok(Event::Text(text)) if in_value || in_inline_text => {
-                value.push_str(&text.xml10_content())
-            }
+            Ok(Event::Text(text)) if in_value || in_inline_text => value.push_str(&text.xml10_content()),
             Ok(Event::GeneralRef(reference)) if in_value || in_inline_text => push_reference(&mut value, &reference),
             Ok(Event::End(event)) => match local(event.name().as_ref()) {
                 "v" => in_value = false,

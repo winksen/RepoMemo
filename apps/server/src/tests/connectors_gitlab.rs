@@ -12,7 +12,10 @@ fn note_token(state: &FakeGitLab, headers: &axum::http::HeaderMap) {
     if let Some(value) = headers.get("private-token") {
         state.tokens.lock().unwrap().push(value.to_str().unwrap().to_owned());
     }
-    assert!(headers.get("authorization").is_none(), "GitLab takes PRIVATE-TOKEN only");
+    assert!(
+        headers.get("authorization").is_none(),
+        "GitLab takes PRIVATE-TOKEN only"
+    );
 }
 
 async fn start_fake_gitlab(state: FakeGitLab) -> String {
@@ -121,7 +124,11 @@ async fn gitlab_issues_and_merge_requests_follow_the_same_model() {
         json!({"link": link, "token": "glpat-secret"}),
     )
     .await;
-    assert_eq!(undetected.status(), 400, "read as GitHub, which this host does not answer to");
+    assert_eq!(
+        undetected.status(),
+        400,
+        "read as GitHub, which this host does not answer to"
+    );
     let checked = response_json(
         call(
             "POST",
@@ -151,7 +158,8 @@ async fn gitlab_issues_and_merge_requests_follow_the_same_model() {
     let mut connector = Value::Null;
     for _ in 0..150 {
         connector = response_json(call("GET", format!("/v1/connectors/{source_id}"), json!({})).await).await;
-        if connector["status"] == "ready" && connector["active_job"].is_null() && connector["last_report"]["added"] == 3 {
+        if connector["status"] == "ready" && connector["active_job"].is_null() && connector["last_report"]["added"] == 3
+        {
             break;
         }
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
@@ -179,11 +187,21 @@ async fn gitlab_issues_and_merge_requests_follow_the_same_model() {
     let lock = artifact("Add a cache lock");
     assert_eq!(stampede["artifact_type"], "issue");
     assert_eq!(lock["artifact_type"], "pr");
-    let detail =
-        response_json(call("GET", format!("/v1/artifacts/{}", lock["id"].as_str().unwrap()), json!({})).await).await;
+    let detail = response_json(
+        call(
+            "GET",
+            format!("/v1/artifacts/{}", lock["id"].as_str().unwrap()),
+            json!({}),
+        )
+        .await,
+    )
+    .await;
     assert_eq!(detail["metadata"]["origin"], "gitlab_merge_request");
     assert_eq!(detail["metadata"]["state"], "merged");
-    assert_eq!(detail["metadata"]["commits"][0], "9f00000000000000000000000000000000000abc");
+    assert_eq!(
+        detail["metadata"]["commits"][0],
+        "9f00000000000000000000000000000000000abc"
+    );
     for (item, expected) in [(&retry, "outdated"), (&lock, "active"), (&stampede, "active")] {
         let lifecycle = response_json(
             call(

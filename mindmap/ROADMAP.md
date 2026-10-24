@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.3.2` (2026-10-24), after `V0.3.0` *Connected*, released after the maintainer's tests of the clean install (R6, R12) · **Next:** [Road to V0.4.0](#-road-to-v040), the 0.3.x releases V0.3.3–V0.3.27 in tracks O to T (decisions 29–32 taken as proposed, 33 recorded in V0.3.27) · **Built before the tag:** tracks K to N (V0.2.57–V0.2.193) · **Next minor after it:** `V0.4.0`, its theme still to be chosen (decision 33)
+> **Current version:** `V0.3.3` (2026-10-24), after `V0.3.0` *Connected*, released after the maintainer's tests of the clean install (R6, R12) · **Next:** [Road to V0.4.0](#-road-to-v040), the 0.3.x releases V0.3.4–V0.3.27 in tracks O to T (decisions 29–32 taken as proposed, 33 recorded in V0.3.27) · **Built before the tag:** tracks K to N (V0.2.57–V0.2.193) · **Next minor after it:** `V0.4.0`, its theme still to be chosen (decision 33)
 > **Feature freeze (V0.1.76 to the `v0.3.0` tag):** lifted by the tag on 2026-10-24. The 0.3.x releases follow the rules of [Road to V0.4.0](#-road-to-v040).
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Security review 2026-10-16 (V0.2.52)](security/2026-10-16-security-review.md) · [Security and backend review 2026-10-21 (V0.2.129)](security/2026-10-21-security-review.md) · [Security review of workspace templates 2026-10-22 (V0.2.192)](security/2026-10-22-workspace-templates-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -77,7 +77,7 @@ timeline
 | Track M: backend hardening and performance (V0.2.149–V0.2.162) | ✅ V0.2.149–V0.2.162 built; decisions 20–23 taken as proposed |
 | Track N: workspace templates (V0.2.163–V0.2.193) | ✅ V0.2.163–V0.2.193 built; decisions 24–28 taken as proposed; [plan](plans/2026-10-22-workspace-templates.md) · [format](technical/workspace-templates.md) |
 | **V0.3.0 *Connected*** | ✅ Released 2026-10-24: the version set to `0.3.0` and tagged `v0.3.0` after tracks K to N and the clean-machine install |
-| Road to V0.4.0 (V0.3.1–V0.3.27, tracks O to T) | 🔄 Under way since 2026-10-24: fixes and the record, the local edition removed, small gaps closed, portability and connector depth, operations, security pass; decisions 29–32 taken as proposed, 33 to record in V0.3.27. Built so far: V0.3.1–V0.3.2 |
+| Road to V0.4.0 (V0.3.1–V0.3.27, tracks O to T) | 🔄 Under way since 2026-10-24: fixes and the record, the local edition removed, small gaps closed, portability and connector depth, operations, security pass; decisions 29–32 taken as proposed, 33 to record in V0.3.27. Built so far: V0.3.1–V0.3.3 |
 | V0.4.0 and later: scale-out, single sign-on, hosted | 💭 Direction (the theme is decision 33) |
 
 ---
@@ -1356,7 +1356,7 @@ Design and limits: [technical/repository-sources.md](technical/repository-source
 
 ## 🎯 Road to V0.4.0
 
-> **Status:** proposed on 2026-10-24, right after `V0.3.0`, and under way the same day: decisions 29–32 above are taken as proposed (the maintainer asked for the releases to be built one by one up to V0.3.27), and decision 33 is recorded in V0.3.27. The releases are numbered V0.3.1–V0.3.27, and `V0.4.0` is cut when the theme of decision 33 is ready, after V0.3.27. Built so far: V0.3.1–V0.3.2.
+> **Status:** proposed on 2026-10-24, right after `V0.3.0`, and under way the same day: decisions 29–32 above are taken as proposed (the maintainer asked for the releases to be built one by one up to V0.3.27), and decision 33 is recorded in V0.3.27. The releases are numbered V0.3.1–V0.3.27, and `V0.4.0` is cut when the theme of decision 33 is ready, after V0.3.27. Built so far: V0.3.1–V0.3.3.
 
 ### What this line is
 
@@ -1389,7 +1389,7 @@ Design and limits: [technical/repository-sources.md](technical/repository-source
 |---|---|---|---|---|---|
 | **V0.3.1** ✅ | 🐞 | Fixes | Corrections that the maintainer's tests of 0.3.0 found. This row is the first; a finding that needs its own release gets the next number and pushes the rest down | R15 | The step that failed passes on a second run |
 | **V0.3.2** ✅ | 🐞 | Tests | Every test written since V0.2.46 is run once; those that fail are corrected, in the test or in the code | R15b | `cargo test --workspace --exclude repomemo-desktop` and `npm run test:web` pass (the maintainer's run) |
-| **V0.3.3** | 📘 | Process | `cargo fmt --all --check` and clippy made clean in one formatting release, then blocking in CI. Line endings of CRLF files are kept | C8 follow-up | CI's formatting step passes on `main`; a second formatting run changes nothing |
+| **V0.3.3** ✅ | 📘 | Process | `cargo fmt --all --check` and clippy made clean in one formatting release, then blocking in CI. Line endings of CRLF files are kept | C8 follow-up | CI's formatting step passes on `main`; a second formatting run changes nothing |
 | **V0.3.4** | 📘 | Release record | The recorded figures: the performance runs before and after track M, the browser pass (axe or Lighthouse, 375 px and 768 px, both themes), the desktop app tried against a server; the result table of the clean install filled and §3 of its page ticked | R6 follow-up, R10 | [performance.md](technical/performance.md) and [clean-install.md](technical/clean-install.md) hold the figures; no box is left unticked without a reason |
 
 #### Track P: The retired local edition removed (V0.3.5–V0.3.7)
@@ -1450,6 +1450,7 @@ One box per release, added as each release is built. Say what was built and what
 
 - [x] **V0.3.1** the maintainer's tests of 0.3.0 found nothing to correct. Done: the version set to `0.3.1` everywhere; the list of findings recorded as empty, so no step needs a second run and the numbers after it do not move; decisions 29–32 taken as proposed; this checklist added. No code changed; `version:check` passes. **Not run:** the tests
 - [x] **V0.3.2** every test written since V0.2.46 compiled and handed over. Done: `cargo check --workspace --exclude repomemo-desktop --tests --locked` and `npm run typecheck` pass; the tests counted from the source (547 Rust, 334 web, 9 checker); the commands for the maintainer's single run are in the changelog (`cargo test --workspace --exclude repomemo-desktop`, `npm run test:web`, `npm run templates:test`). No code changed. **Not run:** the tests (declined on purpose); the roadmap's *Done when* waits for the maintainer's run, and a failure found then takes the next number
+- [x] **V0.3.3** formatting and clippy clean. Done: `cargo fmt --all` over 45 files (hunks only, CRLF kept, a second `--check` changes nothing); `cargo clippy --workspace --exclude repomemo-desktop --all-targets --locked -- -D warnings` passes after behaviour-preserving corrections (`is_none_or`, `is_multiple_of`, two redundant closures, two type aliases, one `too_many_arguments` allowance, `review.rs`'s test module moved to the end, three test assertions); CI's *rustfmt and clippy* job already blocked on both, so it is unchanged. **Not run:** the tests; the maintainer's V0.3.2 run should be made on this tree
 
 ---
 

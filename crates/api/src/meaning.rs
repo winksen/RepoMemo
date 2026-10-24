@@ -188,7 +188,7 @@ impl RepoMemoCore {
                     cached
                         .files
                         .get(&artifact.id)
-                        .map_or(true, |file| file.stamp != stamps[&artifact.id])
+                        .is_none_or(|file| file.stamp != stamps[&artifact.id])
                 })
                 .map(|artifact| artifact.id.clone())
                 .collect::<Vec<_>>()

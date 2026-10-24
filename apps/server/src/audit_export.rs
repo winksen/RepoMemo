@@ -95,7 +95,11 @@ fn parse_bound(value: &str, end_of_day: bool, name: &str) -> Result<String, ApiE
     }
     DateTime::parse_from_rfc3339(value)
         .map(|moment| moment.with_timezone(&Utc).to_rfc3339_opts(SecondsFormat::AutoSi, false))
-        .map_err(|_| ApiError::bad_request(format!("\"{name}\" must be a day such as 2026-10-15 or a time such as 2026-10-15T09:30:00Z.")))
+        .map_err(|_| {
+            ApiError::bad_request(format!(
+                "\"{name}\" must be a day such as 2026-10-15 or a time such as 2026-10-15T09:30:00Z."
+            ))
+        })
 }
 
 /// `GET /v1/system/audit/export?format=&from=&to=`: the audit trail of a
@@ -120,7 +124,11 @@ pub(crate) async fn export_audit(
     let until = match query.to.as_deref().filter(|value| !value.trim().is_empty()) {
         Some(value) => {
             let bound = parse_bound(value, true, "to")?;
-            if bound < now { bound } else { now.clone() }
+            if bound < now {
+                bound
+            } else {
+                now.clone()
+            }
         }
         None => now.clone(),
     };
@@ -130,8 +138,18 @@ pub(crate) async fn export_audit(
 
     let described = format!(
         "{} to {}",
-        query.from.as_deref().map(str::trim).filter(|value| !value.is_empty()).unwrap_or("the start"),
-        query.to.as_deref().map(str::trim).filter(|value| !value.is_empty()).unwrap_or("now")
+        query
+            .from
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .unwrap_or("the start"),
+        query
+            .to
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .unwrap_or("now")
     );
     // Recorded before anything is sent, so a download that is cut short is still on record.
     audit(
@@ -169,7 +187,12 @@ pub(crate) async fn export_audit(
     }
     headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     headers.insert(HeaderName::from_static("x-total-count"), HeaderValue::from(total));
-    Ok((StatusCode::OK, headers, Body::from_stream(ReceiverStream::new(receiver))).into_response())
+    Ok((
+        StatusCode::OK,
+        headers,
+        Body::from_stream(ReceiverStream::new(receiver)),
+    )
+        .into_response())
 }
 
 /// A day for a file name: the digits and dashes of what was asked, or `fallback`.
@@ -181,7 +204,11 @@ fn short_day(value: Option<&str>, fallback: &str) -> String {
         .take(10)
         .filter(|character| character.is_ascii_digit() || *character == '-')
         .collect();
-    if day.len() == 10 { day } else { fallback.to_owned() }
+    if day.len() == 10 {
+        day
+    } else {
+        fallback.to_owned()
+    }
 }
 
 async fn stream_events(
@@ -227,9 +254,10 @@ async fn stream_events(
 
 /// One event as a line of JSON.
 pub(crate) fn json_line(event: &SystemAuditEvent) -> String {
-    let actor = event.actor.as_ref().map(|actor| {
-        json!({"id": actor.id, "email": actor.email, "display_name": actor.display_name})
-    });
+    let actor = event
+        .actor
+        .as_ref()
+        .map(|actor| json!({"id": actor.id, "email": actor.email, "display_name": actor.display_name}));
     let mut line = json!({
         "id": event.id,
         "time": event.created_at,
@@ -245,7 +273,11 @@ pub(crate) fn json_line(event: &SystemAuditEvent) -> String {
 /// One event as a CSV row.
 pub(crate) fn csv_row(event: &SystemAuditEvent) -> String {
     let (id, email, name) = match &event.actor {
-        Some(actor) => (actor.id.as_str(), actor.email.as_deref().unwrap_or(""), actor.display_name.as_str()),
+        Some(actor) => (
+            actor.id.as_str(),
+            actor.email.as_deref().unwrap_or(""),
+            actor.display_name.as_str(),
+        ),
         None => ("", "", ""),
     };
     let cells = [
@@ -302,9 +334,15 @@ mod tests {
         assert_eq!(csv_cell("say \"hi\""), "\"say \"\"hi\"\"\"");
         assert_eq!(csv_cell("line\nbreak"), "\"line\nbreak\"");
         for formula in ["=SUM(A1:A9)", "+1", "-2", "@cmd", "\tx", "\rx"] {
-            assert!(csv_cell(formula).trim_matches('"').starts_with('\''), "{formula:?} was left as it is");
+            assert!(
+                csv_cell(formula).trim_matches('"').starts_with('\''),
+                "{formula:?} was left as it is"
+            );
         }
-        assert_eq!(csv_cell("=HYPERLINK(\"http://x\",\"y\")"), "\"'=HYPERLINK(\"\"http://x\"\",\"\"y\"\")\"");
+        assert_eq!(
+            csv_cell("=HYPERLINK(\"http://x\",\"y\")"),
+            "\"'=HYPERLINK(\"\"http://x\"\",\"\"y\"\")\""
+        );
         assert_eq!(csv_cell("2026-10-15T10:00:00+00:00"), "2026-10-15T10:00:00+00:00");
     }
 
@@ -317,7 +355,10 @@ mod tests {
         );
         let mut system = event("x");
         system.actor = None;
-        assert_eq!(csv_row(&system), "e1,2026-10-15T10:00:00.5+00:00,,,,setting_changed,x\r\n");
+        assert_eq!(
+            csv_row(&system),
+            "e1,2026-10-15T10:00:00.5+00:00,,,,setting_changed,x\r\n"
+        );
     }
 
     #[test]
@@ -332,9 +373,18 @@ mod tests {
 
     #[test]
     fn days_and_moments_become_the_times_events_are_compared_with() {
-        assert_eq!(parse_bound("2026-10-01", false, "from").unwrap(), "2026-10-01T00:00:00+00:00");
-        assert_eq!(parse_bound("2026-10-15", true, "to").unwrap(), "2026-10-16T00:00:00+00:00");
-        assert_eq!(parse_bound("2026-10-15T12:30:00+02:00", true, "to").unwrap(), "2026-10-15T10:30:00+00:00");
+        assert_eq!(
+            parse_bound("2026-10-01", false, "from").unwrap(),
+            "2026-10-01T00:00:00+00:00"
+        );
+        assert_eq!(
+            parse_bound("2026-10-15", true, "to").unwrap(),
+            "2026-10-16T00:00:00+00:00"
+        );
+        assert_eq!(
+            parse_bound("2026-10-15T12:30:00+02:00", true, "to").unwrap(),
+            "2026-10-15T10:30:00+00:00"
+        );
         assert!(parse_bound("yesterday", false, "from").is_err());
         assert!(parse_bound("2026-13-40", false, "from").is_err());
         assert!(Format::parse(Some("xml")).is_err());

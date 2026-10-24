@@ -15,7 +15,12 @@
 //! their default owners) are understood; negation and escapes are not.
 
 /// Where the file is looked for, first one found wins.
-pub const CODEOWNERS_PATHS: &[&str] = &[".github/CODEOWNERS", "CODEOWNERS", "docs/CODEOWNERS", ".gitlab/CODEOWNERS"];
+pub const CODEOWNERS_PATHS: &[&str] = &[
+    ".github/CODEOWNERS",
+    "CODEOWNERS",
+    "docs/CODEOWNERS",
+    ".gitlab/CODEOWNERS",
+];
 
 /// The most owners kept for one file.
 const MAX_OWNERS: usize = 16;
@@ -80,7 +85,10 @@ impl CodeOwners {
     /// The owners of a path (with `/` separators, no leading slash): those of
     /// the last rule that matches it.
     pub fn owners_of(&self, path: &str) -> Vec<String> {
-        let segments = path.split('/').filter(|segment| !segment.is_empty()).collect::<Vec<_>>();
+        let segments = path
+            .split('/')
+            .filter(|segment| !segment.is_empty())
+            .collect::<Vec<_>>();
         self.rules
             .iter()
             .rev()
@@ -128,7 +136,11 @@ fn rule_matches(rule: &Rule, path: &[&str]) -> bool {
     }
     // Where a match may start: the root for an anchored rule, any directory
     // level otherwise.
-    let starts: Vec<usize> = if rule.anchored { vec![0] } else { (0..path.len()).collect() };
+    let starts: Vec<usize> = if rule.anchored {
+        vec![0]
+    } else {
+        (0..path.len()).collect()
+    };
     let last_is_name = rule.segments.last().is_some_and(|segment| !has_wildcard(segment));
     // Whether what a pattern names may be a directory whose content counts.
     let covers_directory = rule.directory || last_is_name || rule.segments.last().is_some_and(|s| s == "**");
@@ -222,13 +234,29 @@ apps/   @app-team @lead\n\
         assert_eq!(owners(file, "main.py"), ["@everyone"]);
         assert_eq!(owners(file, "web/app.js"), ["@js-owner"]);
         assert_eq!(owners(file, "build/logs/2026/run.txt"), ["@ops"]);
-        assert_eq!(owners(file, "other/build/logs/run.txt"), ["@everyone"], "anchored to the root");
+        assert_eq!(
+            owners(file, "other/build/logs/run.txt"),
+            ["@everyone"],
+            "anchored to the root"
+        );
         assert_eq!(owners(file, "docs/intro.md"), ["docs@example.com"]);
-        assert_eq!(owners(file, "docs/deep/intro.md"), ["@everyone"], "`docs/*` does not recurse");
+        assert_eq!(
+            owners(file, "docs/deep/intro.md"),
+            ["@everyone"],
+            "`docs/*` does not recurse"
+        );
         assert_eq!(owners(file, "src/a/b/generated/x.rs"), ["@robots"]);
-        assert_eq!(owners(file, "src/generated/x.rs"), ["@robots"], "`**` takes no segment too");
+        assert_eq!(
+            owners(file, "src/generated/x.rs"),
+            ["@robots"],
+            "`**` takes no segment too"
+        );
         assert_eq!(owners(file, "apps/web/x.ts"), ["@app-team", "@lead"]);
-        assert_eq!(owners(file, "more/apps/x.ts"), ["@app-team", "@lead"], "a bare directory name matches at any depth");
+        assert_eq!(
+            owners(file, "more/apps/x.ts"),
+            ["@app-team", "@lead"],
+            "a bare directory name matches at any depth"
+        );
         assert_eq!(owners(file, "README.md"), ["@writer"]);
         assert_eq!(owners(file, "sub/README.md"), ["@everyone"]);
     }

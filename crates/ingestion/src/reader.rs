@@ -277,7 +277,10 @@ pub fn run_as_document_reader_if_requested() -> bool {
 
 /// The reader process: one request in, one answer out.
 pub fn serve_one_reading() {
-    if let Some(megabytes) = std::env::var(MEMORY_ENV).ok().and_then(|value| value.parse::<u64>().ok()) {
+    if let Some(megabytes) = std::env::var(MEMORY_ENV)
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+    {
         if megabytes > 0 {
             LimitedAllocator::limit_to(megabytes.saturating_mul(1024 * 1024));
         }
@@ -447,8 +450,14 @@ mod tests {
     fn a_request_survives_the_wire() {
         let bytes = encode_request(RequestKind::Text, "report.docx", b"file bytes");
         let request = read_request(&mut bytes.as_slice()).unwrap();
-        assert_eq!((request.kind, request.name.as_str(), request.body.as_slice()), (1, "report.docx", &b"file bytes"[..]));
-        assert!(read_request(&mut &bytes[..bytes.len() - 3]).is_err(), "a cut request is refused");
+        assert_eq!(
+            (request.kind, request.name.as_str(), request.body.as_slice()),
+            (1, "report.docx", &b"file bytes"[..])
+        );
+        assert!(
+            read_request(&mut &bytes[..bytes.len() - 3]).is_err(),
+            "a cut request is refused"
+        );
         assert!(read_request(&mut &b"XXXX\x01\x00\x00"[..]).is_err(), "not a request");
     }
 
@@ -459,9 +468,15 @@ mod tests {
         assert_eq!(decode_response("reader", &ok).unwrap(), b"text");
         let mut failed = Vec::new();
         write_response(&mut failed, Err(anyhow!("not a document"))).unwrap();
-        assert_eq!(decode_response("reader", &failed).unwrap_err().to_string(), "not a document");
+        assert_eq!(
+            decode_response("reader", &failed).unwrap_err().to_string(),
+            "not a document"
+        );
         assert!(decode_response("reader", b"").is_err());
-        assert!(decode_response("reader", &ok[..ok.len() - 1]).is_err(), "a short answer is a crash");
+        assert!(
+            decode_response("reader", &ok[..ok.len() - 1]).is_err(),
+            "a short answer is a crash"
+        );
         assert!(decode_response("reader", &[9, 0, 0, 0, 0, 0, 0, 0, 0]).is_err());
     }
 }

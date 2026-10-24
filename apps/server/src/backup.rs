@@ -218,10 +218,7 @@ fn copy_files(from: &Path, to: &Path, reuse_from: Option<&Path>, mode: CopyMode<
             let copied = match mode {
                 CopyMode::Plain => std::fs::copy(&source, &target),
                 CopyMode::Seal(cipher) => cipher.seal_file(&source, &target).map_err(into_io_error),
-                CopyMode::Open(cipher) => cipher
-                    .open_file(&source, &target)
-                    .map(|()| size)
-                    .map_err(into_io_error),
+                CopyMode::Open(cipher) => cipher.open_file(&source, &target).map(|()| size).map_err(into_io_error),
             };
             match copied {
                 Ok(copied) => {
@@ -353,7 +350,10 @@ async fn choose_cipher(state: &AppState, root: &Path) -> anyhow::Result<Option<s
     let Some(passphrase) = state.backup_key.clone() else {
         return Ok(None);
     };
-    let previous = list_backups(root).into_iter().next().and_then(|backup| backup.encryption);
+    let previous = list_backups(root)
+        .into_iter()
+        .next()
+        .and_then(|backup| backup.encryption);
     let cipher = tokio::task::spawn_blocking(move || {
         if let Some(previous) = previous {
             if let Ok(cipher) = BackupCipher::open(&passphrase, &previous) {
@@ -411,7 +411,12 @@ async fn fill_backup(
             Some(cipher) => CopyMode::Seal(cipher),
             None => CopyMode::Plain,
         };
-        copy_files(&source, &target, previous.map(|folder| folder.join("blobs")).as_deref(), mode)
+        copy_files(
+            &source,
+            &target,
+            previous.map(|folder| folder.join("blobs")).as_deref(),
+            mode,
+        )
     })
     .await
     .context("the file copy stopped unexpectedly")?
@@ -543,7 +548,7 @@ pub(crate) fn run_scheduled(state: &AppState) {
         return;
     }
     let newest = list_backups(&backups_root(state)).into_iter().next();
-    let due = newest.map_or(true, |backup| {
+    let due = newest.is_none_or(|backup| {
         chrono::DateTime::parse_from_rfc3339(&backup.created_at)
             .map(|created| Utc::now().signed_duration_since(created) >= chrono::Duration::hours(hours as i64))
             .unwrap_or(true)
@@ -556,7 +561,10 @@ pub(crate) fn run_scheduled(state: &AppState) {
 /// Whether a backup within the number kept has no checked second copy yet.
 fn copies_waiting(state: &AppState) -> bool {
     let keep = state.settings().backup_keep.max(1) as usize;
-    list_backups(&backups_root(state)).iter().take(keep).any(|backup| backup.copy.is_none())
+    list_backups(&backups_root(state))
+        .iter()
+        .take(keep)
+        .any(|backup| backup.copy.is_none())
 }
 
 /// Copies the backups that have no checked second copy yet (oldest first, so
@@ -580,7 +588,8 @@ async fn copy_pending(state: &AppState) -> Option<Result<String, String>> {
     for backup in waiting {
         let (source, target) = (root.join(&backup.name), destination.clone());
         let expected = (backup.files > 0).then_some((backup.files, backup.bytes));
-        let outcome = tokio::task::spawn_blocking(move || crate::backup_copy::copy_backup(&source, &target, expected)).await;
+        let outcome =
+            tokio::task::spawn_blocking(move || crate::backup_copy::copy_backup(&source, &target, expected)).await;
         let report = match outcome {
             Ok(Ok(report)) => report,
             Ok(Err(error)) => {
@@ -601,7 +610,9 @@ async fn copy_pending(state: &AppState) -> Option<Result<String, String>> {
             Err(error) => Err(std::io::Error::other(error)),
         };
         if let Err(error) = written {
-            return Some(Err(format!("The copy to {shown} was made but could not be recorded: {error}")));
+            return Some(Err(format!(
+                "The copy to {shown} was made but could not be recorded: {error}"
+            )));
         }
         tracing::info!(target: "audit", backup = %backup.name, destination = %shown, files = report.files, "Backup copied and checked");
         copied += 1;
@@ -694,11 +705,7 @@ async fn restore_backup(state: &AppState, name: &str, environment: &str) -> anyh
     ))
 }
 
-async fn copy_into(
-    source: &Path,
-    staging: &Path,
-    cipher: Option<std::sync::Arc<BackupCipher>>,
-) -> anyhow::Result<()> {
+async fn copy_into(source: &Path, staging: &Path, cipher: Option<std::sync::Arc<BackupCipher>>) -> anyhow::Result<()> {
     use anyhow::Context;
     match cipher.clone() {
         None => {
@@ -834,7 +841,13 @@ pub(crate) async fn copy_now(
     require_full_system_admin(&subject)?;
     require_system_change(&subject)?;
     start_copy(&state)?;
-    audit(&state, &subject, "backup_copy_started", "Started copying the backups to the second location.".to_owned()).await;
+    audit(
+        &state,
+        &subject,
+        "backup_copy_started",
+        "Started copying the backups to the second location.".to_owned(),
+    )
+    .await;
     Ok((axum::http::StatusCode::ACCEPTED, Json(overview(&state))))
 }
 
@@ -933,7 +946,12 @@ mod tests {
 
     #[test]
     fn sealed_copies_open_back_to_the_same_files_and_unchanged_ones_are_linked() {
-        let (live, first, second, opened) = (folder("seal-live"), folder("seal-first"), folder("seal-second"), folder("seal-opened"));
+        let (live, first, second, opened) = (
+            folder("seal-live"),
+            folder("seal-first"),
+            folder("seal-second"),
+            folder("seal-opened"),
+        );
         std::fs::create_dir_all(live.join("ab")).unwrap();
         std::fs::write(live.join("ab").join("same"), b"unchanged content").unwrap();
         std::fs::write(live.join("ab").join("empty"), b"").unwrap();
@@ -942,7 +960,10 @@ mod tests {
         let stats = copy_files(&live, &first, None, CopyMode::Seal(&cipher)).unwrap();
         assert_eq!((stats.files, stats.bytes, stats.reused), (2, 17, 0));
         assert!(first.join("ab").join("same.enc").is_file());
-        assert!(!first.join("ab").join("same").exists(), "no plain copy is left beside the sealed one");
+        assert!(
+            !first.join("ab").join("same").exists(),
+            "no plain copy is left beside the sealed one"
+        );
         assert!(!std::fs::read(first.join("ab").join("same.enc"))
             .unwrap()
             .windows(9)
@@ -954,7 +975,10 @@ mod tests {
 
         let stats = copy_files(&first, &opened, None, CopyMode::Open(&cipher)).unwrap();
         assert_eq!(stats.files, 2);
-        assert_eq!(std::fs::read(opened.join("ab").join("same")).unwrap(), b"unchanged content");
+        assert_eq!(
+            std::fs::read(opened.join("ab").join("same")).unwrap(),
+            b"unchanged content"
+        );
         assert_eq!(std::fs::read(opened.join("ab").join("empty")).unwrap(), b"");
 
         // Another key opens nothing.

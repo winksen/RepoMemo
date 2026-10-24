@@ -189,7 +189,7 @@ impl LoginThrottle {
             if failures.len() >= self.max_keys {
                 let mut quiet: Vec<(Instant, String)> = failures
                     .iter()
-                    .filter(|(_, entry)| !entry.locked_until.is_some_and(|until| until > now))
+                    .filter(|(_, entry)| entry.locked_until.is_none_or(|until| until <= now))
                     .map(|(key, entry)| (entry.last_at, key.clone()))
                     .collect();
                 quiet.sort();

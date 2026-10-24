@@ -70,7 +70,9 @@ pub(crate) enum KeyError {
 impl std::fmt::Display for KeyError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Mismatch => f.write_str("This backup was made with a different key than REPOMEMO_BACKUP_KEY, so nothing was restored."),
+            Self::Mismatch => f.write_str(
+                "This backup was made with a different key than REPOMEMO_BACKUP_KEY, so nothing was restored.",
+            ),
             Self::Unusable(reason) => f.write_str(reason),
         }
     }
@@ -93,7 +95,9 @@ impl std::fmt::Debug for BackupCipher {
 /// Checks a passphrase the operator configured.
 pub(crate) fn validate_passphrase(passphrase: &str) -> Result<(), String> {
     if passphrase.chars().count() < MIN_KEY_CHARS {
-        return Err(format!("REPOMEMO_BACKUP_KEY must contain at least {MIN_KEY_CHARS} characters."));
+        return Err(format!(
+            "REPOMEMO_BACKUP_KEY must contain at least {MIN_KEY_CHARS} characters."
+        ));
     }
     Ok(())
 }
@@ -101,7 +105,8 @@ pub(crate) fn validate_passphrase(passphrase: &str) -> Result<(), String> {
 impl BackupCipher {
     fn derive(passphrase: &str, salt: [u8; SALT_BYTES], iterations: u32) -> Result<Self, KeyError> {
         validate_passphrase(passphrase).map_err(KeyError::Unusable)?;
-        let iterations = NonZeroU32::new(iterations).ok_or_else(|| KeyError::Unusable("The backup's key settings are invalid.".to_owned()))?;
+        let iterations = NonZeroU32::new(iterations)
+            .ok_or_else(|| KeyError::Unusable("The backup's key settings are invalid.".to_owned()))?;
         let mut material = [0u8; 32];
         pbkdf2::derive(
             pbkdf2::PBKDF2_HMAC_SHA256,
@@ -138,7 +143,9 @@ impl BackupCipher {
             ));
         }
         if description.chunk_bytes as usize != CHUNK_BYTES {
-            return Err(KeyError::Unusable("This backup uses a chunk size this server does not know.".to_owned()));
+            return Err(KeyError::Unusable(
+                "This backup uses a chunk size this server does not know.".to_owned(),
+            ));
         }
         let salt: [u8; SALT_BYTES] = hex::decode(&description.salt)
             .ok()
@@ -179,7 +186,8 @@ impl BackupCipher {
 
     fn seal_file_inner(&self, from: &Path, to: &Path) -> Result<u64> {
         let mut input = File::open(from).with_context(|| format!("{} could not be read", from.display()))?;
-        let mut output = BufWriter::new(File::create(to).with_context(|| format!("{} could not be written", to.display()))?);
+        let mut output =
+            BufWriter::new(File::create(to).with_context(|| format!("{} could not be written", to.display()))?);
         let mut header = [0u8; HEADER_BYTES];
         header[..MAGIC.len()].copy_from_slice(MAGIC);
         header[MAGIC.len()] = FORMAT_VERSION;
@@ -223,7 +231,10 @@ impl BackupCipher {
     }
 
     fn open_file_inner(&self, from: &Path, to: &Path) -> Result<()> {
-        let name = from.file_name().map(|name| name.to_string_lossy().into_owned()).unwrap_or_default();
+        let name = from
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_default();
         let mut input = File::open(from).with_context(|| format!("{name} could not be read"))?;
         let mut header = [0u8; HEADER_BYTES];
         input
@@ -233,7 +244,8 @@ impl BackupCipher {
             bail!("{name} is not a sealed backup file this server can read");
         }
         let prefix: [u8; PREFIX_BYTES] = header[MAGIC.len() + 1..].try_into().expect("fixed length");
-        let mut output = BufWriter::new(File::create(to).with_context(|| format!("{} could not be written", to.display()))?);
+        let mut output =
+            BufWriter::new(File::create(to).with_context(|| format!("{} could not be written", to.display()))?);
 
         let mut counter = 0_u32;
         let mut current = read_up_to(&mut input, CHUNK_BYTES + TAG_BYTES)?;
@@ -246,7 +258,9 @@ impl BackupCipher {
             let plain = self
                 .key
                 .open_in_place(chunk_nonce(&prefix, counter), chunk_aad(&header, last), &mut current)
-                .map_err(|_| anyhow!("{name} does not open: it was changed, is incomplete or was sealed with another key"))?;
+                .map_err(|_| {
+                    anyhow!("{name} does not open: it was changed, is incomplete or was sealed with another key")
+                })?;
             output.write_all(plain)?;
             if last {
                 break;
@@ -316,7 +330,16 @@ mod tests {
     fn files_of_every_size_round_trip_and_have_the_size_that_is_predicted() {
         let dir = folder("sizes");
         let cipher = cipher();
-        for size in [0usize, 1, 100, CHUNK_BYTES - 1, CHUNK_BYTES, CHUNK_BYTES + 1, CHUNK_BYTES * 3, CHUNK_BYTES * 3 + 17] {
+        for size in [
+            0usize,
+            1,
+            100,
+            CHUNK_BYTES - 1,
+            CHUNK_BYTES,
+            CHUNK_BYTES + 1,
+            CHUNK_BYTES * 3,
+            CHUNK_BYTES * 3 + 17,
+        ] {
             let plain: Vec<u8> = (0..size).map(|index| (index % 251) as u8).collect();
             let (source, sealed, opened) = (dir.join("plain"), dir.join("sealed"), dir.join("opened"));
             std::fs::write(&source, &plain).unwrap();
@@ -370,7 +393,10 @@ mod tests {
         let mut swapped = good.clone();
         let (first, second) = (HEADER_BYTES, HEADER_BYTES + CHUNK_BYTES + TAG_BYTES);
         let chunk = CHUNK_BYTES + TAG_BYTES;
-        let (a, b) = (good[first..first + chunk].to_vec(), good[second..second + chunk].to_vec());
+        let (a, b) = (
+            good[first..first + chunk].to_vec(),
+            good[second..second + chunk].to_vec(),
+        );
         swapped[first..first + chunk].copy_from_slice(&b);
         swapped[second..second + chunk].copy_from_slice(&a);
         std::fs::write(&sealed, &swapped).unwrap();
@@ -401,7 +427,10 @@ mod tests {
         ));
         let mut odd = description.clone();
         odd.cipher = "rot13".to_owned();
-        assert!(matches!(BackupCipher::open(PASSPHRASE, &odd), Err(KeyError::Unusable(_))));
+        assert!(matches!(
+            BackupCipher::open(PASSPHRASE, &odd),
+            Err(KeyError::Unusable(_))
+        ));
         // The same salt and passphrase make the same key.
         let again = BackupCipher::open(PASSPHRASE, &description).unwrap();
         assert_eq!(again.description(), description);

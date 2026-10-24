@@ -161,9 +161,11 @@ fn connector_wish_of(sender: &Sender, headers: &HeaderMap) -> Wish {
             _ => Wish::Ignore("not an issue or pull request event"),
         },
         Sender::GitLab => match header(headers, "x-gitlab-event") {
-            "Issue Hook" | "Confidential Issue Hook" | "Note Hook" | "Confidential Note Hook" | "Merge Request Hook" => {
-                Wish::Sync
-            }
+            "Issue Hook"
+            | "Confidential Issue Hook"
+            | "Note Hook"
+            | "Confidential Note Hook"
+            | "Merge Request Hook" => Wish::Sync,
             _ => Wish::Ignore("not an issue or merge request event"),
         },
         Sender::Generic => Wish::Sync,
@@ -185,11 +187,10 @@ async fn authenticate(
     let fail = |state: &AppState| -> ApiError {
         // Only failures are counted against the address, so a host that
         // pushes a lot is never slowed by its own successes.
-        match state
-            .guards
-            .auth
-            .check(&format!("webhook-fail:{}", client.limit_key()), Quota::per_minute(FAILURES_PER_MINUTE))
-        {
+        match state.guards.auth.check(
+            &format!("webhook-fail:{}", client.limit_key()),
+            Quota::per_minute(FAILURES_PER_MINUTE),
+        ) {
             Ok(()) => ApiError::unauthorized(),
             Err(wait) => crate::security::too_many_requests(
                 format!(
@@ -245,7 +246,10 @@ async fn authenticate(
         .check(&format!("webhook:{source_id}"), Quota::per_minute(CALLS_PER_MINUTE))
         .map_err(|wait| {
             crate::security::too_many_requests(
-                format!("This source gets webhook calls too fast. Try again in {}.", crate::security::wait_text(wait)),
+                format!(
+                    "This source gets webhook calls too fast. Try again in {}.",
+                    crate::security::wait_text(wait)
+                ),
                 wait,
             )
         })?;
@@ -407,11 +411,7 @@ pub(crate) async fn create_repository_webhook(
     State(state): State<AppState>,
     Path(source_id): Path<String>,
 ) -> Result<(StatusCode, Json<WebhookCreated>), ApiError> {
-    let repository = state
-        .core
-        .repo_source(&source_id)
-        .await
-        .map_err(map_storage_error)?;
+    let repository = state.core.repo_source(&source_id).await.map_err(map_storage_error)?;
     create_webhook(
         &state,
         &subject,
@@ -430,11 +430,7 @@ pub(crate) async fn delete_repository_webhook(
     State(state): State<AppState>,
     Path(source_id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
-    let repository = state
-        .core
-        .repo_source(&source_id)
-        .await
-        .map_err(map_storage_error)?;
+    let repository = state.core.repo_source(&source_id).await.map_err(map_storage_error)?;
     delete_webhook(
         &state,
         &subject,
@@ -518,7 +514,10 @@ mod tests {
         let github = headers(&[("x-hub-signature-256", signed(secret, body))]);
         assert!(verified(&Sender::GitHub, &github, body, secret));
         assert!(!verified(&Sender::GitHub, &github, body, "other"));
-        assert!(!verified(&Sender::GitHub, &github, b"{}", secret), "the body is part of it");
+        assert!(
+            !verified(&Sender::GitHub, &github, b"{}", secret),
+            "the body is part of it"
+        );
         let generic = headers(&[("x-repomemo-signature", signed(secret, body))]);
         assert!(verified(&Sender::Generic, &generic, body, secret));
         let gitlab = headers(&[("x-gitlab-token", secret.to_owned())]);
@@ -537,7 +536,10 @@ mod tests {
         let main = br#"{"ref":"refs/heads/main"}"#;
         assert_eq!(wish_of(&Sender::GitHub, &github("ping"), b"{}", None), Wish::Pong);
         assert_eq!(wish_of(&Sender::GitHub, &github("push"), main, None), Wish::Sync);
-        assert_eq!(wish_of(&Sender::GitHub, &github("push"), main, Some("main")), Wish::Sync);
+        assert_eq!(
+            wish_of(&Sender::GitHub, &github("push"), main, Some("main")),
+            Wish::Sync
+        );
         assert_eq!(
             wish_of(&Sender::GitHub, &github("push"), main, Some("release")),
             Wish::Ignore("another branch")
@@ -561,16 +563,36 @@ mod tests {
     #[test]
     fn a_connector_webhook_syncs_on_item_events_only() {
         let github = |event: &str| headers(&[("x-github-event", event.to_owned())]);
-        for event in ["issues", "issue_comment", "pull_request", "pull_request_review", "pull_request_review_comment"] {
-            assert_eq!(connector_wish_of(&Sender::GitHub, &github(event)), Wish::Sync, "{event}");
+        for event in [
+            "issues",
+            "issue_comment",
+            "pull_request",
+            "pull_request_review",
+            "pull_request_review_comment",
+        ] {
+            assert_eq!(
+                connector_wish_of(&Sender::GitHub, &github(event)),
+                Wish::Sync,
+                "{event}"
+            );
         }
         assert_eq!(connector_wish_of(&Sender::GitHub, &github("ping")), Wish::Pong);
-        assert!(matches!(connector_wish_of(&Sender::GitHub, &github("push")), Wish::Ignore(_)));
+        assert!(matches!(
+            connector_wish_of(&Sender::GitHub, &github("push")),
+            Wish::Ignore(_)
+        ));
         let gitlab = |event: &str| headers(&[("x-gitlab-event", event.to_owned())]);
         for event in ["Issue Hook", "Note Hook", "Merge Request Hook"] {
-            assert_eq!(connector_wish_of(&Sender::GitLab, &gitlab(event)), Wish::Sync, "{event}");
+            assert_eq!(
+                connector_wish_of(&Sender::GitLab, &gitlab(event)),
+                Wish::Sync,
+                "{event}"
+            );
         }
-        assert!(matches!(connector_wish_of(&Sender::GitLab, &gitlab("Push Hook")), Wish::Ignore(_)));
+        assert!(matches!(
+            connector_wish_of(&Sender::GitLab, &gitlab("Push Hook")),
+            Wish::Ignore(_)
+        ));
         assert_eq!(connector_wish_of(&Sender::Generic, &HeaderMap::new()), Wish::Sync);
     }
 }
