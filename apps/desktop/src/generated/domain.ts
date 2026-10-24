@@ -820,6 +820,23 @@ export interface ArtifactMentions {
   mentions: ArtifactMention[];
 }
 
+/** One call a source's webhook received (roadmap F17g, V0.3.22). */
+export interface WebhookDelivery {
+  id: string;
+  received_at: string;
+  /** `github`, `gitlab`, `other`, or `resend` for a call made from the page. */
+  sender: string;
+  event: string;
+  /** The sender's own id for the call; empty when it gives none. */
+  delivery_id: string;
+  /** `queued`, `absorbed` (a sync was already running), `ignored`, `pong` or `failed`. */
+  outcome: string;
+  /** Why it was ignored or failed. */
+  reason: string;
+  /** When it was sent again from the page, if it was. */
+  resent_at: string | null;
+}
+
 /**
  * A tracker connected to a workspace: its issues (and later pull requests)
  * are kept as evidence (roadmap F17).

@@ -225,6 +225,8 @@
 | POST | `/v1/connectors/{source_id}/webhook` | managing | require_workspace_admin | — | WebhookCreated |
 | DELETE | `/v1/connectors/{source_id}/webhook` | managing | require_workspace_admin | — | status |
 | POST | `/v1/webhooks/connectors/{source_id}` | public | — | raw body, signed | 200 or 202 `{queued, note}`, else 401 |
+| GET | `/v1/connectors/{source_id}/webhook/deliveries` | auth | require_workspace_write | — | WebhookDelivery[] |
+| POST | `/v1/connectors/{source_id}/webhook/deliveries/{delivery_id}/resend` | auth | require_workspace_write | — | 202 `{queued, note, delivery}` |
 | GET | `/v1/workspaces/{workspace_id}/connectors` | auth | require_workspace_read | — | ConnectorsResponse |
 | POST | `/v1/workspaces/{workspace_id}/connectors` | managing | require_workspace_admin | ConnectorLinkRequest (`link`, `provider?`, `name?`, `token?`) | ConnectorSyncResponse (201) |
 | POST | `/v1/workspaces/{workspace_id}/connectors/check` | managing | require_workspace_admin | ConnectorLinkRequest | ConnectorAccessCheck |
@@ -236,6 +238,8 @@
 | GET | `/v1/artifacts/{artifact_id}/at/{commit}` | auth | require_workspace_read | — | RepoFileAtCommit |
 | POST | `/v1/repositories/{source_id}/webhook` | managing | require_workspace_admin | — | WebhookCreated |
 | DELETE | `/v1/repositories/{source_id}/webhook` | managing | require_workspace_admin | — | status |
+| GET | `/v1/repositories/{source_id}/webhook/deliveries` | auth | require_workspace_write | — | WebhookDelivery[] |
+| POST | `/v1/repositories/{source_id}/webhook/deliveries/{delivery_id}/resend` | auth | require_workspace_write | — | 202 `{queued, note, delivery}` |
 | PUT | `/v1/repositories/{source_id}/deploy-key` | managing | require_workspace_admin | RepositoryDeployKeyRequest | RepoSource |
 | PUT | `/v1/repositories/{source_id}/token` | managing | require_workspace_admin | RepositoryTokenRequest | RepoSource |
 | DELETE | `/v1/repositories/{source_id}/token` | managing | require_workspace_admin | — | status |

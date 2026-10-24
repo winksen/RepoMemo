@@ -18,6 +18,7 @@ import { Button } from "../../components/ui/button";
 import { CopyButton } from "../../components/ui/copy-button";
 import { PanelHeading } from "../../components/ui/panel-heading";
 import { Dialog, DialogCancel } from "../../components/ui/dialog";
+import { WebhookDeliveries } from "../../components/WebhookDeliveries";
 import { showToast } from "../../components/ui/toast";
 import { ICON_SIZE } from "../../components/ui/icon";
 import { STATUS_LABEL, RepoForm, EMPTY_FORM, NO_OFFER, isSshLink, formToken, formSettings, formWithOffer, repoOffer } from "./shared";
@@ -255,6 +256,7 @@ export function RepositorySettings({
             <Button disabled={busy} onClick={() => void makeWebhook(editing)} variant="secondary">{liveEditing?.has_webhook ? "Make a new secret" : "Set up a webhook"}</Button>
             {liveEditing?.has_webhook ? <Button disabled={busy} onClick={() => void removeWebhook(editing)} variant="secondary">Turn off</Button> : null}
           </div>
+          {liveEditing?.has_webhook ? <WebhookDeliveries accessToken={accessToken} kind="repositories" sourceId={editing.id} /> : null}
         </div>
         {editing.remote && editing.has_credential && !isSshLink(editing.root_path) ? <div><Button disabled={busy} onClick={() => void removeToken(editing)} variant="secondary">Remove the token</Button></div> : null}
       </form>

@@ -876,6 +876,22 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             post(webhooks::create_repository_webhook).delete(webhooks::delete_repository_webhook),
         )
         .route(
+            "/v1/repositories/{source_id}/webhook/deliveries",
+            get(webhooks::list_repository_webhook_deliveries),
+        )
+        .route(
+            "/v1/repositories/{source_id}/webhook/deliveries/{delivery_id}/resend",
+            post(webhooks::resend_repository_webhook_delivery),
+        )
+        .route(
+            "/v1/connectors/{source_id}/webhook/deliveries",
+            get(webhooks::list_connector_webhook_deliveries),
+        )
+        .route(
+            "/v1/connectors/{source_id}/webhook/deliveries/{delivery_id}/resend",
+            post(webhooks::resend_connector_webhook_delivery),
+        )
+        .route(
             "/v1/webhooks/repositories/{source_id}",
             post(webhooks::receive_repository_webhook).layer(DefaultBodyLimit::max(webhooks::MAX_BODY_BYTES)),
         )

@@ -931,6 +931,24 @@ pub struct ArtifactMentions {
     pub mentions: Vec<ArtifactMention>,
 }
 
+/// One call a source's webhook received (roadmap F17g, V0.3.22).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WebhookDelivery {
+    pub id: String,
+    pub received_at: String,
+    /// `github`, `gitlab`, `other`, or `resend` for a call made from the page.
+    pub sender: String,
+    pub event: String,
+    /// The sender's own id for the call; empty when it gives none.
+    pub delivery_id: String,
+    /// `queued`, `absorbed` (a sync was already running), `ignored`, `pong` or `failed`.
+    pub outcome: String,
+    /// Why it was ignored or failed.
+    pub reason: String,
+    /// When it was sent again from the page, if it was.
+    pub resent_at: Option<String>,
+}
+
 /// The job kind of a connector's sync.
 pub const CONNECTOR_SYNC_JOB_KIND: &str = "connector_sync";
 

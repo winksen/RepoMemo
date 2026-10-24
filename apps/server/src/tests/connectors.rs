@@ -771,6 +771,107 @@ async fn a_tracker_that_asks_to_wait_or_refuses_the_token_pauses_the_connector()
     assert_eq!(shown["has_webhook"], true);
     assert!(shown["webhook_last_received_at"].is_string());
     assert!(!shown.to_string().contains(&secret));
+
+    // Every call that was signed right is kept, newest first, with what became of it; the one that was not is not.
+    let deliveries_uri = format!("/v1/connectors/{source_id}/webhook/deliveries");
+    let listed = response_json(call("GET", deliveries_uri.clone(), json!({})).await).await;
+    let seen: Vec<(&str, &str)> = listed
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|delivery| {
+            (
+                delivery["event"].as_str().unwrap(),
+                delivery["outcome"].as_str().unwrap(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        seen,
+        vec![("issues", "queued"), ("push", "ignored"), ("ping", "pong")],
+        "{listed}"
+    );
+    assert_eq!(listed[0]["sender"], "github");
+    assert!(listed[1]["reason"]
+        .as_str()
+        .unwrap()
+        .contains("not an issue or pull request event"));
+    let (issues_id, ping_id) = (
+        listed[0]["id"].as_str().unwrap().to_owned(),
+        listed[2]["id"].as_str().unwrap().to_owned(),
+    );
+
+    // A ping asked for nothing, and a delivery that is not there is not found.
+    let resend_uri = |id: &str| format!("/v1/connectors/{source_id}/webhook/deliveries/{id}/resend");
+    assert_eq!(call("POST", resend_uri(&ping_id), json!({})).await.status(), 400);
+    assert_eq!(call("POST", resend_uri("missing"), json!({})).await.status(), 404);
+
+    // One that asked for a sync is sent again, and kept as a delivery of its own.
+    let resent = call("POST", resend_uri(&issues_id), json!({})).await;
+    assert_eq!(resent.status(), 202);
+    let resent = response_json(resent).await;
+    assert_eq!(resent["queued"], true, "{resent}");
+    assert_eq!(resent["delivery"]["sender"], "resend");
+    assert_eq!(resent["delivery"]["event"], "issues");
+    ready(source_id.clone()).await;
+    let listed = response_json(call("GET", deliveries_uri.clone(), json!({})).await).await;
+    assert_eq!(listed[0]["id"], resent["delivery"]["id"]);
+    let original = listed
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|delivery| delivery["id"] == issues_id.as_str())
+        .unwrap();
+    assert!(original["resent_at"].is_string(), "{original}");
+
+    // While the tracker has the connector paused a call cannot be queued: it is kept as failed with the reason,
+    // sending it again fails the same way, and once the pause is over it goes through.
+    *fake.mode.lock().unwrap() = 2;
+    assert_eq!(
+        call("POST", format!("/v1/connectors/{source_id}/sync"), json!({}))
+            .await
+            .status(),
+        200
+    );
+    paused(source_id.clone()).await;
+    let (status, body) = send("issues", signature("{}")).await;
+    assert_eq!((status, body["queued"].as_bool()), (202, Some(false)), "{body}");
+    assert!(body["note"].as_str().unwrap().contains("paused until"), "{body}");
+    let listed = response_json(call("GET", deliveries_uri.clone(), json!({})).await).await;
+    assert_eq!(listed[0]["outcome"], "failed");
+    assert!(
+        listed[0]["reason"].as_str().unwrap().contains("paused until"),
+        "{listed}"
+    );
+    let failed_id = listed[0]["id"].as_str().unwrap().to_owned();
+    let again = response_json(call("POST", resend_uri(&failed_id), json!({})).await).await;
+    assert_eq!(again["queued"], false, "{again}");
+    assert_eq!(again["delivery"]["outcome"], "failed");
+    *fake.mode.lock().unwrap() = 0;
+    assert_eq!(
+        call(
+            "PUT",
+            format!("/v1/connectors/{source_id}/token"),
+            json!({"token": "ghp_third"})
+        )
+        .await
+        .status(),
+        200
+    );
+    let through = response_json(call("POST", resend_uri(&failed_id), json!({})).await).await;
+    assert_eq!(through["queued"], true, "{through}");
+    ready(source_id.clone()).await;
+
+    // Someone who cannot see the workspace sees nothing and sends nothing.
+    let (stranger, _) = register_account(&app, "pause-stranger@example.com").await;
+    for (method, uri) in [("GET", deliveries_uri.clone()), ("POST", resend_uri(&failed_id))] {
+        let response = app
+            .clone()
+            .oneshot(json_request(method, &uri, &stranger, json!({})))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), 403, "{method} {uri}");
+    }
     assert_eq!(
         call("DELETE", format!("/v1/connectors/{source_id}/webhook"), json!({}))
             .await

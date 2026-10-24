@@ -2,6 +2,28 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.3.22 (2026-10-24)
+
+Webhook deliveries are listed and can be sent again.
+
+### Added
+- **A list of the calls a webhook received:** each call to a repository's or a connector's webhook that was signed right is kept with when it came, the sender (GitHub, GitLab or another), the event, the sender's own delivery id and what became of it: `queued` (a sync was queued), `absorbed` (one was already running), `ignored` (an event or branch that asks for nothing, with the reason), `pong` (a ping) or `failed` (the sync could not be queued, with the reason: the tracker's pause, no room in the allowance). The newest hundred of a source are kept, and they go with the source. Migration 0043.
+- **Send again:** a writer can send a call that asked for a sync (queued, absorbed or failed) again from the webhook's dialog in *Settings › Repositories* and *Settings › Issues and pull requests*. The same sync is asked for once more, whatever came of it the first time; the answer says whether it was queued, and the resend is kept as a call of its own (sender "sent again from this page") while the original shows when it was sent again. A ping or an ignored event asks for nothing, so it has no button.
+- **Routes:** `GET /v1/connectors/{id}/webhook/deliveries`, `POST /v1/connectors/{id}/webhook/deliveries/{delivery}/resend` and the same two for `/v1/repositories/{id}`, for people who can write to the workspace.
+
+### Changed
+- **Only calls signed right are kept:** a call that cannot be verified says nothing about the source and is not recorded, and neither is a repeat of a delivery id the source already received within the hour, so a captured call cannot push the real ones out of the list.
+- **Resends are limited** to ten a minute per source.
+- **The documents:** the API reference and the technical mindmap (the routes, the migration, the scope line, test counts: storage 47, web 376), the functional mindmap, the user guide and the roadmap. The F17e gap "webhook deliveries are not listed or redelivered from RepoMemo" is closed.
+- **The version** is `0.3.22` everywhere.
+
+### Checks
+- **Compiled and linted:** `cargo clippy -D warnings` over the storage and server crates with their tests, `cargo fmt --all --check`, `typecheck`, `types:check`, `styles:check`, `a11y:check`, `migrations:check`, `docs:check`, `version:check`.
+- **Tests written, not run:** a storage test (newest first, one source's own, clipped text, the newest hundred, resent marks, removal with the source), the connector webhook test over the router (the calls and their outcomes, a ping and an unknown call refused, a resend, a failure while the tracker has the connector paused, its resend failing alike and going through once the pause is over, a stranger refused), the repository push webhook test (seven calls kept, none for the repeat, a resend, a member reading the list) and web tests (the sentences, who gets the button, the list, an empty list, a resend and its toasts).
+
+### Upgrading
+- Nothing to do. The migration adds one table; calls received before this release are not in the list.
+
 ## V0.3.21 (2026-10-24)
 
 References between issues and pull requests, and the approvals of a pull request.

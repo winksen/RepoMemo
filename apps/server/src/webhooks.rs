@@ -23,6 +23,11 @@
 //! `X-GitHub-Delivery`, GitLab's `X-Gitlab-Event-UUID`, a generic sender's
 //! `X-RepoMemo-Delivery`) is not acted on twice within the hour, so a signed
 //! call that was captured cannot be replayed to keep a source syncing.
+//!
+//! Since V0.3.22 every call that was signed right is kept as a *delivery* (when, sender, event, what
+//! became of it and why not), the newest hundred per source. A delivery that asked for a sync, whatever
+//! came of it, can be sent again by a writer from the source's page: that queues the same sync again
+//! and is kept as a delivery of its own.
 
 use axum::{body::Bytes, http::HeaderMap};
 use ring::hmac;
@@ -111,6 +116,92 @@ fn verified(sender: &Sender, headers: &HeaderMap, body: &[u8], secret: &str) -> 
             let key = hmac::Key::new(hmac::HMAC_SHA256, secret.as_bytes());
             hmac::verify(&key, body, &signature).is_ok()
         }
+    }
+}
+
+/// What came of asking for a sync.
+enum Asked {
+    Queued,
+    /// A sync was already running and takes the change up.
+    Absorbed,
+    Failed(String),
+}
+
+impl Asked {
+    fn of(result: anyhow::Result<Option<IndexingJobStatus>>) -> Self {
+        match result {
+            Ok(Some(_)) => Self::Queued,
+            Ok(None) => Self::Absorbed,
+            // No room on the disk or in the allowance, or paused for the tracker's rate limit: told so, and
+            // the next poll tries again.
+            Err(error) => Self::Failed(format!("{error:#}")),
+        }
+    }
+
+    /// The outcome and reason a delivery is kept with.
+    fn outcome(&self) -> (&'static str, &str) {
+        match self {
+            Self::Queued => ("queued", ""),
+            Self::Absorbed => ("absorbed", "A sync was already running."),
+            Self::Failed(reason) => ("failed", reason),
+        }
+    }
+
+    fn answer(&self) -> (StatusCode, Json<Value>) {
+        match self {
+            Self::Queued => answer(StatusCode::ACCEPTED, true, "sync queued"),
+            Self::Absorbed => answer(StatusCode::ACCEPTED, false, "already syncing"),
+            Self::Failed(reason) => answer(StatusCode::ACCEPTED, false, reason),
+        }
+    }
+}
+
+fn sender_name(sender: &Sender) -> &'static str {
+    match sender {
+        Sender::GitHub => "github",
+        Sender::GitLab => "gitlab",
+        Sender::Generic => "other",
+    }
+}
+
+/// The event the sender names, or `call` for a sender that names none.
+fn event_of(sender: &Sender, headers: &HeaderMap) -> String {
+    let event = match sender {
+        Sender::GitHub => header(headers, "x-github-event"),
+        Sender::GitLab => header(headers, "x-gitlab-event"),
+        Sender::Generic => "",
+    };
+    if event.is_empty() {
+        "call".to_owned()
+    } else {
+        event.to_owned()
+    }
+}
+
+/// Keeps a call that was signed right, with what became of it. A failure to keep it only costs the history.
+async fn note_delivery(
+    state: &AppState,
+    source_id: &str,
+    sender: &Sender,
+    headers: &HeaderMap,
+    outcome: &str,
+    reason: &str,
+) {
+    let delivery = delivery_id(sender, headers);
+    let delivery = if delivery.len() <= 128 { delivery } else { "" };
+    if let Err(error) = state
+        .storage
+        .record_webhook_delivery(
+            source_id,
+            sender_name(sender),
+            &event_of(sender, headers),
+            delivery,
+            outcome,
+            reason,
+        )
+        .await
+    {
+        tracing::warn!(error = %format!("{error:#}"), "A webhook delivery could not be noted");
     }
 }
 
@@ -281,17 +372,20 @@ pub(crate) async fn receive_repository_webhook(
         return Err(ApiError::unauthorized());
     };
     match wish_of(&sender, &headers, &body, repository.settings.branch.as_deref()) {
-        Wish::Pong => Ok(answer(StatusCode::OK, false, "pong")),
-        Wish::Ignore(reason) => Ok(answer(StatusCode::ACCEPTED, false, reason)),
+        Wish::Pong => {
+            note_delivery(&state, &source_id, &sender, &headers, "pong", "").await;
+            Ok(answer(StatusCode::OK, false, "pong"))
+        }
+        Wish::Ignore(reason) => {
+            note_delivery(&state, &source_id, &sender, &headers, "ignored", reason).await;
+            Ok(answer(StatusCode::ACCEPTED, false, reason))
+        }
         Wish::Sync => {
             tracing::info!(target: "audit", repository = %source_id, "A push webhook asked for a sync");
-            match state.repo_sync.start(&repository, None).await {
-                Ok(Some(_)) => Ok(answer(StatusCode::ACCEPTED, true, "sync queued")),
-                Ok(None) => Ok(answer(StatusCode::ACCEPTED, false, "already syncing")),
-                // No room on the disk or in the allowance: the sender is told
-                // so, and the next poll tries again.
-                Err(error) => Ok(answer(StatusCode::ACCEPTED, false, &format!("{error:#}"))),
-            }
+            let asked = Asked::of(state.repo_sync.start(&repository, None).await);
+            let (outcome, reason) = asked.outcome();
+            note_delivery(&state, &source_id, &sender, &headers, outcome, reason).await;
+            Ok(asked.answer())
         }
     }
 }
@@ -314,18 +408,189 @@ pub(crate) async fn receive_connector_webhook(
         return Err(ApiError::unauthorized());
     };
     match connector_wish_of(&sender, &headers) {
-        Wish::Pong => Ok(answer(StatusCode::OK, false, "pong")),
-        Wish::Ignore(reason) => Ok(answer(StatusCode::ACCEPTED, false, reason)),
+        Wish::Pong => {
+            note_delivery(&state, &source_id, &sender, &headers, "pong", "").await;
+            Ok(answer(StatusCode::OK, false, "pong"))
+        }
+        Wish::Ignore(reason) => {
+            note_delivery(&state, &source_id, &sender, &headers, "ignored", reason).await;
+            Ok(answer(StatusCode::ACCEPTED, false, reason))
+        }
         Wish::Sync => {
             tracing::info!(target: "audit", connector = %source_id, "A webhook asked for a connector sync");
-            match state.connector_sync.start(&connector, None).await {
-                Ok(Some(_)) => Ok(answer(StatusCode::ACCEPTED, true, "sync queued")),
-                Ok(None) => Ok(answer(StatusCode::ACCEPTED, false, "already syncing")),
-                // Paused for the tracker's rate limit, or no room: told so.
-                Err(error) => Ok(answer(StatusCode::ACCEPTED, false, &format!("{error:#}"))),
-            }
+            let asked = Asked::of(state.connector_sync.start(&connector, None).await);
+            let (outcome, reason) = asked.outcome();
+            note_delivery(&state, &source_id, &sender, &headers, outcome, reason).await;
+            Ok(asked.answer())
         }
     }
+}
+
+/// Resends allowed per source per minute.
+const RESENDS_PER_MINUTE: u32 = 10;
+
+/// Most deliveries a list shows.
+const DELIVERIES_LISTED: i64 = 100;
+
+#[derive(serde::Serialize)]
+pub(crate) struct ResendAnswer {
+    queued: bool,
+    note: String,
+    /// The delivery this resend is kept as.
+    delivery: repomemo_domain::WebhookDelivery,
+}
+
+async fn deliveries_of(
+    state: &AppState,
+    source_id: &str,
+) -> Result<Json<Vec<repomemo_domain::WebhookDelivery>>, ApiError> {
+    state
+        .storage
+        .list_webhook_deliveries(source_id, DELIVERIES_LISTED)
+        .await
+        .map(Json)
+        .map_err(ApiError::internal)
+}
+
+/// Sends a delivery again: the sync it asked for is asked for once more, whatever came of it the first time.
+/// `start` is how the source's own runner is asked.
+async fn resend(
+    state: &AppState,
+    subject: &AuthenticatedSubject,
+    source_id: &str,
+    delivery_id: &str,
+    start: impl std::future::Future<Output = anyhow::Result<Option<IndexingJobStatus>>>,
+) -> Result<(StatusCode, Json<ResendAnswer>), ApiError> {
+    let delivery = state
+        .storage
+        .webhook_delivery(source_id, delivery_id)
+        .await
+        .map_err(ApiError::internal)?
+        .ok_or_else(|| ApiError::not_found("That delivery was not found. Only the newest hundred are kept."))?;
+    if !matches!(delivery.outcome.as_str(), "queued" | "absorbed" | "failed") {
+        return Err(ApiError::bad_request(
+            "That delivery did not ask for a sync, so there is nothing to send again.",
+        ));
+    }
+    state
+        .guards
+        .auth
+        .check(
+            &format!("webhook-resend:{source_id}"),
+            Quota::per_minute(RESENDS_PER_MINUTE),
+        )
+        .map_err(|wait| {
+            crate::security::too_many_requests(
+                format!(
+                    "Deliveries of this source are being sent again too fast. Try again in {}.",
+                    crate::security::wait_text(wait)
+                ),
+                wait,
+            )
+        })?;
+    tracing::info!(target: "audit", source = %source_id, "A webhook delivery was sent again");
+    let asked = Asked::of(start.await);
+    let (outcome, reason) = asked.outcome();
+    let id = state
+        .storage
+        .record_webhook_delivery(
+            source_id,
+            "resend",
+            &delivery.event,
+            &delivery.delivery_id,
+            outcome,
+            reason,
+        )
+        .await
+        .map_err(ApiError::internal)?;
+    if let Err(error) = state
+        .storage
+        .mark_webhook_delivery_resent(source_id, delivery_id, &subject.user_id)
+        .await
+    {
+        tracing::warn!(error = %format!("{error:#}"), "A resent delivery could not be marked");
+    }
+    let kept = state
+        .storage
+        .webhook_delivery(source_id, &id)
+        .await
+        .map_err(ApiError::internal)?
+        .ok_or_else(|| ApiError::not_found("That delivery was not found."))?;
+    let (status, Json(body)) = asked.answer();
+    Ok((
+        status,
+        Json(ResendAnswer {
+            queued: body.get("queued").and_then(Value::as_bool).unwrap_or(false),
+            note: body.get("note").and_then(Value::as_str).unwrap_or_default().to_owned(),
+            delivery: kept,
+        }),
+    ))
+}
+
+/// The calls a connector's webhook received (writers).
+pub(crate) async fn list_connector_webhook_deliveries(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(source_id): Path<String>,
+) -> Result<Json<Vec<repomemo_domain::WebhookDelivery>>, ApiError> {
+    let connector = state
+        .core
+        .connector_source(&source_id)
+        .await
+        .map_err(map_storage_error)?;
+    require_workspace_write(&state, &subject, &connector.workspace_id).await?;
+    deliveries_of(&state, &source_id).await
+}
+
+/// Sends a delivery to a connector again (writers).
+pub(crate) async fn resend_connector_webhook_delivery(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path((source_id, delivery_id)): Path<(String, String)>,
+) -> Result<(StatusCode, Json<ResendAnswer>), ApiError> {
+    let connector = state
+        .core
+        .connector_source(&source_id)
+        .await
+        .map_err(map_storage_error)?;
+    require_workspace_write(&state, &subject, &connector.workspace_id).await?;
+    resend(
+        &state,
+        &subject,
+        &source_id,
+        &delivery_id,
+        state.connector_sync.start(&connector, Some(subject.user_id.clone())),
+    )
+    .await
+}
+
+/// The calls a repository's webhook received (writers).
+pub(crate) async fn list_repository_webhook_deliveries(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(source_id): Path<String>,
+) -> Result<Json<Vec<repomemo_domain::WebhookDelivery>>, ApiError> {
+    let repository = state.core.repo_source(&source_id).await.map_err(map_storage_error)?;
+    require_workspace_write(&state, &subject, &repository.workspace_id).await?;
+    deliveries_of(&state, &source_id).await
+}
+
+/// Sends a delivery to a repository again (writers).
+pub(crate) async fn resend_repository_webhook_delivery(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path((source_id, delivery_id)): Path<(String, String)>,
+) -> Result<(StatusCode, Json<ResendAnswer>), ApiError> {
+    let repository = state.core.repo_source(&source_id).await.map_err(map_storage_error)?;
+    require_workspace_write(&state, &subject, &repository.workspace_id).await?;
+    resend(
+        &state,
+        &subject,
+        &source_id,
+        &delivery_id,
+        state.repo_sync.start(&repository, Some(subject.user_id.clone())),
+    )
+    .await
 }
 
 #[derive(serde::Serialize)]

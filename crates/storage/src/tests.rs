@@ -2692,3 +2692,107 @@ async fn an_archive_carries_earlier_file_versions_and_saved_searches_and_an_impo
     drop(storage);
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn the_calls_a_webhook_received_are_kept_newest_first_a_hundred_to_a_source_and_go_with_it() {
+    let (storage, data_dir) = temp_storage("webhook-deliveries").await;
+    let workspace = storage.create_workspace("Deliveries").await.unwrap();
+    let user = storage
+        .create_user("ada-deliveries@example.com", "Ada", "hash")
+        .await
+        .unwrap();
+    let source = storage
+        .create_or_get_source(&workspace.id, SourceType::Folder, "tracker", Some("tracker"))
+        .await
+        .unwrap();
+    let other = storage
+        .create_or_get_source(&workspace.id, SourceType::Folder, "other", Some("other"))
+        .await
+        .unwrap();
+
+    let first = storage
+        .record_webhook_delivery(&source.id, "github", "ping", "d-1", "pong", "")
+        .await
+        .unwrap();
+    let second = storage
+        .record_webhook_delivery(
+            &source.id,
+            "gitlab",
+            "Issue Hook",
+            "",
+            "failed",
+            "paused until tomorrow",
+        )
+        .await
+        .unwrap();
+    storage
+        .record_webhook_delivery(&other.id, "other", "call", "", "queued", "")
+        .await
+        .unwrap();
+    let listed = storage.list_webhook_deliveries(&source.id, 10).await.unwrap();
+    assert_eq!(
+        listed.iter().map(|delivery| delivery.id.as_str()).collect::<Vec<_>>(),
+        vec![second.as_str(), first.as_str()],
+        "newest first, and only this source's"
+    );
+    assert_eq!(
+        (
+            listed[0].sender.as_str(),
+            listed[0].event.as_str(),
+            listed[0].outcome.as_str(),
+            listed[0].reason.as_str()
+        ),
+        ("gitlab", "Issue Hook", "failed", "paused until tomorrow")
+    );
+    assert_eq!(listed[1].delivery_id, "d-1");
+    assert!(listed[0].resent_at.is_none());
+
+    // One call is found by its source and id only, and sending it again is noted.
+    assert!(storage.webhook_delivery(&other.id, &second).await.unwrap().is_none());
+    storage
+        .mark_webhook_delivery_resent(&source.id, &second, &user.id)
+        .await
+        .unwrap();
+    let marked = storage.webhook_delivery(&source.id, &second).await.unwrap().unwrap();
+    assert!(marked.resent_at.is_some());
+    assert!(storage
+        .webhook_delivery(&source.id, &first)
+        .await
+        .unwrap()
+        .unwrap()
+        .resent_at
+        .is_none());
+
+    // Text is kept short, and only the newest hundred stay.
+    let long = "x".repeat(1_000);
+    let clipped = storage
+        .record_webhook_delivery(&source.id, "github", &long, &long, "failed", &long)
+        .await
+        .unwrap();
+    let clipped = storage.webhook_delivery(&source.id, &clipped).await.unwrap().unwrap();
+    assert_eq!(
+        (clipped.event.len(), clipped.delivery_id.len(), clipped.reason.len()),
+        (80, 128, 400)
+    );
+    for number in 0..110 {
+        storage
+            .record_webhook_delivery(&source.id, "github", "issues", &format!("n-{number}"), "queued", "")
+            .await
+            .unwrap();
+    }
+    let kept = storage.list_webhook_deliveries(&source.id, 500).await.unwrap();
+    assert_eq!(kept.len(), 100);
+    assert_eq!(kept[0].delivery_id, "n-109");
+    assert!(storage.webhook_delivery(&source.id, &first).await.unwrap().is_none());
+    assert_eq!(storage.list_webhook_deliveries(&other.id, 500).await.unwrap().len(), 1);
+
+    // They go with the source.
+    storage.delete_source(&source.id).await.unwrap();
+    assert!(storage
+        .list_webhook_deliveries(&source.id, 500)
+        .await
+        .unwrap()
+        .is_empty());
+    assert_eq!(storage.list_webhook_deliveries(&other.id, 500).await.unwrap().len(), 1);
+    let _ = std::fs::remove_dir_all(data_dir);
+}

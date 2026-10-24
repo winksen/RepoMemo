@@ -1710,6 +1710,55 @@ async fn push_webhooks_queue_a_sync_only_when_they_are_signed_right() {
         response_json(call("GET", format!("/v1/repositories/{source_id}"), owner.clone(), json!({})).await).await;
     assert!(shown["webhook_last_received_at"].is_string());
 
+    // Every call that was signed right is kept (the repeat of a delivery id and the unsigned ones are not), and a push
+    // can be sent again by a writer.
+    let kept = response_json(
+        call(
+            "GET",
+            format!("/v1/repositories/{source_id}/webhook/deliveries"),
+            owner.clone(),
+            json!({}),
+        )
+        .await,
+    )
+    .await;
+    let kept = kept.as_array().unwrap();
+    assert_eq!(kept.len(), 7, "{kept:?}");
+    assert_eq!(kept.iter().filter(|delivery| delivery["outcome"] == "pong").count(), 1);
+    assert!(kept
+        .iter()
+        .any(|delivery| delivery["outcome"] == "ignored" && delivery["reason"] == "not a push"));
+    for sender in ["github", "gitlab", "other"] {
+        assert!(kept.iter().any(|delivery| delivery["sender"] == sender), "{sender}");
+    }
+    let sent_push = kept
+        .iter()
+        .find(|delivery| delivery["event"] == "push" && delivery["delivery_id"] == "delivery-2")
+        .unwrap();
+    let resent = call(
+        "POST",
+        format!(
+            "/v1/repositories/{source_id}/webhook/deliveries/{}/resend",
+            sent_push["id"].as_str().unwrap()
+        ),
+        owner.clone(),
+        json!({}),
+    )
+    .await;
+    assert_eq!(resent.status(), 202);
+    let resent = response_json(resent).await;
+    assert_eq!(resent["delivery"]["sender"], "resend");
+    assert_eq!(resent["delivery"]["delivery_id"], "delivery-2");
+    // A member who writes may look and resend; the list is theirs to read.
+    let by_member = call(
+        "GET",
+        format!("/v1/repositories/{source_id}/webhook/deliveries"),
+        member.clone(),
+        json!({}),
+    )
+    .await;
+    assert_eq!(by_member.status(), 200);
+
     // A new secret retires the old one; removing it ends the webhook.
     let renewed = response_json(
         call(

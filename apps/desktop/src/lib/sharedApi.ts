@@ -1439,6 +1439,18 @@ export function createSharedConnectorWebhook(accessToken: string, connectorId: s
   return request(`/v1/connectors/${connectorId}/webhook`, { method: "POST", body: JSON.stringify({}) }, accessToken);
 }
 
+/** The connectors and the repositories whose webhooks keep a list of the calls they received (V0.3.22). */
+export type WebhookSourceKind = "connectors" | "repositories";
+
+export function listSharedWebhookDeliveries(accessToken: string, kind: WebhookSourceKind, sourceId: string): Promise<import("../types").WebhookDelivery[]> {
+  return request(`/v1/${kind}/${sourceId}/webhook/deliveries`, {}, accessToken);
+}
+
+/** Asks for the sync a call asked for once more; the answer says whether it was queued and keeps the new call. */
+export function resendSharedWebhookDelivery(accessToken: string, kind: WebhookSourceKind, sourceId: string, deliveryId: string): Promise<{ queued: boolean; note: string; delivery: import("../types").WebhookDelivery }> {
+  return request(`/v1/${kind}/${sourceId}/webhook/deliveries/${deliveryId}/resend`, { method: "POST", body: JSON.stringify({}) }, accessToken);
+}
+
 export function deleteSharedConnectorWebhook(accessToken: string, connectorId: string): Promise<void> {
   return request<void>(`/v1/connectors/${connectorId}/webhook`, { method: "DELETE" }, accessToken);
 }

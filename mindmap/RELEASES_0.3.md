@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.3 → 0.4
 
-> **Line:** `V0.3.1` to `V0.3.27`, then `V0.4.0` (theme to be chosen, decision 33) · **Current:** `V0.3.21` (2026-10-24) · **Next:** `V0.3.22`
+> **Line:** `V0.3.1` to `V0.3.27`, then `V0.4.0` (theme to be chosen, decision 33) · **Current:** `V0.3.22` (2026-10-24) · **Next:** `V0.3.23`
 > **Previous line:** [Releases 0.2 → 0.3](RELEASES_0.2.md) · **Related:** [Roadmap, Road to V0.4.0](ROADMAP.md#-road-to-v040) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
 Every release of the 0.3 line, planned and later shipped, one row each. The plan comes from the [Road to V0.4.0](ROADMAP.md#-road-to-v040), proposed on 2026-10-24: **one change per release**, each shippable alone, committed as `Update V0.3.N`. Decisions 29–32 of the roadmap are taken as proposed (V0.3.1); decision 33, the theme of V0.4.0, is recorded in V0.3.27.
@@ -51,7 +51,7 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | **V0.3.19** | ✅ 2026-10-24 | R. Archives and connectors | 🔧 Enhancement | Archives | Archives (format 2) carry earlier file versions with their contents and saved searches; format 1 still imports | An export imported on another server shows the version history and the saved searches |
 | **V0.3.20** | ✅ 2026-10-24 | R. Archives and connectors | 🔧 Enhancement | Import | Import runs as a background job with a progress bar; the browser sends the file without holding it | A 1 GiB archive imports with a progress bar and flat browser memory |
 | **V0.3.21** | ✅ 2026-10-24 | R. Archives and connectors | 🔧 Enhancement | Connectors | Issue references (`#12`, `owner/repo#12`, `!12`, addresses) between items are read and linked both ways; approvals of a pull request are shown | A pull request that names `#12` links to that issue |
-| **V0.3.22** | 🔜 Planned | R. Archives and connectors | 🔧 Enhancement | Connectors | Webhook deliveries are listed and can be sent again from the connector's page | A failed delivery is listed with its reason and sent again by a writer |
+| **V0.3.22** | ✅ 2026-10-24 | R. Archives and connectors | 🔧 Enhancement | Connectors | Webhook deliveries are listed with their outcome and reason and can be sent again by a writer (connectors and repositories) | A failed delivery is listed with its reason and sent again by a writer |
 | **V0.3.23** | 🔜 Planned | S. Operations and experience | 🔧 Enhancement | Container | `docker compose up` tested in CI, and an `arm64` image job | CI starts the compose file and `/health/ready` answers |
 | **V0.3.24** | 🔜 Planned | S. Operations and experience | 🔧 Enhancement | Backups | A backup passphrase can be rotated: new backups use the new one, old ones are re-sealed on request | A backup sealed with the old passphrase opens only after re-sealing, or with the old one |
 | **V0.3.25** | 🔜 Planned | S. Operations and experience | 🔧 Enhancement | Web client | Accessibility residuals: a skip link in dialogs, roles for the note editor's toolbar, icon buttons of at least 24 px | `a11y:check` covers the three; a screen reader pass finds no serious issue |

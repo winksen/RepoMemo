@@ -6,6 +6,7 @@
 //! [`RepoSecret`] cannot be printed by accident.
 
 use super::*;
+use repomemo_domain::WebhookDelivery;
 
 /// What can be said about a stored credential without opening it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -16,6 +17,9 @@ pub struct RepoCredentialInfo {
     pub username: Option<String>,
     pub updated_at: String,
 }
+
+/// Most calls kept for one source.
+const MAX_DELIVERIES_KEPT: i64 = 100;
 
 /// An opened credential, for handing to git and nothing else. `Debug` hides
 /// the secret, and there is no `Serialize`.
@@ -243,6 +247,99 @@ impl StorageEngine {
             .bind(source_id)
             .execute(&self.pool)
             .await?;
+        Ok(())
+    }
+
+    /// Notes a call a source's webhook received and what became of it; keeps the newest hundred for the source.
+    /// Returns the id of the row.
+    pub async fn record_webhook_delivery(
+        &self,
+        source_id: &str,
+        sender: &str,
+        event: &str,
+        delivery_id: &str,
+        outcome: &str,
+        reason: &str,
+    ) -> Result<String> {
+        let id = Uuid::new_v4().to_string();
+        let clip = |text: &str, max: usize| text.chars().take(max).collect::<String>();
+        sqlx::query(
+            r#"INSERT INTO webhook_deliveries (id, source_id, received_at, sender, event, delivery_id, outcome, reason)
+               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)"#,
+        )
+        .bind(&id)
+        .bind(source_id)
+        .bind(Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true))
+        .bind(clip(sender, 16))
+        .bind(clip(event, 80))
+        .bind(clip(delivery_id, 128))
+        .bind(clip(outcome, 16))
+        .bind(clip(reason, 400))
+        .execute(&self.pool)
+        .await?;
+        sqlx::query(
+            r#"DELETE FROM webhook_deliveries WHERE source_id = ?1 AND id NOT IN
+                 (SELECT id FROM webhook_deliveries WHERE source_id = ?1
+                  ORDER BY received_at DESC, rowid DESC LIMIT ?2)"#,
+        )
+        .bind(source_id)
+        .bind(MAX_DELIVERIES_KEPT)
+        .execute(&self.pool)
+        .await?;
+        Ok(id)
+    }
+
+    fn webhook_delivery_row(row: &SqliteRow) -> WebhookDelivery {
+        WebhookDelivery {
+            id: row.get("id"),
+            received_at: row.get("received_at"),
+            sender: row.get("sender"),
+            event: row.get("event"),
+            delivery_id: row.get("delivery_id"),
+            outcome: row.get("outcome"),
+            reason: row.get("reason"),
+            resent_at: row.get("resent_at"),
+        }
+    }
+
+    /// The calls a source's webhook received, newest first.
+    pub async fn list_webhook_deliveries(&self, source_id: &str, limit: i64) -> Result<Vec<WebhookDelivery>> {
+        let rows = sqlx::query(
+            r#"SELECT id, received_at, sender, event, delivery_id, outcome, reason, resent_at
+               FROM webhook_deliveries WHERE source_id = ?1
+               ORDER BY received_at DESC, rowid DESC LIMIT ?2"#,
+        )
+        .bind(source_id)
+        .bind(limit)
+        .fetch_all(self.reader())
+        .await?;
+        Ok(rows.iter().map(Self::webhook_delivery_row).collect())
+    }
+
+    /// One call of a source, if it has it.
+    pub async fn webhook_delivery(&self, source_id: &str, id: &str) -> Result<Option<WebhookDelivery>> {
+        let row = sqlx::query(
+            r#"SELECT id, received_at, sender, event, delivery_id, outcome, reason, resent_at
+               FROM webhook_deliveries WHERE source_id = ?1 AND id = ?2"#,
+        )
+        .bind(source_id)
+        .bind(id)
+        .fetch_optional(self.reader())
+        .await?;
+        Ok(row.as_ref().map(Self::webhook_delivery_row))
+    }
+
+    /// Notes that a call was sent again, and by whom.
+    pub async fn mark_webhook_delivery_resent(&self, source_id: &str, id: &str, user_id: &str) -> Result<()> {
+        sqlx::query(
+            "UPDATE webhook_deliveries SET resent_at = ?1, resent_by_user_id = ?2 WHERE source_id = ?3 AND id = ?4",
+        )
+        .bind(Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true))
+        .bind(user_id)
+        .bind(source_id)
+        .bind(id)
+        .execute(&self.pool)
+        .await?;
         Ok(())
     }
 

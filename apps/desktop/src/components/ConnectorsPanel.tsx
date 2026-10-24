@@ -23,6 +23,7 @@ import { Button } from "./ui/button";
 import { CopyButton } from "./ui/copy-button";
 import { PanelHeading } from "./ui/panel-heading";
 import { Dialog, DialogCancel } from "./ui/dialog";
+import { WebhookDeliveries } from "./WebhookDeliveries";
 import { Dropdown } from "./ui/dropdown";
 import { Field } from "./ui/field";
 import { Input } from "./ui/input";
@@ -287,6 +288,7 @@ export function ConnectorSettings({
             <Button disabled={busy} onClick={() => void makeWebhook(live)} variant="secondary">{live.has_webhook ? "Make a new secret" : "Set up a webhook"}</Button>
             {live.has_webhook ? <Button disabled={busy} onClick={() => void removeWebhook(live)} variant="secondary">Turn off</Button> : null}
           </div>
+          {live.has_webhook ? <WebhookDeliveries accessToken={accessToken} kind="connectors" onResent={() => void load()} sourceId={live.id} /> : null}
         </div>;
       })()}
     </Dialog> : null}

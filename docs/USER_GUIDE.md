@@ -166,7 +166,7 @@ flowchart LR
 - Only **committed** files are read. Not uncommitted edits, ignored files or build output.
 - An **edited** file is updated in place, keeping its comments and tasks. A **renamed** file keeps its identity. A **deleted** file leaves search but stays readable for cards and comments that cite it, marked outdated.
 - You can **include or exclude** paths such as `docs/**` or `src/`.
-- Remote repositories work over `https` (with a token) or `ssh` (with a deploy key). A push **webhook** from GitHub, GitLab or any sender makes a sync happen within seconds.
+- Remote repositories work over `https` (with a token) or `ssh` (with a deploy key). A push **webhook** from GitHub, GitLab or any sender makes a sync happen within seconds; the webhook's dialog lists the **recent calls** with what became of each (and why when no sync was queued), and **Send again** asks for the sync once more, for instance after a pause is over. Connectors have the same list.
 - Each repository is also **one evidence item** with a no-AI overview (languages, key files, README, recent commits) and an **AI summary** written only when someone asks.
 - A file's page shows its **last author and date** and its `CODEOWNERS`. An owner written as an email address that belongs to a member of the workspace shows as that member, with an **Ask to review** button that gives them a task for the file; `@handles` and teams stay plain hints.
 
