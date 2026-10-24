@@ -1065,6 +1065,16 @@ pub enum SymbolKind {
     Endpoint,
     Config,
     Test,
+    /// A named value fixed at compile time: a Go `const`, a PHP constant (V0.3.17).
+    Constant,
+    /// A package-level variable (Go `var`).
+    Variable,
+    /// A field of a class (Java).
+    Field,
+    /// A property of a class (C#, PHP).
+    Property,
+    /// A named type that is not a struct or an interface: Go `type ID int` and `type A = B`.
+    TypeAlias,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

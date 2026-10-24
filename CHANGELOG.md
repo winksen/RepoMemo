@@ -2,6 +2,30 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.3.17 (2026-10-24)
+
+More code symbols.
+
+### Added
+- **Five kinds of symbol** (`constant`, `variable`, `field`, `property`, `type_alias`), found by the Code symbols box and the assistant's symbol lookup like functions and classes:
+  - **Go:** package-level `const` and `var` (each name of `const Read, Write = 1, 2`, inside or outside a block), and named types that are neither a struct nor an interface (`type ID int`, `type Handler func()`) and aliases (`type Old = Handler`). Anything inside a function is left out.
+  - **Java:** fields of a class, one for each name (`int a, b;`); locals are not fields.
+  - **C#:** properties, including expression-bodied ones.
+  - **PHP:** properties (`$count` is the symbol `count`, one for each in `$a = 0, $b = 1`) and constants, global and in a class.
+- **`INDEXER_VERSION` 5:** stored indexes of Go, Java, C# and PHP files are refreshed in the background after the upgrade (chunks whose text is unchanged keep their identity, and repository syncs index again what is out of date). Nothing else is re-read.
+
+### Changed
+- A Go `type ID int` was left out on purpose until now (the test said so); it is now a type alias. The agent's symbol answer prints the kind, which now may be `Constant`, `Variable`, `Field`, `Property` or `TypeAlias`.
+- **The documents:** the functional mindmap's symbols line, the technical mindmap's index versions and test count (indexer 28), the user guide. The V0.2.35 and V0.2.36 gaps about these symbols are closed; Java nested types of a method body, C# fields, local functions and delegates, and Razor and Blade are still not symbols.
+- **The version** is `0.3.17` everywhere.
+
+### Checks
+- **Compiled and linted:** `cargo clippy -D warnings` over the whole workspace with its tests, `cargo fmt --all --check`, `types:check` (the symbol kind type regenerated), `typecheck`, `docs:check`, `version:check`. The shapes of the grammars' nodes were read from their `node-types.json`.
+- **Tests written, not run:** four in the indexer (Go constants, variables and aliases, and that locals are skipped; Java fields; C# properties; PHP properties and constants without the `$`) and the existing Go test changed, which asserted that `ID` was not a symbol.
+
+### Upgrading
+- Nothing to do. After the upgrade the server indexes the Go, Java, C# and PHP files again in the background; the Code symbols box fills as it goes.
+
 ## V0.3.16 (2026-10-24)
 
 Answers and citations name the last author and date of a repository file.

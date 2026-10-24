@@ -1555,6 +1555,11 @@ fn symbol_kind_to_db(kind: &SymbolKind) -> &'static str {
         SymbolKind::Endpoint => "endpoint",
         SymbolKind::Config => "config",
         SymbolKind::Test => "test",
+        SymbolKind::Constant => "constant",
+        SymbolKind::Variable => "variable",
+        SymbolKind::Field => "field",
+        SymbolKind::Property => "property",
+        SymbolKind::TypeAlias => "type_alias",
     }
 }
 
@@ -1568,6 +1573,11 @@ fn symbol_kind_from_db(value: &str) -> SymbolKind {
         "endpoint" => SymbolKind::Endpoint,
         "config" => SymbolKind::Config,
         "test" => SymbolKind::Test,
+        "constant" => SymbolKind::Constant,
+        "variable" => SymbolKind::Variable,
+        "field" => SymbolKind::Field,
+        "property" => SymbolKind::Property,
+        "type_alias" => SymbolKind::TypeAlias,
         _ => SymbolKind::Function,
     }
 }

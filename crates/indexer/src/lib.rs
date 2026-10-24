@@ -16,7 +16,7 @@ const CODE_MAX_NESTING: usize = 3;
 /// Version of the chunking and symbol logic. Bump it whenever a change would
 /// produce different chunks, so stored indexes are refreshed in the background.
 /// Chunks whose text is unchanged keep their identity when re-indexed.
-pub const INDEXER_VERSION: i64 = 4;
+pub const INDEXER_VERSION: i64 = 5;
 
 #[derive(Debug, Clone)]
 pub struct IndexArtifactOutput {
@@ -182,7 +182,7 @@ fn symbols_from_tree(tree: &Tree, summary: &ArtifactSummary, text: &str) -> Vec<
 }
 
 fn collect_symbols(node: Node<'_>, summary: &ArtifactSummary, text: &str, output: &mut Vec<Symbol>) {
-    if let Some((kind, name_node)) = symbol_descriptor(node, summary.language.as_deref()) {
+    for (kind, name_node) in symbol_descriptors(node, summary.language.as_deref()) {
         if let Ok(name) = name_node.utf8_text(text.as_bytes()) {
             let name = name.trim();
             if !name.is_empty() {
@@ -209,6 +209,61 @@ fn collect_symbols(node: Node<'_>, summary: &ArtifactSummary, text: &str, output
     }
 }
 
+/// The symbols a node declares: usually one, none for most nodes, and several for `const a, b = 1, 2` or `int x, y;`.
+fn symbol_descriptors<'a>(node: Node<'a>, language: Option<&str>) -> Vec<(SymbolKind, Node<'a>)> {
+    if let Some(found) = symbol_descriptor(node, language) {
+        return vec![found];
+    }
+    let names_of = |field: &str| {
+        let mut cursor = node.walk();
+        node.children_by_field_name(field, &mut cursor)
+            .filter(|child| child.kind() == "identifier")
+            .collect::<Vec<_>>()
+    };
+    match (language, node.kind()) {
+        // Go: constants and variables of the package; those inside a function are not worth finding.
+        (Some("Go"), "const_spec") if is_package_level(node) => names_of("name")
+            .into_iter()
+            .map(|name| (SymbolKind::Constant, name))
+            .collect(),
+        (Some("Go"), "var_spec") if is_package_level(node) => names_of("name")
+            .into_iter()
+            .map(|name| (SymbolKind::Variable, name))
+            .collect(),
+        // Java: the fields of a class, one for each declarator (`int a, b;`).
+        (Some("Java"), "field_declaration") => {
+            let mut cursor = node.walk();
+            node.children_by_field_name("declarator", &mut cursor)
+                .filter_map(|declarator| declarator.child_by_field_name("name"))
+                .map(|name| (SymbolKind::Field, name))
+                .collect()
+        }
+        // PHP: `$name` of a property is named `name`, and a constant is the first name of its element.
+        (Some("PHP"), "property_element") => node
+            .child_by_field_name("name")
+            .and_then(|variable| first_child_of_kind(variable, "name"))
+            .map(|name| vec![(SymbolKind::Property, name)])
+            .unwrap_or_default(),
+        (Some("PHP"), "const_element") => first_child_of_kind(node, "name")
+            .map(|name| vec![(SymbolKind::Constant, name)])
+            .unwrap_or_default(),
+        _ => Vec::new(),
+    }
+}
+
+/// Whether a declaration stands outside every function and method (Go).
+fn is_package_level(node: Node<'_>) -> bool {
+    !(has_ancestor_kind(node, "function_declaration")
+        || has_ancestor_kind(node, "method_declaration")
+        || has_ancestor_kind(node, "func_literal"))
+}
+
+fn first_child_of_kind<'a>(node: Node<'a>, kind: &str) -> Option<Node<'a>> {
+    let mut cursor = node.walk();
+    let found = node.children(&mut cursor).find(|child| child.kind() == kind);
+    found
+}
+
 fn symbol_descriptor<'a>(node: Node<'a>, language: Option<&str>) -> Option<(SymbolKind, Node<'a>)> {
     let name = node.child_by_field_name("name")?;
     let kind = match (language, node.kind()) {
@@ -227,12 +282,15 @@ fn symbol_descriptor<'a>(node: Node<'a>, language: Option<&str>) -> Option<(Symb
         (Some("Rust"), "trait_item") => SymbolKind::Interface,
         (Some("Go"), "function_declaration") => SymbolKind::Function,
         (Some("Go"), "method_declaration") => SymbolKind::Method,
-        // Only structs and interfaces are types worth finding; `type ID int` is not.
+        // Structs and interfaces are classes and interfaces; any other named type of the package (`type ID int`) and an
+        // alias (`type A = B`) are type aliases.
         (Some("Go"), "type_spec") => match node.child_by_field_name("type").map(|node| node.kind()) {
             Some("struct_type") => SymbolKind::Class,
             Some("interface_type") => SymbolKind::Interface,
+            _ if is_package_level(node) => SymbolKind::TypeAlias,
             _ => return None,
         },
+        (Some("Go"), "type_alias") if is_package_level(node) => SymbolKind::TypeAlias,
         (Some("Java"), "class_declaration" | "record_declaration") => SymbolKind::Class,
         (Some("Java"), "interface_declaration" | "annotation_type_declaration") => SymbolKind::Interface,
         (Some("Java"), "enum_declaration") => SymbolKind::Enum,
@@ -241,6 +299,7 @@ fn symbol_descriptor<'a>(node: Node<'a>, language: Option<&str>) -> Option<(Symb
         (Some("C#"), "interface_declaration") => SymbolKind::Interface,
         (Some("C#"), "enum_declaration") => SymbolKind::Enum,
         (Some("C#"), "method_declaration" | "constructor_declaration") => SymbolKind::Method,
+        (Some("C#"), "property_declaration") => SymbolKind::Property,
         (Some("PHP"), "class_declaration") => SymbolKind::Class,
         (Some("PHP"), "interface_declaration" | "trait_declaration") => SymbolKind::Interface,
         (Some("PHP"), "enum_declaration") => SymbolKind::Enum,
@@ -931,7 +990,81 @@ mod tests {
         assert!(has_symbol(&output, "Reader", SymbolKind::Interface, 5));
         assert!(has_symbol(&output, "New", SymbolKind::Function, 11));
         assert!(has_symbol(&output, "Get", SymbolKind::Method, 13));
-        assert!(output.symbols.iter().all(|symbol| symbol.name != "ID"));
+        // A named type that is neither is a type alias (V0.3.17).
+        assert!(has_symbol(&output, "ID", SymbolKind::TypeAlias, 9));
+    }
+
+    #[test]
+    fn go_constants_variables_and_type_aliases_are_symbols_but_locals_are_not() {
+        let summary = artifact_summary(ArtifactType::CodeFile, Some("Go"));
+        let text = "package store\n\nconst MaxItems = 10\n\nconst (\n\tRead, Write = 1, 2\n\tAdmin       = 3\n)\n\nvar Default = New()\n\nvar (\n\tcache map[string]int\n)\n\ntype Handler func(string) error\n\ntype Old = Handler\n\ntype Store struct{}\n\nfunc New() *Store {\n\tconst local = 1\n\tvar scratch int\n\ttype inner int\n\t_ = local + scratch\n\treturn &Store{}\n}\n";
+        let output = index_artifact(&summary, text.as_bytes()).unwrap();
+
+        assert!(has_symbol(&output, "MaxItems", SymbolKind::Constant, 3));
+        assert!(has_symbol(&output, "Read", SymbolKind::Constant, 6));
+        assert!(has_symbol(&output, "Write", SymbolKind::Constant, 6));
+        assert!(has_symbol(&output, "Admin", SymbolKind::Constant, 7));
+        assert!(has_symbol(&output, "Default", SymbolKind::Variable, 10));
+        assert!(has_symbol(&output, "cache", SymbolKind::Variable, 13));
+        assert!(has_symbol(&output, "Handler", SymbolKind::TypeAlias, 16));
+        assert!(has_symbol(&output, "Old", SymbolKind::TypeAlias, 18));
+        assert!(has_symbol(&output, "Store", SymbolKind::Class, 20));
+        assert!(has_symbol(&output, "New", SymbolKind::Function, 22));
+        // Inside a function: no constant, no variable and no type that is neither a struct nor an interface.
+        assert!(output
+            .symbols
+            .iter()
+            .all(|symbol| !matches!(symbol.name.as_str(), "local" | "scratch" | "inner")));
+    }
+
+    #[test]
+    fn java_fields_are_symbols_one_for_each_name() {
+        let summary = artifact_summary(ArtifactType::CodeFile, Some("Java"));
+        let text = "package app;\n\npublic class Config {\n    private static final int LIMIT = 5;\n    private String name, label;\n    int[] sizes;\n\n    public String name() {\n        int local = 1;\n        return name;\n    }\n}\n";
+        let output = index_artifact(&summary, text.as_bytes()).unwrap();
+
+        assert!(has_symbol(&output, "Config", SymbolKind::Class, 3));
+        assert!(has_symbol(&output, "LIMIT", SymbolKind::Field, 4));
+        assert!(has_symbol(&output, "name", SymbolKind::Field, 5));
+        assert!(has_symbol(&output, "label", SymbolKind::Field, 5));
+        assert!(has_symbol(&output, "sizes", SymbolKind::Field, 6));
+        assert!(has_symbol(&output, "name", SymbolKind::Method, 8));
+        assert!(
+            output.symbols.iter().all(|symbol| symbol.name != "local"),
+            "a local variable is not a field"
+        );
+    }
+
+    #[test]
+    fn csharp_properties_are_symbols() {
+        let summary = artifact_summary(ArtifactType::CodeFile, Some("C#"));
+        let text = "namespace App;\n\npublic class Account\n{\n    public string Owner { get; set; }\n    public int Balance => 3;\n    private int cached;\n\n    public void Close()\n    {\n        var temp = 1;\n    }\n}\n";
+        let output = index_artifact(&summary, text.as_bytes()).unwrap();
+
+        assert!(has_symbol(&output, "Account", SymbolKind::Class, 3));
+        assert!(has_symbol(&output, "Owner", SymbolKind::Property, 5));
+        assert!(has_symbol(&output, "Balance", SymbolKind::Property, 6));
+        assert!(has_symbol(&output, "Close", SymbolKind::Method, 9));
+        assert!(output.symbols.iter().all(|symbol| symbol.name != "temp"));
+    }
+
+    #[test]
+    fn php_properties_and_constants_are_symbols_without_the_dollar_sign() {
+        let summary = artifact_summary(ArtifactType::CodeFile, Some("PHP"));
+        let text = "<?php\nconst VERSION = '1';\n\nclass Account\n{\n    const LIMIT = 5;\n    public $owner;\n    private static int $count = 0, $total = 1;\n\n    public function close() {\n        $local = 1;\n    }\n}\n";
+        let output = index_artifact(&summary, text.as_bytes()).unwrap();
+
+        assert!(has_symbol(&output, "VERSION", SymbolKind::Constant, 2));
+        assert!(has_symbol(&output, "Account", SymbolKind::Class, 4));
+        assert!(has_symbol(&output, "LIMIT", SymbolKind::Constant, 6));
+        assert!(has_symbol(&output, "owner", SymbolKind::Property, 7));
+        assert!(has_symbol(&output, "count", SymbolKind::Property, 8));
+        assert!(has_symbol(&output, "total", SymbolKind::Property, 8));
+        assert!(has_symbol(&output, "close", SymbolKind::Method, 10));
+        assert!(output
+            .symbols
+            .iter()
+            .all(|symbol| !symbol.name.starts_with('$') && symbol.name != "local"));
     }
 
     #[test]

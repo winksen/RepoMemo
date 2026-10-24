@@ -942,7 +942,12 @@ export type SymbolKind =
   | "route"
   | "endpoint"
   | "config"
-  | "test";
+  | "test"
+  | "constant"
+  | "variable"
+  | "field"
+  | "property"
+  | "type_alias";
 
 export interface Symbol {
   id: string;

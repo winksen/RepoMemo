@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.3.16` (2026-10-24), after `V0.3.0` *Connected*, released after the maintainer's tests of the clean install (R6, R12) · **Next:** [Road to V0.4.0](#-road-to-v040), the 0.3.x releases V0.3.17–V0.3.27 in tracks O to T (decisions 29–32 taken as proposed, 33 recorded in V0.3.27) · **Built before the tag:** tracks K to N (V0.2.57–V0.2.193) · **Next minor after it:** `V0.4.0`, its theme still to be chosen (decision 33)
+> **Current version:** `V0.3.17` (2026-10-24), after `V0.3.0` *Connected*, released after the maintainer's tests of the clean install (R6, R12) · **Next:** [Road to V0.4.0](#-road-to-v040), the 0.3.x releases V0.3.18–V0.3.27 in tracks O to T (decisions 29–32 taken as proposed, 33 recorded in V0.3.27) · **Built before the tag:** tracks K to N (V0.2.57–V0.2.193) · **Next minor after it:** `V0.4.0`, its theme still to be chosen (decision 33)
 > **Feature freeze (V0.1.76 to the `v0.3.0` tag):** lifted by the tag on 2026-10-24. The 0.3.x releases follow the rules of [Road to V0.4.0](#-road-to-v040).
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Security review 2026-10-16 (V0.2.52)](security/2026-10-16-security-review.md) · [Security and backend review 2026-10-21 (V0.2.129)](security/2026-10-21-security-review.md) · [Security review of workspace templates 2026-10-22 (V0.2.192)](security/2026-10-22-workspace-templates-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -77,7 +77,7 @@ timeline
 | Track M: backend hardening and performance (V0.2.149–V0.2.162) | ✅ V0.2.149–V0.2.162 built; decisions 20–23 taken as proposed |
 | Track N: workspace templates (V0.2.163–V0.2.193) | ✅ V0.2.163–V0.2.193 built; decisions 24–28 taken as proposed; [plan](plans/2026-10-22-workspace-templates.md) · [format](technical/workspace-templates.md) |
 | **V0.3.0 *Connected*** | ✅ Released 2026-10-24: the version set to `0.3.0` and tagged `v0.3.0` after tracks K to N and the clean-machine install |
-| Road to V0.4.0 (V0.3.1–V0.3.27, tracks O to T) | 🔄 Under way since 2026-10-24: fixes and the record, the local edition removed, small gaps closed, portability and connector depth, operations, security pass; decisions 29–32 taken as proposed, 33 to record in V0.3.27. Built so far: V0.3.1–V0.3.16 (tracks O and P, then Q from V0.3.8) |
+| Road to V0.4.0 (V0.3.1–V0.3.27, tracks O to T) | 🔄 Under way since 2026-10-24: fixes and the record, the local edition removed, small gaps closed, portability and connector depth, operations, security pass; decisions 29–32 taken as proposed, 33 to record in V0.3.27. Built so far: V0.3.1–V0.3.17 (tracks O and P, then Q from V0.3.8) |
 | V0.4.0 and later: scale-out, single sign-on, hosted | 💭 Direction (the theme is decision 33) |
 
 ---
@@ -805,7 +805,7 @@ Proposed and started on 2026-10-22, with decisions 24–28 taken as proposed. Ev
 - [x] Structure-aware chunks reuse the engine of the other languages: a Go `type_declaration` is labelled by its single `type_spec`; Java class members split under the class name
 - [x] `.go` and `.java` accepted for upload and local import (`ACCEPTED_EXTENSIONS`, `detect_language`, the web client's upload list); repository classification no longer asks Go files for a text check (as for Rust)
 - [x] Tests: Go and Java symbols, packing and labels, splitting between functions and by method (no declaration cut), `go_and_java_files_have_searchable_symbols_and_declaration_chunks` over the API; the unsupported-language fallback test now uses Ruby
-- [ ] Go `const` and `var` blocks, type aliases and named non-struct types (`type ID int`) are chunked but not symbols; Java fields and nested types of a method body are not symbols
+- [x] Go package-level `const` and `var`, aliases and named non-struct types, and Java fields became symbols in V0.3.17. Still true: nested types of a method body are not symbols (`type ID int`) are chunked but not symbols; Java fields and nested types of a method body are not symbols
 
 #### V0.2.36: C# and PHP
 
@@ -814,7 +814,7 @@ Proposed and started on 2026-10-22, with decisions 24–28 taken as proposed. Ev
 - [x] The splitting engine now also splits a container whose only member is large (a namespace holding one big class), for every language
 - [x] `.cs` and `.php` accepted for upload and local import and in the web client's upload list; repository files of both are classified as code with no text check
 - [x] Tests: C# and PHP symbols, packing, splitting by method inside a namespace and a class (no method cut, scope in the heading), and `go_java_csharp_and_php_files_have_searchable_symbols` over the API
-- [ ] C# properties, fields, local functions and delegates, and PHP properties and constants, are chunked but not symbols; Razor (`.cshtml`) and Blade templates are plain text
+- [x] C# properties and PHP properties and constants became symbols in V0.3.17. Still true: C# fields, local functions and delegates are chunked but not symbols; Razor (`.cshtml`) and Blade templates are plain text
 
 #### V0.2.37: Review queue
 
@@ -1356,7 +1356,7 @@ Design and limits: [technical/repository-sources.md](technical/repository-source
 
 ## 🎯 Road to V0.4.0
 
-> **Status:** proposed on 2026-10-24, right after `V0.3.0`, and under way the same day: decisions 29–32 above are taken as proposed (the maintainer asked for the releases to be built one by one up to V0.3.27), and decision 33 is recorded in V0.3.27. The releases are numbered V0.3.1–V0.3.27, and `V0.4.0` is cut when the theme of decision 33 is ready, after V0.3.27. Built so far: V0.3.1–V0.3.16 (tracks O and P, then Q from V0.3.8).
+> **Status:** proposed on 2026-10-24, right after `V0.3.0`, and under way the same day: decisions 29–32 above are taken as proposed (the maintainer asked for the releases to be built one by one up to V0.3.27), and decision 33 is recorded in V0.3.27. The releases are numbered V0.3.1–V0.3.27, and `V0.4.0` is cut when the theme of decision 33 is ready, after V0.3.27. Built so far: V0.3.1–V0.3.17 (tracks O and P, then Q from V0.3.8).
 
 ### What this line is
 
@@ -1417,7 +1417,7 @@ Each row closes a line of the functional mindmap's gaps table or of a release ch
 | **V0.3.14** ✅ | 🔧 | Citations | *View at commit* offered from memory-card links and repository summaries | F16e | A card's link opens the cited text at the commit it names, labelled as such |
 | **V0.3.15** ✅ | ✨ | Artifact page | `CODEOWNERS` owners matched to workspace members | F16f | A matched owner shows as a member and can be asked to review; an unmatched one stays a hint |
 | **V0.3.16** ✅ | 🔧 | Assistant | Answers and citations name the last author and date of a repository file | F16g | A citation of a repository file shows who last changed it |
-| **V0.3.17** | 🔧 | Indexing | More code symbols: Go `const`, `var` and type aliases; Java fields; C# properties; PHP properties and constants | F21c | Each is found in the Code symbols box |
+| **V0.3.17** ✅ | 🔧 | Indexing | More code symbols: Go `const`, `var` and type aliases; Java fields; C# properties; PHP properties and constants | F21c | Each is found in the Code symbols box |
 | **V0.3.18** | 🔧 | Templates | The Overview cards the templates wanted and could not name: repositories in sync, evidence reviewed in 90 days, needing review, duplicates | F26h | A template can list them; General's nine cards are unchanged |
 
 #### Track R: Portable archives and connector depth (V0.3.19–V0.3.22)
@@ -1464,6 +1464,7 @@ One box per release, added as each release is built. Say what was built and what
 - [x] **V0.3.14** *View at commit* from cards and summaries (F16e). Done: `MemoryEvidence.commit`; `insert_citation_link` keeps a citation's commit (7 to 64 hex characters, lower case) in `links.metadata_json`, the evidence query reads it with `json_extract`; the repository summary's citations carry `overview.commit.sha`; `ViewAtCommit` is shown on a memory card's linked evidence and on each file a repository summary is based on; the card's edit form keeps `commit` in its citations so saving does not lose it; types regenerated. Tests written: a storage test and three web tests. Clippy (domain, storage, api, server), fmt, typecheck, types, styles, a11y, docs and version checks pass. **Not run:** the tests and the app; to try: in the assistant ask a question about a repository file, save the answer as a memory card, open the card and press *View at …* on its linked file; and open a repository's page, generate its summary and use the button beside a file it is based on
 - [x] **V0.3.15** owners matched to members (F16f). Done: `CodeOwnerMatch` and `match_owners` (an address matches the member with that address, ignoring case; handles and teams never), `StorageEngine::artifact_code_owners`, `RepoMemoCore::artifact_code_owners`; `GET /v1/artifacts/{id}/code-owners` (read) and `POST /v1/artifacts/{id}/review-requests` (write: only a member the file's CODEOWNERS names, a task *Review <path>* assigned to them through the usual assignment notice, `409` while one is open, a note of 1,000 characters at most); `CodeOwnersHint` on the file's page replaces the plain text; types regenerated (153). Tests written: a unit test, a server test over a real local repository and six web tests. Clippy (domain, storage, api, server), fmt, typecheck, types, styles, a11y, docs and version checks pass. **Not run:** the tests and the app; to try: link a repository whose CODEOWNERS names a workspace member's email, open one of its files, press *Ask to review* beside the member and see the task and the member's notice
 - [x] **V0.3.16** last author and date in answers and citations (F16g). Done: `Citation.last_author` and `last_changed_at` (optional, serde default, types regenerated); filled from the cited search result in Ask answers and the assistant, and from the artifact's synced metadata (`metadata_text`) in a file summary and a workspace overview; `citationChange` and a small note beside each citation in `EvidenceUsed` and the assistant's evidence list; not added to the text sent to the AI provider. Tests written: a unit test and three web tests. Workspace clippy (with tests), fmt, typecheck, types, styles, a11y, docs and version checks pass. **Not run:** the tests and the app; to try: ask a question about a file of a linked repository and read the line beside each citation
+- [x] **V0.3.17** more code symbols (F21c). Done: `SymbolKind` gains `Constant`, `Variable`, `Field`, `Property` and `TypeAlias` (stored as text, no migration; types regenerated); `symbol_descriptors` in the indexer reads Go package-level `const_spec` and `var_spec` (each name), `type_spec` that is neither a struct nor an interface and `type_alias` (package level only), Java `field_declaration` (each declarator), C# `property_declaration`, PHP `property_element` (without the `$`) and `const_element`; `INDEXER_VERSION` 5, so stored indexes are refreshed in the background. Tests written: four, and the Go test that said `type ID int` was not a symbol changed. Workspace clippy (with tests), fmt, types, typecheck, docs and version checks pass. **Not run:** the tests and the app; to try: after the upgrade, search the Code symbols box for a Go constant, a Java field, a C# property and a PHP property or constant of your own code
 
 ---
 

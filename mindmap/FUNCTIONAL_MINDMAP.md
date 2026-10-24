@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.3.16` (2026-10-24). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.3.17` (2026-10-24). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ---
 
@@ -292,7 +292,7 @@ This is a live snapshot computed on each visit:
 - **Index coverage**: the percentage of artifacts that are indexed. Pending artifacts are counted and their size is shown.
 - **Fresh evidence**: artifacts added or updated in the last 7 days.
 - **Knowledge density**: searchable passages per indexed file.
-- **Code symbols**: functions and classes extracted from code.
+- **Code symbols**: functions, classes, interfaces, enums and methods extracted from code in TypeScript, JavaScript, Python, Rust, Go, Java, C# and PHP; since V0.3.17 also Go package-level constants, variables and named types (`type ID int`, `type A = B`), Java fields, C# properties and PHP properties and constants (a local inside a function is never a symbol). Existing files are indexed again in the background after the upgrade.
 - **Team**: member count, active tasks, blocked and overdue tasks ("at risk"), comment count.
 - **Charts**: evidence by type, storage by type, languages, 14-day activity, activity by action, and members by role.
 
