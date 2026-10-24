@@ -126,6 +126,18 @@ if (converterBlock) {
   if (!/REPOMEMO_SOFFICE_WRAPPER:\s*\/usr\/local\/bin\/repomemo-soffice-wrapper/.test(serverBlock ?? "")) problems.push("the server does not reach LibreOffice through the wrapper");
 }
 
+// CI really starts the compose file and builds the images for arm64 (V0.3.23): a job that runs `docker compose up`
+// and waits for the server to be healthy, asks `/health/ready` through the proxy, and a job on an arm64 runner that
+// builds the stages the compose file builds for that platform.
+const ci = workflows.find(([name]) => name === "ci.yml")?.[1] ?? "";
+if (!/docker compose up\b[^\n]*--build[^\n]*--wait\b/.test(ci)) problems.push(".github/workflows/ci.yml has no job that builds the stack and waits for it (docker compose up --build --wait)");
+if (!/curl[^\n]*https:\/\/localhost\/health\/ready/.test(ci)) problems.push(".github/workflows/ci.yml does not ask /health/ready through the proxy");
+if (!/docker compose down\b/.test(ci)) problems.push(".github/workflows/ci.yml does not take the stack down again");
+if (!/runs-on:\s*ubuntu-24\.04-arm\b/.test(ci)) problems.push(".github/workflows/ci.yml has no job on an arm64 runner");
+for (const stage of ["server", "proxy"]) {
+  if (!new RegExp(`docker build[^\\n]*--platform linux/arm64[^\\n]*--target ${stage}\\b`).test(ci)) problems.push(`.github/workflows/ci.yml does not build the ${stage} image for arm64`);
+}
+
 // The binary the Dockerfile copies is the one the server package builds.
 const packageName = /^name\s*=\s*"([^"]+)"/m.exec(serverManifest)?.[1];
 if (!packageName || !dockerfile.includes(`-p ${packageName}`) || !dockerfile.includes(`target/release/${packageName}`)) {

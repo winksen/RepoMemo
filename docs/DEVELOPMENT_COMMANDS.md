@@ -105,6 +105,10 @@ request: the version check, Rust tests on Linux and Windows (the desktop crate
 is left out), the web type check, the web client tests, the accessibility check, the generated-types check, `npm audit --omit=dev`, `cargo deny`
 (policy in `deny.toml`), `cargo fmt --all --check` and clippy with `-D warnings`.
 Licenses and banned crates are checked as well; duplicate versions only warn.
+Two jobs try the container for real: one writes a `.env` with throwaway secrets, runs
+`docker compose up --build --detach --wait` and asks `/health/ready` through the proxy, and one builds the
+server and proxy images for `linux/arm64` on an arm64 runner and checks their architecture (nothing is
+published). Both build the Rust server in the image, so they take a while.
 
 ## Check A Running Server
 

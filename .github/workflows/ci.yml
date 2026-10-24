@@ -3,7 +3,9 @@
 # Blocking: versions agree, workspace templates valid, released migrations unchanged, a 0.2.0 environment upgrades, Rust tests on Linux and Windows, the web type
 # check, web tests, accessibility rules and generated types, rustfmt and clippy, and security
 # advisories for the server's dependencies and the web client's production
-# dependencies.
+# dependencies. The container is tried for real (V0.3.23): `docker compose up` starts the stack and
+# `/health/ready` answers through the proxy, and the server and proxy images are built for arm64 on a
+# native arm64 runner (nothing is published).
 # Advisory (reported, not blocking): duplicate crate versions.
 #
 # Every action is pinned to a commit (the release it is, in the comment), and Dependabot proposes the next one
@@ -75,6 +77,60 @@ jobs:
         run: npm run test:web
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
+
+  # The compose file as a person runs it (roadmap O7b, V0.3.23): the images are built, the stack is brought up with
+  # throwaway secrets, the server must turn healthy and answer `/health/ready` through the proxy, which has
+  # a certificate of its own for `localhost`.
+  compose:
+    name: docker compose up
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: A .env with throwaway secrets
+        run: |
+          {
+            echo "REPOMEMO_HOST=localhost"
+            echo "REPOMEMO_JWT_SECRET=$(openssl rand -hex 32)"
+            echo "REPOMEMO_SECRET_KEY=$(openssl rand -hex 32)"
+          } > .env
+      - name: Build and start the stack
+        run: docker compose up --build --detach --wait --wait-timeout 900
+      - name: The server answers ready through the proxy
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error --insecure --resolve localhost:443:127.0.0.1 https://localhost/health/ready; then
+              echo
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "/health/ready never answered" >&2
+          exit 1
+      - name: What the stack logged
+        if: failure()
+        run: docker compose logs --no-color --tail 200
+      - name: Stop the stack
+        if: always()
+        run: docker compose down --volumes
+
+  # The images for arm64 (roadmap O7b, V0.3.23): built natively on an arm64 runner, so nothing is emulated, and
+  # looked at once: the server's binary and git are arm64 builds. Nothing is pushed anywhere.
+  images-arm64:
+    name: Images for arm64
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Build the server image
+        run: docker build --platform linux/arm64 --target server --tag repomemo-server:arm64 .
+      - name: Build the proxy image
+        run: docker build --platform linux/arm64 --target proxy --tag repomemo-proxy:arm64 .
+      - name: Both images are arm64 ones, and the server image has its git
+        run: |
+          test "$(docker image inspect --format '{{.Architecture}}' repomemo-server:arm64)" = "arm64"
+          test "$(docker image inspect --format '{{.Architecture}}' repomemo-proxy:arm64)" = "arm64"
+          docker run --rm --entrypoint git repomemo-server:arm64 --version
 
   # An environment folder made by 0.2.0 (its schema, rows and files) is opened by the current code and
   # migrated in place with its data intact (roadmap R9). The same test also runs in the job below; it has

@@ -2,6 +2,27 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.3.23 (2026-10-24)
+
+The container is tried in CI, and built for arm64.
+
+### Added
+- **`docker compose up` in CI:** a `compose` job writes a `.env` with throwaway secrets, builds and starts the stack with `docker compose up --build --detach --wait` (so the server must turn healthy by its own health check), asks `/health/ready` through the proxy (the certificate Caddy makes for `localhost` is not checked), prints the stack's logs when it fails and takes the stack down with its volumes.
+- **Images for arm64:** an `images-arm64` job builds the `server` and `proxy` stages for `linux/arm64` on GitHub's arm64 runner, so nothing is emulated, checks that both images are arm64 ones and that the server image has its git. Nothing is pushed anywhere: there is still no published image or registry.
+
+### Changed
+- **`container:check` insists on both:** it refuses a CI file without the compose job (the build with `--wait`, the request for `/health/ready` through the proxy, taking the stack down) or without arm64 builds of the two stages on an arm64 runner. It still reads files only and needs no Docker.
+- **No new action is used:** both jobs run `docker` and `curl` on the runners themselves, with the `checkout` action already pinned to a commit.
+- **The documents:** the production guide's account of `container:check`, the development commands' account of CI, the technical mindmap's scope line and the roadmap. The gaps "no `arm64` job" and "no `docker compose` test in CI" are closed; the images are still never built by the sessions that write the code, so the first run of the two jobs is the maintainer's to watch.
+- **The version** is `0.3.23` everywhere.
+
+### Checks
+- **Run:** `container:check` with the new assertions, `docs:check`, `version:check`, `migrations:check`.
+- **Not run:** the two jobs themselves (they need Docker and GitHub's runners) and the tests; the arm64 job needs a runner type that GitHub offers free for public repositories and to paid plans for private ones.
+
+### Upgrading
+- Nothing to do. If the repository is private on a plan without arm64 runners, remove the `images-arm64` job or give it a runner label of your own; `container:check` then names what is missing.
+
 ## V0.3.22 (2026-10-24)
 
 Webhook deliveries are listed and can be sent again.
