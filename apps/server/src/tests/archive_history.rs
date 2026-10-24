@@ -194,3 +194,150 @@ async fn an_export_imported_elsewhere_shows_the_version_history_and_the_saved_se
     assert_eq!(searches[0]["query"], "edition");
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+/// An import in the background answers as soon as the archive is received, and its progress and result are read
+/// from a job that only its owner can see.
+#[tokio::test]
+async fn an_import_can_run_in_the_background_and_report_its_progress_and_its_result() {
+    let data_dir = temp_data_dir("import-background");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let send = |method: &'static str, uri: String, who: &str, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let (_, _) = register_account(&app, "bg-admin@example.com").await;
+    let (owner, _) = register_account(&app, "bg-owner@example.com").await;
+    let (stranger, _) = register_account(&app, "bg-stranger@example.com").await;
+    let workspace_id = create_workspace(&app, &owner).await;
+    let listed = response_json(
+        app.clone()
+            .oneshot(auth_request("GET", "/v1/workspaces", &owner))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let organization_id = listed[0]["organization_id"].as_str().unwrap().to_owned();
+    for (title, content) in [
+        ("Refund policy", "Refunds are issued within fourteen days of purchase."),
+        ("Shipping notes", "Parcels leave the warehouse every weekday."),
+    ] {
+        let created = send(
+            "POST",
+            format!("/v1/workspaces/{workspace_id}/artifacts/text"),
+            &owner,
+            json!({"title": title, "content": content}),
+        )
+        .await;
+        assert_eq!(created.status(), 201);
+    }
+    let archive = to_bytes(
+        app.clone()
+            .oneshot(auth_request(
+                "GET",
+                &format!("/v1/workspaces/{workspace_id}/export"),
+                &owner,
+            ))
+            .await
+            .unwrap()
+            .into_body(),
+        usize::MAX,
+    )
+    .await
+    .unwrap()
+    .to_vec();
+    let import = |archive: Vec<u8>, who: &str, query: &str| {
+        let app = app.clone();
+        let request = Request::builder()
+            .method("POST")
+            .uri(format!(
+                "/v1/workspaces/import?organization_id={organization_id}{query}"
+            ))
+            .header("authorization", who)
+            .header("content-type", "application/gzip")
+            .body(Body::from(archive))
+            .unwrap();
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let job = |id: String, who: String| {
+        let app = app.clone();
+        let request = auth_request("GET", &format!("/v1/workspaces/import/jobs/{id}"), &who);
+        async move {
+            let response = app.oneshot(request).await.unwrap();
+            let status = response.status().as_u16();
+            (status, response_json(response).await)
+        }
+    };
+    let finished = |id: String, who: String| {
+        let job = &job;
+        async move {
+            for _ in 0..200 {
+                let (status, body) = job(id.clone(), who.clone()).await;
+                assert_eq!(status, 200, "{body}");
+                if body["status"] != "running" {
+                    return body;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            }
+            panic!("the import did not finish");
+        }
+    };
+    let count = || {
+        let app = app.clone();
+        let request = auth_request("GET", "/v1/workspaces", &owner);
+        async move {
+            response_json(app.oneshot(request).await.unwrap())
+                .await
+                .as_array()
+                .unwrap()
+                .len()
+        }
+    };
+
+    // A dry run in the background: a job, then the report, and no workspace.
+    let started = import(archive.clone(), &owner, "&dry_run=true&background=true").await;
+    assert_eq!(started.status(), 202);
+    let dry_id = response_json(started).await["job_id"].as_str().unwrap().to_owned();
+    assert!(dry_id.len() >= 32);
+    let dry = finished(dry_id.clone(), owner.clone()).await;
+    assert_eq!(dry["status"], "done", "{dry}");
+    assert_eq!(dry["stage"], "finished");
+    assert_eq!(dry["report"]["dry_run"], true);
+    assert_eq!(dry["report"]["counts"]["artifacts"], 2);
+    assert!(dry["error"].is_null());
+    assert_eq!(count().await, 1);
+    // Only the person who started it can read it.
+    assert_eq!(job(dry_id, stranger.clone()).await.0, 404);
+    assert_eq!(job("not-a-job".to_owned(), owner.clone()).await.0, 404);
+
+    // The real import: the same, and the workspace is there once the job is done.
+    let started = import(archive.clone(), &owner, "&background=true&name=Moved").await;
+    assert_eq!(started.status(), 202);
+    let id = response_json(started).await["job_id"].as_str().unwrap().to_owned();
+    let done = finished(id, owner.clone()).await;
+    assert_eq!(done["status"], "done", "{done}");
+    assert_eq!(done["report"]["workspace"]["workspace"]["name"], "Moved");
+    assert_eq!(count().await, 2);
+
+    // An archive that is not one fails the job with the reason, and leaves nothing.
+    let started = import(b"hello".to_vec(), &owner, "&background=true").await;
+    assert_eq!(started.status(), 202);
+    let id = response_json(started).await["job_id"].as_str().unwrap().to_owned();
+    let failed = finished(id, owner.clone()).await;
+    assert_eq!(failed["status"], "failed", "{failed}");
+    assert!(
+        failed["error"]
+            .as_str()
+            .unwrap()
+            .contains("not a readable workspace archive"),
+        "{failed}"
+    );
+    assert!(failed["report"].is_null());
+    assert_eq!(count().await, 2);
+
+    // Without the option the answer still comes with the request, as before.
+    let direct = import(archive, &owner, "&dry_run=true").await;
+    assert_eq!(direct.status(), 200);
+    assert_eq!(response_json(direct).await["dry_run"], true);
+    let _ = std::fs::remove_dir_all(data_dir);
+}

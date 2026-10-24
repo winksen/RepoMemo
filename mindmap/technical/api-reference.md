@@ -165,7 +165,8 @@
 | POST | `/v1/artifacts/{artifact_id}/comments` | auth | require_workspace_write | SaveArtifactCommentRequest | ArtifactComment |
 | GET | `/v1/workspaces/{workspace_id}/mention-suggestions` | auth | require_workspace_write | `q` query | Vec<SharedUser> |
 | GET | `/v1/workspaces/{workspace_id}/export` | managing | require_workspace_admin | — | `application/gzip` stream |
-| POST | `/v1/workspaces/import` | managing | create-workspace role check in storage | raw archive; `organization_id`, `dry_run`, `name` query | ArchiveImportReport |
+| POST | `/v1/workspaces/import` | managing | create-workspace role check in storage | raw archive; `organization_id`, `dry_run`, `name`, `background` query | ArchiveImportReport, or `202` `{job_id}` with `background=true` |
+| GET | `/v1/workspaces/import/jobs/{job_id}` | the person who started the import (or a system administrator) | job held in memory | | ImportJobStatus (`status`, `stage`, `progress_current`, `progress_total`, `report`, `error`) |
 | GET | `/v1/artifacts/{artifact_id}/lifecycle` | auth | require_workspace_read | — | ArtifactLifecycle |
 | PUT | `/v1/artifacts/{artifact_id}/lifecycle` | auth | require_workspace_write | SaveArtifactLifecycleRequest | ArtifactLifecycle |
 | GET | `/v1/artifacts/{artifact_id}/lifecycle/history` | auth | require_workspace_read | — | Vec<ArtifactLifecycleEvent |

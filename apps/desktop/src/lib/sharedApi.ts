@@ -1028,27 +1028,56 @@ export async function downloadSharedWorkspaceArchive(accessToken: string, worksp
 }
 
 /** Reads a workspace archive into a new workspace of the organization, or only checks it (`dryRun`). */
+/** How often a background import is asked how far it has got. */
+export const IMPORT_POLL_MS = 700;
+
+/**
+ * Sends a workspace archive and follows the import to its end (V0.3.20). The archive goes as the request body, which
+ * the browser reads from the file as it sends and does not keep in memory; the server answers when it has it, and the
+ * checking and the writing run as a job that is asked about until it is done. `onProgress` hears the stages and, while
+ * the files are stored, how many bytes are done. A server that answers the request with the result itself (an older
+ * one) is understood too.
+ */
 export async function importSharedWorkspaceArchive(accessToken: string, input: {
   organizationId: string;
   archive: Blob;
   dryRun: boolean;
   name?: string;
+  onProgress?: (progress: import("../types").ArchiveImportProgress) => void;
 }): Promise<ArchiveImportReport> {
-  const query = new URLSearchParams({ organization_id: input.organizationId });
+  const query = new URLSearchParams({ organization_id: input.organizationId, background: "true" });
   if (input.dryRun) query.set("dry_run", "true");
   if (input.name?.trim()) query.set("name", input.name.trim());
+  input.onProgress?.({ stage: "uploading", current: 0, total: 0 });
   const response = await authFetch(`${API_URL}/v1/workspaces/import?${query}`, {
     method: "POST",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/gzip", Accept: "application/json" },
     body: input.archive,
     credentials: "include",
   });
-  const payload = await response.json().catch(() => null) as { error?: { message?: string } } | ArchiveImportReport | null;
+  const payload = await response.json().catch(() => null) as { error?: { message?: string } } | { job_id?: string } | ArchiveImportReport | null;
   if (!response.ok) {
     const message = payload && "error" in payload ? payload.error?.message : null;
     throw new SharedApiError(response.status, message ?? `The shared API returned ${response.status}.`);
   }
-  return payload as ArchiveImportReport;
+  if (response.status !== 202 || !payload || !("job_id" in payload) || !payload.job_id) return payload as ArchiveImportReport;
+
+  const jobPath = `/v1/workspaces/import/jobs/${payload.job_id}`;
+  for (;;) {
+    let job: import("../types").ArchiveImportJob;
+    try {
+      job = await request<import("../types").ArchiveImportJob>(jobPath, {}, accessToken);
+    } catch (error) {
+      if (error instanceof SharedApiError && error.status === 404) {
+        throw new SharedApiError(404, "The import stopped before it finished, perhaps because the server restarted. Nothing was created; try again.");
+      }
+      throw error;
+    }
+    input.onProgress?.({ stage: job.stage, current: job.progress_current, total: job.progress_total });
+    if (job.status === "failed") throw new SharedApiError(400, job.error ?? "The archive could not be imported.");
+    if (job.status === "done" && job.report) return job.report;
+    await new Promise((resolve) => window.setTimeout(resolve, IMPORT_POLL_MS));
+  }
 }
 
 export function listSharedFolders(accessToken: string, workspaceId: string): Promise<Folder[]> {

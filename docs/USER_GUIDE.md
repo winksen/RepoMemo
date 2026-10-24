@@ -311,7 +311,7 @@ Safety built in: keys are stored encrypted and never sent back to the browser. A
 ## 11. Taking your data with you
 
 - **Export a workspace** (owners and admins, **Settings › Export**): one archive file with evidence, folders, lifecycle history, memory cards with their citations, tasks and comments. Credentials never leave.
-- **Import a workspace** (organization owners and admins, from the dashboard): the archive is **checked first** without writing anything, then imported as a **new workspace** with you as owner. Comments and tasks are credited to you, with the original author named in the text.
+- **Import a workspace** (organization owners and admins, from the dashboard): the archive is **checked first** without writing anything, then imported as a **new workspace** with you as owner. Comments and tasks are credited to you, with the original author named in the text. A bar shows how far the import has got (sending the file, checking it, storing the files, writing the workspace); a large archive takes a while, and you can have one import running at a time.
 
 An archive is a copy, not a sync: importing the same file twice makes two workspaces.
 

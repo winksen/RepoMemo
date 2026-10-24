@@ -91,4 +91,22 @@ describe("WorkspaceImport", () => {
     await waitFor(() => expect(showToast).toHaveBeenCalledWith("error", "This file is not a readable workspace archive."));
     expect(screen.queryByRole("status")).toBeNull();
   });
+
+  it("shows how far the import has got while it runs, and takes the bar away when it ends", async () => {
+    let finish: (value: ArchiveImportReport) => void = () => {};
+    vi.mocked(importSharedWorkspaceArchive).mockImplementation((_token, input) => new Promise((resolve) => {
+      input.onProgress?.({ stage: "storing_files", current: 512, total: 1024 });
+      finish = resolve;
+    }));
+    render(<WorkspaceImport accessToken="t" onImported={vi.fn()} organizationId="o1" />);
+    choose(archive());
+    fireEvent.click(screen.getByRole("button", { name: /check the archive/i }));
+    const bar = await screen.findByRole("progressbar", { name: "Import progress" }) as HTMLProgressElement;
+    expect(bar.value).toBe(512);
+    expect(bar.max).toBe(1024);
+    expect(screen.getByText(/Storing the files: 50% of/)).toBeTruthy();
+    finish(report());
+    await screen.findByText("Payments");
+    expect(screen.queryByRole("progressbar")).toBeNull();
+  });
 });

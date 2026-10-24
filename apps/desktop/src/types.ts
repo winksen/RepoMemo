@@ -979,6 +979,25 @@ export interface ArchiveCounts {
   saved_searches?: number;
 }
 
+/** Where a background import is (V0.3.20): the stage, how far through the stored files it is, then its report. */
+export interface ArchiveImportJob {
+  id: string;
+  status: "running" | "done" | "failed";
+  stage: "checking" | "storing_files" | "writing_records" | "finished";
+  progress_current: number;
+  progress_total: number;
+  report: ArchiveImportReport | null;
+  error: string | null;
+}
+
+/** What the import shows while it runs: sending the archive, then the server's own stages. */
+export interface ArchiveImportProgress {
+  stage: "uploading" | ArchiveImportJob["stage"];
+  /** Bytes of stored files done, of `total`, in the stage that counts them; 0 and 0 otherwise. */
+  current: number;
+  total: number;
+}
+
 /** The answer to importing a workspace archive, or to checking one first (`dry_run`). */
 export interface ArchiveImportReport {
   dry_run: boolean;

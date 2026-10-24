@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.3.19` (2026-10-24). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.3.20` (2026-10-24). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ---
 
@@ -528,7 +528,7 @@ Owners and administrators can download a workspace as **one archive file** from 
 
 People appear as a name and an address, never as an account of this server; an anonymized account stays "Former member". Credentials never leave: AI provider keys, repository and tracker tokens and webhook secrets are not part of it, and links to a repository or a tracker are carried only as the files they brought. The export is recorded in the workspace's activity, and a workspace missing a stored file is refused with a plain message rather than exported incomplete.
 
-**Importing** (V0.2.41) is the way back in: on the dashboard, owners and administrators of an organization choose an archive under *Import a workspace* and **check it first**. The check reads the whole file, verifies every checksum and every link between records, and says what it holds (files, folders, memory cards, tasks, comments), how big it is, which RepoMemo wrote it, and any warning, without writing anything. Only then does *Import workspace* create a **new workspace** (named as the archive or as you choose) with you as its owner.
+**Importing** (V0.2.41) is the way back in: on the dashboard, owners and administrators of an organization choose an archive under *Import a workspace* and **check it first**. The check reads the whole file, verifies every checksum and every link between records, and says what it holds (files, folders, memory cards, tasks, comments), how big it is, which RepoMemo wrote it, and any warning, without writing anything. Only then does *Import workspace* create a **new workspace** (named as the archive or as you choose) with you as its owner. Since V0.3.20 the import runs on the server as a job and a progress bar follows it (sending the file, checking, storing the files, writing the workspace); the browser sends the file without holding it in memory, and closing the page does not stop an import that has begun. A person has one import at a time.
 
 - Everything arrives as it was: folders, lifecycle states and history, memory cards with their citations (a cited passage is found again once its file is indexed; if it cannot be, the citation points at the whole file and the report says how many), tasks with checklists, comments and the workspace's AI policy. Dates are kept; files are searchable as soon as they are indexed in the background.
 - **Nobody is credited by account.** An archive can be written by anyone, so its authors are not believed: comments, tasks and history belong to you, and the original name is kept in the text ("Originally written by Ada on 2026-10-14"). Owners, reviewers and assignees become notes for the same reason.

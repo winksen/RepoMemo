@@ -151,6 +151,8 @@ struct AppState {
     jwt_secret: String,
     /// The largest workspace archive an import accepts.
     max_import_bytes: u64,
+    /// Imports running or lately finished in the background (V0.3.20).
+    import_jobs: workspace_import::ImportJobs,
     /// The requests being served now, and the cap on them (`REPOMEMO_MAX_IN_FLIGHT`).
     load: Arc<load::LoadGate>,
     /// The largest file an upload or a new version accepts.
@@ -449,6 +451,7 @@ async fn build_state(
         core,
         jwt_secret: config.jwt_secret.clone(),
         max_import_bytes: config.max_import_bytes,
+        import_jobs: Default::default(),
         load: Arc::new(load::LoadGate::new(
             config.max_in_flight,
             config.max_in_flight_per_account,
@@ -962,6 +965,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             },
         ))
         .route("/v1/workspaces/import", post(workspace_import::import_workspace))
+        .route("/v1/workspaces/import/jobs/{job_id}", get(workspace_import::import_job))
         .route("/v1/workspaces/{workspace_id}/events", get(workspace_events))
         .route("/v1/system/events", get(system_events))
         .layer(middleware::from_fn_with_state(state.clone(), web_session::web_session))

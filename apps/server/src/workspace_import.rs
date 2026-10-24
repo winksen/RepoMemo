@@ -7,6 +7,11 @@
 //! stores the files, creates the workspace and writes its records in one
 //! transaction; if that fails the workspace is removed again.
 //!
+//! With `background=true` (V0.3.20) the archive is still received by the request, but the checking and the
+//! writing run as a job the request does not wait for: it answers `202` with a job id, and
+//! `GET /v1/workspaces/import/jobs/{id}` reports the stage and the progress, then the report. A job lives in the
+//! server's memory, so a restart ends it; nothing is created until its last step, and a failed one leaves nothing.
+//!
 //! An archive is only as trustworthy as whoever wrote it, so the importer
 //! gets what it holds and nothing more: records are credited to the importer
 //! (the archive's names are kept in the text), no account is matched by
@@ -15,10 +20,12 @@
 use std::collections::{HashMap, HashSet};
 use std::io::BufReader;
 use std::path::{Path as FsPath, PathBuf};
+use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 use axum::{
     body::Body,
-    extract::{Query, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::{IntoResponse, Response},
     Json,
@@ -29,7 +36,7 @@ use repomemo_domain::{
     ARCHIVE_MANIFEST_ENTRY,
 };
 use repomemo_storage::StorageEngine;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tokio::io::AsyncWriteExt;
 use tokio_stream::StreamExt;
 
@@ -56,6 +63,137 @@ const MAX_EXPANSION: u64 = 100;
 const EXPANSION_ALLOWANCE: u64 = 64 * MIB;
 /// Temporary files older than this are leftovers of an interrupted import.
 const STALE_AFTER: std::time::Duration = std::time::Duration::from_secs(24 * 60 * 60);
+/// Imports running at once on the whole server; a person has one at a time.
+const MAX_RUNNING_IMPORTS: usize = 2;
+/// A finished job is kept this long for its owner to read.
+const FINISHED_KEPT: std::time::Duration = std::time::Duration::from_secs(60 * 60);
+
+/// Where a background import is: kept in memory, read by its owner (V0.3.20).
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct ImportJobStatus {
+    pub(crate) id: String,
+    /// `running`, `done` or `failed`.
+    pub(crate) status: &'static str,
+    /// `checking`, `storing_files`, `writing_records`, then `finished`.
+    pub(crate) stage: &'static str,
+    pub(crate) progress_current: u64,
+    /// Bytes to store; 0 while not known or when the stage has no count.
+    pub(crate) progress_total: u64,
+    /// The report: of a dry run, or of the workspace made; also kept when a real import was refused with problems.
+    pub(crate) report: Option<ArchiveImportReport>,
+    pub(crate) error: Option<String>,
+}
+
+struct ImportJob {
+    owner: String,
+    finished: Option<Instant>,
+    status: ImportJobStatus,
+}
+
+/// The background imports of the server.
+#[derive(Clone, Default)]
+pub(crate) struct ImportJobs(Arc<Mutex<HashMap<String, ImportJob>>>);
+
+impl ImportJobs {
+    fn lock(&self) -> std::sync::MutexGuard<'_, HashMap<String, ImportJob>> {
+        self.0.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    /// Starts a job for `owner`: refused while they have one running, or when the server has enough.
+    pub(crate) fn start(&self, owner: &str) -> Result<String, ApiError> {
+        let mut jobs = self.lock();
+        jobs.retain(|_, job| job.finished.is_none_or(|at| at.elapsed() < FINISHED_KEPT));
+        let running: Vec<&ImportJob> = jobs.values().filter(|job| job.finished.is_none()).collect();
+        if running.iter().any(|job| job.owner == owner) {
+            return Err(ApiError::conflict(
+                "An import of yours is still running. Wait for it to finish, then import the next archive.",
+            ));
+        }
+        if running.len() >= MAX_RUNNING_IMPORTS {
+            return Err(ApiError::new(
+                StatusCode::TOO_MANY_REQUESTS,
+                "imports_busy",
+                "The server is importing other archives right now. Try again in a few minutes.",
+            ));
+        }
+        let id = crate::auth::random_secret();
+        jobs.insert(
+            id.clone(),
+            ImportJob {
+                owner: owner.to_owned(),
+                finished: None,
+                status: ImportJobStatus {
+                    id: id.clone(),
+                    status: "running",
+                    stage: "checking",
+                    progress_current: 0,
+                    progress_total: 0,
+                    report: None,
+                    error: None,
+                },
+            },
+        );
+        Ok(id)
+    }
+
+    fn update(&self, id: &str, change: impl FnOnce(&mut ImportJobStatus)) {
+        if let Some(job) = self.lock().get_mut(id) {
+            change(&mut job.status);
+        }
+    }
+
+    fn finish(&self, id: &str, report: Option<ArchiveImportReport>, error: Option<String>) {
+        if let Some(job) = self.lock().get_mut(id) {
+            job.finished = Some(Instant::now());
+            job.status.status = if error.is_some() { "failed" } else { "done" };
+            job.status.stage = "finished";
+            job.status.progress_current = job.status.progress_total;
+            job.status.report = report;
+            job.status.error = error;
+        }
+    }
+
+    /// The job, for the person who started it and for a system administrator.
+    pub(crate) fn status_for(&self, id: &str, user_id: &str, is_system_admin: bool) -> Option<ImportJobStatus> {
+        self.lock()
+            .get(id)
+            .filter(|job| job.owner == user_id || is_system_admin)
+            .map(|job| job.status.clone())
+    }
+}
+
+/// What a running import reports as it goes; does nothing for an import that waits for its answer.
+struct Progress {
+    jobs: ImportJobs,
+    id: Option<String>,
+}
+
+impl Progress {
+    fn none() -> Self {
+        Self {
+            jobs: ImportJobs::default(),
+            id: None,
+        }
+    }
+
+    fn stage(&self, stage: &'static str, total: u64) {
+        if let Some(id) = &self.id {
+            self.jobs.update(id, |status| {
+                status.stage = stage;
+                status.progress_current = 0;
+                status.progress_total = total;
+            });
+        }
+    }
+
+    fn advance(&self, current: u64) {
+        if let Some(id) = &self.id {
+            self.jobs.update(id, |status| {
+                status.progress_current = current.min(status.progress_total.max(current))
+            });
+        }
+    }
+}
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct ImportQuery {
@@ -64,6 +202,9 @@ pub(crate) struct ImportQuery {
     dry_run: bool,
     /// A name for the new workspace; the archive's own by default.
     name: Option<String>,
+    /// Answer `202` with a job to follow once the archive is received, instead of waiting for the result (V0.3.20).
+    #[serde(default)]
+    background: bool,
 }
 
 /// Removes the temporary file however the import ends.
@@ -96,7 +237,38 @@ pub(crate) async fn import_workspace(
     let started = std::time::Instant::now();
 
     let temporary = receive(&state, body).await?;
-    let report = read_archive(&state, &subject, &query, &temporary.0).await?;
+    if query.background {
+        // The checking and the writing run on their own; this answers as soon as the archive is here.
+        let id = state.import_jobs.start(&subject.user_id)?;
+        let progress = Progress {
+            jobs: state.import_jobs.clone(),
+            id: Some(id.clone()),
+        };
+        let answer = serde_json::json!({ "job_id": id });
+        let task_state = state.clone();
+        tokio::spawn(async move {
+            let outcome = read_archive(&task_state, &subject, &query, &temporary.0, &progress).await;
+            drop(temporary);
+            match outcome {
+                Ok(report) if report.problems.is_empty() || report.dry_run => {
+                    crate::record_timing(
+                        "workspace_import",
+                        &query.organization_id,
+                        started,
+                        report.counts.artifacts as usize,
+                    );
+                    task_state.import_jobs.finish(&id, Some(report), None)
+                }
+                Ok(report) => {
+                    let message = summarize(&report.problems);
+                    task_state.import_jobs.finish(&id, Some(report), Some(message))
+                }
+                Err(error) => task_state.import_jobs.finish(&id, None, Some(error.message)),
+            }
+        });
+        return Ok((StatusCode::ACCEPTED, Json(answer)).into_response());
+    }
+    let report = read_archive(&state, &subject, &query, &temporary.0, &Progress::none()).await?;
     drop(temporary);
 
     if !report.problems.is_empty() && !query.dry_run {
@@ -118,6 +290,22 @@ pub(crate) async fn import_workspace(
 
 fn summarize(problems: &[String]) -> String {
     problems.iter().take(3).cloned().collect::<Vec<_>>().join(" ")
+}
+
+/// `GET /v1/workspaces/import/jobs/{id}`: where a background import is. Only the person who started it
+/// (or a system administrator) can ask; anyone else is told there is no such job.
+pub(crate) async fn import_job(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(job_id): Path<String>,
+) -> Result<Json<ImportJobStatus>, ApiError> {
+    state
+        .import_jobs
+        .status_for(&job_id, &subject.user_id, subject.is_system_admin)
+        .map(Json)
+        .ok_or_else(|| {
+            ApiError::not_found("That import was not found. It may have finished long ago, or the server restarted.")
+        })
 }
 
 /// Streams the request body into a file in the data folder, refusing more
@@ -189,7 +377,9 @@ async fn read_archive(
     subject: &AuthenticatedSubject,
     query: &ImportQuery,
     path: &FsPath,
+    progress: &Progress,
 ) -> Result<ArchiveImportReport, ApiError> {
+    progress.stage("checking", 0);
     let file = std::fs::File::open(path).map_err(ApiError::internal)?;
     let mut reader = ArchiveReader::new(BufReader::new(file));
 
@@ -283,6 +473,7 @@ async fn read_archive(
     let mut seen = HashSet::new();
     let mut read = 0_u64;
     let budget = manifest.blob_bytes();
+    progress.stage("storing_files", budget);
     while let Some((name, bytes)) = reader.next_entry(budget.min(BLOB_MAX_BYTES)).map_err(damaged)? {
         let Some(hash) = name.strip_prefix(ARCHIVE_BLOB_PREFIX) else {
             warnings.push(format!("{name} is not something this server knows and was skipped."));
@@ -293,6 +484,7 @@ async fn read_archive(
             break;
         };
         read += bytes.len() as u64;
+        progress.advance(read);
         if read > budget || bytes.len() as u64 != *size || StorageEngine::content_hash(&bytes) != hash {
             problems.push(format!(
                 "The stored file {hash} does not match its checksum, so it was damaged or changed."
@@ -319,6 +511,7 @@ async fn read_archive(
         return Ok(report(&manifest, Some(&data), problems, warnings, query.dry_run));
     }
 
+    progress.stage("writing_records", 0);
     let mut finished = create_workspace(state, subject, query, &data).await?;
     let mut summary = report(&manifest, Some(&data), problems, warnings, false);
     summary.widened_citations = finished.widened;
@@ -479,4 +672,76 @@ async fn create_workspace(
         workspace: Some(workspace),
         widened,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_person_has_one_import_at_a_time_and_the_server_a_few_and_only_the_owner_reads_a_job() {
+        let jobs = ImportJobs::default();
+        let first = jobs.start("ada").unwrap();
+        assert_eq!(
+            jobs.start("ada").unwrap_err().status,
+            StatusCode::CONFLICT,
+            "one at a time for a person"
+        );
+        let second = jobs.start("grace").unwrap();
+        let busy = jobs.start("alan").unwrap_err();
+        assert_eq!(
+            busy.status,
+            StatusCode::TOO_MANY_REQUESTS,
+            "the limit of the whole server"
+        );
+        assert_ne!(first, second);
+        assert!(first.len() >= 32, "an id nobody guesses");
+
+        // Only the person who started it reads it, or a system administrator.
+        assert!(jobs.status_for(&first, "ada", false).is_some());
+        assert!(jobs.status_for(&first, "grace", false).is_none());
+        assert!(jobs.status_for(&first, "grace", true).is_some());
+        assert!(jobs.status_for("not-a-job", "ada", true).is_none());
+
+        // Finishing frees the person and the room, and the answer stays to be read.
+        jobs.finish(&first, None, Some("It failed.".to_owned()));
+        let done = jobs.status_for(&first, "ada", false).unwrap();
+        assert_eq!(
+            (done.status, done.stage, done.error.as_deref()),
+            ("failed", "finished", Some("It failed."))
+        );
+        let again = jobs.start("ada").unwrap();
+        assert_ne!(again, first);
+        jobs.finish(&second, None, None);
+        assert_eq!(jobs.status_for(&second, "grace", false).unwrap().status, "done");
+    }
+
+    #[test]
+    fn progress_is_reported_by_stage_and_a_finished_job_fills_its_bar() {
+        let jobs = ImportJobs::default();
+        let id = jobs.start("ada").unwrap();
+        let progress = Progress {
+            jobs: jobs.clone(),
+            id: Some(id.clone()),
+        };
+        let now = || jobs.status_for(&id, "ada", false).unwrap();
+        assert_eq!((now().stage, now().progress_total), ("checking", 0));
+        progress.stage("storing_files", 1_000);
+        progress.advance(250);
+        assert_eq!(
+            (now().stage, now().progress_current, now().progress_total),
+            ("storing_files", 250, 1_000)
+        );
+        progress.advance(1_000);
+        assert_eq!(now().progress_current, 1_000);
+        // A new stage starts again from nothing; finishing fills the bar.
+        progress.stage("writing_records", 0);
+        assert_eq!((now().stage, now().progress_current), ("writing_records", 0));
+        jobs.finish(&id, None, None);
+        assert_eq!((now().status, now().stage), ("done", "finished"));
+        // An import that waits for its answer reports nothing, anywhere.
+        let silent = Progress::none();
+        silent.stage("storing_files", 5);
+        silent.advance(5);
+    }
 }

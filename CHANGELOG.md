@@ -2,6 +2,28 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.3.20 (2026-10-24)
+
+Import runs as a background job with a progress bar.
+
+### Added
+- **Background import:** `POST /v1/workspaces/import` takes `background=true`. The request carries the archive as before; once it is received, the server answers `202` with `{"job_id": …}` and does the checking and the writing on its own. `GET /v1/workspaces/import/jobs/{job_id}` gives its `status` (`running`, `done`, `failed`), its `stage` (`checking`, `storing_files`, `writing_records`, `finished`), `progress_current` and `progress_total` (bytes of stored files), then the `report` or the `error`. A failed import leaves nothing behind, as before.
+- **A progress bar** under *Import a workspace* on the dashboard: sending the archive, checking it, storing the files with the share done, writing the workspace. Both the check and the import show it.
+
+### Changed
+- **The browser no longer holds the archive:** the file chosen is sent as the request body, which the browser reads from disk as it sends; the page keeps nothing of it. Closing the page does not stop an import that has begun on the server.
+- **Limits:** a person has one import running at a time (`409` with the reason otherwise) and the server two (`429`). Only the person who started a job, or a system administrator, can read it (`404` for anyone else); a finished job is kept an hour, and a restart of the server ends the jobs in memory without creating anything.
+- **Without `background`** the request behaves as before, so scripts and older clients are unaffected; the web client also still understands an older server that answers the request with the result.
+- **The documents:** the API reference, both mindmaps (the route, the scope line, test counts: server 208, web 367), the user guide and the roadmap; the O2 gaps "no progress while a large archive uploads" and "no background import job" are closed, except that the bytes sent are not counted (the bar is indeterminate while the file travels).
+- **The version** is `0.3.20` everywhere.
+
+### Checks
+- **Compiled and linted:** `cargo clippy -D warnings` over the server crate with its tests, `cargo fmt --all --check`, `typecheck`, `types:check`, `styles:check`, `a11y:check`, `docs:check`, `version:check`.
+- **Tests written, not run:** two unit tests of the job registry and its progress (one import per person and two per server, owner-only reads, finishing frees the room, stages and the bar), a server test over the route (a dry run and a real import as jobs, a stranger and an unknown id refused, a bad archive failing the job with its reason and creating nothing, the request without `background` unchanged) and web tests (the stages followed to the report, the dry run flag, the failure and lost-job messages, the answer of an older server, the refusal, the stage sentences, and the bar shown and removed).
+
+### Upgrading
+- Nothing to do. If a proxy sits in front of the server, it need not change: the archive still travels in one request, now answered sooner.
+
 ## V0.3.19 (2026-10-24)
 
 Archives carry earlier file versions and saved searches.

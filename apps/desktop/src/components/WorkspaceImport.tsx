@@ -1,7 +1,7 @@
 import { type ChangeEvent, useRef, useState } from "react";
 import { IconPackageImport as PackageImport } from "@tabler/icons-react";
 import { importSharedWorkspaceArchive } from "../lib/sharedApi";
-import type { ArchiveImportReport, SharedWorkspace } from "../types";
+import type { ArchiveImportProgress, ArchiveImportReport, SharedWorkspace } from "../types";
 import { Button } from "./ui/button";
 import { PanelHeading } from "./ui/panel-heading";
 import { Input } from "./ui/input";
@@ -24,6 +24,22 @@ export function describeArchive(report: ArchiveImportReport): string {
   ].join(", ");
 }
 
+const STAGE_LABEL: Record<ArchiveImportProgress["stage"], string> = {
+  uploading: "Sending the archive",
+  checking: "Checking the archive",
+  storing_files: "Storing the files",
+  writing_records: "Writing the workspace",
+  finished: "Done",
+};
+
+/** What the progress bar says: the stage, and the share of the files stored while that is counted. */
+export function describeImportProgress(progress: ArchiveImportProgress): string {
+  const label = STAGE_LABEL[progress.stage];
+  return progress.stage === "storing_files" && progress.total > 0
+    ? `${label}: ${Math.min(100, Math.floor((progress.current / progress.total) * 100))}% of ${formatBytes(progress.total)}`
+    : `${label}…`;
+}
+
 /**
  * Brings a workspace archive into a new workspace of the organization. The
  * file is checked first (nothing is written), and imported only when the
@@ -39,6 +55,7 @@ export function WorkspaceImport({ accessToken, onImported, organizationId }: {
   const [name, setName] = useState("");
   const [report, setReport] = useState<ArchiveImportReport | null>(null);
   const [isBusy, setIsBusy] = useState(false);
+  const [progress, setProgress] = useState<ArchiveImportProgress | null>(null);
 
   function choose(event: ChangeEvent<HTMLInputElement>) {
     setFile(event.target.files?.[0] ?? null);
@@ -55,7 +72,7 @@ export function WorkspaceImport({ accessToken, onImported, organizationId }: {
     if (!file) return;
     setIsBusy(true);
     try {
-      const answer = await importSharedWorkspaceArchive(accessToken, { organizationId, archive: file, dryRun, name });
+      const answer = await importSharedWorkspaceArchive(accessToken, { organizationId, archive: file, dryRun, name, onProgress: setProgress });
       if (dryRun) {
         setReport(answer);
         if (!name) setName(answer.workspace_name);
@@ -66,7 +83,7 @@ export function WorkspaceImport({ accessToken, onImported, organizationId }: {
       }
     } catch (error) {
       showToast("error", apiMessage(error, "The archive could not be imported."));
-    } finally { setIsBusy(false); }
+    } finally { setIsBusy(false); setProgress(null); }
   }
 
   return (
@@ -77,6 +94,10 @@ export function WorkspaceImport({ accessToken, onImported, organizationId }: {
         <input accept=".gz,.tgz,application/gzip" aria-label="Workspace archive" disabled={isBusy} onChange={choose} ref={input} type="file" />
         <Button disabled={!file || isBusy} onClick={() => void run(true)} type="button" variant="secondary">{isBusy && !report ? "Checking…" : "Check the archive"}</Button>
       </div>
+      {progress ? <div className="shared-import-progress" role="status">
+        <span>{describeImportProgress(progress)}</span>
+        <progress aria-label="Import progress" max={progress.stage === "storing_files" && progress.total > 0 ? progress.total : undefined} value={progress.stage === "storing_files" && progress.total > 0 ? progress.current : undefined} />
+      </div> : null}
       {report ? <div className="shared-import-report" role="status">
         <strong>{report.workspace_name}</strong>
         <span>{describeArchive(report)} · {formatBytes(report.total_bytes)} · exported {new Date(report.exported_at).toLocaleDateString()} by RepoMemo {report.source_version}</span>
