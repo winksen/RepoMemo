@@ -1,5 +1,5 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { useRef, type FormEvent, type ReactNode } from "react";
+import { useId, useRef, type FormEvent, type MouseEvent, type ReactNode } from "react";
 import { currentOpener, restoreFocus, type FocusAnchor } from "../../lib/focusReturn";
 import { Button } from "./button";
 
@@ -15,6 +15,8 @@ const FIRST_FIELD = "input:not([type=hidden]):not([disabled]):not([readonly]), t
  * and Cancel comes before the decisive action in the footer.
  * Give it `onSubmit` for a dialog with fields: Enter in a field runs it, and the
  * decisive button in the footer says `type="submit"`.
+ * A dialog with a body starts with a skip link (V0.3.25), reached by going back from the first field,
+ * that jumps over a long body to the buttons.
  */
 export function Dialog({
   children,
@@ -44,14 +46,19 @@ export function Dialog({
   // Noted while the opening control still has focus, before the dialog takes it.
   if (open && !wasOpen.current) opener.current = currentOpener();
   wasOpen.current = open;
+  const footerId = useId();
   const width = `rm-dialog-${size ?? (children ? "md" : "sm")}`;
   const body = <>
     {children ? <div className="rm-dialog-body">{children}</div> : null}
-    <div className="rm-dialog-footer">{footer}</div>
+    <div className="rm-dialog-footer" id={footerId}>{footer}</div>
   </>;
   function submit(event: FormEvent) {
     event.preventDefault();
     onSubmit?.();
+  }
+  function skipToButtons(event: MouseEvent) {
+    event.preventDefault();
+    content.current?.querySelector<HTMLElement>(".rm-dialog-footer button:not(:disabled), .rm-dialog-footer a[href]")?.focus();
   }
   return (
     <DialogPrimitive.Root onOpenChange={(next) => { if (!next) onClose(); }} open={open}>
@@ -61,9 +68,11 @@ export function Dialog({
           className={className ? `rm-dialog ${width} ${className}` : `rm-dialog ${width}`}
           onOpenAutoFocus={(event) => {
             const field = content.current?.querySelector<HTMLElement>(FIRST_FIELD);
-            if (!field) return;
+            // Without a field the first control takes it, which must not be the skip link.
+            const target = field ?? content.current?.querySelector<HTMLElement>("button:not(:disabled), [href]:not(.rm-dialog-skip), [tabindex]:not([tabindex='-1'])");
+            if (!target) return;
             event.preventDefault();
-            field.focus();
+            target.focus();
           }}
           onCloseAutoFocus={(event) => {
             if (opener.current && restoreFocus(opener.current)) event.preventDefault();
@@ -72,6 +81,7 @@ export function Dialog({
         >
           <DialogPrimitive.Title className="rm-dialog-title">{title}</DialogPrimitive.Title>
           {description ? <DialogPrimitive.Description className="rm-dialog-description">{description}</DialogPrimitive.Description> : null}
+          {children ? <a className="rm-skip-link rm-dialog-skip" href={`#${footerId}`} onClick={skipToButtons}>Skip to the buttons</a> : null}
           {onSubmit ? <form className="rm-dialog-form" onSubmit={submit}>{body}</form> : body}
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>

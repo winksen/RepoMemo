@@ -85,7 +85,7 @@ npm run test:web          # Vitest + Testing Library (apps/desktop/src/test)
 npm run types:generate    # rewrite apps/desktop/src/generated/domain.ts from crates/domain
 npm run types:check       # fail when that file is out of date (CI runs this)
 npm run styles:check      # stylesheet size and order, and no new bare element style, raw colour, raw layer or raw control height (CI runs this)
-npm run a11y:check        # accessibility rules and colour contrast, reading files only (CI runs this)
+npm run a11y:check        # accessibility rules, toolbars, the dialogs' skip link, button sizes and colour contrast, reading files only (CI runs this)
 npm run migrations:check  # no released database migration was edited or removed, every one is locked (CI runs this)
 npm run docs:check        # routes, settings, versions, releases and links of the documents agree with the code (CI runs this)
 npm run templates:check   # every workspace template file is valid, a changed one has a new version, and no template id is written in code (CI runs this; --base <ref> compares with another commit)

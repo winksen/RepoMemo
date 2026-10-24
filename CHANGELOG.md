@@ -2,6 +2,28 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.3.25 (2026-10-24)
+
+Three accessibility gaps are closed, and the checker holds them.
+
+### Added
+- **A skip link in dialogs:** a dialog that has a body starts with *Skip to the buttons*, which is out of sight until it has focus. It comes before the body, so going back from the first field reaches it, and it moves focus to the dialog's first button without closing it. A dialog without a field no longer risks starting on it: the first control takes the focus, as before. A question with no body has no link.
+- **Toolbars that work from the keyboard:** the note editor's formatting bar and the bulk bar of the file list (`role="toolbar"`) are now one stop in the tab order, with the arrow keys, Home and End moving between the buttons (a disabled one is skipped, the end wraps), the way the WAI-ARIA toolbar pattern asks, and they say they are horizontal. The behaviour is one hook, `useToolbarKeys`.
+- **Buttons of at least 24 px:** the one that was smaller (the remove button on a memory card's evidence, 20 px) is 24 px, from a new `--target-min` token.
+- **`a11y:check` covers all three:** it fails on a `role="toolbar"` without a name, an orientation or a key handler, on a dialog built outside the shared one or a shared one without its skip link, and on a stylesheet rule that gives a button, an icon button or a close or remove control a box under 24 px in both directions (a 1 px label for screen readers is not a target). A new rule name for exceptions: `toolbar`.
+
+### Changed
+- **The documents:** the technical mindmap's account of the accessibility check and its test count (web 386), the functional mindmap, the development commands, the clean-install record and the roadmap. The X1 gap "not covered: a skip link inside dialogs, the note editor's toolbar roles, the target size" is closed; the retired local edition is still outside the check.
+- **The version** is `0.3.25` everywhere.
+
+### Checks
+- **Run:** `a11y:check` with the new rules (126 components, 94 colour pairs, 88 button rules), `typecheck`, `styles:check` (its baseline loses the 20 px entry), `docs:check`, `version:check`.
+- **Tests written, not run:** tests of the dialog's skip link (before the body, to the buttons, not the first focus, absent from a question, pointing at its own footer) and of the toolbar keys (one tab stop, arrows, Home, End, wrap, modifiers and other keys left alone, a disabled button skipped, focus given some other way, vertical).
+- **Not done:** a pass with a screen reader (NVDA or VoiceOver) and a browser audit (axe or Lighthouse) are still the maintainer's to run; the checks are static.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.3.24 (2026-10-24)
 
 The backup passphrase can be changed.

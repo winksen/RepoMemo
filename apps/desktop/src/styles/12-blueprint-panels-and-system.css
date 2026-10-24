@@ -441,6 +441,8 @@ tr.rm-system-row-inactive .rm-system-person img, tr.rm-system-row-inactive .rm-s
 }
 /* The page is focused by script after a move (a heading target, not a control): no ring around the whole page. */
 #main-content:focus { outline: none; }
+/* The skip link of a dialog sits at the corner of the dialog, which is its positioned box (V0.3.25). */
+.rm-dialog-skip { top: 6px; left: 6px; }
 
 /* People who ask their system for less motion get none, except the spinner that says work is going on. */
 @media (prefers-reduced-motion: reduce) {

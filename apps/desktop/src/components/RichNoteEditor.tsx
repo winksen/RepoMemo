@@ -19,6 +19,7 @@ import {
 } from "@tabler/icons-react";
 import { ICON_SIZE } from "./ui/icon";
 import { isSubmitShortcut } from "../lib/submitShortcut";
+import { useToolbarKeys } from "../lib/useToolbarKeys";
 
 /**
  * WYSIWYG note editor. Text is shown formatted while typing and is stored and
@@ -36,6 +37,7 @@ export function RichNoteEditor({
   const lastEmitted = useRef(value);
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState("https://");
+  const toolbar = useToolbarKeys<HTMLDivElement>();
 
   const editor = useEditor({
     extensions: [
@@ -121,7 +123,7 @@ export function RichNoteEditor({
     <div className="rm-rich-editor" onKeyDown={(event) => {
       if ((event.ctrlKey || event.metaKey) && event.key === "k") { event.preventDefault(); openLink(editor); }
     }}>
-      <div aria-label="Formatting" className="rm-rich-toolbar" role="toolbar">
+      <div aria-label="Formatting" aria-orientation="horizontal" className="rm-rich-toolbar" onFocus={toolbar.onFocus} onKeyDown={toolbar.onKeyDown} ref={toolbar.ref} role="toolbar">
         {tools.map((tool) => (
           <button aria-label={tool.label} aria-pressed={tool.on} className={tool.on ? "on" : ""} key={tool.label} onClick={tool.run} onMouseDown={(event) => event.preventDefault()} title={tool.label} type="button">{tool.icon}</button>
         ))}

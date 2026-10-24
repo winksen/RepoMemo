@@ -12,12 +12,17 @@
 //    `aria-label`, text, or an icon with a label); a click handler on an
 //    element that is not a control comes with a role and the keyboard;
 //    `aria-label` only on elements that expose it; table headers say what they
-//    head (`scope`); no positive `tabIndex`.
+//    head (`scope`); no positive `tabIndex`; a `role="toolbar"` has a name, an
+//    orientation and a key handler for the arrow keys (V0.3.25).
+// 3. Dialogs (V0.3.25): every dialog is the shared one, and that one starts with a skip link to
+//    its buttons, which the stylesheets place.
+// 4. Target size (V0.3.25): no rule gives a button, an icon button or a close or remove control a
+//    box under 24 px in both directions (WCAG 2.5.8).
 //
 // A deliberate exception is written next to the element:
 //   {/* a11y-allow: <rule> <why> */}  or  // a11y-allow: <rule> <why>
 // on the line before it. The rules are `name`, `click`, `aria-label`,
-// `tabindex`, `scope` and `alt`.
+// `tabindex`, `scope`, `alt` and `toolbar`.
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
@@ -249,6 +254,12 @@ function checkFile(path) {
         if (value && Number(value) > 0) report(opening, "tabindex", `tabIndex={${value}} changes the natural order; use 0 or -1`);
       }
 
+      if (stringValue(attribute(opening, "role")) === "toolbar") {
+        if (!attribute(opening, "aria-label") && !attribute(opening, "aria-labelledby")) report(opening, "toolbar", 'role="toolbar" has no name: add aria-label');
+        if (!attribute(opening, "aria-orientation")) report(opening, "toolbar", 'role="toolbar" does not say its aria-orientation');
+        if (!attribute(opening, "onKeyDown")) report(opening, "toolbar", 'role="toolbar" has no key handler: the arrow keys move between its buttons (see useToolbarKeys)');
+      }
+
       const label = attribute(opening, "aria-label");
       if (label && !spread && /^[a-z]/.test(name) && !attribute(opening, "role") && !ARIA_LABEL_OK.has(name)) {
         report(opening, "aria-label", `aria-label on <${name}> is not read without a role; give it a role or put the text in the element`);
@@ -284,15 +295,68 @@ function checkFile(path) {
 }
 
 let checked = 0;
+let usesRadixDialog = [];
 for (const path of sources(src)) {
   checked += 1;
   checkFile(path);
+  if (/@radix-ui\/react-dialog/.test(readFileSync(path, "utf8")) && !path.endsWith(join("components", "ui", "dialog.tsx"))) usesRadixDialog.push(relative(root, path).replaceAll("\\", "/"));
 }
 const pairs = checkContrast();
+
+// ----------------------------------------------------------------- dialogs
+
+/** Every dialog is the shared one, and it starts with a skip link that the stylesheets place. */
+function checkDialogs() {
+  for (const file of usesRadixDialog) problems.push(`dialog: ${file} builds its own dialog; use components/ui/dialog.tsx, which has the skip link`);
+  const dialog = readFileSync(join(src, "components", "ui", "dialog.tsx"), "utf8");
+  if (!/className="rm-skip-link rm-dialog-skip"/.test(dialog)) problems.push("dialog: components/ui/dialog.tsx has no skip link (rm-skip-link rm-dialog-skip) at the start of a dialog's body");
+  if (!/rm-dialog-footer"[^>]*id=\{/.test(dialog)) problems.push("dialog: the footer of the dialog has no id for the skip link to point at");
+  const css = readdirSync(join(src, "styles")).map((name) => readFileSync(join(src, "styles", name), "utf8")).join("\n");
+  if (!/\.rm-dialog-skip\b/.test(css)) problems.push("dialog: no stylesheet places .rm-dialog-skip");
+  if (!/\.rm-skip-link:focus-visible/.test(css)) problems.push("dialog: no stylesheet shows .rm-skip-link when it has focus");
+}
+checkDialogs();
+
+// ------------------------------------------------------------- target size
+
+const MIN_TARGET = 24;
+
+/** Whether a selector, by its last part, names a button or a control that is only an icon. */
+function isButtonLike(selector) {
+  const last = selector.trim().split(/[\s>+~]+/).pop().replace(/::?[a-z-]+(\([^)]*\))?/gi, "");
+  return /^button$/i.test(last) || /\[role=["']?button["']?\]/.test(last) || /^\.[\w-]*(button|btn|close|remove|dismiss)[\w-]*$/i.test(last) || /^button[.#[]/.test(last);
+}
+
+/** Rules that give a button-like control a box under 24 px in both directions. */
+function checkTargetSize() {
+  const directory = join(src, "styles");
+  let buttons = 0;
+  for (const name of readdirSync(directory).filter((entry) => /^\d\d-.*\.css$/.test(entry)).sort()) {
+    const css = readFileSync(join(directory, name), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+    for (const rule of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      const selectors = rule[1].split(",").filter(isButtonLike);
+      if (!selectors.length) continue;
+      const size = (property) => {
+        const found = new RegExp(`(?:^|[;\\s])${property}\\s*:\\s*([\\d.]+)px`).exec(rule[2]);
+        return found ? Number(found[1]) : null;
+      };
+      const width = size("width") ?? size("min-width");
+      const height = size("height") ?? size("min-height");
+      buttons += selectors.length;
+      // A label that is only there for screen readers is 1 px by 1 px on purpose; it is not a target.
+      if (width !== null && height !== null && width <= 1 && height <= 1) continue;
+      if (width !== null && height !== null && width < MIN_TARGET && height < MIN_TARGET) {
+        problems.push(`target size: ${name}: ${selectors.map((selector) => selector.trim()).join(", ")} is ${width} x ${height} px, under ${MIN_TARGET} px`);
+      }
+    }
+  }
+  return buttons;
+}
+const buttons = checkTargetSize();
 
 if (problems.length) {
   for (const problem of problems) console.error(`✗ ${problem}`);
   console.error(`\n${problems.length} accessibility problem${problems.length === 1 ? "" : "s"}.`);
   process.exit(1);
 }
-console.log(`Accessibility: ${checked} components read, ${pairs} colour pairs reach their contrast.`);
+console.log(`Accessibility: ${checked} components read, ${pairs} colour pairs reach their contrast, ${buttons} button rules reach ${MIN_TARGET} px, dialogs start with a skip link.`);

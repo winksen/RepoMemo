@@ -60,7 +60,7 @@ The maintainer reported on 2026-10-24 that the tests of the clean install came o
 | CI is green | CI runs on the host, which this work cannot see. At V0.3.3 here: `cargo fmt --all --check`, `cargo clippy -D warnings` (tests included), `typecheck`, `version:check`, `docs:check` and `a11y:check` pass; the tests, `cargo deny` and `npm audit` were not run | Green run on the release commit; tick it with the run's address |
 | `cargo test -p repomemo-desktop` | The crate is left out of CI and of this work; V0.3.6 changes it | The maintainer's run after V0.3.6 |
 | Performance runs | They need release builds, which this repository keeps from the automated work | [performance.md](performance.md) §3: the record sheet, with the commits to compare |
-| Browser pass; polished pages | They need a running app in a browser; the static `a11y:check` passes (122 components, 94 colour pairs) but is not a pass | The record sheet below |
+| Browser pass; polished pages | They need a running app in a browser; the static `a11y:check` passes (126 components, 94 colour pairs, the dialogs' skip link and the 24 px buttons) but is not a pass | The record sheet below |
 | Desktop app tried | It needs a second computer. Step 13 was part of the reported run; its result was not written down | Write the step's result in §4, then tick |
 | Security fixes of V0.2.52; two images; tracks L and M | They need a running server and Docker | Steps 14 and 1 of §2, and the track L and M line above, written in §4. V0.3.23 puts `docker compose up` in CI |
 

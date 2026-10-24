@@ -19,6 +19,8 @@
      Narrow screens use the touch height (13-narrow-screens.css). */
   --control-height: 36px;
   --control-height-touch: 40px;
+  /* The least a button may measure in both directions (WCAG 2.5.8, V0.3.25); check-accessibility.mjs holds the stylesheets to it. */
+  --target-min: 24px;
   --control-radius: 8px;
   --control-border: 2px;
   --control-padding-x: 12px;

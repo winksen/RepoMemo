@@ -73,7 +73,6 @@
   "control height | 09-neutral-research-canvas.css | .button.primary | min-height: 36px",
   "control height | 10-quiet-evidence-desk-and-additions.css | .button | min-height: 32px",
   "control height | 10-quiet-evidence-desk-and-additions.css | .button.primary | min-height: 32px",
-  "control height | 10-quiet-evidence-desk-and-additions.css | .shared-memory-evidence li button | height: 20px",
   "control height | 11-blueprint-primitives.css | .button | min-height: 36px",
   "control height | 11-blueprint-primitives.css | .icon-button | height: 36px",
   "control height | 11-blueprint-primitives.css | .rm-rich-link button | height: 32px",
