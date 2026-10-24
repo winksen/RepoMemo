@@ -3,14 +3,25 @@ import { ADMIN_WORKSPACE_SECTIONS, SYSTEM_SECTIONS, WORKSPACE_SECTIONS, type Wor
 import { routePath, workspaceHomePath } from "./router";
 import { arrangeSections } from "./templateSections";
 import { orderCapabilities } from "./templateAssistant";
+import { type RecentItem } from "../lib/paletteRecents";
 
-export type PaletteGroup = "Assistant" | "Files" | "Memory" | "This workspace" | "Workspaces" | "Pages" | "System";
+export type PaletteGroup = "Recent" | "Assistant" | "Files" | "Memory" | "This workspace" | "Workspaces" | "Pages" | "System";
 
 export type PaletteAction =
   | { kind: "navigate"; to: string }
+  /** Opens the note editor of a workspace (V0.3.13). */
+  | { kind: "new-note"; workspaceId: string; to: string }
   | { kind: "assistant"; capability: AgentCapability | null; message: string };
 
-export type PaletteEntry = { id: string; group: PaletteGroup; label: string; hint?: string; action: PaletteAction };
+export type PaletteEntry = {
+  id: string;
+  group: PaletteGroup;
+  label: string;
+  hint?: string;
+  action: PaletteAction;
+  /** The workspace the entry leads into: a place of it is remembered as recent (V0.3.13). */
+  workspaceId?: string;
+};
 
 export const SECTION_LABELS: Record<WorkspaceSection, string> = {
   overview: "Overview",
@@ -27,7 +38,7 @@ export const SECTION_LABELS: Record<WorkspaceSection, string> = {
   settings: "Workspace settings",
 };
 
-const GROUP_ORDER: PaletteGroup[] = ["Assistant", "Files", "Memory", "This workspace", "Workspaces", "Pages", "System"];
+const GROUP_ORDER: PaletteGroup[] = ["Recent", "Assistant", "Files", "Memory", "This workspace", "Workspaces", "Pages", "System"];
 const MAX_FILES = 8;
 const MAX_CARDS = 6;
 const MAX_ENTRIES = 40;
@@ -48,6 +59,8 @@ export type PaletteInput = {
   labels?: WorkspaceTemplateView["labels"]["sections"] | null;
   /** The assistant's jobs the template prefers first (V0.2.176): the palette lists its assistant commands in that order. */
   assistantOrder?: string[] | null;
+  /** Places the person opened from the palette before, newest first (V0.3.13); listed while nothing is typed. */
+  recents?: RecentItem[];
 };
 
 function terms(text: string): string[] {
@@ -66,6 +79,20 @@ export function paletteEntries(input: PaletteInput): PaletteEntry[] {
   const entries: PaletteEntry[] = [];
   const add = (entry: PaletteEntry) => entries.push(entry);
   const workspace = input.currentWorkspace;
+
+  // Places opened before, while nothing is typed; only those of workspaces the person can still read.
+  if (!words.length && input.recents?.length) {
+    const readable = new Set(input.workspaces.map((entry) => entry.workspace.id));
+    input.recents
+      .filter((item) => readable.has(item.workspaceId))
+      .forEach((item) => add({
+        id: `recent:${item.id}`,
+        group: "Recent",
+        label: item.label,
+        hint: item.hint,
+        action: { kind: "navigate", to: item.to },
+      }));
+  }
 
   if (input.assistantWorkspace) {
     const name = input.assistantWorkspace.workspace.name;
@@ -100,6 +127,7 @@ export function paletteEntries(input: PaletteInput): PaletteEntry[] {
         label: file.title,
         hint: file.path !== file.title ? file.path : workspace.workspace.name,
         action: { kind: "navigate", to: routePath({ name: "artifact", workspaceId: workspace.workspace.id, artifactId: file.id }) },
+        workspaceId: workspace.workspace.id,
       }));
     input.cards.slice(0, MAX_CARDS).forEach((card) => add({
       id: `card:${card.id}`,
@@ -107,7 +135,19 @@ export function paletteEntries(input: PaletteInput): PaletteEntry[] {
       label: card.title,
       hint: "Memory card",
       action: { kind: "navigate", to: routePath({ name: "memory-card", workspaceId: workspace.workspace.id, cardId: card.id }) },
+      workspaceId: workspace.workspace.id,
     }));
+  }
+
+  // A new note in the open workspace, for anyone who can add evidence there.
+  if (workspace && workspace.role !== "viewer" && matchesAll(words, "new note write create add shared note", workspace.workspace.name)) {
+    add({
+      id: "new-note",
+      group: "This workspace",
+      label: "New note",
+      hint: workspace.workspace.name,
+      action: { kind: "new-note", workspaceId: workspace.workspace.id, to: routePath({ name: "workspace", workspaceId: workspace.workspace.id, section: "evidence" }) },
+    });
   }
 
   if (workspace) {
@@ -123,6 +163,7 @@ export function paletteEntries(input: PaletteInput): PaletteEntry[] {
         label: nameOf(section),
         hint: workspace.workspace.name,
         action: { kind: "navigate", to: routePath({ name: "workspace", workspaceId: workspace.workspace.id, section }) },
+        workspaceId: workspace.workspace.id,
       }));
   }
 
@@ -134,6 +175,7 @@ export function paletteEntries(input: PaletteInput): PaletteEntry[] {
       label: entry.workspace.name,
       hint: `Open workspace · ${entry.role}`,
       action: { kind: "navigate", to: workspaceHomePath(entry.workspace.id) },
+      workspaceId: entry.workspace.id,
     }));
 
   [

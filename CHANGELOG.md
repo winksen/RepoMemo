@@ -2,6 +2,28 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.3.13 (2026-10-24)
+
+The command palette keeps recent places and offers *New note*.
+
+### Added
+- **Recent places:** the palette lists the last places a person opened from it (up to eight, newest first) as a *Recent* group while nothing is typed: files, memory cards, workspace sections and workspaces. They are kept in the browser, so they survive a reload, and for that account only (the key carries the account id), and a place is listed only while its workspace is still one the account can read.
+- **New note:** in the open workspace, for anyone who can add evidence (not a viewer), *New note* opens the Evidence section with the note form scrolled into view and its title field focused. The request is held until the page has mounted, taken once, and only for its own workspace.
+
+### Security
+- What is read back from the browser's storage is treated as untrusted: an entry must be a plain path of the app (no scheme, no `//`, only path characters) of a bounded size, or it is dropped; the palette navigates only through the app's router. Nothing is sent to the server, and signing in as someone else on the same browser shows none of the earlier account's places.
+
+### Checks
+- **Compiled and checked:** `typecheck`, `styles:check`, `a11y:check`, `docs:check`, `version:check`. No Rust changed.
+- **Tests written, not run:** a new file for the recents (order, once each, the cap, a reload, one account's own, refusal of addresses that are not app paths and of damaged storage) and six in the palette's tests (the *New note* entry and who gets it, recents first and only for readable workspaces, remembering a chosen file across a new page and per account, opening the note editor from *New note*).
+
+### Changed
+- **The documents:** the functional mindmap's palette row, the technical mindmap's palette row and web test count (346), the user guide. The V0.2.34 gap about recents and creating is closed.
+- **The version** is `0.3.13` everywhere.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.3.12 (2026-10-24)
 
 Search across workspaces takes filters and finds memory cards.

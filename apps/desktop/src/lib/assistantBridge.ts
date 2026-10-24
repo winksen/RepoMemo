@@ -29,6 +29,30 @@ export function onAssistantCommand(listener: Listener): () => void {
   return () => { listeners.delete(listener); };
 }
 
+let pendingNote: string | null = null;
+const noteListeners = new Set<Listener>();
+
+/**
+ * Asks the evidence page of a workspace to open its note editor (V0.3.13): the command palette's *New note*. The
+ * request is kept until that page takes it, so a page that is still opening receives it once it mounts.
+ */
+export function requestNewNote(workspaceId: string) {
+  pendingNote = workspaceId;
+  noteListeners.forEach((listener) => listener());
+}
+
+/** True once, when a new note was asked for in this workspace. */
+export function takeNewNoteRequest(workspaceId: string): boolean {
+  if (pendingNote !== workspaceId) return false;
+  pendingNote = null;
+  return true;
+}
+
+export function onNewNoteRequest(listener: Listener): () => void {
+  noteListeners.add(listener);
+  return () => { noteListeners.delete(listener); };
+}
+
 const OPEN_PALETTE_EVENT = "repomemo:open-palette";
 
 /** Opens the command palette from a button (the keyboard shortcut is Ctrl or Cmd with K). */

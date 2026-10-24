@@ -6,7 +6,8 @@ vi.mock("../web/workspace/data", () => ({ useTemplate: () => [null] }));
 vi.mock("../web/router", async (original) => ({ ...(await original<typeof import("../web/router")>()), navigate: vi.fn() }));
 
 import { querySharedArtifacts, searchSharedMemoryCards } from "../lib/sharedApi";
-import { takeAssistantCommand } from "../lib/assistantBridge";
+import { takeAssistantCommand, takeNewNoteRequest } from "../lib/assistantBridge";
+import { readRecents } from "../lib/paletteRecents";
 import { navigate } from "../web/router";
 import { CommandPalette } from "../web/CommandPalette";
 import { paletteEntries, type PaletteInput } from "../web/paletteEntries";
@@ -34,6 +35,28 @@ const base: PaletteInput = {
 };
 
 describe("paletteEntries", () => {
+  it("offers a new note in the open workspace to anyone who can add evidence, and not to a viewer", () => {
+    const writer = paletteEntries({ ...base, currentWorkspace: ATLAS });
+    const entry = writer.find((candidate) => candidate.id === "new-note");
+    expect(entry?.group).toBe("This workspace");
+    expect(entry?.action).toEqual({ kind: "new-note", workspaceId: "w1", to: "/workspaces/w1/evidence" });
+    expect(paletteEntries({ ...base, currentWorkspace: BORROWED }).some((candidate) => candidate.id === "new-note")).toBe(false);
+    expect(paletteEntries(base).some((candidate) => candidate.id === "new-note")).toBe(false);
+    expect(paletteEntries({ ...base, currentWorkspace: ATLAS, query: "note" }).some((candidate) => candidate.id === "new-note")).toBe(true);
+    expect(paletteEntries({ ...base, currentWorkspace: ATLAS, query: "tasks" }).some((candidate) => candidate.id === "new-note")).toBe(false);
+  });
+
+  it("lists recent places first while nothing is typed, only of workspaces the person can still read", () => {
+    const recents = [
+      { id: "file:a1", label: "Retry policy", hint: "Atlas", to: "/workspaces/w1/artifacts/a1", workspaceId: "w1" },
+      { id: "file:z9", label: "Lost file", hint: "Gone", to: "/workspaces/w9/artifacts/z9", workspaceId: "w9" },
+    ];
+    const empty = paletteEntries({ ...base, currentWorkspace: ATLAS, recents });
+    expect(empty[0]).toMatchObject({ group: "Recent", label: "Retry policy", action: { kind: "navigate", to: "/workspaces/w1/artifacts/a1" } });
+    expect(empty.filter((candidate) => candidate.group === "Recent")).toHaveLength(1);
+    expect(paletteEntries({ ...base, currentWorkspace: ATLAS, recents, query: "retry" }).some((candidate) => candidate.group === "Recent")).toBe(false);
+  });
+
   it("lists the account's pages and workspaces, and nothing of a workspace that is not open", () => {
     const entries = paletteEntries(base);
     expect(entries.filter((entry) => entry.group === "Workspaces").map((entry) => entry.label)).toEqual(["Atlas", "Borrowed"]);
@@ -88,7 +111,7 @@ describe("CommandPalette", () => {
     vi.mocked(navigate).mockClear();
     takeAssistantCommand();
   });
-  afterEach(() => cleanup());
+  afterEach(() => { cleanup(); window.localStorage.clear(); takeNewNoteRequest("w1"); });
 
   const palette = (assistantWorkspaceId: string | null) => render(
     <CommandPalette accessToken="t" assistantWorkspaceId={assistantWorkspaceId} canAdministerSystem={false} currentWorkspaceId="w1" workspaces={[ATLAS, BORROWED]} />,
@@ -103,6 +126,41 @@ describe("CommandPalette", () => {
     await waitFor(() => expect(screen.getByRole("option", { name: /Retry policy/ })).toBeTruthy());
     fireEvent.keyDown(input, { key: "Enter" });
     expect(navigate).toHaveBeenCalledWith("/workspaces/w1/artifacts/a1");
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("remembers what was opened, and lists it first the next time, even after the page is loaded again", async () => {
+    const { unmount } = render(<CommandPalette accessToken="t" assistantWorkspaceId={null} canAdministerSystem={false} currentWorkspaceId="w1" userId="u1" workspaces={[ATLAS, BORROWED]} />);
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+    fireEvent.change(await screen.findByRole("combobox"), { target: { value: "retry" } });
+    fireEvent.click(await screen.findByRole("option", { name: /Retry policy/ }));
+    expect(navigate).toHaveBeenCalledWith("/workspaces/w1/artifacts/a1");
+    expect(readRecents("u1").map((entry) => entry.label)).toEqual(["Retry policy"]);
+    // A page loaded again starts from the browser's storage.
+    unmount();
+    render(<CommandPalette accessToken="t" assistantWorkspaceId={null} canAdministerSystem={false} currentWorkspaceId="w1" userId="u1" workspaces={[ATLAS, BORROWED]} />);
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+    const options = await screen.findAllByRole("option");
+    expect(options[0].textContent).toContain("Retry policy");
+    expect(screen.getByText("Recent")).toBeTruthy();
+    // Another account on this browser has none.
+    cleanup();
+    render(<CommandPalette accessToken="t" assistantWorkspaceId={null} canAdministerSystem={false} currentWorkspaceId="w1" userId="u2" workspaces={[ATLAS, BORROWED]} />);
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+    await screen.findAllByRole("option");
+    expect(screen.queryByText("Recent")).toBeNull();
+  });
+
+  it("opens the note editor of the open workspace from New note", async () => {
+    palette(null);
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+    fireEvent.change(await screen.findByRole("combobox"), { target: { value: "new note" } });
+    fireEvent.click(await screen.findByRole("option", { name: /New note/ }));
+    expect(navigate).toHaveBeenCalledWith("/workspaces/w1/evidence");
+    // The evidence page takes the request once, for its own workspace only.
+    expect(takeNewNoteRequest("w2")).toBe(false);
+    expect(takeNewNoteRequest("w1")).toBe(true);
+    expect(takeNewNoteRequest("w1")).toBe(false);
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 

@@ -1,6 +1,7 @@
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { querySharedArtifacts, searchSharedMemoryCards } from "../lib/sharedApi";
-import { onOpenCommandPalette, sendToAssistant } from "../lib/assistantBridge";
+import { onOpenCommandPalette, requestNewNote, sendToAssistant } from "../lib/assistantBridge";
+import { readRecents, rememberRecent, type RecentItem } from "../lib/paletteRecents";
 import { type ArtifactSummary, type MemoryCardSummary, type SharedWorkspace } from "../types";
 import { Dialog, DialogCancel } from "../components/ui/dialog";
 import { EmptyState } from "../components/ui/empty-state";
@@ -18,13 +19,15 @@ const FILE_SEARCH_LIMIT = 50;
  * action, without the mouse. Files and memory cards come from the open
  * workspace's searches as the person types, both read with the person's own access.
  */
-export function CommandPalette({ accessToken, assistantWorkspaceId, canAdministerSystem, currentWorkspaceId, workspaces }: {
+export function CommandPalette({ accessToken, assistantWorkspaceId, canAdministerSystem, currentWorkspaceId, userId = "", workspaces }: {
   accessToken: string;
   /** The workspace whose page has the assistant docked, if the open page is one. */
   assistantWorkspaceId: string | null;
   canAdministerSystem: boolean;
   /** The workspace the open page belongs to, if any. */
   currentWorkspaceId: string | null;
+  /** Whose recent places are kept; none are kept without it. */
+  userId?: string;
   workspaces: SharedWorkspace[];
 }) {
   const [open, setOpen] = useState(false);
@@ -32,6 +35,7 @@ export function CommandPalette({ accessToken, assistantWorkspaceId, canAdministe
   const [active, setActive] = useState(0);
   const [files, setFiles] = useState<ArtifactSummary[]>([]);
   const [cards, setCards] = useState<MemoryCardSummary[]>([]);
+  const [recents, setRecents] = useState<RecentItem[]>([]);
   const list = useRef<HTMLUListElement>(null);
   const currentWorkspace = workspaces.find((entry) => entry.workspace.id === currentWorkspaceId);
   const assistantWorkspace = workspaces.find((entry) => entry.workspace.id === assistantWorkspaceId);
@@ -53,7 +57,8 @@ export function CommandPalette({ accessToken, assistantWorkspaceId, canAdministe
     setQuery("");
     setActive(0);
     setCards([]);
-  }, [open]);
+    setRecents(readRecents(userId));
+  }, [open, userId]);
 
   // Files are searched by name or path as the person types, whatever the workspace's size. The server
   // takes the longest word; the palette then keeps the files that hold every word.
@@ -86,8 +91,8 @@ export function CommandPalette({ accessToken, assistantWorkspaceId, canAdministe
   const labels = template?.labels.sections;
   const assistantOrder = template?.assistant.order;
   const entries = useMemo(
-    () => paletteEntries({ query, workspaces, assistantWorkspace, currentWorkspace, files, cards, canAdministerSystem, sections, labels, assistantOrder }),
-    [query, workspaces, assistantWorkspace, currentWorkspace, files, cards, canAdministerSystem, sections, labels, assistantOrder],
+    () => paletteEntries({ query, workspaces, assistantWorkspace, currentWorkspace, files, cards, canAdministerSystem, sections, labels, assistantOrder, recents }),
+    [query, workspaces, assistantWorkspace, currentWorkspace, files, cards, canAdministerSystem, sections, labels, assistantOrder, recents],
   );
   const activeIndex = Math.min(active, Math.max(entries.length - 1, 0));
 
@@ -98,8 +103,15 @@ export function CommandPalette({ accessToken, assistantWorkspaceId, canAdministe
   function run(entry: PaletteEntry | undefined) {
     if (!entry) return;
     setOpen(false);
+    // A place of a workspace is remembered, not a command or a page of the account.
+    if (entry.action.kind === "navigate" && entry.workspaceId && !entry.id.startsWith("recent:")) {
+      rememberRecent(userId, { id: entry.id, label: entry.label, hint: entry.hint, to: entry.action.to, workspaceId: entry.workspaceId });
+    }
     if (entry.action.kind === "navigate") navigate(entry.action.to);
-    else sendToAssistant({ capability: entry.action.capability, message: entry.action.message });
+    else if (entry.action.kind === "new-note") {
+      requestNewNote(entry.action.workspaceId);
+      navigate(entry.action.to);
+    } else sendToAssistant({ capability: entry.action.capability, message: entry.action.message });
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {

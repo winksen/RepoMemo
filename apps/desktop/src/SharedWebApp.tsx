@@ -350,6 +350,6 @@ function SharedWebAppContent() {
   return <>
     <PageAnnouncer accessToken={accessToken} route={route} workspaceName={workspace?.workspace.name} />
     {renderPage()}
-    <CommandPalette accessToken={accessToken} assistantWorkspaceId={route.name === "workspace" ? route.workspaceId : null} canAdministerSystem={Boolean(session.is_system_admin || session.is_app_admin)} currentWorkspaceId={workspace ? workspace.workspace.id : null} workspaces={workspaces} />
+    <CommandPalette accessToken={accessToken} userId={session.user.id} assistantWorkspaceId={route.name === "workspace" ? route.workspaceId : null} canAdministerSystem={Boolean(session.is_system_admin || session.is_app_admin)} currentWorkspaceId={workspace ? workspace.workspace.id : null} workspaces={workspaces} />
   </>;
 }

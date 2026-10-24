@@ -91,7 +91,7 @@ An invitation link works once, only for your email address, for 7 days.
 
 ### Move around fast
 
-- **Ctrl K** (or **⌘ K**) opens the **command palette**: jump to any workspace, section, file or memory card, or hand your text to the assistant.
+- **Ctrl K** (or **⌘ K**) opens the **command palette**: jump to any workspace, section, file or memory card, or hand your text to the assistant. It remembers the last places you opened from it and lists them when you open it, and **New note** starts a note in the workspace you are in.
 - Everything works from the keyboard, in light and dark themes, down to phone width.
 
 ---
