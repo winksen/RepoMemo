@@ -1,6 +1,6 @@
 # Clean-machine install: the run before the tag
 
-> **Branch of:** [TECHNICAL_MINDMAP.md](../TECHNICAL_MINDMAP.md) · **Roadmap:** [R6 (V0.2.0)](../ROADMAP.md#v020-team-ready), [R12 (V0.2.56)](../ROADMAP.md) · **Guide followed:** [operations.md](operations.md) · **Status:** V0.2.162 (track K added a browser pass to §3 and its notes to §5; tracks L and M added a line to §3 and their notes to §6). The run itself is the maintainer's (it needs a second machine and a running server, which this repository's rules keep from the automated work), so the result table at the end is empty until it is made.
+> **Branch of:** [TECHNICAL_MINDMAP.md](../TECHNICAL_MINDMAP.md) · **Roadmap:** [R6 (V0.2.0)](../ROADMAP.md#v020-team-ready), [R12 (V0.2.56)](../ROADMAP.md) · **Guide followed:** [operations.md](operations.md) · **Status:** V0.3.4. The install was made by the maintainer, who reported it good on 2026-10-24 (V0.3.0 was tagged on that report); §4 records that, and §3 says why each box is still open and what closes it. Runs need a second machine and a running server, which this repository's rules keep from the automated work, so the per-step results, the browser pass and the performance figures are filled by the maintainer in the sheets of this page and of [performance.md](performance.md).
 
 `V0.3.0` is tagged when a person who has nothing of RepoMemo on their machine installs it **following only the production guide**, with mail and a remote repository, and meets **no workaround**. A workaround is anything done that the guide does not say: a command guessed, a setting found in the code, a retry after a message that should have said why. Each one is written down and becomes a fix of the guide or the server (the way V0.2.1 came from the first run), and the run is made again.
 
@@ -49,13 +49,52 @@ The releases of the 0.2.x line were written and compiled without running the ser
 - [ ] **The security fixes** of V0.2.52 are tried against a running server (the spot checks above).
 - [ ] **The two images** of the container route are built and started once (V0.2.45).
 - [ ] **Tracks L and M** (V0.2.130–V0.2.162) are tried: the container comes up with the read-only root and the converter (and again with `COMPOSE_PROFILES=previews`, a Word file opening as a PDF); a 500 MiB upload leaves the server's memory flat and two uploads at once with `REPOMEMO_UPLOAD_INFLIGHT_MB=1` make the second wait (`503`); a repository sync with nothing new says *Nothing changed*; the evidence section of a workspace with more than 500 files pages by folder, by file type and by name, and a picker (memory card, task, replacement evidence) finds an old file by typing its name; `GET /v1/system/metrics` shows the in-flight and shed counters; and the `performance_at_scale` run is made twice (read tuning off and on) and recorded in [performance.md](performance.md).
-- [ ] The open items in the checklists of the roadmap's releases are read once more, and each is either done, accepted or moved.
+- [x] The open items in the checklists of the roadmap's releases are read once more, and each is either done, accepted or moved (V0.3.4: the table below).
+
+### Where each box stands (V0.3.4)
+
+The maintainer reported on 2026-10-24 that the tests of the clean install came out good, and did not give the result of each step. Nothing below is ticked on that report alone, because a tick should say what was seen. The reason each box is open, and what closes it:
+
+| Box | Why it is open | What closes it |
+|---|---|---|
+| CI is green | CI runs on the host, which this work cannot see. At V0.3.3 here: `cargo fmt --all --check`, `cargo clippy -D warnings` (tests included), `typecheck`, `version:check`, `docs:check` and `a11y:check` pass; the tests, `cargo deny` and `npm audit` were not run | Green run on the release commit; tick it with the run's address |
+| `cargo test -p repomemo-desktop` | The crate is left out of CI and of this work; V0.3.6 changes it | The maintainer's run after V0.3.6 |
+| Performance runs | They need release builds, which this repository keeps from the automated work | [performance.md](performance.md) §3: the record sheet, with the commits to compare |
+| Browser pass; polished pages | They need a running app in a browser; the static `a11y:check` passes (122 components, 94 colour pairs) but is not a pass | The record sheet below |
+| Desktop app tried | It needs a second computer. Step 13 was part of the reported run; its result was not written down | Write the step's result in §4, then tick |
+| Security fixes of V0.2.52; two images; tracks L and M | They need a running server and Docker | Steps 14 and 1 of §2, and the track L and M line above, written in §4. V0.3.23 puts `docker compose up` in CI |
+
+### Browser pass: record sheet
+
+One row per page, one mark per cell: `ok`, or the finding (a finding that needs a release takes the next number of the 0.3 line). Tool: axe or Lighthouse for the first column, device mode for the widths, the keyboard alone for the last.
+
+| Page | axe or Lighthouse: serious findings | 375 px light | 375 px dark | 768 px light | 768 px dark | Keyboard only |
+|---|---|---|---|---|---|---|
+| Sign-in and setup | | | | | | |
+| Dashboard and search across workspaces | | | | | | |
+| Overview, Evidence, Retrieval | | | | | | |
+| An artifact page and the notes editor | | | | | | |
+| Memory, Tasks, Review | | | | | | |
+| Repositories and connectors | | | | | | |
+| Assistant and the command palette | | | | | | |
+| Settings, People, System | | | | | | |
+
+### The open items of the roadmap's checklists
+
+Read once more at V0.3.4. Each open box of a 0.2.x release is one of three things:
+
+| Kind | Which boxes | Where it goes |
+|---|---|---|
+| **Moved to a 0.3.x release** | assistant answers do not name the last author (→ V0.3.16); `CODEOWNERS` owners not matched (→ V0.3.15); memory-card links do not offer *View at commit* (→ V0.3.14); approvals, issue links and mentions between items (→ V0.3.21); webhook deliveries (→ V0.3.22); lookups that read earlier turns (→ V0.3.11); filters and memory cards across workspaces (→ V0.3.12); palette recents and *New note* (→ V0.3.13); Go, Java, C# and PHP symbols (→ V0.3.17); review count and snooze (→ V0.3.10); restoring a version (→ V0.3.8); mentions in tasks and cards (→ V0.3.9); versions and saved searches in archives (→ V0.3.19); import as a job and the whole archive in the browser (→ V0.3.20); backup passphrase rotation (→ V0.3.24); `docker compose` in CI and an `arm64` image (→ V0.3.23); the skip link in dialogs, toolbar roles and 24 px targets (→ V0.3.25); the local edition (→ V0.3.5–V0.3.7) | The release named |
+| **The maintainer's to try** | a real mail server and mailbox; a clone and calls from a real host, GitHub and GitLab; a very large real repository; the release-build run of `map_and_health_at_scale`; the desktop app, the move, the banner and the narrow screens on a real display; the first `docker compose up`; a second clean install | The clean install (§2, §4) and the record sheets above and in [performance.md](performance.md) |
+| **Accepted as stated** | a copy of a backup older than the number kept; the plain snapshot in `.partial` for a moment; a child process without a sandbox; no signed or scheduled audit export; *Change server* restarting the app; separate-line-ending checkouts and sqlx's migration checksums; the review's own "not run" notes; prose claims that need a person | The box's own text; they stay as written |
 
 ## 4. Result
 
 | Date | Machine | Route | Who | Workarounds found | Fixed in | Verdict |
 |---|---|---|---|---|---|---|
-| *not yet run* | | | | | | |
+| 2026-10-24 | the maintainer's | not recorded | the maintainer | none reported | | **Reported good** for the release `V0.3.0`; the result of each step of §2 was not written down, so none of §3 below is ticked on it |
+| *next run* | | | | | | *fill in the result of each step of §2, then tick what it shows* |
 
 When the run passes with no workaround, record it here and in the roadmap's R6 and R12 lines, tick §3, set the version to `0.3.0` (`npm run version:set -- 0.3.0`), write the changelog's `V0.3.0` entry from the releases V0.2.1 to V0.2.129 (the [release index](../RELEASES_0.2.md) is the list; §5 has the notes for the polish track), and tag `v0.3.0`.
 

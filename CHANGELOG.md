@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.3.4 (2026-10-24)
+
+The record of the clean install, the performance runs and the browser pass prepared for the maintainer to fill. Documents only; no code changed, and no figure was invented.
+
+### Changed
+- **The clean-install page** ([clean-install.md](mindmap/technical/clean-install.md)): its result table records the maintainer's run of 2026-10-24 (reported good, per-step results not written down) and a row for the next run; §3 says, for every box, why it is still open and what closes it (CI on the host, the desktop crate's tests, release-build runs, a browser, a second computer, Docker); the browser pass has a record sheet (eight page groups by axe or Lighthouse, 375 px and 768 px in both themes, and keyboard only); and the open boxes of every 0.2.x checklist are triaged into those moved to a numbered 0.3.x release, those that are the maintainer's to try, and those accepted as stated. The box "the open items are read once more" is ticked, with that table as the proof.
+- **The performance page** ([performance.md](mindmap/technical/performance.md)): a record sheet to compare *before track M* (`7291584`, V0.2.148), *after track M* (`457d094`, V0.2.162) and *now*, on one machine, with the machine's fields and one row for each measure of the targets, including the two rows that only exist from track M.
+- **The version** is `0.3.4` everywhere.
+
+### Checks
+- **Passing:** `version:check`, `docs:check`, and the static `a11y:check` (122 components, 94 colour pairs), which the sheet names as not being a browser pass.
+- **Not done, on purpose:** the performance runs (release builds), the browser pass and the desktop try, which need a running server or app; the roadmap's *Done when* for this release ("no box is left unticked without a reason") holds, and the figures are the maintainer's to enter.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.3.3 (2026-10-24)
 
 The code formatted and clippy made clean in one release, so the two steps that CI already blocks on pass on `main`. No behaviour changed.
