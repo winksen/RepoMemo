@@ -30,7 +30,7 @@ Set these in the service's environment, not in a file the web server can read.
 
 | Variable | Value for production | Why |
 |---|---|---|
-| `REPOMEMO_JWT_SECRET` | 32 or more random characters, kept secret | Signs sessions and file links. Changing it signs everyone out |
+| `REPOMEMO_JWT_SECRET` | 32 or more random characters, kept secret | Signs sessions and file links. Changing it signs everyone out. Any secret (this one, `REPOMEMO_SECRET_KEY`, the two backup keys, the setup code) can be given as a file with the same name plus `_FILE`; both at once is refused (V0.4.1) |
 | `REPOMEMO_SECRET_KEY` | 32 or more random characters from a secret store | Encrypts AI provider keys. Without it a key file sits in the data folder, next to what it protects |
 | `REPOMEMO_SERVER_ADDR` | `127.0.0.1:3020` | Listen on loopback only; the proxy is the way in. The server refuses to listen beyond loopback over plain HTTP unless told it is behind TLS |
 | `REPOMEMO_PUBLIC_URL` | `https://memo.example.com` | Turns HSTS on, makes the refresh cookie `Secure` |

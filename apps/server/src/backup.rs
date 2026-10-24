@@ -690,7 +690,7 @@ async fn restore_backup(state: &AppState, name: &str, environment: &str) -> anyh
     // The proof that it works: open it, count what is in it, close it.
     let opened = StorageEngine::open(StorageConfig {
         data_dir: target.clone(),
-        master_key: crate::config::env_text("REPOMEMO_SECRET_KEY"),
+        master_key: crate::config::env_secret("REPOMEMO_SECRET_KEY").ok().flatten(),
         read_connections: 1,
         vector_index_mb: 0,
         read_cache_mb: 0,

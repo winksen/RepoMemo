@@ -225,6 +225,8 @@ program acting as git's askpass) and `REPOMEMO_READER_MEMORY_MB` (the memory cap
 reader). Do not set them. The performance runs read `REPOMEMO_PERF_PASSAGES`,
 `REPOMEMO_PERF_FILES`, `REPOMEMO_PERF_ISSUES` and `REPOMEMO_PERF_LISTED_FILES` (the files of the file-list case, 100,000), only in tests.
 
+**Secrets from files (V0.4.1).** `REPOMEMO_JWT_SECRET`, `REPOMEMO_SECRET_KEY`, `REPOMEMO_BACKUP_KEY`, `REPOMEMO_BACKUP_KEY_PREVIOUS` and `REPOMEMO_SETUP_CODE` can each be given as a file instead: set the same name ending in `_FILE` (for example `REPOMEMO_JWT_SECRET_FILE=/run/secrets/jwt`) to the path of a file that holds the value, as Docker and Kubernetes secrets are mounted. White space and the line ending around the value are dropped. A variable and a file for the same secret are refused at start, and so is a file that cannot be read or is empty. The same rules and limits apply as for the variable.
+
 | Variable | Default | What it does |
 |---|---|---|
 | `REPOMEMO_SERVER_ADDR` | `127.0.0.1:3020` | Address and port the API listens on. The server speaks plain HTTP and has no connection or request timeouts of its own; put a TLS reverse proxy with header, body and idle timeouts in front of it before binding beyond loopback. |

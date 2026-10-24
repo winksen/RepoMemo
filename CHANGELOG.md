@@ -2,6 +2,25 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.1 (2026-10-25)
+
+Every secret can be given as a file, for Docker and Kubernetes secrets.
+
+### Added
+- **Secrets from files:** `REPOMEMO_JWT_SECRET`, `REPOMEMO_SECRET_KEY`, `REPOMEMO_BACKUP_KEY`, `REPOMEMO_BACKUP_KEY_PREVIOUS` and `REPOMEMO_SETUP_CODE` may each be replaced by the same name ending in `_FILE` (`REPOMEMO_JWT_SECRET_FILE=/run/secrets/jwt`), the path of a file holding the secret. The file's surrounding white space and line ending are dropped; a file that cannot be read or is empty is named in the error. A variable **and** a file for the same secret is refused at start, so a stale variable cannot hide the file meant to replace it. The same rules apply to the restore, which reads `REPOMEMO_SECRET_KEY` too.
+- The SMTP password is not an environment variable (it is saved, sealed, from System › Mail), so it has no file form.
+
+### Changed
+- **The documents:** the settings reference (a paragraph on `_FILE` before the table), `.env.example`, the operations guide and the technical mindmap, the release index and the roadmap.
+- **The version** is `0.4.1` everywhere.
+
+### Checks
+- **Compiled and linted:** `cargo check` and `cargo clippy -D warnings` over the server with its tests, `cargo fmt --all --check`, `version:check`, `docs:check`.
+- **Tests written, not run:** four unit tests of the secret reading (a variable alone, a file alone without its line ending, both refused, a missing or empty file named).
+
+### Upgrading
+- Nothing to do. A secret given as a variable keeps working.
+
 ## V0.4.0 (2026-10-25)
 
 The 0.4.x line is opened: preparation for deployment, on the server and on the client.

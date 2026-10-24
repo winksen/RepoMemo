@@ -180,8 +180,9 @@ pub struct ServerConfig {
 
 impl ServerConfig {
     pub fn from_env() -> Result<Self> {
-        let jwt_secret = std::env::var("REPOMEMO_JWT_SECRET")
-            .context("REPOMEMO_JWT_SECRET is required; use at least 32 random characters")?;
+        let jwt_secret = env_secret("REPOMEMO_JWT_SECRET")?.context(
+            "REPOMEMO_JWT_SECRET (or REPOMEMO_JWT_SECRET_FILE) is required; use at least 32 random characters",
+        )?;
         if jwt_secret.len() < 32 {
             bail!("REPOMEMO_JWT_SECRET must contain at least 32 characters");
         }
@@ -215,7 +216,7 @@ impl ServerConfig {
                     .with_context(|| format!("REPOMEMO_ALLOWED_ORIGIN has an invalid origin: {origin}"))
             })
             .collect::<Result<Vec<_>>>()?;
-        let secret_key = env_text("REPOMEMO_SECRET_KEY");
+        let secret_key = env_secret("REPOMEMO_SECRET_KEY")?;
         if secret_key
             .as_ref()
             .is_some_and(|key| key.chars().count() < repomemo_storage::MIN_MASTER_KEY_CHARS)
@@ -225,11 +226,11 @@ impl ServerConfig {
                 repomemo_storage::MIN_MASTER_KEY_CHARS
             );
         }
-        let backup_key = env_text("REPOMEMO_BACKUP_KEY");
+        let backup_key = env_secret("REPOMEMO_BACKUP_KEY")?;
         if let Some(Err(message)) = backup_key.as_deref().map(crate::backup_crypto::validate_passphrase) {
             bail!("{message}");
         }
-        let backup_previous_key = env_text("REPOMEMO_BACKUP_KEY_PREVIOUS");
+        let backup_previous_key = env_secret("REPOMEMO_BACKUP_KEY_PREVIOUS")?;
         if let Some(previous) = backup_previous_key.as_deref() {
             if backup_key.is_none() {
                 bail!("REPOMEMO_BACKUP_KEY_PREVIOUS is the key before a change, so REPOMEMO_BACKUP_KEY must be set to the new one");
@@ -434,7 +435,7 @@ impl ServerConfig {
             system_audit_retention_days: env_parse("REPOMEMO_SYSTEM_AUDIT_RETENTION_DAYS", 365)?,
             logging: LogSettings::from_env()?,
             setup_wizard: env_flag("REPOMEMO_SETUP_WIZARD", true)?,
-            setup_code: match env_text("REPOMEMO_SETUP_CODE") {
+            setup_code: match env_secret("REPOMEMO_SETUP_CODE")? {
                 Some(code) if code.chars().filter(char::is_ascii_alphanumeric).count() < 12 => {
                     bail!("REPOMEMO_SETUP_CODE must contain at least 12 letters or digits")
                 }
@@ -533,6 +534,86 @@ pub(crate) fn env_text(name: &str) -> Option<String> {
         .ok()
         .map(|value| value.trim().to_owned())
         .filter(|value| !value.is_empty())
+}
+
+/// A secret given as the variable itself (`NAME`) or as the path of a file that holds it
+/// (`NAME_FILE`, what Docker and Kubernetes secrets mount). Giving both is refused, so a
+/// stale variable can never hide the file that was meant to replace it.
+pub(crate) fn env_secret(name: &str) -> Result<Option<String>> {
+    secret_from(name, env_text(name), env_text(&format!("{name}_FILE")))
+}
+
+fn secret_from(name: &str, value: Option<String>, file: Option<String>) -> Result<Option<String>> {
+    let Some(path) = file else {
+        return Ok(value);
+    };
+    if value.is_some() {
+        bail!("{name} and {name}_FILE are both set; give the secret one way only");
+    }
+    let text = std::fs::read_to_string(&path).with_context(|| format!("{name}_FILE ({path}) could not be read"))?;
+    let text = text.trim();
+    if text.is_empty() {
+        bail!("{name}_FILE ({path}) is empty");
+    }
+    Ok(Some(text.to_owned()))
+}
+
+#[cfg(test)]
+mod secret_tests {
+    use super::secret_from;
+
+    fn secret_file(contents: &str) -> std::path::PathBuf {
+        let path = std::env::temp_dir().join(format!("repomemo-secret-{}", uuid::Uuid::new_v4()));
+        std::fs::write(&path, contents).unwrap();
+        path
+    }
+
+    #[test]
+    fn a_variable_alone_is_the_secret() {
+        let secret = secret_from("REPOMEMO_BACKUP_KEY", Some("abc".to_owned()), None).unwrap();
+        assert_eq!(secret.as_deref(), Some("abc"));
+        assert_eq!(secret_from("REPOMEMO_BACKUP_KEY", None, None).unwrap(), None);
+    }
+
+    #[test]
+    fn a_file_alone_is_the_secret_without_its_line_ending() {
+        let path = secret_file("from-a-file\r\n");
+        let secret = secret_from("REPOMEMO_BACKUP_KEY", None, Some(path.display().to_string())).unwrap();
+        assert_eq!(secret.as_deref(), Some("from-a-file"));
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn a_variable_and_a_file_for_the_same_secret_are_refused() {
+        let path = secret_file("from-a-file");
+        let error = secret_from(
+            "REPOMEMO_BACKUP_KEY",
+            Some("abc".to_owned()),
+            Some(path.display().to_string()),
+        )
+        .unwrap_err();
+        assert!(error
+            .to_string()
+            .contains("REPOMEMO_BACKUP_KEY and REPOMEMO_BACKUP_KEY_FILE are both set"));
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn a_missing_or_empty_file_is_named() {
+        let missing = secret_from(
+            "REPOMEMO_BACKUP_KEY",
+            None,
+            Some("/nonexistent/repomemo-secret".to_owned()),
+        )
+        .unwrap_err();
+        assert!(missing
+            .to_string()
+            .contains("REPOMEMO_BACKUP_KEY_FILE (/nonexistent/repomemo-secret) could not be read"));
+        let path = secret_file(" \n");
+        let empty = secret_from("REPOMEMO_BACKUP_KEY", None, Some(path.display().to_string())).unwrap_err();
+        assert!(empty.to_string().contains("is empty"));
+        std::fs::remove_file(path).unwrap();
+    }
 }
 
 /// Parses an optional environment variable, with a clear error for a value
