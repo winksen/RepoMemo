@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.3 → 0.4
 
-> **Line:** `V0.3.1` to `V0.3.27`, then `V0.4.0` (theme to be chosen, decision 33) · **Current:** `V0.3.26` (2026-10-24) · **Next:** `V0.3.27`
+> **Line:** `V0.3.1` to `V0.3.27`, then `V0.4.0` (theme proposed: single sign-on, decision 33 to confirm) · **Current:** `V0.3.27` (2026-10-24, the line is closed) · **Next:** the [single sign-on plan](plans/2026-10-24-single-sign-on.md), `V0.3.28` onward
 > **Previous line:** [Releases 0.2 → 0.3](RELEASES_0.2.md) · **Related:** [Roadmap, Road to V0.4.0](ROADMAP.md#-road-to-v040) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
 Every release of the 0.3 line, planned and later shipped, one row each. The plan comes from the [Road to V0.4.0](ROADMAP.md#-road-to-v040), proposed on 2026-10-24: **one change per release**, each shippable alone, committed as `Update V0.3.N`. Decisions 29–32 of the roadmap are taken as proposed (V0.3.1); decision 33, the theme of V0.4.0, is recorded in V0.3.27.
@@ -56,4 +56,4 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | **V0.3.24** | ✅ 2026-10-24 | S. Operations and experience | 🔧 Enhancement | Backups | The backup passphrase can be changed: new backups use the new one, `REPOMEMO_BACKUP_KEY_PREVIOUS` opens the old ones, and a backup can be sealed again on request | A backup sealed with the old passphrase opens only after re-sealing, or with the old one |
 | **V0.3.25** | ✅ 2026-10-24 | S. Operations and experience | 🔧 Enhancement | Web client | Accessibility residuals: a skip link in dialogs, toolbars that work from the keyboard, buttons of at least 24 px, all held by `a11y:check` | `a11y:check` covers the three; a screen reader pass finds no serious issue |
 | **V0.3.26** | ✅ 2026-10-24 | T. Closing | 🔒 Security | Security | Security pass over what 0.3.x added and over the removal of the local edition: 1 medium and 6 low findings fixed, none open | No high or medium finding open |
-| **V0.3.27** | 🔜 Planned | T. Closing | 📘 Update | Release | Release checks repeated; the theme of V0.4.0 recorded (decision 33); the line closed | Every check passes; the next plan is written |
+| **V0.3.27** | ✅ 2026-10-24 | T. Closing | 📘 Update | Release | Release checks repeated; an advisory recorded; the theme of V0.4.0 recorded as a proposal (single sign-on) with its plan; the line closed | Every check passes; the next plan is written |

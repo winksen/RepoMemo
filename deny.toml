@@ -16,6 +16,12 @@ ignore = [
   # decrypted, and there is no fixed release. Revisit by 2027-01-15, or once
   # jsonwebtoken lets the RSA backend be left out.
   { id = "RUSTSEC-2023-0071", reason = "rsa is linked by jsonwebtoken but never used: tokens are HS256" },
+  # Timing variability in constant-time integer operations of crypto-bigint 0.5.5, which arrives through
+  # jsonwebtoken's elliptic-curve backends (p256, p384, ecdsa). RepoMemo signs with HS256 only: no elliptic-curve
+  # key is ever loaded and none of those operations runs on a secret. The fix (0.7.6) is a different major
+  # version that elliptic-curve 0.13 cannot use. Revisit by 2027-01-15, or once jsonwebtoken moves to a
+  # release built on crypto-bigint 0.7 or lets those backends be left out.
+  { id = "RUSTSEC-2026-0387", reason = "crypto-bigint is linked by jsonwebtoken's EC backends but never used: tokens are HS256" },
 ]
 
 [bans]

@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.3.27 (2026-10-24)
+
+The 0.3.x line is closed: the checks are repeated, and the theme of V0.4.0 is recorded with its plan.
+
+### Checks (repeated)
+- **Pass:** `version:check`, `docs:check` (220 routes, 80 settings, 29 documents), `migrations:check` (43 files, every one locked), `container:check`, `templates:check`, `styles:check`, `a11y:check`, `types:check` (154 types), `typecheck`, `cargo fmt --all --check`, `cargo clippy --workspace --exclude repomemo-desktop --all-targets --locked -- -D warnings`, `cargo check -p repomemo-desktop --tests --locked`, `cargo deny check bans licenses advisories` and `npm audit --omit=dev --audit-level=high` (0 vulnerabilities).
+- **Not run, on purpose:** the Rust tests, the web tests, the template checker's tests, the two container jobs of CI and any build or server: the maintainer runs them. The tests written in the 0.3.x line are counted in the technical mindmap (web 386, server 214, storage 47, api 106, domain 4, and the others as they were).
+
+### Changed
+- **An advisory is recorded:** RUSTSEC-2026-0387 (timing variability in `crypto-bigint` 0.5.5) was published since the last check and fails the blocking advisories job of CI. The crate arrives only through `jsonwebtoken`'s elliptic-curve backends (`p256`, `p384`, `ecdsa`); RepoMemo signs with HS256 and loads no elliptic-curve key, so none of those operations runs on a secret, and the fix (0.7.6) is a major version that `elliptic-curve` 0.13 cannot take. It is ignored in `deny.toml` with that reason, as RUSTSEC-2023-0071 is, to be revisited by 2027-01-15 or when `jsonwebtoken` moves on.
+- **Decision 33 is recorded, as a proposal:** the theme of V0.4.0 is **single sign-on (OIDC) first**, as the roadmap recommended. It is the maintainer's to confirm: nothing of it is built, and the plan ([mindmap/plans/2026-10-24-single-sign-on.md](mindmap/plans/2026-10-24-single-sign-on.md)) lists decisions 34–38, ten single-purpose releases (V0.3.28–V0.3.37) and the risks.
+- **The line is closed in the documents:** the roadmap's table and checklist, the 0.3 release index, and the technical mindmap's scope line.
+- **The version** is `0.3.27` everywhere.
+
+### Upgrading
+- Nothing to do. `V0.4.0` is the tag the maintainer cuts after the tests of the clean install, as `V0.3.0` was.
+
 ## V0.3.26 (2026-10-24)
 
 Security pass over what 0.3.x added.
