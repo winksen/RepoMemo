@@ -6,7 +6,7 @@ import { Dialog, DialogCancel } from "../components/ui/dialog";
 import { showToast } from "../components/ui/toast";
 import { getSharedArtifactAtCommit } from "../lib/sharedApi";
 import { type FileCategory } from "./constants";
-import { apiMessage, citationLines, formatMetricDay } from "./format";
+import { apiMessage, citationChange, citationLines, formatMetricDay } from "./format";
 
 export function fileCategoryIcon(category: FileCategory, size: number) {
   if (category === "repository") return <RepositoryIcon size={size} />;
@@ -72,6 +72,7 @@ export function artifactTypeIcon(type: ArtifactType, size: number) {
 export function EvidenceUsed({ accessToken, citations, numbered = false, onOpenArtifact }: { accessToken?: string; citations: Citation[]; numbered?: boolean; onOpenArtifact: (artifactId: string) => void }) {
   return <div className="shared-ai-citations"><strong>Evidence used</strong>{citations.map((citation, index) => <span className="shared-assistant-citation-row" key={`${citation.artifact_id}-${citation.chunk_id ?? "artifact"}-${index}`}>
     <button className="shared-assistant-citation" onClick={() => onOpenArtifact(citation.artifact_id)} title={`Open ${citation.path}`} type="button">{numbered ? `[${index + 1}] ` : ""}{citation.title} · {citation.path}{citationLines(citation)}</button>
+    {citationChange(citation) ? <small className="shared-citation-change">{citationChange(citation)}</small> : null}
     {accessToken ? <ViewAtCommit accessToken={accessToken} citation={citation} /> : null}
   </span>)}</div>;
 }

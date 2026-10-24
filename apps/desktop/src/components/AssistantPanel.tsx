@@ -32,7 +32,7 @@ import { LoadingState } from "./ui/loading-state";
 import { Textarea } from "./ui/textarea";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
-import { apiMessage, formatRecentTime } from "../web/format";
+import { apiMessage, citationChange, formatRecentTime } from "../web/format";
 import { workspaceKeys } from "../lib/queryClient";
 import { useServerState } from "../lib/useServerState";
 import { useErrorToast } from "../lib/useErrorToast";
@@ -346,6 +346,7 @@ function Evidence({ accessToken, citations, isQuestion, onOpenArtifact }: { acce
   const hidden = citations.length - EVIDENCE_PREVIEW_LIMIT;
   const renderCitation = (citation: AgentReply["citations"][number], index: number, onOpen: (artifactId: string) => void) => <span className="shared-assistant-citation-row" key={`${citation.artifact_id}-${citation.chunk_id ?? "artifact"}`}>
     <button className="shared-assistant-citation" onClick={() => onOpen(citation.artifact_id)} type="button">{/* Answers cite their passages as [1], [2]… in this order. */}{isQuestion ? `[${index + 1}] ` : ""}{citation.title} · {citation.path}{citation.start_line ? ` · line ${citation.start_line}` : ""}</button>
+    {citationChange(citation) ? <small className="shared-citation-change">{citationChange(citation)}</small> : null}
     <ViewAtCommit accessToken={accessToken} citation={citation} />
   </span>;
   return <div className="shared-ai-citations">

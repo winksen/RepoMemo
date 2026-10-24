@@ -366,6 +366,8 @@ impl RepoMemoCore {
                     end_line: chunk.end_line,
                     confidence: None,
                     commit: Some(overview.commit.sha.clone()),
+                    last_author: None,
+                    last_changed_at: None,
                 });
             }
             if !text.is_empty() {

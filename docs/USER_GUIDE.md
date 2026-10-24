@@ -206,7 +206,7 @@ Search ranks verified evidence a little higher and, by default, leaves outdated 
 
 ### Ask your evidence
 
-Ask a question in plain language. RepoMemo first retrieves matching passages. If nothing matches, it says so **without calling the AI**. If something does, the AI answers **only from those passages** and returns numbered **citations** you can click to open the exact file.
+Ask a question in plain language. RepoMemo first retrieves matching passages (a passage from a repository file also says who last changed the file and when, beside its citation). If nothing matches, it says so **without calling the AI**. If something does, the AI answers **only from those passages** and returns numbered **citations** you can click to open the exact file.
 
 ```mermaid
 sequenceDiagram

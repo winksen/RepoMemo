@@ -1018,6 +1018,8 @@ impl RepoMemoCore {
                 end_line: chunk.end_line,
                 confidence: None,
                 commit: None,
+                last_author: metadata_text(&detail.metadata, "last_author"),
+                last_changed_at: metadata_text(&detail.metadata, "last_changed_at"),
             })
             .collect();
         Ok(SummaryResult {
@@ -1063,6 +1065,8 @@ impl RepoMemoCore {
                     end_line: chunk.end_line,
                     confidence: None,
                     commit: None,
+                    last_author: metadata_text(&detail.metadata, "last_author"),
+                    last_changed_at: metadata_text(&detail.metadata, "last_changed_at"),
                 });
             }
         }
@@ -1313,6 +1317,8 @@ impl RepoMemoCore {
                 end_line: result.end_line,
                 confidence: Some(result.score),
                 commit: result.commit.clone(),
+                last_author: result.last_author.clone(),
+                last_changed_at: result.last_changed_at.clone(),
             })
             .collect::<Vec<_>>();
         let confidence = retrieved_context.first().map(|result| result.score.clamp(0.0, 1.0));
@@ -1505,6 +1511,15 @@ pub struct PendingWorkspaceIndex {
     artifacts: Vec<ArtifactSummary>,
 }
 
+/// A text a repository sync recorded in an artifact's metadata, such as who last changed the file (V0.3.16).
+fn metadata_text(metadata: &serde_json::Value, key: &str) -> Option<String> {
+    metadata
+        .get(key)
+        .and_then(serde_json::Value::as_str)
+        .filter(|text| !text.is_empty())
+        .map(str::to_owned)
+}
+
 /// A document's text as indexing stored it, in order, for the artifact page.
 /// `None` when the file has no stored passages to trust (not indexed yet, or
 /// changed since: a new version clears `indexed_at`); `Some(None)` when it was
@@ -1628,9 +1643,30 @@ fn sanitize_filename(title: &str, extension: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{evenly_spaced, group_sections, read_archive_entries, recent_readings_of, RepoMemoCore};
+    use super::{evenly_spaced, group_sections, metadata_text, read_archive_entries, recent_readings_of, RepoMemoCore};
     use repomemo_domain::{Citation, CreateMemoryCardRequest};
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn a_citation_names_who_last_changed_a_repository_file_from_what_the_sync_recorded() {
+        let synced = serde_json::json!({ "last_author": "Ada", "last_changed_at": "2026-10-01T09:30:00+00:00", "last_change_commit": "abc" });
+        assert_eq!(metadata_text(&synced, "last_author").as_deref(), Some("Ada"));
+        assert_eq!(
+            metadata_text(&synced, "last_changed_at").as_deref(),
+            Some("2026-10-01T09:30:00+00:00")
+        );
+        // A file that is not a repository's, an empty value and a value that is not text say nothing.
+        assert_eq!(metadata_text(&serde_json::json!({}), "last_author"), None);
+        assert_eq!(
+            metadata_text(&serde_json::json!({ "last_author": "" }), "last_author"),
+            None
+        );
+        assert_eq!(
+            metadata_text(&serde_json::json!({ "last_author": 7 }), "last_author"),
+            None
+        );
+        assert_eq!(metadata_text(&serde_json::json!(null), "last_author"), None);
+    }
 
     #[test]
     fn long_files_are_split_into_bounded_parts() {
@@ -1963,6 +1999,8 @@ Document {file} section {index} covers topic{} and the deploy_{} function.
                     end_line: None,
                     confidence: None,
                     commit: None,
+                    last_author: None,
+                    last_changed_at: None,
                 }],
             })
             .await
@@ -2012,6 +2050,8 @@ Document {file} section {index} covers topic{} and the deploy_{} function.
                 end_line: None,
                 confidence: None,
                 commit: None,
+                last_author: None,
+                last_changed_at: None,
             }],
         })
         .await

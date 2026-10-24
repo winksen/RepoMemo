@@ -2,6 +2,28 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.3.16 (2026-10-24)
+
+Answers and citations name the last author and date of a repository file.
+
+### Added
+- **Beside each citation:** in an answer to a question, in the assistant, in a file summary and in the workspace overview, a citation of a repository file reads *changed by Ada on Oct 1, 2026* next to its path. A citation of a note, an upload or an answer saved before this release says nothing.
+- **Where it comes from:** the citation carries `last_author` and `last_changed_at` (both optional, absent from older saved answers), filled from the search result that was cited (the same data as the file list and the search results since V0.2.24) or, for a summary of one file or of a workspace, from what the last repository sync recorded in that file's metadata.
+
+### Security
+- Nothing new is stored or fetched. The author's name and the date are **not** added to the text sent to the AI provider (the passages and the prompt are unchanged), so a cloud provider learns nothing it did not already receive; they are shown only to people who can read the workspace, as in the file list.
+
+### Checks
+- **Compiled and linted:** `cargo clippy -D warnings` over the whole workspace with its tests, `cargo fmt --all --check`, `typecheck`, `types:check` (153 types), `styles:check`, `a11y:check`, `docs:check`, `version:check`.
+- **Tests written, not run:** a unit test of reading the recorded author and date from a file's metadata, and three web tests (the phrase with an author and a date, with one of them, with neither or a date that cannot be read; the evidence list showing it for a repository file and nothing for a note).
+
+### Changed
+- **The documents:** the functional mindmap's gap row, the technical mindmap's test counts (api 100, web 358), the user guide. The V0.2.24 gap about answers and citations is closed. An answer's own text still does not mention the author.
+- **The version** is `0.3.16` everywhere.
+
+### Upgrading
+- Nothing to do. No migration.
+
 ## V0.3.15 (2026-10-24)
 
 `CODEOWNERS` owners matched to workspace members.

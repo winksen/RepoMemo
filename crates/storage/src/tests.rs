@@ -415,6 +415,8 @@ async fn memory_cards_link_evidence_and_are_searchable() {
                 end_line: None,
                 confidence: None,
                 commit: None,
+                last_author: None,
+                last_changed_at: None,
             }],
         )
         .await
@@ -2460,6 +2462,8 @@ async fn a_memory_card_keeps_the_commit_its_citation_names_and_ignores_one_that_
         end_line: None,
         confidence: None,
         commit: commit.map(str::to_owned),
+        last_author: None,
+        last_changed_at: None,
     };
     let full = "0123456789ABCDEF0123456789abcdef01234567";
     let card = storage

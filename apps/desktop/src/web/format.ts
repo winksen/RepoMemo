@@ -148,6 +148,19 @@ export function artifactCitation(artifacts: ArtifactSummary[], artifactId: strin
 }
 
 /** Where in the file a passage is, and for a repository file the commit its text is from. */
+/**
+ * For a citation of a repository file: who last changed it and when, as a short phrase ("changed by Ada on Oct 1, 2026"),
+ * or an empty string when the citation says neither (a note, an upload, an older answer) (V0.3.16).
+ */
+export function citationChange(citation: { last_author?: string | null; last_changed_at?: string | null }): string {
+  const author = citation.last_author?.trim();
+  const when = citation.last_changed_at ? new Date(citation.last_changed_at) : null;
+  const day = when && !Number.isNaN(when.getTime()) ? when.toLocaleDateString(undefined, { dateStyle: "medium" }) : "";
+  if (author && day) return `changed by ${author} on ${day}`;
+  if (author) return `changed by ${author}`;
+  return day ? `changed on ${day}` : "";
+}
+
 export function citationLines(citation: Pick<Citation, "start_line" | "end_line"> & { commit?: string | null }) {
   const commit = citation.commit ? ` · commit ${citation.commit.slice(0, 7)}` : "";
   if (!citation.start_line) return commit;

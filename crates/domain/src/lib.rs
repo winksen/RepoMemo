@@ -1345,6 +1345,12 @@ pub struct Citation {
     /// For a file of a git repository: the commit the cited text is from.
     #[serde(default)]
     pub commit: Option<String>,
+    /// For a file of a git repository: who last changed it (V0.3.16).
+    #[serde(default)]
+    pub last_author: Option<String>,
+    /// For a file of a git repository: when that change was authored.
+    #[serde(default)]
+    pub last_changed_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

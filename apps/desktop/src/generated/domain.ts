@@ -1175,6 +1175,10 @@ export interface Citation {
   confidence: number | null;
   /** For a file of a git repository: the commit the cited text is from. */
   commit: string | null;
+  /** For a file of a git repository: who last changed it (V0.3.16). */
+  last_author: string | null;
+  /** For a file of a git repository: when that change was authored. */
+  last_changed_at: string | null;
 }
 
 export interface SummaryResult {

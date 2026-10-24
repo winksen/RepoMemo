@@ -2109,6 +2109,8 @@ async fn a_local_workspace_archived_by_the_desktop_app_imports_with_its_memory_a
             end_line: None,
             confidence: None,
             commit: None,
+            last_author: None,
+            last_changed_at: None,
         }],
     })
     .await
