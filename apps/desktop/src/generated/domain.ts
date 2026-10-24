@@ -1016,6 +1016,8 @@ export interface MemoryEvidence {
   start_line: number | null;
   end_line: number | null;
   exists: boolean;
+  /** For evidence from a file of a git repository: the commit the card cited it at (V0.3.14), when it said. */
+  commit: string | null;
 }
 
 export interface MemoryCardDetail {

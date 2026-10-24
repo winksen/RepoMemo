@@ -25,6 +25,7 @@ import { navigate } from "./router";
 import { OrganizationRail, WorkspaceTopbar } from "./Organization";
 import { ICON_SIZE } from "../components/ui/icon";
 import { submitHint } from "../lib/submitShortcut";
+import { ViewAtCommit } from "./common";
 
 type EditableCitation = {
   artifact_id: string;
@@ -34,6 +35,8 @@ type EditableCitation = {
   start_line: number | null;
   end_line: number | null;
   confidence: number | null;
+  /** The commit the card cited a repository file at; kept when the card is saved again. */
+  commit?: string | null;
 };
 
 export function SharedMemoryCardDetail({
@@ -91,6 +94,7 @@ export function SharedMemoryCardDetail({
     start_line: entry.start_line,
     end_line: entry.end_line,
     confidence: null,
+    commit: entry.commit,
   }));
   const citationKey = (list: EditableCitation[]) => list.map((entry) => `${entry.artifact_id}:${entry.chunk_id ?? ""}`).join("|");
   const isDirty = isEditing && Boolean(card) && (
@@ -189,7 +193,7 @@ export function SharedMemoryCardDetail({
       {!card && isLoading ? <LoadingState label="Loading the memory card" /> : null}
       {card?.review.length ? <section className="shared-record-panel shared-review-panel"><h2>Needs review</h2><p className="shared-muted-copy">Evidence this card cites has changed since it was written. Check what it says, edit it or its evidence, or confirm it as it is.</p><ul>{card.review.map((reason, index) => <li key={`${reason.kind}-${index}`}>{reason.detail}{reason.artifact_id ? <> <button className="shared-assistant-citation" onClick={() => onOpenArtifact(reason.artifact_id!)} type="button">Open</button></> : null}</li>)}</ul>{canWrite ? <Button busy={isMutating} onClick={() => void confirmCard()} variant="secondary">Confirm as it is</Button> : null}</section> : null}
       <section className="shared-record-panel"><h2>Durable statement</h2>{isEditing ? <form className="shared-record-edit-form" onSubmit={saveCard}><Field label="Title" required><Input onChange={(event) => setTitle(event.target.value)} value={title} /></Field><Field label="Source" required><Input onChange={(event) => setSource(event.target.value)} value={source} /></Field><Field hint={submitHint("saves")} label="Statement" required><MentionTextarea accessToken={accessToken} onValueChange={setBodyMarkdown} value={bodyMarkdown} workspaceId={workspaceId} /></Field><fieldset className="shared-memory-citations"><legend>Evidence this card cites</legend>{citations.length ? <ul>{citations.map((citation, index) => <li key={`${citation.artifact_id}-${citation.chunk_id ?? "file"}-${index}`}><span>{citation.title}{citation.chunk_id ? citationLines(citation) : " (whole file)"}</span><Button onClick={() => setCitations((current) => current.filter((_, position) => position !== index))} variant="secondary">Remove</Button></li>)}</ul> : <EmptyState title="No evidence is cited" />}<div className="shared-memory-citation-add"><Field label="Evidence to add">{(control) => <Combobox aria-label="Evidence to add" emptyLabel="No file matches" id={control.id} onSearch={picker.search} onValueChange={setAddArtifactId} options={picker.files.filter((artifact) => !artifact.repository_id).map((artifact) => ({ label: artifact.title, value: artifact.id }))} placeholder="Add a file…" value={addArtifactId} />}</Field><Button disabled={!addArtifactId} onClick={addCitation} variant="secondary">Add</Button></div></fieldset><Button busy={isMutating} type="submit" variant="main"><Pencil size={ICON_SIZE.md} /> Save memory</Button></form> : <div className="shared-markdown shared-memory-body"><SafeMarkdown>{card?.card.body_markdown ?? ""}</SafeMarkdown></div>}</section>
-      <section className="shared-record-panel"><h2>Linked evidence</h2>{card?.evidence.length ? <div className="shared-evidence-links">{card.evidence.map((evidence) => <article key={evidence.link_id}>{evidence.artifact_id && evidence.exists ? <button className="shared-assistant-citation shared-evidence-link-title" onClick={() => onOpenArtifact(evidence.artifact_id!)} type="button"><strong>{evidence.title ?? "Untitled evidence"}</strong></button> : <strong>{evidence.title ?? "Untitled evidence"}{evidence.exists ? "" : " (missing)"}</strong>}<span>{evidence.path ?? evidence.target_id}{citationLines(evidence)}</span></article>)}</div> : <EmptyState title="This memory card currently has no linked evidence" />}</section>
+      <section className="shared-record-panel"><h2>Linked evidence</h2>{card?.evidence.length ? <div className="shared-evidence-links">{card.evidence.map((evidence) => <article key={evidence.link_id}>{evidence.artifact_id && evidence.exists ? <button className="shared-assistant-citation shared-evidence-link-title" onClick={() => onOpenArtifact(evidence.artifact_id!)} type="button"><strong>{evidence.title ?? "Untitled evidence"}</strong></button> : <strong>{evidence.title ?? "Untitled evidence"}{evidence.exists ? "" : " (missing)"}</strong>}<span>{evidence.path ?? evidence.target_id}{citationLines(evidence)}</span>{evidence.artifact_id && evidence.exists ? <ViewAtCommit accessToken={accessToken} citation={{ artifact_id: evidence.artifact_id, commit: evidence.commit, end_line: evidence.end_line, path: evidence.path ?? "", start_line: evidence.start_line }} /> : null}</article>)}</div> : <EmptyState title="This memory card currently has no linked evidence" />}</section>
     </SharedRecordLayout>
   );
 }

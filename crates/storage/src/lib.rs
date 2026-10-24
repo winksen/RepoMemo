@@ -646,6 +646,7 @@ struct MemoryEvidenceRow {
     path: Option<String>,
     start_line: Option<i64>,
     end_line: Option<i64>,
+    commit: Option<String>,
 }
 
 #[derive(Debug)]
@@ -1381,6 +1382,7 @@ impl From<MemoryEvidenceRow> for MemoryEvidence {
             start_line: row.start_line,
             end_line: row.end_line,
             exists,
+            commit: row.commit,
         }
     }
 }

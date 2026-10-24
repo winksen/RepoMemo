@@ -1141,6 +1141,9 @@ pub struct MemoryEvidence {
     pub start_line: Option<i64>,
     pub end_line: Option<i64>,
     pub exists: bool,
+    /// For evidence from a file of a git repository: the commit the card cited it at (V0.3.14), when it said.
+    #[serde(default)]
+    pub commit: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

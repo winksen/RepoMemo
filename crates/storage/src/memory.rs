@@ -144,7 +144,8 @@ impl StorageEngine {
               artifacts.title AS title,
               artifacts.path AS path,
               chunks.start_line AS start_line,
-              chunks.end_line AS end_line
+              chunks.end_line AS end_line,
+              json_extract(links.metadata_json, '$.commit') AS "commit"
             FROM links
             LEFT JOIN chunks ON links.to_type = 'chunk' AND chunks.id = links.to_id
             LEFT JOIN artifacts ON artifacts.id = CASE
@@ -358,6 +359,18 @@ impl StorageEngine {
 
 /// Links a memory card to what it cites: the passage when there is one, else
 /// the whole file.
+/// The metadata of a citation's link: the commit it names, when it names one that looks like a commit id (V0.3.14).
+fn cited_commit_metadata(citation: &Citation) -> String {
+    match citation.commit.as_deref().map(str::trim) {
+        Some(commit)
+            if (7..=64).contains(&commit.len()) && commit.chars().all(|character| character.is_ascii_hexdigit()) =>
+        {
+            serde_json::json!({ "commit": commit.to_ascii_lowercase() }).to_string()
+        }
+        _ => "{}".to_owned(),
+    }
+}
+
 async fn insert_citation_link<'e, E>(
     executor: E,
     workspace_id: &str,
@@ -378,7 +391,7 @@ where
         INSERT INTO links (
           id, workspace_id, from_id, from_type, to_id, to_type,
           relation_type, confidence, created_by, metadata_json, created_at
-        ) VALUES (?1, ?2, ?3, 'memory_card', ?4, ?5, 'cites', ?6, 'user', '{}', ?7)
+        ) VALUES (?1, ?2, ?3, 'memory_card', ?4, ?5, 'cites', ?6, 'user', ?7, ?8)
         "#,
     )
     .bind(Uuid::new_v4().to_string())
@@ -387,6 +400,7 @@ where
     .bind(target_id)
     .bind(target_type)
     .bind(citation.confidence)
+    .bind(cited_commit_metadata(citation))
     .bind(now)
     .execute(executor)
     .await?;

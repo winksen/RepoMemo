@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.3.13` (2026-10-24). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.3.14` (2026-10-24). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ---
 
@@ -566,7 +566,7 @@ These are observed in the code and are useful for prioritizing. The roadmap item
 | Gap | Impact |
 |---|---|
 | Only GitHub and GitLab are connected | Issues (V0.2.27) and pull or merge requests (V0.2.28, GitLab V0.2.29) with their comments, reviews and commits are evidence (Settings › Issues and pull requests), and the files, symbols and commits they name are linked both ways (V0.2.30). A connector can have a webhook (V0.2.31) and pauses itself when the tracker asks to wait or refuses the token [F17]. |
-| A citation's old text is opened from the server's copy | *View at commit* (V0.2.26) shows a cited file as it was at the commit it names, while that commit is still in the repository's copy; memory-card links and repository summaries do not offer it yet [F16d]. |
+| A citation's old text is opened from the server's copy | *View at commit* (V0.2.26) shows a cited file as it was at the commit it names, while that commit is still in the repository's copy; since V0.3.14 a memory card's linked evidence and the files a repository summary is based on offer it too, when the card's link named a commit (a citation saved from an answer does; one picked by hand does not) and the summary names the commit it describes [F16d, F16e]. |
 | `CODEOWNERS` owners are hints only | They show on a repository file's page since V0.2.25 but are not matched to workspace members, assigned or notified [F16c]. |
 | Assistant answers and citations do not name the last author | The last author and date of a repository file show on its page, in the file list and in search results since V0.2.24 [F16b]. |
 | Remote repositories and trackers need a named host, and pushes are noticed by polling unless a webhook is set up | `https` links work since V0.2.20 (a read-only token for private ones) and `ssh` links since V0.2.21 (a deploy key and the pinned host key); each clone has a size and a time cap since V0.2.22 and counts in the workspace's storage allowance; a push webhook (GitHub, GitLab or a signed generic call, V0.2.23) queues a sync at once, otherwise the server polls. git resolves host names itself, so for a name that points at a private address the host list is advisory: an egress rule is what enforces it [F4 phase 2, F16a]. A file renamed and edited in one commit keeps its history since V0.1.73 when at least about half of it is unchanged. |

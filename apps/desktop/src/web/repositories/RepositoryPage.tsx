@@ -35,6 +35,7 @@ import {
 import { RepositoryFiles } from "./FileBrowser";
 import { repositoryKeys } from "../../lib/queryClient";
 import { useServerState } from "../../lib/useServerState";
+import { ViewAtCommit } from "../common";
 
 /** Order and labels of the technology groups in the project analysis. */
 const STACK_CATEGORIES: [string, string][] = [
@@ -142,7 +143,8 @@ export function RepositoryDetailView({
   const status = job ? "syncing" : repository.status;
   const commit = repository.last_synced_commit;
   const summaryIsStale = Boolean(summary && commit && summary.commit_sha !== commit.sha);
-  const citedFiles = summary ? Array.from(new Map(summary.citations.map((citation) => [citation.artifact_id, citation.path])).entries()) : [];
+  // Each file the summary is based on, once, with the first passage cited and the commit the summary describes.
+  const citedFiles = summary ? Array.from(new Map(summary.citations.map((citation) => [citation.artifact_id, citation])).values()) : [];
   const progress = job?.progress_total ? Math.min(100, Math.round((job.progress_current / job.progress_total) * 100)) : null;
 
   return <>
@@ -173,7 +175,7 @@ export function RepositoryDetailView({
       {summary ? <>
         <div className="shared-markdown rm-repo-summary"><SafeMarkdown>{summary.summary_markdown}</SafeMarkdown></div>
         <p className="rm-map-muted">Written for commit <code>{summary.commit_sha.slice(0, 7)}</code> on {formatTime(summary.generated_at)}.{summaryIsStale ? " The repository has changed since; regenerate it to describe the current commit." : ""} {summary.warnings.join(" ")}</p>
-        {citedFiles.length ? <div className="rm-repo-cited"><span className="rm-map-muted">Based on</span>{citedFiles.map(([artifactId, path]) => <button className="rm-map-link" key={artifactId} onClick={() => onOpenArtifact(artifactId)} type="button">{path}</button>)}</div> : null}
+        {citedFiles.length ? <div className="rm-repo-cited"><span className="rm-map-muted">Based on</span>{citedFiles.map((citation) => <span className="rm-repo-cited-file" key={citation.artifact_id}><button className="rm-map-link" onClick={() => onOpenArtifact(citation.artifact_id)} type="button">{citation.path}</button><ViewAtCommit accessToken={accessToken} citation={citation} /></span>)}</div> : null}
       </> : <p className="shared-muted-copy">{detail.ai_available ? "No summary yet. A summary describes what the repository is, its main parts and where to start reading, from the overview below and the opening of its key files." : "A summary needs a text AI provider, which an administrator can set up in Settings. The overview below needs no AI."}</p>}
       {canSync && detail.ai_available && overview ? <div className="rm-health-actions"><Button busy={summarizing} onClick={() => void summarize()} variant={summary && !summaryIsStale ? "secondary" : "main"}><Sparkles size={ICON_SIZE.sm} /> {summarizing ? "Summarizing…" : summary ? "Regenerate summary" : "Generate summary"}</Button></div> : null}
     </section>

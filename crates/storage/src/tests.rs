@@ -2420,3 +2420,108 @@ async fn a_snoozed_review_item_is_kept_for_its_person_until_its_date() {
     drop(storage);
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn a_memory_card_keeps_the_commit_its_citation_names_and_ignores_one_that_is_not_a_commit() {
+    let (storage, data_dir) = temp_storage("memory-commit").await;
+    let workspace = storage.create_workspace("Commits").await.unwrap();
+    let source = storage
+        .create_or_get_source(&workspace.id, SourceType::Manual, "Notes", None)
+        .await
+        .unwrap();
+    let bytes = b"fn main() {}";
+    let content_hash = StorageEngine::content_hash(bytes);
+    storage
+        .store_blob(&content_hash, bytes, Some("text/plain"))
+        .await
+        .unwrap();
+    let artifact = storage
+        .store_artifact(NewArtifact {
+            workspace_id: workspace.id.clone(),
+            source_id: source.id,
+            artifact_type: ArtifactType::CodeFile,
+            title: "main.rs".to_owned(),
+            path: "src/main.rs".to_owned(),
+            content_hash,
+            mime_type: Some("text/plain".to_owned()),
+            language: Some("Rust".to_owned()),
+            size_bytes: bytes.len() as i64,
+            metadata: json!({}),
+        })
+        .await
+        .unwrap()
+        .artifact;
+    let cite = |commit: Option<&str>| Citation {
+        artifact_id: artifact.id.clone(),
+        chunk_id: None,
+        title: artifact.title.clone(),
+        path: artifact.path.clone(),
+        start_line: None,
+        end_line: None,
+        confidence: None,
+        commit: commit.map(str::to_owned),
+    };
+    let full = "0123456789ABCDEF0123456789abcdef01234567";
+    let card = storage
+        .create_memory_card(
+            &workspace.id,
+            "Entry point",
+            "Starts here.",
+            "manual",
+            None,
+            &[cite(Some(full))],
+        )
+        .await
+        .unwrap();
+    let evidence = storage.get_memory_card(&card.id).await.unwrap().evidence;
+    assert_eq!(evidence.len(), 1);
+    assert_eq!(
+        evidence[0].commit.as_deref(),
+        Some(full.to_ascii_lowercase().as_str()),
+        "the commit the citation named, in lower case"
+    );
+
+    // Saying the commit again keeps it; leaving it out, or naming something that is not a commit, stores none.
+    storage
+        .update_memory_card(
+            &card.id,
+            "Entry point",
+            "Starts here.",
+            "manual",
+            None,
+            Some(&[cite(Some(full))]),
+        )
+        .await
+        .unwrap();
+    assert!(storage.get_memory_card(&card.id).await.unwrap().evidence[0]
+        .commit
+        .is_some());
+    for named in [
+        None,
+        Some("main"),
+        Some("../../etc/passwd"),
+        Some("abc"),
+        Some("zzzzzzzzzz"),
+    ] {
+        storage
+            .update_memory_card(
+                &card.id,
+                "Entry point",
+                "Starts here.",
+                "manual",
+                None,
+                Some(&[cite(named)]),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            storage.get_memory_card(&card.id).await.unwrap().evidence[0].commit,
+            None,
+            "{named:?}"
+        );
+    }
+
+    storage.pool.close().await;
+    drop(storage);
+    let _ = std::fs::remove_dir_all(data_dir);
+}

@@ -2,6 +2,29 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.3.14 (2026-10-24)
+
+*View at commit* from memory cards and repository summaries.
+
+### Added
+- **On a memory card:** each linked file of a git repository whose citation named a commit shows *View at `0123456`*, which opens the cited text as it was at that commit, labelled as such, with the cited lines marked and a note when it is not the current version. A card made from an assistant answer keeps the commit the answer named; evidence picked by hand names none and shows no button.
+- **On a repository's page:** each file the AI summary is based on offers the same button, at the commit the summary describes.
+- **How a card remembers it:** the commit is kept in the link's own `metadata_json` (no migration), only when it looks like a commit id (7 to 64 hexadecimal characters, stored in lower case), read back as `MemoryEvidence.commit`, and sent again when a card is edited so saving a card does not lose it.
+
+### Security
+- The commit is data the card's writer supplied, shown and sent to the existing `GET /v1/artifacts/{id}/at/{commit}`, which reads the file of that artifact in its repository's own copy under the reader's workspace rights; anything that is not a hexadecimal id is dropped before it is stored.
+
+### Checks
+- **Compiled and linted:** `cargo clippy -D warnings` over the domain, storage, api and server crates with their tests, `cargo fmt --all --check`, `typecheck`, `types:check` (152 types), `styles:check`, `a11y:check`, `docs:check`, `version:check`.
+- **Tests written, not run:** a storage test (a named commit kept in lower case and read back, kept when the citation says it again, none stored when it is left out or is not a commit) and three web tests of the button (nothing without a commit, the label and the text with its lines marked and the current-version note, the error). The two pages' wiring is not covered by a rendering test.
+
+### Changed
+- **The documents:** the functional mindmap's gap row, the technical mindmap's route row and test counts (storage 45, web 349). The V0.2.26 gap about cards and summaries is closed.
+- **The version** is `0.3.14` everywhere.
+
+### Upgrading
+- Nothing to do. A card made before this release names no commit, so it shows no button until its evidence is cited from an answer again.
+
 ## V0.3.13 (2026-10-24)
 
 The command palette keeps recent places and offers *New note*.
