@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.0 (2026-10-25)
+
+The 0.4.x line is opened: preparation for deployment, on the server and on the client.
+
+### Changed
+- **The theme of the next line is chosen:** RepoMemo should deploy **directly on a server or in containers, containers preferred and tested**, with the API (Rust, its database and its files) and the web client (React) as separate containers, and the **desktop app resumed** as the web client's own UI and components, talking to the API directly, installable, an administrator being able to hand a team an executable already set for their server, Windows first, then Linux and macOS. Single sign-on, recorded as a proposal in V0.3.27, stays the candidate for the line after; its plan is set aside.
+- **The plan and the index are written:** [mindmap/plans/2026-10-25-deployment.md](mindmap/plans/2026-10-25-deployment.md) (where deployment stands, the shape aimed at, decisions 33–40, the tracks, the desktop app in detail, how the line is tested, the risks) and [mindmap/RELEASES_0.4.md](mindmap/RELEASES_0.4.md): **67 single-purpose releases in eight tracks** (configuration and secrets; the server image; the web image and the topology; compose and running containers; direct install; registry and release pipeline; the desktop app on the web client; documents, security and closing). The roadmap carries the same tables and its decision table decisions 33–40.
+- **The documents check knows the new index:** `docs:check` reads `RELEASES_0.4.md` for the current version and for its releases, and `CLAUDE.md` lists it.
+- **The version** is `0.4.0` everywhere. No code changed.
+
+### Checks
+- **Run:** `version:check` and `docs:check` (the links of the two new documents included).
+- **Not run:** nothing else applies: no code, test, build or server was touched.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.3.27 (2026-10-24)
 
 The 0.3.x line is closed: the checks are repeated, and the theme of V0.4.0 is recorded with its plan.

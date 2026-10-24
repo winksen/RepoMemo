@@ -7,9 +7,9 @@
 //   1. Every route of the server (node scripts/list-routes.mjs) has a row in
 //      mindmap/technical/api-reference.md.
 //   2. Every REPOMEMO_* variable the Rust code reads is described in docs/DEVELOPMENT_COMMANDS.md.
-//   3. The version the mindmaps and the current release index (0.3) say they describe is the
+//   3. The version the mindmaps and the current release index (0.4) say they describe is the
 //      product's version.
-//   4. Every release of an index (0.2, 0.3) marked done has an entry in CHANGELOG.md, and every
+//   4. Every release of an index (0.2, 0.3, 0.4) marked done has an entry in CHANGELOG.md, and every
 //      entry of the changelog from 0.2.1 on has a row in its index.
 //   5. Every relative link of the documents points at a file that exists and, in a Markdown file,
 //      at a heading that exists.
@@ -63,7 +63,7 @@ const stamps = [
   ["mindmap/FUNCTIONAL_MINDMAP.md", /reflects the code at `V([\d.]+)`/],
   ["mindmap/TECHNICAL_MINDMAP.md", /code at `V([\d.]+)`/],
   ["mindmap/ROADMAP.md", /\*\*Current version:\*\* `V([\d.]+)`/],
-  ["mindmap/RELEASES_0.3.md", /\*\*Current:\*\* `V([\d.]+)`/],
+  ["mindmap/RELEASES_0.4.md", /\*\*Current:\*\* `V([\d.]+)`/],
 ];
 for (const [path, pattern] of stamps) {
   const found = pattern.exec(read(path))?.[1];
@@ -73,8 +73,8 @@ if (!new RegExp(`^## V${version.replace(/\./g, "\\.")} \\(`, "m").test(read("CHA
 
 // 4. Releases ---------------------------------------------------------------
 const changelog = read("CHANGELOG.md");
-// One index for each minor line; the line's first number (0.2.0, 0.3.0) is the previous line's last.
-for (const [line, file] of [["2", "mindmap/RELEASES_0.2.md"], ["3", "mindmap/RELEASES_0.3.md"]]) {
+// One index for each minor line; the line's first number (0.2.0, 0.3.0, 0.4.0) is the previous line's last.
+for (const [line, file] of [["2", "mindmap/RELEASES_0.2.md"], ["3", "mindmap/RELEASES_0.3.md"], ["4", "mindmap/RELEASES_0.4.md"]]) {
   const first = `0.${line}.0`;
   const entries = new Set([...changelog.matchAll(new RegExp(`^## V(0\\.${line}\\.\\d+) \\(`, "gm"))].map((match) => match[1]));
   const index = read(file);

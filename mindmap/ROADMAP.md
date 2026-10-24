@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.3.27` (2026-10-24), after `V0.3.0` *Connected*, released after the maintainer's tests of the clean install (R6, R12) · **Next:** the [single sign-on plan](plans/2026-10-24-single-sign-on.md), `V0.3.28` onward (the 0.3.x line, [Road to V0.4.0](#-road-to-v040), is built and closed; decision 33 is recorded as a proposal for the maintainer to confirm) · **Built before the tag:** tracks K to N (V0.2.57–V0.2.193) · **Next minor after it:** `V0.4.0`, its theme proposed as single sign-on (decision 33, to confirm)
+> **Current version:** `V0.4.0` (2026-10-25), after `V0.3.0` *Connected*, released after the maintainer's tests of the clean install (R6, R12) · **Next:** [the 0.4.x line, preparation for deployment](#-the-04x-line-preparation-for-deployment), `V0.4.1` onward (the 0.3.x line, [Road to V0.4.0](#-road-to-v040), is built and closed; the [plan](plans/2026-10-25-deployment.md) and [RELEASES_0.4.md](RELEASES_0.4.md) are written) · **Built before the tag:** tracks K to N (V0.2.57–V0.2.193) · **Next minor after the 0.4.x line:** its theme to be chosen (single sign-on is the candidate)
 > **Feature freeze (V0.1.76 to the `v0.3.0` tag):** lifted by the tag on 2026-10-24. The 0.3.x releases follow the rules of [Road to V0.4.0](#-road-to-v040).
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Security review 2026-10-16 (V0.2.52)](security/2026-10-16-security-review.md) · [Security and backend review 2026-10-21 (V0.2.129)](security/2026-10-21-security-review.md) · [Security review of workspace templates 2026-10-22 (V0.2.192)](security/2026-10-22-workspace-templates-security-review.md) · [Security review of 0.3.x 2026-10-24 (V0.3.26)](security/2026-10-24-0.3-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -79,8 +79,9 @@ timeline
 | Track N: workspace templates (V0.2.163–V0.2.193) | ✅ V0.2.163–V0.2.193 built; decisions 24–28 taken as proposed; [plan](plans/2026-10-22-workspace-templates.md) · [format](technical/workspace-templates.md) |
 | **V0.3.0 *Connected*** | ✅ Released 2026-10-24: the version set to `0.3.0` and tagged `v0.3.0` after tracks K to N and the clean-machine install |
 | Road to V0.4.0 (V0.3.1–V0.3.27, tracks O to T) | ✅ Built and closed on 2026-10-24 at V0.3.27: fixes and the record, the local edition removed, small gaps closed, portability and connector depth, operations, security pass and release checks; decisions 29–32 taken as proposed, 33 recorded as a proposal |
-| Plan for the theme of V0.4.0: single sign-on (OIDC) (V0.3.28–V0.3.37) | 📝 Proposed in V0.3.27; [plan](plans/2026-10-24-single-sign-on.md); nothing built until the maintainer confirms decision 33 and decisions 34–38 |
-| V0.4.0 and later: scale-out, single sign-on, hosted | 💭 Direction (single sign-on first is proposed in decision 33; the rest waits) |
+| The 0.4.x line: preparation for deployment, server and client, containers first (V0.4.0–V0.4.67) | 🔄 Opened on 2026-10-25 by V0.4.0: 67 releases planned in eight tracks (configuration, the server image, the web image, compose and tests, direct install, registry, the desktop app on the web client, documents and security); [plan](plans/2026-10-25-deployment.md), [index](RELEASES_0.4.md); decisions 33–40 proposed |
+| Single sign-on (OIDC) | 💭 Set aside on 2026-10-25, kept as the candidate for the line after; [plan](plans/2026-10-24-single-sign-on.md) |
+| After the 0.4.x line: single sign-on, scale-out, hosted | 💭 Direction (the theme is not chosen; single sign-on is the candidate) |
 
 ---
 
@@ -1205,7 +1206,14 @@ The brief of each release (change, files, done when, commit line) is in the [pla
 | 30 | **The 0.3.x rules** | V0.3.1 | The freeze ends at the tag. One change per release as in 0.2.x, committed as `Update V0.3.N`, each with its changelog entry, mindmap updates and its row in `RELEASES_0.3.md`; security rules come with a new surface; the release checks are repeated at the end of the line (V0.3.27) rather than after each track. *Taken as proposed (V0.3.1)* |
 | 31 | **Removing the retired local edition** (F20d) | V0.3.5 | Remove it in three releases (V0.3.5–V0.3.7), the move to a server included. `UPGRADING.md` says the last release that can move a local workspace is V0.3.4, so anyone who still needs it moves it before upgrading. *Alternative:* keep the move one more minor and remove only the local app. *Taken as proposed (V0.3.1)* |
 | 32 | **The size and order of track Q** | V0.3.8 | Track Q (V0.3.8–V0.3.18) is eleven independent gaps from the functional mindmap, ordered by how often a team meets them. Drop, reorder or defer any of them; nothing depends on another. *Taken as proposed (V0.3.1)* |
-| 33 | **The theme of V0.4.0** | V0.3.27 | Recorded in V0.3.27 as a proposal, **single sign-on (OIDC) first**, for the maintainer to confirm; the plan is [single sign-on](plans/2026-10-24-single-sign-on.md). Before it: not decided. The candidates are in [Later](#-later-v040-and-beyond): single sign-on and enterprise controls, a scale-out server (PostgreSQL, object storage, a worker), more connectors, or assistant actions. *Recommendation:* single sign-on (OIDC) first, because the single-node server already holds the performance targets and sign-in is what blocks a larger organization sooner. Record the choice in the V0.3.27 release |
+| 33 | **The theme of V0.4.0 and of the 0.4.x line** | V0.4.0 | **Preparation for deployment**, chosen by the maintainer on 2026-10-25 (it replaced the proposal of single sign-on recorded in V0.3.27, which stays the candidate for the line after). Plan: [plans/2026-10-25-deployment.md](plans/2026-10-25-deployment.md) |
+| 34 | **Numbering of the line** | V0.4.0 | `V0.4.0` opens the line; `V0.4.1`–`V0.4.67` are built one by one; the next minor is cut after the maintainer's tests of a clean container install, as `V0.3.0` was. *Proposed* |
+| 35 | **Containers are the supported path** | V0.4.0 | Documented first, tested in CI and recorded in the clean-install page; a direct install is supported with an archive and a guide. *Proposed* |
+| 36 | **Three images, two main** | V0.4.0 | `repomemo-api` and `repomemo-web` are separate; the converter is optional; TLS is a separate `edge` piece. *Proposed* |
+| 37 | **Same origin by default, cross-origin supported** | V0.4.0 | The web image forwards `/v1` to the API by default; two addresses are supported through runtime configuration and a stated cookie and origin policy. *Proposed* |
+| 38 | **Registry and tags** | V0.4.0 | GitHub's container registry, `X.Y.Z`, `X.Y` and `latest`, multi-architecture, pushed by a tag only, with an SBOM and an attestation. *Proposed* |
+| 39 | **One desktop client** | V0.4.0 | The desktop app is the web client in a window: no desktop-only screen except the window's chrome and the connect screen, which uses the web client's components. *Proposed* |
+| 40 | **How an administrator gives a team the app** | V0.4.0 | The same executable plus `repomemo-desktop.json`, or an installer packaged for one server; signing and updates are later releases that need the maintainer's certificates and keys. *Proposed* |
 
 ---
 
@@ -1358,7 +1366,7 @@ Design and limits: [technical/repository-sources.md](technical/repository-source
 
 ## 🎯 Road to V0.4.0
 
-> **Status:** proposed on 2026-10-24, right after `V0.3.0`, and under way the same day: decisions 29–32 above are taken as proposed (the maintainer asked for the releases to be built one by one up to V0.3.27), and decision 33 is recorded in V0.3.27. The releases are numbered V0.3.1–V0.3.27, and `V0.4.0` is cut when the theme of decision 33 is ready, after V0.3.27. Built: V0.3.1–V0.3.27 (tracks O to T); the line is closed.
+> **Status:** proposed on 2026-10-24, right after `V0.3.0`, and under way the same day: decisions 29–32 above are taken as proposed (the maintainer asked for the releases to be built one by one up to V0.3.27), and decision 33 was recorded in V0.3.27 and replaced by the maintainer on 2026-10-25 (the 0.4.x line). The releases are numbered V0.3.1–V0.3.27. Built: V0.3.1–V0.3.27 (tracks O to T); the line is closed.
 
 ### What this line is
 
@@ -1480,9 +1488,140 @@ One box per release, added as each release is built. Say what was built and what
 
 ---
 
-## 💭 Later: V0.4.0 and beyond
+## 🎯 The 0.4.x line: preparation for deployment
 
-What the 0.3.x line leaves out. The order is not decided (decision 33 proposes single sign-on first; its [plan](plans/2026-10-24-single-sign-on.md) is written).
+> **Status:** proposed and opened on 2026-10-25 by `V0.4.0`, replacing the theme recorded in V0.3.27 (single sign-on, which stays the candidate for a later line). The maintainer chose it: RepoMemo should be deployable from this repository **directly on a server or in containers, containers preferred and tested**, with the API (Rust, its database and its files) and the web client (React) as separate containers, and the **desktop app** resumed as the web client's own UI and components, talking to the API directly, installable, **Windows first**, then Linux and macOS. The plan is [plans/2026-10-25-deployment.md](plans/2026-10-25-deployment.md); every release is in [RELEASES_0.4.md](RELEASES_0.4.md). Decisions 33–40 are proposed there and in the table above; nothing past `V0.4.0` is built.
+
+### What this line is
+
+`V0.3.0` made RepoMemo reach where a team's knowledge lives; the 0.3.x line paid off what it left. This line makes it **possible to put it somewhere**: a published pair of images, a compose file a stranger can run, a release archive for a plain server, and a desktop app an administrator can send to a team already pointed at the right server. It adds no product feature to the memory itself.
+
+### How the 0.4.x releases are cut
+
+- **One change per release**, as before, and as many releases as there are separate changes: 67 are planned.
+- **Containers first:** every release that touches the way the server runs says what it did to the containers, and the tests this line adds are tests of the containers (the stack started, used, backed up, restored and upgraded), written and compiled with the release and run by CI where they can be.
+- **Server and client apart:** the API image and the web image are built, configured, tested and published separately; neither needs the other to start.
+- **One client:** the desktop app is the web client in a window. A difference between them is a defect to be listed (V0.4.43) and closed or justified.
+- **The tests are the maintainer's to run,** and the first run of the container jobs is theirs to watch; nothing here builds or starts a server in the sessions that write the code.
+
+#### Track U: Configuration and secrets (V0.4.1–V0.4.6)
+
+| Release | Type | Section | The one change | IDs | Done when |
+|---|---|---|---|---|---|
+| **V0.4.1** | 🔧 | Configuration | Every secret can be given as a file (`REPOMEMO_JWT_SECRET_FILE`, `REPOMEMO_SECRET_KEY_FILE`, the backup keys, the SMTP password, the setup code), for Docker and Kubernetes secrets | D1 | A server started with only `_FILE` variables runs; a variable and a file for the same secret is refused |
+| **V0.4.2** | ✨ | Server | `repomemo-server --check-config` validates the environment and the data folder, prints what it would use with the secrets hidden, and exits with a code | D2 | A container run with `--check-config` says what is wrong without starting |
+| **V0.4.3** | 🔧 | Server | Build information in `/health` and `--version`: version, commit, build date and image tag, from build arguments | D3 | `/health` names the exact image that answers |
+| **V0.4.4** | 🔧 | Storage | The data folder can be split: `REPOMEMO_DB_DIR`, `REPOMEMO_BLOB_DIR` and `REPOMEMO_BACKUP_DIR` default to places under it, so the database and the files can sit on separate volumes | D4 | A server with three folders on three mounts runs, backs up and restores |
+| **V0.4.5** | 🔧 | Server | A check of the data folder at start: writable, free space, ownership, and a warning for a network file system under SQLite's write-ahead log | D5 | A read-only or full volume is named in the first log line, not by a later failure |
+| **V0.4.6** | 🔧 | Server | A clean stop on SIGTERM and Ctrl+C: new requests refused, running ones finished within a limit, jobs left resumable, the write-ahead log checkpointed | D6 | `docker stop` leaves a database that opens without recovery and no job lost |
+
+#### Track V: The server image (V0.4.7–V0.4.13)
+
+| Release | Type | Section | The one change | IDs | Done when |
+|---|---|---|---|---|---|
+| **V0.4.7** | 🔧 | Container | The server stage builds its dependencies in a cached layer, so a change of code does not rebuild the world | D7 | A code-only change rebuilds in a fraction of a full build, measured in CI |
+| **V0.4.8** | 🔧 | Container | A smaller server image: stripped binary, no `curl` or `socat` where the server can do it itself (`repomemo-server --health` for the health check) | D8 | The health check passes without `curl`; the image is smaller by the figure recorded |
+| **V0.4.9** | 🔧 | Container | OCI labels and build arguments (source, version, revision, created) on every image, asserted by `container:check` | D9 | `docker inspect` names the release and the commit |
+| **V0.4.10** | 🐞 | Container | Volumes that belong to root: an entrypoint that fixes ownership and drops to the unprivileged user, or a clear refusal when it cannot | D10 | A fresh named volume and a bind mount of a root-owned folder both start |
+| **V0.4.11** | ✨ | Container | An API-only compose file (`deploy/api.yml`): the server and its volumes, one published port, no web and no proxy, for people who bring their own front | D11 | It starts alone and answers `/health/ready` on its port |
+| **V0.4.12** | 🔧 | Container | The converter image (LibreOffice) built and tagged on its own, with its own check in CI | D12 | The `previews` profile starts from the converter's own tag |
+| **V0.4.13** | 🔒 | Container | Image scanning in CI: a scanner pinned by digest reads each image, high findings fail the job, the report is kept | D13 | A known-bad base image fails the job |
+
+#### Track W: The web image and the topology (V0.4.14–V0.4.21)
+
+| Release | Type | Section | The one change | IDs | Done when |
+|---|---|---|---|---|---|
+| **V0.4.14** | ✨ | Web | Runtime configuration: the web app reads `/config.json` (API address, product name) when it starts, instead of a build-time address, so one image serves any server | D14 | The same image points at two different servers by its environment alone |
+| **V0.4.15** | ✨ | Web | The web image on its own (`repomemo-web`): the built app behind a small static server, hashed assets cached and the page never, compression, the single-page fallback, security headers, its own health endpoint | D15 | The image runs without the API and serves the app with the right headers |
+| **V0.4.16** | ✨ | Web | Same-origin mode: the web image forwards `/v1` and `/health` to `REPOMEMO_API_UPSTREAM`, set when it starts, with live events unbuffered | D16 | Sign-in, search and live events work through the web image alone |
+| **V0.4.17** | 🔧 | Web | Cross-origin mode: the web on one address and the API on another: several allowed origins, the refresh cookie and its attributes for it, the content security policy taken from the configuration | D17 | The two images on two addresses sign in, refresh and stream; a third origin is refused |
+| **V0.4.18** | 🔧 | Container | TLS as its own optional piece (the `edge` profile): automatic certificates for a public name, the proxy's own authority for `localhost`, or certificates the operator supplies; the web image speaks plain HTTP | D18 | The stack runs without `edge` behind another proxy and with it for each of the three modes |
+| **V0.4.19** | 📘 | Deployment | Sample front doors for nginx and Traefik in `deploy/proxies/`, with the headers the server trusts and live events unbuffered, read by `container:check` | D19 | Each sample names the server's trusted-proxy setting and turns buffering off |
+| **V0.4.20** | ✨ | Web | The server can serve the built web app itself (`REPOMEMO_WEB_DIR`) for single-process installs: the same headers and fallback, off by default | D20 | One process answers the app and the API on one port |
+| **V0.4.21** | 🔧 | Web client | The client checks the server's version at start and says plainly when the API is too old or too new (a page, not a broken screen), in the browser and in the desktop app | D21 | A client against an incompatible server shows the reason and the versions |
+
+#### Track X: Compose and running containers (V0.4.22–V0.4.30)
+
+| Release | Type | Section | The one change | IDs | Done when |
+|---|---|---|---|---|---|
+| **V0.4.22** | 🔧 | Compose | Compose restructured around the pieces: `web` and `api` always, `edge` and `previews` as profiles, named volumes for the database, the files and the backups, and a way to move the single `repomemo-data` volume of 0.3.x into them | D22 | A 0.3.27 volume is moved and the stack starts on it with its data |
+| **V0.4.23** | ✨ | Deployment | `deploy/init` (shell and PowerShell): makes the `.env` with strong secrets and the host name, and refuses to overwrite one | D23 | One command from a clean checkout gives a working `.env` |
+| **V0.4.24** | ✨ | Deployment | `deploy/upgrade`: backs up through the API, pulls the new images, restarts, waits for healthy and puts the old tag back if it does not | D24 | A deliberately broken tag ends on the old version, running |
+| **V0.4.25** | 🔧 | Deployment | Backups and restores in containers, written and scripted: the server's own backups, a copy of the volumes, `docker compose run` for the console; a restore tested in CI | D25 | CI restores a backup into a second stack and finds the data |
+| **V0.4.26** | 🔧 | Tests | The compose job runs `scripts/smoke-test.mjs` against the stack: first-run setup through the API, a workspace, an upload, indexing, search, a backup, an export and an import | D26 | CI fails when any of those steps fails in the containers |
+| **V0.4.27** | 🔧 | Tests | An upgrade test in CI: the previous release's images create data on named volumes, the new images take over the same volumes, and the data is intact | D27 | A migration that loses data fails the job |
+| **V0.4.28** | 🔧 | Compose | Healthchecks for every service, `depends_on` conditions, restart policies, `stop_grace_period`, log rotation, and documented memory and CPU limits | D28 | `docker compose up --wait` returns only when every service is healthy |
+| **V0.4.29** | 🔧 | Server | JSON logs to standard output (`REPOMEMO_LOG_FORMAT=json`), no log files in containers, the audit target kept apart | D29 | Every line of `docker compose logs api` parses as JSON when asked for |
+| **V0.4.30** | 📘 | Deployment | Metrics in containers: a sample Prometheus scrape of `/v1/system/metrics` with a token, and a `monitoring` profile as an example, never on by default | D30 | The example starts and shows the server's figures |
+
+#### Track Y: Direct install (V0.4.31–V0.4.36)
+
+| Release | Type | Section | The one change | IDs | Done when |
+|---|---|---|---|---|---|
+| **V0.4.31** | ✨ | Packaging | The server release archive and its packager (`scripts/package-server.mjs`): binary, built web app, `.env.example`, service files, readme and checksums, the same layout on every system | D31 | The archive unpacked and started on a clean machine serves the app |
+| **V0.4.32** | ✨ | Packaging | Linux: a hardened systemd unit and an install script that makes the user and the folders; `systemd-analyze verify` in CI | D32 | The unit verifies and the script is safe to run twice |
+| **V0.4.33** | ✨ | Packaging | Windows: the server runs as a service (`repomemo-server service install|uninstall`) with a PowerShell install script | D33 | The service starts at boot, stops cleanly and uninstalls |
+| **V0.4.34** | 📘 | Deployment | Front doors for direct installs: the built-in web folder, Caddy or nginx in front, and the firewall and certificate steps for each system | D34 | A reader can reach a working HTTPS address by following one page |
+| **V0.4.35** | 🔧 | Packaging | CI builds the server for Linux x64, Linux arm64 and Windows x64 and attaches the archives to the release with SHA256SUMS | D35 | The three archives and their checksums are on a release |
+| **V0.4.36** | 🔧 | Server | The server refuses to start on a database written by a newer version, naming both versions; an upgrade and rollback guide for direct installs that begins with a backup | D36 | An older binary on a newer database stops with the reason and changes nothing |
+
+#### Track Z: Registry and release pipeline (V0.4.37–V0.4.42)
+
+| Release | Type | Section | The one change | IDs | Done when |
+|---|---|---|---|---|---|
+| **V0.4.37** | ✨ | Release | A release workflow on a `v*` tag: the tag must equal the version, the checks run, multi-architecture images are pushed to GHCR (`X.Y.Z`, `X.Y` and `latest`); nothing is pushed by a pull request | D37 | A tag publishes the three images for amd64 and arm64 |
+| **V0.4.38** | 🔒 | Release | Provenance: an SBOM and a build attestation for each image, optional keyless signing, and how to verify them | D38 | A published image's attestation verifies against the repository |
+| **V0.4.39** | 📘 | Release | The release page is written from the changelog entry, with the images, the archives and the installer listed | D39 | The page of a release needs no hand editing |
+| **V0.4.40** | 🔧 | Compose | `docker-compose.yml` pulls the released images (`REPOMEMO_VERSION`); building is a separate override file for development | D40 | `docker compose pull && up` runs a released version without a compiler |
+| **V0.4.41** | ✨ | Deployment | A quick start: one documented command that fetches the compose file and the init script of a release and checks their checksum | D41 | A clean machine with Docker has a running server after that command and the init |
+| **V0.4.42** | 📘 | Release | Dependabot and the pinning rules cover the new workflows; `container:check` refuses an unpinned action or image in them | D42 | No `uses:` or `FROM` in any workflow or Dockerfile names a moving tag |
+
+#### Track AA: The desktop app on the web client (V0.4.43–V0.4.61)
+
+| Release | Type | Section | The one change | IDs | Done when |
+|---|---|---|---|---|---|
+| **V0.4.43** | 📘 | Desktop | A parity audit of the desktop client against the web client, written as a checklist (transport, downloads, links, notifications, shortcuts, window), and a test that the two share one bundle and one entry | H43 | Every difference is listed with the release that closes it or the reason it stays |
+| **V0.4.44** | 🔧 | Desktop | One transport: `sharedApi` has a single `fetch` seam, the desktop's HTTP plugin only where the webview needs it, both covered by tests; no desktop branch inside a component | H44 | No component tests for the desktop runtime; the seam is the only place |
+| **V0.4.45** | 🔧 | Desktop | The connect screen is made of the web client's own components (dialog, field, button, toast) and tokens, so there is one look; the desktop's own styles are only the window's chrome | H45 | The connect screen and the sign-in page share their building blocks |
+| **V0.4.46** | ✨ | Desktop | A preset server: an address fixed when the app is packaged, which skips the connect screen and cannot be changed | H46 | A packaged app opens on the sign-in page of its server with no address field |
+| **V0.4.47** | ✨ | Desktop | A configuration file for the app (`repomemo-desktop.json` beside the executable or in its config folder): server address, name, whether it is locked, a support link; it overrides what a person typed and is checked by the same rules | H47 | The same executable with two files talks to two servers; a bad file is named, not obeyed |
+| **V0.4.48** | ✨ | Desktop | An admin command, `npm run desktop:package -- --server https://memo.example.com --name "Acme Memo"`, that makes a Windows installer and a portable executable already set for that server | H48 | An administrator without Rust installed can hand a team a working file (documented path: the CI artifact plus the configuration file) |
+| **V0.4.49** | ✨ | Desktop | Windows builds in CI (`windows-latest`): the installer and the portable executable are uploaded as artifacts; the WebView2 runtime handled (fetched when missing, or carried for offline installs) | H49 | CI uploads a Windows installer that opens the app on a clean machine |
+| **V0.4.50** | 🔧 | Desktop | The Windows installer: per person, no administrator rights, Start menu and desktop shortcuts, a silent install for IT (`/S`), an uninstall that offers to forget the saved session | H50 | Install, silent install and uninstall all leave the machine as described |
+| **V0.4.51** | 🔧 | Desktop | Identity and polish: the icon set from the logo, product and version details in the executable, a window title that names the workspace, one instance only, size and place remembered | H51 | A second launch focuses the first; the window comes back where it was |
+| **V0.4.52** | 🔧 | Desktop | Saving files from the app: exports and downloads through a native save dialog, since a blob download is not the same in every webview | H52 | An archive export, a memory card export and a document download each save where the person chose |
+| **V0.4.53** | ✨ | Desktop | Native notifications for the notices a person chose, and a badge for what waits in Review | H53 | A notice arrives on the desktop while the app is in the background |
+| **V0.4.54** | ✨ | Desktop | `repomemo://` links: *Open in the app* on a page of the web client and a link from a notice open the same page in the app; only the app's own paths are taken | H54 | A link opens the page in the app; a foreign path is refused |
+| **V0.4.55** | 🔧 | Desktop | Servers with their own certificate authority: an optional certificate bundle in the configuration file that the app trusts for that server only | H55 | A server with an internal CA works; the same bundle does not make any other site trusted |
+| **V0.4.56** | ✨ | Desktop | Updates: the app checks a signed update feed (opt-in, from the release or from the administrator's own address) and offers the new version | H56 | An older app offers the newer one and installs it; an unsigned feed is refused |
+| **V0.4.57** | 🔒 | Desktop | Windows code signing in CI when the signing secret exists, and the guidance for the SmartScreen warning when it does not | H57 | A signed build shows its publisher; an unsigned one is documented |
+| **V0.4.58** | 🔧 | Desktop | A parity check (`npm run desktop:check`): no desktop-only component or stylesheet outside a short list, in CI with the other checks | H58 | Adding a desktop-only screen fails the check until it is listed with a reason |
+| **V0.4.59** | ✨ | Desktop | Linux builds: AppImage and `.deb` from CI, the system libraries listed; the same preset and configuration file | H59 | CI uploads both and the AppImage opens the app on a clean Ubuntu |
+| **V0.4.60** | ✨ | Desktop | macOS builds: a universal `.dmg` from CI, signing and notarization when the secrets exist; the same preset and configuration file | H60 | CI uploads a `.dmg` that opens the app |
+| **V0.4.61** | 📘 | Desktop | Where each system keeps the app's configuration, its saved session and its logs, written for administrators | H61 | An administrator can find, change and remove each of them |
+
+#### Track AB: Documents, security and closing (V0.4.62–V0.4.67)
+
+| Release | Type | Section | The one change | IDs | Done when |
+|---|---|---|---|---|---|
+| **V0.4.62** | 📘 | Documents | The deployment guide (`docs/DEPLOYMENT.md`): choose container or direct install, sizing, the first hour, backups, upgrades | D62 | A new administrator reaches a running server from that page alone |
+| **V0.4.63** | 📘 | Documents | The desktop administrator's guide (`docs/DESKTOP_ADMIN.md`): packaging for a server, handing it to a team, updating, removing | D63 | An administrator hands a team a working app from that page alone |
+| **V0.4.64** | 📘 | Documents | Troubleshooting and FAQ: the log lines, the health checks and the usual errors, each with its cause and its remedy | D64 | Every error the checks and the first-run setup can raise is listed |
+| **V0.4.65** | 🔒 | Security | A security pass over the deployment surface: cross-origin cookies, the web image and `config.json`, the desktop configuration file and the installers, `_FILE` secrets, the release pipeline and the images | D65 | No high or medium finding open |
+| **V0.4.66** | 📘 | Release record | The clean-install page gets the container steps (the ones the maintainer runs) and the desktop steps, with a record sheet | D66 | The maintainer can run and record a container install from the page |
+| **V0.4.67** | 📘 | Release | Release checks repeated; the line closed; the next theme is chosen (single sign-on stays the candidate) | D67 | Every check passes; the next plan is written |
+
+### Release checklists (0.4.x)
+
+One box per release, added as each release is built. Say what was built and what was not run (the tests are the maintainer's to run).
+
+- [x] **V0.4.0** the line opened. Done: the theme recorded (decision 33 replaced), decisions 34–40 proposed, [the plan](plans/2026-10-25-deployment.md) and [RELEASES_0.4.md](RELEASES_0.4.md) written with 67 releases in eight tracks, the single-sign-on plan set aside as the candidate for a later line, `check-docs` taught the new index, the version set to `0.4.0`. No code changed. **Not run:** nothing to run; **to confirm:** the numbering and the decisions
+
+---
+
+## 💭 Later: after the 0.4.x line
+
+What the 0.3.x and 0.4.x lines leave out. Single sign-on is the candidate for the line after 0.4.x (its [plan](plans/2026-10-24-single-sign-on.md) is written and set aside); the order is not decided.
 
 | Direction | Scope |
 |---|---|

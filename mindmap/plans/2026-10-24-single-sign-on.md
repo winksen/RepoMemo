@@ -1,6 +1,6 @@
 `# Single sign-on (OIDC): the plan for the theme of V0.4.0
 `
-`> **Status:** proposed on 2026-10-24, in the release that closes the 0.3.x line (`V0.3.27`), as the record of [decision 33](../ROADMAP.md#decisions-to-agree-before-work-starts) *The theme of V0.4.0*. The roadmap recommended single sign-on first, and this plan writes it down; **the maintainer confirms or changes the theme before any of it is built**, as with every decision before it. Nothing here is built.
+`> **Status:** **set aside on 2026-10-25**: the maintainer chose [preparation for deployment](2026-10-25-deployment.md) as the theme of the 0.4.x line. This plan stays as the candidate for a later line, and the release numbers in it (V0.3.28–V0.3.37) are void. It was proposed on 2026-10-24, in the release that closes the 0.3.x line (`V0.3.27`), as the record of [decision 33](../ROADMAP.md#decisions-to-agree-before-work-starts) *The theme of V0.4.0*. The roadmap recommended single sign-on first, and this plan writes it down; **the maintainer confirms or changes the theme before any of it is built**, as with every decision before it. Nothing here is built.
 `> **Method:** a reading of what sign-in is today ([§1](#1-what-exists-today)) and a list of single-purpose releases, numbered as 0.2.x was before `V0.3.0` and 0.3.x before this one: the work is built as `V0.3.28` onward, committed as `Update V0.3.N`, and `V0.4.0` is cut when the maintainer's tests of the clean install pass, as `V0.3.0` was.
 `> **Related:** [roadmap](../ROADMAP.md) · [auth and authorization](../technical/auth-and-authorization.md) · [seventh security review](../security/2026-10-24-0.3-security-review.md)
 `
@@ -62,10 +62,10 @@
 `
 `## 5. Left out, on purpose
 `
-`SAML; SCIM provisioning and deprovisioning; several providers or a provider for each organization; a hosted, multi-tenant service; and the other directions of [Later](../ROADMAP.md#-later-v040-and-beyond) (a scale-out server, more connectors, assistant actions), which wait for their turn after this one.
+`SAML; SCIM provisioning and deprovisioning; several providers or a provider for each organization; a hosted, multi-tenant service; and the other directions of [Later](../ROADMAP.md#-later-after-the-04x-line) (a scale-out server, more connectors, assistant actions), which wait for their turn after this one.
 `
 `## 6. What the maintainer decides now
 `
-`1. **The theme:** confirm single sign-on first (decision 33), or choose another direction from [Later](../ROADMAP.md#-later-v040-and-beyond); this plan is then rewritten or set aside.
+`1. **The theme:** confirm single sign-on first (decision 33), or choose another direction from [Later](../ROADMAP.md#-later-after-the-04x-line); this plan is then rewritten or set aside.
 `2. **Decisions 34–38**, each as proposed or changed.
 `3. **The numbering:** `V0.3.28` onward until the tag, as proposed, or a `V0.4.x` line instead.

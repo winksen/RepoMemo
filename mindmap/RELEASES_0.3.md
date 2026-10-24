@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.3 → 0.4
 
-> **Line:** `V0.3.1` to `V0.3.27`, then `V0.4.0` (theme proposed: single sign-on, decision 33 to confirm) · **Current:** `V0.3.27` (2026-10-24, the line is closed) · **Next:** the [single sign-on plan](plans/2026-10-24-single-sign-on.md), `V0.3.28` onward
+> **Line:** `V0.3.1` to `V0.3.27`, then the [0.4 line](RELEASES_0.4.md), opened by `V0.4.0` (preparation for deployment, decision 33) · **Current:** `V0.3.27` (2026-10-24, the line is closed) · **Next:** [Releases 0.4](RELEASES_0.4.md)
 > **Previous line:** [Releases 0.2 → 0.3](RELEASES_0.2.md) · **Related:** [Roadmap, Road to V0.4.0](ROADMAP.md#-road-to-v040) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
 Every release of the 0.3 line, planned and later shipped, one row each. The plan comes from the [Road to V0.4.0](ROADMAP.md#-road-to-v040), proposed on 2026-10-24: **one change per release**, each shippable alone, committed as `Update V0.3.N`. Decisions 29–32 of the roadmap are taken as proposed (V0.3.1); decision 33, the theme of V0.4.0, is recorded in V0.3.27.
@@ -22,7 +22,7 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | V0.3.19–V0.3.22 | R. Portable archives and connector depth | Versions and saved searches in archives, import as a background job, issue references and approvals, webhook deliveries |
 | V0.3.23–V0.3.25 | S. Operations and experience | Compose tested in CI and an `arm64` image, backup passphrase rotation, accessibility residuals |
 | V0.3.26–V0.3.27 | T. Closing | Security pass, release checks, the theme of V0.4.0 recorded |
-| V0.4.0 | — | Theme to be chosen (decision 33) |
+| V0.4.0 | — | Opens the [0.4 line](RELEASES_0.4.md): preparation for deployment (decision 33) |
 
 ---
 
