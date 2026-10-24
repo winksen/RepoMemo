@@ -312,6 +312,236 @@ async fn an_encrypted_backup_holds_nothing_readable_and_restores_only_with_its_k
     let _ = std::fs::remove_dir_all(data_dir);
 }
 
+/// Copies a backup folder (the files are copied, not linked) into another server's backups.
+fn copy_backup_folder(from: &std::path::Path, to: &std::path::Path) {
+    std::fs::create_dir_all(to).unwrap();
+    for entry in std::fs::read_dir(from).unwrap().flatten() {
+        let target = to.join(entry.file_name());
+        if entry.file_type().unwrap().is_dir() {
+            copy_backup_folder(&entry.path(), &target);
+        } else {
+            std::fs::copy(entry.path(), target).unwrap();
+        }
+    }
+}
+
+#[tokio::test]
+async fn a_backup_made_with_the_old_passphrase_opens_with_it_or_after_it_is_sealed_again() {
+    const OLD: &str = "the old backup passphrase, long enough";
+    const NEW: &str = "the new backup passphrase, long enough";
+
+    // A server with the old passphrase makes a backup.
+    let old_dir = temp_data_dir("rotate-old");
+    let mut config = ServerConfig::for_test(old_dir.clone());
+    config.backup_key = Some(OLD.to_owned());
+    let old_app = router(config).await.unwrap();
+    let (old_admin, _) = register_account(&old_app, "rotate-old@example.com").await;
+    let workspace_id = create_workspace(&old_app, &old_admin).await;
+    assert_eq!(
+        upload(
+            &old_app,
+            &old_admin,
+            &workspace_id,
+            "plan.txt",
+            b"Ship on Friday".to_vec()
+        )
+        .await,
+        201
+    );
+    let started = old_app
+        .clone()
+        .oneshot(json_request("POST", "/v1/system/backups", &old_admin, json!({})))
+        .await
+        .unwrap();
+    assert_eq!(started.status(), 202);
+    let made = wait_for_backup_work(&old_app, &old_admin).await;
+    assert_eq!(made["status"]["succeeded"], true, "{made}");
+    let name = made["backups"][0]["name"].as_str().unwrap().to_owned();
+    let sealed_by_old = old_dir.join("backups").join(&name);
+
+    // A server on the new passphrase is given that backup. Without the old one it stays shut; with it, the
+    // backup is listed as made with the previous key and restores.
+    let serve = |label: &str, previous: Option<&str>| {
+        let dir = temp_data_dir(label);
+        let mut config = ServerConfig::for_test(dir.clone());
+        config.backup_key = Some(NEW.to_owned());
+        config.backup_previous_key = previous.map(str::to_owned);
+        async move { (router(config).await.unwrap(), dir) }
+    };
+    let overview = |app: axum::Router, admin: String| async move {
+        response_json(
+            app.oneshot(auth_request("GET", "/v1/system/backups", &admin))
+                .await
+                .unwrap(),
+        )
+        .await
+    };
+    let restore = |app: axum::Router, admin: String, name: String, environment: String| async move {
+        let started = app
+            .clone()
+            .oneshot(json_request(
+                "POST",
+                &format!("/v1/system/backups/{name}/restore"),
+                &admin,
+                json!({"environment": environment}),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(started.status(), 202);
+        wait_for_backup_work(&app, &admin).await
+    };
+    let reseal = |app: axum::Router, admin: String, name: String| async move {
+        let started = app
+            .clone()
+            .oneshot(json_request(
+                "POST",
+                &format!("/v1/system/backups/{name}/reseal"),
+                &admin,
+                json!({}),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(started.status(), 202);
+        wait_for_backup_work(&app, &admin).await
+    };
+    let unique = || format!("rotate-{}", &uuid::Uuid::new_v4().simple().to_string()[..8]);
+    let state_of = |overview: &Value, wanted: &str| {
+        overview["backups"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|backup| backup["name"] == wanted)
+            .unwrap()["sealed_with"]
+            .clone()
+    };
+
+    let (shut_app, shut_dir) = serve("rotate-shut", None).await;
+    let (shut_admin, _) = register_account(&shut_app, "rotate-shut@example.com").await;
+    copy_backup_folder(&sealed_by_old, &shut_dir.join("backups").join(&name));
+    let listed = overview(shut_app.clone(), shut_admin.clone()).await;
+    assert_eq!(state_of(&listed, &name), "neither", "{listed}");
+    assert_eq!(listed["previous_key_set"], false);
+    let refused = restore(shut_app.clone(), shut_admin.clone(), name.clone(), unique()).await;
+    assert_eq!(refused["status"]["succeeded"], false, "{refused}");
+    assert!(
+        refused["status"]["message"].as_str().unwrap().contains("different key"),
+        "{refused}"
+    );
+    // Nor can it be sealed again without the old passphrase.
+    let nothing = reseal(shut_app.clone(), shut_admin.clone(), name.clone()).await;
+    assert_eq!(nothing["status"]["succeeded"], false, "{nothing}");
+    assert!(
+        nothing["status"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("REPOMEMO_BACKUP_KEY_PREVIOUS"),
+        "{nothing}"
+    );
+
+    let (app, dir) = serve("rotate-new", Some(OLD)).await;
+    let (admin, _) = register_account(&app, "rotate-new@example.com").await;
+    copy_backup_folder(&sealed_by_old, &dir.join("backups").join(&name));
+    let listed = overview(app.clone(), admin.clone()).await;
+    assert_eq!(state_of(&listed, &name), "previous", "{listed}");
+    assert_eq!(listed["previous_key_set"], true);
+    let salt_before = listed["backups"][0]["encryption"]["salt"].as_str().unwrap().to_owned();
+    let environment = unique();
+    let opened = restore(app.clone(), admin.clone(), name.clone(), environment.clone()).await;
+    assert_eq!(opened["status"]["succeeded"], true, "{opened}");
+    assert!(
+        opened["status"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("REPOMEMO_BACKUP_KEY_PREVIOUS"),
+        "{opened}"
+    );
+    let _ = std::fs::remove_dir_all(crate::environment::environments_root().unwrap().join(&environment));
+
+    // A new backup is sealed with the new passphrase, and is not offered for sealing again.
+    tokio::time::sleep(std::time::Duration::from_millis(1_100)).await;
+    assert_eq!(
+        app.clone()
+            .oneshot(json_request("POST", "/v1/system/backups", &admin, json!({})))
+            .await
+            .unwrap()
+            .status(),
+        202
+    );
+    let fresh = wait_for_backup_work(&app, &admin).await;
+    assert_eq!(fresh["status"]["succeeded"], true, "{fresh}");
+    let fresh = overview(app.clone(), admin.clone()).await;
+    let fresh_name = fresh["backups"][0]["name"].as_str().unwrap().to_owned();
+    assert_ne!(fresh_name, name);
+    assert_eq!(state_of(&fresh, &fresh_name), "current");
+    assert_eq!(state_of(&fresh, &name), "previous");
+
+    // Sealing again: the files are written afresh under the new passphrase, in the same place, and the old
+    // backup no longer needs the old passphrase.
+    let sealed = reseal(app.clone(), admin.clone(), name.clone()).await;
+    assert_eq!(sealed["status"]["operation"], "reseal");
+    assert_eq!(sealed["status"]["succeeded"], true, "{sealed}");
+    let sealed = overview(app.clone(), admin.clone()).await;
+    assert_eq!(state_of(&sealed, &name), "current");
+    let manifest = sealed["backups"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|backup| backup["name"] == name.as_str())
+        .unwrap();
+    assert_ne!(manifest["encryption"]["salt"].as_str().unwrap(), salt_before);
+    let folder = dir.join("backups").join(&name);
+    assert!(folder.join("repomemo.sqlite.enc").is_file());
+    assert!(folder.join("secret.key.enc").is_file());
+    assert!(!folder.join("repomemo.sqlite").exists());
+    for leftover in [format!("{name}.resealing.partial"), format!("{name}.replaced.partial")] {
+        assert!(!dir.join("backups").join(leftover).exists());
+    }
+    // Once more is refused: there is nothing left to do.
+    let again = reseal(app.clone(), admin.clone(), name.clone()).await;
+    assert_eq!(again["status"]["succeeded"], false, "{again}");
+    assert!(
+        again["status"]["message"].as_str().unwrap().contains("already"),
+        "{again}"
+    );
+    // And a backup that does not exist has nothing to seal.
+    let missing = app
+        .clone()
+        .oneshot(json_request(
+            "POST",
+            "/v1/system/backups/backup-20200101-000000/reseal",
+            &admin,
+            json!({}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(missing.status(), 404);
+
+    // A server that has only the new passphrase now opens it.
+    let (plain_app, plain_dir) = serve("rotate-after", None).await;
+    let (plain_admin, _) = register_account(&plain_app, "rotate-after@example.com").await;
+    copy_backup_folder(&folder, &plain_dir.join("backups").join(&name));
+    let listed = overview(plain_app.clone(), plain_admin.clone()).await;
+    assert_eq!(state_of(&listed, &name), "current", "{listed}");
+    let environment = unique();
+    let opened = restore(
+        plain_app.clone(),
+        plain_admin.clone(),
+        name.clone(),
+        environment.clone(),
+    )
+    .await;
+    assert_eq!(opened["status"]["succeeded"], true, "{opened}");
+    assert!(
+        !opened["status"]["message"].as_str().unwrap().contains("PREVIOUS"),
+        "{opened}"
+    );
+    let _ = std::fs::remove_dir_all(crate::environment::environments_root().unwrap().join(&environment));
+
+    for path in [old_dir, shut_dir, dir, plain_dir] {
+        let _ = std::fs::remove_dir_all(path);
+    }
+}
+
 #[tokio::test]
 async fn each_backup_is_copied_to_a_second_place_and_checked() {
     let data_dir = temp_data_dir("backup-copy");

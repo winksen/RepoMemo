@@ -623,11 +623,13 @@ export interface BackupManifest {
   bytes?: number;
   /** Present once the backup was copied to the second location and checked. */
   copy?: { destination: string; copied_at: string; files: number; bytes: number; linked: number } | null;
+  /** Which configured key opens a sealed backup: the current one, the previous one (it can be sealed again) or neither. */
+  sealed_with?: "current" | "previous" | "neither" | null;
 }
 
 export interface BackupStatus {
   running: boolean;
-  operation: "backup" | "restore" | "copy" | null;
+  operation: "backup" | "restore" | "copy" | "reseal" | null;
   started_at: string | null;
   finished_at: string | null;
   succeeded: boolean | null;
@@ -643,6 +645,8 @@ export interface BackupsOverview {
   disk_free_bytes: number | null;
   /** Whether new backups are sealed (REPOMEMO_BACKUP_KEY is set). */
   encryption_enabled: boolean;
+  /** Whether the key before the last change is kept (REPOMEMO_BACKUP_KEY_PREVIOUS), so older backups can be opened and sealed again. */
+  previous_key_set?: boolean;
   /** The folder every backup is copied to, when one is set. */
   copy_directory?: string | null;
 }

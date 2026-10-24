@@ -2,6 +2,28 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.3.24 (2026-10-24)
+
+The backup passphrase can be changed.
+
+### Added
+- **`REPOMEMO_BACKUP_KEY_PREVIOUS`:** the passphrase before the last change. Put the new one in `REPOMEMO_BACKUP_KEY` and the old one here (16 or more characters, different from the new one, and only with the new one set) and restart. New backups are sealed with the new passphrase; a backup made with the old one still restores, because the server tries the new passphrase and then the old (the restore says when it used the old one).
+- **Which key opens a backup:** System › Backups marks each sealed backup *previous key* (the old passphrase opens it) or *key not available* (neither does), and the listing carries `sealed_with` (`current`, `previous`, `neither`). Deriving a key is slow, so it is worked out once for each way of sealing and remembered.
+- **Sealing again:** *Seal again with the current key* on a backup the previous key made, `POST /v1/system/backups/{name}/reseal` and `backup reseal <backup> --yes` in the console (system administrators). The files are read with the old passphrase and written afresh with the new one, a chunk at a time, so the plain text is never whole in memory or on the disk, into `<name>.resealing.partial` beside the original; the original is replaced only when the new folder is whole, and a failure leaves it as it was. It needs about as much free disk as the backup takes (the server checks first) and is refused for a backup the current key already opens, a backup that is not sealed, or when `REPOMEMO_BACKUP_KEY_PREVIOUS` is not the key it was made with.
+
+### Changed
+- **A second copy of a backup that was sealed again is sent afresh:** the copy is trusted only when its manifest is the backup's own, so a copy made before the change is replaced instead of being counted as the new backup's copy.
+- **The mismatch message** now names both variables.
+- **The documents:** the production guide's account of changing the passphrase, the development commands (the new variable), the compose file and `.env.example`, the console guide, the API reference, the technical mindmap (routes, scope line, test counts: server 213, web 379) and the roadmap. The O6a gap "no rotation of old backups" is closed; the passphrase is still the only way back into a backup.
+- **The version** is `0.3.24` everywhere.
+
+### Checks
+- **Compiled and linted:** `cargo clippy -D warnings` over the server crate with its tests, `cargo fmt --all --check`, `typecheck`, `types:check`, `container:check`, `docs:check`, `version:check`.
+- **Tests written, not run:** unit tests of sealing a file again (every size, the new key only, a wrong key, a changed byte and a cut end failing and leaving nothing), of opening with either key and telling which, of sealing a whole backup folder again, and of a second copy sent afresh; a server test over the router (a backup made on the old passphrase given to a server on the new one: shut without the old one, listed as previous and restored with it, sealed again, no longer needing it, and refused a second time) and web tests of the badges and the action.
+
+### Upgrading
+- Nothing to do unless you change the passphrase. To change it: set `REPOMEMO_BACKUP_KEY` to the new one and `REPOMEMO_BACKUP_KEY_PREVIOUS` to the old one, restart, seal the backups you keep again, then remove `REPOMEMO_BACKUP_KEY_PREVIOUS`.
+
 ## V0.3.23 (2026-10-24)
 
 The container is tried in CI, and built for arm64.

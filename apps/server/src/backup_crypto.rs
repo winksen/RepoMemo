@@ -15,6 +15,9 @@
 //!   counter) and is bound to the file's header and to whether it is the last
 //!   one, so a chunk cannot be moved, repeated or dropped from the end without
 //!   the file failing to open.
+//! * **A passphrase can be changed** (V0.3.24): new backups use `REPOMEMO_BACKUP_KEY`, backups made with the one
+//!   before stay readable while it is kept as `REPOMEMO_BACKUP_KEY_PREVIOUS`, and a backup can be sealed again
+//!   with the new one (`BackupCipher::reseal_file`, a chunk at a time).
 //! * **Backups keep sharing unchanged files.** A new backup made with the same
 //!   passphrase reuses the salt of the one before it, so a stored file that has
 //!   not changed seals to the same bytes and can still be hard-linked instead
@@ -71,7 +74,7 @@ impl std::fmt::Display for KeyError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Mismatch => f.write_str(
-                "This backup was made with a different key than REPOMEMO_BACKUP_KEY, so nothing was restored.",
+                "This backup was made with a different key than REPOMEMO_BACKUP_KEY (or REPOMEMO_BACKUP_KEY_PREVIOUS), so nothing was restored.",
             ),
             Self::Unusable(reason) => f.write_str(reason),
         }
@@ -188,14 +191,7 @@ impl BackupCipher {
         let mut input = File::open(from).with_context(|| format!("{} could not be read", from.display()))?;
         let mut output =
             BufWriter::new(File::create(to).with_context(|| format!("{} could not be written", to.display()))?);
-        let mut header = [0u8; HEADER_BYTES];
-        header[..MAGIC.len()].copy_from_slice(MAGIC);
-        header[MAGIC.len()] = FORMAT_VERSION;
-        let mut prefix = [0u8; PREFIX_BYTES];
-        SystemRandom::new()
-            .fill(&mut prefix)
-            .map_err(|_| anyhow!("the system could not provide random bytes"))?;
-        header[MAGIC.len() + 1..].copy_from_slice(&prefix);
+        let (header, prefix) = new_header()?;
         output.write_all(&header)?;
 
         let mut plain_bytes = 0_u64;
@@ -231,6 +227,43 @@ impl BackupCipher {
     }
 
     fn open_file_inner(&self, from: &Path, to: &Path) -> Result<()> {
+        let mut output =
+            BufWriter::new(File::create(to).with_context(|| format!("{} could not be written", to.display()))?);
+        self.read_chunks(from, |plain, _, _| Ok(output.write_all(plain)?))?;
+        output.flush()?;
+        Ok(())
+    }
+
+    /// Opens `from`, which this cipher sealed, and seals it again with `new` into `to`, a chunk at a time, so
+    /// the plain text is never whole in memory and never on the disk (V0.3.24). The new file has a header of its
+    /// own; a wrong key, a changed byte or a missing end fails as it does when opening.
+    pub(crate) fn reseal_file(&self, new: &BackupCipher, from: &Path, to: &Path) -> Result<()> {
+        let result = self.reseal_file_inner(new, from, to);
+        if result.is_err() {
+            let _ = std::fs::remove_file(to);
+        }
+        result
+    }
+
+    fn reseal_file_inner(&self, new: &BackupCipher, from: &Path, to: &Path) -> Result<()> {
+        let mut output =
+            BufWriter::new(File::create(to).with_context(|| format!("{} could not be written", to.display()))?);
+        let (header, prefix) = new_header()?;
+        output.write_all(&header)?;
+        self.read_chunks(from, |plain, counter, last| {
+            let mut chunk = plain.to_vec();
+            new.key
+                .seal_in_place_append_tag(chunk_nonce(&prefix, counter), chunk_aad(&header, last), &mut chunk)
+                .map_err(|_| anyhow!("a chunk could not be sealed"))?;
+            Ok(output.write_all(&chunk)?)
+        })?;
+        output.flush()?;
+        Ok(())
+    }
+
+    /// Opens the sealed file `from` a chunk at a time and hands each plain chunk, its number and whether it is the
+    /// last to `each`. A wrong key, a changed byte, a missing end and a chunk out of place all fail.
+    fn read_chunks(&self, from: &Path, mut each: impl FnMut(&[u8], u32, bool) -> Result<()>) -> Result<()> {
         let name = from
             .file_name()
             .map(|name| name.to_string_lossy().into_owned())
@@ -244,8 +277,6 @@ impl BackupCipher {
             bail!("{name} is not a sealed backup file this server can read");
         }
         let prefix: [u8; PREFIX_BYTES] = header[MAGIC.len() + 1..].try_into().expect("fixed length");
-        let mut output =
-            BufWriter::new(File::create(to).with_context(|| format!("{} could not be written", to.display()))?);
 
         let mut counter = 0_u32;
         let mut current = read_up_to(&mut input, CHUNK_BYTES + TAG_BYTES)?;
@@ -261,16 +292,28 @@ impl BackupCipher {
                 .map_err(|_| {
                     anyhow!("{name} does not open: it was changed, is incomplete or was sealed with another key")
                 })?;
-            output.write_all(plain)?;
+            each(plain, counter, last)?;
             if last {
                 break;
             }
             current = next;
             counter = counter.checked_add(1).context("the file is too large to open")?;
         }
-        output.flush()?;
         Ok(())
     }
+}
+
+/// A fresh header for a sealed file: the format and a random prefix for the chunks' nonces.
+fn new_header() -> Result<([u8; HEADER_BYTES], [u8; PREFIX_BYTES])> {
+    let mut header = [0u8; HEADER_BYTES];
+    header[..MAGIC.len()].copy_from_slice(MAGIC);
+    header[MAGIC.len()] = FORMAT_VERSION;
+    let mut prefix = [0u8; PREFIX_BYTES];
+    SystemRandom::new()
+        .fill(&mut prefix)
+        .map_err(|_| anyhow!("the system could not provide random bytes"))?;
+    header[MAGIC.len() + 1..].copy_from_slice(&prefix);
+    Ok((header, prefix))
 }
 
 fn chunk_nonce(prefix: &[u8; PREFIX_BYTES], counter: u32) -> Nonce {
@@ -440,5 +483,61 @@ mod tests {
     fn passphrases_must_be_long_enough() {
         assert!(validate_passphrase("short").is_err());
         assert!(validate_passphrase(PASSPHRASE).is_ok());
+    }
+
+    #[test]
+    fn a_file_sealed_again_opens_with_the_new_key_only_and_holds_the_same_bytes() {
+        let dir = folder("reseal");
+        let (old, new) = (
+            cipher(),
+            BackupCipher::create("a second long enough passphrase").unwrap(),
+        );
+        for size in [0usize, 1, CHUNK_BYTES, CHUNK_BYTES + 1, CHUNK_BYTES * 3 + 17] {
+            let plain: Vec<u8> = (0..size).map(|index| (index % 241) as u8).collect();
+            let (source, sealed, again, opened) = (
+                dir.join("plain"),
+                dir.join("sealed"),
+                dir.join("again"),
+                dir.join("opened"),
+            );
+            std::fs::write(&source, &plain).unwrap();
+            old.seal_file(&source, &sealed).unwrap();
+            old.reseal_file(&new, &sealed, &again).unwrap();
+            assert_eq!(
+                std::fs::metadata(&again).unwrap().len(),
+                BackupCipher::sealed_len(size as u64),
+                "size {size}"
+            );
+            assert_ne!(
+                std::fs::read(&sealed).unwrap(),
+                std::fs::read(&again).unwrap(),
+                "size {size}"
+            );
+            assert!(
+                old.open_file(&again, &opened).is_err(),
+                "the old key no longer opens it"
+            );
+            assert!(!opened.exists());
+            new.open_file(&again, &opened).unwrap();
+            assert_eq!(std::fs::read(&opened).unwrap(), plain, "size {size}");
+        }
+
+        // Sealing again fails like opening: a wrong key, a changed byte, a cut end; and leaves nothing.
+        let (source, sealed, again) = (dir.join("plain"), dir.join("sealed"), dir.join("again"));
+        std::fs::write(&source, vec![9u8; CHUNK_BYTES * 2]).unwrap();
+        old.seal_file(&source, &sealed).unwrap();
+        assert!(new.reseal_file(&old, &sealed, &again).is_err(), "sealed by another key");
+        assert!(!again.exists());
+        let mut bytes = std::fs::read(&sealed).unwrap();
+        let last = bytes.len() - 20;
+        bytes[last] ^= 1;
+        std::fs::write(&sealed, &bytes).unwrap();
+        assert!(old.reseal_file(&new, &sealed, &again).is_err(), "a changed byte");
+        assert!(!again.exists());
+        bytes.truncate(HEADER_BYTES + CHUNK_BYTES + TAG_BYTES);
+        std::fs::write(&sealed, &bytes).unwrap();
+        assert!(old.reseal_file(&new, &sealed, &again).is_err(), "a cut end");
+        assert!(!again.exists());
+        let _ = std::fs::remove_dir_all(dir);
     }
 }

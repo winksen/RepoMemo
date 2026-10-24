@@ -1749,6 +1749,11 @@ export function deleteSystemBackup(accessToken: string, name: string): Promise<v
   return request<void>(`/v1/system/backups/${encodeURIComponent(name)}`, { method: "DELETE" }, accessToken);
 }
 
+/** Seals a backup made with REPOMEMO_BACKUP_KEY_PREVIOUS again with the current key (V0.3.24). */
+export function resealSystemBackup(accessToken: string, name: string): Promise<BackupsOverview> {
+  return request<BackupsOverview>(`/v1/system/backups/${encodeURIComponent(name)}/reseal`, { method: "POST", body: JSON.stringify({}) }, accessToken);
+}
+
 export function restoreSystemBackup(accessToken: string, name: string, environment: string): Promise<BackupsOverview> {
   return request<BackupsOverview>(`/v1/system/backups/${encodeURIComponent(name)}/restore`, {
     method: "POST",

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { IconDatabase as Database, IconKey as Key } from "@tabler/icons-react";
-import { copySystemBackups, createSystemBackup, deleteSystemBackup, getSystemBackups, restoreSystemBackup } from "../../lib/sharedApi";
+import { copySystemBackups, createSystemBackup, deleteSystemBackup, getSystemBackups, resealSystemBackup, restoreSystemBackup } from "../../lib/sharedApi";
 import type { BackupsOverview } from "../../types";
 import { ActionMenu } from "../../components/ui/action-menu";
 import { Badge } from "../../components/ui/badge";
@@ -47,6 +47,12 @@ export function BackupsPanel({ accessToken, canChange }: { accessToken: string; 
     catch (error) { showToast("error", apiMessage(error, "The copy could not start.")); }
     finally { setIsBusy(false); }
   }
+  async function reseal(name: string) {
+    setIsBusy(true);
+    try { setOverview(await resealSystemBackup(accessToken, name)); showToast("success", "Sealing the backup again with the current key was started."); }
+    catch (error) { showToast("error", apiMessage(error, "The backup could not be sealed again.")); }
+    finally { setIsBusy(false); }
+  }
   async function restore() {
     if (!restoring) return;
     setIsBusy(true);
@@ -70,7 +76,7 @@ export function BackupsPanel({ accessToken, canChange }: { accessToken: string; 
       ["Folder", <code key="dir">{overview?.directory ?? "—"}</code>],
       ["Automatic backups", overview ? (overview.interval_hours ? `every ${overview.interval_hours} h, ${overview.keep} kept` : `off, ${overview.keep} kept (Settings › Automatic backups)`) : "—"],
       ["Second copy", overview ? (overview.copy_directory ? <><code key="copy">{overview.copy_directory}</code>, each backup checked after it is copied</> : "off: set REPOMEMO_BACKUP_COPY_DIR to a folder on another disk or a share") : "—"],
-      ["Encryption", overview ? (overview.encryption_enabled ? "on: new backups are sealed with REPOMEMO_BACKUP_KEY" : "off: set REPOMEMO_BACKUP_KEY to seal new backups") : "—"],
+      ["Encryption", overview ? (overview.encryption_enabled ? `on: new backups are sealed with REPOMEMO_BACKUP_KEY${overview.previous_key_set ? "; REPOMEMO_BACKUP_KEY_PREVIOUS opens the backups made before the key changed" : ""}` : "off: set REPOMEMO_BACKUP_KEY to seal new backups") : "—"],
       ["Free disk", overview?.disk_free_bytes != null ? formatBytes(overview.disk_free_bytes) : "unknown"],
       ["Last backup or restore", status?.finished_at ? `${formatTime(status.finished_at)} · ${status.message ?? ""}` : "none since the server started"],
     ]} />
@@ -78,12 +84,13 @@ export function BackupsPanel({ accessToken, canChange }: { accessToken: string; 
     {overview?.backups.length ? <Table>
       <thead><tr><th scope="col">Backup</th><th scope="col">Made</th><th scope="col">Version</th><th scope="col">Files</th><th scope="col">Database</th><th scope="col">Key</th>{overview.copy_directory ? <th scope="col">Second copy</th> : null}{canChange ? <th scope="col"><span className="sr-only">Actions</span></th> : null}</tr></thead>
       <tbody>{overview.backups.map((backup) => <tr key={backup.name}>
-        <th scope="row">{backup.name}<Badge>{backup.trigger}</Badge>{backup.encryption ? <Badge>encrypted</Badge> : null}</th>
+        <th scope="row">{backup.name}<Badge>{backup.trigger}</Badge>{backup.encryption ? <Badge>encrypted</Badge> : null}{backup.sealed_with === "previous" ? <Badge>previous key</Badge> : null}{backup.sealed_with === "neither" ? <Badge>key not available</Badge> : null}</th>
         <td>{formatTime(backup.created_at)}</td><td>{backup.version}</td>
         <td>{count(backup.blob_count)} · {formatBytes(backup.blob_bytes)}{backup.missing_blobs ? ` · ${count(backup.missing_blobs)} missing` : ""}</td>
         <td>{formatBytes(backup.database_bytes)}</td><td>{backup.includes_key ? "included" : "not in it"}</td>
         {overview.copy_directory ? <td>{backup.copy ? `checked ${formatTime(backup.copy.copied_at)}` : "waiting"}</td> : null}
         {canChange ? <td><ActionMenu items={[
+          ...(backup.sealed_with === "previous" ? [{ label: "Seal again with the current key", onSelect: () => void reseal(backup.name) }] : []),
           { label: "Restore as a new environment…", onSelect: () => { setEnvironment(""); setRestoring(backup.name); } },
           { label: "Delete", onSelect: () => setDeleting(backup.name), destructive: true },
         ]} label={`Actions for ${backup.name}`} /></td> : null}

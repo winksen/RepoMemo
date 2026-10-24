@@ -67,6 +67,10 @@ pub(crate) struct BackupManifest {
     /// backup's `copy.json` when listing; never part of the manifest file.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub copy: Option<BackupCopyRecord>,
+    /// Which configured passphrase opens a sealed backup: `current`, `previous` or `neither`. Worked out when
+    /// listing; never part of the manifest file.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sealed_with: Option<String>,
 }
 
 /// Written beside a backup (`copy.json`) when its second copy was made and checked.
@@ -103,6 +107,9 @@ pub(crate) struct BackupsResponse {
     pub disk_free_bytes: Option<u64>,
     /// Whether new backups are sealed (`REPOMEMO_BACKUP_KEY` is set).
     pub encryption_enabled: bool,
+    /// Whether the key before the last change is kept (`REPOMEMO_BACKUP_KEY_PREVIOUS`), so that backups made with
+    /// it can be opened and sealed again.
+    pub previous_key_set: bool,
     /// The folder every backup is copied to, when one is set.
     pub copy_directory: Option<String>,
 }
@@ -464,6 +471,7 @@ async fn fill_backup(
         files,
         bytes,
         copy: None,
+        sealed_with: None,
     };
     tokio::fs::write(partial.join(MANIFEST_FILE), serde_json::to_vec_pretty(&manifest)?).await?;
     Ok(manifest)
@@ -650,17 +658,17 @@ async fn restore_backup(state: &AppState, name: &str, environment: &str) -> anyh
     let manifest = read_manifest(&source).context("The backup is incomplete or its manifest cannot be read.")?;
     // A sealed backup needs its key, and the key is checked first: a wrong
     // one is refused before any folder is made.
-    let cipher = match manifest.encryption.clone() {
-        None => None,
+    let (cipher, with_previous) = match manifest.encryption.clone() {
+        None => (None, false),
         Some(description) => {
-            let passphrase = state.backup_key.clone().context(
-                "This backup is encrypted. Set REPOMEMO_BACKUP_KEY to the key it was made with and restart the server.",
-            )?;
-            let opened = tokio::task::spawn_blocking(move || BackupCipher::open(&passphrase, &description))
-                .await
-                .context("the backup key could not be prepared")?
-                .map_err(|error: KeyError| anyhow::anyhow!("{error}"))?;
-            Some(std::sync::Arc::new(opened))
+            let (current, previous) = (state.backup_key.clone(), state.backup_previous_key.clone());
+            let (opened, with_previous) = tokio::task::spawn_blocking(move || {
+                open_with_configured(current.as_deref(), previous.as_deref(), &description)
+            })
+            .await
+            .context("the backup key could not be prepared")?
+            .map_err(|error: KeyError| anyhow::anyhow!("{error}"))?;
+            (Some(std::sync::Arc::new(opened)), with_previous)
         }
     };
     let root = crate::environment::environments_root()?;
@@ -700,8 +708,16 @@ async fn restore_backup(state: &AppState, name: &str, environment: &str) -> anyh
     engine.close().await;
     let statistics = statistics.context("The restored database could not be read.")?;
     Ok(format!(
-        "Restored {name} (made by {}) as the environment {environment}: {} workspaces, {} files, {} people. Attach it from the environment menu.",
-        manifest.version, statistics.workspace_count, statistics.artifact_count, statistics.user_count
+        "Restored {name} (made by {}) as the environment {environment}: {} workspaces, {} files, {} people{}. Attach it from the environment menu.",
+        manifest.version,
+        statistics.workspace_count,
+        statistics.artifact_count,
+        statistics.user_count,
+        if with_previous {
+            "; it was opened with REPOMEMO_BACKUP_KEY_PREVIOUS, so seal it again to retire that key"
+        } else {
+            ""
+        }
     ))
 }
 
@@ -749,6 +765,214 @@ async fn copy_into(source: &Path, staging: &Path, cipher: Option<std::sync::Arc<
     .await
     .context("the file copy stopped unexpectedly")?
     .context("the stored files could not be copied")?;
+    Ok(())
+}
+
+/// Opens a backup with the current key, or with the previous one when that is what it was made with; the second
+/// answer says which.
+fn open_with_configured(
+    current: Option<&str>,
+    previous: Option<&str>,
+    description: &BackupEncryption,
+) -> Result<(BackupCipher, bool), KeyError> {
+    let Some(current) = current else {
+        return Err(KeyError::Unusable(
+            "This backup is encrypted. Set REPOMEMO_BACKUP_KEY to the key it was made with and restart the server."
+                .to_owned(),
+        ));
+    };
+    match BackupCipher::open(current, description) {
+        Ok(cipher) => Ok((cipher, false)),
+        Err(KeyError::Mismatch) => match previous {
+            Some(previous) => BackupCipher::open(previous, description).map(|cipher| (cipher, true)),
+            None => Err(KeyError::Mismatch),
+        },
+        Err(other) => Err(other),
+    }
+}
+
+/// Which configured passphrase opens a way of sealing.
+fn key_use(current: Option<&str>, previous: Option<&str>, description: &BackupEncryption) -> &'static str {
+    if current.is_some_and(|key| BackupCipher::open(key, description).is_ok()) {
+        "current"
+    } else if previous.is_some_and(|key| BackupCipher::open(key, description).is_ok()) {
+        "previous"
+    } else {
+        "neither"
+    }
+}
+
+/// Fills in `sealed_with` of the sealed backups. A key takes a moment to derive, so it is done once for each way
+/// of sealing (backups made one after the other share it) and remembered.
+async fn tell_keys(state: &AppState, backups: &mut [BackupManifest]) {
+    for backup in backups.iter_mut() {
+        let Some(description) = backup.encryption.clone() else {
+            continue;
+        };
+        let memo = format!("{}:{}", description.salt, description.key_check);
+        let known = state
+            .backup_key_use
+            .lock()
+            .ok()
+            .and_then(|known| known.get(&memo).copied());
+        let found = match known {
+            Some(found) => found,
+            None => {
+                let (current, previous) = (state.backup_key.clone(), state.backup_previous_key.clone());
+                let found =
+                    tokio::task::spawn_blocking(move || key_use(current.as_deref(), previous.as_deref(), &description))
+                        .await
+                        .unwrap_or("neither");
+                if let Ok(mut known) = state.backup_key_use.lock() {
+                    known.insert(memo, found);
+                }
+                found
+            }
+        };
+        backup.sealed_with = Some(found.to_owned());
+    }
+}
+
+/// Seals every file of the backup `from`, which `old` sealed, again with `new` into `to`; returns how many files.
+/// The manifest and the record of a second copy are left to the caller.
+fn reseal_folder(old: &BackupCipher, new: &BackupCipher, from: &Path, to: &Path) -> anyhow::Result<u64> {
+    std::fs::create_dir_all(to)?;
+    let mut files = 0;
+    for entry in std::fs::read_dir(from)? {
+        let entry = entry?;
+        let (path, name) = (entry.path(), entry.file_name().to_string_lossy().into_owned());
+        let target = to.join(&name);
+        if entry.file_type()?.is_dir() {
+            files += reseal_folder(old, new, &path, &target)?;
+        } else if name == MANIFEST_FILE || name == COPY_RECORD_FILE {
+            continue;
+        } else if name.ends_with(SEALED_SUFFIX) {
+            old.reseal_file(new, &path, &target)?;
+            if name == format!("{SECRET_KEY_FILE_NAME}{SEALED_SUFFIX}") {
+                repomemo_storage::restrict_to_owner(&target);
+            }
+            files += 1;
+        } else {
+            std::fs::copy(&path, &target)?;
+            files += 1;
+        }
+    }
+    Ok(files)
+}
+
+/// Seals a backup again with the current key: its files are read with the previous key and written under
+/// `<name>.resealing.partial`, then the new folder takes the old one's place. Nothing of the old backup is
+/// touched until the new one is whole.
+async fn reseal_backup(state: &AppState, name: &str) -> anyhow::Result<String> {
+    use anyhow::Context;
+    let root = backups_root(state);
+    let source = root.join(name);
+    let manifest = read_manifest(&source).context("The backup is incomplete or its manifest cannot be read.")?;
+    let description = manifest
+        .encryption
+        .clone()
+        .context("This backup is not sealed, so there is nothing to seal again.")?;
+    let current = state
+        .backup_key
+        .clone()
+        .context("Set REPOMEMO_BACKUP_KEY to the new key and restart the server.")?;
+    let previous = state.backup_previous_key.clone();
+    // The keys are checked first: it must be the previous one that opens the backup.
+    let (old, new) = {
+        let description = description.clone();
+        tokio::task::spawn_blocking(move || -> Result<(BackupCipher, BackupCipher), String> {
+            if BackupCipher::open(&current, &description).is_ok() {
+                return Err("This backup is sealed with the current key already.".to_owned());
+            }
+            let Some(previous) = previous else {
+                return Err(
+                    "Set REPOMEMO_BACKUP_KEY_PREVIOUS to the key this backup was made with and restart the server."
+                        .to_owned(),
+                );
+            };
+            let old = BackupCipher::open(&previous, &description).map_err(|error| error.to_string())?;
+            let new = BackupCipher::create(&current).map_err(|error| error.to_string())?;
+            Ok((old, new))
+        })
+        .await
+        .context("the backup keys could not be prepared")?
+        .map_err(|message| anyhow::anyhow!(message))?
+    };
+    // The new folder is whole beside the old one before it replaces it.
+    if let Some(free) = free_disk_bytes(state.storage.data_dir()) {
+        if free < manifest.bytes.saturating_add(manifest.database_bytes) {
+            anyhow::bail!(
+                "There is not enough free disk to seal {name} again: it needs about as much room as the backup takes."
+            );
+        }
+    }
+    let staging = root.join(format!("{name}.resealing{PARTIAL_SUFFIX}"));
+    let replaced = root.join(format!("{name}.replaced{PARTIAL_SUFFIX}"));
+    for leftover in [&staging, &replaced] {
+        if leftover.exists() {
+            let _ = tokio::fs::remove_dir_all(leftover).await;
+        }
+    }
+    let new = std::sync::Arc::new(new);
+    let (from, to, sealer) = (source.clone(), staging.clone(), new.clone());
+    let outcome = async {
+        tokio::task::spawn_blocking(move || reseal_folder(&old, &sealer, &from, &to))
+            .await
+            .context("the sealing stopped unexpectedly")??;
+        let (files, bytes) = crate::backup_copy::folder_totals(&staging)?;
+        let resealed = BackupManifest {
+            encryption: Some(new.description()),
+            files,
+            bytes,
+            copy: None,
+            sealed_with: None,
+            ..manifest.clone()
+        };
+        tokio::fs::write(staging.join(MANIFEST_FILE), serde_json::to_vec_pretty(&resealed)?).await?;
+        anyhow::Ok(files)
+    }
+    .await;
+    let files = match outcome {
+        Ok(files) => files,
+        Err(error) => {
+            let _ = tokio::fs::remove_dir_all(&staging).await;
+            return Err(error);
+        }
+    };
+    rename_with_retries(&source, &replaced)
+        .await
+        .context("the backup could not be set aside")?;
+    if let Err(error) = rename_with_retries(&staging, &source).await {
+        // Put the old one back: the backup is never left without a folder.
+        let _ = rename_with_retries(&replaced, &source).await;
+        let _ = tokio::fs::remove_dir_all(&staging).await;
+        return Err(anyhow::Error::new(error).context("the sealed-again backup could not be put in place"));
+    }
+    let _ = tokio::fs::remove_dir_all(&replaced).await;
+    Ok(format!(
+        "Sealed {name} again with the current key ({files} files). It no longer needs REPOMEMO_BACKUP_KEY_PREVIOUS."
+    ))
+}
+
+/// Starts sealing a backup again with the current key, in the background.
+pub(crate) fn start_reseal(state: &AppState, name: &str) -> Result<(), ApiError> {
+    if !valid_backup_name(name) || !backups_root(state).join(name).is_dir() {
+        return Err(ApiError::not_found("There is no backup with that name."));
+    }
+    if !begin(state, "reseal") {
+        return Err(ApiError::conflict("A backup or restore is already running."));
+    }
+    let (state, name) = (state.clone(), name.to_owned());
+    tokio::spawn(async move {
+        let result = reseal_backup(&state, &name)
+            .await
+            .map_err(|error| format!("Sealing the backup again failed: {error:#}"));
+        match &result {
+            Ok(message) => tracing::info!(target: "audit", backup = %name, "{message}"),
+            Err(message) => tracing::error!(error = %message, "Sealing a backup again failed"),
+        }
+        finish(&state, &result);
+    });
     Ok(())
 }
 
@@ -804,11 +1028,19 @@ pub(crate) fn overview(state: &AppState) -> BackupsResponse {
         interval_hours: settings.backup_interval_hours,
         disk_free_bytes: free_disk_bytes(state.storage.data_dir()),
         encryption_enabled: state.backup_key.is_some(),
+        previous_key_set: state.backup_previous_key.is_some(),
         copy_directory: state
             .backup_copy_dir
             .as_ref()
             .map(|folder| folder.to_string_lossy().trim_start_matches(r"\\?\").to_owned()),
     }
+}
+
+/// What the page and the console show, with which key opens each sealed backup.
+pub(crate) async fn overview_with_keys(state: &AppState) -> BackupsResponse {
+    let mut response = overview(state);
+    tell_keys(state, &mut response.backups).await;
+    response
 }
 
 // ---------------------------------------------------------------------------
@@ -819,7 +1051,7 @@ pub(crate) async fn list(
     State(state): State<AppState>,
 ) -> Result<Json<BackupsResponse>, ApiError> {
     require_system_admin(&subject)?;
-    Ok(Json(overview(&state)))
+    Ok(Json(overview_with_keys(&state).await))
 }
 
 pub(crate) async fn create(
@@ -830,7 +1062,7 @@ pub(crate) async fn create(
     require_system_change(&subject)?;
     start_backup(&state, "manual")?;
     audit(&state, &subject, "backup_started", "Started a backup.".to_owned()).await;
-    Ok((axum::http::StatusCode::ACCEPTED, Json(overview(&state))))
+    Ok((axum::http::StatusCode::ACCEPTED, Json(overview_with_keys(&state).await)))
 }
 
 /// Copies the backups that have no checked second copy yet, now.
@@ -848,7 +1080,26 @@ pub(crate) async fn copy_now(
         "Started copying the backups to the second location.".to_owned(),
     )
     .await;
-    Ok((axum::http::StatusCode::ACCEPTED, Json(overview(&state))))
+    Ok((axum::http::StatusCode::ACCEPTED, Json(overview_with_keys(&state).await)))
+}
+
+/// Seals a backup that the previous key made again with the current key.
+pub(crate) async fn reseal(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    UrlPath(name): UrlPath<String>,
+) -> Result<(axum::http::StatusCode, Json<BackupsResponse>), ApiError> {
+    require_full_system_admin(&subject)?;
+    require_system_change(&subject)?;
+    start_reseal(&state, &name)?;
+    audit(
+        &state,
+        &subject,
+        "backup_resealed",
+        format!("Started sealing the backup {name} again with the current key."),
+    )
+    .await;
+    Ok((axum::http::StatusCode::ACCEPTED, Json(overview_with_keys(&state).await)))
 }
 
 pub(crate) async fn delete(
@@ -886,7 +1137,7 @@ pub(crate) async fn restore(
         format!("Started restoring the backup {name} into the environment {environment}."),
     )
     .await;
-    Ok((axum::http::StatusCode::ACCEPTED, Json(overview(&state))))
+    Ok((axum::http::StatusCode::ACCEPTED, Json(overview_with_keys(&state).await)))
 }
 
 #[cfg(test)]
@@ -1008,6 +1259,7 @@ mod tests {
             files: 0,
             bytes: 0,
             copy: None,
+            sealed_with: None,
         };
         for (name, at) in [
             ("backup-20261001-000000", "2026-10-01T00:00:00Z"),
@@ -1028,5 +1280,77 @@ mod tests {
             .collect::<Vec<_>>();
         assert_eq!(listed, ["backup-20261002-000000", "backup-20261001-000000"]);
         let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn a_backup_opens_with_the_current_key_or_the_previous_one_and_says_which() {
+        let (current, previous) = ("the current backup passphrase", "the previous backup passphrase");
+        let by_previous = BackupCipher::create(previous).unwrap().description();
+        let by_current = BackupCipher::create(current).unwrap().description();
+
+        let (_, used_previous) = open_with_configured(Some(current), Some(previous), &by_previous).unwrap();
+        assert!(used_previous);
+        let (_, used_previous) = open_with_configured(Some(current), Some(previous), &by_current).unwrap();
+        assert!(!used_previous, "the current key is tried first");
+        // Without the previous key the old backup stays shut, and with neither nothing opens.
+        assert!(matches!(
+            open_with_configured(Some(current), None, &by_previous),
+            Err(KeyError::Mismatch)
+        ));
+        assert!(matches!(
+            open_with_configured(Some(current), Some("another passphrase, not either"), &by_previous),
+            Err(KeyError::Mismatch)
+        ));
+        assert!(matches!(
+            open_with_configured(None, None, &by_current),
+            Err(KeyError::Unusable(_))
+        ));
+
+        assert_eq!(key_use(Some(current), Some(previous), &by_current), "current");
+        assert_eq!(key_use(Some(current), Some(previous), &by_previous), "previous");
+        assert_eq!(key_use(Some(current), None, &by_previous), "neither");
+        assert_eq!(key_use(None, None, &by_current), "neither");
+    }
+
+    #[test]
+    fn a_backup_folder_is_sealed_again_file_by_file_and_the_manifest_is_left_to_the_caller() {
+        let (live, sealed, again, opened) = (
+            folder("reseal-live"),
+            folder("reseal-old"),
+            folder("reseal-new"),
+            folder("reseal-opened"),
+        );
+        std::fs::create_dir_all(live.join("ab")).unwrap();
+        std::fs::write(live.join("ab").join("one"), b"first stored file").unwrap();
+        std::fs::write(live.join("ab").join("empty"), b"").unwrap();
+        std::fs::write(live.join("repomemo.sqlite"), vec![7u8; 200_000]).unwrap();
+        let old = BackupCipher::create("the previous backup passphrase").unwrap();
+        let new = BackupCipher::create("the current backup passphrase").unwrap();
+        copy_files(&live, &sealed, None, CopyMode::Seal(&old)).unwrap();
+        std::fs::write(sealed.join(MANIFEST_FILE), b"{}").unwrap();
+        std::fs::write(sealed.join(COPY_RECORD_FILE), b"{}").unwrap();
+
+        let files = reseal_folder(&old, &new, &sealed, &again).unwrap();
+        assert_eq!(files, 3);
+        assert!(!again.join(MANIFEST_FILE).exists());
+        assert!(!again.join(COPY_RECORD_FILE).exists());
+        assert!(again.join("ab").join("one.enc").is_file());
+        // Only the new key opens the new files, and they hold what the old ones held.
+        assert!(copy_files(&again, &folder("reseal-wrong"), None, CopyMode::Open(&old)).is_err());
+        copy_files(&again, &opened, None, CopyMode::Open(&new)).unwrap();
+        assert_eq!(
+            std::fs::read(opened.join("ab").join("one")).unwrap(),
+            b"first stored file"
+        );
+        assert_eq!(std::fs::read(opened.join("ab").join("empty")).unwrap(), b"");
+        assert_eq!(
+            std::fs::read(opened.join("repomemo.sqlite")).unwrap(),
+            vec![7u8; 200_000]
+        );
+        // The old folder is untouched and still opens with the old key.
+        assert!(sealed.join("ab").join("one.enc").is_file());
+        for path in [live, sealed, again, opened] {
+            let _ = std::fs::remove_dir_all(path);
+        }
     }
 }

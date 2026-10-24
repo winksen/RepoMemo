@@ -181,8 +181,18 @@ pub(crate) fn copy_backup(source: &Path, destination_root: &Path, expected: Opti
     }
     let final_folder = destination_root.join(&name);
     if final_folder.exists() {
-        // Already there: trust it only after checking it again, else send it afresh.
-        match verify_copy(&final_folder) {
+        // Already there: trust it only if it is a copy of this very backup (a backup sealed again with another key
+        // has a manifest of its own) and checks out again, else send it afresh.
+        let same_backup =
+            std::fs::read(source.join(MANIFEST_FILE)).ok() == std::fs::read(final_folder.join(MANIFEST_FILE)).ok();
+        let checked = if same_backup {
+            verify_copy(&final_folder)
+        } else {
+            Err(anyhow::anyhow!(
+                "the backup was changed (sealed again) after this copy was made"
+            ))
+        };
+        match checked {
             Ok(report) => return Ok(report),
             Err(error) => {
                 tracing::warn!(backup = %name, error = %format!("{error:#}"), "A second copy did not check out and is sent again");
@@ -393,6 +403,32 @@ mod tests {
         // A file changed behind the copy's back is found.
         std::fs::write(done.join("blobs/ab/same"), b"tampered!").unwrap();
         assert!(verify_copy(&done).unwrap_err().to_string().contains("blobs/ab/same"));
+        for path in [backups, copies] {
+            let _ = std::fs::remove_dir_all(path);
+        }
+    }
+
+    #[test]
+    fn a_copy_of_a_backup_that_was_sealed_again_is_sent_afresh_not_trusted() {
+        let (backups, copies) = (folder("again-src"), folder("again-dst"));
+        let first = backup(
+            &backups,
+            "backup-20261001-000000",
+            &[("repomemo.sqlite", b"sealed one way")],
+        );
+        copy_backup(&first, &copies, None).unwrap();
+        // The backup is sealed again: other bytes, and a manifest that says so.
+        std::fs::write(first.join("repomemo.sqlite"), b"sealed another").unwrap();
+        std::fs::write(first.join(MANIFEST_FILE), b"{\"sealed\":\"again\"}").unwrap();
+        let report = copy_backup(&first, &copies, Some((1, 14))).unwrap();
+        assert_eq!(report.files, 1);
+        let done = copies.join("backup-20261001-000000");
+        assert_eq!(std::fs::read(done.join("repomemo.sqlite")).unwrap(), b"sealed another");
+        assert_eq!(
+            std::fs::read(done.join(MANIFEST_FILE)).unwrap(),
+            b"{\"sealed\":\"again\"}"
+        );
+        assert_eq!(verify_copy(&done).unwrap().files, 1);
         for path in [backups, copies] {
             let _ = std::fs::remove_dir_all(path);
         }

@@ -100,6 +100,7 @@
 | POST | `/v1/system/backups/copy` | auth | require_full_system_admin, require_system_change | — | BackupsResponse |
 | DELETE | `/v1/system/backups/{name}` | auth | require_full_system_admin, require_system_change | — | status |
 | POST | `/v1/system/backups/{name}/restore` | auth | require_full_system_admin, require_system_change | RestoreRequest | BackupsResponse |
+| POST | `/v1/system/backups/{name}/reseal` | auth | require_full_system_admin, require_system_change | — | BackupsResponse |
 | GET | `/v1/system/metrics` | auth | require_full_system_admin | — | — |
 | GET | `/v1/system/console` | auth | require_system_admin | — | WelcomeResponse |
 | POST | `/v1/system/console` | reading | require_system_admin (+ require_system_change for --yes) | — | — |

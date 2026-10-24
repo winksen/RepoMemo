@@ -32,6 +32,9 @@ pub struct ServerConfig {
     pub secret_key: Option<String>,
     /// Seals backups when set (`REPOMEMO_BACKUP_KEY`, at least 16 characters).
     pub backup_key: Option<String>,
+    /// The key backups were sealed with before the last change of `REPOMEMO_BACKUP_KEY`
+    /// (`REPOMEMO_BACKUP_KEY_PREVIOUS`): it opens those backups, and they can be sealed again with the new key.
+    pub backup_previous_key: Option<String>,
     /// Another folder (a network share, say) every backup is copied to and checked in
     /// (`REPOMEMO_BACKUP_COPY_DIR`).
     pub backup_copy_dir: Option<std::path::PathBuf>,
@@ -226,6 +229,21 @@ impl ServerConfig {
         if let Some(Err(message)) = backup_key.as_deref().map(crate::backup_crypto::validate_passphrase) {
             bail!("{message}");
         }
+        let backup_previous_key = env_text("REPOMEMO_BACKUP_KEY_PREVIOUS");
+        if let Some(previous) = backup_previous_key.as_deref() {
+            if backup_key.is_none() {
+                bail!("REPOMEMO_BACKUP_KEY_PREVIOUS is the key before a change, so REPOMEMO_BACKUP_KEY must be set to the new one");
+            }
+            if crate::backup_crypto::validate_passphrase(previous).is_err() {
+                bail!(
+                    "REPOMEMO_BACKUP_KEY_PREVIOUS must contain at least {} characters.",
+                    crate::backup_crypto::MIN_KEY_CHARS
+                );
+            }
+            if backup_key.as_deref() == Some(previous) {
+                bail!("REPOMEMO_BACKUP_KEY_PREVIOUS is the same as REPOMEMO_BACKUP_KEY; leave it unset until the key changes");
+            }
+        }
         // Unset: this machine's Ollama (its port) and OpenRouter only. `*` opens every host
         // (link-local and cloud-metadata addresses stay refused). An entry may end in `:port`.
         let ai_allowed_hosts = match env_text("REPOMEMO_AI_ALLOWED_HOSTS") {
@@ -322,6 +340,7 @@ impl ServerConfig {
                 .unwrap_or_default(),
             secret_key,
             backup_key,
+            backup_previous_key,
             backup_copy_dir: env_text("REPOMEMO_BACKUP_COPY_DIR").map(std::path::PathBuf::from),
             templates_dir: env_text("REPOMEMO_TEMPLATES_DIR").map(std::path::PathBuf::from),
             // Closed by default: people join with invitation links (review M1).
@@ -438,6 +457,7 @@ impl ServerConfig {
             soffice_wrapper: Vec::new(),
             secret_key: None,
             backup_key: None,
+            backup_previous_key: None,
             backup_copy_dir: None,
             templates_dir: None,
             allow_registration: true,

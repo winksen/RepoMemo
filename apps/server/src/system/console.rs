@@ -67,6 +67,7 @@ const COMMANDS: &[CommandSpec] = &[
     CommandSpec { name: "backup list", usage: "backup list", summary: "Backups kept in the data folder, with the state of the last backup or restore.", changes: false, arguments: 0, flags: &[] },
     CommandSpec { name: "backup create", usage: "backup create --yes", summary: "Starts a backup of the database, stored files and key file; watch it with backup list.", changes: true, arguments: 0, flags: &[] },
     CommandSpec { name: "backup restore", usage: "backup restore <backup> <environment> --yes", summary: "Restores a backup into a new environment folder (it never touches the running one) and checks that it opens.", changes: true, arguments: 2, flags: &[] },
+    CommandSpec { name: "backup reseal", usage: "backup reseal <backup> --yes", summary: "Seals a backup made with REPOMEMO_BACKUP_KEY_PREVIOUS again with the current REPOMEMO_BACKUP_KEY; watch it with backup list.", changes: true, arguments: 1, flags: &[] },
     CommandSpec { name: "backup delete", usage: "backup delete <backup> --yes", summary: "Deletes one backup.", changes: true, arguments: 1, flags: &[] },
     CommandSpec { name: "maintenance status", usage: "maintenance status", summary: "The last maintenance run and the next one.", changes: false, arguments: 0, flags: &[] },
     CommandSpec { name: "maintenance run", usage: "maintenance run --yes", summary: "Runs a full maintenance pass now.", changes: true, arguments: 0, flags: &[] },
@@ -1188,7 +1189,7 @@ async fn execute(
         }
 
         "backup list" => {
-            let overview = crate::backup::overview(state);
+            let overview = crate::backup::overview_with_keys(state).await;
             let status = &overview.status;
             let summary = match (status.running, status.message.as_deref()) {
                 (true, _) => format!("A {} is running.", status.operation.unwrap_or("backup")),
@@ -1208,6 +1209,7 @@ async fn execute(
                         "blob_count",
                         "blob_bytes",
                         "includes_key",
+                        "sealed_with",
                     ],
                 },
                 to_json(overview.backups)?,
@@ -1244,6 +1246,24 @@ async fn execute(
             Ok(applied(
                 spec,
                 format!("Restoring {name} into {environment}. Check it with backup list; attach it from the environment menu when it is done."),
+                View::Text,
+                Value::Null,
+            ))
+        }
+
+        "backup reseal" => {
+            let name = &arguments[0];
+            if !line.yes {
+                return Ok(dry_run(
+                    spec,
+                    format!("Would seal the backup {name} again with the current REPOMEMO_BACKUP_KEY."),
+                ));
+            }
+            crate::system::require_full_system_admin(subject)?;
+            crate::backup::start_reseal(state, name)?;
+            Ok(applied(
+                spec,
+                format!("Sealing {name} again with the current key. Check it with backup list."),
                 View::Text,
                 Value::Null,
             ))

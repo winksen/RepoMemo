@@ -43,6 +43,7 @@ services:
       REPOMEMO_SYSTEM_ADMIN_EMAILS: ${REPOMEMO_SYSTEM_ADMIN_EMAILS:-}
       REPOMEMO_BACKUP_INTERVAL_HOURS: ${REPOMEMO_BACKUP_INTERVAL_HOURS:-24}
       REPOMEMO_BACKUP_KEY: ${REPOMEMO_BACKUP_KEY:-}
+      REPOMEMO_BACKUP_KEY_PREVIOUS: ${REPOMEMO_BACKUP_KEY_PREVIOUS:-}
       REPOMEMO_OFFICE_PREVIEWS: ${REPOMEMO_OFFICE_PREVIEWS:-false}
       # Where LibreOffice runs when previews are on: the converter container, through its socket.
       REPOMEMO_PREVIEW_ROOT: /var/lib/repomemo-previews

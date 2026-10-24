@@ -162,6 +162,11 @@ struct AppState {
     upload_gate_bytes: u64,
     /// The passphrase backups are sealed with, when one is set.
     backup_key: Option<Arc<str>>,
+    /// The passphrase backups were sealed with before the last change, when it is kept (V0.3.24).
+    backup_previous_key: Option<Arc<str>>,
+    /// Which passphrase opens a way of sealing (a salt and its check value), worked out once because deriving a
+    /// key is slow: `current`, `previous` or `neither`.
+    backup_key_use: Arc<std::sync::Mutex<std::collections::HashMap<String, &'static str>>>,
     /// Where each backup is copied to and checked, when set.
     backup_copy_dir: Option<PathBuf>,
     /// The templates the operator's folder added, and the files it left out (V0.2.189).
@@ -462,6 +467,8 @@ async fn build_state(
         )),
         upload_gate_bytes: config.upload_inflight_bytes,
         backup_key: config.backup_key.as_deref().map(Arc::from),
+        backup_previous_key: config.backup_previous_key.as_deref().map(Arc::from),
+        backup_key_use: Default::default(),
         backup_copy_dir: config.backup_copy_dir.clone(),
         template_files: Arc::new(template_files),
         event_bus,
@@ -621,6 +628,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route("/v1/system/backups/copy", post(backup::copy_now))
         .route("/v1/system/backups/{name}", delete(backup::delete))
         .route("/v1/system/backups/{name}/restore", post(backup::restore))
+        .route("/v1/system/backups/{name}/reseal", post(backup::reseal))
         .route("/v1/system/metrics", get(system::metrics))
         .route("/v1/system/mail", get(mail::get_mail).put(mail::put_mail))
         .route("/v1/system/mail/outbox", get(mail::list_outbox))

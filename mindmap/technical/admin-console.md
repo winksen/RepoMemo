@@ -104,6 +104,7 @@ flowchart LR
 | `backup list` | no | `GET /v1/system/backups` |
 | `backup create` | **yes** | `POST /v1/system/backups` (starts it; `backup list` shows progress) |
 | `backup restore <backup> <environment>` | **yes** | `POST /v1/system/backups/{name}/restore` (a new environment folder; system administrators) |
+| `backup reseal <backup>` | **yes** | `POST /v1/system/backups/{name}/reseal` (V0.3.24: seals a backup made with `REPOMEMO_BACKUP_KEY_PREVIOUS` again with the current key; system administrators) |
 | `backup delete <backup>` | **yes** | `DELETE /v1/system/backups/{name}` |
 | `workspace list` | no | the workspaces of the server with their file and memory card counts (system administrators) |
 | `workspace reindex <workspace>` | **yes** | `POST /v1/workspaces/{id}/index` (V0.2.6: `202` with the job); the dry run counts the files the current indexer has not indexed (system administrators) |
