@@ -12,15 +12,10 @@ name = "repomemo_desktop_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [dependencies]
-chrono.workspace = true
-repomemo-api.workspace = true
-repomemo-domain.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tauri.workspace = true
-tauri-plugin-dialog.workspace = true
 tauri-plugin-http.workspace = true
-tokio.workspace = true
 url.workspace = true
 
 # The session of a server connection is kept in the operating system's credential store (V0.2.49).

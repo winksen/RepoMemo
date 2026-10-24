@@ -2,6 +2,28 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.3.6 (2026-10-24)
+
+The desktop shell holds only what a client of a server needs: its address, its session and its window.
+
+### Removed
+- **The local commands:** the 26 Tauri commands that called `RepoMemoCore` in-process (`list_workspaces`, `import_paths`, `search_workspace`, `ask_workspace` and the rest), `AppState`, `RepoMemoCore::boot` at start and the shell's own data folder.
+- **The move:** `handoff.rs` and its four commands (`export_workspace_archive`, `read_export`, `copy_export`, `discard_export`).
+- **The dialog plugin:** nothing used it once the move was gone, so `tauri-plugin-dialog`, the `dialog:default` permission and `@tauri-apps/plugin-dialog` are removed too.
+- **Dependencies:** `repomemo-api`, `repomemo-domain`, `chrono`, `tokio` and `tauri-plugin-dialog` leave the shell's `Cargo.toml` (and `tauri-plugin-dialog` the workspace's); `Cargo.lock` loses 47 lines, `package.json` and `package-lock.json` one package.
+
+### Changed
+- **The shell** is `lib.rs` (the HTTP plugin, the connection state, the window built with `on_navigation`, eight commands: `current_server`, `prepare_server`, `remember_server`, `forget_server`, `save_session`, `load_session`, `clear_session`, `open_external`) and `connection.rs`. `cargo tree -p repomemo-desktop` reaches no `repomemo-*` crate.
+- **The documents:** the technical mindmap's shell row and scope line; the roadmap's checklist.
+- **The version** is `0.3.6` everywhere.
+
+### Checks
+- **Passing:** `cargo check -p repomemo-desktop --tests` (the shell's tests included), `cargo fmt --all --check`, `version:check` and `docs:check`.
+- **Not run:** the tests and the app. `RepoMemoCore::export_workspace_archive` and `write_workspace_archive` in `repomemo-api` stay (the move was their only caller; they are tested and harmless, and are the first candidates if a later release prunes dead code).
+
+### Upgrading
+- Nothing to do for a server. The desktop app no longer creates or opens a local data folder; an old one is left on the computer untouched.
+
 ## V0.3.5 (2026-10-24)
 
 The local edition is removed from the desktop client: the app opens on the server address screen only.
