@@ -2,6 +2,28 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.3.9 (2026-10-24)
+
+`@mentions` in task descriptions and memory cards.
+
+### Added
+- **Mentions beyond comments:** an `@address` in a task's description (created or saved) or in a memory card's text notifies that member, like in a comment. The notice is *You were mentioned in a task* (type `task_mention`, leads to the task board) or *You were mentioned in team memory* (type `memory_mention`, leads to the card), in the app and by mail as the person chose.
+- **Suggestions while typing:** the task description and the memory card fields (new card and edit) are `MentionTextarea`s, so typing `@` suggests the workspace's members, as in a comment.
+
+### Changed
+- **Who is told:** direct members of the workspace only. An organization member who is not in the workspace is neither suggested (as before) nor notified; the author is never told; on a save, only addresses that were **not** in the text before are told, so editing a description does not tell everyone again.
+- **One preference:** the choosable kind *You are mentioned in a comment, a task or a memory card* (`evidence_mention`) covers all three; nothing new to set, no migration.
+- **Code:** `notify_artifact_mentions` is now a thin call of `notify_mentions`, which takes a `MentionedIn` place (a file, a task or a memory card) and the text before the save; `mentioned_addresses` reads the addresses.
+- **The documents:** the functional mindmap's notifications row, the technical mindmap's routes and test counts (server 197), the user guide. The V0.2.39 gap about tasks and cards is closed.
+- **The version** is `0.3.9` everywhere.
+
+### Checks
+- **Compiled and linted:** `cargo clippy -D warnings` over the server crate with its tests, `cargo fmt --all --check`, `typecheck`, `docs:check`, `version:check`.
+- **Tests written, not run:** a server test (a task naming a member, an organization member outside the workspace and its author tells only the member; saving again tells nobody and a new name tells only that person; a memory card tells the member, an edit that names nobody new is quiet; the notices lead to the task board and the card) and a unit test of the address reading. No new web test: `MentionTextarea` is unchanged and has its own.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.3.8 (2026-10-24)
 
 Restore an earlier version of a file.

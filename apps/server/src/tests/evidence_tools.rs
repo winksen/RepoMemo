@@ -616,6 +616,189 @@ async fn restoring_an_earlier_version_makes_a_new_version_with_its_text_and_keep
 }
 
 #[tokio::test]
+async fn mentions_in_tasks_and_memory_cards_tell_workspace_members_once_and_nobody_else() {
+    let data_dir = temp_data_dir("mentions-everywhere");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let (_, _) = register_account(&app, "mentions-admin@example.com").await;
+    let (owner, _) = register_account(&app, "mentions-owner@example.com").await;
+    let (member, _) = register_account(&app, "mentions-member@example.com").await;
+    let (orgmate, _) = register_account(&app, "mentions-orgmate@example.com").await;
+    let workspace_id = create_workspace(&app, &owner).await;
+    let organizations = response_json(
+        app.clone()
+            .oneshot(auth_request("GET", "/v1/organizations", &owner))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let organization_id = organizations[0]["id"].as_str().unwrap().to_owned();
+    join(
+        &app,
+        &owner,
+        "organizations",
+        &organization_id,
+        "mentions-orgmate@example.com",
+        "member",
+    )
+    .await;
+    join(
+        &app,
+        &owner,
+        "workspaces",
+        &workspace_id,
+        "mentions-member@example.com",
+        "member",
+    )
+    .await;
+    // The kinds of notice a person has, in alphabetical order.
+    let kinds = |who: String| {
+        let request = auth_request("GET", "/v1/notifications", &who);
+        let app = app.clone();
+        async move {
+            let mut kinds = response_json(app.oneshot(request).await.unwrap())
+                .await
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|notice| notice["notification_type"].as_str().unwrap().to_owned())
+                .collect::<Vec<_>>();
+            kinds.sort();
+            kinds
+        }
+    };
+
+    // A task whose description names a member, an organization member who is not in the workspace, and
+    // its own author: only the member is told.
+    let created = call(
+        &app,
+        "POST",
+        &format!("/v1/workspaces/{workspace_id}/tasks"),
+        &owner,
+        json!({
+            "title": "Check the API",
+            "description": "@mentions-member@example.com please look, @mentions-orgmate@example.com too, and @mentions-owner@example.com",
+            "status": "open",
+            "priority": "medium",
+            "assignee_user_id": null,
+            "artifact_id": null,
+            "due_at": null
+        }),
+    )
+    .await;
+    assert_eq!(created.status(), 201);
+    let task = response_json(created).await;
+    let task_id = task["id"].as_str().unwrap().to_owned();
+    assert_eq!(kinds(member.clone()).await, ["task_mention"]);
+    assert!(
+        kinds(orgmate.clone()).await.is_empty(),
+        "not in the workspace: not told"
+    );
+    assert!(kinds(owner.clone()).await.is_empty(), "never the author");
+
+    // Saving the task again without a new name tells nobody again; a new name tells only that person.
+    let save = |description: &'static str| {
+        let request = json_request(
+            "PUT",
+            &format!("/v1/tasks/{task_id}"),
+            &owner,
+            json!({
+                "title": "Check the API",
+                "description": description,
+                "status": "open",
+                "priority": "medium",
+                "assignee_user_id": null,
+                "artifact_id": null,
+                "due_at": null
+            }),
+        );
+        let app = app.clone();
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    assert_eq!(
+        save("@mentions-member@example.com please look, and thanks")
+            .await
+            .status(),
+        200
+    );
+    assert_eq!(
+        kinds(member.clone()).await,
+        ["task_mention"],
+        "the same name is not told twice"
+    );
+    assert_eq!(
+        save("@mentions-member@example.com please look, @mentions-owner@example.com")
+            .await
+            .status(),
+        200
+    );
+    assert_eq!(kinds(member.clone()).await.len(), 1);
+
+    // A memory card names the member; changing the text without a new name is quiet, a second card is not.
+    let card = call(
+        &app,
+        "POST",
+        &format!("/v1/workspaces/{workspace_id}/memory-cards"),
+        &owner,
+        json!({
+            "title": "Rule",
+            "body_markdown": "Keep shared data on the API, says @mentions-member@example.com.",
+            "source": "Flow",
+            "confidence": null,
+            "citations": []
+        }),
+    )
+    .await;
+    assert_eq!(card.status(), 201);
+    let card_id = response_json(card).await["id"].as_str().unwrap().to_owned();
+    assert_eq!(kinds(member.clone()).await, ["memory_mention", "task_mention"]);
+    let edited = call(
+        &app,
+        "PUT",
+        &format!("/v1/memory-cards/{card_id}"),
+        &owner,
+        json!({
+            "title": "Rule",
+            "body_markdown": "Keep shared data on the API, says @mentions-member@example.com. Edited.",
+            "source": "Flow",
+            "confidence": null,
+            "citations": []
+        }),
+    )
+    .await;
+    assert_eq!(edited.status(), 200);
+    assert_eq!(
+        kinds(member.clone()).await.len(),
+        2,
+        "an edit that names nobody new is quiet"
+    );
+    assert!(kinds(orgmate).await.is_empty());
+
+    // The notice leads to the task board and to the card, and the preference covers both.
+    let notices = response_json(
+        app.clone()
+            .oneshot(auth_request("GET", "/v1/notifications", &member))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let hrefs = notices
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|notice| notice["href"].as_str().unwrap().to_owned())
+        .collect::<Vec<_>>();
+    assert!(
+        hrefs.contains(&format!("/workspaces/{workspace_id}/tasks")),
+        "{hrefs:?}"
+    );
+    assert!(
+        hrefs.contains(&format!("/workspaces/{workspace_id}/memory-cards/{card_id}")),
+        "{hrefs:?}"
+    );
+    let _ = std::fs::remove_dir_all(data_dir);
+}
+
+#[tokio::test]
 async fn the_console_creates_reset_links_and_lists_tokens() {
     let data_dir = temp_data_dir("console-tools");
     let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();

@@ -279,7 +279,7 @@ flowchart TD
 
 | Feature | What it gives you |
 |---|---|
-| **Discussion** | Threaded comments on any evidence. Type `@` to mention a teammate: they get notified (in the app and, if they like, by email) |
+| **Discussion** | Threaded comments on any evidence. Type `@` to mention a teammate, in a comment, a task's description or a memory card: they get notified (in the app and, if they like, by email), only if they are members of the workspace, and only once for each text you add them to |
 | **Task board** | Open, In progress, Blocked and Done columns. Tasks have a priority, an assignee, a due date, linked evidence and **checklists**. Assigning notifies the person, and the task shows on their profile |
 | **People** | Members, invitations and a summary of what *your* role allows |
 | **Activity feed** | Who did what, with a 365-day calendar *(admins)* |
@@ -396,7 +396,7 @@ To set expectations:
 | Keep a decision | Save an answer as a **memory card**, or write one in **Memory** |
 | See what needs attention | **Review** |
 | Check what has gone stale | **Health** and **Map** |
-| Hand work to someone | **Tasks**, or `@mention` in a comment |
+| Hand work to someone | **Tasks**, or `@mention` in a comment or a task |
 | Bring in a codebase | **Settings › Repositories** *(admins)* |
 | Turn on AI | **Settings › AI integration** *(admins)* |
 | Run the server | **System** *(system admins)* |

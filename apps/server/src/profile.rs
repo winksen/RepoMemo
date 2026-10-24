@@ -121,7 +121,10 @@ pub(crate) async fn update_profile(
 /// (password resets) always reach the app and the mail: they are not here.
 const CHOOSABLE_KINDS: [(&str, &str); 3] = [
     ("task_assigned", "A task is assigned to you"),
-    ("evidence_mention", "You are mentioned in a comment"),
+    (
+        "evidence_mention",
+        "You are mentioned in a comment, a task or a memory card",
+    ),
     (
         "daily_digest",
         "A summary by mail of what you have not read, once a day",
@@ -250,23 +253,19 @@ pub(crate) async fn notify_task_assignee(state: &AppState, actor_user_id: &str, 
     }
 }
 
-pub(crate) async fn notify_artifact_mentions(
-    state: &AppState,
-    actor_user_id: &str,
-    workspace_id: &str,
-    artifact_id: &str,
-    artifact_title: &str,
-    body: &str,
-) {
-    let members = match state.storage.list_workspace_members(workspace_id).await {
-        Ok(members) => members,
-        Err(error) => {
-            tracing::error!(error = %error, workspace_id, "Failed to resolve evidence comment mentions");
-            return;
-        }
-    };
-    let mentioned_emails = body
-        .split_whitespace()
+/// Where a mention was written. It decides the words of the notice, its type and where it leads (V0.3.9).
+pub(crate) enum MentionedIn<'a> {
+    /// A comment on a file.
+    Artifact { id: &'a str, title: &'a str },
+    /// The description of a task.
+    Task { title: &'a str },
+    /// The text of a memory card.
+    MemoryCard { id: &'a str, title: &'a str },
+}
+
+/// The addresses written after an `@` in a text, in lower case.
+pub(crate) fn mentioned_addresses(text: &str) -> BTreeSet<String> {
+    text.split_whitespace()
         .filter_map(|token| {
             token
                 .trim_matches(|character: char| {
@@ -276,17 +275,89 @@ pub(crate) async fn notify_artifact_mentions(
                     )
                 })
                 .strip_prefix('@')
-                .map(|email| email.to_ascii_lowercase())
+                .filter(|address| !address.is_empty())
+                .map(|address| address.to_ascii_lowercase())
         })
-        .collect::<BTreeSet<_>>();
+        .collect()
+}
+
+pub(crate) async fn notify_artifact_mentions(
+    state: &AppState,
+    actor_user_id: &str,
+    workspace_id: &str,
+    artifact_id: &str,
+    artifact_title: &str,
+    body: &str,
+) {
+    notify_mentions(
+        state,
+        actor_user_id,
+        workspace_id,
+        MentionedIn::Artifact {
+            id: artifact_id,
+            title: artifact_title,
+        },
+        body,
+        "",
+    )
+    .await;
+}
+
+/// Tells the members of a workspace that a text mentions them. Only direct members of the workspace
+/// are told (an organization member who is not in the workspace is neither suggested nor notified), never
+/// the person who wrote it, and, when `earlier` is the text as it was before this save, nobody it already
+/// mentioned. One preference ("You are mentioned") covers every place.
+pub(crate) async fn notify_mentions(
+    state: &AppState,
+    actor_user_id: &str,
+    workspace_id: &str,
+    place: MentionedIn<'_>,
+    text: &str,
+    earlier: &str,
+) {
+    let mentioned_emails = mentioned_addresses(text);
+    if mentioned_emails.is_empty() {
+        return;
+    }
+    let already = mentioned_addresses(earlier);
+    let members = match state.storage.list_workspace_members(workspace_id).await {
+        Ok(members) => members,
+        Err(error) => {
+            tracing::error!(error = %error, workspace_id, "Failed to resolve mentions");
+            return;
+        }
+    };
+    let (notification_type, title, subject_title, action, path) = match place {
+        MentionedIn::Artifact { id, title } => (
+            "evidence_mention",
+            "You were mentioned in evidence discussion",
+            title,
+            "mentioned you on",
+            format!("/workspaces/{workspace_id}/artifacts/{id}"),
+        ),
+        MentionedIn::Task { title } => (
+            "task_mention",
+            "You were mentioned in a task",
+            title,
+            "mentioned you in the task",
+            format!("/workspaces/{workspace_id}/tasks"),
+        ),
+        MentionedIn::MemoryCard { id, title } => (
+            "memory_mention",
+            "You were mentioned in team memory",
+            title,
+            "mentioned you in the memory card",
+            format!("/workspaces/{workspace_id}/memory-cards/{id}"),
+        ),
+    };
     for member in members {
         let Some(email) = member.user.email.as_deref() else {
             continue;
         };
-        if member.user.id == actor_user_id || !mentioned_emails.contains(&email.to_ascii_lowercase()) {
+        let email = email.to_ascii_lowercase();
+        if member.user.id == actor_user_id || !mentioned_emails.contains(&email) || already.contains(&email) {
             continue;
         }
-        let path = format!("/workspaces/{workspace_id}/artifacts/{artifact_id}");
         let (in_app, by_mail) = delivery(state, &member.user.id, "evidence_mention").await;
         if in_app {
             create_notification(
@@ -294,9 +365,9 @@ pub(crate) async fn notify_artifact_mentions(
                 NewSharedNotification {
                     user_id: member.user.id.clone(),
                     workspace_id: Some(workspace_id.to_owned()),
-                    notification_type: "evidence_mention".to_owned(),
-                    title: "You were mentioned in evidence discussion".to_owned(),
-                    body: format!("You were mentioned on {}.", artifact_title),
+                    notification_type: notification_type.to_owned(),
+                    title: title.to_owned(),
+                    body: format!("You were mentioned on {subject_title}."),
                     href: path.clone(),
                 },
             )
@@ -306,11 +377,11 @@ pub(crate) async fn notify_artifact_mentions(
             crate::mail::mail_notification(
                 state,
                 crate::mail::NotificationMail {
-                    kind: "evidence_mention",
+                    kind: notification_type,
                     actor_id: actor_user_id,
                     recipient_id: &member.user.id,
-                    action: "mentioned you on",
-                    subject_title: artifact_title,
+                    action,
+                    subject_title,
                     path: &path,
                 },
             )
@@ -322,5 +393,21 @@ pub(crate) async fn notify_artifact_mentions(
 pub(crate) async fn create_notification(state: &AppState, notification: NewSharedNotification) {
     if let Err(error) = state.storage.create_shared_notification(notification).await {
         tracing::error!(error = %error, "Failed to create shared notification");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::mentioned_addresses;
+
+    #[test]
+    fn addresses_are_read_after_an_at_sign_and_trimmed_of_punctuation() {
+        let found =
+            mentioned_addresses("Ask @Ada@Example.com, then @grace@example.com). Not a@b.com, nor @ alone, nor @.");
+        assert_eq!(
+            found.into_iter().collect::<Vec<_>>(),
+            ["ada@example.com", "grace@example.com"]
+        );
+        assert!(mentioned_addresses("").is_empty());
     }
 }

@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.3.8` (2026-10-24). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.3.9` (2026-10-24). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ---
 
@@ -230,7 +230,7 @@ A **System** button in the header opens `/system`, with these pages:
 | **Sign in** (`/login`) | Email and password. A wrong email and a wrong password produce the same message. After 10 failed attempts in a row the account is locked for 15 minutes from that address (both configurable), and too many attempts from one address are slowed down. A browser that still holds a session of the account gets past a lockout other people caused. The session itself is kept in a cookie scripts cannot read. |
 | **Session** | Renewed silently in the background for up to 30 days of inactivity, so nobody is signed out mid-work. |
 | **Profile** (`/profile`) | Upload or remove a **profile picture** (PNG, JPEG or WebP; cropped square and shrunk to 256 px in the browser; server limit 512 KiB, 64–1024 px square). It also shows in workspace members, organization members and System › Users, and falls back to initials. Rename yourself, change your password (the current password is required; **every other device is signed out**, this one stays signed in), **sign out everywhere** (every device, this one included), see last connection time, workspace count, a **365-day contribution calendar**, and **tasks assigned to you**. |
-| **Notifications** (`/notifications`) | "Task assigned to you" and "You were mentioned in evidence discussion". Mark one or all as read. Clicking a notification opens the related page. |
+| **Notifications** (`/notifications`) | "Task assigned to you", "You were mentioned in evidence discussion", and, since V0.3.9, "You were mentioned in a task" and "You were mentioned in team memory" (an `@address` in a task's description or a memory card's text; only direct members of the workspace are suggested or told, never the author, and a save tells only the people it adds). Mark one or all as read. Clicking a notification opens the related page. |
 | **Theme** | Light and dark toggle, remembered per browser. |
 | **Command palette** | **Ctrl K** (or **⌘ K**, or the search button in the header) opens a search box over what can be opened: workspaces, the open workspace's sections, its files and memory cards, pages such as the dashboard and profile, System pages for administrators. Arrow keys and Enter pick; Esc closes. On a workspace page the typed text can also be sent to the assistant as a question, a file lookup, a content search or a symbol lookup. |
 | **Sign out** | Always visible in the header. |

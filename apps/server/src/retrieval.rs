@@ -311,6 +311,18 @@ pub(crate) async fn create_memory_card(
         })
         .await
         .map_err(map_core_error)?;
+    crate::notify_mentions(
+        &state,
+        &subject.user_id,
+        &workspace_id,
+        crate::MentionedIn::MemoryCard {
+            id: &card.id,
+            title: &card.title,
+        },
+        &card.body_markdown,
+        "",
+    )
+    .await;
     record_workspace_activity(
         &state,
         &workspace_id,
@@ -347,6 +359,7 @@ pub(crate) async fn update_memory_card(
         .map_err(map_core_error)?;
     require_workspace_write(&state, &subject, &current.card.workspace_id).await?;
     let workspace_id = current.card.workspace_id;
+    let earlier_body = current.card.body_markdown;
     let card = state
         .core
         .update_memory_card(UpdateMemoryCardRequest {
@@ -359,6 +372,18 @@ pub(crate) async fn update_memory_card(
         })
         .await
         .map_err(map_core_error)?;
+    crate::notify_mentions(
+        &state,
+        &subject.user_id,
+        &workspace_id,
+        crate::MentionedIn::MemoryCard {
+            id: &card.id,
+            title: &card.title,
+        },
+        &card.body_markdown,
+        &earlier_body,
+    )
+    .await;
     record_workspace_activity(
         &state,
         &workspace_id,

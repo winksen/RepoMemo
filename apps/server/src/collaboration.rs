@@ -42,6 +42,15 @@ pub(crate) async fn create_collaboration_task(
         .await
         .map_err(map_storage_error)?;
     notify_task_assignee(&state, &subject.user_id, &task).await;
+    notify_mentions(
+        &state,
+        &subject.user_id,
+        &workspace_id,
+        MentionedIn::Task { title: &task.title },
+        &task.description,
+        "",
+    )
+    .await;
     record_workspace_activity(
         &state,
         &workspace_id,
@@ -78,6 +87,16 @@ pub(crate) async fn update_collaboration_task(
     {
         notify_task_assignee(&state, &subject.user_id, &task).await;
     }
+    // Only people this save adds are told, not everyone the description already named.
+    notify_mentions(
+        &state,
+        &subject.user_id,
+        &task.workspace_id,
+        MentionedIn::Task { title: &task.title },
+        &task.description,
+        &current.description,
+    )
+    .await;
     record_workspace_activity(
         &state,
         &task.workspace_id,
