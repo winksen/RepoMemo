@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.3 → 0.4
 
-> **Line:** `V0.3.1` to `V0.3.27`, then `V0.4.0` (theme to be chosen, decision 33) · **Current:** `V0.3.14` (2026-10-24) · **Next:** `V0.3.15`, CODEOWNERS owners matched to members
+> **Line:** `V0.3.1` to `V0.3.27`, then `V0.4.0` (theme to be chosen, decision 33) · **Current:** `V0.3.15` (2026-10-24) · **Next:** `V0.3.16`, the last author in answers and citations
 > **Previous line:** [Releases 0.2 → 0.3](RELEASES_0.2.md) · **Related:** [Roadmap, Road to V0.4.0](ROADMAP.md#-road-to-v040) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
 Every release of the 0.3 line, planned and later shipped, one row each. The plan comes from the [Road to V0.4.0](ROADMAP.md#-road-to-v040), proposed on 2026-10-24: **one change per release**, each shippable alone, committed as `Update V0.3.N`. Decisions 29–32 of the roadmap are taken as proposed (V0.3.1); decision 33, the theme of V0.4.0, is recorded in V0.3.27.
@@ -44,7 +44,7 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | **V0.3.12** | ✅ 2026-10-24 | Q. Small gaps | 🔧 Enhancement | Retrieval | Search across workspaces takes filters (kind of file, language, days) and finds memory cards, each under its workspace's role | Each result is still checked against its workspace's role and AI policy |
 | **V0.3.13** | ✅ 2026-10-24 | Q. Small gaps | 🔧 Enhancement | Web shell | The command palette keeps recent places (per account, in the browser) and offers *New note* in the open workspace | Recent items survive a reload; *New note* opens the editor in the open workspace |
 | **V0.3.14** | ✅ 2026-10-24 | Q. Small gaps | 🔧 Enhancement | Citations | *View at commit* offered from memory-card links (the commit a citation named is kept in the link) and repository summaries | A card's link opens the cited text at the commit it names, labelled as such |
-| **V0.3.15** | 🔜 Planned | Q. Small gaps | ✨ Feature | Artifact page | `CODEOWNERS` owners matched to workspace members | A matched owner shows as a member and can be asked to review; an unmatched one stays a hint |
+| **V0.3.15** | ✅ 2026-10-24 | Q. Small gaps | ✨ Feature | Artifact page | `CODEOWNERS` owners written as an address matched to workspace members; a writer can ask a matched owner to review a file (a task); handles and teams stay hints | A matched owner shows as a member and can be asked to review; an unmatched one stays a hint |
 | **V0.3.16** | 🔜 Planned | Q. Small gaps | 🔧 Enhancement | Assistant | Answers and citations name the last author and date of a repository file | A citation of a repository file shows who last changed it |
 | **V0.3.17** | 🔜 Planned | Q. Small gaps | 🔧 Enhancement | Indexing | More code symbols: Go `const`, `var` and type aliases; Java fields; C# properties; PHP properties and constants | Each is found in the Code symbols box |
 | **V0.3.18** | 🔜 Planned | Q. Small gaps | 🔧 Enhancement | Templates | The Overview cards the templates wanted and could not name: repositories in sync, evidence reviewed in 90 days, needing review, duplicates | A template can list them; General's nine cards are unchanged |

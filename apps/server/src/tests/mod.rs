@@ -10,6 +10,7 @@ use tower::ServiceExt;
 
 mod ai;
 mod auth;
+mod code_owners;
 mod compression;
 mod connectors;
 mod connectors_gitlab;

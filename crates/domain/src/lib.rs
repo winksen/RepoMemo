@@ -1231,6 +1231,16 @@ pub struct SearchResult {
     pub last_changed_at: Option<String>,
 }
 
+/// An owner that `CODEOWNERS` names for a file, and the member of the workspace it stands for (V0.3.15). An owner
+/// written as an address stands for the member whose account has that address; `@handles` and `@org/teams` belong to
+/// the code host, not to RepoMemo, so they stay hints with no member.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CodeOwnerMatch {
+    /// The owner as `CODEOWNERS` writes it.
+    pub owner: String,
+    pub member: Option<SharedUser>,
+}
+
 /// A search result from one of several workspaces searched together.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrossSearchResult {

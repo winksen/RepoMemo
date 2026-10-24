@@ -530,6 +530,21 @@ impl StorageEngine {
         Ok(changed)
     }
 
+    /// The owners `CODEOWNERS` named for a file the last time its repository was synced (V0.3.15); none for a
+    /// file that has none, and for one that is not a repository's.
+    pub async fn artifact_code_owners(&self, artifact_id: &str) -> Result<Vec<String>> {
+        let raw = sqlx::query_scalar::<_, Option<String>>(
+            "SELECT json_extract(metadata_json, '$.code_owners') FROM artifacts WHERE id = ?1",
+        )
+        .bind(artifact_id)
+        .fetch_optional(self.reader())
+        .await?
+        .flatten();
+        Ok(raw
+            .and_then(|text| serde_json::from_str::<Vec<String>>(&text).ok())
+            .unwrap_or_default())
+    }
+
     /// Records which owners `CODEOWNERS` names for each file, in its
     /// artifact's metadata (`code_owners`). Rows that already say so are left
     /// alone. Returns how many changed.

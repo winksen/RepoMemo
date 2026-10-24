@@ -168,7 +168,7 @@ flowchart LR
 - You can **include or exclude** paths such as `docs/**` or `src/`.
 - Remote repositories work over `https` (with a token) or `ssh` (with a deploy key). A push **webhook** from GitHub, GitLab or any sender makes a sync happen within seconds.
 - Each repository is also **one evidence item** with a no-AI overview (languages, key files, README, recent commits) and an **AI summary** written only when someone asks.
-- A file's page shows its **last author and date** and its `CODEOWNERS` as hints.
+- A file's page shows its **last author and date** and its `CODEOWNERS`. An owner written as an email address that belongs to a member of the workspace shows as that member, with an **Ask to review** button that gives them a task for the file; `@handles` and teams stay plain hints.
 
 ### Issues and pull requests
 
@@ -383,7 +383,7 @@ To set expectations:
 - Issue and pull-request connectors cover **GitHub and GitLab** only.
 - A workspace **template** arranges what exists; it doesn't add new sections, and an organization can't save its own template for all its workspaces yet.
 - Archives are a copy, not a continuous sync. Saved searches, assistant chats and the activity feed aren't in them.
-- Ownership hints from `CODEOWNERS` aren't matched to members or notified.
+- `CODEOWNERS` owners are matched to members only when written as an email address; `@handles` and teams stay hints, and nobody is asked to review unless you press **Ask to review**.
 
 ---
 

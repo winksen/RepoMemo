@@ -891,6 +891,16 @@ export function querySharedArtifacts(accessToken: string, workspaceId: string, i
   }, accessToken);
 }
 
+/** The owners `CODEOWNERS` names for a repository file, each with the workspace member it stands for (V0.3.15). */
+export function getSharedArtifactCodeOwners(accessToken: string, artifactId: string): Promise<import("../types").CodeOwnerMatch[]> {
+  return request<import("../types").CodeOwnerMatch[]>(`/v1/artifacts/${artifactId}/code-owners`, {}, accessToken);
+}
+
+/** Asks a member that `CODEOWNERS` names for a file to review it: a task is assigned to them (V0.3.15). */
+export function requestSharedArtifactReview(accessToken: string, artifactId: string, userId: string, note = ""): Promise<import("../types").CollaborationTask> {
+  return request<import("../types").CollaborationTask>(`/v1/artifacts/${artifactId}/review-requests`, { method: "POST", body: JSON.stringify({ user_id: userId, note }) }, accessToken);
+}
+
 /** A repository file's text as it was at a commit (what a citation names). */
 export function getSharedArtifactAtCommit(accessToken: string, artifactId: string, commit: string): Promise<RepoFileAtCommit> {
   return request<RepoFileAtCommit>(`/v1/artifacts/${artifactId}/at/${encodeURIComponent(commit)}`, {}, accessToken);

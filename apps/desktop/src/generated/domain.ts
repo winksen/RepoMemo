@@ -1093,6 +1093,17 @@ export interface SearchResult {
   last_changed_at: string | null;
 }
 
+/**
+ * An owner that `CODEOWNERS` names for a file, and the member of the workspace it stands for (V0.3.15). An owner
+ * written as an address stands for the member whose account has that address; `@handles` and `@org/teams` belong to
+ * the code host, not to RepoMemo, so they stay hints with no member.
+ */
+export interface CodeOwnerMatch {
+  /** The owner as `CODEOWNERS` writes it. */
+  owner: string;
+  member: SharedUser | null;
+}
+
 /** A search result from one of several workspaces searched together. */
 export interface CrossSearchResult {
   workspace_id: string;

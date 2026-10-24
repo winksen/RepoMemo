@@ -923,6 +923,11 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             "/v1/artifacts/{artifact_id}/versions/{version}/restore",
             post(restore_artifact_version),
         )
+        .route("/v1/artifacts/{artifact_id}/code-owners", get(get_artifact_code_owners))
+        .route(
+            "/v1/artifacts/{artifact_id}/review-requests",
+            post(request_artifact_review),
+        )
         .route("/v1/artifacts/{artifact_id}/compare", get(compare_artifact_versions))
         .route(
             "/v1/workspaces/{workspace_id}/transfer-ownership",

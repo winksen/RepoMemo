@@ -1427,6 +1427,117 @@ pub(crate) async fn get_artifact_version_text(
         .map_err(map_core_error)
 }
 
+/// The owners `CODEOWNERS` names for a file, each with the workspace member it stands for (V0.3.15).
+pub(crate) async fn get_artifact_code_owners(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(artifact_id): Path<String>,
+) -> Result<Json<Vec<repomemo_domain::CodeOwnerMatch>>, ApiError> {
+    readable_artifact_summary(&state, &subject, &artifact_id).await?;
+    state
+        .core
+        .artifact_code_owners(&artifact_id)
+        .await
+        .map(Json)
+        .map_err(map_core_error)
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct ReviewRequestBody {
+    /// The member asked: one of the owners `CODEOWNERS` names for the file.
+    user_id: String,
+    /// A line for the person; a default says why they are asked.
+    #[serde(default)]
+    note: String,
+}
+
+/// Asks a matched owner to review a file (V0.3.15). The request is a task assigned to them, for the file, so it
+/// reaches them as any assignment does (the app, and mail as they chose) and is tracked with the other tasks.
+pub(crate) async fn request_artifact_review(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(artifact_id): Path<String>,
+    Json(request): Json<ReviewRequestBody>,
+) -> Result<(StatusCode, Json<repomemo_domain::CollaborationTask>), ApiError> {
+    let summary = writable_artifact_summary(&state, &subject, &artifact_id).await?;
+    let note = request.note.trim().to_owned();
+    if note.chars().count() > 1_000 {
+        return Err(ApiError::bad_request("A note is 1,000 characters at most."));
+    }
+    // Only an owner the file's CODEOWNERS names, who is a member of this workspace, can be asked this way.
+    let owners = state
+        .core
+        .artifact_code_owners(&artifact_id)
+        .await
+        .map_err(map_core_error)?;
+    let Some(owner) = owners
+        .iter()
+        .find(|entry| entry.member.as_ref().is_some_and(|member| member.id == request.user_id))
+    else {
+        return Err(ApiError::bad_request(
+            "Only a member of this workspace that CODEOWNERS names for this file can be asked to review it.",
+        ));
+    };
+    let title = format!("Review {}", summary.path.chars().take(160).collect::<String>());
+    let existing = state
+        .storage
+        .list_collaboration_tasks(&summary.workspace_id)
+        .await
+        .map_err(map_storage_error)?;
+    if existing.iter().any(|task| {
+        task.status != "done"
+            && task.title == title
+            && task.artifact_id.as_deref() == Some(artifact_id.as_str())
+            && task
+                .assignee
+                .as_ref()
+                .is_some_and(|assignee| assignee.id == request.user_id)
+    }) {
+        return Err(ApiError::new(
+            StatusCode::CONFLICT,
+            "review_already_requested",
+            "This person has already been asked to review this file, and has not finished.",
+        ));
+    }
+    let description = if note.is_empty() {
+        format!(
+            "Asked to review {} as an owner named in CODEOWNERS ({}).",
+            summary.path, owner.owner
+        )
+    } else {
+        note
+    };
+    let task = state
+        .storage
+        .create_collaboration_task(
+            &summary.workspace_id,
+            &subject.user_id,
+            NewCollaborationTask {
+                title,
+                description,
+                status: "open".to_owned(),
+                priority: "medium".to_owned(),
+                assignee_user_id: Some(request.user_id.clone()),
+                artifact_id: Some(artifact_id.clone()),
+                due_at: None,
+            },
+        )
+        .await
+        .map_err(map_storage_error)?;
+    notify_task_assignee(&state, &subject.user_id, &task).await;
+    record_workspace_activity(
+        &state,
+        &summary.workspace_id,
+        &subject.user_id,
+        "task_created",
+        "task",
+        Some(&task.id),
+        format!("Asked for a review of {}: {}.", summary.path, task.title),
+    )
+    .await;
+    Ok((StatusCode::CREATED, Json(task)))
+}
+
 /// Two versions of a file compared line by line.
 pub(crate) async fn compare_artifact_versions(
     subject: AuthenticatedSubject,

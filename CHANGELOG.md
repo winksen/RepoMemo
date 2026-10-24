@@ -2,6 +2,29 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.3.15 (2026-10-24)
+
+`CODEOWNERS` owners matched to workspace members.
+
+### Added
+- **Matching:** an owner that `CODEOWNERS` writes as an address (`ada@example.com`) shows on the file's page as the member whose account has that address, ignoring case. A `@handle`, a `@org/team`, an address nobody has and an anonymized account are never matched: handles and teams belong to the code host, so guessing (a handle that looks like a member's name) would put the wrong person on a file.
+- **Asking for a review:** beside a matched owner, a person who can change the file sees *Ask to review*. It assigns that member a task *Review <path>* for the file, which reaches them like any assignment (the app, and mail as they chose, under their *task assigned* preference) and shows in Tasks and the activity feed. The same person is asked once while the task is open; once it is done they can be asked again, with an optional note.
+- **`GET /v1/artifacts/{id}/code-owners`** (anyone who can read the file) answers each owner with its member or none; **`POST /v1/artifacts/{id}/review-requests`** takes `{user_id, note?}`.
+
+### Security
+- Asking is open only to people who can change the file, and only for a member that the file's own CODEOWNERS names: the server recomputes the matches and refuses any other `user_id` (`400`), so the route cannot be used to assign work to an arbitrary member. A note is limited to 1,000 characters. The member's name is shown to readers of the workspace, who already see members in comments and activity; their address is the owner text the repository itself published.
+
+### Checks
+- **Compiled and linted:** `cargo clippy -D warnings` over the domain, storage, api and server crates with their tests, `cargo fmt --all --check`, `typecheck`, `types:check` (153 types), `styles:check`, `a11y:check` (124 components), `docs:check`, `version:check`.
+- **Tests written, not run:** a unit test of the matching (case, handles, teams, strangers, an account with no address), a server test over a real local repository whose `CODEOWNERS` names a member, a handle, a team and a stranger (what is matched, a file of handles only, an outsider refused, a viewer and an outsider cannot ask, an unnamed member and a bad id and an over-long note are refused, the task and the member's notice, asking again is refused while open and allowed once done), and six web tests (nothing without owners, hints then the member, the server failing, no button for a reader, asking once, a refusal).
+
+### Changed
+- **The documents:** the functional mindmap's gap row, the repository sources page, the API reference, the technical mindmap's routes and test counts (api 99, server 203, web 355), the user guide. The V0.2.25 gap about matching is closed; owners in the file list and in search results are not shown.
+- **The version** is `0.3.15` everywhere.
+
+### Upgrading
+- Nothing to do. No migration; owners are read from what the last sync stored.
+
 ## V0.3.14 (2026-10-24)
 
 *View at commit* from memory cards and repository summaries.

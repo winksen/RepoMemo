@@ -177,6 +177,8 @@
 | GET | `/v1/artifacts/{artifact_id}/versions` | auth | require_workspace_read (via the artifact) | — | Vec<ArtifactVersion> |
 | GET | `/v1/artifacts/{artifact_id}/versions/{version}` | auth | require_workspace_read (via the artifact) | — | ArtifactVersionText |
 | POST | `/v1/artifacts/{artifact_id}/versions/{version}/restore` | auth | require_workspace_write (via the artifact) | — | SharedArtifactSummary |
+| GET | `/v1/artifacts/{artifact_id}/code-owners` | auth | require_workspace_read (via the artifact) | — | Vec<CodeOwnerMatch> |
+| POST | `/v1/artifacts/{artifact_id}/review-requests` | auth | require_workspace_write (via the artifact) | — | CollaborationTask |
 | GET | `/v1/artifacts/{artifact_id}/compare` | auth | require_workspace_read (via the artifact) | `from`, `to` query | VersionComparison |
 
 ## Retrieval, memory and assistant

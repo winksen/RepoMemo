@@ -3,7 +3,10 @@
 //! A repository's `CODEOWNERS` file says who owns which paths. RepoMemo shows
 //! the matching owners on each file as a hint next to its review owner: the
 //! two are different things (an owner here is a handle on the host, not a
-//! person of the workspace), and nothing is ever assigned from it.
+//! person of the workspace), and nothing is ever assigned from it. Since
+//! V0.3.15 an owner written as an address is matched to the member with that
+//! address ([`match_owners`]), and a person who can change the file can ask
+//! that member to review it; a `@handle` or team is never guessed at.
 //!
 //! The matcher follows what GitHub and GitLab document, without regular
 //! expressions: patterns are read top to bottom and the last one that matches
@@ -14,6 +17,10 @@
 //! pattern with no owners clears ownership. GitLab's `[Section]` lines (and
 //! their default owners) are understood; negation and escapes are not.
 
+use repomemo_domain::{CodeOwnerMatch, WorkspaceMember};
+
+use crate::RepoMemoCore;
+
 /// Where the file is looked for, first one found wins.
 pub const CODEOWNERS_PATHS: &[&str] = &[
     ".github/CODEOWNERS",
@@ -21,6 +28,51 @@ pub const CODEOWNERS_PATHS: &[&str] = &[
     "docs/CODEOWNERS",
     ".gitlab/CODEOWNERS",
 ];
+
+/// Which of a workspace's members the owners of a file stand for (V0.3.15): an owner written as an address matches the
+/// member whose account has that address, ignoring case. A `@handle` or `@org/team` is the code host's, so it is
+/// never matched, and neither is a member with no address (an anonymized account) or an address nobody has.
+pub fn match_owners(owners: &[String], members: &[WorkspaceMember]) -> Vec<CodeOwnerMatch> {
+    owners
+        .iter()
+        .map(|owner| {
+            let written = owner.trim();
+            let is_address = !written.starts_with('@')
+                && written.matches('@').count() == 1
+                && !written.chars().any(char::is_whitespace);
+            let member = is_address
+                .then(|| {
+                    members.iter().find(|member| {
+                        member
+                            .user
+                            .email
+                            .as_deref()
+                            .is_some_and(|email| email.eq_ignore_ascii_case(written))
+                    })
+                })
+                .flatten()
+                .map(|member| member.user.clone());
+            CodeOwnerMatch {
+                owner: owner.clone(),
+                member,
+            }
+        })
+        .collect()
+}
+
+impl RepoMemoCore {
+    /// The owners `CODEOWNERS` named for a file the last time its repository was synced, each with the workspace
+    /// member it stands for. Empty for a file with no owners, and for one that is not a repository's.
+    pub async fn artifact_code_owners(&self, artifact_id: &str) -> anyhow::Result<Vec<CodeOwnerMatch>> {
+        let summary = self.storage.get_artifact_summary(artifact_id).await?;
+        let owners = self.storage.artifact_code_owners(artifact_id).await?;
+        if owners.is_empty() {
+            return Ok(Vec::new());
+        }
+        let members = self.storage.list_workspace_members(&summary.workspace_id).await?;
+        Ok(match_owners(&owners, &members))
+    }
+}
 
 /// The most owners kept for one file.
 const MAX_OWNERS: usize = 16;
@@ -214,7 +266,55 @@ fn wildcard_match(pattern: &[u8], text: &[u8]) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use repomemo_domain::{SharedUser, WorkspaceRole};
+
     use super::*;
+
+    fn member(id: &str, name: &str, email: Option<&str>) -> WorkspaceMember {
+        WorkspaceMember {
+            user: SharedUser {
+                id: id.to_owned(),
+                display_name: name.to_owned(),
+                email: email.map(str::to_owned),
+            },
+            role: WorkspaceRole::Member,
+            joined_at: String::new(),
+            updated_at: String::new(),
+        }
+    }
+
+    #[test]
+    fn an_owner_written_as_an_address_stands_for_the_member_with_that_address_and_nothing_else_is_guessed() {
+        let members = [
+            member("u1", "Ada", Some("Ada@Example.com")),
+            member("u2", "Grace", Some("grace@example.com")),
+            member("u3", "Former member", None),
+        ];
+        let owners = [
+            "@ada".to_owned(),
+            "ada@example.com".to_owned(),
+            "@org/payments".to_owned(),
+            "nobody@example.com".to_owned(),
+            "grace@example.com ".to_owned(),
+            "a@b@example.com".to_owned(),
+        ];
+        let matched = match_owners(&owners, &members);
+        let ids: Vec<Option<&str>> = matched
+            .iter()
+            .map(|entry| entry.member.as_ref().map(|user| user.id.as_str()))
+            .collect();
+        // A handle that looks like a member's name is still the code host's; an address matches whatever its case.
+        assert_eq!(ids, [None, Some("u1"), None, None, Some("u2"), None]);
+        assert_eq!(
+            matched[1].owner, "ada@example.com",
+            "the owner stays as CODEOWNERS wrote it"
+        );
+        assert!(match_owners(&[], &members).is_empty());
+        // An account with no address is matched by nothing.
+        assert!(match_owners(&["@former".to_owned(), "".to_owned()], &members)
+            .iter()
+            .all(|entry| entry.member.is_none()));
+    }
 
     fn owners(file: &str, path: &str) -> Vec<String> {
         CodeOwners::parse(file).owners_of(path)
