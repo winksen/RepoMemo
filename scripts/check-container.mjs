@@ -165,6 +165,24 @@ if (!/HEALTHCHECK[^\n]*\\\n\s*CMD \["repomemo-server", "--health"\]/.test(docker
   if (/\bcurl\b/.test(serverStage.replace(/#[^\n]*/g, ""))) problems.push("the server image installs or runs curl; the health check is repomemo-server --health");
 }
 
+// Every image says what it is (V0.4.9): the same labels on the server, the converter and the proxy, from the
+// build arguments the compose file gives each of them.
+for (const stage of ["server", "converter", "proxy"]) {
+  const start = dockerfile.search(new RegExp(String.raw`^FROM\s.*\sAS\s${stage}\s*$`, "m"));
+  const next = dockerfile.slice(start + 1).search(/^FROM\s/m);
+  const body = start < 0 ? "" : dockerfile.slice(start, next < 0 ? undefined : start + 1 + next);
+  for (const key of ["title", "description", "source", "licenses", "version", "revision", "created"]) {
+    if (!body.includes(`org.opencontainers.image.${key}=`)) problems.push(`the ${stage} image has no org.opencontainers.image.${key} label`);
+  }
+  for (const name of ["REPOMEMO_BUILD_COMMIT", "REPOMEMO_BUILD_DATE", "REPOMEMO_IMAGE_TAG"]) {
+    if (!new RegExp(String.raw`^ARG\s+${name}\b`, "m").test(body)) problems.push(`the ${stage} stage does not take the build argument ${name} its labels use`);
+  }
+  const service = new RegExp(String.raw`target:\s*${stage}\s*\n\s*args:([\s\S]*?)(?=\n    \S)`).exec(compose)?.[1] ?? "";
+  for (const name of ["REPOMEMO_BUILD_COMMIT", "REPOMEMO_BUILD_DATE", "REPOMEMO_IMAGE_TAG"]) {
+    if (!service.includes(name)) problems.push(`the compose file does not pass ${name} to the ${stage} image`);
+  }
+}
+
 // The server image is told what it is (V0.4.3): the Dockerfile takes the three build arguments, and the compose file gives them.
 for (const name of ["REPOMEMO_BUILD_COMMIT", "REPOMEMO_BUILD_DATE", "REPOMEMO_IMAGE_TAG"]) {
   if (!new RegExp(String.raw`^ARG\s+${name}\b`, "m").test(dockerfile)) problems.push(`the Dockerfile has no ARG ${name}, so /health cannot name the build`);

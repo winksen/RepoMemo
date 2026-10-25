@@ -81,6 +81,18 @@ ENV REPOMEMO_SERVER_ADDR=0.0.0.0:3020 \
 EXPOSE 3020
 HEALTHCHECK --interval=15s --timeout=5s --start-period=40s --retries=3 \
     CMD ["repomemo-server", "--health"]
+# Labels, last so that a new commit does not rebuild what is above (V0.4.9).
+ARG REPOMEMO_SOURCE_URL=https://github.com/repomemo/repomemo
+ARG REPOMEMO_BUILD_COMMIT=unknown
+ARG REPOMEMO_BUILD_DATE=unknown
+ARG REPOMEMO_IMAGE_TAG=unknown
+LABEL org.opencontainers.image.title="repomemo-server" \
+      org.opencontainers.image.description="RepoMemo API: the server, its database and its stored files" \
+      org.opencontainers.image.source="${REPOMEMO_SOURCE_URL}" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.version="${REPOMEMO_IMAGE_TAG}" \
+      org.opencontainers.image.revision="${REPOMEMO_BUILD_COMMIT}" \
+      org.opencontainers.image.created="${REPOMEMO_BUILD_DATE}"
 ENTRYPOINT ["repomemo-server"]
 
 # ---------------------------------------------------------------------------
@@ -99,6 +111,18 @@ COPY --chmod=0755 docker/soffice-listener.sh /usr/local/bin/repomemo-soffice-lis
 COPY --chmod=0755 docker/soffice-run.sh /usr/local/bin/repomemo-soffice-run
 USER repomemo
 ENV HOME=/tmp
+# Labels, last so that a new commit does not rebuild what is above (V0.4.9).
+ARG REPOMEMO_SOURCE_URL=https://github.com/repomemo/repomemo
+ARG REPOMEMO_BUILD_COMMIT=unknown
+ARG REPOMEMO_BUILD_DATE=unknown
+ARG REPOMEMO_IMAGE_TAG=unknown
+LABEL org.opencontainers.image.title="repomemo-converter" \
+      org.opencontainers.image.description="RepoMemo converter: LibreOffice for layout-accurate previews, with no network" \
+      org.opencontainers.image.source="${REPOMEMO_SOURCE_URL}" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.version="${REPOMEMO_IMAGE_TAG}" \
+      org.opencontainers.image.revision="${REPOMEMO_BUILD_COMMIT}" \
+      org.opencontainers.image.created="${REPOMEMO_BUILD_DATE}"
 ENTRYPOINT ["repomemo-soffice-listener"]
 
 # ---------------------------------------------------------------------------
@@ -110,3 +134,15 @@ COPY --from=web /build/apps/desktop/dist /srv/web
 COPY docker/Caddyfile /etc/caddy/Caddyfile
 RUN printf 'header ?Content-Security-Policy "%s"\n' "$(cat /srv/web/content-security-policy.txt)" > /etc/caddy/csp.caddy
 EXPOSE 80 443 443/udp
+# Labels, last so that a new commit does not rebuild what is above (V0.4.9).
+ARG REPOMEMO_SOURCE_URL=https://github.com/repomemo/repomemo
+ARG REPOMEMO_BUILD_COMMIT=unknown
+ARG REPOMEMO_BUILD_DATE=unknown
+ARG REPOMEMO_IMAGE_TAG=unknown
+LABEL org.opencontainers.image.title="repomemo-proxy" \
+      org.opencontainers.image.description="RepoMemo front door: Caddy, the web app and the way to the server" \
+      org.opencontainers.image.source="${REPOMEMO_SOURCE_URL}" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.version="${REPOMEMO_IMAGE_TAG}" \
+      org.opencontainers.image.revision="${REPOMEMO_BUILD_COMMIT}" \
+      org.opencontainers.image.created="${REPOMEMO_BUILD_DATE}"

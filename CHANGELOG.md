@@ -2,6 +2,26 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.9 (2026-10-25)
+
+Every image says what it is.
+
+### Added
+- **OCI labels on the three images:** `repomemo-server`, `repomemo-converter` and `repomemo-proxy` each carry `org.opencontainers.image.title`, `description`, `source`, `licenses`, `version`, `revision` and `created`. The version, the revision and the creation date come from the build arguments of V0.4.3 (`REPOMEMO_IMAGE_TAG`, `REPOMEMO_BUILD_COMMIT`, `REPOMEMO_BUILD_DATE`), the source from a new `REPOMEMO_SOURCE_URL` (the repository's address by default, for a fork to change). A build without them says `unknown`. The labels are the last lines of their stage, so a new commit does not rebuild the layers above.
+- **The compose file passes the three build arguments to the converter and the proxy** as it already did to the server.
+
+### Changed
+- **`container:check`** asserts, for each of the three images, the seven labels, the three `ARG`s of the stage and the compose file's build arguments for it.
+- **The documents:** the operations guide, the technical mindmap, the roadmap and the release index.
+- **The version** is `0.4.9` everywhere.
+
+### Checks
+- **Run:** `container:check`, `version:check`, `docs:check`.
+- **Not run:** any image build, so `docker inspect` has not been read; that is for the first CI build.
+
+### Upgrading
+- Nothing to do. `docker inspect` on an image built from this release names the release and the commit.
+
 ## V0.4.8 (2026-10-25)
 
 The server image is smaller and needs no curl.
