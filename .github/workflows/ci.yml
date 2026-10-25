@@ -349,6 +349,62 @@ jobs:
           docker rm --force converter-ci || true
           docker volume rm converter-ci-socket || true
 
+  # The server as a release archive (V0.4.31): the web app and the server are built, packed by scripts/package-server.mjs,
+  # and the archive is unpacked in a clean folder, checked against its own checksums and started: it serves the app.
+  server-archive:
+    name: Server archive (linux x64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - name: The packager's own tests
+        run: npm run package:test
+      - name: Build the web app (for the page's own host) and the server
+        run: |
+          npm ci
+          VITE_REPOMEMO_API_URL="" npm run build
+          cargo build --release --locked -p repomemo-server
+      - name: Pack it
+        run: SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)" node scripts/package-server.mjs --binary target/release/repomemo-server --web apps/desktop/dist --os linux --arch x64 --out dist-server
+      - name: Unpack in a clean folder and check the checksums
+        run: |
+          mkdir "$RUNNER_TEMP/clean"
+          tar -xzf dist-server/repomemo-server-*-linux-x64.tar.gz -C "$RUNNER_TEMP/clean"
+          cd "$RUNNER_TEMP/clean"/repomemo-server-*-linux-x64
+          sha256sum --check SHA256SUMS
+          (cd "$GITHUB_WORKSPACE/dist-server" && sha256sum --check SHA256SUMS)
+      - name: Start it and ask for the app
+        run: |
+          home="$(echo "$RUNNER_TEMP"/clean/repomemo-server-*-linux-x64)"
+          mkdir "$RUNNER_TEMP/work"
+          cd "$RUNNER_TEMP/work"
+          REPOMEMO_JWT_SECRET="$(openssl rand -hex 32)" REPOMEMO_SECRET_KEY="$(openssl rand -hex 32)" \
+            REPOMEMO_SERVER_DATA_DIR=main REPOMEMO_WEB_DIR="$home/web" REPOMEMO_SERVER_ADDR=127.0.0.1:3020 \
+            "$home/bin/repomemo-server" > server.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3020/health/ready > /dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:3020/ | grep -qi '<div id="root">'
+          curl --fail --silent http://127.0.0.1:3020/config.json | grep -q '"apiUrl":""'
+          curl --fail --silent http://127.0.0.1:3020/health | grep -q '"status":"ok"'
+      - name: What it logged
+        if: failure()
+        run: cat "$RUNNER_TEMP/work/server.log"
+      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: server-archive-linux-x64
+          path: dist-server
+          if-no-files-found: error
+
   # The monitoring example (V0.4.30): Prometheus scrapes the server's metrics with a system-scope token and shows its figures.
   monitoring:
     name: Prometheus example

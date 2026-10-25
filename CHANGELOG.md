@@ -2,6 +2,28 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.31 (2026-10-25)
+
+The server as a release archive, for a plain server.
+
+### Added
+- **`scripts/package-server.mjs`** (`npm run package:server`): packs the server for a direct install. The folder `repomemo-server-<version>-<os>-<arch>` holds `bin/` (the server, `repomemo-server.exe` on Windows), `web/` (the built web app), `config/repomemo.env.example`, `service/` (for the unit and scripts of V0.4.32–V0.4.33), `README.txt`, `VERSION` and `SHA256SUMS` (the checksum of every file in it). **The layout is the same on every system.** It is a `.tar.gz` for Linux (binary mode 0755) and a `.zip` for Windows, both **written by the script itself** (no archive tool is needed), in a fixed order and with a fixed time (`SOURCE_DATE_EPOCH`), so the same input makes the same archive. `<out>/SHA256SUMS` names each archive once.
+- **`deploy/direct/repomemo.env.example`:** the settings of a direct install: the address, the public address and origin, trust of the front door, the data folder, `REPOMEMO_WEB_DIR` (V0.4.20), and the two secrets (as variables or as files).
+- **`scripts/package-server.test.mjs`** (`npm run package:test`): five tests of the packager (the Linux layout and modes, the Windows zip, the inner checksums, reproducibility and the outer checksum file, the refusals). They read the archives back with readers of their own.
+- **A CI job, `server-archive`,** builds the web app (for the page's own host) and the server, packs them, unpacks the archive in a clean folder, checks both checksum files, starts the server from it on the web app inside it and asks the page, `/config.json` and `/health`. The archive is kept as an artifact.
+
+### Changed
+- **`container:check`** holds the packager's contents, the settings example (only variables the server reads) and the CI job.
+- **The documents:** the operations guide, the technical mindmap, the roadmap and the release index.
+- **The version** is `0.4.31` everywhere.
+
+### Checks
+- **Run:** the packager's five tests (they pass), a real run of the packager on stand-in files with the system `tar`, `unzip` and `sha256sum -c` reading its archives, `container:check`, `version:check`, `docs:check`.
+- **Not run:** a real build of the server or the web app, and the unpacked server started on a clean machine (the `server-archive` job is that test).
+
+### Upgrading
+- Nothing to do.
+
 ## V0.4.30 (2026-10-25)
 
 An example of reading the server's metrics in containers.

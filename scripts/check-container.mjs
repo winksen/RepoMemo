@@ -266,6 +266,22 @@ for (const name of ["REPOMEMO_WEB_API_URL", "REPOMEMO_PRODUCT_NAME"]) {
 if (!/handle \/config\.json/.test(webCaddyfile)) problems.push("docker/Caddyfile.web does not serve /config.json");
 if (!/vite\.config\.ts/.test("vite.config.ts") || !vite.includes("config.json")) problems.push("the web build does not write a default config.json");
 if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge does not use REPOMEMO_HOST");
+// The server as a release archive (V0.4.31): one packager, the same layout on every system, tried in CI by unpacking in a
+// clean folder and starting the server on the web app inside it.
+{
+  const packager = read("scripts/package-server.mjs");
+  for (const needle of ["bin/", "web/", "config/repomemo.env.example", "service/", "README.txt", "SHA256SUMS", "VERSION"]) {
+    if (!packager.includes(needle)) problems.push(`scripts/package-server.mjs does not put ${needle} in the archive`);
+  }
+  if (!/repomemo-server\.exe/.test(packager) || !/tar\.gz/.test(packager) || !/zip/.test(packager)) problems.push("scripts/package-server.mjs does not make a tar.gz for Linux and a zip with repomemo-server.exe for Windows");
+  const env = read("deploy/direct/repomemo.env.example");
+  for (const name of ["REPOMEMO_SERVER_ADDR", "REPOMEMO_PUBLIC_URL", "REPOMEMO_WEB_DIR", "REPOMEMO_JWT_SECRET", "REPOMEMO_SECRET_KEY", "REPOMEMO_SERVER_DATA_DIR"]) {
+    if (!new RegExp(`^${name}=`, "m").test(env)) problems.push(`deploy/direct/repomemo.env.example does not set ${name}`);
+    if (!sourceText.includes(`"${name}"`)) problems.push(`deploy/direct/repomemo.env.example sets ${name}, which the server does not read`);
+  }
+  if (!/^  server-archive:/m.test(ci) || !/package-server\.mjs --binary/.test(ci) || !/sha256sum --check SHA256SUMS/.test(ci) || !/REPOMEMO_WEB_DIR="\$home\/web"/.test(ci)) problems.push(".github/workflows/ci.yml does not pack the server, unpack it clean and start it on its own web app");
+}
+
 // Metrics in containers (V0.4.30): an example, behind its own profile, pinned, on the loopback, read-only, with the token
 // mounted read-only and the scrape configuration reading it; CI shows the figures.
 {
