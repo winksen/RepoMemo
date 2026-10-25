@@ -282,6 +282,19 @@ if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge d
   if (!/^  server-archive:/m.test(ci) || !/package-server\.mjs --binary/.test(ci) || !/sha256sum --check SHA256SUMS/.test(ci) || !/REPOMEMO_WEB_DIR="\$home\/web"/.test(ci)) problems.push(".github/workflows/ci.yml does not pack the server, unpack it clean and start it on its own web app");
 }
 
+// The upgrade and rollback guide for direct installs (V0.4.36) begins with a backup and says what the refusal means.
+{
+  const guide = read("docs/DIRECT_UPGRADE.md");
+  const upgrading = guide.slice(guide.indexOf("## Upgrading"), guide.indexOf("## Rolling back"));
+  if (!/^1\. \*\*Back up/m.test(upgrading)) problems.push("docs/DIRECT_UPGRADE.md does not begin the upgrade with a backup");
+  for (const needle of ["ln -sfn /opt/repomemo-<old> /opt/repomemo", "New-Item -ItemType Junction", "repomemo.version", "newer than this program", "Nothing\n     was changed", "Restore the backup"]) {
+    if (!guide.includes(needle)) problems.push(`docs/DIRECT_UPGRADE.md lacks ${needle.replace(/\n/g, " ")}`);
+  }
+  const newer = read("crates/storage/src/newer.rs");
+  if (!newer.includes("newer than this program") || !newer.includes("Nothing was changed") || !newer.includes("MARKER_FILE")) problems.push("crates/storage/src/newer.rs no longer refuses a newer database with a message that names both versions");
+  if (!read("crates/storage/src/lib.rs").includes("newer::refuse_newer_database(&pool, &db_dir).await?;\n        MIGRATOR.run")) problems.push("the storage engine no longer refuses a newer database before it migrates");
+}
+
 // The server is built for three platforms and attached to the release (V0.4.35): native runners, the tag must be the
 // version, one SHA256SUMS, and nothing is attached by a pull request or a branch.
 {

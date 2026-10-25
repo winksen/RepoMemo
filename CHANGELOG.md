@@ -2,6 +2,25 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.36 (2026-10-25)
+
+An older server refuses a database from a newer release, and a guide to upgrade and roll back.
+
+### Added
+- **A database from a newer release is refused, not opened.** Before it changes anything, the storage engine reads the file `repomemo.version` beside the database (the release that last opened it; every start leaves it and it never goes backwards) and the highest migration the database has applied. A marker newer than the program, or a migration the program does not know, stops the start with a message that **names both releases** and says nothing was changed. A database with no marker (made before this release) or a marker that is equal or older opens as before. Backup restores into a new environment are unaffected.
+- **`docs/DIRECT_UPGRADE.md`:** the guide for direct installs. **It begins with a backup** (and says why it is the only way back across an upgrade), then upgrading with the installer of V0.4.32–V0.4.33 (check the archive, unpack in a new folder, run the installer, look), rolling back by moving the link or junction, what the refusal means when the old release will not start (restore the backup; what was written after it is in the folder moved aside), and what not to do (unpack over the running release, delete the marker, run two releases on one data folder).
+
+### Changed
+- **`container:check`** holds the guide's order and contents and that the refusal still comes before the migrations and names both versions. **The documents:** the operations guide, the technical mindmap, the roadmap and the release index. **The version** is `0.4.36` everywhere.
+
+### Checks
+- **Compiled and linted:** `cargo clippy -D warnings` over the storage, api and server crates with their tests, `cargo fmt --all --check`, `container:check`, `version:check`, `docs:check`.
+- **Tests written, not run:** four unit tests of the rule (a newer marker, the ordinary cases, an unknown migration, a marker that never goes back) and a storage test that makes a database, sets a newer marker, sees the refusal name both versions with the database file unchanged, then removes the marker, adds a migration from the future and sees that refused too.
+- **Not run:** an older binary on a newer database by hand (the release's own check).
+
+### Upgrading
+- Nothing to do. From now on, going back to an older release across a release that changed the database needs the backup; the server says so instead of damaging the data.
+
 ## V0.4.35 (2026-10-25)
 
 The server is built for three platforms and attached to the release.

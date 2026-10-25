@@ -2850,3 +2850,47 @@ async fn the_database_the_files_and_the_backups_can_sit_in_three_folders() {
     drop(storage);
     let _ = std::fs::remove_dir_all(base);
 }
+#[tokio::test]
+async fn a_database_from_a_newer_release_is_refused_and_left_as_it_was() {
+    let data = std::env::temp_dir().join(format!("repomemo-newer-{}", uuid::Uuid::new_v4()));
+    let storage = StorageEngine::open(StorageConfig::new(data.clone())).await.unwrap();
+    storage.close().await;
+    assert_eq!(
+        std::fs::read_to_string(data.join("repomemo.version")).unwrap().trim(),
+        env!("CARGO_PKG_VERSION"),
+        "a start leaves the release that opened the database"
+    );
+
+    // A newer release has opened it since.
+    std::fs::write(data.join("repomemo.version"), "99.1.0\n").unwrap();
+    let before = std::fs::read(data.join("repomemo.sqlite")).unwrap();
+    let error = StorageEngine::open(StorageConfig::new(data.clone()))
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("99.1.0") && error.contains(env!("CARGO_PKG_VERSION")),
+        "{error}"
+    );
+    assert_eq!(
+        std::fs::read(data.join("repomemo.sqlite")).unwrap(),
+        before,
+        "nothing was changed"
+    );
+
+    // Without the marker, a migration this program does not know gives it away.
+    std::fs::remove_file(data.join("repomemo.version")).unwrap();
+    let options = sqlx::sqlite::SqliteConnectOptions::new().filename(data.join("repomemo.sqlite"));
+    let pool = sqlx::SqlitePool::connect_with(options).await.unwrap();
+    sqlx::query("INSERT INTO _sqlx_migrations (version, description, success, checksum, execution_time) VALUES (999999, 'from the future', 1, X'00', 0)")
+        .execute(&pool)
+        .await
+        .unwrap();
+    pool.close().await;
+    let error = StorageEngine::open(StorageConfig::new(data.clone()))
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("migration 999999"), "{error}");
+    let _ = std::fs::remove_dir_all(data);
+}

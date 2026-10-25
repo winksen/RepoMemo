@@ -55,6 +55,7 @@ pub use mentions::{MentionRow, MentionWrite, WorkspaceFileIndex};
 pub use organizations::StarterSetup;
 pub use repo::RepoLastChange;
 pub use repo::{RepoFileRecord, RepoFileWrite};
+mod newer;
 use secrets::SecretBox;
 pub use secrets::{restrict_to_owner, KEY_FILE_NAME as SECRET_KEY_FILE_NAME, MIN_MASTER_KEY_CHARS};
 pub use setup::SetupState;
@@ -767,7 +768,10 @@ impl StorageEngine {
             .connect_with(options.clone())
             .await?;
 
+        // A database from a newer release is refused before anything is changed (V0.4.36).
+        newer::refuse_newer_database(&pool, &db_dir).await?;
         MIGRATOR.run(&pool).await?;
+        newer::leave_marker(&db_dir);
 
         // The readers do the searching, so they get a larger page cache, memory-mapped reads and
         // temporary tables in memory; the connection that writes keeps SQLite's defaults.
