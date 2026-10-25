@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { IconArrowRight as ArrowRight, IconKey as Key, IconShieldLock as Shield } from "@tabler/icons-react";
 import { configureDesktopApi, getSharedHealth } from "../lib/sharedApi";
+import { checkServerVersion, versionAdvice } from "../lib/versionCheck";
 import { desktopServer } from "../lib/desktop";
 import { normalizeServerAddress } from "../lib/serverAddress";
 import { ThemeToggle } from "./SharedLayout";
@@ -54,6 +55,8 @@ export function DesktopConnect({ onConnected }: { onConnected: () => void }) {
       if (typeof health?.status !== "string" || typeof health?.authentication !== "string") {
         throw new Error(`${origin} answered, but it does not look like a RepoMemo server.`);
       }
+      const verdict = checkServerVersion(health.version);
+      if (!verdict.ok) throw new Error(versionAdvice(verdict, true).body);
       await desktopServer.remember();
       onConnected();
     } catch (error) {

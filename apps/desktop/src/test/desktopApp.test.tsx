@@ -16,8 +16,9 @@ import { DesktopApp } from "../components/DesktopApp";
 import { desktopServer } from "../lib/desktop";
 import { configureDesktopApi, getSharedHealth } from "../lib/sharedApi";
 import { showToast } from "../components/ui/toast";
+import { CLIENT_VERSION } from "../lib/versionCheck";
 
-const healthy = { service: "repomemo-server", status: "ok", authentication: "jwt" };
+const healthy = { service: "repomemo-server", status: "ok", authentication: "jwt", version: CLIENT_VERSION };
 
 function start() {
   render(<DesktopApp />);
@@ -78,6 +79,16 @@ describe("the desktop app", () => {
     await waitFor(() => expect(showToast).toHaveBeenCalledWith("error", expect.stringContaining("does not look like a RepoMemo server")));
     expect(desktopServer.remember).not.toHaveBeenCalled();
     expect(screen.queryByText("the web client")).toBeNull();
+  });
+
+  it("does not keep a server of another release line and says which is which", async () => {
+    start();
+    await screen.findByLabelText("Server address");
+    vi.mocked(getSharedHealth).mockResolvedValueOnce({ ...healthy, version: "0.3.27" });
+    typeAddress("repomemo.example.com");
+    connect();
+    await waitFor(() => expect(showToast).toHaveBeenCalledWith("error", expect.stringContaining(`This app is version ${CLIENT_VERSION} and the server is version 0.3.27`)));
+    expect(desktopServer.remember).not.toHaveBeenCalled();
   });
 
   it("shows the shell's own reason when it refuses an address", async () => {

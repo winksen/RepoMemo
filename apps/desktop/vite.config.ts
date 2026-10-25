@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { loadEnv, type Plugin } from "vite";
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
@@ -68,6 +69,10 @@ export default defineConfig(({ mode }) => {
   const apiUrl = env.VITE_REPOMEMO_API_URL ?? "http://127.0.0.1:3020";
   return {
     plugins: [react(), contentSecurityPolicyPlugin(apiUrl), runtimeConfigPlugin(apiUrl)],
+    // The release this build is, compared with the server's at start (V0.4.21).
+    define: {
+      __REPOMEMO_VERSION__: JSON.stringify((JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")) as { version: string }).version),
+    },
     clearScreen: false,
     server: {
       strictPort: true,

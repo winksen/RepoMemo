@@ -2,6 +2,27 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.21 (2026-10-25)
+
+The client says plainly when the server is not its release.
+
+### Added
+- **A version check at start:** the web app (and the desktop window, which runs the same app) reads the `version` in `/health` and compares its major and minor numbers with its own, which the build now knows (`__REPOMEMO_VERSION__`, from `package.json`). The patch number never matters. A server on an earlier minor, or one that does not report a version (earlier than 0.4.3), is **too old**; one on a later minor is **too new**. Instead of a screen that half works, a page (`VersionMismatch`) shows both versions and what to do: update the server, reload or clear the cache, or install the desktop app that matches the server.
+- **The desktop connect screen** applies the same rule: it does not remember a server of another release line and says why in the message.
+
+### Changed
+- **`lib/versionCheck.ts`** holds the rule and the advice; the page uses the existing sign-in layout, so no stylesheet changed.
+- **The documents:** the operations guide, the technical mindmap, the roadmap and the release index.
+- **The version** is `0.4.21` everywhere.
+
+### Checks
+- **Run:** `typecheck`, `styles:check`, `a11y:check`, `version:check`, `docs:check`.
+- **Tests written, not run:** seven web tests (`versionCheck.test.tsx`: same minor, older, newer, no version, an unknown own version, the advice, the page) and one for the desktop connect screen; the existing desktop tests now give their stand-in server the client's version.
+- **Not run:** an app against a real server of another release.
+
+### Upgrading
+- A browser that cached the old web app may say *This app is too old for this server* until it reloads, after the server moves to a new minor release.
+
 ## V0.4.20 (2026-10-25)
 
 The server can serve the web app itself.

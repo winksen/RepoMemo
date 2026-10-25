@@ -36,6 +36,8 @@ import { CommandPalette } from "./web/CommandPalette";
 import { PageAnnouncer } from "./web/PageAnnouncer";
 import { ConfirmProvider } from "./components/ui/confirm-dialog";
 import { watchFocusLoss } from "./lib/focusReturn";
+import { checkServerVersion } from "./lib/versionCheck";
+import { VersionMismatch } from "./components/VersionMismatch";
 
 export function SharedWebApp() {
   return (
@@ -56,6 +58,8 @@ function SharedWebAppContent() {
   // Invitation and reset links carry their secret in the fragment (`/invite#<secret>`), never sent to a server.
   const [linkSecret, setLinkSecret] = useState(currentLinkSecret);
   const [apiAvailable, setApiAvailable] = useState<boolean | null>(null);
+  // What the server says it is; an app and a server of different releases show a page that says so (V0.4.21).
+  const [serverVersion, setServerVersion] = useState<{ known: boolean; version: string | null }>({ known: false, version: null });
   // Whether the server still has to be set up; the server is the authority.
   const [setup, setSetup] = useState<ServerSetupStatus | null>(null);
   // Whether the server has an environment folder attached; without one it can only show the environment menu.
@@ -102,7 +106,12 @@ function SharedWebAppContent() {
   }, [pathname]);
 
   useEffect(() => {
-    getSharedHealth().then(() => setApiAvailable(true)).catch(() => setApiAvailable(false));
+    getSharedHealth()
+      .then((health) => {
+        setApiAvailable(true);
+        setServerVersion({ known: true, version: health.version ?? null });
+      })
+      .catch(() => setApiAvailable(false));
   }, []);
 
   useEffect(() => {
@@ -179,6 +188,11 @@ function SharedWebAppContent() {
       navigate("/dashboard", true);
     }
   }, [pageState, pathname, setup]);
+
+  const versionVerdict = serverVersion.known ? checkServerVersion(serverVersion.version) : { ok: true as const };
+  if (!versionVerdict.ok) {
+    return <VersionMismatch verdict={versionVerdict} desktop={"__TAURI_INTERNALS__" in window} />;
+  }
 
   if (!platform) {
     return <LoadingCanvas label="Checking the server" />;
