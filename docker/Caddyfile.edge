@@ -1,0 +1,33 @@
+# The edge (V0.4.18; see ../Dockerfile, target edge): TLS and nothing else, an optional piece in front of the web image,
+# which speaks plain HTTP. Skip it when another proxy or a load balancer already brings the certificate.
+#
+# REPOMEMO_HOST is the name people use. Three ways to a certificate, decided by docker/edge-entrypoint.sh:
+#   - a public name (memo.example.com): Caddy gets one from Let's Encrypt; ports 80 and 443 must reach this
+#     container and the name must point at this machine;
+#   - "localhost" (the default): a certificate from Caddy's own authority, for trying it out on one machine;
+#   - certificates you supply: tls.crt and tls.key in the folder mounted at /certs (REPOMEMO_TLS_DIR).
+# The client's address goes to the web image in X-Forwarded-For, which the API believes only from the addresses
+# listed in its REPOMEMO_TRUSTED_PROXIES.
+
+{
+	# Caddy's control endpoint is not needed here.
+	admin off
+}
+
+{$REPOMEMO_HOST:localhost} {
+	import /tmp/tls.caddy
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+
+	# Everything goes to the web image, which serves the app and forwards the API. No buffering, so live events
+	# arrive as they happen.
+	reverse_proxy {$REPOMEMO_EDGE_UPSTREAM:web:8080} {
+		flush_interval -1
+		transport http {
+			response_header_timeout 180s
+		}
+	}
+}

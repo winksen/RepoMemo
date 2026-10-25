@@ -2,6 +2,26 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.18 (2026-10-25)
+
+TLS is a piece of its own, in front of a web image that speaks plain HTTP.
+
+### Changed
+- **The compose file's front door is two services.** The `proxy` service and image are gone. `web` (the `webapp` image of V0.4.15–V0.4.17) always runs: the app over plain HTTP, `/config.json`, and `/v1` and `/health` forwarded to the server (`REPOMEMO_API_UPSTREAM: server:3020`). It is published on `127.0.0.1:8080` (`REPOMEMO_WEB_PORT`) for a proxy of one's own. `edge` runs only with `COMPOSE_PROFILES=edge`.
+- **`edge` is TLS and nothing else:** a new `edge` stage and image (`docker/Caddyfile.edge`, `docker/edge-entrypoint.sh`) in front of `web`, with three ways to a certificate: Caddy's automatic ones for a public name (Let's Encrypt), its own authority for `localhost`, or **the operator's own**: `tls.crt` and `tls.key` in `deploy/certs` (or `REPOMEMO_TLS_DIR`), mounted read-only at `/certs`; one of the two files without the other stops it with a message. It drops every capability but `NET_BIND_SERVICE`, and HSTS is its header. `.gitignore` keeps keys out of the repository.
+- **The client's address crosses two hops:** the web image keeps the `X-Forwarded-For` the edge sends (`trusted_proxies`, private ranges by default, `REPOMEMO_WEB_TRUSTED_PROXIES` to change) and adds to it; the server trusts both addresses (`REPOMEMO_TRUSTED_PROXIES: 172.29.0.2,172.29.0.4`).
+- **CI:** the `compose` job asks for the `edge` profile; new jobs bring the stack up **without** the edge (the web image answers on 8080 in plain HTTP, no edge service runs) and **with a certificate of one's own** (the one served is the one supplied); the arm64 job builds the web and edge images; the image scan reads the edge and the web image.
+- **`container:check`** is rewritten for the new shape (stages, targets, labels, the two trusted addresses, the edge's profile, capabilities and mount, the entrypoint and the three CI jobs).
+- **The documents:** the operations guide (services table, *behind your own proxy*), UPGRADING, the technical mindmap, the roadmap and the release index.
+- **The version** is `0.4.18` everywhere.
+
+### Checks
+- **Run:** `container:check`, `version:check`, `docs:check`, a syntax check of the entrypoint.
+- **Not run:** any image or the stack. The three CI jobs are the test and their first run is the one to read (Caddy's `trusted_proxies static private_ranges` global option and the `tls` file form in particular).
+
+### Upgrading
+- **Add `COMPOSE_PROFILES=edge` to your `.env`** to keep HTTPS on 80 and 443; without it the stack answers on `127.0.0.1:8080` only. Certificates already obtained stay in the `caddy-data` volume. See UPGRADING.md.
+
 ## V0.4.17 (2026-10-25)
 
 The web app and the API can have two addresses.

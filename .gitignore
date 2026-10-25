@@ -28,3 +28,7 @@ Thumbs.db
 /.impeccable
 docs/DESIGN_BLUEPRINT.md
 /docs/api
+
+# Certificates for the edge profile (V0.4.18): keys never leave the machine.
+deploy/certs/*
+!deploy/certs/README.md

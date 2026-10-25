@@ -91,6 +91,7 @@ jobs:
         run: |
           {
             echo "REPOMEMO_HOST=localhost"
+            echo "COMPOSE_PROFILES=edge"
             echo "REPOMEMO_JWT_SECRET=$(openssl rand -hex 32)"
             echo "REPOMEMO_SECRET_KEY=$(openssl rand -hex 32)"
           } > .env
@@ -130,13 +131,13 @@ jobs:
         run: |
           docker build --target server --tag repomemo-server:scan .
           docker build --target converter --tag repomemo-converter:scan .
-          docker build --target proxy --tag repomemo-proxy:scan .
+          docker build --target edge --tag repomemo-edge:scan .
           docker build --target webapp --tag repomemo-web:scan .
       - name: Read each image
         run: |
           mkdir -p scan-reports
           failed=0
-          for name in server converter proxy web; do
+          for name in server converter edge web; do
             docker run --rm \
               --volume /var/run/docker.sock:/var/run/docker.sock \
               --volume "$PWD:/work" --workdir /work \
@@ -325,6 +326,71 @@ jobs:
           docker rm --force converter-ci || true
           docker volume rm converter-ci-socket || true
 
+  # The stack without the edge, behind a proxy of one's own (V0.4.18): with no profile, the server and the web image run,
+  # and the web image answers the app and the API on its loopback port, in plain HTTP.
+  compose-no-edge:
+    name: docker compose without the edge
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: A .env with throwaway secrets and no profile
+        run: |
+          {
+            echo "REPOMEMO_JWT_SECRET=$(openssl rand -hex 32)"
+            echo "REPOMEMO_SECRET_KEY=$(openssl rand -hex 32)"
+          } > .env
+      - name: Build and start the stack
+        run: docker compose up --build --detach --wait --wait-timeout 900
+      - name: The web image answers the app and the API in plain HTTP
+        run: |
+          curl --fail --silent http://127.0.0.1:8080/health/ready
+          curl --fail --silent http://127.0.0.1:8080/ | grep -qi '<div id="root">'
+      - name: No edge runs
+        run: test -z "$(docker compose ps --services | grep -x edge || true)"
+      - name: What the stack logged
+        if: failure()
+        run: docker compose logs --no-color --tail 200
+      - name: Stop the stack
+        if: always()
+        run: docker compose down --volumes
+
+  # The edge with certificates of the operator's own (V0.4.18): the certificate in deploy/certs is the one served.
+  edge-certificates:
+    name: Edge with supplied certificates
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: A certificate of our own for localhost
+        run: |
+          openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj "/CN=localhost/O=Supplied Certificate Test" \
+            -addext "subjectAltName=DNS:localhost" -keyout deploy/certs/tls.key -out deploy/certs/tls.crt
+      - name: A .env with throwaway secrets
+        run: |
+          {
+            echo "REPOMEMO_HOST=localhost"
+            echo "COMPOSE_PROFILES=edge"
+            echo "REPOMEMO_JWT_SECRET=$(openssl rand -hex 32)"
+            echo "REPOMEMO_SECRET_KEY=$(openssl rand -hex 32)"
+          } > .env
+      - name: Build and start the stack
+        run: docker compose up --build --detach --wait --wait-timeout 900
+      - name: The edge serves our certificate
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --insecure --resolve localhost:443:127.0.0.1 https://localhost/health/ready; then break; fi
+            sleep 3
+          done
+          echo | openssl s_client -connect 127.0.0.1:443 -servername localhost 2>/dev/null | openssl x509 -noout -subject | tee subject.txt
+          grep -q "Supplied Certificate Test" subject.txt
+      - name: What the stack logged
+        if: failure()
+        run: docker compose logs --no-color --tail 200
+      - name: Stop the stack
+        if: always()
+        run: docker compose down --volumes
+
   # The API on its own (V0.4.11): deploy/api.yml starts the server and its volume with no web client and no proxy,
   # and it must turn healthy and answer `/health/ready` on its published port.
   api-only:
@@ -387,12 +453,15 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Build the server image
         run: docker build --platform linux/arm64 --target server --tag repomemo-server:arm64 .
-      - name: Build the proxy image
-        run: docker build --platform linux/arm64 --target proxy --tag repomemo-proxy:arm64 .
+      - name: Build the web image
+        run: docker build --platform linux/arm64 --target webapp --tag repomemo-web:arm64 .
+      - name: Build the edge image
+        run: docker build --platform linux/arm64 --target edge --tag repomemo-edge:arm64 .
       - name: Both images are arm64 ones, and the server image has its git
         run: |
           test "$(docker image inspect --format '{{.Architecture}}' repomemo-server:arm64)" = "arm64"
-          test "$(docker image inspect --format '{{.Architecture}}' repomemo-proxy:arm64)" = "arm64"
+          test "$(docker image inspect --format '{{.Architecture}}' repomemo-web:arm64)" = "arm64"
+          test "$(docker image inspect --format '{{.Architecture}}' repomemo-edge:arm64)" = "arm64"
           docker run --rm --entrypoint git repomemo-server:arm64 --version
 
   # An environment folder made by 0.2.0 (its schema, rows and files) is opened by the current code and

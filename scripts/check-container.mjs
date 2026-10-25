@@ -25,7 +25,8 @@ const workflows = readdirSync(".github/workflows")
   .filter((name) => /.ya?ml$/.test(name))
   .map((name) => [name, read(join(".github/workflows", name))]);
 const compose = read("docker-compose.yml");
-const caddyfile = read("docker/Caddyfile");
+const caddyfile = read("docker/Caddyfile.edge");
+const webCaddyfile = read("docker/Caddyfile.web");
 const example = read(".env.example");
 const ignore = read(".dockerignore");
 const vite = read("apps/desktop/vite.config.ts");
@@ -34,7 +35,7 @@ const serverManifest = read("apps/server/Cargo.toml");
 // No tabs in YAML, and files that Linux reads keep LF line endings in the repository.
 if (/\t/.test(compose)) problems.push("docker-compose.yml contains a tab; YAML allows spaces only");
 const attributes = read(".gitattributes");
-for (const pattern of ["Dockerfile", "docker/Caddyfile", "docker/*.sh", "docker-compose.yml"]) {
+for (const pattern of ["Dockerfile", "docker/Caddyfile.edge", "docker/Caddyfile.web", "docker/*.sh", "docker-compose.yml"]) {
   if (!attributes.split(/\r?\n/).some((line) => line.startsWith(pattern) && /eol=lf/.test(line))) {
     problems.push(`.gitattributes does not keep ${pattern} on LF line endings`);
   }
@@ -83,13 +84,13 @@ if (!baseRelease || !(baseRelease in gitOfDebian)) {
 
 // Stages: the compose targets exist, and the two images the guide names are there.
 const stages = [...dockerfile.matchAll(/^FROM\s+\S+\s+AS\s+(\S+)/gim)].map((match) => match[1]);
-for (const stage of ["web", "build", "server", "proxy"]) {
+for (const stage of ["web", "build", "server", "edge", "webapp"]) {
   if (!stages.includes(stage)) problems.push(`Dockerfile has no stage named ${stage}`);
 }
 for (const match of compose.matchAll(/^\s+target:\s*(\S+)/gm)) {
   if (!stages.includes(match[1])) problems.push(`docker-compose.yml builds the target ${match[1]}, which the Dockerfile does not have`);
 }
-for (const stage of ["server", "proxy"]) {
+for (const stage of ["server", "web".replace("web", "webapp"), "edge"]) {
   if (!new RegExp(`^\\s+target:\\s*${stage}\\s*$`, "m").test(compose)) problems.push(`docker-compose.yml does not build the ${stage} image`);
 }
 
@@ -127,14 +128,14 @@ if (converterBlock) {
 }
 
 // CI really starts the compose file and builds the images for arm64 (V0.3.23): a job that runs `docker compose up`
-// and waits for the server to be healthy, asks `/health/ready` through the proxy, and a job on an arm64 runner that
+// and waits for the server to be healthy, asks `/health/ready` through the edge, and a job on an arm64 runner that
 // builds the stages the compose file builds for that platform.
 const ci = workflows.find(([name]) => name === "ci.yml")?.[1] ?? "";
 if (!/docker compose up\b[^\n]*--build[^\n]*--wait\b/.test(ci)) problems.push(".github/workflows/ci.yml has no job that builds the stack and waits for it (docker compose up --build --wait)");
-if (!/curl[^\n]*https:\/\/localhost\/health\/ready/.test(ci)) problems.push(".github/workflows/ci.yml does not ask /health/ready through the proxy");
+if (!/curl[^\n]*https:\/\/localhost\/health\/ready/.test(ci)) problems.push(".github/workflows/ci.yml does not ask /health/ready through the edge");
 if (!/docker compose down\b/.test(ci)) problems.push(".github/workflows/ci.yml does not take the stack down again");
 if (!/runs-on:\s*ubuntu-24\.04-arm\b/.test(ci)) problems.push(".github/workflows/ci.yml has no job on an arm64 runner");
-for (const stage of ["server", "proxy"]) {
+for (const stage of ["server", "webapp", "edge"]) {
   if (!new RegExp(`docker build[^\\n]*--platform linux/arm64[^\\n]*--target ${stage}\\b`).test(ci)) problems.push(`.github/workflows/ci.yml does not build the ${stage} image for arm64`);
 }
 
@@ -177,9 +178,9 @@ if (!/HEALTHCHECK[^\n]*\\\n\s*CMD \["repomemo-server", "--health"\]/.test(docker
   if (/\bcurl\b/.test(serverStage.replace(/#[^\n]*/g, ""))) problems.push("the server image installs or runs curl; the health check is repomemo-server --health");
 }
 
-// Every image says what it is (V0.4.9): the same labels on the server, the converter and the proxy, from the
+// Every image says what it is (V0.4.9): the same labels on the server, the converter and the edge, from the
 // build arguments the compose file gives each of them.
-for (const stage of ["server", "converter", "proxy", "webapp"]) {
+for (const stage of ["server", "converter", "edge", "webapp"]) {
   const start = dockerfile.search(new RegExp(String.raw`^FROM\s.*\sAS\s${stage}\s*$`, "m"));
   const next = dockerfile.slice(start + 1).search(/^FROM\s/m);
   const body = start < 0 ? "" : dockerfile.slice(start, next < 0 ? undefined : start + 1 + next);
@@ -189,7 +190,6 @@ for (const stage of ["server", "converter", "proxy", "webapp"]) {
   for (const name of ["REPOMEMO_BUILD_COMMIT", "REPOMEMO_BUILD_DATE", "REPOMEMO_IMAGE_TAG"]) {
     if (!new RegExp(String.raw`^ARG\s+${name}\b`, "m").test(body)) problems.push(`the ${stage} stage does not take the build argument ${name} its labels use`);
   }
-  if (stage === "webapp") continue; // not in the compose file yet (V0.4.22 puts it there)
   const service = new RegExp(String.raw`target:\s*${stage}\s*\n\s*args:([\s\S]*?)(?=\n    \S)`).exec(compose)?.[1] ?? "";
   for (const name of ["REPOMEMO_BUILD_COMMIT", "REPOMEMO_BUILD_DATE", "REPOMEMO_IMAGE_TAG"]) {
     if (!service.includes(name)) problems.push(`the compose file does not pass ${name} to the ${stage} image`);
@@ -213,7 +213,7 @@ const walk = (folder) => {
 };
 walk("apps/server/src");
 const sourceText = serverSource.join("\n");
-const composeOnly = new Set(["REPOMEMO_HOST", "REPOMEMO_VERSION", "REPOMEMO_CONVERTER_IMAGE", "REPOMEMO_WEB_API_URL", "REPOMEMO_PRODUCT_NAME"]);
+const composeOnly = new Set(["REPOMEMO_HOST", "REPOMEMO_VERSION", "REPOMEMO_CONVERTER_IMAGE", "REPOMEMO_WEB_API_URL", "REPOMEMO_PRODUCT_NAME", "REPOMEMO_API_UPSTREAM", "REPOMEMO_WEB_PORT", "REPOMEMO_TLS_DIR"]);
 const used = new Set([...compose.matchAll(/\b(REPOMEMO_[A-Z0-9_]+)\b/g)].map((match) => match[1]));
 for (const name of used) {
   if (!composeOnly.has(name) && !sourceText.includes(`"${name}"`)) problems.push(`docker-compose.yml sets ${name}, which the server does not read`);
@@ -233,12 +233,16 @@ for (const match of example.matchAll(/^(REPOMEMO_[A-Z0-9_]+)=/gm)) {
 // The proxy reaches the server where it listens, and the server trusts the proxy's address.
 const listens = /REPOMEMO_SERVER_ADDR:\s*0\.0\.0\.0:(\d+)/.exec(compose)?.[1];
 if (!listens) problems.push("docker-compose.yml does not make the server listen on all interfaces");
-else if (!caddyfile.includes(`reverse_proxy server:${listens}`)) problems.push(`docker/Caddyfile does not proxy to server:${listens}`);
+else if (!new RegExp(`REPOMEMO_API_UPSTREAM:\\s*server:${listens}\\b`).test(compose)) problems.push(`docker-compose.yml does not send the web image's API rule to server:${listens}`);
+if (!/reverse_proxy \{\$REPOMEMO_EDGE_UPSTREAM:web:8080\}/.test(caddyfile)) problems.push("docker/Caddyfile.edge does not send everything to the web image on 8080");
 // The health check (repomemo-server --health, V0.4.8) asks the address in REPOMEMO_SERVER_ADDR, which the image and the compose file set alike.
 if (listens && !new RegExp(`REPOMEMO_SERVER_ADDR=0\\.0\\.0\\.0:${listens}\\b`).test(dockerfile)) problems.push("the server image's REPOMEMO_SERVER_ADDR, which its health check asks, is not the port the server listens on");
-const proxyAddress = /proxy:[\s\S]*?ipv4_address:\s*(\S+)/.exec(compose)?.[1];
+// Two hops carry the client's address (V0.4.18): the edge, then the web image; the server trusts both.
+const proxyAddress = /^  edge:\n[\s\S]*?ipv4_address:\s*(\S+)/m.exec(compose)?.[1];
+const webAddress = /^  web:\n[\s\S]*?ipv4_address:\s*(\S+)/m.exec(compose)?.[1];
 const trusted = /REPOMEMO_TRUSTED_PROXIES:\s*(\S+)/.exec(compose)?.[1];
-if (!proxyAddress || proxyAddress !== trusted) problems.push(`the server must trust the proxy's address (proxy ${proxyAddress ?? "none"}, trusted ${trusted ?? "none"})`);
+if (!proxyAddress || !webAddress || trusted !== `${proxyAddress},${webAddress}`) problems.push(`the server must trust the edge and the web image (edge ${proxyAddress ?? "none"}, web ${webAddress ?? "none"}, trusted ${trusted ?? "none"})`);
+if (!/trusted_proxies static/.test(webCaddyfile)) problems.push("docker/Caddyfile.web does not keep the client's address from the edge (trusted_proxies)");
 const subnet = /subnet:\s*(\d+\.\d+\.\d+)\.\d+\/\d+/.exec(compose)?.[1];
 for (const address of [...compose.matchAll(/ipv4_address:\s*(\S+)/g)].map((match) => match[1])) {
   if (!subnet || !address.startsWith(`${subnet}.`)) problems.push(`${address} is outside the compose network`);
@@ -252,16 +256,29 @@ if (!/WORKDIR \/var\/lib\/repomemo/.test(dockerfile)) problems.push("the server'
 if (!/VITE_REPOMEMO_API_URL=""/.test(dockerfile)) problems.push("the web app is not built for the page's own address");
 if (/VITE_REPOMEMO_API_URL\s*\|\|/.test(vite)) problems.push("vite.config.ts treats an empty API address as unset, which would put 127.0.0.1 into the content security policy");
 if (!vite.includes("content-security-policy.txt") || !dockerfile.includes("content-security-policy.txt")) problems.push("the content security policy file the build writes is not given to the proxy");
-if (!caddyfile.includes("import /etc/caddy/csp.caddy") || !dockerfile.includes("/etc/caddy/csp.caddy")) problems.push("the Caddyfile and the Dockerfile disagree about the content security policy snippet");
-if (!caddyfile.includes("flush_interval -1")) problems.push("the proxy buffers the live event streams");
+if (!webCaddyfile.includes("import /etc/caddy/csp.caddy") || !dockerfile.includes("/etc/caddy/csp.caddy")) problems.push("the Caddyfile and the Dockerfile disagree about the content security policy snippet");
+if (!caddyfile.includes("flush_interval -1")) problems.push("the edge buffers the live event streams");
 // The web app is told its API address and name when it starts (V0.4.14): the proxy serves /config.json from the environment the compose file gives it.
 for (const name of ["REPOMEMO_WEB_API_URL", "REPOMEMO_PRODUCT_NAME"]) {
-  if (!caddyfile.includes(`{$${name}:`)) problems.push(`the Caddyfile does not read ${name} for /config.json`);
-  if (!compose.includes(`${name}:`)) problems.push(`docker-compose.yml does not give the proxy ${name}`);
+  if (!webCaddyfile.includes(`{$${name}:`)) problems.push(`docker/Caddyfile.web does not read ${name} for /config.json`);
+  if (!compose.includes(`${name}:`)) problems.push(`docker-compose.yml does not give the web image ${name}`);
 }
-if (!/handle \/config\.json/.test(caddyfile)) problems.push("the Caddyfile does not serve /config.json");
+if (!/handle \/config\.json/.test(webCaddyfile)) problems.push("docker/Caddyfile.web does not serve /config.json");
 if (!/vite\.config\.ts/.test("vite.config.ts") || !vite.includes("config.json")) problems.push("the web build does not write a default config.json");
-if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("the Caddyfile does not use REPOMEMO_HOST");
+if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge does not use REPOMEMO_HOST");
+// TLS is the edge's alone (V0.4.18): optional behind a profile, three ways to a certificate, never in the web image.
+{
+  const edgeBlock = /^  edge:\n([\s\S]*?)(?=^  \S|^\S|(?![\s\S]))/m.exec(compose)?.[1] ?? "";
+  if (!/^\s+profiles:\s*\n\s+-\s*edge\s*$/m.test(edgeBlock)) problems.push("docker-compose.yml: the edge is not behind the edge profile");
+  if (!/\/certs:ro/.test(edgeBlock)) problems.push("docker-compose.yml: the edge does not mount the operator's certificates read-only at /certs");
+  if (!/^\s+cap_add:\s*\n\s+-\s*NET_BIND_SERVICE\s*$/m.test(edgeBlock) || !/^\s+cap_drop:\s*\n\s+-\s*ALL\s*$/m.test(edgeBlock)) problems.push("docker-compose.yml: the edge should drop every capability but NET_BIND_SERVICE");
+  const entrypoint = read("docker/edge-entrypoint.sh");
+  if (!entrypoint.includes("/certs/tls.crt") || !entrypoint.includes("/certs/tls.key")) problems.push("docker/edge-entrypoint.sh does not use the certificates mounted at /certs");
+  if (!caddyfile.includes("import /tmp/tls.caddy") || !/ENTRYPOINT \["repomemo-edge-entrypoint"\]/.test(dockerfile)) problems.push("the edge does not take its certificate rule from its entrypoint");
+  if (/tls internal|auto_https/.test(webCaddyfile.replace(/auto_https off/, ""))) problems.push("docker/Caddyfile.web carries TLS settings; TLS belongs to the edge");
+  if (!/COMPOSE_PROFILES=edge/.test(example)) problems.push(".env.example does not ask for the edge profile");
+  if (!/echo "COMPOSE_PROFILES=edge"/.test(ci) || !/^  compose-no-edge:/m.test(ci) || !/^  edge-certificates:/m.test(ci)) problems.push(".github/workflows/ci.yml does not try the stack with the edge, without it and with supplied certificates");
+}
 
 // Nothing private goes into the build context.
 for (const pattern of [".git", ".env", "workspace-data", "target"]) {
@@ -319,7 +336,7 @@ for (const pattern of [".git", ".env", "workspace-data", "target"]) {
   else {
     if (!/TRIVY_IMAGE:\s*\S+@sha256:[0-9a-f]{64}\b/.test(job)) problems.push("the image-scan job's scanner is not pinned by digest");
     if (!/--severity HIGH,CRITICAL/.test(job) || !/--exit-code 1/.test(job)) problems.push("the image-scan job does not fail on a high or critical finding");
-    for (const [name, target] of [["server", "server"], ["converter", "converter"], ["proxy", "proxy"], ["web", "webapp"]]) {
+    for (const [name, target] of [["server", "server"], ["converter", "converter"], ["edge", "edge"], ["web", "webapp"]]) {
       if (!new RegExp(String.raw`--target ${target}\b[^\n]*--tag repomemo-${name}:scan`).test(job)) problems.push(`the image-scan job does not build the ${name} image`);
     }
     if (!/upload-artifact@/.test(job)) problems.push("the image-scan job does not keep its reports");

@@ -3,9 +3,10 @@
 # RepoMemo as containers (roadmap O7): two images from one file.
 #
 #   docker build --target server -t repomemo-server .   the API, background work and the data folder
-#   docker build --target proxy  -t repomemo-proxy  .   Caddy: TLS, the web app and the way to the server
+#   docker build --target webapp -t repomemo-web    .   the web client over plain HTTP
+#   docker build --target edge   -t repomemo-edge   .   Caddy: TLS only, optional, in front of the web image
 #
-# `docker compose up` (see docker-compose.yml) builds and starts both. The
+# `docker compose up` (see docker-compose.yml) builds and starts them. The
 # guide is mindmap/technical/operations.md, "Running it in containers".
 
 # Every base image is pinned by digest (roadmap E17): a tag can move, a digest cannot.
@@ -129,26 +130,25 @@ LABEL org.opencontainers.image.title="repomemo-converter" \
 ENTRYPOINT ["repomemo-soffice-listener"]
 
 # ---------------------------------------------------------------------------
-# The front door: Caddy gets the certificate, serves the web app and sends
-# /v1 and /health to the server. The content security policy the build wrote
-# next to the web app is put into the Caddy configuration, as the guide asks.
-FROM caddy:2-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f AS proxy
-COPY --from=web /build/apps/desktop/dist /srv/web
-COPY docker/Caddyfile /etc/caddy/Caddyfile
-RUN printf 'header ?Content-Security-Policy "%s"\n' "$(cat /srv/web/content-security-policy.txt)" > /etc/caddy/csp.caddy
+# The edge (V0.4.18): TLS and nothing else, optional, in front of the web image. Caddy gets a certificate for a
+# public name, makes its own for localhost, or uses the ones mounted at /certs (docker/edge-entrypoint.sh).
+FROM caddy:2-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f AS edge
+COPY docker/Caddyfile.edge /etc/caddy/Caddyfile
+COPY --chmod=0755 docker/edge-entrypoint.sh /usr/local/bin/repomemo-edge-entrypoint
 EXPOSE 80 443 443/udp
 # Labels, last so that a new commit does not rebuild what is above (V0.4.9).
 ARG REPOMEMO_SOURCE_URL=https://github.com/repomemo/repomemo
 ARG REPOMEMO_BUILD_COMMIT=unknown
 ARG REPOMEMO_BUILD_DATE=unknown
 ARG REPOMEMO_IMAGE_TAG=unknown
-LABEL org.opencontainers.image.title="repomemo-proxy" \
-      org.opencontainers.image.description="RepoMemo front door: Caddy, the web app and the way to the server" \
+LABEL org.opencontainers.image.title="repomemo-edge" \
+      org.opencontainers.image.description="RepoMemo edge: TLS in front of the web image, with automatic or supplied certificates" \
       org.opencontainers.image.source="${REPOMEMO_SOURCE_URL}" \
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.version="${REPOMEMO_IMAGE_TAG}" \
       org.opencontainers.image.revision="${REPOMEMO_BUILD_COMMIT}" \
       org.opencontainers.image.created="${REPOMEMO_BUILD_DATE}"
+ENTRYPOINT ["repomemo-edge-entrypoint"]
 
 # ---------------------------------------------------------------------------
 # The web client on its own (V0.4.15): the built app behind a small static server, over plain HTTP on 8080, with

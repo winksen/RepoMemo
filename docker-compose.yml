@@ -1,6 +1,6 @@
 # RepoMemo for a team, in containers (roadmap O7).
 #
-#   cp .env.example .env     # then fill in the secrets and the host name
+#   cp .env.example .env     # then fill in the secrets and the host name; it asks for the edge (TLS) profile
 #   docker compose up -d
 #
 # Open https://<REPOMEMO_HOST> and follow the first-run setup. The data lives
@@ -47,9 +47,9 @@ services:
       # The address people use; it turns on HSTS and secure cookies.
       REPOMEMO_PUBLIC_URL: https://${REPOMEMO_HOST:-localhost}
       REPOMEMO_ALLOWED_ORIGIN: https://${REPOMEMO_HOST:-localhost}
-      # Only the proxy container is believed about client addresses.
+      # Only the edge and the web container are believed about client addresses.
       REPOMEMO_TRUST_PROXY: "true"
-      REPOMEMO_TRUSTED_PROXIES: 172.29.0.2
+      REPOMEMO_TRUSTED_PROXIES: 172.29.0.2,172.29.0.4
       REPOMEMO_JWT_SECRET: ${REPOMEMO_JWT_SECRET:?Set REPOMEMO_JWT_SECRET in .env (32 or more random characters)}
       REPOMEMO_SECRET_KEY: ${REPOMEMO_SECRET_KEY:?Set REPOMEMO_SECRET_KEY in .env (32 or more random characters)}
       REPOMEMO_SETUP_CODE: ${REPOMEMO_SETUP_CODE:-}
@@ -98,25 +98,70 @@ services:
       - repomemo-previews:/var/lib/repomemo-previews
       - soffice-socket:/run/soffice
 
-  proxy:
+  # The web client over plain HTTP (V0.4.18): the app, /config.json, and /v1 and /health forwarded to the server. It
+  # publishes its port on this machine's loopback only; behind your own proxy, point that at it. TLS is the edge's.
+  web:
     build:
       context: .
-      target: proxy
+      target: webapp
       args:
         REPOMEMO_BUILD_COMMIT: ${REPOMEMO_BUILD_COMMIT:-unknown}
         REPOMEMO_BUILD_DATE: ${REPOMEMO_BUILD_DATE:-unknown}
         REPOMEMO_IMAGE_TAG: ${REPOMEMO_VERSION:-local}
-    image: repomemo-proxy:${REPOMEMO_VERSION:-local}
+    image: repomemo-web:${REPOMEMO_VERSION:-local}
     restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       server:
         condition: service_healthy
     environment:
-      REPOMEMO_HOST: ${REPOMEMO_HOST:-localhost}
+      REPOMEMO_API_UPSTREAM: server:3020
       # What the web app is told when it starts (/config.json): the API's address (empty: this host) and the name
       # shown in the browser's tab. No quote or backslash in either.
       REPOMEMO_WEB_API_URL: ${REPOMEMO_WEB_API_URL:-}
       REPOMEMO_PRODUCT_NAME: ${REPOMEMO_PRODUCT_NAME:-RepoMemo}
+    ports:
+      - "127.0.0.1:${REPOMEMO_WEB_PORT:-8080}:8080"
+    networks:
+      repomemo:
+        ipv4_address: 172.29.0.4
+
+  # TLS in front of the web image, only with COMPOSE_PROFILES=edge: a certificate for a public name, Caddy's own for
+  # localhost, or the ones in REPOMEMO_TLS_DIR (tls.crt and tls.key). Leave it out behind a proxy of your own.
+  edge:
+    profiles:
+      - edge
+    build:
+      context: .
+      target: edge
+      args:
+        REPOMEMO_BUILD_COMMIT: ${REPOMEMO_BUILD_COMMIT:-unknown}
+        REPOMEMO_BUILD_DATE: ${REPOMEMO_BUILD_DATE:-unknown}
+        REPOMEMO_IMAGE_TAG: ${REPOMEMO_VERSION:-local}
+    image: repomemo-edge:${REPOMEMO_VERSION:-local}
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      web:
+        condition: service_healthy
+    environment:
+      REPOMEMO_HOST: ${REPOMEMO_HOST:-localhost}
     ports:
       - "80:80"
       - "443:443"
@@ -124,6 +169,7 @@ services:
     volumes:
       - caddy-data:/data
       - caddy-config:/config
+      - ${REPOMEMO_TLS_DIR:-./deploy/certs}:/certs:ro
     networks:
       repomemo:
         ipv4_address: 172.29.0.2

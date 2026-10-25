@@ -9,6 +9,11 @@
 {
 	admin off
 	auto_https off
+	# The edge (or another proxy in front) sends the client's address in X-Forwarded-For; it is kept and added to
+	# before the API gets it. Private ranges by default; REPOMEMO_WEB_TRUSTED_PROXIES narrows or widens them.
+	servers {
+		trusted_proxies static {$REPOMEMO_WEB_TRUSTED_PROXIES:private_ranges}
+	}
 }
 
 :8080 {
