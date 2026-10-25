@@ -266,6 +266,24 @@ for (const name of ["REPOMEMO_WEB_API_URL", "REPOMEMO_PRODUCT_NAME"]) {
 if (!/handle \/config\.json/.test(webCaddyfile)) problems.push("docker/Caddyfile.web does not serve /config.json");
 if (!/vite\.config\.ts/.test("vite.config.ts") || !vite.includes("config.json")) problems.push("the web build does not write a default config.json");
 if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge does not use REPOMEMO_HOST");
+// The previous release's data survives this one (V0.4.27): the job builds the release named in deploy/upgrade-from.txt,
+// seeds it, moves its volume and checks everything through the new stack.
+{
+  const from = read("deploy/upgrade-from.txt");
+  if (!/^[0-9a-f]{40}\s/m.test(from.replace(/^#.*$/gm, ""))) problems.push("deploy/upgrade-from.txt names no commit (40 hexadecimal characters) for the upgrade test to start from");
+  const job = /^  upgrade-from-previous:\n([\s\S]*?)(?=^  \S|(?![\s\S]))/m.exec(ci)?.[1] ?? "";
+  if (!job) problems.push(".github/workflows/ci.yml has no upgrade-from-previous job");
+  else {
+    for (const needle of ["deploy/upgrade-from.txt", "ref: ${{ env.PREVIOUS_SHA }}", "upgrade-test.mjs seed", "migrate-volumes.sh", "upgrade-test.mjs verify"]) {
+      if (!job.includes(needle)) problems.push(`the upgrade-from-previous job lacks ${needle}`);
+    }
+  }
+  const script = read("scripts/upgrade-test.mjs");
+  for (const call of ["/v1/setup/admin", "/artifacts/upload", "/search", "/v1/auth/login", "/file"]) {
+    if (!script.includes(call)) problems.push(`scripts/upgrade-test.mjs does not use ${call}`);
+  }
+}
+
 // The compose job runs the smoke test over the whole stack (V0.4.26), setup included, and the script does the first hour.
 {
   const smoke = read("scripts/smoke-test.mjs");

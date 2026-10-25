@@ -2,6 +2,27 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.27 (2026-10-25)
+
+The data of the previous release is checked through this one.
+
+### Added
+- **An upgrade test in CI, `upgrade-from-previous`:** the release named in `deploy/upgrade-from.txt` (V0.3.27, by commit; until images are published it is built from source) is built and run on a single volume as it ran for people. `scripts/upgrade-test.mjs seed` makes its first administrator, a workspace and an uploaded note and waits until the note is searchable. The container is stopped, `deploy/migrate-volumes.sh` moves the volume into the three of this release, the compose stack starts on them, and `scripts/upgrade-test.mjs verify` signs the same administrator in and finds the workspace, the note in its list, its file read back and its text by search. **A migration that loses data fails the job.**
+- **`scripts/upgrade-test.mjs`** uses only API calls that exist in every release since 0.3.0, so the same script runs against both.
+- **`deploy/upgrade-from.txt`** names the release to start from, with a note to move it forward when a release is published.
+
+### Changed
+- **`container:check`** insists on the job's steps, on a commit in the file and on the script's calls.
+- **The documents:** the operations guide, the technical mindmap, the roadmap and the release index.
+- **The version** is `0.4.27` everywhere.
+
+### Checks
+- **Run:** a syntax check of the script, `container:check`, `version:check`, `docs:check`.
+- **Not run:** the job. The earlier release is built and run only in CI, the only place with both images; its first run may name an API shape of 0.3.27 that differs from what was read (the setup completion, the list of organizations).
+
+### Upgrading
+- Nothing to do.
+
 ## V0.4.26 (2026-10-25)
 
 CI uses the stack: the smoke test runs over the containers.

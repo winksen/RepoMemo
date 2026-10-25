@@ -334,6 +334,61 @@ jobs:
           docker rm --force converter-ci || true
           docker volume rm converter-ci-socket || true
 
+  # The data of the previous release survives this one (V0.4.27): the previous release (deploy/upgrade-from.txt) is built and
+  # run on a single volume, makes an administrator, a workspace and an indexed note; its volume is moved into the three of
+  # this release (V0.4.22), the compose stack starts on them, and the same administrator signs in, finds the workspace and
+  # the note, reads its file back and finds its text by search. A migration that loses data fails the job.
+  upgrade-from-previous:
+    name: Upgrade from the previous release
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+      - name: Which release is the previous one
+        run: echo "PREVIOUS_SHA=$(grep -v '^#' deploy/upgrade-from.txt | awk 'NR==1 {print $1}')" >> "$GITHUB_ENV"
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ env.PREVIOUS_SHA }}
+          path: previous
+      - name: Build the previous release's server image
+        run: docker build --target server --tag repomemo-server:previous previous
+      - name: Secrets, shared by both releases
+        run: |
+          {
+            echo "REPOMEMO_JWT_SECRET=$(openssl rand -hex 32)"
+            echo "REPOMEMO_SECRET_KEY=$(openssl rand -hex 32)"
+            echo "REPOMEMO_SETUP_CODE=UPGRADETEST2345"
+          } > .env
+      - name: The previous release makes its data on a single volume
+        run: |
+          set -a; . ./.env; set +a
+          docker volume create repomemo_repomemo-data
+          docker run --detach --name previous --publish 127.0.0.1:3020:3020 --volume repomemo_repomemo-data:/var/lib/repomemo \
+            --env REPOMEMO_SERVER_ADDR=0.0.0.0:3020 --env REPOMEMO_SERVER_DATA_DIR=main --env REPOMEMO_ALLOW_INSECURE_HTTP=true \
+            --env REPOMEMO_JWT_SECRET --env REPOMEMO_SECRET_KEY --env REPOMEMO_SETUP_CODE repomemo-server:previous
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3020/health/ready > /dev/null; then break; fi
+            sleep 2
+          done
+          node scripts/upgrade-test.mjs seed http://127.0.0.1:3020 "$REPOMEMO_SETUP_CODE" "$RUNNER_TEMP/state.json"
+          docker stop previous
+          docker rm previous
+      - name: Move its volume into the three of this release and start this release
+        run: |
+          sh deploy/migrate-volumes.sh repomemo
+          docker compose up --build --detach --wait --wait-timeout 900
+      - name: Nothing was lost
+        run: node scripts/upgrade-test.mjs verify http://127.0.0.1:8080 "$RUNNER_TEMP/state.json"
+      - name: What the stack logged
+        if: failure()
+        run: docker compose logs --no-color --tail 200
+      - name: Clean up
+        if: always()
+        run: docker compose down --volumes || true
+
   # Backups and restores in containers (V0.4.25): a stack makes data, its volumes are copied with the stack stopped, the
   # copy is restored into the volumes of a second stack, and the second stack has the data.
   volume-restore:

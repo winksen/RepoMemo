@@ -1,0 +1,4 @@
+# The release the upgrade test (CI job upgrade-from-previous, V0.4.27) starts from: the commit of the last release whose
+# images people run. Until images are published (V0.4.37) it is built from this commit; afterwards the job pulls the
+# published image of the previous tag. Move it forward when a release is published.
+1af40ec5bf4132a830be185cd8b369ecf5fb4199 V0.3.27
