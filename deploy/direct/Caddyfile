@@ -1,0 +1,26 @@
+# Caddy in front of a direct install (V0.4.34): TLS, compression and the server on 127.0.0.1:3020, which serves the web app
+# itself (REPOMEMO_WEB_DIR). Replace memo.example.com with your name; ports 80 and 443 must reach this machine and the name
+# must point at it, and Caddy gets and renews the certificate by itself.
+#
+# On the server (/etc/repomemo/repomemo.env): REPOMEMO_PUBLIC_URL=https://memo.example.com, REPOMEMO_ALLOWED_ORIGIN the same,
+# REPOMEMO_TRUST_PROXY=true (Caddy is on loopback, which the server already believes).
+{
+	admin off
+}
+
+memo.example.com {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+
+	# One address for the app and the API; live events are not buffered.
+	reverse_proxy 127.0.0.1:3020 {
+		flush_interval -1
+		transport http {
+			response_header_timeout 180s
+		}
+	}
+}

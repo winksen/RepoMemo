@@ -2,6 +2,25 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.34 (2026-10-25)
+
+One page from a direct install to a working https address.
+
+### Added
+- **`docs/FRONT_DOORS.md`:** the one page for a direct install: the three server settings that go with any front door (`REPOMEMO_PUBLIC_URL`, `REPOMEMO_ALLOWED_ORIGIN`, `REPOMEMO_TRUST_PROXY`), then Caddy (an automatic certificate), nginx with certbot, or the server alone on a trusted network; Windows (Caddy for Windows, or IIS with response buffering off); the firewall for ufw, firewalld and Windows, with a note not to open 3020; and a check with `curl` and the journal. Because the server serves the web app itself (V0.4.20) and listens on the loopback, one proxy rule is enough.
+- **`deploy/direct/Caddyfile` and `deploy/direct/nginx.conf`:** the two samples the page uses, for the server on `127.0.0.1:3020`: compression, HSTS, long uploads, the event streams unbuffered.
+- **A CI job, `direct-front-doors`,** has Caddy validate the Caddyfile and nginx test the nginx file (a throwaway certificate; both images pinned by digest).
+
+### Changed
+- **`container:check`** holds the page's contents, what the two samples must do and the CI job. **The documents:** the operations guide, the technical mindmap, the roadmap and the release index. **The version** is `0.4.34` everywhere.
+
+### Checks
+- **Run:** `container:check`, `version:check`, `docs:check` (the page's links).
+- **Not run:** Caddy or nginx with the files (CI does); a person following the page on a clean machine, which is the release's real test.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.4.33 (2026-10-25)
 
 Windows: the server runs as a service.

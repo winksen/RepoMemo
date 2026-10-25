@@ -282,6 +282,20 @@ if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge d
   if (!/^  server-archive:/m.test(ci) || !/package-server\.mjs --binary/.test(ci) || !/sha256sum --check SHA256SUMS/.test(ci) || !/REPOMEMO_WEB_DIR="\$home\/web"/.test(ci)) problems.push(".github/workflows/ci.yml does not pack the server, unpack it clean and start it on its own web app");
 }
 
+// Front doors for a direct install (V0.4.34): one page, a Caddyfile and an nginx file for the server on 127.0.0.1:3020, both
+// validated in CI by the programs themselves.
+{
+  const page = read("docs/FRONT_DOORS.md");
+  const caddy = read("deploy/direct/Caddyfile");
+  const nginx = read("deploy/direct/nginx.conf");
+  for (const needle of ["REPOMEMO_PUBLIC_URL", "REPOMEMO_ALLOWED_ORIGIN", "REPOMEMO_TRUST_PROXY", "deploy/direct/Caddyfile", "deploy/direct/nginx.conf", "ufw allow", "firewall-cmd", "New-NetFirewallRule", "certbot", "Do **not** open 3020"]) {
+    if (!page.includes(needle)) problems.push(`docs/FRONT_DOORS.md lacks ${needle}`);
+  }
+  if (!caddy.includes("reverse_proxy 127.0.0.1:3020") || !caddy.includes("flush_interval -1")) problems.push("deploy/direct/Caddyfile does not send everything to the server with the event streams unbuffered");
+  if (!nginx.includes("proxy_pass http://127.0.0.1:3020") || !/proxy_buffering off;/.test(nginx) || !/Strict-Transport-Security/.test(nginx)) problems.push("deploy/direct/nginx.conf does not proxy to the server, unbuffer the event streams and send HSTS");
+  if (!/caddy validate --config/.test(ci) || !/nginx -t/.test(ci) || !/^  direct-front-doors:/m.test(ci)) problems.push(".github/workflows/ci.yml does not have Caddy and nginx validate the direct-install samples");
+}
+
 // Windows: the server runs as a service, registered by its own command, with a script that is safe to run twice (V0.4.33).
 {
   const install = read("deploy/direct/service/install.ps1");
