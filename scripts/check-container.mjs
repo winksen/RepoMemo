@@ -156,6 +156,15 @@ if (/--mount=type=cache,target=\/build\/target/.test(dockerfile)) problems.push(
 if (!/cargo install cargo-chef --locked --version \d+\.\d+\.\d+/.test(dockerfile)) problems.push("cargo-chef is not installed at a pinned version");
 if (!workflows.some(([, text]) => text.includes("server-image-cache:"))) problems.push("CI has no server-image-cache job that measures the rebuild");
 
+// A smaller server image (V0.4.8): the binary is stripped, and the health check is the server's own --health,
+// so the image carries no curl. socat stays for the converter's socket (repomemo-soffice-wrapper).
+if (!/strip --strip-unneeded/.test(dockerfile)) problems.push("the server binary is not stripped");
+if (!/HEALTHCHECK[^\n]*\\\n\s*CMD \["repomemo-server", "--health"\]/.test(dockerfile)) problems.push("the server image's health check is not repomemo-server --health");
+{
+  const serverStage = dockerfile.slice(dockerfile.indexOf("AS server"), dockerfile.indexOf("AS converter"));
+  if (/\bcurl\b/.test(serverStage.replace(/#[^\n]*/g, ""))) problems.push("the server image installs or runs curl; the health check is repomemo-server --health");
+}
+
 // The server image is told what it is (V0.4.3): the Dockerfile takes the three build arguments, and the compose file gives them.
 for (const name of ["REPOMEMO_BUILD_COMMIT", "REPOMEMO_BUILD_DATE", "REPOMEMO_IMAGE_TAG"]) {
   if (!new RegExp(String.raw`^ARG\s+${name}\b`, "m").test(dockerfile)) problems.push(`the Dockerfile has no ARG ${name}, so /health cannot name the build`);
@@ -194,7 +203,8 @@ for (const match of example.matchAll(/^(REPOMEMO_[A-Z0-9_]+)=/gm)) {
 const listens = /REPOMEMO_SERVER_ADDR:\s*0\.0\.0\.0:(\d+)/.exec(compose)?.[1];
 if (!listens) problems.push("docker-compose.yml does not make the server listen on all interfaces");
 else if (!caddyfile.includes(`reverse_proxy server:${listens}`)) problems.push(`docker/Caddyfile does not proxy to server:${listens}`);
-if (listens && !new RegExp(`127\\.0\\.0\\.1:${listens}/health/ready`).test(dockerfile)) problems.push("the server image's health check does not ask the port the server listens on");
+// The health check (repomemo-server --health, V0.4.8) asks the address in REPOMEMO_SERVER_ADDR, which the image and the compose file set alike.
+if (listens && !new RegExp(`REPOMEMO_SERVER_ADDR=0\\.0\\.0\\.0:${listens}\\b`).test(dockerfile)) problems.push("the server image's REPOMEMO_SERVER_ADDR, which its health check asks, is not the port the server listens on");
 const proxyAddress = /proxy:[\s\S]*?ipv4_address:\s*(\S+)/.exec(compose)?.[1];
 const trusted = /REPOMEMO_TRUSTED_PROXIES:\s*(\S+)/.exec(compose)?.[1];
 if (!proxyAddress || proxyAddress !== trusted) problems.push(`the server must trust the proxy's address (proxy ${proxyAddress ?? "none"}, trusted ${trusted ?? "none"})`);

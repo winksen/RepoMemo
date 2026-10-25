@@ -18,6 +18,10 @@ fn main() {
     if repomemo_git::remote::run_as_askpass_if_requested() {
         return;
     }
+    // `--health` is the container's health check: ask this machine's server, exit 0 or 1.
+    if std::env::args().any(|argument| argument == "--health") {
+        std::process::exit(repomemo_server::health_probe());
+    }
     if std::env::args().any(|argument| argument == "--version" || argument == "-V") {
         println!("{}", repomemo_server::BUILD.line());
         return;

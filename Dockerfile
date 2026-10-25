@@ -47,7 +47,7 @@ ARG REPOMEMO_BUILD_DATE=unknown
 ARG REPOMEMO_IMAGE_TAG=unknown
 RUN cargo build --release --locked -p repomemo-server \
     && mkdir -p /out \
-    && cp target/release/repomemo-server /out/repomemo-server
+    && strip --strip-unneeded -o /out/repomemo-server target/release/repomemo-server
 
 # ---------------------------------------------------------------------------
 # The server, on Debian 13 (trixie): its git 2.47.3 is a release the remote-clone check
@@ -60,7 +60,7 @@ RUN cargo build --release --locked -p repomemo-server \
 FROM debian:trixie-slim@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad AS server
 ARG WITH_LIBREOFFICE=false
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl git socat \
+    && apt-get install -y --no-install-recommends ca-certificates git socat \
     && if [ "$WITH_LIBREOFFICE" = "true" ]; then \
          apt-get install -y --no-install-recommends libreoffice-core libreoffice-writer libreoffice-calc libreoffice-impress fonts-dejavu-core; \
        fi \
@@ -80,7 +80,7 @@ ENV REPOMEMO_SERVER_ADDR=0.0.0.0:3020 \
     REPOMEMO_SERVER_DATA_DIR=main
 EXPOSE 3020
 HEALTHCHECK --interval=15s --timeout=5s --start-period=40s --retries=3 \
-    CMD curl --fail --silent http://127.0.0.1:3020/health/ready || exit 1
+    CMD ["repomemo-server", "--health"]
 ENTRYPOINT ["repomemo-server"]
 
 # ---------------------------------------------------------------------------

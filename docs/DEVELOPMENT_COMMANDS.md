@@ -227,6 +227,8 @@ reader). Do not set them. The performance runs read `REPOMEMO_PERF_PASSAGES`,
 
 **Secrets from files (V0.4.1).** `REPOMEMO_JWT_SECRET`, `REPOMEMO_SECRET_KEY`, `REPOMEMO_BACKUP_KEY`, `REPOMEMO_BACKUP_KEY_PREVIOUS` and `REPOMEMO_SETUP_CODE` can each be given as a file instead: set the same name ending in `_FILE` (for example `REPOMEMO_JWT_SECRET_FILE=/run/secrets/jwt`) to the path of a file that holds the value, as Docker and Kubernetes secrets are mounted. White space and the line ending around the value are dropped. A variable and a file for the same secret are refused at start, and so is a file that cannot be read or is empty. The same rules and limits apply as for the variable.
 
+**Health check (V0.4.8).** `repomemo-server --health` asks the server on this machine (the address in `REPOMEMO_SERVER_ADDR`, with an all-interfaces address asked on the loopback) for `/health/ready` and exits `0` when it answers 200, else `1`. It is the container's health check, so the image needs no `curl`.
+
 **Checking a configuration (V0.4.2).** `repomemo-server --check-config` reads the environment as a start would, prints what it would use with the secrets hidden, checks that the data folder exists and is writable (or can be created), and exits without serving: `0` the configuration can start, `1` it is invalid, `2` the data folder cannot be used. In a container: `docker compose run --rm server --check-config`.
 
 | Variable | Default | What it does |

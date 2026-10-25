@@ -2,6 +2,27 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.8 (2026-10-25)
+
+The server image is smaller and needs no curl.
+
+### Added
+- **`repomemo-server --health`:** asks the server on this machine for `/health/ready` (the address in `REPOMEMO_SERVER_ADDR`, an all-interfaces address asked on the loopback), with a few lines of HTTP by hand and a 4-second limit, and exits 0 on a 200 and 1 otherwise, saying why on standard error.
+
+### Changed
+- **The server image:** the health check is `CMD ["repomemo-server", "--health"]`, `curl` is no longer installed, and the binary is copied out of the build stripped (`strip --strip-unneeded`). `socat` stays, since `repomemo-soffice-wrapper` reaches the converter's socket with it.
+- **`container:check`** insists on the stripped binary, on the `--health` check and on no `curl` in the server stage; its rule that the health check asks the listening port now reads `REPOMEMO_SERVER_ADDR` of the image against the compose file's.
+- **The documents:** the settings reference (the health check), the operations guide, the technical mindmap, the roadmap and the release index.
+- **The version** is `0.4.8` everywhere.
+
+### Checks
+- **Compiled and linted:** `cargo clippy -D warnings` over the server with its tests, `cargo fmt --all --check`, `container:check`, `version:check`, `docs:check`.
+- **Tests written, not run:** three unit tests of the probe (200 and 503 from a stand-in server, a closed port and a non-HTTP answer as errors, an all-interfaces address asked on the loopback).
+- **Not measured:** the size of the image. No image was built, so the saving is not recorded; the first CI build is where to read it.
+
+### Upgrading
+- Nothing to do. A `docker run` with its own health check that used `curl` in the image should use `repomemo-server --health`.
+
 ## V0.4.7 (2026-10-25)
 
 The server image builds its dependencies in a layer of their own.
