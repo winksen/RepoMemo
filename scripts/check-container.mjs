@@ -266,6 +266,35 @@ for (const name of ["REPOMEMO_WEB_API_URL", "REPOMEMO_PRODUCT_NAME"]) {
 if (!/handle \/config\.json/.test(webCaddyfile)) problems.push("docker/Caddyfile.web does not serve /config.json");
 if (!/vite\.config\.ts/.test("vite.config.ts") || !vite.includes("config.json")) problems.push("the web build does not write a default config.json");
 if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge does not use REPOMEMO_HOST");
+// Every service can say it is healthy, stops with time to finish, restarts and rotates its logs (V0.4.28), so that
+// `docker compose up --wait` returns only when the whole stack is.
+{
+  const stageHasHealthcheck = (target) => {
+    const start = dockerfile.search(new RegExp(String.raw`^FROM\s.*\sAS\s+${target}\s*$`, "m"));
+    const next = dockerfile.slice(start + 1).search(/^FROM\s/m);
+    return start >= 0 && /^HEALTHCHECK\b/m.test(next < 0 ? dockerfile.slice(start) : dockerfile.slice(start, start + 1 + next));
+  };
+  for (const [file, text] of [["docker-compose.yml", compose], ["deploy/api.yml", read("deploy/api.yml")]]) {
+    const body = text.slice(text.indexOf("\nservices:"), text.indexOf("\nnetworks:") > 0 ? text.indexOf("\nnetworks:") : text.indexOf("\nvolumes:"));
+    for (const match of body.matchAll(/^  ([a-z][\w-]*):\n([\s\S]*?)(?=^  \S|(?![\s\S]))/gm)) {
+      const [, name, block] = match;
+      const target = /target:\s*(\S+)/.exec(block)?.[1];
+      if (!/^\s+healthcheck:/m.test(block) && !(target && stageHasHealthcheck(target))) problems.push(`${file}: ${name} has no health check, in the compose file or in its image`);
+      if (!/^\s+restart:\s*unless-stopped\s*$/m.test(block)) problems.push(`${file}: ${name} does not restart unless stopped`);
+      if (!/^\s+stop_grace_period:\s*\d+s\s*$/m.test(block)) problems.push(`${file}: ${name} has no stop_grace_period`);
+      if (!/^\s+logging:\s*\*logging\s*$/m.test(block)) problems.push(`${file}: ${name} does not rotate its logs`);
+    }
+    if (!/^x-logging:\s*&logging\s*\n\s+driver:\s*json-file\s*\n\s+options:\s*\n\s+max-size:\s*"\d+m"\s*\n\s+max-file:\s*"\d+"/m.test(text)) problems.push(`${file} has no log rotation (x-logging)`);
+  }
+  // The server gets longer to stop than the grace it gives running requests (REPOMEMO_SHUTDOWN_GRACE_SECONDS, 30 by default).
+  const grace = Number(/^  server:\n[\s\S]*?stop_grace_period:\s*(\d+)s/m.exec(compose)?.[1] ?? 0);
+  if (grace <= 30) problems.push("the server's stop_grace_period is not longer than its shutdown grace of 30 seconds");
+  for (const name of ["web", "edge"]) {
+    if (!new RegExp(`^  ${name}:\\n[\\s\\S]*?depends_on:\\s*\\n\\s+\\w+:\\s*\\n\\s+condition:\\s*service_healthy`, "m").test(compose)) problems.push(`docker-compose.yml: ${name} does not wait for the service it fronts to be healthy`);
+  }
+  if (!/docker compose ps --format[^\n]*Health/.test(ci)) problems.push(".github/workflows/ci.yml does not read the health of every service after --wait");
+}
+
 // The previous release's data survives this one (V0.4.27): the job builds the release named in deploy/upgrade-from.txt,
 // seeds it, moves its volume and checks everything through the new stack.
 {

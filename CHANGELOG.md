@@ -2,6 +2,26 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.28 (2026-10-25)
+
+Every service says it is healthy, and the stack waits for all of them.
+
+### Changed
+- **Health checks for every service:** the server (`repomemo-server --health`) and the web image (`/healthz`) had theirs in the image; the edge now reports healthy when something listens on port 443 (read from `/proc/net`, since the image has no tool for it), and the converter when its socket exists. `docker compose up --wait` therefore returns only when the whole stack is healthy; the web image waits for the server and the edge for the web image.
+- **Time to stop:** `stop_grace_period` is 45 seconds for the server (longer than the 30 it gives running requests, V0.4.6) and 10 for the others, in `docker-compose.yml` and `deploy/api.yml`.
+- **Log rotation:** every service logs to Docker's `json-file` driver, five files of ten megabytes each, through one `x-logging` anchor.
+- **Limits are documented, not set:** the operations guide gives starting figures for memory and says what to add under a service to cap it; the compose file points there.
+- **CI** reads the health of every service after `--wait` and fails when one is not `healthy`. **`container:check`** insists on a health check (in the file or the image), the restart policy, the grace period, the rotation and the dependencies' conditions for each service of both compose files, and on a server grace longer than 30 seconds.
+- **The documents:** the operations guide (*Healthy, patient and quiet*), the technical mindmap, the roadmap and the release index.
+- **The version** is `0.4.28` everywhere.
+
+### Checks
+- **Run:** `container:check`, `version:check`, `docs:check`.
+- **Not run:** the stack. The edge's `/proc/net` check and the converter's `test -S` are the first to read in CI's output.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.4.27 (2026-10-25)
 
 The data of the previous release is checked through this one.

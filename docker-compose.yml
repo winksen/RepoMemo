@@ -15,6 +15,20 @@
 
 name: repomemo
 
+# Logs go to Docker's json-file driver with rotation, so a container's log never fills the disk (V0.4.28): five files of
+# ten megabytes each per container.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+# Memory and CPU are not limited here because the right figures depend on the machine and the data. Sizing guidance,
+# and the lines to add under a service, are in mindmap/technical/operations.md ("Sizing and limits"), for example:
+#   deploy:
+#     resources:
+#       limits: { memory: 2g, cpus: "2" }
+
 services:
   server:
     build:
@@ -26,6 +40,8 @@ services:
         REPOMEMO_IMAGE_TAG: ${REPOMEMO_VERSION:-local}
     image: repomemo-server:${REPOMEMO_VERSION:-local}
     restart: unless-stopped
+    stop_grace_period: 45s
+    logging: *logging
     init: true
     read_only: true
     tmpfs:
@@ -94,6 +110,15 @@ services:
     # Built here by default; REPOMEMO_CONVERTER_IMAGE starts a converter image of its own instead (V0.4.12).
     image: ${REPOMEMO_CONVERTER_IMAGE:-repomemo-converter:${REPOMEMO_VERSION:-local}}
     restart: unless-stopped
+    stop_grace_period: 10s
+    logging: *logging
+    # The listener has opened its socket on the volume it shares with the server.
+    healthcheck:
+      test: ["CMD", "test", "-S", "/run/soffice/convert.sock"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     init: true
     network_mode: none
     read_only: true
@@ -119,6 +144,8 @@ services:
         REPOMEMO_IMAGE_TAG: ${REPOMEMO_VERSION:-local}
     image: repomemo-web:${REPOMEMO_VERSION:-local}
     restart: unless-stopped
+    stop_grace_period: 10s
+    logging: *logging
     init: true
     read_only: true
     tmpfs:
@@ -156,6 +183,16 @@ services:
         REPOMEMO_IMAGE_TAG: ${REPOMEMO_VERSION:-local}
     image: repomemo-edge:${REPOMEMO_VERSION:-local}
     restart: unless-stopped
+    stop_grace_period: 10s
+    logging: *logging
+    # Caddy has no health route of its own with its admin endpoint off: something must be listening on port 443 (read
+    # from /proc/net, since the image has no tool for it).
+    healthcheck:
+      test: ["CMD-SHELL", "grep -Eqi ':01BB [0-9A-F:]+ 0A ' /proc/net/tcp /proc/net/tcp6"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     init: true
     read_only: true
     tmpfs:

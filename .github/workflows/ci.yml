@@ -109,6 +109,11 @@ jobs:
           done
           echo "/health/ready never answered" >&2
           exit 1
+      - name: Every service is healthy, as --wait promised (V0.4.28)
+        run: |
+          docker compose ps --format '{{.Service}} {{.Health}}' | tee services.txt
+          test "$(wc -l < services.txt)" -ge 3
+          ! grep -v ' healthy$' services.txt
       - name: The first hour, through the proxy and the containers
         run: |
           # Setup, a workspace, an upload, indexing, search, a backup, an export and an import (V0.4.26). The checks of the

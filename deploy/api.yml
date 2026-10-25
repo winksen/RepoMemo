@@ -13,6 +13,13 @@
 
 name: repomemo-api
 
+# Logs go to Docker's json-file driver with rotation (five files of ten megabytes per container, V0.4.28).
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   server:
     build:
@@ -24,6 +31,8 @@ services:
         REPOMEMO_IMAGE_TAG: ${REPOMEMO_VERSION:-local}
     image: repomemo-server:${REPOMEMO_VERSION:-local}
     restart: unless-stopped
+    stop_grace_period: 45s
+    logging: *logging
     init: true
     read_only: true
     tmpfs:
