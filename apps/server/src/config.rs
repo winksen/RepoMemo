@@ -18,6 +18,9 @@ pub struct ServerConfig {
     pub jwt_secret: String,
     /// Browser origins allowed to call the API (CORS). Empty: no CORS headers.
     pub allowed_origins: Vec<HeaderValue>,
+    /// The refresh cookie's `SameSite` attribute (`REPOMEMO_COOKIE_SAMESITE`): `Strict` (the default; the web app and the
+    /// API on one site), `Lax`, or `None` for a web app and an API on different sites (needs an `https://` public address).
+    pub cookie_same_site: &'static str,
     /// Whether LibreOffice converts uploaded Office files for layout-accurate
     /// previews (`REPOMEMO_OFFICE_PREVIEWS`). Off by default: LibreOffice parses
     /// files strangers uploaded, so an operator turns it on on purpose, and
@@ -337,6 +340,7 @@ impl ServerConfig {
         let trust_proxy = env_flag("REPOMEMO_TRUST_PROXY", false)?;
         let allow_insecure_http = env_flag("REPOMEMO_ALLOW_INSECURE_HTTP", false)?;
         check_transport(bind_address, public_url.as_deref(), trust_proxy, allow_insecure_http)?;
+        let cookie_same_site = parse_same_site(env_text("REPOMEMO_COOKIE_SAMESITE").as_deref(), public_url.as_deref())?;
         let repo_poll_seconds: u64 = env_parse("REPOMEMO_REPO_POLL_SECONDS", 300)?;
         let maintenance_minutes: u64 = env_parse("REPOMEMO_MAINTENANCE_INTERVAL_MINUTES", 60)?;
         let index_retry_hours: u64 = env_parse("REPOMEMO_INDEX_RETRY_HOURS", 6)?;
@@ -350,6 +354,7 @@ impl ServerConfig {
             backup_dir,
             jwt_secret,
             allowed_origins,
+            cookie_same_site,
             office_previews: env_flag("REPOMEMO_OFFICE_PREVIEWS", false)?,
             preview_root: env_text("REPOMEMO_PREVIEW_ROOT").map(PathBuf::from),
             soffice: std::env::var_os("REPOMEMO_SOFFICE").map(PathBuf::from),
@@ -473,6 +478,7 @@ impl ServerConfig {
             backup_dir: None,
             jwt_secret: "test-secret-that-is-long-enough-for-jwt-signing".to_owned(),
             allowed_origins: Vec::new(),
+            cookie_same_site: "Strict",
             office_previews: false,
             preview_root: None,
             soffice: None,
@@ -638,6 +644,23 @@ mod secret_tests {
     }
 }
 
+/// The refresh cookie's `SameSite` attribute from `REPOMEMO_COOKIE_SAMESITE` (V0.4.17). `None` is only accepted
+/// with an `https://` public address, since a browser takes `SameSite=None` only together with `Secure`.
+pub(crate) fn parse_same_site(value: Option<&str>, public_url: Option<&str>) -> Result<&'static str> {
+    match value.map(str::to_ascii_lowercase).as_deref() {
+        None | Some("strict") => Ok("Strict"),
+        Some("lax") => Ok("Lax"),
+        Some("none") => {
+            if public_url.is_some_and(|url| url.starts_with("https://")) {
+                Ok("None")
+            } else {
+                bail!("REPOMEMO_COOKIE_SAMESITE=none needs REPOMEMO_PUBLIC_URL to be an https:// address, since a browser takes SameSite=None only with Secure")
+            }
+        }
+        Some(other) => bail!("REPOMEMO_COOKIE_SAMESITE must be strict, lax or none, not {other}"),
+    }
+}
+
 /// A folder given by an environment variable: an absolute path, or unset.
 fn env_folder(name: &str) -> Result<Option<PathBuf>> {
     let Some(value) = env_text(name) else {
@@ -712,6 +735,11 @@ pub(crate) struct RuntimeSettings {
     pub(crate) proxy: security::ProxyTrust,
     /// The refresh cookie carries `Secure` (the public address is HTTPS).
     pub(crate) secure_cookies: bool,
+    /// `Strict`, `Lax` or `None` (see [`ServerConfig::cookie_same_site`]).
+    pub(crate) cookie_same_site: &'static str,
+    /// The origins that may call the API, as text; a request that presents the refresh cookie from another one is
+    /// refused when the cookie is not `Strict`.
+    pub(crate) allowed_origins: Vec<String>,
     pub(crate) max_event_streams_per_user: usize,
     pub(crate) access_token_ttl_minutes: i64,
     pub(crate) refresh_token_ttl_days: i64,
@@ -750,6 +778,13 @@ impl RuntimeSettings {
                 .public_url
                 .as_deref()
                 .is_some_and(|url| url.starts_with("https://")),
+            cookie_same_site: config.cookie_same_site,
+            allowed_origins: config
+                .allowed_origins
+                .iter()
+                .filter_map(|origin| origin.to_str().ok())
+                .map(|origin| origin.trim_end_matches('/').to_ascii_lowercase())
+                .collect(),
             max_event_streams_per_user: config.max_event_streams_per_user,
             access_token_ttl_minutes: config.access_token_ttl_minutes,
             refresh_token_ttl_days: config.refresh_token_ttl_days,
@@ -773,5 +808,28 @@ impl RuntimeSettings {
             system_admin_emails: config.system_admin_emails.clone(),
             logging: config.logging.clone(),
         }
+    }
+}
+#[cfg(test)]
+mod same_site_tests {
+    use super::parse_same_site;
+
+    #[test]
+    fn strict_is_the_default_and_the_others_are_named() {
+        assert_eq!(parse_same_site(None, None).unwrap(), "Strict");
+        assert_eq!(parse_same_site(Some("STRICT"), None).unwrap(), "Strict");
+        assert_eq!(parse_same_site(Some("lax"), None).unwrap(), "Lax");
+        assert!(parse_same_site(Some("sometimes"), None).is_err());
+    }
+
+    #[test]
+    fn none_needs_an_https_public_address() {
+        assert_eq!(
+            parse_same_site(Some("none"), Some("https://memo.example.com")).unwrap(),
+            "None"
+        );
+        let error = parse_same_site(Some("none"), Some("http://memo.example.com")).unwrap_err();
+        assert!(error.to_string().contains("https://"));
+        assert!(parse_same_site(Some("none"), None).is_err());
     }
 }

@@ -12,8 +12,10 @@
 //!   from the cookie when the body has none;
 //! - signing out, or a refresh the server refuses, clears the cookie.
 //!
-//! The cookie is `SameSite=Strict`, so it needs the web app and the API on one
-//! site (one host behind the proxy; ports may differ). Its path is `/v1/auth`
+//! The cookie is `SameSite=Strict` by default, so it needs the web app and the API on one
+//! site (one host behind the proxy; ports may differ). `REPOMEMO_COOKIE_SAMESITE` (V0.4.17) lets it be `Lax` or
+//! `None` for a web app on another address; then a request that presents it from an origin that is not listed in
+//! `REPOMEMO_ALLOWED_ORIGIN` is refused. Its path is `/v1/auth`
 //! rather than only `/v1/auth/refresh` so that sign-in (lockout bypass) and
 //! sign-out (server-side revocation) receive it too.
 
@@ -85,11 +87,11 @@ fn cookie_name(secure: bool) -> &'static str {
     }
 }
 
-fn set_cookie(token: &str, max_age_seconds: i64, secure: bool) -> HeaderValue {
+fn set_cookie(token: &str, max_age_seconds: i64, secure: bool, same_site: &str) -> HeaderValue {
     let flag = if secure { "; Secure" } else { "" };
     let name = cookie_name(secure);
     HeaderValue::from_str(&format!(
-        "{name}={token}; Path={COOKIE_PATH}; HttpOnly; SameSite=Strict; Max-Age={max_age_seconds}{flag}"
+        "{name}={token}; Path={COOKIE_PATH}; HttpOnly; SameSite={same_site}; Max-Age={max_age_seconds}{flag}"
     ))
     .unwrap_or_else(|_| HeaderValue::from_static(""))
 }
@@ -101,6 +103,22 @@ fn clear_legacy_cookie() -> HeaderValue {
         "{COOKIE_NAME}=; Path={COOKIE_PATH}; HttpOnly; SameSite=Strict; Max-Age=0"
     ))
     .unwrap_or_else(|_| HeaderValue::from_static(""))
+}
+
+/// Whether a request that presents the refresh cookie may come from the page it says it does. Under `Strict` the
+/// browser sends the cookie to nobody else, so nothing is asked; under `Lax` or `None` an `Origin` header
+/// that is not among the allowed origins is refused. A request with no `Origin` (the console, a script) is left alone.
+fn origin_allowed(headers: &HeaderMap, same_site: &str, allowed: &[String]) -> bool {
+    if same_site == "Strict" {
+        return true;
+    }
+    match headers.get(header::ORIGIN).and_then(|value| value.to_str().ok()) {
+        None => true,
+        Some(origin) => {
+            let origin = origin.trim_end_matches('/').to_ascii_lowercase();
+            allowed.contains(&origin)
+        }
+    }
 }
 
 fn bad_request() -> Response {
@@ -115,6 +133,12 @@ pub(crate) async fn web_session(State(state): State<AppState>, request: Request,
     let mut request = request;
 
     if request.method() == Method::POST && PRESENTS_TOKEN.contains(&path.as_str()) {
+        if cookie_token(request.headers()).is_some() {
+            let settings = state.settings();
+            if !origin_allowed(request.headers(), settings.cookie_same_site, &settings.allowed_origins) {
+                return (StatusCode::FORBIDDEN, "This origin may not use the sign-in cookie.").into_response();
+            }
+        }
         if let Some(token) = cookie_token(request.headers()) {
             let (mut parts, body) = request.into_parts();
             let Ok(bytes) = to_bytes(body, MAX_REQUEST_BYTES).await else {
@@ -157,9 +181,10 @@ pub(crate) async fn web_session(State(state): State<AppState>, request: Request,
         || (path == "/v1/auth/refresh" && status == StatusCode::UNAUTHORIZED)
     {
         // Both names go over HTTPS: the one in use and the one an earlier release set.
-        response
-            .headers_mut()
-            .append(header::SET_COOKIE, set_cookie("", 0, settings.secure_cookies));
+        response.headers_mut().append(
+            header::SET_COOKIE,
+            set_cookie("", 0, settings.secure_cookies, settings.cookie_same_site),
+        );
         if settings.secure_cookies {
             response.headers_mut().append(header::SET_COOKIE, clear_legacy_cookie());
         }
@@ -184,9 +209,10 @@ pub(crate) async fn web_session(State(state): State<AppState>, request: Request,
         };
         value["refresh_token"] = Value::String(String::new());
         let max_age = settings.refresh_token_ttl_days.max(1) * 24 * 60 * 60;
-        parts
-            .headers
-            .append(header::SET_COOKIE, set_cookie(&token, max_age, settings.secure_cookies));
+        parts.headers.append(
+            header::SET_COOKIE,
+            set_cookie(&token, max_age, settings.secure_cookies, settings.cookie_same_site),
+        );
         // The name an earlier release used is read once (above) and replaced here.
         if settings.secure_cookies {
             parts.headers.append(header::SET_COOKIE, clear_legacy_cookie());
@@ -217,23 +243,59 @@ mod tests {
 
     #[test]
     fn the_cookie_is_http_only_strict_and_scoped() {
-        let value = set_cookie("token", 60, true);
+        let value = set_cookie("token", 60, true, "Strict");
         let text = value.to_str().unwrap();
         for part in ["HttpOnly", "SameSite=Strict", "Path=/v1/auth", "Max-Age=60", "Secure"] {
             assert!(text.contains(part), "{part} missing from {text}");
         }
-        assert!(!set_cookie("token", 60, false).to_str().unwrap().contains("Secure"));
+        assert!(!set_cookie("token", 60, false, "Strict")
+            .to_str()
+            .unwrap()
+            .contains("Secure"));
+    }
+
+    #[test]
+    fn the_same_site_attribute_follows_the_setting() {
+        let none = set_cookie("token", 60, true, "None");
+        assert!(
+            none.to_str().unwrap().contains("SameSite=None; Max-Age=60; Secure"),
+            "{none:?}"
+        );
+        let lax = set_cookie("token", 60, true, "Lax");
+        assert!(lax.to_str().unwrap().contains("SameSite=Lax"));
+    }
+
+    #[test]
+    fn a_cookie_from_an_unlisted_origin_is_refused_unless_the_cookie_is_strict() {
+        let allowed = vec!["https://app.example.com".to_owned()];
+        let from = |origin: &str| {
+            let mut headers = HeaderMap::new();
+            headers.insert(header::ORIGIN, HeaderValue::from_str(origin).unwrap());
+            headers
+        };
+        assert!(origin_allowed(&from("https://app.example.com"), "None", &allowed));
+        assert!(origin_allowed(&from("https://APP.example.com/"), "None", &allowed));
+        assert!(!origin_allowed(&from("https://evil.example.org"), "None", &allowed));
+        assert!(!origin_allowed(&from("https://evil.example.org"), "Lax", &allowed));
+        assert!(
+            origin_allowed(&from("https://evil.example.org"), "Strict", &allowed),
+            "Strict never leaves the site"
+        );
+        assert!(
+            origin_allowed(&HeaderMap::new(), "None", &allowed),
+            "a script sends no Origin"
+        );
     }
 
     #[test]
     fn over_https_the_cookie_carries_the_secure_prefix_and_the_old_name_is_read_once_and_cleared() {
-        let secure = set_cookie("token", 60, true);
+        let secure = set_cookie("token", 60, true, "Strict");
         assert!(
             secure.to_str().unwrap().starts_with("__Secure-repomemo_refresh=token;"),
             "{secure:?}"
         );
         assert!(secure.to_str().unwrap().contains("; Secure"));
-        let plain = set_cookie("token", 60, false);
+        let plain = set_cookie("token", 60, false, "Strict");
         assert!(
             plain.to_str().unwrap().starts_with("repomemo_refresh=token;"),
             "{plain:?}"

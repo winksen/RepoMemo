@@ -188,7 +188,8 @@ jobs:
           curl --fail --silent --dump-header page.headers --output page.html http://127.0.0.1:8080/
           grep -qi '<div id="root">' page.html
           grep -qi '^cache-control: no-cache' page.headers
-          grep -qi '^content-security-policy: ' page.headers
+          grep -qi "^content-security-policy: .*connect-src 'self' https://api.example.com[ ;]" page.headers
+          ! grep -qi 'http-equiv="Content-Security-Policy"' page.html
           grep -qi '^x-content-type-options: nosniff' page.headers
           grep -qi '^x-frame-options: DENY' page.headers
           ! grep -qi '^server: ' page.headers
@@ -254,6 +255,40 @@ jobs:
         run: |
           docker rm --force api web || true
           docker network rm repomemo-ci || true
+
+  # The web app on one address and the API on another (V0.4.17): the server runs with the web app's origin allowed
+  # and a cookie that may cross sites; the requests a browser makes from the web origin and from a third one are made
+  # by script, and the third is refused.
+  cross-origin:
+    name: Two origins
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+      - name: Build the API image
+        run: docker build --target server --tag repomemo-server:ci .
+      - name: Start the API with another address for the web app
+        run: |
+          docker run --detach --name api --publish 127.0.0.1:3020:3020 --env REPOMEMO_SERVER_ADDR=0.0.0.0:3020 --env REPOMEMO_SERVER_DATA_DIR=main \
+            --env REPOMEMO_ALLOW_INSECURE_HTTP=true --env REPOMEMO_ALLOWED_ORIGIN=http://app.localtest.me:8080 --env REPOMEMO_COOKIE_SAMESITE=lax \
+            --env "REPOMEMO_JWT_SECRET=$(openssl rand -hex 32)" --env "REPOMEMO_SECRET_KEY=$(openssl rand -hex 32)" repomemo-server:ci
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3020/health/ready > /dev/null; then exit 0; fi
+            sleep 2
+          done
+          docker logs api >&2
+          exit 1
+      - name: Sign in, refresh and stream from the web origin, and be refused from a third
+        run: node scripts/cross-origin-test.mjs http://127.0.0.1:3020 http://app.localtest.me:8080 http://evil.localtest.me
+      - name: What the API logged
+        if: failure()
+        run: docker logs api
+      - name: Clean up
+        if: always()
+        run: docker rm --force api || true
 
   # The converter image on its own (V0.4.12): built and tagged without the rest, it must run as the unprivileged
   # user, listen on its socket with no network and a read-only root, and say which LibreOffice it carries.

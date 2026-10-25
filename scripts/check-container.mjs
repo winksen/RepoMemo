@@ -287,6 +287,18 @@ for (const pattern of [".git", ".env", "workspace-data", "target"]) {
   if (!/docker build[^\n]*--target webapp\b/.test(ci) || !/--publish 127\.0\.0\.1:8080:8080[\s\S]*--read-only[\s\S]*--cap-drop ALL/.test(ci)) problems.push(".github/workflows/ci.yml has no job that runs the web image alone, read-only and without capabilities");
 }
 
+// Cross-origin mode (V0.4.17): the web image puts the API's origin into the policy it sends when it starts, the page
+// carries no policy of its own that could narrow it, and CI tries two origins and a third.
+{
+  const script = read("docker/web-entrypoint.sh");
+  const webStage = dockerfile.slice(dockerfile.search(/^FROM\s.*\sAS\s+webapp\s*$/m));
+  if (!script.includes("REPOMEMO_WEB_API_ORIGIN") || !script.includes("REPOMEMO_WEB_API_URL")) problems.push("docker/web-entrypoint.sh does not work the API's origin out of REPOMEMO_WEB_API_URL");
+  if (!webStage.includes("{\\$REPOMEMO_WEB_API_ORIGIN:}")) problems.push("the web image's policy does not take the API's origin when it starts");
+  if (!/sed -i '[^']*Content-Security-Policy[^']*d' \/srv\/web\/index\.html/.test(webStage)) problems.push("the web image leaves the build's own policy in the page, which would narrow the one it sends");
+  if (!/\[!\]A-Za-z0-9/.test(script)) problems.push("docker/web-entrypoint.sh checks its values with a bracket expression that does not close on ]");
+  if (!/node scripts\/cross-origin-test\.mjs/.test(ci) || !/REPOMEMO_COOKIE_SAMESITE=lax/.test(ci)) problems.push(".github/workflows/ci.yml has no job that tries the API and the web app on two origins");
+}
+
 // Same-origin mode (V0.4.16): the web image forwards /v1 and /health to REPOMEMO_API_UPSTREAM with the live event
 // streams unbuffered, from a snippet its entrypoint writes; CI runs it together with the API.
 {

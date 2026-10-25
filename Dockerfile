@@ -163,7 +163,11 @@ RUN adduser -S -D -H -u 10001 -h /nonexistent repomemo \
 COPY --from=web /build/apps/desktop/dist /srv/web
 COPY docker/Caddyfile.web /etc/caddy/Caddyfile
 COPY --chmod=0755 docker/web-entrypoint.sh /usr/local/bin/repomemo-web-entrypoint
-RUN printf 'header ?Content-Security-Policy "%s"\n' "$(cat /srv/web/content-security-policy.txt)" > /etc/caddy/csp.caddy
+# The policy is the build's, with the API's origin added to connect-src when the container starts
+# (REPOMEMO_WEB_API_ORIGIN, worked out by the entrypoint from REPOMEMO_WEB_API_URL). The build's own copy of the
+# policy in the page is taken out: a policy in the page could only ever narrow the one the header sends.
+RUN sed -i '/http-equiv="Content-Security-Policy"/d' /srv/web/index.html \
+    && printf 'header ?Content-Security-Policy "%s"\n' "$(sed "s/connect-src 'self'/connect-src 'self' {\$REPOMEMO_WEB_API_ORIGIN:}/" /srv/web/content-security-policy.txt)" > /etc/caddy/csp.caddy
 ENV XDG_DATA_HOME=/tmp XDG_CONFIG_HOME=/tmp
 USER 10001
 EXPOSE 8080

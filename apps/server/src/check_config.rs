@@ -97,6 +97,9 @@ pub(crate) fn check_config_report(config: Result<ServerConfig>) -> CheckReport {
             .collect::<Vec<_>>()
             .join(", ")
     ));
+    report
+        .lines
+        .push(format!("sign-in cookie    SameSite={}", config.cookie_same_site));
     report.lines.push(format!(
         "proxy trusted     {}",
         if config.trust_proxy { "yes" } else { "no" }

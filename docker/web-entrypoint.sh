@@ -13,9 +13,27 @@ set -eu
 snippet=/tmp/api.caddy
 upstream="${REPOMEMO_API_UPSTREAM:-}"
 
+# Cross-origin mode (V0.4.17): when the app is told to call an API on another address (REPOMEMO_WEB_API_URL), that
+# address's origin joins connect-src in the content security policy. It must be http(s)://host[:port][/path] with
+# nothing that could widen the policy; an empty value means the page's own host and adds nothing.
+api_url="${REPOMEMO_WEB_API_URL:-}"
+REPOMEMO_WEB_API_ORIGIN=""
+if [ -n "$api_url" ]; then
+  case "$api_url" in
+    *[!]A-Za-z0-9.:/_[-]*)
+      echo "repomemo-web: REPOMEMO_WEB_API_URL ($api_url) may hold only letters, digits and . : / _ - [ ]" >&2
+      exit 1
+      ;;
+    http://*|https://*) ;;
+    *) echo "repomemo-web: REPOMEMO_WEB_API_URL ($api_url) must start with http:// or https://" >&2; exit 1 ;;
+  esac
+  REPOMEMO_WEB_API_ORIGIN=$(printf '%s' "$api_url" | sed -E 's#^(https?://[^/]+).*#\1#')
+fi
+export REPOMEMO_WEB_API_ORIGIN
+
 if [ -n "$upstream" ]; then
   case "$upstream" in
-    *[!A-Za-z0-9.:/_\[\]-]*)
+    *[!]A-Za-z0-9.:/_[-]*)
       echo "repomemo-web: REPOMEMO_API_UPSTREAM ($upstream) may hold only letters, digits and . : / _ - [ ] (host:port or http(s)://host:port)" >&2
       exit 1
       ;;

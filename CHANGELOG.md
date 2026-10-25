@@ -2,6 +2,31 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.17 (2026-10-25)
+
+The web app and the API can have two addresses.
+
+### Added
+- **Cross-origin mode:** the web image is told the API's address (`REPOMEMO_WEB_API_URL`), hands it to the app through `/config.json` (V0.4.14) and **adds its origin to `connect-src`** of the content security policy it sends. The entrypoint works the origin out when the container starts and refuses a value with a character outside letters, digits and `. : / _ - [ ]` or without `http://` or `https://`. The build's own policy in the page is taken out of the image, since a policy in the page can only narrow the header's.
+- **`REPOMEMO_COOKIE_SAMESITE`:** `strict` (the default), `lax` or `none` for the sign-in cookie. `none` is refused at start unless `REPOMEMO_PUBLIC_URL` is `https://`, since a browser takes `SameSite=None` only with `Secure`. `--check-config` prints it.
+- **A third origin is refused:** under `lax` or `none`, a request that presents the refresh cookie with an `Origin` that is not in `REPOMEMO_ALLOWED_ORIGIN` gets 403 before the token is read; requests with no `Origin` (the console, scripts) are unaffected, and so is the default `strict` mode, where a browser sends the cookie to no other site. The CORS answer already named listed origins only, with credentials.
+- **`scripts/cross-origin-test.mjs`** makes the requests a browser makes from the web app's origin and from a third one against a new server: register (the cookie, not the body), refresh, the third origin's 403, the two preflights and the opening of the live event stream. CI's `cross-origin` job runs it; the `web-image` job now also reads the policy's `connect-src` and that the page carries none.
+
+### Fixed
+- **The web image's entrypoint (V0.4.16) checked its values with a bracket expression that did not close where meant,** so a value was refused or accepted wrongly. It now reads `[!]A-Za-z0-9.:/_[-]`; `container:check` insists on that form.
+
+### Changed
+- **The documents:** the settings reference (two rows), the operations guide, the technical mindmap, the roadmap and the release index.
+- **The version** is `0.4.17` everywhere.
+
+### Checks
+- **Compiled and linted:** `cargo clippy -D warnings` over the server with its tests, `cargo fmt --all --check`, `container:check`, `version:check`, `docs:check`, a syntax check of the entrypoint and a try of its bracket expression on seven values.
+- **Tests written, not run:** server unit tests (the `SameSite` attribute follows the setting; the origin rule under `Strict`, `Lax` and `None`, with and without an `Origin`; the setting's parsing and its https rule). The script and the CI job are the test of the two origins.
+- **Not run:** any image or server; the sign-in through a real browser on two addresses.
+
+### Upgrading
+- Nothing to do. To put the web app elsewhere, follow *Cross-origin mode* in the operations guide.
+
 ## V0.4.16 (2026-10-25)
 
 The web image can forward the API, so one address serves both.
