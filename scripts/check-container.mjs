@@ -143,8 +143,20 @@ const packageName = /^name\s*=\s*"([^"]+)"/m.exec(serverManifest)?.[1];
 if (!packageName || !dockerfile.includes(`-p ${packageName}`) || !dockerfile.includes(`target/release/${packageName}`)) {
   problems.push(`the Dockerfile does not build and copy the server package (${packageName ?? "unknown"})`);
 }
-if (!/ENTRYPOINT \["repomemo-server"\]/.test(dockerfile)) problems.push("the server image does not start repomemo-server");
-if (!/USER\s+repomemo/.test(dockerfile)) problems.push("the server image runs as root");
+// The server image starts the entrypoint (V0.4.10), which fixes the ownership of a volume that belongs to
+// someone else and drops to the unprivileged user before the server runs; it never runs the server as root.
+const entrypoint = read("docker/entrypoint.sh");
+if (!/ENTRYPOINT \["repomemo-entrypoint"\]/.test(dockerfile)) problems.push("the server image does not start repomemo-entrypoint");
+if (!dockerfile.includes("docker/entrypoint.sh")) problems.push("the Dockerfile does not copy docker/entrypoint.sh");
+if (!/exec setpriv --reuid="\$uid" --regid="\$uid" --clear-groups repomemo-server/.test(entrypoint)) problems.push("docker/entrypoint.sh does not drop to the unprivileged user before it runs the server");
+if (!/uid=10001\b/.test(entrypoint) || !/useradd[^\n]*--uid 10001/.test(dockerfile)) problems.push("the entrypoint and the Dockerfile do not name the same unprivileged user (10001)");
+if (!/chown -R/.test(entrypoint)) problems.push("docker/entrypoint.sh does not give a volume to the unprivileged user");
+{
+  const serverStage = dockerfile.slice(dockerfile.indexOf("AS server"), dockerfile.indexOf("AS converter"));
+  if (/^USER\s+(root|0)/m.test(serverStage)) problems.push("the server stage sets USER root; the entrypoint drops the privilege itself");
+}
+if (!/^\s+cap_add:\s*\n(\s+-\s*(CHOWN|DAC_OVERRIDE|FOWNER|SETUID|SETGID)\s*\n)+/m.test(serverBlock ?? "")) problems.push("docker-compose.yml: the server needs CHOWN, DAC_OVERRIDE, FOWNER, SETUID and SETGID for its entrypoint, and no more");
+if (/^\s+-\s*(SYS_ADMIN|NET_ADMIN|NET_RAW|SYS_PTRACE|ALL)\s*$/m.test((serverBlock ?? "").split("cap_add:")[1] ?? "")) problems.push("docker-compose.yml: the server adds a capability beyond its entrypoint's");
 if (/^\s*(ENV|ARG)\s+\S*(SECRET|PASSWORD|TOKEN|JWT)\S*=/im.test(dockerfile)) problems.push("the Dockerfile bakes a secret into an image");
 
 // A change of code does not build the dependencies again (V0.4.7): they are cooked from a recipe in a layer of

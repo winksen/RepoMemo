@@ -2,6 +2,26 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.10 (2026-10-25)
+
+A volume that belongs to root no longer stops the server.
+
+### Fixed
+- **Volumes that belong to someone else:** a bind-mounted folder owned by root (or by whoever made it on the host) used to fail on the first write. The server image now starts `repomemo-entrypoint` (`docker/entrypoint.sh`), which, started as root, gives the data folders to the unprivileged user 10001 when they or something shallow inside them belong to another account, and runs the server as that user (`setpriv`), so the server never runs as root. The stored files are not walked (that would take minutes at every start of a large install). Started as another user (`user:` in compose, `runAsUser` in Kubernetes) it cannot change owners, and refuses with a message naming the folder and the `chown` to run on the host. A folder it cannot change (a share that refuses `chown`) is refused with the reason.
+
+### Changed
+- **The compose file** keeps `cap_drop: ALL` for the server and adds back only `CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETUID` and `SETGID` for the entrypoint; they are gone once the server runs as user 10001, and `no-new-privileges` stays. The Dockerfile's server stage has no `USER` line any more.
+- **`container:check`** insists on the entrypoint, on its drop to the same user the Dockerfile makes, on the `chown`, on those five capabilities and no more, and on no `USER root`.
+- **The documents:** the operations guide, the technical mindmap, the roadmap and the release index.
+- **The version** is `0.4.10` everywhere.
+
+### Checks
+- **Run:** `container:check`, `version:check`, `docs:check`.
+- **Not run:** any image build and both cases of the release's test (a fresh named volume, a root-owned bind mount); they are for the maintainer's hands and for CI once V0.4.26 starts the stack.
+
+### Upgrading
+- Nothing to do for the compose file. If you run the image yourself with `--cap-drop ALL`, add `--cap-add` for the five above, or run it with `--user 10001` on folders that user owns.
+
 ## V0.4.9 (2026-10-25)
 
 Every image says what it is.

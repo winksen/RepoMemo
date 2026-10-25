@@ -70,12 +70,15 @@ RUN apt-get update \
     && chown repomemo:repomemo /var/lib/repomemo /var/lib/repomemo-previews /run/soffice
 COPY --from=build /out/repomemo-server /usr/local/bin/repomemo-server
 COPY --chmod=0755 docker/soffice-wrapper.sh /usr/local/bin/repomemo-soffice-wrapper
+# Starts as root only to give a volume that belongs to someone else to user 10001 and drop to it (V0.4.10).
+COPY --chmod=0755 docker/entrypoint.sh /usr/local/bin/repomemo-entrypoint
 
 # The data folder (the database, the stored files, the key file and the
 # backups) is `workspace-data/` under the working directory. Keep it in a volume.
 WORKDIR /var/lib/repomemo
 VOLUME /var/lib/repomemo
-USER repomemo
+# No USER line: the entrypoint runs as root, fixes the ownership of the data folders and runs the server as
+# user 10001 (repomemo). Started with another user, it only checks that the folders can be written.
 ENV REPOMEMO_SERVER_ADDR=0.0.0.0:3020 \
     REPOMEMO_SERVER_DATA_DIR=main
 EXPOSE 3020
@@ -93,7 +96,7 @@ LABEL org.opencontainers.image.title="repomemo-server" \
       org.opencontainers.image.version="${REPOMEMO_IMAGE_TAG}" \
       org.opencontainers.image.revision="${REPOMEMO_BUILD_COMMIT}" \
       org.opencontainers.image.created="${REPOMEMO_BUILD_DATE}"
-ENTRYPOINT ["repomemo-server"]
+ENTRYPOINT ["repomemo-entrypoint"]
 
 # ---------------------------------------------------------------------------
 # The converter (V0.2.148): LibreOffice and nothing else, for the compose profile `previews`. It listens on a

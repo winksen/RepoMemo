@@ -7,7 +7,8 @@
 # in the `repomemo-data` volume; back it up from System > Backups, as in the
 # production guide (mindmap/technical/operations.md, "Running it in containers").
 #
-# The server runs with a read-only root, no capabilities and no way to gain any. Layout-accurate
+# The server runs with a read-only root, as user 10001 and with no capability once it has started (its entrypoint
+# starts as root only to give a volume that belongs to someone else to that user), and no way to gain any. Layout-accurate
 # Office previews run in the `converter` container, which has no network and sees only the previews
 # volume: turn them on with COMPOSE_PROFILES=previews and REPOMEMO_OFFICE_PREVIEWS=true in .env.
 
@@ -28,8 +29,16 @@ services:
     read_only: true
     tmpfs:
       - /tmp
+    # Starts as root only to fix the ownership of a volume and drop to user 10001 (docker/entrypoint.sh): the few
+    # capabilities that takes, and nothing else; the server itself keeps none.
     cap_drop:
       - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETUID
+      - SETGID
     security_opt:
       - no-new-privileges:true
     environment:
