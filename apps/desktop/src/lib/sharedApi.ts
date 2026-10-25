@@ -107,6 +107,12 @@ export let sharedApiUrl = API_URL;
 let httpFetch: typeof fetch = (input, init) => fetch(input, init);
 let desktopSession = false;
 
+/** Points the web client at the API the host that serves it names (V0.4.14); an empty address is the page's own host. */
+export function configureWebApi(apiUrl: string) {
+  API_URL = apiUrl.replace(/\/$/, "");
+  sharedApiUrl = API_URL;
+}
+
 /**
  * Points this client at a server chosen in the desktop app (V0.2.49). There is no cookie jar there,
  * so the client does not say it is the web app: the server then returns the refresh token in the

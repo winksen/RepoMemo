@@ -2,6 +2,31 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.14 (2026-10-25)
+
+The web app reads its server's address when it starts.
+
+### Added
+- **Runtime configuration of the web app:** before it draws anything, the built web app asks the host that serves it for `/config.json` and reads `apiUrl` (the API's address; empty is the page's own host; absent keeps the address it was built with) and `productName` (the browser tab's title). Only an empty or plain `http(s)` address with no login, query or fragment is taken, and a one-line name of at most 60 characters; anything else is ignored. A host with no such file, or the development server (which answers with the page), leaves the build's own values. The desktop window does not ask: its shell tells it the server.
+- **The build writes a default `config.json`** beside the page with the address it was built for. **The compose file's proxy serves its own** from `REPOMEMO_WEB_API_URL` and `REPOMEMO_PRODUCT_NAME` (new compose settings, in `.env.example`), uncached, so one built image can be given another name or address by its environment alone.
+
+### Changed
+- **`sharedApi`** has `configureWebApi`, the web counterpart of the desktop's `configureDesktopApi`; `main.tsx` starts the app after the configuration is read.
+- **`container:check`** insists on the Caddyfile's `/config.json`, the two settings in the compose file and the build's default file.
+- **The documents:** the settings reference, the operations guide, the technical mindmap, the roadmap and the release index.
+- **The version** is `0.4.14` everywhere.
+
+### Known limit
+- The page's **content security policy** is still the one the build wrote, which allows the page's own host and the address it was built for. A runtime `apiUrl` on another origin is therefore blocked by the browser until the policy is built from the configuration at start (V0.4.17, cross-origin mode). Same-origin use, the default, is unaffected.
+
+### Checks
+- **Run:** `typecheck`, `container:check`, `version:check`, `docs:check`.
+- **Tests written, not run:** seven web tests (`runtimeConfig.test.ts`): valid and refused addresses, the name, non-object files, the loader's missing, failing and non-JSON answers, and the address and title applied.
+- **Not run:** any build of the web app or the images.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.4.13 (2026-10-25)
 
 The images are scanned for known vulnerabilities in CI.

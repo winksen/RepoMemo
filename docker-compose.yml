@@ -113,6 +113,10 @@ services:
         condition: service_healthy
     environment:
       REPOMEMO_HOST: ${REPOMEMO_HOST:-localhost}
+      # What the web app is told when it starts (/config.json): the API's address (empty: this host) and the name
+      # shown in the browser's tab. No quote or backslash in either.
+      REPOMEMO_WEB_API_URL: ${REPOMEMO_WEB_API_URL:-}
+      REPOMEMO_PRODUCT_NAME: ${REPOMEMO_PRODUCT_NAME:-RepoMemo}
     ports:
       - "80:80"
       - "443:443"

@@ -35,6 +35,16 @@
 		}
 	}
 
+	# What the web app is told when it starts (V0.4.14): the API's address (empty: this host) and the name of the
+	# product, from the environment. The values go into JSON as they are, so they must not hold a quote or a
+	# backslash. The content security policy below still allows only this host and the address the app was built
+	# for; another API address needs a policy that names it (V0.4.17).
+	handle /config.json {
+		header Cache-Control "no-store"
+		header Content-Type "application/json"
+		respond `{"apiUrl":"{$REPOMEMO_WEB_API_URL:}","productName":"{$REPOMEMO_PRODUCT_NAME:RepoMemo}"}` 200
+	}
+
 	# The web app, with the content security policy the build wrote.
 	handle {
 		root * /srv/web

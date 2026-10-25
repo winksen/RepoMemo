@@ -32,6 +32,20 @@ function contentSecurityPolicy(apiUrl: string): { meta: string; header: string }
   return { meta, header: `${meta}; frame-ancestors 'none'` };
 }
 
+/**
+ * The `config.json` the host serves beside the built page (V0.4.14), with the address the app was built for:
+ * a host that sets its own (the web image, the proxy of the compose file) replaces it, so one build serves any server.
+ */
+function runtimeConfigPlugin(apiUrl: string): Plugin {
+  return {
+    name: "repomemo-runtime-config",
+    apply: "build",
+    generateBundle() {
+      this.emitFile({ type: "asset", fileName: "config.json", source: `${JSON.stringify({ apiUrl }, null, 2)}\n` });
+    },
+  };
+}
+
 /** Puts the policy in the built page and writes the header value for the host. */
 function contentSecurityPolicyPlugin(apiUrl: string): Plugin {
   const policy = contentSecurityPolicy(apiUrl);
@@ -53,7 +67,7 @@ export default defineConfig(({ mode }) => {
   // An empty address means the API is on the page's own host (the container image); only an unset one falls back.
   const apiUrl = env.VITE_REPOMEMO_API_URL ?? "http://127.0.0.1:3020";
   return {
-    plugins: [react(), contentSecurityPolicyPlugin(apiUrl)],
+    plugins: [react(), contentSecurityPolicyPlugin(apiUrl), runtimeConfigPlugin(apiUrl)],
     clearScreen: false,
     server: {
       strictPort: true,

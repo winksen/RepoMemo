@@ -212,7 +212,7 @@ const walk = (folder) => {
 };
 walk("apps/server/src");
 const sourceText = serverSource.join("\n");
-const composeOnly = new Set(["REPOMEMO_HOST", "REPOMEMO_VERSION", "REPOMEMO_CONVERTER_IMAGE"]);
+const composeOnly = new Set(["REPOMEMO_HOST", "REPOMEMO_VERSION", "REPOMEMO_CONVERTER_IMAGE", "REPOMEMO_WEB_API_URL", "REPOMEMO_PRODUCT_NAME"]);
 const used = new Set([...compose.matchAll(/\b(REPOMEMO_[A-Z0-9_]+)\b/g)].map((match) => match[1]));
 for (const name of used) {
   if (!composeOnly.has(name) && !sourceText.includes(`"${name}"`)) problems.push(`docker-compose.yml sets ${name}, which the server does not read`);
@@ -253,6 +253,13 @@ if (/VITE_REPOMEMO_API_URL\s*\|\|/.test(vite)) problems.push("vite.config.ts tre
 if (!vite.includes("content-security-policy.txt") || !dockerfile.includes("content-security-policy.txt")) problems.push("the content security policy file the build writes is not given to the proxy");
 if (!caddyfile.includes("import /etc/caddy/csp.caddy") || !dockerfile.includes("/etc/caddy/csp.caddy")) problems.push("the Caddyfile and the Dockerfile disagree about the content security policy snippet");
 if (!caddyfile.includes("flush_interval -1")) problems.push("the proxy buffers the live event streams");
+// The web app is told its API address and name when it starts (V0.4.14): the proxy serves /config.json from the environment the compose file gives it.
+for (const name of ["REPOMEMO_WEB_API_URL", "REPOMEMO_PRODUCT_NAME"]) {
+  if (!caddyfile.includes(`{$${name}:`)) problems.push(`the Caddyfile does not read ${name} for /config.json`);
+  if (!compose.includes(`${name}:`)) problems.push(`docker-compose.yml does not give the proxy ${name}`);
+}
+if (!/handle \/config\.json/.test(caddyfile)) problems.push("the Caddyfile does not serve /config.json");
+if (!/vite\.config\.ts/.test("vite.config.ts") || !vite.includes("config.json")) problems.push("the web build does not write a default config.json");
 if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("the Caddyfile does not use REPOMEMO_HOST");
 
 // Nothing private goes into the build context.
