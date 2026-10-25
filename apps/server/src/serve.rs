@@ -13,15 +13,14 @@ use hyper_util::{
 };
 use tokio::net::TcpListener;
 
-/// How long in-flight requests get to finish once shutdown is requested.
-const SHUTDOWN_GRACE: Duration = Duration::from_secs(30);
-
-/// Serves `app` on `listener` until `shutdown` resolves. A zero
-/// `header_read_timeout` leaves header reads unlimited.
+/// Serves `app` on `listener` until `shutdown` resolves; then it stops listening, so no new connection is
+/// taken, and running requests get `grace` to finish (V0.4.6). A zero `header_read_timeout` leaves header
+/// reads unlimited.
 pub async fn serve(
     listener: TcpListener,
     app: Router,
     header_read_timeout: Duration,
+    grace: Duration,
     shutdown: impl Future<Output = ()>,
 ) -> std::io::Result<()> {
     let mut builder = Builder::new(TokioExecutor::new());
@@ -58,10 +57,12 @@ pub async fn serve(
             }
         });
     }
+    // The address stops answering now: a request that arrives from here on is refused by the system.
+    drop(listener);
     tokio::select! {
         _ = graceful.shutdown() => {}
-        _ = tokio::time::sleep(SHUTDOWN_GRACE) => {
-            tracing::warn!("Some connections were still open after the shutdown grace period");
+        _ = tokio::time::sleep(grace) => {
+            tracing::warn!(grace_seconds = grace.as_secs(), "Some connections were still open after the shutdown grace period");
         }
     }
     Ok(())
@@ -78,9 +79,15 @@ mod tests {
         let address = listener.local_addr().unwrap();
         let app = Router::new().route("/ping", axum::routing::get(|| async { "pong" }));
         let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
-        let server = tokio::spawn(serve(listener, app, Duration::from_millis(300), async {
-            let _ = stopped.await;
-        }));
+        let server = tokio::spawn(serve(
+            listener,
+            app,
+            Duration::from_millis(300),
+            Duration::from_secs(5),
+            async {
+                let _ = stopped.await;
+            },
+        ));
 
         // A normal request still works.
         let mut good = tokio::net::TcpStream::connect(address).await.unwrap();

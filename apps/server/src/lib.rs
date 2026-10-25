@@ -197,6 +197,8 @@ struct AppState {
     host: environment::HostHandle,
     /// Set when the environment is being detached: open streams end.
     closing: Arc<std::sync::atomic::AtomicBool>,
+    /// Wakes the open streams when `closing` is set, so a stop does not wait for their next check.
+    closing_signal: Arc<tokio::sync::Notify>,
 }
 
 impl AppState {
@@ -230,6 +232,36 @@ pub struct ReadinessResponse {
 pub async fn router(config: ServerConfig) -> Result<Router> {
     let host = environment::Host::start(config).await?;
     Ok(host.router())
+}
+
+/// A started server that can be stopped cleanly (V0.4.6): `begin_closing` ends the open streams, and once
+/// the connections are done `finish` stops the background work, closes the interrupted jobs and folds the
+/// write-ahead log into the database.
+pub struct RunningServer {
+    host: Arc<environment::Host>,
+}
+
+pub async fn start(config: ServerConfig) -> Result<RunningServer> {
+    Ok(RunningServer {
+        host: environment::Host::start(config).await?,
+    })
+}
+
+impl RunningServer {
+    pub fn router(&self) -> Router {
+        self.host.router()
+    }
+
+    /// Ends the live event streams now instead of at their next check.
+    pub async fn begin_closing(&self) {
+        self.host.begin_closing().await;
+    }
+
+    /// Stops background work, marks the jobs that were running as interrupted (they can be run again) and
+    /// closes the database after folding the write-ahead log back into it.
+    pub async fn finish(self) {
+        self.host.shutdown().await;
+    }
 }
 
 /// Opens storage in `config.data_dir`, recovers from the previous shutdown
@@ -498,6 +530,7 @@ async fn build_state(
         setup,
         host,
         closing: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        closing_signal: Arc::new(tokio::sync::Notify::new()),
     };
     let maintenance_task = maintenance::start(state.clone());
     Ok((state, vec![polling_task, connector_task, maintenance_task, mail_task]))

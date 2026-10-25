@@ -326,6 +326,45 @@ impl Host {
         Ok(())
     }
 
+    /// Ends the open streams of the attached environment; the server is about to stop.
+    pub(crate) async fn begin_closing(&self) {
+        if let Some(attachment) = self.current.read().await.as_ref() {
+            attachment
+                .state
+                .closing
+                .store(true, std::sync::atomic::Ordering::SeqCst);
+            attachment.state.closing_signal.notify_waiters();
+        }
+    }
+
+    /// The end of a clean stop: background work stops, jobs that were running are closed as interrupted
+    /// (the next start would do the same), and the database is closed after the log is folded back.
+    pub(crate) async fn shutdown(&self) {
+        let _switch = self.switching.lock().await;
+        let Some(attachment) = self.current.write().await.take() else {
+            return;
+        };
+        for task in &attachment.tasks {
+            task.abort();
+        }
+        for task in attachment.tasks {
+            let _ = tokio::time::timeout(std::time::Duration::from_secs(5), task).await;
+        }
+        match attachment
+            .state
+            .storage
+            .fail_all_interrupted_jobs("Interrupted by a server stop; run it again.")
+            .await
+        {
+            Ok(0) => {}
+            Ok(count) => tracing::info!(count, "Closed jobs that were still running as interrupted"),
+            Err(error) => tracing::warn!(error = %error, "Could not close the running jobs"),
+        }
+        attachment.state.storage.close().await;
+        crate::logs::stop_file_output();
+        tracing::info!(target: "audit", environment = %attachment.name, "Environment closed for a stop");
+    }
+
     /// The full application: platform routes first, everything else goes to
     /// the attached environment's router.
     pub(crate) fn router(self: &Arc<Self>) -> Router {

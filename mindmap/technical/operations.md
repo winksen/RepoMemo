@@ -236,6 +236,12 @@ By default everything is in the data folder: `repomemo.sqlite` (with its write-a
 - **Moving an existing install:** stop the server, move the database file (and its `-wal` and `-shm` files if any), `blobs/` or `backups/` to the new folder, set the variable, start. A server that finds no database in `REPOMEMO_DB_DIR` starts a new empty one.
 - `repomemo-server --check-config` tries each folder that is set.
 
+### Stopping it cleanly (V0.4.6)
+
+On SIGTERM (what `docker stop`, systemd and Kubernetes send) or Ctrl+C the server, in this order: stops listening, so a new connection is refused by the system; ends the live event streams at once (the browser reconnects to whatever comes next); lets running requests finish for up to `REPOMEMO_SHUTDOWN_GRACE_SECONDS` (30); stops the background work; marks the jobs that were still running as interrupted (*Interrupted by a server stop; run it again*), so none shows progress forever and none is lost; and folds the write-ahead log into the database before closing it, so the next start opens a database that needs no recovery. A kill (SIGKILL, power loss) is still safe for the data (SQLite recovers), but leaves the log to be replayed.
+
+Give the service manager more time than the grace: `stop_grace_period: 45s` in compose (V0.4.28 sets it), `TimeoutStopSec=45` in systemd.
+
 ### The check of the folders at start (V0.4.5)
 
 Before it opens anything, the server looks at every folder it will write to (the data folder and the three of *Splitting the data folder*) and says what is wrong in its **first log line**, which is also printed to standard error:

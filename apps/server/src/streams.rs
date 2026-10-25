@@ -131,6 +131,7 @@ pub(crate) async fn watch_system_event_stream_access(
         let remaining = subject.expires_at.saturating_sub(jsonwebtoken::get_current_timestamp());
         tokio::select! {
             _ = closer.closed() => return,
+            _ = state.closing_signal.notified() => {}
             _ = tokio::time::sleep(EVENT_STREAM_RECHECK.min(Duration::from_secs(remaining))) => {}
         }
         let expired = jsonwebtoken::get_current_timestamp() >= subject.expires_at;
@@ -252,6 +253,7 @@ pub(crate) async fn watch_event_stream_access(
         let remaining = subject.expires_at.saturating_sub(jsonwebtoken::get_current_timestamp());
         tokio::select! {
             _ = closer.closed() => return,
+            _ = state.closing_signal.notified() => {}
             _ = tokio::time::sleep(EVENT_STREAM_RECHECK.min(Duration::from_secs(remaining))) => {}
         }
         let expired = jsonwebtoken::get_current_timestamp() >= subject.expires_at;

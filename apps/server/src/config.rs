@@ -81,6 +81,8 @@ pub struct ServerConfig {
     /// How long a client may take to send its request headers
     /// (`REPOMEMO_HEADER_TIMEOUT_SECONDS`, 0 turns it off).
     pub header_read_timeout: Duration,
+    /// How long running requests get to finish once the server is asked to stop (`REPOMEMO_SHUTDOWN_GRACE_SECONDS`).
+    pub shutdown_grace: Duration,
     /// Event streams one person may hold open at once
     /// (`REPOMEMO_MAX_EVENT_STREAMS_PER_USER`).
     pub max_event_streams_per_user: usize,
@@ -374,6 +376,7 @@ impl ServerConfig {
             max_import_bytes: env_parse::<u64>("REPOMEMO_MAX_IMPORT_MB", 2048)?.clamp(1, 1_048_576) * 1024 * 1024,
             request_timeout: Duration::from_secs(env_parse("REPOMEMO_REQUEST_TIMEOUT_SECONDS", 120)?),
             header_read_timeout: Duration::from_secs(env_parse("REPOMEMO_HEADER_TIMEOUT_SECONDS", 30)?),
+            shutdown_grace: Duration::from_secs(env_parse("REPOMEMO_SHUTDOWN_GRACE_SECONDS", 30)?),
             max_event_streams_per_user: env_parse::<usize>("REPOMEMO_MAX_EVENT_STREAMS_PER_USER", 10)?.clamp(1, 1000),
             index_concurrency: env_parse::<usize>("REPOMEMO_INDEX_CONCURRENCY", 2)?.clamp(1, 16),
             embedding_concurrency: env_parse::<usize>("REPOMEMO_EMBEDDING_CONCURRENCY", 1)?.clamp(1, 8),
@@ -493,6 +496,7 @@ impl ServerConfig {
             max_import_bytes: 64 * 1024 * 1024,
             request_timeout: Duration::from_secs(120),
             header_read_timeout: Duration::from_secs(30),
+            shutdown_grace: Duration::from_secs(5),
             max_event_streams_per_user: 10,
             index_concurrency: 2,
             embedding_concurrency: 1,

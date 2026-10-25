@@ -1,4 +1,4 @@
-use repomemo_server::{init_logging, router, serve, ServerConfig};
+use repomemo_server::{init_logging, serve, ServerConfig};
 use tokio::net::TcpListener;
 use tracing::info;
 
@@ -55,21 +55,29 @@ async fn run() {
     }
     let address = config.bind_address;
     let header_read_timeout = config.header_read_timeout;
+    let shutdown_grace = config.shutdown_grace;
     let listener = TcpListener::bind(address)
         .await
         .expect("failed to bind RepoMemo server address");
 
     info!(%address, "RepoMemo shared-backend foundation is listening");
-    let app = match router(config).await {
-        Ok(app) => app,
+    let server = match repomemo_server::start(config).await {
+        Ok(server) => server,
         Err(error) => {
             eprintln!("RepoMemo could not start: {error:#}");
             std::process::exit(1);
         }
     };
-    serve(listener, app, header_read_timeout, shutdown_signal())
-        .await
-        .expect("RepoMemo server stopped unexpectedly");
+    let app = server.router();
+    // On a stop: the live streams end, running requests finish within the grace, then the work stops,
+    // interrupted jobs are closed and the write-ahead log is folded back (V0.4.6).
+    serve(listener, app, header_read_timeout, shutdown_grace, async {
+        shutdown_signal().await;
+        server.begin_closing().await;
+    })
+    .await
+    .expect("RepoMemo server stopped unexpectedly");
+    server.finish().await;
     info!("RepoMemo server stopped");
 }
 

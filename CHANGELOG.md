@@ -2,6 +2,26 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.6 (2026-10-25)
+
+The server stops cleanly on SIGTERM and Ctrl+C.
+
+### Added
+- **A clean stop, in order:** on SIGTERM or Ctrl+C the server stops listening (a new connection is refused by the system), ends the live event streams at once (they used to be cut at their next check, up to 30 seconds later), lets running requests finish within `REPOMEMO_SHUTDOWN_GRACE_SECONDS` (30; it was a fixed 30), stops the background work, marks the jobs that were still running as interrupted, and folds the write-ahead log into the database before closing it. The next start opens a database that needs no recovery and finds no job running forever.
+- **`repomemo_server::start`** returns a `RunningServer` (`router`, `begin_closing`, `finish`); `router` stays for the tests. The event streams wake on a signal (`closing_signal`) as well as on their timer.
+
+### Changed
+- **`serve`** takes the grace as a parameter.
+- **The documents:** the settings reference (one setting), the operations guide (§4, *Stopping it cleanly*), the technical mindmap, the roadmap and the release index.
+- **The version** is `0.4.6` everywhere.
+
+### Checks
+- **Compiled and linted:** `cargo clippy -D warnings` over the server with its tests, `cargo fmt --all --check`, `version:check`, `docs:check`.
+- **Tests written, not run:** a server test that registers an account, stops cleanly and finds the write-ahead log empty, then starts again on the same folder. `docker stop` itself (the signal, the 10-second default, V0.4.28's `stop_grace_period`) is for the maintainer's hands.
+
+### Upgrading
+- Nothing to do. If a service manager stops the server, give it a wait longer than `REPOMEMO_SHUTDOWN_GRACE_SECONDS`.
+
 ## V0.4.5 (2026-10-25)
 
 A bad data volume is named when the server starts.

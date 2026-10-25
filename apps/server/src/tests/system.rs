@@ -1344,3 +1344,25 @@ async fn organizations_and_local_links_are_for_administrators_until_the_settings
     );
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn a_clean_stop_leaves_a_database_that_needs_no_recovery() {
+    let data_dir = temp_data_dir("clean-stop");
+    let server = crate::start(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let app = server.router();
+    register_account(&app, "stopping@example.com").await;
+
+    server.begin_closing().await;
+    server.finish().await;
+
+    // The write-ahead log was folded into the database and removed on the way out.
+    let wal = data_dir.join("repomemo.sqlite-wal");
+    assert!(
+        std::fs::metadata(&wal).map_or(true, |meta| meta.len() == 0),
+        "the write-ahead log is empty after a clean stop"
+    );
+    // And the next start opens it as it is.
+    let again = crate::start(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    again.finish().await;
+    let _ = std::fs::remove_dir_all(data_dir);
+}
