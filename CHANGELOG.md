@@ -2,6 +2,26 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.13 (2026-10-25)
+
+The images are scanned for known vulnerabilities in CI.
+
+### Added
+- **An `image-scan` job in CI:** it builds the server, the converter and the proxy images and reads each with Trivy 0.75.0, run as a container pinned by digest so that a moving tag cannot change the scanner. A **high or critical** finding that has a fix fails the job once all three have been read (so one report is not hiding another). The JSON and table reports of each image are kept as the `image-scan-reports` artifact.
+- **`.trivyignore`:** the findings that are accepted, each with a reason and a date to look again; empty today.
+
+### Changed
+- **`container:check`** insists on the job, on the scanner's digest, on the severity and the exit code, on the three images and on the kept reports.
+- **The documents:** the operations guide, the technical mindmap, the roadmap and the release index.
+- **The version** is `0.4.13` everywhere.
+
+### Checks
+- **Run:** `container:check`, `version:check`, `docs:check`.
+- **Not run:** any image build or scan, so what the images contain is **not known yet**; the job's first run is the one to read, and it may fail on a finding that needs a decision (a base image to move, or an entry in `.trivyignore`). The release's check, that a known-bad base image fails the job, was not tried.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.4.12 (2026-10-25)
 
 The converter image is built, tagged and tried on its own.

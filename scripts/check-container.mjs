@@ -260,6 +260,22 @@ for (const pattern of [".git", ".env", "workspace-data", "target"]) {
   if (!ignore.split(/\r?\n/).includes(pattern)) problems.push(`.dockerignore does not leave out ${pattern}`);
 }
 
+// The images are scanned in CI (V0.4.13): a scanner container pinned by digest reads the server, the converter and
+// the proxy, a high or critical finding fails the job, and the reports are kept.
+{
+  const job = /^  image-scan:\n([\s\S]*?)(?=^  \S|(?![\s\S]))/m.exec(ci)?.[1] ?? "";
+  if (!job) problems.push(".github/workflows/ci.yml has no image-scan job");
+  else {
+    if (!/TRIVY_IMAGE:\s*\S+@sha256:[0-9a-f]{64}\b/.test(job)) problems.push("the image-scan job's scanner is not pinned by digest");
+    if (!/--severity HIGH,CRITICAL/.test(job) || !/--exit-code 1/.test(job)) problems.push("the image-scan job does not fail on a high or critical finding");
+    for (const name of ["server", "converter", "proxy"]) {
+      if (!new RegExp(String.raw`--target ${name}\b[^\n]*--tag repomemo-${name}:scan`).test(job)) problems.push(`the image-scan job does not build the ${name} image`);
+    }
+    if (!/upload-artifact@/.test(job)) problems.push("the image-scan job does not keep its reports");
+  }
+  if (!existsSync(".trivyignore")) problems.push(".trivyignore is missing (it may be empty)");
+}
+
 // The converter has an image of its own (V0.4.12): its compose service can start a tag given by
 // REPOMEMO_CONVERTER_IMAGE, and CI builds the converter stage alone and starts it as the previews profile does.
 if (!/image:\s*\$\{REPOMEMO_CONVERTER_IMAGE:-repomemo-converter:/.test(converterBlock ?? "")) problems.push("docker-compose.yml: the converter cannot start an image given by REPOMEMO_CONVERTER_IMAGE");

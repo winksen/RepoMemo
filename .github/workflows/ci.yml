@@ -114,6 +114,53 @@ jobs:
         if: always()
         run: docker compose down --volumes
 
+  # The images are scanned (V0.4.13): the server, the converter and the proxy are built and read by Trivy, a container
+  # pinned by digest, for known vulnerabilities in the operating system and in the Rust and npm packages they carry.
+  # A high or critical finding that has a fix fails the job after all three are read; the reports are kept.
+  # `.trivyignore` lists what is accepted, each with a reason.
+  image-scan:
+    name: Image scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      TRIVY_IMAGE: ghcr.io/aquasecurity/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Build the three images
+        run: |
+          docker build --target server --tag repomemo-server:scan .
+          docker build --target converter --tag repomemo-converter:scan .
+          docker build --target proxy --tag repomemo-proxy:scan .
+      - name: Read each image
+        run: |
+          mkdir -p scan-reports
+          failed=0
+          for name in server converter proxy; do
+            docker run --rm \
+              --volume /var/run/docker.sock:/var/run/docker.sock \
+              --volume "$PWD:/work" --workdir /work \
+              "$TRIVY_IMAGE" image \
+              --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 \
+              --ignorefile /work/.trivyignore \
+              --format json --output "/work/scan-reports/$name.json" \
+              "repomemo-$name:scan" || failed=1
+            docker run --rm \
+              --volume /var/run/docker.sock:/var/run/docker.sock \
+              --volume "$PWD:/work" --workdir /work \
+              "$TRIVY_IMAGE" image \
+              --severity HIGH,CRITICAL --ignore-unfixed --ignorefile /work/.trivyignore \
+              --format table --output "/work/scan-reports/$name.txt" \
+              "repomemo-$name:scan" || true
+          done
+          exit "$failed"
+      - name: Keep the reports
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: image-scan-reports
+          path: scan-reports
+          if-no-files-found: warn
+
   # The converter image on its own (V0.4.12): built and tagged without the rest, it must run as the unprivileged
   # user, listen on its socket with no network and a read-only root, and say which LibreOffice it carries.
   converter-image:

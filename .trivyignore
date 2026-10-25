@@ -1,0 +1,2 @@
+# Findings the image scan (CI job `image-scan`, V0.4.13) accepts, one id per line (CVE-2026-0000), each with a
+# reason and a date to look again on the line above it. Empty: every high or critical finding with a fix fails.
