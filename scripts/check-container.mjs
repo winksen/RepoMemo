@@ -287,6 +287,18 @@ for (const pattern of [".git", ".env", "workspace-data", "target"]) {
   if (!/docker build[^\n]*--target webapp\b/.test(ci) || !/--publish 127\.0\.0\.1:8080:8080[\s\S]*--read-only[\s\S]*--cap-drop ALL/.test(ci)) problems.push(".github/workflows/ci.yml has no job that runs the web image alone, read-only and without capabilities");
 }
 
+// Same-origin mode (V0.4.16): the web image forwards /v1 and /health to REPOMEMO_API_UPSTREAM with the live event
+// streams unbuffered, from a snippet its entrypoint writes; CI runs it together with the API.
+{
+  const webCaddy = read("docker/Caddyfile.web");
+  const script = read("docker/web-entrypoint.sh");
+  if (!webCaddy.includes("import /tmp/api.caddy")) problems.push("docker/Caddyfile.web does not take its API rule from /tmp/api.caddy");
+  if (!/flush_interval -1/.test(script) || !/reverse_proxy \$target/.test(script)) problems.push("docker/web-entrypoint.sh does not forward to the upstream with the live event streams unbuffered");
+  if (!script.includes("REPOMEMO_API_UPSTREAM")) problems.push("docker/web-entrypoint.sh does not read REPOMEMO_API_UPSTREAM");
+  if (!/ENTRYPOINT \["repomemo-web-entrypoint"\]/.test(dockerfile) || !dockerfile.includes("docker/web-entrypoint.sh")) problems.push("the web image does not start its entrypoint");
+  if (!/REPOMEMO_API_UPSTREAM=api:3020/.test(ci) || !/http:\/\/127\.0\.0\.1:8080\/health\/ready/.test(ci)) problems.push(".github/workflows/ci.yml has no job that asks the API through the web image");
+}
+
 // The images are scanned in CI (V0.4.13): a scanner container pinned by digest reads the server, the converter and
 // the proxy, a high or critical finding fails the job, and the reports are kept.
 {

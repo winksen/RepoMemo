@@ -35,10 +35,11 @@
 		respond `{"apiUrl":"{$REPOMEMO_WEB_API_URL:}","productName":"{$REPOMEMO_PRODUCT_NAME:RepoMemo}"}` 200
 	}
 
-	# The API is not here. Forwarding to one is V0.4.16 (REPOMEMO_API_UPSTREAM); until then, say so plainly.
+	# The API (V0.4.16, same-origin mode): forwarded to REPOMEMO_API_UPSTREAM when it is set, with the live event
+	# streams unbuffered; otherwise a plain sentence. The entrypoint writes the snippet when the container starts.
 	@api path /v1/* /health /health/*
 	handle @api {
-		respond "This web image has no API behind it." 502
+		import /tmp/api.caddy
 	}
 
 	handle {

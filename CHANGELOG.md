@@ -2,6 +2,27 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.16 (2026-10-25)
+
+The web image can forward the API, so one address serves both.
+
+### Added
+- **Same-origin mode:** the web image (V0.4.15) forwards `/v1/*`, `/health` and `/health/*` to `REPOMEMO_API_UPSTREAM`, which is read when the container starts. The live event streams are not buffered (`flush_interval -1`) and the first byte may take 180 seconds, as in the compose file's proxy. One address then serves the app and the API, and the sign-in cookie stays simple.
+- **`docker/web-entrypoint.sh`,** the image's entrypoint: it takes `host:port` or `http(s)://host:port`, refuses a character outside letters, digits and `. : / _ - [ ]`, a path or a missing port before it reaches the configuration, writes the rule into `/tmp/api.caddy` and starts Caddy. With the variable unset the image serves the app alone and answers 502 on the API paths, saying why.
+- **A CI job, `same-origin`,** builds the server and the web image, runs them on a network with the web image read-only and without capabilities, and asks `/health/ready`, `/health`, an anonymous `/v1/workspaces` (401) and the page through the web image alone.
+
+### Changed
+- **`container:check`** holds the snippet, the unbuffered streams, the entrypoint and the CI job.
+- **The documents:** the operations guide (including that the web image's address belongs in the API's `REPOMEMO_TRUSTED_PROXIES`), the technical mindmap, the roadmap and the release index.
+- **The version** is `0.4.16` everywhere.
+
+### Checks
+- **Run:** `container:check`, `version:check`, `docs:check`, a syntax check of the entrypoint script.
+- **Not run:** any image build or the two containers. The `same-origin` job covers health, refusal and the page; **sign-in, search and live events through the web image** are the release's real test and are for the maintainer's hands now and for V0.4.26's smoke test in CI.
+
+### Upgrading
+- Nothing to do. The compose file still uses the `proxy` image.
+
 ## V0.4.15 (2026-10-25)
 
 The web client is an image of its own.

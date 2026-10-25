@@ -211,6 +211,50 @@ jobs:
         if: always()
         run: docker rm --force web-ci || true
 
+  # The two images together, with nothing between them (V0.4.16): the web image forwards /v1 and /health to the API, so
+  # one address serves the app and the API.
+  same-origin:
+    name: Web and API, same origin
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Build both images
+        run: |
+          docker build --target server --tag repomemo-server:ci .
+          docker build --target webapp --tag repomemo-web:ci .
+      - name: Start the API and the web image on one network
+        run: |
+          docker network create repomemo-ci
+          docker run --detach --name api --network repomemo-ci --env REPOMEMO_SERVER_ADDR=0.0.0.0:3020 --env REPOMEMO_SERVER_DATA_DIR=main \
+            --env REPOMEMO_ALLOW_INSECURE_HTTP=true --env REPOMEMO_ALLOWED_ORIGIN=http://127.0.0.1:8080 \
+            --env "REPOMEMO_JWT_SECRET=$(openssl rand -hex 32)" --env "REPOMEMO_SECRET_KEY=$(openssl rand -hex 32)" repomemo-server:ci
+          docker run --detach --name web --network repomemo-ci --publish 127.0.0.1:8080:8080 --read-only --tmpfs /tmp --cap-drop ALL \
+            --env REPOMEMO_API_UPSTREAM=api:3020 repomemo-web:ci
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:8080/health/ready > /dev/null; then exit 0; fi
+            sleep 2
+          done
+          docker logs api >&2
+          docker logs web >&2
+          exit 1
+      - name: The app, the API and its refusals through the web image alone
+        run: |
+          test "$(curl --fail --silent http://127.0.0.1:8080/health/ready)" = '{"status":"ready","database":"ok"}'
+          curl --fail --silent http://127.0.0.1:8080/health | grep -q '"status":"ok"'
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:8080/v1/workspaces)" = "401"
+          curl --fail --silent http://127.0.0.1:8080/ | grep -qi '<div id="root">'
+      - name: What both logged
+        if: failure()
+        run: |
+          docker logs api
+          docker logs web
+      - name: Clean up
+        if: always()
+        run: |
+          docker rm --force api web || true
+          docker network rm repomemo-ci || true
+
   # The converter image on its own (V0.4.12): built and tagged without the rest, it must run as the unprivileged
   # user, listen on its socket with no network and a read-only root, and say which LibreOffice it carries.
   converter-image:

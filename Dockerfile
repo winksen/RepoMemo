@@ -162,12 +162,14 @@ RUN adduser -S -D -H -u 10001 -h /nonexistent repomemo \
     && apk del libcap-setcap
 COPY --from=web /build/apps/desktop/dist /srv/web
 COPY docker/Caddyfile.web /etc/caddy/Caddyfile
+COPY --chmod=0755 docker/web-entrypoint.sh /usr/local/bin/repomemo-web-entrypoint
 RUN printf 'header ?Content-Security-Policy "%s"\n' "$(cat /srv/web/content-security-policy.txt)" > /etc/caddy/csp.caddy
 ENV XDG_DATA_HOME=/tmp XDG_CONFIG_HOME=/tmp
 USER 10001
 EXPOSE 8080
 HEALTHCHECK --interval=15s --timeout=5s --start-period=5s --retries=3 \
     CMD ["wget", "--quiet", "--output-document=/dev/null", "http://127.0.0.1:8080/healthz"]
+ENTRYPOINT ["repomemo-web-entrypoint"]
 # Labels, last so that a new commit does not rebuild what is above (V0.4.9).
 ARG REPOMEMO_SOURCE_URL=https://github.com/repomemo/repomemo
 ARG REPOMEMO_BUILD_COMMIT=unknown
