@@ -114,6 +114,41 @@ jobs:
         if: always()
         run: docker compose down --volumes
 
+  # The converter image on its own (V0.4.12): built and tagged without the rest, it must run as the unprivileged
+  # user, listen on its socket with no network and a read-only root, and say which LibreOffice it carries.
+  converter-image:
+    name: Converter image
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Build the converter image
+        run: docker build --target converter --tag repomemo-converter:ci .
+      - name: It runs as the unprivileged user and starts the listener
+        run: |
+          test "$(docker image inspect --format '{{.Config.User}}' repomemo-converter:ci)" = "repomemo"
+          docker image inspect --format '{{json .Config.Entrypoint}}' repomemo-converter:ci | grep -q repomemo-soffice-listener
+      - name: It listens on its socket with no network and a read-only root
+        run: |
+          docker run --detach --name converter-ci --network none --read-only --tmpfs /tmp --cap-drop ALL \
+            --security-opt no-new-privileges:true --volume converter-ci-socket:/run/soffice repomemo-converter:ci
+          for attempt in $(seq 1 30); do
+            if docker exec converter-ci test -S /run/soffice/convert.sock; then exit 0; fi
+            sleep 1
+          done
+          docker logs converter-ci >&2
+          echo "the converter never opened its socket" >&2
+          exit 1
+      - name: Which LibreOffice it carries
+        run: |
+          version=$(docker run --rm --network none --entrypoint soffice repomemo-converter:ci --headless --version || true)
+          echo "The converter image carries: $version" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Clean up
+        if: always()
+        run: |
+          docker rm --force converter-ci || true
+          docker volume rm converter-ci-socket || true
+
   # The API on its own (V0.4.11): deploy/api.yml starts the server and its volume with no web client and no proxy,
   # and it must turn healthy and answer `/health/ready` on its published port.
   api-only:

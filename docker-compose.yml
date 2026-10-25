@@ -82,7 +82,8 @@ services:
         REPOMEMO_BUILD_COMMIT: ${REPOMEMO_BUILD_COMMIT:-unknown}
         REPOMEMO_BUILD_DATE: ${REPOMEMO_BUILD_DATE:-unknown}
         REPOMEMO_IMAGE_TAG: ${REPOMEMO_VERSION:-local}
-    image: repomemo-converter:${REPOMEMO_VERSION:-local}
+    # Built here by default; REPOMEMO_CONVERTER_IMAGE starts a converter image of its own instead (V0.4.12).
+    image: ${REPOMEMO_CONVERTER_IMAGE:-repomemo-converter:${REPOMEMO_VERSION:-local}}
     restart: unless-stopped
     init: true
     network_mode: none

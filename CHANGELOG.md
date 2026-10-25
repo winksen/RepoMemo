@@ -2,6 +2,26 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.12 (2026-10-25)
+
+The converter image is built, tagged and tried on its own.
+
+### Added
+- **A CI job for the converter image on its own:** `converter-image` builds the Dockerfile's `converter` stage alone and tagged, checks that it runs as the unprivileged `repomemo` user with the listener as its entrypoint, starts it as the `previews` profile does (no network, a read-only root, every capability dropped, `no-new-privileges`) and waits for its socket, and writes the LibreOffice version it carries into the job summary.
+- **`REPOMEMO_CONVERTER_IMAGE`** (compose, not the server): the converter service starts the image it names (such as `repomemo-converter:0.4.12`) instead of the one built here; unset, nothing changes. V0.4.40 uses it for released images.
+
+### Changed
+- **`container:check`** insists on both: the compose service's `image:` variable and the CI job that starts the converter alone.
+- **The documents:** the operations guide, the technical mindmap, the roadmap and the release index.
+- **The version** is `0.4.12` everywhere.
+
+### Checks
+- **Run:** `container:check`, `version:check`, `docs:check`.
+- **Not run:** any image build; the new CI job is the test and its first run is the one to read (the LibreOffice version it prints is what the server will accept or refuse, 26.2.5 or later).
+
+### Upgrading
+- Nothing to do.
+
 ## V0.4.11 (2026-10-25)
 
 The API can run alone.

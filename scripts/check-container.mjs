@@ -212,7 +212,7 @@ const walk = (folder) => {
 };
 walk("apps/server/src");
 const sourceText = serverSource.join("\n");
-const composeOnly = new Set(["REPOMEMO_HOST", "REPOMEMO_VERSION"]);
+const composeOnly = new Set(["REPOMEMO_HOST", "REPOMEMO_VERSION", "REPOMEMO_CONVERTER_IMAGE"]);
 const used = new Set([...compose.matchAll(/\b(REPOMEMO_[A-Z0-9_]+)\b/g)].map((match) => match[1]));
 for (const name of used) {
   if (!composeOnly.has(name) && !sourceText.includes(`"${name}"`)) problems.push(`docker-compose.yml sets ${name}, which the server does not read`);
@@ -259,6 +259,11 @@ if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("the Caddyfile does not 
 for (const pattern of [".git", ".env", "workspace-data", "target"]) {
   if (!ignore.split(/\r?\n/).includes(pattern)) problems.push(`.dockerignore does not leave out ${pattern}`);
 }
+
+// The converter has an image of its own (V0.4.12): its compose service can start a tag given by
+// REPOMEMO_CONVERTER_IMAGE, and CI builds the converter stage alone and starts it as the previews profile does.
+if (!/image:\s*\$\{REPOMEMO_CONVERTER_IMAGE:-repomemo-converter:/.test(converterBlock ?? "")) problems.push("docker-compose.yml: the converter cannot start an image given by REPOMEMO_CONVERTER_IMAGE");
+if (!/docker build[^\n]*--target converter\b[^\n]*--tag repomemo-converter/.test(ci) || !/--network none[^\n]*--read-only|--read-only[^\n]*--network none/.test(ci.replace(/\\\n\s*/g, " "))) problems.push(".github/workflows/ci.yml has no job that builds the converter image alone and runs it with no network and a read-only root");
 
 // The API on its own (V0.4.11): deploy/api.yml is the server and its volume, one published port on the loopback,
 // no web client and no proxy; it is locked down like the server of the full stack, and CI starts it.
