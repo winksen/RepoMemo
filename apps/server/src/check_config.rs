@@ -100,6 +100,14 @@ pub(crate) fn check_config_report(config: Result<ServerConfig>) -> CheckReport {
     report
         .lines
         .push(format!("sign-in cookie    SameSite={}", config.cookie_same_site));
+    match config.web_dir.as_deref() {
+        Some(dir) => report
+            .lines
+            .push(format!("web app           served from {}", dir.display())),
+        None => report
+            .lines
+            .push("web app           not served by this server".to_owned()),
+    }
     report.lines.push(format!(
         "proxy trusted     {}",
         if config.trust_proxy { "yes" } else { "no" }

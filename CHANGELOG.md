@@ -2,6 +2,27 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.20 (2026-10-25)
+
+The server can serve the web app itself.
+
+### Added
+- **`REPOMEMO_WEB_DIR`:** the absolute path of the built web app, which the server then serves itself, for a single-process install: one program, one port, no web server in front. Off by default; the folder must hold an `index.html`. Everything under `/v1/` and `/health` stays the API's. Any other path is a file of the folder, or the page for a client route; a missing file with an extension is a 404 and not the page. Hashed files under `/assets/` are cached for a year and the rest revalidates; the page carries the security headers (`nosniff`, `X-Frame-Options: DENY`, no referrer, HSTS behind an https public address) and the content security policy the build wrote. Only `GET` and `HEAD` are answered.
+- **`/config.json` is made by the server** in that mode: the API is this host (`apiUrl` empty) and `productName` is the new **`REPOMEMO_PRODUCT_NAME`** (one line, 60 characters or fewer, no quote or backslash). `--check-config` says whether the web app is served.
+- **`web_files.rs`:** the path rules (no `..`, backslash, NUL or drive; a link out of the folder names nothing), the media types and the answer.
+
+### Changed
+- **The documents:** the settings reference (two rows), the operations guide, the technical mindmap, the roadmap and the release index.
+- **The version** is `0.4.20` everywhere.
+
+### Checks
+- **Compiled and linted:** `cargo clippy -D warnings` over the server with its tests, `cargo fmt --all --check`, `version:check`, `docs:check`.
+- **Tests written, not run:** four unit tests (the API's paths, the files found and the paths refused, the config for this host, the media types) and a server test that serves a page, a client route, a hashed file, a missing file, `/config.json` and still answers `/v1` and `/health/ready`.
+- **Not run:** the server with a real build of the web app on one port (the release's check, for the maintainer's hands).
+
+### Upgrading
+- Nothing to do. The feature is off until `REPOMEMO_WEB_DIR` is set.
+
 ## V0.4.19 (2026-10-25)
 
 Sample front doors for nginx and Traefik.

@@ -187,6 +187,10 @@ pub struct ServerConfig {
     /// The one-time code the onboarding asks for; generated and printed on
     /// the console at startup when unset.
     pub setup_code: Option<String>,
+    /// The built web app the server serves itself (`REPOMEMO_WEB_DIR`, V0.4.20); `None` serves none.
+    pub web_dir: Option<PathBuf>,
+    /// The name `/config.json` gives the page when the server serves it (`REPOMEMO_PRODUCT_NAME`).
+    pub product_name: String,
 }
 
 impl ServerConfig {
@@ -215,6 +219,20 @@ impl ServerConfig {
         let db_dir = env_folder("REPOMEMO_DB_DIR")?;
         let blob_dir = env_folder("REPOMEMO_BLOB_DIR")?;
         let backup_dir = env_folder("REPOMEMO_BACKUP_DIR")?;
+        let web_dir = env_folder("REPOMEMO_WEB_DIR")?;
+        if let Some(dir) = &web_dir {
+            if !dir.join("index.html").is_file() {
+                bail!("REPOMEMO_WEB_DIR ({}) has no index.html; build the web app (npm run build) and give the dist folder", dir.display());
+            }
+        }
+        let product_name = env_text("REPOMEMO_PRODUCT_NAME").unwrap_or_else(|| "RepoMemo".to_owned());
+        if product_name.chars().count() > 60
+            || product_name
+                .chars()
+                .any(|character| character.is_control() || character == '"' || character == '\\')
+        {
+            bail!("REPOMEMO_PRODUCT_NAME must be one line of 60 characters or fewer, with no quote or backslash");
+        }
         if data_dir.is_none() && (db_dir.is_some() || blob_dir.is_some() || backup_dir.is_some()) {
             bail!("REPOMEMO_DB_DIR, REPOMEMO_BLOB_DIR and REPOMEMO_BACKUP_DIR belong to one environment, so REPOMEMO_SERVER_DATA_DIR must be set too");
         }
@@ -458,6 +476,8 @@ impl ServerConfig {
             system_audit_retention_days: env_parse("REPOMEMO_SYSTEM_AUDIT_RETENTION_DAYS", 365)?,
             logging: LogSettings::from_env()?,
             setup_wizard: env_flag("REPOMEMO_SETUP_WIZARD", true)?,
+            web_dir,
+            product_name,
             setup_code: match env_secret("REPOMEMO_SETUP_CODE")? {
                 Some(code) if code.chars().filter(char::is_ascii_alphanumeric).count() < 12 => {
                     bail!("REPOMEMO_SETUP_CODE must contain at least 12 letters or digits")
@@ -553,6 +573,8 @@ impl ServerConfig {
             // Tests register accounts directly; the onboarding has its own tests.
             setup_wizard: false,
             setup_code: None,
+            web_dir: None,
+            product_name: "RepoMemo".to_owned(),
         }
     }
 }

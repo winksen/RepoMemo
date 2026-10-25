@@ -608,6 +608,13 @@ async fn attach(
 
 /// Everything else: the attached environment answers, or none is attached.
 async fn delegate(State(host): State<Arc<Host>>, request: Request) -> Response {
+    // With a web folder (V0.4.20) the server is also the web host: what the API does not answer is the page.
+    if let Some(root) = host.config.web_dir.as_deref() {
+        if !crate::web_files::is_api_path(request.uri().path()) {
+            let (method, path) = (request.method().clone(), request.uri().path().to_owned());
+            return crate::web_files::respond(&host.config, root, method, path).await;
+        }
+    }
     let router = host
         .current
         .read()

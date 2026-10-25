@@ -1346,6 +1346,51 @@ async fn organizations_and_local_links_are_for_administrators_until_the_settings
 }
 
 #[tokio::test]
+async fn the_server_can_serve_the_web_app_itself() {
+    let data_dir = temp_data_dir("web-dir");
+    let web = temp_data_dir("web-files");
+    std::fs::create_dir_all(web.join("assets")).unwrap();
+    std::fs::write(web.join("index.html"), "<div id=\"root\"></div>").unwrap();
+    std::fs::write(web.join("assets").join("app-1.js"), "1").unwrap();
+    std::fs::write(web.join("content-security-policy.txt"), "default-src 'self'").unwrap();
+    let mut config = ServerConfig::for_test(data_dir.clone());
+    config.web_dir = Some(web.clone());
+    let app = router(config).await.unwrap();
+    let get = |uri: &str| {
+        let app = app.clone();
+        let request = Request::builder().uri(uri).body(Body::empty()).unwrap();
+        async move { app.oneshot(request).await.unwrap() }
+    };
+
+    let page = get("/").await;
+    assert_eq!(page.status(), 200);
+    assert_eq!(page.headers()["cache-control"], "no-cache");
+    assert_eq!(page.headers()["x-content-type-options"], "nosniff");
+    assert_eq!(page.headers()["content-security-policy"], "default-src 'self'");
+    assert_eq!(
+        get("/workspaces/anything/here").await.status(),
+        200,
+        "a client route gets the page"
+    );
+    let asset = get("/assets/app-1.js").await;
+    assert_eq!(asset.headers()["cache-control"], "public, max-age=31536000, immutable");
+    assert_eq!(get("/assets/missing.js").await.status(), 404);
+    assert_eq!(
+        get("/%2e%2e/secret").await.status(),
+        200,
+        "an encoded dot path is only a client route"
+    );
+    let config_json = response_json(get("/config.json").await).await;
+    assert_eq!(config_json["apiUrl"], "");
+    // The API still answers its own paths.
+    assert_eq!(get("/v1/workspaces").await.status(), 401);
+    assert_eq!(get("/health/ready").await.status(), 200);
+
+    let _ = std::fs::remove_dir_all(web);
+    let _ = std::fs::remove_dir_all(data_dir);
+}
+
+#[tokio::test]
 async fn a_clean_stop_leaves_a_database_that_needs_no_recovery() {
     let data_dir = temp_data_dir("clean-stop");
     let server = crate::start(ServerConfig::for_test(data_dir.clone())).await.unwrap();

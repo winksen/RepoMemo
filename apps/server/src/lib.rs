@@ -45,6 +45,7 @@ mod streams;
 mod system;
 mod templates;
 mod verification;
+mod web_files;
 mod web_session;
 mod webhooks;
 mod workspace_export;
