@@ -2,6 +2,27 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.11 (2026-10-25)
+
+The API can run alone.
+
+### Added
+- **`deploy/api.yml`:** a compose file with the server and its volume and nothing else: no web client, no proxy, and one port published on the machine's loopback (`REPOMEMO_API_PORT`, 3020). It takes the same two secrets, builds the same server image with the same build arguments, is locked down like the full stack's server (read-only root, `cap_drop: ALL` with the five of V0.4.10, `no-new-privileges`) and expects the front door of the person who runs it: `REPOMEMO_PUBLIC_URL` (the address people use), `REPOMEMO_ALLOWED_ORIGIN` (the web client's origin, the public URL by default) and `REPOMEMO_TRUSTED_PROXIES`. Start it with `docker compose -f deploy/api.yml --env-file .env up -d --build --wait`.
+- **A CI job, `api-only`,** starts it with throwaway secrets, waits for it to be healthy, asks `http://127.0.0.1:3020/health/ready`, checks that the server is the only service and takes it down.
+
+### Changed
+- **`container:check`** reads `deploy/api.yml`: the server alone, its image, the lock-down, one published port on the loopback, no web or proxy service, only variables the server reads, the two required secrets, and the CI job.
+- **`.env.example`** names the three variables that only this file uses.
+- **The documents:** the operations guide, the technical mindmap, the roadmap and the release index.
+- **The version** is `0.4.11` everywhere.
+
+### Checks
+- **Run:** `container:check`, `version:check`, `docs:check`.
+- **Not run:** the stack itself. The `api-only` job is the test and the maintainer's first run of it is the one to read (nested defaults such as `${A:-${B:-c}}` need a current Docker Compose).
+
+### Upgrading
+- Nothing to do. The full stack is unchanged.
+
 ## V0.4.10 (2026-10-25)
 
 A volume that belongs to root no longer stops the server.

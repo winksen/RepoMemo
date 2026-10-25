@@ -260,6 +260,24 @@ for (const pattern of [".git", ".env", "workspace-data", "target"]) {
   if (!ignore.split(/\r?\n/).includes(pattern)) problems.push(`.dockerignore does not leave out ${pattern}`);
 }
 
+// The API on its own (V0.4.11): deploy/api.yml is the server and its volume, one published port on the loopback,
+// no web client and no proxy; it is locked down like the server of the full stack, and CI starts it.
+{
+  const api = read("deploy/api.yml");
+  const declared = api.slice(api.indexOf("\nservices:"), api.indexOf("\nvolumes:"));
+  const names = [...declared.matchAll(/^  ([a-z][\w-]*):\s*$/gm)].map((match) => match[1]);
+  if (names.length !== 1 || names[0] !== "server") problems.push(`deploy/api.yml should hold the server alone, not ${names.join(", ") || "nothing"}`);
+  if (!/target:\s*server\b/.test(api)) problems.push("deploy/api.yml does not build the server image");
+  if (!/^\s+read_only:\s*true\s*$/m.test(api) || !/^\s+cap_drop:\s*\n\s+-\s*ALL\s*$/m.test(api) || !/no-new-privileges:true/.test(api)) problems.push("deploy/api.yml does not lock the server down like docker-compose.yml");
+  if ((api.match(/^\s+ports:\s*$/gm) ?? []).length !== 1 || (api.match(/^\s+-\s*"127\.0\.0\.1:/gm) ?? []).length !== 1) problems.push("deploy/api.yml should publish one port, on the loopback");
+  if (/\b(proxy|web|caddy)\b:/.test(declared)) problems.push("deploy/api.yml carries a web client or a proxy");
+  for (const match of api.matchAll(/^\s+(REPOMEMO_[A-Z0-9_]+):/gm)) {
+    if (!sourceText.includes(`"${match[1]}"`)) problems.push(`deploy/api.yml sets ${match[1]}, which the server does not read`);
+  }
+  if (!/REPOMEMO_JWT_SECRET:\s*\$\{REPOMEMO_JWT_SECRET:\?/.test(api) || !/REPOMEMO_SECRET_KEY:\s*\$\{REPOMEMO_SECRET_KEY:\?/.test(api)) problems.push("deploy/api.yml does not require the two secrets");
+  if (!/docker compose -f deploy\/api\.yml[^\n]*up\b[^\n]*--wait\b/.test(ci) || !/curl[^\n]*127\.0\.0\.1:3020\/health\/ready/.test(ci)) problems.push(".github/workflows/ci.yml does not start deploy/api.yml and ask /health/ready on its port");
+}
+
 if (problems.length) {
   console.error(`The container files have ${problems.length} problem${problems.length === 1 ? "" : "s"}:`);
   for (const problem of problems) console.error(` - ${problem}`);

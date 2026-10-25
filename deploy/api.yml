@@ -1,0 +1,65 @@
+# RepoMemo's API alone (V0.4.11): the server and its volume, one published port, no web client and no proxy.
+# For people who bring their own front: an nginx or Traefik of theirs, a load balancer, or a web client served
+# from somewhere else. The guide is mindmap/technical/operations.md, "Running it in containers".
+#
+#   cp .env.example .env     # fill in the secrets; set REPOMEMO_PUBLIC_URL to the address people will use
+#   docker compose -f deploy/api.yml --env-file .env up -d --build --wait
+#   curl http://127.0.0.1:3020/health/ready
+#
+# The port is published on this machine's loopback only. Put your front door in front of it, send it
+# `X-Forwarded-For`, and list its address in REPOMEMO_TRUSTED_PROXIES (loopback is believed already).
+# The server speaks plain HTTP: the TLS is your front door's. The web client is not here; see
+# docker-compose.yml for the pair, or deploy a web app of your own and list its origin in REPOMEMO_ALLOWED_ORIGIN.
+
+name: repomemo-api
+
+services:
+  server:
+    build:
+      context: ..
+      target: server
+      args:
+        REPOMEMO_BUILD_COMMIT: ${REPOMEMO_BUILD_COMMIT:-unknown}
+        REPOMEMO_BUILD_DATE: ${REPOMEMO_BUILD_DATE:-unknown}
+        REPOMEMO_IMAGE_TAG: ${REPOMEMO_VERSION:-local}
+    image: repomemo-server:${REPOMEMO_VERSION:-local}
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    # Starts as root only to give a volume that belongs to someone else to user 10001 (docker/entrypoint.sh).
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETUID
+      - SETGID
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      REPOMEMO_SERVER_ADDR: 0.0.0.0:3020
+      REPOMEMO_SERVER_DATA_DIR: main
+      # The address people use, behind your front door; it turns on HSTS and secure cookies.
+      REPOMEMO_PUBLIC_URL: ${REPOMEMO_PUBLIC_URL:-https://localhost}
+      # The browsers' origins that may call the API: the web client's address (the same by default).
+      REPOMEMO_ALLOWED_ORIGIN: ${REPOMEMO_ALLOWED_ORIGIN:-${REPOMEMO_PUBLIC_URL:-https://localhost}}
+      # Client addresses are read from the front door's headers; list its address when it is not on loopback.
+      REPOMEMO_TRUST_PROXY: "true"
+      REPOMEMO_TRUSTED_PROXIES: ${REPOMEMO_TRUSTED_PROXIES:-}
+      REPOMEMO_JWT_SECRET: ${REPOMEMO_JWT_SECRET:?Set REPOMEMO_JWT_SECRET in .env (32 or more random characters)}
+      REPOMEMO_SECRET_KEY: ${REPOMEMO_SECRET_KEY:?Set REPOMEMO_SECRET_KEY in .env (32 or more random characters)}
+      REPOMEMO_SETUP_CODE: ${REPOMEMO_SETUP_CODE:-}
+      REPOMEMO_SYSTEM_ADMIN_EMAILS: ${REPOMEMO_SYSTEM_ADMIN_EMAILS:-}
+      REPOMEMO_BACKUP_INTERVAL_HOURS: ${REPOMEMO_BACKUP_INTERVAL_HOURS:-24}
+      REPOMEMO_BACKUP_KEY: ${REPOMEMO_BACKUP_KEY:-}
+      REPOMEMO_BACKUP_KEY_PREVIOUS: ${REPOMEMO_BACKUP_KEY_PREVIOUS:-}
+    ports:
+      - "127.0.0.1:${REPOMEMO_API_PORT:-3020}:3020"
+    volumes:
+      - repomemo-data:/var/lib/repomemo
+
+volumes:
+  repomemo-data:

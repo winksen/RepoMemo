@@ -114,6 +114,33 @@ jobs:
         if: always()
         run: docker compose down --volumes
 
+  # The API on its own (V0.4.11): deploy/api.yml starts the server and its volume with no web client and no proxy,
+  # and it must turn healthy and answer `/health/ready` on its published port.
+  api-only:
+    name: API alone
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: A .env with throwaway secrets
+        run: |
+          {
+            echo "REPOMEMO_JWT_SECRET=$(openssl rand -hex 32)"
+            echo "REPOMEMO_SECRET_KEY=$(openssl rand -hex 32)"
+          } > .env
+      - name: Build and start the API
+        run: docker compose -f deploy/api.yml --env-file .env up --build --detach --wait --wait-timeout 900
+      - name: The API answers ready on its own port
+        run: curl --fail --silent --show-error http://127.0.0.1:3020/health/ready
+      - name: Nothing else runs
+        run: test "$(docker compose -f deploy/api.yml --env-file .env ps --services | tr '\n' ' ')" = "server "
+      - name: What the API logged
+        if: failure()
+        run: docker compose -f deploy/api.yml --env-file .env logs --no-color --tail 200
+      - name: Stop the API
+        if: always()
+        run: docker compose -f deploy/api.yml --env-file .env down --volumes
+
   # The server image builds its dependencies in a layer of their own (V0.4.7). The image is built twice on a
   # clean runner: once whole, then after a change of code only. The second build must reuse the layer of
   # dependencies and take well under the first; both times are written to the job's summary.
