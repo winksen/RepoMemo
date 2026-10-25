@@ -326,6 +326,40 @@ jobs:
           docker rm --force converter-ci || true
           docker volume rm converter-ci-socket || true
 
+  # The upgrade script (V0.4.24): a good tag is run, a broken one ends on the old version, running.
+  upgrade-script:
+    name: Upgrade script
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: An install on version ci1
+        run: |
+          sh deploy/init.sh --no-edge
+          echo "REPOMEMO_VERSION=ci1" >> .env
+          docker compose up --build --detach --wait --wait-timeout 900
+          curl --fail --silent http://127.0.0.1:8080/health | grep -q '"image":"ci1"'
+      - name: A tag that does not exist ends on the old version, running
+        run: |
+          if sh deploy/upgrade.sh --version broken --no-build --no-backup --timeout 120; then echo "the broken tag should have failed" >&2; exit 1; fi
+          grep -q '^REPOMEMO_VERSION=ci1$' .env
+          curl --fail --silent http://127.0.0.1:8080/health | grep -q '"image":"ci1"'
+      - name: A good tag is run
+        run: |
+          sh deploy/upgrade.sh --version ci2 --no-backup
+          grep -q '^REPOMEMO_VERSION=ci2$' .env
+          curl --fail --silent http://127.0.0.1:8080/health | grep -q '"image":"ci2"'
+      - name: Without a token or --no-backup it stops before touching anything
+        run: |
+          if sh deploy/upgrade.sh --version ci3; then echo "it should have asked for a backup" >&2; exit 1; fi
+          grep -q '^REPOMEMO_VERSION=ci2$' .env
+      - name: What the stack logged
+        if: failure()
+        run: docker compose logs --no-color --tail 200
+      - name: Stop the stack
+        if: always()
+        run: docker compose down --volumes
+
   # The script that makes a .env (V0.4.23), in shell and in PowerShell: strong secrets, the host name, the edge profile, and it
   # refuses to overwrite a file. The result must be a file Docker Compose accepts.
   init-scripts:

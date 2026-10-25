@@ -2,6 +2,27 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.24 (2026-10-25)
+
+An upgrade script that comes back to the old version when the new one fails.
+
+### Added
+- **`deploy/upgrade.sh --version TAG`:** upgrades a container install in four steps. (1) **A backup through the API**: a personal access token of the `system` scope (`REPOMEMO_UPGRADE_TOKEN` or `--token-file`) makes the server back itself up, and the script waits for it to succeed; without a token it stops unless `--no-backup` says there is a backup of one's own. (2) Only then **`REPOMEMO_VERSION` in `.env`** is set to the tag. (3) The images are pulled where they can be (`--ignore-buildable`) and the stack is restarted with `docker compose up --wait`; then `/health/ready` is asked at the web image's loopback port. (4) If the new version does not turn healthy, the script prints the last log lines, **puts the old tag back in `.env` and starts the old images again** (no build), and exits 1.
+- **It never deletes a volume,** and changes nothing before the backup is made. `--no-build` runs only images that exist or can be pulled, which is how a released tag is run once V0.4.40 publishes them; `--env-file`, `--url` and `--timeout` adjust it.
+- **A CI job, `upgrade-script`,** installs on a tag `ci1`, runs the script with a tag that does not exist (it must exit 1 and leave `ci1` running, `/health` saying so through its `image`), runs a good one (`ci2`), and checks that without a token or `--no-backup` it stops before touching `.env`.
+
+### Changed
+- **`container:check`** holds the backup through the API, the wait, the way back, no deletion, and that the backup comes before the change of `.env`.
+- **The documents:** the operations guide, the technical mindmap, the roadmap and the release index.
+- **The version** is `0.4.24` everywhere.
+
+### Checks
+- **Run:** a syntax check and the argument handling of the script (no tag, a bad tag, `--help`), `container:check`, `version:check`, `docs:check`.
+- **Not run:** the script against a stack. The `upgrade-script` job is the test; the backup through the API (a token, the polling of its status) is not in it and is for the maintainer's hands.
+
+### Upgrading
+- Nothing to do. The script is for the upgrades from here on; a 0.3.x install moves volumes first (V0.4.22).
+
 ## V0.4.23 (2026-10-25)
 
 One command makes a working .env.

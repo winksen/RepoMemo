@@ -266,6 +266,18 @@ for (const name of ["REPOMEMO_WEB_API_URL", "REPOMEMO_PRODUCT_NAME"]) {
 if (!/handle \/config\.json/.test(webCaddyfile)) problems.push("docker/Caddyfile.web does not serve /config.json");
 if (!/vite\.config\.ts/.test("vite.config.ts") || !vite.includes("config.json")) problems.push("the web build does not write a default config.json");
 if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge does not use REPOMEMO_HOST");
+// The upgrade script (V0.4.24): a backup through the API first, a wait until healthy, the old version put back, and
+// no volume ever deleted.
+{
+  const upgrade = read("deploy/upgrade.sh");
+  if (!upgrade.includes("/v1/system/backups")) problems.push("deploy/upgrade.sh does not make its backup through the API");
+  if (!/--wait\b/.test(upgrade) || !/wait_ready/.test(upgrade)) problems.push("deploy/upgrade.sh does not wait for the services to be healthy");
+  if (!/set_version "\$old"/.test(upgrade)) problems.push("deploy/upgrade.sh does not put the old version back when the new one does not turn healthy");
+  if (/\bdown\b[^\n]*(-v|--volumes)|volume rm|volume prune|rm -rf/.test(upgrade.replace(/#[^\n]*/g, ""))) problems.push("deploy/upgrade.sh can delete data; it must never remove a volume");
+  if (upgrade.indexOf("make a backup") > upgrade.indexOf('set_version "$version"') || !upgrade.includes('echo "upgrade: making a backup"')) problems.push("deploy/upgrade.sh changes .env before the backup");
+  if (!/^  upgrade-script:/m.test(ci) || !/upgrade\.sh --version broken/.test(ci)) problems.push(".github/workflows/ci.yml does not try the upgrade script with a broken tag");
+}
+
 // The scripts that make a .env (V0.4.23): shell and PowerShell, strong secrets, never an overwrite, and tried in CI.
 {
   const sh = read("deploy/init.sh");
