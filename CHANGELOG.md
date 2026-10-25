@@ -2,6 +2,28 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.15 (2026-10-25)
+
+The web client is an image of its own.
+
+### Added
+- **`repomemo-web`:** a `webapp` stage in the Dockerfile (`docker build --target webapp`) and `docker/Caddyfile.web`. The built web app behind Caddy over **plain HTTP on port 8080**, with no API, no certificate and no database to start. It runs as the unprivileged user 10001 with Caddy's file capability removed, so it runs read-only and with every capability dropped.
+- **What it serves:** the app with the single-page fallback; hashed files under `/assets/` with `Cache-Control: public, max-age=31536000, immutable` and the page itself with `no-cache`; zstd and gzip; the content security policy the build wrote and `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer` and a restrictive `Permissions-Policy`, with no `Server` header; `/config.json` from `REPOMEMO_WEB_API_URL` and `REPOMEMO_PRODUCT_NAME`; and `/healthz`, its health check. `/v1` and `/health` answer 502 with a plain sentence until V0.4.16 forwards them.
+- **The image has the same labels** as the others and is read by the image scan of V0.4.13.
+- **A CI job, `web-image`,** builds it and runs it alone, read-only and without capabilities, with the two settings in its environment, and reads the page, the fallback, the headers, a hashed file's cache header, `/config.json`, compression and `/healthz`.
+
+### Changed
+- **`container:check`** holds the Caddyfile's promises, the unprivileged user, the health check and the CI job; the label rule covers the fourth image. `.gitattributes` keeps the new Caddyfile on LF.
+- **The documents:** the operations guide, the technical mindmap, the roadmap and the release index.
+- **The version** is `0.4.15` everywhere.
+
+### Checks
+- **Run:** `container:check`, `version:check`, `docs:check`.
+- **Not run:** any image build; the `web-image` job is the test, and the first run is the one to read (Caddy's `setcap -r`, the `wget` health check and the header names in particular).
+
+### Upgrading
+- Nothing to do. The compose file still uses the `proxy` image; V0.4.22 builds it around the two.
+
 ## V0.4.14 (2026-10-25)
 
 The web app reads its server's address when it starts.

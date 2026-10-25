@@ -131,11 +131,12 @@ jobs:
           docker build --target server --tag repomemo-server:scan .
           docker build --target converter --tag repomemo-converter:scan .
           docker build --target proxy --tag repomemo-proxy:scan .
+          docker build --target webapp --tag repomemo-web:scan .
       - name: Read each image
         run: |
           mkdir -p scan-reports
           failed=0
-          for name in server converter proxy; do
+          for name in server converter proxy web; do
             docker run --rm \
               --volume /var/run/docker.sock:/var/run/docker.sock \
               --volume "$PWD:/work" --workdir /work \
@@ -160,6 +161,55 @@ jobs:
           name: image-scan-reports
           path: scan-reports
           if-no-files-found: warn
+
+  # The web client on its own (V0.4.15): the image runs without the API, read-only and with every capability dropped,
+  # and serves the app with the right headers, the single-page fallback, the runtime configuration and its health route.
+  web-image:
+    name: Web image
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Build the web image
+        run: docker build --target webapp --tag repomemo-web:ci .
+      - name: Start it alone
+        run: |
+          docker run --detach --name web-ci --publish 127.0.0.1:8080:8080 --read-only --tmpfs /tmp --cap-drop ALL \
+            --security-opt no-new-privileges:true \
+            --env REPOMEMO_WEB_API_URL=https://api.example.com --env "REPOMEMO_PRODUCT_NAME=Acme Memo" repomemo-web:ci
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8080/healthz > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          docker logs web-ci >&2
+          exit 1
+      - name: The app, the fallback and the headers
+        run: |
+          curl --fail --silent --dump-header page.headers --output page.html http://127.0.0.1:8080/
+          grep -qi '<div id="root">' page.html
+          grep -qi '^cache-control: no-cache' page.headers
+          grep -qi '^content-security-policy: ' page.headers
+          grep -qi '^x-content-type-options: nosniff' page.headers
+          grep -qi '^x-frame-options: DENY' page.headers
+          ! grep -qi '^server: ' page.headers
+          curl --fail --silent http://127.0.0.1:8080/workspaces/anything/here | grep -qi '<div id="root">'
+      - name: Hashed files are cached for a year
+        run: |
+          asset=$(grep -o '/assets/[^"]*\.js' page.html | head -1)
+          test -n "$asset"
+          curl --fail --silent --dump-header asset.headers --output /dev/null "http://127.0.0.1:8080$asset"
+          grep -qi '^cache-control: public, max-age=31536000, immutable' asset.headers
+      - name: It tells the app its server and name from the environment
+        run: |
+          test "$(curl --fail --silent http://127.0.0.1:8080/config.json)" = '{"apiUrl":"https://api.example.com","productName":"Acme Memo"}'
+      - name: Compression
+        run: curl --fail --silent --header 'Accept-Encoding: gzip' --dump-header gz.headers --output /dev/null http://127.0.0.1:8080/ && grep -qi '^content-encoding: ' gz.headers
+      - name: What the web image logged
+        if: failure()
+        run: docker logs web-ci
+      - name: Clean up
+        if: always()
+        run: docker rm --force web-ci || true
 
   # The converter image on its own (V0.4.12): built and tagged without the rest, it must run as the unprivileged
   # user, listen on its socket with no network and a read-only root, and say which LibreOffice it carries.

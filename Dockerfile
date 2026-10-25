@@ -149,3 +149,34 @@ LABEL org.opencontainers.image.title="repomemo-proxy" \
       org.opencontainers.image.version="${REPOMEMO_IMAGE_TAG}" \
       org.opencontainers.image.revision="${REPOMEMO_BUILD_COMMIT}" \
       org.opencontainers.image.created="${REPOMEMO_BUILD_DATE}"
+
+# ---------------------------------------------------------------------------
+# The web client on its own (V0.4.15): the built app behind a small static server, over plain HTTP on 8080, with
+# no API and no TLS. A front door brings the certificate; REPOMEMO_WEB_API_URL and REPOMEMO_PRODUCT_NAME say
+# what the app is told when it starts (/config.json). Caddy's file capability is taken off so that the image
+# also runs with every capability dropped.
+FROM caddy:2-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f AS webapp
+RUN adduser -S -D -H -u 10001 -h /nonexistent repomemo \
+    && apk add --no-cache libcap-setcap \
+    && (setcap -r /usr/bin/caddy || true) \
+    && apk del libcap-setcap
+COPY --from=web /build/apps/desktop/dist /srv/web
+COPY docker/Caddyfile.web /etc/caddy/Caddyfile
+RUN printf 'header ?Content-Security-Policy "%s"\n' "$(cat /srv/web/content-security-policy.txt)" > /etc/caddy/csp.caddy
+ENV XDG_DATA_HOME=/tmp XDG_CONFIG_HOME=/tmp
+USER 10001
+EXPOSE 8080
+HEALTHCHECK --interval=15s --timeout=5s --start-period=5s --retries=3 \
+    CMD ["wget", "--quiet", "--output-document=/dev/null", "http://127.0.0.1:8080/healthz"]
+# Labels, last so that a new commit does not rebuild what is above (V0.4.9).
+ARG REPOMEMO_SOURCE_URL=https://github.com/repomemo/repomemo
+ARG REPOMEMO_BUILD_COMMIT=unknown
+ARG REPOMEMO_BUILD_DATE=unknown
+ARG REPOMEMO_IMAGE_TAG=unknown
+LABEL org.opencontainers.image.title="repomemo-web" \
+      org.opencontainers.image.description="RepoMemo web client: the built app over plain HTTP, with no API behind it" \
+      org.opencontainers.image.source="${REPOMEMO_SOURCE_URL}" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.version="${REPOMEMO_IMAGE_TAG}" \
+      org.opencontainers.image.revision="${REPOMEMO_BUILD_COMMIT}" \
+      org.opencontainers.image.created="${REPOMEMO_BUILD_DATE}"

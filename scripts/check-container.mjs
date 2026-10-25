@@ -179,7 +179,7 @@ if (!/HEALTHCHECK[^\n]*\\\n\s*CMD \["repomemo-server", "--health"\]/.test(docker
 
 // Every image says what it is (V0.4.9): the same labels on the server, the converter and the proxy, from the
 // build arguments the compose file gives each of them.
-for (const stage of ["server", "converter", "proxy"]) {
+for (const stage of ["server", "converter", "proxy", "webapp"]) {
   const start = dockerfile.search(new RegExp(String.raw`^FROM\s.*\sAS\s${stage}\s*$`, "m"));
   const next = dockerfile.slice(start + 1).search(/^FROM\s/m);
   const body = start < 0 ? "" : dockerfile.slice(start, next < 0 ? undefined : start + 1 + next);
@@ -189,6 +189,7 @@ for (const stage of ["server", "converter", "proxy"]) {
   for (const name of ["REPOMEMO_BUILD_COMMIT", "REPOMEMO_BUILD_DATE", "REPOMEMO_IMAGE_TAG"]) {
     if (!new RegExp(String.raw`^ARG\s+${name}\b`, "m").test(body)) problems.push(`the ${stage} stage does not take the build argument ${name} its labels use`);
   }
+  if (stage === "webapp") continue; // not in the compose file yet (V0.4.22 puts it there)
   const service = new RegExp(String.raw`target:\s*${stage}\s*\n\s*args:([\s\S]*?)(?=\n    \S)`).exec(compose)?.[1] ?? "";
   for (const name of ["REPOMEMO_BUILD_COMMIT", "REPOMEMO_BUILD_DATE", "REPOMEMO_IMAGE_TAG"]) {
     if (!service.includes(name)) problems.push(`the compose file does not pass ${name} to the ${stage} image`);
@@ -267,6 +268,25 @@ for (const pattern of [".git", ".env", "workspace-data", "target"]) {
   if (!ignore.split(/\r?\n/).includes(pattern)) problems.push(`.dockerignore does not leave out ${pattern}`);
 }
 
+// The web client has an image of its own (V0.4.15): plain HTTP on 8080, no API needed, hashed files cached and the page
+// never, a health route, an unprivileged user and a CI job that runs it alone.
+{
+  const webCaddy = read("docker/Caddyfile.web");
+  if (!stages.includes("webapp")) problems.push("the Dockerfile has no webapp stage (the web image)");
+  for (const [needle, what] of [
+    [":8080", "listens on 8080"], ["auto_https off", "leaves TLS to a front door"], ["/healthz", "has a health route"],
+    ["/config.json", "serves /config.json"], ["immutable", "caches hashed files"], ["no-cache", "revalidates the page"],
+    ["try_files {path} /index.html", "falls back to the page for client routes"], ["csp.caddy", "sends the content security policy"],
+    ["nosniff", "sets the security headers"],
+  ]) {
+    if (!webCaddy.includes(needle)) problems.push(`docker/Caddyfile.web does not serve what the web image promises: it never ${what}`);
+  }
+  const webStage = dockerfile.slice(dockerfile.search(/^FROM\s.*\sAS\s+webapp\s*$/m));
+  if (!/^USER\s+10001\b/m.test(webStage)) problems.push("the web image does not run as an unprivileged user");
+  if (!/HEALTHCHECK[\s\S]*\/healthz/.test(webStage)) problems.push("the web image has no health check on /healthz");
+  if (!/docker build[^\n]*--target webapp\b/.test(ci) || !/--publish 127\.0\.0\.1:8080:8080[\s\S]*--read-only[\s\S]*--cap-drop ALL/.test(ci)) problems.push(".github/workflows/ci.yml has no job that runs the web image alone, read-only and without capabilities");
+}
+
 // The images are scanned in CI (V0.4.13): a scanner container pinned by digest reads the server, the converter and
 // the proxy, a high or critical finding fails the job, and the reports are kept.
 {
@@ -275,8 +295,8 @@ for (const pattern of [".git", ".env", "workspace-data", "target"]) {
   else {
     if (!/TRIVY_IMAGE:\s*\S+@sha256:[0-9a-f]{64}\b/.test(job)) problems.push("the image-scan job's scanner is not pinned by digest");
     if (!/--severity HIGH,CRITICAL/.test(job) || !/--exit-code 1/.test(job)) problems.push("the image-scan job does not fail on a high or critical finding");
-    for (const name of ["server", "converter", "proxy"]) {
-      if (!new RegExp(String.raw`--target ${name}\b[^\n]*--tag repomemo-${name}:scan`).test(job)) problems.push(`the image-scan job does not build the ${name} image`);
+    for (const [name, target] of [["server", "server"], ["converter", "converter"], ["proxy", "proxy"], ["web", "webapp"]]) {
+      if (!new RegExp(String.raw`--target ${target}\b[^\n]*--tag repomemo-${name}:scan`).test(job)) problems.push(`the image-scan job does not build the ${name} image`);
     }
     if (!/upload-artifact@/.test(job)) problems.push("the image-scan job does not keep its reports");
   }

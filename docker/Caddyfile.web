@@ -1,0 +1,54 @@
+# The web client on its own (V0.4.15; see ../Dockerfile, target webapp). It serves the built web app over plain HTTP
+# on port 8080 and nothing else: no certificate (an `edge` proxy or any other front door brings TLS), no database,
+# no API. It needs no API to start.
+#
+# What it gives: the app, with the single-page fallback; hashed files under /assets/ cached for a year and never
+# the page itself; compression; security headers and the content security policy the build wrote; /config.json
+# from the environment (REPOMEMO_WEB_API_URL, REPOMEMO_PRODUCT_NAME); and /healthz for orchestrators.
+
+{
+	admin off
+	auto_https off
+}
+
+:8080 {
+	encode zstd gzip
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		X-Frame-Options DENY
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+
+	handle /healthz {
+		header Cache-Control "no-store"
+		respond "ok" 200
+	}
+
+	# What the web app is told when it starts. The values go into JSON as they are, so they must not hold a quote
+	# or a backslash.
+	handle /config.json {
+		header Cache-Control "no-store"
+		header Content-Type "application/json"
+		respond `{"apiUrl":"{$REPOMEMO_WEB_API_URL:}","productName":"{$REPOMEMO_PRODUCT_NAME:RepoMemo}"}` 200
+	}
+
+	# The API is not here. Forwarding to one is V0.4.16 (REPOMEMO_API_UPSTREAM); until then, say so plainly.
+	@api path /v1/* /health /health/*
+	handle @api {
+		respond "This web image has no API behind it." 502
+	}
+
+	handle {
+		root * /srv/web
+		import /etc/caddy/csp.caddy
+		@hashed path /assets/*
+		header @hashed Cache-Control "public, max-age=31536000, immutable"
+		@page not path /assets/*
+		header @page Cache-Control "no-cache"
+		try_files {path} /index.html
+		file_server
+	}
+}
