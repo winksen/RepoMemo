@@ -282,6 +282,22 @@ if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge d
   if (!/^  server-archive:/m.test(ci) || !/package-server\.mjs --binary/.test(ci) || !/sha256sum --check SHA256SUMS/.test(ci) || !/REPOMEMO_WEB_DIR="\$home\/web"/.test(ci)) problems.push(".github/workflows/ci.yml does not pack the server, unpack it clean and start it on its own web app");
 }
 
+// Windows: the server runs as a service, registered by its own command, with a script that is safe to run twice (V0.4.33).
+{
+  const install = read("deploy/direct/service/install.ps1");
+  const uninstall = read("deploy/direct/service/uninstall.ps1");
+  const service = read("apps/server/src/winservice.rs");
+  for (const needle of ["service install --workdir", "exists; leaving it as it is", "Junction", "icacls", "is already registered", "GenerateSecrets", "never overwritten"]) {
+    if (!install.includes(needle)) problems.push(`deploy/direct/service/install.ps1 lacks ${needle}`);
+  }
+  if (!/service uninstall/.test(uninstall) || /Remove-Item[^\n]*ProgramData/i.test(uninstall)) problems.push("deploy/direct/service/uninstall.ps1 must unregister the service and never delete the data folder");
+  for (const needle of ["ServiceStartType::AutoStart", "NT AUTHORITY\\\\LocalService", "ServiceControl::Stop", "run_server", "restart/5000"]) {
+    if (!service.includes(needle)) problems.push(`apps/server/src/winservice.rs lacks ${needle}`);
+  }
+  if (!/^\[target\.'cfg\(windows\)'\.dependencies\]\s*\nwindows-service/m.test(serverManifest)) problems.push("apps/server/Cargo.toml does not depend on windows-service for Windows only");
+  if (!/^  server-archive-windows:/m.test(ci) || !/install\.ps1"? -GenerateSecrets -Start/.test(ci) || !/StartType -ne "Automatic"/.test(ci) || !/uninstall\.ps1/.test(ci)) problems.push(".github/workflows/ci.yml does not install, start, stop and remove the Windows service");
+}
+
 // Linux: a hardened systemd unit and an install script that is safe to run twice (V0.4.32).
 {
   const unit = read("deploy/direct/service/repomemo.service");

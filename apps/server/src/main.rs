@@ -1,6 +1,4 @@
-use repomemo_server::{init_logging, serve, stderr_line, ServerConfig};
-use tokio::net::TcpListener;
-use tracing::info;
+use repomemo_server::{run_server, shutdown_signal};
 
 // Counts memory only in a document reader process, which asks it to; the
 // server itself pays for one flag check per allocation.
@@ -30,96 +28,18 @@ fn main() {
     if std::env::args().any(|argument| argument == "--check-config") {
         std::process::exit(repomemo_server::check_config());
     }
+    // `service install|uninstall|run` is the Windows service (V0.4.33).
+    let arguments: Vec<String> = std::env::args().skip(1).collect();
+    if arguments.first().map(String::as_str) == Some("service") {
+        std::process::exit(repomemo_server::service_command(&arguments[1..]));
+    }
     run();
 }
 
 #[tokio::main]
 async fn run() {
-    // Console, in-memory buffer for System › Logs and optional daily files;
-    // levels and format follow the environment until a system administrator
-    // changes them in System › Settings.
-    init_logging().expect("Invalid RepoMemo logging configuration");
-
-    let config = match ServerConfig::from_env() {
-        Ok(config) => config,
-        Err(error) => {
-            eprintln!(
-                "{}",
-                stderr_line("error", &format!("Invalid RepoMemo server configuration: {error:#}"))
-            );
-            std::process::exit(1);
-        }
-    };
-    // A read-only, full or networked data folder is named now, not by a failure later on.
-    let folders = repomemo_server::startup_report(&config);
-    for warning in &folders.warnings {
-        tracing::warn!("{warning}");
+    let code = run_server(shutdown_signal()).await;
+    if code != 0 {
+        std::process::exit(code);
     }
-    if let Some(error) = folders.errors.first() {
-        tracing::error!("{error}");
-        eprintln!(
-            "{}",
-            stderr_line("error", &format!("RepoMemo cannot use its data folders: {error}"))
-        );
-        std::process::exit(1);
-    }
-    let address = config.bind_address;
-    let header_read_timeout = config.header_read_timeout;
-    let shutdown_grace = config.shutdown_grace;
-    let listener = TcpListener::bind(address)
-        .await
-        .expect("failed to bind RepoMemo server address");
-
-    info!(%address, "RepoMemo shared-backend foundation is listening");
-    let server = match repomemo_server::start(config).await {
-        Ok(server) => server,
-        Err(error) => {
-            eprintln!(
-                "{}",
-                stderr_line("error", &format!("RepoMemo could not start: {error:#}"))
-            );
-            std::process::exit(1);
-        }
-    };
-    let app = server.router();
-    // On a stop: the live streams end, running requests finish within the grace, then the work stops,
-    // interrupted jobs are closed and the write-ahead log is folded back (V0.4.6).
-    serve(listener, app, header_read_timeout, shutdown_grace, async {
-        shutdown_signal().await;
-        server.begin_closing().await;
-    })
-    .await
-    .expect("RepoMemo server stopped unexpectedly");
-    server.finish().await;
-    info!("RepoMemo server stopped");
-}
-
-/// Resolves on Ctrl-C, or SIGTERM on Unix (what service managers and
-/// containers send), so in-flight requests finish before the process exits.
-async fn shutdown_signal() {
-    let ctrl_c = async {
-        if let Err(error) = tokio::signal::ctrl_c().await {
-            tracing::error!(error = %error, "Failed to listen for Ctrl-C");
-            std::future::pending::<()>().await;
-        }
-    };
-    #[cfg(unix)]
-    let terminate = async {
-        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
-            Ok(mut signal) => {
-                signal.recv().await;
-            }
-            Err(error) => {
-                tracing::error!(error = %error, "Failed to listen for SIGTERM");
-                std::future::pending::<()>().await;
-            }
-        }
-    };
-    #[cfg(not(unix))]
-    let terminate = std::future::pending::<()>();
-    tokio::select! {
-        _ = ctrl_c => {}
-        _ = terminate => {}
-    }
-    info!("Shutdown requested; finishing in-flight requests");
 }

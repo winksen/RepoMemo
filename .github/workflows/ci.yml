@@ -436,6 +436,87 @@ jobs:
           path: dist-server
           if-no-files-found: error
 
+  # Windows: the server as a service (V0.4.33). The archive for Windows is built and packed, installed with the script, and
+  # the service must be registered to start at boot, answer, stop cleanly and be removed.
+  server-archive-windows:
+    name: Server archive (windows x64) and service
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - name: Build the web app (for the page's own host) and the server
+        shell: bash
+        run: |
+          npm ci
+          VITE_REPOMEMO_API_URL="" npm run build
+          cargo build --release --locked -p repomemo-server
+      - name: Pack it
+        shell: bash
+        run: node scripts/package-server.mjs --binary target/release/repomemo-server.exe --web apps/desktop/dist --os windows --arch x64 --out dist-server
+      - name: Unpack it
+        shell: pwsh
+        run: |
+          Expand-Archive -Path (Get-ChildItem dist-server\repomemo-server-*-windows-x64.zip).FullName -DestinationPath "$env:RUNNER_TEMP\clean"
+          $root = (Get-ChildItem "$env:RUNNER_TEMP\clean" -Directory).FullName
+          "ARCHIVE_ROOT=$root" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Install it as a service and start it
+        shell: pwsh
+        run: |
+          & "$env:ARCHIVE_ROOT\service\install.ps1" -GenerateSecrets -Start
+          $service = Get-Service RepoMemo
+          if ($service.Status -ne "Running") { throw "the service is $($service.Status)" }
+          if ($service.StartType -ne "Automatic") { throw "the service does not start at boot: $($service.StartType)" }
+      - name: It answers, and serves the app
+        shell: pwsh
+        run: |
+          $ready = $false
+          for ($attempt = 0; $attempt -lt 60 -and -not $ready; $attempt++) {
+            try { $ready = (Invoke-WebRequest -UseBasicParsing http://127.0.0.1:3020/health/ready).StatusCode -eq 200 } catch { Start-Sleep -Seconds 1 }
+          }
+          if (-not $ready) { throw "/health/ready never answered" }
+          if ((Invoke-WebRequest -UseBasicParsing http://127.0.0.1:3020/).Content -notmatch '<div id="root">') { throw "the app is not served" }
+      - name: A second run of the installer changes nothing
+        shell: pwsh
+        run: |
+          $before = (Get-FileHash "$env:ProgramData\RepoMemo\repomemo.env").Hash + (Get-Item "$env:ProgramFiles\RepoMemo\current").Target
+          & "$env:ARCHIVE_ROOT\service\install.ps1"
+          $after = (Get-FileHash "$env:ProgramData\RepoMemo\repomemo.env").Hash + (Get-Item "$env:ProgramFiles\RepoMemo\current").Target
+          if ($before -ne $after) { throw "the second run changed the settings or the link" }
+          if ((Get-Service RepoMemo).Status -ne "Running") { throw "the service stopped" }
+      - name: It stops cleanly
+        shell: pwsh
+        run: |
+          Stop-Service RepoMemo
+          (Get-Service RepoMemo).WaitForStatus("Stopped", [TimeSpan]::FromSeconds(60))
+          $log = Get-ChildItem "$env:ProgramData\RepoMemo\workspace-data\main\logs" -Filter *.jsonl -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($log) { Get-Content $log.FullName -Tail 3 }
+      - name: It is removed, and the data stays
+        shell: pwsh
+        run: |
+          & "$env:ARCHIVE_ROOT\service\uninstall.ps1"
+          if (Get-Service RepoMemo -ErrorAction SilentlyContinue) { throw "the service is still registered" }
+          if (-not (Test-Path "$env:ProgramData\RepoMemo\repomemo.env")) { throw "the settings were removed" }
+      - name: What it logged
+        if: failure()
+        shell: pwsh
+        run: |
+          Get-Service RepoMemo -ErrorAction SilentlyContinue | Format-List
+          Get-ChildItem "$env:ProgramData\RepoMemo" -Recurse -Filter *.jsonl -ErrorAction SilentlyContinue | ForEach-Object { Get-Content $_.FullName -Tail 40 }
+          Get-WinEvent -FilterHashtable @{ LogName = "System"; ProviderName = "Service Control Manager" } -MaxEvents 8 -ErrorAction SilentlyContinue | Format-List TimeCreated, Message
+      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: server-archive-windows-x64
+          path: dist-server
+          if-no-files-found: error
+
   # The monitoring example (V0.4.30): Prometheus scrapes the server's metrics with a system-scope token and shows its figures.
   monitoring:
     name: Prometheus example

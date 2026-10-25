@@ -38,6 +38,7 @@ mod repositories;
 mod requests;
 mod retrieval;
 mod review;
+mod runner;
 mod security;
 mod serve;
 mod setup;
@@ -48,6 +49,7 @@ mod verification;
 mod web_files;
 mod web_session;
 mod webhooks;
+mod winservice;
 mod workspace_export;
 mod workspace_import;
 mod workspaces;
@@ -72,8 +74,14 @@ use workspaces::*;
 pub use logs::{init_logging, log_capture_layer, stderr_line, LogSettings};
 
 pub use maintenance::MaintenanceSettings;
+pub use runner::{run_server, shutdown_signal};
 pub use security::Quota;
 pub use serve::serve;
+
+/// `repomemo-server service ...`: the Windows service (V0.4.33). Returns the exit code.
+pub fn service_command(words: &[String]) -> i32 {
+    winservice::run(words)
+}
 
 use std::{
     collections::{BTreeMap, BTreeSet},

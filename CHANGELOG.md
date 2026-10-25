@@ -2,6 +2,29 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.33 (2026-10-25)
+
+Windows: the server runs as a service.
+
+### Added
+- **`repomemo-server service install | uninstall | run`:** the server registers itself as a Windows service. `install` registers it with the service manager to start when Windows does, as `NT AUTHORITY\LocalService` (`--account` changes it), with the working folder and the settings file it was given, and sets it to restart after a failure (5 s, 5 s, 30 s); `uninstall` stops and removes it; `run` is what the manager starts: it answers the manager, goes to the working folder, reads the settings file (`NAME=value` lines, comments and blank lines skipped, a BOM and a pair of quotes tolerated) into the environment, and runs the server until Stop or a Windows shutdown, then stops it cleanly (V0.4.6). It uses the `windows-service` crate on Windows only (MIT or Apache-2.0; `cargo deny` licenses and bans pass); on any other system the command says to use systemd.
+- **`runner.rs`:** what `main` did to start and stop the server is now `run_server(shutdown)`, shared by `main` and the service, which returns an exit code instead of exiting from inside.
+- **`service/install.ps1` and `service/uninstall.ps1`** (in the Windows archive): the PowerShell installer, safe to run twice, and its removal that never touches the data (see the operations guide).
+- **A CI job, `server-archive-windows`,** builds the Windows archive on a Windows runner, installs it with the script, checks that the service runs and starts at boot (`Automatic`), asks `/health/ready` and the page, runs the installer again and compares the settings and the junction, stops the service within a minute, removes it and checks the settings stay. The archive is kept as an artifact.
+
+### Changed
+- **`container:check`** holds the Windows service's pieces (the installer's safeguards, the uninstaller not deleting the data, the service code's essentials, the Windows-only dependency and the CI job).
+- **The documents:** the operations guide, the technical mindmap, the roadmap and the release index.
+- **The version** is `0.4.33` everywhere.
+
+### Checks
+- **Compiled and linted** (on Windows, so the service code itself was compiled): `cargo clippy -D warnings` over the server with its tests, `cargo fmt --all --check`, `cargo deny check bans licenses`, the PowerShell parser on the three PowerShell scripts (no errors; none was run), `container:check`, `version:check`, `docs:check`.
+- **Tests written, not run:** three unit tests (the command line, its mistakes, the env file).
+- **Not run:** the service, the installer or the uninstaller. The `server-archive-windows` job is the test, and **it is the first time the code talks to the service manager**; a rejected account, access list or start type will show there. Reboot behaviour is not tested (only that the start type is automatic).
+
+### Upgrading
+- Nothing to do. A new install: unpack the zip and run `.\service\install.ps1 -GenerateSecrets -Start` as an administrator.
+
 ## V0.4.32 (2026-10-25)
 
 Linux: a hardened systemd unit and an installer that is safe to run twice.
