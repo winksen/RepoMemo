@@ -266,6 +266,14 @@ for (const name of ["REPOMEMO_WEB_API_URL", "REPOMEMO_PRODUCT_NAME"]) {
 if (!/handle \/config\.json/.test(webCaddyfile)) problems.push("docker/Caddyfile.web does not serve /config.json");
 if (!/vite\.config\.ts/.test("vite.config.ts") || !vite.includes("config.json")) problems.push("the web build does not write a default config.json");
 if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge does not use REPOMEMO_HOST");
+// The server logs JSON to standard output and keeps no log files in a container (V0.4.29); the lines written outside the
+// logging (the entrypoint, a refused start) have the same shape.
+for (const [file, text] of [["docker-compose.yml", compose], ["deploy/api.yml", read("deploy/api.yml")]]) {
+  if (!/REPOMEMO_LOG_FORMAT:\s*json\b/.test(text) || !/REPOMEMO_LOG_TO_FILE:\s*"?false"?/.test(text)) problems.push(`${file} does not make the server log JSON to standard output with no log files`);
+}
+if (!/say\(\)/.test(read("docker/entrypoint.sh")) || !/"target":"repomemo_entrypoint"/.test(read("docker/entrypoint.sh"))) problems.push("docker/entrypoint.sh does not write its lines as JSON when REPOMEMO_LOG_FORMAT is json");
+if (!/docker compose logs --no-log-prefix[^\n]*server/.test(ci) || !/JSON\.parse\(line\)/.test(ci)) problems.push(".github/workflows/ci.yml does not check that every line of the server's log is JSON");
+
 // Every service can say it is healthy, stops with time to finish, restarts and rotates its logs (V0.4.28), so that
 // `docker compose up --wait` returns only when the whole stack is.
 {

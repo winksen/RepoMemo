@@ -114,6 +114,16 @@ jobs:
           docker compose ps --format '{{.Service}} {{.Health}}' | tee services.txt
           test "$(wc -l < services.txt)" -ge 3
           ! grep -v ' healthy$' services.txt
+      - name: Every line the server wrote is JSON (V0.4.29)
+        run: |
+          docker compose logs --no-log-prefix --no-color server > server.log
+          test -s server.log
+          node -e '
+            const lines = require("fs").readFileSync("server.log", "utf8").split("\n").filter(Boolean);
+            const bad = lines.filter((line) => { try { const v = JSON.parse(line); return !(v.timestamp && v.level && v.target && "message" in v); } catch { return true; } });
+            if (bad.length) { console.error(bad.length + " of " + lines.length + " lines are not log objects, first: " + bad[0]); process.exit(1); }
+            console.log(lines.length + " lines, all JSON log objects");
+          '
       - name: The first hour, through the proxy and the containers
         run: |
           # Setup, a workspace, an upload, indexing, search, a backup, an export and an import (V0.4.26). The checks of the

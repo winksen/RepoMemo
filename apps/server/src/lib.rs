@@ -69,7 +69,7 @@ use retrieval::*;
 use streams::*;
 use workspaces::*;
 
-pub use logs::{init_logging, log_capture_layer, LogSettings};
+pub use logs::{init_logging, log_capture_layer, stderr_line, LogSettings};
 
 pub use maintenance::MaintenanceSettings;
 pub use security::Quota;

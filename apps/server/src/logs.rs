@@ -516,6 +516,31 @@ impl LogBuffer {
 }
 
 // ---------------------------------------------------------------------------
+// Lines written before the logging is up, or outside it
+
+/// One line for standard error from code that runs before the logging is up (a refused configuration, a folder that
+/// cannot be used): in the same shape as the log lines when `REPOMEMO_LOG_FORMAT` is `json`, so that every line a
+/// container writes parses (V0.4.29), and plain text otherwise.
+pub fn stderr_line(level: &str, message: &str) -> String {
+    let json = std::env::var("REPOMEMO_LOG_FORMAT").is_ok_and(|format| format.trim().eq_ignore_ascii_case("json"));
+    format_stderr_line(json, level, message)
+}
+
+fn format_stderr_line(json: bool, level: &str, message: &str) -> String {
+    if !json {
+        return message.to_owned();
+    }
+    serde_json::to_string(&FileLine {
+        timestamp: Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+        level: level.to_ascii_uppercase(),
+        target: "repomemo_server::startup".to_owned(),
+        message: message.to_owned(),
+        fields: String::new(),
+    })
+    .unwrap_or_else(|_| message.to_owned())
+}
+
+// ---------------------------------------------------------------------------
 // JSON console output
 
 struct JsonConsoleLayer;
@@ -990,5 +1015,20 @@ mod tests {
         }
         assert!(written.contains("\"message\":\"Stored\""), "{written}");
         let _ = std::fs::remove_dir_all(data_dir);
+    }
+}
+#[cfg(test)]
+mod stderr_tests {
+    use super::format_stderr_line;
+
+    #[test]
+    fn a_line_before_the_logging_is_json_when_asked_and_plain_otherwise() {
+        let json = format_stderr_line(true, "error", "the folder \"/data\" is full");
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(value["level"], "ERROR");
+        assert_eq!(value["message"], "the folder \"/data\" is full");
+        assert!(value["timestamp"].as_str().is_some_and(|stamp| stamp.ends_with('Z')));
+        assert_eq!(value["target"], "repomemo_server::startup");
+        assert_eq!(format_stderr_line(false, "error", "plain"), "plain");
     }
 }

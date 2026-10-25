@@ -2,6 +2,26 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.29 (2026-10-25)
+
+In containers the server logs JSON to standard output, and every line parses.
+
+### Changed
+- **The compose files make the server log JSON and keep no log files:** `REPOMEMO_LOG_FORMAT=json` and `REPOMEMO_LOG_TO_FILE=false` in `docker-compose.yml` and `deploy/api.yml`. The server writes one JSON object per line to standard output (`timestamp`, `level`, `target`, `message`, `fields`), which was already possible (`REPOMEMO_LOG_FORMAT`) and is now the default in containers; the daily files in the data folder are off there, and `System > Logs` shows the in-memory buffer.
+- **Every line parses.** What was written outside the logging now has the same shape under `json`: a refused configuration, a data folder that cannot be used, a start that failed (`stderr_line` in `logs.rs`, used by `main.rs`) and the entrypoint's lines when it gives a volume to its user or cannot (`say` in `docker/entrypoint.sh`, quotes and backslashes escaped).
+- **The audit target is kept apart** by its `target`: audit events carry `"target":"audit"` in the same stream, so a collector separates them with a filter (an example is in the operations guide); they remain in the database too.
+- **CI** checks that every line of the server's log is a JSON object with a timestamp, a level, a target and a message. **`container:check`** holds the two settings in both compose files, the entrypoint's JSON and that CI step.
+- **The documents:** the settings reference (`REPOMEMO_LOG_FORMAT`), the operations guide, the technical mindmap, the roadmap and the release index.
+- **The version** is `0.4.29` everywhere.
+
+### Checks
+- **Compiled and linted:** `cargo clippy -D warnings` over the server with its tests, `cargo fmt --all --check`, `container:check`, `version:check`, `docs:check`, a syntax check of the entrypoint and a try of its `say` with quotes and a backslash (the output parses).
+- **Tests written, not run:** one unit test of the JSON line (level, message with quotes, a timestamp ending in `Z`, the target) and of the plain form.
+- **Not run:** the stack. Caddy's lines are not the server's and are not part of the check.
+
+### Upgrading
+- Nothing to do. Anyone who read the container's logs as text sees JSON now; set `REPOMEMO_LOG_FORMAT=text` in the environment of the service to go back.
+
 ## V0.4.28 (2026-10-25)
 
 Every service says it is healthy, and the stack waits for all of them.

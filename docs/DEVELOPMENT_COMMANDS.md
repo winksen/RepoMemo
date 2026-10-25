@@ -309,7 +309,7 @@ reader). Do not set them. The performance runs read `REPOMEMO_PERF_PASSAGES`,
 | `REPOMEMO_SETUP_WIZARD` | `true` | A brand-new server (no account yet) opens the **onboarding** in the web app to create its first system administrator. `false` skips it: the first account to register becomes system administrator, as before. |
 | `REPOMEMO_SETUP_CODE` | generated | The one-time code the onboarding asks for (at least 12 letters or digits). When unset, the server makes one at each start until setup is done and prints it on its console, in a framed block, never in the log files. |
 | `RUST_LOG` | unset | A raw log filter (tracing syntax). When set, it is used instead of the per-category levels until a system administrator chooses levels in **System › Settings › Logging**; resetting those brings it back. |
-| `REPOMEMO_LOG_FORMAT` | `text` | Console log format: `text`, `compact` or `json` (one JSON object per line, for log collectors). |
+| `REPOMEMO_LOG_FORMAT` | `text` | Console log format: `text`, `compact` or `json` (one JSON object per line, for log collectors). With `json`, the lines written before the logging is up (a refused configuration, a data folder that cannot be used) and by the container's entrypoint are JSON objects of the same shape too (V0.4.29), so every line parses. The compose files set it, with `REPOMEMO_LOG_TO_FILE=false`. |
 | `REPOMEMO_LOG_TO_FILE` | `true` | Keep logs in daily files `<data dir>/logs/repomemo-YYYY-MM-DD.jsonl` (JSON lines, UTC days), browsable and downloadable in **System › Logs**. |
 | `REPOMEMO_LOG_RETENTION_DAYS` | `14` | Daily log files older than this are deleted by maintenance; `0` keeps them forever. |
 

@@ -1,4 +1,4 @@
-use repomemo_server::{init_logging, serve, ServerConfig};
+use repomemo_server::{init_logging, serve, stderr_line, ServerConfig};
 use tokio::net::TcpListener;
 use tracing::info;
 
@@ -43,7 +43,10 @@ async fn run() {
     let config = match ServerConfig::from_env() {
         Ok(config) => config,
         Err(error) => {
-            eprintln!("Invalid RepoMemo server configuration: {error:#}");
+            eprintln!(
+                "{}",
+                stderr_line("error", &format!("Invalid RepoMemo server configuration: {error:#}"))
+            );
             std::process::exit(1);
         }
     };
@@ -54,7 +57,10 @@ async fn run() {
     }
     if let Some(error) = folders.errors.first() {
         tracing::error!("{error}");
-        eprintln!("RepoMemo cannot use its data folders: {error}");
+        eprintln!(
+            "{}",
+            stderr_line("error", &format!("RepoMemo cannot use its data folders: {error}"))
+        );
         std::process::exit(1);
     }
     let address = config.bind_address;
@@ -68,7 +74,10 @@ async fn run() {
     let server = match repomemo_server::start(config).await {
         Ok(server) => server,
         Err(error) => {
-            eprintln!("RepoMemo could not start: {error:#}");
+            eprintln!(
+                "{}",
+                stderr_line("error", &format!("RepoMemo could not start: {error:#}"))
+            );
             std::process::exit(1);
         }
     };

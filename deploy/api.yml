@@ -51,6 +51,10 @@ services:
     environment:
       REPOMEMO_SERVER_ADDR: 0.0.0.0:3020
       REPOMEMO_SERVER_DATA_DIR: main
+      # Logs are one JSON object per line on standard output, for Docker's log driver and any collector (V0.4.29); no
+      # log files in the container. Audit events carry "target":"audit", so a collector can keep them apart.
+      REPOMEMO_LOG_FORMAT: json
+      REPOMEMO_LOG_TO_FILE: "false"
       # The database, the stored files and the backups sit in volumes of their own (V0.4.22); the key file, the logs and
       # the previews stay in repomemo-data.
       REPOMEMO_DB_DIR: /var/lib/repomemo-db
