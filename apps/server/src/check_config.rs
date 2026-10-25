@@ -104,23 +104,7 @@ pub(crate) fn check_config_report(config: Result<ServerConfig>) -> CheckReport {
     for name in SECRETS {
         report.lines.push(secret_line(name, &mut report.warnings));
     }
-    match config.data_dir.as_deref() {
-        Some(dir) => {
-            data_folder(dir, "data folder      ", &mut report);
-            for (label, folder) in [
-                ("database folder  ", config.db_dir.as_deref()),
-                ("files folder     ", config.blob_dir.as_deref()),
-                ("backups folder   ", config.backup_dir.as_deref()),
-            ] {
-                if let Some(folder) = folder {
-                    data_folder(folder, label, &mut report);
-                }
-            }
-        }
-        None => report
-            .lines
-            .push("data folder       not set: the server starts detached and an administrator picks one".to_owned()),
-    }
+    folders(&config, &mut report);
     for (label, folder) in [
         ("backup copy      ", config.backup_copy_dir.as_deref()),
         ("templates folder ", config.templates_dir.as_deref()),
@@ -185,25 +169,84 @@ fn readable_by_others(_path: &Path) -> Option<&'static str> {
     None
 }
 
-/// The data folder: present or creatable, and writable. A small file is made and removed to be sure.
-fn data_folder(dir: &Path, label: &str, report: &mut CheckReport) {
+/// A volume with less free space than this cannot take a database: the start is refused (V0.4.5).
+const FULL_BELOW_BYTES: u64 = 16 * 1024 * 1024;
+
+/// The check at start (V0.4.5): the folders the server will write to, so a read-only, full or
+/// networked volume is named in the first log line and not by a failure later on.
+pub fn startup_report(config: &ServerConfig) -> CheckReport {
+    let mut report = CheckReport::default();
+    folders(config, &mut report);
+    report
+}
+
+/// The data folder and the folders split from it.
+fn folders(config: &ServerConfig, report: &mut CheckReport) {
+    let Some(dir) = config.data_dir.as_deref() else {
+        report
+            .lines
+            .push("data folder       not set: the server starts detached and an administrator picks one".to_owned());
+        return;
+    };
+    let floor = config.disk_floor_mb.saturating_mul(1024 * 1024);
+    data_folder(dir, "data folder      ", floor, report);
+    for (label, folder) in [
+        ("database folder  ", config.db_dir.as_deref()),
+        ("files folder     ", config.blob_dir.as_deref()),
+        ("backups folder   ", config.backup_dir.as_deref()),
+    ] {
+        if let Some(folder) = folder {
+            data_folder(folder, label, floor, report);
+        }
+    }
+}
+
+/// A folder: present or creatable, writable (a small file is made and removed to be sure), with room
+/// left, and not on a network file system, which SQLite's write-ahead log cannot work on.
+fn data_folder(dir: &Path, label: &str, floor: u64, report: &mut CheckReport) {
+    let name = label.trim();
     if dir.is_dir() {
         let probe = dir.join(format!(".repomemo-check-{}", std::process::id()));
         match std::fs::write(&probe, b"") {
             Ok(()) => {
                 let _ = std::fs::remove_file(&probe);
-                report.lines.push(format!("{label} {} (exists, writable)", dir.display()));
+                report
+                    .lines
+                    .push(format!("{label} {} (exists, writable)", dir.display()));
             }
-            Err(error) => report.errors.push(format!(
-                "{} {} is not writable: {error}. Give the server's account write access to it, or mount the volume read-write.",
-                label.trim(),
-                dir.display()
+            Err(error) => {
+                report.errors.push(format!(
+                    "{name} {} is not writable: {error}.{} Give the server's account write access to it, or mount the volume read-write.",
+                    dir.display(),
+                    owner_hint(dir)
+                ));
+                return;
+            }
+        }
+        match crate::quotas::free_disk_bytes(dir) {
+            Some(free) if free < FULL_BELOW_BYTES => report.errors.push(format!(
+                "{name} {} is full: {} MiB free. Free some room or mount a larger volume.",
+                dir.display(),
+                free / (1024 * 1024)
             )),
+            Some(free) if free < floor => report.warnings.push(format!(
+                "{name} {} has {} MiB free, under the floor of {} MiB where uploads are refused (REPOMEMO_DISK_FLOOR_MB).",
+                dir.display(),
+                free / (1024 * 1024),
+                floor / (1024 * 1024)
+            )),
+            _ => {}
+        }
+        if let Some(kind) = network_file_system(&mount_table(), dir) {
+            report.warnings.push(format!(
+                "{name} {} is on a network file system ({kind}). SQLite's write-ahead log needs shared memory and locks such file systems do not give, so a database kept there can be corrupted; use a local volume for the database.",
+                dir.display()
+            ));
         }
     } else if dir.exists() {
         report
             .errors
-            .push(format!("{} {} exists but is not a folder", label.trim(), dir.display()));
+            .push(format!("{name} {} exists but is not a folder", dir.display()));
     } else {
         match dir.ancestors().skip(1).find(|parent| parent.is_dir()) {
             Some(parent) if parent.metadata().is_ok_and(|meta| !meta.permissions().readonly()) => {
@@ -214,12 +257,72 @@ fn data_folder(dir: &Path, label: &str, report: &mut CheckReport) {
                 ));
             }
             _ => report.errors.push(format!(
-                "{} {} does not exist and cannot be created there",
-                label.trim(),
+                "{name} {} does not exist and cannot be created there",
                 dir.display()
             )),
         }
     }
+}
+
+/// On Unix, who owns the folder and who the server runs as, when they differ (the usual cause of a
+/// volume that is not writable: it belongs to root and the server is not).
+#[cfg(unix)]
+fn owner_hint(dir: &Path) -> String {
+    use std::os::unix::fs::MetadataExt;
+    let owner = std::fs::metadata(dir).map(|meta| meta.uid());
+    // The owner of /proc/self is the account the process runs as.
+    let me = std::fs::metadata("/proc/self").map(|meta| meta.uid());
+    match (owner, me) {
+        (Ok(owner), Ok(me)) if owner != me => {
+            format!(" The folder belongs to user {owner} and the server runs as user {me}.")
+        }
+        _ => String::new(),
+    }
+}
+
+#[cfg(not(unix))]
+fn owner_hint(_dir: &Path) -> String {
+    String::new()
+}
+
+/// The mounted file systems, on Linux; empty elsewhere.
+fn mount_table() -> String {
+    std::fs::read_to_string("/proc/self/mountinfo").unwrap_or_default()
+}
+
+/// Names the network file system `dir` is on, from the text of `/proc/self/mountinfo` (the longest mount
+/// point that holds it decides), or from the shape of a Windows path.
+pub(crate) fn network_file_system(mountinfo: &str, dir: &Path) -> Option<String> {
+    const NETWORK: [&str; 10] = [
+        "nfs",
+        "nfs4",
+        "cifs",
+        "smb3",
+        "smbfs",
+        "9p",
+        "afs",
+        "ncpfs",
+        "fuse.sshfs",
+        "glusterfs",
+    ];
+    let text = dir.to_string_lossy();
+    if text.starts_with(r"\\?\UNC\") || (text.starts_with(r"\\") && !text.starts_with(r"\\?\")) {
+        return Some("a network share".to_owned());
+    }
+    let resolved = dir.canonicalize().unwrap_or_else(|_| dir.to_path_buf());
+    mountinfo
+        .lines()
+        .filter_map(|line| {
+            let (before, after) = line.split_once(" - ")?;
+            let mount_point = before.split_whitespace().nth(4)?;
+            let kind = after.split_whitespace().next()?;
+            resolved
+                .starts_with(mount_point)
+                .then(|| (mount_point.len(), kind.to_owned()))
+        })
+        .max_by_key(|(length, _)| *length)
+        .map(|(_, kind)| kind)
+        .filter(|kind| NETWORK.contains(&kind.as_str()))
 }
 
 #[cfg(test)]
@@ -273,6 +376,55 @@ mod tests {
         let report = check_config_report(Ok(ServerConfig::for_test(dir.join("later"))));
         assert!(report.errors.is_empty());
         assert!(report.render().contains("will be created inside"));
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod folder_tests {
+    use super::*;
+
+    const MOUNTS: &str = "\
+24 1 8:1 / / rw,relatime shared:1 - ext4 /dev/sda1 rw
+31 24 0:27 / /srv rw,relatime shared:2 - nfs4 server:/export rw,vers=4.2
+32 31 0:28 / /srv/local rw,relatime shared:3 - ext4 /dev/sdb1 rw
+40 24 0:30 / /mnt/share rw,relatime shared:4 - cifs //nas/share rw
+";
+
+    #[test]
+    fn a_network_file_system_is_named_by_its_longest_mount_point() {
+        assert_eq!(
+            network_file_system(MOUNTS, Path::new("/srv/data")).as_deref(),
+            Some("nfs4")
+        );
+        assert_eq!(
+            network_file_system(MOUNTS, Path::new("/mnt/share/memo")).as_deref(),
+            Some("cifs")
+        );
+        assert_eq!(network_file_system(MOUNTS, Path::new("/srv/local/data")), None);
+        assert_eq!(network_file_system(MOUNTS, Path::new("/var/lib/repomemo")), None);
+        assert_eq!(network_file_system("", Path::new("/anything")), None);
+    }
+
+    #[test]
+    fn a_windows_network_path_is_a_share() {
+        assert!(network_file_system("", Path::new(r"\nas\memo")).is_some());
+        assert!(network_file_system("", Path::new(r"\?\C:\memo")).is_none());
+    }
+
+    #[test]
+    fn a_folder_under_the_disk_floor_is_warned_about() {
+        let dir = std::env::temp_dir().join(format!("repomemo-room-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        if crate::quotas::free_disk_bytes(&dir).is_some() {
+            let mut warned = CheckReport::default();
+            data_folder(&dir, "data folder      ", u64::MAX, &mut warned);
+            assert!(warned.errors.is_empty());
+            assert!(warned
+                .warnings
+                .iter()
+                .any(|warning| warning.contains("under the floor")));
+        }
         std::fs::remove_dir_all(dir).unwrap();
     }
 }

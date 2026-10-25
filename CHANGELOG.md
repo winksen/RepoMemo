@@ -2,6 +2,25 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.5 (2026-10-25)
+
+A bad data volume is named when the server starts.
+
+### Added
+- **A check of the folders at start:** before storage is opened, the data folder and the folders split from it (V0.4.4) are tried. A folder that **cannot be written** (a read-only mount, a volume owned by another account) or is **full** (under 16 MiB free) refuses the start, and the reason is the first log line, also written to standard error; on Linux it says which user owns the folder and which user the server runs as. A folder **under the disk floor** (`REPOMEMO_DISK_FLOOR_MB`) or on a **network file system** (NFS, SMB/CIFS, 9p, sshfs, a Windows share, from `/proc/self/mountinfo` or the shape of a UNC path) is a warning; SQLite's write-ahead log does not work safely there.
+- **`--check-config`** prints the same findings (free space and file system included).
+
+### Changed
+- **The documents:** the operations guide (§4, *The check of the folders at start*), the technical mindmap, the roadmap and the release index.
+- **The version** is `0.4.5` everywhere.
+
+### Checks
+- **Compiled and linted:** `cargo clippy -D warnings` over the server with its tests (the Unix-only code is compiled by CI on Linux, not here), `cargo fmt --all --check`, `version:check`, `docs:check`.
+- **Tests written, not run:** the naming of a network file system by the longest mount point (NFS under `/srv`, a local volume inside it, SMB), a Windows share path, and the warning under the disk floor. A read-only or full volume is for the maintainer's hands.
+
+### Upgrading
+- Nothing to do. A server that starts on a read-only or nearly full volume now refuses with the reason; one on a network file system warns and starts.
+
 ## V0.4.4 (2026-10-25)
 
 The data folder can be split across volumes.

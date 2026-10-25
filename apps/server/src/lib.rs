@@ -55,7 +55,7 @@ use ai::*;
 use artifacts::*;
 use auth::*;
 pub use build_info::{BuildInfo, BUILD};
-pub use check_config::check_config;
+pub use check_config::{check_config, startup_report};
 use collaboration::*;
 pub use config::*;
 use errors::*;

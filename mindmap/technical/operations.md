@@ -236,6 +236,16 @@ By default everything is in the data folder: `repomemo.sqlite` (with its write-a
 - **Moving an existing install:** stop the server, move the database file (and its `-wal` and `-shm` files if any), `blobs/` or `backups/` to the new folder, set the variable, start. A server that finds no database in `REPOMEMO_DB_DIR` starts a new empty one.
 - `repomemo-server --check-config` tries each folder that is set.
 
+### The check of the folders at start (V0.4.5)
+
+Before it opens anything, the server looks at every folder it will write to (the data folder and the three of *Splitting the data folder*) and says what is wrong in its **first log line**, which is also printed to standard error:
+
+- **Not writable** (a read-only mount, or a volume that belongs to another account): the start is refused, naming the folder, the system's reason and, on Linux, the user that owns the folder and the user the server runs as.
+- **Full** (under 16 MiB free): the start is refused. **Under the disk floor** (`REPOMEMO_DISK_FLOOR_MB`, 1024 by default): a warning, since uploads are refused there.
+- **On a network file system** (NFS, SMB/CIFS, 9p, sshfs, a Windows share): a warning. SQLite's write-ahead log needs shared memory and locks such file systems do not give, so keep the database on a local volume (files and backups may be elsewhere). Linux reads `/proc/self/mountinfo`; Windows recognises a UNC path.
+
+`repomemo-server --check-config` prints the same findings without starting.
+
 ### Checking a configuration (V0.4.2)
 
 `repomemo-server --check-config` reads the environment exactly as a start would, prints what the server would use (secrets only as "set, N characters" or "from the file …", never their values), looks at the data folder (it exists and is writable, or can be created) and exits **without serving**: `0` the configuration can start, `1` it is invalid (the first error is named), `2` the data folder cannot be used. A secret file that other accounts can read is a warning on Unix. In a container: `docker compose run --rm server --check-config`.

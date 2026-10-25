@@ -43,6 +43,16 @@ async fn run() {
             std::process::exit(1);
         }
     };
+    // A read-only, full or networked data folder is named now, not by a failure later on.
+    let folders = repomemo_server::startup_report(&config);
+    for warning in &folders.warnings {
+        tracing::warn!("{warning}");
+    }
+    if let Some(error) = folders.errors.first() {
+        tracing::error!("{error}");
+        eprintln!("RepoMemo cannot use its data folders: {error}");
+        std::process::exit(1);
+    }
     let address = config.bind_address;
     let header_read_timeout = config.header_read_timeout;
     let listener = TcpListener::bind(address)
