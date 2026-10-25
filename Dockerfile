@@ -25,17 +25,27 @@ ENV VITE_REPOMEMO_API_URL=""
 RUN npm run build
 
 # ---------------------------------------------------------------------------
-# The server binary.
-FROM rust:1-trixie@sha256:767c71592f7d1f3f242292000f8efd4e67b6732363da176772f4d220332e264f AS build
+# The server binary, in three steps so that a change of code does not build the world again (V0.4.7):
+# the dependencies are built from a recipe that holds only the manifests and the lock file, in a layer that
+# stays cached until a dependency changes; then the code is built on top of it.
+FROM rust:1-trixie@sha256:767c71592f7d1f3f242292000f8efd4e67b6732363da176772f4d220332e264f AS chef
+RUN cargo install cargo-chef --locked --version 0.1.71
 WORKDIR /build
+
+FROM chef AS planner
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
+
+FROM chef AS build
+COPY --from=planner /build/recipe.json recipe.json
+# The dependencies of the server and nothing else. This layer is the one that is reused.
+RUN cargo chef cook --release --locked -p repomemo-server --recipe-path recipe.json
 COPY . .
 # What this build is called, printed by /health and --version (V0.4.3).
 ARG REPOMEMO_BUILD_COMMIT=unknown
 ARG REPOMEMO_BUILD_DATE=unknown
 ARG REPOMEMO_IMAGE_TAG=unknown
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/build/target \
-    cargo build --release --locked -p repomemo-server \
+RUN cargo build --release --locked -p repomemo-server \
     && mkdir -p /out \
     && cp target/release/repomemo-server /out/repomemo-server
 

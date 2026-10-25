@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.7 (2026-10-25)
+
+The server image builds its dependencies in a layer of their own.
+
+### Changed
+- **A cached layer of dependencies:** the Dockerfile's server build is now three stages. `chef` installs `cargo-chef` (pinned at 0.1.71), `planner` writes a recipe that holds only the manifests and the lock file, and `build` cooks the dependencies of `repomemo-server` from that recipe in a layer that stays cached until a dependency changes, then copies the code and builds it. A change of code no longer rebuilds the dependencies. The cache mounts over the registry and the build folder are removed: a mount over `/build/target` would hide the cooked layer, and the layer is what CI and a fresh machine can keep.
+- **CI measures it:** a `server-image-cache` job builds the server image whole on a clean runner, appends a line to the server's `main.rs`, builds again, writes both times to the job summary and fails when the second took more than 60% of the first.
+- **`container:check`** insists on the order (`cargo chef cook` before `COPY . .`), on a pinned `cargo-chef`, on no cache mount over `/build/target`, and on the CI job.
+- **The documents:** the operations guide, the technical mindmap, the roadmap and the release index.
+- **The version** is `0.4.7` everywhere.
+
+### Checks
+- **Run:** `container:check`, `version:check`, `docs:check`.
+- **Not run:** any image build, so the saving is **not measured yet**: the new CI job is the measure, and the maintainer should read its first run (and that `cargo chef cook -p` accepts the workspace as it is).
+
+### Upgrading
+- Nothing to do. The first build of an image after this release builds the dependencies once; the ones after reuse them.
+
 ## V0.4.6 (2026-10-25)
 
 The server stops cleanly on SIGTERM and Ctrl+C.

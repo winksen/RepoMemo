@@ -114,6 +114,31 @@ jobs:
         if: always()
         run: docker compose down --volumes
 
+  # The server image builds its dependencies in a layer of their own (V0.4.7). The image is built twice on a
+  # clean runner: once whole, then after a change of code only. The second build must reuse the layer of
+  # dependencies and take well under the first; both times are written to the job's summary.
+  server-image-cache:
+    name: Server image cache
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Build the server image whole
+        run: |
+          start=$(date +%s)
+          docker build --target server --tag repomemo-server:cache-first .
+          echo "FIRST=$(( $(date +%s) - start ))" >> "$GITHUB_ENV"
+      - name: Change the code and build it again
+        run: |
+          echo "// a change of code that no dependency sees" >> apps/server/src/main.rs
+          start=$(date +%s)
+          docker build --target server --tag repomemo-server:cache-second .
+          echo "SECOND=$(( $(date +%s) - start ))" >> "$GITHUB_ENV"
+      - name: The second build reused the dependencies
+        run: |
+          echo "Whole build: ${FIRST}s. After a change of code: ${SECOND}s." | tee -a "$GITHUB_STEP_SUMMARY"
+          test "$(( SECOND * 10 ))" -lt "$(( FIRST * 6 ))" || { echo "the rebuild took more than 60% of the whole build" >&2; exit 1; }
+
   # The images for arm64 (roadmap O7b, V0.3.23): built natively on an arm64 runner, so nothing is emulated, and
   # looked at once: the server's binary and git are arm64 builds. Nothing is pushed anywhere.
   images-arm64:

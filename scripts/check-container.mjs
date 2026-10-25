@@ -147,6 +147,15 @@ if (!/ENTRYPOINT \["repomemo-server"\]/.test(dockerfile)) problems.push("the ser
 if (!/USER\s+repomemo/.test(dockerfile)) problems.push("the server image runs as root");
 if (/^\s*(ENV|ARG)\s+\S*(SECRET|PASSWORD|TOKEN|JWT)\S*=/im.test(dockerfile)) problems.push("the Dockerfile bakes a secret into an image");
 
+// A change of code does not build the dependencies again (V0.4.7): they are cooked from a recipe in a layer of
+// their own, before the code is copied in, and no cache mount over the build directory hides that layer.
+const cooked = dockerfile.indexOf("cargo chef cook");
+const copiedCode = dockerfile.indexOf("COPY . .", dockerfile.indexOf("AS build"));
+if (cooked < 0 || copiedCode < 0 || cooked > copiedCode) problems.push("the server build does not cook its dependencies before it copies the code (cargo chef cook, then COPY . .)");
+if (/--mount=type=cache,target=\/build\/target/.test(dockerfile)) problems.push("a cache mount over /build/target hides the layer of built dependencies");
+if (!/cargo install cargo-chef --locked --version \d+\.\d+\.\d+/.test(dockerfile)) problems.push("cargo-chef is not installed at a pinned version");
+if (!workflows.some(([, text]) => text.includes("server-image-cache:"))) problems.push("CI has no server-image-cache job that measures the rebuild");
+
 // The server image is told what it is (V0.4.3): the Dockerfile takes the three build arguments, and the compose file gives them.
 for (const name of ["REPOMEMO_BUILD_COMMIT", "REPOMEMO_BUILD_DATE", "REPOMEMO_IMAGE_TAG"]) {
   if (!new RegExp(String.raw`^ARG\s+${name}\b`, "m").test(dockerfile)) problems.push(`the Dockerfile has no ARG ${name}, so /health cannot name the build`);
