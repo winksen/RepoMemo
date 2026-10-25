@@ -266,6 +266,25 @@ for (const name of ["REPOMEMO_WEB_API_URL", "REPOMEMO_PRODUCT_NAME"]) {
 if (!/handle \/config\.json/.test(webCaddyfile)) problems.push("docker/Caddyfile.web does not serve /config.json");
 if (!/vite\.config\.ts/.test("vite.config.ts") || !vite.includes("config.json")) problems.push("the web build does not write a default config.json");
 if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge does not use REPOMEMO_HOST");
+// Sample front doors (V0.4.19): each names the server's trusted-proxy setting, forwards the client's address, turns
+// buffering off for the live event streams and sends HSTS.
+{
+  const nginx = read("deploy/proxies/nginx.conf");
+  const traefik = read("deploy/proxies/traefik.yml");
+  for (const [name, text] of [["nginx.conf", nginx], ["traefik.yml", traefik]]) {
+    if (!text.includes("REPOMEMO_TRUST_PROXY=true") || !text.includes("REPOMEMO_TRUSTED_PROXIES")) problems.push(`deploy/proxies/${name} does not name the server's trusted-proxy settings`);
+    if (!text.includes("REPOMEMO_PUBLIC_URL") || !text.includes("REPOMEMO_ALLOWED_ORIGIN")) problems.push(`deploy/proxies/${name} does not name the server's public address and origin`);
+  }
+  if (!/proxy_buffering off;/.test(nginx) || !/proxy_set_header X-Forwarded-For \$remote_addr;/.test(nginx)) problems.push("deploy/proxies/nginx.conf does not turn buffering off for the event streams or set X-Forwarded-For to the client");
+  if (!/location ~ \^\/v1\/\(workspaces\/\[\^\/\]\+\/events\|system\/events\)\$/.test(nginx)) problems.push("deploy/proxies/nginx.conf has no location for the live event streams");
+  if (!/Strict-Transport-Security/.test(nginx) || !/stsSeconds/.test(traefik)) problems.push("a sample front door does not send HSTS");
+  if (!/flushInterval:\s*"?1ms"?/.test(traefik)) problems.push("deploy/proxies/traefik.yml does not flush the live event streams at once");
+  if (/forwardedHeaders:\s*\n\s+insecure:\s*true/.test(traefik)) problems.push("deploy/proxies/traefik.yml trusts forwarded headers from anyone");
+  for (const route of ["/v1/workspaces/{workspace_id}/events", "/v1/system/events"]) {
+    if (!readFileSync("apps/server/src/lib.rs", "utf8").includes(route)) problems.push(`the server has no ${route}, which the sample front doors name`);
+  }
+}
+
 // TLS is the edge's alone (V0.4.18): optional behind a profile, three ways to a certificate, never in the web image.
 {
   const edgeBlock = /^  edge:\n([\s\S]*?)(?=^  \S|^\S|(?![\s\S]))/m.exec(compose)?.[1] ?? "";

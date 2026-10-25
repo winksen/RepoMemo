@@ -2,6 +2,25 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.19 (2026-10-25)
+
+Sample front doors for nginx and Traefik.
+
+### Added
+- **`deploy/proxies/`:** a sample nginx configuration and a sample Traefik dynamic configuration (file provider) for the web image on `127.0.0.1:8080`, with a README of what every front door must do. Each names the server's settings that go with it (`REPOMEMO_TRUST_PROXY=true`, `REPOMEMO_TRUSTED_PROXIES`, `REPOMEMO_PUBLIC_URL`, `REPOMEMO_ALLOWED_ORIGIN`), passes the client's address in `X-Forwarded-For`, sends HSTS, and **does not buffer the live event streams**: nginx has a `location` for `/v1/workspaces/<id>/events` and `/v1/system/events` with `proxy_buffering off` and a one-hour read timeout, Traefik flushes at once. nginx also allows 1 GiB uploads without request buffering.
+
+### Changed
+- **`container:check`** reads both samples: the trusted-proxy and address settings named, buffering off, the client's address set from the connection and not appended to, HSTS, Traefik not trusting forwarded headers from anyone, and that the two event routes still exist in the server.
+- **The documents:** the operations guide (a bullet and *behind your own proxy*), the technical mindmap, the roadmap and the release index.
+- **The version** is `0.4.19` everywhere.
+
+### Checks
+- **Run:** `container:check`, `version:check`, `docs:check`.
+- **Not run:** nginx or Traefik with these files; they are samples to adapt (the host name, the certificate paths, the entry point and resolver names).
+
+### Upgrading
+- Nothing to do.
+
 ## V0.4.18 (2026-10-25)
 
 TLS is a piece of its own, in front of a web image that speaks plain HTTP.

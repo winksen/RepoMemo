@@ -1,0 +1,39 @@
+# RepoMemo behind Traefik (V0.4.19): a sample dynamic configuration (file provider) for the web image, which serves
+# the app and the API on one address (docker compose without the `edge` profile publishes it on 127.0.0.1:8080).
+# Traefik's static configuration needs an entry point named `websecure` and a certificate resolver named `letsencrypt`
+# (rename them below to match yours).
+#
+# Set on the server (in .env or the environment of the API):
+#   REPOMEMO_PUBLIC_URL=https://memo.example.com
+#   REPOMEMO_ALLOWED_ORIGIN=https://memo.example.com
+#   REPOMEMO_TRUST_PROXY=true
+#   REPOMEMO_TRUSTED_PROXIES=<the address Traefik connects from>
+# Traefik adds the client's address to X-Forwarded-For; the entry point must not trust forwarded headers from the
+# internet (no `forwardedHeaders.insecure`).
+
+http:
+  routers:
+    repomemo:
+      rule: "Host(`memo.example.com`)"
+      entryPoints:
+        - websecure
+      service: repomemo
+      middlewares:
+        - repomemo-headers
+      tls:
+        certResolver: letsencrypt
+
+  middlewares:
+    repomemo-headers:
+      headers:
+        stsSeconds: 31536000
+
+  services:
+    repomemo:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1:8080"
+        # Live event streams arrive as they happen: flush at once, do not buffer them.
+        responseForwarding:
+          flushInterval: "1ms"
+        passHostHeader: true
