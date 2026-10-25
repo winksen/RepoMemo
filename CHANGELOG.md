@@ -2,6 +2,26 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.26 (2026-10-25)
+
+CI uses the stack: the smoke test runs over the containers.
+
+### Added
+- **`scripts/smoke-test.mjs` does the first hour.** With `REPOMEMO_SMOKE_SETUP_CODE` (the new server's `REPOMEMO_SETUP_CODE`) it runs the first-run setup (the administrator, then its completion), makes a workspace, uploads a Markdown note, waits for the indexing jobs, searches for text from the note until it is found, makes a backup and waits for it, exports the workspace as an archive and imports that archive as a new workspace. Every step is a check; any failure makes the script exit 1. Without the variable it is the read-only check it was.
+- **The compose job of CI runs it** against the stack through the edge (TLS, the proxy's own certificate for `localhost`), after the stack is healthy and `/health/ready` answers: first-run setup through the API, a workspace, an upload, indexing, search, a backup, an export and an import, all in the containers.
+
+### Changed
+- **`container:check`** insists on the CI step and its setup code, on the script using each step, and on the server still having each of those routes.
+- **The documents:** the operations guide, the technical mindmap, the roadmap and the release index.
+- **The version** is `0.4.26` everywhere.
+
+### Checks
+- **Run:** a syntax check of the script, `container:check`, `version:check`, `docs:check`.
+- **Not run:** the script against a server or the stack. **It is the first time these steps are chained,** so the first CI run may find a field name or a status code that differs from what was read in the code (the organization of a new administrator, the shape of the jobs list, the search body); fix what it names.
+
+### Upgrading
+- Nothing to do. The script changes data: use it on a test stack only.
+
 ## V0.4.25 (2026-10-25)
 
 Backups and restores in containers, written as scripts and tried in CI.

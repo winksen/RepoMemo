@@ -266,6 +266,18 @@ for (const name of ["REPOMEMO_WEB_API_URL", "REPOMEMO_PRODUCT_NAME"]) {
 if (!/handle \/config\.json/.test(webCaddyfile)) problems.push("docker/Caddyfile.web does not serve /config.json");
 if (!/vite\.config\.ts/.test("vite.config.ts") || !vite.includes("config.json")) problems.push("the web build does not write a default config.json");
 if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge does not use REPOMEMO_HOST");
+// The compose job runs the smoke test over the whole stack (V0.4.26), setup included, and the script does the first hour.
+{
+  const smoke = read("scripts/smoke-test.mjs");
+  if (!/REPOMEMO_SMOKE_SETUP_CODE=\S+\s+node scripts\/smoke-test\.mjs https:\/\/localhost/.test(ci) || !/echo "REPOMEMO_SETUP_CODE=/.test(ci)) problems.push(".github/workflows/ci.yml does not run scripts/smoke-test.mjs against the stack with a setup code");
+  for (const step of ["/v1/setup/admin", "/v1/setup/complete", "/artifacts/upload", "/search", "/export", "/v1/workspaces/import", "/v1/system/backups"]) {
+    if (!smoke.includes(step)) problems.push(`scripts/smoke-test.mjs does not use ${step}, a step of the first hour`);
+  }
+  for (const route of ["/v1/setup/admin", "/v1/setup/complete", "/v1/workspaces/{workspace_id}/artifacts/upload", "/v1/workspaces/{workspace_id}/search", "/v1/workspaces/{workspace_id}/export", "/v1/workspaces/import", "/v1/system/backups"]) {
+    if (!readFileSync("apps/server/src/lib.rs", "utf8").includes(route)) problems.push(`the server has no ${route}, which the smoke test uses`);
+  }
+}
+
 // Backups and restores in containers (V0.4.25): the volumes are copied out (the database and the files only with the stack
 // stopped), restored into empty volumes only, never over an existing copy, and a CI job restores into a second stack.
 {

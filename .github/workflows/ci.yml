@@ -92,6 +92,7 @@ jobs:
           {
             echo "REPOMEMO_HOST=localhost"
             echo "COMPOSE_PROFILES=edge"
+            echo "REPOMEMO_SETUP_CODE=SMOKETEST2345"
             echo "REPOMEMO_JWT_SECRET=$(openssl rand -hex 32)"
             echo "REPOMEMO_SECRET_KEY=$(openssl rand -hex 32)"
           } > .env
@@ -108,6 +109,13 @@ jobs:
           done
           echo "/health/ready never answered" >&2
           exit 1
+      - name: The first hour, through the proxy and the containers
+        run: |
+          # Setup, a workspace, an upload, indexing, search, a backup, an export and an import (V0.4.26). The checks of the
+          # script itself pass or the job fails.
+          REPOMEMO_SMOKE_SETUP_CODE=SMOKETEST2345 node scripts/smoke-test.mjs https://localhost
+        env:
+          NODE_TLS_REJECT_UNAUTHORIZED: "0"
       - name: What the stack logged
         if: failure()
         run: docker compose logs --no-color --tail 200
