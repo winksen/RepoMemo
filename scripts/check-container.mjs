@@ -282,6 +282,23 @@ if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge d
   if (!/^  server-archive:/m.test(ci) || !/package-server\.mjs --binary/.test(ci) || !/sha256sum --check SHA256SUMS/.test(ci) || !/REPOMEMO_WEB_DIR="\$home\/web"/.test(ci)) problems.push(".github/workflows/ci.yml does not pack the server, unpack it clean and start it on its own web app");
 }
 
+// The server is built for three platforms and attached to the release (V0.4.35): native runners, the tag must be the
+// version, one SHA256SUMS, and nothing is attached by a pull request or a branch.
+{
+  const archives = workflows.find(([name]) => name === "server-archives.yml")?.[1] ?? "";
+  if (!archives) problems.push(".github/workflows/server-archives.yml is missing");
+  else {
+    for (const platform of ["os: linux, arch: x64, runner: ubuntu-latest", "os: linux, arch: arm64, runner: ubuntu-24.04-arm", "os: windows, arch: x64, runner: windows-latest"]) {
+      if (!archives.includes(platform)) problems.push(`the server archives are not built for ${platform}`);
+    }
+    if (!/tags:\s*\["v\*"\]/.test(archives) || /pull_request/.test(archives)) problems.push("the archives workflow must run on a v* tag (or by hand) and never on a pull request");
+    if (!/test "\$\{GITHUB_REF_NAME\}" = "v\$\(node -p/.test(archives)) problems.push("the archives workflow does not require the tag to be the version");
+    if (!/^  release:\n[\s\S]*?if: startsWith\(github\.ref, 'refs\/tags\/v'\)/m.test(archives) || !/contents: write/.test(archives)) problems.push("only a tag may attach archives to a release, and only that job may write");
+    if (!/sha256sum --check SHA256SUMS/.test(archives) || !/= "3"/.test(archives) || !/gh release upload/.test(archives)) problems.push("the archives workflow does not check three archives against one SHA256SUMS before attaching them");
+    if (/^permissions:\s*\n\s+contents:\s*write/m.test(archives)) problems.push("the archives workflow gives every job write access");
+  }
+}
+
 // Front doors for a direct install (V0.4.34): one page, a Caddyfile and an nginx file for the server on 127.0.0.1:3020, both
 // validated in CI by the programs themselves.
 {

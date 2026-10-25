@@ -1,0 +1,97 @@
+# The server as release archives (V0.4.35): built natively for Linux x64, Linux arm64 and Windows x64, packed by
+# scripts/package-server.mjs, and, on a tag, attached to the GitHub release with one SHA256SUMS. Nothing is published by
+# a pull request or a push to a branch; a manual run only keeps the archives as artifacts.
+name: Server archives
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  build:
+    name: ${{ matrix.os }} ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: linux, arch: x64, runner: ubuntu-latest, binary: repomemo-server }
+          - { os: linux, arch: arm64, runner: ubuntu-24.04-arm, binary: repomemo-server }
+          - { os: windows, arch: x64, runner: windows-latest, binary: repomemo-server.exe }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - name: The tag is the version
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: test "${GITHUB_REF_NAME}" = "v$(node -p "require('./package.json').version")"
+      - name: Build the web app (for the page's own host) and the server
+        shell: bash
+        run: |
+          npm ci
+          VITE_REPOMEMO_API_URL="" npm run build
+          cargo build --release --locked -p repomemo-server
+      - name: Pack it
+        shell: bash
+        run: |
+          SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)" node scripts/package-server.mjs \
+            --binary "target/release/${{ matrix.binary }}" --web apps/desktop/dist \
+            --os "${{ matrix.os }}" --arch "${{ matrix.arch }}" --out dist-server
+      - name: The binary is for this platform
+        shell: bash
+        run: |
+          file="target/release/${{ matrix.binary }}"
+          case "${{ matrix.os }}-${{ matrix.arch }}" in
+            linux-x64) file "$file" | grep -q "x86-64" ;;
+            linux-arm64) file "$file" | grep -q "aarch64" ;;
+            windows-x64) file "$file" | grep -q "x86-64" ;;
+          esac
+      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: server-${{ matrix.os }}-${{ matrix.arch }}
+          path: dist-server/repomemo-server-*
+          if-no-files-found: error
+
+  release:
+    name: Attach to the release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          path: archives
+          pattern: server-*
+          merge-multiple: true
+      - name: One SHA256SUMS for the three archives, checked
+        run: |
+          cd archives
+          test "$(ls repomemo-server-*.tar.gz repomemo-server-*.zip | wc -l)" = "3"
+          sha256sum repomemo-server-*.tar.gz repomemo-server-*.zip | sort -k2 > SHA256SUMS
+          sha256sum --check SHA256SUMS
+          cat SHA256SUMS
+      - name: Attach them (the release is made if it is not there; existing files are replaced)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1 \
+            || gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$GITHUB_REF_NAME" --notes "Release $GITHUB_REF_NAME. The notes are the changelog entry of this version."
+          gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber archives/repomemo-server-* archives/SHA256SUMS

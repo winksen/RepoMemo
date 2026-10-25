@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.35 (2026-10-25)
+
+The server is built for three platforms and attached to the release.
+
+### Added
+- **`.github/workflows/server-archives.yml`:** on a `v*` tag, and by hand (which only keeps the archives as artifacts), never on a pull request. For **Linux x64, Linux arm64 and Windows x64**, on native runners (no cross-compiling or emulation), it checks that the tag is `v` plus the version, builds the web app for the page's own host and the server, checks that the binary is for that platform, and packs it with `scripts/package-server.mjs` (V0.4.31), the commit's date being the time recorded.
+- **Attaching to the release:** a second job, the only one with write access and only on a tag, downloads the three archives, requires exactly three, writes **one `SHA256SUMS`** over them and checks it, then attaches the archives and the sums to the GitHub release, making the release first when it is not there (existing files are replaced, so a re-run is safe). Its text is the changelog's from V0.4.39.
+
+### Changed
+- **`container:check`** holds the three platforms and runners, the tag rule, the tag-only release job with the only write permission and the checked sums. **The documents:** the operations guide, the technical mindmap, the roadmap and the release index. **The version** is `0.4.35` everywhere.
+
+### Checks
+- **Run:** `container:check`, `version:check`, `docs:check`.
+- **Not run:** the workflow (it runs on a tag, or by hand from the Actions page: a manual run is the way to try it before a tag). The release step has never run; the first tag is its test.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.4.34 (2026-10-25)
 
 One page from a direct install to a working https address.
