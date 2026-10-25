@@ -9,3 +9,4 @@ docker/Caddyfile.web text eol=lf
 docker/*.sh text eol=lf
 .env.example text eol=lf
 .dockerignore text eol=lf
+deploy/*.sh text eol=lf

@@ -266,6 +266,22 @@ for (const name of ["REPOMEMO_WEB_API_URL", "REPOMEMO_PRODUCT_NAME"]) {
 if (!/handle \/config\.json/.test(webCaddyfile)) problems.push("docker/Caddyfile.web does not serve /config.json");
 if (!/vite\.config\.ts/.test("vite.config.ts") || !vite.includes("config.json")) problems.push("the web build does not write a default config.json");
 if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge does not use REPOMEMO_HOST");
+// The scripts that make a .env (V0.4.23): shell and PowerShell, strong secrets, never an overwrite, and tried in CI.
+{
+  const sh = read("deploy/init.sh");
+  const ps = read("deploy/init.ps1");
+  for (const [name, text] of [["init.sh", sh], ["init.ps1", ps]]) {
+    for (const needle of ["REPOMEMO_JWT_SECRET", "REPOMEMO_SECRET_KEY", "REPOMEMO_HOST", "COMPOSE_PROFILES"]) {
+      if (!text.includes(needle)) problems.push(`deploy/${name} does not set ${needle}`);
+    }
+    if (!/exists already/.test(text)) problems.push(`deploy/${name} does not refuse to overwrite a .env`);
+  }
+  if (!/openssl rand -hex 32/.test(sh) || !/RandomNumberGenerator/.test(ps)) problems.push("the init scripts do not draw their secrets from a strong source");
+  if (!/umask 077/.test(sh)) problems.push("deploy/init.sh does not keep the .env to its owner");
+  if (!attributes.split(/\r?\n/).some((line) => line.startsWith("deploy/*.sh") && /eol=lf/.test(line))) problems.push(".gitattributes does not keep deploy/*.sh on LF line endings");
+  if (!/^  init-scripts:/m.test(ci) || !/init\.sh/.test(ci) || !/init\.ps1/.test(ci)) problems.push(".github/workflows/ci.yml does not try both init scripts");
+}
+
 // The data is in three volumes of its own and a 0.3.x install can move into them (V0.4.22).
 for (const [file, text] of [["docker-compose.yml", compose], ["deploy/api.yml", read("deploy/api.yml")]]) {
   for (const [volume, variable, folder] of [["repomemo-db", "REPOMEMO_DB_DIR", "/var/lib/repomemo-db"], ["repomemo-files", "REPOMEMO_BLOB_DIR", "/var/lib/repomemo-files"], ["repomemo-backups", "REPOMEMO_BACKUP_DIR", "/var/lib/repomemo-backups"]]) {

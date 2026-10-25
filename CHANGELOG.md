@@ -2,6 +2,27 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.23 (2026-10-25)
+
+One command makes a working .env.
+
+### Added
+- **`deploy/init.sh` and `deploy/init.ps1`:** make the `.env` of a container install from `.env.example`: the host name (`--host`, `-HostName`; letters, digits, dots and hyphens only), two random 64-character secrets (`openssl rand -hex 32`, or `/dev/urandom` without it; .NET's random number generator in PowerShell), and `COMPOSE_PROFILES` set to `edge` or, with `--no-edge` / `-NoEdge`, to nothing. On Unix the file is readable by its owner alone; the PowerShell file is UTF-8 without a byte-order mark, which Compose would read as part of the first name. They print the command to start and remind you to keep a copy of `REPOMEMO_SECRET_KEY`.
+- **They refuse to overwrite** a `.env` that exists, and say why: new secrets would sign everyone out and make the stored provider keys unreadable. `--output` / `-Output` names another file.
+- **A CI job, `init-scripts`,** runs both: the host, the profile and two 64-hex secrets are in the file, the shell file is mode 600, a second run is refused, two runs share no secret, and `docker compose config` accepts what each wrote.
+
+### Changed
+- **`.gitattributes`** keeps `deploy/*.sh` on LF. `container:check` holds the scripts and the CI job.
+- **The documents:** the operations guide, the technical mindmap, the roadmap and the release index.
+- **The version** is `0.4.23` everywhere.
+
+### Checks
+- **Run:** the shell script itself (it makes a file, refuses a second run, rejects a bad host name and leaves secrets that differ; no server or container is involved), `container:check`, `version:check`, `docs:check`.
+- **Not run:** the PowerShell script (no PowerShell session was opened for it) and `docker compose config` on the result; the CI job does both.
+
+### Upgrading
+- Nothing to do. An existing `.env` is never touched.
+
 ## V0.4.22 (2026-10-25)
 
 The compose files keep the data in volumes of their own.

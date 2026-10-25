@@ -326,6 +326,43 @@ jobs:
           docker rm --force converter-ci || true
           docker volume rm converter-ci-socket || true
 
+  # The script that makes a .env (V0.4.23), in shell and in PowerShell: strong secrets, the host name, the edge profile, and it
+  # refuses to overwrite a file. The result must be a file Docker Compose accepts.
+  init-scripts:
+    name: Init scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: The shell script makes a .env
+        run: |
+          sh deploy/init.sh --host memo.example.com --output sh.env
+          grep -q '^REPOMEMO_HOST=memo.example.com$' sh.env
+          grep -q '^COMPOSE_PROFILES=edge$' sh.env
+          grep -Eq '^REPOMEMO_JWT_SECRET=[0-9a-f]{64}$' sh.env
+          grep -Eq '^REPOMEMO_SECRET_KEY=[0-9a-f]{64}$' sh.env
+          test "$(stat -c %a sh.env)" = "600"
+          docker compose --env-file sh.env config --quiet
+      - name: It refuses to overwrite, and says why
+        run: |
+          if sh deploy/init.sh --output sh.env; then echo "the second run should have been refused" >&2; exit 1; fi
+      - name: Two runs do not share secrets
+        run: |
+          sh deploy/init.sh --no-edge --output other.env
+          test "$(grep '^REPOMEMO_JWT_SECRET=' sh.env)" != "$(grep '^REPOMEMO_JWT_SECRET=' other.env)"
+          grep -q '^COMPOSE_PROFILES=$' other.env
+      - name: The PowerShell script makes the same
+        shell: pwsh
+        run: |
+          ./deploy/init.ps1 -HostName memo.example.com -Output ps.env
+          if (-not (Select-String -Path ps.env -Pattern '^REPOMEMO_JWT_SECRET=[0-9a-f]{64}$' -Quiet)) { throw "no strong JWT secret" }
+          if (-not (Select-String -Path ps.env -Pattern '^COMPOSE_PROFILES=edge$' -Quiet)) { throw "no edge profile" }
+          $failed = $false
+          try { ./deploy/init.ps1 -Output ps.env } catch { $failed = $true }
+          if (-not $failed) { throw "the second run should have been refused" }
+      - name: The PowerShell file is one Docker Compose accepts
+        run: docker compose --env-file ps.env config --quiet
+
   # A 0.3.x layout is moved into the three volumes (V0.4.22): the server runs once on the single volume the way 0.3.x
   # ran it and an account is made; the stack is stopped, deploy/migrate-volumes.sh moves the data, the compose stack starts
   # on the new volumes and the same account signs in. (V0.4.27 repeats this with the real 0.3.27 images.)
