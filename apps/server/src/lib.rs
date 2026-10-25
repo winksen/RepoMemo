@@ -12,6 +12,7 @@ mod avatars;
 mod backup;
 mod backup_copy;
 mod backup_crypto;
+mod build_info;
 mod check_config;
 mod collaboration;
 mod compression;
@@ -53,6 +54,7 @@ use access_control::*;
 use ai::*;
 use artifacts::*;
 use auth::*;
+pub use build_info::{BuildInfo, BUILD};
 pub use check_config::check_config;
 use collaboration::*;
 pub use config::*;
@@ -211,6 +213,9 @@ pub struct HealthResponse {
     pub authentication: &'static str,
     /// The server still has to be set up through the onboarding.
     pub setup_required: bool,
+    /// The version, commit, date and image tag this server was built as (V0.4.3).
+    #[serde(flatten)]
+    pub build: BuildInfo,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -1022,6 +1027,7 @@ async fn health(State(state): State<AppState>) -> Json<HealthResponse> {
         status: "ok",
         authentication: "jwt",
         setup_required: setup::setup_pending(&state).await.unwrap_or(false),
+        build: BUILD,
     })
 }
 

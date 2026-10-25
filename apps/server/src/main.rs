@@ -18,6 +18,10 @@ fn main() {
     if repomemo_git::remote::run_as_askpass_if_requested() {
         return;
     }
+    if std::env::args().any(|argument| argument == "--version" || argument == "-V") {
+        println!("{}", repomemo_server::BUILD.line());
+        return;
+    }
     // `--check-config` reads the environment as a start would, reports it and exits.
     if std::env::args().any(|argument| argument == "--check-config") {
         std::process::exit(repomemo_server::check_config());

@@ -233,6 +233,8 @@ What the compose file settles for you, from §2: the server listens on all inter
 
 ### Is it up?
 
+Since V0.4.3 `/health` also names the build that answers (`version`, `commit`, `built_at`, `image`), and `repomemo-server --version` prints the same. The commit, date and image tag are build arguments of the Dockerfile (`REPOMEMO_BUILD_COMMIT`, `REPOMEMO_BUILD_DATE`, `REPOMEMO_IMAGE_TAG`); the compose file passes the tag from `REPOMEMO_VERSION`, and a plain `docker build` reports `unknown` for the ones it was not given.
+
 | Check | Answers |
 |---|---|
 | `GET /health` | 200 while the process is alive; `setup_required` is true until the first-run setup is done |

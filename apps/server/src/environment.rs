@@ -591,6 +591,10 @@ fn unattached(host: &Host, path: &str) -> Response {
             "authentication": "jwt",
             "setup_required": false,
             "environment_required": true,
+            "version": crate::BUILD.version,
+            "commit": crate::BUILD.commit,
+            "built_at": crate::BUILD.built_at,
+            "image": crate::BUILD.image,
         }))
         .into_response(),
         "/health/ready" => (

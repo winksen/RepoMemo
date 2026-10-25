@@ -2,6 +2,26 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.3 (2026-10-25)
+
+The server says which build it is.
+
+### Added
+- **Build information:** `/health` now carries `version`, `commit`, `built_at` and `image` (also in the detached answer a server gives before an environment is attached), and `repomemo-server --version` (or `-V`) prints the same on one line. The commit, the date and the image tag are `REPOMEMO_BUILD_COMMIT`, `REPOMEMO_BUILD_DATE` and `REPOMEMO_IMAGE_TAG`, read **at build time**; a build that was not given them says `unknown`.
+- **The image is told what it is:** the Dockerfile's build stage takes the three as `ARG`s, the compose file passes the commit, the date and `REPOMEMO_VERSION` as the image tag, and `container:check` fails when either side lacks one.
+- **The web client's type for `/health`** (`SharedHealth`) names the new fields, which the version check of V0.4.21 will read.
+
+### Changed
+- **The documents:** the settings reference (the three build-time variables), the operations guide, the technical mindmap, the roadmap and the release index.
+- **The version** is `0.4.3` everywhere.
+
+### Checks
+- **Compiled and linted:** `cargo clippy -D warnings` over the server with its tests, `cargo fmt --all --check`, `typecheck`, `container:check`, `version:check`, `docs:check`.
+- **Tests written, not run:** two unit tests (an unset build argument reads `unknown`; the version line names the package version) and a server test that `/health` names the version and carries the three other fields. No image was built.
+
+### Upgrading
+- Nothing to do. `/health` answers more fields; nothing that read it breaks.
+
 ## V0.4.2 (2026-10-25)
 
 A configuration can be checked without starting the server.

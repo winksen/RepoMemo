@@ -120,8 +120,20 @@ export function configureDesktopApi(serverUrl: string, desktopFetch: typeof fetc
   desktopSession = true;
 }
 
-export function getSharedHealth(): Promise<{ service: string; status: string; authentication: string; setup_required?: boolean }> {
-  return request<{ service: string; status: string; authentication: string; setup_required?: boolean }>("/health");
+/** What `/health` answers; the build fields name the exact server (V0.4.3). */
+export type SharedHealth = {
+  service: string;
+  status: string;
+  authentication: string;
+  setup_required?: boolean;
+  version?: string;
+  commit?: string;
+  built_at?: string;
+  image?: string;
+};
+
+export function getSharedHealth(): Promise<SharedHealth> {
+  return request<SharedHealth>("/health");
 }
 
 export const SHARED_SESSION_STORAGE_KEY = "repomemo.shared.access-token";

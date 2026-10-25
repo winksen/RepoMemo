@@ -375,6 +375,23 @@ async fn the_authentication_rate_limit_answers_429() {
 }
 
 #[tokio::test]
+async fn health_names_the_build_that_answers() {
+    let data_dir = temp_data_dir("health-build");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let health = response_json(
+        app.oneshot(Request::builder().uri("/health").body(Body::empty()).unwrap())
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(health["version"], env!("CARGO_PKG_VERSION"));
+    for field in ["commit", "built_at", "image"] {
+        assert!(health[field].is_string(), "/health names the {field}");
+    }
+    let _ = std::fs::remove_dir_all(data_dir);
+}
+
+#[tokio::test]
 async fn closed_registration_only_admits_the_first_account() {
     let data_dir = temp_data_dir("closed-registration");
     let mut config = ServerConfig::for_test(data_dir.clone());

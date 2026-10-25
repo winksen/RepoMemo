@@ -29,6 +29,10 @@ RUN npm run build
 FROM rust:1-trixie@sha256:767c71592f7d1f3f242292000f8efd4e67b6732363da176772f4d220332e264f AS build
 WORKDIR /build
 COPY . .
+# What this build is called, printed by /health and --version (V0.4.3).
+ARG REPOMEMO_BUILD_COMMIT=unknown
+ARG REPOMEMO_BUILD_DATE=unknown
+ARG REPOMEMO_IMAGE_TAG=unknown
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/build/target \
     cargo build --release --locked -p repomemo-server \

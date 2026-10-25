@@ -18,6 +18,10 @@ services:
     build:
       context: .
       target: server
+      args:
+        REPOMEMO_BUILD_COMMIT: ${REPOMEMO_BUILD_COMMIT:-unknown}
+        REPOMEMO_BUILD_DATE: ${REPOMEMO_BUILD_DATE:-unknown}
+        REPOMEMO_IMAGE_TAG: ${REPOMEMO_VERSION:-local}
     image: repomemo-server:${REPOMEMO_VERSION:-local}
     restart: unless-stopped
     init: true

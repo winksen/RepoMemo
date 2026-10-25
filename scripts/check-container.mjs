@@ -147,6 +147,12 @@ if (!/ENTRYPOINT \["repomemo-server"\]/.test(dockerfile)) problems.push("the ser
 if (!/USER\s+repomemo/.test(dockerfile)) problems.push("the server image runs as root");
 if (/^\s*(ENV|ARG)\s+\S*(SECRET|PASSWORD|TOKEN|JWT)\S*=/im.test(dockerfile)) problems.push("the Dockerfile bakes a secret into an image");
 
+// The server image is told what it is (V0.4.3): the Dockerfile takes the three build arguments, and the compose file gives them.
+for (const name of ["REPOMEMO_BUILD_COMMIT", "REPOMEMO_BUILD_DATE", "REPOMEMO_IMAGE_TAG"]) {
+  if (!new RegExp(String.raw`^ARG\s+${name}\b`, "m").test(dockerfile)) problems.push(`the Dockerfile has no ARG ${name}, so /health cannot name the build`);
+  if (!compose.includes(`${name}:`)) problems.push(`the compose file gives no build argument ${name}`);
+}
+
 // Every REPOMEMO_ variable the compose file sets is one the server (or the proxy) reads.
 const serverSource = [];
 const walk = (folder) => {
