@@ -1,0 +1,56 @@
+# RepoMemo as a systemd service (V0.4.32). install.sh puts this file at /etc/systemd/system/repomemo.service; keep local
+# changes in a drop-in (systemctl edit repomemo), so an upgrade can replace this file.
+#
+# The server runs as its own user, may write only its working folder, and has no capabilities, no new privileges and a
+# filtered set of system calls. The settings, with the secrets, are in /etc/repomemo/repomemo.env.
+[Unit]
+Description=RepoMemo server
+Documentation=https://github.com/repomemo/repomemo
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=repomemo
+Group=repomemo
+# The data lives in workspace-data/ under this folder (REPOMEMO_SERVER_DATA_DIR=main in the env file).
+WorkingDirectory=/var/lib/repomemo
+EnvironmentFile=/etc/repomemo/repomemo.env
+# /opt/repomemo is a link to the release in use, so a new release is a new link (install.sh).
+ExecStart=/opt/repomemo/bin/repomemo-server
+Restart=on-failure
+RestartSec=5
+# A stop is a SIGTERM: the server finishes running requests for REPOMEMO_SHUTDOWN_GRACE_SECONDS (30), then closes the
+# database cleanly. Give it longer than that before systemd kills it.
+KillSignal=SIGTERM
+TimeoutStopSec=45
+LimitNOFILE=65536
+
+# What the service may not do.
+NoNewPrivileges=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+UMask=0077
+ProtectSystem=strict
+ReadWritePaths=/var/lib/repomemo
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProcSubset=pid
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+
+[Install]
+WantedBy=multi-user.target

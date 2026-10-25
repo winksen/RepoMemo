@@ -282,6 +282,24 @@ if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge d
   if (!/^  server-archive:/m.test(ci) || !/package-server\.mjs --binary/.test(ci) || !/sha256sum --check SHA256SUMS/.test(ci) || !/REPOMEMO_WEB_DIR="\$home\/web"/.test(ci)) problems.push(".github/workflows/ci.yml does not pack the server, unpack it clean and start it on its own web app");
 }
 
+// Linux: a hardened systemd unit and an install script that is safe to run twice (V0.4.32).
+{
+  const unit = read("deploy/direct/service/repomemo.service");
+  const install = read("deploy/direct/service/install.sh");
+  for (const directive of ["User=repomemo", "NoNewPrivileges=true", "CapabilityBoundingSet=", "ProtectSystem=strict", "ReadWritePaths=/var/lib/repomemo", "PrivateTmp=true", "ProtectHome=true", "RestrictAddressFamilies=", "SystemCallFilter=@system-service", "MemoryDenyWriteExecute=true", "EnvironmentFile=/etc/repomemo/repomemo.env", "ExecStart=/opt/repomemo/bin/repomemo-server", "TimeoutStopSec=", "KillSignal=SIGTERM"]) {
+    if (!unit.includes(directive)) problems.push(`deploy/direct/service/repomemo.service lacks ${directive}`);
+  }
+  const stop = Number(/^TimeoutStopSec=(\d+)/m.exec(unit)?.[1] ?? 0);
+  if (stop <= 30) problems.push("the unit's TimeoutStopSec is not longer than the server's shutdown grace of 30 seconds");
+  for (const needle of ["useradd --system", "getent passwd repomemo", "ln -sfn", "cmp -s", "chmod 0600", "exists; leaving it as it is", "systemctl daemon-reload", "systemctl enable"]) {
+    if (!install.includes(needle)) problems.push(`deploy/direct/service/install.sh does not do what makes it safe to run twice: ${needle}`);
+  }
+  if (/\brm -rf "?\$prefix\/repomemo"?\b|rm -rf \/var\/lib/.test(install)) problems.push("deploy/direct/service/install.sh deletes the data or the link target");
+  const env = read("deploy/direct/repomemo.env.example");
+  if (!env.includes("REPOMEMO_WEB_DIR=/opt/repomemo/web")) problems.push("the settings example's web folder is not under the link the unit runs from (/opt/repomemo)");
+  if (!/systemd-analyze verify \/etc\/systemd\/system\/repomemo\.service/.test(ci) || !/service\/install\.sh" --generate-secrets --start/.test(ci) || !/A second run changes nothing/.test(ci)) problems.push(".github/workflows/ci.yml does not verify the unit, install the archive as a service and run the installer twice");
+}
+
 // Metrics in containers (V0.4.30): an example, behind its own profile, pinned, on the loopback, read-only, with the token
 // mounted read-only and the scrape configuration reading it; CI shows the figures.
 {

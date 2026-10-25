@@ -2,6 +2,27 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.32 (2026-10-25)
+
+Linux: a hardened systemd unit and an installer that is safe to run twice.
+
+### Added
+- **`service/repomemo.service`** (in the archive; `deploy/direct/service/` in the source): the server as a systemd service, run as the user `repomemo` with no capabilities and no new privileges, `ProtectSystem=strict` with only `/var/lib/repomemo` writable, private `/tmp` and devices, the kernel's tunables, modules, logs, control groups, clock and host name closed to it, only the `AF_UNIX`, `AF_INET` and `AF_INET6` address families, no namespaces, no real-time scheduling, no setuid files, no writes to executable memory, native system calls only and the `@system-service` set. It reads `/etc/repomemo/repomemo.env`, runs `/opt/repomemo/bin/repomemo-server` from `/var/lib/repomemo`, restarts on failure, sends SIGTERM and waits 45 seconds (the server's own grace is 30, V0.4.6).
+- **`service/install.sh`:** run as root from the unpacked archive. It makes the `repomemo` user and group (no login) and `/var/lib/repomemo` and `/etc/repomemo`; copies the release to `/opt/repomemo-<version>` and points the link `/opt/repomemo` at it, so a new release is a new link and the old one stays (V0.4.36 uses it); makes `/etc/repomemo/repomemo.env` from the example **only if it is absent** (mode 0600, root), with new secrets under `--generate-secrets`; installs and enables the unit; `--start` starts it, and refuses while a secret is empty. **It is safe to run twice:** every step checks first, an existing settings file is never touched, a release folder that differs is never overwritten, and a link that is not a link is refused.
+- **CI** (`server-archive`, V0.4.31) now also installs the unpacked archive as a service on its runner, runs `systemd-analyze verify` on the unit, waits for `/health/ready`, asks the page, checks the user, the file mode and that the process runs as `repomemo`, runs the installer a second time and compares the files and the link before and after, and stops the service cleanly.
+
+### Changed
+- **`container:check`** holds the unit's hardening, a stop time longer than the server's grace, what makes the installer safe to run twice, the settings example's web folder under the link, and the CI steps.
+- **The documents:** the operations guide, the technical mindmap, the roadmap and the release index.
+- **The version** is `0.4.32` everywhere.
+
+### Checks
+- **Run:** a syntax check of the installer, `container:check`, `version:check`, `docs:check`, the packager's tests.
+- **Not run:** the installer, the unit under systemd or `systemd-analyze` (this machine runs neither). The hardening is the part most likely to need a first-run correction: a call the server makes that `@system-service` or `MemoryDenyWriteExecute` forbids shows in the journal, and CI's job is where it will show.
+
+### Upgrading
+- Nothing to do. A new install: unpack, `sudo sh service/install.sh --generate-secrets --start`.
+
 ## V0.4.31 (2026-10-25)
 
 The server as a release archive, for a plain server.

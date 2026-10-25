@@ -396,9 +396,40 @@ jobs:
           curl --fail --silent http://127.0.0.1:3020/ | grep -qi '<div id="root">'
           curl --fail --silent http://127.0.0.1:3020/config.json | grep -q '"apiUrl":""'
           curl --fail --silent http://127.0.0.1:3020/health | grep -q '"status":"ok"'
+      - name: Stop it, then install the archive as a systemd service (V0.4.32)
+        run: |
+          pkill -x repomemo-server || true
+          home="$(echo "$RUNNER_TEMP"/clean/repomemo-server-*-linux-x64)"
+          sudo sh "$home/service/install.sh" --generate-secrets --start
+          sudo systemd-analyze verify /etc/systemd/system/repomemo.service
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3020/health/ready > /dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:3020/ | grep -qi '<div id="root">'
+          systemctl is-active repomemo
+          sudo systemd-analyze security repomemo.service --no-pager | tail -3 || true
+          test "$(id -un repomemo)" = "repomemo"
+          test "$(sudo stat -c %a /etc/repomemo/repomemo.env)" = "600"
+          ps -o user= -C repomemo-server | grep -qx repomemo
+      - name: A second run changes nothing
+        run: |
+          home="$(echo "$RUNNER_TEMP"/clean/repomemo-server-*-linux-x64)"
+          before="$(sudo sha256sum /etc/repomemo/repomemo.env /etc/systemd/system/repomemo.service | sha256sum; readlink /opt/repomemo)"
+          sudo sh "$home/service/install.sh"
+          after="$(sudo sha256sum /etc/repomemo/repomemo.env /etc/systemd/system/repomemo.service | sha256sum; readlink /opt/repomemo)"
+          test "$before" = "$after"
+          systemctl is-active repomemo
+      - name: It stops cleanly
+        run: |
+          sudo systemctl stop repomemo
+          ! systemctl is-failed --quiet repomemo
+          sudo journalctl -u repomemo --no-pager | tail -5
       - name: What it logged
         if: failure()
-        run: cat "$RUNNER_TEMP/work/server.log"
+        run: |
+          cat "$RUNNER_TEMP/work/server.log" || true
+          sudo journalctl -u repomemo --no-pager | tail -60 || true
       - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: server-archive-linux-x64
