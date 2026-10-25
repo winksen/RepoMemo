@@ -227,6 +227,15 @@ What the compose file settles for you, from §2: the server listens on all inter
 - **Behind your own proxy** (nginx, Traefik, a load balancer): build and run only the `server` target, keep it on a private network, and use §3 for the proxy.
 - `node scripts/check-container.mjs` (`npm run container:check`, run by CI) checks the Dockerfile, the compose file, the Caddyfile and `.env.example` against each other and against the variables the server reads, asserts that the server image's git is one `is_patched_git` accepts, refuses a base image without a digest, a CI action not pinned to a commit and a Dependabot file that leaves an ecosystem out; it needs no Docker. *Since V0.3.23* it also asserts that CI has a job that runs `docker compose up --build --wait` and asks `/health/ready` through the proxy, takes the stack down again, and a job on an arm64 runner that builds the `server` and `proxy` stages for `linux/arm64`.
 
+### Splitting the data folder (V0.4.4)
+
+By default everything is in the data folder: `repomemo.sqlite` (with its write-ahead log), `blobs/`, `backups/`, `secret.key`, `logs/`, `previews/` and `tmp/`. Three absolute-path settings move the first three elsewhere, for example onto three volumes: `REPOMEMO_DB_DIR` (the database, best on fast local disk), `REPOMEMO_BLOB_DIR` (the stored files, which can be large and slow) and `REPOMEMO_BACKUP_DIR` (backups, best on another disk than the two above). Each defaults to its place under the data folder, so nothing changes until one is set; all three need `REPOMEMO_SERVER_DATA_DIR`. The key file, the logs and the previews stay in the data folder, so back that up with the others.
+
+- **Received files** wait in `.incoming` inside the files folder instead of `tmp/`, so storing a file stays a rename on one volume; the sweep of untracked files leaves that folder alone.
+- **Backups** are made from the running database into the backups folder, and their free-space figure is the backups folder's. A restore still makes a normal single-folder environment under `workspace-data/`; to put a restored environment on separate volumes, stop, move `repomemo.sqlite*` and `blobs/` to the volumes and set the three variables.
+- **Moving an existing install:** stop the server, move the database file (and its `-wal` and `-shm` files if any), `blobs/` or `backups/` to the new folder, set the variable, start. A server that finds no database in `REPOMEMO_DB_DIR` starts a new empty one.
+- `repomemo-server --check-config` tries each folder that is set.
+
 ### Checking a configuration (V0.4.2)
 
 `repomemo-server --check-config` reads the environment exactly as a start would, prints what the server would use (secrets only as "set, N characters" or "from the file …", never their values), looks at the data folder (it exists and is writable, or can be created) and exits **without serving**: `0` the configuration can start, `1` it is invalid (the first error is named), `2` the data folder cannot be used. A secret file that other accounts can read is a warning on Unix. In a container: `docker compose run --rm server --check-config`.

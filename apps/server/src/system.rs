@@ -1048,7 +1048,8 @@ pub(crate) async fn overview(
     require_system_admin(&subject)?;
     let statistics = state.storage.system_statistics().await.map_err(map_storage_error)?;
     let data_dir = PathBuf::from(&state.instance.data_dir);
-    let file_size = |name: &str| std::fs::metadata(data_dir.join(name)).map_or(0, |metadata| metadata.len());
+    let db_dir = state.storage.db_dir().to_path_buf();
+    let file_size = |name: &str| std::fs::metadata(db_dir.join(name)).map_or(0, |metadata| metadata.len());
     let (preview_count, preview_bytes) = std::fs::read_dir(state.converter.cache_dir())
         .map(|entries| {
             entries
@@ -2006,7 +2007,8 @@ pub(crate) async fn metrics(
     }
     let statistics = state.storage.system_statistics().await.map_err(map_storage_error)?;
     let data_dir = PathBuf::from(state.storage.data_dir());
-    let file_size = |name: &str| std::fs::metadata(data_dir.join(name)).map_or(0, |metadata| metadata.len());
+    let file_size =
+        |name: &str| std::fs::metadata(state.storage.db_dir().join(name)).map_or(0, |metadata| metadata.len());
     let traffic = state.telemetry.traffic();
     let (tracked_keys, locked_sign_ins) = state.guards.stats();
     let (vector_bytes, vector_workspaces) = state.storage.vector_index_usage();

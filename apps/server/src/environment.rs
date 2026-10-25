@@ -42,7 +42,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use repomemo_storage::{inspect_environment, EnvironmentState};
+use repomemo_storage::{inspect_environment, inspect_environment_split, EnvironmentState};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{Mutex, RwLock};
 use tower::ServiceExt;
@@ -194,7 +194,8 @@ impl Host {
         });
         match host.config.data_dir.clone() {
             Some(dir) => {
-                match inspect_environment(&dir).await {
+                let database_dir = host.config.db_dir.clone().unwrap_or_else(|| dir.clone());
+                match inspect_environment_split(&dir, &database_dir).await {
                     EnvironmentState::Invalid(reason) => {
                         bail!("{} is not a usable RepoMemo environment: {reason}", dir.display());
                     }

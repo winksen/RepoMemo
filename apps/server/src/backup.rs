@@ -30,7 +30,6 @@ use crate::system::{audit, require_full_system_admin, require_system_admin, requ
 use crate::{ApiError, AppState, AuthenticatedSubject};
 
 /// The folder inside the data folder that holds backups.
-pub(crate) const BACKUPS_DIR: &str = "backups";
 const MANIFEST_FILE: &str = "manifest.json";
 const COPY_RECORD_FILE: &str = "copy.json";
 const DATABASE_FILE: &str = "repomemo.sqlite";
@@ -133,7 +132,7 @@ fn valid_backup_name(name: &str) -> bool {
 }
 
 fn backups_root(state: &AppState) -> PathBuf {
-    state.storage.data_dir().join(BACKUPS_DIR)
+    state.storage.backup_dir().to_path_buf()
 }
 
 /// What a folder copy did.
@@ -690,6 +689,9 @@ async fn restore_backup(state: &AppState, name: &str, environment: &str) -> anyh
     // The proof that it works: open it, count what is in it, close it.
     let opened = StorageEngine::open(StorageConfig {
         data_dir: target.clone(),
+        db_dir: None,
+        blob_dir: None,
+        backup_dir: None,
         master_key: crate::config::env_secret("REPOMEMO_SECRET_KEY").ok().flatten(),
         read_connections: 1,
         vector_index_mb: 0,
@@ -899,7 +901,7 @@ async fn reseal_backup(state: &AppState, name: &str) -> anyhow::Result<String> {
         .map_err(|message| anyhow::anyhow!(message))?
     };
     // The new folder is whole beside the old one before it replaces it.
-    if let Some(free) = free_disk_bytes(state.storage.data_dir()) {
+    if let Some(free) = free_disk_bytes(state.storage.backup_dir()) {
         if free < manifest.bytes.saturating_add(manifest.database_bytes) {
             anyhow::bail!(
                 "There is not enough free disk to seal {name} again: it needs about as much room as the backup takes."
@@ -1026,7 +1028,7 @@ pub(crate) fn overview(state: &AppState) -> BackupsResponse {
         directory: root.to_string_lossy().trim_start_matches(r"\\?\").to_owned(),
         keep: settings.backup_keep,
         interval_hours: settings.backup_interval_hours,
-        disk_free_bytes: free_disk_bytes(state.storage.data_dir()),
+        disk_free_bytes: free_disk_bytes(state.storage.backup_dir()),
         encryption_enabled: state.backup_key.is_some(),
         previous_key_set: state.backup_previous_key.is_some(),
         copy_directory: state

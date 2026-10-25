@@ -66,9 +66,9 @@ impl Drop for StagedBlob {
 }
 
 impl StorageEngine {
-    /// Starts receiving a file into `<data>/tmp/`.
+    /// Starts receiving a file into `<data>/tmp/`, or `.incoming` inside a separate blob folder.
     pub async fn begin_staged_blob(&self) -> Result<StagedBlobWriter> {
-        let directory = self.data_dir.join("tmp");
+        let directory = self.staging_dir.clone();
         tokio::fs::create_dir_all(&directory).await?;
         let path = directory.join(format!("upload-{}.part", Uuid::new_v4().simple()));
         let file = tokio::fs::File::create(&path)

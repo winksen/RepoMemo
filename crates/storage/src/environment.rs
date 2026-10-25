@@ -31,13 +31,29 @@ pub enum EnvironmentState {
 
 /// Looks into `dir` without changing anything.
 pub async fn inspect_environment(dir: &Path) -> EnvironmentState {
-    match inspect(dir).await {
+    inspect_environment_split(dir, dir).await
+}
+
+/// Looks into an environment whose database file is in `database_dir` (V0.4.4); the data folder
+/// itself may then hold only the key file, the logs and the backups.
+pub async fn inspect_environment_split(dir: &Path, database_dir: &Path) -> EnvironmentState {
+    match inspect(dir, database_dir).await {
         Ok(state) => state,
         Err(reason) => EnvironmentState::Invalid(reason),
     }
 }
 
-async fn inspect(dir: &Path) -> Result<EnvironmentState, String> {
+async fn inspect(dir: &Path, database_dir: &Path) -> Result<EnvironmentState, String> {
+    if database_dir != dir {
+        match tokio::fs::metadata(dir).await {
+            Ok(metadata) if !metadata.is_dir() => return Err("This is a file, not a folder.".to_owned()),
+            Err(error) if error.kind() != std::io::ErrorKind::NotFound => {
+                return Err(format!("The folder cannot be read: {error}."))
+            }
+            _ => {}
+        }
+    }
+    let (dir_for_blobs, dir) = (dir, database_dir);
     let metadata = match tokio::fs::metadata(dir).await {
         Ok(metadata) => metadata,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(EnvironmentState::Empty),
@@ -73,7 +89,7 @@ async fn inspect(dir: &Path) -> Result<EnvironmentState, String> {
     if header.len() < SQLITE_HEADER.len() || &header[..SQLITE_HEADER.len()] != SQLITE_HEADER {
         return Err(format!("{DATABASE_FILE} is not a SQLite database."));
     }
-    if let Ok(blobs) = tokio::fs::metadata(dir.join("blobs")).await {
+    if let Ok(blobs) = tokio::fs::metadata(dir_for_blobs.join("blobs")).await {
         if !blobs.is_dir() {
             return Err("blobs exists but is not a folder.".to_owned());
         }

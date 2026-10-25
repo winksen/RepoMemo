@@ -210,7 +210,10 @@ impl StorageEngine {
             while let Some(entry) = entries.next_entry().await? {
                 let file_type = entry.file_type().await?;
                 if file_type.is_dir() {
-                    directories.push(entry.path());
+                    // Files being received wait in a folder of their own; they are not untracked.
+                    if entry.file_name() != crate::STAGING_DIR {
+                        directories.push(entry.path());
+                    }
                 } else if file_type.is_file() {
                     files.push(entry.path());
                 }

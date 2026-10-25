@@ -14,6 +14,9 @@ const SECRETS: [&str; 5] = [
     "REPOMEMO_SETUP_CODE",
 ];
 
+/// How errors about the folders begin; they are exit code 2.
+const FOLDERS: [&str; 4] = ["data folder", "database folder", "files folder", "backups folder"];
+
 /// What the check found: lines to print, and what is wrong (errors) or doubtful (warnings).
 #[derive(Debug, Default)]
 pub struct CheckReport {
@@ -28,7 +31,9 @@ impl CheckReport {
     pub fn exit_code(&self) -> i32 {
         match (
             self.errors.is_empty(),
-            self.errors.iter().any(|error| error.starts_with("data folder")),
+            self.errors
+                .iter()
+                .any(|error| FOLDERS.iter().any(|folder| error.starts_with(folder))),
         ) {
             (true, _) => 0,
             (false, true) => 2,
@@ -100,7 +105,18 @@ pub(crate) fn check_config_report(config: Result<ServerConfig>) -> CheckReport {
         report.lines.push(secret_line(name, &mut report.warnings));
     }
     match config.data_dir.as_deref() {
-        Some(dir) => data_folder(dir, &mut report),
+        Some(dir) => {
+            data_folder(dir, "data folder      ", &mut report);
+            for (label, folder) in [
+                ("database folder  ", config.db_dir.as_deref()),
+                ("files folder     ", config.blob_dir.as_deref()),
+                ("backups folder   ", config.backup_dir.as_deref()),
+            ] {
+                if let Some(folder) = folder {
+                    data_folder(folder, label, &mut report);
+                }
+            }
+        }
         None => report
             .lines
             .push("data folder       not set: the server starts detached and an administrator picks one".to_owned()),
@@ -170,34 +186,36 @@ fn readable_by_others(_path: &Path) -> Option<&'static str> {
 }
 
 /// The data folder: present or creatable, and writable. A small file is made and removed to be sure.
-fn data_folder(dir: &Path, report: &mut CheckReport) {
+fn data_folder(dir: &Path, label: &str, report: &mut CheckReport) {
     if dir.is_dir() {
         let probe = dir.join(format!(".repomemo-check-{}", std::process::id()));
         match std::fs::write(&probe, b"") {
             Ok(()) => {
                 let _ = std::fs::remove_file(&probe);
-                report.lines.push(format!("data folder       {} (exists, writable)", dir.display()));
+                report.lines.push(format!("{label} {} (exists, writable)", dir.display()));
             }
             Err(error) => report.errors.push(format!(
-                "data folder {} is not writable: {error}. Give the server's account write access to it, or mount the volume read-write.",
+                "{} {} is not writable: {error}. Give the server's account write access to it, or mount the volume read-write.",
+                label.trim(),
                 dir.display()
             )),
         }
     } else if dir.exists() {
         report
             .errors
-            .push(format!("data folder {} exists but is not a folder", dir.display()));
+            .push(format!("{} {} exists but is not a folder", label.trim(), dir.display()));
     } else {
         match dir.ancestors().skip(1).find(|parent| parent.is_dir()) {
             Some(parent) if parent.metadata().is_ok_and(|meta| !meta.permissions().readonly()) => {
                 report.lines.push(format!(
-                    "data folder       {} (will be created inside {})",
+                    "{label} {} (will be created inside {})",
                     dir.display(),
                     parent.display()
                 ));
             }
             _ => report.errors.push(format!(
-                "data folder {} does not exist and cannot be created there",
+                "{} {} does not exist and cannot be created there",
+                label.trim(),
                 dir.display()
             )),
         }

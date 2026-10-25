@@ -2796,3 +2796,57 @@ async fn the_calls_a_webhook_received_are_kept_newest_first_a_hundred_to_a_sourc
     assert_eq!(storage.list_webhook_deliveries(&other.id, 500).await.unwrap().len(), 1);
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn the_database_the_files_and_the_backups_can_sit_in_three_folders() {
+    let base = std::env::temp_dir().join(format!("repomemo-split-{}", uuid::Uuid::new_v4()));
+    let (data, db, blobs, backups) = (
+        base.join("data"),
+        base.join("database"),
+        base.join("files"),
+        base.join("backups"),
+    );
+    let mut config = StorageConfig::new(data.clone());
+    config.db_dir = Some(db.clone());
+    config.blob_dir = Some(blobs.clone());
+    config.backup_dir = Some(backups.clone());
+    let storage = StorageEngine::open(config).await.unwrap();
+
+    assert!(
+        db.join("repomemo.sqlite").is_file(),
+        "the database is in its own folder"
+    );
+    assert!(!data.join("repomemo.sqlite").exists(), "and not in the data folder");
+    assert_eq!(storage.db_dir(), db);
+    assert_eq!(storage.blob_dir(), blobs);
+    assert_eq!(storage.backup_dir(), backups);
+
+    // A received file waits beside the stored ones, so storing it is a rename on one volume.
+    let bytes = b"stored on its own volume".to_vec();
+    let mut writer = storage.begin_staged_blob().await.unwrap();
+    writer.write(&bytes).await.unwrap();
+    let staged = writer.finish().await.unwrap();
+    assert!(blobs.join(".incoming").is_dir());
+    assert!(!data.join("tmp").exists());
+    let hash = staged.content_hash.clone();
+    storage.store_staged_blob(staged, Some("text/plain")).await.unwrap();
+    assert!(storage.blob_path_for_hash(&hash).starts_with(&blobs));
+    assert_eq!(std::fs::read(storage.blob_path_for_hash(&hash)).unwrap(), bytes);
+
+    // The sweep of untracked files leaves a file that is still being received alone.
+    let waiting = blobs.join(".incoming").join("upload-waiting.part");
+    std::fs::write(&waiting, b"half").unwrap();
+    storage
+        .sweep_untracked_blob_files(std::time::Duration::from_secs(0))
+        .await
+        .unwrap();
+    assert!(waiting.exists());
+
+    // The environment is recognised from the database folder, though the data folder holds no database.
+    assert_eq!(
+        super::inspect_environment_split(&data, &db).await,
+        super::EnvironmentState::Valid
+    );
+    drop(storage);
+    let _ = std::fs::remove_dir_all(base);
+}

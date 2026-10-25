@@ -245,6 +245,9 @@ async fn build_state(
         .context("an environment folder is required to open storage")?;
     let storage = StorageEngine::open(StorageConfig {
         data_dir: data_dir.clone(),
+        db_dir: config.db_dir.clone(),
+        blob_dir: config.blob_dir.clone(),
+        backup_dir: config.backup_dir.clone(),
         master_key: config.secret_key.clone(),
         read_connections: config.db_read_connections,
         vector_index_mb: config.vector_index_mb,

@@ -9,6 +9,12 @@ pub struct ServerConfig {
     /// `None` starts the server detached: an administrator picks the
     /// environment in the web app.
     pub data_dir: Option<PathBuf>,
+    /// Where the database file lives (`REPOMEMO_DB_DIR`); `None` keeps it in the data folder.
+    pub db_dir: Option<PathBuf>,
+    /// Where the stored files live (`REPOMEMO_BLOB_DIR`); `None` keeps them in `<data folder>/blobs`.
+    pub blob_dir: Option<PathBuf>,
+    /// Where backups are made (`REPOMEMO_BACKUP_DIR`); `None` keeps them in `<data folder>/backups`.
+    pub backup_dir: Option<PathBuf>,
     pub jwt_secret: String,
     /// Browser origins allowed to call the API (CORS). Empty: no CORS headers.
     pub allowed_origins: Vec<HeaderValue>,
@@ -201,6 +207,12 @@ impl ServerConfig {
             )?),
             _ => None,
         };
+        let db_dir = env_folder("REPOMEMO_DB_DIR")?;
+        let blob_dir = env_folder("REPOMEMO_BLOB_DIR")?;
+        let backup_dir = env_folder("REPOMEMO_BACKUP_DIR")?;
+        if data_dir.is_none() && (db_dir.is_some() || blob_dir.is_some() || backup_dir.is_some()) {
+            bail!("REPOMEMO_DB_DIR, REPOMEMO_BLOB_DIR and REPOMEMO_BACKUP_DIR belong to one environment, so REPOMEMO_SERVER_DATA_DIR must be set too");
+        }
         let allowed_origins = std::env::var("REPOMEMO_ALLOWED_ORIGIN")
             .unwrap_or_else(|_| "http://127.0.0.1:3021".to_owned())
             .split(',')
@@ -331,6 +343,9 @@ impl ServerConfig {
             service_name: std::env::var("REPOMEMO_SERVICE_NAME").unwrap_or_else(|_| "repomemo-server".to_owned()),
             bind_address,
             data_dir,
+            db_dir,
+            blob_dir,
+            backup_dir,
             jwt_secret,
             allowed_origins,
             office_previews: env_flag("REPOMEMO_OFFICE_PREVIEWS", false)?,
@@ -450,6 +465,9 @@ impl ServerConfig {
             service_name: "repomemo-server-test".to_owned(),
             bind_address: "127.0.0.1:0".parse().unwrap(),
             data_dir: Some(data_dir),
+            db_dir: None,
+            blob_dir: None,
+            backup_dir: None,
             jwt_secret: "test-secret-that-is-long-enough-for-jwt-signing".to_owned(),
             allowed_origins: Vec::new(),
             office_previews: false,
@@ -614,6 +632,18 @@ mod secret_tests {
         assert!(empty.to_string().contains("is empty"));
         std::fs::remove_file(path).unwrap();
     }
+}
+
+/// A folder given by an environment variable: an absolute path, or unset.
+fn env_folder(name: &str) -> Result<Option<PathBuf>> {
+    let Some(value) = env_text(name) else {
+        return Ok(None);
+    };
+    let path = PathBuf::from(&value);
+    if !path.is_absolute() {
+        bail!("{name} must be an absolute path, not {value}");
+    }
+    Ok(Some(path))
 }
 
 /// Parses an optional environment variable, with a clear error for a value

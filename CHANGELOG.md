@@ -2,6 +2,28 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.4 (2026-10-25)
+
+The data folder can be split across volumes.
+
+### Added
+- **Three folders that can sit on their own volumes:** `REPOMEMO_DB_DIR` (the database file and its write-ahead log), `REPOMEMO_BLOB_DIR` (the stored files) and `REPOMEMO_BACKUP_DIR` (the backups). Each is an absolute path and defaults to its place under the data folder (the folder itself, `blobs/`, `backups/`), so nothing changes until one is set. They need `REPOMEMO_SERVER_DATA_DIR` (they belong to one environment, never to the many a managed server can switch between).
+- **`StorageConfig`** gains `db_dir`, `blob_dir` and `backup_dir`, and `StorageEngine` `db_dir()` and `backup_dir()`. The environment a server is started on is recognised from the database folder (`inspect_environment_split`).
+- **Files being received stay on the files' volume:** with a separate files folder they wait in `.incoming` inside it, so storing one is still a rename; the sweep of untracked files skips that folder.
+- **`--check-config`** tries each folder that is set and names it in its errors (exit code 2 as for the data folder).
+
+### Changed
+- **Backups** are made in, listed from and measured for free space in the backups folder; the system overview and the metrics read the database file's size where it is.
+- **The documents:** the settings reference (three variables), the operations guide (§4, *Splitting the data folder*), the technical mindmap, the roadmap and the release index.
+- **The version** is `0.4.4` everywhere.
+
+### Checks
+- **Compiled and linted:** `cargo clippy -D warnings` over the storage crate and the server with their tests, `cargo fmt --all --check`, `version:check`, `docs:check`.
+- **Tests written, not run:** a storage test that opens an engine with three folders, finds the database and the files where they were put and the received file beside them, leaves a waiting file alone in the sweep and recognises the environment. The backup and restore of a split install, and three mounts in a container, are for the maintainer's hands (V0.4.22 gives compose its volumes).
+
+### Upgrading
+- Nothing to do. To move an install onto separate volumes, follow *Splitting the data folder* in the operations guide: stop, move, set the variable, start.
+
 ## V0.4.3 (2026-10-25)
 
 The server says which build it is.

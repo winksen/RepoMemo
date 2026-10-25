@@ -49,7 +49,7 @@ pub use accounts::{Anonymization, Deactivation, OwnedPlace, FORMER_MEMBER};
 pub use archive_import::{ImportedWorkspace, PendingPassage};
 pub use connectors::{ConnectorItemOutcome, ConnectorItemWrite};
 pub use credentials::{RepoCredentialInfo, RepoSecret, RepoWebhookInfo};
-pub use environment::{inspect_environment, EnvironmentState};
+pub use environment::{inspect_environment, inspect_environment_split, EnvironmentState};
 pub use mail::{DigestCandidate, DigestNotice, MailOutboxCounts, MailSettingsUpdate, QueuedMail, StoredMailSettings};
 pub use mentions::{MentionRow, MentionWrite, WorkspaceFileIndex};
 pub use organizations::StarterSetup;
@@ -65,6 +65,8 @@ pub use users::RefreshOutcome;
 
 /// The database file inside an environment folder.
 const DATABASE_FILE: &str = "repomemo.sqlite";
+/// The folder inside a separate blob folder where received files wait (V0.4.4).
+pub(crate) const STAGING_DIR: &str = ".incoming";
 static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
 
 /// How long SQLite waits for a competing writer before failing with
@@ -88,6 +90,13 @@ pub trait ActivityObserver: Send + Sync {
 #[derive(Debug, Clone)]
 pub struct StorageConfig {
     pub data_dir: PathBuf,
+    /// Where the database file lives (V0.4.4); `None` keeps it in `data_dir`.
+    pub db_dir: Option<PathBuf>,
+    /// Where the stored files live; `None` keeps them in `data_dir/blobs`. Received files wait in a folder
+    /// of their own beside them, so that storing one is a rename on one volume.
+    pub blob_dir: Option<PathBuf>,
+    /// Where backups are made and kept; `None` keeps them in `data_dir/backups`.
+    pub backup_dir: Option<PathBuf>,
     /// Key material used to encrypt secrets (AI provider API keys) at rest.
     /// When `None`, a random key is kept in `secret.key` in the data
     /// directory, created on first use.
@@ -109,6 +118,9 @@ impl StorageConfig {
     pub fn new(data_dir: impl Into<PathBuf>) -> Self {
         Self {
             data_dir: data_dir.into(),
+            db_dir: None,
+            blob_dir: None,
+            backup_dir: None,
             master_key: None,
             read_connections: DEFAULT_READ_CONNECTIONS,
             vector_index_mb: DEFAULT_VECTOR_INDEX_MB,
@@ -146,7 +158,11 @@ pub struct StorageEngine {
     /// Read-only connections for everything that only looks.
     read_pool: SqlitePool,
     data_dir: PathBuf,
+    db_dir: PathBuf,
     blob_dir: PathBuf,
+    /// Where files being received wait: always on the volume of `blob_dir`.
+    staging_dir: PathBuf,
+    backup_dir: PathBuf,
     secrets: SecretBox,
     /// Serialises blob writes with blob garbage collection, so a blob that is
     /// being stored again is never deleted underneath the writer.
@@ -714,14 +730,25 @@ impl StorageEngine {
     pub async fn open(config: StorageConfig) -> Result<Self> {
         tokio::fs::create_dir_all(&config.data_dir).await?;
 
-        let blob_dir = config.data_dir.join("blobs");
+        let db_dir = config.db_dir.clone().unwrap_or_else(|| config.data_dir.clone());
+        tokio::fs::create_dir_all(&db_dir).await?;
+        let blob_dir = config.blob_dir.clone().unwrap_or_else(|| config.data_dir.join("blobs"));
         tokio::fs::create_dir_all(&blob_dir).await?;
+        // Received files wait beside the stored ones when those are elsewhere, so storing one stays a rename.
+        let staging_dir = match config.blob_dir {
+            Some(_) => blob_dir.join(STAGING_DIR),
+            None => config.data_dir.join("tmp"),
+        };
+        let backup_dir = config
+            .backup_dir
+            .clone()
+            .unwrap_or_else(|| config.data_dir.join("backups"));
         // Files that were being received when the last process stopped.
-        let _ = tokio::fs::remove_dir_all(config.data_dir.join("tmp")).await;
+        let _ = tokio::fs::remove_dir_all(&staging_dir).await;
 
         let secrets = SecretBox::load(&config.data_dir, config.master_key.as_deref())?;
 
-        let db_path = config.data_dir.join(DATABASE_FILE);
+        let db_path = db_dir.join(DATABASE_FILE);
         // WAL with `synchronous = NORMAL` never corrupts the database; at worst
         // the last transactions before a power loss are rolled back.
         let options = SqliteConnectOptions::new()
@@ -764,7 +791,10 @@ impl StorageEngine {
             pool,
             read_pool,
             data_dir: config.data_dir,
+            db_dir,
             blob_dir,
+            staging_dir,
+            backup_dir,
             secrets,
             blob_lock: Arc::new(tokio::sync::Mutex::new(())),
             vectors: Arc::new(vectors::VectorCache::new(config.vector_index_mb)),
@@ -816,6 +846,16 @@ impl StorageEngine {
 
     pub fn data_dir(&self) -> &Path {
         &self.data_dir
+    }
+
+    /// The folder that holds the database file.
+    pub fn db_dir(&self) -> &Path {
+        &self.db_dir
+    }
+
+    /// The folder backups are made in.
+    pub fn backup_dir(&self) -> &Path {
+        &self.backup_dir
     }
 
     pub fn blob_dir(&self) -> &Path {
