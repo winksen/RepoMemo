@@ -266,6 +266,23 @@ for (const name of ["REPOMEMO_WEB_API_URL", "REPOMEMO_PRODUCT_NAME"]) {
 if (!/handle \/config\.json/.test(webCaddyfile)) problems.push("docker/Caddyfile.web does not serve /config.json");
 if (!/vite\.config\.ts/.test("vite.config.ts") || !vite.includes("config.json")) problems.push("the web build does not write a default config.json");
 if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge does not use REPOMEMO_HOST");
+// The data is in three volumes of its own and a 0.3.x install can move into them (V0.4.22).
+for (const [file, text] of [["docker-compose.yml", compose], ["deploy/api.yml", read("deploy/api.yml")]]) {
+  for (const [volume, variable, folder] of [["repomemo-db", "REPOMEMO_DB_DIR", "/var/lib/repomemo-db"], ["repomemo-files", "REPOMEMO_BLOB_DIR", "/var/lib/repomemo-files"], ["repomemo-backups", "REPOMEMO_BACKUP_DIR", "/var/lib/repomemo-backups"]]) {
+    if (!text.includes(`${variable}: ${folder}`)) problems.push(`${file} does not set ${variable} to ${folder}`);
+    if (!text.includes(`- ${volume}:${folder}`)) problems.push(`${file} does not mount the ${volume} volume at ${folder}`);
+    if (!new RegExp(`^volumes:[\\s\\S]*^  ${volume}:`, "m").test(text)) problems.push(`${file} does not declare the ${volume} volume`);
+  }
+}
+{
+  const migrate = read("deploy/migrate-volumes.sh");
+  for (const volume of ["repomemo-data", "repomemo-db", "repomemo-files", "repomemo-backups"]) {
+    if (!migrate.includes(volume)) problems.push(`deploy/migrate-volumes.sh does not know the ${volume} volume`);
+  }
+  if (/\brm -rf\b/.test(migrate.replace(/#[^\n]*/g, "").replace(/<<EOF[\s\S]*?\nEOF/, ""))) problems.push("deploy/migrate-volumes.sh deletes something; it must only copy");
+  if (!/^  volume-migration:/m.test(ci) || !/migrate-volumes\.sh/.test(ci)) problems.push(".github/workflows/ci.yml does not try the move of a single volume into three");
+}
+
 // Sample front doors (V0.4.19): each names the server's trusted-proxy setting, forwards the client's address, turns
 // buffering off for the live event streams and sends HSTS.
 {

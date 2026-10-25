@@ -42,6 +42,11 @@ services:
     environment:
       REPOMEMO_SERVER_ADDR: 0.0.0.0:3020
       REPOMEMO_SERVER_DATA_DIR: main
+      # The database, the stored files and the backups sit in volumes of their own (V0.4.22); the key file, the logs and
+      # the previews stay in repomemo-data.
+      REPOMEMO_DB_DIR: /var/lib/repomemo-db
+      REPOMEMO_BLOB_DIR: /var/lib/repomemo-files
+      REPOMEMO_BACKUP_DIR: /var/lib/repomemo-backups
       # The address people use, behind your front door; it turns on HSTS and secure cookies.
       REPOMEMO_PUBLIC_URL: ${REPOMEMO_PUBLIC_URL:-https://localhost}
       # The browsers' origins that may call the API: the web client's address (the same by default).
@@ -60,6 +65,12 @@ services:
       - "127.0.0.1:${REPOMEMO_API_PORT:-3020}:3020"
     volumes:
       - repomemo-data:/var/lib/repomemo
+      - repomemo-db:/var/lib/repomemo-db
+      - repomemo-files:/var/lib/repomemo-files
+      - repomemo-backups:/var/lib/repomemo-backups
 
 volumes:
   repomemo-data:
+  repomemo-db:
+  repomemo-files:
+  repomemo-backups:

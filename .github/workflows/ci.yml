@@ -326,6 +326,58 @@ jobs:
           docker rm --force converter-ci || true
           docker volume rm converter-ci-socket || true
 
+  # A 0.3.x layout is moved into the three volumes (V0.4.22): the server runs once on the single volume the way 0.3.x
+  # ran it and an account is made; the stack is stopped, deploy/migrate-volumes.sh moves the data, the compose stack starts
+  # on the new volumes and the same account signs in. (V0.4.27 repeats this with the real 0.3.27 images.)
+  volume-migration:
+    name: Move the single volume into three
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: A .env with throwaway secrets
+        run: |
+          {
+            echo "REPOMEMO_JWT_SECRET=$(openssl rand -hex 32)"
+            echo "REPOMEMO_SECRET_KEY=$(openssl rand -hex 32)"
+          } > .env
+      - name: Build the server image
+        run: docker build --target server --tag repomemo-server:migrate .
+      - name: Run it on one volume, the old way, and make an account
+        run: |
+          set -a; . ./.env; set +a
+          docker volume create repomemo_repomemo-data
+          docker run --detach --name old --publish 127.0.0.1:3020:3020 --volume repomemo_repomemo-data:/var/lib/repomemo \
+            --env REPOMEMO_SERVER_ADDR=0.0.0.0:3020 --env REPOMEMO_SERVER_DATA_DIR=main --env REPOMEMO_ALLOW_INSECURE_HTTP=true \
+            --env REPOMEMO_JWT_SECRET --env REPOMEMO_SECRET_KEY repomemo-server:migrate
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3020/health/ready > /dev/null; then break; fi
+            sleep 2
+          done
+          curl --fail --silent --output /dev/null --request POST --header 'content-type: application/json' \
+            --data '{"email":"moved@example.com","display_name":"Moved","password":"a-long-enough-password-1"}' http://127.0.0.1:3020/v1/auth/register
+          docker stop old
+          docker rm old
+      - name: Move the data
+        run: sh deploy/migrate-volumes.sh repomemo
+      - name: Start the stack on the new volumes
+        run: docker compose up --build --detach --wait --wait-timeout 900
+      - name: The same account signs in, and the data is in the new volumes
+        run: |
+          curl --fail --silent --output /dev/null --request POST --header 'content-type: application/json' \
+            --data '{"email":"moved@example.com","password":"a-long-enough-password-1"}' http://127.0.0.1:8080/v1/auth/login
+          docker run --rm --volume repomemo_repomemo-db:/db:ro alpine test -f /db/repomemo.sqlite
+      - name: A second run refuses to mix
+        run: |
+          docker compose down
+          if sh deploy/migrate-volumes.sh repomemo; then echo "the second run should have been refused" >&2; exit 1; fi
+      - name: What the stack logged
+        if: failure()
+        run: docker compose logs --no-color --tail 200
+      - name: Clean up
+        if: always()
+        run: docker compose down --volumes || true
+
   # The stack without the edge, behind a proxy of one's own (V0.4.18): with no profile, the server and the web image run,
   # and the web image answers the app and the API on its loopback port, in plain HTTP.
   compose-no-edge:

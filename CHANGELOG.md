@@ -2,6 +2,29 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.22 (2026-10-25)
+
+The compose files keep the data in volumes of their own.
+
+### Changed
+- **Three volumes for the data:** `repomemo-db` (the database and its write-ahead log), `repomemo-files` (the stored files) and `repomemo-backups`, beside `repomemo-data`, which keeps the key file, the logs and the data folder itself. `docker-compose.yml` and `deploy/api.yml` mount them and set `REPOMEMO_DB_DIR`, `REPOMEMO_BLOB_DIR` and `REPOMEMO_BACKUP_DIR` (V0.4.4) to them, so each can be backed up, sized and put on its own disk. The compose files are otherwise shaped as V0.4.18 left them: `web` and the server always, `edge` and `previews` as profiles. The service is still called `server` (it is the API).
+
+### Added
+- **`deploy/migrate-volumes.sh [project]`:** moves a 0.3.x install's single volume into the three. It refuses to run while a container uses the old volume, when the old volume holds no database, or when a new volume is not empty; it copies the database (with its log), the stored files and the backups, checks the number of files and the database's size, and **deletes nothing**: the old copies stay under `workspace-data/main` in `repomemo-data` until the operator removes them, with the command printed.
+- **A CI job, `volume-migration`,** runs the server image once on a single volume the way 0.3.x ran it, makes an account, stops it, runs the script, starts the compose stack and signs the same account in, checks the database is in `repomemo-db`, and checks that a second run of the script is refused. (V0.4.27 repeats it with the real 0.3.27 images.)
+
+### Changed (checks and documents)
+- **`container:check`** holds the three volumes and variables in both compose files, that the script knows all four volumes and deletes nothing, and the CI job.
+- **The documents:** the operations guide, the technical mindmap, the roadmap and the release index.
+- **The version** is `0.4.22` everywhere.
+
+### Checks
+- **Run:** `container:check`, `version:check`, `docs:check`, a syntax check of the script.
+- **Not run:** the script and the stack. The `volume-migration` job is the test and its first run is the one to read; a Windows host runs the script from WSL or Git Bash.
+
+### Upgrading
+- **Stop the stack, run `sh deploy/migrate-volumes.sh`, start the stack,** sign in and check your data, then remove the old copies as the script says. A new install needs nothing. Without the move, a server started on the new files would find no database in `repomemo-db` and begin a new empty one: the old data is not lost, it is simply not used.
+
 ## V0.4.21 (2026-10-25)
 
 The client says plainly when the server is not its release.

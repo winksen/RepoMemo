@@ -3,8 +3,9 @@
 #   cp .env.example .env     # then fill in the secrets and the host name; it asks for the edge (TLS) profile
 #   docker compose up -d
 #
-# Open https://<REPOMEMO_HOST> and follow the first-run setup. The data lives
-# in the `repomemo-data` volume; back it up from System > Backups, as in the
+# Open https://<REPOMEMO_HOST> and follow the first-run setup. The data lives in three volumes (the database, the stored
+# files, the backups) and `repomemo-data` (the key file and the logs); a 0.3.x install moves its single volume into them
+# with deploy/migrate-volumes.sh. Back it up from System > Backups, as in the
 # production guide (mindmap/technical/operations.md, "Running it in containers").
 #
 # The server runs with a read-only root, as user 10001 and with no capability once it has started (its entrypoint
@@ -44,6 +45,11 @@ services:
     environment:
       REPOMEMO_SERVER_ADDR: 0.0.0.0:3020
       REPOMEMO_SERVER_DATA_DIR: main
+      # The database, the stored files and the backups sit in volumes of their own (V0.4.22); the key file, the logs and
+      # the previews stay in repomemo-data.
+      REPOMEMO_DB_DIR: /var/lib/repomemo-db
+      REPOMEMO_BLOB_DIR: /var/lib/repomemo-files
+      REPOMEMO_BACKUP_DIR: /var/lib/repomemo-backups
       # The address people use; it turns on HSTS and secure cookies.
       REPOMEMO_PUBLIC_URL: https://${REPOMEMO_HOST:-localhost}
       REPOMEMO_ALLOWED_ORIGIN: https://${REPOMEMO_HOST:-localhost}
@@ -64,6 +70,9 @@ services:
       REPOMEMO_SOFFICE_WRAPPER: /usr/local/bin/repomemo-soffice-wrapper
     volumes:
       - repomemo-data:/var/lib/repomemo
+      - repomemo-db:/var/lib/repomemo-db
+      - repomemo-files:/var/lib/repomemo-files
+      - repomemo-backups:/var/lib/repomemo-backups
       - repomemo-previews:/var/lib/repomemo-previews
       - soffice-socket:/run/soffice
     networks:
@@ -182,6 +191,9 @@ networks:
 
 volumes:
   repomemo-data:
+  repomemo-db:
+  repomemo-files:
+  repomemo-backups:
   repomemo-previews:
   soffice-socket:
   caddy-data:
