@@ -23,7 +23,7 @@ old="${project}_repomemo-data"
 db="${project}_repomemo-db"
 files="${project}_repomemo-files"
 backups="${project}_repomemo-backups"
-helper="${REPOMEMO_MIGRATE_IMAGE:-alpine:3.20}"
+helper="${REPOMEMO_MIGRATE_IMAGE:-alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc}"
 
 fail() {
   echo "migrate-volumes: $*" >&2

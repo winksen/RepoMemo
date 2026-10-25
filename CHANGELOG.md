@@ -2,6 +2,28 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.25 (2026-10-25)
+
+Backups and restores in containers, written as scripts and tried in CI.
+
+### Added
+- **`deploy/backup-volumes.sh`:** copies the volumes of a container install into archives to keep elsewhere. By default the server's own backups (`repomemo-backups`) and `repomemo-data` (the key file, the logs), which is safe while the stack runs; with `--all` also the database and the stored files, **with the stack stopped** meanwhile and started again after. A `backup.txt` says when and from what; a folder that has one is never overwritten. `--project` names another compose project.
+- **`deploy/restore-volumes.sh`:** fills the volumes of a stack from such a folder, **empty volumes only**: a volume that holds anything or that a container uses is refused, so a restore can never mix two installs or overwrite a live one. It deletes nothing.
+- **A CI job, `volume-restore`,** makes a stack with an account, copies its volumes with `--all`, checks a second copy into the same folder is refused, stops the stack, restores into the volumes of a second stack, starts it, signs the same account in, and checks that a restore over the now filled volumes is refused.
+
+### Changed
+- **The helper image of the volume scripts** (`alpine:3.20`) is pinned by digest, in the three scripts (`migrate-volumes.sh` too); `container:check` insists on it.
+- **`container:check`** holds the volumes the scripts know, the stop and start, no overwriting, the refusals, no deletion and the CI job.
+- **The documents:** the operations guide (why the console needs no container: it is an HTTP client), the technical mindmap, the roadmap and the release index.
+- **The version** is `0.4.25` everywhere.
+
+### Checks
+- **Run:** a syntax check of the scripts, `container:check`, `version:check`, `docs:check`.
+- **Not run:** the scripts against volumes (the `volume-restore` job is the test), the server's own backup through the API from a script (V0.4.24's script does it), and a sealed backup restored in a container.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.4.24 (2026-10-25)
 
 An upgrade script that comes back to the old version when the new one fails.

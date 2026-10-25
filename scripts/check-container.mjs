@@ -266,6 +266,24 @@ for (const name of ["REPOMEMO_WEB_API_URL", "REPOMEMO_PRODUCT_NAME"]) {
 if (!/handle \/config\.json/.test(webCaddyfile)) problems.push("docker/Caddyfile.web does not serve /config.json");
 if (!/vite\.config\.ts/.test("vite.config.ts") || !vite.includes("config.json")) problems.push("the web build does not write a default config.json");
 if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge does not use REPOMEMO_HOST");
+// Backups and restores in containers (V0.4.25): the volumes are copied out (the database and the files only with the stack
+// stopped), restored into empty volumes only, never over an existing copy, and a CI job restores into a second stack.
+{
+  const backup = read("deploy/backup-volumes.sh");
+  const restore = read("deploy/restore-volumes.sh");
+  for (const short of ["repomemo-backups", "repomemo-data", "repomemo-db", "repomemo-files"]) {
+    if (!backup.includes(short)) problems.push(`deploy/backup-volumes.sh does not know the ${short} volume`);
+  }
+  if (!/compose stop/.test(backup) || !/compose start/.test(backup)) problems.push("deploy/backup-volumes.sh does not stop the stack for the database and the files, and start it again");
+  if (!/never overwritten/.test(backup) || !/backup\.txt/.test(backup)) problems.push("deploy/backup-volumes.sh can overwrite an earlier copy");
+  if (!/is not empty; refusing/.test(restore) || !/a container uses/.test(restore)) problems.push("deploy/restore-volumes.sh does not refuse a volume that is filled or in use");
+  if (/\brm -rf\b|volume rm/.test((backup + restore).replace(/#[^\n]*/g, "")) ) problems.push("the volume scripts delete something");
+  for (const [file, text] of [["backup-volumes.sh", backup], ["restore-volumes.sh", restore], ["migrate-volumes.sh", read("deploy/migrate-volumes.sh")]]) {
+    if (!/alpine:[\d.]+@sha256:[0-9a-f]{64}/.test(text)) problems.push(`deploy/${file} runs a helper image that is not pinned by digest`);
+  }
+  if (!/^  volume-restore:/m.test(ci) || !/restore-volumes\.sh --from/.test(ci)) problems.push(".github/workflows/ci.yml does not restore a copy into a second stack");
+}
+
 // The upgrade script (V0.4.24): a backup through the API first, a wait until healthy, the old version put back, and
 // no volume ever deleted.
 {

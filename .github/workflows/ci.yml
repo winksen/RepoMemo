@@ -326,6 +326,51 @@ jobs:
           docker rm --force converter-ci || true
           docker volume rm converter-ci-socket || true
 
+  # Backups and restores in containers (V0.4.25): a stack makes data, its volumes are copied with the stack stopped, the
+  # copy is restored into the volumes of a second stack, and the second stack has the data.
+  volume-restore:
+    name: Restore into a second stack
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: A first stack with an account
+        run: |
+          sh deploy/init.sh --no-edge
+          docker compose --project-name repomemo-a up --build --detach --wait --wait-timeout 900
+          curl --fail --silent --output /dev/null --request POST --header 'content-type: application/json' \
+            --data '{"email":"restored@example.com","display_name":"Restored","password":"a-long-enough-password-1"}' http://127.0.0.1:8080/v1/auth/register
+      - name: Copy its volumes off (the stack is stopped for the database and the files, then started again)
+        run: |
+          sh deploy/backup-volumes.sh --project repomemo-a --out "$RUNNER_TEMP/copies" --all
+          test -f "$RUNNER_TEMP/copies/backup.txt"
+          curl --fail --silent http://127.0.0.1:8080/health/ready
+      - name: A second copy into the same folder is refused
+        run: if sh deploy/backup-volumes.sh --project repomemo-a --out "$RUNNER_TEMP/copies" --all; then echo "it should have refused" >&2; exit 1; fi
+      - name: Stop the first stack and restore into a second
+        run: |
+          docker compose --project-name repomemo-a down
+          sh deploy/restore-volumes.sh --from "$RUNNER_TEMP/copies" --project repomemo-b
+          docker compose --project-name repomemo-b up --build --detach --wait --wait-timeout 900
+      - name: The second stack has the account
+        run: |
+          curl --fail --silent --output /dev/null --request POST --header 'content-type: application/json' \
+            --data '{"email":"restored@example.com","password":"a-long-enough-password-1"}' http://127.0.0.1:8080/v1/auth/login
+      - name: A restore over a filled volume is refused
+        run: |
+          docker compose --project-name repomemo-b down
+          if sh deploy/restore-volumes.sh --from "$RUNNER_TEMP/copies" --project repomemo-b; then echo "it should have refused" >&2; exit 1; fi
+      - name: What the stacks logged
+        if: failure()
+        run: |
+          docker compose --project-name repomemo-a logs --no-color --tail 100 || true
+          docker compose --project-name repomemo-b logs --no-color --tail 100 || true
+      - name: Clean up
+        if: always()
+        run: |
+          docker compose --project-name repomemo-a down --volumes || true
+          docker compose --project-name repomemo-b down --volumes || true
+
   # The upgrade script (V0.4.24): a good tag is run, a broken one ends on the old version, running.
   upgrade-script:
     name: Upgrade script
