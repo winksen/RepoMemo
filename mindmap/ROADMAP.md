@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.4.29` (2026-10-25), after `V0.3.0` *Connected*, released after the maintainer's tests of the clean install (R6, R12) · **Next:** [the 0.4.x line, preparation for deployment](#-the-04x-line-preparation-for-deployment), `V0.4.30` onward (the 0.3.x line, [Road to V0.4.0](#-road-to-v040), is built and closed; the [plan](plans/2026-10-25-deployment.md) and [RELEASES_0.4.md](RELEASES_0.4.md) are written) · **Built before the tag:** tracks K to N (V0.2.57–V0.2.193) · **Next minor after the 0.4.x line:** its theme to be chosen (single sign-on is the candidate)
+> **Current version:** `V0.4.30` (2026-10-25), after `V0.3.0` *Connected*, released after the maintainer's tests of the clean install (R6, R12) · **Next:** [the 0.4.x line, preparation for deployment](#-the-04x-line-preparation-for-deployment), `V0.4.31` onward (the 0.3.x line, [Road to V0.4.0](#-road-to-v040), is built and closed; the [plan](plans/2026-10-25-deployment.md) and [RELEASES_0.4.md](RELEASES_0.4.md) are written) · **Built before the tag:** tracks K to N (V0.2.57–V0.2.193) · **Next minor after the 0.4.x line:** its theme to be chosen (single sign-on is the candidate)
 > **Feature freeze (V0.1.76 to the `v0.3.0` tag):** lifted by the tag on 2026-10-24. The 0.3.x releases follow the rules of [Road to V0.4.0](#-road-to-v040).
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Security review 2026-10-16 (V0.2.52)](security/2026-10-16-security-review.md) · [Security and backend review 2026-10-21 (V0.2.129)](security/2026-10-21-security-review.md) · [Security review of workspace templates 2026-10-22 (V0.2.192)](security/2026-10-22-workspace-templates-security-review.md) · [Security review of 0.3.x 2026-10-24 (V0.3.26)](security/2026-10-24-0.3-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -1490,7 +1490,7 @@ One box per release, added as each release is built. Say what was built and what
 
 ## 🎯 The 0.4.x line: preparation for deployment
 
-> **Status:** proposed and opened on 2026-10-25 by `V0.4.0`, replacing the theme recorded in V0.3.27 (single sign-on, which stays the candidate for a later line). The maintainer chose it: RepoMemo should be deployable from this repository **directly on a server or in containers, containers preferred and tested**, with the API (Rust, its database and its files) and the web client (React) as separate containers, and the **desktop app** resumed as the web client's own UI and components, talking to the API directly, installable, **Windows first**, then Linux and macOS. The plan is [plans/2026-10-25-deployment.md](plans/2026-10-25-deployment.md); every release is in [RELEASES_0.4.md](RELEASES_0.4.md). Decisions 33–40 are proposed there and in the table above; built one by one from `V0.4.1`, 29 of 67 so far.
+> **Status:** proposed and opened on 2026-10-25 by `V0.4.0`, replacing the theme recorded in V0.3.27 (single sign-on, which stays the candidate for a later line). The maintainer chose it: RepoMemo should be deployable from this repository **directly on a server or in containers, containers preferred and tested**, with the API (Rust, its database and its files) and the web client (React) as separate containers, and the **desktop app** resumed as the web client's own UI and components, talking to the API directly, installable, **Windows first**, then Linux and macOS. The plan is [plans/2026-10-25-deployment.md](plans/2026-10-25-deployment.md); every release is in [RELEASES_0.4.md](RELEASES_0.4.md). Decisions 33–40 are proposed there and in the table above; built one by one from `V0.4.1`, 30 of 67 so far.
 
 ### What this line is
 
@@ -1552,7 +1552,7 @@ One box per release, added as each release is built. Say what was built and what
 | **V0.4.27** ✅ | 🔧 | Tests | An upgrade test in CI: the previous release's images create data on named volumes, the new images take over the same volumes, and the data is intact | D27 | A migration that loses data fails the job |
 | **V0.4.28** ✅ | 🔧 | Compose | Healthchecks for every service, `depends_on` conditions, restart policies, `stop_grace_period`, log rotation, and documented memory and CPU limits | D28 | `docker compose up --wait` returns only when every service is healthy |
 | **V0.4.29** ✅ | 🔧 | Server | JSON logs to standard output (`REPOMEMO_LOG_FORMAT=json`), no log files in containers, the audit target kept apart | D29 | Every line of `docker compose logs api` parses as JSON when asked for |
-| **V0.4.30** | 📘 | Deployment | Metrics in containers: a sample Prometheus scrape of `/v1/system/metrics` with a token, and a `monitoring` profile as an example, never on by default | D30 | The example starts and shows the server's figures |
+| **V0.4.30** ✅ | 📘 | Deployment | Metrics in containers: a sample Prometheus scrape of `/v1/system/metrics` with a token, and a `monitoring` profile as an example, never on by default | D30 | The example starts and shows the server's figures |
 
 #### Track Y: Direct install (V0.4.31–V0.4.36)
 
@@ -1645,6 +1645,7 @@ One box per release, added as each release is built. Say what was built and what
 - [x] **V0.4.27** the upgrade test (D27). Done: `scripts/upgrade-test.mjs` (seed, verify), `deploy/upgrade-from.txt`, the `upgrade-from-previous` CI job, `container:check` rules, operations guide. **Not run:** the job or the script (CI is the only place with both releases)
 - [x] **V0.4.28** healthchecks, grace and logs (D28). Done: the edge's and the converter's health checks, `stop_grace_period`, `x-logging` rotation in both compose files, the CI step reading every service's health, `container:check` rules, sizing guidance in the operations guide. **Not run:** the stack (the `/proc/net` check of the edge is the one to read first)
 - [x] **V0.4.29** JSON logs (D29). Done: the two settings in both compose files, `stderr_line` and its use in `main.rs`, `say` in `docker/entrypoint.sh`, the CI step parsing the server's log, `container:check` rules; one unit test; settings reference and operations guide. **Not run:** the test (compiled only) and the stack
+- [x] **V0.4.30** metrics in containers (D30). Done: the `prometheus` service behind the `monitoring` profile, `deploy/monitoring/` (scrape block, README), the `.gitignore` line, the `monitoring` CI job, `container:check` rules, operations guide. **Not run:** Prometheus or the stack (CI's first run is the test)
 
 ---
 

@@ -224,6 +224,41 @@ services:
       repomemo:
         ipv4_address: 172.29.0.2
 
+  # An example of reading the server's metrics (V0.4.30), only with the `monitoring` profile and never by default: Prometheus
+  # scrapes /v1/system/metrics with the token in deploy/monitoring/metrics-token. See deploy/monitoring/README.md.
+  prometheus:
+    profiles:
+      - monitoring
+    image: prom/prometheus:v3.8.1@sha256:2b6f734e372c1b4717008f7d0a0152316aedd4d13ae17ef1e3268dbfaf68041b
+    restart: unless-stopped
+    stop_grace_period: 10s
+    logging: *logging
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--output-document=/dev/null", "http://127.0.0.1:9090/-/healthy"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    depends_on:
+      server:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./deploy/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ${REPOMEMO_METRICS_TOKEN_FILE:-./deploy/monitoring/metrics-token}:/etc/prometheus/metrics-token:ro
+      - prometheus-data:/prometheus
+    networks:
+      repomemo:
+        ipv4_address: 172.29.0.5
+
 networks:
   repomemo:
     ipam:
@@ -239,3 +274,4 @@ volumes:
   soffice-socket:
   caddy-data:
   caddy-config:
+  prometheus-data:

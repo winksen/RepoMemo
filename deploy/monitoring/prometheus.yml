@@ -1,0 +1,17 @@
+# A sample Prometheus configuration for RepoMemo (V0.4.30): it scrapes the server's figures every 15 seconds with a token.
+# The `monitoring` profile of docker-compose.yml starts a Prometheus with this file. It is an example to adapt, never on
+# by default.
+#
+# The token is a personal access token of the `system` scope (Profile > API tokens, made by a system administrator),
+# kept in deploy/monitoring/metrics-token (one line, nothing else; the file is not committed).
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: repomemo
+    metrics_path: /v1/system/metrics
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/metrics-token
+    static_configs:
+      - targets: ["server:3020"]

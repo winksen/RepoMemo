@@ -2,6 +2,27 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.30 (2026-10-25)
+
+An example of reading the server's metrics in containers.
+
+### Added
+- **A `monitoring` profile with an example Prometheus:** `docker compose --profile monitoring up -d` starts Prometheus (v3.8.1, pinned by tag and digest, read-only, every capability dropped, published on `127.0.0.1:9090` only, data in the `prometheus-data` volume, health-checked) that scrapes `/v1/system/metrics` every 15 seconds with a personal access token of the `system` scope. The token is a file, `deploy/monitoring/metrics-token` (`REPOMEMO_METRICS_TOKEN_FILE` names another), mounted read-only; `.gitignore` keeps it out of the repository. **It is never on by default.**
+- **`deploy/monitoring/prometheus.yml`** is the scrape block, written to be copied into a Prometheus of one's own (target `server:3020` on the compose network), and **`deploy/monitoring/README.md`** walks through the token, the profile and a first query.
+- **A CI job, `monitoring`,** starts a stack without the profile (and checks Prometheus is not among its services), makes an administrator and a `system` token through the API, starts Prometheus with the profile and waits until `repomemo_users` returns a value.
+
+### Changed
+- **`container:check`** holds the profile, the pin, the loopback port, the read-only mounts, the scrape block, the `.gitignore` line, the CI job and that the server still has the metric the example reads.
+- **The documents:** the operations guide, the technical mindmap, the roadmap and the release index.
+- **The version** is `0.4.30` everywhere.
+
+### Checks
+- **Run:** `container:check`, `version:check`, `docs:check`.
+- **Not run:** Prometheus or the stack. The `monitoring` job is the test; its first run may name a response shape of the setup or token calls that differs from what was read in the code.
+
+### Upgrading
+- Nothing to do. The example does not start unless asked.
+
 ## V0.4.29 (2026-10-25)
 
 In containers the server logs JSON to standard output, and every line parses.

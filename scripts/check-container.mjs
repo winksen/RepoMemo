@@ -213,7 +213,7 @@ const walk = (folder) => {
 };
 walk("apps/server/src");
 const sourceText = serverSource.join("\n");
-const composeOnly = new Set(["REPOMEMO_HOST", "REPOMEMO_VERSION", "REPOMEMO_CONVERTER_IMAGE", "REPOMEMO_WEB_API_URL", "REPOMEMO_PRODUCT_NAME", "REPOMEMO_API_UPSTREAM", "REPOMEMO_WEB_PORT", "REPOMEMO_TLS_DIR"]);
+const composeOnly = new Set(["REPOMEMO_HOST", "REPOMEMO_VERSION", "REPOMEMO_CONVERTER_IMAGE", "REPOMEMO_WEB_API_URL", "REPOMEMO_PRODUCT_NAME", "REPOMEMO_API_UPSTREAM", "REPOMEMO_WEB_PORT", "REPOMEMO_TLS_DIR", "REPOMEMO_METRICS_TOKEN_FILE"]);
 const used = new Set([...compose.matchAll(/\b(REPOMEMO_[A-Z0-9_]+)\b/g)].map((match) => match[1]));
 for (const name of used) {
   if (!composeOnly.has(name) && !sourceText.includes(`"${name}"`)) problems.push(`docker-compose.yml sets ${name}, which the server does not read`);
@@ -266,6 +266,21 @@ for (const name of ["REPOMEMO_WEB_API_URL", "REPOMEMO_PRODUCT_NAME"]) {
 if (!/handle \/config\.json/.test(webCaddyfile)) problems.push("docker/Caddyfile.web does not serve /config.json");
 if (!/vite\.config\.ts/.test("vite.config.ts") || !vite.includes("config.json")) problems.push("the web build does not write a default config.json");
 if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge does not use REPOMEMO_HOST");
+// Metrics in containers (V0.4.30): an example, behind its own profile, pinned, on the loopback, read-only, with the token
+// mounted read-only and the scrape configuration reading it; CI shows the figures.
+{
+  const block = /^  prometheus:\n([\s\S]*?)(?=^  \S|^\S|(?![\s\S]))/m.exec(compose)?.[1] ?? "";
+  if (!/^\s+profiles:\s*\n\s+-\s*monitoring\s*$/m.test(block)) problems.push("docker-compose.yml: Prometheus is not behind the monitoring profile, so it would start by default");
+  if (!/image:\s*prom\/prometheus:v[\d.]+@sha256:[0-9a-f]{64}/.test(block)) problems.push("docker-compose.yml: the Prometheus image is not pinned by tag and digest");
+  if (!/"127\.0\.0\.1:9090:9090"/.test(block)) problems.push("docker-compose.yml: Prometheus is published beyond the loopback");
+  if (!/^\s+read_only:\s*true\s*$/m.test(block) || !/metrics-token\}?:\/etc\/prometheus\/metrics-token:ro/.test(block)) problems.push("docker-compose.yml: Prometheus is not read-only or does not mount the token read-only");
+  const scrape = read("deploy/monitoring/prometheus.yml");
+  if (!scrape.includes("/v1/system/metrics") || !scrape.includes("credentials_file: /etc/prometheus/metrics-token") || !scrape.includes("server:3020")) problems.push("deploy/monitoring/prometheus.yml does not scrape the server's metrics with the token");
+  if (!/^deploy\/monitoring\/metrics-token$/m.test(read(".gitignore"))) problems.push(".gitignore does not keep the metrics token out of the repository");
+  if (!/^  monitoring:/m.test(ci) || !/query=repomemo_users/.test(ci)) problems.push(".github/workflows/ci.yml does not start the monitoring example and read a figure from it");
+  if (!readFileSync("apps/server/src/system.rs", "utf8").includes("repomemo_users")) problems.push("the server no longer has the repomemo_users metric the example reads");
+}
+
 // The server logs JSON to standard output and keeps no log files in a container (V0.4.29); the lines written outside the
 // logging (the entrypoint, a refused start) have the same shape.
 for (const [file, text] of [["docker-compose.yml", compose], ["deploy/api.yml", read("deploy/api.yml")]]) {

@@ -349,6 +349,48 @@ jobs:
           docker rm --force converter-ci || true
           docker volume rm converter-ci-socket || true
 
+  # The monitoring example (V0.4.30): Prometheus scrapes the server's metrics with a system-scope token and shows its figures.
+  monitoring:
+    name: Prometheus example
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: A new stack without the monitoring profile
+        run: |
+          sh deploy/init.sh --no-edge
+          echo "REPOMEMO_SETUP_CODE=METRICSTEST2345" >> .env
+          docker compose up --build --detach --wait --wait-timeout 900 server web
+          test -z "$(docker compose ps --services | grep -x prometheus || true)"
+      - name: An administrator and a token of the system scope
+        run: |
+          session=$(curl --fail --silent --request POST --header 'content-type: application/json' \
+            --data '{"code":"METRICSTEST2345","email":"metrics@example.com","display_name":"Metrics","password":"a-long-enough-password-1"}' \
+            http://127.0.0.1:8080/v1/setup/admin)
+          access=$(echo "$session" | sed -E 's/.*"access_token":"([^"]+)".*/\1/')
+          created=$(curl --fail --silent --request POST --header "authorization: Bearer $access" --header 'content-type: application/json' \
+            --data '{"name":"prometheus","scope":"system","expires_in_days":1}' http://127.0.0.1:8080/v1/profile/tokens)
+          echo "$created" | sed -E 's/.*"secret":"([^"]+)".*/\1/' | tr -d '\n' > deploy/monitoring/metrics-token
+          test -s deploy/monitoring/metrics-token
+      - name: Start Prometheus with the profile
+        run: docker compose --profile monitoring up --detach --wait --wait-timeout 300 prometheus
+      - name: It shows the server's figures
+        run: |
+          for attempt in $(seq 1 40); do
+            answer=$(curl --silent 'http://127.0.0.1:9090/api/v1/query?query=repomemo_users')
+            if echo "$answer" | grep -q '"result":\[{'; then echo "$answer"; exit 0; fi
+            sleep 3
+          done
+          curl --silent 'http://127.0.0.1:9090/api/v1/targets' >&2 || true
+          echo "Prometheus never showed repomemo_users" >&2
+          exit 1
+      - name: What the stack logged
+        if: failure()
+        run: docker compose --profile monitoring logs --no-color --tail 100
+      - name: Clean up
+        if: always()
+        run: docker compose --profile monitoring down --volumes || true
+
   # The data of the previous release survives this one (V0.4.27): the previous release (deploy/upgrade-from.txt) is built and
   # run on a single volume, makes an administrator, a workspace and an indexed note; its volume is moved into the three of
   # this release (V0.4.22), the compose stack starts on them, and the same administrator signs in, finds the workspace and
