@@ -66,6 +66,11 @@ describe("every difference is written down", () => {
     expect(code.filter(([, source]) => /(?<![\w.])fetch\(/.test(source)).map(([path]) => path)).toEqual(["../lib/transport.ts"]);
   });
 
+  it("saves every file through one function, which the app replaces with a native dialog (V0.4.52)", () => {
+    expect(code.filter(([, source]) => /\.download = /.test(source)).map(([path]) => path)).toEqual(["../lib/saveBlob.ts"]);
+    expect(code.filter(([, source]) => source.includes("saveThroughShell")).map(([path]) => path).sort()).toEqual(["../components/DesktopApp.tsx", "../lib/desktop.ts"]);
+  });
+
   it("lists exactly the files that branch on the desktop runtime or call the shell", () => {
     const listed = parity
       .slice(parity.indexOf("## Files that know about the desktop"))

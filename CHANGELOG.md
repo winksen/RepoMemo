@@ -2,6 +2,25 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.52 (2026-10-26)
+
+Exports and downloads save where the person chooses, in every webview.
+
+### Added
+- **A native save dialog** (`files.rs`, `tauri-plugin-dialog`): the command `save_file` takes the file's bytes as the raw body of the call (not JSON) and the suggested name in a header, opens the system's save dialog, writes the bytes where the person pointed and answers the path, or nothing when they cancelled. The name is only a suggestion: it is cleaned of folders, forbidden characters and the names Windows reserves, shortened and never empty. A write that fails says where and why.
+- **`setFileSaver`** in `lib/saveBlob.ts`: `saveBlob` now answers whether the file was saved, and the app installs `saveThroughShell` for the length of its window; a browser keeps the anchor download. A cancelled dialog shows no "downloaded" toast.
+- **Tests:** three Rust tests (percent-decoding of the name, safe suggestions, nothing empty, reserved or endless) and `fileSaver.test.ts` (four: the browser's anchor and its address let go; the bytes, not JSON, with the encoded name; a cancel answers no; the installed saver is used and removable; a refused save reaches the caller), one test for a cancelled template download and one parity test that no code but `saveBlob` sets `.download`.
+
+### Changed
+- **Every download goes through `saveBlob`:** the archive export, the memory card export, the document download (and its open-in-Word save), the template file, the audit export and a log file each had a copy of the anchor code, six in all; they now call the one function. **The documents:** the parity audit (the downloads row is closed), the operations guide, the technical mindmap, the roadmap and the release index. **The version** is `0.4.52` everywhere.
+
+### Checks
+- **Run:** `cargo check -p repomemo-desktop --tests`, `cargo clippy -p repomemo-desktop --all-targets -- -D warnings`, `cargo fmt --all`, `typecheck`, the download-related and desktop page tests (70 passed, 6 new), `container:check`, `version:check`, `docs:check`.
+- **Not run:** the Rust tests (compiled), the dialog, a save of an archive, a memory card and a document in the app. A file is held in memory and passed whole to the shell; very large archives are the limit of that.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.4.51 (2026-10-26)
 
 The app has an identity of its own: the logo as its icon, its details in the executable, one window, and a title that names where you are.

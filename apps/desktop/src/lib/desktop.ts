@@ -75,3 +75,24 @@ export function followPageTitle(): () => void {
   apply();
   return () => observer.disconnect();
 }
+
+/** The bytes of a blob (a webview has `arrayBuffer`; the older readers in a test page do not). */
+function readBytes(blob: Blob): Promise<Uint8Array> {
+  if (typeof blob.arrayBuffer === "function") return blob.arrayBuffer().then((buffer) => new Uint8Array(buffer));
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(new Uint8Array(reader.result as ArrayBuffer));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsArrayBuffer(blob);
+  });
+}
+
+/**
+ * Saves a file through the shell's native save dialog (V0.4.52). The bytes go to the shell as the body of the call, not as JSON, and the
+ * name goes in a header as a suggestion the person can change. Answers whether the file was saved (`false`: the person cancelled).
+ */
+export async function saveThroughShell(blob: Blob, filename: string): Promise<boolean> {
+  const bytes = await readBytes(blob);
+  const saved = await invoke<string | null>("save_file", bytes, { headers: { "x-file-name": encodeURIComponent(filename) } });
+  return saved !== null;
+}

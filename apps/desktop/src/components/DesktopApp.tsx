@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { SharedWebApp } from "../SharedWebApp";
+import { setFileSaver } from "../lib/saveBlob";
 import { LoadingCanvas } from "../web/common";
-import { desktopServer, desktopSettings, followPageTitle, installExternalLinkHandler, type DesktopSettings } from "../lib/desktop";
+import { desktopServer, desktopSettings, followPageTitle, installExternalLinkHandler, saveThroughShell, type DesktopSettings } from "../lib/desktop";
 import { pointAtServer } from "../lib/desktopConnection";
 import { DesktopConfigProblem } from "./DesktopConfigProblem";
 import { DesktopConnect } from "./DesktopConnect";
@@ -32,6 +33,11 @@ export function DesktopApp() {
 
   useEffect(() => installExternalLinkHandler(), []);
   useEffect(() => followPageTitle(), []);
+  // Files are saved through the shell's dialog here (V0.4.52).
+  useEffect(() => {
+    setFileSaver(saveThroughShell);
+    return () => setFileSaver(null);
+  }, []);
 
   useEffect(() => {
     forgetRetiredChoices();

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { IconDownload as Download, IconPackageExport as PackageExport } from "@tabler/icons-react";
 import { downloadSharedWorkspaceArchive } from "../lib/sharedApi";
+import { saveBlob } from "../lib/saveBlob";
 import { Button } from "./ui/button";
 import { PanelHeading } from "./ui/panel-heading";
 import { showToast } from "./ui/toast";
@@ -15,15 +16,7 @@ export function WorkspaceExportSettings({ accessToken, workspaceId }: { accessTo
     setIsExporting(true);
     try {
       const { blob, filename } = await downloadSharedWorkspaceArchive(accessToken, workspaceId);
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
-      showToast("success", "The workspace archive was downloaded.");
+      if (await saveBlob(blob, filename)) showToast("success", "The workspace archive was downloaded.");
     } catch (error) {
       showToast("error", apiMessage(error, "The workspace could not be exported."));
     } finally { setIsExporting(false); }

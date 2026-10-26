@@ -56,6 +56,7 @@ function show(view: WorkspaceTemplateView | null) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(saveBlob).mockResolvedValue(true);
   vi.mocked(saveSharedWorkspaceTemplate).mockResolvedValue(current());
 });
 afterEach(cleanup);
@@ -183,6 +184,15 @@ describe("Settings › Template", () => {
     await waitFor(() => expect(downloadSharedWorkspaceTemplateFile).toHaveBeenCalledWith("t", "w1", { id: "night-shift", name: "Night shift" }));
     await waitFor(() => expect(saveBlob).toHaveBeenCalledWith(file, "night-shift.json"));
     expect(showToast).toHaveBeenCalledWith("success", expect.stringContaining("REPOMEMO_TEMPLATES_DIR"));
+  });
+
+  it("says nothing of a download the person cancelled in the save dialog", async () => {
+    show(current());
+    vi.mocked(downloadSharedWorkspaceTemplateFile).mockResolvedValue({ blob: new Blob(["{}"]), filename: "night-shift.json" });
+    vi.mocked(saveBlob).mockResolvedValue(false);
+    fireEvent.click(screen.getByRole("button", { name: "Download as template file" }));
+    await waitFor(() => expect(saveBlob).toHaveBeenCalled());
+    expect(showToast).not.toHaveBeenCalled();
   });
 
   it("says why when the server refuses the file, and saves nothing", async () => {

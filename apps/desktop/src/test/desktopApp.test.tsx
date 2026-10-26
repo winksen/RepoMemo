@@ -5,6 +5,7 @@ vi.mock("../lib/desktop", () => ({
   isDesktopRuntime: true,
   installExternalLinkHandler: () => () => undefined,
   followPageTitle: () => () => undefined,
+  saveThroughShell: vi.fn(),
   desktopSettings: { get: vi.fn() },
   desktopServer: { current: vi.fn(), prepare: vi.fn(), remember: vi.fn(), forget: vi.fn() },
 }));

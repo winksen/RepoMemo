@@ -94,8 +94,7 @@ function ExportTemplate({ accessToken, current, workspaceId }: { accessToken: st
     setBusy(true);
     try {
       const { blob, filename } = await downloadSharedWorkspaceTemplateFile(accessToken, workspaceId, { id: id.trim(), name: name.trim() });
-      saveBlob(blob, filename);
-      showToast("success", `${filename} was downloaded. Put it in the folder REPOMEMO_TEMPLATES_DIR names on a server and restart it.`);
+      if (await saveBlob(blob, filename)) showToast("success", `${filename} was downloaded. Put it in the folder REPOMEMO_TEMPLATES_DIR names on a server and restart it.`);
     } catch (requestError) {
       showToast("error", apiMessage(requestError, "The template file could not be downloaded."));
     } finally { setBusy(false); }

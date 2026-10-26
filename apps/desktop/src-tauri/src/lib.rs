@@ -1,5 +1,6 @@
 mod config;
 mod connection;
+mod files;
 
 use tauri::Manager;
 
@@ -24,6 +25,8 @@ pub fn run() {
     builder
         // The window comes back with the size and place it was left in (V0.4.51).
         .plugin(tauri_plugin_window_state::Builder::default().build())
+        // The save dialog of `files::save_file` (V0.4.52); the page cannot open one itself.
+        .plugin(tauri_plugin_dialog::init())
         // The window may call no server until one is chosen; `connection` adds the chosen one (V0.2.49).
         .plugin(tauri_plugin_http::init())
         .manage(Connection::default())
@@ -66,7 +69,8 @@ pub fn run() {
             connection::save_session,
             connection::load_session,
             connection::clear_session,
-            connection::open_external
+            connection::open_external,
+            files::save_file
         ])
         .run(tauri::generate_context!())
         .expect("error while running RepoMemo");

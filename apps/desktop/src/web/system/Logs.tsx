@@ -15,6 +15,7 @@ import { showToast } from "../../components/ui/toast";
 import { ICON_SIZE } from "../../components/ui/icon";
 import { apiMessage, formatBytes } from "../format";
 import { Facts, useSystemData } from "./shared";
+import { saveBlob } from "../../lib/saveBlob";
 import { systemKeys } from "../../lib/queryClient";
 
 const LIVE_SOURCE = "live";
@@ -47,14 +48,7 @@ export function LogsSection({ accessToken, canDownload, onOpenSettings, workspac
   async function download() {
     try {
       const blob = await downloadSystemLogFile(accessToken, source);
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `repomemo-${source}.jsonl`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      await saveBlob(blob, `repomemo-${source}.jsonl`);
     } catch (error) { showToast("error", apiMessage(error, "The log file could not be downloaded.")); }
   }
 

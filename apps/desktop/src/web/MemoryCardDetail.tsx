@@ -24,6 +24,7 @@ import { apiMessage, citationLines } from "./format";
 import { navigate } from "./router";
 import { OrganizationRail, WorkspaceTopbar } from "./Organization";
 import { ICON_SIZE } from "../components/ui/icon";
+import { saveBlob } from "../lib/saveBlob";
 import { submitHint } from "../lib/submitShortcut";
 import { ViewAtCommit } from "./common";
 
@@ -160,12 +161,7 @@ export function SharedMemoryCardDetail({
     try {
       const markdown = await exportSharedMemoryCard(accessToken, cardId);
       const file = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
-      const url = URL.createObjectURL(file);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `${(card?.card.title ?? "repomemo-memory").replace(/[^a-z0-9-_]+/gi, "-").toLowerCase()}.md`;
-      link.click();
-      URL.revokeObjectURL(url);
+      await saveBlob(file, `${(card?.card.title ?? "repomemo-memory").replace(/[^a-z0-9-_]+/gi, "-").toLowerCase()}.md`);
     } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsExporting(false); }
   }
 

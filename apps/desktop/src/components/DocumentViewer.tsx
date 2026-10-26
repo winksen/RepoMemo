@@ -14,17 +14,7 @@ import { workspaceKeys } from "../lib/queryClient";
 import { useServerState } from "../lib/useServerState";
 import { useErrorToast } from "../lib/useErrorToast";
 import { useObjectUrl } from "../lib/useObjectUrl";
-
-function saveBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
-}
+import { saveBlob } from "../lib/saveBlob";
 
 /** A preview of a business document with "Open in ..." and Download actions. */
 export function DocumentViewer({ accessToken, artifact }: { accessToken: string; artifact: ArtifactSummary }) {
@@ -84,7 +74,7 @@ export function DocumentViewer({ accessToken, artifact }: { accessToken: string;
 
   async function download() {
     setIsBusy(true);
-    try { saveBlob(await downloadSharedArtifactFile(accessToken, artifact.id), filename); }
+    try { await saveBlob(await downloadSharedArtifactFile(accessToken, artifact.id), filename); }
     catch (error) { showToast("error", apiMessage(error, "Something went wrong.")); }
     finally { setIsBusy(false); }
   }
@@ -108,8 +98,7 @@ export function DocumentViewer({ accessToken, artifact }: { accessToken: string;
         window.location.href = `${target.scheme}${fileUrl}`;
         showToast("info", `Opening in ${target.label}. If nothing happens, use Download and open the file from your downloads.`);
       } else {
-        saveBlob(await downloadSharedArtifactFile(accessToken, artifact.id), filename);
-        showToast("info", `Saved ${filename}. Open it to read it in ${target.label}.`);
+        if (await saveBlob(await downloadSharedArtifactFile(accessToken, artifact.id), filename)) showToast("info", `Saved ${filename}. Open it to read it in ${target.label}.`);
       }
     } catch (error) { showToast("error", apiMessage(error, "Something went wrong.")); }
     finally { setIsBusy(false); }

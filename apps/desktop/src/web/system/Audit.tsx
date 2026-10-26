@@ -16,6 +16,7 @@ import { showToast } from "../../components/ui/toast";
 import { ICON_SIZE } from "../../components/ui/icon";
 import { apiMessage, formatTime } from "../format";
 import { useSystemData, count, RefreshButton } from "./shared";
+import { saveBlob } from "../../lib/saveBlob";
 import { systemKeys } from "../../lib/queryClient";
 
 export function AuditSection({ accessToken, canExport }: { accessToken: string; canExport: boolean }) {
@@ -30,15 +31,8 @@ export function AuditSection({ accessToken, canExport }: { accessToken: string; 
     setIsExporting(true);
     try {
       const { blob, filename, count } = await downloadSystemAuditExport(accessToken, { format, from, to });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
-      showToast("success", `Downloaded ${count.toLocaleString()} audit event${count === 1 ? "" : "s"}. The download is recorded in the trail.`);
+      // The export is recorded by the server when it is sent; the toast says so only once the file is saved.
+      if (await saveBlob(blob, filename)) showToast("success", `Downloaded ${count.toLocaleString()} audit event${count === 1 ? "" : "s"}. The download is recorded in the trail.`);
       void reload();
     } catch (error) { showToast("error", apiMessage(error, "The audit trail could not be exported.")); }
     finally { setIsExporting(false); }
