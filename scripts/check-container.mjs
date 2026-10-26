@@ -529,6 +529,23 @@ if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge d
   if (!/"depends":\s*\["xdg-utils"\]/.test(shell)) problems.push("the .deb does not depend on xdg-utils, which opens links outside the app");
 }
 
+// The desktop app for macOS (V0.4.60): one universal .dmg built on a macOS runner, signed ad hoc without credentials and signed and
+// notarized with them, which only the build step reads; looked at, opened and kept as an artifact; nothing is published.
+{
+  const mac = workflows.find(([name]) => name === "desktop-macos.yml")?.[1] ?? "";
+  if (!mac) problems.push(".github/workflows/desktop-macos.yml is missing");
+  else {
+    if (!/runs-on: macos-latest/.test(mac) || !/--target universal-apple-darwin --bundles dmg/.test(mac) || !/aarch64-apple-darwin,x86_64-apple-darwin/.test(mac)) problems.push("the macOS desktop workflow does not build a universal .dmg for both architectures");
+    if (!/lipo -archs/.test(mac) || !/grep -q "x86_64" archs\.txt && grep -q "arm64" archs\.txt/.test(mac) || !/codesign --verify --deep --strict/.test(mac)) problems.push("the macOS desktop workflow does not check that the app is universal and signed");
+    if (!/spctl --assess/.test(mac) || !/stapler validate/.test(mac) || !/is not notarized/.test(mac)) problems.push("the macOS desktop workflow must check notarization when the credentials exist and say plainly when the app is not notarized");
+    if ((mac.match(/secrets\.APPLE_[A-Z_]+/g) ?? []).filter((use) => use !== "secrets.APPLE_CERTIFICATE" && use !== "secrets.APPLE_ID").length !== 4 || /\n      (APPLE_[A-Z_]+):/.test(mac)) problems.push("the Apple credentials must be read by the build step alone, under names of their own");
+    if (!/tauri\.adhoc\.conf\.json/.test(mac) || !/"signingIdentity":\s*"-"/.test(read("apps/desktop/src-tauri/tauri.adhoc.conf.json"))) problems.push("without a certificate the macOS app must be signed ad hoc");
+    if (!/upload-artifact@[0-9a-f]{40}[\s\S]*desktop-macos-universal/.test(mac)) problems.push("the macOS desktop workflow does not keep its files as the artifact desktop-macos-universal");
+    if (/contents:\s*write|gh release|packages:\s*write/.test(mac)) problems.push("the macOS desktop workflow publishes or writes; it only keeps an artifact");
+    if (!/test "\$\{GITHUB_REF_NAME\}" = "v\$\(node -p/.test(mac)) problems.push("the macOS desktop workflow does not require the tag to be the version");
+  }
+}
+
 // The parity check of the desktop app (V0.4.58) runs in CI with its tests, and its list exists.
 {
   if (!/node scripts\/check-desktop\.mjs/.test(ci) || !/check-desktop\.test\.mjs/.test(ci)) problems.push("CI does not run the desktop parity check and its tests");

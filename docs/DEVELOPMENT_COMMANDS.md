@@ -97,6 +97,25 @@ titled RepoMemo, and checks that the package registers `repomemo://` links.
   (a zip with an `.exe`); on Linux hand out the AppImage or the `.deb` with the file beside it.
 - **Not yet.** Linux arm64, and signed updates for Linux (the feed carries Windows only; a Linux app is updated by installing again).
 
+## The Desktop App On macOS
+
+The *Desktop macOS* workflow (V0.4.60; by hand from the Actions page, or a tag's) builds one **universal** `RepoMemo_<version>_universal.dmg` on
+a macOS runner, a single app that runs on Apple silicon and on Intel, and keeps it with `SHA256SUMS` as the artifact `desktop-macos-universal`.
+CI checks that the program holds both architectures (`lipo`), that the bundle is correctly signed (`codesign --verify --deep --strict`) and
+registers `repomemo://` links, and opens it once. macOS 10.15 or later.
+
+- **Signed and notarized, when the repository has the Apple credentials:** the secrets `APPLE_CERTIFICATE` (a base64 `.p12` of a *Developer ID
+  Application* certificate), `APPLE_CERTIFICATE_PASSWORD` and `APPLE_SIGNING_IDENTITY` sign the app; adding `APPLE_ID`, `APPLE_PASSWORD` (an
+  app-specific password) and `APPLE_TEAM_ID` has Apple notarize it, and CI then requires `spctl --assess` and `stapler validate` to pass. Only the
+  build step reads them. The app then opens with a double click.
+- **Without them** the app is signed *ad hoc* (an Apple-silicon Mac will not start a program with no signature at all) and is not notarized; the
+  log says so. Gatekeeper then asks: control-click the app, *Open*, *Open*; or for a downloaded file, `xattr -dr com.apple.quarantine
+  /Applications/RepoMemo.app`. IT can allow it by its team or by the hash in `SHA256SUMS`.
+- **Preset and file.** `REPOMEMO_PRESET_SERVER` at build time and `repomemo-desktop.json` work as on the other systems; the file goes in
+  `~/Library/Application Support/com.repomemo.desktop/`, or beside the program inside the bundle (`RepoMemo.app/Contents/MacOS/`, which breaks the
+  signature, so prefer the folder). The session is kept in the Keychain.
+- **Not yet.** Signed updates for macOS (the feed carries Windows only).
+
 ## Check That The Desktop App Stays The Web Client
 
 ```powershell

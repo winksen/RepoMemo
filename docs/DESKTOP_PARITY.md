@@ -26,7 +26,7 @@ Written for V0.4.43; each release that closes a row updates it and says so (*don
 | Server note | none | the server's name and *Change server* in the account area (`DesktopServerNote`) | Stays: only the app has a server to change; it is the one desktop-only piece of the page and asks `platform.choosesServer` |
 | Updates | the next page load | none: the person installs a new version by hand | Closed by V0.4.56 (done: signed updates from the administrator's feed, or the project's releases when the person opts in) |
 | Private certificate authority | the browser's own store | the system store only | Closed by V0.4.55 (done: a `certificate` bundle in the file, checked by a relay that trusts it for that server only) |
-| Installing | none | a Windows installer, then Linux and macOS packages | Closed by V0.4.49 to V0.4.60 (Windows done at V0.4.50; Linux done at V0.4.59: an AppImage and a .deb; macOS at V0.4.60) |
+| Installing | none | a Windows installer, then Linux and macOS packages | Closed by V0.4.49 to V0.4.60 (Windows done at V0.4.50; Linux done at V0.4.59: an AppImage and a .deb; macOS done at V0.4.60: a universal .dmg) |
 
 ## What exists for the desktop alone
 

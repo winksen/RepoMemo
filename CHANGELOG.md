@@ -2,6 +2,26 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.60 (2026-10-26)
+
+CI builds the desktop app for macOS: one universal .dmg, signed and notarized when the credentials exist.
+
+### Added
+- **`.github/workflows/desktop-macos.yml`:** on a `v*` tag (the tag must be the version), on a pull request that touches the desktop app, and by hand. On `macos-latest`, with both Apple Rust targets, it builds `RepoMemo_<version>_universal.dmg` (`tauri build --target universal-apple-darwin --bundles dmg`: Apple silicon and Intel in one app, macOS 10.15 or later) and keeps it with `SHA256SUMS` as the artifact `desktop-macos-universal`. It publishes nothing and has read access only.
+- **Signed and notarized with credentials:** the secrets `APPLE_CERTIFICATE` (a base64 `.p12`), its password and `APPLE_SIGNING_IDENTITY` sign the app; `APPLE_ID`, `APPLE_PASSWORD` and `APPLE_TEAM_ID` add Apple's notarization. They are read by the build step alone, under names of their own and exported only when present. **Without them** the app is signed ad hoc (`tauri.adhoc.conf.json`; an Apple-silicon Mac will not start a program with no signature) and the log says plainly that it is not notarized.
+- **What CI checks:** the program holds `x86_64` and `arm64` (`lipo -archs`), the bundle identifier is `com.repomemo.desktop` and `repomemo` is registered as a link scheme in `Info.plist`, the signature is valid (`codesign --verify --deep --strict`), and, when notarization was asked for, `spctl --assess` and `stapler validate` pass; then the app is opened from the mounted image and must stay up.
+- **Guidance** in the development commands (*The desktop app on macOS*): the credentials, what Gatekeeper asks of an app that is not notarized and how a person or IT answers, where the configuration file goes, and that the session is in the Keychain.
+
+### Changed
+- **`tauri.conf.json`** sets the minimum macOS version. The same preset address and configuration file work on macOS unchanged. **`container:check`** holds the runner, the universal build, the checks, the notarization rule, the credentials read by the build step alone, the ad hoc fallback, the artifact and the absence of any write. **The documents:** the development commands, the parity audit, the operations guide, the technical mindmap, the roadmap and the release index. **The version** is `0.4.60` everywhere.
+
+### Checks
+- **Run:** `cargo check` (it reads the changed configuration), `desktop:check`, `container:check`, `version:check`, `docs:check`.
+- **Not run:** the workflow, the .dmg, signing, notarization, the app on any Mac. No Apple credentials exist yet, so every build is ad hoc signed. Left out: signed updates for macOS (the feed carries Windows only).
+
+### Upgrading
+- Nothing to do.
+
 ## V0.4.59 (2026-10-26)
 
 CI builds the desktop app for Linux: an AppImage and a .deb, with the libraries listed.
