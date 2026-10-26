@@ -20,7 +20,7 @@ resolver = "2"
 # The product version: the server reports it (System › Overview, the console).
 # Set it everywhere at once with `npm run version:set -- <version>`; CI checks
 # that Cargo.toml, Cargo.lock, package.json and tauri.conf.json agree.
-version = "0.4.50"
+version = "0.4.51"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/repomemo/repomemo"
@@ -58,6 +58,8 @@ tree-sitter-typescript = "0.23"
 tauri = { version = "2", features = [] }
 tauri-build = { version = "2", features = [] }
 tauri-plugin-http = "2"
+tauri-plugin-single-instance = "2"
+tauri-plugin-window-state = "2"
 keyring = { version = "3", default-features = false }
 url = "2"
 thiserror = "2"

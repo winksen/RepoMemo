@@ -420,6 +420,24 @@ if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge d
   }
 }
 
+// The app's identity (V0.4.51): an icon set made from the logo, the product's details in the executable, one copy per person, the
+// window's size and place remembered, and the title bar following the page; CI looks at the executable and starts a second copy.
+{
+  const shell = read("apps/desktop/src-tauri/tauri.conf.json");
+  for (const icon of ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"]) {
+    if (!shell.includes(`"${icon}"`) || !existsSync(`apps/desktop/src-tauri/${icon}`)) problems.push(`the desktop icon set lacks ${icon}`);
+  }
+  for (const key of ["publisher", "copyright", "shortDescription", "longDescription", "homepage", "category"]) {
+    if (!new RegExp(`"${key}":\\s*"[^"]+"`).test(shell)) problems.push(`tauri.conf.json gives the executable no ${key}`);
+  }
+  const shellCode = read("apps/desktop/src-tauri/src/lib.rs");
+  if (!/tauri_plugin_single_instance::init/.test(shellCode) || !/asked_to_forget/.test(shellCode.slice(0, shellCode.indexOf("tauri_plugin_single_instance")))) problems.push("the app is not limited to one copy, or the uninstaller's start is held up by it");
+  if (!/tauri_plugin_window_state::Builder/.test(shellCode)) problems.push("the window does not come back where it was (tauri-plugin-window-state)");
+  if (!/core:window:allow-set-title/.test(read("apps/desktop/src-tauri/capabilities/default.json")) || !/followPageTitle/.test(read("apps/desktop/src/components/DesktopApp.tsx"))) problems.push("the window's title does not follow the page's title");
+  const windows = workflows.find(([name]) => name === "desktop-windows.yml")?.[1] ?? "";
+  if (!/VersionInfo/.test(windows) || !/a second copy of the app stayed open/.test(windows)) problems.push("the Windows desktop workflow does not look at the executable's details or start a second copy");
+}
+
 // The page of a release is written from the changelog (V0.4.39): the workflow that makes the release uses the script, never a
 // sentence typed into it, and the script lists what a release holds.
 {

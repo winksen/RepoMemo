@@ -9,7 +9,21 @@ use crate::connection::Connection;
 /// the operating system's credential store and the window that may call that server and no other. Everything
 /// else is the web client's. The local workspace and the commands that served it were removed in V0.3.6.
 pub fn run() {
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default();
+    // One copy of the app per person (V0.4.51): a second start brings the first to the front and ends. The uninstaller's
+    // `--forget-session` start (V0.4.50) must run even while the app is open, so it is not held up by the first copy.
+    if !connection::asked_to_forget(std::env::args()) {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _arguments, _directory| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }));
+    }
+    builder
+        // The window comes back with the size and place it was left in (V0.4.51).
+        .plugin(tauri_plugin_window_state::Builder::default().build())
         // The window may call no server until one is chosen; `connection` adds the chosen one (V0.2.49).
         .plugin(tauri_plugin_http::init())
         .manage(Connection::default())

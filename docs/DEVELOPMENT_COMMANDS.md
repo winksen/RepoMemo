@@ -37,13 +37,13 @@ Why: starts the React UI in browser-preview mode. This does not launch the nativ
 
 ## Verify The Rust Workspace
 
-If this is a fresh checkout, create the local Tauri icon first:
+The icon set is committed (V0.4.51: made from the logo, `apps/desktop/public/RM-logo.svg`). Make it again only when the logo changes:
 
 ```powershell
 npm run icons
 ```
 
-Why: Tauri's Windows resource build requires `apps/desktop/src-tauri/icons/icon.ico`.
+Why: Tauri's own icon command draws every size the installer, Windows, macOS and Linux use from the logo; the Windows resource build needs `apps/desktop/src-tauri/icons/icon.ico`.
 
 ```powershell
 cargo check

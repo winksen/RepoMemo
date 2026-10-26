@@ -2,6 +2,28 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.51 (2026-10-26)
+
+The app has an identity of its own: the logo as its icon, its details in the executable, one window, and a title that names where you are.
+
+### Added
+- **The icon set, made from the logo** (`apps/desktop/public/RM-logo.svg`, by Tauri's icon command through `npm run icons`): `32x32`, `128x128`, `128x128@2x`, `icon.png`, `icon.ico` (several sizes), `icon.icns` and the Windows store sizes, all committed and named in `tauri.conf.json`. `npm run icons` drops the phone folders the command also writes. The earlier icon was a 32-pixel square drawn by a script.
+- **The executable says what it is:** publisher, copyright, category, short and long description and homepage in `tauri.conf.json`, which Tauri writes into the Windows version resource, the installer's *Publisher* and the Linux package. CI reads the version resource of the built executable and requires the product name, the file version and a description.
+- **One copy per person:** `tauri-plugin-single-instance`: a second start brings the first window to the front (unminimized, shown, focused) and ends. The uninstaller's `--forget-session` start (V0.4.50) is not held up by a running copy. CI starts a second copy and requires that it ends while the first stays.
+- **The window comes back where it was:** `tauri-plugin-window-state` keeps the size and place and restores them at the next start.
+- **A title that names the workspace:** `followPageTitle` makes the title bar the page's `document.title` ("Platform · Evidence · RepoMemo", which carries the workspace's name), with the `core:window:allow-set-title` permission, a `MutationObserver` and three tests (`windowTitle.test.ts`).
+
+### Changed
+- **Dependencies:** `tauri-plugin-single-instance` and `tauri-plugin-window-state` (and what the first needs on Linux); `cargo deny check` reports advisories, bans, licenses and sources ok.
+- **`container:check`** holds the icon files, the executable's details, the two plugins and the order that keeps the uninstaller's start free, the title permission and its use, and CI's two new looks. **The documents:** the development commands, the parity audit (the window row is closed), the operations guide, the technical mindmap, the roadmap and the release index. **The version** is `0.4.51` everywhere.
+
+### Checks
+- **Run:** `cargo check -p repomemo-desktop --tests`, `cargo clippy -p repomemo-desktop --all-targets -- -D warnings`, `cargo fmt --all`, `cargo deny check`, the desktop page tests (36 passed, 3 new), `typecheck`, `container:check`, `version:check`, `docs:check`.
+- **Not run:** the app, the second copy, the remembered size and place, the title bar. The window-state file (`.window-state.json` in the config folder) is not removed by *forget the sign-in*; it holds no account data.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.4.50 (2026-10-26)
 
 The Windows installer installs for one person, silently when asked, and offers to forget the session when it removes the app.

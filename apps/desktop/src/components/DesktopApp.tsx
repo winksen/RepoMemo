@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { SharedWebApp } from "../SharedWebApp";
 import { LoadingCanvas } from "../web/common";
-import { desktopServer, desktopSettings, installExternalLinkHandler, type DesktopSettings } from "../lib/desktop";
+import { desktopServer, desktopSettings, followPageTitle, installExternalLinkHandler, type DesktopSettings } from "../lib/desktop";
 import { pointAtServer } from "../lib/desktopConnection";
 import { DesktopConfigProblem } from "./DesktopConfigProblem";
 import { DesktopConnect } from "./DesktopConnect";
@@ -31,6 +31,7 @@ export function DesktopApp() {
   const [settings, setSettings] = useState<DesktopSettings>(NO_SETTINGS);
 
   useEffect(() => installExternalLinkHandler(), []);
+  useEffect(() => followPageTitle(), []);
 
   useEffect(() => {
     forgetRetiredChoices();

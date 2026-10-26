@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 /** Whether this page runs inside the desktop app's window (it then talks to a chosen server through the shell). */
 export const isDesktopRuntime = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -61,3 +62,16 @@ export type DesktopSettings = {
 export const desktopSettings = {
   get: () => invoke<DesktopSettings>("desktop_settings"),
 };
+
+/**
+ * Makes the window's title the page's (V0.4.51): the client names the page it shows in `document.title` ("Platform · Evidence",
+ * with the workspace's name), and a window of the app has no tab to show it in, so the title bar does. Returns the way to stop.
+ */
+export function followPageTitle(): () => void {
+  const window_ = getCurrentWindow();
+  const apply = () => void window_.setTitle(document.title).catch(() => undefined);
+  const observer = new MutationObserver(apply);
+  observer.observe(document.head, { childList: true, subtree: true, characterData: true });
+  apply();
+  return () => observer.disconnect();
+}

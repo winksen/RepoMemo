@@ -16,6 +16,8 @@ serde.workspace = true
 serde_json.workspace = true
 tauri.workspace = true
 tauri-plugin-http.workspace = true
+tauri-plugin-single-instance.workspace = true
+tauri-plugin-window-state.workspace = true
 url.workspace = true
 
 # The session of a server connection is kept in the operating system's credential store (V0.2.49).

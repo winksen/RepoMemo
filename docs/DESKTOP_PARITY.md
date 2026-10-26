@@ -21,7 +21,7 @@ Written for V0.4.43; each release that closes a row updates it and says so (*don
 | Links into the app | a URL | none: a link from a notice or a page of the web client cannot open the app | Closed by V0.4.54 (`repomemo://` links, only the app's own paths) |
 | Notifications | the Notifications page, in the tab | the same page; nothing when the window is in the background | Closed by V0.4.53 (native notifications and a badge for what waits in Review) |
 | Shortcuts | the page's own (command palette, editor, submit) | the same; no menu bar shortcuts of the platform, no global ones | Stays: nothing in the web client needs a platform menu |
-| Window | a tab | a fixed title, a default size and place, any number of copies | Closed by V0.4.51 (the title names the workspace, one instance, size and place remembered) |
+| Window | a tab | a fixed title, a default size and place, any number of copies | Closed by V0.4.51 (done: the title bar follows the page title, which names the workspace; one copy per person; size and place remembered) |
 | Version note | tells the person to reload or ask an administrator | tells the person to update the app (`VersionMismatch` takes a `desktop` flag) | Closed by V0.4.44 (done: the flag is `platform.installedApp`, from `lib/platform.ts`, the one place that knows the runtime) |
 | Server note | none | the server's name and *Change server* in the account area (`DesktopServerNote`) | Stays: only the app has a server to change; it is the one desktop-only piece of the page and asks `platform.choosesServer` |
 | Updates | the next page load | none: the person installs a new version by hand | Closed by V0.4.56 (a signed update feed, opt-in) |
