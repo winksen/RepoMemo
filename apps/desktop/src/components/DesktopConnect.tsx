@@ -6,7 +6,7 @@ import { pointAtServer } from "../lib/desktopConnection";
 import { checkServerVersion, versionAdvice } from "../lib/versionCheck";
 import { desktopServer } from "../lib/desktop";
 import { normalizeServerAddress } from "../lib/serverAddress";
-import { ThemeToggle } from "./SharedLayout";
+import { AuthFrame } from "./AuthFrame";
 import { Button } from "./ui/button";
 import { Field } from "./ui/field";
 import { Input } from "./ui/input";
@@ -61,35 +61,29 @@ export function DesktopConnect({ onConnected }: { onConnected: () => void }) {
   }
 
   return (
-    <main className="shared-auth-canvas">
-      <ThemeToggle className="shared-auth-theme-toggle" />
-      <section aria-label="RepoMemo desktop" className="shared-auth-intro">
-        <div className="shared-brand"><img alt="RepoMemo" className="shared-brand-full" src="/RM-logofull.svg" /></div>
-        <p className="shared-eyebrow">Desktop app</p>
-        <h1>Your team's evidence, on your desktop.</h1>
-        <p className="shared-intro-copy">The desktop app opens your RepoMemo server and shows the same pages as the browser. Your workspaces, memory and permissions stay on the server.</p>
-        <dl className="shared-trust-list">
-          <div><dt><Shield size={ICON_SIZE.md} /> One server</dt><dd>The app calls only the server you choose here, and cannot be sent to another site.</dd></div>
-          <div><dt><Key size={ICON_SIZE.md} /> Your session</dt><dd>Kept in this computer's credential store (Windows Credential Manager, the macOS Keychain or the system keyring), not in a file.</dd></div>
-        </dl>
-      </section>
-
-      <section aria-label="Choose a server" className="shared-auth-form-region">
-        <div className="shared-auth-form-shell">
-          <div className="shared-auth-heading">
-            <p className="shared-eyebrow">Connect</p>
-            <h2>Which server?</h2>
-            <p>Enter the address your administrator gave you, such as <code>repomemo.example.com</code>. Use <code>https://</code>; plain <code>http://</code> is only accepted for a server on your own network.</p>
-          </div>
-          <form className="shared-auth-form" onSubmit={connect}>
-            <Field label="Server address" required><Input autoCapitalize="none" autoComplete="url" autoCorrect="off" autoFocus inputMode="url" onChange={(event) => setAddress(event.target.value)} placeholder="https://repomemo.example.com" spellCheck={false} type="text" value={address} /></Field>
-            <Button busy={isConnecting} type="submit" variant="main">
-              <ArrowRight size={ICON_SIZE.md} />
-              Connect
-            </Button>
-          </form>
-        </div>
-      </section>
-    </main>
+    <AuthFrame
+      copy="The desktop app opens your RepoMemo server and shows the same pages as the browser. Your workspaces, memory and permissions stay on the server."
+      eyebrow="Desktop app"
+      formLabel="Choose a server"
+      introLabel="RepoMemo desktop"
+      title="Your team's evidence, on your desktop."
+      trust={[
+        { icon: <Shield size={ICON_SIZE.md} />, title: "One server", text: "The app calls only the server you choose here, and cannot be sent to another site." },
+        { icon: <Key size={ICON_SIZE.md} />, title: "Your session", text: "Kept in this computer's credential store (Windows Credential Manager, the macOS Keychain or the system keyring), not in a file." },
+      ]}
+    >
+      <div className="shared-auth-heading">
+        <p className="shared-eyebrow">Connect</p>
+        <h2>Which server?</h2>
+        <p>Enter the address your administrator gave you, such as <code>repomemo.example.com</code>. Use <code>https://</code>; plain <code>http://</code> is only accepted for a server on your own network.</p>
+      </div>
+      <form className="shared-auth-form" onSubmit={connect}>
+        <Field label="Server address" required><Input autoCapitalize="none" autoComplete="url" autoCorrect="off" autoFocus inputMode="url" onChange={(event) => setAddress(event.target.value)} placeholder="https://repomemo.example.com" spellCheck={false} type="text" value={address} /></Field>
+        <Button busy={isConnecting} type="submit" variant="main">
+          <ArrowRight size={ICON_SIZE.md} />
+          Connect
+        </Button>
+      </form>
+    </AuthFrame>
   );
 }

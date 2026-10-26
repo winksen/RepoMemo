@@ -2,6 +2,25 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.45 (2026-10-26)
+
+The connect screen and the sign-in page are one frame with different contents.
+
+### Added
+- **`components/AuthFrame.tsx`:** the frame of a page that asks who you are or which server: the theme toggle, the brand and an introduction with a trust list on one side, the form on the other. Its classes (`shared-auth-canvas`, `-intro`, `-form-region`, `-form-shell`) are written there and nowhere else in the two pages.
+- **`connectScreen.test.tsx`** (four tests): both pages use the frame and write none of its classes; both build their form from the web client's field, input, button and toast, with the heading and form classes of the sign-in page; the frame puts the introduction beside the form with the trust list; the connect screen is that frame, with its address field and *Connect* button.
+
+### Changed
+- **The sign-in page (`AuthCanvas`) and the desktop connect screen (`DesktopConnect`)** are made of `AuthFrame`; what each adds is its own heading, form and copy. The look did not change: the markup and classes are the same ones as before. The desktop app's own styles are now only the account area's server note (`rm-desktop-server`).
+- **The documents:** the parity audit (the first-screen row is closed), the operations guide, the technical mindmap, the roadmap and the release index. **The version** is `0.4.45` everywhere.
+
+### Checks
+- **Run:** `connectScreen.test.tsx` (4 passed), the desktop app, set-up pages and accessibility tests (19 passed), `typecheck`, `a11y:check`, `styles:check`, `container:check`, `version:check`, `docs:check`.
+- **Not run:** the app, a look at both screens in the browser and the window. The other pages that write the same classes (invitation, password reset, e-mail check, set-up) were left as they are.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.4.44 (2026-10-26)
 
 The client sends every request through one transport, and no component asks which window it is in.

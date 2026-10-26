@@ -7,7 +7,7 @@ import { Field } from "../components/ui/field";
 import { SegmentedControl } from "../components/ui/segmented-control";
 import { Input } from "../components/ui/input";
 import { Toast, showToast } from "../components/ui/toast";
-import { ThemeToggle } from "../components/SharedLayout";
+import { AuthFrame } from "../components/AuthFrame";
 import { type AuthMode } from "./constants";
 import { apiMessage } from "./format";
 import { navigate } from "./router";
@@ -83,51 +83,45 @@ export function AuthCanvas({
   }
 
   return (
-    <main className="shared-auth-canvas">
-      <ThemeToggle className="shared-auth-theme-toggle" />
-      <section className="shared-auth-intro" aria-label="RepoMemo shared mode">
-        <div className="shared-brand"><img alt="RepoMemo" className="shared-brand-full" src="/RM-logofull.svg" /></div>
-        <p className="shared-eyebrow">Shared workspace</p>
-        <h1>One evidence base for the team.</h1>
-        <p className="shared-intro-copy">Sign in to the server-authoritative workspace. Your browser only receives data allowed by your signed session.</p>
-        <dl className="shared-trust-list">
-          <div><dt><Shield size={ICON_SIZE.md} /> Server boundary</dt><dd>Shared data is requested through the protected API.</dd></div>
-          <div><dt><Key size={ICON_SIZE.md} /> Session token</dt><dd>Access expires and is kept only for this browser session.</dd></div>
-          <div><dt><Users size={ICON_SIZE.md} /> Membership-aware</dt><dd>Workspace access is scoped to the signed-in account.</dd></div>
-        </dl>
-      </section>
-
-      <section className="shared-auth-form-region" aria-label="Account access">
-        <div className="shared-auth-form-shell">
-          {setupPending ? null : <SegmentedControl aria-label="Account action" fill onValueChange={(next) => { navigate(next === "sign-in" ? "/login" : "/register"); setMode(next); setError(null); }} options={[{ label: "Sign in", value: "sign-in" }, { label: "Create account", value: "sign-up" }]} value={mode} />}
-          {setupPending ? <div className="shared-auth-heading">
-            <p className="shared-eyebrow">Server setup</p>
-            <h2>Finish setting up RepoMemo</h2>
-            <p>This server's setup is not finished. Sign in as the system administrator created during setup to complete it. Nobody else can sign in or register until then.</p>
-          </div> : <div className="shared-auth-heading">
-            <p className="shared-eyebrow">{mode === "sign-in" ? "Welcome back" : "Start a shared workspace"}</p>
-            <h2>{mode === "sign-in" ? "Continue to RepoMemo" : "Create your account"}</h2>
-            <p>{mode === "sign-in" ? "Use the credentials registered with this server." : "Your account will be the initial owner of any organization you create."}</p>
-          </div>}
-          <form className="shared-auth-form" onSubmit={submit}>
-            {mode === "sign-up" ? <Field label="Display name" required><Input autoComplete="name" onChange={(event) => setDisplayName(event.target.value)} placeholder="Ada Lovelace" value={displayName} /></Field> : null}
-            <Field label="Email" required><Input autoComplete="email" onChange={(event) => setEmail(event.target.value)} placeholder="you@company.com" type="email" value={email} /></Field>
-            <Field label="Password" required><Input autoComplete={mode === "sign-up" ? "new-password" : "current-password"} minLength={12} onChange={(event) => setPassword(event.target.value)} placeholder="At least 12 characters" type="password" value={password} /></Field>
-            <Toast kind="error" message={error} />
-            <Button busy={isSubmitting} type="submit" variant="main">
-              <ArrowRight size={ICON_SIZE.md} />
-              {mode === "sign-in" ? "Sign in to shared mode" : "Create account and continue"}
-            </Button>
-          </form>
-          {mode === "sign-in" ? <div className="shared-auth-hint">
-            {forgotOpen
-              ? <p>We will send a link to <strong>{email.trim() || "the address above"}</strong> if an account uses it and this server sends mail. It works once, for one hour. <Button busy={isSubmitting} onClick={() => void forgot()} variant="secondary">Send the link</Button> <Button onClick={() => setForgotOpen(false)} variant="secondary">Cancel</Button></p>
-              : <p>Forgot your password? <Button onClick={() => setForgotOpen(true)} variant="secondary">Get a link by email</Button>, or ask a system administrator of this server for a reset link (System › Users).</p>}
-          </div> : <p className="shared-auth-hint">Invited by a teammate? Open the invitation link you received instead: it creates the account with the right access.</p>}
-          <p className="shared-api-note">API {apiAvailable === true ? "healthy" : apiAvailable === false ? "unreachable" : "checking"} · <code>{sharedApiUrl || "this address"}</code></p>
-          <DesktopServerNote signedIn={false} />
-        </div>
-      </section>
-    </main>
+    <AuthFrame
+      copy="Sign in to the server-authoritative workspace. Your browser only receives data allowed by your signed session."
+      eyebrow="Shared workspace"
+      formLabel="Account access"
+      introLabel="RepoMemo shared mode"
+      title="One evidence base for the team."
+      trust={[
+        { icon: <Shield size={ICON_SIZE.md} />, title: "Server boundary", text: "Shared data is requested through the protected API." },
+        { icon: <Key size={ICON_SIZE.md} />, title: "Session token", text: "Access expires and is kept only for this browser session." },
+        { icon: <Users size={ICON_SIZE.md} />, title: "Membership-aware", text: "Workspace access is scoped to the signed-in account." },
+      ]}
+    >
+      {setupPending ? null : <SegmentedControl aria-label="Account action" fill onValueChange={(next) => { navigate(next === "sign-in" ? "/login" : "/register"); setMode(next); setError(null); }} options={[{ label: "Sign in", value: "sign-in" }, { label: "Create account", value: "sign-up" }]} value={mode} />}
+      {setupPending ? <div className="shared-auth-heading">
+        <p className="shared-eyebrow">Server setup</p>
+        <h2>Finish setting up RepoMemo</h2>
+        <p>This server's setup is not finished. Sign in as the system administrator created during setup to complete it. Nobody else can sign in or register until then.</p>
+      </div> : <div className="shared-auth-heading">
+        <p className="shared-eyebrow">{mode === "sign-in" ? "Welcome back" : "Start a shared workspace"}</p>
+        <h2>{mode === "sign-in" ? "Continue to RepoMemo" : "Create your account"}</h2>
+        <p>{mode === "sign-in" ? "Use the credentials registered with this server." : "Your account will be the initial owner of any organization you create."}</p>
+      </div>}
+      <form className="shared-auth-form" onSubmit={submit}>
+        {mode === "sign-up" ? <Field label="Display name" required><Input autoComplete="name" onChange={(event) => setDisplayName(event.target.value)} placeholder="Ada Lovelace" value={displayName} /></Field> : null}
+        <Field label="Email" required><Input autoComplete="email" onChange={(event) => setEmail(event.target.value)} placeholder="you@company.com" type="email" value={email} /></Field>
+        <Field label="Password" required><Input autoComplete={mode === "sign-up" ? "new-password" : "current-password"} minLength={12} onChange={(event) => setPassword(event.target.value)} placeholder="At least 12 characters" type="password" value={password} /></Field>
+        <Toast kind="error" message={error} />
+        <Button busy={isSubmitting} type="submit" variant="main">
+          <ArrowRight size={ICON_SIZE.md} />
+          {mode === "sign-in" ? "Sign in to shared mode" : "Create account and continue"}
+        </Button>
+      </form>
+      {mode === "sign-in" ? <div className="shared-auth-hint">
+        {forgotOpen
+          ? <p>We will send a link to <strong>{email.trim() || "the address above"}</strong> if an account uses it and this server sends mail. It works once, for one hour. <Button busy={isSubmitting} onClick={() => void forgot()} variant="secondary">Send the link</Button> <Button onClick={() => setForgotOpen(false)} variant="secondary">Cancel</Button></p>
+          : <p>Forgot your password? <Button onClick={() => setForgotOpen(true)} variant="secondary">Get a link by email</Button>, or ask a system administrator of this server for a reset link (System › Users).</p>}
+      </div> : <p className="shared-auth-hint">Invited by a teammate? Open the invitation link you received instead: it creates the account with the right access.</p>}
+      <p className="shared-api-note">API {apiAvailable === true ? "healthy" : apiAvailable === false ? "unreachable" : "checking"} · <code>{sharedApiUrl || "this address"}</code></p>
+      <DesktopServerNote signedIn={false} />
+    </AuthFrame>
   );
 }
