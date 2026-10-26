@@ -2,6 +2,26 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.48 (2026-10-26)
+
+One command from an administrator's keyboard to a file a team can use.
+
+### Added
+- **`npm run desktop:package -- --server https://memo.example.com --name "Acme Memo"`** (`scripts/package-desktop.mjs`; also `--support` for a help link and `--open` to leave the server unlocked). It writes, in `dist-desktop/`: `RepoMemo-<name>-portable.zip` (the program as `RepoMemo.exe`, `repomemo-desktop.json` beside it and a readme; the same bytes every time), `RepoMemo-<name>-setup.exe` when an installer exists, the same `repomemo-desktop.json` for IT to place in the config folder, and one `SHA256SUMS`.
+- **With Rust:** it builds the app with the address compiled in (`REPOMEMO_PRESET_SERVER`, V0.4.46; `tauri build --bundles nsis`), so the executable alone talks to that server and no other. **Without Rust:** `--from FOLDER` takes `repomemo-desktop.exe` and `*-setup.exe` from the artifact CI uploads and adds the configuration file; nothing is built.
+- **The checks of the app, before anything is written:** the address by the rules of a typed one (`https://`, or `http://` on your own network, nothing after the host), the name (one line, up to 60 characters) and the help link (`http(s)`, no login), in the app's own words; a mistake, a missing folder or a folder with no program stops the command with nothing written.
+- **`package-desktop.test.mjs`** (seven tests): the configuration for the documented choices is the sample administrators are given; the address rules (the same lists as the Rust tests); the name and the help link; file names; the handout from an artifact (zip with the three files, installer, configuration, sums); the same zip bytes every time; a bad server or an empty folder writes nothing. CI runs it.
+
+### Changed
+- **`container:check`** requires the command to compile the address in, to take `--from` and to write the configuration file, the `desktop:package` script, and CI to run the tests. **The documents:** the development commands (*Hand a team the desktop app*, with the Rust and no-Rust ways and what the second does not give), the operations guide, the technical mindmap, the roadmap and the release index. **The version** is `0.4.48` everywhere.
+
+### Checks
+- **Run:** `desktop:test` (7 passed), `container:check`, `version:check`, `docs:check`.
+- **Not run:** the build mode (it needs Rust and the Tauri CLI and builds an app), an installer, a handout on a clean machine. The artifact CI uploads does not exist until V0.4.49.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.4.47 (2026-10-26)
 
 A file beside the app says which server it talks to: the same executable with two files talks to two servers.

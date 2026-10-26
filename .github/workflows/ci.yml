@@ -61,6 +61,8 @@ jobs:
         run: node --test scripts/release-notes.test.mjs
       - name: The pinning rules refuse what they should
         run: node --test scripts/pins.test.mjs
+      - name: The desktop packaging command checks what it is given
+        run: node --test scripts/package-desktop.test.mjs
 
   web:
     name: Web client

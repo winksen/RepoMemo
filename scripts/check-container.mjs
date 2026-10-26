@@ -376,6 +376,16 @@ if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge d
   if (!existsSync("docs/QUICK_START.md")) problems.push("docs/QUICK_START.md is missing");
 }
 
+// The administrator's command for the desktop app (V0.4.48): it checks the address by the app's own rules, compiles it in when it
+// builds, and with --from needs no Rust; CI tries it.
+{
+  const command = read("scripts/package-desktop.mjs");
+  if (!command.includes("REPOMEMO_PRESET_SERVER") || !command.includes('arg("from")') || !command.includes("repomemo-desktop.json")) problems.push("scripts/package-desktop.mjs must compile the address in, take --from for an administrator without Rust, and write repomemo-desktop.json");
+  const packageJson = read("package.json");
+  if (!/"desktop:package": "node scripts\/package-desktop\.mjs"/.test(packageJson)) problems.push("package.json has no desktop:package script");
+  if (!/node --test scripts\/package-desktop\.test\.mjs/.test(ci)) problems.push("CI does not run the desktop packaging tests");
+}
+
 // The page of a release is written from the changelog (V0.4.39): the workflow that makes the release uses the script, never a
 // sentence typed into it, and the script lists what a release holds.
 {

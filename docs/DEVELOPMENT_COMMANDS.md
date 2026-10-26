@@ -91,6 +91,27 @@ the app's config folder (`%APPDATA%\com.repomemo.desktop` on Windows, `~/.config
   **named and not obeyed**: the app shows the file and the reason in place of everything else and connects to nothing, so a mistake
   cannot be gone around by typing an address.
 
+## Hand A Team The Desktop App
+
+```powershell
+npm run desktop:package -- --server https://memo.example.com --name "Acme Memo" --support https://intranet.example.com/help/memo
+```
+
+Why: one command from an administrator's keyboard to the files a team needs, in `dist-desktop/` (V0.4.48): `RepoMemo-Acme-Memo-portable.zip`
+(the program, `repomemo-desktop.json` and a readme; unpack it anywhere), `RepoMemo-Acme-Memo-setup.exe` (the per-person installer, when one is
+there), the same `repomemo-desktop.json` for IT to place in `%APPDATA%\com.repomemo.desktop\`, and `SHA256SUMS`. The address, the name and the
+help link are checked by the rules the app checks them by, and a mistake stops the command before anything is written. `--open` leaves the
+server unlocked (the person may change it).
+
+- **With Rust and the Tauri CLI installed,** the command builds the app with the address compiled in (the executable alone then talks to
+  that server and no other), as the section above does, and packs the result.
+- **Without Rust,** point it at the app CI builds: `npm run desktop:package -- --server ... --name ... --from C:\path\to\artifact`, where
+  the folder holds `repomemo-desktop.exe` (and `*-setup.exe`). It builds nothing; it adds the configuration file and packs the handout.
+  Without a compiled-in address the program obeys the file beside it, which the person could delete: for a team that must not reach
+  another server, build with Rust.
+
+`npm run desktop:test` tests the command (checks, handout, reproducible zip).
+
 ## Versions And Continuous Integration
 
 The product version lives in several files (Cargo, npm, Tauri). Set them all at
