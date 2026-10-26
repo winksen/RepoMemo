@@ -1,0 +1,44 @@
+# The desktop app against the web client: parity audit
+
+The desktop app is the web client in a window (decision 33, V0.4.43): one bundle, one entry (`index.html` loading `src/main.tsx`),
+the same pages, components and styles. `App` chooses the window's start (`DesktopApp` in Tauri, `SharedWebApp` in a browser) and the
+desktop's start is `SharedWebApp` once a server is chosen. A difference between the two is a defect to be listed here and either
+closed by a release or kept for a stated reason. `apps/desktop/src/test/desktopParity.test.ts` reads this page: every row below must
+say which, and the list of files that know about the desktop must be the one in the last section.
+
+Written for V0.4.43; each release that closes a row updates it.
+
+## The differences
+
+| Area | In the browser | In the desktop app | Closed by or why it stays |
+| --- | --- | --- | --- |
+| Transport | `fetch` of the page, with the refresh token in an HttpOnly cookie | the HTTP plugin's `fetch` for the chosen server only, no redirects, the refresh token in the operating system's credential store; the client says it is `desktop` | Closed by V0.4.44 (one `fetch` seam in `sharedApi`, the plugin chosen there and nowhere else, both tested) |
+| Which server | the page's own host (`/config.json`) | typed on a connect screen, checked by the shell, kept in `server.json` | Closed by V0.4.46 (a preset address) and V0.4.47 (a configuration file); typing stays for an unconfigured app |
+| First screen | the sign-in page | `DesktopConnect`, a screen of its own with its own copy | Closed by V0.4.45 (the same dialog, field, button and toast, one look) |
+| Downloads | an anchor with `download`, the browser's own dialog | the same anchor, which a webview treats differently per system (a blob download may not save at all) | Closed by V0.4.52 (a native save dialog for exports and downloads) |
+| Open a PDF or an Office file | a new tab, or the application's URL scheme (`ms-word:`) | saved first, then opened from the file manager; no tab, no scheme (`DocumentViewer`) | Stays: a window without tabs cannot hand a link to another program; V0.4.52 makes the saving clean |
+| Links to other sites | open in a new tab | `target="_blank"` links go to the system browser (`installExternalLinkHandler`); the window never leaves the bundled client | Stays: the window must not leave the client (it holds the session) |
+| Links into the app | a URL | none: a link from a notice or a page of the web client cannot open the app | Closed by V0.4.54 (`repomemo://` links, only the app's own paths) |
+| Notifications | the Notifications page, in the tab | the same page; nothing when the window is in the background | Closed by V0.4.53 (native notifications and a badge for what waits in Review) |
+| Shortcuts | the page's own (command palette, editor, submit) | the same; no menu bar shortcuts of the platform, no global ones | Stays: nothing in the web client needs a platform menu |
+| Window | a tab | a fixed title, a default size and place, any number of copies | Closed by V0.4.51 (the title names the workspace, one instance, size and place remembered) |
+| Version note | tells the person to reload or ask an administrator | tells the person to update the app (`VersionMismatch` takes a `desktop` flag) | Closed by V0.4.44 (the flag comes from the one place that knows the runtime) |
+| Server note | none | the server's name and *Change server* in the account area (`DesktopServerNote`) | Stays: only the app has a server to change; it is the one desktop-only piece of the page, listed below |
+| Updates | the next page load | none: the person installs a new version by hand | Closed by V0.4.56 (a signed update feed, opt-in) |
+| Private certificate authority | the browser's own store | the system store only | Closed by V0.4.55 (a certificate bundle for that server only) |
+| Installing | none | a Windows installer, then Linux and macOS packages | Closed by V0.4.49 to V0.4.60 |
+
+## Files that know about the desktop
+
+The files below, and only these, branch on the desktop runtime or call the shell. The list shrinks as rows close (V0.4.44 leaves the
+transport in one file; V0.4.58 turns the list into a check that fails the build).
+
+- `src/App.tsx`
+- `src/main.tsx`
+- `src/SharedWebApp.tsx`
+- `src/components/DesktopApp.tsx`
+- `src/components/DesktopConnect.tsx`
+- `src/components/DesktopServerNote.tsx`
+- `src/components/DocumentViewer.tsx`
+- `src/lib/desktop.ts`
+- `src/lib/sharedApi.ts`

@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.43 (2026-10-26)
+
+Every difference between the desktop app and the web client is written down, with the release that closes it or the reason it stays.
+
+### Added
+- **`docs/DESKTOP_PARITY.md`:** the parity audit. A table of fourteen differences (transport, which server, the first screen, downloads, opening a PDF or an Office file, links to other sites, links into the app, notifications, shortcuts, the window, the version note, the server note, updates, a private certificate authority, installing), each with what the browser does, what the desktop does and either *Closed by V0.4.N* or *Stays:* with the reason. Under it, the list of files that know about the desktop (nine).
+- **`desktopParity.test.ts`** (six tests): the page has one script, `src/main.tsx`, and there is no other page; the build has no second input and the shell serves the one `../dist` with no window of its own page; the client is mounted in one place (`createRoot` once) and `App` chooses between exactly `DesktopApp` and `SharedWebApp`, which the desktop start renders; the audit names the six areas (transport, downloads, links, notifications, shortcuts, window); every row says which release or why; and the files that branch on the desktop runtime or call the shell are exactly the ones the page lists, so a new desktop branch fails the test until it is written down.
+
+### Changed
+- **The documents:** the operations guide, the technical mindmap, the roadmap and the release index. **The version** is `0.4.43` everywhere. No application code changed.
+
+### Checks
+- **Run:** `desktopParity.test.ts` (6 passed), `typecheck`, `container:check`, `version:check`, `docs:check`.
+- **Not run:** the rest of the web tests, the desktop crate, the app.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.4.42 (2026-10-26)
 
 Nothing the release pipeline runs can move under it: every workflow, every image.
