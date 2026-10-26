@@ -2,6 +2,26 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.59 (2026-10-26)
+
+CI builds the desktop app for Linux: an AppImage and a .deb, with the libraries listed.
+
+### Added
+- **`.github/workflows/desktop-linux.yml`:** on a `v*` tag (the tag must be the version), on a pull request that touches the desktop app, and by hand. On Ubuntu 22.04 (the oldest glibc and WebKitGTK 4.1 a current Ubuntu or Debian still has, so the AppImage runs on newer systems) it installs the build libraries, builds with `tauri build --bundles appimage,deb`, and keeps `RepoMemo_<version>_amd64.AppImage`, the `.deb`, the bare program and `SHA256SUMS` as the artifact `desktop-linux-x64`. It publishes nothing and has read access only.
+- **What CI checks:** the `.deb` says what it is and what it needs (`dpkg-deb --info`: the package name, `xdg-utils`, WebKitGTK 4.1), carries its desktop entry and registers `repomemo://` links; the AppImage is started on a display of its own (xvfb, no installation) and must stay up with a window titled RepoMemo; the `.deb` is installed with `apt` and the installed program is started the same way.
+- **The libraries, written down** in the development commands: what to build with, what the `.deb` pulls in, FUSE 2 for the AppImage (or `APPIMAGE_EXTRACT_AND_RUN=1`), the Secret Service the session is kept in, where the configuration file goes, and what is not there yet.
+
+### Changed
+- **`tauri.conf.json`** no longer runs `npm.cmd` (a Windows-only name, the thing V0.4.49 noted): `npm run dev` and `npm run build` work on every system. The `.deb` depends on `xdg-utils`, which opens links outside the app.
+- **The same preset address and configuration file** work on Linux unchanged (`REPOMEMO_PRESET_SERVER`, `repomemo-desktop.json`). **`container:check`** holds the runner, the bundles, the libraries, the three tries, the link registration, the artifact and the absence of any write. **The documents:** the development commands (*The desktop app on Linux*), the parity audit, the operations guide, the technical mindmap, the roadmap and the release index. **The version** is `0.4.59` everywhere.
+
+### Checks
+- **Run:** `cargo check` (it reads the changed configuration), `desktop:check`, `container:check`, `version:check`, `docs:check`.
+- **Not run:** the workflow, either package, the app on any Linux system. Left out on purpose: Linux arm64, and signed updates for Linux (the update feed carries Windows only).
+
+### Upgrading
+- Nothing to do.
+
 ## V0.4.58 (2026-10-26)
 
 Adding a screen or a style only the desktop app has now fails CI until it is listed with a reason.

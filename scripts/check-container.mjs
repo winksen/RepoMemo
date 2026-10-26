@@ -510,6 +510,25 @@ if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge d
   if (!/SmartScreen/.test(read("docs/DEVELOPMENT_COMMANDS.md"))) problems.push("the SmartScreen warning is not explained");
 }
 
+// The desktop app for Linux (V0.4.59): an AppImage and a .deb built on Ubuntu 22.04, looked at, tried on a display of its own, kept as
+// an artifact and published nowhere; the build commands are not Windows-only.
+{
+  const linux = workflows.find(([name]) => name === "desktop-linux.yml")?.[1] ?? "";
+  if (!linux) problems.push(".github/workflows/desktop-linux.yml is missing");
+  else {
+    if (!/runs-on: ubuntu-22\.04/.test(linux) || !/npx tauri build --bundles appimage,deb/.test(linux)) problems.push("the Linux desktop workflow does not build the AppImage and the .deb on Ubuntu 22.04");
+    if (!/libwebkit2gtk-4\.1-dev/.test(linux) || !/xvfb/.test(linux)) problems.push("the Linux desktop workflow does not install the system libraries and a display to try the app on");
+    if (!/APPIMAGE_EXTRACT_AND_RUN/.test(linux) || !/xdotool search --name/.test(linux) || !/apt-get install -y "\.\/\$\(ls dist-desktop-ci\/\*\.deb\)"/.test(linux)) problems.push("the Linux desktop workflow does not open the AppImage and the installed .deb");
+    if (!/x-scheme-handler\/repomemo/.test(linux)) problems.push("the Linux desktop workflow does not check that the package registers repomemo:// links");
+    if (!/upload-artifact@[0-9a-f]{40}[\s\S]*desktop-linux-x64/.test(linux)) problems.push("the Linux desktop workflow does not keep its files as the artifact desktop-linux-x64");
+    if (/contents:\s*write|gh release|packages:\s*write/.test(linux)) problems.push("the Linux desktop workflow publishes or writes; it only keeps an artifact");
+    if (!/test "\$\{GITHUB_REF_NAME\}" = "v\$\(node -p/.test(linux)) problems.push("the Linux desktop workflow does not require the tag to be the version");
+  }
+  const shell = read("apps/desktop/src-tauri/tauri.conf.json");
+  if (/npm\.cmd/.test(shell)) problems.push("tauri.conf.json runs npm.cmd, which only Windows has");
+  if (!/"depends":\s*\["xdg-utils"\]/.test(shell)) problems.push("the .deb does not depend on xdg-utils, which opens links outside the app");
+}
+
 // The parity check of the desktop app (V0.4.58) runs in CI with its tests, and its list exists.
 {
   if (!/node scripts\/check-desktop\.mjs/.test(ci) || !/check-desktop\.test\.mjs/.test(ci)) problems.push("CI does not run the desktop parity check and its tests");

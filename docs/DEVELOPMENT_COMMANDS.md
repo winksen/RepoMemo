@@ -79,6 +79,24 @@ key and its password as the repository secrets `TAURI_SIGNING_PRIVATE_KEY` and `
 text in the repository variable `REPOMEMO_UPDATE_PUBKEY`, which CI passes to the build and which decides whether a tag publishes the signed
 update. A build without it never looks at the project's releases.
 
+## The Desktop App On Linux
+
+The *Desktop Linux* workflow (V0.4.59; run it by hand from the Actions page, or take a tag's) builds on Ubuntu 22.04 and keeps the artifact
+`desktop-linux-x64`: `RepoMemo_<version>_amd64.AppImage`, `RepoMemo_<version>_amd64.deb`, the bare `repomemo-desktop` program and
+`SHA256SUMS`. Ubuntu 22.04 is used on purpose: it has the oldest glibc and WebKitGTK 4.1 that a current Ubuntu or Debian still carries, so
+the AppImage runs on newer systems too. CI starts the AppImage and the installed `.deb` on a display of its own and requires a live window
+titled RepoMemo, and checks that the package registers `repomemo://` links.
+
+- **Libraries.** To *build*: `build-essential pkg-config file patchelf libssl-dev libgtk-3-dev librsvg2-dev libwebkit2gtk-4.1-dev
+  libayatana-appindicator3-dev libxdo-dev`. To *run* the `.deb`, `apt` pulls what it names (`libwebkit2gtk-4.1-0`, GTK 3 and `xdg-utils`,
+  which opens links outside the app). The AppImage carries most libraries but needs FUSE 2 (`sudo apt install libfuse2` on Ubuntu 22.04 and
+  later), or run it with `APPIMAGE_EXTRACT_AND_RUN=1`.
+- **The session** is kept in the Secret Service (GNOME Keyring or KWallet), so a desktop session with one running is needed to stay signed in.
+- **Preset and file.** `REPOMEMO_PRESET_SERVER` at build time and `repomemo-desktop.json` work as on Windows; the file goes beside the program
+  (next to the AppImage, or `/usr/bin` for the package) or in `~/.config/com.repomemo.desktop/`. `desktop:package --from` is Windows-shaped
+  (a zip with an `.exe`); on Linux hand out the AppImage or the `.deb` with the file beside it.
+- **Not yet.** Linux arm64, and signed updates for Linux (the feed carries Windows only; a Linux app is updated by installing again).
+
 ## Check That The Desktop App Stays The Web Client
 
 ```powershell
