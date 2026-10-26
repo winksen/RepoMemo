@@ -462,6 +462,20 @@ if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge d
   if (!/opensInApp/.test(read("apps/desktop/src/components/OpenInAppLink.tsx"))) problems.push("Open in the app is not shown by capability (platform.opensInApp)");
 }
 
+// A server with its own certificate authority (V0.4.55): the bundle is trusted for the file's server only, by a loopback relay that
+// uses no other root, forwards to one origin and answers nothing without the run's secret; the window may call only the relay.
+{
+  const relay = read("apps/desktop/src-tauri/src/trust.rs");
+  if (!/tls_built_in_root_certs\(false\)/.test(relay) || !/add_root_certificate/.test(relay)) problems.push("the relay must trust the administrator's bundle alone (tls_built_in_root_certs(false) and add_root_certificate)");
+  if (!/TOKEN_HEADER/.test(relay) || !/StatusCode::FORBIDDEN/.test(relay) || !/upstream_url\(&origin/.test(relay)) problems.push("the relay must answer nothing without the run's secret and forward to its one origin");
+  if (!/Policy::none\(\)/.test(relay) || !/127\.0\.0\.1/.test(relay)) problems.push("the relay must follow no redirect and listen on the loopback only");
+  const connection = read("apps/desktop/src-tauri/src/connection.rs");
+  if (!/fn uses_private_ca/.test(connection) || !/== Some\(origin\)/.test(connection) || !/allow_address\(app, &relay\.proxy\)/.test(connection)) problems.push("the bundle is not tied to the file's server, or the window may call the real server beside the relay");
+  if (!/certificate: Option<String>/.test(read("apps/desktop/src-tauri/src/config.rs"))) problems.push("the configuration file takes no certificate");
+  if (!/throughRelay/.test(read("apps/desktop/src/lib/transport.ts")) || !/desktopServer\.route\(\)/.test(read("apps/desktop/src/lib/desktopConnection.ts"))) problems.push("the client does not send a private-authority server's requests through the relay");
+  if (!existsSync("apps/desktop/src-tauri/testdata/test-ca.pem") || /PRIVATE KEY/.test(read("apps/desktop/src-tauri/testdata/test-ca.pem"))) problems.push("the test certificate is missing, or holds a private key");
+}
+
 // The page of a release is written from the changelog (V0.4.39): the workflow that makes the release uses the script, never a
 // sentence typed into it, and the script lists what a release holds.
 {

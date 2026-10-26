@@ -20,7 +20,7 @@ resolver = "2"
 # The product version: the server reports it (System › Overview, the console).
 # Set it everywhere at once with `npm run version:set -- <version>`; CI checks
 # that Cargo.toml, Cargo.lock, package.json and tauri.conf.json agree.
-version = "0.4.54"
+version = "0.4.55"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/repomemo/repomemo"
@@ -66,6 +66,11 @@ tauri-plugin-window-state = "2"
 keyring = { version = "3", default-features = false }
 url = "2"
 thiserror = "2"
+hyper = { version = "1", features = ["server", "http1"] }
+hyper-util = { version = "0.1", features = ["tokio"] }
+http-body-util = "0.1"
+bytes = "1"
+futures-util = { version = "0.3", default-features = false }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "fs", "net", "signal", "sync", "process", "time"] }
 tokio-stream = { version = "0.1", features = ["sync"] }
 tower = { version = "0.5", features = ["util"] }

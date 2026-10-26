@@ -9,7 +9,7 @@ vi.mock("../lib/desktop", () => ({
   shellNotifier: {},
   appLinks: { takePending: vi.fn(async () => null), listen: vi.fn(async () => () => undefined) },
   desktopSettings: { get: vi.fn() },
-  desktopServer: { current: vi.fn(), locked: vi.fn(), prepare: vi.fn(), remember: vi.fn(), forget: vi.fn() },
+  desktopServer: { current: vi.fn(), locked: vi.fn(), route: vi.fn(async () => null), prepare: vi.fn(), remember: vi.fn(), forget: vi.fn() },
 }));
 vi.mock("../lib/sharedApi", () => ({ configureDesktopApi: vi.fn(), getSharedHealth: vi.fn(), sharedApiUrl: "https://memo.example.com" }));
 vi.mock("../lib/desktopConnection", () => ({ pointAtServer: vi.fn(async () => undefined) }));

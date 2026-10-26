@@ -22,7 +22,10 @@ use serde_json::json;
 use tauri::{ipc::CapabilityBuilder, AppHandle, Manager, State};
 use url::{Host, Url};
 
-use crate::config::ConfigState;
+use crate::{
+    config::ConfigState,
+    trust::{self, Route},
+};
 
 const KEYRING_SERVICE: &str = "RepoMemo";
 const SERVER_FILE: &str = "server.json";
@@ -38,6 +41,8 @@ const PRESET_SERVER: Option<&str> = option_env!("REPOMEMO_PRESET_SERVER");
 pub struct Connection {
     current: Mutex<Option<String>>,
     locked: AtomicBool,
+    /// The server whose requests go through the relay of its private certificate authority (V0.4.55), and where the relay is.
+    route: Mutex<Option<(String, Route)>>,
 }
 
 impl Connection {
@@ -166,8 +171,8 @@ pub fn read_saved_server(app: &AppHandle) -> Option<String> {
     normalize_server_url(&saved.server_url).ok()
 }
 
-/// Lets the window's pages call this server, and no other.
-pub fn allow_server(app: &AppHandle, origin: &str) -> Result<(), String> {
+/// Lets the window's pages call this address, and no other.
+fn allow_address(app: &AppHandle, origin: &str) -> Result<(), String> {
     let identifier = format!("server-{}", origin.replace(|c: char| !c.is_ascii_alphanumeric(), "-"));
     let capability = CapabilityBuilder::new(identifier).window("main").permission_scoped(
         "http:default",
@@ -175,6 +180,39 @@ pub fn allow_server(app: &AppHandle, origin: &str) -> Result<(), String> {
         Vec::<serde_json::Value>::new(),
     );
     app.add_capability(capability).map_err(|error| error.to_string())
+}
+
+/// Whether the requests for this server go through the relay of a private certificate authority: the administrator's file names a
+/// bundle and this is the file's server. Any other address is called as it is, with the system's ordinary trust.
+pub fn uses_private_ca(file: &ConfigState, origin: &str) -> bool {
+    !file.certificates.is_empty() && file.config.server.as_deref() == Some(origin)
+}
+
+/// Lets the window call a server: directly, or, when [`uses_private_ca`], only the relay that checks its certificate by the file's
+/// bundle and nothing else (V0.4.55).
+pub fn route_server(app: &AppHandle, connection: &Connection, file: &ConfigState, origin: &str) -> Result<(), String> {
+    let mut route = connection.route.lock().map_err(|_| "state is locked".to_owned())?;
+    if !uses_private_ca(file, origin) {
+        *route = None;
+        return allow_address(app, origin);
+    }
+    let relay = match route.as_ref() {
+        Some((served, relay)) if served == origin => relay.clone(),
+        _ => trust::start(origin, file.certificates.clone())?,
+    };
+    allow_address(app, &relay.proxy)?;
+    *route = Some((origin.to_owned(), relay));
+    Ok(())
+}
+
+/// The relay the page sends this run's requests through, if the server has a private certificate authority.
+#[tauri::command]
+pub fn server_route(connection: State<'_, Connection>) -> Option<Route> {
+    connection
+        .route
+        .lock()
+        .ok()
+        .and_then(|route| route.as_ref().map(|(_, relay)| relay.clone()))
 }
 
 /// The server a run starts on and whether it is locked, from the three places that can name one, strongest first: the address the
@@ -204,7 +242,7 @@ pub fn start(app: &AppHandle, connection: &Connection, file: &ConfigState) -> Re
     };
     let (origin, locked) = choose_start(preset, file, saved);
     if let Some(origin) = origin {
-        allow_server(app, &origin)?;
+        route_server(app, connection, file, &origin)?;
         *connection.current.lock().map_err(|_| "state is locked".to_owned())? = Some(origin);
     }
     connection.locked.store(locked, Ordering::SeqCst);
@@ -277,10 +315,15 @@ pub fn server_locked(connection: State<'_, Connection>) -> bool {
 /// Checks an address a person typed and lets the window call that server. Nothing is saved until
 /// [`remember_server`], after the page has found a RepoMemo server there.
 #[tauri::command]
-pub fn prepare_server(app: AppHandle, connection: State<'_, Connection>, address: String) -> Result<String, String> {
+pub fn prepare_server(
+    app: AppHandle,
+    connection: State<'_, Connection>,
+    file: State<'_, ConfigState>,
+    address: String,
+) -> Result<String, String> {
     ensure_unlocked(&connection)?;
     let origin = normalize_server_url(&address)?;
-    allow_server(&app, &origin)?;
+    route_server(&app, &connection, &file, &origin)?;
     *connection.current.lock().map_err(|_| "state is locked".to_owned())? = Some(origin.clone());
     Ok(origin)
 }
@@ -478,6 +521,7 @@ mod tests {
                 ..Default::default()
             },
             problem: problem.map(str::to_owned),
+            ..Default::default()
         }
     }
 
@@ -549,6 +593,31 @@ mod tests {
         assert_eq!(
             servers_to_forget(None, &ConfigState::default(), own("https://saved.example.com")).len(),
             1
+        );
+    }
+
+    #[test]
+    fn a_private_authority_is_trusted_for_the_files_server_and_no_other() {
+        let mut file = file_with(Some("https://memo.example.com"), true, None);
+        assert!(
+            !uses_private_ca(&file, "https://memo.example.com"),
+            "no bundle, no relay"
+        );
+        file.certificates = trust::parse_bundle(include_str!("../testdata/test-ca.pem").as_bytes()).unwrap();
+        assert!(uses_private_ca(&file, "https://memo.example.com"));
+        assert!(
+            !uses_private_ca(&file, "https://other.example.com"),
+            "the same bundle does not make another site trusted"
+        );
+        assert!(
+            !uses_private_ca(
+                &ConfigState {
+                    certificates: file.certificates.clone(),
+                    ..ConfigState::default()
+                },
+                "https://memo.example.com"
+            ),
+            "a bundle with no server of the file"
         );
     }
 

@@ -87,6 +87,13 @@ the app's config folder (`%APPDATA%\com.repomemo.desktop` on Windows, `~/.config
   connect screen's field. An address compiled into the app (`REPOMEMO_PRESET_SERVER`) wins over the file's.
 - `name`: what the window and the page are called (one line, up to 60 characters).
 - `support`: an `http(s)` address shown as a *Help* link on the connect screen and in the account area.
+- `certificate`: a PEM file of the authority that signed the server's certificate, for a server behind a company's own CA (V0.4.55): a name
+  beside `repomemo-desktop.json`, or a full path; one to ten certificates, at most 256 KB; it needs a `server`. The app then calls that
+  server through a relay of its own on the loopback (the HTTP plugin cannot add a root), which checks the server's certificate against
+  **this bundle alone** (the system's roots are not used for it), forwards only to that server's address and answers only the app that
+  started it. **The same bundle trusts no other site:** the app asks the system's ordinary trust for any other address, and the window
+  may call nothing but that one. A bundle that is missing, is not PEM certificates or is too large spoils the whole file, which is shown
+  and not obeyed. Hand out the authority's certificate only: never its key (`desktop:package --certificate` refuses a file with one).
 - Nothing else is accepted. A file that is not valid JSON, names a field the app does not know, or holds a value that fails its rule is
   **named and not obeyed**: the app shows the file and the reason in place of everything else and connects to nothing, so a mistake
   cannot be gone around by typing an address.
@@ -101,7 +108,8 @@ Why: one command from an administrator's keyboard to the files a team needs, in 
 (the program, `repomemo-desktop.json` and a readme; unpack it anywhere), `RepoMemo-Acme-Memo-setup.exe` (the per-person installer, when one is
 there), the same `repomemo-desktop.json` for IT to place in `%APPDATA%\com.repomemo.desktop\`, and `SHA256SUMS`. The address, the name and the
 help link are checked by the rules the app checks them by, and a mistake stops the command before anything is written. `--open` leaves the
-server unlocked (the person may change it).
+server unlocked (the person may change it). `--certificate ca.pem` (V0.4.55) is for a server behind a company's own authority: the file is checked,
+handed out as `repomemo-ca.pem` beside the configuration file, and named in it.
 
 - **With Rust and the Tauri CLI installed,** the command builds the app with the address compiled in (the executable alone then talks to
   that server and no other), as the section above does, and packs the result.

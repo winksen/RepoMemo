@@ -3,6 +3,7 @@ mod connection;
 mod deeplink;
 mod files;
 mod notice;
+mod trust;
 
 use tauri::Manager;
 use tauri_plugin_deep_link::DeepLinkExt;
@@ -85,6 +86,7 @@ pub fn run() {
             config::desktop_settings,
             connection::current_server,
             connection::server_locked,
+            connection::server_route,
             connection::prepare_server,
             connection::remember_server,
             connection::forget_server,

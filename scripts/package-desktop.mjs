@@ -54,7 +54,7 @@ export function normalizeServer(input) {
 }
 
 /** The text of repomemo-desktop.json for these choices, checked the way the app checks a file. */
-export function buildConfig({ server, name, support, locked = true }) {
+export function buildConfig({ server, name, support, locked = true, certificate }) {
   const config = { server: normalizeServer(server) };
   if (name !== undefined) {
     const folded = String(name).split(/\s+/).filter(Boolean).join(" ");
@@ -73,12 +73,29 @@ export function buildConfig({ server, name, support, locked = true }) {
     if (!["http:", "https:"].includes(url.protocol) || !url.hostname || url.username || url.password) throw new Error("support: must be an http:// or https:// address without a login");
     config.support = url.toString();
   }
+  if (certificate !== undefined) config.certificate = certificate;
   return `${JSON.stringify(config, null, 2)}\n`;
 }
 
 /** A name for a file: letters and digits, one dash between words. */
 export function slug(name) {
   return String(name ?? "").normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[^A-Za-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "RepoMemo";
+}
+
+const CERTIFICATE_NAME = "repomemo-ca.pem";
+const MAX_BUNDLE_BYTES = 256 * 1024;
+const MAX_CERTIFICATES = 10;
+
+/** The bundle of a private certificate authority (V0.4.55), checked as the app checks it, to be put beside the configuration file. */
+export function readCertificate(path) {
+  if (!existsSync(path)) throw new Error(`certificate: ${path} does not exist`);
+  const bytes = readFileSync(path);
+  if (bytes.length > MAX_BUNDLE_BYTES) throw new Error(`certificate: ${path} is ${bytes.length} bytes; a bundle of authorities is a few kilobytes`);
+  const blocks = bytes.toString("utf8").match(/-----BEGIN CERTIFICATE-----[A-Za-z0-9+/=\s]+-----END CERTIFICATE-----/g) ?? [];
+  if (blocks.length === 0) throw new Error(`certificate: ${path} holds no certificate (a PEM file has -----BEGIN CERTIFICATE----- blocks; a key or a request is not one)`);
+  if (blocks.length > MAX_CERTIFICATES) throw new Error(`certificate: ${path} holds ${blocks.length} certificates; the most taken is ${MAX_CERTIFICATES}`);
+  if (/-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(bytes.toString("utf8"))) throw new Error(`certificate: ${path} holds a private key; hand out the authority's certificate only`);
+  return { name: CERTIFICATE_NAME, bytes };
 }
 
 function handoutReadme({ name, server, version, hasInstaller }) {
@@ -97,12 +114,13 @@ repomemo-desktop.json in %APPDATA%\\com.repomemo.desktop\\ (or beside the instal
 }
 
 /** The zip of the portable folder. */
-export function portableZip({ exeBytes, configText, readmeText, exeName = "RepoMemo.exe", mtime = 0 }) {
+export function portableZip({ exeBytes, configText, readmeText, exeName = "RepoMemo.exe", certificate, mtime = 0 }) {
   const top = "RepoMemo";
   const entries = [
     { path: `${top}/${exeName}`, bytes: exeBytes, mode: 0o755 },
     { path: `${top}/${CONFIG_FILE}`, bytes: Buffer.from(configText), mode: 0o644 },
     { path: `${top}/README.txt`, bytes: Buffer.from(readmeText), mode: 0o644 },
+    ...(certificate ? [{ path: `${top}/${certificate.name}`, bytes: certificate.bytes, mode: 0o644 }] : []),
   ];
   return buildZip(entries, mtime);
 }
@@ -124,8 +142,9 @@ function buildWithTauri(server) {
 }
 
 /** Makes the handout; returns the files written. */
-export function packageDesktop({ server, name, support, locked = true, from, out, version, mtime = 0, build = buildWithTauri }) {
-  const configText = buildConfig({ server, name, support, locked });
+export function packageDesktop({ server, name, support, locked = true, certificatePath, from, out, version, mtime = 0, build = buildWithTauri }) {
+  const certificate = certificatePath ? readCertificate(certificatePath) : undefined;
+  const configText = buildConfig({ server, name, support, locked, certificate: certificate?.name });
   const origin = JSON.parse(configText).server;
   let found;
   if (from) {
@@ -144,12 +163,13 @@ export function packageDesktop({ server, name, support, locked = true, from, out
     writeFileSync(join(out, file), bytes);
     written.push(file);
   };
-  put(`${stem}-portable.zip`, portableZip({ exeBytes: readFileSync(found.exe), configText, readmeText: handoutReadme({ name: label, server: origin, version, hasInstaller: Boolean(found.installer) }), mtime }));
+  put(`${stem}-portable.zip`, portableZip({ exeBytes: readFileSync(found.exe), configText, certificate, readmeText: handoutReadme({ name: label, server: origin, version, hasInstaller: Boolean(found.installer) }), mtime }));
   if (found.installer) {
     copyFileSync(found.installer, join(out, `${stem}-setup.exe`));
     written.push(`${stem}-setup.exe`);
   }
   put(CONFIG_FILE, configText);
+  if (certificate) put(certificate.name, certificate.bytes);
   const sums = written.map((file) => `${sha256(readFileSync(join(out, file)))}  ${file}`).sort((a, b) => a.slice(66).localeCompare(b.slice(66)));
   put("SHA256SUMS", `${sums.join("\n")}\n`);
   return written;
@@ -169,6 +189,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       server: arg("server"),
       name: arg("name"),
       support: arg("support"),
+      certificatePath: arg("certificate"),
       locked: !process.argv.includes("--open"),
       from: arg("from"),
       out,

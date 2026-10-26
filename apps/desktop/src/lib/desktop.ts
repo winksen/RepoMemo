@@ -9,6 +9,8 @@ export const isDesktopRuntime = typeof window !== "undefined" && "__TAURI_INTERN
 export const desktopServer = {
   /** The address this run talks to: the one the app was packaged for, else the one saved by an earlier run, or null. */
   current: () => invoke<string | null>("current_server"),
+  /** Where the requests for the chosen server go when its certificate is checked by the administrator's own authority (V0.4.55), else null. */
+  route: () => invoke<{ proxy: string; token: string } | null>("server_route"),
   /** Whether the app was packaged for one server (V0.4.46), which then cannot be changed. */
   locked: () => invoke<boolean>("server_locked"),
   /** Checks an address and allows the window to call it. Nothing is kept until `remember`. */

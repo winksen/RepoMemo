@@ -2,6 +2,28 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.55 (2026-10-26)
+
+A server behind a company's own certificate authority works in the app, and the same bundle trusts nothing else.
+
+### Added
+- **A `certificate` in the configuration file:** the name of a PEM file beside `repomemo-desktop.json` (or a full path) holding the authority that signed the server's certificate: one to ten certificates, at most 256 KB, and only with a `server`. A bundle that is missing, is not PEM certificates or is too large spoils the whole file, which is shown and not obeyed (V0.4.47).
+- **A relay on the loopback (`trust.rs`):** the HTTP plugin has no way to add a root, so for the file's server the shell starts a small relay (hyper and reqwest) on `127.0.0.1` and lets the window call **only the relay**, not the server. The relay forwards the path and query of each request to that one origin over TLS trusting **the bundle alone** (`tls_built_in_root_certs(false)`), follows no redirect, drops the headers of one connection, streams the bodies both ways (uploads, downloads and the live event stream) and answers 403 to anything without the run's secret (a new random value each run, sent in `x-repomemo-route`) and 400 to a request for any other address. A certificate error comes back as a 502 that says so.
+- **The client's side:** `desktopServer.route()` tells the page where the relay is; the transport (V0.4.44) sends the server's own address's requests there with the secret and leaves the page knowing the server by its own address. A request for any other address is not rewritten, and the shell's scope refuses it.
+- **Only for that server:** the relay is started when the app talks to the file's server (typed, suggested or locked); to any other address the app asks the system's ordinary trust. `desktop:package --certificate ca.pem` checks the bundle (a key is refused), hands it out as `repomemo-ca.pem` beside the configuration file and names it there.
+- **Tests:** four Rust tests in `trust.rs` (the bundle's size and shape, the one forwarded path, the headers), two in `config.rs` (the field, the bundle read from beside the file and a bad one spoiling it) and one in `connection.rs` (the bundle belongs to the file's server only), a public test certificate (`testdata/test-ca.pem`, no key), three transport tests (the relay's address and secret, nothing else rewritten, the whole client through the relay) and two packaging tests.
+
+### Changed
+- **Dependencies:** `hyper`, `hyper-util`, `http-body-util`, `bytes`, `futures-util` and reqwest's `stream` feature in the desktop crate; `cargo deny check` reports advisories, bans, licenses and sources ok. `ConfigState` holds the certificates. A test of the capabilities of `platform` that V0.4.53 and V0.4.54 left expecting three flags now expects five.
+- **`container:check`** holds the relay's rules (the bundle alone, the secret, one origin, no redirect, the loopback), that the bundle is tied to the file's server and that the window may call the relay only, the field and the client's rewrite. **The documents:** the development commands, the parity audit (the certificate-authority row is closed), the operations guide, the technical mindmap, the roadmap and the release index. **The version** is `0.4.55` everywhere.
+
+### Checks
+- **Run:** `cargo check`, `cargo clippy -p repomemo-desktop --all-targets -- -D warnings`, `cargo fmt --all`, `cargo deny check`, `typecheck`, `desktop:test` (9 passed), the desktop page tests, `container:check`, `version:check`, `docs:check`. The whole web suite fails 22 tests in other files on this machine (the missing `ResizeObserver` and the like); the same tests fail on the commit of V0.4.43, before the desktop work began, and none fails that did not there.
+- **Not run:** the Rust tests (compiled), the relay against a server with a private authority, a real streamed upload or the live event stream through it. The relay is the largest piece of shell code so far: the first real server behind an internal CA is its test.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.4.54 (2026-10-26)
 
 A page of the web client opens in the app: `repomemo://` links, with only the app's own pages taken.

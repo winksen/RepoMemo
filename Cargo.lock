@@ -4163,7 +4163,7 @@ checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
 name = "repomemo-ai"
-version = "0.4.54"
+version = "0.4.55"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -4177,7 +4177,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-api"
-version = "0.4.54"
+version = "0.4.55"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4199,7 +4199,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-console"
-version = "0.4.54"
+version = "0.4.55"
 dependencies = [
  "nu-ansi-term",
  "repomemo-domain",
@@ -4214,9 +4214,15 @@ dependencies = [
 
 [[package]]
 name = "repomemo-desktop"
-version = "0.4.54"
+version = "0.4.55"
 dependencies = [
+ "bytes",
+ "futures-util",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
  "keyring",
+ "reqwest 0.12.28",
  "serde",
  "serde_json",
  "tauri",
@@ -4227,12 +4233,14 @@ dependencies = [
  "tauri-plugin-notification",
  "tauri-plugin-single-instance",
  "tauri-plugin-window-state",
+ "tokio",
  "url",
+ "uuid",
 ]
 
 [[package]]
 name = "repomemo-domain"
-version = "0.4.54"
+version = "0.4.55"
 dependencies = [
  "anyhow",
  "serde",
@@ -4241,7 +4249,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-git"
-version = "0.4.54"
+version = "0.4.55"
 dependencies = [
  "anyhow",
  "repomemo-domain",
@@ -4250,7 +4258,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-indexer"
-version = "0.4.54"
+version = "0.4.55"
 dependencies = [
  "anyhow",
  "hex",
@@ -4270,7 +4278,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-ingestion"
-version = "0.4.54"
+version = "0.4.55"
 dependencies = [
  "anyhow",
  "calamine",
@@ -4285,7 +4293,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-mail"
-version = "0.4.54"
+version = "0.4.55"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -4301,7 +4309,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-retrieval"
-version = "0.4.54"
+version = "0.4.55"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4311,7 +4319,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-server"
-version = "0.4.54"
+version = "0.4.55"
 dependencies = [
  "anyhow",
  "argon2",
@@ -4343,7 +4351,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-storage"
-version = "0.4.54"
+version = "0.4.55"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -4361,7 +4369,7 @@ dependencies = [
 
 [[package]]
 name = "repomemo-templates"
-version = "0.4.54"
+version = "0.4.55"
 dependencies = [
  "serde",
  "serde_json",
@@ -4379,6 +4387,7 @@ dependencies = [
  "cookie_store",
  "encoding_rs",
  "futures-core",
+ "futures-util",
  "h2",
  "http",
  "http-body",
@@ -4400,12 +4409,14 @@ dependencies = [
  "sync_wrapper",
  "tokio",
  "tokio-rustls",
+ "tokio-util",
  "tower",
  "tower-http",
  "tower-service",
  "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
+ "wasm-streams 0.4.2",
  "web-sys",
  "webpki-roots",
 ]
@@ -4440,7 +4451,7 @@ dependencies = [
  "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
- "wasm-streams",
+ "wasm-streams 0.5.0",
  "web-sys",
 ]
 
@@ -6742,6 +6753,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23f0c9c52aa7cd7d77769a4cfe2a9adb1b331f489a41d912ce14513d5ab995c6"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "wasm-streams"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "15053d8d85c7eccdbefef60f06769760a563c7f0a9d6902a13d35c7800b0ad65"
+dependencies = [
+ "futures-util",
+ "js-sys",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
 ]
 
 [[package]]

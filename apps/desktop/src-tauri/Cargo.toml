@@ -22,6 +22,14 @@ tauri-plugin-notification.workspace = true
 tauri-plugin-single-instance.workspace = true
 tauri-plugin-window-state.workspace = true
 url.workspace = true
+bytes.workspace = true
+futures-util.workspace = true
+http-body-util.workspace = true
+hyper.workspace = true
+hyper-util.workspace = true
+reqwest = { workspace = true, features = ["stream"] }
+tokio.workspace = true
+uuid.workspace = true
 
 # The session of a server connection is kept in the operating system's credential store (V0.2.49).
 [target.'cfg(windows)'.dependencies]

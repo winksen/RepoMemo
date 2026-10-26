@@ -56,10 +56,50 @@ describe("the one transport", () => {
 describe("what the window can do", () => {
   it("is asked as capabilities, which the app and a browser answer differently", async () => {
     const app = (await import("../lib/platform")).platform;
-    expect(app).toEqual({ opensTabs: false, choosesServer: true, installedApp: true });
+    expect(app).toEqual({ opensTabs: false, choosesServer: true, installedApp: true, nativeNotices: true, opensInApp: false });
     vi.resetModules();
     vi.doMock("../lib/desktop", () => ({ isDesktopRuntime: false }));
     const browser = (await import("../lib/platform")).platform;
-    expect(browser).toEqual({ opensTabs: true, choosesServer: false, installedApp: false });
+    expect(browser).toEqual({ opensTabs: true, choosesServer: false, installedApp: false, nativeNotices: false, opensInApp: true });
+  });
+});
+
+describe("a server with its own certificate authority (V0.4.55)", () => {
+  const relay = { origin: "https://memo.example.com", proxy: "http://127.0.0.1:51234", token: "secret-1" };
+
+  it("is called through the relay with the run's secret, the page still using the server's own address", async () => {
+    const { throughRelay } = await import("../lib/transport");
+    const sent = throughRelay(relay, "https://memo.example.com/v1/auth/login?x=1", { headers: { "X-RepoMemo-Client": "desktop" } });
+    expect(sent.url).toBe("http://127.0.0.1:51234/v1/auth/login?x=1");
+    expect(sent.headers.get("x-repomemo-route")).toBe("secret-1");
+    expect(sent.headers.get("x-repomemo-client")).toBe("desktop");
+    expect(throughRelay(relay, new URL("https://memo.example.com/health")).url).toBe("http://127.0.0.1:51234/health");
+    expect(throughRelay(relay, "https://memo.example.com").url).toBe("http://127.0.0.1:51234");
+  });
+
+  it("sends nothing else to the relay, and gives it nothing", async () => {
+    const { throughRelay } = await import("../lib/transport");
+    for (const other of ["https://other.example.com/v1/x", "https://memo.example.com.evil.example.com/v1/x", "https://memo.example.comx/v1/x", "http://127.0.0.1:51234/v1/x"]) {
+      const sent = throughRelay(relay, other);
+      expect(sent.url, other).toBe(other);
+      expect(sent.headers.get("x-repomemo-route"), other).toBeNull();
+    }
+  });
+
+  it("goes through the shell's client by way of the relay, and the whole client with it", async () => {
+    plugin.fetch.mockImplementation(async () => health());
+    vi.resetModules();
+    vi.doMock("../lib/desktop", () => ({
+      isDesktopRuntime: true,
+      desktopServer: { route: async () => ({ proxy: relay.proxy, token: relay.token }) },
+      sessionStore: { save: async () => undefined, load: async () => null, clear: async () => undefined },
+    }));
+    const { pointAtServer } = await import("../lib/desktopConnection");
+    const api = await import("../lib/sharedApi");
+    await pointAtServer(relay.origin);
+    await api.getSharedHealth();
+    expect(String(plugin.fetch.mock.calls[0][0])).toBe("http://127.0.0.1:51234/health");
+    expect(new Headers(plugin.fetch.mock.calls[0][1]?.headers).get("x-repomemo-route")).toBe("secret-1");
+    expect(plugin.fetch.mock.calls[0][1]).toMatchObject({ maxRedirections: 0 });
   });
 });

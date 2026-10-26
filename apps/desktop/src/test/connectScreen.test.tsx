@@ -8,7 +8,7 @@ vi.mock("../lib/desktop", () => ({
   saveThroughShell: vi.fn(),
   shellNotifier: {},
   appLinks: { takePending: vi.fn(async () => null), listen: vi.fn(async () => () => undefined) },
-  desktopServer: { current: vi.fn(), prepare: vi.fn(), remember: vi.fn(), forget: vi.fn() },
+  desktopServer: { current: vi.fn(), route: vi.fn(), prepare: vi.fn(), remember: vi.fn(), forget: vi.fn() },
 }));
 vi.mock("../lib/sharedApi", () => ({ configureDesktopApi: vi.fn(), getSharedHealth: vi.fn(), sharedApiUrl: "https://repomemo.example.com" }));
 vi.mock("../components/ui/toast", () => ({ showToast: vi.fn(), Toast: () => null }));

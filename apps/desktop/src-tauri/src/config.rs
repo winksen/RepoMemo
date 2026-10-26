@@ -21,6 +21,7 @@ use crate::connection::normalize_server_url;
 pub const CONFIG_FILE: &str = "repomemo-desktop.json";
 const MAX_NAME_CHARS: usize = 60;
 const MAX_FILE_BYTES: u64 = 16 * 1024;
+const MAX_PATH_CHARS: usize = 260;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -29,6 +30,7 @@ struct RawConfig {
     name: Option<String>,
     locked: Option<bool>,
     support: Option<String>,
+    certificate: Option<String>,
 }
 
 /// What a valid file says.
@@ -42,6 +44,8 @@ pub struct DesktopConfig {
     pub locked: bool,
     /// An `http(s)` address where a person asks for help.
     pub support_url: Option<String>,
+    /// A PEM bundle of the authority that signed the server's certificate (V0.4.55), as written: a name beside this file, or a path.
+    pub certificate: Option<String>,
 }
 
 /// The file that was found, what it says, or why it cannot be used. Fixed at start.
@@ -49,6 +53,8 @@ pub struct DesktopConfig {
 pub struct ConfigState {
     pub source: Option<PathBuf>,
     pub config: DesktopConfig,
+    /// The certificates read from [`DesktopConfig::certificate`], trusted for the file's server and for no other address.
+    pub certificates: Vec<reqwest::Certificate>,
     pub problem: Option<String>,
 }
 
@@ -92,12 +98,49 @@ pub fn parse_config(text: &str) -> Result<DesktopConfig, String> {
     if raw.locked.is_some() && server.is_none() {
         return Err("locked: there is no server to lock; add a \"server\"".to_owned());
     }
+    let certificate = match raw.certificate.as_deref().map(str::trim) {
+        None | Some("") => None,
+        Some(file) if file.chars().count() <= MAX_PATH_CHARS && !file.chars().any(char::is_control) => {
+            Some(file.to_owned())
+        }
+        Some(_) => {
+            return Err(format!(
+                "certificate: must be the name of a file, up to {MAX_PATH_CHARS} characters"
+            ))
+        }
+    };
+    if certificate.is_some() && server.is_none() {
+        return Err("certificate: it is trusted for a server; add a \"server\"".to_owned());
+    }
     Ok(DesktopConfig {
         locked: server.is_some() && raw.locked.unwrap_or(true),
         server,
         name,
         support_url,
+        certificate,
     })
+}
+
+/// The certificates the file names: read from beside the file (or from the absolute path given), whole or not at all.
+pub fn read_certificates(config_file: &Path, config: &DesktopConfig) -> Result<Vec<reqwest::Certificate>, String> {
+    let Some(name) = &config.certificate else {
+        return Ok(Vec::new());
+    };
+    let path = config_file
+        .parent()
+        .map(|folder| folder.join(name))
+        .unwrap_or_else(|| PathBuf::from(name));
+    let size = fs::metadata(&path)
+        .map_err(|error| format!("certificate: {} cannot be read ({error})", path.display()))?
+        .len();
+    if size > crate::trust::MAX_BUNDLE_BYTES {
+        return Err(format!(
+            "certificate: {} is {size} bytes; a bundle of authorities is a few kilobytes",
+            path.display()
+        ));
+    }
+    let pem = fs::read(&path).map_err(|error| format!("certificate: {} cannot be read ({error})", path.display()))?;
+    crate::trust::parse_bundle(&pem).map_err(|reason| format!("certificate: {}: {reason}", path.display()))
 }
 
 fn check_support_url(address: &str) -> Result<String, String> {
@@ -143,21 +186,30 @@ pub fn load(app: &AppHandle) -> ConfigState {
     if let Ok(directory) = app.path().app_config_dir() {
         directories.push(directory);
     }
-    let Some(path) = find_config(&directories) else {
+    load_from(&directories)
+}
+
+/// The file in the first of these folders that has one, with the certificates it names; a file that is wrong in any way, including a
+/// certificate that cannot be read, is a problem and nothing in it is kept.
+pub fn load_from(directories: &[PathBuf]) -> ConfigState {
+    let Some(path) = find_config(directories) else {
         return ConfigState::default();
     };
-    match read_config(&path) {
-        Ok(config) => ConfigState {
+    match read_config(&path)
+        .and_then(|config| read_certificates(&path, &config).map(|certificates| (config, certificates)))
+    {
+        Ok((config, certificates)) => ConfigState {
             source: Some(path),
             config,
+            certificates,
             problem: None,
         },
         Err(reason) => {
             let problem = format!("{}: {reason}", path.display());
             ConfigState {
                 source: Some(path),
-                config: DesktopConfig::default(),
                 problem: Some(problem),
+                ..ConfigState::default()
             }
         }
     }
@@ -273,6 +325,77 @@ mod tests {
         );
         let _ = fs::remove_dir_all(beside);
         let _ = fs::remove_dir_all(config);
+    }
+
+    #[test]
+    fn a_certificate_bundle_belongs_to_the_files_server() {
+        let config = parse_config(r#"{ "server": "memo.example.com", "certificate": " memo-ca.pem " }"#).unwrap();
+        assert_eq!(config.certificate.as_deref(), Some("memo-ca.pem"));
+        assert!(parse_config(r#"{ "certificate": "memo-ca.pem" }"#)
+            .unwrap_err()
+            .starts_with("certificate: "));
+        assert!(
+            parse_config(r#"{ "server": "memo.example.com", "certificate": "a\u0007.pem" }"#)
+                .unwrap_err()
+                .starts_with("certificate: ")
+        );
+        let long = format!(
+            r#"{{ "server": "memo.example.com", "certificate": "{}" }}"#,
+            "c".repeat(300)
+        );
+        assert!(parse_config(&long).unwrap_err().starts_with("certificate: "));
+        assert_eq!(
+            parse_config(r#"{ "server": "memo.example.com", "certificate": "" }"#)
+                .unwrap()
+                .certificate,
+            None
+        );
+    }
+
+    #[test]
+    fn the_bundle_is_read_from_beside_the_file_and_a_bad_one_spoils_the_whole_file() {
+        let directory = folder("bundle");
+        let file = directory.join(CONFIG_FILE);
+        let text = r#"{ "server": "memo.example.com", "certificate": "memo-ca.pem" }"#;
+        fs::write(&file, text).unwrap();
+        // The bundle is not there.
+        let state = load_from(std::slice::from_ref(&directory));
+        assert!(
+            state.problem.as_deref().unwrap().contains("memo-ca.pem cannot be read")
+                || state.problem.as_deref().unwrap().contains("memo-ca.pem"),
+            "{:?}",
+            state.problem
+        );
+        assert!(
+            state.certificates.is_empty() && state.config.server.is_none(),
+            "nothing of a spoiled file is kept"
+        );
+        // It is there, and good.
+        fs::copy(
+            concat!(env!("CARGO_MANIFEST_DIR"), "/testdata/test-ca.pem"),
+            directory.join("memo-ca.pem"),
+        )
+        .unwrap();
+        let state = load_from(std::slice::from_ref(&directory));
+        assert_eq!(state.problem, None);
+        assert_eq!(state.certificates.len(), 1);
+        assert_eq!(state.config.server.as_deref(), Some("https://memo.example.com"));
+        // It is there, and not a certificate.
+        fs::write(directory.join("memo-ca.pem"), "not a certificate").unwrap();
+        let state = load_from(std::slice::from_ref(&directory));
+        assert!(
+            state.problem.as_deref().unwrap().contains("no certificate"),
+            "{:?}",
+            state.problem
+        );
+        assert!(state.certificates.is_empty());
+        // It is far too big.
+        fs::write(directory.join("memo-ca.pem"), "x".repeat(300_000)).unwrap();
+        assert!(load_from(std::slice::from_ref(&directory))
+            .problem
+            .unwrap()
+            .contains("bytes"));
+        let _ = fs::remove_dir_all(directory);
     }
 
     #[test]
