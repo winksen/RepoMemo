@@ -59,6 +59,8 @@ jobs:
         run: node --test scripts/check-templates.test.mjs
       - name: The release page is written from the changelog
         run: node --test scripts/release-notes.test.mjs
+      - name: The pinning rules refuse what they should
+        run: node --test scripts/pins.test.mjs
 
   web:
     name: Web client

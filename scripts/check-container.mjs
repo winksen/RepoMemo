@@ -10,6 +10,7 @@
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { pinProblems } from "./pins.mjs";
 
 const problems = [];
 const read = (path) => {
@@ -43,23 +44,25 @@ for (const pattern of ["Dockerfile", "docker/Caddyfile.edge", "docker/Caddyfile.
 }
 
 // Nothing moves: a base image names a digest, an action names a commit, and Dependabot keeps both current.
-const earlierStages = new Set();
-for (const match of dockerfile.matchAll(/^FROM\s+(\S+)(?:\s+AS\s+(\S+))?/gim)) {
-  const [, image, stage] = match;
-  if (image !== "scratch" && !earlierStages.has(image) && !/@sha256:[0-9a-f]{64}$/.test(image)) problems.push(`the Dockerfile's FROM ${image} names no digest (use image:tag@sha256:...)`);
-  if (stage) earlierStages.add(stage);
-}
-for (const [name, text] of workflows) {
-  for (const match of text.matchAll(/^\s*-?\s*uses:\s*(\S+)/gm)) {
-    const [action, ref] = match[1].split("@");
-    if (action.startsWith("./")) continue;
-    if (!/^[0-9a-f]{40}$/.test(ref ?? "")) problems.push(`.github/workflows/${name} uses ${match[1]}, which is a tag or branch; pin it to a commit`);
-  }
-}
+// The rules are in scripts/pins.mjs (V0.4.42), with tests: every workflow, the Dockerfile, the compose files, the examples and the
+// scripts that run an image are read, so a new file is covered without being listed.
+const pinnedFiles = [
+  ["docker-compose.yml", compose],
+  ["docker-compose.build.yml", composeBuild],
+  ...["deploy/api.yml", ...readdirSync("deploy").filter((name) => name.endsWith(".sh")).map((name) => `deploy/${name}`), ...readdirSync("deploy/direct/service").map((name) => `deploy/direct/service/${name}`), "deploy/init.ps1", "deploy/monitoring/prometheus.yml", ".env.example"].map((path) => [path, read(path)]),
+];
+problems.push(...pinProblems({ workflows, dockerfile, others: pinnedFiles }));
 const dependabot = read(".github/dependabot.yml");
-for (const ecosystem of ["cargo", "npm", "github-actions", "docker"]) {
+for (const ecosystem of ["cargo", "npm", "github-actions", "docker", "docker-compose"]) {
   if (!new RegExp(String.raw`package-ecosystem:\s*${ecosystem}\b`).test(dependabot)) problems.push(`.github/dependabot.yml does not watch ${ecosystem}`);
 }
+// Dependabot reads workflows from /.github/workflows and the Dockerfile from the directory it is told: both must be the root.
+for (const ecosystem of ["github-actions", "docker", "docker-compose"]) {
+  if (!new RegExp(String.raw`package-ecosystem:\s*${ecosystem}\b[^\n]*\n\s*directory:\s*/\s*\n`).test(dependabot)) problems.push(`.github/dependabot.yml: ${ecosystem} is not read from the repository root`);
+}
+if (!/node --test scripts\/pins\.test\.mjs/.test(workflows.find(([name]) => name === "ci.yml")?.[1] ?? "")) problems.push("CI does not run the pinning rules' tests (scripts/pins.test.mjs)");
+const workflowFiles = readdirSync(".github/workflows").filter((name) => /\.ya?ml$/.test(name));
+if (workflowFiles.length < 3) problems.push("the workflows folder lost a workflow (ci, server-archives and release-images are expected)");
 
 // The server image's git must be one the remote-clone check accepts (S5-7): Debian 12 ships 2.39.5, which
 // `is_patched_git` refuses, so remote repositories could not be cloned in the image.

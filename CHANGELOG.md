@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.42 (2026-10-26)
+
+Nothing the release pipeline runs can move under it: every workflow, every image.
+
+### Added
+- **`scripts/pins.mjs`** and **`scripts/pins.test.mjs`** (`npm run pins:test`): the pinning rules as functions with five tests. An action is a 40-character commit (a tag, a branch or no reference is refused; a local `./` action is fine); a Dockerfile `FROM` names a digest (an earlier stage and `scratch` need none, and a `--platform` flag is not mistaken for the image); and **an image pinned by digest anywhere in the project is refused when it is named with a tag and no digest anywhere else**, in a workflow, a compose file, a script or the Dockerfile, so a new `docker run caddy:2-alpine` in a new workflow is caught without anyone adding it to a list.
+- **Dependabot watches the compose files' images** (`docker-compose`, from the root) beside the Dockerfile's base images and the actions; the actions arrive as one grouped pull request so the three workflows never disagree on `checkout`.
+
+### Changed
+- **`container:check`** runs the rules over every workflow found in `.github/workflows` (the new ones included), the Dockerfile, both compose files, the scripts in `deploy/`, the service files, the monitoring example and `.env.example`; it also requires Dependabot to watch Actions, the Dockerfile and the compose files from the root, and CI to run the pinning tests. It found nothing unpinned in the project as it stands. **The documents:** the operations guide, the technical mindmap, the roadmap and the release index. **The version** is `0.4.42` everywhere.
+
+### Checks
+- **Run:** `pins:test` (5 passed), `container:check` (also tried with an unpinned action and an unpinned image added: both refused), `version:check`, `docs:check`.
+- **Not run:** Dependabot itself (it reads the file on GitHub; the `docker-compose` ecosystem and the group are its documented options).
+
+### Upgrading
+- Nothing to do.
+
 ## V0.4.41 (2026-10-26)
 
 A clean machine with Docker goes from nothing to a running server with one fetched script and the init.

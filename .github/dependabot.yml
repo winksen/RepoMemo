@@ -21,12 +21,25 @@ updates:
       npm-minor-and-patch:
         update-types: [minor, patch]
 
+  # Every workflow in .github/workflows (ci, server-archives, release-images and any added later) is read from the root. An
+  # action used by several of them (checkout, setup-node) arrives as one pull request, so they never disagree.
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
 
+  # The Dockerfile's base images (each pinned by digest) ...
   - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+
+  # ... and the images the compose files name (the Prometheus example), pinned by digest too. `container:check` refuses an
+  # image that is pinned somewhere and named without its digest anywhere else.
+  - package-ecosystem: docker-compose
     directory: /
     schedule:
       interval: weekly
