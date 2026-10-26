@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { IconDownload as Download, IconExternalLink as ExternalLink, IconLoader2 as Loader, IconPaperclip as Paperclip } from "@tabler/icons-react";
 import { createSharedFileLink, downloadSharedArtifactFile, downloadSharedRenderedPreview, getSharedDocumentPreview, getSharedRenderStatus, sharedApiUrl } from "../lib/sharedApi";
 import { canOpenInApp, columnLetters, documentKindOf, OPEN_IN_APP } from "../lib/documents";
-import { isDesktopRuntime } from "../lib/desktop";
+import { platform } from "../lib/platform";
 import type { ArtifactSummary, DocumentPreview, SheetPreview } from "../types";
 import type { RenderStatus } from "../lib/sharedApi";
 import { Button } from "./ui/button";
@@ -95,14 +95,14 @@ export function DocumentViewer({ accessToken, artifact }: { accessToken: string;
     setIsBusy(true);
     try {
       // The desktop window has no tabs and cannot hand a link to Word: the file is saved to open from there.
-      if (kind === "pdf" && !isDesktopRuntime) {
+      if (kind === "pdf" && platform.opensTabs) {
         // Open the tab first so the browser treats it as a user action.
         const tab = window.open("", "_blank");
         const blob = await downloadSharedArtifactFile(accessToken, artifact.id);
         const url = URL.createObjectURL(new Blob([blob], { type: "application/pdf" }));
         if (tab) tab.location.href = url; else window.location.href = url;
         window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      } else if (target.scheme && !isDesktopRuntime) {
+      } else if (target.scheme && platform.opensTabs) {
         const link = await createSharedFileLink(accessToken, artifact.id);
         const fileUrl = `${sharedApiUrl}/v1/shared-files/${link.token}/${encodeURIComponent(link.filename)}`;
         window.location.href = `${target.scheme}${fileUrl}`;

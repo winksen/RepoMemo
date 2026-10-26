@@ -9,6 +9,7 @@ FORM: The established RepoMemo operate composition, adapted into a protected bro
 import { useEffect, useState } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
+import { platform as clientPlatform } from "./lib/platform";
 import { clearRecents } from "./lib/paletteRecents";
 import { SHARED_SESSION_STORAGE_KEY as SESSION_STORAGE_KEY, clearSharedSession, getPlatformStatus, getServerSetup, getSharedHealth, getSharedSession, listSharedOrganizations, listSharedWorkspaces, refreshSharedSession } from "./lib/sharedApi";
 import { type Organization, type ServerSetupStatus, type SharedSession, type SharedWorkspace } from "./types";
@@ -191,7 +192,7 @@ function SharedWebAppContent() {
 
   const versionVerdict = serverVersion.known ? checkServerVersion(serverVersion.version) : { ok: true as const };
   if (!versionVerdict.ok) {
-    return <VersionMismatch verdict={versionVerdict} desktop={"__TAURI_INTERNALS__" in window} />;
+    return <VersionMismatch verdict={versionVerdict} desktop={clientPlatform.installedApp} />;
   }
 
   if (!platform) {

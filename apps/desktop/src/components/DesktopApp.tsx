@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { SharedWebApp } from "../SharedWebApp";
 import { LoadingCanvas } from "../web/common";
 import { desktopServer, installExternalLinkHandler } from "../lib/desktop";
-import { DesktopConnect, pointAtServer } from "./DesktopConnect";
+import { pointAtServer } from "../lib/desktopConnection";
+import { DesktopConnect } from "./DesktopConnect";
 
 type Phase = "starting" | "connect" | "server";
 

@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { IconServer as Server } from "@tabler/icons-react";
 import { sharedApiUrl } from "../lib/sharedApi";
-import { desktopServer, isDesktopRuntime } from "../lib/desktop";
+import { desktopServer } from "../lib/desktop";
+import { platform } from "../lib/platform";
 import { Button } from "./ui/button";
 import { Dialog, DialogCancel } from "./ui/dialog";
 import { showToast } from "./ui/toast";
@@ -12,7 +13,7 @@ import { apiMessage } from "../web/format";
 export function DesktopServerNote({ signedIn }: { signedIn: boolean }) {
   const [asking, setAsking] = useState(false);
   const [isChanging, setIsChanging] = useState(false);
-  if (!isDesktopRuntime) return null;
+  if (!platform.choosesServer) return null;
   const host = sharedApiUrl.replace(/^https?:\/\//, "");
 
   async function change() {

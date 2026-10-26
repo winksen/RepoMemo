@@ -2,6 +2,28 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.44 (2026-10-26)
+
+The client sends every request through one transport, and no component asks which window it is in.
+
+### Added
+- **`lib/transport.ts`, the one seam:** the browser's own `fetch` (`browserTransport`, looked up when called) and the shell's client (`shellTransport`: `tauri-plugin-http` with `maxRedirections: 0`, loaded only here). `sharedApi` sends every request, including its refreshes, logouts and the live event stream, through the transport it was given and uses no other `fetch`.
+- **`lib/platform.ts`:** what the window can do, as capabilities (`opensTabs`, `choosesServer`, `installedApp`). A component asks for a capability and never which runtime it is in.
+- **`lib/desktopConnection.ts`:** `pointAtServer`, which gives the client the shell's transport for the server the shell allowed (it was in the connect screen).
+- **`transport.test.ts`** (four tests): the browser's transport is the page's `fetch`; the shell's passes `maxRedirections: 0`; a web client sends through the page's `fetch` and never the shell's, and once pointed at a server the app sends through the shell's and never the page's; the capabilities for the app and for a browser.
+
+### Changed
+- **No desktop branch inside a component:** `DocumentViewer`, `DesktopServerNote` and `SharedWebApp` ask `platform`; the entry (`App`, `main`) asks `isDesktopRuntime`, which is the only place the runtime is detected (`__TAURI_INTERNALS__` is in `lib/desktop.ts` alone). `DesktopConnect` no longer builds a client.
+- **`desktopParity.test.ts`** (now seven tests) refuses the runtime test, the shell's plugin or a call of `fetch` anywhere but those places, and the parity page's list of files that know about the desktop is down from nine to seven. The rows for the transport and the version note are closed in the audit.
+- **The documents:** the parity audit, the operations guide, the technical mindmap, the roadmap and the release index. **The version** is `0.4.44` everywhere.
+
+### Checks
+- **Run:** `transport.test.ts` (4 passed), `desktopParity.test.ts` (7 passed), `desktopApp` and `desktopSession` tests (13 passed), `typecheck`, `container:check`, `version:check`, `docs:check`; the whole web suite once: 9 tests fail in five files this release does not touch (`workspaceImport`, `templatePicker`, `templateAssistant`, `narrowScreens`, `reviewQueue`), the same 9 on the commit before.
+- **Not run:** the app against a server; the desktop crate.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.4.43 (2026-10-26)
 
 Every difference between the desktop app and the web client is written down, with the release that closes it or the reason it stays.

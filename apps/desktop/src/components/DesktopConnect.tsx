@@ -1,7 +1,8 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { IconArrowRight as ArrowRight, IconKey as Key, IconShieldLock as Shield } from "@tabler/icons-react";
-import { configureDesktopApi, getSharedHealth } from "../lib/sharedApi";
+import { getSharedHealth } from "../lib/sharedApi";
+import { pointAtServer } from "../lib/desktopConnection";
 import { checkServerVersion, versionAdvice } from "../lib/versionCheck";
 import { desktopServer } from "../lib/desktop";
 import { normalizeServerAddress } from "../lib/serverAddress";
@@ -12,13 +13,6 @@ import { Input } from "./ui/input";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
 import { apiMessage } from "../web/format";
-
-/** Points this client at a server the shell has allowed, and checks that a RepoMemo server answers there. */
-export async function pointAtServer(origin: string) {
-  const { fetch: desktopFetch } = await import("@tauri-apps/plugin-http");
-  // The shell allows the chosen server's address only; a redirect to anywhere else is not followed.
-  configureDesktopApi(origin, ((input: RequestInfo | URL, init?: RequestInit) => desktopFetch(input, { ...init, maxRedirections: 0 })) as typeof fetch);
-}
 
 function reason(error: unknown): string {
   const text = typeof error === "string" ? error : apiMessage(error, "");

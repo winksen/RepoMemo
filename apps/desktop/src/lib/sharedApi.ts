@@ -92,6 +92,7 @@ import type {
 
 import { queryClient } from "./queryClient";
 import { sessionStore } from "./desktop";
+import { browserTransport, type Transport } from "./transport";
 
 let API_URL = (import.meta.env.VITE_REPOMEMO_API_URL ?? "http://127.0.0.1:3020").replace(/\/$/, "");
 
@@ -102,9 +103,9 @@ const clientHeader = (): [string, string] => ["X-RepoMemo-Client", clientName];
 /** The address of the server this client talks to (a live binding: the desktop app sets it once the person has chosen a server). */
 export let sharedApiUrl = API_URL;
 
-// Where requests go out: the browser's own `fetch`, or in the desktop app the shell's HTTP client,
-// which is limited to the chosen server and has no cookies.
-let httpFetch: typeof fetch = (input, init) => fetch(input, init);
+// Where requests go out (V0.4.44): the one transport (lib/transport.ts). The browser's own `fetch` unless the desktop app
+// gave the shell's HTTP client, which is limited to the chosen server and has no cookies. No other `fetch` is used here.
+let httpFetch: Transport = browserTransport;
 let desktopSession = false;
 
 /** Points the web client at the API the host that serves it names (V0.4.14); an empty address is the page's own host. */
@@ -118,11 +119,11 @@ export function configureWebApi(apiUrl: string) {
  * so the client does not say it is the web app: the server then returns the refresh token in the
  * response, and it is kept in the operating system's credential store instead of the page.
  */
-export function configureDesktopApi(serverUrl: string, desktopFetch: typeof fetch) {
+export function configureDesktopApi(serverUrl: string, transport: Transport) {
   API_URL = serverUrl.replace(/\/$/, "");
   sharedApiUrl = API_URL;
   clientName = "desktop";
-  httpFetch = desktopFetch;
+  httpFetch = transport;
   desktopSession = true;
 }
 

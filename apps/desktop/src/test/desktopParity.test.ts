@@ -54,6 +54,18 @@ describe("every difference is written down", () => {
     }
   });
 
+  it("keeps the runtime out of the components: they ask the platform, and the shell's plugin and the network have one place each", () => {
+    const inside = (folder: string) => code.filter(([path]) => path.startsWith(folder));
+    const runtimeTest = /isDesktopRuntime|__TAURI_INTERNALS__|@tauri-apps|installExternalLinkHandler/;
+    for (const [path, source] of [...inside("../components/"), ...inside("../web/")]) {
+      if (/\/Desktop(App|Connect)\.tsx$/.test(path)) continue;
+      expect(runtimeTest.test(source), path).toBe(false);
+    }
+    expect(code.filter(([, source]) => source.includes("__TAURI_INTERNALS__")).map(([path]) => path)).toEqual(["../lib/desktop.ts"]);
+    expect(code.filter(([, source]) => source.includes("plugin-http")).map(([path]) => path)).toEqual(["../lib/transport.ts"]);
+    expect(code.filter(([, source]) => /(?<![\w.])fetch\(/.test(source)).map(([path]) => path)).toEqual(["../lib/transport.ts"]);
+  });
+
   it("lists exactly the files that branch on the desktop runtime or call the shell", () => {
     const listed = parity
       .slice(parity.indexOf("## Files that know about the desktop"))
