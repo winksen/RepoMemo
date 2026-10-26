@@ -2,6 +2,25 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.49 (2026-10-26)
+
+CI builds the Windows desktop app and keeps the installer and the portable executable.
+
+### Added
+- **`.github/workflows/desktop-windows.yml`:** on a `v*` tag (the tag must be the version), on a pull request that touches the desktop app, and by hand. On `windows-latest` it builds the app with `tauri build --bundles nsis` and keeps the portable executable (`repomemo-desktop.exe`) and the per-person installer (`RepoMemo_<version>_x64-setup.exe`); builds the installer again with `tauri.offline.conf.json` and keeps it as `RepoMemo_<version>_x64-offline.exe`; **starts the portable executable for 25 seconds and requires that it is still running and that its window is titled RepoMemo**; writes one `SHA256SUMS`; and uploads the lot as the artifact `desktop-windows-x64`. It publishes nothing and has read access only.
+- **WebView2 handled both ways:** the installer **fetches the runtime when it is missing** (`webviewInstallMode: downloadBootstrapper`, silent, in `tauri.conf.json`), and the **offline installer carries it** (`offlineInstaller`, in `tauri.offline.conf.json`, about 130 MB larger) for machines with no internet.
+- `tauri.conf.json` names the icon (`icons/icon.ico`) the installer and the executable use.
+
+### Changed
+- **`container:check`** holds the runner, the NSIS build, the offline configuration, the bootstrapper setting, the start-up check, the artifact, the tag rule and that the workflow writes nothing. **The documents:** the development commands (where the artifact is and what is in it), the operations guide, the technical mindmap, the roadmap and the release index. **The version** is `0.4.49` everywhere.
+
+### Checks
+- **Run:** `cargo check -p repomemo-desktop` (it reads the new configuration), `container:check`, `version:check`, `docs:check`.
+- **Not run:** the workflow, an installer, the offline installer, the app on a clean machine. `beforeBuildCommand` is `npm.cmd run build`, which is Windows-only; V0.4.59 will have to change it for Linux and macOS.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.4.48 (2026-10-26)
 
 One command from an administrator's keyboard to a file a team can use.

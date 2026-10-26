@@ -105,7 +105,7 @@ server unlocked (the person may change it).
 
 - **With Rust and the Tauri CLI installed,** the command builds the app with the address compiled in (the executable alone then talks to
   that server and no other), as the section above does, and packs the result.
-- **Without Rust,** point it at the app CI builds: `npm run desktop:package -- --server ... --name ... --from C:\path\to\artifact`, where
+- **Without Rust,** point it at the app CI builds (the *Desktop Windows* workflow: run it by hand from the Actions page, or take the one of a tag, and download the artifact `desktop-windows-x64`; it holds `repomemo-desktop.exe`, the per-person installer `RepoMemo_<version>_x64-setup.exe`, `RepoMemo_<version>_x64-offline.exe` which carries the WebView2 runtime for machines with no internet, and `SHA256SUMS`): `npm run desktop:package -- --server ... --name ... --from C:\path\to\artifact`, where
   the folder holds `repomemo-desktop.exe` (and `*-setup.exe`). It builds nothing; it adds the configuration file and packs the handout.
   Without a compiled-in address the program obeys the file beside it, which the person could delete: for a team that must not reach
   another server, build with Rust.

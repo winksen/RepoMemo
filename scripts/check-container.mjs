@@ -386,6 +386,22 @@ if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge d
   if (!/node --test scripts\/package-desktop\.test\.mjs/.test(ci)) problems.push("CI does not run the desktop packaging tests");
 }
 
+// The desktop app for Windows is built in CI (V0.4.49): the per-person installer (WebView2 fetched when missing), one that carries
+// WebView2, the portable executable, started once, kept as an artifact and published nowhere.
+{
+  const windows = workflows.find(([name]) => name === "desktop-windows.yml")?.[1] ?? "";
+  if (!windows) problems.push(".github/workflows/desktop-windows.yml is missing");
+  else {
+    if (!/runs-on: windows-latest/.test(windows) || !/npx tauri build --bundles nsis\b/.test(windows)) problems.push("the Windows desktop workflow does not build the installer on windows-latest");
+    if (!/tauri\.offline\.conf\.json/.test(windows) || !/"type": "offlineInstaller"/.test(read("apps/desktop/src-tauri/tauri.offline.conf.json"))) problems.push("the Windows desktop workflow does not build the installer that carries WebView2");
+    if (!/"webviewInstallMode":\s*\{\s*"type":\s*"downloadBootstrapper"/.test(read("apps/desktop/src-tauri/tauri.conf.json"))) problems.push("the installer does not fetch WebView2 when it is missing (webviewInstallMode downloadBootstrapper)");
+    if (!/repomemo-desktop\.exe/.test(windows) || !/MainWindowTitle/.test(windows)) problems.push("the Windows desktop workflow neither keeps the portable executable nor starts it to see it open");
+    if (!/upload-artifact@[0-9a-f]{40}[\s\S]*desktop-windows-x64/.test(windows)) problems.push("the Windows desktop workflow does not keep its files as the artifact desktop-windows-x64");
+    if (/contents:\s*write|gh release|packages:\s*write/.test(windows)) problems.push("the Windows desktop workflow publishes or writes; it only keeps an artifact");
+    if (!/test "\$\{GITHUB_REF_NAME\}" = "v\$\(node -p/.test(windows)) problems.push("the Windows desktop workflow does not require the tag to be the version");
+  }
+}
+
 // The page of a release is written from the changelog (V0.4.39): the workflow that makes the release uses the script, never a
 // sentence typed into it, and the script lists what a release holds.
 {
