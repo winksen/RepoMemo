@@ -17,7 +17,7 @@ How to move an existing server from any V0.1.x release (V0.1.40 and later) to **
 
 Environments from V0.1.40 and later upgrade in place. An older one: open it first with V0.1.40.
 
-**Running in containers (V0.2.45 and later):** back up, fetch the new release and run `docker compose up -d --build`. The data volume is kept and migrations run at start; the [production guide](mindmap/technical/operations.md) has the rest.
+**Running in containers (V0.2.45 and later):** back up, set `REPOMEMO_VERSION` in `.env` to the new release (or run `deploy/upgrade.sh --version X.Y.Z`), then `docker compose pull && docker compose up -d`; from a checkout, build with `docker-compose.build.yml` instead (V0.4.40). The data volume is kept and migrations run at start; the [production guide](mindmap/technical/operations.md) has the rest.
 
 ## What you must do, by the version you come from
 

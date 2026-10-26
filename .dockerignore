@@ -20,3 +20,4 @@ docs/design
 !apps/*/README.md
 Dockerfile
 docker-compose.yml
+docker-compose.build.yml

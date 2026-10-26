@@ -62,6 +62,6 @@ cat <<DONE
 init: wrote $output for $host (edge: $edge), readable by you alone.
 Keep a copy of REPOMEMO_SECRET_KEY somewhere safe: without it the AI provider keys and repository tokens stored in the
 database must be entered again. Then:
-  docker compose up -d --build --wait
+  docker compose pull && docker compose up -d --wait
 and open https://$host (or http://127.0.0.1:8080 without the edge) to finish the first-run setup.
 DONE

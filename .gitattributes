@@ -4,6 +4,7 @@
 # Read by Linux containers: never CRLF.
 Dockerfile text eol=lf
 docker-compose.yml text eol=lf
+docker-compose.build.yml text eol=lf
 docker/Caddyfile.edge text eol=lf
 docker/Caddyfile.web text eol=lf
 docker/*.sh text eol=lf

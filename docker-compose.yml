@@ -1,7 +1,10 @@
 # RepoMemo for a team, in containers (roadmap O7).
 #
 #   cp .env.example .env     # then fill in the secrets and the host name; it asks for the edge (TLS) profile
-#   docker compose up -d
+#   docker compose pull && docker compose up -d
+#
+# The images are the released ones (ghcr.io/repomemo/repomemo-<name>:${REPOMEMO_VERSION}), pulled, not built: no compiler is
+# needed. To build them from this checkout instead, add docker-compose.build.yml (see that file).
 #
 # Open https://<REPOMEMO_HOST> and follow the first-run setup. The data lives in three volumes (the database, the stored
 # files, the backups) and `repomemo-data` (the key file and the logs); a 0.3.x install moves its single volume into them
@@ -31,14 +34,7 @@ x-logging: &logging
 
 services:
   server:
-    build:
-      context: .
-      target: server
-      args:
-        REPOMEMO_BUILD_COMMIT: ${REPOMEMO_BUILD_COMMIT:-unknown}
-        REPOMEMO_BUILD_DATE: ${REPOMEMO_BUILD_DATE:-unknown}
-        REPOMEMO_IMAGE_TAG: ${REPOMEMO_VERSION:-local}
-    image: repomemo-server:${REPOMEMO_VERSION:-local}
+    image: ${REPOMEMO_REGISTRY:-ghcr.io/repomemo}/repomemo-server:${REPOMEMO_VERSION:-latest}
     restart: unless-stopped
     stop_grace_period: 45s
     logging: *logging
@@ -104,15 +100,8 @@ services:
   converter:
     profiles:
       - previews
-    build:
-      context: .
-      target: converter
-      args:
-        REPOMEMO_BUILD_COMMIT: ${REPOMEMO_BUILD_COMMIT:-unknown}
-        REPOMEMO_BUILD_DATE: ${REPOMEMO_BUILD_DATE:-unknown}
-        REPOMEMO_IMAGE_TAG: ${REPOMEMO_VERSION:-local}
-    # Built here by default; REPOMEMO_CONVERTER_IMAGE starts a converter image of its own instead (V0.4.12).
-    image: ${REPOMEMO_CONVERTER_IMAGE:-repomemo-converter:${REPOMEMO_VERSION:-local}}
+    # The released converter image by default; REPOMEMO_CONVERTER_IMAGE starts a converter image of its own instead (V0.4.12).
+    image: ${REPOMEMO_CONVERTER_IMAGE:-${REPOMEMO_REGISTRY:-ghcr.io/repomemo}/repomemo-converter:${REPOMEMO_VERSION:-latest}}
     restart: unless-stopped
     stop_grace_period: 10s
     logging: *logging
@@ -139,14 +128,7 @@ services:
   # The web client over plain HTTP (V0.4.18): the app, /config.json, and /v1 and /health forwarded to the server. It
   # publishes its port on this machine's loopback only; behind your own proxy, point that at it. TLS is the edge's.
   web:
-    build:
-      context: .
-      target: webapp
-      args:
-        REPOMEMO_BUILD_COMMIT: ${REPOMEMO_BUILD_COMMIT:-unknown}
-        REPOMEMO_BUILD_DATE: ${REPOMEMO_BUILD_DATE:-unknown}
-        REPOMEMO_IMAGE_TAG: ${REPOMEMO_VERSION:-local}
-    image: repomemo-web:${REPOMEMO_VERSION:-local}
+    image: ${REPOMEMO_REGISTRY:-ghcr.io/repomemo}/repomemo-web:${REPOMEMO_VERSION:-latest}
     restart: unless-stopped
     stop_grace_period: 10s
     logging: *logging
@@ -178,14 +160,7 @@ services:
   edge:
     profiles:
       - edge
-    build:
-      context: .
-      target: edge
-      args:
-        REPOMEMO_BUILD_COMMIT: ${REPOMEMO_BUILD_COMMIT:-unknown}
-        REPOMEMO_BUILD_DATE: ${REPOMEMO_BUILD_DATE:-unknown}
-        REPOMEMO_IMAGE_TAG: ${REPOMEMO_VERSION:-local}
-    image: repomemo-edge:${REPOMEMO_VERSION:-local}
+    image: ${REPOMEMO_REGISTRY:-ghcr.io/repomemo}/repomemo-edge:${REPOMEMO_VERSION:-latest}
     restart: unless-stopped
     stop_grace_period: 10s
     logging: *logging

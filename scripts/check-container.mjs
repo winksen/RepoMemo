@@ -25,6 +25,7 @@ const workflows = readdirSync(".github/workflows")
   .filter((name) => /.ya?ml$/.test(name))
   .map((name) => [name, read(join(".github/workflows", name))]);
 const compose = read("docker-compose.yml");
+const composeBuild = read("docker-compose.build.yml");
 const caddyfile = read("docker/Caddyfile.edge");
 const webCaddyfile = read("docker/Caddyfile.web");
 const example = read(".env.example");
@@ -87,11 +88,11 @@ const stages = [...dockerfile.matchAll(/^FROM\s+\S+\s+AS\s+(\S+)/gim)].map((matc
 for (const stage of ["web", "build", "server", "edge", "webapp"]) {
   if (!stages.includes(stage)) problems.push(`Dockerfile has no stage named ${stage}`);
 }
-for (const match of compose.matchAll(/^\s+target:\s*(\S+)/gm)) {
-  if (!stages.includes(match[1])) problems.push(`docker-compose.yml builds the target ${match[1]}, which the Dockerfile does not have`);
+for (const match of composeBuild.matchAll(/^\s+target:\s*(\S+)/gm)) {
+  if (!stages.includes(match[1])) problems.push(`docker-compose.build.yml builds the target ${match[1]}, which the Dockerfile does not have`);
 }
-for (const stage of ["server", "web".replace("web", "webapp"), "edge"]) {
-  if (!new RegExp(`^\\s+target:\\s*${stage}\\s*$`, "m").test(compose)) problems.push(`docker-compose.yml does not build the ${stage} image`);
+for (const stage of ["server", "converter", "webapp", "edge"]) {
+  if (!new RegExp(`^\\s+target:\\s*${stage}\\s*$`, "m").test(composeBuild)) problems.push(`docker-compose.build.yml does not build the ${stage} image`);
 }
 
 // Lock-down (S5-8, E1c): the server has a read-only root, no capabilities and no way to gain any; LibreOffice runs
@@ -119,7 +120,7 @@ if (converterBlock) {
   for (const volume of ["repomemo-previews", "soffice-socket"]) {
     if (!converterBlock.includes(volume) || !(serverBlock ?? "").includes(volume)) problems.push(`the server and the converter must share the ${volume} volume`);
   }
-  if (!/target:\s*converter/.test(converterBlock) || !stages.includes("converter")) problems.push("the converter service needs the Dockerfile's converter stage");
+  if (!/target:\s*converter/.test(composeBuild) || !stages.includes("converter")) problems.push("the converter service needs the Dockerfile's converter stage");
   for (const file of ["docker/soffice-wrapper.sh", "docker/soffice-run.sh", "docker/soffice-listener.sh"]) {
     if (!existsSync(file)) problems.push(`${file} is missing`);
     else if (!dockerfile.includes(file)) problems.push(`the Dockerfile does not copy ${file}`);
@@ -190,16 +191,18 @@ for (const stage of ["server", "converter", "edge", "webapp"]) {
   for (const name of ["REPOMEMO_BUILD_COMMIT", "REPOMEMO_BUILD_DATE", "REPOMEMO_IMAGE_TAG"]) {
     if (!new RegExp(String.raw`^ARG\s+${name}\b`, "m").test(body)) problems.push(`the ${stage} stage does not take the build argument ${name} its labels use`);
   }
-  const service = new RegExp(String.raw`target:\s*${stage}\s*\n\s*args:([\s\S]*?)(?=\n    \S)`).exec(compose)?.[1] ?? "";
-  for (const name of ["REPOMEMO_BUILD_COMMIT", "REPOMEMO_BUILD_DATE", "REPOMEMO_IMAGE_TAG"]) {
-    if (!service.includes(name)) problems.push(`the compose file does not pass ${name} to the ${stage} image`);
-  }
+  // The build file gives each image the arguments through one anchor (x-build-args), which holds all three.
+  if (!new RegExp(String.raw`target:\s*${stage}\s*\n\s*args:\s*\*build-args`).test(composeBuild)) problems.push(`the build file does not pass the build arguments to the ${stage} image`);
+}
+const buildArgs = /x-build-args:\s*&build-args\n((?:  .*\n)+)/.exec(composeBuild)?.[1] ?? "";
+for (const name of ["REPOMEMO_BUILD_COMMIT", "REPOMEMO_BUILD_DATE", "REPOMEMO_IMAGE_TAG"]) {
+  if (!buildArgs.includes(name)) problems.push(`the build file does not pass ${name} to the images`);
 }
 
 // The server image is told what it is (V0.4.3): the Dockerfile takes the three build arguments, and the compose file gives them.
 for (const name of ["REPOMEMO_BUILD_COMMIT", "REPOMEMO_BUILD_DATE", "REPOMEMO_IMAGE_TAG"]) {
   if (!new RegExp(String.raw`^ARG\s+${name}\b`, "m").test(dockerfile)) problems.push(`the Dockerfile has no ARG ${name}, so /health cannot name the build`);
-  if (!compose.includes(`${name}:`)) problems.push(`the compose file gives no build argument ${name}`);
+  if (!composeBuild.includes(`${name}:`)) problems.push(`the build file gives no build argument ${name}`);
 }
 
 // Every REPOMEMO_ variable the compose file sets is one the server (or the proxy) reads.
@@ -213,7 +216,7 @@ const walk = (folder) => {
 };
 walk("apps/server/src");
 const sourceText = serverSource.join("\n");
-const composeOnly = new Set(["REPOMEMO_HOST", "REPOMEMO_VERSION", "REPOMEMO_CONVERTER_IMAGE", "REPOMEMO_WEB_API_URL", "REPOMEMO_PRODUCT_NAME", "REPOMEMO_API_UPSTREAM", "REPOMEMO_WEB_PORT", "REPOMEMO_TLS_DIR", "REPOMEMO_METRICS_TOKEN_FILE"]);
+const composeOnly = new Set(["REPOMEMO_HOST", "REPOMEMO_VERSION", "REPOMEMO_CONVERTER_IMAGE", "REPOMEMO_REGISTRY", "REPOMEMO_WEB_API_URL", "REPOMEMO_PRODUCT_NAME", "REPOMEMO_API_UPSTREAM", "REPOMEMO_WEB_PORT", "REPOMEMO_TLS_DIR", "REPOMEMO_METRICS_TOKEN_FILE"]);
 const used = new Set([...compose.matchAll(/\b(REPOMEMO_[A-Z0-9_]+)\b/g)].map((match) => match[1]));
 for (const name of used) {
   if (!composeOnly.has(name) && !sourceText.includes(`"${name}"`)) problems.push(`docker-compose.yml sets ${name}, which the server does not read`);
@@ -336,6 +339,20 @@ if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge d
   }
 }
 
+// The compose file runs released images (V0.4.40): it builds nothing, names the four images on the registry with the release's
+// tag, and the build file is the one place a build is described. CI builds through it and checks the two readings of the files.
+{
+  if (/^\s+build:/m.test(compose)) problems.push("docker-compose.yml builds an image; the build belongs to docker-compose.build.yml");
+  for (const name of ["server", "converter", "web", "edge"]) {
+    if (!compose.includes(`/repomemo-${name}:\${REPOMEMO_VERSION:-latest}`) || !compose.includes("${REPOMEMO_REGISTRY:-ghcr.io/repomemo}")) problems.push(`docker-compose.yml does not run the released ${name} image from the registry`);
+    if (!new RegExp(`image:.*repomemo-${name}:\\$\\{REPOMEMO_VERSION:-local\\}`).test(composeBuild)) problems.push(`docker-compose.build.yml does not tag the ${name} image it builds with a local name`);
+  }
+  if (!/^docker-compose\.build\.yml text eol=lf/m.test(attributes)) problems.push(".gitattributes does not keep docker-compose.build.yml on LF line endings");
+  if (!/^COMPOSE_FILE: docker-compose\.yml:docker-compose\.build\.yml/m.test(ci.replace(/^ +/gm, ""))) problems.push("CI does not build the images of the commit through the build file (COMPOSE_FILE)");
+  if (!/check-compose-images\.mjs released/.test(ci) || !/check-compose-images\.mjs built/.test(ci)) problems.push("CI does not check both readings of the compose files (released and built)");
+  if (!/^REPOMEMO_VERSION=(latest|\d+\.\d+\.\d+)$/m.test(example)) problems.push(".env.example does not name a released tag (latest or X.Y.Z) in REPOMEMO_VERSION");
+}
+
 // The page of a release is written from the changelog (V0.4.39): the workflow that makes the release uses the script, never a
 // sentence typed into it, and the script lists what a release holds.
 {
@@ -451,7 +468,7 @@ if (!/docker compose logs --no-log-prefix[^\n]*server/.test(ci) || !/JSON\.parse
     const body = text.slice(text.indexOf("\nservices:"), text.indexOf("\nnetworks:") > 0 ? text.indexOf("\nnetworks:") : text.indexOf("\nvolumes:"));
     for (const match of body.matchAll(/^  ([a-z][\w-]*):\n([\s\S]*?)(?=^  \S|(?![\s\S]))/gm)) {
       const [, name, block] = match;
-      const target = /target:\s*(\S+)/.exec(block)?.[1];
+      const target = /target:\s*(\S+)/.exec(block)?.[1] ?? new RegExp(String.raw`^  ${name}:\n    build:\n      context: \.\n      target: (\S+)`, "m").exec(composeBuild)?.[1];
       if (!/^\s+healthcheck:/m.test(block) && !(target && stageHasHealthcheck(target))) problems.push(`${file}: ${name} has no health check, in the compose file or in its image`);
       if (!/^\s+restart:\s*unless-stopped\s*$/m.test(block)) problems.push(`${file}: ${name} does not restart unless stopped`);
       if (!/^\s+stop_grace_period:\s*\d+s\s*$/m.test(block)) problems.push(`${file}: ${name} has no stop_grace_period`);
@@ -660,7 +677,7 @@ for (const pattern of [".git", ".env", "workspace-data", "target"]) {
 
 // The converter has an image of its own (V0.4.12): its compose service can start a tag given by
 // REPOMEMO_CONVERTER_IMAGE, and CI builds the converter stage alone and starts it as the previews profile does.
-if (!/image:\s*\$\{REPOMEMO_CONVERTER_IMAGE:-repomemo-converter:/.test(converterBlock ?? "")) problems.push("docker-compose.yml: the converter cannot start an image given by REPOMEMO_CONVERTER_IMAGE");
+if (!/image:\s*\$\{REPOMEMO_CONVERTER_IMAGE:-/.test(converterBlock ?? "") || !/image:\s*\$\{REPOMEMO_CONVERTER_IMAGE:-repomemo-converter:/.test(composeBuild)) problems.push("docker-compose.yml: the converter cannot start an image given by REPOMEMO_CONVERTER_IMAGE");
 if (!/docker build[^\n]*--target converter\b[^\n]*--tag repomemo-converter/.test(ci) || !/--network none[^\n]*--read-only|--read-only[^\n]*--network none/.test(ci.replace(/\\\n\s*/g, " "))) problems.push(".github/workflows/ci.yml has no job that builds the converter image alone and runs it with no network and a read-only root");
 
 // The API on its own (V0.4.11): deploy/api.yml is the server and its volume, one published port on the loopback,

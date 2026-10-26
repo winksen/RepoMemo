@@ -31,6 +31,8 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
+  # The compose file pulls the released images (V0.4.40); CI tries the code of this commit, so it builds them.
+  COMPOSE_FILE: docker-compose.yml:docker-compose.build.yml
 
 jobs:
   versions:
@@ -680,6 +682,27 @@ jobs:
         run: |
           docker compose --project-name repomemo-a down --volumes || true
           docker compose --project-name repomemo-b down --volumes || true
+
+  # The compose file on its own runs released images (V0.4.40): no build, the registry's names and the tag of the release, and
+  # the build file is what adds a build. Nothing is started or pulled here.
+  compose-released-images:
+    name: Compose runs released images
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      COMPOSE_FILE: docker-compose.yml
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+      - run: sh deploy/init.sh --no-edge
+      - name: The compose file names the released images and builds nothing
+        run: REPOMEMO_VERSION=9.9.9 docker compose --profile previews --profile edge config --format json | node scripts/check-compose-images.mjs released 9.9.9 ghcr.io/repomemo
+      - name: Another registry is one setting
+        run: REPOMEMO_VERSION=9.9.9 REPOMEMO_REGISTRY=registry.example.com/acme docker compose --profile previews --profile edge config --format json | node scripts/check-compose-images.mjs released 9.9.9 registry.example.com/acme
+      - name: The build file is what adds a build
+        run: REPOMEMO_VERSION=9.9.9 docker compose -f docker-compose.yml -f docker-compose.build.yml --profile previews --profile edge config --format json | node scripts/check-compose-images.mjs built 9.9.9
 
   # The upgrade script (V0.4.24): a good tag is run, a broken one ends on the old version, running.
   upgrade-script:

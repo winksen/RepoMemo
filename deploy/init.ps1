@@ -46,5 +46,5 @@ $lines = Get-Content -Path $example | ForEach-Object {
 Write-Host "init: wrote $Output for $HostName (edge: $(-not $NoEdge))."
 Write-Host "Keep a copy of REPOMEMO_SECRET_KEY somewhere safe: without it the AI provider keys and repository tokens stored in the"
 Write-Host "database must be entered again. Then:"
-Write-Host "  docker compose up -d --build --wait"
+Write-Host "  docker compose pull; docker compose up -d --wait"
 Write-Host "and open https://$HostName (or http://127.0.0.1:8080 without the edge) to finish the first-run setup."

@@ -1,0 +1,44 @@
+# Build the images from this checkout instead of pulling the released ones (V0.4.40), for development and for a checkout
+# between releases. This file only adds a build to each service of docker-compose.yml:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build --wait
+#
+# or, once, put `COMPOSE_FILE=docker-compose.yml:docker-compose.build.yml` in .env (on Windows the separator is `;`, with
+# `COMPOSE_PATH_SEPARATOR=;`), after which plain `docker compose up -d --build` builds. The images are tagged
+# repomemo-<name>:${REPOMEMO_VERSION:-local} on this machine, so they never replace a released image. A server
+# installed from the released images needs none of this: `docker compose pull && docker compose up -d`.
+
+x-build-args: &build-args
+  REPOMEMO_BUILD_COMMIT: ${REPOMEMO_BUILD_COMMIT:-unknown}
+  REPOMEMO_BUILD_DATE: ${REPOMEMO_BUILD_DATE:-unknown}
+  REPOMEMO_IMAGE_TAG: ${REPOMEMO_VERSION:-local}
+
+services:
+  server:
+    build:
+      context: .
+      target: server
+      args: *build-args
+    image: repomemo-server:${REPOMEMO_VERSION:-local}
+
+  # Built here by default; REPOMEMO_CONVERTER_IMAGE starts a converter image of its own instead (V0.4.12).
+  converter:
+    build:
+      context: .
+      target: converter
+      args: *build-args
+    image: ${REPOMEMO_CONVERTER_IMAGE:-repomemo-converter:${REPOMEMO_VERSION:-local}}
+
+  web:
+    build:
+      context: .
+      target: webapp
+      args: *build-args
+    image: repomemo-web:${REPOMEMO_VERSION:-local}
+
+  edge:
+    build:
+      context: .
+      target: edge
+      args: *build-args
+    image: repomemo-edge:${REPOMEMO_VERSION:-local}

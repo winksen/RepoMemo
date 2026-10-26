@@ -74,7 +74,7 @@ The server and a Caddy front door (TLS and the web app) as two containers, with 
 
 ```powershell
 Copy-Item .env.example .env   # set REPOMEMO_JWT_SECRET and REPOMEMO_SECRET_KEY (32+ random characters each), and REPOMEMO_HOST
-docker compose up -d --build
+docker compose pull; docker compose up -d   # the released images; docker-compose.build.yml builds this checkout instead
 docker compose logs server    # the first-run setup code
 ```
 

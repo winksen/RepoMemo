@@ -10,7 +10,8 @@
 #   --version TAG      the tag to run (REPOMEMO_VERSION in .env); required
 #   --env-file FILE    the .env of the install (default .env)
 #   --url URL          where the web image answers (default http://127.0.0.1:8080, its loopback port)
-#   --no-build         use images that exist or can be pulled; do not build from this checkout
+#   --build            build the images from this checkout (docker-compose.build.yml must be in COMPOSE_FILE)
+#   --no-build         pull the released images; do not build (the default unless COMPOSE_FILE names docker-compose.build.yml)
 #   --no-backup        skip the backup (the script says so); without it and without a token, it stops
 #   --timeout SECONDS  how long to wait for healthy and for the backup (default 900)
 #
@@ -23,7 +24,7 @@ set -eu
 env_file=".env"
 url="http://127.0.0.1:8080"
 version=""
-build=yes
+build=auto
 backup=yes
 timeout=900
 token="${REPOMEMO_UPGRADE_TOKEN:-}"
@@ -40,14 +41,25 @@ while [ $# -gt 0 ]; do
     --url) [ $# -ge 2 ] || fail "--url needs an address"; url="$2"; shift 2 ;;
     --token-file) [ $# -ge 2 ] || fail "--token-file needs a path"; [ -r "$2" ] || fail "cannot read $2"; token="$(tr -d ' \r\n' < "$2")"; shift 2 ;;
     --timeout) [ $# -ge 2 ] || fail "--timeout needs seconds"; timeout="$2"; shift 2 ;;
+    --build) build=yes; shift ;;
     --no-build) build=no; shift ;;
     --no-backup) backup=no; shift ;;
-    -h|--help) sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,23p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) fail "unknown argument: $1 (try --help)" ;;
   esac
 done
 
 [ -n "$version" ] || fail "give the tag to run: --version TAG"
+
+# The released images are pulled unless the install builds them (docker-compose.build.yml in COMPOSE_FILE, in the
+# environment or in the env file).
+if [ "$build" = auto ]; then
+  files="${COMPOSE_FILE:-$(grep -E '^COMPOSE_FILE=' "$env_file" 2>/dev/null | tail -n 1 | cut -d= -f2- || true)}"
+  case "$files" in
+    *docker-compose.build.yml*) build=yes ;;
+    *) build=no ;;
+  esac
+fi
 case "$version" in
   *[!A-Za-z0-9._-]*) fail "the tag ($version) may hold only letters, digits, dots, underscores and hyphens" ;;
 esac

@@ -2,6 +2,27 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.40 (2026-10-26)
+
+The compose file runs a released version: pull, then up, with no compiler.
+
+### Changed
+- **`docker-compose.yml` pulls images and builds nothing:** the four services name `ghcr.io/repomemo/repomemo-<name>:${REPOMEMO_VERSION:-latest}` (the registry is `REPOMEMO_REGISTRY`, so a mirror of your own is one setting; `REPOMEMO_CONVERTER_IMAGE` still wins for the converter). `REPOMEMO_VERSION` in `.env.example` is now `latest`, with the advice to pin a release; it was `local`, the tag of images built on the machine.
+- **`deploy/upgrade.sh`** pulls the released images by default and builds only when `COMPOSE_FILE` (in the environment or in the env file) names the build file; `--build` and `--no-build` still force either. `deploy/init.sh` and `init.ps1` print `docker compose pull && docker compose up -d --wait`.
+- **`container:check`** reads the build instructions from the build file, and refuses a build, a moving name or a missing registry setting in the compose file. **The documents:** the development commands, the upgrade notes, the operations guide, the technical mindmap, the roadmap and the release index. **The version** is `0.4.40` everywhere.
+
+### Added
+- **`docker-compose.build.yml`:** the one place a build is described (the four stages, the commit, date and tag as build arguments, local tags `repomemo-<name>:${REPOMEMO_VERSION:-local}`). `docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build --wait` builds this checkout; `COMPOSE_FILE` in `.env` does it for good.
+- **`scripts/check-compose-images.mjs`** and a CI job, **Compose runs released images:** `docker compose config` of the compose file alone names the four released images with the tag asked for and has no build; another registry changes only the prefix; with the build file every service builds. The other CI jobs set `COMPOSE_FILE` to build the commit they test.
+- **The release page** (V0.4.39) tells how to run the release: set the tag, pull, up.
+
+### Checks
+- **Run:** `container:check`, `version:check`, `docs:check`, `docker compose config` on the compose file alone and with the build file (read by `check-compose-images.mjs`: both passed), shell syntax of the two scripts.
+- **Not run:** the stack, a pull (no image exists on the registry until the first tag), `deploy/upgrade.sh` and the CI jobs. `deploy/api.yml` (the API alone) still builds.
+
+### Upgrading
+- **A container install built from a checkout:** put `COMPOSE_FILE=docker-compose.yml:docker-compose.build.yml` in `.env` (on Windows `;` and `COMPOSE_PATH_SEPARATOR=;`) to keep building, or set `REPOMEMO_VERSION` to a release and run `docker compose pull && docker compose up -d` to run the released images. A `.env` that still says `REPOMEMO_VERSION=local` would try to pull a tag that does not exist: change it.
+
 ## V0.4.39 (2026-10-26)
 
 The page of a release is the changelog's, with nothing typed by hand.

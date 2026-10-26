@@ -39,7 +39,8 @@ export function releaseNotes({ changelog, version, owner, repo }) {
   lines.push("### Container images", "");
   lines.push(`Four images for \`linux/amd64\` and \`linux/arm64\`, named \`${version}\`, \`${version.replace(/\.\d+$/, "")}\` and \`latest\`:`, "");
   for (const name of IMAGES) lines.push(`- \`${registry}/repomemo-${name}:${version}\``);
-  lines.push("", `Each carries a signed build attestation and an SBOM: see [verifying an image](https://github.com/${repo}/blob/v${version}/docs/VERIFYING_IMAGES.md).`, "");
+  lines.push("", `Run them with \`REPOMEMO_VERSION=${version}\` in \`.env\`, then \`docker compose pull && docker compose up -d\`.`);
+  lines.push(`Each carries a signed build attestation and an SBOM: see [verifying an image](https://github.com/${repo}/blob/v${version}/docs/VERIFYING_IMAGES.md).`, "");
   lines.push("### Server archives", "");
   for (const [label, os, arch, extension] of ARCHIVES) lines.push(`- ${label}: \`repomemo-server-${version}-${os}-${arch}.${extension}\``);
   lines.push("- `SHA256SUMS`: check a download with `sha256sum --check --ignore-missing SHA256SUMS`", "");
