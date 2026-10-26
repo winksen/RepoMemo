@@ -1,0 +1,21 @@
+{
+  "_": "The files and styles that exist for the desktop app alone (V0.4.58). `npm run desktop:check` fails when a file that knows about the desktop, or a stylesheet class named for it, is not listed here with the reason it is not part of the web client. Adding to this list is the decision to make the app differ from the browser: say why.",
+  "files": {
+    "src/App.tsx": "The entry that chooses the desktop's start or the web client's; the one place the runtime is chosen",
+    "src/main.tsx": "The one mount; it asks the runtime whether to read the host's configuration, which the desktop gets from its shell",
+    "src/components/DesktopApp.tsx": "The desktop's start: the shell's settings, the saved server, the links, notices and updates; it renders the web client",
+    "src/components/DesktopConnect.tsx": "Asking for a server address: a browser is served by the server it talks to and has none to choose",
+    "src/components/DesktopConfigProblem.tsx": "Showing the administrator's configuration file when it cannot be used: only the app reads one",
+    "src/components/DesktopServerNote.tsx": "The server's name, Change server, the help link and the update choice in the account area: only the app has a server to change",
+    "src/components/UpdateOffer.tsx": "Offering a newer version of the app: a browser page is always the server's latest",
+    "src/lib/desktop.ts": "The calls to the shell, and the one place the runtime is detected",
+    "src/lib/desktopConnection.ts": "Pointing the client at the server the shell allowed, through the shell's transport or its relay",
+    "src/lib/platform.ts": "What the window can do, asked as capabilities; the components never ask which runtime they are in",
+    "src/lib/transport.ts": "The one seam between the client and the network: the page's fetch, or the shell's client",
+    "src/lib/sharedApi.ts": "Keeps the desktop session in the credential store and takes its transport from the seam; the rest is the web client's"
+  },
+  "styles": {
+    "rm-desktop-server": "The server note of the account area, which only the app shows",
+    "rm-desktop-server-host": "The host name inside that note"
+  }
+}

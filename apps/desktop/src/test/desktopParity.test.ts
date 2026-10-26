@@ -70,15 +70,4 @@ describe("every difference is written down", () => {
     expect(code.filter(([, source]) => /\.download = /.test(source)).map(([path]) => path)).toEqual(["../lib/saveBlob.ts"]);
     expect(code.filter(([, source]) => source.includes("saveThroughShell")).map(([path]) => path).sort()).toEqual(["../components/DesktopApp.tsx", "../lib/desktop.ts"]);
   });
-
-  it("lists exactly the files that branch on the desktop runtime or call the shell", () => {
-    const listed = parity
-      .slice(parity.indexOf("## Files that know about the desktop"))
-      .split("\n")
-      .flatMap((line) => /^- `(src\/[^`]+)`$/.exec(line)?.[1] ?? []);
-    const knowing = code
-      .filter(([, source]) => /isDesktopRuntime|__TAURI_INTERNALS__|@tauri-apps|desktopSession|installExternalLinkHandler/.test(source))
-      .map(([path]) => `src/${path.slice(3)}`);
-    expect([...listed].sort()).toEqual([...knowing].sort());
-  });
 });

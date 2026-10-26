@@ -510,6 +510,13 @@ if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge d
   if (!/SmartScreen/.test(read("docs/DEVELOPMENT_COMMANDS.md"))) problems.push("the SmartScreen warning is not explained");
 }
 
+// The parity check of the desktop app (V0.4.58) runs in CI with its tests, and its list exists.
+{
+  if (!/node scripts\/check-desktop\.mjs/.test(ci) || !/check-desktop\.test\.mjs/.test(ci)) problems.push("CI does not run the desktop parity check and its tests");
+  if (!/"desktop:check": "node scripts\/check-desktop\.mjs"/.test(read("package.json"))) problems.push("package.json has no desktop:check script");
+  if (!existsSync("apps/desktop/desktop-only.json")) problems.push("apps/desktop/desktop-only.json (the list of what is for the desktop alone) is missing");
+}
+
 // The page of a release is written from the changelog (V0.4.39): the workflow that makes the release uses the script, never a
 // sentence typed into it, and the script lists what a release holds.
 {

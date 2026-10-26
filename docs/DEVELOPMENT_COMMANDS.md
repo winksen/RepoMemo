@@ -79,6 +79,16 @@ key and its password as the repository secrets `TAURI_SIGNING_PRIVATE_KEY` and `
 text in the repository variable `REPOMEMO_UPDATE_PUBKEY`, which CI passes to the build and which decides whether a tag publishes the signed
 update. A build without it never looks at the project's releases.
 
+## Check That The Desktop App Stays The Web Client
+
+```powershell
+npm run desktop:check
+```
+
+Why: the app is the web client in a window (V0.4.58). The command fails when a file or a style exists for the desktop alone and is not listed,
+with its reason, in `apps/desktop/desktop-only.json`; a listed entry that is gone, or has no reason, fails too. CI runs it with the other
+checks, and `npm run desktop:parity:test` tests the command.
+
 ## Windows Code Signing And The SmartScreen Warning
 
 **Signing (V0.4.57).** When the repository has the secrets `WINDOWS_CERTIFICATE` (a code-signing certificate as a base64 `.pfx`) and

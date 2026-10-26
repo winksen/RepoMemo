@@ -28,14 +28,9 @@ Written for V0.4.43; each release that closes a row updates it and says so (*don
 | Private certificate authority | the browser's own store | the system store only | Closed by V0.4.55 (done: a `certificate` bundle in the file, checked by a relay that trusts it for that server only) |
 | Installing | none | a Windows installer, then Linux and macOS packages | Closed by V0.4.49 to V0.4.60 |
 
-## Files that know about the desktop
+## What exists for the desktop alone
 
-The files below, and only these, test the desktop runtime, load the shell's plugins or hold the desktop session. A component asks `platform` for a capability (`opensTabs`, `choosesServer`, `installedApp`) and never which runtime it is in (V0.4.44); the only components on the list are the entry and the desktop's own start. The list turns into a check that fails the build at V0.4.58.
-
-- `src/App.tsx`
-- `src/main.tsx`
-- `src/components/DesktopApp.tsx`
-- `src/lib/desktop.ts`
-- `src/lib/platform.ts`
-- `src/lib/sharedApi.ts`
-- `src/lib/transport.ts`
+Since V0.4.58 this is a check, not a list on this page: `apps/desktop/desktop-only.json` names every file that knows about the shell and every
+style named for the desktop, each with the reason it is not part of the web client, and `npm run desktop:check` (run by CI) fails when a
+desktop-only screen or style exists that is not listed, when a listed one is gone or no longer knows about the desktop, or when a reason is
+missing. Adding a screen only the app has is the decision to make it differ from the browser: add the entry and say why.

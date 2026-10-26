@@ -2,6 +2,25 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.58 (2026-10-26)
+
+Adding a screen or a style only the desktop app has now fails CI until it is listed with a reason.
+
+### Added
+- **`npm run desktop:check`** (`scripts/check-desktop.mjs`): reads `apps/desktop/src` and fails when a file exists for the desktop alone and is not in `apps/desktop/desktop-only.json`, or a stylesheet class is named for the desktop and is not listed. A file is desktop-only when its name says desktop, or it imports the desktop module or a Tauri package, or tests the runtime. A listed entry whose file is gone, that no longer knows about the desktop, or that gives no reason (at least a sentence) fails too, so the list cannot grow stale. Tests and generated files are not counted.
+- **`desktop-only.json`:** the twelve files (the entry and the mount, the desktop's start, the connect screen, the configuration problem, the server note, the update offer and the six library files that talk to the shell or hold the seam) and the two styles of the server note, each with the reason it is not part of the web client.
+- **`check-desktop.test.mjs`** (six tests): a clean web client passes; a screen named for the desktop, one that calls the shell and one that imports the desktop module each fail until listed; a style class named for the desktop fails until listed; a stale entry, a runtime-free file on the list and a reason that says nothing fail; tests and generated files are ignored; the real app passes. CI runs the check and its tests with the other checks.
+
+### Changed
+- **The parity audit** no longer keeps a list of files itself: the list is the check's, and the test that compared the audit's list with the code (V0.4.43) is gone. **`container:check`** holds that CI runs the check and its tests and that the list exists. **The documents:** the development commands, the parity audit, the operations guide, the technical mindmap, the roadmap and the release index. **The version** is `0.4.58` everywhere.
+
+### Checks
+- **Run:** `desktop:check` (12 files, 2 styles), `desktop:parity:test` (6 passed), the desktop parity page test (7 passed), `typecheck`, `container:check`, `version:check`, `docs:check`.
+- **Not run:** CI itself.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.4.57 (2026-10-26)
 
 The Windows program and installers are signed when the repository has a certificate, and the warning for an unsigned build is explained.
