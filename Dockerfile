@@ -132,7 +132,7 @@ ENTRYPOINT ["repomemo-soffice-listener"]
 # ---------------------------------------------------------------------------
 # The edge (V0.4.18): TLS and nothing else, optional, in front of the web image. Caddy gets a certificate for a
 # public name, makes its own for localhost, or uses the ones mounted at /certs (docker/edge-entrypoint.sh).
-FROM caddy:2-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f AS edge
+FROM caddy:2-alpine@sha256:eb4d35b7452d1ab6171fbdbe8d9275b2301dad6dad92115d91e19fb9b24d510f AS edge
 COPY docker/Caddyfile.edge /etc/caddy/Caddyfile
 COPY --chmod=0755 docker/edge-entrypoint.sh /usr/local/bin/repomemo-edge-entrypoint
 EXPOSE 80 443 443/udp
@@ -155,7 +155,7 @@ ENTRYPOINT ["repomemo-edge-entrypoint"]
 # no API and no TLS. A front door brings the certificate; REPOMEMO_WEB_API_URL and REPOMEMO_PRODUCT_NAME say
 # what the app is told when it starts (/config.json). Caddy's file capability is taken off so that the image
 # also runs with every capability dropped.
-FROM caddy:2-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f AS webapp
+FROM caddy:2-alpine@sha256:eb4d35b7452d1ab6171fbdbe8d9275b2301dad6dad92115d91e19fb9b24d510f AS webapp
 RUN adduser -S -D -H -u 10001 -h /nonexistent repomemo \
     && apk add --no-cache libcap-setcap \
     && (setcap -r /usr/bin/caddy || true) \
