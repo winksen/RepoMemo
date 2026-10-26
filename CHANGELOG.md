@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.57 (2026-10-26)
+
+The Windows program and installers are signed when the repository has a certificate, and the warning for an unsigned build is explained.
+
+### Added
+- **Signing in CI:** when the repository has the secrets `WINDOWS_CERTIFICATE` (a base64 `.pfx`) and `WINDOWS_CERTIFICATE_PASSWORD`, the *Desktop Windows* workflow imports the certificate in the one step that reads it (the file is removed at once), writes a signing configuration with its thumbprint, SHA-256 and a timestamp server, and builds both installers and the program with it. A new step then **fails the job unless every `.exe` carries a valid signature and a timestamp**, so a signature that would end with the certificate does not pass. Without the secrets the build is unsigned and the log says so plainly (a notice per file).
+- **Guidance:** *Windows code signing and the SmartScreen warning* in the development commands: how to make the secret, why SmartScreen warns for an unsigned (and for a newly signed) program, what a person does (*More info*, *Run anyway*, unblocking a downloaded zip), and what IT does (a publisher rule, or the hash from `SHA256SUMS`, or its software tool and the installer's `/S`), with the command that shows a file's signature. A handout built from a signed artifact stays signed, since the configuration file is separate from the program; the portable zip itself is not signed, the program in it is.
+
+### Changed
+- **`.gitignore`** keeps the generated `tauri.signing.conf.json` out of the repository. **`container:check`** holds that signing happens only when the repository has a certificate, that the certificate is read and its file removed in the import step and nowhere else, the thumbprint, SHA-256 and timestamp, both installers built with the configuration, the failure on a bad signature, the plain notice when unsigned, and the SmartScreen guidance. **The documents:** the development commands, the parity audit, the operations guide, the technical mindmap, the roadmap and the release index. **The version** is `0.4.57` everywhere.
+
+### Checks
+- **Run:** `container:check`, `version:check`, `docs:check`.
+- **Not run:** the workflow, the import, a signed build, the signature check. No certificate exists yet; until the maintainer buys one and sets the secrets, every build is unsigned and says so.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.4.56 (2026-10-26)
 
 The app can look for a newer version of itself, offer it, and install it only if it is signed.

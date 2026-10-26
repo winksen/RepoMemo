@@ -79,6 +79,28 @@ key and its password as the repository secrets `TAURI_SIGNING_PRIVATE_KEY` and `
 text in the repository variable `REPOMEMO_UPDATE_PUBKEY`, which CI passes to the build and which decides whether a tag publishes the signed
 update. A build without it never looks at the project's releases.
 
+## Windows Code Signing And The SmartScreen Warning
+
+**Signing (V0.4.57).** When the repository has the secrets `WINDOWS_CERTIFICATE` (a code-signing certificate as a base64 `.pfx`) and
+`WINDOWS_CERTIFICATE_PASSWORD`, the *Desktop Windows* workflow imports it in the one step that needs it, builds with the certificate's
+thumbprint (SHA-256, timestamped, so the signature outlives the certificate), and then **fails unless the program and both installers carry
+a valid, timestamped signature**; the artifact's files then show your organisation as their publisher. Make the base64 with
+`[Convert]::ToBase64String([IO.File]::ReadAllBytes("cert.pfx"))`. Without the secrets the build is unsigned, and the workflow says so in its
+log. The configuration file and `desktop:package` change nothing in the program, so a handout built from a signed artifact stays signed.
+The portable *zip* itself is not signed; the program inside it is.
+
+**The warning when it is not signed.** Windows SmartScreen shows *Windows protected your PC* for a program it has no reputation for, which
+every unsigned (and every newly signed) program is. It is not a finding about the file. For people:
+
+- *More info*, then *Run anyway*. For a zip from the web, right-click it, *Properties*, *Unblock*, before unpacking (or
+  `Unblock-File .\RepoMemo-Acme-Memo-portable.zip`).
+- Installing per person, the installer needs no administrator rights, so there is no further prompt.
+
+For IT, in order of preference: sign with your organisation's certificate and allow that publisher (Intune, AppLocker or WDAC publisher
+rule); or allow the file by its hash from `SHA256SUMS`; or distribute through your software tool (the installer's `/S`). Check what you
+have before allowing it: `Get-AuthenticodeSignature .\RepoMemo_<version>_x64-setup.exe | Format-List Status, SignerCertificate`, and the
+hash against the release's `SHA256SUMS` and, for the images, [VERIFYING_IMAGES.md](VERIFYING_IMAGES.md).
+
 ## Configure The Desktop App With A File
 
 The same executable can talk to different servers if it is given a file (V0.4.47): `repomemo-desktop.json`, beside the executable or in

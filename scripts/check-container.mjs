@@ -495,6 +495,21 @@ if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge d
   if (!/"feed:test":/.test(read("package.json"))) problems.push("package.json has no feed:test script");
 }
 
+// Windows code signing (V0.4.57): the certificate is read by the one step that imports it, the build signs with a timestamp, the
+// job fails when a signed build's files are not validly signed, and an unsigned build says so.
+{
+  const windows = workflows.find(([name]) => name === "desktop-windows.yml")?.[1] ?? "";
+  if (!/HAS_WINDOWS_CERT:\s*\$\{\{\s*secrets\.WINDOWS_CERTIFICATE != ''/.test(windows)) problems.push("the Windows desktop workflow does not sign only when the repository has a certificate");
+  const importStep = /- name: Import the signing certificate[\s\S]*?(?=\n      - name:)/.exec(windows)?.[0] ?? "";
+  if (!/secrets\.WINDOWS_CERTIFICATE\b/.test(importStep) || !/Remove-Item \$pfx/.test(importStep)) problems.push("the signing certificate must be read, and the file removed, in the step that imports it");
+  if ((windows.match(/secrets\.WINDOWS_CERTIFICATE\b/g) ?? []).length !== 2) problems.push("the signing certificate is used outside its import step");
+  if (!/certificateThumbprint/.test(windows) || !/digestAlgorithm = "sha256"/.test(windows) || !/timestampUrl/.test(windows)) problems.push("the build must sign with the certificate's thumbprint, SHA-256 and a timestamp");
+  if ((windows.match(/tauri\.signing\.conf\.json/g) ?? []).length < 3) problems.push("both installers must be built with the signing configuration");
+  if (!/Get-AuthenticodeSignature/.test(windows) || !/is not validly signed/.test(windows) || !/is not signed \(the repository has no WINDOWS_CERTIFICATE secret\)/.test(windows)) problems.push("the workflow must fail on a bad signature and say plainly that a build is unsigned");
+  if (!/tauri\.signing\.conf\.json/.test(read(".gitignore"))) problems.push(".gitignore does not keep the generated signing configuration out");
+  if (!/SmartScreen/.test(read("docs/DEVELOPMENT_COMMANDS.md"))) problems.push("the SmartScreen warning is not explained");
+}
+
 // The page of a release is written from the changelog (V0.4.39): the workflow that makes the release uses the script, never a
 // sentence typed into it, and the script lists what a release holds.
 {

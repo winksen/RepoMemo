@@ -33,3 +33,6 @@ docs/DESIGN_BLUEPRINT.md
 deploy/certs/*
 !deploy/certs/README.md
 deploy/monitoring/metrics-token
+
+# Written in CI from the signing certificate (V0.4.57); never kept
+apps/desktop/src-tauri/tauri.signing.conf.json
