@@ -54,7 +54,17 @@ Why: verifies Rust crates, Tauri command wiring, SQLx migrations, and compile-ti
 This requires Rust/Cargo to be installed and available on `PATH`.
 See `docs/WINDOWS_SETUP.md` if PowerShell reports `cargo` as not recognized.
 
-## Versions And Continuous Integration
+## Package The Desktop App For One Server
+
+```powershell
+$env:REPOMEMO_PRESET_SERVER = "https://memo.example.com"
+npm run tauri:build --workspace @repomemo/desktop
+```
+
+Why: the address is compiled into the app (V0.4.46). An app packaged this way opens on its server's sign-in page with no address field,
+ignores any address saved by an earlier run and cannot be pointed elsewhere (*Change server* is gone and the shell refuses it). The
+address is checked by the rules of a typed one (`https://`, or `http://` on your own network, nothing after the host), and a bad one
+stops the app at start with a message that names it. Without the variable, the app asks for an address as before.
 
 The product version lives in several files (Cargo, npm, Tauri). Set them all at
 once, and check that they agree (CI runs the check on every push):

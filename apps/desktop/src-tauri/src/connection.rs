@@ -6,7 +6,16 @@
 //! token of the session is kept in the operating system's credential store, never in a file or in
 //! the page's storage. The window itself never leaves the bundled client (see [`is_app_url`]).
 
-use std::{fs, net::Ipv4Addr, path::PathBuf, process::Command, sync::Mutex};
+use std::{
+    fs,
+    net::Ipv4Addr,
+    path::PathBuf,
+    process::Command,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Mutex,
+    },
+};
 
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -16,11 +25,39 @@ use url::{Host, Url};
 const KEYRING_SERVICE: &str = "RepoMemo";
 const SERVER_FILE: &str = "server.json";
 
-/// The server this run talks to: its origin (`https://host:port`), set at start from the saved
-/// address or by [`prepare_server`].
+/// The server this app was packaged for (V0.4.46), fixed when it was compiled: `REPOMEMO_PRESET_SERVER=https://memo.example.com
+/// npm run tauri:build`. With one, the app never asks for an address, ignores the one saved by an earlier run and cannot be
+/// pointed anywhere else.
+const PRESET_SERVER: Option<&str> = option_env!("REPOMEMO_PRESET_SERVER");
+
+/// The server this run talks to: its origin (`https://host:port`), set at start from the preset, the saved
+/// address or by [`prepare_server`]. Locked when the app was packaged for a server.
 #[derive(Default)]
 pub struct Connection {
     current: Mutex<Option<String>>,
+    locked: AtomicBool,
+}
+
+/// The preset server as an origin, `None` when the app was packaged without one. A preset that is not a usable address is an
+/// error, checked by the same rules as a typed one, so a mistake stops the app at start instead of showing a blank screen.
+pub fn resolve_preset(value: Option<&str>) -> Result<Option<String>, String> {
+    match value.map(str::trim) {
+        None | Some("") => Ok(None),
+        Some(text) => normalize_server_url(text).map(Some).map_err(|reason| {
+            format!("The server address this app was packaged with ({text}) cannot be used. {reason}")
+        }),
+    }
+}
+
+/// Refuses a change of server in an app that was packaged for one.
+fn ensure_unlocked(connection: &Connection) -> Result<(), String> {
+    if connection.locked.load(Ordering::SeqCst) {
+        let origin = current_origin(connection).unwrap_or_default();
+        return Err(format!(
+            "This app is set up for {origin}; its server cannot be changed."
+        ));
+    }
+    Ok(())
 }
 
 #[derive(Serialize, Deserialize)]
@@ -131,8 +168,14 @@ pub fn allow_server(app: &AppHandle, origin: &str) -> Result<(), String> {
     app.add_capability(capability).map_err(|error| error.to_string())
 }
 
-/// Starts a run on the saved server, if there is one.
+/// Starts a run on the preset server if the app was packaged for one, otherwise on the saved server, if there is one.
 pub fn start(app: &AppHandle, connection: &Connection) -> Result<(), String> {
+    if let Some(origin) = resolve_preset(PRESET_SERVER)? {
+        allow_server(app, &origin)?;
+        *connection.current.lock().map_err(|_| "state is locked".to_owned())? = Some(origin);
+        connection.locked.store(true, Ordering::SeqCst);
+        return Ok(());
+    }
     if let Some(origin) = read_saved_server(app) {
         allow_server(app, &origin)?;
         *connection.current.lock().map_err(|_| "state is locked".to_owned())? = Some(origin);
@@ -159,10 +202,17 @@ pub fn current_server(connection: State<'_, Connection>) -> Option<String> {
     connection.current.lock().ok().and_then(|current| current.clone())
 }
 
+/// Whether the app was packaged for one server, which then cannot be changed.
+#[tauri::command]
+pub fn server_locked(connection: State<'_, Connection>) -> bool {
+    connection.locked.load(Ordering::SeqCst)
+}
+
 /// Checks an address a person typed and lets the window call that server. Nothing is saved until
 /// [`remember_server`], after the page has found a RepoMemo server there.
 #[tauri::command]
 pub fn prepare_server(app: AppHandle, connection: State<'_, Connection>, address: String) -> Result<String, String> {
+    ensure_unlocked(&connection)?;
     let origin = normalize_server_url(&address)?;
     allow_server(&app, &origin)?;
     *connection.current.lock().map_err(|_| "state is locked".to_owned())? = Some(origin.clone());
@@ -172,6 +222,7 @@ pub fn prepare_server(app: AppHandle, connection: State<'_, Connection>, address
 /// Keeps the chosen server for the next start.
 #[tauri::command]
 pub fn remember_server(app: AppHandle, connection: State<'_, Connection>) -> Result<(), String> {
+    ensure_unlocked(&connection)?;
     let origin = current_origin(&connection)?;
     let text = serde_json::to_string_pretty(&SavedServer { server_url: origin }).map_err(|error| error.to_string())?;
     fs::write(saved_server_path(&app)?, text).map_err(|error| error.to_string())
@@ -180,6 +231,7 @@ pub fn remember_server(app: AppHandle, connection: State<'_, Connection>) -> Res
 /// Forgets the server and its session and starts again, so the next run asks for an address.
 #[tauri::command]
 pub fn forget_server(app: AppHandle, connection: State<'_, Connection>) -> Result<(), String> {
+    ensure_unlocked(&connection)?;
     if let Ok(origin) = current_origin(&connection) {
         if let Ok(entry) = session_entry(&origin) {
             // Nothing stored is fine.
@@ -317,6 +369,48 @@ mod tests {
         ] {
             assert!(normalize_server_url(bad).is_err(), "{bad:?} should be refused");
         }
+    }
+
+    #[test]
+    fn an_app_packaged_without_a_server_has_no_preset() {
+        assert_eq!(resolve_preset(None).unwrap(), None);
+        assert_eq!(resolve_preset(Some("")).unwrap(), None);
+        assert_eq!(resolve_preset(Some("   ")).unwrap(), None);
+    }
+
+    #[test]
+    fn a_preset_is_checked_by_the_rules_of_a_typed_address() {
+        assert_eq!(
+            resolve_preset(Some(" memo.example.com ")).unwrap().as_deref(),
+            Some("https://memo.example.com")
+        );
+        assert_eq!(
+            resolve_preset(Some("http://192.168.1.20:3020")).unwrap().as_deref(),
+            Some("http://192.168.1.20:3020")
+        );
+        for bad in [
+            "http://memo.example.com",
+            "https://memo.example.com/app",
+            "ftp://x",
+            "https://u:p@x.com",
+        ] {
+            let message = resolve_preset(Some(bad)).unwrap_err();
+            assert!(message.contains(bad), "{message} should name {bad}");
+            assert!(
+                message.contains("packaged"),
+                "{message} should say where the address came from"
+            );
+        }
+    }
+
+    #[test]
+    fn a_locked_connection_refuses_a_change_and_an_open_one_allows_it() {
+        let connection = Connection::default();
+        assert!(ensure_unlocked(&connection).is_ok());
+        *connection.current.lock().unwrap() = Some("https://memo.example.com".to_owned());
+        connection.locked.store(true, Ordering::SeqCst);
+        let message = ensure_unlocked(&connection).unwrap_err();
+        assert!(message.contains("https://memo.example.com") && message.contains("cannot be changed"));
     }
 
     #[test]

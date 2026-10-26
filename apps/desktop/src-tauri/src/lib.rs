@@ -31,6 +31,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             connection::current_server,
+            connection::server_locked,
             connection::prepare_server,
             connection::remember_server,
             connection::forget_server,

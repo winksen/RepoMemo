@@ -5,8 +5,10 @@ export const isDesktopRuntime = typeof window !== "undefined" && "__TAURI_INTERN
 
 /** The server a desktop run talks to; the shell checks every address and lets the window call only that one. */
 export const desktopServer = {
-  /** The address saved by an earlier run, or null. */
+  /** The address this run talks to: the one the app was packaged for, else the one saved by an earlier run, or null. */
   current: () => invoke<string | null>("current_server"),
+  /** Whether the app was packaged for one server (V0.4.46), which then cannot be changed. */
+  locked: () => invoke<boolean>("server_locked"),
   /** Checks an address and allows the window to call it. Nothing is kept until `remember`. */
   prepare: (address: string) => invoke<string>("prepare_server", { address }),
   /** Keeps the prepared server for the next start. */

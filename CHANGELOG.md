@@ -2,6 +2,25 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.46 (2026-10-26)
+
+An app can be packaged for one server: it opens on that server's sign-in page and cannot be pointed elsewhere.
+
+### Added
+- **A preset server:** `REPOMEMO_PRESET_SERVER=https://memo.example.com` when the app is built (`build.rs` reruns when it changes) is compiled into the shell (`option_env!`). It is checked by the rules of a typed address (`https://`, or `http://` on your own network, nothing after the host) and normalized; a bad one stops the app at start with a message that names the address and where it came from.
+- **A locked connection:** with a preset, the shell allows that server's address to the window at start, ignores the address saved by an earlier run, and refuses `prepare_server`, `remember_server` and `forget_server` ("This app is set up for ...; its server cannot be changed."). A new command, `server_locked`, tells the page.
+- **Tests:** three Rust tests (no preset; a preset is checked like a typed address and the message names it; a locked connection refuses and an open one allows) and `desktopPreset.test.tsx` (five tests: the app opens on the server with no address field and asks the shell nothing; the server note shows the host with no *Change server* when locked, and offers none before the shell has answered; an app without a preset offers it as before, also when the shell cannot say).
+
+### Changed
+- **`DesktopServerNote`** asks the shell whether the server is locked and hides *Change server* when it is. **The documents:** the development commands (packaging for one server), the parity audit, the functional and technical mindmaps, the operations guide, the roadmap and the release index. **The version** is `0.4.46` everywhere.
+
+### Checks
+- **Run:** `cargo check -p repomemo-desktop --tests`, `cargo clippy -p repomemo-desktop --all-targets -- -D warnings`, `cargo fmt --all`, `desktopPreset.test.tsx` and the desktop app and parity tests (19 passed), `typecheck`, `container:check`, `version:check`, `docs:check`.
+- **Not run:** the three Rust tests (compiled, not run), a packaged app, the app against a server.
+
+### Upgrading
+- Nothing to do. An app built without the variable behaves as before.
+
 ## V0.4.45 (2026-10-26)
 
 The connect screen and the sign-in page are one frame with different contents.
