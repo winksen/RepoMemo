@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { IconServer as Server } from "@tabler/icons-react";
 import { sharedApiUrl } from "../lib/sharedApi";
-import { desktopServer, desktopSettings } from "../lib/desktop";
+import { appUpdates, desktopServer, desktopSettings } from "../lib/desktop";
+import { readUpdateChoice, writeUpdateChoice } from "../lib/updateChoice";
 import { platform } from "../lib/platform";
 import { Button } from "./ui/button";
 import { Dialog, DialogCancel } from "./ui/dialog";
@@ -16,9 +17,13 @@ export function DesktopServerNote({ signedIn }: { signedIn: boolean }) {
   // An app packaged for one server (V0.4.46) shows it and offers no way to change it; until the shell says, it offers none.
   const [locked, setLocked] = useState(true);
   const [supportUrl, setSupportUrl] = useState<string | null>(null);
+  // Looking for updates at the project's releases is the person's to turn on (V0.4.56); the administrator's feed is not.
+  const [personChooses, setPersonChooses] = useState(false);
+  const [looksForUpdates, setLooksForUpdates] = useState(readUpdateChoice);
   useEffect(() => {
     if (!platform.choosesServer) return;
     let cancelled = false;
+    Promise.resolve().then(() => appUpdates.mode()).then((mode) => { if (!cancelled) setPersonChooses(mode === "optional"); }, () => undefined);
     desktopSettings.get().then((found) => { if (!cancelled) setSupportUrl(found.supportUrl); }, () => undefined);
     desktopServer.locked().then((value) => { if (!cancelled) setLocked(value); }, () => { if (!cancelled) setLocked(false); });
     return () => { cancelled = true; };
@@ -41,6 +46,7 @@ export function DesktopServerNote({ signedIn }: { signedIn: boolean }) {
     <div className="rm-desktop-server">
       <span><Server size={ICON_SIZE.sm} /> <span className="rm-desktop-server-host" title={sharedApiUrl}>{host}</span></span>
       {supportUrl ? <a href={supportUrl} rel="noreferrer" target="_blank">Help</a> : null}
+      {personChooses ? <label className="rm-desktop-updates"><input checked={looksForUpdates} onChange={(event) => { setLooksForUpdates(event.target.checked); writeUpdateChoice(event.target.checked); }} type="checkbox" /> Check for updates</label> : null}
       {locked ? null : <Button onClick={() => setAsking(true)} type="button" variant="secondary">Change server</Button>}
     </div>
     <Dialog

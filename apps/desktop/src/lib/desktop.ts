@@ -119,3 +119,15 @@ export const appLinks = {
     return () => stops.forEach((stop) => stop());
   },
 };
+
+/** An update the shell found and checked the address of (V0.4.56); its signature is checked again before it is installed. */
+export type UpdateInfo = { version: string; notes: string | null };
+
+export const appUpdates = {
+  /** Who decides whether the app looks: `managed` (the administrator's feed), `optional` (the person's choice) or `off`. */
+  mode: () => invoke<"off" | "optional" | "managed">("update_mode"),
+  /** Looks for a newer version; `enabled` is the person's choice, which counts for the project's feed only. */
+  check: (enabled: boolean) => invoke<UpdateInfo | null>("check_update", { enabled }),
+  /** Downloads the update found, checks its signature, installs it and restarts the app. */
+  install: () => invoke<void>("install_update"),
+};

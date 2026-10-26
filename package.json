@@ -1,6 +1,6 @@
 {
   "name": "repomemo",
-  "version": "0.4.55",
+  "version": "0.4.56",
   "private": true,
   "description": "Local-first technical memory workspace for teams.",
   "workspaces": [
@@ -32,7 +32,8 @@
     "notes:test": "node --test scripts/release-notes.test.mjs",
     "pins:test": "node --test scripts/pins.test.mjs",
     "desktop:package": "node scripts/package-desktop.mjs",
-    "desktop:test": "node --test scripts/package-desktop.test.mjs"
+    "desktop:test": "node --test scripts/package-desktop.test.mjs",
+    "feed:test": "node --test scripts/update-feed.test.mjs"
   },
   "engines": {
     "node": ">=22.12",

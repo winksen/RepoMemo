@@ -9,6 +9,7 @@ import { appLinks, desktopServer, desktopSettings, followPageTitle, installExter
 import { pointAtServer } from "../lib/desktopConnection";
 import { DesktopConfigProblem } from "./DesktopConfigProblem";
 import { DesktopConnect } from "./DesktopConnect";
+import { UpdateOffer } from "./UpdateOffer";
 
 type Phase = "starting" | "connect" | "server" | "problem";
 
@@ -86,7 +87,7 @@ export function DesktopApp() {
   }, [phase]);
 
   if (phase === "starting") return <LoadingCanvas label="Starting RepoMemo" />;
-  if (phase === "server") return <SharedWebApp />;
+  if (phase === "server") return <><SharedWebApp /><UpdateOffer /></>;
   if (phase === "problem") return <DesktopConfigProblem problem={settings.problem ?? ""} />;
   return <DesktopConnect onConnected={() => setPhase("server")} suggestedServer={settings.suggestedServer} supportUrl={settings.supportUrl} />;
 }

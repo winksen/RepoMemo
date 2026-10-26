@@ -397,7 +397,9 @@ if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge d
     if (!/"webviewInstallMode":\s*\{\s*"type":\s*"downloadBootstrapper"/.test(read("apps/desktop/src-tauri/tauri.conf.json"))) problems.push("the installer does not fetch WebView2 when it is missing (webviewInstallMode downloadBootstrapper)");
     if (!/repomemo-desktop\.exe/.test(windows) || !/MainWindowTitle/.test(windows)) problems.push("the Windows desktop workflow neither keeps the portable executable nor starts it to see it open");
     if (!/upload-artifact@[0-9a-f]{40}[\s\S]*desktop-windows-x64/.test(windows)) problems.push("the Windows desktop workflow does not keep its files as the artifact desktop-windows-x64");
-    if (/contents:\s*write|gh release|packages:\s*write/.test(windows)) problems.push("the Windows desktop workflow publishes or writes; it only keeps an artifact");
+    // Only the update job of V0.4.56 may write, on a tag, once the signing key's public half is set.
+    const buildPart = windows.slice(0, windows.indexOf("\n  publish-update:") > 0 ? windows.indexOf("\n  publish-update:") : undefined);
+    if (/contents:\s*write|gh release|packages:\s*write/.test(buildPart)) problems.push("the Windows desktop build publishes or writes; it only keeps an artifact");
     if (!/test "\$\{GITHUB_REF_NAME\}" = "v\$\(node -p/.test(windows)) problems.push("the Windows desktop workflow does not require the tag to be the version");
   }
 }
@@ -474,6 +476,23 @@ if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge d
   if (!/certificate: Option<String>/.test(read("apps/desktop/src-tauri/src/config.rs"))) problems.push("the configuration file takes no certificate");
   if (!/throughRelay/.test(read("apps/desktop/src/lib/transport.ts")) || !/desktopServer\.route\(\)/.test(read("apps/desktop/src/lib/desktopConnection.ts"))) problems.push("the client does not send a private-authority server's requests through the relay");
   if (!existsSync("apps/desktop/src-tauri/testdata/test-ca.pem") || /PRIVATE KEY/.test(read("apps/desktop/src-tauri/testdata/test-ca.pem"))) problems.push("the test certificate is missing, or holds a private key");
+}
+
+// Signed updates (V0.4.56): the app checks a feed whose updates are signed (the plugin refuses an unsigned one, and a signature made for
+// another version), only the administrator's feed or the person's own choice makes it look, and only a tag with the signing key
+// publishes one.
+{
+  const shell = read("apps/desktop/src-tauri/tauri.conf.json");
+  if (!/"requireSignedVersion":\s*true/.test(shell) || !/"updater":/.test(shell)) problems.push("the updater does not require the signed version (a replayed older release)");
+  if (/dangerous/i.test(shell) || /dangerous/i.test(read("apps/desktop/src-tauri/src/updates.rs"))) problems.push("the updater is told to accept something dangerous (insecure transport, invalid certificates)");
+  const updates = read("apps/desktop/src-tauri/src/updates.rs");
+  if (!/Mode::Optional && !enabled/.test(updates) || !/Mode::Managed/.test(updates)) problems.push("the app must look for the project's updates only when the person chose, and for the administrator's always");
+  if (!/updates::check_update/.test(read("apps/desktop/src-tauri/src/lib.rs"))) problems.push("the shell does not register the update commands");
+  const windows = workflows.find(([name]) => name === "desktop-windows.yml")?.[1] ?? "";
+  const job = windows.slice(windows.indexOf("\n  publish-update:"));
+  if (!/if: startsWith\(github\.ref, 'refs\/tags\/v'\) && vars\.REPOMEMO_UPDATE_PUBKEY != ''/.test(job) || !/contents: write/.test(job) || !/update-feed\.mjs/.test(job)) problems.push("only a tag with the update key may publish the signed update feed");
+  if (!/feed:test|update-feed\.test\.mjs/.test(ci)) problems.push("CI does not run the update feed tests");
+  if (!/"feed:test":/.test(read("package.json"))) problems.push("package.json has no feed:test script");
 }
 
 // The page of a release is written from the changelog (V0.4.39): the workflow that makes the release uses the script, never a

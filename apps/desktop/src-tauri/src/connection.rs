@@ -118,6 +118,11 @@ pub fn normalize_server_url(input: &str) -> Result<String, String> {
     Ok(url.origin().ascii_serialization())
 }
 
+/// Whether an address is on the person's own network (the rule that lets a server, or an update feed, use plain `http`).
+pub fn is_local_url(url: &Url) -> bool {
+    url.host().is_some_and(|host| is_local_host(&host))
+}
+
 fn is_local_host(host: &Host<&str>) -> bool {
     match host {
         Host::Domain(name) => {

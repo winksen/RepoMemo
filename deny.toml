@@ -22,6 +22,14 @@ ignore = [
   # version that elliptic-curve 0.13 cannot use. Revisit by 2027-01-15, or once jsonwebtoken moves to a
   # release built on crypto-bigint 0.7 or lets those backends be left out.
   { id = "RUSTSEC-2026-0387", reason = "crypto-bigint is linked by jsonwebtoken's EC backends but never used: tokens are HS256" },
+  # zip 4.6.1 arrives through tauri-plugin-updater (V0.4.56). Its extraction keeps SUID/SGID bits (0367) and follows symbolic
+  # links out of the folder (0368). The updater extracts only an archive whose signature it has already checked against the
+  # public key of the maintainer or of the administrator's own feed, as the person who runs the app (never as root), so an
+  # attacker would need the signing key first. Approved by the maintainer on 2026-10-26. Revisit by 2027-01-15, or once
+  # tauri-plugin-updater uses zip 9.
+  { id = "RUSTSEC-2026-0367", reason = "zip extracts only archives the updater has verified against a signing key, as the person, not root" },
+  { id = "RUSTSEC-2026-0368", reason = "zip extracts only archives the updater has verified against a signing key" },
+  { id = "RUSTSEC-2026-0369", reason = "the same zip extraction, applying permissions through symbolic links; same reasoning" },
 ]
 
 [bans]

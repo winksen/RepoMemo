@@ -4,6 +4,7 @@ mod deeplink;
 mod files;
 mod notice;
 mod trust;
+mod updates;
 
 use tauri::Manager;
 use tauri_plugin_deep_link::DeepLinkExt;
@@ -37,8 +38,11 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         // `repomemo://` links from the system (V0.4.54); `deeplink` decides which ones the app shows.
         .plugin(tauri_plugin_deep_link::init())
+        // Signed updates (V0.4.56); the feed and key are given at run time by `updates`.
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(Connection::default())
         .manage(deeplink::Links::default())
+        .manage(updates::Found::default())
         .setup(|app| {
             // The administrator's file is read once, first: it decides the server and the name.
             let file = config::load(app.handle());
@@ -97,7 +101,10 @@ pub fn run() {
             files::save_file,
             notice::notify,
             notice::set_badge,
-            deeplink::take_pending_link
+            deeplink::take_pending_link,
+            updates::update_mode,
+            updates::check_update,
+            updates::install_update
         ])
         .run(tauri::generate_context!())
         .expect("error while running RepoMemo");

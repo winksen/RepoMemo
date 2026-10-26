@@ -66,6 +66,19 @@ ignores any address saved by an earlier run and cannot be pointed elsewhere (*Ch
 address is checked by the rules of a typed one (`https://`, or `http://` on your own network, nothing after the host), and a bad one
 stops the app at start with a message that names it. Without the variable, the app asks for an address as before.
 
+## Build The App With The Update Key
+
+```powershell
+$env:REPOMEMO_UPDATE_PUBKEY = "<the text of the .pub file of your signing key pair>"
+npm run tauri:build --workspace @repomemo/desktop
+```
+
+Why: `REPOMEMO_UPDATE_PUBKEY` (V0.4.56) is the public key the project's release updates are signed with, compiled into the app so that the
+person's *Check for updates* can look at the project's releases. Make the pair once with `npx tauri signer generate`; keep the private
+key and its password as the repository secrets `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, and put the public
+text in the repository variable `REPOMEMO_UPDATE_PUBKEY`, which CI passes to the build and which decides whether a tag publishes the signed
+update. A build without it never looks at the project's releases.
+
 ## Configure The Desktop App With A File
 
 The same executable can talk to different servers if it is given a file (V0.4.47): `repomemo-desktop.json`, beside the executable or in
@@ -94,6 +107,11 @@ the app's config folder (`%APPDATA%\com.repomemo.desktop` on Windows, `~/.config
   started it. **The same bundle trusts no other site:** the app asks the system's ordinary trust for any other address, and the window
   may call nothing but that one. A bundle that is missing, is not PEM certificates or is too large spoils the whole file, which is shown
   and not obeyed. Hand out the authority's certificate only: never its key (`desktop:package --certificate` refuses a file with one).
+- `updates`: your own update feed (V0.4.56), `{ "feed": "https://updates.example.com/latest.json", "publicKey": "<the .pub file of your signing key pair>" }`. The app then looks
+  for a newer version on its own, offers it, and installs it only when the person agrees. Every update is checked against that key before it
+  is installed (an unsigned one, a wrongly signed one and one signed for another version are refused). The feed is a `latest.json` as
+  `node scripts/update-feed.mjs` writes it. Without `updates`, an app built with the project's release key looks at the project's releases
+  only if the person turns on *Check for updates* in the account area; an app without that key never looks.
 - Nothing else is accepted. A file that is not valid JSON, names a field the app does not know, or holds a value that fails its rule is
   **named and not obeyed**: the app shows the file and the reason in place of everything else and connects to nothing, so a mistake
   cannot be gone around by typing an address.

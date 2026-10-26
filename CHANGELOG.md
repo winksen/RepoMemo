@@ -2,6 +2,29 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.56 (2026-10-26)
+
+The app can look for a newer version of itself, offer it, and install it only if it is signed.
+
+### Added
+- **The updater** (`updates.rs`, `tauri-plugin-updater`): `check_update` looks in a feed and keeps what it finds, `install_update` downloads it, checks its signature and restarts the app. The updater is configured with `requireSignedVersion`, so an update announced for a version other than the one its signature was made for (a replayed older release) is refused as well as an unsigned or wrongly signed one; nothing "dangerous" (insecure transport, invalid certificates) is switched on, and `container:check` refuses it.
+- **Who decides whether the app looks:** the administrator's `updates` in `repomemo-desktop.json` (`feed`, an `https://` address or `http://` on the own network, and `publicKey`, the key it is signed by): the app looks without asking and the person is offered what it finds. Otherwise the project's release feed (`.../releases/latest/download/latest.json`) in a build that carries the release key (`REPOMEMO_UPDATE_PUBKEY`), and only if the person turns on **Check for updates** in the account area (off until then, remembered). A build with neither never looks.
+- **The page:** `UpdateOffer` looks once when the client is up and asks *Install and restart* or *Later*; a refusal by the shell (a signature that does not match) is shown as its own sentence.
+- **The feed:** `scripts/update-feed.mjs` writes the `latest.json` from a version, the notes and, per platform, the installer's address and signature; it refuses an empty signature, a plain-http or login-carrying address, an unknown or repeated platform and a bad version (`npm run feed:test`, three tests, in CI).
+- **The release:** the Windows workflow signs the installer when the repository has `TAURI_SIGNING_PRIVATE_KEY` (and its password) and builds with `tauri.updater.conf.json` (`createUpdaterArtifacts`); a new `publish-update` job, on a tag and only when the variable `REPOMEMO_UPDATE_PUBKEY` is set, attaches the signed installer, its signature and `latest.json` to the release. It is the only job of that workflow that writes. To start: `npx tauri signer generate`, put the private key in the secret and the `.pub` text in the variable.
+- **Tests:** four Rust tests (the administrator's feed wins and is looked at without asking; the project's feed is the person's, and only in a build with its key; its address; the feed's rules in the file) and `appUpdates.test.tsx` (six).
+
+### Changed
+- **`deny.toml`** ignores RUSTSEC-2026-0367, -0368 and -0369: `zip` 4.6.1, brought by the updater, extracts with unsafe permissions and symbolic links. The updater extracts only an archive whose signature it has checked, as the person and not as root. **Approved by the maintainer on 2026-10-26**; revisit by 2027-01-15 or when the plugin uses zip 9.
+- **`container:check`** holds the signed-version rule, the absence of anything dangerous, who decides, the registered commands, the publishing job's conditions and the feed tests. **The documents:** the development commands (`updates`), the user guide, the parity audit (the updates row is closed), the operations guide, the functional and technical mindmaps, the roadmap and the release index. **The version** is `0.4.56` everywhere.
+
+### Checks
+- **Run:** `cargo check`, `cargo clippy -p repomemo-desktop --all-targets -- -D warnings`, `cargo fmt --all`, `cargo deny check` (with the three ignores), `typecheck`, `a11y:check`, `styles:check`, `feed:test` (3), the desktop page tests (36 with the neighbours), `container:check`, `version:check`, `docs:check`.
+- **Not run:** the Rust tests (compiled), the updater against a real feed, a signed build, an installation from an older app, the publishing job. The updater plugin's start needs a `pubkey` in `tauri.conf.json`, which holds a placeholder that the feed's own key replaces at run time; if the plugin refuses it at start, that is the first thing to look at. No signing key exists yet: until the maintainer makes one, no update is published and the project's feed is off.
+
+### Upgrading
+- Nothing to do. An app without a feed behaves as before.
+
 ## V0.4.55 (2026-10-26)
 
 A server behind a company's own certificate authority works in the app, and the same bundle trusts nothing else.

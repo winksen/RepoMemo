@@ -27,6 +27,12 @@ jobs:
     name: Windows x64
     runs-on: windows-latest
     timeout-minutes: 90
+    env:
+      # Updates (V0.4.56) are signed only when the repository has the signing key; the app carries the matching public key.
+      HAS_SIGNING_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      REPOMEMO_UPDATE_PUBKEY: ${{ vars.REPOMEMO_UPDATE_PUBKEY }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -44,7 +50,11 @@ jobs:
       - run: npm ci
       - name: Build the app and the per-person installer (WebView2 is fetched when it is missing)
         working-directory: apps/desktop
-        run: npx tauri build --bundles nsis
+        shell: pwsh
+        run: |
+          $extra = @()
+          if ($env:HAS_SIGNING_KEY -eq 'true') { $extra = @('--config', 'src-tauri/tauri.updater.conf.json') }
+          npx tauri build --bundles nsis @extra
       - name: Keep the portable executable and the installer
         shell: pwsh
         run: |
@@ -52,6 +62,8 @@ jobs:
           $version = node -p "require('./package.json').version"
           Copy-Item target/release/repomemo-desktop.exe dist-desktop-ci/repomemo-desktop.exe
           Copy-Item "target/release/bundle/nsis/RepoMemo_${version}_x64-setup.exe" "dist-desktop-ci/RepoMemo_${version}_x64-setup.exe"
+          # The installer's signature, for the update feed, when the signing key was given.
+          if ($env:HAS_SIGNING_KEY -eq 'true') { Copy-Item "target/release/bundle/nsis/RepoMemo_${version}_x64-setup.exe.sig" "dist-desktop-ci/RepoMemo_${version}_x64-setup.exe.sig" }
       - name: The executable says what it is
         shell: pwsh
         run: |
@@ -133,3 +145,37 @@ jobs:
           name: desktop-windows-x64
           path: dist-desktop-ci/*
           if-no-files-found: error
+
+  # The update feed (V0.4.56): on a tag, and only when the repository has the signing key, the signed installer and a latest.json that
+  # names it are attached to the release, which the app's updater reads. The only job here that writes, and it writes nothing else.
+  publish-update:
+    name: Publish the signed update
+    needs: windows
+    if: startsWith(github.ref, 'refs/tags/v') && vars.REPOMEMO_UPDATE_PUBKEY != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: desktop-windows-x64
+          path: desktop
+      - name: The feed, from the installer and its signature
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          test -s "desktop/RepoMemo_${version}_x64-setup.exe.sig" || { echo "the build was not signed (no signing key); no update is published"; exit 1; }
+          node scripts/release-notes.mjs --version "$version" --repo "$GITHUB_REPOSITORY" > release-notes.md
+          SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)" node scripts/update-feed.mjs --version "$version" --notes release-notes.md --out latest.json             --platform windows-x86_64 --url "https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/RepoMemo_${version}_x64-setup.exe"             --signature "desktop/RepoMemo_${version}_x64-setup.exe.sig"
+          cat latest.json
+      - name: Attach them (the release is made by the archives workflow; wait for it)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          for attempt in $(seq 1 60); do
+            gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1 && break
+            sleep 30
+          done
+          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null
+          gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber             "desktop/RepoMemo_${version}_x64-setup.exe" "desktop/RepoMemo_${version}_x64-setup.exe.sig" latest.json

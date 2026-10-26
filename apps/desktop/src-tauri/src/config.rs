@@ -31,6 +31,21 @@ struct RawConfig {
     locked: Option<bool>,
     support: Option<String>,
     certificate: Option<String>,
+    updates: Option<RawUpdates>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct RawUpdates {
+    feed: String,
+    public_key: String,
+}
+
+/// An administrator's own update feed (V0.4.56): where to look, and the key its updates must be signed with.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UpdateFeed {
+    pub url: String,
+    pub public_key: String,
 }
 
 /// What a valid file says.
@@ -46,6 +61,8 @@ pub struct DesktopConfig {
     pub support_url: Option<String>,
     /// A PEM bundle of the authority that signed the server's certificate (V0.4.55), as written: a name beside this file, or a path.
     pub certificate: Option<String>,
+    /// The administrator's own update feed; the app then checks it without asking the person.
+    pub updates: Option<UpdateFeed>,
 }
 
 /// The file that was found, what it says, or why it cannot be used. Fixed at start.
@@ -112,12 +129,39 @@ pub fn parse_config(text: &str) -> Result<DesktopConfig, String> {
     if certificate.is_some() && server.is_none() {
         return Err("certificate: it is trusted for a server; add a \"server\"".to_owned());
     }
+    let updates = match raw.updates {
+        None => None,
+        Some(raw) => Some(check_update_feed(&raw.feed, &raw.public_key)?),
+    };
     Ok(DesktopConfig {
         locked: server.is_some() && raw.locked.unwrap_or(true),
         server,
         name,
         support_url,
         certificate,
+        updates,
+    })
+}
+
+/// The feed is an `https://` address (`http://` on the person's own network), and the key is the base64 text a signing key's public
+/// half is written as.
+fn check_update_feed(feed: &str, public_key: &str) -> Result<UpdateFeed, String> {
+    let message = "updates: feed must be an https:// address (http:// on your own network) without a login".to_owned();
+    let url = Url::parse(feed.trim()).map_err(|_| message.clone())?;
+    let secure = url.scheme() == "https" || (url.scheme() == "http" && crate::connection::is_local_url(&url));
+    if !secure || url.host_str().is_none() || !url.username().is_empty() || url.password().is_some() {
+        return Err(message);
+    }
+    let key = public_key.trim();
+    let alphabet = key
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '/' | '='));
+    if !(40..=600).contains(&key.len()) || !alphabet {
+        return Err("updates: publicKey must be the public key of the signing key pair, as base64 text (the .pub file of `tauri signer generate`)".to_owned());
+    }
+    Ok(UpdateFeed {
+        url: url.to_string(),
+        public_key: key.to_owned(),
     })
 }
 
@@ -325,6 +369,45 @@ mod tests {
         );
         let _ = fs::remove_dir_all(beside);
         let _ = fs::remove_dir_all(config);
+    }
+
+    #[test]
+    fn an_update_feed_is_a_secure_address_and_the_key_it_is_signed_with() {
+        let key = "A".repeat(80);
+        let text = |feed: &str, key: &str| format!(r#"{{ "updates": {{ "feed": "{feed}", "publicKey": "{key}" }} }}"#);
+        let config = parse_config(&text("https://updates.example.com/latest.json", &key)).unwrap();
+        assert_eq!(config.updates.unwrap().url, "https://updates.example.com/latest.json");
+        assert!(
+            parse_config(&text("http://192.168.1.5/latest.json", &key)).is_ok(),
+            "http on the own network"
+        );
+        for bad in [
+            "http://updates.example.com/latest.json",
+            "ftp://x.example.com/f",
+            "https://u:p@x.example.com/f",
+            "latest.json",
+        ] {
+            assert!(
+                parse_config(&text(bad, &key)).unwrap_err().starts_with("updates: feed"),
+                "{bad}"
+            );
+        }
+        for bad in ["", "short", &"!".repeat(80), &"A".repeat(700)] {
+            assert!(
+                parse_config(&text("https://updates.example.com/latest.json", bad))
+                    .unwrap_err()
+                    .starts_with("updates: publicKey"),
+                "{bad:.10}"
+            );
+        }
+        assert!(
+            parse_config(r#"{ "updates": { "feed": "https://x.example.com/f" } }"#).is_err(),
+            "a feed needs its key"
+        );
+        assert!(parse_config(
+            r#"{ "updates": { "feed": "https://x.example.com/f", "publicKey": "k", "skip": true } }"#
+        )
+        .is_err());
     }
 
     #[test]

@@ -20,6 +20,7 @@ tauri-plugin-dialog.workspace = true
 tauri-plugin-http.workspace = true
 tauri-plugin-notification.workspace = true
 tauri-plugin-single-instance.workspace = true
+tauri-plugin-updater.workspace = true
 tauri-plugin-window-state.workspace = true
 url.workspace = true
 bytes.workspace = true
