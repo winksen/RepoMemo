@@ -70,6 +70,43 @@ jobs:
           $app.Refresh()
           if ($app.MainWindowTitle -ne "RepoMemo") { throw "the window is titled '$($app.MainWindowTitle)', not RepoMemo" }
           Stop-Process -Id $app.Id -Force
+      - name: The installer installs for one person, silently, with a shortcut in the Start menu and on the desktop
+        shell: pwsh
+        run: |
+          $version = node -p "require('./package.json').version"
+          $setup = (Resolve-Path "dist-desktop-ci/RepoMemo_${version}_x64-setup.exe").Path
+          $run = Start-Process -FilePath $setup -ArgumentList "/S" -Wait -PassThru
+          if ($run.ExitCode -ne 0) { throw "the installer exited with code $($run.ExitCode)" }
+          $dir = Join-Path $env:LOCALAPPDATA "RepoMemo"
+          $programs = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs"
+          $desktop = [Environment]::GetFolderPath("Desktop")
+          foreach ($path in @((Join-Path $dir "uninstall.exe"), (Join-Path $programs "RepoMemo.lnk"), (Join-Path $desktop "RepoMemo.lnk"))) {
+            if (-not (Test-Path $path)) { throw "the installer left no $path" }
+          }
+          if (-not (Get-ChildItem $dir -Filter *.exe | Where-Object Name -ne "uninstall.exe")) { throw "the installer left no program in $dir" }
+          if (-not (Test-Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\RepoMemo")) { throw "the installation is not recorded for the person" }
+          if (Test-Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\RepoMemo") { throw "the installation is recorded for the machine" }
+      - name: The installed app opens
+        shell: pwsh
+        run: |
+          $dir = Join-Path $env:LOCALAPPDATA "RepoMemo"
+          $program = Get-ChildItem $dir -Filter *.exe | Where-Object Name -ne "uninstall.exe" | Select-Object -First 1
+          $app = Start-Process -FilePath $program.FullName -PassThru
+          Start-Sleep -Seconds 25
+          if ($app.HasExited) { throw "the installed app exited with code $($app.ExitCode)" }
+          Stop-Process -Id $app.Id -Force
+      - name: A silent removal takes the program and the shortcuts and keeps the person's saved sign-in
+        shell: pwsh
+        run: |
+          $dir = Join-Path $env:LOCALAPPDATA "RepoMemo"
+          $config = Join-Path $env:APPDATA "com.repomemo.desktop"
+          New-Item -ItemType Directory -Force $config | Out-Null
+          Set-Content -Path (Join-Path $config "server.json") -Value '{ "server_url": "https://memo.example.com" }'
+          Start-Process -FilePath (Join-Path $dir "uninstall.exe") -ArgumentList "/S", "_?=$dir" -Wait
+          if (Get-ChildItem $dir -Filter *.exe -ErrorAction SilentlyContinue | Where-Object Name -ne "uninstall.exe") { throw "the program is still in $dir" }
+          if (Test-Path (Join-Path ([Environment]::GetFolderPath("Desktop")) "RepoMemo.lnk")) { throw "the desktop shortcut is still there" }
+          if (Test-Path (Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\RepoMemo.lnk")) { throw "the Start menu entry is still there" }
+          if (-not (Test-Path (Join-Path $config "server.json"))) { throw "a silent removal forgot the saved server" }
       - name: One SHA256SUMS
         shell: pwsh
         run: |

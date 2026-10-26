@@ -204,6 +204,44 @@ pub fn start(app: &AppHandle, connection: &Connection, file: &ConfigState) -> Re
     Ok(())
 }
 
+/// The flag with which the uninstaller (V0.4.50) asks the program to forget what it keeps for a person and leave, without a window.
+pub const FORGET_FLAG: &str = "--forget-session";
+
+/// Whether the program was started to forget the saved session.
+pub fn asked_to_forget<I: IntoIterator<Item = String>>(arguments: I) -> bool {
+    arguments.into_iter().skip(1).any(|argument| argument == FORGET_FLAG)
+}
+
+/// Every server this computer may hold a session for, once each: the packaged address, the configuration file's, the saved one.
+pub fn servers_to_forget(preset: Option<String>, file: &ConfigState, saved: Option<String>) -> Vec<String> {
+    let mut found: Vec<String> = Vec::new();
+    for origin in [preset, file.config.server.clone(), saved].into_iter().flatten() {
+        if !found.contains(&origin) {
+            found.push(origin);
+        }
+    }
+    found
+}
+
+/// Forgets the sessions in the credential store and the saved server, and says how many sessions there were to forget. The
+/// administrator's configuration file is not touched.
+pub fn forget_saved(app: &AppHandle, file: &ConfigState) -> usize {
+    let preset = resolve_preset(PRESET_SERVER).ok().flatten();
+    let origins = servers_to_forget(preset, file, read_saved_server(app));
+    let mut forgotten = 0;
+    for origin in &origins {
+        if let Ok(entry) = session_entry(origin) {
+            if entry.delete_credential().is_ok() {
+                forgotten += 1;
+            }
+        }
+    }
+    if let Ok(path) = saved_server_path(app) {
+        let _ = fs::remove_file(path);
+    }
+    forgotten
+}
+
 fn current_origin(connection: &Connection) -> Result<String, String> {
     connection
         .current
@@ -469,6 +507,42 @@ mod tests {
             (own(saved), false)
         );
         assert_eq!(choose_start(None, &ConfigState::default(), None), (None, false));
+    }
+
+    #[test]
+    fn the_uninstaller_asks_with_one_flag_and_only_that_flag() {
+        let args = |list: &[&str]| list.iter().map(|text| (*text).to_owned()).collect::<Vec<_>>();
+        assert!(asked_to_forget(args(&["RepoMemo.exe", "--forget-session"])));
+        assert!(!asked_to_forget(args(&["RepoMemo.exe"])));
+        assert!(!asked_to_forget(args(&[
+            "RepoMemo.exe",
+            "--forget-sessions",
+            "forget-session"
+        ])));
+        // The program's own name is never taken for the flag.
+        assert!(!asked_to_forget(args(&["--forget-session"])));
+    }
+
+    #[test]
+    fn every_server_with_a_session_is_forgotten_once() {
+        let file = file_with(Some("https://file.example.com"), true, None);
+        let own = |text: &str| Some(text.to_owned());
+        assert_eq!(
+            servers_to_forget(
+                own("https://preset.example.com"),
+                &file,
+                own("https://file.example.com")
+            ),
+            vec![
+                "https://preset.example.com".to_owned(),
+                "https://file.example.com".to_owned()
+            ]
+        );
+        assert!(servers_to_forget(None, &ConfigState::default(), None).is_empty());
+        assert_eq!(
+            servers_to_forget(None, &ConfigState::default(), own("https://saved.example.com")).len(),
+            1
+        );
     }
 
     #[test]

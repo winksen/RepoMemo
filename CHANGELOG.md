@@ -2,6 +2,27 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.50 (2026-10-26)
+
+The Windows installer installs for one person, silently when asked, and offers to forget the session when it removes the app.
+
+### Added
+- **Per person, no administrator rights:** the NSIS installer is `installMode: currentUser`: it installs into `%LOCALAPPDATA%\RepoMemo`, records itself under the person's own uninstall list (`HKCU`) and has no language picker. The Start menu entry and the desktop shortcut are the installer's own, made also on a silent install; `/NS` leaves them out.
+- **Silent install for IT:** `RepoMemo_<version>_x64-setup.exe /S` (and `/D=C:\path` last for another folder), documented with where the configuration file goes.
+- **An uninstall that offers to forget the saved session:** interactively it asks (default No) whether to also forget the server and the sign-in saved on the computer; if yes, it runs the program with the new flag `--forget-session`, which, without opening a window, deletes the sessions in the Windows credential store for every server it knows (the packaged one, the configuration file's, the saved one) and the saved `server.json`, and leaves the administrator's file alone. A silent removal (`/S`) asks nothing and keeps them, so an update keeps the person signed in; `RepoMemo.exe --forget-session` first forgets on a silent removal.
+- **Tests:** two Rust tests (the flag is the one argument after the program's name; every server with a session is forgotten once). CI's Windows job now installs the installer silently and checks that it left the program, the uninstaller, both shortcuts and the entry for the person (and none for the machine), opens the installed program, and removes it silently, checking that the program and the shortcuts are gone and the saved server kept.
+
+### Changed
+- **A release build has no console window** behind the app (`windows_subsystem = "windows"`); V0.4.49 started the app with one, which would also have confused its window-title check.
+- **`container:check`** holds the per-person mode, the hooks, the flag, the subsystem and the CI steps. **The documents:** the development commands (*The Windows installer*), the parity audit, the operations guide, the technical mindmap, the roadmap and the release index. **The version** is `0.4.50` everywhere.
+
+### Checks
+- **Run:** `cargo check -p repomemo-desktop --tests`, `cargo clippy -p repomemo-desktop --all-targets -- -D warnings`, `cargo fmt --all`, `container:check`, `version:check`, `docs:check`. The installer's hook macros and defines (`MAINBINARYNAME`, `NSIS_HOOK_PREUNINSTALL`, the shortcut functions and `/NS`) were read in Tauri's installer template.
+- **Not run:** the Rust tests (compiled, not run), the installer, the uninstaller, the workflow. The hook has not been through NSIS; CI's first build is its compile.
+
+### Upgrading
+- Nothing to do. An app installed by an earlier build (none was published) is not touched.
+
 ## V0.4.49 (2026-10-26)
 
 CI builds the Windows desktop app and keeps the installer and the portable executable.

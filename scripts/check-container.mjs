@@ -402,6 +402,24 @@ if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge d
   }
 }
 
+// The Windows installer (V0.4.50): per person with no administrator rights, silent with /S, shortcuts, and an uninstaller that
+// offers to forget the saved session by asking the program itself, which has a flag for it and opens no window; CI installs,
+// opens and removes it.
+{
+  const shell = read("apps/desktop/src-tauri/tauri.conf.json");
+  if (!/"installMode":\s*"currentUser"/.test(shell)) problems.push("the Windows installer is not per person (nsis installMode currentUser)");
+  if (!/"installerHooks":\s*"windows\/hooks\.nsh"/.test(shell)) problems.push("the Windows installer has no hooks (installerHooks windows/hooks.nsh)");
+  const hooks = read("apps/desktop/src-tauri/windows/hooks.nsh");
+  if (!/NSIS_HOOK_PREUNINSTALL/.test(hooks) || !/--forget-session/.test(hooks) || !/IfSilent keep_session/.test(hooks) || !/MessageBox MB_YESNO/.test(hooks)) problems.push("the uninstaller does not offer to forget the saved session (and keep it on a silent removal)");
+  const connection = read("apps/desktop/src-tauri/src/connection.rs");
+  if (!connection.includes('"--forget-session"')) problems.push("the program does not take --forget-session, which the uninstaller runs");
+  if (!/windows_subsystem = "windows"/.test(read("apps/desktop/src-tauri/src/main.rs"))) problems.push("a release build opens a console window behind the app (windows_subsystem)");
+  const windows = workflows.find(([name]) => name === "desktop-windows.yml")?.[1] ?? "";
+  for (const needle of ['ArgumentList "/S"', "LOCALAPPDATA", "HKCU:", "uninstall.exe", "Start Menu"]) {
+    if (!windows.includes(needle)) problems.push(`the Windows desktop workflow does not try the installer (${needle})`);
+  }
+}
+
 // The page of a release is written from the changelog (V0.4.39): the workflow that makes the release uses the script, never a
 // sentence typed into it, and the script lists what a release holds.
 {

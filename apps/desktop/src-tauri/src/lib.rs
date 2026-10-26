@@ -16,6 +16,11 @@ pub fn run() {
         .setup(|app| {
             // The administrator's file is read once, first: it decides the server and the name.
             let file = config::load(app.handle());
+            // The uninstaller (V0.4.50) starts the program to forget the saved session; it opens no window.
+            if connection::asked_to_forget(std::env::args()) {
+                connection::forget_saved(app.handle(), &file);
+                std::process::exit(0);
+            }
             connection::start(app.handle(), &app.state::<Connection>(), &file)?;
             let name = file.config.name.clone();
             app.manage(file);

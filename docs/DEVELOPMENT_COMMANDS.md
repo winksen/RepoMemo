@@ -112,6 +112,19 @@ server unlocked (the person may change it).
 
 `npm run desktop:test` tests the command (checks, handout, reproducible zip).
 
+### The Windows installer
+
+`RepoMemo_<version>_x64-setup.exe` (V0.4.50) installs **for the person who runs it**: no administrator rights, into
+`%LOCALAPPDATA%\RepoMemo`, recorded under that person's own uninstall list, with a Start menu entry and a desktop shortcut.
+
+- **Silent install for IT:** `RepoMemo_<version>_x64-setup.exe /S` (add `/NS` for no shortcuts, and `/D=C:\path` last to choose the
+  folder). Put `repomemo-desktop.json` in `%APPDATA%\com.repomemo.desktop\` or beside the installed program.
+- **Uninstall:** from *Apps* in Settings, or `%LOCALAPPDATA%\RepoMemo\uninstall.exe`. Interactively it asks whether to also **forget
+  the server and the sign-in** saved on the computer (the saved server and the session in the Windows credential store; the
+  administrator's file is left alone); the default is to keep them. `uninstall.exe /S` asks nothing and keeps them, so an update that
+  removes and installs again keeps the person signed in; to forget on a silent removal, run `RepoMemo.exe --forget-session` first (it
+  opens no window).
+
 ## Versions And Continuous Integration
 
 The product version lives in several files (Cargo, npm, Tauri). Set them all at
