@@ -2,6 +2,27 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.41 (2026-10-26)
+
+A clean machine with Docker goes from nothing to a running server with one fetched script and the init.
+
+### Added
+- **`deploy/quickstart.sh`:** finds the latest release (or the one given with `--version`), downloads `SHA256SUMS` and `repomemo-compose-<version>.tar.gz` from the release page, **checks the archive against the sums before it unpacks anything** (a mismatch, or a sums file that does not list the archive, stops with nothing written), unpacks it into an empty folder and pins `REPOMEMO_VERSION` in the unpacked `.env.example` to the release it fetched. It starts nothing. `--repo` and `--base-url` serve a mirror.
+- **`deploy/package-compose.sh`** and **`deploy/compose-bundle.txt`:** the archive of the container files (compose file and its build file, `.env.example`, the init, upgrade, backup, restore and migrate scripts, the proxy and monitoring samples, the quick start page), the same bytes every time (sorted names, no owner, the commit's time, gzip without a name).
+- **`docs/QUICK_START.md`:** the one command, the careful way (download, check, read, run), then the init, the first start and what to read next.
+- **CI's `quickstart` job:** packs the files twice and compares them, fetches them with the script from a local release folder, runs the init in the result, reads the stack it describes (the released images, tag `9.9.9`), and tampers with the archive to see that nothing is unpacked.
+
+### Changed
+- **The release** (the archives workflow) packs the container files, copies the script, and writes one `SHA256SUMS` over the three server archives, the container files and the script; all are attached. **The release page** has a *Quick start* section with the command for that version.
+- **`container:check`** holds the list (every file exists, the compose file's bind mounts are in it), the check before the unpack, the pin, the attached files and the CI job. **The documents:** the operations guide, the technical mindmap, the roadmap and the release index. **The version** is `0.4.41` everywhere.
+
+### Checks
+- **Run:** `container:check`, `version:check`, `docs:check`, `notes:test` (4 passed), shell syntax; the packer and the script by hand against a local release folder (checksum ok, unpacked, pinned to 9.9.9, the same bytes on a second pack; a tampered archive refused with nothing unpacked).
+- **Not run:** the CI job, the release job, the script against github.com (no release exists yet), the init and the stack on the unpacked files. Windows has no script of its own: it unpacks the archive by hand and uses `init.ps1`.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.4.40 (2026-10-26)
 
 The compose file runs a released version: pull, then up, with no compiler.

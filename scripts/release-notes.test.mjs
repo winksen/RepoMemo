@@ -40,6 +40,8 @@ test("the page lists the four images, the three archives, the sums and the insta
   for (const name of ["server", "converter", "edge", "web"]) assert.ok(page.includes(`\`ghcr.io/acme/repomemo-${name}:1.2.4\``), name);
   for (const file of ["linux-x64.tar.gz", "linux-arm64.tar.gz", "windows-x64.zip"]) assert.ok(page.includes(`repomemo-server-1.2.4-${file}`), file);
   assert.ok(page.includes("SHA256SUMS"));
+  assert.ok(page.includes("releases/download/v1.2.4/quickstart.sh | sh -s -- --version 1.2.4"));
+  assert.ok(page.includes("repomemo-compose-1.2.4.tar.gz"));
   assert.ok(page.includes("service/install.sh") && page.includes("service\\install.ps1"));
   assert.ok(page.includes("`1.2` and `latest`"));
   assert.ok(page.includes("https://github.com/Acme/repomemo/blob/v1.2.4/docs/VERIFYING_IMAGES.md"));

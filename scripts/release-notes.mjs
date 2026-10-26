@@ -41,6 +41,9 @@ export function releaseNotes({ changelog, version, owner, repo }) {
   for (const name of IMAGES) lines.push(`- \`${registry}/repomemo-${name}:${version}\``);
   lines.push("", `Run them with \`REPOMEMO_VERSION=${version}\` in \`.env\`, then \`docker compose pull && docker compose up -d\`.`);
   lines.push(`Each carries a signed build attestation and an SBOM: see [verifying an image](https://github.com/${repo}/blob/v${version}/docs/VERIFYING_IMAGES.md).`, "");
+  lines.push("### Quick start (containers)", "");
+  lines.push("```bash", `curl -fsSL https://github.com/${repo}/releases/download/v${version}/quickstart.sh | sh -s -- --version ${version} --dir repomemo`, "```", "");
+  lines.push(`It fetches \`repomemo-compose-${version}.tar.gz\` (the compose file, \`.env.example\`, the init, upgrade and backup scripts), checks it against \`SHA256SUMS\` and unpacks it; then \`sh deploy/init.sh --host <name>\` and \`docker compose pull && docker compose up -d --wait\`. See [the quick start](https://github.com/${repo}/blob/v${version}/docs/QUICK_START.md).`, "");
   lines.push("### Server archives", "");
   for (const [label, os, arch, extension] of ARCHIVES) lines.push(`- ${label}: \`repomemo-server-${version}-${os}-${arch}.${extension}\``);
   lines.push("- `SHA256SUMS`: check a download with `sha256sum --check --ignore-missing SHA256SUMS`", "");

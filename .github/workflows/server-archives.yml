@@ -82,11 +82,16 @@ jobs:
           path: archives
           pattern: server-*
           merge-multiple: true
-      - name: One SHA256SUMS for the three archives, checked
+      - name: The container files and the quick start script (V0.4.41)
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          sh deploy/package-compose.sh "$version" archives
+          cp deploy/quickstart.sh archives/quickstart.sh
+      - name: One SHA256SUMS for the three archives, the container files and the script, checked
         run: |
           cd archives
           test "$(ls repomemo-server-*.tar.gz repomemo-server-*.zip | wc -l)" = "3"
-          sha256sum repomemo-server-*.tar.gz repomemo-server-*.zip | sort -k2 > SHA256SUMS
+          sha256sum repomemo-server-*.tar.gz repomemo-server-*.zip repomemo-compose-*.tar.gz quickstart.sh | sort -k2 > SHA256SUMS
           sha256sum --check SHA256SUMS
           cat SHA256SUMS
       - name: The page, written from the changelog entry of this version
@@ -100,4 +105,4 @@ jobs:
           else
             gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$GITHUB_REF_NAME" --notes-file release-notes.md
           fi
-          gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber archives/repomemo-server-* archives/SHA256SUMS
+          gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber archives/repomemo-server-* archives/repomemo-compose-* archives/quickstart.sh archives/SHA256SUMS

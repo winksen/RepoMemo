@@ -704,6 +704,43 @@ jobs:
       - name: The build file is what adds a build
         run: REPOMEMO_VERSION=9.9.9 docker compose -f docker-compose.yml -f docker-compose.build.yml --profile previews --profile edge config --format json | node scripts/check-compose-images.mjs built 9.9.9
 
+  # The quick start (V0.4.41): the container files of a release are packed, fetched by the script with their checksum, the init
+  # makes a .env, and the stack they describe is the released one. A download that does not match its checksum unpacks nothing.
+  quickstart:
+    name: Quick start
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      COMPOSE_FILE: docker-compose.yml
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+      - name: A release page with the container files and their sums
+        run: |
+          mkdir -p "$RUNNER_TEMP/site/v9.9.9"
+          sh deploy/package-compose.sh 9.9.9 "$RUNNER_TEMP/site/v9.9.9"
+          (cd "$RUNNER_TEMP/site/v9.9.9" && sha256sum repomemo-compose-9.9.9.tar.gz > SHA256SUMS)
+          sh deploy/package-compose.sh 9.9.9 "$RUNNER_TEMP/again"
+          cmp "$RUNNER_TEMP/again/repomemo-compose-9.9.9.tar.gz" "$RUNNER_TEMP/site/v9.9.9/repomemo-compose-9.9.9.tar.gz"
+      - name: Fetch, check and unpack
+        run: |
+          sh deploy/quickstart.sh --version 9.9.9 --base-url "file://$RUNNER_TEMP/site" --dir "$RUNNER_TEMP/repomemo"
+          test -f "$RUNNER_TEMP/repomemo/docker-compose.yml"
+          grep -q '^REPOMEMO_VERSION=9.9.9$' "$RUNNER_TEMP/repomemo/.env.example"
+      - name: The init makes a .env, and the stack is the released one
+        working-directory: ${{ runner.temp }}/repomemo
+        run: |
+          sh deploy/init.sh --no-edge
+          grep -q '^REPOMEMO_VERSION=9.9.9$' .env
+          docker compose --profile previews --profile edge config --format json | node "$GITHUB_WORKSPACE/scripts/check-compose-images.mjs" released 9.9.9 ghcr.io/repomemo
+      - name: A download that does not match its sums unpacks nothing
+        run: |
+          echo tampered > "$RUNNER_TEMP/site/v9.9.9/repomemo-compose-9.9.9.tar.gz"
+          if sh deploy/quickstart.sh --version 9.9.9 --base-url "file://$RUNNER_TEMP/site" --dir "$RUNNER_TEMP/refused"; then echo "it should have refused" >&2; exit 1; fi
+          test ! -e "$RUNNER_TEMP/refused"
+
   # The upgrade script (V0.4.24): a good tag is run, a broken one ends on the old version, running.
   upgrade-script:
     name: Upgrade script

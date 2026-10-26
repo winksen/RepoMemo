@@ -1,0 +1,19 @@
+# The files of a container install that are attached to a release as repomemo-compose-<version>.tar.gz (V0.4.41), one path
+# per line, relative to the repository. deploy/package-compose.sh packs exactly these; container:check refuses a line that
+# names a file which is not there, and a bind mount of the compose file that the list leaves out.
+docker-compose.yml
+docker-compose.build.yml
+.env.example
+deploy/init.sh
+deploy/init.ps1
+deploy/upgrade.sh
+deploy/backup-volumes.sh
+deploy/restore-volumes.sh
+deploy/migrate-volumes.sh
+deploy/certs/README.md
+deploy/monitoring/README.md
+deploy/monitoring/prometheus.yml
+deploy/proxies/README.md
+deploy/proxies/nginx.conf
+deploy/proxies/traefik.yml
+docs/QUICK_START.md

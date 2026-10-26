@@ -353,6 +353,26 @@ if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge d
   if (!/^REPOMEMO_VERSION=(latest|\d+\.\d+\.\d+)$/m.test(example)) problems.push(".env.example does not name a released tag (latest or X.Y.Z) in REPOMEMO_VERSION");
 }
 
+// The quick start (V0.4.41): the container files of a release are packed from a list, attached with the script, and listed in the
+// release's SHA256SUMS; the script checks the archive against them before it unpacks anything. CI tries all of it.
+{
+  const list = read("deploy/compose-bundle.txt").split(/\r?\n/).filter((line) => line && !line.startsWith("#"));
+  for (const path of list) if (!existsSync(path)) problems.push(`deploy/compose-bundle.txt names ${path}, which is not there`);
+  for (const path of ["docker-compose.yml", ".env.example", "deploy/init.sh", "deploy/init.ps1", "deploy/upgrade.sh"]) {
+    if (!list.includes(path)) problems.push(`deploy/compose-bundle.txt leaves out ${path}`);
+  }
+  for (const match of compose.matchAll(/^\s+-\s+(?:\$\{[A-Z_]+:-)?\.\/(deploy\/[\w./-]+)/gm)) {
+    if (!list.includes(match[1]) && !/metrics-token$/.test(match[1]) && !/certs$/.test(match[1])) problems.push(`the compose file mounts ${match[1]}, which the container bundle leaves out`);
+  }
+  const script = read("deploy/quickstart.sh");
+  if (!/sha256sum|shasum/.test(script) || !/nothing was unpacked/.test(script) || script.indexOf("checksum of") > script.indexOf("tar --extract")) problems.push("deploy/quickstart.sh does not check the download before it unpacks it");
+  if (!/REPOMEMO_VERSION=\$version/.test(script)) problems.push("deploy/quickstart.sh does not pin the install to the release it fetched");
+  const archives = workflows.find(([name]) => name === "server-archives.yml")?.[1] ?? "";
+  if (!/package-compose\.sh/.test(archives) || !/repomemo-compose-\*\.tar\.gz quickstart\.sh \| sort/.test(archives) || !/archives\/quickstart\.sh archives\/SHA256SUMS/.test(archives)) problems.push("the release does not attach the container files, the quick start script and their sums");
+  if (!/deploy\/quickstart\.sh --version 9\.9\.9 --base-url/.test(ci) || !/does not match its sums unpacks nothing/.test(ci)) problems.push("CI does not try the quick start, including a download that does not match its sums");
+  if (!existsSync("docs/QUICK_START.md")) problems.push("docs/QUICK_START.md is missing");
+}
+
 // The page of a release is written from the changelog (V0.4.39): the workflow that makes the release uses the script, never a
 // sentence typed into it, and the script lists what a release holds.
 {
