@@ -76,6 +76,7 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           path: archives
@@ -88,10 +89,15 @@ jobs:
           sha256sum repomemo-server-*.tar.gz repomemo-server-*.zip | sort -k2 > SHA256SUMS
           sha256sum --check SHA256SUMS
           cat SHA256SUMS
-      - name: Attach them (the release is made if it is not there; existing files are replaced)
+      - name: The page, written from the changelog entry of this version
+        run: node scripts/release-notes.mjs --version "${GITHUB_REF_NAME#v}" --repo "$GITHUB_REPOSITORY" > release-notes.md
+      - name: Attach them (the release is made if it is not there; existing files are replaced; the page is always the changelog's)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1 \
-            || gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$GITHUB_REF_NAME" --notes "Release $GITHUB_REF_NAME. The notes are the changelog entry of this version."
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --notes-file release-notes.md
+          else
+            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$GITHUB_REF_NAME" --notes-file release-notes.md
+          fi
           gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber archives/repomemo-server-* archives/SHA256SUMS

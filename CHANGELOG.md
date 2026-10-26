@@ -2,6 +2,25 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.39 (2026-10-26)
+
+The page of a release is the changelog's, with nothing typed by hand.
+
+### Added
+- **`scripts/release-notes.mjs`** (`npm run notes`): prints the changelog entry of a version (the one in `package.json` by default), then what the release holds: the four images on GHCR with their three names, the three server archives and `SHA256SUMS`, the Linux and Windows installers inside the archives, the upgrade guide and the page on verifying an image. It refuses a version with no entry or an empty one.
+- **`scripts/release-notes.test.mjs`** (`npm run notes:test`): four tests (the entry is cut at the next release and CRLF is dropped, a missing or empty entry is refused, the page names every image, archive, sums file and installer, the real changelog has an entry for the current version); CI runs it with the other checks.
+
+### Changed
+- **The archives workflow** writes the page with the script and makes the release with `--notes-file`; when the release already exists (a re-run) it rewrites the title and the page the same way, so the page is always the changelog's. The sentence it used to carry is gone.
+- **`container:check`** refuses a release page typed into the workflow, requires the re-run rewrite, the script's list and the CI test. **The documents:** the development commands, the operations guide, the technical mindmap, the roadmap and the release index. **The version** is `0.4.39` everywhere.
+
+### Checks
+- **Run:** `notes:test` (4 passed), `container:check`, `version:check`, `docs:check`.
+- **Not run:** the workflow; no release page has been made. The images workflow (V0.4.37) does not touch the page, so the page lists the images even if their job fails.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.4.38 (2026-10-26)
 
 Each published image says who built it and what is in it, and anyone can check.

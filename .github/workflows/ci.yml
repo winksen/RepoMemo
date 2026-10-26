@@ -55,6 +55,8 @@ jobs:
         run: node scripts/check-templates.mjs --base "${{ github.event.pull_request.base.sha || github.event.before }}"
       - name: The template checker refuses what it should
         run: node --test scripts/check-templates.test.mjs
+      - name: The release page is written from the changelog
+        run: node --test scripts/release-notes.test.mjs
 
   web:
     name: Web client

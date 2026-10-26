@@ -336,6 +336,21 @@ if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge d
   }
 }
 
+// The page of a release is written from the changelog (V0.4.39): the workflow that makes the release uses the script, never a
+// sentence typed into it, and the script lists what a release holds.
+{
+  const archives = workflows.find(([name]) => name === "server-archives.yml")?.[1] ?? "";
+  if (archives) {
+    if (!/node scripts\/release-notes\.mjs --version/.test(archives) || !/--notes-file release-notes\.md/.test(archives) || /--notes "/.test(archives)) problems.push("the release page must be written by scripts/release-notes.mjs from the changelog, not typed into the workflow");
+    if (!/gh release edit .* --notes-file/.test(archives)) problems.push("a re-run must rewrite the release page from the changelog too");
+  }
+  const notes = read("scripts/release-notes.mjs");
+  for (const needle of ["repomemo-${name}:${version}", "SHA256SUMS", "service/install.sh", "install.ps1", "VERIFYING_IMAGES.md"]) {
+    if (!notes.includes(needle)) problems.push(`scripts/release-notes.mjs does not list ${needle}`);
+  }
+  if (!/release-notes\.test\.mjs/.test(workflows.find(([name]) => name === "ci.yml")?.[1] ?? "")) problems.push("CI does not run the release notes tests");
+}
+
 // Provenance (V0.4.38): each joined image gets a signed build attestation and a signed SBOM, kept with the image, and the
 // page that says how to verify them exists.
 {

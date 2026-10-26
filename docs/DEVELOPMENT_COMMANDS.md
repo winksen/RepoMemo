@@ -64,7 +64,9 @@ npm run version:set -- 0.1.67
 npm run version:check
 ```
 
-Record what changed in `CHANGELOG.md` under the new version.
+Record what changed in `CHANGELOG.md` under the new version. The page of a release is written from that entry, so nobody edits it
+by hand: `npm run notes` prints it for the version in `package.json` (or `-- --version 0.4.39`), and `npm run notes:test` tests the
+script. The release workflows use the same script when a `v*` tag is pushed.
 
 ## Run It In Containers
 
