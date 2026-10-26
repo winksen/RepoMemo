@@ -2,6 +2,26 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.47 (2026-10-26)
+
+A file beside the app says which server it talks to: the same executable with two files talks to two servers.
+
+### Added
+- **`repomemo-desktop.json`**, read once at start from the folder of the executable, else the app's config folder (`config.rs`). Four fields and nothing else: `server` (checked by the rules of a typed address), `name` (one line, up to 60 characters; the window's title and the page's), `locked` (default true when there is a server) and `support` (an `http(s)` address, no login). A server in the file that is locked overrides what a person typed and any saved address; unlocked, it only fills in the connect screen's field. An address compiled into the app (V0.4.46) still wins.
+- **A bad file is named, not obeyed:** a file that is too long, is not JSON, names a field the app does not know, has a value that fails its rule or a `locked` with no `server` makes the app show the file's path and the reason in place of everything else (`DesktopConfigProblem`, on the same frame as the connect screen) and connect to nothing, not even to the saved server, so typing an address cannot go around it.
+- **`deploy/desktop/repomemo-desktop.example.json`**, which a Rust test reads and checks. The page's *Help* link (connect screen, account area) opens in the system browser.
+- **Tests:** seven Rust tests in `config.rs` (a valid file, an open server and a byte-order mark, the server's rules, every kind of bad file named, beside-the-executable first, a file read whole or not at all, the example) and two in `connection.rs` (the strongest place decides, a file with a problem starts nothing); `desktopConfig.test.tsx` (six: a bad file replaces everything and nothing connects, the name is the title, an unlocked server is filled in, a locked one opens at once, the help link, a shell that cannot say).
+
+### Changed
+- **`start`** picks the server with one function (`choose_start`: the packaged address, then the file's locked server, then the saved one). **`DesktopApp`** reads the settings first; `DesktopServerNote` shows the help link. **The documents:** the development commands (the file, with its places on each system; the heading of the versions section, which V0.4.46 had dropped, is back), the parity audit, the functional and technical mindmaps, the operations guide, the roadmap and the release index. **The version** is `0.4.47` everywhere.
+
+### Checks
+- **Run:** `cargo check -p repomemo-desktop --tests`, `cargo clippy -p repomemo-desktop --all-targets -- -D warnings`, `cargo fmt --all`, the desktop page tests (29 passed), `typecheck`, `a11y:check`, `container:check`, `version:check`, `docs:check`.
+- **Not run:** the Rust tests (compiled, not run), the app with a file beside it.
+
+### Upgrading
+- Nothing to do. Without the file the app behaves as before.
+
 ## V0.4.46 (2026-10-26)
 
 An app can be packaged for one server: it opens on that server's sign-in page and cannot be pointed elsewhere.

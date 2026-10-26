@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../lib/desktop", () => ({
   isDesktopRuntime: true,
   installExternalLinkHandler: () => () => undefined,
+  desktopSettings: { get: vi.fn() },
   desktopServer: { current: vi.fn(), prepare: vi.fn(), remember: vi.fn(), forget: vi.fn() },
 }));
 vi.mock("../lib/sharedApi", () => ({ configureDesktopApi: vi.fn(), getSharedHealth: vi.fn(), sharedApiUrl: "https://repomemo.example.com" }));
@@ -13,7 +14,7 @@ vi.mock("../components/SharedLayout", () => ({ ThemeToggle: () => null }));
 vi.mock("../SharedWebApp", () => ({ SharedWebApp: () => <p>the web client</p> }));
 
 import { DesktopApp } from "../components/DesktopApp";
-import { desktopServer } from "../lib/desktop";
+import { desktopServer, desktopSettings } from "../lib/desktop";
 import { configureDesktopApi, getSharedHealth } from "../lib/sharedApi";
 import { showToast } from "../components/ui/toast";
 import { CLIENT_VERSION } from "../lib/versionCheck";
@@ -25,6 +26,7 @@ function start() {
 }
 
 beforeEach(() => {
+  vi.mocked(desktopSettings.get).mockResolvedValue({ name: null, supportUrl: null, suggestedServer: null, source: null, problem: null });
   window.localStorage.clear();
   vi.mocked(desktopServer.current).mockResolvedValue(null);
   vi.mocked(desktopServer.prepare).mockImplementation(async (address) => `https://${address.replace(/^https?:\/\//, "")}`);

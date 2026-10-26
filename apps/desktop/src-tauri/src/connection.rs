@@ -22,6 +22,8 @@ use serde_json::json;
 use tauri::{ipc::CapabilityBuilder, AppHandle, Manager, State};
 use url::{Host, Url};
 
+use crate::config::ConfigState;
+
 const KEYRING_SERVICE: &str = "RepoMemo";
 const SERVER_FILE: &str = "server.json";
 
@@ -168,18 +170,37 @@ pub fn allow_server(app: &AppHandle, origin: &str) -> Result<(), String> {
     app.add_capability(capability).map_err(|error| error.to_string())
 }
 
-/// Starts a run on the preset server if the app was packaged for one, otherwise on the saved server, if there is one.
-pub fn start(app: &AppHandle, connection: &Connection) -> Result<(), String> {
-    if let Some(origin) = resolve_preset(PRESET_SERVER)? {
+/// The server a run starts on and whether it is locked, from the three places that can name one, strongest first: the address the
+/// app was packaged with (V0.4.46), a locked server in the configuration file (V0.4.47), and the address saved by an earlier run.
+/// A configuration file with a problem starts nothing: the app says what is wrong instead of asking for an address that would go
+/// around it.
+pub fn choose_start(preset: Option<String>, file: &ConfigState, saved: Option<String>) -> (Option<String>, bool) {
+    if let Some(origin) = preset {
+        return (Some(origin), true);
+    }
+    if file.problem.is_some() {
+        return (None, false);
+    }
+    match (&file.config.server, file.config.locked) {
+        (Some(origin), true) => (Some(origin.clone()), true),
+        _ => (saved, false),
+    }
+}
+
+/// Starts a run on the server [`choose_start`] picks, if there is one.
+pub fn start(app: &AppHandle, connection: &Connection, file: &ConfigState) -> Result<(), String> {
+    let preset = resolve_preset(PRESET_SERVER)?;
+    let saved = if preset.is_some() || file.problem.is_some() {
+        None
+    } else {
+        read_saved_server(app)
+    };
+    let (origin, locked) = choose_start(preset, file, saved);
+    if let Some(origin) = origin {
         allow_server(app, &origin)?;
         *connection.current.lock().map_err(|_| "state is locked".to_owned())? = Some(origin);
-        connection.locked.store(true, Ordering::SeqCst);
-        return Ok(());
     }
-    if let Some(origin) = read_saved_server(app) {
-        allow_server(app, &origin)?;
-        *connection.current.lock().map_err(|_| "state is locked".to_owned())? = Some(origin);
-    }
+    connection.locked.store(locked, Ordering::SeqCst);
     Ok(())
 }
 
@@ -401,6 +422,62 @@ mod tests {
                 "{message} should say where the address came from"
             );
         }
+    }
+
+    fn file_with(server: Option<&str>, locked: bool, problem: Option<&str>) -> ConfigState {
+        ConfigState {
+            source: None,
+            config: crate::config::DesktopConfig {
+                server: server.map(str::to_owned),
+                locked,
+                ..Default::default()
+            },
+            problem: problem.map(str::to_owned),
+        }
+    }
+
+    #[test]
+    fn the_strongest_place_that_names_a_server_decides() {
+        let (preset, file_server, saved) = (
+            "https://preset.example.com",
+            "https://file.example.com",
+            "https://saved.example.com",
+        );
+        let own = |text: &str| Some(text.to_owned());
+        // The address the app was packaged with beats everything.
+        assert_eq!(
+            choose_start(own(preset), &file_with(Some(file_server), true, None), own(saved)),
+            (own(preset), true)
+        );
+        // A locked server in the file beats what a person typed before.
+        assert_eq!(
+            choose_start(None, &file_with(Some(file_server), true, None), own(saved)),
+            (own(file_server), true)
+        );
+        // An unlocked one is only offered: the saved address, or none, is used.
+        assert_eq!(
+            choose_start(None, &file_with(Some(file_server), false, None), own(saved)),
+            (own(saved), false)
+        );
+        assert_eq!(
+            choose_start(None, &file_with(Some(file_server), false, None), None),
+            (None, false)
+        );
+        // No file at all: as before.
+        assert_eq!(
+            choose_start(None, &ConfigState::default(), own(saved)),
+            (own(saved), false)
+        );
+        assert_eq!(choose_start(None, &ConfigState::default(), None), (None, false));
+    }
+
+    #[test]
+    fn a_file_with_a_problem_starts_nothing_and_leaves_no_way_round_it() {
+        let broken = file_with(None, false, Some("repomemo-desktop.json: server: nope"));
+        assert_eq!(
+            choose_start(None, &broken, Some("https://saved.example.com".to_owned())),
+            (None, false)
+        );
     }
 
     #[test]

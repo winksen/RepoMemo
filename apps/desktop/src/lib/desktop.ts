@@ -43,3 +43,21 @@ export function installExternalLinkHandler(): () => void {
   document.addEventListener("click", onClick);
   return () => document.removeEventListener("click", onClick);
 }
+
+/** What the administrator's configuration file (V0.4.47) says, as far as the page needs it. */
+export type DesktopSettings = {
+  /** What the app is called (the window's title and the page's). */
+  name: string | null;
+  /** Where a person asks for help. */
+  supportUrl: string | null;
+  /** A server to offer on the connect screen, when the file names one without locking it. */
+  suggestedServer: string | null;
+  /** The file that was found. */
+  source: string | null;
+  /** Why that file cannot be used; when set, nothing in it is obeyed and the app does not connect. */
+  problem: string | null;
+};
+
+export const desktopSettings = {
+  get: () => invoke<DesktopSettings>("desktop_settings"),
+};

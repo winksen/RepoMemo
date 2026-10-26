@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { IconServer as Server } from "@tabler/icons-react";
 import { sharedApiUrl } from "../lib/sharedApi";
-import { desktopServer } from "../lib/desktop";
+import { desktopServer, desktopSettings } from "../lib/desktop";
 import { platform } from "../lib/platform";
 import { Button } from "./ui/button";
 import { Dialog, DialogCancel } from "./ui/dialog";
@@ -15,9 +15,11 @@ export function DesktopServerNote({ signedIn }: { signedIn: boolean }) {
   const [isChanging, setIsChanging] = useState(false);
   // An app packaged for one server (V0.4.46) shows it and offers no way to change it; until the shell says, it offers none.
   const [locked, setLocked] = useState(true);
+  const [supportUrl, setSupportUrl] = useState<string | null>(null);
   useEffect(() => {
     if (!platform.choosesServer) return;
     let cancelled = false;
+    desktopSettings.get().then((found) => { if (!cancelled) setSupportUrl(found.supportUrl); }, () => undefined);
     desktopServer.locked().then((value) => { if (!cancelled) setLocked(value); }, () => { if (!cancelled) setLocked(false); });
     return () => { cancelled = true; };
   }, []);
@@ -38,6 +40,7 @@ export function DesktopServerNote({ signedIn }: { signedIn: boolean }) {
   return <>
     <div className="rm-desktop-server">
       <span><Server size={ICON_SIZE.sm} /> <span className="rm-desktop-server-host" title={sharedApiUrl}>{host}</span></span>
+      {supportUrl ? <a href={supportUrl} rel="noreferrer" target="_blank">Help</a> : null}
       {locked ? null : <Button onClick={() => setAsking(true)} type="button" variant="secondary">Change server</Button>}
     </div>
     <Dialog

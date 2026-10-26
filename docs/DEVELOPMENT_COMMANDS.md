@@ -66,6 +66,33 @@ ignores any address saved by an earlier run and cannot be pointed elsewhere (*Ch
 address is checked by the rules of a typed one (`https://`, or `http://` on your own network, nothing after the host), and a bad one
 stops the app at start with a message that names it. Without the variable, the app asks for an address as before.
 
+## Configure The Desktop App With A File
+
+The same executable can talk to different servers if it is given a file (V0.4.47): `repomemo-desktop.json`, beside the executable or in
+the app's config folder (`%APPDATA%\com.repomemo.desktop` on Windows, `~/.config/com.repomemo.desktop` on Linux,
+`~/Library/Application Support/com.repomemo.desktop` on macOS); the one beside the executable wins. A sample is
+`deploy/desktop/repomemo-desktop.example.json`:
+
+```json
+{
+  "server": "https://memo.example.com",
+  "name": "Acme Memo",
+  "locked": true,
+  "support": "https://intranet.example.com/help/memo"
+}
+```
+
+- `server`: the server's address, checked by the rules of a typed one. With `locked` true (the default when there is a server) it
+  overrides what a person typed, no connect screen is shown and *Change server* is gone; with `"locked": false` it only fills in the
+  connect screen's field. An address compiled into the app (`REPOMEMO_PRESET_SERVER`) wins over the file's.
+- `name`: what the window and the page are called (one line, up to 60 characters).
+- `support`: an `http(s)` address shown as a *Help* link on the connect screen and in the account area.
+- Nothing else is accepted. A file that is not valid JSON, names a field the app does not know, or holds a value that fails its rule is
+  **named and not obeyed**: the app shows the file and the reason in place of everything else and connects to nothing, so a mistake
+  cannot be gone around by typing an address.
+
+## Versions And Continuous Integration
+
 The product version lives in several files (Cargo, npm, Tauri). Set them all at
 once, and check that they agree (CI runs the check on every push):
 

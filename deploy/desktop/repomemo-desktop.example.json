@@ -1,0 +1,6 @@
+{
+  "server": "https://memo.example.com",
+  "name": "Acme Memo",
+  "locked": true,
+  "support": "https://intranet.example.com/help/memo"
+}

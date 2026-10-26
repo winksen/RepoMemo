@@ -1,3 +1,4 @@
+mod config;
 mod connection;
 
 use tauri::Manager;
@@ -13,7 +14,11 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .manage(Connection::default())
         .setup(|app| {
-            connection::start(app.handle(), &app.state::<Connection>())?;
+            // The administrator's file is read once, first: it decides the server and the name.
+            let file = config::load(app.handle());
+            connection::start(app.handle(), &app.state::<Connection>(), &file)?;
+            let name = file.config.name.clone();
+            app.manage(file);
 
             // The window is made here, not by the configuration, so it can refuse to leave the bundled client.
             let window = app
@@ -23,13 +28,17 @@ pub fn run() {
                 .first()
                 .cloned()
                 .ok_or("the configuration has no window")?;
-            tauri::WebviewWindowBuilder::from_config(app, &window)?
-                .on_navigation(connection::is_app_url)
-                .build()?;
+            let mut builder =
+                tauri::WebviewWindowBuilder::from_config(app, &window)?.on_navigation(connection::is_app_url);
+            if let Some(name) = name {
+                builder = builder.title(name);
+            }
+            builder.build()?;
 
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            config::desktop_settings,
             connection::current_server,
             connection::server_locked,
             connection::prepare_server,

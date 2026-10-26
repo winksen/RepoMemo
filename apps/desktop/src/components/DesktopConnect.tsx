@@ -24,8 +24,9 @@ function reason(error: unknown): string {
  * checks the address and lets this window call that server and no other; the page then asks the server for
  * its health, and only a server that answers is kept for the next start.
  */
-export function DesktopConnect({ onConnected }: { onConnected: () => void }) {
-  const [address, setAddress] = useState("");
+export function DesktopConnect({ onConnected, suggestedServer = null, supportUrl = null }: { onConnected: () => void; suggestedServer?: string | null; supportUrl?: string | null }) {
+  // The administrator's file (V0.4.47) may offer a server without locking it: it is filled in, and can be changed.
+  const [address, setAddress] = useState(suggestedServer ?? "");
   const [isConnecting, setIsConnecting] = useState(false);
 
   async function connect(event: FormEvent<HTMLFormElement>) {
@@ -84,6 +85,7 @@ export function DesktopConnect({ onConnected }: { onConnected: () => void }) {
           Connect
         </Button>
       </form>
+      {supportUrl ? <p className="shared-auth-hint">Need help? <a href={supportUrl} rel="noreferrer" target="_blank">Ask here</a>.</p> : null}
     </AuthFrame>
   );
 }

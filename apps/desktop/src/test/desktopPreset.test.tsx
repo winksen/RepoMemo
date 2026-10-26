@@ -1,9 +1,10 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../lib/desktop", () => ({
   isDesktopRuntime: true,
   installExternalLinkHandler: () => () => undefined,
+  desktopSettings: { get: vi.fn() },
   desktopServer: { current: vi.fn(), locked: vi.fn(), prepare: vi.fn(), remember: vi.fn(), forget: vi.fn() },
 }));
 vi.mock("../lib/sharedApi", () => ({ configureDesktopApi: vi.fn(), getSharedHealth: vi.fn(), sharedApiUrl: "https://memo.example.com" }));
@@ -14,9 +15,10 @@ vi.mock("../SharedWebApp", () => ({ SharedWebApp: () => <p>the web client</p> })
 
 import { DesktopApp } from "../components/DesktopApp";
 import { DesktopServerNote } from "../components/DesktopServerNote";
-import { desktopServer } from "../lib/desktop";
+import { desktopServer, desktopSettings } from "../lib/desktop";
 import { pointAtServer } from "../lib/desktopConnection";
 
+beforeEach(() => { vi.mocked(desktopSettings.get).mockResolvedValue({ name: null, supportUrl: null, suggestedServer: null, source: null, problem: null }); });
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
 describe("an app packaged for one server (V0.4.46)", () => {
