@@ -1,9 +1,11 @@
 mod config;
 mod connection;
+mod deeplink;
 mod files;
 mod notice;
 
 use tauri::Manager;
+use tauri_plugin_deep_link::DeepLinkExt;
 
 use crate::connection::Connection;
 
@@ -32,7 +34,10 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         // System notifications and the badge of `notice` (V0.4.53).
         .plugin(tauri_plugin_notification::init())
+        // `repomemo://` links from the system (V0.4.54); `deeplink` decides which ones the app shows.
+        .plugin(tauri_plugin_deep_link::init())
         .manage(Connection::default())
+        .manage(deeplink::Links::default())
         .setup(|app| {
             // The administrator's file is read once, first: it decides the server and the name.
             let file = config::load(app.handle());
@@ -60,6 +65,20 @@ pub fn run() {
             }
             builder.build()?;
 
+            // A link opened while the app runs, and the one that started it (the page takes that one when it is ready).
+            let handle = app.handle().clone();
+            app.deep_link().on_open_url(move |event| {
+                let links: Vec<String> = event.urls().iter().map(|url| url.to_string()).collect();
+                deeplink::handle(&handle, &links);
+            });
+            if let Ok(Some(urls)) = app.deep_link().get_current() {
+                let links: Vec<String> = urls.iter().map(|url| url.to_string()).collect();
+                deeplink::handle(app.handle(), &links);
+            }
+            // An installed app has the scheme registered by its installer; a development run registers it for itself.
+            #[cfg(all(debug_assertions, any(windows, target_os = "linux")))]
+            let _ = app.deep_link().register_all();
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -75,7 +94,8 @@ pub fn run() {
             connection::open_external,
             files::save_file,
             notice::notify,
-            notice::set_badge
+            notice::set_badge,
+            deeplink::take_pending_link
         ])
         .run(tauri::generate_context!())
         .expect("error while running RepoMemo");

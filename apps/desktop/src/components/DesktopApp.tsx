@@ -3,7 +3,9 @@ import { SharedWebApp } from "../SharedWebApp";
 import { setNotifier } from "../lib/notifier";
 import { setFileSaver } from "../lib/saveBlob";
 import { LoadingCanvas } from "../web/common";
-import { desktopServer, desktopSettings, followPageTitle, installExternalLinkHandler, saveThroughShell, shellNotifier, type DesktopSettings } from "../lib/desktop";
+import { navigate } from "../web/router";
+import { showToast } from "./ui/toast";
+import { appLinks, desktopServer, desktopSettings, followPageTitle, installExternalLinkHandler, saveThroughShell, shellNotifier, type DesktopSettings } from "../lib/desktop";
 import { pointAtServer } from "../lib/desktopConnection";
 import { DesktopConfigProblem } from "./DesktopConfigProblem";
 import { DesktopConnect } from "./DesktopConnect";
@@ -70,6 +72,18 @@ export function DesktopApp() {
     })();
     return () => { cancelled = true; };
   }, []);
+
+  // `repomemo://` links (V0.4.54): the one the app was started with, then any opened while it runs.
+  useEffect(() => {
+    if (phase !== "server") return;
+    let cancelled = false;
+    let stop: (() => void) | undefined;
+    appLinks.listen((path) => navigate(path), (reason) => showToast("error", reason)).then((remove) => {
+      if (cancelled) remove(); else stop = remove;
+    }, () => undefined);
+    appLinks.takePending().then((path) => { if (path && !cancelled) navigate(path); }, () => undefined);
+    return () => { cancelled = true; stop?.(); };
+  }, [phase]);
 
   if (phase === "starting") return <LoadingCanvas label="Starting RepoMemo" />;
   if (phase === "server") return <SharedWebApp />;

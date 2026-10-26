@@ -17,6 +17,7 @@ import { MAIN_CONTENT_ID } from "../web/RouteAnnouncer";
 import { Button } from "./ui/button";
 import { IconButton } from "./ui/icon-button";
 import { DesktopServerNote } from "./DesktopServerNote";
+import { OpenInAppLink } from "./OpenInAppLink";
 import { ICON_SIZE } from "./ui/icon";
 
 const THEME_STORAGE_KEY = "repomemo.theme";
@@ -99,7 +100,7 @@ export function SharedLayout({
     <div className="shared-home-frame">
       <aside aria-label="Workspaces and organizations" className="shared-home-rail" data-open={railOpen}>
         <Button aria-controls="shared-rail-body" aria-expanded={railOpen} className="shared-rail-toggle" onClick={() => setRailOpen((open) => !open)} type="button" variant="secondary"><span>Workspaces and organizations</span><ChevronDown size={ICON_SIZE.md} /></Button>
-        <div className="shared-rail-body" id="shared-rail-body">{sidebar}{session.is_system_admin || session.is_app_admin ? <SystemRailEntry onNavigate={onNavigate} /> : null}<div className="shared-rail-footer"><Shield size={ICON_SIZE.sm} /><span>JWT active · API {apiAvailable === true ? "healthy" : apiAvailable === false ? "offline" : "checking"}</span></div><DesktopServerNote signedIn /></div>
+        <div className="shared-rail-body" id="shared-rail-body">{sidebar}{session.is_system_admin || session.is_app_admin ? <SystemRailEntry onNavigate={onNavigate} /> : null}<div className="shared-rail-footer"><Shield size={ICON_SIZE.sm} /><span>JWT active · API {apiAvailable === true ? "healthy" : apiAvailable === false ? "offline" : "checking"}</span></div><DesktopServerNote signedIn /><OpenInAppLink className="shared-open-in-app" path={`${window.location.pathname}${window.location.search}`} /></div>
       </aside>
       <main className="shared-home-content" id={MAIN_CONTENT_ID} tabIndex={-1}>
         {workspaceNavigation}

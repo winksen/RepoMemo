@@ -40,6 +40,13 @@ pub struct Connection {
     locked: AtomicBool,
 }
 
+impl Connection {
+    /// The origin this run talks to, if one is chosen.
+    pub fn current_origin_or_none(&self) -> Option<String> {
+        self.current.lock().ok().and_then(|current| current.clone())
+    }
+}
+
 /// The preset server as an origin, `None` when the app was packaged without one. A preset that is not a usable address is an
 /// error, checked by the same rules as a typed one, so a mistake stops the app at start instead of showing a blank screen.
 pub fn resolve_preset(value: Option<&str>) -> Result<Option<String>, String> {

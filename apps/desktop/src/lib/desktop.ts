@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 /** Whether this page runs inside the desktop app's window (it then talks to a chosen server through the shell). */
@@ -102,3 +103,17 @@ export async function saveThroughShell(blob: Blob, filename: string): Promise<bo
   const saved = await invoke<string | null>("save_file", bytes, { headers: { "x-file-name": encodeURIComponent(filename) } });
   return saved !== null;
 }
+
+/** `repomemo://` links that reach the app (V0.4.54): the shell has already refused what is not the client's own page. */
+export const appLinks = {
+  /** The page of the link the app was started with, once; `null` when there is none. */
+  takePending: () => invoke<string | null>("take_pending_link"),
+  /** Calls `onPath` for a link opened while the app runs, and `onRefused` with the reason for one the shell turned away. */
+  listen: async (onPath: (path: string) => void, onRefused: (reason: string) => void): Promise<() => void> => {
+    const stops = await Promise.all([
+      listen<string>("open-path", (event) => onPath(event.payload)),
+      listen<string>("open-path-refused", (event) => onRefused(event.payload)),
+    ]);
+    return () => stops.forEach((stop) => stop());
+  },
+};

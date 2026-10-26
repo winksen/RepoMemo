@@ -448,6 +448,20 @@ if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge d
   if (!/nativeNotices \? <NoticeWatcher/.test(read("apps/desktop/src/SharedWebApp.tsx"))) problems.push("the notice watcher is not shown by capability (platform.nativeNotices)");
 }
 
+// repomemo:// links (V0.4.54): the system hands them to the one running copy, the shell takes only the client's own paths for its own
+// server, the installer registers the scheme for the person, and the page offers them in a browser only.
+{
+  const shell = read("apps/desktop/src-tauri/tauri.conf.json");
+  if (!/"deep-link":\s*\{\s*"desktop":\s*\{\s*"schemes":\s*\["repomemo"\]/.test(shell)) problems.push("tauri.conf.json does not register the repomemo scheme (plugins deep-link)");
+  if (!/tauri-plugin-single-instance = \{[^}]*"deep-link"/.test(read("Cargo.toml"))) problems.push("the single-instance plugin does not pass a link to the running copy (feature deep-link)");
+  const links = read("apps/desktop/src-tauri/src/deeplink.rs");
+  if (!/fn is_app_path/.test(links) || !/connected to/.test(links) || !/APP_AREAS/.test(links)) problems.push("the shell does not check a link's path and server");
+  if (!/take_pending_link/.test(read("apps/desktop/src-tauri/src/lib.rs")) || !/on_open_url/.test(read("apps/desktop/src-tauri/src/lib.rs"))) problems.push("the shell does not hand a link to the page (on_open_url, take_pending_link)");
+  const windows = workflows.find(([name]) => name === "desktop-windows.yml")?.[1] ?? "";
+  if (!/Classes\\repomemo\\shell\\open\\command/.test(windows)) problems.push("the Windows desktop workflow does not check that the repomemo:// links are registered for the person");
+  if (!/opensInApp/.test(read("apps/desktop/src/components/OpenInAppLink.tsx"))) problems.push("Open in the app is not shown by capability (platform.opensInApp)");
+}
+
 // The page of a release is written from the changelog (V0.4.39): the workflow that makes the release uses the script, never a
 // sentence typed into it, and the script lists what a release holds.
 {

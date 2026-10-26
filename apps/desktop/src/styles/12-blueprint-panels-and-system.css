@@ -461,6 +461,8 @@ tr.rm-system-row-inactive .rm-system-person img, tr.rm-system-row-inactive .rm-s
 .rm-desktop-server-host { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rm-desktop-server .rm-button { min-height: 28px; padding: 0 8px; font-size: 12px; }
 .shared-api-note + .rm-desktop-server { margin-top: 14px; }
+.shared-open-in-app { display: inline-block; margin-top: 10px; color: var(--color-text-muted); font-size: 12px; text-decoration: underline; }
+.shared-notification-list article > .shared-open-in-app { margin: 6px 0 0 14px; }
 .rm-repo-cited-file { display: inline-flex; align-items: center; gap: 6px; }
 .rm-code-owner small { color: var(--color-text-muted); }
 .shared-citation-change { color: var(--color-text-muted); }

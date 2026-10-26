@@ -378,6 +378,7 @@ What the app adds to the pages of the browser:
 - **Your administrator may have set it up for you.** An app packaged for your team, or given a `repomemo-desktop.json`, opens straight on your server's sign-in page with no address to type (and no *Change server*). If that file is wrong, the app says which file and why, and connects to nothing: ask your administrator.
 - **Saving a file asks where.** An export or a download (a workspace archive, a memory card, a document, the audit trail) opens the system's save dialog; cancelling it saves nothing and says nothing.
 - **It tells you while it is in the background.** A new notice (the ones your notification preferences in Profile let through) appears as a system notification, and the app's icon shows how much waits: your unread notices and the items waiting in Review.
+- **Open a page in the app from the browser.** In a browser, the account area and each notice carry **Open in the app**: it hands the page to the desktop app, which shows the same page on the same server. The app opens only RepoMemo's own pages for the server it is connected to, and tells you when it turns a link away.
 - **One window, where you left it.** Starting the app again brings the open window to the front; it comes back at the size and place you left it, and its title bar names the page and the workspace you are on.
 - **Removing it.** The uninstaller asks whether to also forget the server and the sign-in saved on this computer.
 

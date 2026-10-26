@@ -16,7 +16,7 @@ const FALLBACK_NAME: &str = "download";
 const MAX_NAME_CHARS: usize = 120;
 
 /// Reads `%XX` escapes as UTF-8; `None` for a bad escape or bytes that are not UTF-8.
-pub fn percent_decode(text: &str) -> Option<String> {
+pub(crate) fn percent_decode(text: &str) -> Option<String> {
     let bytes = text.as_bytes();
     let mut decoded = Vec::with_capacity(bytes.len());
     let mut index = 0;

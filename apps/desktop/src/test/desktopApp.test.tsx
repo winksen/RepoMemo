@@ -7,6 +7,7 @@ vi.mock("../lib/desktop", () => ({
   followPageTitle: () => () => undefined,
   saveThroughShell: vi.fn(),
   shellNotifier: {},
+  appLinks: { takePending: vi.fn(async () => null), listen: vi.fn(async () => () => undefined) },
   desktopSettings: { get: vi.fn() },
   desktopServer: { current: vi.fn(), prepare: vi.fn(), remember: vi.fn(), forget: vi.fn() },
 }));

@@ -98,6 +98,7 @@ jobs:
           }
           if (-not (Get-ChildItem $dir -Filter *.exe | Where-Object Name -ne "uninstall.exe")) { throw "the installer left no program in $dir" }
           if (-not (Test-Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\RepoMemo")) { throw "the installation is not recorded for the person" }
+          if (-not (Test-Path "HKCU:\Software\Classes\repomemo\shell\open\command")) { throw "the repomemo:// links are not registered for the person" }
           if (Test-Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\RepoMemo") { throw "the installation is recorded for the machine" }
       - name: The installed app opens
         shell: pwsh

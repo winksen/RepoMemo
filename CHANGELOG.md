@@ -2,6 +2,25 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.54 (2026-10-26)
+
+A page of the web client opens in the app: `repomemo://` links, with only the app's own pages taken.
+
+### Added
+- **The link:** `repomemo://open?server=<origin>&path=<path>`. A browser page offers **Open in the app** (in the account area, for the page being shown, and on each notice of the Notifications page), made by `appLinkFor` for the server the page talks to. The scheme is registered for the person by the installer (the per-person registry on Windows) and the app is told of a link by the system: the one running copy gets it (`tauri-plugin-single-instance` with its `deep-link` feature, `tauri-plugin-deep-link`), and a copy started by the link keeps it until the client is ready (`take_pending_link`).
+- **What the shell takes (`deeplink.rs`):** only the client's own paths (`/workspaces/...`, `/dashboard`, `/profile`, `/notifications`, `/system/...`, with a query and fragment), and only for the server the app is connected to. Everything else is refused with a reason the app shows as a toast: another host or scheme, `//`, a backslash, a control character, a `..` or an encoded slash in a part, a path over 2048 characters, a link with a login or a port, an extra parameter, a server that is not this one (the message names both), no page at all, or no server chosen yet. The client's own copy of the rules (`lib/appLink.ts`) is checked against the same cases, and its list of areas against the shell's and the router's.
+- **Tests:** four Rust tests (the paths, a good link, every refusal with its reason, no server) and `appLinks.test.tsx` (nine) and `desktopLinks.test.tsx` (four: the link the app started with, one opened while it runs, one turned away, listening stops); CI's Windows job requires the scheme registered for the person.
+
+### Changed
+- **`DesktopApp`** shows the page of a link once the client is up, and `platform` gains `opensInApp` (browser only). **The documents:** the user guide, the parity audit (links into the app are closed), the operations guide, the functional and technical mindmaps, the roadmap and the release index. **The version** is `0.4.54` everywhere.
+
+### Checks
+- **Run:** `cargo check`, `cargo clippy -p repomemo-desktop --all-targets -- -D warnings`, `cargo fmt --all`, `cargo deny check`, `typecheck`, `a11y:check`, `styles:check`, the desktop page tests (51 passed, 13 new), `container:check`, `version:check`, `docs:check`.
+- **Not run:** the Rust tests (compiled), a link from a browser into an installed app, the registration on any system. A link refused while the app has no server (a cold start) has no page to tell, so it shows nothing. A click on a system notification does not open the page: the platforms do not report it.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.4.53 (2026-10-26)
 
 A notice reaches the desktop while the app is in the background, and the icon shows what waits.

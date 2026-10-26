@@ -13,4 +13,6 @@ export const platform = {
   installedApp: isDesktopRuntime,
   /** The client can tell a person of a new notice while its window is in the background (V0.4.53). */
   nativeNotices: isDesktopRuntime,
+  /** A page can offer to be opened in the desktop app (V0.4.54): only a browser can; the app is already there. */
+  opensInApp: !isDesktopRuntime,
 };

@@ -3,6 +3,7 @@ import { IconBell as Bell, IconChevronRight as ChevronRight } from "@tabler/icon
 import { listSharedNotifications, markAllSharedNotificationsRead, markSharedNotificationRead } from "../lib/sharedApi";
 import { type Organization, type SharedNotification, type SharedSession, type SharedWorkspace } from "../types";
 import { Button } from "../components/ui/button";
+import { OpenInAppLink } from "../components/OpenInAppLink";
 import { PageHeader } from "../components/ui/page-header";
 import { EmptyState } from "../components/ui/empty-state";
 import { Pagination } from "../components/ui/pagination";
@@ -65,7 +66,7 @@ export function SharedNotifications({
     <section className="shared-page-content shared-notifications-page" aria-busy={isLoading}>
       <PageHeader actions={<Button disabled={isMutating || unreadCount === 0} onClick={() => void markAllRead()} type="button" variant="secondary">Mark all read</Button>} description={<>Task assignments and direct evidence mentions appear here. Mention a teammate with their email, for example <code>@person@example.com</code>.</>} title="Notifications" />
       <Toast kind="error" message={error} />
-      <section className="shared-notification-list" aria-label="Notifications">{notifications.length ? paging.rows.map((notification) => <article className={notification.read_at ? "" : "is-unread"} key={notification.id}><Button onClick={() => void openNotification(notification)} type="button" variant="secondary"><span className="shared-notification-icon"><Bell size={ICON_SIZE.md} /></span><span><strong>{notification.title}</strong><small>{notification.body}</small><time dateTime={notification.created_at}>{formatTime(notification.created_at)}</time></span><ChevronRight size={ICON_SIZE.md} /></Button></article>) : <EmptyState description="Assignments and evidence mentions will appear here when your team needs your attention." icon={<Bell size={25} />} title="Nothing new" />}</section>
+      <section className="shared-notification-list" aria-label="Notifications">{notifications.length ? paging.rows.map((notification) => <article className={notification.read_at ? "" : "is-unread"} key={notification.id}><Button onClick={() => void openNotification(notification)} type="button" variant="secondary"><span className="shared-notification-icon"><Bell size={ICON_SIZE.md} /></span><span><strong>{notification.title}</strong><small>{notification.body}</small><time dateTime={notification.created_at}>{formatTime(notification.created_at)}</time></span><ChevronRight size={ICON_SIZE.md} /></Button><OpenInAppLink className="shared-open-in-app" label="Open in the app" path={notification.href} /></article>) : <EmptyState description="Assignments and evidence mentions will appear here when your team needs your attention." icon={<Bell size={25} />} title="Nothing new" />}</section>
       <Pagination {...paging.props} />
     </section>
   </SharedLayout>;
