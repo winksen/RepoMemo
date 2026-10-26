@@ -1,6 +1,7 @@
 mod config;
 mod connection;
 mod files;
+mod notice;
 
 use tauri::Manager;
 
@@ -29,6 +30,8 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         // The window may call no server until one is chosen; `connection` adds the chosen one (V0.2.49).
         .plugin(tauri_plugin_http::init())
+        // System notifications and the badge of `notice` (V0.4.53).
+        .plugin(tauri_plugin_notification::init())
         .manage(Connection::default())
         .setup(|app| {
             // The administrator's file is read once, first: it decides the server and the name.
@@ -70,7 +73,9 @@ pub fn run() {
             connection::load_session,
             connection::clear_session,
             connection::open_external,
-            files::save_file
+            files::save_file,
+            notice::notify,
+            notice::set_badge
         ])
         .run(tauri::generate_context!())
         .expect("error while running RepoMemo");

@@ -76,6 +76,12 @@ export function followPageTitle(): () => void {
   return () => observer.disconnect();
 }
 
+/** System notifications and the app's badge, through the shell (V0.4.53). */
+export const shellNotifier = {
+  notify: ({ title, body }: { title: string; body: string }) => invoke<boolean>("notify", { title, body }),
+  badge: (count: number) => invoke<void>("set_badge", { count }),
+};
+
 /** The bytes of a blob (a webview has `arrayBuffer`; the older readers in a test page do not). */
 function readBytes(blob: Blob): Promise<Uint8Array> {
   if (typeof blob.arrayBuffer === "function") return blob.arrayBuffer().then((buffer) => new Uint8Array(buffer));

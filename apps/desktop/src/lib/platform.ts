@@ -11,4 +11,6 @@ export const platform = {
   choosesServer: isDesktopRuntime,
   /** The client was installed on this computer, so a version that does not fit the server's means updating it, not reloading the page. */
   installedApp: isDesktopRuntime,
+  /** The client can tell a person of a new notice while its window is in the background (V0.4.53). */
+  nativeNotices: isDesktopRuntime,
 };

@@ -2,6 +2,26 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.53 (2026-10-26)
+
+A notice reaches the desktop while the app is in the background, and the icon shows what waits.
+
+### Added
+- **`NoticeWatcher`:** shows nothing; while a person is signed in it looks at their notices every minute (the ones their own notification preferences let through, so the notices "a person chose" are exactly those), tells them of a new unread one with a **system notification** when the window is out of focus or out of sight (one notice as itself, several as a count and the first titles), and never twice. The first look after the app opens tells about nothing; it only counts.
+- **A badge for what waits:** the app's icon is marked with the unread notices plus the items waiting in Review across the person's workspaces (counted every five minutes, at most 25 workspaces; what a person snoozed does not wait). A count where the system has one (macOS, Linux), a red dot on the taskbar button on Windows, which has none; nothing when zero, and removed when the person signs out.
+- **The shell's side (`notice.rs`, `tauri-plugin-notification`):** `notify` asks for permission when it has not been given, shows the notification and answers whether it did (a person who refused gets none); the title and body are cleaned to one line without control characters, shortened and never empty. `set_badge` sets the count or the dot.
+- **`Notifier`** (`lib/notifier.ts`): the seam; a browser installs none and the watcher does nothing there, the app installs the shell's. **Tests:** two Rust tests (cleaning, the dot) and `nativeNotices.test.tsx` (ten: what a look finds, how notices are worded, the count of the queues and the focus rule; the watcher counts without telling at first, tells once from the background, stays quiet in front, counts the queues every fifth look, takes the badge away on sign-out, does nothing without a notifier).
+
+### Changed
+- **`SharedWebApp`** shows the watcher by capability (`platform.nativeNotices`). **`docs/USER_GUIDE.md`** § 13 now tells what the app adds (the set-up file, the save dialog, the notices and badge, the one window, removal). **`container:check`** holds the plugin, the commands and the watcher's three rules. **The documents:** the parity audit (the notifications row is closed), the operations guide, the functional and technical mindmaps, the roadmap and the release index. **The version** is `0.4.53` everywhere.
+
+### Checks
+- **Run:** `cargo check`, `cargo clippy -p repomemo-desktop --all-targets -- -D warnings`, `cargo fmt --all`, `cargo deny check`, `typecheck`, the desktop and notice tests (36 passed), `container:check`, `version:check`, `docs:check`.
+- **Not run:** the Rust tests (compiled), a real notification, the permission prompt, the badge on any system. Clicking a system notification does not open the page yet (the notice waits on the Notifications page); `repomemo://` links (V0.4.54) are what will let it.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.4.52 (2026-10-26)
 
 Exports and downloads save where the person chooses, in every webview.

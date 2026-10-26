@@ -6,6 +6,7 @@ vi.mock("../lib/desktop", () => ({
   installExternalLinkHandler: () => () => undefined,
   followPageTitle: () => () => undefined,
   saveThroughShell: vi.fn(),
+  shellNotifier: {},
   desktopSettings: { get: vi.fn() },
   desktopServer: { current: vi.fn(), locked: vi.fn(), prepare: vi.fn(), remember: vi.fn(), forget: vi.fn() },
 }));

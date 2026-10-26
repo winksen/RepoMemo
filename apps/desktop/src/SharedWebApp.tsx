@@ -28,6 +28,7 @@ import { LoadingCanvas } from "./web/common";
 import { AuthCanvas } from "./web/AuthCanvas";
 import { SharedProfile } from "./web/Profile";
 import { SharedNotifications } from "./web/Notifications";
+import { NoticeWatcher } from "./web/NoticeWatcher";
 import { SharedDashboard, SharedWorkspaceHome } from "./web/Dashboard";
 import { SharedWorkspaceDetail } from "./web/WorkspaceDetail";
 import { WorkspaceLanding } from "./web/WorkspaceLanding";
@@ -367,6 +368,7 @@ function SharedWebAppContent() {
   // The palette is on every signed-in page; the assistant can be started from it where one is docked.
   return <>
     <PageAnnouncer accessToken={accessToken} route={route} workspaceName={workspace?.workspace.name} />
+    {clientPlatform.nativeNotices ? <NoticeWatcher accessToken={accessToken} userId={session.user.id} workspaceIds={workspaces.map((entry) => entry.workspace.id)} /> : null}
     {renderPage()}
     <CommandPalette accessToken={accessToken} userId={session.user.id} assistantWorkspaceId={route.name === "workspace" ? route.workspaceId : null} canAdministerSystem={Boolean(session.is_system_admin || session.is_app_admin)} currentWorkspaceId={workspace ? workspace.workspace.id : null} workspaces={workspaces} />
   </>;

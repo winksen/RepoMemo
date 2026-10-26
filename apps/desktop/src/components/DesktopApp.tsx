@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { SharedWebApp } from "../SharedWebApp";
+import { setNotifier } from "../lib/notifier";
 import { setFileSaver } from "../lib/saveBlob";
 import { LoadingCanvas } from "../web/common";
-import { desktopServer, desktopSettings, followPageTitle, installExternalLinkHandler, saveThroughShell, type DesktopSettings } from "../lib/desktop";
+import { desktopServer, desktopSettings, followPageTitle, installExternalLinkHandler, saveThroughShell, shellNotifier, type DesktopSettings } from "../lib/desktop";
 import { pointAtServer } from "../lib/desktopConnection";
 import { DesktopConfigProblem } from "./DesktopConfigProblem";
 import { DesktopConnect } from "./DesktopConnect";
@@ -33,6 +34,11 @@ export function DesktopApp() {
 
   useEffect(() => installExternalLinkHandler(), []);
   useEffect(() => followPageTitle(), []);
+  // Notices and the badge go through the shell (V0.4.53).
+  useEffect(() => {
+    setNotifier(shellNotifier);
+    return () => setNotifier(null);
+  }, []);
   // Files are saved through the shell's dialog here (V0.4.52).
   useEffect(() => {
     setFileSaver(saveThroughShell);

@@ -438,6 +438,16 @@ if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge d
   if (!/VersionInfo/.test(windows) || !/a second copy of the app stayed open/.test(windows)) problems.push("the Windows desktop workflow does not look at the executable's details or start a second copy");
 }
 
+// Native notices (V0.4.53): the shell shows a notification and a badge only when asked, the client decides what to tell, and a
+// browser has no notifier.
+{
+  const shellCode = read("apps/desktop/src-tauri/src/lib.rs");
+  if (!/tauri_plugin_notification::init/.test(shellCode) || !/notice::notify/.test(shellCode) || !/notice::set_badge/.test(shellCode)) problems.push("the shell does not register the notification plugin and the notice and badge commands");
+  const watcher = read("apps/desktop/src/web/NoticeWatcher.tsx");
+  if (!/currentNotifier\(\)/.test(watcher) || !/windowIsInBackground\(\)/.test(watcher) || !/badge\(0\)/.test(watcher)) problems.push("the notice watcher must do nothing without a notifier, notify only from the background and take the badge away when it stops");
+  if (!/nativeNotices \? <NoticeWatcher/.test(read("apps/desktop/src/SharedWebApp.tsx"))) problems.push("the notice watcher is not shown by capability (platform.nativeNotices)");
+}
+
 // The page of a release is written from the changelog (V0.4.39): the workflow that makes the release uses the script, never a
 // sentence typed into it, and the script lists what a release holds.
 {
