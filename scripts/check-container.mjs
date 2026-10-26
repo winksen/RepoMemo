@@ -546,6 +546,18 @@ if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge d
   }
 }
 
+// Where the app keeps its files (V0.4.61): the page for administrators names every file and flag the code uses, on all three systems,
+// and says the app writes no log of its own, which stays true while no logging plugin is linked.
+{
+  const page = read("docs/DESKTOP_FILES.md");
+  for (const needle of ["repomemo-desktop.json", "server.json", ".window-state.json", "--forget-session", "com.repomemo.desktop", "%APPDATA%", "~/Library/Application Support", "~/.config", "Credential Manager", "Keychain", "Secret Service", "RepoMemo\\uninstall.exe"]) {
+    if (!page.includes(needle)) problems.push(`docs/DESKTOP_FILES.md does not mention ${needle}`);
+  }
+  const connection = read("apps/desktop/src-tauri/src/connection.rs");
+  if (!connection.includes('SERVER_FILE: &str = "server.json"') || !connection.includes('KEYRING_SERVICE: &str = "RepoMemo"')) problems.push("the saved server file or the credential store's service changed: docs/DESKTOP_FILES.md describes server.json and RepoMemo");
+  if (!existsSync("docs/DESKTOP_FILES.md") || /tauri[-_]plugin[-_]log/.test(read("apps/desktop/src-tauri/Cargo.toml"))) problems.push("the app links a logging plugin, so docs/DESKTOP_FILES.md is wrong to say it writes no log");
+}
+
 // The parity check of the desktop app (V0.4.58) runs in CI with its tests, and its list exists.
 {
   if (!/node scripts\/check-desktop\.mjs/.test(ci) || !/check-desktop\.test\.mjs/.test(ci)) problems.push("CI does not run the desktop parity check and its tests");

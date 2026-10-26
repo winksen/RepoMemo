@@ -2,6 +2,25 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.61 (2026-10-26)
+
+An administrator can find, change and remove everything the app keeps on a computer, on Windows, macOS and Linux.
+
+### Added
+- **`docs/DESKTOP_FILES.md`:** for each system, where the program, the configuration folder, the saved session and the web view's own data are; what is in the configuration folder (`repomemo-desktop.json`, `server.json`, `.window-state.json`) and who writes each; and how to find what a machine is set up for, change the server, remove the saved sign-in without removing the app (`--forget-session`, or `cmdkey`, `security` or `secret-tool` by hand), remove the app and reset the page's own choices.
+- **About logs, said plainly:** the app writes none of its own; a bad configuration file, an unreachable server, a refused link or a failed update is shown as a sentence on the page, and the server's *System › Logs*, *System › Overview* (which lists the client as `desktop`) and audit trail are where a connection problem is answered. A Linux program started from a terminal prints what it prints.
+- **Links** from the development commands and the user guide.
+
+### Changed
+- **`container:check`** requires the page to name every file and flag the code uses and the three systems' places, checks that the saved-server file name and the credential-store service the page describes are the code's, and fails if a logging plugin is ever linked while the page says there is no log. **The documents:** the operations guide, the technical mindmap, the roadmap and the release index. **The version** is `0.4.61` everywhere.
+
+### Checks
+- **Run:** `container:check`, `version:check`, `docs:check`.
+- **Not run:** nothing was looked at on a Mac or a Linux machine. The places for the web view's data and the credential entries' exact names are the operating systems' and the library's defaults for the app's identifier, written from their documentation, not found on a machine: look at one before scripting against them.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.4.60 (2026-10-26)
 
 CI builds the desktop app for macOS: one universal .dmg, signed and notarized when the credentials exist.

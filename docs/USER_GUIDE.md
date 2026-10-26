@@ -381,6 +381,7 @@ What the app adds to the pages of the browser:
 - **Open a page in the app from the browser.** In a browser, the account area and each notice carry **Open in the app**: it hands the page to the desktop app, which shows the same page on the same server. The app opens only RepoMemo's own pages for the server it is connected to, and tells you when it turns a link away.
 - **One window, where you left it.** Starting the app again brings the open window to the front; it comes back at the size and place you left it, and its title bar names the page and the workspace you are on.
 - **Updates.** When your administrator has set up an update feed, the app tells you when a newer version is ready and installs it only when you say so. Otherwise, **Check for updates** in the account area (when your app can) looks at RepoMemo's releases, once a start, if you turn it on. An update that is not properly signed is refused.
+- **Where it keeps things.** Your sign-in is in your computer's secure store, the app's settings in a small folder of your account; your administrator's guide ([DESKTOP_FILES.md](DESKTOP_FILES.md)) lists where, on each system, and how to clear them.
 - **Removing it.** The uninstaller asks whether to also forget the server and the sign-in saved on this computer.
 
 ---

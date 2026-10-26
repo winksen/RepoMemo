@@ -79,6 +79,11 @@ key and its password as the repository secrets `TAURI_SIGNING_PRIVATE_KEY` and `
 text in the repository variable `REPOMEMO_UPDATE_PUBKEY`, which CI passes to the build and which decides whether a tag publishes the signed
 update. A build without it never looks at the project's releases.
 
+## Where The Desktop App Keeps Its Files
+
+The configuration folder, the saved session, the web view's data and the (absent) logs, on each system, and how to find, change and remove each:
+[DESKTOP_FILES.md](DESKTOP_FILES.md) (V0.4.61).
+
 ## The Desktop App On Linux
 
 The *Desktop Linux* workflow (V0.4.59; run it by hand from the Actions page, or take a tag's) builds on Ubuntu 22.04 and keeps the artifact

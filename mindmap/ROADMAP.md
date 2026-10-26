@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.4.60` (2026-10-26), after `V0.3.0` *Connected*, released after the maintainer's tests of the clean install (R6, R12) · **Next:** [the 0.4.x line, preparation for deployment](#-the-04x-line-preparation-for-deployment), `V0.4.61` onward (the 0.3.x line, [Road to V0.4.0](#-road-to-v040), is built and closed; the [plan](plans/2026-10-25-deployment.md) and [RELEASES_0.4.md](RELEASES_0.4.md) are written) · **Built before the tag:** tracks K to N (V0.2.57–V0.2.193) · **Next minor after the 0.4.x line:** its theme to be chosen (single sign-on is the candidate)
+> **Current version:** `V0.4.61` (2026-10-26), after `V0.3.0` *Connected*, released after the maintainer's tests of the clean install (R6, R12) · **Next:** [the 0.4.x line, preparation for deployment](#-the-04x-line-preparation-for-deployment), `V0.4.62` onward (the 0.3.x line, [Road to V0.4.0](#-road-to-v040), is built and closed; the [plan](plans/2026-10-25-deployment.md) and [RELEASES_0.4.md](RELEASES_0.4.md) are written) · **Built before the tag:** tracks K to N (V0.2.57–V0.2.193) · **Next minor after the 0.4.x line:** its theme to be chosen (single sign-on is the candidate)
 > **Feature freeze (V0.1.76 to the `v0.3.0` tag):** lifted by the tag on 2026-10-24. The 0.3.x releases follow the rules of [Road to V0.4.0](#-road-to-v040).
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Security review 2026-10-16 (V0.2.52)](security/2026-10-16-security-review.md) · [Security and backend review 2026-10-21 (V0.2.129)](security/2026-10-21-security-review.md) · [Security review of workspace templates 2026-10-22 (V0.2.192)](security/2026-10-22-workspace-templates-security-review.md) · [Security review of 0.3.x 2026-10-24 (V0.3.26)](security/2026-10-24-0.3-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -1490,7 +1490,7 @@ One box per release, added as each release is built. Say what was built and what
 
 ## 🎯 The 0.4.x line: preparation for deployment
 
-> **Status:** proposed and opened on 2026-10-25 by `V0.4.0`, replacing the theme recorded in V0.3.27 (single sign-on, which stays the candidate for a later line). The maintainer chose it: RepoMemo should be deployable from this repository **directly on a server or in containers, containers preferred and tested**, with the API (Rust, its database and its files) and the web client (React) as separate containers, and the **desktop app** resumed as the web client's own UI and components, talking to the API directly, installable, **Windows first**, then Linux and macOS. The plan is [plans/2026-10-25-deployment.md](plans/2026-10-25-deployment.md); every release is in [RELEASES_0.4.md](RELEASES_0.4.md). Decisions 33–40 are proposed there and in the table above; built one by one from `V0.4.1`, 60 of 67 so far.
+> **Status:** proposed and opened on 2026-10-25 by `V0.4.0`, replacing the theme recorded in V0.3.27 (single sign-on, which stays the candidate for a later line). The maintainer chose it: RepoMemo should be deployable from this repository **directly on a server or in containers, containers preferred and tested**, with the API (Rust, its database and its files) and the web client (React) as separate containers, and the **desktop app** resumed as the web client's own UI and components, talking to the API directly, installable, **Windows first**, then Linux and macOS. The plan is [plans/2026-10-25-deployment.md](plans/2026-10-25-deployment.md); every release is in [RELEASES_0.4.md](RELEASES_0.4.md). Decisions 33–40 are proposed there and in the table above; built one by one from `V0.4.1`, 61 of 67 so far.
 
 ### What this line is
 
@@ -1598,7 +1598,7 @@ One box per release, added as each release is built. Say what was built and what
 | **V0.4.58** ✅ | 🔧 | Desktop | A parity check (`npm run desktop:check`): no desktop-only component or stylesheet outside a short list, in CI with the other checks | H58 | Adding a desktop-only screen fails the check until it is listed with a reason |
 | **V0.4.59** ✅ | ✨ | Desktop | Linux builds: AppImage and `.deb` from CI, the system libraries listed; the same preset and configuration file | H59 | CI uploads both and the AppImage opens the app on a clean Ubuntu |
 | **V0.4.60** ✅ | ✨ | Desktop | macOS builds: a universal `.dmg` from CI, signing and notarization when the secrets exist; the same preset and configuration file | H60 | CI uploads a `.dmg` that opens the app |
-| **V0.4.61** | 📘 | Desktop | Where each system keeps the app's configuration, its saved session and its logs, written for administrators | H61 | An administrator can find, change and remove each of them |
+| **V0.4.61** ✅ | 📘 | Desktop | Where each system keeps the app's configuration, its saved session and its logs, written for administrators | H61 | An administrator can find, change and remove each of them |
 
 #### Track AB: Documents, security and closing (V0.4.62–V0.4.67)
 
@@ -1676,6 +1676,7 @@ One box per release, added as each release is built. Say what was built and what
 - [x] **V0.4.58** the desktop parity check (H58). Done: `scripts/check-desktop.mjs`, `apps/desktop/desktop-only.json` (12 files, 2 styles), `check-desktop.test.mjs` (6 passed), the CI steps, `container:check` rules; the audit's own list and its test removed. **Not run:** CI
 - [x] **V0.4.59** Linux builds (H59). Done: `.github/workflows/desktop-linux.yml`, the `.deb` dependency and the build commands without `npm.cmd`, the libraries documented, `container:check` rules; cargo check reads the configuration. **Not run:** the workflow, either package, the app on Linux; arm64 and Linux updates left out
 - [x] **V0.4.60** macOS builds (H60). Done: `.github/workflows/desktop-macos.yml`, `tauri.adhoc.conf.json`, the minimum macOS version, the guidance for credentials and Gatekeeper, `container:check` rules; cargo check reads the configuration. **Not run:** the workflow, the .dmg, signing or notarization, a Mac; no Apple credentials exist yet
+- [x] **V0.4.61** where the app keeps its files (H61). Done: `docs/DESKTOP_FILES.md`, links from the development commands and the user guide, `container:check` rules. **Not looked at on a Mac or a Linux machine:** the web view's folders and the credential entries' names are the systems' defaults, written from documentation
 
 ---
 
