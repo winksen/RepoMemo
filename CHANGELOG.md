@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.37 (2026-10-26)
+
+A tag publishes the images to the registry.
+
+### Added
+- **`.github/workflows/release-images.yml`:** on a `v*` tag, and by hand (which builds and pushes nothing), never on a pull request or a push to a branch. A first job checks that the tag is `v` plus the version and runs the version, container, migration, documentation and template checks. Then the **four images** (server, converter, edge and web; the plan said three, but the Dockerfile has four stages that carry the labels) are built **natively** for `amd64` (`ubuntu-latest`) and `arm64` (`ubuntu-24.04-arm`), with the commit, date and version as build arguments, and pushed to `ghcr.io/<owner>/repomemo-<name>` under an architecture tag.
+- **One name for both:** a second job per image, only on a tag, joins the two into one multi-architecture image named **`X.Y.Z`, `X.Y` and `latest`** (`docker buildx imagetools create`) and checks that both `linux/amd64` and `linux/arm64` are in it. The two architecture tags stay on the registry because the joined image refers to them.
+
+### Changed
+- **`container:check`** holds the tag rule, the five checks that run first, the two architectures on native runners, the four images, the three names, push on a tag only and `packages: write` in the two jobs that push and nowhere else. **The documents:** the operations guide, the technical mindmap, the roadmap and the release index. **The version** is `0.4.37` everywhere.
+
+### Checks
+- **Run:** `container:check`, `version:check`, `docs:check`.
+- **Not run:** the workflow (a manual run from the Actions page builds the eight images and pushes none; pushing and naming happen only on the first tag). The package visibility on GHCR is the maintainer's to set after the first push.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.4.36 (2026-10-25)
 
 An older server refuses a database from a newer release, and a guide to upgrade and roll back.

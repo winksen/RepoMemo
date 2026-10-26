@@ -312,6 +312,30 @@ if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge d
   }
 }
 
+// The images on the registry (V0.4.37): a v* tag runs the checks, builds the four images natively for both architectures and
+// gives each one name under X.Y.Z, X.Y and latest. A pull request or a branch publishes nothing, and only the two jobs that
+// push may write packages.
+{
+  const release = workflows.find(([name]) => name === "release-images.yml")?.[1] ?? "";
+  if (!release) problems.push(".github/workflows/release-images.yml is missing");
+  else {
+    if (!/tags:\s*\["v\*"\]/.test(release) || /pull_request/.test(release)) problems.push("the release images workflow must run on a v* tag (or by hand) and never on a pull request");
+    if (!/test "\$\{GITHUB_REF_NAME\}" = "v\$\(node -p/.test(release)) problems.push("the release images workflow does not require the tag to be the version");
+    for (const check of ["set-version.mjs --check", "check-container.mjs", "check-migrations.mjs", "check-docs.mjs", "check-templates.mjs"]) {
+      if (!release.includes(check)) problems.push(`the release images workflow does not run ${check} before building`);
+    }
+    for (const arch of ["{ name: amd64, runner: ubuntu-latest }", "{ name: arm64, runner: ubuntu-24.04-arm }"]) {
+      if (!release.includes(arch)) problems.push(`the release images are not built natively for ${arch}`);
+    }
+    for (const image of ["{ name: server, target: server }", "{ name: converter, target: converter }", "{ name: edge, target: edge }", "{ name: web, target: webapp }"]) {
+      if (!release.includes(image)) problems.push(`the release images workflow does not build ${image}`);
+    }
+    if (!release.includes('--tag "${name}:${version}" --tag "${name}:${minor}" --tag "${name}:latest"')) problems.push("the release images are not named X.Y.Z, X.Y and latest");
+    if (!release.includes('if [ "${GITHUB_REF_TYPE}" = "tag" ]') || !/^  manifest:\n[\s\S]*?if: startsWith\(github\.ref, 'refs\/tags\/v'\)/m.test(release)) problems.push("only a tag may push an image or name it");
+    if (/^permissions:\s*\n\s+(contents|packages):\s*write/m.test(release) || (release.match(/packages: write/g) ?? []).length !== 2) problems.push("only the build and manifest jobs may write packages");
+  }
+}
+
 // Front doors for a direct install (V0.4.34): one page, a Caddyfile and an nginx file for the server on 127.0.0.1:3020, both
 // validated in CI by the programs themselves.
 {
