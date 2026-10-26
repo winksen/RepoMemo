@@ -2,6 +2,26 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.38 (2026-10-26)
+
+Each published image says who built it and what is in it, and anyone can check.
+
+### Added
+- **A signed build attestation per image:** after the two architectures are joined, the `release-images` workflow signs a SLSA provenance statement for the joined image's digest (`actions/attest-build-provenance`, keyless, with GitHub's workflow identity and Sigstore) and keeps it with the image on the registry. It names the repository, the workflow file, the commit and the tag.
+- **A signed SBOM per image:** the scanner already used by CI (Trivy, pinned by digest) reads the pushed image and writes an SPDX document, which `actions/attest-sbom` signs and keeps with the image.
+- **`docs/VERIFYING_IMAGES.md`:** how to verify an image with `gh attestation verify` (and `--predicate-type https://spdx.dev/Spdx` to read the SBOM), the same with `cosign verify-attestation`, what a valid attestation does and does not say, and to deploy by digest.
+
+### Changed
+- **Keyless signing is the signing:** the image itself is not signed with a second tool; the signed statements are bound to its digest. Only the join job has `id-token: write` and `attestations: write`.
+- **`container:check`** holds the two pinned attestation actions, the registry copy of both, the scanner pinned by digest, the sole signing job and the guide's commands. **The documents:** the operations guide, the technical mindmap, the roadmap and the release index. **The version** is `0.4.38` everywhere.
+
+### Checks
+- **Run:** `container:check`, `version:check`, `docs:check`.
+- **Not run:** the workflow, so no attestation has been made or verified. Attestations to a private repository's packages need a plan that supports them; the first tag shows it.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.4.37 (2026-10-26)
 
 A tag publishes the images to the registry.

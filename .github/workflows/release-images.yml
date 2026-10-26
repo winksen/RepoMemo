@@ -1,6 +1,8 @@
 # The images on the registry (V0.4.37): on a v* tag the checks run, then the four images (server, converter, edge, web) are
 # built natively for amd64 and arm64 and pushed to GHCR as X.Y.Z, X.Y and latest. A pull request or a push to a branch
 # publishes nothing; a manual run builds everything and pushes nothing.
+# Provenance (V0.4.38): each joined image gets a signed build attestation and a signed SBOM (SPDX), both kept with the image
+# on the registry and verifiable with `gh attestation verify` (docs/VERIFYING_IMAGES.md).
 name: Release images
 
 on:
@@ -13,6 +15,7 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
+  TRIVY_IMAGE: ghcr.io/aquasecurity/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa
 
 jobs:
   checks:
@@ -83,6 +86,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: One name for both architectures, under X.Y.Z, X.Y and latest
@@ -101,3 +106,29 @@ jobs:
           docker buildx imagetools inspect "${name}:${version}" | tee inspect.txt
           grep -q "linux/amd64" inspect.txt
           grep -q "linux/arm64" inspect.txt
+          echo "digest=$(docker buildx imagetools inspect "${name}:${version}" --format '{{ .Manifest.Digest }}')" >> "$GITHUB_OUTPUT"
+          echo "name=${name}" >> "$GITHUB_OUTPUT"
+        id: joined
+      - name: The SBOM (SPDX), read from the pushed image
+        env:
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          docker run --rm --env TRIVY_USERNAME --env TRIVY_PASSWORD \
+            --volume "$PWD:/work" --workdir /work \
+            "$TRIVY_IMAGE" image --format spdx-json --output /work/sbom.spdx.json \
+            "${{ steps.joined.outputs.name }}@${{ steps.joined.outputs.digest }}"
+          test -s sbom.spdx.json
+      - name: Sign the build attestation (keyless) and keep it with the image
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ steps.joined.outputs.name }}
+          subject-digest: ${{ steps.joined.outputs.digest }}
+          push-to-registry: true
+      - name: Sign the SBOM (keyless) and keep it with the image
+        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
+        with:
+          subject-name: ${{ steps.joined.outputs.name }}
+          subject-digest: ${{ steps.joined.outputs.digest }}
+          sbom-path: sbom.spdx.json
+          push-to-registry: true

@@ -336,6 +336,23 @@ if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge d
   }
 }
 
+// Provenance (V0.4.38): each joined image gets a signed build attestation and a signed SBOM, kept with the image, and the
+// page that says how to verify them exists.
+{
+  const release = workflows.find(([name]) => name === "release-images.yml")?.[1] ?? "";
+  if (release) {
+    if (!/uses: actions\/attest-build-provenance@[0-9a-f]{40}/.test(release) || !/uses: actions\/attest-sbom@[0-9a-f]{40}/.test(release)) problems.push("the release images workflow does not attest the build and the SBOM");
+    if ((release.match(/push-to-registry: true/g) ?? []).length !== 2) problems.push("the attestations are not kept with the image on the registry");
+    if (!/spdx-json/.test(release) || !/TRIVY_IMAGE: ghcr\.io\/aquasecurity\/trivy:[^@\s]+@sha256:[0-9a-f]{64}/.test(release)) problems.push("the SBOM is not made by a scanner pinned by digest");
+    const manifestJob = release.slice(release.indexOf("\n  manifest:"));
+    if (!/id-token: write/.test(manifestJob) || !/attestations: write/.test(manifestJob) || (release.match(/id-token: write/g) ?? []).length !== 1) problems.push("only the manifest job may sign (id-token and attestations write)");
+  }
+  const guide = read("docs/VERIFYING_IMAGES.md");
+  for (const needle of ["gh attestation verify", "cosign verify-attestation", "spdx.dev/Spdx", "by digest"]) {
+    if (!guide.includes(needle)) problems.push(`docs/VERIFYING_IMAGES.md lacks ${needle}`);
+  }
+}
+
 // Front doors for a direct install (V0.4.34): one page, a Caddyfile and an nginx file for the server on 127.0.0.1:3020, both
 // validated in CI by the programs themselves.
 {
