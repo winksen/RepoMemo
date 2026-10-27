@@ -40,6 +40,7 @@ import { Field } from "../../components/ui/field";
 import { Input } from "../../components/ui/input";
 import { SearchField } from "../../components/ui/search-field";
 import { LoadingState } from "../../components/ui/loading-state";
+import { Dropdown } from "../../components/ui/dropdown";
 import { Tooltip } from "../../components/ui/tooltip";
 import { showToast } from "../../components/ui/toast";
 import { appLink, SecretDialog } from "../../components/SecretDialog";
@@ -88,15 +89,20 @@ type UserAction = { kind: "grant" | "revoke" | "grant-app" | "revoke-app" | "sig
 export function UsersSection({ accessToken, session }: { accessToken: string; session: SharedSession }) {
   const [users, isLoading, reload] = useSystemData<SystemUser[]>(systemKeys.users(), () => listSystemUsers(accessToken));
   const [filter, setFilter] = useState("");
+  const [sort, setSort] = useState("name");
   const [pending, setPending] = useState<UserAction | null>(null);
   const [resetLink, setResetLink] = useState<{ user: SystemUser; url: string; expiresAt: string } | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [confirmText, setConfirmText] = useState("");
   const visible = useMemo(() => {
     const needle = filter.trim().toLowerCase();
-    return (users ?? []).filter((user) => !needle || user.display_name.toLowerCase().includes(needle) || user.email.toLowerCase().includes(needle));
-  }, [users, filter]);
-  const paging = usePagedList(visible, filter);
+    return (users ?? []).filter((user) => !needle || user.display_name.toLowerCase().includes(needle) || user.email.toLowerCase().includes(needle)).sort((left, right) => {
+      if (sort === "joined") return right.created_at.localeCompare(left.created_at) || left.id.localeCompare(right.id);
+      if (sort === "connected") return (right.last_connected_at ?? "").localeCompare(left.last_connected_at ?? "") || left.id.localeCompare(right.id);
+      return left.display_name.localeCompare(right.display_name) || left.email.localeCompare(right.email);
+    });
+  }, [users, filter, sort]);
+  const paging = usePagedList(visible, `${filter}:${sort}`);
 
   async function confirm() {
     if (!pending) return;
@@ -155,10 +161,11 @@ export function UsersSection({ accessToken, session }: { accessToken: string; se
   return <>
     <div className="rm-system-toolbar">
       <SearchField aria-label="Filter users" onValueChange={setFilter} placeholder="Filter by name or email" value={filter} />
+      <Dropdown aria-label="Sort users" onValueChange={setSort} options={[{ label: "Name A–Z", value: "name" }, { label: "Recently connected", value: "connected" }, { label: "Newest joined", value: "joined" }]} value={sort} />
       <RefreshButton isLoading={isLoading} onClick={() => void reload()} />
     </div>
     {users ? <>
-    <Table>
+    <Table className="rm-dense-table rm-users-table">
       <thead><tr><th scope="col">Person</th><th scope="col">Role</th><th scope="col">Organizations and workspaces</th><th scope="col">Sessions</th><th scope="col">Last connected</th><th scope="col">Joined</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
       <tbody>{paging.rows.map((user) => <tr className={user.deactivated_at ? "rm-system-row-inactive" : undefined} key={user.id}>
         <th scope="row"><span className="rm-system-person"><UserAvatar name={user.display_name} size={32} userId={user.id} /><span><strong>{user.display_name}{user.id === session.user.id ? " (you)" : ""}</strong><small>{user.email}</small>{user.deactivated_at ? <small><Tooltip content={`Deactivated ${formatTime(user.deactivated_at)}`}><Badge icon={<UserOff size={ICON_SIZE.sm} />} tone="warning">{user.anonymized_at ? "Anonymized" : "Deactivated"}</Badge></Tooltip></small> : null}</span></span></th>

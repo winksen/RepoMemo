@@ -57,7 +57,7 @@ export function JobsSection({ accessToken, canChange }: { accessToken: string; c
         <RefreshButton isLoading={isLoading} onClick={() => void reload()} />
       </div>
       {jobs?.length ? <>
-      <Table>
+      <Table className="rm-dense-table rm-jobs-table">
         <thead><tr><th scope="col">Kind</th><th scope="col">Workspace</th><th scope="col">Status</th><th scope="col">Progress</th><th scope="col">Started</th><th scope="col">Updated</th><th scope="col">Detail</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
         <tbody>{jobs.map((job) => <tr key={job.id}>
           <th scope="row">{(job.kind ?? "indexing").replace(/_/g, " ")}</th>

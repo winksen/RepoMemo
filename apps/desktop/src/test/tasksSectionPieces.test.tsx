@@ -59,4 +59,14 @@ describe("tasks on the shared pieces", () => {
     renderTasks();
     expect(screen.getByRole("button", { name: "Delete Fix login" }).className).toContain("rm-icon-button");
   });
+
+  it("sorts visible tasks by priority and lets the user choose title order", () => {
+    data.tasks = [{ ...task, id: "t2", title: "Alpha", priority: "low" }, { ...task, id: "t3", title: "Zulu", priority: "urgent" }];
+    renderTasks();
+    expect(screen.getByRole("combobox", { name: "Sort tasks" })).toBeTruthy();
+    expect(Array.from(document.querySelectorAll(".shared-task-card h4"), (title) => title.textContent)).toEqual(["Zulu", "Alpha"]);
+    cleanup();
+    renderTasks(new Map<string, unknown>([["tasks.taskSort", "title"]]));
+    expect(Array.from(document.querySelectorAll(".shared-task-card h4"), (title) => title.textContent)).toEqual(["Alpha", "Zulu"]);
+  });
 });

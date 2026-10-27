@@ -119,6 +119,23 @@ th > .rm-badge,
 .rm-table td { font-variant-numeric: tabular-nums; }
 .rm-table tbody tr:hover { background: var(--color-surface-2); }
 .rm-table .rm-table-number { text-align: right; font-variant-numeric: tabular-nums; }
+.rm-dense-table .rm-table { table-layout: fixed; }
+.rm-dense-table .rm-table th,
+.rm-dense-table .rm-table td { min-width: 0; overflow-wrap: anywhere; }
+.rm-dense-table .rm-table th:last-child,
+.rm-dense-table .rm-table td:last-child { width: 64px; text-align: right; }
+.rm-dense-table .rm-table td:last-child .rm-button { min-width: 0; }
+.rm-jobs-table .rm-table th:nth-child(4),
+.rm-jobs-table .rm-table td:nth-child(4) { width: 95px; }
+.rm-jobs-table .rm-table th:nth-child(5),
+.rm-jobs-table .rm-table th:nth-child(6),
+.rm-jobs-table .rm-table td:nth-child(5),
+.rm-jobs-table .rm-table td:nth-child(6) { width: 120px; }
+.rm-users-table .rm-table th:first-child { width: 21%; }
+.rm-users-table .rm-table th:nth-child(3) { width: 25%; }
+.rm-users-table .rm-table th:nth-child(4) { width: 70px; }
+.rm-users-table .rm-table th:nth-child(5),
+.rm-users-table .rm-table th:nth-child(6) { width: 115px; }
 
 /* Combobox: a dropdown-looking trigger and a popover with a search field and a list of matches. */
 .rm-combobox-trigger { width: 100%; }

@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.88 (2026-10-27)
+
+Dense evidence and System views keep long values and actions readable.
+
+### Changed
+- Evidence list rows show and wrap full paths, align selection, keep actions visible and state their newest-first order.
+- Jobs and users tables use bounded columns and wrap long values; user sorting covers name, recent connection and join date.
+- Task cards keep actions in a consistent position and support priority, due-date and title sorting.
+
+### Checks
+- Focused evidence, tasks and System component tests, TypeScript, styles, version and layout checks pass.
+
+### Upgrading
+- No migration is required.
+
 ## V0.4.87 (2026-10-27)
 
 Search results are easier to compare and include evidence state.
